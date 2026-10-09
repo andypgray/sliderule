@@ -1,0 +1,119 @@
+using Shouldly;
+using Xunit;
+using SlideRule.Codebase;
+
+namespace SlideRule.Tests.Extraction;
+
+/// <summary>
+///     Top-level statements (a synthesized <c>Program</c> entry point) on the extraction fast path. The
+///     simple-program <c>Program</c> is not implicitly declared on this Roslyn, so it is admitted like any
+///     solution type, its top-level-statement references bind to it, and the <c>ReferenceWalker</c> descent
+///     boundary keeps a sibling type declared in the same file from being misattributed to it. These pins
+///     hold that behavior in place.
+/// </summary>
+public sealed class TopLevelProgramExtractionTests
+{
+    // A single file: top-level statements calling Worker.Start(), then two sibling types in the same file.
+    // Worker.Start() in turn calls Gadget.Spin() — an edge that must stay Worker's, never Program's.
+    private static readonly CodebaseModel Model = CompilationFactory.ExtractConsoleApp(("Program.cs", """
+                                                                                                      using N;
+
+                                                                                                      Worker.Start();
+
+                                                                                                      namespace N
+                                                                                                      {
+                                                                                                          public static class Worker
+                                                                                                          {
+                                                                                                              public static void Start()
+                                                                                                              {
+                                                                                                                  Gadget.Spin();
+                                                                                                              }
+                                                                                                          }
+
+                                                                                                          public static class Gadget
+                                                                                                          {
+                                                                                                              public static void Spin()
+                                                                                                              {
+                                                                                                              }
+                                                                                                          }
+                                                                                                      }
+                                                                                                      """));
+
+    [Fact]
+    public void TopLevelStatements_SynthesizedProgram_ExtractsAsSolutionType()
+    {
+        TypeNode program = Model.Type("Program");
+
+        program.IsExternal.ShouldBeFalse();
+        program.ProjectName.ShouldBe("TestProject");
+        program.Kind.ShouldBe(TypeKind.Class);
+    }
+
+    [Fact]
+    public void TopLevelStatements_ReferenceFromTopLevelCode_MintsAnEdgeFromProgram()
+    {
+        // `Worker.Start();` is a top-level statement, so the edge is attributed to the synthesized Program.
+        Model.HasEdge("Program", "N.Worker")
+            .ShouldBeTrue();
+        Model.Edge("Program", "N.Worker")
+            .Sites.Lines()
+            .ShouldBe([3]);
+    }
+
+    [Fact]
+    public void TopLevelStatements_SiblingTypeInSameFile_KeepsItsOwnEdgesNotProgramS()
+    {
+        // Gadget.Spin() is called from Worker.Start(), not from top-level code: the edge is Worker's, and
+        // Program must NOT pick it up even though Worker is declared in Program's own compilation unit.
+        Model.HasEdge("N.Worker", "N.Gadget")
+            .ShouldBeTrue();
+        Model.HasEdge("Program", "N.Gadget")
+            .ShouldBeFalse();
+    }
+
+    [Fact]
+    public void TopLevelStatements_SynthesizedProgram_HasEmptyDeclarationSites()
+    {
+        // Pinned so a change is deliberate: Program's declaring syntax is the CompilationUnitSyntax, which
+        // carries no type identifier, so no declaration site is recorded.
+        TypeNode program = Model.Type("Program");
+        program.DeclarationSites.ShouldBeEmpty();
+        program.FilePaths.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void TopLevelStatements_SynthesizedEntryPoint_IsNotInventoried()
+    {
+        // `<Main>$` has no source-writable name, so it is not authored surface and no member subject may
+        // reach it (GRAMMAR §4.6) — otherwise a naming law over a project noun goes red on a name no author
+        // can change. The enclosing Program type stays inventoried: its name IS writable.
+        TypeNode program = Model.Type("Program");
+
+        program.Members.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void TopLevelStatements_FileLevelDirectivesAndAssemblyAttributes_AreNotAttributedToProgram()
+    {
+        // Program's declaring syntax is the whole compilation unit, so its walk starts above the file's using
+        // directives and global attribute lists. In any other file those belong to no type, and Program is no
+        // exception: only its statements are its code. The bare Abs call still reaches Math through the
+        // using static, at the statement's line alone.
+        CodebaseModel model = CompilationFactory.ExtractConsoleApp(("Program.cs", """
+                                                                                  using static System.Math;
+                                                                                  using Builder = System.Text.StringBuilder;
+
+                                                                                  [assembly: System.Reflection.AssemblyDescription("probe")]
+
+                                                                                  int magnitude = Abs(-1);
+                                                                                  """));
+
+        model.HasEdge("Program", "System.Text.StringBuilder")
+            .ShouldBeFalse();
+        model.HasEdge("Program", "System.Reflection.AssemblyDescriptionAttribute")
+            .ShouldBeFalse();
+        model.Edge("Program", "System.Math")
+            .Sites.Lines()
+            .ShouldBe([6]);
+    }
+}

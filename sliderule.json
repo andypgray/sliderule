@@ -1,0 +1,22 @@
+{
+  "solution": "SlideRule.slnx",
+  "spec": "arch/SlideRule.Architecture/SlideRule.Architecture.csproj",
+  "render": {
+    "model": true,
+    "diagram": {
+      "path": "ARCHITECTURE.md",
+      "only": [
+        "SlideRule",
+        "SlideRule.Analyzers",
+        "SlideRule.Cli",
+        "SlideRule.Xunit",
+        "SlideRule.Extraction",
+        "SlideRule.Packs.DotNet",
+        "SlideRule.Roslyn",
+        "SlideRule.SpecAnalyzers",
+        "SlideRule.SpecCompletion",
+        "SlideRule.Architecture"
+      ]
+    }
+  }
+}

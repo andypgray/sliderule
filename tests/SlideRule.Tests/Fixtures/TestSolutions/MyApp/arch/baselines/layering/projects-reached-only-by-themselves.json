@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 2,
+  "rules": {
+    "layering/projects-reached-only-by-themselves": {
+      "entries": [
+        { "source": "T:MyApp.Domain.OrderService", "target": "T:MyApp.Web.HomeController", "siteCount": 3, "seal": "53faa9b073416cda" },
+        { "source": "T:MyApp.Domain.OrderService", "target": "T:MyApp.Web.WebTextExtensions", "siteCount": 1, "seal": "c45c51b23c603606" },
+        { "source": "T:MyApp.Web.HomeController", "target": "T:MyApp.Legacy.Billing.IBillingFacade", "siteCount": 2, "seal": "e66441b85daff60b" },
+        { "source": "T:MyApp.Web.InvoiceController", "target": "T:MyApp.Legacy.Billing.BillingCalculator", "siteCount": 2, "seal": "804f8263cc5f73a9" },
+        { "source": "T:MyApp.Web.InvoiceController", "target": "T:MyApp.Legacy.Billing.RoundingMode", "siteCount": 1, "seal": "175437a172843c9e" }
+      ]
+    }
+  }
+}

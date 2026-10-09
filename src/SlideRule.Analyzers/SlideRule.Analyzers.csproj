@@ -1,0 +1,105 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <!-- netstandard2.0 because the compiler loads this assembly into whatever process is building the
+             project — csc on the command line, the compiler server, Visual Studio on .NET Framework — and
+             only netstandard2.0 loads in all of them. LangVersion 13.0 is pinned for the same reason as
+             Core's: netstandard2.0 otherwise defaults to C# 7.3. -->
+        <TargetFramework>netstandard2.0</TargetFramework>
+        <LangVersion>13.0</LangVersion>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+
+        <!-- Makes the banned-API rule an enforced gate: an analyzer runs inside the compiler, where there
+             is no console, no current directory and no clock worth reading, and a call to one of them is
+             an error here rather than a warning nobody sees. -->
+        <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+
+        <IsRoslynComponent>true</IsRoslynComponent>
+
+        <!-- Ships as an analyzer and nothing else: a consumer references the package and their next build
+             reports the rules, so there is no API here for anyone to call. Version + shared metadata come
+             from the repo-root Directory.Build.props; the knobs below are what an analyzer-only package
+             needs on top of it. -->
+        <PackageId>SlideRule.Analyzers</PackageId>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <Description>SlideRule.Analyzers is the SlideRule build analyzer. It reports a broken architecture rule as a compiler warning at the offending code. The warning shows in the editor as you type and in plain 'dotnet build' output. It reads the rules from sliderule.model.json, which 'sliderule render --model' writes. It runs the same extractor and checker as 'sliderule check' over the project being compiled. 'sliderule check' stays the gate. The analyzer reports only the rules one project's compilation can decide, and never a violation 'check' would not. It needs a compiler on Roslyn 4.0.1 or later (the .NET 6 SDK, Visual Studio 2022). An older compiler builds as before, without the analyzer.</Description>
+        <PackageTags>architecture;architecture-as-code;roslyn;analyzer;roslyn-analyzer;dependency-rules;layering;static-analysis;csharp;dotnet</PackageTags>
+
+        <!-- Something a consumer's build uses rather than something their own library passes on, which is
+             what DevelopmentDependency says: it keeps the package out of the dependencies of whatever they
+             publish next. -->
+        <DevelopmentDependency>true</DevelopmentDependency>
+
+        <!-- No lib/ folder. The assembly the compiler loads goes under analyzers/dotnet/cs, packed by the
+             target at the bottom of this file, and a second copy in lib/ would be a reference every
+             consumer compiles against by accident. NU5128 is NuGet noticing exactly that shape: a package
+             that declares a framework and puts nothing under lib/ or ref/ to match it. -->
+        <IncludeBuildOutput>false</IncludeBuildOutput>
+        <NoWarn>$(NoWarn);NU5128</NoWarn>
+
+        <!-- Symbols are collected with the build output, and this package ships none, so there is nothing
+             for a symbol package to hold. Measured with the repo-root value left in force: pack writes the
+             .nupkg and then fails the project with "NU5017: Cannot create a package that has no
+             dependencies nor content", so this line is what keeps the solution packable at all. -->
+        <IncludeSymbols>false</IncludeSymbols>
+
+        <!-- An analyzer's dependencies are resolved from the directory it sits in, never from the
+             consumer's package graph, so Core and Extraction travel beside it under analyzers/dotnet/cs
+             and the nuspec declares no dependencies at all. The two ProjectReferences below say the same
+             thing on the restore side with PrivateAssets="all". -->
+        <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+        <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);_PackAnalyzerClosure</TargetsForTfmSpecificContentInPackage>
+
+        <RestoreLockedMode Condition="'$(CI)' == 'true'">true</RestoreLockedMode>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <None Include="README.md" Pack="true" PackagePath="/" />
+        <!-- One source file packed to two paths. buildTransitive/ is where an SDK-style consumer reads it,
+             and it also flows on to a project that references theirs; build/ is the only place an older
+             client or a packages.config project looks. A consumer can therefore import it twice, which the
+             file is written to survive. -->
+        <None Include="buildTransitive\*.targets" Pack="true" PackagePath="buildTransitive/" />
+        <None Include="buildTransitive\*.targets" Pack="true" PackagePath="build/" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- No compiler-API reference of its own: Roslyn arrives through Extraction, whose
+             Microsoft.CodeAnalysis.CSharp sits at the support floor and carries no PrivateAssets, so the
+             floor literal stays in one place and this project cannot drift above it. -->
+        <ProjectReference Include="..\SlideRule.Extraction\SlideRule.Extraction.csproj" PrivateAssets="all" />
+        <ProjectReference Include="..\SlideRule\SlideRule.csproj" PrivateAssets="all" />
+        <!-- A build-time analyzer for this project alone, at the newest stable version rather than the
+             3.3.2 the floor brings transitively — which is too old to enforce the extended analyzer rules
+             the property above asks for. -->
+        <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="5.9.0" PrivateAssets="all" />
+        <AdditionalFiles Include="AnalyzerReleases.Shipped.md" />
+        <AdditionalFiles Include="AnalyzerReleases.Unshipped.md" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <InternalsVisibleTo Include="SlideRule.Tests" />
+    </ItemGroup>
+
+    <!-- The three assemblies the compiler has to load together, in the one folder it resolves them from,
+         named once for the two places that need them: the pack hook below, and the example solutions, which
+         call this target for their Analyzer items (examples/Directory.Build.targets). $(TargetDir) rather
+         than $(OutputPath) because the paths leave this project, and only an absolute path means the same
+         file to the project that receives it. In a target rather than a top-level ItemGroup because a
+         target's Returns are what another project's MSBuild task can ask for. -->
+    <Target Name="GetSlideRuleAnalyzerClosure" Returns="@(SlideRuleAnalyzerClosureFile)">
+        <ItemGroup>
+            <SlideRuleAnalyzerClosureFile Include="$(TargetDir)SlideRule.Analyzers.dll;$(TargetDir)SlideRule.Extraction.dll;$(TargetDir)SlideRule.dll" />
+        </ItemGroup>
+    </Target>
+
+    <!-- TargetsForTfmSpecificContentInPackage is the hook that still runs with IncludeBuildOutput off, so
+         this is what puts anything at all in the package. -->
+    <Target Name="_PackAnalyzerClosure" DependsOnTargets="GetSlideRuleAnalyzerClosure">
+        <ItemGroup>
+            <TfmSpecificPackageFile Include="@(SlideRuleAnalyzerClosureFile)" PackagePath="analyzers/dotnet/cs" />
+        </ItemGroup>
+    </Target>
+
+</Project>

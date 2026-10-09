@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>disable</Nullable>
+        <ImplicitUsings>disable</ImplicitUsings> <!-- parity: raw CSharpCompilation has no implicit usings -->
+        <!-- This is the fixture's first PackageReference, which would otherwise turn on .NET's NuGet
+             vulnerability audit. The audit fetches advisory data from every configured feed, and an
+             unreachable private feed emits NU1900 warnings that MSBuildWorkspace surfaces as workspace
+             diagnostics — tripping check's fail-closed gate. A throwaway test fixture needs no audit, and
+             disabling it keeps the fixture's workspace load clean and offline-deterministic. -->
+        <NuGetAudit>false</NuGetAudit>
+        <RestoreLockedMode Condition="'$(CI)' == 'true'">true</RestoreLockedMode>
+    </PropertyGroup>
+    <ItemGroup>
+        <ProjectReference Include="..\MyApp.Legacy.Billing\MyApp.Legacy.Billing.csproj" />
+    </ItemGroup>
+    <!-- The DI axis (GRAMMAR 4.7): ServiceWiring registers with AddSingleton/AddScoped/AddTransient, which
+         live in the Abstractions assembly. Restored UNLOCKED: nothing under Fixtures/ sets
+         RestorePackagesWithLockFile, so no packages.lock.json is ever written here and the
+         RestoreLockedMode this project declares has nothing to hold it to. That declaration is for
+         OpenSSF Scorecard, which reads csproj files only and credits the property all-or-nothing across
+         every one of them. -->
+    <ItemGroup>
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.11" />
+    </ItemGroup>
+</Project>

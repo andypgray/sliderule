@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!-- The second importer of the source-only package, and a sibling of DriftedApp.Json rather than a consumer of
+         it: the same two frameworks, its own copy of every Polyfills name, and no ProjectReference at all. So two
+         projects in one solution each compile the same shims, which is what every netstandard project does with a
+         polyfill package, and each copy answers only for the references its own project makes. Do not add a
+         reference to DriftedApp.Json. -->
+    <PropertyGroup>
+        <TargetFrameworks>netstandard2.1;net10.0</TargetFrameworks>
+        <Nullable>disable</Nullable>
+        <ImplicitUsings>disable</ImplicitUsings> <!-- parity: raw CSharpCompilation has no implicit usings -->
+        <RestoreLockedMode Condition="'$(CI)' == 'true'">true</RestoreLockedMode>
+    </PropertyGroup>
+    <Import Project="..\Contoso.Polyfill\Contoso.Polyfill.props" />
+</Project>

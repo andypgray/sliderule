@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 2,
+  "rules": {
+    "data-access/no-inline-sql": {
+      "entries": [
+        { "source": "T:Meridian.Web.Controllers.CustomsController", "target": "T:Microsoft.Data.SqlClient.SqlCommand", "siteCount": 3, "seal": "6ded31eef71b7a6c" },
+        { "source": "T:Meridian.Web.Controllers.CustomsController", "target": "T:Microsoft.Data.SqlClient.SqlConnection", "siteCount": 2, "seal": "633939e4289712a7" },
+        { "source": "T:Meridian.Web.Controllers.DriversController", "target": "T:Microsoft.Data.SqlClient.SqlCommand", "siteCount": 3, "seal": "cd4295cf9bac9524" },
+        { "source": "T:Meridian.Web.Controllers.DriversController", "target": "T:Microsoft.Data.SqlClient.SqlConnection", "siteCount": 2, "seal": "521b177760fe5638" },
+        { "source": "T:Meridian.Web.Controllers.InvoicesController", "target": "T:Microsoft.Data.SqlClient.SqlCommand", "siteCount": 3, "seal": "398f0d9f65e51385" },
+        { "source": "T:Meridian.Web.Controllers.InvoicesController", "target": "T:Microsoft.Data.SqlClient.SqlConnection", "siteCount": 2, "seal": "1fc958e8f61e6110" },
+        { "source": "T:Meridian.Web.Controllers.ManifestsController", "target": "T:Microsoft.Data.SqlClient.SqlCommand", "siteCount": 4, "seal": "0401d4c57e2c8039" },
+        { "source": "T:Meridian.Web.Controllers.ManifestsController", "target": "T:Microsoft.Data.SqlClient.SqlConnection", "siteCount": 2, "seal": "fa213118704025c5" },
+        { "source": "T:Meridian.Web.Controllers.RatesController", "target": "T:Microsoft.Data.SqlClient.SqlCommand", "siteCount": 3, "seal": "48b73e560f2d208f" },
+        { "source": "T:Meridian.Web.Controllers.RatesController", "target": "T:Microsoft.Data.SqlClient.SqlConnection", "siteCount": 2, "seal": "318bdb231b900815" },
+        { "source": "T:Meridian.Web.Controllers.ShipmentsController", "target": "T:Microsoft.Data.SqlClient.SqlCommand", "siteCount": 3, "seal": "33b12aa7ead1e953" },
+        { "source": "T:Meridian.Web.Controllers.ShipmentsController", "target": "T:Microsoft.Data.SqlClient.SqlConnection", "siteCount": 2, "seal": "b2e756ee9226d150" }
+      ]
+    }
+  }
+}

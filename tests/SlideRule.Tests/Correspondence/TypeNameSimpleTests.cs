@@ -1,0 +1,55 @@
+using Shouldly;
+using Xunit;
+using SlideRule.Prose;
+
+namespace SlideRule.Tests.Correspondence;
+
+/// <summary>
+///     <see cref="TypeName.Simple" /> — the unqualified, generic-aware display name used in prose (GRAMMAR
+///     §5–6). The leaf of a nested generic chain owns only the type parameters it introduces, so
+///     <c>Simple</c> must distribute arity the way <c>FullDisplay</c> does (via <c>IntroducedArity</c>)
+///     rather than emit the whole <c>GetGenericArguments()</c> list against the leaf name.
+/// </summary>
+public sealed class TypeNameSimpleTests
+{
+    [Fact]
+    public void Simple_TopLevelOpenGeneric_UsesDeclaredParameterName()
+    {
+        // Unchanged baseline: a top-level generic still renders its own parameters.
+        TypeName.Simple(typeof(IDictionary<,>))
+            .ShouldBe("IDictionary<TKey, TValue>");
+    }
+
+    [Fact]
+    public void Simple_NestedGenericChain_RendersOnlyTheLeafsOwnArgument()
+    {
+        // GenericInner introduces one parameter (TInner); TOuter belongs to GenericOuter. The buggy Simple
+        // rendered "GenericInner<String, Int32>" — the whole chain's arguments against the leaf name.
+        TypeName.Simple(typeof(GenericOuter<string>.GenericInner<int>))
+            .ShouldBe("GenericInner<Int32>");
+    }
+
+    [Fact]
+    public void Simple_NonGenericTypeNestedInClosedGeneric_HasNoTypeArguments()
+    {
+        // PlainInner introduces zero parameters though it inherits the outer's; the buggy Simple emitted
+        // "PlainInner<String>".
+        TypeName.Simple(typeof(GenericOuter<string>.PlainInner))
+            .ShouldBe("PlainInner");
+    }
+
+    // Arity is the shape under test — neither parameter is meant to be used, and the types are named by
+    // typeof rather than constructed, so nothing here is ever instantiated. Nor is it static: an ordinary
+    // generic class carrying nested types is the production shape TypeName.Simple has to render, and a
+    // fixture that stops resembling it stops testing it.
+    // ReSharper disable once UnusedTypeParameter
+    // ReSharper disable once ClassNeverInstantiated.Local
+    // ReSharper disable once ConvertToStaticClass
+    private sealed class GenericOuter<TOuter>
+    {
+        // ReSharper disable once UnusedTypeParameter
+        public sealed class GenericInner<TInner>;
+
+        public sealed class PlainInner;
+    }
+}

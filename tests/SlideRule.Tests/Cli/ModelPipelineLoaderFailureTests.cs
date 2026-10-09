@@ -1,0 +1,64 @@
+using System.Reflection;
+using Shouldly;
+using Xunit;
+using SlideRule.Cli.Pipeline;
+
+namespace SlideRule.Tests.Cli;
+
+/// <summary>
+///     When spec discovery's <c>GetTypes()</c> raises a <see cref="ReflectionTypeLoadException" />
+///     (a dependency of the spec assembly that is missing or the wrong version — never the contract, which
+///     binds on the assembly rather than its version), the pipeline surfaces the
+///     <em>distinct</em> loader messages — deduped and ordinal-sorted so the output is deterministic —
+///     under a naming/fix frame, not a raw reflection failure. Pinned with a fabricated exception.
+/// </summary>
+public sealed class ModelPipelineLoaderFailureTests
+{
+    [Fact]
+    public void LoaderFailureMessage_DistinctLoaderMessages_AreDedupedAndOrdinalSorted()
+    {
+        var exception = new ReflectionTypeLoadException(
+            [null, null, null],
+            [
+                new TypeLoadException("Could not load type 'Zebra'."),
+                new FileNotFoundException("Could not load file or assembly 'Acme'."),
+                new FileNotFoundException("Could not load file or assembly 'Acme'.") // duplicate — deduped
+            ]);
+
+        // Build the spec path with the native separator so Path.GetFileName strips the directory on
+        // every OS. A literal "C:\out\..." only strips on Windows — on Linux/macOS '\' is not a
+        // separator, so the whole string survives and the pinned bare-filename message fails.
+        string specDllPath = Path.Combine("out", "Meridian.Architecture.dll");
+
+        string message = ModelPipeline.LoaderFailureMessage(exception, specDllPath);
+
+        message.ShouldBe(
+            "Could not load spec assembly 'Meridian.Architecture.dll'; one or more types failed to load:\n"
+            + "  Could not load file or assembly 'Acme'.\n"
+            + "  Could not load type 'Zebra'.\n"
+            + "Build the spec project and restore its dependencies, then retry. If it is already built, an "
+            + "assembly named above is one the spec's own build does not put where the loader can reach it: "
+            + "for a NuGet package, add <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies> to "
+            + "the spec .csproj and rebuild; for a .NET shared framework (<FrameworkReference>) or a .NET "
+            + "Framework reference assembly, no build setting stages it — name the type as a string rather "
+            + "than a typeof(), which needs no assembly load.");
+    }
+
+    [Fact]
+    public void LoaderFailureMessage_NoLoaderDetail_StillNamesTheAssemblyAndFix()
+    {
+        var exception = new ReflectionTypeLoadException([null], [null]);
+
+        string message = ModelPipeline.LoaderFailureMessage(exception, "Spec.dll");
+
+        message.ShouldBe(
+            "Could not load spec assembly 'Spec.dll'; one or more types failed to load:\n"
+            + "  (the runtime reported no loader detail)\n"
+            + "Build the spec project and restore its dependencies, then retry. If it is already built, an "
+            + "assembly named above is one the spec's own build does not put where the loader can reach it: "
+            + "for a NuGet package, add <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies> to "
+            + "the spec .csproj and rebuild; for a .NET shared framework (<FrameworkReference>) or a .NET "
+            + "Framework reference assembly, no build setting stages it — name the type as a string rather "
+            + "than a typeof(), which needs no assembly load.");
+    }
+}

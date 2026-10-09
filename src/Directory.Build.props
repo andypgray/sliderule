@@ -1,0 +1,125 @@
+<Project>
+
+    <!-- Pull in the repo-root props (version + shared package metadata) first: GetPathOfFileAbove
+         starts the search in the PARENT of this directory, so it finds the root file rather than
+         re-importing this one. -->
+    <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+    <!-- Half of the supply-chain lock-file policy: which projects MAINTAIN a lock file. Scoped to src/
+         (the four that pack, the rule pack, the two assemblies the contract package carries, and the two the tool
+         and the xUnit adapter carry) — plus
+         an inline copy in the tests csproj, since tests live outside this directory. It is deliberately
+         NOT at the repo root: FixtureRestorer restores throwaway fixture-solution copies under a
+         project's bin/ mid-test-run without stripping $(CI), and those copies walk up to whatever props
+         file sits above them — a root-level policy would demand lock files for the fixtures and fail
+         their CI restore. RestorePackagesWithLockFile makes restore generate/maintain
+         packages.lock.json.
+
+         The other half — RestoreLockedMode, which fails a CI restore when the resolved graph drifts
+         from the committed lock file — is NOT here. Every tracked csproj declares it for itself, because
+         OpenSSF Scorecard's Pinned-Dependencies check reads csproj files only, never an imported props
+         file, and credits the property all-or-nothing across every csproj in the tree; declared here it
+         was invisible to the check. Where no lock file sits beside a project the
+         property is inert, which is why it costs the fixtures nothing. RestoreLockSiteTests holds every
+         tracked csproj to carrying it. Local restores stay unlocked either way, so adding a package
+         updates the lock naturally. -->
+    <PropertyGroup>
+        <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    </PropertyGroup>
+
+    <!-- ContinuousIntegrationBuild makes release builds deterministic (normalised paths, stable
+         SourceLink). $(CI) is set to 'true' by GitHub Actions, so it only bites in CI. Scoped here
+         rather than at the repo root for the same reason as the lock policy above, and the root file
+         spells out what went wrong when it was not: it implies DeterministicSourcePaths, which needs
+         SourceRoot items that a non-SDK-style fixture project cannot have — and the fixtures are
+         staged inside the repo tree, so they inherit whatever sits above them. -->
+    <PropertyGroup Condition="'$(CI)' == 'true'">
+        <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+    </PropertyGroup>
+
+    <!-- Whether the analyzers are loaded at all, which decides whether the severities below are read by
+         anything. The SDK turns its own analyzers on only from net5.0 up, and five of the nine projects
+         here target netstandard2.0, so without this those promotions are inert exactly where they were
+         wanted, and silent about it. Declared once here rather than per project: four of the five
+         netstandard projects had to remember it by hand and the fifth, the largest, did not, which is
+         the whole failure mode. EnforceExtendedAnalyzerRules stays per project — it asks a different
+         question, about what the compiler will host. -->
+    <PropertyGroup>
+        <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    </PropertyGroup>
+
+    <!-- Analyzer severities, from the repo-root analyzers.globalconfig (which explains what it promotes,
+         why, and why it is not named .globalconfig). Naming it here is what scopes it to src/, the way
+         the policies above are scoped: nothing auto-discovers it, so the fixture copies staged under
+         bin/ never inherit it. The tests csproj names the same file for itself. -->
+    <ItemGroup>
+        <GlobalAnalyzerConfigFiles Include="$(MSBuildThisFileDirectory)../analyzers.globalconfig" />
+    </ItemGroup>
+
+    <!-- The compiler writes each project's XML documentation file, and the packages carry it beside
+         the assembly, so a consumer's editor shows the doc comments the source already carries. The
+         file is also what turns the documentation-mode diagnostics on: without it the compiler
+         resolves no cref and reports no missing comment, so a namespace move can leave crefs pointing
+         at nothing through a green build and a green suite. That whole family is promoted to an
+         error here, not CS1591 alone, so the build holds both halves of the invariant: every public
+         member is documented, and every comment is well-formed and resolves. A comment naming a type
+         that no longer exists is as broken as a missing one. Scoped to src/ for the same reason as
+         the policies above: the tests project would report thousands of missing comments on its
+         public test members, and the fixture copies staged under bin/ must inherit nothing from
+         here. -->
+    <PropertyGroup>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <WarningsAsErrors>$(WarningsAsErrors);CS0419;CS1570;CS1571;CS1572;CS1573;CS1574;CS1580;CS1581;CS1584;CS1587;CS1589;CS1590;CS1591;CS1592;CS1710;CS1711;CS1712;CS1723;CS1734;CS1735</WarningsAsErrors>
+    </PropertyGroup>
+
+    <!-- NU1701 is restore resolving a package through the .NET Framework fallback: the project then
+         compiles against assemblies built for another framework, and their Framework polyfills join
+         the graph. The MSBuild packages are the known case, since each MSBuild minor line ships assets
+         for its own .NET only and the next line carries none for this target framework, so a version
+         bump that leaves the line fails restore here instead of building green on the wrong assets.
+         Restore reads this property too, so the promotion holds before anything compiles. Scoped to
+         src/ for the same reason as the policies above. -->
+    <PropertyGroup>
+        <WarningsAsErrors>$(WarningsAsErrors);NU1701</WarningsAsErrors>
+    </PropertyGroup>
+
+    <!-- Package validation's baseline and mode, shared by the two packages that switch validation on in
+         their own csproj: the contract and the xUnit adapter, the two assemblies a consumer's own project
+         compiles against. The Core csproj says why validation runs at all. What the two share is written
+         here, so the one number a release moves has one site.
+
+         Strict mode compares in both directions, so an ADDITION reports as well as a removal. That is the
+         half worth paying for: a removal breaks a consumer loudly at their next build, while an addition is
+         the thing that silently becomes permanent. It is also what lets the committed surface pins in tests/
+         stay at type-and-enum grain rather than enumerating every member: with member additions reported
+         here, pinning them there would move those files on roughly half of all commits to say the same
+         thing twice.
+
+         What this check does NOT give is locality. It runs at pack time, which in practice is one CI job and
+         the release gate, so the pins exist to red in the suite beside the edit. An enum renumbering reports
+         here as CP0011 and without strict mode, being a break rather than a growth (measured 2026-09-12),
+         but it is also the one surface change that breaks no compile anywhere, so it is the one most worth
+         catching in seconds.
+
+         The baseline names the last PUBLISHED version, which is one number for both packages because they
+         release in lockstep, so it lags <Version> by design. No version under these package IDs is published
+         yet, so no baseline is declared: the SDK downloads the baseline by package ID, and a version that does
+         not exist fails the pack. The first release under these IDs puts PackageValidationBaselineVersion back
+         in the group below at its own number. From then on, bumping it is part of the release ritual,
+         deliberately NOT a fifth site in ManifestVersionTests' four-way version equality;
+         PublicSurfaceSyncTests asserts only that a declared baseline is no newer, and that no csproj
+         overrides it.
+
+         Acknowledgement is a CompatibilitySuppressions.xml beside the csproj it acknowledges for, regenerated
+         with -p:ApiCompatGenerateSuppressionFile=true and reviewed per symbol. With no baseline there is
+         nothing to acknowledge, so neither package carries one.
+
+         The group is unconditioned on purpose and inert in every project that does not validate: the SDK
+         gates both the baseline's download and the comparison on EnablePackageValidation and IsPackable. A
+         condition on $(EnablePackageValidation) or $(PackageId) would never hold here, because this file is
+         evaluated before a project body sets either. -->
+    <PropertyGroup>
+        <EnableStrictModeForBaselineValidation>true</EnableStrictModeForBaselineValidation>
+    </PropertyGroup>
+
+</Project>

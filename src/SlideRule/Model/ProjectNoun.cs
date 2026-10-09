@@ -1,0 +1,21 @@
+using SlideRule.Prose;
+
+namespace SlideRule.Model;
+
+/// <summary>
+///     Types in a named project — <c>arch.Project("MyApp.Web")</c>. Reference fragment:
+///     "types in project `MyApp.Web`" (GRAMMAR §5.1).
+/// </summary>
+internal sealed class ProjectNoun(string name) : SelectionNoun
+{
+    /// <summary>The project (assembly) name.</summary>
+    internal string Name { get; } = name;
+
+    internal override string Locative => $" in project {ProseFormat.Backtick(Name)}";
+
+    internal override string CollapsedLocative(IReadOnlyList<SelectionNoun> group)
+    {
+        List<string> names = group.Select(noun => ((ProjectNoun)noun).Name).ToList();
+        return $" in projects {ProseFormat.BacktickedList(names)}";
+    }
+}

@@ -1,0 +1,86 @@
+<Project>
+
+    <!-- Repo-wide package identity, shared by all four shipping projects. The four packages
+         (SlideRule, .Analyzers, .Xunit, .Cli) version in lockstep: this
+         <Version> is the only MSBuild-side declaration. It must agree with the two copies in
+         .mcp/server.json (.version and .packages[0].version); release.yml refuses a tag unless all three
+         equal the tag. The nuget metadata below (authors, licence, project/repo URLs, SourceLink
+         knobs, symbol packages) is identical across the four, so it lives here rather than being
+         copy-pasted into each csproj. The one exception is stated where it is made: the analyzer
+         package ships no build output, so its own project file turns the symbol package off.
+
+         Four packages, eight shipped assemblies. SlideRule.SpecAnalyzers and
+         SlideRule.SpecCompletion do not pack: both go out inside SlideRule, under
+         analyzers/dotnet/cs. SlideRule.Extraction and SlideRule.Roslyn do not pack either:
+         they go out inside the tool and the xUnit adapter, and extraction inside the analyzer package too.
+         All four take the identity pin below from here like every other project. -->
+    <!-- The binding identity is pinned and deliberately does NOT track <Version>. AssemblyVersion is what
+         a spec project's compiled reference to SlideRule carries, and the default binder rejects a
+         host whose copy is older than that reference — so letting it track the package version meant every
+         release minted a new identity and broke specs built against a newer contract than the tool running
+         them. FileVersion and InformationalVersion still track <Version>, so "which build is
+         this" stays answerable. Nothing binds on AssemblyVersion, and the one place that prints it is the
+         message for a spec built against another contract; ServerVersion, the SARIF driver and the two
+         analyzers' version check all read InformationalVersion. 1.0.0.0 is the value to pin to because it
+         is what the SDK assigns a source-built or vendored contract, which puts packaged and source builds
+         on one identity, and it outranks every version shipped before the pin (0.1.0.0, 0.2.0.0) so their
+         specs still bind.
+
+         The pin covers the two analyzer directories too. SlideRule and SlideRule.Analyzers
+         each carry a copy of SlideRule.dll beside their analyzer, so a project referencing both
+         hands the compiler two copies under one identity. At one version they are one file, which the
+         analyzer package's shape check holds, and every compiler handles them: the .NET compiler loads each
+         package's directory on its own, and a .NET Framework compiler server that meets new copies after
+         an upgrade refuses that compilation and shuts down, so the build compiles once without it. At two
+         versions no identity helps, since the SDK's package conflict resolution passes only the newer
+         copy and a .NET Framework process holds just one, so one analyzer is handed the other version's
+         contract. Each analyzer therefore compares its own version with the copy it was handed before it
+         does anything else, and reports a difference as its fault warning, SR2093 or SR1093, instead of
+         checking. -->
+    <PropertyGroup>
+        <Version>0.1.0</Version>
+        <AssemblyVersion>1.0.0.0</AssemblyVersion>
+        <!-- FileVersion defaults to AssemblyVersion, not to Version (Microsoft.NET.GenerateAssemblyInfo
+             .targets), so pinning one would silently pin both. Restated from Version, with any prerelease
+             suffix trimmed because a file version must be four numeric parts. -->
+        <FileVersion>$([System.Text.RegularExpressions.Regex]::Match($(Version), '^[0-9]+\.[0-9]+\.[0-9]+')).0</FileVersion>
+        <Authors>Andrew Gray</Authors>
+        <Copyright>Copyright (c) 2026 Andrew Gray</Copyright>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <PackageProjectUrl>https://github.com/andypgray/sliderule</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/andypgray/sliderule</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+        <PublishRepositoryUrl>true</PublishRepositoryUrl>
+        <EmbedUntrackedSources>true</EmbedUntrackedSources>
+        <IncludeSymbols>true</IncludeSymbols>
+        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    </PropertyGroup>
+
+    <!-- Deliberately NO $(CI)-conditioned build policy here — not the lock-file policy
+         (RestorePackagesWithLockFile / RestoreLockedMode) and not ContinuousIntegrationBuild.
+         RestorePackagesWithLockFile and ContinuousIntegrationBuild live one level down in
+         src/Directory.Build.props (plus an inline lock-file copy in the tests csproj);
+         RestoreLockedMode lives in every tracked csproj, for a reason src/Directory.Build.props
+         records — Scorecard's Pinned-Dependencies check cannot see an imported props file.
+
+         Reason, shared by both: fixture solutions are staged under a project's bin/ and built there
+         mid-test-run — FixtureRestorer shells `dotnet restore` on them, and MSBuildWorkspace runs
+         design-time builds over them — all without stripping $(CI) from the child process. Those
+         throwaway copies sit inside the repo tree, so they walk up and import whatever props file is
+         above them, and this is that file. A repo-root policy therefore reaches code it was never
+         written for:
+
+         - A lock policy would demand committed lock files for the temp fixture projects and, in CI,
+           fail their locked-mode restore outright, breaking the temp-copy contract.
+         - ContinuousIntegrationBuild implies DeterministicSourcePaths, which requires SourceRoot
+           items. A non-SDK-style project in the 2003 MSBuild XML namespace has no SourceLink and so
+           no SourceRoot, and its design-time build fails with "SourceRoot items must include at least
+           one top-level (not nested) item" — a workspace-load diagnostic that reds `check` on the CI
+           legs only. That is a real bug this file shipped, found 2026-08-03 (see the ClassicApp
+           fixture and ClassicProjectCheckTests).
+
+         Scoping both below the repo root keeps the shipping projects deterministic and locked while
+         leaving the fixtures with no lock file to be held to — which is also what makes the
+         RestoreLockedMode each of them now declares inert. -->
+
+</Project>

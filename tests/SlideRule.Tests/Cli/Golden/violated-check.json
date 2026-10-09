@@ -1,0 +1,1083 @@
+{
+  "schemaVersion": 3,
+  "solution": "MyApp.sln",
+  "specAssembly": "SlideRule.MyAppViolatedSpec.dll",
+  "summary": {
+    "rulesChecked": 32,
+    "rulesPassed": 3,
+    "rulesFailed": 27,
+    "rulesSkipped": 2,
+    "violations": 51,
+    "warnings": 2
+  },
+  "rules": [
+    {
+      "id": "layering/domain-independent",
+      "posture": "enforce",
+      "status": "failed",
+      "sentence": "The Domain layer must not reference the Web layer.",
+      "because": "Domain is UI-agnostic; transaction boundaries live in services.",
+      "fix": "Define an abstraction in Domain and implement it in Web.",
+      "violationCount": 2,
+      "violations": [
+        {
+          "kind": "reference",
+          "source": "MyApp.Domain.OrderService",
+          "target": "MyApp.Web.HomeController",
+          "siteCount": 3,
+          "sites": [
+            {
+              "file": "MyApp.Domain/OrderService.cs",
+              "line": 9
+            },
+            {
+              "file": "MyApp.Domain/OrderService.cs",
+              "line": 10
+            },
+            {
+              "file": "MyApp.Domain/OrderService.cs",
+              "line": 13
+            }
+          ]
+        },
+        {
+          "kind": "reference",
+          "source": "MyApp.Domain.OrderService",
+          "target": "MyApp.Web.WebTextExtensions",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Domain/OrderService.cs",
+              "line": 10
+            }
+          ]
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "layering/projects-independent",
+      "posture": "enforce",
+      "status": "failed",
+      "sentence": "Each of the projects matching `MyApp.*` must not reference the others.",
+      "because": "Each MyApp project is its own deployable unit; a reference from one into another couples their release cadences.",
+      "fix": "Move the shared type into a project both may reference, or reach the other project through an abstraction it owns.",
+      "violationCount": 5,
+      "violations": [
+        {
+          "kind": "reference",
+          "source": "MyApp.Domain.OrderService",
+          "target": "MyApp.Web.HomeController",
+          "siteCount": 3,
+          "sites": [
+            {
+              "file": "MyApp.Domain/OrderService.cs",
+              "line": 9
+            },
+            {
+              "file": "MyApp.Domain/OrderService.cs",
+              "line": 10
+            },
+            {
+              "file": "MyApp.Domain/OrderService.cs",
+              "line": 13
+            }
+          ]
+        },
+        {
+          "kind": "reference",
+          "source": "MyApp.Domain.OrderService",
+          "target": "MyApp.Web.WebTextExtensions",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Domain/OrderService.cs",
+              "line": 10
+            }
+          ]
+        },
+        {
+          "kind": "reference",
+          "source": "MyApp.Web.HomeController",
+          "target": "MyApp.Legacy.Billing.IBillingFacade",
+          "siteCount": 2,
+          "sites": [
+            {
+              "file": "MyApp.Web/HomeController.cs",
+              "line": 17
+            },
+            {
+              "file": "MyApp.Web/HomeController.cs",
+              "line": 20
+            }
+          ]
+        },
+        {
+          "kind": "reference",
+          "source": "MyApp.Web.InvoiceController",
+          "target": "MyApp.Legacy.Billing.BillingCalculator",
+          "siteCount": 2,
+          "sites": [
+            {
+              "file": "MyApp.Web/InvoiceController.cs",
+              "line": 9
+            },
+            {
+              "file": "MyApp.Web/InvoiceController.cs",
+              "line": 10
+            }
+          ]
+        },
+        {
+          "kind": "reference",
+          "source": "MyApp.Web.InvoiceController",
+          "target": "MyApp.Legacy.Billing.RoundingMode",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Web/InvoiceController.cs",
+              "line": 10
+            }
+          ]
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "layering/projects-reached-only-by-themselves",
+      "posture": "migrate",
+      "status": "passed",
+      "sentence": "Each of the projects matching `MyApp.*` must be referenced only by itself.",
+      "because": "A project anything may reach into has no surface to change; every edge into it is part of its contract whether or not anyone meant it to be.",
+      "fix": "Reach the project through an abstraction it owns, or move the type both projects need into a project both may reference.",
+      "baseline": {
+        "path": "arch/baselines/layering/projects-reached-only-by-themselves.json",
+        "grandfathered": 5,
+        "stale": 0
+      },
+      "violationCount": 0,
+      "violations": [],
+      "warnings": []
+    },
+    {
+      "id": "layering/web-cuts-not-circular",
+      "posture": "enforce",
+      "status": "failed",
+      "sentence": "Each of the Reporting and Invoicing layers must not have circular references with the others.",
+      "because": "Reporting and invoicing are two cuts of the web layer with no intended order between them; a circle means neither can be extracted without dragging the other along.",
+      "fix": "Move what one cut borrows from the other into a type both may reach, or pick a direction and state it as an ordering rule.",
+      "violationCount": 2,
+      "violations": [
+        {
+          "kind": "reference",
+          "source": "MyApp.Web.InvoiceCreatedHandler",
+          "target": "MyApp.Web.ReportEndpoint",
+          "detail": "circular references among the Reporting and Invoicing layers",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Web/InvoiceCreatedHandler.cs",
+              "line": 10
+            }
+          ]
+        },
+        {
+          "kind": "reference",
+          "source": "MyApp.Web.ReportEndpoint",
+          "target": "MyApp.Web.InvoiceService",
+          "detail": "circular references among the Reporting and Invoicing layers",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Web/ReportEndpoint.cs",
+              "line": 23
+            }
+          ]
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "layering/billing-independent",
+      "posture": "enforce",
+      "status": "passed",
+      "sentence": "Types in `MyApp.Legacy.Billing.*` must not reference types in `MyApp.Web.*`.",
+      "because": "Billing must not reach up into the web layer.",
+      "violationCount": 0,
+      "violations": [],
+      "warnings": []
+    },
+    {
+      "id": "data-access/no-inline-sql",
+      "posture": "migrate",
+      "status": "failed",
+      "sentence": "Types in the Web layer named `*Controller` must not reference types in `System.Data.*`.",
+      "because": "Repository pattern for testability.",
+      "fix": "Inject the repository.",
+      "baseline": {
+        "path": "arch/baselines/data-access/no-inline-sql.json",
+        "grandfathered": 1,
+        "stale": 0
+      },
+      "violationCount": 1,
+      "violations": [
+        {
+          "kind": "reference",
+          "source": "MyApp.Web.HomeController",
+          "target": "System.Data.DataTable",
+          "siteCount": 2,
+          "sites": [
+            {
+              "file": "MyApp.Web/HomeController.cs",
+              "line": 24
+            },
+            {
+              "file": "MyApp.Web/HomeController.cs",
+              "line": 26
+            }
+          ]
+        }
+      ],
+      "warnings": [
+        {
+          "kind": "deadExemplar",
+          "message": "This rule's exemplar \"types named `OrdersRepository`\" matched no solution-declared types.",
+          "hint": "A name in a `Named` list is the whole simple name, matched exactly, without its namespace, generic arity or containing type; the verdict never depends on it, so point it at a type the solution declares or remove it."
+        }
+      ]
+    },
+    {
+      "id": "time/inject-clock",
+      "posture": "migrate",
+      "status": "failed",
+      "sentence": "The Web layer must not use `DateTime.Now` or `DateTime.UtcNow`.",
+      "because": "Wall-clock reads are untestable; inject IClock.",
+      "fix": "Take IClock in the constructor.",
+      "exemplar": [
+        {
+          "type": "MyApp.Domain.OrderService",
+          "sites": [
+            {
+              "file": "MyApp.Domain/OrderService.cs",
+              "line": 5
+            }
+          ]
+        }
+      ],
+      "baseline": {
+        "path": "arch/baselines/time/inject-clock.json",
+        "grandfathered": 0,
+        "stale": 0
+      },
+      "violationCount": 2,
+      "violations": [
+        {
+          "kind": "memberUse",
+          "source": "MyApp.Web.HomeController",
+          "targetMember": "P:System.DateTime.Now",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Web/HomeController.cs",
+              "line": 32
+            }
+          ]
+        },
+        {
+          "kind": "memberUse",
+          "source": "MyApp.Web.HomeController",
+          "targetMember": "P:System.DateTime.UtcNow",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Web/HomeController.cs",
+              "line": 37
+            }
+          ]
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "naming/async-suffix",
+      "posture": "migrate",
+      "status": "failed",
+      "sentence": "Methods of the Web layer returning `Task` or `Task<TResult>` must be named `*Async`.",
+      "because": "Async methods are discovered by their Async suffix.",
+      "fix": "Rename the method to end in Async and update its callers.",
+      "baseline": {
+        "path": "arch/baselines/naming/async-suffix.json",
+        "grandfathered": 0,
+        "stale": 0
+      },
+      "violationCount": 2,
+      "violations": [
+        {
+          "kind": "memberShape",
+          "subjectMember": "M:MyApp.Web.HomeController.Load",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Web/HomeController.cs",
+              "line": 48
+            }
+          ]
+        },
+        {
+          "kind": "memberShape",
+          "subjectMember": "M:MyApp.Web.HomeController.Save",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Web/HomeController.cs",
+              "line": 43
+            }
+          ]
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "di/handlers-via-registry",
+      "posture": "migrate",
+      "status": "failed",
+      "sentence": "Types, except `HandlerRegistry`, must not construct types implementing `IHandler<T>`.",
+      "because": "Handlers are resolved through HandlerRegistry; direct construction bypasses discovery.",
+      "fix": "Resolve the handler through HandlerRegistry instead of constructing it.",
+      "baseline": {
+        "path": "arch/baselines/di/handlers-via-registry.json",
+        "grandfathered": 0,
+        "stale": 0
+      },
+      "violationCount": 1,
+      "violations": [
+        {
+          "kind": "construction",
+          "source": "MyApp.Web.InvoiceService",
+          "target": "MyApp.Web.InvoiceCreatedHandler",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Web/InvoiceService.cs",
+              "line": 8
+            }
+          ]
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "di/no-captive-dependencies",
+      "posture": "migrate",
+      "status": "failed",
+      "sentence": "Singleton-registered types must not inject scoped-registered types or transient-registered types.",
+      "because": "A singleton that captures a scoped or transient service pins it to the whole process lifetime.",
+      "fix": "Inject IServiceScopeFactory and resolve the dependency inside a scope.",
+      "baseline": {
+        "path": "arch/baselines/di/no-captive-dependencies.json",
+        "grandfathered": 0,
+        "stale": 0
+      },
+      "violationCount": 2,
+      "violations": [
+        {
+          "kind": "injection",
+          "source": "MyApp.Web.ReportScheduler",
+          "target": "MyApp.Web.IOrderFeed",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Web/ReportScheduler.cs",
+              "line": 7
+            }
+          ]
+        },
+        {
+          "kind": "injection",
+          "source": "MyApp.Web.ReportScheduler",
+          "target": "MyApp.Web.IOrderFormatter",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Web/ReportScheduler.cs",
+              "line": 8
+            }
+          ]
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "layering/no-ghost",
+      "posture": "enforce",
+      "status": "passed",
+      "sentence": "Types in `MyApp.Domain.*` must not reference types in `MyApp.Ghost.*`.",
+      "because": "Nothing should reference the (nonexistent) ghost layer.",
+      "violationCount": 0,
+      "violations": [],
+      "warnings": [
+        {
+          "kind": "inertTarget",
+          "message": "This rule is inert: its target selection matched no types.",
+          "hint": "A trailing `.*` covers the namespace itself and everything under it, and `Legacy*` never crosses a dot; a rule whose target matches nothing passes forever, so decide before keeping it."
+        }
+      ]
+    },
+    {
+      "id": "naming/nonexistent",
+      "posture": "enforce",
+      "status": "failed",
+      "sentence": "Types in `MyApp.Nowhere.*` must be named `*Service`.",
+      "because": "A subject that matches nothing must fail loudly.",
+      "violationCount": 1,
+      "violations": [
+        {
+          "kind": "emptySubject",
+          "detail": "The subject selection matched no solution-declared types.",
+          "hint": "A trailing `.*` covers the namespace itself and everything under it, and `Legacy*` never crosses a dot; check the selection against what the solution declares.",
+          "siteCount": 0,
+          "sites": []
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "legacy/billing/containment",
+      "posture": "quarantine",
+      "status": "failed",
+      "sentence": "Types in `MyApp.Legacy.Billing.*`, except `IBillingFacade` or `BillingFacade`, must be referenced only by types in `MyApp.Legacy.Billing.*`, `IBillingFacade` or `BillingFacade`.",
+      "because": "Replacement scheduled; not worth stabilizing.",
+      "fix": "use `IBillingFacade`",
+      "baseline": {
+        "path": "arch/violated-quarantine-baseline.json",
+        "grandfathered": 0,
+        "stale": 0
+      },
+      "violationCount": 2,
+      "violations": [
+        {
+          "kind": "reference",
+          "source": "MyApp.Web.InvoiceController",
+          "target": "MyApp.Legacy.Billing.BillingCalculator",
+          "siteCount": 2,
+          "sites": [
+            {
+              "file": "MyApp.Web/InvoiceController.cs",
+              "line": 9
+            },
+            {
+              "file": "MyApp.Web/InvoiceController.cs",
+              "line": 10
+            }
+          ]
+        },
+        {
+          "kind": "reference",
+          "source": "MyApp.Web.InvoiceController",
+          "target": "MyApp.Legacy.Billing.RoundingMode",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Web/InvoiceController.cs",
+              "line": 10
+            }
+          ]
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "legacy/billing/tripwire",
+      "posture": "quarantine",
+      "status": "skipped",
+      "sentence": "",
+      "because": "Replacement scheduled; not worth stabilizing.",
+      "skipReason": "Tripwire: no diff context — run 'sliderule check --diff-base <ref>' to check changed files against this quarantined scope.",
+      "violationCount": 0,
+      "violations": [],
+      "warnings": []
+    },
+    {
+      "id": "exceptions/no-general-catch",
+      "posture": "migrate",
+      "status": "failed",
+      "sentence": "The Web layer must not catch `Exception`.",
+      "because": "A catch-all hides the failures you meant to handle; catch the specific exception instead.",
+      "fix": "Catch the specific exception type you can handle, not System.Exception.",
+      "baseline": {
+        "path": "arch/baselines/exceptions/no-general-catch.json",
+        "grandfathered": 0,
+        "stale": 0
+      },
+      "violationCount": 2,
+      "violations": [
+        {
+          "kind": "catch",
+          "source": "MyApp.Web.ReportEndpoint",
+          "target": "System.Exception",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Web/ReportEndpoint.cs",
+              "line": 15
+            }
+          ]
+        },
+        {
+          "kind": "catch",
+          "source": "MyApp.Web.ReportPublisher",
+          "target": "System.Exception",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Web/ReportPublisher.cs",
+              "line": 22
+            }
+          ]
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "exceptions/domain-throws-domain",
+      "posture": "enforce",
+      "status": "failed",
+      "sentence": "The Domain layer must throw only `OrderRuleViolation`.",
+      "because": "Domain code signals rule failures with the domain's own exception, not a generic BCL type.",
+      "fix": "Throw OrderRuleViolation (or another domain exception) instead of a BCL exception type.",
+      "violationCount": 1,
+      "violations": [
+        {
+          "kind": "throw",
+          "source": "MyApp.Domain.OrderApproval",
+          "target": "System.InvalidOperationException",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Domain/OrderApproval.cs",
+              "line": 17
+            }
+          ]
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "async/accept-cancellation",
+      "posture": "enforce",
+      "status": "failed",
+      "sentence": "Methods of the Web layer returning `Task` or `Task<TResult>` must accept a parameter of type `CancellationToken`.",
+      "because": "A Task-returning method that ignores cancellation cannot be stopped once its caller has moved on.",
+      "fix": "Add a CancellationToken parameter and flow it to the calls you await.",
+      "violationCount": 3,
+      "violations": [
+        {
+          "kind": "memberShape",
+          "subjectMember": "M:MyApp.Web.HomeController.Load",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Web/HomeController.cs",
+              "line": 48
+            }
+          ]
+        },
+        {
+          "kind": "memberShape",
+          "subjectMember": "M:MyApp.Web.HomeController.Save",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Web/HomeController.cs",
+              "line": 43
+            }
+          ]
+        },
+        {
+          "kind": "memberShape",
+          "subjectMember": "M:MyApp.Web.HomeController.SaveAsync",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Web/HomeController.cs",
+              "line": 53
+            }
+          ]
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "api/return-dtos",
+      "posture": "migrate",
+      "status": "failed",
+      "sentence": "The Web layer must not expose `DataTable`.",
+      "because": "An infrastructure type on a presentation-layer public signature couples every caller to it; return a DTO or view model.",
+      "fix": "Return a DTO instead of exposing System.Data.DataTable.",
+      "baseline": {
+        "path": "arch/baselines/api/return-dtos.json",
+        "grandfathered": 0,
+        "stale": 0
+      },
+      "violationCount": 2,
+      "violations": [
+        {
+          "kind": "expose",
+          "source": "MyApp.Web.HomeController",
+          "target": "System.Data.DataTable",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Web/HomeController.cs",
+              "line": 24
+            }
+          ]
+        },
+        {
+          "kind": "expose",
+          "source": "MyApp.Web.InvoiceController",
+          "target": "System.Data.DataTable",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Web/InvoiceController.cs",
+              "line": 14
+            }
+          ]
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "exceptions/no-unfiltered-catch",
+      "posture": "enforce",
+      "status": "failed",
+      "sentence": "The Web or Domain layers must not catch `Exception` without a `when` filter.",
+      "because": "An unfiltered broad catch swallows every failure alike; a `when` filter names the ones this handler actually expects.",
+      "fix": "Add a `when` filter naming the exceptions you can handle, or catch those types directly.",
+      "violationCount": 2,
+      "violations": [
+        {
+          "kind": "catch",
+          "source": "MyApp.Web.ReportEndpoint",
+          "target": "System.Exception",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Web/ReportEndpoint.cs",
+              "line": 15
+            }
+          ]
+        },
+        {
+          "kind": "catch",
+          "source": "MyApp.Web.ReportPublisher",
+          "target": "System.Exception",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Web/ReportPublisher.cs",
+              "line": 22
+            }
+          ]
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "exceptions/no-swallowed-catch",
+      "posture": "enforce",
+      "status": "failed",
+      "sentence": "The Web or Domain layers must not swallow `Exception`.",
+      "because": "A handler that catches everything and continues hands its caller a wrong answer that reads like a right one; rethrowing keeps the failure travelling.",
+      "fix": "Rethrow after cleanup, translate to a domain exception, or add a `when` filter naming what you can handle.",
+      "violationCount": 1,
+      "violations": [
+        {
+          "kind": "catch",
+          "source": "MyApp.Web.ReportEndpoint",
+          "target": "System.Exception",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Web/ReportEndpoint.cs",
+              "line": 15
+            }
+          ]
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "exceptions/no-bare-bcl-throw",
+      "posture": "enforce",
+      "status": "failed",
+      "sentence": "The Domain layer must not throw `InvalidOperationException`.",
+      "because": "InvalidOperationException tells a caller nothing it can dispatch on; the domain has its own exception for rule failures.",
+      "fix": "Throw OrderRuleViolation instead of System.InvalidOperationException.",
+      "violationCount": 1,
+      "violations": [
+        {
+          "kind": "throw",
+          "source": "MyApp.Domain.OrderApproval",
+          "target": "System.InvalidOperationException",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Domain/OrderApproval.cs",
+              "line": 17
+            }
+          ]
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "layering/services-in-web",
+      "posture": "enforce",
+      "status": "failed",
+      "sentence": "Types named `*Service` must reside in project `MyApp.Web`.",
+      "because": "Services are wired by the web host; a service outside MyApp.Web escapes its registration sweep.",
+      "fix": "Move the service into the MyApp.Web project.",
+      "violationCount": 1,
+      "violations": [
+        {
+          "kind": "shape",
+          "subject": "MyApp.Domain.OrderService",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Domain/OrderService.cs",
+              "line": 5
+            }
+          ]
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "layering/services-behind-contracts",
+      "posture": "migrate",
+      "status": "failed",
+      "sentence": "Types named `*Service` must have exactly one counterpart named `I{Name}` among interfaces.",
+      "because": "A caller that can only name the concrete service cannot be handed a different one; the I{Name} contract is where a double or a second implementation goes.",
+      "fix": "Extract an I{Name} interface for the service and consume that.",
+      "baseline": {
+        "path": "arch/baselines/layering/services-behind-contracts.json",
+        "grandfathered": 1,
+        "stale": 0
+      },
+      "violationCount": 1,
+      "violations": [
+        {
+          "kind": "shape",
+          "subject": "MyApp.Web.InvoiceService",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Web/InvoiceService.cs",
+              "line": 4
+            }
+          ]
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "layering/no-ungoverned-types",
+      "posture": "enforce",
+      "status": "failed",
+      "sentence": "Types in `MyApp.*` must belong to the Domain layer or the Web layer.",
+      "because": "A type in no declared layer is governed by no layer rule; the two layers are the covering set.",
+      "fix": "Move the type into a declared layer's namespace, or declare its layer in this spec.",
+      "violationCount": 4,
+      "violations": [
+        {
+          "kind": "shape",
+          "subject": "MyApp.Legacy.Billing.BillingCalculator",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Legacy.Billing/BillingCalculator.cs",
+              "line": 5
+            }
+          ]
+        },
+        {
+          "kind": "shape",
+          "subject": "MyApp.Legacy.Billing.BillingFacade",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Legacy.Billing/BillingFacade.cs",
+              "line": 3
+            }
+          ]
+        },
+        {
+          "kind": "shape",
+          "subject": "MyApp.Legacy.Billing.IBillingFacade",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Legacy.Billing/IBillingFacade.cs",
+              "line": 3
+            }
+          ]
+        },
+        {
+          "kind": "shape",
+          "subject": "MyApp.Legacy.Billing.RoundingMode",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Legacy.Billing/RoundingMode.cs",
+              "line": 3
+            }
+          ]
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "di/handlers-registered",
+      "posture": "enforce",
+      "status": "failed",
+      "sentence": "Types implementing `IHandler<T>` or types named `*Scheduler` must be registered.",
+      "because": "Handlers and schedulers are resolved from the container; one that is never registered fails at dispatch, not at startup.",
+      "fix": "Register the type in ServiceWiring.Configure.",
+      "violationCount": 2,
+      "violations": [
+        {
+          "kind": "shape",
+          "subject": "MyApp.Web.InvoiceCreatedHandler",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Web/InvoiceCreatedHandler.cs",
+              "line": 3
+            }
+          ]
+        },
+        {
+          "kind": "shape",
+          "subject": "MyApp.Web.RefundProcessor",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Web/RefundProcessor.cs",
+              "line": 3
+            }
+          ]
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "domain/values-immutable",
+      "posture": "enforce",
+      "status": "failed",
+      "sentence": "Properties of the Domain layer must be get-only.",
+      "because": "A value a caller can reassign after construction is not a value; the invariants the constructor checked stop holding the moment anyone writes to it.",
+      "fix": "Take the value in the constructor and expose it `{ get; }`; hand back a new instance for a changed one.",
+      "violationCount": 3,
+      "violations": [
+        {
+          "kind": "memberShape",
+          "subjectMember": "P:MyApp.Domain.Money.Amount",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Domain/Money.cs",
+              "line": 3
+            }
+          ]
+        },
+        {
+          "kind": "memberShape",
+          "subjectMember": "P:MyApp.Domain.Order.Reference",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Domain/Order.cs",
+              "line": 5
+            }
+          ]
+        },
+        {
+          "kind": "memberShape",
+          "subjectMember": "P:MyApp.Domain.Order.Total",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Domain/Order.cs",
+              "line": 7
+            }
+          ]
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "state/no-static-mutable",
+      "posture": "enforce",
+      "status": "failed",
+      "sentence": "Static fields of the Web layer must be readonly.",
+      "because": "A writable static is state the whole process shares; the last write anywhere decides what the next request reads, and nothing in the signature says so.",
+      "fix": "Make the field `readonly` or `const`, or move the state onto an instance whose lifetime the caller controls.",
+      "violationCount": 1,
+      "violations": [
+        {
+          "kind": "memberShape",
+          "subjectMember": "F:MyApp.Web.ReportBudget.RenderCount",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Web/ReportBudget.cs",
+              "line": 18
+            }
+          ]
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "packaging/supported-frameworks",
+      "posture": "enforce",
+      "status": "failed",
+      "sentence": "Projects matching `MyApp.*` must target only `net8.0`.",
+      "because": "The hosts this app deploys to are on the net8.0 LTS; a project that targets anything newer builds here and fails to start there.",
+      "fix": "Set `TargetFramework` to `net8.0`, or upgrade the hosts first and move this rule with them.",
+      "violationCount": 3,
+      "violations": [
+        {
+          "kind": "projectShape",
+          "subjectProject": "MyApp.Domain",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Domain/MyApp.Domain.csproj",
+              "line": 3
+            }
+          ]
+        },
+        {
+          "kind": "projectShape",
+          "subjectProject": "MyApp.Legacy.Billing",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Legacy.Billing/MyApp.Legacy.Billing.csproj",
+              "line": 3
+            }
+          ]
+        },
+        {
+          "kind": "projectShape",
+          "subjectProject": "MyApp.Web",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Web/MyApp.Web.csproj",
+              "line": 3
+            }
+          ]
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "packaging/no-feed-dependencies",
+      "posture": "enforce",
+      "status": "failed",
+      "sentence": "Projects matching `MyApp.*` must reference no NuGet packages other than private ones, whose `PrivateAssets` is `all` (declared references only; transitive dependencies are not seen).",
+      "because": "Other solutions take these projects as packages; a package one of them depends on becomes a dependency of every solution that takes it.",
+      "fix": "Use a type the SDK already supplies, or reference an assembly the repository carries.",
+      "violationCount": 1,
+      "violations": [
+        {
+          "kind": "projectShape",
+          "subjectProject": "MyApp.Web",
+          "package": "Microsoft.Extensions.DependencyInjection.Abstractions",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Web/MyApp.Web.csproj",
+              "line": 24
+            }
+          ]
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "packaging/locked-restore",
+      "posture": "enforce",
+      "status": "failed",
+      "sentence": "Project `MyApp.Web` must lock package restore.",
+      "because": "An unpinned restore resolves a different package graph on a different day; the build CI passed is then not the build that ships.",
+      "fix": "Set `RestorePackagesWithLockFile` to true and commit the lock file the next restore produces.",
+      "violationCount": 1,
+      "violations": [
+        {
+          "kind": "projectShape",
+          "subjectProject": "MyApp.Web",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Web/MyApp.Web.csproj",
+              "line": 1
+            }
+          ]
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "packaging/nothing-published",
+      "posture": "enforce",
+      "status": "failed",
+      "sentence": "Projects matching `MyApp.*`, except project `MyApp.Legacy.Billing`, must not be packable.",
+      "because": "The SDK packs by default, so a project nobody meant to publish is one `dotnet pack` away from a package on a feed.",
+      "fix": "Set `IsPackable` to false in the project file.",
+      "violationCount": 2,
+      "violations": [
+        {
+          "kind": "projectShape",
+          "subjectProject": "MyApp.Domain",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Domain/MyApp.Domain.csproj",
+              "line": 1
+            }
+          ]
+        },
+        {
+          "kind": "projectShape",
+          "subjectProject": "MyApp.Web",
+          "siteCount": 1,
+          "sites": [
+            {
+              "file": "MyApp.Web/MyApp.Web.csproj",
+              "line": 1
+            }
+          ]
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "id": "domain/retry-budget/tripwire",
+      "posture": "caution",
+      "status": "skipped",
+      "sentence": "",
+      "because": "The retry budget is the one place the domain sanctions a broad catch, and every caller relies on the filter.",
+      "skipReason": "Tripwire: no diff context — run 'sliderule check --diff-base <ref>' to check changed files against this cautioned scope.",
+      "violationCount": 0,
+      "violations": [],
+      "warnings": []
+    }
+  ],
+  "workspaceDiagnostics": []
+}

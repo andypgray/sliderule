@@ -1,0 +1,19 @@
+using SlideRule.Prose;
+
+namespace SlideRule.Model;
+
+/// <summary>
+///     <c>.AttributedWith(typeof(ApiControllerAttribute))</c> → " attributed with `[ApiController]`"
+///     (GRAMMAR §5.2) — the <c>Attribute</c> suffix is stripped and the name bracketed. The anchor is a
+///     <see cref="TypeAnchor" />, so the string form
+///     (<c>.AttributedWith("MyPackage.ApiControllerAttribute")</c>) renders the identical fragment.
+/// </summary>
+internal sealed class AttributedWithAdjective(TypeAnchor anchor) : SelectionAdjective
+{
+    /// <summary>The attribute a selected type carries, by <c>typeof</c> or by definition name.</summary>
+    internal TypeAnchor Anchor { get; } = anchor;
+
+    internal override AdjectivePlacement Placement => AdjectivePlacement.Inline;
+
+    internal override string Fragment => $" attributed with {ProseFormat.Backtick(ProseFormat.AttributeName(Anchor))}";
+}

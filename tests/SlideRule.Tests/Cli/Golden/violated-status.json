@@ -1,0 +1,341 @@
+{
+  "schemaVersion": 2,
+  "solution": "MyApp.sln",
+  "specAssembly": "SlideRule.MyAppViolatedSpec.dll",
+  "rules": [
+    {
+      "id": "layering/domain-independent",
+      "posture": "enforce",
+      "status": "failed",
+      "violations": 2,
+      "warnings": 0
+    },
+    {
+      "id": "layering/projects-independent",
+      "posture": "enforce",
+      "status": "failed",
+      "violations": 5,
+      "warnings": 0
+    },
+    {
+      "id": "layering/projects-reached-only-by-themselves",
+      "posture": "migrate",
+      "status": "passed",
+      "violations": 0,
+      "warnings": 0,
+      "ratchet": {
+        "baselinePath": "arch/baselines/layering/projects-reached-only-by-themselves.json",
+        "captured": true,
+        "remaining": 5,
+        "remainingSites": 9,
+        "newViolations": 0,
+        "stale": 0,
+        "promotable": false,
+        "cells": [
+          {
+            "name": "MyApp.Legacy.Billing",
+            "remaining": 3,
+            "remainingSites": 5
+          },
+          {
+            "name": "MyApp.Web",
+            "remaining": 2,
+            "remainingSites": 4
+          }
+        ]
+      }
+    },
+    {
+      "id": "layering/web-cuts-not-circular",
+      "posture": "enforce",
+      "status": "failed",
+      "violations": 2,
+      "warnings": 0
+    },
+    {
+      "id": "layering/billing-independent",
+      "posture": "enforce",
+      "status": "passed",
+      "violations": 0,
+      "warnings": 0
+    },
+    {
+      "id": "data-access/no-inline-sql",
+      "posture": "migrate",
+      "status": "failed",
+      "violations": 1,
+      "warnings": 1,
+      "ratchet": {
+        "baselinePath": "arch/baselines/data-access/no-inline-sql.json",
+        "captured": true,
+        "remaining": 1,
+        "remainingSites": 2,
+        "newViolations": 1,
+        "stale": 0,
+        "promotable": false
+      }
+    },
+    {
+      "id": "time/inject-clock",
+      "posture": "migrate",
+      "status": "failed",
+      "violations": 2,
+      "warnings": 0,
+      "ratchet": {
+        "baselinePath": "arch/baselines/time/inject-clock.json",
+        "captured": false,
+        "remaining": 0,
+        "remainingSites": 0,
+        "newViolations": 2,
+        "stale": 0,
+        "promotable": false
+      }
+    },
+    {
+      "id": "naming/async-suffix",
+      "posture": "migrate",
+      "status": "failed",
+      "violations": 2,
+      "warnings": 0,
+      "ratchet": {
+        "baselinePath": "arch/baselines/naming/async-suffix.json",
+        "captured": false,
+        "remaining": 0,
+        "remainingSites": 0,
+        "newViolations": 2,
+        "stale": 0,
+        "promotable": false
+      }
+    },
+    {
+      "id": "di/handlers-via-registry",
+      "posture": "migrate",
+      "status": "failed",
+      "violations": 1,
+      "warnings": 0,
+      "ratchet": {
+        "baselinePath": "arch/baselines/di/handlers-via-registry.json",
+        "captured": false,
+        "remaining": 0,
+        "remainingSites": 0,
+        "newViolations": 1,
+        "stale": 0,
+        "promotable": false
+      }
+    },
+    {
+      "id": "di/no-captive-dependencies",
+      "posture": "migrate",
+      "status": "failed",
+      "violations": 2,
+      "warnings": 0,
+      "ratchet": {
+        "baselinePath": "arch/baselines/di/no-captive-dependencies.json",
+        "captured": false,
+        "remaining": 0,
+        "remainingSites": 0,
+        "newViolations": 2,
+        "stale": 0,
+        "promotable": false
+      }
+    },
+    {
+      "id": "layering/no-ghost",
+      "posture": "enforce",
+      "status": "passed",
+      "violations": 0,
+      "warnings": 1
+    },
+    {
+      "id": "naming/nonexistent",
+      "posture": "enforce",
+      "status": "failed",
+      "violations": 1,
+      "warnings": 0
+    },
+    {
+      "id": "legacy/billing/containment",
+      "posture": "quarantine",
+      "status": "failed",
+      "violations": 2,
+      "warnings": 0,
+      "ratchet": {
+        "baselinePath": "arch/violated-quarantine-baseline.json",
+        "captured": false,
+        "remaining": 0,
+        "remainingSites": 0,
+        "newViolations": 2,
+        "stale": 0
+      }
+    },
+    {
+      "id": "legacy/billing/tripwire",
+      "posture": "quarantine",
+      "status": "skipped",
+      "violations": 0,
+      "warnings": 0
+    },
+    {
+      "id": "exceptions/no-general-catch",
+      "posture": "migrate",
+      "status": "failed",
+      "violations": 2,
+      "warnings": 0,
+      "ratchet": {
+        "baselinePath": "arch/baselines/exceptions/no-general-catch.json",
+        "captured": false,
+        "remaining": 0,
+        "remainingSites": 0,
+        "newViolations": 2,
+        "stale": 0,
+        "promotable": false
+      }
+    },
+    {
+      "id": "exceptions/domain-throws-domain",
+      "posture": "enforce",
+      "status": "failed",
+      "violations": 1,
+      "warnings": 0
+    },
+    {
+      "id": "async/accept-cancellation",
+      "posture": "enforce",
+      "status": "failed",
+      "violations": 3,
+      "warnings": 0
+    },
+    {
+      "id": "api/return-dtos",
+      "posture": "migrate",
+      "status": "failed",
+      "violations": 2,
+      "warnings": 0,
+      "ratchet": {
+        "baselinePath": "arch/baselines/api/return-dtos.json",
+        "captured": false,
+        "remaining": 0,
+        "remainingSites": 0,
+        "newViolations": 2,
+        "stale": 0,
+        "promotable": false
+      }
+    },
+    {
+      "id": "exceptions/no-unfiltered-catch",
+      "posture": "enforce",
+      "status": "failed",
+      "violations": 2,
+      "warnings": 0
+    },
+    {
+      "id": "exceptions/no-swallowed-catch",
+      "posture": "enforce",
+      "status": "failed",
+      "violations": 1,
+      "warnings": 0
+    },
+    {
+      "id": "exceptions/no-bare-bcl-throw",
+      "posture": "enforce",
+      "status": "failed",
+      "violations": 1,
+      "warnings": 0
+    },
+    {
+      "id": "layering/services-in-web",
+      "posture": "enforce",
+      "status": "failed",
+      "violations": 1,
+      "warnings": 0
+    },
+    {
+      "id": "layering/services-behind-contracts",
+      "posture": "migrate",
+      "status": "failed",
+      "violations": 1,
+      "warnings": 0,
+      "ratchet": {
+        "baselinePath": "arch/baselines/layering/services-behind-contracts.json",
+        "captured": true,
+        "remaining": 1,
+        "remainingSites": 1,
+        "newViolations": 1,
+        "stale": 0,
+        "promotable": false
+      }
+    },
+    {
+      "id": "layering/no-ungoverned-types",
+      "posture": "enforce",
+      "status": "failed",
+      "violations": 4,
+      "warnings": 0
+    },
+    {
+      "id": "di/handlers-registered",
+      "posture": "enforce",
+      "status": "failed",
+      "violations": 2,
+      "warnings": 0
+    },
+    {
+      "id": "domain/values-immutable",
+      "posture": "enforce",
+      "status": "failed",
+      "violations": 3,
+      "warnings": 0
+    },
+    {
+      "id": "state/no-static-mutable",
+      "posture": "enforce",
+      "status": "failed",
+      "violations": 1,
+      "warnings": 0
+    },
+    {
+      "id": "packaging/supported-frameworks",
+      "posture": "enforce",
+      "status": "failed",
+      "violations": 3,
+      "warnings": 0
+    },
+    {
+      "id": "packaging/no-feed-dependencies",
+      "posture": "enforce",
+      "status": "failed",
+      "violations": 1,
+      "warnings": 0
+    },
+    {
+      "id": "packaging/locked-restore",
+      "posture": "enforce",
+      "status": "failed",
+      "violations": 1,
+      "warnings": 0
+    },
+    {
+      "id": "packaging/nothing-published",
+      "posture": "enforce",
+      "status": "failed",
+      "violations": 2,
+      "warnings": 0
+    },
+    {
+      "id": "domain/retry-budget/tripwire",
+      "posture": "caution",
+      "status": "skipped",
+      "violations": 0,
+      "warnings": 0
+    }
+  ],
+  "summary": {
+    "rulesChecked": 32,
+    "rulesPassed": 3,
+    "rulesFailed": 27,
+    "rulesSkipped": 2,
+    "grandfatheredRemaining": 7,
+    "grandfatheredSites": 12,
+    "fixedAwaitingAcceptance": 0
+  }
+}

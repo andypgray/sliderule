@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+        <RestoreLockedMode Condition="'$(CI)' == 'true'">true</RestoreLockedMode>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\..\..\src\SlideRule\SlideRule.csproj" />
+        <ProjectReference Include="..\..\..\..\src\SlideRule.Packs.DotNet\SlideRule.Packs.DotNet.csproj" />
+        <ProjectReference Include="..\..\src\Meridian.Clearance\Meridian.Clearance.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.Data.SqlClient" Version="7.0.2" />
+    </ItemGroup>
+
+</Project>

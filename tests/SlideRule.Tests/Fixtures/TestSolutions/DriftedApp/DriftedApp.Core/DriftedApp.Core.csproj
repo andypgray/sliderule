@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!-- The drifted-copies fixture's core project. It declares DriftedApp.StringExtensions in a file of its own,
+         and DriftedApp.Core.Ansi declares the same full name in a DIFFERENT file with different members. Only
+         this copy reaches DriftedApp.Cell, which nothing else declares. Extraction gives a multiply-declared type
+         the facts of its FIRST declarer in ordinal project order, and 'DriftedApp.Core' sorts ahead of
+         'DriftedApp.Core.Ansi', so this project wins them by name, the way a core project and its satellite
+         sort in the wild.
+         No ProjectReference to the satellite, and the satellite declares none to this project: an edge between
+         the two, in either direction, is one no project file declares.
+         Package-free like the other TestSolutions beds: the whole restore resolves from the SDK, so the
+         startup sweep costs no network. Restored UNLOCKED — the lock-file policy lives only in the tests
+         project, never here. -->
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>disable</Nullable>
+        <ImplicitUsings>disable</ImplicitUsings> <!-- parity: raw CSharpCompilation has no implicit usings -->
+        <RestoreLockedMode Condition="'$(CI)' == 'true'">true</RestoreLockedMode>
+    </PropertyGroup>
+</Project>

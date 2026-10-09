@@ -1,0 +1,1 @@
+SlideRule.Xunit.ArchRuleTests`1

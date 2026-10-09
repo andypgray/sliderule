@@ -1,0 +1,170 @@
+using Microsoft.CodeAnalysis;
+using Shouldly;
+using Xunit;
+using SlideRule.Codebase;
+using SlideRule.Roslyn;
+using SlideRule.Roslyn.Replay;
+using SlideRule.Roslyn.Solutions;
+using SlideRule.Tests.Extraction;
+using SlideRule.Tests.TestSupport;
+
+namespace SlideRule.Tests.Replay;
+
+/// <summary>
+///     The fidelity gate: a binlog replayed into an <c>AdhocWorkspace</c> must produce the
+///     same <see cref="CodebaseModel" /> the MSBuildWorkspace path produces from the same tree — edge for
+///     edge, external for external, site for site. All tests share this class's own binlog fixture and
+///     run sequentially, so the freshness test may mutate the copy in place and revert it without racing
+///     the others. Pinned facts are the spec.
+/// </summary>
+public sealed class BinlogReplayFidelityTests(BinlogFixtureWorkspace fixture) : IClassFixture<BinlogFixtureWorkspace>
+{
+    private BinlogFixtureWorkspace Fixture => fixture;
+
+    [Fact]
+    public async Task Replay_SameTreeAsMsBuildWorkspace_ProducesIdenticalModel()
+    {
+        // Arrange — extract the SAME temp copy both ways, through the one shared extractor path.
+        using LoadedSolution loaded = await WorkspaceLoader.LoadAsync(Fixture.SolutionPath);
+        CodebaseModel viaMsBuild = await CodebaseExtractor.ExtractFromSolutionAsync(loaded.Solution);
+
+        using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath);
+        CodebaseModel viaReplay = await CodebaseExtractor.ExtractFromSolutionAsync(replayed.Solution);
+
+        // Act + Assert — fact for fact, raw paths included so a slash/spelling drift fails here (never
+        // papered over).
+        viaReplay.ShouldModelTheSameAs(viaMsBuild);
+    }
+
+    [Fact]
+    public async Task Replay_SolutionMembership_LandsOnTheReplayedProjectsToo()
+    {
+        // A binlog records what was built, not what a solution declares, so membership on this path comes
+        // from the discovered solution file exactly as it does on the MSBuild path — and lands only because
+        // SolutionReader gives each replayed project its csproj FilePath to be matched on. Worth pinning
+        // rather than assuming: if that path were ever absent the label would silently degrade to null on
+        // every replayed run, which fails open and therefore reds nothing else.
+        using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath);
+        CodebaseModel model = await CodebaseExtractor.ExtractFromSolutionAsync(
+            replayed.Solution, declaredMembers: SpecExclusion.TryReadDeclaredMembers(Fixture.SolutionPath));
+
+        model.Projects.Select(project => (project.Name, project.SolutionMember))
+            .ShouldBe([("MyApp.Domain", true), ("MyApp.Legacy.Billing", true), ("MyApp.Web", true)]);
+    }
+
+    [Fact]
+    public async Task Replay_UnreadableMembership_LeavesEveryReplayedProjectUnlabeled()
+    {
+        // The fail-open half, on the path most likely to hit it: a replay driven from a binlog whose
+        // solution never resolves (or resolves to a format the parser does not own) must leave the label
+        // absent rather than call every project a passenger — which, once `render` filters on it, would
+        // empty the drawing.
+        using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath);
+        CodebaseModel model = await CodebaseExtractor.ExtractFromSolutionAsync(
+            replayed.Solution, declaredMembers: SpecExclusion.TryReadDeclaredMembers(Fixture.BinlogPath));
+
+        model.Projects.Select(project => project.SolutionMember)
+            .ShouldAllBe(member => member == null);
+    }
+
+    [Fact]
+    public void Replay_ReportsNoFailedProjects_BecauseEveryReplayedProjectWasReallyBuilt()
+    {
+        // The gate's input on this path, pinned empty rather than assumed empty. A replayed project comes
+        // from a compiler invocation a real build actually made, so it carries an output path and cannot
+        // present the failed shape; and a binlog records what was built rather than what a .sln declares, so
+        // the declared-but-absent arm has nothing to compare against. The value is still computed by the one
+        // routine the MSBuild path uses — a replay that started answering "incomplete" would be a real
+        // regression, and hardcoding empty here would hide it.
+        using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath);
+
+        replayed.FailedProjects.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Replay_ConstructorEdges_MatchTheMsBuildWorkspace()
+    {
+        // The construction channel (GRAMMAR §4.5) survives the binlog-replay path — an explicit assertion
+        // beside the whole-model dump equality above, so a dropped ctor channel is a named failure not a diff.
+        using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath);
+        CodebaseModel model = await CodebaseExtractor.ExtractFromSolutionAsync(replayed.Solution);
+
+        model.HasConstructorEdge("MyApp.Domain.OrderService", "MyApp.Web.HomeController")
+            .ShouldBeTrue();
+        model.ConstructorEdge("MyApp.Web.InvoiceController", "System.Data.DataTable")
+            .Constructed.IsExternal.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task Replay_AfterAppendingTypePostBuild_ReflectsCurrentDiskNotCapturedText()
+    {
+        // Arrange — append a new type to a source file already covered by the binlog's csc file list, AFTER
+        // the binlog was built. Mutate the shared copy in place; a try/finally reverts it for the others.
+        string moneySource = Fixture.PathOf("MyApp.Domain", "Money.cs");
+        string original = File.ReadAllText(moneySource);
+        try
+        {
+            File.WriteAllText(moneySource, $"{original}{Environment.NewLine}public sealed class ReplayFreshnessProbe {{ }}{Environment.NewLine}");
+
+            // Act — replay the UNCHANGED binlog; text is read from current disk at materialisation time.
+            using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath);
+            CodebaseModel model = await CodebaseExtractor.ExtractFromSolutionAsync(replayed.Solution);
+
+            // Assert — the post-capture type is in the model, proving text is not embedded in the binlog.
+            model.Types.Select(t => t.FullName)
+                .ShouldContain("MyApp.Domain.ReplayFreshnessProbe");
+        }
+        finally
+        {
+            File.WriteAllText(moneySource, original);
+        }
+
+        // And the revert is visible to a fresh replay — the freshness contract cuts both ways.
+        using ReplayedSolution reverted = BinlogReplayer.Replay(Fixture.BinlogPath);
+        CodebaseModel afterRevert = await CodebaseExtractor.ExtractFromSolutionAsync(reverted.Solution);
+        afterRevert.Types.Select(t => t.FullName)
+            .ShouldNotContain("MyApp.Domain.ReplayFreshnessProbe");
+    }
+
+    [Fact]
+    public async Task Replay_DisposedWrapper_LeavesSolutionUsable()
+    {
+        // Arrange
+        ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath);
+        CodebaseModel before = await CodebaseExtractor.ExtractFromSolutionAsync(replayed.Solution);
+
+        // Act — dispose the wrapper (workspace + reader), then keep using the Solution.
+        replayed.Dispose();
+        CodebaseModel after = await CodebaseExtractor.ExtractFromSolutionAsync(replayed.Solution);
+
+        // Assert — a Roslyn Solution outlives its workspace (the repo-wide LoadedSolution contract).
+        after.Types.Count.ShouldBe(before.Types.Count);
+    }
+
+    [Fact]
+    public void Replay_EveryProject_HasCsprojFilePathAndBuiltOutputAssembly()
+    {
+        // Arrange
+        using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath);
+
+        // Assert — SolutionReader populates FilePath (csproj) and OutputFilePath (the obj-path intermediate
+        // assembly) with no backfill needed; both must be real files on disk. Only the three C# projects
+        // survive the C#-only replay filter, keyed on the extension-less MSBuild-parity names.
+        replayed.Solution.Projects.Select(p => p.Name)
+            .OrderBy(n => n, StringComparer.Ordinal)
+            .ShouldBe(["MyApp.Domain", "MyApp.Legacy.Billing", "MyApp.Web"]);
+
+        foreach (Project project in replayed.Solution.Projects)
+        {
+            string projectPath = project.FilePath.ShouldNotBeNull();
+            projectPath.ShouldEndWith(".csproj");
+            File.Exists(projectPath)
+                .ShouldBeTrue($"csproj should exist on disk: {projectPath}");
+
+            string outputPath = project.OutputFilePath.ShouldNotBeNull();
+            File.Exists(outputPath)
+                .ShouldBeTrue(
+                    $"built output assembly should exist on disk: {outputPath}");
+        }
+    }
+}

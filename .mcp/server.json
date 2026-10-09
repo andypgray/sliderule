@@ -1,0 +1,43 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.andypgray/sliderule",
+  "description": "A .NET architecture checker that enforces one C# spec and renders the same rules for coding agents.",
+  "version": "0.1.0",
+  "repository": {
+    "url": "https://github.com/andypgray/sliderule",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "nuget",
+      "registryBaseUrl": "https://api.nuget.org/v3/index.json",
+      "identifier": "SlideRule.Cli",
+      "version": "0.1.0",
+      "runtimeHint": "dnx",
+      "transport": {
+        "type": "stdio"
+      },
+      "packageArguments": [
+        {
+          "type": "positional",
+          "value": "mcp"
+        },
+        {
+          "type": "positional",
+          "valueHint": "solution",
+          "description": "The solution file to check. When it is omitted, the server reads SLIDERULE_SOLUTION_PATH and then walks up from its working directory. A solution passed here beats both. The walk stops at the first directory holding a sliderule.json or exactly one .sln, .slnf or .slnx file. Without a sliderule.json, a solution under src/ is not found, and several side by side are refused as ambiguous. A config generated from this manifest passes none, so where the walk finds no solution, commit a sliderule.json at the repository root. Otherwise give the solution here or in SLIDERULE_SOLUTION_PATH at install time. A server that cannot bind still starts, answers every tool call with the reason, and names the CLI command that reads the same model. That command is spelled through dotnet dnx, because this launch installs no sliderule command.",
+          "isRequired": false,
+          "format": "filepath"
+        }
+      ],
+      "environmentVariables": [
+        {
+          "name": "SLIDERULE_SOLUTION_PATH",
+          "description": "The solution to check when no solution argument is passed. A config generated from this manifest passes no argument, so set this at install time where the server's walk finds no solution. A committed sliderule.json at the repository root binds the same repository with no install-time setting. A server left unbound still starts, and its session works from the CLI alone. That CLI is spelled through dotnet dnx, because this launch installs no sliderule command.",
+          "isRequired": false,
+          "format": "filepath"
+        }
+      ]
+    }
+  ]
+}

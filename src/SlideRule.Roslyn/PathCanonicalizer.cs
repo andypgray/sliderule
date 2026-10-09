@@ -1,0 +1,91 @@
+namespace SlideRule.Roslyn;
+
+/// <summary>
+///     A managed <c>realpath</c>: resolves a path to a symlink-free, fully-qualified spelling so that paths
+///     obtained different ways can be compared as strings. A workspace's document paths keep whatever
+///     spelling the solution was opened with, while a path from another tool may already be
+///     symlink-resolved; on a symlinked root (macOS's <c>/var</c> against <c>/private/var</c>, a symlinked
+///     home directory, a Windows junction) the two never match, and a prefix test silently misses.
+///     Canonicalize both sides once and they agree.
+/// </summary>
+// It lives in this assembly rather than in Core because FileSystemInfo.ResolveLinkTarget is net6+ and
+// Core is netstandard2.0. The resolution is a fixed-point walk: GetFullPath first, then repeatedly find
+// the deepest symlinked ancestor, follow it to its final target and reattach the remainder, until no
+// symlink is left.
+internal static class PathCanonicalizer
+{
+    // Belt-and-braces bound so a pathological reparse graph (mutually recursive symlinks) can never
+    // spin forever; real filesystems converge in one or two passes. A genuine cycle throws inside
+    // ResolveLinkTarget and is swallowed as "not a resolvable link", so this is only a backstop.
+    private const int MaxIterations = 40;
+
+    /// <summary>
+    ///     Returns <paramref name="path" /> made absolute and symlink-free, following a symlinked directory anywhere
+    ///     along it rather than only at the end. A path with no symlinks in it comes back exactly as
+    ///     <see cref="System.IO.Path.GetFullPath(string)" /> would return it. A path that does not exist is still made
+    ///     absolute and a symlinked directory above it is still followed; nothing here reports whether the path exists,
+    ///     so callers keep their own existence checks. An empty path is returned unchanged.
+    /// </summary>
+    /// <param name="path">The path to resolve, absolute or relative to the current directory.</param>
+    /// <returns>The absolute, symlink-free spelling of <paramref name="path" />.</returns>
+    public static string Resolve(string path)
+    {
+        if (string.IsNullOrEmpty(path)) return path;
+
+        string current = Path.GetFullPath(path);
+        for (var iteration = 0; iteration < MaxIterations; iteration++)
+        {
+            string? resolved = ResolveDeepestSymlink(current);
+            if (resolved is null) return current; // no symlinked ancestor left — fixed point reached
+
+            current = Path.GetFullPath(resolved);
+        }
+
+        return current;
+    }
+
+    /// <summary>
+    ///     Whether <paramref name="path" /> is itself a reparse point — the single probe
+    ///     <see cref="Resolve" /> makes before it starts climbing, asked on its own.
+    /// </summary>
+    /// <remarks>
+    ///     For a caller that has already resolved every ancestor and only needs to know whether the leaf can
+    ///     be reattached as-is. A <c>.csproj</c> that is a symlink resolves here exactly as a directory does,
+    ///     which is precisely why the question has to be asked rather than assumed away.
+    /// </remarks>
+    internal static bool IsLink(string path)
+    {
+        return TryResolveLinkTarget(new DirectoryInfo(path)) is not null;
+    }
+
+    // Walks ancestors leaf→root; at the first (deepest) symlinked ancestor, returns the path with that
+    // ancestor replaced by its final target and the remainder reattached. Returns null when no ancestor
+    // is a symlink.
+    private static string? ResolveDeepestSymlink(string current)
+    {
+        for (DirectoryInfo? dir = new(current); dir is not null; dir = dir.Parent)
+        {
+            if (TryResolveLinkTarget(dir) is not { } target) continue;
+
+            string remainder = Path.GetRelativePath(dir.FullName, current);
+            return remainder == "." ? target : Path.Combine(target, remainder);
+        }
+
+        return null;
+    }
+
+    // ResolveLinkTarget probes the path as a reparse point, which throws on drive roots ("C:\"),
+    // access-denied ancestors, and nonexistent paths; a throw here just means "not a resolvable link,
+    // keep walking up".
+    private static string? TryResolveLinkTarget(DirectoryInfo dir)
+    {
+        try
+        {
+            return dir.ResolveLinkTarget(true)?.FullName;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+}

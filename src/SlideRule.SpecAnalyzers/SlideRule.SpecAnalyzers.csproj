@@ -1,0 +1,54 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <!-- netstandard2.0 because the compiler loads this assembly into whatever process is building the
+             project — csc on the command line, the compiler server, Visual Studio on .NET Framework — and
+             only netstandard2.0 loads in all of them. LangVersion 13.0 is pinned for the same reason as
+             Core's: netstandard2.0 otherwise defaults to C# 7.3. -->
+        <TargetFramework>netstandard2.0</TargetFramework>
+        <LangVersion>13.0</LangVersion>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+
+        <!-- Makes the banned-API rule an enforced gate: an analyzer runs inside the compiler, where there
+             is no console, no current directory and no clock worth reading, and a call to one of them is
+             an error here rather than a warning nobody sees. -->
+        <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+
+        <IsRoslynComponent>true</IsRoslynComponent>
+
+        <!-- This assembly travels inside the contract package, beside the contract every spec project
+             already references, and is never a package of its own. So there is no package metadata here,
+             no README, no development-dependency flag and no targets file: a consumer who has the contract
+             has this, and a consumer who does not has no spec to read. -->
+        <IsPackable>false</IsPackable>
+
+        <RestoreLockedMode Condition="'$(CI)' == 'true'">true</RestoreLockedMode>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <!-- The compiler-API floor as its own literal, which is the one place in this repository where a
+             second statement of it is right. The sibling analyzer takes the floor through the extraction
+             project, whose reference carries no PrivateAssets; this project's only project reference is
+             the contract, which declares no compiler API at all, so there is nothing to take it from.
+             RoslynFloorPinTests holds this literal and the extraction project's equal, and the
+             dependency-update ignore that keeps an automated bump from raising it. -->
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.0.1" PrivateAssets="all" />
+        <!-- A build-time analyzer for this project alone, at the newest stable version rather than the
+             3.3.2 the floor brings transitively — which is too old to enforce the extended analyzer rules
+             the property above asks for. -->
+        <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="5.9.0" PrivateAssets="all" />
+        <!-- The contract, and nothing else. Every verdict reported here is decided by the same types the
+             spec loader decides with, so the warning at the literal and the error at load cannot come to
+             say different things; the extraction, checking and rendering machinery has no part in reading
+             one string and is not referenced. -->
+        <ProjectReference Include="..\SlideRule\SlideRule.csproj" />
+        <AdditionalFiles Include="AnalyzerReleases.Shipped.md" />
+        <AdditionalFiles Include="AnalyzerReleases.Unshipped.md" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <InternalsVisibleTo Include="SlideRule.Tests" />
+    </ItemGroup>
+
+</Project>

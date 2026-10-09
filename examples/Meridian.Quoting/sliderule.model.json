@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 2,
+  "spec": "Meridian.Quoting.Architecture",
+  "projects": [
+    { "name": "Meridian.Quoting.Api", "assemblies": ["Meridian.Quoting.Api"] },
+    { "name": "Meridian.Quoting.Application", "assemblies": ["Meridian.Quoting.Application"] },
+    { "name": "Meridian.Quoting.Domain", "assemblies": ["Meridian.Quoting.Domain"] },
+    { "name": "Meridian.Quoting.Infrastructure", "assemblies": ["Meridian.Quoting.Infrastructure"] }
+  ],
+  "layers": [
+    { "name": "Domain", "globs": ["Meridian.Quoting.Domain.*"], "purpose": "Domain holds the quote and rate-card model." },
+    { "name": "Application", "globs": ["Meridian.Quoting.Application.*"], "purpose": "Application holds the use cases and the ports they depend on." },
+    { "name": "Infrastructure", "globs": ["Meridian.Quoting.Infrastructure.*"], "purpose": "Infrastructure implements the ports: in-memory persistence and the system clock." },
+    { "name": "Api", "globs": ["Meridian.Quoting.Api.*"], "purpose": "Api is the composition root and the HTTP surface." }
+  ],
+  "rules": [
+    {
+      "id": "layering/domain-independent",
+      "posture": "enforce",
+      "sentence": "The Domain layer must not reference the Application layer, the Infrastructure layer or the Api layer.",
+      "because": "The Domain holds the quote and rate model the rest of the subsystem is built on; it stays free of the layers that depend on it so it can be reasoned about and tested on its own.",
+      "fix": "Move the dependency out of Domain: define an interface here and implement it in the outer layer that needs it.",
+      "constraint": { "node": "mustNotReference", "subject": { "noun": { "node": "layer", "name": "Domain" } }, "operands": [{ "noun": { "node": "layer", "name": "Application" } }, { "noun": { "node": "layer", "name": "Infrastructure" } }, { "noun": { "node": "layer", "name": "Api" } }] }
+    },
+    {
+      "id": "layering/application-boundaries",
+      "posture": "enforce",
+      "sentence": "The Application layer must reference only the Domain layer (external packages are not constrained by this rule).",
+      "because": "Use cases depend on the Domain and on abstractions they own, never on a concrete adapter; keeping Infrastructure and Api out of Application is what lets persistence and transport be swapped or faked in a test.",
+      "fix": "Depend on a port (an interface in Domain or Application) instead of the concrete type; wire the implementation in the Api composition root.",
+      "constraint": { "node": "mustOnlyReference", "subject": { "noun": { "node": "layer", "name": "Application" } }, "operands": [{ "noun": { "node": "layer", "name": "Domain" } }] }
+    },
+    {
+      "id": "naming/interfaces",
+      "posture": "enforce",
+      "sentence": "Interfaces in `Meridian.Quoting.*` must be named `I*`.",
+      "because": "The `I` prefix is how a reader and an agent tell a port from its implementation at a glance; the convention stays total so the distinction is reliable.",
+      "citation": "https://learn.microsoft.com/dotnet/standard/design-guidelines/names-of-classes-structs-and-interfaces",
+      "constraint": { "node": "mustHavePrefix", "subject": { "noun": { "node": "types" }, "adjectives": [{ "node": "ofKind", "kind": "interface" }, { "node": "inNamespace", "glob": "Meridian.Quoting.*" }] }, "prefix": "I" }
+    },
+    {
+      "id": "naming/controllers",
+      "posture": "enforce",
+      "sentence": "Types in `Meridian.Quoting.Api.Controllers.*` must be named `*Controller`.",
+      "because": "Request handlers are found by their `*Controller` name, by routing and by agents reading the code; keep the convention total.",
+      "constraint": { "node": "mustHaveSuffix", "subject": { "noun": { "node": "types" }, "adjectives": [{ "node": "inNamespace", "glob": "Meridian.Quoting.Api.Controllers.*" }] }, "suffix": "Controller" }
+    },
+    {
+      "id": "handlers/naming",
+      "posture": "enforce",
+      "sentence": "Types implementing `IHandler` must be named `*Handler`.",
+      "because": "Handlers are registered and resolved by the `IHandler` marker; the `*Handler` suffix keeps them greppable and the registration total.",
+      "constraint": { "node": "mustHaveSuffix", "subject": { "noun": { "node": "types" }, "adjectives": [{ "node": "implementing", "anchor": { "name": "Meridian.Quoting.Application.Abstractions.IHandler" } }] }, "suffix": "Handler" }
+    },
+    {
+      "id": "handlers/transactional",
+      "posture": "enforce",
+      "sentence": "Types implementing `ICommandHandler<TCommand>` must be attributed with `[Transactional]`.",
+      "because": "Every command here mutates the store, and the command bus opens a unit of work only around a handler marked `[Transactional]`; an unmarked command handler would commit each write on its own and leave a half-written quote if it failed midway.",
+      "fix": "Add `[Transactional]` to the command handler; if the work is read-only, make it a query handler instead.",
+      "exemplar": { "noun": { "node": "type", "anchor": { "name": "Meridian.Quoting.Application.Handlers.RequestQuoteHandler" } } },
+      "constraint": { "node": "mustBeAttributedWith", "subject": { "noun": { "node": "types" }, "adjectives": [{ "node": "implementing", "anchor": { "name": "Meridian.Quoting.Application.Abstractions.ICommandHandler<TCommand>", "onDefinition": true } }] }, "anchor": { "name": "Meridian.Quoting.Application.Abstractions.TransactionalAttribute" } }
+    },
+    {
+      "id": "persistence/repository-ports",
+      "posture": "enforce",
+      "sentence": "Interfaces named `*Repository` must reside in `Meridian.Quoting.Domain.*`.",
+      "because": "A `*Repository` is the Domain's own persistence contract; the interface lives with the model it serves and only its implementation lives in Infrastructure. This is the boundary that keeps data access out of the request path.",
+      "fix": "Move the `*Repository` interface into Meridian.Quoting.Domain; leave the implementation in Meridian.Quoting.Infrastructure.",
+      "constraint": { "node": "mustResideInNamespace", "subject": { "noun": { "node": "types" }, "adjectives": [{ "node": "ofKind", "kind": "interface" }, { "node": "withSuffix", "suffix": "Repository" }] }, "glob": "Meridian.Quoting.Domain.*" }
+    },
+    {
+      "id": "time/injected-clock",
+      "posture": "enforce",
+      "sentence": "Types in `Meridian.Quoting.*`, except types named `SystemClock`, must not use `DateTime.Now` or `DateTime.UtcNow`.",
+      "because": "A quote's validity window is computed from the current instant; read straight from the wall clock it cannot be tested at a fixed moment, so time enters through IClock and SystemClock is the one adapter that reads the machine clock.",
+      "fix": "Take IClock in the constructor and read clock.UtcNow; SystemClock is the one sanctioned wall-clock read.",
+      "exemplar": { "noun": { "node": "type", "anchor": { "name": "Meridian.Quoting.Application.Handlers.RequestQuoteHandler" } } },
+      "constraint": { "node": "mustNotUse", "subject": { "noun": { "node": "types" }, "adjectives": [{ "node": "inNamespace", "glob": "Meridian.Quoting.*" }, { "node": "except", "payload": { "noun": { "node": "types" }, "adjectives": [{ "node": "named", "names": ["SystemClock"] }] } }] }, "members": [{ "declaring": { "name": "System.DateTime" }, "name": "Now", "isMethod": false }, { "declaring": { "name": "System.DateTime" }, "name": "UtcNow", "isMethod": false }] }
+    }
+  ],
+  "omitted": [
+    { "id": "messaging/immutable-messages", "reason": "A Must predicate is code, and this file carries data only." }
+  ]
+}

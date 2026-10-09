@@ -1,0 +1,177 @@
+using Shouldly;
+using Xunit;
+using SlideRule.Tests.TestSupport;
+
+namespace SlideRule.Tests.Cli;
+
+/// <summary>
+///     End-to-end <c>explain</c> through the real command tree, all on the DLL fast path (no workspace,
+///     so fast): a rule dumps its fields and exits 0; an unknown ID exits 2 with the ordinal-sorted list
+///     of available (post-desugar) IDs; an ID that is a JSON array written as text exits 2 naming that
+///     shape and nothing else; a missing <c>rule-id</c>, with neither <c>--type</c> nor <c>--path</c> in its place,
+///     exits 2 naming the three forms.
+/// </summary>
+public sealed class ExplainCommandTests
+{
+    [Fact]
+    public async Task Explain_EnforceRule_DumpsFieldsAndExitsZero()
+    {
+        CliResult result = await CliRunner.InvokeAsync(
+            "explain", "layering/domain-independent", "--spec", CliRunner.ViolatedSpecDll);
+
+        result.ShouldSucceed();
+        result.Out.NormalizedTrimmed()
+            .ShouldBe(
+                ("layering/domain-independent (enforce)\n" +
+                 "  sentence: The Domain layer must not reference the Web layer.\n" +
+                 "  because: Domain is UI-agnostic; transaction boundaries live in services.\n" +
+                 "  fix: Define an abstraction in Domain and implement it in Web.").NormalizedTrimmed());
+    }
+
+    [Fact]
+    public async Task Explain_RuleNamingAnExemplar_PrintsItAsTheSpecNamesIt()
+    {
+        CliResult result = await CliRunner.InvokeAsync(
+            "explain", "time/inject-clock", "--spec", CliRunner.ViolatedSpecDll);
+
+        // Explain reads the spec alone, so the exemplar is the phrase the spec composes, with no file or line.
+        result.ShouldSucceed();
+        result.Out.NormalizedTrimmed()
+            .ShouldBe(
+                ("time/inject-clock (migrate)\n" +
+                 "  sentence: The Web layer must not use `DateTime.Now` or `DateTime.UtcNow`.\n" +
+                 "  because: Wall-clock reads are untestable; inject IClock.\n" +
+                 "  fix: Take IClock in the constructor.\n" +
+                 "  exemplar: `OrderService`\n" +
+                 "  from: Code reads the ambient clock directly.\n" +
+                 "  policy: MigrateIfSmall\n" +
+                 "  baseline: arch/baselines/time/inject-clock.json").NormalizedTrimmed());
+    }
+
+    [Fact]
+    public async Task Explain_MigrateRuleWithoutBaseline_DumpsConventionalBaselinePath()
+    {
+        CliResult result = await CliRunner.InvokeAsync(
+            "explain", "data-access/no-inline-sql", "--spec", CliRunner.ViolatedSpecDll);
+
+        result.ShouldSucceed("data-access/no-inline-sql (migrate)");
+        result.Out.ShouldContain("  from: Some controllers open database connections directly.");
+        result.Out.ShouldContain("  policy: MigrateIfSmall");
+        // .Baseline omitted ⇒ the conventional default path is filled at model build (GRAMMAR §4.4).
+        result.Out.ShouldContain("  baseline: arch/baselines/data-access/no-inline-sql.json");
+    }
+
+    [Fact]
+    public async Task Explain_CautionTripwire_DumpsScopeAndDragonsWithNoBoundaryOrBaseline()
+    {
+        CliResult result = await CliRunner.InvokeAsync(
+            "explain", "domain/retry-budget/tripwire", "--spec", CliRunner.ViolatedSpecDll);
+
+        // The whole dump rather than a header pin plus absences: a caution has no containment sentence, no
+        // sanctioned surface and nothing to grandfather, so what needs proving end-to-end is that these four
+        // lines are all of them — the posture's field set is what the reader learns here.
+        result.ShouldSucceed();
+        result.Out.NormalizedTrimmed()
+            .ShouldBe(
+                ("domain/retry-budget/tripwire (caution/tripwire)\n" +
+                 "  because: The retry budget is the one place the domain sanctions a broad catch, and every " +
+                 "caller relies on the filter.\n" +
+                 "  scope: domain/retry-budget\n" +
+                 "  dragons: RetryPolicy's broad catch is filtered on purpose: the `when` clause is what keeps " +
+                 "it green under the unfiltered-catch rule, and it is the fixture's one sanctioned broad " +
+                 "handler. Keep the filter; add cases beside it, never inside it.").NormalizedTrimmed());
+    }
+
+    [Fact]
+    public async Task Explain_UnknownRuleId_ExitsTwoWithSortedListing()
+    {
+        CliResult result = await CliRunner.InvokeAsync(
+            "explain", "no/such/rule", "--spec", CliRunner.ViolatedSpecDll);
+
+        result.ShouldRefuseWith();
+        // The post-desugar ID set includes both scope postures' children (GRAMMAR §7): the quarantine's
+        // containment + tripwire pair, and the caution's tripwire on its own.
+        result.Err.NormalizedTrimmed()
+            .ShouldContain(
+                "Unknown rule ID 'no/such/rule'. Available rule IDs:\n" +
+                "  api/return-dtos\n" +
+                "  async/accept-cancellation\n" +
+                "  data-access/no-inline-sql\n" +
+                "  di/handlers-registered\n" +
+                "  di/handlers-via-registry\n" +
+                "  di/no-captive-dependencies\n" +
+                "  domain/retry-budget/tripwire\n" +
+                "  domain/values-immutable\n" +
+                "  exceptions/domain-throws-domain\n" +
+                "  exceptions/no-bare-bcl-throw\n" +
+                "  exceptions/no-general-catch\n" +
+                "  exceptions/no-swallowed-catch\n" +
+                "  exceptions/no-unfiltered-catch\n" +
+                "  layering/billing-independent\n" +
+                "  layering/domain-independent\n" +
+                "  layering/no-ghost\n" +
+                "  layering/no-ungoverned-types\n" +
+                "  layering/projects-independent\n" +
+                "  layering/projects-reached-only-by-themselves\n" +
+                "  layering/services-behind-contracts\n" +
+                "  layering/services-in-web\n" +
+                "  layering/web-cuts-not-circular\n" +
+                "  legacy/billing/containment\n" +
+                "  legacy/billing/tripwire\n" +
+                "  naming/async-suffix\n" +
+                "  naming/nonexistent\n" +
+                "  packaging/locked-restore\n" +
+                "  packaging/no-feed-dependencies\n" +
+                "  packaging/nothing-published\n" +
+                "  packaging/supported-frameworks\n" +
+                "  state/no-static-mutable");
+    }
+
+    [Fact]
+    public async Task Explain_RuleIdAsAStringifiedArray_RefusesOnTheShapeAndOmitsTheListing()
+    {
+        CliResult result = await CliRunner.InvokeAsync(
+            "explain", """["layering/domain-independent"]""", "--spec", CliRunner.ViolatedSpecDll);
+
+        // The listing above is what a reader needs when they misspelled an ID; here they can read the ID off
+        // their own brackets, so the shape is the whole of what they are missing.
+        result.ShouldRefuseWith(
+            "Unknown rule ID '[\"layering/domain-independent\"]'. That is a JSON array written as text; "
+            + "pass one rule ID: 'layering/domain-independent'.");
+        result.Err.ShouldNotContain("Available rule IDs");
+    }
+
+    [Fact]
+    public async Task Explain_SeveralRuleIdsInOneArray_NamesTheShapeAndEchoesNothing()
+    {
+        CliResult result = await CliRunner.InvokeAsync(
+            "explain", """["layering/domain-independent","layering/no-ghost"]""",
+            "--spec", CliRunner.ViolatedSpecDll);
+
+        // No echo: an array of several holds no single value this verb could have taken, and picking one of
+        // them for the caller would be a guess dressed as advice.
+        result.ShouldRefuseWith(
+            "Unknown rule ID '[\"layering/domain-independent\",\"layering/no-ghost\"]'. That is a JSON array "
+            + "written as text; pass one rule ID.");
+        result.Err.ShouldNotContain("Available rule IDs");
+    }
+
+    [Fact]
+    public async Task Explain_SpecClassWithoutAParameterlessConstructor_RefusesWithTheMessageAndNoStackTrace()
+    {
+        string specDll = NoConstructorSpec.EmitDll("explain-no-ctor");
+
+        CliResult result = await CliRunner.InvokeAsync("explain", "any/rule", "--spec", specDll);
+
+        result.ShouldRefuseWith(NoConstructorSpec.Refusal);
+        result.Err.ShouldNotContain("   at ", result.Transcript());
+    }
+
+    [Fact]
+    public async Task Explain_MissingRuleId_ExitsTwoNamingTheThreeForms()
+    {
+        CliResult result = await CliRunner.InvokeAsync("explain", "--spec", CliRunner.ViolatedSpecDll);
+
+        result.ShouldRefuseWith("Pass exactly one of a rule ID, --type and --path.");
+    }
+}

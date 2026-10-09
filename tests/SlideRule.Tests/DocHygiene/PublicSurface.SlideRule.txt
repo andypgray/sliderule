@@ -1,0 +1,61 @@
+SlideRule.Accessibility
+    Public = 0
+    Internal = 1
+    Protected = 2
+    ProtectedInternal = 3
+    PrivateProtected = 4
+    Private = 5
+SlideRule.Arch
+SlideRule.Constraint
+SlideRule.FieldSelectionConstraints
+SlideRule.Fluent.FieldSelection
+SlideRule.Fluent.ICautionedScope
+SlideRule.Fluent.IEnforceRule
+SlideRule.Fluent.IMigrateRule
+SlideRule.Fluent.IQuarantinedScope
+SlideRule.Fluent.MemberSelection
+SlideRule.Fluent.MethodSelection
+SlideRule.Fluent.NamespacePattern
+SlideRule.Fluent.ProjectSelection
+SlideRule.Fluent.PropertySelection
+SlideRule.Fluent.TypeNamePattern
+SlideRule.IArchitectureSpec
+SlideRule.IAttributeInfo
+SlideRule.IMemberInfo
+SlideRule.IPackageReferenceInfo
+SlideRule.IParameterInfo
+SlideRule.IProjectInfo
+SlideRule.IRuleBuilder
+SlideRule.IScopeBuilder
+SlideRule.ITypeInfo
+SlideRule.Layer
+SlideRule.Lifetime
+    Singleton = 0
+    Scoped = 1
+    Transient = 2
+SlideRule.Member
+SlideRule.MemberKind
+    Method = 0
+    Property = 1
+    Field = 2
+    Event = 3
+SlideRule.MemberSelectionAdjectives
+SlideRule.MemberSelectionConstraints
+SlideRule.MethodSelectionConstraints
+SlideRule.MigrationPolicy
+    MigrateIfSmall = 0
+    AlwaysMigrate = 1
+    NeverMigrate = 2
+SlideRule.ProjectSelectionAdjectives
+SlideRule.ProjectSelectionConstraints
+SlideRule.PropertySelectionConstraints
+SlideRule.Selection
+SlideRule.SelectionAdjectives
+SlideRule.SelectionConstraints
+SlideRule.SpecValidation
+SlideRule.TypeKind
+    Class = 0
+    Interface = 1
+    Struct = 2
+    Enum = 3
+    Delegate = 4

@@ -1,0 +1,72 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <!-- net10.0 host: orchestrates workspace load → spec load → extract → check → render.
+             RollForward=Major so a global tool runs on a newer shared runtime. This project packs as
+             the `sliderule` global tool and MCP server; PackageId is set explicitly to
+             SlideRule.Cli because AssemblyName is `sliderule-cli`, which would otherwise become
+             the package id. The assembly is not plain `sliderule`: that differs from the contract's
+             `SlideRule` only by case, and the runtime, Windows and macOS all treat the two as one
+             assembly, so every folder holding both (this output, the tool package, the tests' bin)
+             would break. -->
+        <TargetFramework>net10.0</TargetFramework>
+        <OutputType>Exe</OutputType>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <RollForward>Major</RollForward>
+        <AssemblyName>sliderule-cli</AssemblyName>
+
+        <!-- Global tool + MCP server identity. PackAsTool applies the DotnetTool package type;
+             PackageType=McpServer additionally marks it for MCP Registry / NuGet MCP discovery. The
+             two coexist. Version + shared metadata come from the repo-root Directory.Build.props. -->
+        <PackAsTool>true</PackAsTool>
+        <ToolCommandName>sliderule</ToolCommandName>
+        <PackageId>SlideRule.Cli</PackageId>
+        <PackageType>McpServer</PackageType>
+        <Description>SlideRule is a .NET architecture checker that enforces one C# spec and renders the same rules for coding agents. A rule is either the law (Enforce) or a ratchet over a counted baseline (Migrate). A scope either fails a new reference into it (Quarantine) or only warns when a change touches it (Caution). The tool checks a solution at the command line, in CI and when a coding agent's turn ends. Agents read the rules in a managed AGENTS.md block and per-directory rule cards, and query them over MCP with 'sliderule mcp'. It is built for long-lived, business-critical .NET codebases.</Description>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <PackageTags>architecture;architecture-as-code;fitness-functions;dependency-rules;layering;static-analysis;tech-debt;legacy;agents-md;mcp;model-context-protocol;ai;claude;cursor;copilot;csharp;dotnet-tool;dotnet</PackageTags>
+        <RestoreLockedMode Condition="'$(CI)' == 'true'">true</RestoreLockedMode>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <!-- PackagePath must use forward slashes: on a Linux release runner a backslash is not a path
+             separator, so `.mcp\server.json` mis-packs as the literal `.mcp//server.json` and
+             nuget.org fails to detect the MCP manifest. The tool ships the root README and the
+             MCP server manifest. -->
+        <None Include="..\..\README.md" Pack="true" PackagePath="/" />
+        <None Include="..\..\.mcp\server.json" Pack="true" PackagePath=".mcp/server.json" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\SlideRule\SlideRule.csproj" />
+        <ProjectReference Include="..\SlideRule.Extraction\SlideRule.Extraction.csproj" />
+        <ProjectReference Include="..\SlideRule.Roslyn\SlideRule.Roslyn.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="System.CommandLine" Version="2.0.12" />
+        <!-- The `mcp` subcommand's stdio server chassis. The four packages are exact-pinned to
+             current versions, all present in the local NuGet cache. -->
+        <PackageReference Include="ModelContextProtocol" Version="2.2.0" />
+        <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.12" />
+        <PackageReference Include="Serilog.Extensions.Hosting" Version="10.0.0" />
+        <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- LogicalName pinned so ServerInstructions loads "server-instructions.md" rather than the
+             path-mangled default (the file lives under Mcp\). -->
+        <EmbeddedResource Include="Mcp\server-instructions.md" LogicalName="server-instructions.md" />
+        <!-- Same pinned short LogicalName for the derive_spec prompt body (the file lives under
+             Mcp\Prompts\). House style embeds by short name; the .NET default is dotted
+             assembly-qualified ids — the deliberate divergence EmbeddedResourceText.Load consumes. -->
+        <EmbeddedResource Include="Mcp\Prompts\derive-spec.md" LogicalName="derive-spec.md" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <InternalsVisibleTo Include="SlideRule.Tests" />
+        <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
+    </ItemGroup>
+
+</Project>

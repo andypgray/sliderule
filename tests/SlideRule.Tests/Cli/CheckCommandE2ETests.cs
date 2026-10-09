@@ -1,0 +1,727 @@
+using System.Text.Json;
+using Shouldly;
+using Xunit;
+using SlideRule.Tests.TestSupport;
+
+namespace SlideRule.Tests.Cli;
+
+/// <summary>
+///     End-to-end <c>check</c> runs against the real MyApp fixture solution. The violated spec is the
+///     acceptance test: one failing rule shows its ID, because, fix and <c>file:line</c> sites together,
+///     and its <c>--json</c> document at every grain and its SARIF output are pinned by goldens. The clean
+///     spec exits 0.
+/// </summary>
+/// <remarks>
+///     <para>
+///         The <c>--rules</c> rows pin the narrowing knob: it decides what <em>runs</em>, so the report, the
+///         summary counts and the 0/1 verdict are all the subset's, and the human stamp (or the document's
+///         <c>rulesFilter</c>) is what stops a green subset of a red spec reading as a green solution. A
+///         filter matching no rule refuses before extraction, since rule IDs come from the spec model.
+///     </para>
+///     <para>
+///         The grain rows pin the other knob, and the two are independent: <c>--rules</c> narrows the
+///         <em>subject</em> (which rules are evaluated at all), while <c>--grain overview</c>, <c>--grain skeleton</c>
+///         and <c>--grain index</c> coarsen the <em>grain</em> (how much of each evaluated rule is written). Every
+///         rung is a whole verdict over the same rules — which is what makes an over-budget MCP call safe to
+///         degrade automatically — full grain stamps no <c>grain</c> key, and the per-rule
+///         <c>violationCount</c> and per-violation <c>siteCount</c> ride every rung, so the keys a consumer
+///         scripts against never depend on the grain the report landed on.
+///     </para>
+/// </remarks>
+public sealed class CheckCommandE2ETests
+{
+    // The violated-spec report, run once for the whole class. A dozen facts below assert different slices
+    // of one report from a byte-identical command line, over paths that are run-stable statics and a fixture
+    // tree no fact here mutates — so re-running the check per fact would buy a dozen identical extractions
+    // and no isolation. The Lazy defers the run until the first fact that needs it and shares the fault if it
+    // throws; every other fact (clean spec, --sarif, --rules, missing spec) still runs its own command line.
+    private static readonly Lazy<Task<CliResult>> ViolatedHuman = new(() =>
+        CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll));
+
+    private static readonly Lazy<Task<CliResult>> ViolatedJson = new(() =>
+        CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json"));
+
+    [Fact]
+    public async Task Check_ViolatedSpec_ExitsOneWithAllFourComponents()
+    {
+        CliResult result = await ViolatedHuman.Value;
+
+        result.ShouldReportViolations("FAIL layering/domain-independent");
+        result.Out.ShouldContain("because: Domain is UI-agnostic; transaction boundaries live in services.");
+        result.Out.ShouldContain("fix: Define an abstraction in Domain and implement it in Web.");
+        result.Out.ShouldContain(
+            "MyApp.Domain/OrderService.cs:9 — MyApp.Domain.OrderService references MyApp.Web.HomeController");
+    }
+
+    [Fact]
+    public async Task Check_ViolatedSpec_ReportsTheFamilyRuleAsOneLawOverEveryCrossProjectEdge()
+    {
+        CliResult result = await ViolatedHuman.Value;
+
+        // One rule over a three-cell partition, where a spec without the noun would need one rule per
+        // project pair: the sentence names the family, and the edges are every reference that leaves a
+        // cell for another — in both directions the solution's references actually run.
+        result.ShouldReportViolations(
+            "FAIL layering/projects-independent — Each of the projects matching `MyApp.*` must not reference the others.");
+        result.Out.ShouldContain(
+            "MyApp.Domain/OrderService.cs:9 — MyApp.Domain.OrderService references MyApp.Web.HomeController");
+        result.Out.ShouldContain(
+            "MyApp.Web/InvoiceController.cs:10 — MyApp.Web.InvoiceController references MyApp.Legacy.Billing.RoundingMode");
+        // The facade path is sanctioned by the quarantine and still crosses a project boundary, so this
+        // rule reds on it — two laws over one edge, asking different questions (GRAMMAR §4.3).
+        result.Out.ShouldContain(
+            "MyApp.Web/HomeController.cs:17 — MyApp.Web.HomeController references MyApp.Legacy.Billing.IBillingFacade");
+    }
+
+    [Fact]
+    public async Task Check_ViolatedSpec_ReportsTheCircleAsOneLawOverBothArrowsOfIt()
+    {
+        CliResult result = await ViolatedHuman.Value;
+
+        // Two cuts of the web layer that reference each other: the cells MAY point at one another, so the
+        // cross-cell ban could not say this law — only the circle is forbidden, and both its arrows are red
+        // under one ID because the verb knows a circle exists and not which way it should have run.
+        result.ShouldReportViolations(
+            "FAIL layering/web-cuts-not-circular — Each of the Reporting and Invoicing layers must not have circular references with the others.");
+        result.Out.ShouldContain(
+            "MyApp.Web/InvoiceCreatedHandler.cs:10 — MyApp.Web.InvoiceCreatedHandler references MyApp.Web.ReportEndpoint");
+        result.Out.ShouldContain(
+            "MyApp.Web/ReportEndpoint.cs:23 — MyApp.Web.ReportEndpoint references MyApp.Web.InvoiceService");
+    }
+
+    [Fact]
+    public async Task Check_ViolatedSpecJson_CarriesTheCircleAsADetailOnEveryPairThatLiesOnIt()
+    {
+        CliResult json = await ViolatedJson.Value;
+
+        // The verb's one addition to the wire document: the circle rides as a per-violation detail, which
+        // the JSON channel alone reads — the human report, the baseline and SARIF see an ordinary reference
+        // pair, which is what keeps the ratchet untouched by this verb (GRAMMAR §4.3).
+        json.Out.ShouldHaveFailedWith("layering/web-cuts-not-circular", "target",
+            ["MyApp.Web.InvoiceService", "MyApp.Web.ReportEndpoint"]);
+        json.Out.ShouldHaveDetailOnEveryViolation(
+            "layering/web-cuts-not-circular", "circular references among the Reporting and Invoicing layers");
+    }
+
+    [Fact]
+    public async Task Check_ViolatedSpec_RatchetsMigrateRuleWithGrandfatheredInvoiceAndRedHome()
+    {
+        CliResult result = await ViolatedHuman.Value;
+
+        result.ShouldReportViolations();
+        // HomeController's DataTable is new code in the old pattern — red.
+        result.Out.ShouldContain("FAIL data-access/no-inline-sql");
+        result.Out.ShouldContain("MyApp.Web/HomeController.cs:24 — MyApp.Web.HomeController references System.Data.DataTable");
+        result.Out.ShouldContain("grandfathered: 1 (baselined; run 'sliderule status' for burndown)");
+        // InvoiceController's DataTable is grandfathered by the conventional baseline — suppressed, not red.
+        result.Out.ShouldNotContain("MyApp.Web.InvoiceController references System.Data.DataTable");
+    }
+
+    [Fact]
+    public async Task Check_ViolatedSpec_ReportsMemberUseRuleWithUsesLinesAndInitHint()
+    {
+        CliResult result = await ViolatedHuman.Value;
+
+        result.ShouldReportViolations();
+        // The member-use half of the report (GRAMMAR §4.5): the layer-voice sentence, a 'uses' line per banned
+        // read at its file:line, and — uncaptured member-level Migrate — the same init hint as any ratcheted rule.
+        result.Out.ShouldContain("FAIL time/inject-clock — The Web layer must not use `DateTime.Now` or `DateTime.UtcNow`.");
+        result.Out.ShouldContain("MyApp.Web/HomeController.cs:32 — MyApp.Web.HomeController uses System.DateTime.Now");
+        result.Out.ShouldContain("MyApp.Web/HomeController.cs:37 — MyApp.Web.HomeController uses System.DateTime.UtcNow");
+        result.Out.ShouldContain(
+            "hint: no baseline captured for this rule; run 'sliderule baseline init' to grandfather existing violations");
+    }
+
+    [Fact]
+    public async Task Check_ViolatedSpec_QuarantineContainmentRedInteriorGreenFacadeTripwireSkips()
+    {
+        CliResult result = await ViolatedHuman.Value;
+
+        result.ShouldReportViolations();
+        // Uncaptured containment (its baseline path is deliberately uncommitted) → interior refs are hard red.
+        result.Out.ShouldContain("FAIL legacy/billing/containment");
+        result.Out.ShouldContain(
+            "MyApp.Web/InvoiceController.cs:9 — MyApp.Web.InvoiceController references MyApp.Legacy.Billing.BillingCalculator");
+        result.Out.ShouldContain("fix: use `IBillingFacade`");
+        result.Out.ShouldContain(
+            "hint: no baseline captured for this rule; run 'sliderule baseline init' to grandfather existing violations");
+        // The facade path (HomeController → IBillingFacade) is the sanctioned surface, so it is absent from
+        // THIS rule's violations — read off the document rather than off the whole report, because
+        // layering/projects-independent reds on the very same edge asking a different question (GRAMMAR §4.3).
+        CliResult json = await ViolatedJson.Value;
+        json.Out.ShouldHaveFailedWith("legacy/billing/containment", "target",
+            ["MyApp.Legacy.Billing.BillingCalculator", "MyApp.Legacy.Billing.RoundingMode"]);
+        // The tripwire skips without a --diff-base.
+        result.Out.ShouldContain("skip legacy/billing/tripwire");
+        result.Out.ShouldContain(
+            "skipped: Tripwire: no diff context — run 'sliderule check --diff-base <ref>' to check changed files against this quarantined scope.");
+    }
+
+    [Fact]
+    public async Task Check_ViolatedSpec_CautionSkipsWithItsOwnReasonAndAddsNothingElse()
+    {
+        CliResult result = await ViolatedHuman.Value;
+
+        // The twin of the row above for the posture with no red state: the caution's only rule is its
+        // tripwire, so the skip is the whole of what a caution contributes to a run with no --diff-base.
+        // The reason is worded for the posture rather than shared with the quarantine's, because the two
+        // scopes ask different things of the reader who goes looking for it.
+        result.Out.ShouldContain("skip domain/retry-budget/tripwire");
+        result.Out.ShouldContain(
+            "skipped: Tripwire: no diff context — run 'sliderule check --diff-base <ref>' to check changed files against this cautioned scope.");
+        // No containment, no boundary, no baseline hint: a caution has no law to fail and nothing to
+        // grandfather, so the report gains one skip line and no red anywhere.
+        result.Out.ShouldNotContain("domain/retry-budget/containment");
+        result.Out.ShouldNotContain("FAIL domain/retry-budget");
+        result.Out.ShouldContain("Checked 32 rules: 3 passed, 27 failed, 2 skipped (51 violations, 2 warnings).");
+    }
+
+    [Fact]
+    public async Task Check_ViolatedSpec_ReportsCatchRuleWithCatchesLineAndInitHint()
+    {
+        CliResult result = await ViolatedHuman.Value;
+
+        result.ShouldReportViolations();
+        // The catch half of the report (GRAMMAR §4.8): the caught-type sentence, a 'catches' line at the
+        // catch site's file:line, and — uncaptured catch-level Migrate — the same init hint as any ratcheted rule.
+        result.Out.ShouldContain("FAIL exceptions/no-general-catch — The Web layer must not catch `Exception`.");
+        result.Out.ShouldContain(
+            "MyApp.Web/ReportEndpoint.cs:15 — MyApp.Web.ReportEndpoint catches System.Exception");
+        result.Out.ShouldContain(
+            "hint: no baseline captured for this rule; run 'sliderule baseline init' to grandfather existing violations");
+    }
+
+    [Fact]
+    public async Task Check_ViolatedSpec_ReportsThrowRuleWithThrowsLineAndAllowsDomainException()
+    {
+        CliResult result = await ViolatedHuman.Value;
+
+        result.ShouldReportViolations();
+        // The throw half of the report (GRAMMAR §4.8): a strict Enforce allow-list. OrderApproval's BCL throw
+        // is red at its site; its sanctioned OrderRuleViolation throw is green — allowed, so never listed.
+        result.Out.ShouldContain("FAIL exceptions/domain-throws-domain — The Domain layer must throw only `OrderRuleViolation`.");
+        result.Out.ShouldContain(
+            "MyApp.Domain/OrderApproval.cs:17 — MyApp.Domain.OrderApproval throws System.InvalidOperationException");
+        result.Out.ShouldNotContain("throws MyApp.Domain.OrderRuleViolation");
+    }
+
+    [Fact]
+    public async Task Check_ViolatedSpec_ReportsUnfilteredCatchRuleAndSparesTheFilteredCatch()
+    {
+        CliResult result = await ViolatedHuman.Value;
+
+        result.ShouldReportViolations();
+        // The filter-aware catch half of the report (GRAMMAR §4.8): a union subject speaks in union voice, and
+        // the rule reads the sites extraction recorded as unfiltered. ReportEndpoint's and ReportPublisher's
+        // blanket catches spell no `when` filter, so both are red at the very sites exceptions/no-general-catch
+        // reds — a second rule over the same two edges, each with its own identity.
+        result.Out.ShouldContain(
+            "FAIL exceptions/no-unfiltered-catch — The Web or Domain layers must not catch `Exception` without a `when` filter.");
+        result.Out.ShouldContain(
+            "MyApp.Web/ReportEndpoint.cs:15 — MyApp.Web.ReportEndpoint catches System.Exception");
+        result.Out.ShouldContain(
+            "MyApp.Web/ReportPublisher.cs:22 — MyApp.Web.ReportPublisher catches System.Exception");
+        // The green half, stated as an absence: RetryPolicy catches the identical type under the identical
+        // subject, and its `when` filter keeps it out of the evidence entirely — no site line, no mention.
+        result.Out.ShouldNotContain("RetryPolicy");
+    }
+
+    [Fact]
+    public async Task Check_ViolatedSpec_ReportsSwallowRuleAndSparesTheRethrowingCatch()
+    {
+        CliResult result = await ViolatedHuman.Value;
+
+        result.ShouldReportViolations();
+        // The rethrow-aware catch half of the report (GRAMMAR §4.8), and the axis differentiator end to end.
+        // ReportPublisher's catch is red under BOTH rules above — same type, same lack of filter — and green
+        // here, because its clause ends in `throw;` and suppresses nothing. Its absence from this one block is
+        // therefore the whole difference between the three catch verbs, read off a single report.
+        string block = result.ShouldHaveRuleBlock("exceptions/no-swallowed-catch");
+        block.ShouldContain("The Web or Domain layers must not swallow `Exception`.");
+        block.ShouldContain("MyApp.Web/ReportEndpoint.cs:15 — MyApp.Web.ReportEndpoint catches System.Exception");
+        block.ShouldNotContain("ReportPublisher");
+    }
+
+    [Fact]
+    public async Task Check_ViolatedSpec_ReportsThrowBanRuleAlongsideTheThrowAllowList()
+    {
+        CliResult result = await ViolatedHuman.Value;
+
+        result.ShouldReportViolations();
+        // The ban polarity beside the allow-list (GRAMMAR §4.8): two rules red at the SAME throw site, each with
+        // its own identity. The 'throws' evidence line is shared text with exceptions/domain-throws-domain, so
+        // what tells the two blocks apart is the prose — this rule names the one type it bans, not the set it
+        // permits — and those are the pins.
+        result.Out.ShouldContain(
+            "FAIL exceptions/no-bare-bcl-throw — The Domain layer must not throw `InvalidOperationException`.");
+        result.Out.ShouldContain(
+            "because: InvalidOperationException tells a caller nothing it can dispatch on; the domain has its own exception for rule failures.");
+        result.Out.ShouldContain("fix: Throw OrderRuleViolation instead of System.InvalidOperationException.");
+        result.Out.ShouldContain(
+            "MyApp.Domain/OrderApproval.cs:17 — MyApp.Domain.OrderApproval throws System.InvalidOperationException");
+    }
+
+    [Fact]
+    public async Task Check_ViolatedSpec_ReportsExposeRuleWithExposesLinesAndInitHint()
+    {
+        CliResult result = await ViolatedHuman.Value;
+
+        result.ShouldReportViolations();
+        // The exposure half of the report (GRAMMAR §4.9): the layer-voice sentence, an 'exposes' line per public
+        // signature that surfaces the banned type, and — uncaptured Migrate — the same init hint as any ratcheted
+        // rule. Both controllers red: InvoiceController is grandfathered for its DataTable *reference* under
+        // data-access/no-inline-sql, but baselines are per-rule, so the byte-identical exposure edge reds here.
+        result.Out.ShouldContain("FAIL api/return-dtos — The Web layer must not expose `DataTable`.");
+        result.Out.ShouldContain(
+            "MyApp.Web/HomeController.cs:24 — MyApp.Web.HomeController exposes System.Data.DataTable");
+        result.Out.ShouldContain(
+            "MyApp.Web/InvoiceController.cs:14 — MyApp.Web.InvoiceController exposes System.Data.DataTable");
+        result.Out.ShouldContain(
+            "hint: no baseline captured for this rule; run 'sliderule baseline init' to grandfather existing violations");
+    }
+
+    [Fact]
+    public async Task Check_CleanSpec_ExitsZero()
+    {
+        CliResult result = await CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", CliRunner.CleanSpecDll);
+
+        result.ShouldSucceed();
+    }
+
+    [Fact]
+    public async Task Check_LayerSpec_JudgesEachLayerAsWhateverDefinesIt()
+    {
+        // The three definition forms in one run: Web is its project and reds on the two controllers that
+        // reach billing, the Reporting refinement narrows Web to the Report* types and holds, and the
+        // quarantine over the glob-defined Billing layer holds too.
+        CliResult result = await CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", CliRunner.LayerSpecDll);
+
+        result.ShouldReportViolations(
+            "FAIL layering/web-not-billing — The Web layer must not reference types in `MyApp.Legacy.Billing.*`.",
+            "MyApp.Web/InvoiceController.cs:9 — MyApp.Web.InvoiceController references MyApp.Legacy.Billing.BillingCalculator",
+            "pass layering/reporting-not-billing — The Reporting layer must not reference types in `MyApp.Legacy.Billing.*`.",
+            "pass legacy/billing/containment — Types in the Billing layer, except `IBillingFacade` or `BillingFacade`, "
+            + "must be referenced only by the Billing layer, `IBillingFacade` or `BillingFacade`.");
+    }
+
+    [Fact]
+    public async Task Check_ViolatedSpecJson_MatchesGolden()
+    {
+        CliResult result = await ViolatedJson.Value;
+
+        result.ShouldReportViolations();
+        result.Out.ShouldMatchGolden("violated-check.json");
+    }
+
+    [Fact]
+    public async Task Check_ViolatedSpecJson_StampsNoGrain()
+    {
+        // The negative control that keeps the grain stamp meaningful: a full report says nothing about
+        // grain, so a document that names one is always a coarsened one, never the complete report.
+        CliResult result = await ViolatedJson.Value;
+
+        using JsonDocument document = result.ShouldHaveJsonStdout();
+        document.RootElement.TryGetProperty("grain", out _)
+            .ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Check_ViolatedSpecOverviewJson_MatchesGolden()
+    {
+        // Act
+        CliResult result = await CliRunner.InvokeAsync(
+            "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json", "--grain", "overview");
+
+        // Assert — the whole report at coarser grain: every rule and every violation still here with its
+        // prose and its edge, each violation's sites elided down to the siteCount that rides every grain,
+        // and the grain stamped so a reader knows which document this is.
+        result.ShouldReportViolations();
+        result.Out.ShouldMatchGolden("violated-check-overview.json");
+    }
+
+    [Fact]
+    public async Task Check_ViolatedSpecSkeletonJson_MatchesGolden()
+    {
+        // Act
+        CliResult result = await CliRunner.InvokeAsync(
+            "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json", "--grain", "skeleton");
+
+        // Assert — the verdict alone: every rule with its prose, status, baseline and warnings, its
+        // violations elided down to the violationCount that rides every grain. Still a verdict, which is
+        // what distinguishes it from status's burndown over the same rules.
+        result.ShouldReportViolations();
+        result.Out.ShouldMatchGolden("violated-check-skeleton.json");
+    }
+
+    [Fact]
+    public async Task Check_ViolatedSpecIndexJson_MatchesGolden()
+    {
+        // Act
+        CliResult result = await CliRunner.InvokeAsync(
+            "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json", "--grain", "index");
+
+        // Assert — the ladder's floor: a verdict per rule ID, with the prose gone and everything a next call
+        // needs still here. It is not a smaller skeleton for the same reader — it is what a client whose
+        // channel cannot hold the skeleton gets instead of a document cut mid-array.
+        result.ShouldReportViolations();
+        result.Out.ShouldMatchGolden("violated-check-index.json");
+    }
+
+    [Fact]
+    public async Task Check_GrainFull_IsTheDocumentWithNoGrain()
+    {
+        // Arrange & Act — full is the ladder's top rung, spelled so a caller can name it; it is the document
+        // that carries no grain stamp at all, not a rung with a document of its own.
+        CliResult result = await CliRunner.InvokeAsync(
+            "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json", "--grain", "full");
+
+        // Assert
+        result.ShouldReportViolations();
+        result.Out.ShouldMatchGolden("violated-check.json");
+    }
+
+    [Fact]
+    public async Task Check_GrainOffTheLadder_IsRefusedAtParseNamingEveryRung()
+    {
+        // Arrange & Act — the grain is one option with four values, so a word that names no rung is a parse
+        // error naming the rungs, in the text arch_check gives for the same word.
+        CliResult result = await CliRunner.InvokeAsync(
+            "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json", "--grain", "coarse");
+
+        // Assert
+        result.ShouldRefuseWith("Unknown grain 'coarse'; use full, overview, skeleton or index.");
+        result.Out.ShouldBeEmpty(result.Transcript());
+    }
+
+    [Fact]
+    public async Task Check_GrainAsAJsonArray_IsRefusedOnTheShape()
+    {
+        // Arrange & Act — an array written where one grain goes. The refusal names the shape and echoes the one
+        // value inside it, as the tool parameter's does, rather than listing the rungs.
+        CliResult result = await CliRunner.InvokeAsync(
+            "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json", "--grain", """["overview"]""");
+
+        // Assert
+        result.ShouldRefuseWith(
+            "Unknown grain '[\"overview\"]'. That is a JSON array written as text; pass one grain: 'overview'.");
+        result.Out.ShouldBeEmpty(result.Transcript());
+    }
+
+    [Fact]
+    public async Task Check_SkeletonJson_ReportsAPassingRulesElidedViolationsAsZeroRatherThanOmittingThem()
+    {
+        // Arrange — an elided array must not read as an empty one, and the case that proves it is the rule
+        // with nothing to elide: a passing rule renders violationCount 0, so "not rendered at this grain"
+        // and "none found" stay distinguishable at the one place they would otherwise collapse.
+        CliResult result = await CliRunner.InvokeAsync(
+            "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json", "--grain", "skeleton");
+
+        // Act
+        using JsonDocument document = result.ShouldHaveJsonStdout();
+        JsonElement passing = document.RootElement.GetProperty("rules")
+            .EnumerateArray()
+            .First(rule => rule.GetProperty("status")
+                .GetString() == "passed");
+
+        // Assert
+        passing.TryGetProperty("violations", out _)
+            .ShouldBeFalse();
+        passing.GetProperty("violationCount")
+            .GetInt32()
+            .ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task Check_FullJson_EveryRuleAndEveryViolationCarryTheCountBesideItsExpansion()
+    {
+        // The count is the key a consumer scripts against, so rendering the expansion must never displace
+        // it: at full grain both sit side by side and the count is the array's length — which also keeps
+        // grandfathered violations out of the count exactly as they stay out of the array. Swept over every
+        // rule and every violation so a future grain change cannot drop either count from any of them.
+        CliResult result = await ViolatedJson.Value;
+
+        result.ShouldReportViolations();
+        using JsonDocument document = result.ShouldHaveJsonStdout();
+        foreach (JsonElement rule in document.RootElement.GetProperty("rules")
+                     .EnumerateArray())
+        {
+            string id = rule.GetProperty("id")
+                .GetString()!;
+            List<string> keys = rule.EnumerateObject()
+                .Select(field => field.Name)
+                .ToList();
+            keys.ShouldContain("violationCount", id);
+            keys.ShouldContain("violations", id);
+            rule.GetProperty("violationCount")
+                .GetInt32()
+                .ShouldBe(rule.GetProperty("violations")
+                    .GetArrayLength(), id);
+
+            foreach (JsonElement violation in rule.GetProperty("violations")
+                         .EnumerateArray())
+            {
+                List<string> violationKeys = violation.EnumerateObject()
+                    .Select(field => field.Name)
+                    .ToList();
+                violationKeys.ShouldContain("siteCount", id);
+                violationKeys.ShouldContain("sites", id);
+                violation.GetProperty("siteCount")
+                    .GetInt32()
+                    .ShouldBe(violation.GetProperty("sites")
+                        .GetArrayLength(), id);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Check_SkeletonJson_EveryRuleKeepsTheCountWhenTheElisionDropsTheArray()
+    {
+        // The same sweep at the coarse grain: the elision drops the array and only the array. Together with
+        // the full-grain sweep above this pins the per-rule key set at both ends of the ladder, so no
+        // future grain change can drop the count silently from either.
+        CliResult result = await CliRunner.InvokeAsync(
+            "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json", "--grain", "skeleton");
+
+        result.ShouldReportViolations();
+        using JsonDocument document = result.ShouldHaveJsonStdout();
+        foreach (JsonElement rule in document.RootElement.GetProperty("rules")
+                     .EnumerateArray())
+        {
+            string id = rule.GetProperty("id")
+                .GetString()!;
+            List<string> keys = rule.EnumerateObject()
+                .Select(field => field.Name)
+                .ToList();
+            keys.ShouldContain("violationCount", id);
+            keys.ShouldNotContain("violations", id);
+        }
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("overview")]
+    [InlineData("skeleton")]
+    public async Task Check_JsonAtEveryGrain_ADefensiveReadOfAFailedRulesCountNeverAnswersZero(string? grain)
+    {
+        // The field-test repro: a consumer scripting the Python idiom rule.get('violationCount', 0) over a
+        // fine-grain report read 0 for rules that had failed, because the count key used to substitute for
+        // the rendered array. Absent-means-zero is the ordinary defensive read, so the count must be present
+        // and non-zero for every failed rule at every grain — that is what makes the read safe.
+        string[] arguments = grain is null
+            ? ["check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json"]
+            : ["check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json", "--grain", grain];
+
+        CliResult result = await CliRunner.InvokeAsync(arguments);
+
+        result.ShouldReportViolations();
+        result.Out.ShouldReportViolationCount("layering/domain-independent", 2);
+        using JsonDocument document = result.ShouldHaveJsonStdout();
+        List<JsonElement> failed = document.RootElement.GetProperty("rules")
+            .EnumerateArray()
+            .Where(rule => rule.GetProperty("status")
+                .GetString() == "failed")
+            .ToList();
+
+        failed.ShouldNotBeEmpty();
+        foreach (JsonElement rule in failed)
+        {
+            string id = rule.GetProperty("id")
+                .GetString()!;
+            rule.TryGetProperty("violationCount", out JsonElement count)
+                .ShouldBeTrue(id);
+            count.GetInt32()
+                .ShouldBeGreaterThan(0, id);
+        }
+    }
+
+    [Fact]
+    public async Task Check_HumanOutput_IgnoresTheGrainOption()
+    {
+        // Arrange — grain is a property of the JSON document alone: a terminal has no response budget to
+        // overrun, and the human block is what a developer reads to fix something.
+        CliResult plain = await ViolatedHuman.Value;
+
+        // Act
+        CliResult skeleton = await CliRunner.InvokeAsync(
+            "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--grain", "skeleton");
+
+        // Assert
+        skeleton.ShouldReportViolations();
+        skeleton.Out.NormalizedTrimmed()
+            .ShouldBe(plain.Out.NormalizedTrimmed());
+    }
+
+    [Fact]
+    public async Task Check_ViolatedSpecSarif_MatchesGolden()
+    {
+        // The SARIF render target over the same result model: one result per violation site, red errors and
+        // grandfathered notes, solution-relative paths. The golden is temp-path-independent because every URI
+        // is resolved against SRCROOT, so the temp file the run writes to never leaks into the document.
+        using TempDirectory temp = TestTempRoot.Fresh("check-sarif");
+        string sarifPath = temp.PathOf("violated-check.sarif");
+
+        CliResult result = await CliRunner.InvokeAsync(
+            "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--sarif", sarifPath);
+
+        result.ShouldReportViolations();
+        File.ReadAllText(sarifPath)
+            .ShouldMatchGolden("violated-check.sarif");
+    }
+
+    [Fact]
+    public async Task Check_ViolatedSpecJsonWithSarif_StdoutStaysPureJson()
+    {
+        // --json owns stdout. --sarif writes its report to the file, and the human-mode `wrote <path>` line is
+        // suppressed under --json, so a hook still parses a single JSON document off stdout. The parse below is
+        // the whole claim: it rejects trailing content, so a leaked wrote line cannot hide behind the document.
+        using TempDirectory temp = TestTempRoot.Fresh("check-sarif");
+        string sarifPath = temp.PathOf("violated-check.sarif");
+
+        CliResult result = await CliRunner.InvokeAsync(
+            "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json", "--sarif", sarifPath);
+
+        result.ShouldReportViolations();
+        using JsonDocument _ = result.ShouldHaveJsonStdout();
+        File.Exists(sarifPath)
+            .ShouldBeTrue();
+        File.ReadAllText(sarifPath)
+            .ShouldContain("\"$schema\"");
+    }
+
+    [Fact]
+    public async Task Check_MissingSpecFile_ExitsTwoWithMessage()
+    {
+        CliResult result = await CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", "does-not-exist.dll");
+
+        result.ShouldRefuseWith("was not found");
+    }
+
+    [Fact]
+    public async Task Check_RulesSelectingOnePassingRule_StampsTheFilterAndExitsZero()
+    {
+        // Act — one green rule picked out of a spec with twenty-seven red ones.
+        CliResult result = await CliRunner.InvokeAsync(
+            "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--rules", "layering/billing-independent");
+
+        // Assert — exit 0, because the rules that were not selected were not run. That is the whole hazard the
+        // stamp exists for: a green subset of a red spec looks exactly like a green solution without it.
+        result.ShouldSucceed(
+            "Checking 1 of 32 rules matching 'layering/billing-independent'; the verdict below covers only those, "
+            + "so a clean result here is not a clean solution.");
+        result.Out.ShouldNotContain("layering/domain-independent");
+    }
+
+    [Fact]
+    public async Task Check_RulesSelectingAnAreaGlob_CountsTheSubsetAndStillExitsOne()
+    {
+        // Act — an area glob over the five exceptions/* rules, all of them red.
+        CliResult result = await CliRunner.InvokeAsync(
+            "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--rules", "exceptions/*");
+
+        // Assert — the exit contract is untouched: narrowing changes what runs, never what a violation means.
+        result.ShouldReportViolations(
+            "Checking 5 of 32 rules matching 'exceptions/*'; the verdict below covers only those, so a clean "
+            + "result here is not a clean solution.",
+            "FAIL exceptions/no-general-catch",
+            "FAIL exceptions/no-bare-bcl-throw");
+        // The rules outside the filter are absent entirely — --rules narrows what runs, not what is displayed.
+        result.Out.ShouldNotContain("layering/domain-independent");
+        result.Out.ShouldNotContain("legacy/billing/containment");
+    }
+
+    [Fact]
+    public async Task Check_RulesSubsetJson_RecordsTheFilterAndCountsOnlyWhatRan()
+    {
+        // Act
+        CliResult result = await CliRunner.InvokeAsync(
+            "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json", "--rules", "exceptions/*");
+
+        // Assert — the stamp never reaches stdout under --json; the document carries the same fact in
+        // rulesFilter, and the summary counts the five rules that ran rather than the thirty-two that exist.
+        result.ShouldReportViolations();
+        using JsonDocument document = result.ShouldHaveJsonStdout();
+        JsonElement root = document.RootElement;
+
+        root.GetProperty("rulesFilter")
+            .EnumerateArray()
+            .Select(glob => glob.GetString())
+            .ShouldBe(["exceptions/*"]);
+        root.GetProperty("rules")
+            .GetArrayLength()
+            .ShouldBe(5);
+        root.GetProperty("summary")
+            .GetProperty("rulesChecked")
+            .GetInt32()
+            .ShouldBe(5);
+    }
+
+    [Fact]
+    public async Task Check_UnfilteredJson_OmitsTheRulesFilterEntirely()
+    {
+        // Act
+        CliResult result = await ViolatedJson.Value;
+
+        // Assert — the slot is absent, not empty, so a whole-spec document has no rulesFilter key at all
+        // (which the golden above pins).
+        result.ShouldReportViolations();
+        using JsonDocument document = result.ShouldHaveJsonStdout();
+        document.RootElement.TryGetProperty("rulesFilter", out _)
+            .ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Check_RulesMatchingNothing_RefusesBeforeExtractionAndListsTheAvailableRuleIds()
+    {
+        // Act
+        CliResult result = await CliRunner.InvokeAsync(
+            "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--rules", "nope/*");
+
+        // Assert — refusing beats checking nothing, which would exit 0 and read as a clean solution. The IDs
+        // come from the spec model, so this costs no codebase walk to say.
+        result.ShouldRefuseWith(
+            "No rule matched 'nope/*'. Available rule IDs:",
+            "layering/domain-independent",
+            "legacy/billing/tripwire");
+        result.Out.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Check_RulesAsAStringifiedArray_RefusesOnTheShapeAndOmitsTheRoster()
+    {
+        // Act — what a client sends when it serializes a JSON array into the string parameter the schema
+        // advertises. The ID inside the brackets is a real one, which is what made the roster read as a
+        // contradiction: it named back the very ID the lead said nothing matched.
+        CliResult result = await CliRunner.InvokeAsync(
+            "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll,
+            "--rules", """["layering/domain-independent"]""");
+
+        // Assert — the roster's absence is the point. Every name the reader could want is inside their own
+        // brackets, so the missing information is the shape, and the advice echoes the value to paste back.
+        result.ShouldRefuseWith(
+            "No rule matched '[\"layering/domain-independent\"]'. That is a JSON array written as text; "
+            + "pass the globs as one semicolon-separated string: 'layering/domain-independent'.");
+        result.Err.ShouldNotContain("Available rule IDs");
+        result.Out.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Check_DiffBaseAsAStringifiedArray_RefusesOnTheShape()
+    {
+        // Act — the same client defect as the row above, on the other string parameter of the same verb. A
+        // client that serializes arrays does it uniformly, so meeting one good message and one git failure
+        // on one tool is the inconsistency the shape refusals exist to remove.
+        CliResult result = await CliRunner.InvokeAsync(
+            "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll,
+            "--diff-base", """["HEAD","main"]""");
+
+        // Assert — git's own words are the absence that matters. Unguarded this reached git, which called
+        // the token an ambiguous argument: a message that quotes what arrived without naming what is wrong
+        // with it, under a lede that spells a CLI flag the MCP caller never passed.
+        result.ShouldRefuseWith(
+            "Cannot resolve changed files since '[\"HEAD\",\"main\"]'. That is a JSON array written as "
+            + "text; pass one git ref.");
+        result.Err.ShouldNotContain("ambiguous argument");
+        result.Err.ShouldNotContain("--diff-base could not resolve changed files");
+        result.Out.ShouldBeEmpty();
+    }
+}

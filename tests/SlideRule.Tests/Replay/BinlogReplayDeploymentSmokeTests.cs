@@ -1,0 +1,101 @@
+using System.Diagnostics;
+using System.Text;
+using Shouldly;
+using Xunit;
+using SlideRule.Roslyn.Hosting;
+using SlideRule.Tests.Cli;
+using SlideRule.Tests.TestSupport;
+
+namespace SlideRule.Tests.Replay;
+
+/// <summary>
+///     The deployment-shaped regression net for the binlog-replay MSBuildLocator crash: it runs
+///     the shipped <c>sliderule-cli.dll</c> as a <em>child process</em> so it exercises the exact condition that
+///     masked the bug from the rest of the suite. Every other replay E2E drives the command tree in-process,
+///     where a <c>[ModuleInitializer]</c> (<see cref="MsBuildInitializer" />) has already registered MSBuild
+///     for the whole test process — so the replay path found <c>Microsoft.Build.Framework</c> regardless of
+///     whether it registered the locator itself, and the deployed tool crashed while the tests stayed green.
+/// </summary>
+/// <remarks>
+///     <para>
+///         The binlog reader (<c>Basic.CompilerLog.Util</c>) parses the binlog through
+///         MSBuild.StructuredLogger, which binds <c>Microsoft.Build.Framework</c> at runtime. The repo ships no
+///         MSBuild engine assemblies (they resolve from the SDK only after <c>MSBuildLocator</c> registration),
+///         so the replay path must register the locator or the parser fails with
+///         <c>Could not load file or assembly 'Microsoft.Build.Framework …'</c>. This is the only test that
+///         runs the shipped registration path for replay: a fresh child process with no module initializer and
+///         no pre-registration, launched with the test host's MSBuild poison vars stripped
+///         (<see cref="DotnetCli.ApplyCleanSdkEnvironment" />) so the child sees a normal user environment —
+///         precisely what a user typing <c>sliderule check --binlog</c> gets.
+///     </para>
+///     <para>
+///         One method, two legs, each costing seconds: the replay leg must exit clean with no loader error, and
+///         its stdout must be byte-identical to the same <c>check</c> run without <c>--binlog</c> (a cold
+///         design-time build) — byte-parity proven at the deployment boundary, not just in-process. Each leg
+///         gets its own throwaway <c>SLIDERULE_CACHE_DIR</c>.
+///     </para>
+/// </remarks>
+public sealed class BinlogReplayDeploymentSmokeTests(BinlogFixtureWorkspace fixture)
+    : IClassFixture<BinlogFixtureWorkspace>, IDisposable
+{
+    private readonly TempDirectory _cacheRootBase = TestTempRoot.Fresh("binlog-smoke");
+
+    private BinlogFixtureWorkspace Fixture => fixture;
+
+    public void Dispose()
+    {
+        _cacheRootBase.Dispose();
+    }
+
+    [Fact]
+    public void Check_BinlogReplayOutOfProcess_RegistersMsBuildAndMatchesColdWithoutLoaderError()
+    {
+        string cli = TestsBinCli.Dll();
+
+        // (a) the shipped condition: `check --binlog` in a child process with no pre-registered MSBuild. Before
+        //     the fix this crashed here with "could not be replayed: Could not load file or assembly
+        //     'Microsoft.Build.Framework …'"; the gate now registers MSBuildLocator up front, so the parser
+        //     resolves the SDK's engine assemblies and the run completes clean.
+        ChildProcess.ProcessResult replay = RunCliOutOfProcess(
+            cli, FreshCache(),
+            "check", Fixture.SolutionPath, "--binlog", Fixture.BinlogPath, "--spec", CliRunner.CleanSpecDll);
+
+        replay.ExitCode.ShouldBe(0);
+        replay.StandardError.ShouldNotContain("could not be replayed");
+        replay.StandardError.ShouldNotContain("Microsoft.Build.Framework");
+
+        // (b) the same check WITHOUT --binlog on its own fresh cache — a cold design-time build, the parity
+        //     baseline. Byte-identical stdout at the deployment boundary is the headline guarantee.
+        ChildProcess.ProcessResult cold = RunCliOutOfProcess(
+            cli, FreshCache(), "check", Fixture.SolutionPath, "--spec", CliRunner.CleanSpecDll);
+
+        cold.ExitCode.ShouldBe(0);
+        replay.StandardOutput.ShouldBe(cold.StandardOutput);
+    }
+
+    // Launches `dotnet <sliderule-cli.dll> <args>` through the drain-safe ChildProcess, in the same cleaned SDK
+    // environment DotnetCli uses (poison MSBuild/VS vars stripped, node/server reuse off) plus a throwaway
+    // SLIDERULE_CACHE_DIR — a deployment-normal child with none of the test host's MSBuild registration
+    // leaking in. UTF-8 decoding matches the CLI's own console encoding so the captured text is faithful.
+    private static ChildProcess.ProcessResult RunCliOutOfProcess(string cliDll, string cacheDir, params string[] args)
+    {
+        var startInfo = new ProcessStartInfo("dotnet")
+        {
+            WorkingDirectory = AppContext.BaseDirectory,
+            StandardOutputEncoding = Encoding.UTF8,
+            StandardErrorEncoding = Encoding.UTF8
+        };
+        startInfo.ArgumentList.Add(cliDll);
+        foreach (string arg in args) startInfo.ArgumentList.Add(arg);
+
+        DotnetCli.ApplyCleanSdkEnvironment(startInfo);
+        startInfo.Environment[SlideRuleEnvVars.CacheDirectory] = cacheDir;
+
+        return ChildProcess.Run(startInfo);
+    }
+
+    private string FreshCache()
+    {
+        return _cacheRootBase.UniqueChildPath();
+    }
+}

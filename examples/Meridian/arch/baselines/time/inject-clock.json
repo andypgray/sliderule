@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 2,
+  "rules": {
+    "time/inject-clock": {
+      "entries": [
+        { "source": "T:Meridian.Web.Controllers.CustomsController", "target": "P:System.DateTime.UtcNow", "siteCount": 1, "seal": "5bad924532dea412" },
+        { "source": "T:Meridian.Web.Controllers.DriversController", "target": "P:System.DateTime.Now", "siteCount": 1, "seal": "af93d60f2c0e599e" },
+        { "source": "T:Meridian.Web.Controllers.InvoicesController", "target": "P:System.DateTime.Now", "siteCount": 1, "seal": "2d88aa637a0999b2" },
+        { "source": "T:Meridian.Web.Controllers.InvoicesController", "target": "P:System.DateTime.UtcNow", "siteCount": 1, "seal": "52f3ee4b54fbbcf2" },
+        { "source": "T:Meridian.Web.Controllers.ManifestsController", "target": "P:System.DateTime.UtcNow", "siteCount": 1, "seal": "a33093fc91476030" },
+        { "source": "T:Meridian.Web.Controllers.RatesController", "target": "P:System.DateTime.UtcNow", "siteCount": 1, "seal": "0d7067b732a4b49e" },
+        { "source": "T:Meridian.Web.Controllers.ShipmentsController", "target": "P:System.DateTime.UtcNow", "siteCount": 1, "seal": "ff68a2f73d70cdf1" }
+      ]
+    }
+  }
+}

@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!-- The satellite. It declares DriftedApp.StringExtensions a second time, in Utilities/StringExtensions.cs,
+         whose members have drifted away from the core's copy, and it declares NO ProjectReference at all. So
+         nothing it compiles can reach DriftedApp.Cell, and any DriftedApp.Core.Ansi -> DriftedApp.Core edge in
+         the survey, or any violation that charges this project with the core copy's reference, is the phantom.
+         The absence of a ProjectReference is what makes the assertion "no edge between the declarers at all"
+         rather than a count, so no ordering accident can satisfy it. Do not add one. -->
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>disable</Nullable>
+        <ImplicitUsings>disable</ImplicitUsings> <!-- parity: raw CSharpCompilation has no implicit usings -->
+        <RestoreLockedMode Condition="'$(CI)' == 'true'">true</RestoreLockedMode>
+    </PropertyGroup>
+</Project>

@@ -1,0 +1,117 @@
+using Shouldly;
+using Xunit;
+using SlideRule.Cli;
+using SlideRule.Roslyn;
+using SlideRule.Tests.Checking;
+using SlideRule.Tests.TestSupport;
+using SlideRule.Validation;
+
+namespace SlideRule.Tests.Cli;
+
+/// <summary>
+///     The exception → stderr + exit-code mapping, unit-tested without a workspace: a
+///     <see cref="SpecValidationException" /> lists every error at once (agents fix a spec in one
+///     pass), a <see cref="UserErrorException" /> renders message-only, and both exit 2.
+/// </summary>
+public sealed class CliErrorMapperTests
+{
+    [Fact]
+    public void Write_SpecValidationException_ListsEveryErrorAndExitsTwo()
+    {
+        // A real validation failure: two rules each missing the required .Because.
+        var validation = Should.Throw<SpecValidationException>(() =>
+            Checker.Model(arch =>
+            {
+                arch.Rule("area/one")
+                    .Enforce(arch.Types.MustHavePrefix("X"));
+                arch.Rule("area/two")
+                    .Enforce(arch.Types.MustHaveSuffix("Y"));
+            }));
+
+        var error = new StringWriter();
+        int exit = CliErrorMapper.Write(validation, error);
+
+        exit.ShouldBe(2);
+        var text = error.ToString();
+        text.ShouldContain("Spec validation failed:");
+        text.ShouldContain("area/one");
+        text.ShouldContain("area/two");
+    }
+
+    [Fact]
+    public void Write_UserError_RendersMessageOnlyAndExitsTwo()
+    {
+        var error = new StringWriter();
+
+        int exit = CliErrorMapper.Write(new UserErrorException("no spec project found"), error);
+
+        exit.ShouldBe(2);
+        error.ToString()
+            .Trim()
+            .ShouldBe("no spec project found");
+    }
+
+    [Fact]
+    public void UserFacingMessage_UnexpectedError_ReturnsNull()
+    {
+        CliErrorMapper.UserFacingMessage(new InvalidCastException("bug"))
+            .ShouldBeNull();
+    }
+
+    [Fact]
+    public void Write_UnexpectedError_DumpsTheStackTraceAndStillExitsTwo()
+    {
+        // The other half of "anything else is a bug": UserFacingMessage returning null is what routes an
+        // unexpected exception here, and what it must produce is the full ToString() — type, message and
+        // stack — because for a bug the stack is the report. Thrown rather than constructed so there is
+        // a real stack to lose.
+        Exception bug = Should.Throw<InvalidCastException>(() => throw new InvalidCastException("bug"));
+
+        var error = new StringWriter();
+        int exit = CliErrorMapper.Write(bug, error);
+
+        exit.ShouldBe(2);
+        var text = error.ToString();
+        text.ShouldContain("System.InvalidCastException");
+        text.ShouldContain("bug");
+        text.ShouldContain(nameof(CliErrorMapperTests));
+    }
+
+    // The MCP GlobalCallToolFilter renders UserFacingMessage; the CLI renders Write. This pins them to
+    // the identical multi-line body (after newline normalization) so the two surfaces stay in parity —
+    // for a multi-line UserErrorException (the unknown-rule listing) and for spec validation.
+    [Fact]
+    public void Write_MatchesUserFacingMessage_ForMultilineUserError()
+    {
+        var exception = new UserErrorException("Unknown rule ID 'x'. Available rule IDs:\n  a/one\n  b/two");
+        var error = new StringWriter();
+
+        CliErrorMapper.Write(exception, error);
+
+        error.ToString()
+            .NormalizedLines()
+            .TrimEnd('\n')
+            .ShouldBe(CliErrorMapper.UserFacingMessage(exception));
+    }
+
+    [Fact]
+    public void Write_MatchesUserFacingMessage_ForSpecValidation()
+    {
+        var validation = Should.Throw<SpecValidationException>(() =>
+            Checker.Model(arch =>
+            {
+                arch.Rule("area/one")
+                    .Enforce(arch.Types.MustHavePrefix("X"));
+                arch.Rule("area/two")
+                    .Enforce(arch.Types.MustHaveSuffix("Y"));
+            }));
+        var error = new StringWriter();
+
+        CliErrorMapper.Write(validation, error);
+
+        error.ToString()
+            .NormalizedLines()
+            .TrimEnd('\n')
+            .ShouldBe(CliErrorMapper.UserFacingMessage(validation));
+    }
+}

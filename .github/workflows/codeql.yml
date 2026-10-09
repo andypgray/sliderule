@@ -1,0 +1,68 @@
+# CodeQL static analysis for C#. Runs GitHub's semantic code-scanning engine and uploads results
+# to the repo's Security tab. build-mode: none does buildless analysis, so it does not depend on
+# CodeQL supporting the net10.0 build. Also satisfies OpenSSF Scorecard's SAST check, which credits
+# the presence of a github/codeql-action/analyze step.
+#
+# Two bounds, so a green run here is not read as "nothing to find". Buildless extraction resolves
+# what it can from source rather than from a compiled assembly graph, so dataflow that leaves this
+# repository's own code — through a NuGet dependency, or through a type CodeQL could not resolve —
+# is weaker than a build-mode run's would be; the trade is that the analysis cannot be broken by an
+# SDK CodeQL does not yet build. And `languages: csharp` is the whole scan: the bash these workflows
+# carry in `run:` blocks — much of ci.yml, and the publish steps in release.yml — is analysed by
+# nothing here. Adding `actions` alongside `csharp` in `languages` is what would cover it.
+#
+# While the repository is private the analyze job skips, because code scanning is unavailable there; the
+# visibility job asks the API rather than reading the event, since a scheduled run's payload carries no
+# repository, and the analysis resumes by itself once the repository is public again.
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '30 3 * * 1'  # Mondays 03:30 UTC (offset from the Scorecard workflow's 02:30)
+
+permissions:
+  contents: read
+
+jobs:
+  visibility:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      public: ${{ steps.probe.outputs.public }}
+    steps:
+      - id: probe
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          public="$(gh api "repos/$GITHUB_REPOSITORY" --jq '.private == false')"
+          echo "public=$public" >> "$GITHUB_OUTPUT"
+
+  analyze:
+    name: Analyze (C#)
+    needs: visibility
+    if: needs.visibility.outputs.public == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write  # upload CodeQL findings to code scanning
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          languages: csharp
+          build-mode: none
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          category: '/language:csharp'

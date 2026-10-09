@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SourceOnlyPackage: the bed for a context card placed above the checkout.
+
+  ONE PROJECT, ONE SOURCE-ONLY PACKAGE. Contoso.Shims ships a C# file as a content file with buildAction Compile,
+  so a restore adds that file to this project's compilation straight out of the package folder. The test restores
+  into a/home/.nuget/packages beside b/repo, so the project's own file and the package's share nothing but the
+  root of the copy, and a card collapsed over both lands there. See RenderContainmentE2ETests.
+
+  THE PACKAGE IS MANUFACTURED AT TEST TIME, not committed, and NUGET_PACKAGES points inside the copy.
+
+  THREE SITING CONSTRAINTS, the ones FieldMini.Core.csproj states, for the same reasons.
+
+  1. It lives under Fixtures/RenderContainmentSolutions/, NOT Fixtures/TestSolutions/, which FixtureRestorer
+     restores at startup against a feed that does not exist until a test writes it.
+
+  2. It is NOT a member of SlideRule.slnx and is NOT ProjectReference'd from the tests csproj.
+
+  3. Source only: no bin/, no obj/, no feed/, and no committed .nupkg.
+-->
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>disable</Nullable>
+        <ImplicitUsings>disable</ImplicitUsings>
+        <!-- No audit: the feed is a local folder, and an advisory line is not what this bed measures. -->
+        <NuGetAudit>false</NuGetAudit>
+        <RestoreLockedMode Condition="'$(CI)' == 'true'">true</RestoreLockedMode>
+    </PropertyGroup>
+    <ItemGroup>
+        <PackageReference Include="Contoso.Shims" Version="1.0.0" />
+    </ItemGroup>
+</Project>

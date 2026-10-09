@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 2,
+  "rules": {
+    "naming/async-suffix": {
+      "entries": [
+        { "subject": "M:Meridian.Domain.IBookingRepository.Add(Meridian.Domain.Booking)", "seal": "816ea10b794be4cd" },
+        { "subject": "M:Meridian.Domain.IBookingRepository.Get(System.String)", "seal": "7077ff92059ab71a" },
+        { "subject": "M:Meridian.Domain.IQuoteRepository.Add(Meridian.Domain.Quote)", "seal": "5b2ad6d50c51c3f6" },
+        { "subject": "M:Meridian.Domain.IQuoteRepository.Get(System.String)", "seal": "52918d3314840cb8" },
+        { "subject": "M:Meridian.Domain.IRateCardRepository.GetForLane(System.String,System.DateTime)", "seal": "c5b7dff1f77fadba" },
+        { "subject": "M:Meridian.Web.Controllers.BookingsController.Create(Meridian.Web.Models.CreateBookingRequest)", "seal": "d5a591ad4e2edf4d" },
+        { "subject": "M:Meridian.Web.Controllers.QuotesController.Create(Meridian.Web.Models.CreateQuoteRequest)", "seal": "ca4a07b9278232b1" },
+        { "subject": "M:Meridian.Web.Controllers.QuotesController.Get(System.String)", "seal": "1361f092110d12bc" },
+        { "subject": "M:Meridian.Web.Data.BookingRepository.Add(Meridian.Domain.Booking)", "seal": "77e57bf2ac97a457" },
+        { "subject": "M:Meridian.Web.Data.BookingRepository.Get(System.String)", "seal": "c2b2f38380e9b4bd" },
+        { "subject": "M:Meridian.Web.Data.QuoteRepository.Add(Meridian.Domain.Quote)", "seal": "a4dbaa2ddfb7f8e3" },
+        { "subject": "M:Meridian.Web.Data.QuoteRepository.Get(System.String)", "seal": "4748256b667481ee" },
+        { "subject": "M:Meridian.Web.Data.RateCardRepository.GetForLane(System.String,System.DateTime)", "seal": "825adb3e4fb1011a" }
+      ]
+    }
+  }
+}

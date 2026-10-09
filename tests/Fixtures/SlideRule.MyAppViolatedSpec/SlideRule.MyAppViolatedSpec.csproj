@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <!-- A spec fixture for the MyApp test solution, referencing Core and the three MyApp projects its
+         rules govern. Built and loaded by the CLI e2e tests via the spec flag; its DLL path is baked into
+         the test assembly's metadata. Sibling of the test project (NOT under
+         tests/SlideRule.Tests/Fixtures/) so the test csproj's Fixtures globs never sweep it.
+
+         The MyApp references are what the typeof() anchors below bind to. A spec fixture CAN carry
+         name-carrier stubs instead — correspondence is by full name, so the checker cannot tell — but this
+         solution compiles the MyApp sources too, and a stub then declares an FQN twice in one universe,
+         which the merge reports as an advisory conflation note on every check of this repo. Referencing the
+         real projects removes the cause rather than the report. LegacySpec is the precedent. -->
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <IsPackable>false</IsPackable>
+        <RestoreLockedMode Condition="'$(CI)' == 'true'">true</RestoreLockedMode>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\..\src\SlideRule\SlideRule.csproj" />
+        <ProjectReference Include="..\..\SlideRule.Tests\Fixtures\TestSolutions\MyApp\MyApp.Domain\MyApp.Domain.csproj" />
+        <ProjectReference Include="..\..\SlideRule.Tests\Fixtures\TestSolutions\MyApp\MyApp.Web\MyApp.Web.csproj" />
+        <ProjectReference Include="..\..\SlideRule.Tests\Fixtures\TestSolutions\MyApp\MyApp.Legacy.Billing\MyApp.Legacy.Billing.csproj" />
+    </ItemGroup>
+
+</Project>

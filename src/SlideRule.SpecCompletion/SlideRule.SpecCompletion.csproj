@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <!-- netstandard2.0 because an editor loads this assembly into whatever process is hosting it —
+             Visual Studio on .NET Framework, the language server on .NET, Rider's backend — and only
+             netstandard2.0 loads in all of them. LangVersion 13.0 is pinned for the same reason as the
+             sibling analyzer's: netstandard2.0 otherwise defaults to C# 7.3. -->
+        <TargetFramework>netstandard2.0</TargetFramework>
+        <LangVersion>13.0</LangVersion>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+
+        <!-- The banned-API gate is right for editor-hosted code for the same reason it is right inside
+             the compiler: there is no console, no current directory and no clock worth reading in the
+             process that loads this, and a call to one of them is an error here rather than a warning
+             nobody sees. This assembly declares no analyzer and no generator, which is the whole reason
+             it exists — RS1038 forbids a Workspaces reference beside a DiagnosticAnalyzer, and the
+             completion API lives in Workspaces and Features. -->
+        <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+
+        <!-- This assembly travels inside the contract package, beside the contract every spec project
+             already references, and is never a package of its own — the same arrangement as the sibling
+             analyzer's, for the same reason: a consumer who has the contract has this. -->
+        <IsPackable>false</IsPackable>
+
+        <RestoreLockedMode Condition="'$(CI)' == 'true'">true</RestoreLockedMode>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <!-- The compiler-API floor as its own literal, stated here for the reason the sibling analyzer
+             states it: this project references no project in this repository at all, so there is nothing
+             to take a compiler API from. Features brings the completion surface and, with it,
+             Workspaces.Common; both stay private, because a package flowing on from here would put a copy
+             at the floor in front of everything that referenced this project. RoslynFloorPinTests holds
+             both literals and the dependency-update ignores that keep an automated bump from raising them. -->
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.0.1" PrivateAssets="all" />
+        <PackageReference Include="Microsoft.CodeAnalysis.Features" Version="4.0.1" PrivateAssets="all" />
+        <!-- A build-time analyzer for this project alone, at the newest stable version rather than the
+             one the floor brings transitively — which is too old to enforce the extended analyzer rules
+             the property above asks for. -->
+        <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="5.9.0" PrivateAssets="all" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <InternalsVisibleTo Include="SlideRule.Tests" />
+    </ItemGroup>
+
+</Project>

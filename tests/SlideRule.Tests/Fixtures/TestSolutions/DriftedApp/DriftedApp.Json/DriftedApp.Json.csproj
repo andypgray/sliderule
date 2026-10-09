@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!-- A multi-targeting library that compiles a source-only package into itself. The import below stands in for
+         the Compile items a restore adds, so this project declares its own Polyfills.Guard and, on netstandard2.1,
+         its own Polyfills.MD5Polyfill. DriftedApp.Testing imports the same file and declares both names again, so
+         each name is one type that two projects declare, and each project's reference to Guard reaches its own
+         copy.
+         No ProjectReference, here or in DriftedApp.Testing. Every reference to a shim therefore stays inside the
+         project that makes it, and a layer defined by this project shares no copy with a layer defined by the
+         other. Do not add one.
+         netstandard2.1 rather than netstandard2.0, because the SDK carries netstandard2.1's reference pack, where
+         netstandard2.0 would restore NETStandard.Library from a feed. That keeps the bed package-free, like its
+         siblings. Its default language version has no file-scoped namespaces, so the sources use blocks. -->
+    <PropertyGroup>
+        <TargetFrameworks>netstandard2.1;net10.0</TargetFrameworks>
+        <Nullable>disable</Nullable>
+        <ImplicitUsings>disable</ImplicitUsings> <!-- parity: raw CSharpCompilation has no implicit usings -->
+        <RestoreLockedMode Condition="'$(CI)' == 'true'">true</RestoreLockedMode>
+    </PropertyGroup>
+    <Import Project="..\Contoso.Polyfill\Contoso.Polyfill.props" />
+</Project>
