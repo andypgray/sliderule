@@ -1,0 +1,39 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+*.cache
+*.dll
+*.exe
+*.pdb
+*.nupkg
+*.snupkg
+
+## IDE
+.vs/
+.idea/
+*.sln.DotSettings.user
+*.lscache
+
+## Build
+artifacts/
+nupkg/
+TestResults/
+
+## OS
+Thumbs.db
+.DS_Store
+
+## Local-only Claude tooling (dev aids, not imposed on the public repo)
+.claude/
+.mcp.json
+CLAUDE.md
+tests/SlideRule.Tests/Local/
+
+## Internal design docs — kept locally, not published (GRAMMAR.md is tracked at the repo root)
+docs/
+
+## Extra hygiene patterns the tree-wide gate reads when present. Untracked on purpose: a denylist
+## naming private repositories would publish the very names it protects.
+.hygiene-private

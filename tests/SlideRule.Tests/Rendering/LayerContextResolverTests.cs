@@ -1,0 +1,278 @@
+using Shouldly;
+using SlideRule.Checking;
+using SlideRule.Codebase;
+using SlideRule.Hosting;
+using SlideRule.Rendering;
+using SlideRule.Tests.Checking;
+using SlideRule.Tests.Extraction;
+using Xunit;
+
+namespace SlideRule.Tests.Rendering;
+
+/// <summary>
+///     Layer placement: a layer earns a "local rules" card iff at least one Enforce or
+///     Migrate rule is anchored on it (subject noun head is that layer), and the card lands in the
+///     deepest common ancestor directory of the whole layer's types. A refined subject (adjective /
+///     <c>Except</c>) keeps its noun head, so it still anchors; a namespace-subject rule over the same
+///     types does not; a scope-posture rule never anchors, whichever verb declared the scope (its story is
+///     the scope card). A layer
+///     matching no types resolves to a null directory with a skip reason. No MSBuild — paths are
+///     synthesized through <see cref="CompilationFactory" />.
+/// </summary>
+public class LayerContextResolverTests
+{
+    // The codebases the facts place against. The one-file Web scene is shared with
+    // ContextFileComposerTests as ContextFixtures.WebCodebase; these two are this suite's own.
+    private static readonly CodebaseModel BillingOnly = CompilationFactory.Extract("MyApp.Legacy.Billing",
+        (ContextFixtures.Site("MyApp.Legacy.Billing", "BillingCalculator.cs"),
+            "namespace MyApp.Legacy.Billing; public class BillingCalculator {}"));
+
+    private static readonly CodebaseModel WebAndBilling = CompilationFactory.Extract("MyApp",
+        (ContextFixtures.Site("src", "MyApp.Web", "HomeController.cs"), "namespace MyApp.Web; public class HomeController {}"),
+        (ContextFixtures.Site("src", "MyApp.Legacy.Billing", "BillingCalculator.cs"),
+            "namespace MyApp.Legacy.Billing; public class BillingCalculator {}"));
+
+    private static readonly IArchitectureSpec WebLayerSpec = ContextFixtures.WebLayer();
+
+    private static readonly IArchitectureSpec DescribedWebLayerSpec =
+        ContextFixtures.WebLayer("The HTTP surface: controllers and the views they serve.");
+
+    // A Web layer whose only rule has a web.Except(...) subject — a refinement that preserves the noun head.
+    private static readonly IArchitectureSpec ExceptRefinedSpec = new InlineSpec(arch =>
+    {
+        Layer web = arch.Layer("Web", "MyApp.Web.*");
+        arch.Rule("layering/web-core-not-legacy")
+            .Enforce(web.Except(arch.Namespace("MyApp.Web.Internal.*"))
+                .MustNotReference(arch.Namespace("MyApp.Legacy.*")))
+            .Because("Public web must not touch legacy.");
+    });
+
+    // A Web layer whose only rule ranges over MyApp.Web.* through a NamespaceNoun subject, not the layer.
+    private static readonly IArchitectureSpec NamespaceSubjectSpec = new InlineSpec(arch =>
+    {
+        arch.Layer("Web", "MyApp.Web.*");
+        arch.Rule("layering/web-namespace")
+            .Enforce(arch.Namespace("MyApp.Web.*").MustNotReference(arch.Namespace("MyApp.Legacy.*")))
+            .Because("A namespace-subject rule, deliberately not layer-anchored.");
+    });
+
+    // A Web layer whose only rule has a union subject the layer is an operand of — the union owns the
+    // subject, so nothing anchors on the layer.
+    private static readonly IArchitectureSpec UnionSubjectSpec = new InlineSpec(arch =>
+    {
+        Layer web = arch.Layer("Web", "MyApp.Web.*");
+        arch.Rule("layering/web-or-domain-not-legacy")
+            .Enforce(arch.AnyOf(web, arch.Namespace("MyApp.Domain.*"))
+                .MustNotReference(arch.Namespace("MyApp.Legacy.*")))
+            .Because("Neither the web layer nor the domain touches legacy.");
+    });
+
+    // Two layers under one family rule and nothing else: the rule anchors on each cell, and each card
+    // lands at its own cell's directory rather than at the subject's head.
+    private static readonly IArchitectureSpec FamilySubjectSpec = new InlineSpec(arch =>
+    {
+        Layer web = arch.Layer("Web", "MyApp.Web.*");
+        Layer billing = arch.Layer("Billing", "MyApp.Legacy.Billing.*");
+        arch.Rule("layering/leaves-independent")
+            .Enforce(arch.Each(web, billing).MustNotReferenceEachOther())
+            .Because("Neither leaf may grow a dependency on the other.");
+    });
+
+    // The same family narrowed by an adjective — a refinement keeps the noun head, family or not.
+    private static readonly IArchitectureSpec RefinedFamilySubjectSpec = new InlineSpec(arch =>
+    {
+        Layer web = arch.Layer("Web", "MyApp.Web.*");
+        Layer billing = arch.Layer("Billing", "MyApp.Legacy.Billing.*");
+        arch.Rule("layering/leaves-independent")
+            .Enforce(arch.Each(web, billing).Except(arch.Types.Named("Shared")).MustNotReferenceEachOther())
+            .Because("Neither leaf may grow a dependency on the other.");
+    });
+
+    // The project form of the same law: it names no layer, so it anchors no card at all.
+    private static readonly IArchitectureSpec ProjectFamilySubjectSpec = new InlineSpec(arch =>
+    {
+        arch.Layer("Web", "MyApp.Web.*");
+        arch.Rule("layering/projects-independent")
+            .Enforce(arch.Each(arch.Projects.Matching("MyApp.*")).MustNotReferenceEachOther())
+            .Because("Each project is its own deployable unit.");
+    });
+
+    // A Billing layer with one anchored rule — used to place against a codebase that has no billing types.
+    private static readonly IArchitectureSpec BillingLayerSpec = new InlineSpec(ContextFixtures.BillingLayer);
+
+    // A hermetically quarantined Billing layer with no other rule — its only layer-anchored subject is the
+    // Quarantine containment, which the resolver excludes.
+    private static readonly IArchitectureSpec QuarantinedLayerSpec = new InlineSpec(arch =>
+    {
+        Layer billing = arch.Layer("Billing", "MyApp.Legacy.Billing.*");
+        arch.Scope("legacy/billing")
+            .Quarantine(billing)
+            .Dragons("Banker's rounding is structural.")
+            .Because("Replacement scheduled; not worth stabilizing.");
+    });
+
+    // A cautioned Billing layer with no other rule. Its one child is a tripwire, which carries no constraint
+    // at all — so it anchors nothing whether or not the posture filter were to let it through.
+    private static readonly IArchitectureSpec CautionedLayerSpec = new InlineSpec(arch =>
+    {
+        Layer billing = arch.Layer("Billing", "MyApp.Legacy.Billing.*");
+        arch.Scope("legacy/billing")
+            .Caution(billing)
+            .Dragons("Banker's rounding is structural.")
+            .Because("Every caller depends on the exact rounding.");
+    });
+
+    private static IReadOnlyList<LayerPlacement> Resolve(IArchitectureSpec spec, CodebaseModel codebase)
+    {
+        return Resolve(ArchModelBuilder.Build(spec), codebase);
+    }
+
+    // Every scene resolves inside the shared solution directory, which the scenes' codebases declare their files under.
+    private static IReadOnlyList<LayerPlacement> Resolve(ArchitectureModel model, CodebaseModel codebase)
+    {
+        return LayerContextResolver.Resolve(
+            model, new SelectionEvaluator(codebase), new DirectoryPlacement.Boundary(ContextFixtures.SolutionDirectory));
+    }
+
+    [Fact]
+    public void Resolve_LayerWithAnchoredRule_PicksDeepestCommonDirectory()
+    {
+        CodebaseModel codebase = CompilationFactory.Extract("MyApp.Web",
+            (ContextFixtures.Site("src", "MyApp.Web", "HomeController.cs"), "namespace MyApp.Web; public class HomeController {}"),
+            (ContextFixtures.Site("src", "MyApp.Web", "InvoiceController.cs"), "namespace MyApp.Web; public class InvoiceController {}"));
+
+        IReadOnlyList<LayerPlacement> placements = Resolve(WebLayerSpec, codebase);
+
+        LayerPlacement placement = placements.ShouldHaveSingleItem();
+        placement.LayerName.ShouldBe("Web");
+        placement.Rules.Select(rule => rule.Id)
+            .ShouldBe(["layering/web-not-billing"]);
+        ContextFixtures.Relative(placement.Destination.DirectoryPath)
+            .ShouldBe("src/MyApp.Web");
+        placement.Destination.SkipReason.ShouldBeNull();
+        placement.Purpose.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Resolve_DescribedLayer_CarriesItsPurposeOntoThePlacement()
+    {
+        // The purpose rides from the layer definition onto the placement, which is the only route it has
+        // into the card lede — the renderer is handed it, never the model.
+        LayerPlacement placement = Resolve(DescribedWebLayerSpec, ContextFixtures.WebCodebase)[0];
+
+        placement.Purpose.ShouldBe("The HTTP surface: controllers and the views they serve.");
+    }
+
+    [Fact]
+    public void Resolve_AnchoredViaExcept_StillAnchors()
+    {
+        // The rule subject is web.Except(...); the Except refinement keeps the LayerNoun head, so the
+        // layer still anchors and the card ranges over the whole layer directory.
+        LayerPlacement placement = Resolve(ExceptRefinedSpec, ContextFixtures.WebCodebase)[0];
+
+        placement.LayerName.ShouldBe("Web");
+        ContextFixtures.Relative(placement.Destination.DirectoryPath)
+            .ShouldBe("src/MyApp.Web");
+    }
+
+    [Fact]
+    public void Resolve_NamespaceSubjectRule_LayerGetsNoPlacement()
+    {
+        // A rule whose subject is arch.Namespace("MyApp.Web.*") ranges over the same types as the Web
+        // layer, but its noun head is a NamespaceNoun — anchoring is by noun identity, not type set.
+        Resolve(NamespaceSubjectSpec, ContextFixtures.WebCodebase)
+            .ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Resolve_QuarantinePostureRuleOnLayer_Excluded()
+    {
+        // The layer is quarantined (its desugared containment subject is layer-anchored) but carries no
+        // Enforce/Migrate rule — Quarantine posture is excluded, so the layer earns no card and does not
+        // double-emit beside its quarantine card.
+        Resolve(QuarantinedLayerSpec, BillingOnly)
+            .ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Resolve_CautionPostureRuleOnLayer_Excluded()
+    {
+        // The caution card already covers this directory; a layer card beside it would say the same thing
+        // twice in the same file.
+        Resolve(CautionedLayerSpec, BillingOnly)
+            .ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Resolve_LayerMatchingNoTypes_ReturnsNullDirectoryWithSkipReason()
+    {
+        // The Billing layer's rule anchors it, but no billing-namespace type exists to place it on.
+        LayerPlacement placement = Resolve(BillingLayerSpec, ContextFixtures.WebCodebase)[0];
+
+        placement.Destination.DirectoryPath.ShouldBeNull();
+        placement.Destination.SkipReason.ShouldBe("layer 'Billing' matched no types; no scoped context emitted");
+    }
+
+    [Fact]
+    public void Resolve_FamilyOfLayersSubject_AnchorsEveryCellAtItsOwnDirectory()
+    {
+        // One rule, two cards: the sentence names every cell, so it reads correctly on each — and the
+        // directory is the CELL's, never the subject head's, or both cards would land in one place.
+        IReadOnlyList<LayerPlacement> placements = Resolve(FamilySubjectSpec, WebAndBilling);
+
+        placements.Select(placement => (placement.LayerName, ContextFixtures.Relative(placement.Destination.DirectoryPath)))
+            .ShouldBe([("Web", "src/MyApp.Web"), ("Billing", "src/MyApp.Legacy.Billing")]);
+        placements.ShouldAllBe(placement => placement.Rules.Count == 1);
+    }
+
+    [Fact]
+    public void Resolve_RefinedFamilySubject_StillAnchorsEveryCell()
+    {
+        // An Except on the family produces a RefinedSelection over the same noun, exactly as it does over
+        // a bare layer, so anchoring survives it — and each card still ranges over the whole cell.
+        Resolve(RefinedFamilySubjectSpec, WebAndBilling)
+            .Select(placement => placement.LayerName)
+            .ShouldBe(["Web", "Billing"]);
+    }
+
+    [Fact]
+    public void Resolve_FamilyOfProjectsSubject_AnchorsNothing()
+    {
+        // The project form names no layer, so there is no card to place — a bare project noun earns none
+        // either, and a family of them is the same answer.
+        ArchitectureModel model = ArchModelBuilder.Build(ProjectFamilySubjectSpec);
+
+        Resolve(model, ContextFixtures.WebCodebase)
+            .ShouldBeEmpty();
+        LayerContextResolver.HasAnchoredLayers(model)
+            .ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Resolve_UnionSubjectContainingTheLayer_AnchorsNothing()
+    {
+        // A union has no single home directory even when a Layer is one of its operands, so it anchors no
+        // scoped card and the rule renders into the root block only (GRAMMAR §6). A union also carries no
+        // noun, so anchoring must never be decided by reading one.
+        ArchitectureModel model = ArchModelBuilder.Build(UnionSubjectSpec);
+
+        Resolve(model, ContextFixtures.WebCodebase)
+            .ShouldBeEmpty();
+        LayerContextResolver.HasAnchoredLayers(model)
+            .ShouldBeFalse();
+    }
+
+    [Fact]
+    public void HasAnchoredLayers_LayerButNoAnchoringRule_False()
+    {
+        LayerContextResolver.HasAnchoredLayers(ArchModelBuilder.Build(NamespaceSubjectSpec))
+            .ShouldBeFalse();
+    }
+
+    [Fact]
+    public void HasAnchoredLayers_AnchoredRule_True()
+    {
+        LayerContextResolver.HasAnchoredLayers(ArchModelBuilder.Build(WebLayerSpec))
+            .ShouldBeTrue();
+    }
+}

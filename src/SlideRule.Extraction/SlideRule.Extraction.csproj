@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <!-- netstandard2.0 against the compiler API alone: this half of extraction runs wherever a
+             compilation exists, including inside a compiler host on .NET Framework, which is why it
+             cannot sit beside MSBuildWorkspace in the net10 project. LangVersion 13.0 is pinned for the
+             same reason as Core's — netstandard2.0 otherwise defaults to C# 7.3. -->
+        <TargetFramework>netstandard2.0</TargetFramework>
+        <LangVersion>13.0</LangVersion>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+
+        <!-- Carried inside the packages that run it rather than shipped as one of its own: nothing here is
+             public, and the tool, the xUnit adapter and the analyzer package bundle this assembly beside
+             their own. -->
+        <IsPackable>false</IsPackable>
+        <RestoreLockedMode Condition="'$(CI)' == 'true'">true</RestoreLockedMode>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\SlideRule\SlideRule.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- 'sliderule' is the CLI's AssemblyName, which is what an InternalsVisibleTo entry has to
+             match. The analyzer assembly is named here so that adding it needs no edit to this file. -->
+        <InternalsVisibleTo Include="SlideRule.Roslyn" />
+        <InternalsVisibleTo Include="sliderule-cli" />
+        <InternalsVisibleTo Include="SlideRule.Tests" />
+        <InternalsVisibleTo Include="SlideRule.Analyzers" />
+        <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
+    </ItemGroup>
+
+    <!-- The support floor, and the reason this project exists: the oldest compiler API SlideRule
+         runs against. It is a floor rather than a dependency to keep fresh, so the version is
+         deliberately NOT an exact range — an exact range cannot unify with the 5.9.0 the workspace
+         project pins, and the two resolve together in every graph that holds both. It carries no
+         PrivateAssets either: the floor is part of the contract and has to reach the nuspec, so a
+         consumer resolving this package learns which compiler version it needs. A test holds this
+         literal and .github/dependabot.yml ignores the package for every update run; without both, the
+         first dependency-update run raises the floor silently. -->
+    <ItemGroup>
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.0.1" />
+    </ItemGroup>
+
+</Project>

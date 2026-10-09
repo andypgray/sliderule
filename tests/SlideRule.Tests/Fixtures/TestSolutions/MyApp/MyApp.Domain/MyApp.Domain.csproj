@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>disable</Nullable>
+        <ImplicitUsings>disable</ImplicitUsings> <!-- parity: raw CSharpCompilation has no implicit usings -->
+        <!-- The SDK hands a project its references' own references as well (Domain would compile against
+             Billing through Web). The survey reports the declared references whatever this says; the
+             setting stays because it shapes the compilation this bed's tests were written against, in
+             which Domain does not see Billing. -->
+        <DisableTransitiveProjectReferences>true</DisableTransitiveProjectReferences>
+        <!-- Domain references Web, which now carries a PackageReference; that turns on .NET's NuGet
+             vulnerability audit solution-wide, and an unreachable private feed emits NU1900 warnings that
+             MSBuildWorkspace surfaces as workspace diagnostics (tripping check's fail-closed gate). A
+             throwaway test fixture needs no audit; disabling it keeps the workspace load clean offline. -->
+        <NuGetAudit>false</NuGetAudit>
+        <RestoreLockedMode Condition="'$(CI)' == 'true'">true</RestoreLockedMode>
+    </PropertyGroup>
+    <ItemGroup>
+        <ProjectReference Include="..\MyApp.Web\MyApp.Web.csproj" />
+    </ItemGroup>
+    <!-- Snippets/ holds scratch *.cs that live in the project cone on disk but are NOT compiled. This is the
+         exclusion fixture: a file the zero-MSBuild cone scan sees but never enters the model. It must stay
+         excluded, so the many MyApp goldens keep passing byte-identical (that unchanged-ness is the test). -->
+    <ItemGroup>
+        <Compile Remove="Snippets/**/*.cs" />
+    </ItemGroup>
+</Project>

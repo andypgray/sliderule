@@ -1,0 +1,65 @@
+<Project>
+
+    <PropertyGroup>
+        <_SlideRuleAnalyzerProject>$(MSBuildThisFileDirectory)../src/SlideRule.Analyzers/SlideRule.Analyzers.csproj</_SlideRuleAnalyzerProject>
+    </PropertyGroup>
+
+    <!-- The three assemblies the compiler loads together, which is how the package ships them: an analyzer's
+         dependencies are resolved from the analyzer paths it was handed and from nowhere else. The analyzer
+         project names them, and the last call below takes them from it, so neither their folder nor their
+         list is restated here.
+
+         Taken as plain Analyzer items rather than reached through a ProjectReference carrying
+         OutputItemType="Analyzer". Measured: a project reference is followed into the workspace whatever its
+         ReferenceOutputAssembly says, so that shape put the analyzer and the extraction library into every
+         example's checked universe — the survey of the Meridian example grew from six projects to eight — and
+         an example's universe must hold its own code and nothing of the tool checking it.
+
+         What the project reference used to do, and all it is still wanted for: the three files exist by the
+         time anything compiles against them, so a clean clone that builds an example solution before it
+         builds anything else still works.
+
+         Restore is its own call under a fixed extra property. A project evaluated before its restore wrote
+         project.assets.json is the evaluation the build call would otherwise be served from, so the two calls
+         must not share one; and the property is a fixed value rather than one per caller so that every
+         example project reaching this target in a parallel build shares a single cached execution instead of
+         racing in the same obj directory. TargetFramework is dropped for a neighbouring reason: inherited
+         from a multi-targeted caller it would build this project for a framework it does not target, and
+         the last call would hand back that build's files.
+
+         One limit comes with it. A rebuild of an example solution (the Rebuild target, which the
+         no-incremental switch selects) cleans the contract library, which every example reaches through
+         its spec project, while this target asks for the same library through a request the outer build
+         cannot order against. Measured: under a parallel build that fails now and then with CS0006. A
+         plain build does not, from a clean tree or an old one, and -m:1 makes a rebuild safe. Ordering
+         the two would take putting the analyzer into the outer graph, which is the project reference
+         this file exists to avoid. -->
+    <Target Name="_SlideRuleBuildTheAnalyzer" BeforeTargets="CoreCompile">
+        <MSBuild Projects="$(_SlideRuleAnalyzerProject)"
+                 Targets="Restore"
+                 Properties="Configuration=$(Configuration);_SlideRuleAnalyzerRestore=true"
+                 RemoveProperties="TargetFramework" />
+        <MSBuild Projects="$(_SlideRuleAnalyzerProject)"
+                 Targets="Build"
+                 Properties="Configuration=$(Configuration)"
+                 RemoveProperties="TargetFramework" />
+        <MSBuild Projects="$(_SlideRuleAnalyzerProject)"
+                 Targets="GetSlideRuleAnalyzerClosure"
+                 Properties="Configuration=$(Configuration)"
+                 RemoveProperties="TargetFramework">
+            <Output TaskParameter="TargetOutputs" ItemName="Analyzer" />
+        </MSBuild>
+    </Target>
+
+    <!-- The package's own MSBuild file, imported rather than restated, so these builds exercise the wiring
+         an adopter gets: the nearest sliderule.model.json, the baselines beside it, and the switch that
+         says how much to report. -->
+    <Import Project="$(MSBuildThisFileDirectory)../src/SlideRule.Analyzers/buildTransitive/SlideRule.Analyzers.targets" />
+
+    <PropertyGroup>
+        <!-- No compiler server: it outlives the build that started it, and would go on holding the analyzer
+             assemblies open under src/ where this repository's own build writes them. -->
+        <UseSharedCompilation>false</UseSharedCompilation>
+    </PropertyGroup>
+
+</Project>

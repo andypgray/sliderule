@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 2,
+  "rules": {
+    "roslyn/msbuild-bootstrap/containment": {
+      "entries": [
+        { "source": "T:SlideRule.Tests.Roslyn.MsBuildBootstrapTests", "target": "T:SlideRule.Roslyn.MsBuild.VsInstance", "siteCount": 13, "seal": "d29d9a9845f43fb6" },
+        { "source": "T:SlideRule.Tests.Roslyn.VsWhereLocatorTests", "target": "T:SlideRule.Roslyn.MsBuild.VsInstance", "siteCount": 9, "seal": "e76639115def63df" },
+        { "source": "T:SlideRule.Tests.Roslyn.VsWhereLocatorTests", "target": "T:SlideRule.Roslyn.MsBuild.VsWhereLocator", "siteCount": 5, "seal": "ade13b719ffdd6ea" }
+      ]
+    }
+  }
+}

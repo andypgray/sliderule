@@ -1,0 +1,975 @@
+using Shouldly;
+using Xunit;
+using SlideRule.Codebase;
+
+namespace SlideRule.Tests.Extraction;
+
+/// <summary>
+///     One fact per declared-member inventory rule (GRAMMAR §4.6), over the MSBuild-free fast path — the
+///     member-subject analog of <see cref="CodebaseExtractorMemberEdgeTests" />. The exclusions are pinned
+///     by their absence, and member sets are ordered ordinal by SymbolId. A row suffixed
+///     <c>PinnedEmpirically</c> records observed Roslyn behaviour rather than a designed rule.
+///     Pinned strings are the spec — moving one is a deliberate act.
+/// </summary>
+public sealed class CodebaseExtractorMemberInventoryTests
+{
+    [Fact]
+    public void Inventory_AllFourKinds_AreInventoriedWithKindsAndSymbolIds()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public class C
+                                                         {
+                                                             public int Field;
+                                                             public int Prop { get; set; }
+                                                             public event System.Action Evt;
+                                                             public void Do() {}
+                                                         }
+                                                         """);
+
+        TypeNode c = model.Type("N.C");
+
+        // One entry per kind, no accessors and no auto-property / field-like-event backing field.
+        c.MemberIds()
+            .ShouldBe(["E:N.C.Evt", "F:N.C.Field", "M:N.C.Do", "P:N.C.Prop"]);
+        c.Member("M:N.C.Do")
+            .Kind.ShouldBe(MemberKind.Method);
+        c.Member("P:N.C.Prop")
+            .Kind.ShouldBe(MemberKind.Property);
+        c.Member("F:N.C.Field")
+            .Kind.ShouldBe(MemberKind.Field);
+        c.Member("E:N.C.Evt")
+            .Kind.ShouldBe(MemberKind.Event);
+    }
+
+    [Fact]
+    public void Inventory_MethodReturnTypes_NormalizeToDefinitionLevelFullNames()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public class C
+                                                         {
+                                                             public void Nothing() {}
+                                                             public System.Threading.Tasks.Task Bare() => null!;
+                                                             public System.Threading.Tasks.Task<int> Generic() => null!;
+                                                             public int Number() => 0;
+                                                         }
+                                                         """);
+
+        TypeNode c = model.Type("N.C");
+
+        // void → System.Void; a constructed generic erases to its definition (declared type-parameter names),
+        // so `Task<int>` matches a `.Returning(typeof(Task<>))` anchor (GRAMMAR §4.6). Never the metadata form.
+        c.Member("M:N.C.Nothing")
+            .ReturnTypeFullName.ShouldBe("System.Void");
+        c.Member("M:N.C.Bare")
+            .ReturnTypeFullName.ShouldBe("System.Threading.Tasks.Task");
+        c.Member("M:N.C.Generic")
+            .ReturnTypeFullName.ShouldBe("System.Threading.Tasks.Task<TResult>");
+        c.Member("M:N.C.Number")
+            .ReturnTypeFullName.ShouldBe("System.Int32");
+
+        // A method carries only a return type; its member-type slot is null.
+        c.Member("M:N.C.Nothing")
+            .MemberTypeFullName.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Inventory_PropertyFieldEventTypes_CarryMemberTypeFullNameNotReturnType()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public class C
+                                                         {
+                                                             public string Prop { get; set; }
+                                                             public int Field;
+                                                             public event System.Action Evt;
+                                                         }
+                                                         """);
+
+        TypeNode c = model.Type("N.C");
+
+        c.Member("P:N.C.Prop")
+            .MemberTypeFullName.ShouldBe("System.String");
+        c.Member("P:N.C.Prop")
+            .ReturnTypeFullName.ShouldBeNull();
+        c.Member("F:N.C.Field")
+            .MemberTypeFullName.ShouldBe("System.Int32");
+        c.Member("E:N.C.Evt")
+            .MemberTypeFullName.ShouldBe("System.Action");
+    }
+
+    [Fact]
+    public void Inventory_AutoProperty_FoldsToOnePropertyEntryNoAccessorsOrBackingField()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public class C { public int P { get; set; } }
+                                                         """);
+
+        // One P: entry — never M:get_P / M:set_P (accessors fold), and no <P>k__BackingField (implicit).
+        model.Type("N.C")
+            .MemberIds()
+            .ShouldBe(["P:N.C.P"]);
+    }
+
+    [Fact]
+    public void Inventory_SpecialMembers_AreAllExcluded()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public class C
+                                                         {
+                                                             public C() {}
+                                                             static C() {}
+                                                             ~C() {}
+                                                             public static C operator +(C a, C b) => a;
+                                                             public static implicit operator int(C c) => 0;
+                                                             public int this[int i] => i;
+                                                             public void Ordinary() {}
+                                                         }
+                                                         """);
+
+        // Only the Ordinary method survives — ctor, static ctor, finalizer, operator, conversion, and indexer
+        // are all excluded (the ratified §4.6 list).
+        model.Type("N.C")
+            .MemberIds()
+            .ShouldBe(["M:N.C.Ordinary"]);
+    }
+
+    [Fact]
+    public void Inventory_ExplicitInterfaceMethodImplementation_IsExcluded()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public interface IFoo { void Bar(); }
+                                                         public class C : IFoo
+                                                         {
+                                                             void IFoo.Bar() {}
+                                                             public void Ordinary() {}
+                                                         }
+                                                         """);
+
+        // An explicit interface METHOD implementation is a non-Ordinary method (its MethodKind is
+        // ExplicitInterfaceImplementation), so the §4.6 kind filter drops it before it can enter the
+        // inventory — only the ordinary method survives. It therefore never becomes a member subject, and
+        // MustAcceptParameter (§5.7) never reads its parameters: it is absent from the inventory both consult.
+        model.Type("N.C")
+            .MemberIds()
+            .ShouldBe(["M:N.C.Ordinary"]);
+    }
+
+    [Fact]
+    public void Inventory_ExplicitInterfacePropertyAndEventImplementations_AreExcluded()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public interface IFoo
+                                                         {
+                                                             int P { get; set; }
+                                                             event System.Action E;
+                                                         }
+                                                         public class C : IFoo
+                                                         {
+                                                             public int Q { get; set; }
+                                                             int IFoo.P { get; set; }
+                                                             event System.Action IFoo.E { add {} remove {} }
+                                                         }
+                                                         """);
+
+        // RATIFIED (GRAMMAR §4.6): explicit interface implementations are excluded from the inventory
+        // uniformly across all three member kinds — a METHOD impl via the non-Ordinary MethodKind screen, a
+        // PROPERTY or EVENT impl via its non-empty ExplicitInterfaceImplementations. An explicit impl is
+        // interface plumbing (Private, name fixed by the interface), never authored surface: no member subject
+        // sees one and MustAcceptParameter (§5.7) never reads one. Only the ordinary property Q survives.
+        model.Type("N.C")
+            .MemberIds()
+            .ShouldBe(["P:N.C.Q"]);
+    }
+
+    [Fact]
+    public void Inventory_EnumType_ContributesNoInventory()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public enum Color { Red, Green, Blue }
+                                                         """);
+
+        // An enum's fields are its values — an enum-value read stays a recorded member USE (§4.5), not inventory.
+        model.Type("N.Color")
+            .Members.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Inventory_DelegateType_ContributesNoInventory()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public delegate int Notify(string message);
+                                                         """);
+
+        // Invoke / BeginInvoke / EndInvoke are runtime plumbing, not authored surface.
+        model.Type("N.Notify")
+            .Members.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Inventory_VirtualMethod_IsVirtualTrueAbstractFalse()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public class Base { public virtual void M() {} }
+                                                         """);
+
+        MemberNode m = model.Type("N.Base")
+            .Member("M:N.Base.M");
+        m.IsVirtual.ShouldBeTrue();
+        m.IsAbstract.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Inventory_OverrideMethod_IsNotVirtual()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public class Base { public virtual void M() {} }
+                                                         public class Derived : Base { public override void M() {} }
+                                                         """);
+
+        // C# declaration semantics, not IL: an override is not itself "virtual" in the authored sense.
+        MemberNode m = model.Type("N.Derived")
+            .Member("M:N.Derived.M");
+        m.IsVirtual.ShouldBeFalse();
+        m.IsAbstract.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Inventory_AbstractMethod_IsAbstractTrueVirtualFalse()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public abstract class A { public abstract void M(); }
+                                                         """);
+
+        MemberNode m = model.Type("N.A")
+            .Member("M:N.A.M");
+        m.IsAbstract.ShouldBeTrue();
+        m.IsVirtual.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Inventory_InterfaceMembers_AreAbstractNotVirtual()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public interface I { void M(); int P { get; } }
+                                                         """);
+
+        TypeNode i = model.Type("N.I");
+        i.Member("M:N.I.M")
+            .IsAbstract.ShouldBeTrue();
+        i.Member("M:N.I.M")
+            .IsVirtual.ShouldBeFalse();
+        i.Member("P:N.I.P")
+            .IsAbstract.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Inventory_AsyncMethod_IsAsyncTrueWithTaskReturn()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public class C
+                                                         {
+                                                             public async System.Threading.Tasks.Task Go() { await System.Threading.Tasks.Task.Yield(); }
+                                                             public void Sync() {}
+                                                         }
+                                                         """);
+
+        MemberNode go = model.Type("N.C")
+            .Member("M:N.C.Go");
+        go.IsAsync.ShouldBeTrue();
+        go.ReturnTypeFullName.ShouldBe("System.Threading.Tasks.Task");
+        model.Type("N.C")
+            .Member("M:N.C.Sync")
+            .IsAsync.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Inventory_Accessibility_CoversPublicInternalPrivateAndStatic()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public class C
+                                                         {
+                                                             public void Pub() {}
+                                                             internal void Int() {}
+                                                             private void Priv() {}
+                                                             public static void Stat() {}
+                                                         }
+                                                         """);
+
+        TypeNode c = model.Type("N.C");
+        c.Member("M:N.C.Pub")
+            .Accessibility.ShouldBe(Accessibility.Public);
+        c.Member("M:N.C.Int")
+            .Accessibility.ShouldBe(Accessibility.Internal);
+        c.Member("M:N.C.Priv")
+            .Accessibility.ShouldBe(Accessibility.Private);
+        c.Member("M:N.C.Stat")
+            .IsStatic.ShouldBeTrue();
+        c.Member("M:N.C.Pub")
+            .IsStatic.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Inventory_Fields_ConstReadonlyAndStatic_AreAllInventoried()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public class C
+                                                         {
+                                                             public const int Max = 5;
+                                                             public readonly int Ro;
+                                                             public static int Shared;
+                                                             public int Inst;
+                                                         }
+                                                         """);
+
+        TypeNode c = model.Type("N.C");
+        c.MemberIds()
+            .ShouldBe(["F:N.C.Inst", "F:N.C.Max", "F:N.C.Ro", "F:N.C.Shared"]);
+        c.Member("F:N.C.Max")
+            .IsStatic.ShouldBeTrue(); // const is static
+        c.Member("F:N.C.Shared")
+            .IsStatic.ShouldBeTrue();
+        c.Member("F:N.C.Inst")
+            .IsStatic.ShouldBeFalse();
+
+        // IsConst and IsReadOnly are DISJOINT, not nested: a const field is not `readonly` in C# declaration
+        // semantics, so anything asking whether a field can be reassigned has to read both facts.
+        c.Member("F:N.C.Max")
+            .IsConst.ShouldBeTrue();
+        c.Member("F:N.C.Max")
+            .IsReadOnly.ShouldBeFalse();
+        c.Member("F:N.C.Ro")
+            .IsReadOnly.ShouldBeTrue();
+        c.Member("F:N.C.Ro")
+            .IsConst.ShouldBeFalse();
+        c.Member("F:N.C.Shared")
+            .IsReadOnly.ShouldBeFalse();
+        c.Member("F:N.C.Inst")
+            .IsReadOnly.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Inventory_GenericMethod_ReturnTypeUsesDeclaredParameterName()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public class C { public T Echo<T>(T value) => value; }
+                                                         """);
+
+        // The return type is the method's own type parameter, rendered as its declared name (definition-level).
+        MemberNode echo = model.Type("N.C")
+            .Members.Single(m => m.Name == "Echo");
+        echo.SymbolId.ShouldBe("M:N.C.Echo``1(``0)");
+        echo.ReturnTypeFullName.ShouldBe("T");
+    }
+
+    [Fact]
+    public void Inventory_OverloadedMethods_CarryParameterTypedSymbolIds()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public class C { public void M(int x) {} public void M(string s) {} }
+                                                         """);
+
+        // One inventory entry per overload — the §4.3 per-subject identity substrate, mirroring the edge side.
+        model.Type("N.C")
+            .MemberIds()
+            .ShouldBe(["M:N.C.M(System.Int32)", "M:N.C.M(System.String)"]);
+    }
+
+    [Fact]
+    public void Inventory_PartialType_UnionsMembersOrderedBySymbolIdWithPerPartSites()
+    {
+        CodebaseModel model = CompilationFactory.Extract("Proj",
+            ("PartA.cs", """
+                         namespace N;
+                         public partial class Split { public int A; public void C() {} }
+                         """),
+            ("PartB.cs", """
+                         namespace N;
+                         public partial class Split { public void B() {} }
+                         """));
+
+        TypeNode split = model.Type("N.Split");
+
+        // Members from both parts, ordered ordinal by SymbolId (F: before M:, then B before C).
+        split.MemberIds()
+            .ShouldBe(["F:N.Split.A", "M:N.Split.B", "M:N.Split.C"]);
+
+        // Each member's declaration site is the identifier line (+1) of its own part.
+        split.Member("M:N.Split.B")
+            .FilePaths.ShouldBe(["PartB.cs"]);
+        split.Member("M:N.Split.B")
+            .DeclarationSites.Lines()
+            .ShouldBe([2]);
+        split.Member("M:N.Split.C")
+            .FilePaths.ShouldBe(["PartA.cs"]);
+        split.Member("M:N.Split.C")
+            .DeclarationSites.Lines()
+            .ShouldBe([2]);
+    }
+
+    [Fact]
+    public void Inventory_MethodParameters_AreCapturedInDeclarationOrderWithDefaultValuedCounted()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public class C
+                                                         {
+                                                             public void Seed(int count, System.Threading.CancellationToken cancellationToken = default) {}
+                                                         }
+                                                         """);
+
+        // Declaration order is preserved ([count, cancellationToken], not sorted or reversed) and a
+        // default-valued parameter is a fact like any other — it counts (GRAMMAR §4.6, §5.6).
+        MemberNode seed = model.Type("N.C")
+            .Members.Single(m => m.Name == "Seed");
+        seed.Parameters.Select(p => (p.Name, p.TypeFullName))
+            .ShouldBe(
+            [
+                ("count", "System.Int32"),
+                ("cancellationToken", "System.Threading.CancellationToken")
+            ]);
+    }
+
+    [Fact]
+    public void Inventory_ExtensionMethod_IncludesTheThisParameter()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public static class StringExtensions
+                                                         {
+                                                             public static string Shout(this string text) => text;
+                                                         }
+                                                         """);
+
+        // The DECLARED static method's parameter list is read (never the reduced instance form), so the `this`
+        // receiver parameter is a recorded fact — present in both the DocId and the parameter facts.
+        MemberNode shout = model.Type("N.StringExtensions")
+            .Member("M:N.StringExtensions.Shout(System.String)");
+        shout.Parameters.Select(p => (p.Name, p.TypeFullName))
+            .ShouldBe([("text", "System.String")]);
+    }
+
+    [Fact]
+    public void Inventory_RefInOutParameters_RecordTheUnderlyingType()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public class C
+                                                         {
+                                                             public void Move(ref int a, in int b, out int c) { c = a + b; }
+                                                         }
+                                                         """);
+
+        // ref/in/out are calling-convention modifiers, not part of the recorded parameter type — all three
+        // record the underlying System.Int32.
+        MemberNode move = model.Type("N.C")
+            .Members.Single(m => m.Name == "Move");
+        move.Parameters.Select(p => (p.Name, p.TypeFullName))
+            .ShouldBe(
+            [
+                ("a", "System.Int32"),
+                ("b", "System.Int32"),
+                ("c", "System.Int32")
+            ]);
+    }
+
+    [Fact]
+    public void Inventory_ParamsArrayParameter_RecordsTheArrayType()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public class C
+                                                         {
+                                                             public void CancelAll(params System.Threading.CancellationToken[] tokens) {}
+                                                         }
+                                                         """);
+
+        // A params parameter records the ARRAY type, never the element type.
+        MemberNode cancelAll = model.Type("N.C")
+            .Members.Single(m => m.Name == "CancelAll");
+        cancelAll.Parameters.Select(p => (p.Name, p.TypeFullName))
+            .ShouldBe(
+                [("tokens", "System.Threading.CancellationToken[]")]);
+    }
+
+    [Fact]
+    public void Inventory_NullableValueTypeParameter_RecordsNullableDefinitionForm()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public class C
+                                                         {
+                                                             public void Maybe(System.Threading.CancellationToken? token) {}
+                                                         }
+                                                         """);
+
+        // A T? parameter records System.Nullable<T>'s definition form (never the unwrapped T), the same
+        // construction-erasing normalization the return type uses.
+        MemberNode maybe = model.Type("N.C")
+            .Members.Single(m => m.Name == "Maybe");
+        maybe.Parameters.Select(p => (p.Name, p.TypeFullName))
+            .ShouldBe([("token", "System.Nullable<T>")]);
+    }
+
+    [Fact]
+    public void Inventory_TypeParameterTypedParameter_RecordsDeclaredTypeParameterName()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public class C { public T Echo<T>(T value) => value; }
+                                                         """);
+
+        // The same definition-level path that renders Echo's RETURN type as "T" renders its parameter type "T".
+        MemberNode echo = model.Type("N.C")
+            .Members.Single(m => m.Name == "Echo");
+        echo.Parameters.Select(p => (p.Name, p.TypeFullName))
+            .ShouldBe([("value", "T")]);
+    }
+
+    [Fact]
+    public void Inventory_PositionalRecord_PropertyCarriesNoParameters_PinnedEmpirically()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public record R(int X);
+                                                         """);
+
+        // EMPIRICAL PIN (GRAMMAR §4.6 compiler-generated boundary): the positional property X is present; the
+        // synthesized EqualityContract / <Clone>$ / PrintMembers / ToString / Equals / GetHashCode / copy-ctor
+        // / Deconstruct / == / != are all implicitly declared or non-Ordinary and excluded.
+        // The positional list surfaces as the generated property X only; the primary constructor is outside the
+        // member inventory, so nothing here carries parameter facts.
+        TypeNode r = model.Type("N.R");
+        r.MemberIds()
+            .ShouldBe(["P:N.R.X"]);
+        r.Member("P:N.R.X")
+            .Parameters.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Inventory_PartialMethod_ReadsParametersOnceInDeclarationOrder()
+    {
+        CodebaseModel model = CompilationFactory.Extract("Proj",
+            ("DefPart.cs", """
+                           namespace N;
+                           public partial class Host { partial void OnScan(int index, string label); }
+                           """),
+            ("ImplPart.cs", """
+                            namespace N;
+                            public partial class Host { partial void OnScan(int index, string label) {} }
+                            """));
+
+        // A partial method's defining and implementing parts resolve to ONE inventory member (Single throws on
+        // a duplicate), and its parameters are read once — [index, label], never doubled to four or reordered.
+        MemberNode onScan = model.Type("N.Host")
+            .Members.Single(m => m.Name == "OnScan");
+        onScan.Parameters.Select(p => (p.Name, p.TypeFullName))
+            .ShouldBe(
+            [
+                ("index", "System.Int32"),
+                ("label", "System.String")
+            ]);
+    }
+
+    [Fact]
+    public void Inventory_PropertyFieldEvent_CarryEmptyParameterLists()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public class C
+                                                         {
+                                                             public int Field;
+                                                             public int Prop { get; set; }
+                                                             public event System.Action Evt;
+                                                             public void Nullary() {}
+                                                         }
+                                                         """);
+
+        // Only methods carry parameters; a property, field, and event each hold the empty list, as does a
+        // parameterless method.
+        TypeNode c = model.Type("N.C");
+        c.Member("F:N.C.Field")
+            .Parameters.ShouldBeEmpty();
+        c.Member("P:N.C.Prop")
+            .Parameters.ShouldBeEmpty();
+        c.Member("E:N.C.Evt")
+            .Parameters.ShouldBeEmpty();
+        c.Member("M:N.C.Nullary")
+            .Parameters.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Inventory_AllFourKinds_CarryTheirDeclaredAttributes()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public sealed class MarkAttribute : System.Attribute {}
+                                                         public class C
+                                                         {
+                                                             [Mark] public int Field;
+                                                             [Mark] public int Prop { get; set; }
+                                                             [Mark] public event System.Action Evt;
+                                                             [Mark] public void Do() {}
+                                                         }
+                                                         """);
+
+        // Every member kind carries its own attribute facts (GRAMMAR §4.6). Each is a definition/constructed
+        // pair; for a non-generic attribute the two names coincide, and both keep the `Attribute` suffix — the
+        // extraction FQN, never the `[Mark]` shorthand the source spells.
+        TypeNode c = model.Type("N.C");
+        c.Member("F:N.C.Field")
+            .AttributeNames()
+            .ShouldBe([("N.MarkAttribute", "N.MarkAttribute")]);
+        c.Member("P:N.C.Prop")
+            .AttributeNames()
+            .ShouldBe([("N.MarkAttribute", "N.MarkAttribute")]);
+        c.Member("E:N.C.Evt")
+            .AttributeNames()
+            .ShouldBe([("N.MarkAttribute", "N.MarkAttribute")]);
+        c.Member("M:N.C.Do")
+            .AttributeNames()
+            .ShouldBe([("N.MarkAttribute", "N.MarkAttribute")]);
+    }
+
+    [Fact]
+    public void Inventory_UnattributedMembers_CarryEmptyAttributeLists()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public class C
+                                                         {
+                                                             public int Field;
+                                                             public int Prop { get; set; }
+                                                             public event System.Action Evt;
+                                                             public void Do() {}
+                                                         }
+                                                         """);
+
+        // A member that declares no attribute holds the empty list, never null — the same contract the
+        // parameter facts carry.
+        TypeNode c = model.Type("N.C");
+        c.Member("F:N.C.Field")
+            .Attributes.ShouldBeEmpty();
+        c.Member("P:N.C.Prop")
+            .Attributes.ShouldBeEmpty();
+        c.Member("E:N.C.Evt")
+            .Attributes.ShouldBeEmpty();
+        c.Member("M:N.C.Do")
+            .Attributes.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Inventory_SeveralAttributesOnOneMember_AreOrderedOrdinalByConstructedName()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public sealed class ZetaAttribute : System.Attribute {}
+                                                         public sealed class AlphaAttribute : System.Attribute {}
+                                                         public class C
+                                                         {
+                                                             [Zeta, Alpha] public void Do() {}
+                                                         }
+                                                         """);
+
+        // Source order is deliberately Zeta-then-Alpha: the recorded order is ordinal by constructed name, so a
+        // persisted fragment is byte-stable however the source (or Roslyn) happened to order the list.
+        model.Type("N.C")
+            .Member("M:N.C.Do")
+            .Attributes.Select(a => a.FullName)
+            .ShouldBe(["N.AlphaAttribute", "N.ZetaAttribute"]);
+    }
+
+    [Fact]
+    public void Inventory_PropertyAccessorAttribute_IsOutsideThePropertysAttributeFact()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public sealed class MarkAttribute : System.Attribute {}
+                                                         public sealed class OnlyGetAttribute : System.Attribute {}
+                                                         public class C
+                                                         {
+                                                             [Mark] public int P { [OnlyGet] get; set; }
+                                                         }
+                                                         """);
+
+        // RATIFIED boundary (GRAMMAR §4.6): the fact is DECLARED-ONLY — read off the member symbol itself. An
+        // attribute on the property is in; one on its `get` accessor is out, because it hangs off the accessor
+        // METHOD symbol, and accessors fold into the property rather than being inventoried in their own right.
+        model.Type("N.C")
+            .Member("P:N.C.P")
+            .Attributes.Select(a => a.FullName)
+            .ShouldBe(["N.MarkAttribute"]);
+    }
+
+    [Fact]
+    public void Inventory_ReturnTargetedAttribute_IsOutsideTheMethodsAttributeFact()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public sealed class MarkAttribute : System.Attribute {}
+                                                         public sealed class OnlyReturnAttribute : System.Attribute {}
+                                                         public class C
+                                                         {
+                                                             [Mark]
+                                                             [return: OnlyReturn]
+                                                             public int Do() => 0;
+                                                         }
+                                                         """);
+
+        // The same declared-only boundary on the method side: a `[return:]` attribute hangs off the return-value
+        // pseudo-symbol, not the method, so it is deliberately outside the fact a member subject reads.
+        model.Type("N.C")
+            .Member("M:N.C.Do")
+            .Attributes.Select(a => a.FullName)
+            .ShouldBe(["N.MarkAttribute"]);
+    }
+
+    [Fact]
+    public void Inventory_GenericAttribute_RecordsDefinitionAndConstructedNamesSeparately()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public sealed class MarkAttribute<T> : System.Attribute {}
+                                                         public class C
+                                                         {
+                                                             [Mark<int>] public void Do() {}
+                                                         }
+                                                         """);
+
+        // A C# 11 generic attribute is where the pair earns its keep: the definition side erases the
+        // construction (so an open-definition anchor matches any construction), while the constructed name keeps
+        // the substituted argument — exactly the type-side attribute-construction discipline, member-level.
+        model.Type("N.C")
+            .Member("M:N.C.Do")
+            .AttributeNames()
+            .ShouldBe([("N.MarkAttribute<T>", "N.MarkAttribute<System.Int32>")]);
+    }
+
+    [Fact]
+    public void Inventory_PartialMethodParts_UnionBothPartsAttributes_PinnedEmpirically()
+    {
+        CodebaseModel model = CompilationFactory.Extract("Proj",
+            ("Attrs.cs", """
+                         namespace N;
+                         public sealed class OnDefiningAttribute : System.Attribute {}
+                         public sealed class AlsoOnImplementingAttribute : System.Attribute {}
+                         """),
+            ("DefPart.cs", """
+                           namespace N;
+                           public partial class Host { [OnDefining] partial void OnScan(); }
+                           """),
+            ("ImplPart.cs", """
+                            namespace N;
+                            public partial class Host { [AlsoOnImplementing] partial void OnScan() {} }
+                            """));
+
+        // EMPIRICAL PIN: a partial method's two parts carry different attributes, and the merged symbol the
+        // inventory reads reports BOTH — observed Roslyn merged-symbol behaviour, not a designed rule. The union
+        // is the honest reading for a member subject (either part's attribute is authored surface). The names
+        // are chosen so ordinal order reverses part order, which pins the ordering as by constructed name.
+        model.Type("N.Host")
+            .Members.Single(m => m.Name == "OnScan")
+            .Attributes.Select(a => a.FullName)
+            .ShouldBe(["N.AlsoOnImplementingAttribute", "N.OnDefiningAttribute"]);
+    }
+
+    [Fact]
+    public void Inventory_PropertySetterShapes_AutoGetSet_GetOnly_InitOnly()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public class C
+                                                         {
+                                                             public int Settable { get; set; }
+                                                             public int GetOnly { get; }
+                                                             public int InitOnly { get; init; }
+                                                         }
+                                                         """);
+
+        // The three canonical property shapes and the pair of facts that separates them (GRAMMAR §4.6):
+        // HasSetter records that a setter accessor exists at all, HasInitOnlySetter which kind it is — so an
+        // init-only property reports BOTH, never the get-only pair. The pair refines rather than competes.
+        TypeNode c = model.Type("N.C");
+        c.Member("P:N.C.Settable")
+            .HasSetter.ShouldBeTrue();
+        c.Member("P:N.C.Settable")
+            .HasInitOnlySetter.ShouldBeFalse();
+        c.Member("P:N.C.GetOnly")
+            .HasSetter.ShouldBeFalse();
+        c.Member("P:N.C.GetOnly")
+            .HasInitOnlySetter.ShouldBeFalse();
+        c.Member("P:N.C.InitOnly")
+            .HasSetter.ShouldBeTrue();
+        c.Member("P:N.C.InitOnly")
+            .HasInitOnlySetter.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Inventory_ExpressionBodiedProperty_HasNoSetter()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public class C { public int P => 1; }
+                                                         """);
+
+        // An expression-bodied property is a getter and nothing else — the shorthand declares no setter to
+        // find, so it reads exactly as `{ get; }` does.
+        MemberNode p = model.Type("N.C")
+            .Member("P:N.C.P");
+        p.HasSetter.ShouldBeFalse();
+        p.HasInitOnlySetter.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Inventory_ManualAccessorsAndPrivateSetter_StillCountAsSetters()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public class C
+                                                         {
+                                                             private int backing;
+                                                             public int Manual { get { return backing; } set { backing = value; } }
+                                                             public int Restricted { get; private set; }
+                                                             public int Shared { get; internal set; }
+                                                         }
+                                                         """);
+
+        // ACCESSIBILITY-BLIND, the honesty boundary: the fact is that a setter exists, not that a caller
+        // outside the type can reach it. A hand-written accessor body, a `private set` and an `internal set`
+        // are each a setter, so none of the three is get-only however unreachable the write is.
+        TypeNode c = model.Type("N.C");
+        c.Member("P:N.C.Manual")
+            .HasSetter.ShouldBeTrue();
+        c.Member("P:N.C.Restricted")
+            .HasSetter.ShouldBeTrue();
+        c.Member("P:N.C.Shared")
+            .HasSetter.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Inventory_AbstractAndInterfaceProperty_WithSetter_ReportHasSetter()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public abstract class A { public abstract int P { get; set; } }
+                                                         public interface I { int Q { get; set; } }
+                                                         """);
+
+        // C# declaration semantics, as everywhere else in §4.6: a bodiless accessor is still a declared
+        // setter, so an abstract property and an interface property each report one. What is recorded is the
+        // shape of the declaration, never whether an implementation was written.
+        model.Type("N.A")
+            .Member("P:N.A.P")
+            .HasSetter.ShouldBeTrue();
+        model.Type("N.I")
+            .Member("P:N.I.Q")
+            .HasSetter.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Inventory_StaticProperty_CarriesNoFieldFlags()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public class C { public static int P { get; set; } }
+                                                         """);
+
+        // Kind-scoping in the negative direction, the IsAsync contract applied to the field facts: a property
+        // is never IsReadOnly and never IsConst, whatever else it is.
+        MemberNode p = model.Type("N.C")
+            .Member("P:N.C.P");
+        p.IsStatic.ShouldBeTrue();
+        p.IsReadOnly.ShouldBeFalse();
+        p.IsConst.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Inventory_Method_CarriesNoMutabilityFlags()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public class C { public void Do() {} }
+                                                         """);
+
+        // The other half of the same contract: all four mutability facts are simply false on a method, so a
+        // member subject sweeping every kind can read them without a kind test first.
+        MemberNode go = model.Type("N.C")
+            .Member("M:N.C.Do");
+        go.HasSetter.ShouldBeFalse();
+        go.HasInitOnlySetter.ShouldBeFalse();
+        go.IsReadOnly.ShouldBeFalse();
+        go.IsConst.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Inventory_PositionalRecordAndRecordStruct_PropertiesAreInitOnly_PinnedEmpirically()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public record R(int X);
+                                                         public readonly record struct S(int Y);
+                                                         """);
+
+        // EMPIRICAL PIN: the property a positional parameter generates carries an INIT-ONLY setter on both a
+        // record class and a readonly record struct — observed Roslyn behaviour, not a designed rule. It is
+        // why a positional record is a settable shape rather than a get-only one, so the two facts have to be
+        // read off the generated property rather than assumed from the record's own immutability.
+        MemberNode x = model.Type("N.R")
+            .Member("P:N.R.X");
+        x.HasSetter.ShouldBeTrue();
+        x.HasInitOnlySetter.ShouldBeTrue();
+        MemberNode y = model.Type("N.S")
+            .Member("P:N.S.Y");
+        y.HasSetter.ShouldBeTrue();
+        y.HasInitOnlySetter.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Inventory_PartialPropertyParts_ReadTheMergedSymbolsSetter_PinnedEmpirically()
+    {
+        CodebaseModel model = CompilationFactory.Extract("Proj",
+            ("DefPart.cs", """
+                           namespace N;
+                           public partial class Host
+                           {
+                               public partial int Count { get; set; }
+                               public partial int Label { get; }
+                           }
+                           """),
+            ("ImplPart.cs", """
+                            namespace N;
+                            public partial class Host
+                            {
+                                public partial int Count { get => 0; set {} }
+                                public partial int Label { get => 1; }
+                            }
+                            """));
+
+        // EMPIRICAL PIN, the partial-method row's C# 13 twin: a partial property's defining and implementing
+        // parts resolve to ONE inventory member (Single throws on a duplicate), and the setter fact is read
+        // off that merged symbol — so the get-only pair reports no setter while the get/set pair does, and
+        // being partial is not itself a shape.
+        TypeNode host = model.Type("N.Host");
+        MemberNode count = host.Members.Single(m => m.Name == "Count");
+        count.HasSetter.ShouldBeTrue();
+        count.HasInitOnlySetter.ShouldBeFalse();
+        MemberNode label = host.Members.Single(m => m.Name == "Label");
+        label.HasSetter.ShouldBeFalse();
+    }
+}

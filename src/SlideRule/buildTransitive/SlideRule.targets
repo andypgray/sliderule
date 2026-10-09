@@ -1,0 +1,43 @@
+<Project>
+
+    <!-- What this package asks of a consumer's build, and the whole of it: nothing, on a compiler that can
+         load the analyzer, and the analyzer taken back out on one that cannot.
+
+         The same file is packed to buildTransitive/ and to build/, so a project can end up importing both
+         copies. Nothing here may depend on running once. It defines a target and nothing else — no
+         property, no item, no import — so a second import redefines that target with identical text and
+         leaves exactly what one import left. That emptiness is also what makes the file safe for the
+         consumers who get it without ever asking for it: buildTransitive/ flows through a package
+         dependency, so a project that references only SlideRule.Xunit imports this file while
+         receiving none of this package's analyzers. The removal below then matches no item and does
+         nothing, which is the right answer for them.
+
+         A compiler below Roslyn 4.0.1 cannot load the analyzer and says so with CS8032 on every build of
+         every project that references this package: a warning ordinarily, an error wherever warnings are
+         errors, and an estate that has pinned an old SDK for years is often one that builds with
+         warnings as errors. Taking the analyzer back out is what leaves such a build working exactly as
+         it did before this package carried one. Measured on the 3.1 and 5.0 SDKs: CompilerApiVersion is empty on a host below the
+         floor and carries a value on every host at or above it, and the Analyzer items carry
+         NuGetPackageId on all of them.
+
+         The removal is by NuGetPackageId and never by file name, so it takes out everything this package
+         put in the directory: the spec-literal analyzer, the completion provider beside it and the copy
+         of the contract they load against. A third file joining the closure needs no edit here.
+
+         The target's NAME is significant and deliberately not the one the analyzer package uses. A spec
+         project can reference both packages; MSBuild lets the later definition of a target name replace
+         the earlier one silently, so two packages sharing a name would leave one package's analyzers in
+         place below the floor and the CS8032 back. The two package ids are compared with ==, not by
+         prefix, so 'SlideRule' and 'SlideRule.Analyzers' select their own items and
+         nothing of each other's. -->
+    <Target Name="_SlideRuleRemoveContractAnalyzerBelowTheFloor"
+            BeforeTargets="CoreCompile"
+            Condition="'$(CompilerApiVersion)' == ''">
+        <ItemGroup>
+            <_SlideRuleContractAnalyzerBelowTheFloor Include="@(Analyzer)"
+                                                      Condition="'%(Analyzer.NuGetPackageId)' == 'SlideRule'" />
+            <Analyzer Remove="@(_SlideRuleContractAnalyzerBelowTheFloor)" />
+        </ItemGroup>
+    </Target>
+
+</Project>

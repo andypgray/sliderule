@@ -1,0 +1,208 @@
+using System.Reflection;
+using System.Security.Cryptography;
+using System.Text;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Text;
+using SlideRule.Roslyn.Solutions;
+
+namespace SlideRule.Roslyn.Caching;
+
+/// <summary>
+///     The pure file-stamping primitives shared by the twin structure-keyed cache stores — the
+///     <see cref="ExtractionCacheStore" /> and the
+///     <see cref="SlideRule.Roslyn.Replay.BinlogCaptureStore" />. Both persist a
+///     <see cref="FileStamp" /> per structural input and validate it against disk the same way: stat first,
+///     and re-hash only when the stat moved (a bare mtime touch on unchanged bytes must not invalidate).
+///     That racy-window discipline is defined once here, so the two stores cannot drift apart.
+/// </summary>
+/// <remarks>
+///     Everything here is pure over its arguments and disk state. Each store keeps its own manifest-typed
+///     read/write wrappers, its own promotion policy, and its own <c>ContentHashCount</c> observable — the
+///     last threaded back through <see cref="CheckStructural" />'s <c>onHash</c> callback so a store still
+///     counts exactly its own validation reads without this shared code knowing the counter exists.
+/// </remarks>
+internal static class FileStamping
+{
+    /// <summary>
+    ///     Probe files whose presence anywhere from a project directory up to the filesystem root changes
+    ///     the build — stamped even when absent, so a newly-appearing one is an existence flip. Shared by both
+    ///     cache stores and the warm <see cref="WorkspaceSession" /> reconcile sweep.
+    /// </summary>
+    /// <remarks>
+    ///     <c>Directory.Packages.props</c> is here on the contract above rather than on a measured miss: a
+    ///     concrete central-package-management edit usually also rewrites <c>project.assets.json</c>, which
+    ///     <see cref="IntermediateOutputTree.AssetsPathsOf" /> already stamps. That file is a proxy, and only
+    ///     after a restore — so the probe is what holds the invariant, not the coincidence.
+    /// </remarks>
+    internal static readonly string[] StructuralProbeFileNames =
+        ["Directory.Build.props", "Directory.Build.targets", "Directory.Packages.props", "global.json"];
+
+    /// <summary>
+    ///     The tool version stamped into a manifest: this (Roslyn) assembly's informational version
+    ///     (e.g. <c>0.1.0+&lt;sha&gt;</c>). The .NET SDK appends the commit hash, giving per-commit cache
+    ///     invalidation during development. All packages ship lockstep, so the value equals the tool's.
+    /// </summary>
+    internal static readonly string CurrentToolVersion =
+        typeof(FileStamping).Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+        ?? "unknown";
+
+    /// <summary>
+    ///     Stamps <paramref name="path" /> as it is on disk now — existence, mtime/length, content hash, and the
+    ///     racy-window promotion verdict.
+    /// </summary>
+    internal static FileStamp StampOf(string path)
+    {
+        string full = Path.GetFullPath(path);
+        FileFreshness fresh = FileFreshness.Capture(full);
+        if (!fresh.Exists) return new FileStamp(full, false, 0, 0, null, false);
+
+        return new FileStamp(full, true, fresh.LastWriteTimeUtc.Ticks, fresh.Length, TryHashFile(full), fresh.IsPromoted);
+    }
+
+    /// <summary>
+    ///     Stamps <paramref name="path" /> as a source document: everything <see cref="StampOf" /> records
+    ///     plus the <see cref="SourceShape" /> of the bytes it hashed.
+    /// </summary>
+    /// <remarks>
+    ///     The <see cref="FileFreshness.Capture" /> comes first, exactly as in <see cref="StampOf" />, so the
+    ///     racy-window verdict is never made against a stat taken after the read. The hash and the shape come
+    ///     from <see cref="TryReadDocument" /> — the one routine validation reads through too, which is what
+    ///     makes the two hashes and the two shapes comparable at all.
+    /// </remarks>
+    internal static FileStamp StampDocument(string path)
+    {
+        string full = Path.GetFullPath(path);
+        FileFreshness fresh = FileFreshness.Capture(full);
+        if (!fresh.Exists) return new FileStamp(full, false, 0, 0, null, false);
+
+        (string Sha256, SourceShape Shape)? read = TryReadDocument(full);
+        return new FileStamp(
+            full, true, fresh.LastWriteTimeUtc.Ticks, fresh.Length, read?.Sha256, fresh.IsPromoted, read?.Shape);
+    }
+
+    /// <summary>
+    ///     One read of a C# document: the lowercase-hex SHA-256 of its bytes and the
+    ///     <see cref="SourceShape" /> of the text they parse to, or null when it is unreadable — an I/O
+    ///     failure degrades exactly as <see cref="TryHashFile" /> does.
+    /// </summary>
+    /// <remarks>
+    ///     Both halves must come from the same bytes and the same parse options on the capture side and the
+    ///     validation side, or a shape comparison would be answering about two different texts. That is the
+    ///     whole reason this is one routine rather than a hash call beside a parse call.
+    /// </remarks>
+    internal static (string Sha256, SourceShape Shape)? TryReadDocument(string path)
+    {
+        try
+        {
+            byte[] bytes = File.ReadAllBytes(path);
+            string sha = Convert.ToHexStringLower(SHA256.HashData(bytes));
+
+            using var stream = new MemoryStream(bytes);
+            SourceText text = SourceText.From(stream);
+            SyntaxTree tree = CSharpSyntaxTree.ParseText(text, path: path);
+            return (sha, SourceShape.Of(tree));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    ///     Rebuilds a stamp from a fresh <see cref="FileFreshness" /> capture and an already-computed hash.
+    ///     <paramref name="shape" /> is the shape to carry forward, and stays null for a structural input,
+    ///     which has none.
+    /// </summary>
+    internal static FileStamp RefreshStamp(string path, FileFreshness current, string? sha, SourceShape? shape = null)
+    {
+        return new FileStamp(
+            path, current.Exists, current.LastWriteTimeUtc.Ticks, current.Length, sha, current.IsPromoted, shape);
+    }
+
+    /// <summary>
+    ///     Lowercase-hex SHA-256 of the file's bytes, or null when it is unreadable — an I/O failure degrades, never
+    ///     throws. Streamed, because this runs over every source document in the solution on a cold run.
+    /// </summary>
+    /// <remarks>
+    ///     Unbuffered and declared sequential rather than opened through <see cref="File.OpenRead" />: the
+    ///     digest already reads front to back in large blocks, so buffering pays nothing here.
+    /// </remarks>
+    internal static string? TryHashFile(string path)
+    {
+        try
+        {
+            using var stream = new FileStream(
+                path, FileMode.Open, FileAccess.Read, FileShare.Read, 0, FileOptions.SequentialScan);
+            return Convert.ToHexStringLower(SHA256.HashData(stream));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    ///     Lowercase-hex SHA-256 of <paramref name="value" />'s UTF-8 bytes — the same digest format as
+    ///     <see cref="TryHashFile" />, beside it so the four decisions the two share (algorithm, encoding, hex
+    ///     case, no separator) stay one decision. Both cache stores key their on-disk identity on it.
+    /// </summary>
+    internal static string HashText(string value)
+    {
+        return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
+    }
+
+    /// <summary>
+    ///     Reconstitutes a <see cref="FileFreshness" /> from a stamp for a pure stat comparison; the racy verdict is the
+    ///     persisted <see cref="FileStamp.Promoted" /> flag, not a re-derived instant.
+    /// </summary>
+    internal static FileFreshness ToFreshness(FileStamp stamp)
+    {
+        return new FileFreshness(stamp.Exists, new DateTime(stamp.LastWriteTimeUtcTicks, DateTimeKind.Utc), stamp.Length, default);
+    }
+
+    /// <summary>
+    ///     Scalar value-equality of two stamp lists (<see cref="FileStamp" /> is a record) — whether a validation
+    ///     refreshed any stamp.
+    /// </summary>
+    internal static bool StampsEqual(IReadOnlyList<FileStamp> left, IReadOnlyList<FileStamp> right)
+    {
+        if (left.Count != right.Count) return false;
+        for (var i = 0; i < left.Count; i++)
+            if (left[i] != right[i])
+                return false; // FileStamp is a record ⇒ scalar value equality
+        return true;
+    }
+
+    /// <summary>
+    ///     Validates one structural stamp against disk: an existence flip is a change; a promoted stat match is
+    ///     trusted without a read; otherwise the file is re-hashed (invoking <paramref name="onHash" /> first,
+    ///     so the caller can count the read) — a real content change is a change, a bare touch refreshes the
+    ///     stamp so the next sweep is pure-stat.
+    /// </summary>
+    /// <param name="stamp">The recorded stamp to check against current disk state.</param>
+    /// <param name="onHash">
+    ///     Invoked once immediately before each content hash, so a store can maintain its own read counter.
+    ///     Required: both stores expose that count as a test observable, and a caller that passed nothing
+    ///     would be silently uncounted rather than visibly opting out.
+    /// </param>
+    /// <returns>
+    ///     <c>Changed</c> is true on an existence flip or real content change; <c>Refreshed</c> is the stamp to carry
+    ///     forward.
+    /// </returns>
+    internal static (bool Changed, FileStamp Refreshed) CheckStructural(FileStamp stamp, Action onHash)
+    {
+        FileFreshness current = FileFreshness.Capture(stamp.Path);
+        if (stamp.Exists != current.Exists) return (true, stamp);
+        if (!stamp.Exists) return (false, stamp);
+        if (ToFreshness(stamp).MatchesStat(current) && stamp.Promoted) return (false, stamp);
+
+        onHash();
+        string? sha = TryHashFile(stamp.Path);
+        if (sha is null || !string.Equals(sha, stamp.Sha256, StringComparison.Ordinal)) return (true, stamp);
+
+        // Content unchanged despite the stat delta (a bare touch): refresh so the next sweep is pure-stat.
+        return (false, RefreshStamp(stamp.Path, current, sha));
+    }
+}

@@ -1,0 +1,67 @@
+<Project>
+
+    <!-- Hands the SlideRule analyzer the three things it needs to run inside a build: the rules
+         (sliderule.model.json), the baselines those rules ratchet against, and the switch a build sets to
+         choose how much the analyzer reports.
+
+         The same file is packed to buildTransitive/ and to build/, so a project can end up importing both
+         copies. Nothing here may depend on running once, which is why each block removes what it is about
+         to add: running it twice then leaves exactly what running it once did. KeepDuplicates cannot do
+         that job here, being honoured only inside a target. -->
+
+    <ItemGroup>
+        <!-- The switch, which the analyzer reads as build_property.SlideRuleTier. A property is
+             invisible inside an analyzer unless it is named here. -->
+        <CompilerVisibleProperty Remove="SlideRuleTier" />
+        <CompilerVisibleProperty Include="SlideRuleTier" />
+    </ItemGroup>
+
+    <!-- The nearest sliderule.model.json at or above the project directory, which is where the render
+         verb puts it. A project that keeps its model somewhere else sets SlideRuleModelFile itself and
+         this default steps aside. Measured: the search returns an empty string when there is no model file
+         anywhere above, which is the case the guards below are written for. -->
+    <PropertyGroup Condition="'$(SlideRuleModelFile)' == ''">
+        <SlideRuleModelFile>$([MSBuild]::GetPathOfFileAbove('sliderule.model.json', '$(MSBuildProjectDirectory)'))</SlideRuleModelFile>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="Exists('$(SlideRuleModelFile)')">
+        <_SlideRuleModelDirectory>$([System.IO.Path]::GetDirectoryName('$(SlideRuleModelFile)'))</_SlideRuleModelDirectory>
+        <_SlideRuleBaselineGlob>$(_SlideRuleModelDirectory)/arch/baselines/**/*.json</_SlideRuleBaselineGlob>
+    </PropertyGroup>
+
+    <!-- The model, and beside it the baselines that sit under it by convention. The Exists guard is not
+         tidiness: an AdditionalFiles entry naming a file that is not there is error CS2001 on every build,
+         so a project with no model file above it would stop compiling rather than simply go unchecked. A
+         glob that matches nothing adds nothing, so a repository that keeps no baselines needs no guard of
+         its own. -->
+    <ItemGroup Condition="Exists('$(SlideRuleModelFile)')">
+        <AdditionalFiles Remove="$(SlideRuleModelFile)" />
+        <AdditionalFiles Include="$(SlideRuleModelFile)" />
+        <AdditionalFiles Remove="$(_SlideRuleBaselineGlob)" />
+        <AdditionalFiles Include="$(_SlideRuleBaselineGlob)" />
+    </ItemGroup>
+
+    <!-- SlideRuleBaseline is the item a project adds to when a spec put a baseline somewhere the glob
+         above does not reach. Only the entries that exist are handed over, because a stale one is CS2001
+         again, and the Exclude is what keeps a path the glob already found from being listed twice. -->
+    <ItemGroup>
+        <AdditionalFiles Remove="@(SlideRuleBaseline)" />
+        <AdditionalFiles Include="@(SlideRuleBaseline->Exists())" Exclude="@(AdditionalFiles)" />
+    </ItemGroup>
+
+    <!-- A compiler below Roslyn 4.0.1 cannot load this analyzer and says so with CS8032 on every build of
+         every project that references the package: a warning ordinarily, an error wherever warnings are
+         errors. Taking the analyzer back out is what leaves such a build working exactly as it did before.
+         Measured on the 3.1 and 5.0 SDKs: CompilerApiVersion is empty on a host below the floor and carries
+         a value on every host at or above it, and the Analyzer items carry NuGetPackageId on all of them. -->
+    <Target Name="_SlideRuleRemoveAnalyzerBelowTheFloor"
+            BeforeTargets="CoreCompile"
+            Condition="'$(CompilerApiVersion)' == ''">
+        <ItemGroup>
+            <_SlideRuleAnalyzerBelowTheFloor Include="@(Analyzer)"
+                                               Condition="'%(Analyzer.NuGetPackageId)' == 'SlideRule.Analyzers'" />
+            <Analyzer Remove="@(_SlideRuleAnalyzerBelowTheFloor)" />
+        </ItemGroup>
+    </Target>
+
+</Project>

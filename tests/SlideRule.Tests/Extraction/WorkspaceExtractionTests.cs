@@ -1,0 +1,604 @@
+using Microsoft.Build.Locator;
+using Shouldly;
+using Xunit;
+using SlideRule.Codebase;
+using SlideRule.Tests.TestSupport;
+
+namespace SlideRule.Tests.Extraction;
+
+/// <summary>
+///     The MSBuildWorkspace tier: the fixture solution is loaded and extracted once by
+///     <see cref="WorkspaceFixture" />; these tests read the shared model. Pinned strings are the
+///     spec — moving one is a deliberate act.
+/// </summary>
+public sealed class WorkspaceExtractionTests(WorkspaceFixture fixture)
+{
+    [Fact]
+    public void LoadAsync_FixtureSolution_LoadsThreeProjectsWithLocatorRegistered()
+    {
+        MSBuildLocator.IsRegistered.ShouldBeTrue();
+        fixture.Model.Projects.Select(p => p.Name)
+            .ShouldBe(["MyApp.Domain", "MyApp.Legacy.Billing", "MyApp.Web"]);
+    }
+
+    [Fact]
+    public void ExtractFromSolutionAsync_FixtureSolution_CarriesEachProjectsAssemblyNames()
+    {
+        // The three fixture projects each compile to one assembly, and each names it after itself — the
+        // ordinary case, and the one the model file records so a reader holding a compilation can tell
+        // whether it is one the file speaks about.
+        fixture.Model.Projects.Select(project => (project.Name, Assemblies: string.Join(", ", project.AssemblyNames)))
+            .ShouldBe([
+                ("MyApp.Domain", "MyApp.Domain"),
+                ("MyApp.Legacy.Billing", "MyApp.Legacy.Billing"),
+                ("MyApp.Web", "MyApp.Web")
+            ]);
+    }
+
+    [Fact]
+    public void ExtractFromSolutionAsync_FixtureSolution_PinsProjectReferenceGraph()
+    {
+        ProjectNode Project(string name)
+        {
+            return fixture.Model.Projects.Single(p => p.Name == name);
+        }
+
+        Project("MyApp.Domain")
+            .ProjectReferences.ShouldBe(["MyApp.Web"]);
+        Project("MyApp.Web")
+            .ProjectReferences.ShouldBe(["MyApp.Legacy.Billing"]);
+        Project("MyApp.Legacy.Billing")
+            .ProjectReferences.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void ExtractFromSolutionAsync_DomainProject_PinsCompleteEdgeList()
+    {
+        string rendered = string.Join("\n", fixture.Model.Edges
+            .Where(e => e.Source.ProjectName == "MyApp.Domain")
+            .Select(fixture.RenderEdge));
+
+        rendered.ShouldBe(
+            """
+            MyApp.Domain.Order -> MyApp.Domain.Money @ MyApp.Domain/Order.Validation.cs:5, MyApp.Domain/Order.cs:7, MyApp.Domain/Order.cs:9
+            MyApp.Domain.Order -> MyApp.Domain.Order.Line @ MyApp.Domain/Order.cs:9
+            MyApp.Domain.Order.Line -> MyApp.Domain.Money @ MyApp.Domain/Order.cs:13, MyApp.Domain/Order.cs:21
+            MyApp.Domain.OrderApproval -> MyApp.Domain.Money @ MyApp.Domain/OrderApproval.cs:10
+            MyApp.Domain.OrderApproval -> MyApp.Domain.Order @ MyApp.Domain/OrderApproval.cs:8, MyApp.Domain/OrderApproval.cs:10, MyApp.Domain/OrderApproval.cs:15
+            MyApp.Domain.OrderApproval -> MyApp.Domain.OrderRuleViolation @ MyApp.Domain/OrderApproval.cs:12
+            MyApp.Domain.OrderApproval -> System.InvalidOperationException @ MyApp.Domain/OrderApproval.cs:17
+            MyApp.Domain.OrderRuleViolation -> System.Exception @ MyApp.Domain/OrderRuleViolation.cs:5
+            MyApp.Domain.OrderService -> MyApp.Domain.Order @ MyApp.Domain/OrderService.cs:7, MyApp.Domain/OrderService.cs:10
+            MyApp.Domain.OrderService -> MyApp.Web.HomeController @ MyApp.Domain/OrderService.cs:9, MyApp.Domain/OrderService.cs:10, MyApp.Domain/OrderService.cs:13
+            MyApp.Domain.OrderService -> MyApp.Web.WebTextExtensions @ MyApp.Domain/OrderService.cs:10
+            MyApp.Domain.PricingStrategy -> MyApp.Domain.Money @ MyApp.Domain/PricingStrategy.cs:3
+            MyApp.Domain.PricingStrategy -> MyApp.Domain.Order @ MyApp.Domain/PricingStrategy.cs:3
+            MyApp.Domain.RetryPolicy -> System.Exception @ MyApp.Domain/RetryPolicy.cs:18
+            """);
+    }
+
+    [Fact]
+    public void ExtractFromSolutionAsync_DomainProject_PinsCompleteMemberEdgeList()
+    {
+        // The member-use channel (GRAMMAR §4.5) for the Domain project, pinned whole: property accesses fold
+        // to P: (Reference, Amount, Total), the cross-project call is the M: overload (RenderOrder), and the
+        // reduced extension resolves to the declaring static class (WebTextExtensions), never to string.
+        // OrderApproval's throw-guard reads its own `order.Total.Amount` (two P: hops) and calls Validate (M:).
+        // Deliberately ABSENT: OrderService's `new HomeController()` and OrderApproval's two `throw new` sites
+        // (constructions, not uses), and `typeof(HomeController)` — none is a use.
+        string rendered = string.Join("\n", fixture.Model.MemberEdges
+            .Where(e => e.Source.ProjectName == "MyApp.Domain")
+            .Select(fixture.RenderMemberEdge));
+
+        rendered.ShouldBe(
+            """
+            MyApp.Domain.Order -> P:MyApp.Domain.Money.Amount @ MyApp.Domain/Order.Validation.cs:5
+            MyApp.Domain.OrderApproval -> M:MyApp.Domain.Order.Validate @ MyApp.Domain/OrderApproval.cs:15
+            MyApp.Domain.OrderApproval -> P:MyApp.Domain.Money.Amount @ MyApp.Domain/OrderApproval.cs:10
+            MyApp.Domain.OrderApproval -> P:MyApp.Domain.Order.Total @ MyApp.Domain/OrderApproval.cs:10
+            MyApp.Domain.OrderService -> M:MyApp.Web.HomeController.RenderOrder(System.String) @ MyApp.Domain/OrderService.cs:10
+            MyApp.Domain.OrderService -> M:MyApp.Web.WebTextExtensions.ToWebDisplay(System.String) @ MyApp.Domain/OrderService.cs:10
+            MyApp.Domain.OrderService -> P:MyApp.Domain.Order.Reference @ MyApp.Domain/OrderService.cs:10
+            """);
+    }
+
+    [Fact]
+    public void ExtractFromSolutionAsync_DomainProject_PinsCompleteConstructorEdgeList()
+    {
+        // The construction channel (GRAMMAR §4.5) for the Domain project, pinned whole: Order builds its nested
+        // Line, OrderService `new`s the cross-project HomeController, and OrderApproval's throw-guard `new`s both
+        // its domain OrderRuleViolation and the BCL InvalidOperationException. Deliberately ABSENT: OrderService's
+        // typeof(HomeController) at line 13 (a type reference, not a construction) and OrderRuleViolation's
+        // `: base(message)` (a base-constructor call, not a `new`) — neither is a ctor edge.
+        string rendered = string.Join("\n", fixture.Model.ConstructorEdges
+            .Where(e => e.Source.ProjectName == "MyApp.Domain")
+            .Select(fixture.RenderConstructorEdge));
+
+        rendered.ShouldBe(
+            """
+            MyApp.Domain.Order -> MyApp.Domain.Order.Line @ MyApp.Domain/Order.cs:9
+            MyApp.Domain.OrderApproval -> MyApp.Domain.OrderRuleViolation @ MyApp.Domain/OrderApproval.cs:12
+            MyApp.Domain.OrderApproval -> System.InvalidOperationException @ MyApp.Domain/OrderApproval.cs:17
+            MyApp.Domain.OrderService -> MyApp.Web.HomeController @ MyApp.Domain/OrderService.cs:9
+            """);
+
+        // Cross-project construction resolves to the declared Web node, and the type edge co-exists.
+        fixture.Model.ConstructorEdge("MyApp.Domain.OrderService", "MyApp.Web.HomeController")
+            .Constructed.IsExternal.ShouldBeFalse();
+        fixture.Model.HasEdge("MyApp.Domain.OrderService", "MyApp.Web.HomeController")
+            .ShouldBeTrue();
+    }
+
+    [Fact]
+    public void ExtractFromSolutionAsync_BillingCalculatorMemberEdges_PinExternalNormalizedForms()
+    {
+        // The real-workspace member DocIds against BCL metadata: the two Math.Round overloads are distinct
+        // M: ids (the §4.3 per-overload identity substrate), the enum members are F:, and the external flag is
+        // set for the BCL targets but not the in-solution RoundingMode.
+        string rendered = string.Join("\n", fixture.Model.MemberEdges
+            .Where(e => e.Source.FullName == "MyApp.Legacy.Billing.BillingCalculator")
+            .Select(fixture.RenderMemberEdge));
+
+        rendered.ShouldBe(
+            """
+            MyApp.Legacy.Billing.BillingCalculator -> F:MyApp.Legacy.Billing.RoundingMode.Bankers @ MyApp.Legacy.Billing/BillingCalculator.cs:9
+            MyApp.Legacy.Billing.BillingCalculator -> F:System.MidpointRounding.ToEven @ MyApp.Legacy.Billing/BillingCalculator.cs:10
+            MyApp.Legacy.Billing.BillingCalculator -> M:System.Math.Round(System.Decimal,System.Int32) @ MyApp.Legacy.Billing/BillingCalculator.cs:11
+            MyApp.Legacy.Billing.BillingCalculator -> M:System.Math.Round(System.Decimal,System.Int32,System.MidpointRounding) @ MyApp.Legacy.Billing/BillingCalculator.cs:10
+            """);
+
+        MemberReference round = fixture.Model.MemberEdge(
+                "MyApp.Legacy.Billing.BillingCalculator", "M:System.Math.Round(System.Decimal,System.Int32)")
+            .Member;
+        round.ContainingType.IsExternal.ShouldBeTrue();
+        round.ContainingType.ShouldBeSameAs(fixture.Model.Type("System.Math"));
+
+        fixture.Model.MemberEdge(
+                "MyApp.Legacy.Billing.BillingCalculator", "F:MyApp.Legacy.Billing.RoundingMode.Bankers")
+            .Member.ContainingType.IsExternal.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void ExtractFromSolutionAsync_HomeControllerStringBuilderUse_UnionsSitesUnderOneExternalMethodEdge()
+    {
+        // Two Append call sites (lines 13, 19) union into one external M: edge; the constructor at line 9 is not here.
+        MemberEdge append = fixture.Model.MemberEdge(
+            "MyApp.Web.HomeController", "M:System.Text.StringBuilder.Append(System.String)");
+
+        append.Member.ContainingType.IsExternal.ShouldBeTrue();
+        append.Sites.Lines()
+            .ShouldBe([13, 19]);
+    }
+
+    [Fact]
+    public void ExtractFromSolutionAsync_WebToBillingFacadeEdge_PinsCleanFacadeSites()
+    {
+        fixture.Model.Edge("MyApp.Web.HomeController", "MyApp.Legacy.Billing.IBillingFacade")
+            .Sites.Lines()
+            .ShouldBe([17, 20]);
+    }
+
+    [Fact]
+    public void ExtractFromSolutionAsync_WebToBillingCalculatorEdge_PinsNonFacadeSites()
+    {
+        fixture.Model.Edge("MyApp.Web.InvoiceController", "MyApp.Legacy.Billing.BillingCalculator")
+            .Sites.Lines()
+            .ShouldBe([9, 10]);
+    }
+
+    [Fact]
+    public void ExtractFromSolutionAsync_InvoiceControllerToDataTable_PinsGrandfatheredMigrateEdge()
+    {
+        // The site the Migrate baseline grandfathers: InvoiceController's inline DataTable.
+        ReferenceEdge edge = fixture.Model.Edge("MyApp.Web.InvoiceController", "System.Data.DataTable");
+
+        edge.Target.IsExternal.ShouldBeTrue();
+        edge.Sites.Lines()
+            .ShouldBe([14, 16]);
+    }
+
+    [Fact]
+    public void ExtractFromSolutionAsync_HomeControllerToDataTable_PinsNewRedMigrateEdge()
+    {
+        // New code in the OLD pattern — HomeController's DataTable is not in the baseline, so it stays red.
+        ReferenceEdge edge = fixture.Model.Edge("MyApp.Web.HomeController", "System.Data.DataTable");
+
+        edge.Target.IsExternal.ShouldBeTrue();
+        edge.Sites.Lines()
+            .ShouldBe([24, 26]);
+    }
+
+    [Fact]
+    public void ExtractFromSolutionAsync_HomeControllerClockReads_PinNewMemberUseEdgesAndDateTimeTypeEdge()
+    {
+        // The member-use channel (GRAMMAR §4.5) on HomeController's two ambient-clock reads: each folds to a
+        // P: member edge on the external System.DateTime — the rows time/inject-clock bans. The parallel type
+        // edge to System.DateTime carries the two return types as well as the two reads.
+        fixture.Model.MemberEdge("MyApp.Web.HomeController", "P:System.DateTime.Now")
+            .Sites.Lines()
+            .ShouldBe([32]);
+        fixture.Model.MemberEdge("MyApp.Web.HomeController", "P:System.DateTime.UtcNow")
+            .Sites.Lines()
+            .ShouldBe([37]);
+
+        ReferenceEdge dateTime = fixture.Model.Edge("MyApp.Web.HomeController", "System.DateTime");
+        dateTime.Target.IsExternal.ShouldBeTrue();
+        dateTime.Sites.Lines()
+            .ShouldBe([30, 32, 35, 37]);
+    }
+
+    [Fact]
+    public void ExtractFromSolutionAsync_HomeControllerMembers_PinDeclaredInventoryAndFacts()
+    {
+        // The member inventory (GRAMMAR §4.6) on the real workspace: the nine declared members (the implicit
+        // default constructor excluded), ordered ordinal by SymbolId. Return/member types are definition-level
+        // FQNs, accessibility carries through (the private field included), and each member's DeclaringType is
+        // the SAME node instance held by model.Types. The three Task-returning methods are the
+        // naming/async-suffix subject universe — Load returns Task<int> (a definition-level Task`1).
+        TypeNode home = fixture.Model.Type("MyApp.Web.HomeController");
+
+        home.MemberIds()
+            .ShouldBe([
+                "F:MyApp.Web.HomeController.log",
+                "M:MyApp.Web.HomeController.ExportOrders",
+                "M:MyApp.Web.HomeController.ExportStamp",
+                "M:MyApp.Web.HomeController.ExportStampUtc",
+                "M:MyApp.Web.HomeController.Load",
+                "M:MyApp.Web.HomeController.RenderOrder(System.String)",
+                "M:MyApp.Web.HomeController.Save",
+                "M:MyApp.Web.HomeController.SaveAsync",
+                "M:MyApp.Web.HomeController.ShowInvoiceTotal(MyApp.Legacy.Billing.IBillingFacade)"
+            ]);
+
+        MemberNode log = home.Member("F:MyApp.Web.HomeController.log");
+        log.Kind.ShouldBe(MemberKind.Field);
+        log.Accessibility.ShouldBe(Accessibility.Private);
+        log.MemberTypeFullName.ShouldBe("System.Text.StringBuilder");
+        log.DeclaringType.ShouldBeSameAs(home);
+
+        MemberNode stamp = home.Member("M:MyApp.Web.HomeController.ExportStamp");
+        stamp.Kind.ShouldBe(MemberKind.Method);
+        stamp.Accessibility.ShouldBe(Accessibility.Public);
+        stamp.ReturnTypeFullName.ShouldBe("System.DateTime");
+        stamp.DeclarationSites.Single()
+            .Line.ShouldBe(30);
+
+        home.Member("M:MyApp.Web.HomeController.RenderOrder(System.String)")
+            .ReturnTypeFullName.ShouldBe("System.String");
+
+        // Parameter facts (GRAMMAR §4.6, §5.6) survive the real MSBuild workspace + cache round-trip:
+        // definition-level types in declaration order, an external parameter type kept whole, and a
+        // parameterless method carrying the empty list.
+        home.Member("M:MyApp.Web.HomeController.RenderOrder(System.String)")
+            .Parameters
+            .Select(p => (p.Name, p.TypeFullName))
+            .ShouldBe([("description", "System.String")]);
+        home.Member("M:MyApp.Web.HomeController.ShowInvoiceTotal(MyApp.Legacy.Billing.IBillingFacade)")
+            .Parameters
+            .Select(p => (p.Name, p.TypeFullName))
+            .ShouldBe([("facade", "MyApp.Legacy.Billing.IBillingFacade")]);
+        home.Member("M:MyApp.Web.HomeController.Save")
+            .Parameters.ShouldBeEmpty();
+
+        // Externals carry no inventory (the member axis is solution-declared-only).
+        fixture.Model.Type("System.Text.StringBuilder")
+            .Members.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void ExtractFromSolutionAsync_SymbolIds_PinRealWorkspaceDocIdForms()
+    {
+        // The baseline keys (GRAMMAR §4.3) from the real workspace: plain, open generic (backtick-arity),
+        // nested (dotted), and external.
+        fixture.Model.Type("MyApp.Web.HomeController")
+            .SymbolId.ShouldBe("T:MyApp.Web.HomeController");
+        fixture.Model.Type("MyApp.Web.IHandler<T>")
+            .SymbolId.ShouldBe("T:MyApp.Web.IHandler`1");
+        fixture.Model.Type("MyApp.Domain.Order.Line")
+            .SymbolId.ShouldBe("T:MyApp.Domain.Order.Line");
+        fixture.Model.Type("System.Data.DataTable")
+            .SymbolId.ShouldBe("T:System.Data.DataTable");
+    }
+
+    [Fact]
+    public void ExtractFromSolutionAsync_StringBuilderTarget_IsExternalWithPinnedSites()
+    {
+        ReferenceEdge edge = fixture.Model.Edge("MyApp.Web.HomeController", "System.Text.StringBuilder");
+
+        edge.Target.IsExternal.ShouldBeTrue();
+        edge.Target.ProjectName.ShouldNotBeNullOrEmpty();
+        edge.Sites.Lines()
+            .ShouldBe([9, 13, 14, 19]);
+    }
+
+    [Fact]
+    public void ExtractFromSolutionAsync_PartialOrder_IsOneNodeWithTwoDeclarationSites()
+    {
+        fixture.Model.Type("MyApp.Domain.Order")
+            .DeclarationSites
+            .Select(s => $"{fixture.RelativePath(s)}:{s.Line}")
+            .ShouldBe(["MyApp.Domain/Order.Validation.cs:3", "MyApp.Domain/Order.cs:3"]);
+    }
+
+    [Fact]
+    public void ExtractFromSolutionAsync_FixtureKinds_MapToCoreTypeKinds()
+    {
+        fixture.Model.Type("MyApp.Domain.Money")
+            .Kind.ShouldBe(TypeKind.Struct);
+        fixture.Model.Type("MyApp.Web.InvoiceCreated")
+            .Kind.ShouldBe(TypeKind.Class);
+        fixture.Model.Type("MyApp.Domain.PricingStrategy")
+            .Kind.ShouldBe(TypeKind.Delegate);
+        fixture.Model.Type("MyApp.Legacy.Billing.RoundingMode")
+            .Kind.ShouldBe(TypeKind.Enum);
+        fixture.Model.Type("MyApp.Web.IHandler<T>")
+            .Kind.ShouldBe(TypeKind.Interface);
+        fixture.Model.Type("MyApp.Web.WebTextExtensions")
+            .Kind.ShouldBe(TypeKind.Class);
+    }
+
+    [Fact]
+    public void ExtractFromSolutionAsync_GenericAndNestedFullNames_RenderPinnedForms()
+    {
+        fixture.Model.Types.ShouldContain(t => t.FullName == "MyApp.Web.IHandler<T>");
+        fixture.Model.Types.ShouldContain(t => t.FullName == "MyApp.Domain.Order.Line");
+    }
+
+    [Fact]
+    public void ExtractFromSolutionAsync_ShapeFacts_SurviveTheRealWorkspace()
+    {
+        TypeNode ext = fixture.Model.Type("MyApp.Web.WebTextExtensions");
+        ext.IsStatic.ShouldBeTrue();
+        ext.IsSealed.ShouldBeFalse();
+        ext.IsAbstract.ShouldBeFalse();
+        ext.Accessibility.ShouldBe(Accessibility.Public);
+
+        // The pinned two-file partial: FilePaths verbatim (real workspace paths are absolute with
+        // mixed separators, hence normalize-then-EndsWith) in site order — Order.Validation.cs sorts
+        // before Order.cs ('V' < 'c' ordinal).
+        TypeNode order = fixture.Model.Type("MyApp.Domain.Order");
+        order.FilePaths.Count.ShouldBe(2);
+        order.FilePaths[0]
+            .Replace('\\', '/')
+            .ShouldEndWith("MyApp.Domain/Order.Validation.cs");
+        order.FilePaths[1]
+            .Replace('\\', '/')
+            .ShouldEndWith("MyApp.Domain/Order.cs");
+
+        // Already-pinned external: real metadata scalars, empty sites.
+        TypeNode sb = fixture.Model.Type("System.Text.StringBuilder");
+        sb.IsSealed.ShouldBeTrue();
+        sb.FilePaths.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void ExtractFromSolutionAsync_HomeController_PopulatesITypeInfoSurface()
+    {
+        TypeNode home = fixture.Model.Type("MyApp.Web.HomeController");
+        home.Attributes.Select(a => a.FullName())
+            .ShouldBe(["MyApp.Web.WebRouteAttribute"]);
+        var homeBase = (TypeNode)home.BaseType!;
+        homeBase.FullName.ShouldBe("System.Object");
+        homeBase.IsExternal.ShouldBeTrue();
+        home.DeclarationSites.Single()
+            .Line.ShouldBe(7);
+
+        ((TypeNode)fixture.Model.Type("MyApp.Web.WebRouteAttribute")
+            .BaseType!).FullName.ShouldBe("System.Attribute");
+
+        fixture.Model.Type("MyApp.Web.InvoiceCreatedHandler")
+            .Interfaces.Select(i => i.FullName())
+            .ShouldBe(["MyApp.Web.IHandler<T>"]);
+    }
+
+    [Fact]
+    public void ExtractFromSolutionAsync_HandlerConstructions_PinConstructedInterfaceName()
+    {
+        TypeConstruction handler = fixture.Model.Type("MyApp.Web.InvoiceCreatedHandler")
+            .AllInterfaces
+            .Single(c => c.Definition.FullName == "MyApp.Web.IHandler<T>");
+        handler.FullName.ShouldBe("MyApp.Web.IHandler<MyApp.Web.InvoiceCreated>");
+
+        fixture.Model.Type("MyApp.Web.RefundProcessor")
+            .AllInterfaces
+            .Single()
+            .FullName.ShouldBe("MyApp.Web.IHandler<MyApp.Web.InvoiceCreated>");
+    }
+
+    [Fact]
+    public void ExtractFromSolutionAsync_HomeControllerConstructions_PinAttributeAndBaseChain()
+    {
+        TypeNode home = fixture.Model.Type("MyApp.Web.HomeController");
+        home.AttributeConstructions.Select(c => c.FullName)
+            .ShouldBe(["MyApp.Web.WebRouteAttribute"]);
+        home.BaseTypeChain.Select(c => c.FullName)
+            .ShouldBe(["System.Object"]);
+    }
+
+    [Fact]
+    public void ExtractFromSolutionAsync_ExternalObjectNode_HasShallowConstructionLists()
+    {
+        TypeNode obj = fixture.Model.Type("System.Object");
+        obj.IsExternal.ShouldBeTrue();
+        obj.AllInterfaces.ShouldBeEmpty();
+        obj.BaseTypeChain.ShouldBeEmpty();
+        obj.AttributeConstructions.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void ExtractFromCompilations_BillingSources_MatchWorkspaceExtractionExactly()
+    {
+        string billingDir = Path.Combine(
+            AppContext.BaseDirectory, "Fixtures", "TestSolutions", "MyApp", "MyApp.Legacy.Billing");
+        (string Path, string Source)[] files = Directory.EnumerateFiles(billingDir, "*.cs")
+            .Select(f => ($"MyApp.Legacy.Billing/{Path.GetFileName(f)}", File.ReadAllText(f)))
+            .ToArray();
+
+        CodebaseModel fast = CompilationFactory.Extract("MyApp.Legacy.Billing", files);
+
+        List<string> fastEdges = RenderBillingEdges(fast.Edges, s => s.FilePath);
+        List<string> workspaceEdges = RenderBillingEdges(fixture.Model.Edges, fixture.RelativePath);
+
+        workspaceEdges.ShouldBe(fastEdges);
+        fastEdges.ShouldNotBeEmpty();
+    }
+
+    [Fact]
+    public void ExtractFromSolutionAsync_ReportSchedulerInjection_PinsCaptiveConstructorEdges()
+    {
+        // The injection channel (GRAMMAR §4.7) for the captive-dependency flagship: the singleton
+        // ReportScheduler's primary constructor takes a scoped IOrderFeed and a transient IOrderFormatter,
+        // each at its own parameter file:line — the two edges di/no-captive-dependencies reds on.
+        string rendered = string.Join("\n", fixture.Model.InjectionEdges
+            .Where(e => e.Source.FullName == "MyApp.Web.ReportScheduler")
+            .Select(fixture.RenderInjectionEdge));
+
+        rendered.ShouldBe(
+            """
+            MyApp.Web.ReportScheduler -> MyApp.Web.IOrderFeed @ MyApp.Web/ReportScheduler.cs:7
+            MyApp.Web.ReportScheduler -> MyApp.Web.IOrderFormatter @ MyApp.Web/ReportScheduler.cs:8
+            """);
+
+        // Both injected endpoints are in-solution nodes (reference equality, not just name), so the
+        // Registered(Scoped)/Registered(Transient) operands match them as members.
+        fixture.Model.InjectionEdge("MyApp.Web.ReportScheduler", "MyApp.Web.IOrderFeed")
+            .Injected.IsExternal.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void ExtractFromSolutionAsync_ServiceWiring_PinsThreeRegistrationFacts()
+    {
+        // The registration channel (GRAMMAR §4.7): ServiceWiring.Configure's three recognized calls, each
+        // keyed (lifetime, service, implementation) at the invoked-method file:line. AddSingleton<ReportScheduler>()
+        // is the one-type-arg self form (service == implementation); the other two name a distinct
+        // implementation. The whole list is pinned — these are the only registrations the fixture spells.
+        string rendered = string.Join("\n", fixture.Model.ServiceRegistrations.Select(fixture.RenderRegistration));
+
+        rendered.ShouldBe(
+            """
+            Singleton MyApp.Web.ReportScheduler -> MyApp.Web.ReportScheduler @ MyApp.Web/ServiceWiring.cs:13
+            Scoped MyApp.Web.IOrderFeed -> MyApp.Web.OrderFeed @ MyApp.Web/ServiceWiring.cs:14
+            Transient MyApp.Web.IOrderFormatter -> MyApp.Web.OrderFormatter @ MyApp.Web/ServiceWiring.cs:15
+            """);
+    }
+
+    [Fact]
+    public void ExtractFromSolutionAsync_ExceptionEdges_PinReportEndpointCatchAndOrderApprovalThrows()
+    {
+        // The catch/throw channels (GRAMMAR §4.8) survive the real MSBuild workspace + cache round-trip.
+        // ReportEndpoint's blanket `catch (System.Exception)` is the exceptions/no-general-catch red;
+        // OrderApproval's two `throw new` sites are throw edges — its own sanctioned in-solution
+        // OrderRuleViolation and the BCL InvalidOperationException the strict exceptions/domain-throws-domain
+        // rule reds on. Each rides beside the §4.1 reference edge its type-name syntax mints (a bare catch would
+        // name no type and mint none, but this catch is typed).
+
+        // At least one CatchEdge: the blanket catch, external caught type, at the catch-clause line, with its
+        // co-existing §4.1 reference edge.
+        CatchEdge swallow = fixture.Model.CatchEdge("MyApp.Web.ReportEndpoint", "System.Exception");
+        swallow.Caught.IsExternal.ShouldBeTrue();
+        swallow.Sites.Lines()
+            .ShouldBe([15]);
+        fixture.Model.CatchEdges("MyApp.Web.ReportEndpoint")
+            .Select(e => e.Caught.FullName)
+            .ShouldBe(["System.Exception"]);
+        fixture.Model.HasEdge("MyApp.Web.ReportEndpoint", "System.Exception")
+            .ShouldBeTrue();
+
+        // The filter fact, through the same workspace + cache path: ReportEndpoint's clause spells no `when`, so
+        // its one site is recorded unfiltered, while RetryPolicy catches the identical external type behind a
+        // filter and records none. Both edges — and both reference edges — exist either way, which is the
+        // difference the filter-aware verb reads and the plain catch verb cannot see.
+        swallow.UnfilteredSites.Lines()
+            .ShouldBe([15]);
+        CatchEdge guarded = fixture.Model.CatchEdge("MyApp.Domain.RetryPolicy", "System.Exception");
+        guarded.Sites.Lines()
+            .ShouldBe([18]);
+        guarded.UnfilteredSites.Lines()
+            .ShouldBeEmpty();
+        fixture.Model.HasEdge("MyApp.Domain.RetryPolicy", "System.Exception")
+            .ShouldBeTrue();
+
+        // The rethrow fact, through that same path: ReportEndpoint's clause returns -1, so its unfiltered site is
+        // also a swallowing site, while ReportPublisher catches the identical external type just as unfiltered and
+        // ends its block in `throw;`, so its site is recorded unfiltered and NOT swallowing. That difference is
+        // what the rethrow-aware verb reads and neither of the other two catch verbs can see; RetryPolicy's
+        // filtered clause is out of both subsets, the subset-of-a-subset holding end to end.
+        swallow.SwallowingSites.Lines()
+            .ShouldBe([15]);
+        CatchEdge rethrowing = fixture.Model.CatchEdge("MyApp.Web.ReportPublisher", "System.Exception");
+        rethrowing.Sites.Lines()
+            .ShouldBe([22]);
+        rethrowing.UnfilteredSites.Lines()
+            .ShouldBe([22]);
+        rethrowing.SwallowingSites.Lines()
+            .ShouldBeEmpty();
+        guarded.SwallowingSites.Lines()
+            .ShouldBeEmpty();
+
+        // At least one ThrowEdge: OrderApproval's whole throw set, pinned — the in-solution domain exception at
+        // its `throw new` line and the BCL one at its own, each beside the §4.1 reference edge and (for `throw
+        // new`) the §4.5 construction edge.
+        fixture.Model.ThrowEdges("MyApp.Domain.OrderApproval")
+            .Select(e => e.Thrown.FullName)
+            .ShouldBe(["MyApp.Domain.OrderRuleViolation", "System.InvalidOperationException"]);
+        fixture.Model.ThrowEdge("MyApp.Domain.OrderApproval", "MyApp.Domain.OrderRuleViolation")
+            .Sites.Lines()
+            .ShouldBe([12]);
+
+        ThrowEdge bclThrow = fixture.Model.ThrowEdge("MyApp.Domain.OrderApproval", "System.InvalidOperationException");
+        bclThrow.Thrown.IsExternal.ShouldBeTrue();
+        bclThrow.Sites.Lines()
+            .ShouldBe([17]);
+        fixture.Model.HasEdge("MyApp.Domain.OrderApproval", "System.InvalidOperationException")
+            .ShouldBeTrue();
+    }
+
+    [Fact]
+    public void ExtractFromSolutionAsync_HomeControllerExposure_PinsSignaturePositionEdges()
+    {
+        // The exposure channel (GRAMMAR §4.9) for HomeController, pinned whole: one edge per definition-level
+        // type named in a public signature position of an effectively-public member — return + parameter types
+        // and property/field/event types. Load's Task<int> mints BOTH the open Task`1 and Int32; the two
+        // DateTime-returning clock methods union to two sites, as do the two Task-returning save methods; the
+        // string return+param of RenderOrder dedupe to one site. Deliberately ABSENT: the private `log` field's
+        // StringBuilder (not effectively public — the honesty boundary), the constructor axis (§4.7), and the
+        // method-body member uses (§4.5) — only static signatures surface here.
+        string rendered = string.Join("\n", fixture.Model.ExposureEdges
+            .Where(e => e.Source.FullName == "MyApp.Web.HomeController")
+            .Select(fixture.RenderExposureEdge));
+
+        rendered.ShouldBe(
+            """
+            MyApp.Web.HomeController -> MyApp.Legacy.Billing.IBillingFacade @ MyApp.Web/HomeController.cs:17
+            MyApp.Web.HomeController -> System.Data.DataTable @ MyApp.Web/HomeController.cs:24
+            MyApp.Web.HomeController -> System.DateTime @ MyApp.Web/HomeController.cs:30, MyApp.Web/HomeController.cs:35
+            MyApp.Web.HomeController -> System.Decimal @ MyApp.Web/HomeController.cs:17
+            MyApp.Web.HomeController -> System.Int32 @ MyApp.Web/HomeController.cs:48
+            MyApp.Web.HomeController -> System.String @ MyApp.Web/HomeController.cs:11
+            MyApp.Web.HomeController -> System.Threading.Tasks.Task @ MyApp.Web/HomeController.cs:43, MyApp.Web/HomeController.cs:53
+            MyApp.Web.HomeController -> System.Threading.Tasks.Task<TResult> @ MyApp.Web/HomeController.cs:48
+            """);
+
+        // The in-solution exposed endpoint is the same declared node (reference equality, not just name), and the
+        // exposure edge rides beside the ordinary §4.1 reference edge the same signature type-name mints.
+        fixture.Model.ExposureEdge("MyApp.Web.HomeController", "MyApp.Legacy.Billing.IBillingFacade")
+            .Exposed.IsExternal.ShouldBeFalse();
+        fixture.Model.HasEdge("MyApp.Web.HomeController", "MyApp.Legacy.Billing.IBillingFacade")
+            .ShouldBeTrue();
+
+        // The private `log` field is not surface, so its StringBuilder type is never exposed (though the field's
+        // in-body uses still mint their own §4.5 member edges) — the effective-visibility boundary.
+        fixture.Model.HasExposureEdge("MyApp.Web.HomeController", "System.Text.StringBuilder")
+            .ShouldBeFalse();
+    }
+
+    private static List<string> RenderBillingEdges(IEnumerable<ReferenceEdge> edges, Func<SourceLocation, string> path)
+    {
+        return edges
+            .Where(e => e.Source.ProjectName == "MyApp.Legacy.Billing")
+            .Select(e => $"{e.Source.FullName} -> {e.Target.FullName} (external={e.Target.IsExternal}) @ "
+                         + string.Join(", ", e.Sites.Select(s => $"{path(s)}:{s.Line}")))
+            .OrderBy(x => x, StringComparer.Ordinal)
+            .ToList();
+    }
+}

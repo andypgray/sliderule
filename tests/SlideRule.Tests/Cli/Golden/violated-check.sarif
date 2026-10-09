@@ -1,0 +1,2358 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "SlideRule",
+          "version": "0.1.0",
+          "informationUri": "https://github.com/andypgray/sliderule",
+          "rules": [
+            {
+              "id": "layering/domain-independent",
+              "shortDescription": {
+                "text": "The Domain layer must not reference the Web layer."
+              },
+              "fullDescription": {
+                "text": "Domain is UI-agnostic; transaction boundaries live in services."
+              },
+              "help": {
+                "text": "Define an abstraction in Domain and implement it in Web."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "enforce"
+              }
+            },
+            {
+              "id": "layering/projects-independent",
+              "shortDescription": {
+                "text": "Each of the projects matching `MyApp.*` must not reference the others."
+              },
+              "fullDescription": {
+                "text": "Each MyApp project is its own deployable unit; a reference from one into another couples their release cadences."
+              },
+              "help": {
+                "text": "Move the shared type into a project both may reference, or reach the other project through an abstraction it owns."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "enforce"
+              }
+            },
+            {
+              "id": "layering/projects-reached-only-by-themselves",
+              "shortDescription": {
+                "text": "Each of the projects matching `MyApp.*` must be referenced only by itself."
+              },
+              "fullDescription": {
+                "text": "A project anything may reach into has no surface to change; every edge into it is part of its contract whether or not anyone meant it to be."
+              },
+              "help": {
+                "text": "Reach the project through an abstraction it owns, or move the type both projects need into a project both may reference."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "migrate"
+              }
+            },
+            {
+              "id": "layering/web-cuts-not-circular",
+              "shortDescription": {
+                "text": "Each of the Reporting and Invoicing layers must not have circular references with the others."
+              },
+              "fullDescription": {
+                "text": "Reporting and invoicing are two cuts of the web layer with no intended order between them; a circle means neither can be extracted without dragging the other along."
+              },
+              "help": {
+                "text": "Move what one cut borrows from the other into a type both may reach, or pick a direction and state it as an ordering rule."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "enforce"
+              }
+            },
+            {
+              "id": "layering/billing-independent",
+              "shortDescription": {
+                "text": "Types in `MyApp.Legacy.Billing.*` must not reference types in `MyApp.Web.*`."
+              },
+              "fullDescription": {
+                "text": "Billing must not reach up into the web layer."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "enforce"
+              }
+            },
+            {
+              "id": "data-access/no-inline-sql",
+              "shortDescription": {
+                "text": "Types in the Web layer named `*Controller` must not reference types in `System.Data.*`."
+              },
+              "fullDescription": {
+                "text": "Repository pattern for testability."
+              },
+              "help": {
+                "text": "Inject the repository."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "migrate"
+              }
+            },
+            {
+              "id": "time/inject-clock",
+              "shortDescription": {
+                "text": "The Web layer must not use `DateTime.Now` or `DateTime.UtcNow`."
+              },
+              "fullDescription": {
+                "text": "Wall-clock reads are untestable; inject IClock."
+              },
+              "help": {
+                "text": "Take IClock in the constructor. Exemplar: OrderService (MyApp.Domain/OrderService.cs:5)."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "migrate"
+              }
+            },
+            {
+              "id": "naming/async-suffix",
+              "shortDescription": {
+                "text": "Methods of the Web layer returning `Task` or `Task<TResult>` must be named `*Async`."
+              },
+              "fullDescription": {
+                "text": "Async methods are discovered by their Async suffix."
+              },
+              "help": {
+                "text": "Rename the method to end in Async and update its callers."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "migrate"
+              }
+            },
+            {
+              "id": "di/handlers-via-registry",
+              "shortDescription": {
+                "text": "Types, except `HandlerRegistry`, must not construct types implementing `IHandler<T>`."
+              },
+              "fullDescription": {
+                "text": "Handlers are resolved through HandlerRegistry; direct construction bypasses discovery."
+              },
+              "help": {
+                "text": "Resolve the handler through HandlerRegistry instead of constructing it."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "migrate"
+              }
+            },
+            {
+              "id": "di/no-captive-dependencies",
+              "shortDescription": {
+                "text": "Singleton-registered types must not inject scoped-registered types or transient-registered types."
+              },
+              "fullDescription": {
+                "text": "A singleton that captures a scoped or transient service pins it to the whole process lifetime."
+              },
+              "help": {
+                "text": "Inject IServiceScopeFactory and resolve the dependency inside a scope."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "migrate"
+              }
+            },
+            {
+              "id": "layering/no-ghost",
+              "shortDescription": {
+                "text": "Types in `MyApp.Domain.*` must not reference types in `MyApp.Ghost.*`."
+              },
+              "fullDescription": {
+                "text": "Nothing should reference the (nonexistent) ghost layer."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "enforce"
+              }
+            },
+            {
+              "id": "naming/nonexistent",
+              "shortDescription": {
+                "text": "Types in `MyApp.Nowhere.*` must be named `*Service`."
+              },
+              "fullDescription": {
+                "text": "A subject that matches nothing must fail loudly."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "enforce"
+              }
+            },
+            {
+              "id": "legacy/billing/containment",
+              "shortDescription": {
+                "text": "Types in `MyApp.Legacy.Billing.*`, except `IBillingFacade` or `BillingFacade`, must be referenced only by types in `MyApp.Legacy.Billing.*`, `IBillingFacade` or `BillingFacade`."
+              },
+              "fullDescription": {
+                "text": "Replacement scheduled; not worth stabilizing."
+              },
+              "help": {
+                "text": "use `IBillingFacade`"
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "quarantine"
+              }
+            },
+            {
+              "id": "legacy/billing/tripwire",
+              "fullDescription": {
+                "text": "Replacement scheduled; not worth stabilizing."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "properties": {
+                "posture": "quarantine"
+              }
+            },
+            {
+              "id": "exceptions/no-general-catch",
+              "shortDescription": {
+                "text": "The Web layer must not catch `Exception`."
+              },
+              "fullDescription": {
+                "text": "A catch-all hides the failures you meant to handle; catch the specific exception instead."
+              },
+              "help": {
+                "text": "Catch the specific exception type you can handle, not System.Exception."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "migrate"
+              }
+            },
+            {
+              "id": "exceptions/domain-throws-domain",
+              "shortDescription": {
+                "text": "The Domain layer must throw only `OrderRuleViolation`."
+              },
+              "fullDescription": {
+                "text": "Domain code signals rule failures with the domain's own exception, not a generic BCL type."
+              },
+              "help": {
+                "text": "Throw OrderRuleViolation (or another domain exception) instead of a BCL exception type."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "enforce"
+              }
+            },
+            {
+              "id": "async/accept-cancellation",
+              "shortDescription": {
+                "text": "Methods of the Web layer returning `Task` or `Task<TResult>` must accept a parameter of type `CancellationToken`."
+              },
+              "fullDescription": {
+                "text": "A Task-returning method that ignores cancellation cannot be stopped once its caller has moved on."
+              },
+              "help": {
+                "text": "Add a CancellationToken parameter and flow it to the calls you await."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "enforce"
+              }
+            },
+            {
+              "id": "api/return-dtos",
+              "shortDescription": {
+                "text": "The Web layer must not expose `DataTable`."
+              },
+              "fullDescription": {
+                "text": "An infrastructure type on a presentation-layer public signature couples every caller to it; return a DTO or view model."
+              },
+              "help": {
+                "text": "Return a DTO instead of exposing System.Data.DataTable."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "migrate"
+              }
+            },
+            {
+              "id": "exceptions/no-unfiltered-catch",
+              "shortDescription": {
+                "text": "The Web or Domain layers must not catch `Exception` without a `when` filter."
+              },
+              "fullDescription": {
+                "text": "An unfiltered broad catch swallows every failure alike; a `when` filter names the ones this handler actually expects."
+              },
+              "help": {
+                "text": "Add a `when` filter naming the exceptions you can handle, or catch those types directly."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "enforce"
+              }
+            },
+            {
+              "id": "exceptions/no-swallowed-catch",
+              "shortDescription": {
+                "text": "The Web or Domain layers must not swallow `Exception`."
+              },
+              "fullDescription": {
+                "text": "A handler that catches everything and continues hands its caller a wrong answer that reads like a right one; rethrowing keeps the failure travelling."
+              },
+              "help": {
+                "text": "Rethrow after cleanup, translate to a domain exception, or add a `when` filter naming what you can handle."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "enforce"
+              }
+            },
+            {
+              "id": "exceptions/no-bare-bcl-throw",
+              "shortDescription": {
+                "text": "The Domain layer must not throw `InvalidOperationException`."
+              },
+              "fullDescription": {
+                "text": "InvalidOperationException tells a caller nothing it can dispatch on; the domain has its own exception for rule failures."
+              },
+              "help": {
+                "text": "Throw OrderRuleViolation instead of System.InvalidOperationException."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "enforce"
+              }
+            },
+            {
+              "id": "layering/services-in-web",
+              "shortDescription": {
+                "text": "Types named `*Service` must reside in project `MyApp.Web`."
+              },
+              "fullDescription": {
+                "text": "Services are wired by the web host; a service outside MyApp.Web escapes its registration sweep."
+              },
+              "help": {
+                "text": "Move the service into the MyApp.Web project."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "enforce"
+              }
+            },
+            {
+              "id": "layering/services-behind-contracts",
+              "shortDescription": {
+                "text": "Types named `*Service` must have exactly one counterpart named `I{Name}` among interfaces."
+              },
+              "fullDescription": {
+                "text": "A caller that can only name the concrete service cannot be handed a different one; the I{Name} contract is where a double or a second implementation goes."
+              },
+              "help": {
+                "text": "Extract an I{Name} interface for the service and consume that."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "migrate"
+              }
+            },
+            {
+              "id": "layering/no-ungoverned-types",
+              "shortDescription": {
+                "text": "Types in `MyApp.*` must belong to the Domain layer or the Web layer."
+              },
+              "fullDescription": {
+                "text": "A type in no declared layer is governed by no layer rule; the two layers are the covering set."
+              },
+              "help": {
+                "text": "Move the type into a declared layer's namespace, or declare its layer in this spec."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "enforce"
+              }
+            },
+            {
+              "id": "di/handlers-registered",
+              "shortDescription": {
+                "text": "Types implementing `IHandler<T>` or types named `*Scheduler` must be registered."
+              },
+              "fullDescription": {
+                "text": "Handlers and schedulers are resolved from the container; one that is never registered fails at dispatch, not at startup."
+              },
+              "help": {
+                "text": "Register the type in ServiceWiring.Configure."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "enforce"
+              }
+            },
+            {
+              "id": "domain/values-immutable",
+              "shortDescription": {
+                "text": "Properties of the Domain layer must be get-only."
+              },
+              "fullDescription": {
+                "text": "A value a caller can reassign after construction is not a value; the invariants the constructor checked stop holding the moment anyone writes to it."
+              },
+              "help": {
+                "text": "Take the value in the constructor and expose it `{ get; }`; hand back a new instance for a changed one."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "enforce"
+              }
+            },
+            {
+              "id": "state/no-static-mutable",
+              "shortDescription": {
+                "text": "Static fields of the Web layer must be readonly."
+              },
+              "fullDescription": {
+                "text": "A writable static is state the whole process shares; the last write anywhere decides what the next request reads, and nothing in the signature says so."
+              },
+              "help": {
+                "text": "Make the field `readonly` or `const`, or move the state onto an instance whose lifetime the caller controls."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "enforce"
+              }
+            },
+            {
+              "id": "packaging/supported-frameworks",
+              "shortDescription": {
+                "text": "Projects matching `MyApp.*` must target only `net8.0`."
+              },
+              "fullDescription": {
+                "text": "The hosts this app deploys to are on the net8.0 LTS; a project that targets anything newer builds here and fails to start there."
+              },
+              "help": {
+                "text": "Set `TargetFramework` to `net8.0`, or upgrade the hosts first and move this rule with them."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "enforce"
+              }
+            },
+            {
+              "id": "packaging/no-feed-dependencies",
+              "shortDescription": {
+                "text": "Projects matching `MyApp.*` must reference no NuGet packages other than private ones, whose `PrivateAssets` is `all` (declared references only; transitive dependencies are not seen)."
+              },
+              "fullDescription": {
+                "text": "Other solutions take these projects as packages; a package one of them depends on becomes a dependency of every solution that takes it."
+              },
+              "help": {
+                "text": "Use a type the SDK already supplies, or reference an assembly the repository carries."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "enforce"
+              }
+            },
+            {
+              "id": "packaging/locked-restore",
+              "shortDescription": {
+                "text": "Project `MyApp.Web` must lock package restore."
+              },
+              "fullDescription": {
+                "text": "An unpinned restore resolves a different package graph on a different day; the build CI passed is then not the build that ships."
+              },
+              "help": {
+                "text": "Set `RestorePackagesWithLockFile` to true and commit the lock file the next restore produces."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "enforce"
+              }
+            },
+            {
+              "id": "packaging/nothing-published",
+              "shortDescription": {
+                "text": "Projects matching `MyApp.*`, except project `MyApp.Legacy.Billing`, must not be packable."
+              },
+              "fullDescription": {
+                "text": "The SDK packs by default, so a project nobody meant to publish is one `dotnet pack` away from a package on a feed."
+              },
+              "help": {
+                "text": "Set `IsPackable` to false in the project file."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "posture": "enforce"
+              }
+            },
+            {
+              "id": "domain/retry-budget/tripwire",
+              "fullDescription": {
+                "text": "The retry budget is the one place the domain sanctions a broad catch, and every caller relies on the filter."
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "properties": {
+                "posture": "caution"
+              }
+            }
+          ]
+        }
+      },
+      "invocations": [
+        {
+          "executionSuccessful": true
+        }
+      ],
+      "originalUriBaseIds": {
+        "SRCROOT": {}
+      },
+      "results": [
+        {
+          "ruleId": "layering/domain-independent",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Domain.OrderService references MyApp.Web.HomeController"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Domain/OrderService.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 9
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|T:MyApp.Domain.OrderService|T:MyApp.Web.HomeController||MyApp.Domain/OrderService.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "layering/domain-independent",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Domain.OrderService references MyApp.Web.HomeController"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Domain/OrderService.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 10
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|T:MyApp.Domain.OrderService|T:MyApp.Web.HomeController||MyApp.Domain/OrderService.cs|1"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "layering/domain-independent",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Domain.OrderService references MyApp.Web.HomeController"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Domain/OrderService.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 13
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|T:MyApp.Domain.OrderService|T:MyApp.Web.HomeController||MyApp.Domain/OrderService.cs|2"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "layering/domain-independent",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Domain.OrderService references MyApp.Web.WebTextExtensions"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Domain/OrderService.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 10
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|T:MyApp.Domain.OrderService|T:MyApp.Web.WebTextExtensions||MyApp.Domain/OrderService.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "layering/projects-independent",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Domain.OrderService references MyApp.Web.HomeController"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Domain/OrderService.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 9
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|T:MyApp.Domain.OrderService|T:MyApp.Web.HomeController||MyApp.Domain/OrderService.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "layering/projects-independent",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Domain.OrderService references MyApp.Web.HomeController"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Domain/OrderService.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 10
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|T:MyApp.Domain.OrderService|T:MyApp.Web.HomeController||MyApp.Domain/OrderService.cs|1"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "layering/projects-independent",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Domain.OrderService references MyApp.Web.HomeController"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Domain/OrderService.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 13
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|T:MyApp.Domain.OrderService|T:MyApp.Web.HomeController||MyApp.Domain/OrderService.cs|2"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "layering/projects-independent",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Domain.OrderService references MyApp.Web.WebTextExtensions"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Domain/OrderService.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 10
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|T:MyApp.Domain.OrderService|T:MyApp.Web.WebTextExtensions||MyApp.Domain/OrderService.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "layering/projects-independent",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.HomeController references MyApp.Legacy.Billing.IBillingFacade"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/HomeController.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 17
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|T:MyApp.Web.HomeController|T:MyApp.Legacy.Billing.IBillingFacade||MyApp.Web/HomeController.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "layering/projects-independent",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.HomeController references MyApp.Legacy.Billing.IBillingFacade"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/HomeController.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 20
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|T:MyApp.Web.HomeController|T:MyApp.Legacy.Billing.IBillingFacade||MyApp.Web/HomeController.cs|1"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "layering/projects-independent",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.InvoiceController references MyApp.Legacy.Billing.BillingCalculator"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/InvoiceController.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 9
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|T:MyApp.Web.InvoiceController|T:MyApp.Legacy.Billing.BillingCalculator||MyApp.Web/InvoiceController.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "layering/projects-independent",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.InvoiceController references MyApp.Legacy.Billing.BillingCalculator"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/InvoiceController.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 10
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|T:MyApp.Web.InvoiceController|T:MyApp.Legacy.Billing.BillingCalculator||MyApp.Web/InvoiceController.cs|1"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "layering/projects-independent",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.InvoiceController references MyApp.Legacy.Billing.RoundingMode"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/InvoiceController.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 10
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|T:MyApp.Web.InvoiceController|T:MyApp.Legacy.Billing.RoundingMode||MyApp.Web/InvoiceController.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "layering/projects-reached-only-by-themselves",
+          "level": "note",
+          "message": {
+            "text": "MyApp.Domain.OrderService references MyApp.Web.HomeController (grandfathered in arch/baselines/layering/projects-reached-only-by-themselves.json)"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Domain/OrderService.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 9
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|T:MyApp.Domain.OrderService|T:MyApp.Web.HomeController||MyApp.Domain/OrderService.cs|0"
+          },
+          "baselineState": "unchanged",
+          "suppressions": [
+            {
+              "kind": "external",
+              "justification": "grandfathered in arch/baselines/layering/projects-reached-only-by-themselves.json"
+            }
+          ]
+        },
+        {
+          "ruleId": "layering/projects-reached-only-by-themselves",
+          "level": "note",
+          "message": {
+            "text": "MyApp.Domain.OrderService references MyApp.Web.HomeController (grandfathered in arch/baselines/layering/projects-reached-only-by-themselves.json)"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Domain/OrderService.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 10
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|T:MyApp.Domain.OrderService|T:MyApp.Web.HomeController||MyApp.Domain/OrderService.cs|1"
+          },
+          "baselineState": "unchanged",
+          "suppressions": [
+            {
+              "kind": "external",
+              "justification": "grandfathered in arch/baselines/layering/projects-reached-only-by-themselves.json"
+            }
+          ]
+        },
+        {
+          "ruleId": "layering/projects-reached-only-by-themselves",
+          "level": "note",
+          "message": {
+            "text": "MyApp.Domain.OrderService references MyApp.Web.HomeController (grandfathered in arch/baselines/layering/projects-reached-only-by-themselves.json)"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Domain/OrderService.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 13
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|T:MyApp.Domain.OrderService|T:MyApp.Web.HomeController||MyApp.Domain/OrderService.cs|2"
+          },
+          "baselineState": "unchanged",
+          "suppressions": [
+            {
+              "kind": "external",
+              "justification": "grandfathered in arch/baselines/layering/projects-reached-only-by-themselves.json"
+            }
+          ]
+        },
+        {
+          "ruleId": "layering/projects-reached-only-by-themselves",
+          "level": "note",
+          "message": {
+            "text": "MyApp.Domain.OrderService references MyApp.Web.WebTextExtensions (grandfathered in arch/baselines/layering/projects-reached-only-by-themselves.json)"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Domain/OrderService.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 10
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|T:MyApp.Domain.OrderService|T:MyApp.Web.WebTextExtensions||MyApp.Domain/OrderService.cs|0"
+          },
+          "baselineState": "unchanged",
+          "suppressions": [
+            {
+              "kind": "external",
+              "justification": "grandfathered in arch/baselines/layering/projects-reached-only-by-themselves.json"
+            }
+          ]
+        },
+        {
+          "ruleId": "layering/projects-reached-only-by-themselves",
+          "level": "note",
+          "message": {
+            "text": "MyApp.Web.HomeController references MyApp.Legacy.Billing.IBillingFacade (grandfathered in arch/baselines/layering/projects-reached-only-by-themselves.json)"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/HomeController.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 17
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|T:MyApp.Web.HomeController|T:MyApp.Legacy.Billing.IBillingFacade||MyApp.Web/HomeController.cs|0"
+          },
+          "baselineState": "unchanged",
+          "suppressions": [
+            {
+              "kind": "external",
+              "justification": "grandfathered in arch/baselines/layering/projects-reached-only-by-themselves.json"
+            }
+          ]
+        },
+        {
+          "ruleId": "layering/projects-reached-only-by-themselves",
+          "level": "note",
+          "message": {
+            "text": "MyApp.Web.HomeController references MyApp.Legacy.Billing.IBillingFacade (grandfathered in arch/baselines/layering/projects-reached-only-by-themselves.json)"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/HomeController.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 20
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|T:MyApp.Web.HomeController|T:MyApp.Legacy.Billing.IBillingFacade||MyApp.Web/HomeController.cs|1"
+          },
+          "baselineState": "unchanged",
+          "suppressions": [
+            {
+              "kind": "external",
+              "justification": "grandfathered in arch/baselines/layering/projects-reached-only-by-themselves.json"
+            }
+          ]
+        },
+        {
+          "ruleId": "layering/projects-reached-only-by-themselves",
+          "level": "note",
+          "message": {
+            "text": "MyApp.Web.InvoiceController references MyApp.Legacy.Billing.BillingCalculator (grandfathered in arch/baselines/layering/projects-reached-only-by-themselves.json)"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/InvoiceController.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 9
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|T:MyApp.Web.InvoiceController|T:MyApp.Legacy.Billing.BillingCalculator||MyApp.Web/InvoiceController.cs|0"
+          },
+          "baselineState": "unchanged",
+          "suppressions": [
+            {
+              "kind": "external",
+              "justification": "grandfathered in arch/baselines/layering/projects-reached-only-by-themselves.json"
+            }
+          ]
+        },
+        {
+          "ruleId": "layering/projects-reached-only-by-themselves",
+          "level": "note",
+          "message": {
+            "text": "MyApp.Web.InvoiceController references MyApp.Legacy.Billing.BillingCalculator (grandfathered in arch/baselines/layering/projects-reached-only-by-themselves.json)"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/InvoiceController.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 10
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|T:MyApp.Web.InvoiceController|T:MyApp.Legacy.Billing.BillingCalculator||MyApp.Web/InvoiceController.cs|1"
+          },
+          "baselineState": "unchanged",
+          "suppressions": [
+            {
+              "kind": "external",
+              "justification": "grandfathered in arch/baselines/layering/projects-reached-only-by-themselves.json"
+            }
+          ]
+        },
+        {
+          "ruleId": "layering/projects-reached-only-by-themselves",
+          "level": "note",
+          "message": {
+            "text": "MyApp.Web.InvoiceController references MyApp.Legacy.Billing.RoundingMode (grandfathered in arch/baselines/layering/projects-reached-only-by-themselves.json)"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/InvoiceController.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 10
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|T:MyApp.Web.InvoiceController|T:MyApp.Legacy.Billing.RoundingMode||MyApp.Web/InvoiceController.cs|0"
+          },
+          "baselineState": "unchanged",
+          "suppressions": [
+            {
+              "kind": "external",
+              "justification": "grandfathered in arch/baselines/layering/projects-reached-only-by-themselves.json"
+            }
+          ]
+        },
+        {
+          "ruleId": "layering/web-cuts-not-circular",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.InvoiceCreatedHandler references MyApp.Web.ReportEndpoint"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/InvoiceCreatedHandler.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 10
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|T:MyApp.Web.InvoiceCreatedHandler|T:MyApp.Web.ReportEndpoint||MyApp.Web/InvoiceCreatedHandler.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "layering/web-cuts-not-circular",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.ReportEndpoint references MyApp.Web.InvoiceService"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/ReportEndpoint.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 23
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|T:MyApp.Web.ReportEndpoint|T:MyApp.Web.InvoiceService||MyApp.Web/ReportEndpoint.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "data-access/no-inline-sql",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.HomeController references System.Data.DataTable"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/HomeController.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 24
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|T:MyApp.Web.HomeController|T:System.Data.DataTable||MyApp.Web/HomeController.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "data-access/no-inline-sql",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.HomeController references System.Data.DataTable"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/HomeController.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 26
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|T:MyApp.Web.HomeController|T:System.Data.DataTable||MyApp.Web/HomeController.cs|1"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "data-access/no-inline-sql",
+          "level": "note",
+          "message": {
+            "text": "MyApp.Web.InvoiceController references System.Data.DataTable (grandfathered in arch/baselines/data-access/no-inline-sql.json)"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/InvoiceController.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 14
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|T:MyApp.Web.InvoiceController|T:System.Data.DataTable||MyApp.Web/InvoiceController.cs|0"
+          },
+          "baselineState": "unchanged",
+          "suppressions": [
+            {
+              "kind": "external",
+              "justification": "grandfathered in arch/baselines/data-access/no-inline-sql.json"
+            }
+          ]
+        },
+        {
+          "ruleId": "data-access/no-inline-sql",
+          "level": "note",
+          "message": {
+            "text": "MyApp.Web.InvoiceController references System.Data.DataTable (grandfathered in arch/baselines/data-access/no-inline-sql.json)"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/InvoiceController.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 16
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|T:MyApp.Web.InvoiceController|T:System.Data.DataTable||MyApp.Web/InvoiceController.cs|1"
+          },
+          "baselineState": "unchanged",
+          "suppressions": [
+            {
+              "kind": "external",
+              "justification": "grandfathered in arch/baselines/data-access/no-inline-sql.json"
+            }
+          ]
+        },
+        {
+          "ruleId": "data-access/no-inline-sql",
+          "level": "warning",
+          "message": {
+            "text": "This rule's exemplar \"types named `OrdersRepository`\" matched no solution-declared types."
+          },
+          "locations": [],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|exemplar|types named `OrdersRepository`|||0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "time/inject-clock",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.HomeController uses System.DateTime.Now"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/HomeController.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 32
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|T:MyApp.Web.HomeController|P:System.DateTime.Now||MyApp.Web/HomeController.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "time/inject-clock",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.HomeController uses System.DateTime.UtcNow"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/HomeController.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 37
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|T:MyApp.Web.HomeController|P:System.DateTime.UtcNow||MyApp.Web/HomeController.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "naming/async-suffix",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.HomeController.Load()"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/HomeController.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 48
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|||M:MyApp.Web.HomeController.Load|MyApp.Web/HomeController.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "naming/async-suffix",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.HomeController.Save()"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/HomeController.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 43
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|||M:MyApp.Web.HomeController.Save|MyApp.Web/HomeController.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "di/handlers-via-registry",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.InvoiceService constructs MyApp.Web.InvoiceCreatedHandler"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/InvoiceService.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 8
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|T:MyApp.Web.InvoiceService|T:MyApp.Web.InvoiceCreatedHandler||MyApp.Web/InvoiceService.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "di/no-captive-dependencies",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.ReportScheduler injects MyApp.Web.IOrderFeed"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/ReportScheduler.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 7
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|T:MyApp.Web.ReportScheduler|T:MyApp.Web.IOrderFeed||MyApp.Web/ReportScheduler.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "di/no-captive-dependencies",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.ReportScheduler injects MyApp.Web.IOrderFormatter"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/ReportScheduler.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 8
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|T:MyApp.Web.ReportScheduler|T:MyApp.Web.IOrderFormatter||MyApp.Web/ReportScheduler.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "layering/no-ghost",
+          "level": "warning",
+          "message": {
+            "text": "This rule is inert: its target selection matched no types."
+          },
+          "locations": [],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|||||0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "legacy/billing/containment",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.InvoiceController references MyApp.Legacy.Billing.BillingCalculator"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/InvoiceController.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 9
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|T:MyApp.Web.InvoiceController|T:MyApp.Legacy.Billing.BillingCalculator||MyApp.Web/InvoiceController.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "legacy/billing/containment",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.InvoiceController references MyApp.Legacy.Billing.BillingCalculator"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/InvoiceController.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 10
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|T:MyApp.Web.InvoiceController|T:MyApp.Legacy.Billing.BillingCalculator||MyApp.Web/InvoiceController.cs|1"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "legacy/billing/containment",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.InvoiceController references MyApp.Legacy.Billing.RoundingMode"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/InvoiceController.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 10
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|T:MyApp.Web.InvoiceController|T:MyApp.Legacy.Billing.RoundingMode||MyApp.Web/InvoiceController.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "exceptions/no-general-catch",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.ReportEndpoint catches System.Exception"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/ReportEndpoint.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 15
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|T:MyApp.Web.ReportEndpoint|T:System.Exception||MyApp.Web/ReportEndpoint.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "exceptions/no-general-catch",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.ReportPublisher catches System.Exception"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/ReportPublisher.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 22
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|T:MyApp.Web.ReportPublisher|T:System.Exception||MyApp.Web/ReportPublisher.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "exceptions/domain-throws-domain",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Domain.OrderApproval throws System.InvalidOperationException"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Domain/OrderApproval.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 17
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|T:MyApp.Domain.OrderApproval|T:System.InvalidOperationException||MyApp.Domain/OrderApproval.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "async/accept-cancellation",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.HomeController.Load()"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/HomeController.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 48
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|||M:MyApp.Web.HomeController.Load|MyApp.Web/HomeController.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "async/accept-cancellation",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.HomeController.Save()"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/HomeController.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 43
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|||M:MyApp.Web.HomeController.Save|MyApp.Web/HomeController.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "async/accept-cancellation",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.HomeController.SaveAsync()"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/HomeController.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 53
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|||M:MyApp.Web.HomeController.SaveAsync|MyApp.Web/HomeController.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "api/return-dtos",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.HomeController exposes System.Data.DataTable"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/HomeController.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 24
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|T:MyApp.Web.HomeController|T:System.Data.DataTable||MyApp.Web/HomeController.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "api/return-dtos",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.InvoiceController exposes System.Data.DataTable"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/InvoiceController.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 14
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|T:MyApp.Web.InvoiceController|T:System.Data.DataTable||MyApp.Web/InvoiceController.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "exceptions/no-unfiltered-catch",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.ReportEndpoint catches System.Exception"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/ReportEndpoint.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 15
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|T:MyApp.Web.ReportEndpoint|T:System.Exception||MyApp.Web/ReportEndpoint.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "exceptions/no-unfiltered-catch",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.ReportPublisher catches System.Exception"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/ReportPublisher.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 22
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|T:MyApp.Web.ReportPublisher|T:System.Exception||MyApp.Web/ReportPublisher.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "exceptions/no-swallowed-catch",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.ReportEndpoint catches System.Exception"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/ReportEndpoint.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 15
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|T:MyApp.Web.ReportEndpoint|T:System.Exception||MyApp.Web/ReportEndpoint.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "exceptions/no-bare-bcl-throw",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Domain.OrderApproval throws System.InvalidOperationException"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Domain/OrderApproval.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 17
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|T:MyApp.Domain.OrderApproval|T:System.InvalidOperationException||MyApp.Domain/OrderApproval.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "layering/services-in-web",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Domain.OrderService"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Domain/OrderService.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 5
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|||T:MyApp.Domain.OrderService|MyApp.Domain/OrderService.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "layering/services-behind-contracts",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.InvoiceService"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/InvoiceService.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 4
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|||T:MyApp.Web.InvoiceService|MyApp.Web/InvoiceService.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "layering/services-behind-contracts",
+          "level": "note",
+          "message": {
+            "text": "MyApp.Domain.OrderService (grandfathered in arch/baselines/layering/services-behind-contracts.json)"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Domain/OrderService.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 5
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|||T:MyApp.Domain.OrderService|MyApp.Domain/OrderService.cs|0"
+          },
+          "baselineState": "unchanged",
+          "suppressions": [
+            {
+              "kind": "external",
+              "justification": "grandfathered in arch/baselines/layering/services-behind-contracts.json"
+            }
+          ]
+        },
+        {
+          "ruleId": "layering/no-ungoverned-types",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Legacy.Billing.BillingCalculator"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Legacy.Billing/BillingCalculator.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 5
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|||T:MyApp.Legacy.Billing.BillingCalculator|MyApp.Legacy.Billing/BillingCalculator.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "layering/no-ungoverned-types",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Legacy.Billing.BillingFacade"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Legacy.Billing/BillingFacade.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 3
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|||T:MyApp.Legacy.Billing.BillingFacade|MyApp.Legacy.Billing/BillingFacade.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "layering/no-ungoverned-types",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Legacy.Billing.IBillingFacade"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Legacy.Billing/IBillingFacade.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 3
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|||T:MyApp.Legacy.Billing.IBillingFacade|MyApp.Legacy.Billing/IBillingFacade.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "layering/no-ungoverned-types",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Legacy.Billing.RoundingMode"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Legacy.Billing/RoundingMode.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 3
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|||T:MyApp.Legacy.Billing.RoundingMode|MyApp.Legacy.Billing/RoundingMode.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "di/handlers-registered",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.InvoiceCreatedHandler"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/InvoiceCreatedHandler.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 3
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|||T:MyApp.Web.InvoiceCreatedHandler|MyApp.Web/InvoiceCreatedHandler.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "di/handlers-registered",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.RefundProcessor"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/RefundProcessor.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 3
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|||T:MyApp.Web.RefundProcessor|MyApp.Web/RefundProcessor.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "domain/values-immutable",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Domain.Money.Amount"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Domain/Money.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 3
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|||P:MyApp.Domain.Money.Amount|MyApp.Domain/Money.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "domain/values-immutable",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Domain.Order.Reference"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Domain/Order.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 5
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|||P:MyApp.Domain.Order.Reference|MyApp.Domain/Order.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "domain/values-immutable",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Domain.Order.Total"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Domain/Order.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 7
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|||P:MyApp.Domain.Order.Total|MyApp.Domain/Order.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "state/no-static-mutable",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web.ReportBudget.RenderCount"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/ReportBudget.cs",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 18
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|||F:MyApp.Web.ReportBudget.RenderCount|MyApp.Web/ReportBudget.cs|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "packaging/supported-frameworks",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Domain"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Domain/MyApp.Domain.csproj",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 3
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|||project:MyApp.Domain|MyApp.Domain/MyApp.Domain.csproj|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "packaging/supported-frameworks",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Legacy.Billing"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Legacy.Billing/MyApp.Legacy.Billing.csproj",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 3
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|||project:MyApp.Legacy.Billing|MyApp.Legacy.Billing/MyApp.Legacy.Billing.csproj|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "packaging/supported-frameworks",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/MyApp.Web.csproj",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 3
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|||project:MyApp.Web|MyApp.Web/MyApp.Web.csproj|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "packaging/no-feed-dependencies",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web references package Microsoft.Extensions.DependencyInjection.Abstractions"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/MyApp.Web.csproj",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 24
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1||Microsoft.Extensions.DependencyInjection.Abstractions|project:MyApp.Web|MyApp.Web/MyApp.Web.csproj|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "packaging/locked-restore",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/MyApp.Web.csproj",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|||project:MyApp.Web|MyApp.Web/MyApp.Web.csproj|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "packaging/nothing-published",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Domain"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Domain/MyApp.Domain.csproj",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|||project:MyApp.Domain|MyApp.Domain/MyApp.Domain.csproj|0"
+          },
+          "baselineState": "new"
+        },
+        {
+          "ruleId": "packaging/nothing-published",
+          "level": "error",
+          "message": {
+            "text": "MyApp.Web"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "MyApp.Web/MyApp.Web.csproj",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "slideRuleViolationIdentity/v1": "v1|||project:MyApp.Web|MyApp.Web/MyApp.Web.csproj|0"
+          },
+          "baselineState": "new"
+        }
+      ]
+    }
+  ]
+}

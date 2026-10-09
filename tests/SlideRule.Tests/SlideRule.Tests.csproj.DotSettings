@@ -1,0 +1,20 @@
+<wpf:ResourceDictionary xml:space="preserve" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:s="clr-namespace:System;assembly=mscorlib" xmlns:ss="urn:shemas-jetbrains-com:settings-storage-xaml" xmlns:wpf="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
+	<!-- The repo's first per-project settings layer, and the reason it exists is scope.
+
+	     MethodHasAsyncOverload sits at WARNING in the solution file, where it guards the async
+	     pipelines in Core, Roslyn, Xunit and the CLI: a sync call that blocks one of those is a
+	     real defect. It cannot mean that here. Every finding it raises in this project is
+	     File.ReadAllText or File.WriteAllText in a test's arrange or assert block — fixture setup
+	     on tiny files, strictly sequential, inside an async Task test method whose async exists to
+	     await the runner under test rather than to overlap anything. Awaiting them yields no
+	     thread, saves no blocking, and puts await noise through arrange blocks that read as data.
+
+	     Off here rather than demoted in the solution file, because demoting it there would give up
+	     the guard everywhere. Project layers are mounted by default, so the explicit WARNING in
+	     the solution file still reaches every other project.
+
+	     Editing this file: XML forbids adjacent hyphens inside a comment, and a layer that stops
+	     parsing is mounted by nobody and reported by nothing — every inspection it scopes SILENTLY
+	     keeps its solution-level severity, which reads exactly like the mechanism not working. -->
+	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=MethodHasAsyncOverload/@EntryIndexedValue">DO_NOT_SHOW</s:String>
+</wpf:ResourceDictionary>

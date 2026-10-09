@@ -1,0 +1,21 @@
+<Project>
+
+    <!-- The adapter loads the solution under test through MSBuildWorkspace, with MSBuild's engine taken from the SDK
+         on the test host: Microsoft.Build.Locator registers it, and the Locator refuses to build a project that would
+         carry engine assemblies of its own (MSBL001), because a copy in the test output loads in place of the SDK's.
+         The workspace packages and the binlog reader the adapter depends on each declare engine packages with runtime
+         assets, so a test project that takes the adapter would get those copies, and the refusal, from nothing it
+         wrote. This removes exactly those runtime assets, before the Locator looks and before the copy and the
+         dependency manifest read them, which is what ExcludeAssets="runtime" on each package would do. It names only
+         the engine packages that reach a test project through the adapter; anything else stays the project's own. -->
+    <Target Name="_SlideRuleXunitExcludeEngineRuntime"
+            AfterTargets="ResolvePackageAssets"
+            BeforeTargets="EnsureMSBuildAssembliesNotCopied">
+        <ItemGroup>
+            <_SlideRuleEngineRuntime Include="@(RuntimeCopyLocalItems)"
+                                            Condition="'%(RuntimeCopyLocalItems.NuGetPackageId)' == 'Microsoft.Build.Framework' or '%(RuntimeCopyLocalItems.NuGetPackageId)' == 'Microsoft.Build.Utilities.Core' or '%(RuntimeCopyLocalItems.NuGetPackageId)' == 'Microsoft.NET.StringTools'" />
+            <RuntimeCopyLocalItems Remove="@(_SlideRuleEngineRuntime)" />
+        </ItemGroup>
+    </Target>
+
+</Project>

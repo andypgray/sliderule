@@ -1,0 +1,72 @@
+# Weekly dependency-update PRs: GitHub Actions pins and NuGet packages.
+# SHA-pinned action versions (see .github/workflows/) are kept current by the
+# github-actions ecosystem; the SECURITY.md pinning promise depends on this file.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    # Dependabot treats each action path as its own dependency, so an ungrouped bump raises one PR
+    # for codeql-action/init and another for codeql-action/analyze — and analyze refuses a
+    # configuration written by a different version, so each half-move is red on arrival. Grouping
+    # moves the pair together. CodeQlActionPinTests holds the workflows to the same agreement.
+    groups:
+      codeql-action:
+        patterns:
+          - github/codeql-action*
+
+  # Only the projects with a committed packages.lock.json are listed. The fixture and arch projects
+  # are deliberately absent — they carry no lock files by design. DependabotCoverageTests holds the
+  # directories of every nuget entry and that set of lock files to each other.
+  #
+  # One entry for all of them, because an ignore cannot be scoped to one project. An update run reads
+  # each listed project together with every project it reaches through a ProjectReference, and bumps
+  # packages in those too: the run for the tests project reaches everything under src/. An ignore on a
+  # separate entry would hold only in that entry's run, never in the runs that reach its project
+  # through a reference.
+  #
+  # Microsoft.CodeAnalysis.CSharp and Microsoft.CodeAnalysis.Features are the product's support floor:
+  # the oldest compiler API SlideRule runs against, stated by the extraction project, the spec
+  # analyzer and the completion provider. It is not a dependency to keep fresh: raising it drops
+  # support for every host pinned below it, which is a decision for a person to take deliberately.
+  # Each package is named exactly rather than by the family wildcard, which would also freeze the
+  # workspace packages and Microsoft.CodeAnalysis.Analyzers, all meant to stay current.
+  # RoslynFloorPinTests holds these ignores and the three projects' literals to each other.
+  #
+  # The four Microsoft.Build engine packages and Microsoft.NET.StringTools are held to the 18.9 line,
+  # patches still allowed. Each MSBuild minor line now ships assets for its own .NET only: 18.10 is
+  # the .NET 11 line and carries net11.0 and net472 but no net10.0, so on these net10.0 projects
+  # Microsoft.Build 18.10 would compile against its .NET Framework assemblies. The hold lifts when the
+  # projects move to net11.0. MsBuildLinePinTests holds these ignores, the pins and the target
+  # framework to each other.
+  #
+  # Changing the directory list orphans the pull requests the old list opened: no later run refreshes
+  # or closes them, so close them by hand.
+  - package-ecosystem: nuget
+    directories:
+      - /src/SlideRule
+      - /src/SlideRule.Analyzers
+      - /src/SlideRule.Cli
+      - /src/SlideRule.Extraction
+      - /src/SlideRule.Packs.DotNet
+      - /src/SlideRule.Roslyn
+      - /src/SlideRule.SpecAnalyzers
+      - /src/SlideRule.SpecCompletion
+      - /src/SlideRule.Xunit
+      - /tests/SlideRule.Tests
+    schedule:
+      interval: weekly
+    ignore:
+      - dependency-name: Microsoft.CodeAnalysis.CSharp
+      - dependency-name: Microsoft.CodeAnalysis.Features
+      - dependency-name: Microsoft.Build
+        versions: [">= 18.10"]
+      - dependency-name: Microsoft.Build.Framework
+        versions: [">= 18.10"]
+      - dependency-name: Microsoft.Build.Tasks.Core
+        versions: [">= 18.10"]
+      - dependency-name: Microsoft.Build.Utilities.Core
+        versions: [">= 18.10"]
+      - dependency-name: Microsoft.NET.StringTools
+        versions: [">= 18.10"]

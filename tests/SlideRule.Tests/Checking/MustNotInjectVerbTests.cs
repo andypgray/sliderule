@@ -1,0 +1,241 @@
+using Xunit;
+using SlideRule.Baselines;
+using SlideRule.Checking;
+using SlideRule.Codebase;
+using SlideRule.Tests.Extraction;
+
+namespace SlideRule.Tests.Checking;
+
+/// <summary>
+///     The injection verb <c>MustNotInject</c> over the fast path (GRAMMAR §4.7, §4.3, §5.3): a captive
+///     injection trips only where a singleton-registered subject takes a scoped/transient-registered service
+///     as a constructor parameter (at the parameter's <c>file:line</c>), and a mere reference without a
+///     constructor parameter stays silent. Unlike <c>MustNotConstruct</c>, the verb never warns: an empty
+///     <c>Registered</c> operand is the win condition, not an inert target. Violation identity is the
+///     (source, injected) type pair, constructor-overload- and parameter-name-indifferent, keyed by
+///     <see cref="BaselineEntry.ForEdge" /> as a reference is.
+/// </summary>
+public sealed class MustNotInjectVerbTests
+{
+    // CaptiveSingleton takes the scoped IScopedDep as a constructor parameter (the captive edge);
+    // ReferencingSingleton only mentions IScopedDep in a *method* signature — a reference edge, never a
+    // constructor injection — so MustNotInject is silent on it where MustNotReference would fire. Both are
+    // registered singletons; IScopedDep/ScopedDep are registered scoped.
+    private const string Scene = """
+                                 using Microsoft.Extensions.DependencyInjection;
+                                 namespace App
+                                 {
+                                     public interface IScopedDep {}
+                                     public class ScopedDep : IScopedDep {}
+                                     public class CaptiveSingleton
+                                     {
+                                         public CaptiveSingleton(IScopedDep dep) { }
+                                     }
+                                     public class ReferencingSingleton
+                                     {
+                                         public IScopedDep Passthrough(IScopedDep dep) => dep;
+                                     }
+                                     public static class Wiring
+                                     {
+                                         public static void Configure(IServiceCollection services)
+                                         {
+                                             services.AddSingleton<CaptiveSingleton>();
+                                             services.AddSingleton<ReferencingSingleton>();
+                                             services.AddScoped<IScopedDep, ScopedDep>();
+                                         }
+                                     }
+                                 }
+                                 """;
+
+    private static readonly CodebaseModel SceneModel = CompilationFactory.ExtractWithDi(("Scene.cs", Scene));
+
+    [Fact]
+    public void MustNotInject_SingletonInjectsScoped_FailsWithSourceTargetSitesAndHumanLine()
+    {
+        RuleResult result = Checker.Run(SceneModel, arch =>
+                arch.Rule("di/no-captive")
+                    .Enforce(arch.Registered(Lifetime.Singleton).MustNotInject(arch.Registered(Lifetime.Scoped)))
+                    .Because("b"))
+            .Single();
+
+        result.ShouldHaveFailedWithSingleEdge(ViolationKind.Injection, "App.CaptiveSingleton", "App.IScopedDep");
+
+        string block = result.HumanBlock();
+        block.ShouldContain("App.CaptiveSingleton injects App.IScopedDep");
+        block.ShouldContain("Scene.cs:"); // the injected parameter's file:line
+    }
+
+    [Fact]
+    public void MustNotInject_SingletonReferencesScopedWithoutInjecting_PassesCleanWithNoWarnings()
+    {
+        // ReferencingSingleton mentions IScopedDep only in a method signature (a reference edge) — it takes no
+        // constructor parameter of it, so MustNotInject is silent exactly where MustNotReference would fire.
+        // The scoped operand resolves (IScopedDep/ScopedDep exist), so this is a real pass, not an inert one.
+        RuleResult result = Checker.Run(SceneModel, arch =>
+                arch.Rule("di/no-captive")
+                    .Enforce(arch.Registered(Lifetime.Singleton).WithPrefix("Referencing")
+                        .MustNotInject(arch.Registered(Lifetime.Scoped)))
+                    .Because("b"))
+            .Single();
+
+        result.ShouldHavePassedClean();
+    }
+
+    [Fact]
+    public void MustNotInject_SingletonInjectsSingleton_StaysSilentByLifetimeMembership()
+    {
+        // Svc injects IOther, but IOther is registered *singleton*, not scoped — so the ban on injecting
+        // scoped services never fires. The scoped operand is non-empty (IUnrelated is scoped), so this proves
+        // membership discriminates by lifetime, not merely that nothing scoped exists.
+        const string source = """
+                              using Microsoft.Extensions.DependencyInjection;
+                              namespace App
+                              {
+                                  public interface IOther {}
+                                  public class Other : IOther {}
+                                  public interface IUnrelated {}
+                                  public class Unrelated : IUnrelated {}
+                                  public class Svc { public Svc(IOther dep) { } }
+                                  public static class Wiring
+                                  {
+                                      public static void Configure(IServiceCollection services)
+                                      {
+                                          services.AddSingleton<Svc>();
+                                          services.AddSingleton<IOther, Other>();
+                                          services.AddScoped<IUnrelated, Unrelated>();
+                                      }
+                                  }
+                              }
+                              """;
+
+        RuleResult result = Checker.Run(CompilationFactory.ExtractWithDi(("Scene.cs", source)), arch =>
+                arch.Rule("di/no-captive")
+                    .Enforce(arch.Registered(Lifetime.Singleton).MustNotInject(arch.Registered(Lifetime.Scoped)))
+                    .Because("b"))
+            .Single();
+
+        result.ShouldHavePassedClean();
+    }
+
+    [Fact]
+    public void MustNotInject_ExceptSanctionedRoot_ExemptsRootButOtherSiteStaysRed()
+    {
+        // The DI shape: the sanctioned composition root may inject the scoped concrete type; everyone else may
+        // not. .Except carves the root out of the subject set, so its captive injection is exempt while the
+        // ordinary singleton in the same estate stays red.
+        const string source = """
+                              using Microsoft.Extensions.DependencyInjection;
+                              namespace App
+                              {
+                                  public interface IScopedDep {}
+                                  public class ScopedDep : IScopedDep {}
+                                  public class OrdinarySingleton { public OrdinarySingleton(IScopedDep dep) { } }
+                              }
+                              namespace App.Composition
+                              {
+                                  public class SanctionedRoot { public SanctionedRoot(App.IScopedDep dep) { } }
+                              }
+                              namespace App
+                              {
+                                  public static class Wiring
+                                  {
+                                      public static void Configure(IServiceCollection services)
+                                      {
+                                          services.AddSingleton<OrdinarySingleton>();
+                                          services.AddSingleton<App.Composition.SanctionedRoot>();
+                                          services.AddScoped<IScopedDep, ScopedDep>();
+                                      }
+                                  }
+                              }
+                              """;
+
+        RuleResult result = Checker.Run(CompilationFactory.ExtractWithDi(("Scene.cs", source)), arch =>
+                arch.Rule("di/no-captive")
+                    .Enforce(arch.Registered(Lifetime.Singleton).Except(arch.Namespace("App.Composition.*"))
+                        .MustNotInject(arch.Registered(Lifetime.Scoped)))
+                    .Because("b"))
+            .Single();
+
+        result.ShouldHaveFailedWithEdges(ViolationKind.Injection, ["App.OrdinarySingleton -> App.IScopedDep"]);
+    }
+
+    [Fact]
+    public void MustNotInject_GrandfatheredPairPasses_NewInjectedTargetStaysRed()
+    {
+        // The injection ratchet keys the (source, injected) type pair (GRAMMAR §4.3): Svc is grandfathered for
+        // injecting IScopedA, but its NEW injection of IScopedB is a distinct identity → red.
+        const string source = """
+                              using Microsoft.Extensions.DependencyInjection;
+                              namespace App
+                              {
+                                  public interface IScopedA {}
+                                  public class ScopedA : IScopedA {}
+                                  public interface IScopedB {}
+                                  public class ScopedB : IScopedB {}
+                                  public class Svc { public Svc(IScopedA a, IScopedB b) { } }
+                                  public static class Wiring
+                                  {
+                                      public static void Configure(IServiceCollection services)
+                                      {
+                                          services.AddSingleton<Svc>();
+                                          services.AddScoped<IScopedA, ScopedA>();
+                                          services.AddScoped<IScopedB, ScopedB>();
+                                      }
+                                  }
+                              }
+                              """;
+        BaselineIndex index = Checker.Baselines("di/no-captive", BaselineEntry.ForEdge("T:App.Svc", "T:App.IScopedA"));
+
+        RuleResult result = Checker.Run(CompilationFactory.ExtractWithDi(("Scene.cs", source)), index, arch =>
+                arch.Rule("di/no-captive")
+                    .Migrate("legacy captive dependencies", arch.Registered(Lifetime.Singleton)
+                        .MustNotInject(arch.Registered(Lifetime.Scoped)))
+                    .Because("resolve scoped work through IServiceScopeFactory"))
+            .Single();
+
+        result.ShouldHaveFailedWithEdges(ViolationKind.Injection, ["App.Svc -> App.IScopedB"]);
+        result.ShouldHaveGrandfathered(1);
+    }
+
+    [Fact]
+    public void MustNotInject_EmptyRegisteredOperand_NeverWarns()
+    {
+        // The never-warns pin (GRAMMAR §4.7, §5.3): the scoped operand resolves empty (no scoped registrations
+        // exist), which for MustNotInject is the *win condition* — no such registrations, so nothing to inject.
+        // MustNotConstruct WOULD flag an empty pattern operand as an inert-target warning; ForbiddenInjection
+        // drops that arm, so the result is a clean pass with ZERO warnings.
+        const string source = """
+                              using Microsoft.Extensions.DependencyInjection;
+                              namespace App
+                              {
+                                  public interface IFoo {}
+                                  public class Foo : IFoo {}
+                                  public static class Wiring
+                                  {
+                                      public static void Configure(IServiceCollection services) => services.AddSingleton<IFoo, Foo>();
+                                  }
+                              }
+                              """;
+
+        RuleResult result = Checker.Run(CompilationFactory.ExtractWithDi(("Scene.cs", source)), arch =>
+                arch.Rule("di/no-captive")
+                    .Enforce(arch.Registered(Lifetime.Singleton).MustNotInject(arch.Registered(Lifetime.Scoped)))
+                    .Because("b"))
+            .Single();
+
+        result.ShouldHavePassedClean();
+    }
+
+    [Fact]
+    public void JsonReportRenderer_InjectionViolation_EmitsInjectionKindAndTargetAndOmitsMemberSlots()
+    {
+        // The JSON kind string is "injection", and the injected type rides the `target` field a reference uses,
+        // so the report is schemaVersion 3 with the member and subject slots omitted.
+        CheckReport report = Checker.Run(SceneModel, arch =>
+            arch.Rule("di/no-captive")
+                .Enforce(arch.Registered(Lifetime.Singleton).MustNotInject(arch.Registered(Lifetime.Scoped)))
+                .Because("b"));
+
+        report.ShouldRenderEdgeViolation("injection", "App.CaptiveSingleton", "App.IScopedDep");
+    }
+}

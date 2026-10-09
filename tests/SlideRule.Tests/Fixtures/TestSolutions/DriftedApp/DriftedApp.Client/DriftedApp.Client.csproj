@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!-- The control. A real ProjectReference to the core and a reference to a type only the core declares, so
+         the genuine DriftedApp.Client -> DriftedApp.Core edge must survive whatever removes the phantom ones.
+         Without it a fix would be indistinguishable from dropping every edge into a project that declares a
+         shared name. -->
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>disable</Nullable>
+        <ImplicitUsings>disable</ImplicitUsings> <!-- parity: raw CSharpCompilation has no implicit usings -->
+        <RestoreLockedMode Condition="'$(CI)' == 'true'">true</RestoreLockedMode>
+    </PropertyGroup>
+    <ItemGroup>
+        <ProjectReference Include="..\DriftedApp.Core\DriftedApp.Core.csproj" />
+    </ItemGroup>
+</Project>

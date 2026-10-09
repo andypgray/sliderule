@@ -1,0 +1,93 @@
+using Shouldly;
+using Xunit;
+using SlideRule.Roslyn.Solutions;
+
+namespace SlideRule.Tests.Roslyn;
+
+/// <summary>
+///     The declared references named, over synthetic paths: no workspace, no MSBuild and no disk. The
+///     canonicalizer is a parameter, so each row passes the identity or a stand-in for a link, and the
+///     filesystem never decides a verdict here.
+/// </summary>
+public sealed class DeclaredProjectReferencesTests
+{
+    [Fact]
+    public void Names_DeclaredPaths_NameTheLoadedProjectsOrdinallyAndOnce()
+    {
+        // Arrange — the same include written twice, and the declarations in an order that is not the answer's.
+        IReadOnlyDictionary<string, string> byFile = DeclaredProjectReferences.NamesByProjectFile(
+            [("/repo/src/Web/Web.csproj", "Web"), ("/repo/src/Core/Core.csproj", "Core")], AsIs);
+
+        // Act
+        IReadOnlyList<string> names = DeclaredProjectReferences.Names(
+            ["/repo/src/Web/Web.csproj", "/repo/src/Core/Core.csproj", "/repo/src/Core/Core.csproj"], byFile, AsIs);
+
+        // Assert
+        names.ShouldBe(["Core", "Web"]);
+    }
+
+    [Fact]
+    public void Names_APathNoLoadedProjectAnswersTo_IsDropped()
+    {
+        // Arrange — a declared project the workspace did not load, whether because the file is gone or
+        // because its load failed. There is no project to name, and the workspace's own list has none either.
+        IReadOnlyDictionary<string, string> byFile =
+            DeclaredProjectReferences.NamesByProjectFile([("/repo/src/Core/Core.csproj", "Core")], AsIs);
+
+        // Act
+        IReadOnlyList<string> names = DeclaredProjectReferences.Names(
+            ["/repo/tools/Gone/Gone.csproj", "/repo/src/Core/Core.csproj"], byFile, AsIs);
+
+        // Assert
+        names.ShouldBe(["Core"]);
+    }
+
+    [Fact]
+    public void NamesByProjectFile_AProjectWithNoFileAndAFrameworkTwin_LeavesOneEntry()
+    {
+        // Arrange — a project the workspace reported no file for, which no declared path can reach, and a
+        // multi-targeted project loaded once per framework under its one name.
+        (string? FilePath, string Name)[] loaded =
+        [
+            (null, "Floating"),
+            ("/repo/src/Core/Core.csproj", "Core"),
+            ("/repo/src/Core/Core.csproj", "Core")
+        ];
+
+        // Act
+        IReadOnlyDictionary<string, string> byFile = DeclaredProjectReferences.NamesByProjectFile(loaded, AsIs);
+
+        // Assert
+        byFile.ShouldBe([new KeyValuePair<string, string>("/repo/src/Core/Core.csproj", "Core")]);
+    }
+
+    [Fact]
+    public void Names_ALinkSpellingAndItsResolvedPath_MeetThroughTheCanonicalizer()
+    {
+        // Arrange — the workspace named the project through a link, and the evaluated include resolved to
+        // the directory it points at. Only the canonicalizer makes the two spellings one file.
+        IReadOnlyDictionary<string, string> resolved =
+            DeclaredProjectReferences.NamesByProjectFile([("/repo/link/Core/Core.csproj", "Core")], ThroughLink);
+        IReadOnlyDictionary<string, string> unresolved =
+            DeclaredProjectReferences.NamesByProjectFile([("/repo/link/Core/Core.csproj", "Core")], AsIs);
+
+        // Act
+        IReadOnlyList<string> named = DeclaredProjectReferences.Names(["/repo/real/Core/Core.csproj"], resolved, ThroughLink);
+        IReadOnlyList<string> missed = DeclaredProjectReferences.Names(["/repo/real/Core/Core.csproj"], unresolved, AsIs);
+
+        // Assert: the two legs differ, so the one that meets is the canonicalizer's doing.
+        missed.ShouldBeEmpty("without the canonicalizer the two spellings are two files");
+        named.ShouldBe(["Core"]);
+    }
+
+    private static string? AsIs(string? path)
+    {
+        return path;
+    }
+
+    // A stand-in for a link: every path through /repo/link/ resolves to the same place under /repo/real/.
+    private static string? ThroughLink(string? path)
+    {
+        return path?.Replace("/link/", "/real/", StringComparison.Ordinal);
+    }
+}

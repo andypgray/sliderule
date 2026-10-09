@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <!-- The quarantined-scope e2e fixture: one Quarantine scope over MyApp.Legacy.Billing with NO explicit
+         .Baseline, so its containment resolves to the conventional default
+         arch/baselines/legacy/billing/containment.json (committed alongside the MyApp fixture). Against
+         that grandfather baseline the whole run is exit 0 — the containment passes, the tripwire skips.
+         References Core plus the MyApp project whose facade types BoundaryOnlyVia names; its DLL path is
+         baked into the test assembly's metadata and loaded via the spec flag. That reference replaced
+         name-carrier stubs, which declared a MyApp FQN a second time in THIS solution's universe and cost
+         every check of this repo an advisory conflation note. -->
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <IsPackable>false</IsPackable>
+        <RestoreLockedMode Condition="'$(CI)' == 'true'">true</RestoreLockedMode>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\..\src\SlideRule\SlideRule.csproj" />
+        <ProjectReference Include="..\..\SlideRule.Tests\Fixtures\TestSolutions\MyApp\MyApp.Legacy.Billing\MyApp.Legacy.Billing.csproj" />
+    </ItemGroup>
+
+</Project>

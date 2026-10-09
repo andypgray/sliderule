@@ -1,0 +1,8 @@
+<Solution>
+  <Project Path="DriftedApp.Client/DriftedApp.Client.csproj" />
+  <Project Path="DriftedApp.Core/DriftedApp.Core.csproj" />
+  <Project Path="DriftedApp.Core.Ansi/DriftedApp.Core.Ansi.csproj" />
+  <Project Path="DriftedApp.Json/DriftedApp.Json.csproj" />
+  <Project Path="DriftedApp.Markup/DriftedApp.Markup.csproj" />
+  <Project Path="DriftedApp.Testing/DriftedApp.Testing.csproj" />
+</Solution>

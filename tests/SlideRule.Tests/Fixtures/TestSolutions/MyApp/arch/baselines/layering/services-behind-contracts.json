@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "digest": "70171b322756da7313efe74225cd9061f64191746a9fc5c0dc721d5831793c01",
+  "rules": {
+    "layering/services-behind-contracts": {
+      "entries": [
+        { "subject": "T:MyApp.Domain.OrderService" }
+      ]
+    }
+  }
+}

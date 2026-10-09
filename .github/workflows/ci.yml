@@ -1,0 +1,1317 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  # Two Windows legs, because the .NET Framework fixtures make the Visual Studio on the image
+  # required rather than incidental. `windows-latest` is now the VS-2026-only image (VS
+  # Enterprise 18.x, no VS 2022 and no Build Tools 17 anywhere on it), and a non-SDK-style project in
+  # the 2003 MSBuild XML namespace is exactly what MsBuildBootstrap's VS 16/17 preference has nothing
+  # to prefer on there. `windows-2022` is the leg that gives the suite a VS 17 machine, so the
+  # README's legacy claim stays proven under CI — and keeping `windows-latest` in the matrix is what
+  # keeps the VS 2026 gap exposed rather than hidden.
+  build-and-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, windows-2022, macos-latest]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+
+      # Dependabot bumps a PackageReference and leaves packages.lock.json alone, so a NuGet update
+      # PR arrives failing NU1004 at Restore, before a single test runs — a red check that says
+      # nothing about the bump it was raised for. Relocking first means everything below tests what
+      # Dependabot actually proposed. The same step runs in pack-check, self-check and examples; the
+      # rationale lives here only, so the four copies cannot drift apart in wording.
+      #
+      # Solution-wide, because the staleness ripples: a version change in one project rewrites the
+      # lock file of every project that references it transitively, and Dependabot updates one
+      # directory at a time, so nothing scoped to the bumped project could be right. Four details
+      # carry weight:
+      #
+      #   - shell: bash, because this matrix includes Windows, where run: defaults to pwsh and the
+      #     `||` below would not parse.
+      #   - CI: '' is scoped to this step alone, so only this restore leaves locked mode; every
+      #     build, test and pack step after it still sees CI=true. RestorePackagesWithLockFile is
+      #     unconditional, so the lock files are rewritten rather than ignored.
+      #   - The commit is local and never pushed. A GITHUB_TOKEN push could not re-trigger the PR's
+      #     checks anyway, and a standing write credential is a poor trade for a weekly convenience
+      #     PR. It exists so pack-check's `<version>+<commit>` assertion still names the commit
+      #     SourceLink embedded, and so nothing packs from a dirty tree.
+      #   - head_ref, not actor: head_ref is empty on push, so main is untouched; a maintainer
+      #     re-running the workflow gets the same answer; and a github-actions bump does not pay for
+      #     a restore it has no use for.
+      #
+      # The PR still cannot reach all-green by itself. The lock-files job below stays red until a
+      # human puts the relock commit on the branch, which is the one signal worth acting on.
+      - name: Regenerate NuGet lock files (Dependabot NuGet PRs)
+        if: startsWith(github.head_ref, 'dependabot/nuget/')
+        shell: bash
+        env:
+          CI: ''
+        run: |
+          dotnet restore SlideRule.slnx --force-evaluate
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- '*packages.lock.json'
+          git diff --cached --quiet || git commit -q -m 'Regenerate NuGet lock files'
+
+      # Restore/build/test the whole solution, not just the test project: the self-spec
+      # tests open the real SlideRule.slnx through MSBuildWorkspace, so building the
+      # entire solution is what guarantees the workspace resolves at test time.
+      #
+      # --locked-mode is named on the line rather than left to CI=true. Every tracked csproj already
+      # sets RestoreLockedMode under $(CI), so this restore was locked either way — but only for as
+      # long as the runner keeps setting that variable, and the day it stops, the restore goes
+      # unlocked silently with nothing red. Spelled here it is unconditional.
+      # The flag applies to every project in the graph, which costs nothing: locked mode only bites
+      # where a lock file exists, so every lock-file project is held to its committed graph while
+      # the arch project and the throwaway fixtures, which carry no lock file by design, restore
+      # unlocked exactly as before. Which projects those are is a law rather than a count:
+      # packaging/shipping-locks-restore requires a lock file of everything that ships.
+      #
+      # This is the only step in either workflow that restores through a line of its own. Every other
+      # restore is IMPLICIT — pack-check's pack, self-check's build, the examples job's four example
+      # builds plus its CLI build and its adapter test, and release.yml's Release build and pack — so
+      # each of those names -p:RestoreLockedMode=true instead, for exactly the reason above. That is
+      # the property form of this same policy: --locked-mode is a restore-only switch and sets that
+      # property, so a step with no restore line of its own can only name the property.
+      #
+      # Measured 2026-09-01 rather than assumed. With one direct entry's requested range made stale
+      # (the lock file out of date, not broken), a plain build exits 0 and silently rewrites the lock
+      # file back to matching — the exposure — while the same build, the same pack, and an example
+      # solution build that reaches src only by ProjectReference all exit 1 on NU1004 once the
+      # property is on. Dropping a transitive entry instead proves nothing: a lock file that is broken
+      # rather than stale fails NU1102 in both modes.
+      - name: Restore
+        run: dotnet restore SlideRule.slnx --locked-mode
+
+      - name: Build
+        run: dotnet build SlideRule.slnx --no-restore
+
+      # Which MSBuild each image actually hands the tool, asserted rather than assumed. Everything this
+      # repository knows about MSBuild skew was measured on one developer machine — VS 17.14, via vswhere —
+      # and the two Windows legs exist precisely because the images are expected to disagree. Nothing checked
+      # that they still disagree the way the comment at the top of this job says they do, so a reimaged runner
+      # would move the whole matrix onto an MSBuild nobody chose and every result would quietly re-measure
+      # against it. This is the step that says so instead.
+      #
+      # The selection note is diagnostic context by design, not a banner: a clean run says nothing about
+      # MSBuild on any surface, so an assertion has to give the note something to ride on. A solution naming a
+      # project the tree does not contain is the smallest thing that does — the load is partial, graph refuses
+      # (graph, because it is the verb that needs no spec), and the refusal carries the selection line.
+      # Nothing is restored and nothing is built, so the step costs seconds and has no failure mode of its own.
+      #
+      # No patch version is pinned. The line is echoed on every run, so the version is always on the record;
+      # what reddens is a change of kind — VS or SDK, and which side of MsBuildBootstrap's VS 16/17 preference
+      # the image fell on.
+      - name: Assert which MSBuild this runner selects
+        shell: bash
+        env:
+          IMAGE: ${{ matrix.os }}
+        run: |
+          root="$RUNNER_TEMP/msbuild-selection"
+          mkdir -p "$root"
+          cat > "$root/Selection.slnx" <<'SLNX'
+          <Solution>
+            <Project Path="Absent/Absent.csproj" />
+          </Solution>
+          SLNX
+
+          log="$root/graph.log"
+          dotnet run --no-build --project src/SlideRule.Cli -- graph "$root/Selection.slnx" --no-cache \
+            > /dev/null 2> "$log" || true
+
+          selection="$(sed -n 's/^ *MSBuild for this run: \(.*\)\. Set SLIDERULE_VS_INSTALL_PATH.*$/\1/p' "$log")"
+          echo "MSBuild on $IMAGE: ${selection:-<nothing reported>}"
+
+          if [ -z "$selection" ]; then
+            echo "::error::graph reported no MSBuild selection at all on $IMAGE. Either the refusal stopped carrying MsBuildBootstrap.SelectionNote(), or the workspace failed on this image before it could refuse — this leg exists to surface both."
+            cat "$log"
+            exit 1
+          fi
+
+          # 'via vswhere)' is the VS-or-SDK answer; the envelope tail is which side of the VS 16/17 preference
+          # the image landed on. The tail is matched without its leading em dash so the comparison stays ASCII.
+          outside='outside the tested VS 2019/2022 envelope'
+          sdk='MSBuildLocator default (no Visual Studio install detected via vswhere)'
+          bad=''
+          case "$IMAGE" in
+            windows-2022)
+              # The leg that gives the suite a VS 17 machine, which is what keeps the README's legacy claim
+              # proven on an MSBuild inside the tested envelope.
+              if ! grep -Fq 'via vswhere)' <<<"$selection"; then
+                bad='vswhere found no Visual Studio, so the tool fell back to the SDK MSBuild and this leg no longer tests VS 17'
+              elif grep -Fq "$outside" <<<"$selection"; then
+                bad='the selected Visual Studio is outside the VS 16/17 preference, so this is no longer the VS 2022 leg'
+              fi
+              ;;
+            windows-latest)
+              # The VS-2026-only image. The comment at the top of this job asserts that in prose; this is the
+              # line that checks it, and green here means the gap is still exposed rather than quietly closed.
+              if ! grep -Fq 'via vswhere)' <<<"$selection"; then
+                bad='vswhere found no Visual Studio, so the tool fell back to the SDK MSBuild'
+              elif ! grep -Fq "$outside" <<<"$selection"; then
+                bad='a VS 2019/2022 turned up on the image this job describes as shipping VS 2026 alone'
+              fi
+              ;;
+            *)
+              # No Visual Studio to find, so the SDK MSBuild is the whole answer — the other half of the
+              # VS-or-SDK question, and the arm every non-Windows measurement in this repository rests on.
+              if [ "$selection" != "$sdk" ]; then bad="expected '$sdk'"; fi
+              ;;
+          esac
+
+          if [ -n "$bad" ]; then
+            echo "::error::MSBuild selection on $IMAGE is not what this workflow assumes: $bad. It reported: $selection"
+            echo "If GitHub reimaged the runner, update the expectation here and re-read the two-Windows-legs comment at the top of this job: it says what each leg is for, and the answer may be that this leg has stopped doing its job rather than that the expectation is stale."
+            exit 1
+          fi
+
+      # The same command on four images is not the same test run, and no leg here covers the suite. Around
+      # a dozen facts gate themselves on the machine and report `skipped` with a reason rather than
+      # failing. Windows-only: the .NET Framework axis (ClassicApp's non-SDK load, the Framework binlog
+      # replay), the Windows-x64 process-footprint scans, the drive-letter path vectors, and the
+      # registration facts that read a Git for Windows install. Never on Windows: the POSIX rooted-path
+      # vectors, and the case-sensitive path matching — which needs a case-sensitive filesystem, so ubuntu
+      # is the only image that runs it at all. Each skip carries its own reason in the log; that is where
+      # to read what a given leg left out.
+      #
+      # One fact reaches the network: the citation link check HEADs every page the committed context
+      # blocks cite. It is opt-in, and ubuntu is the single leg that opts in — one outward leg, the
+      # same shape as the manifest-version job's nuget.org read — so the other three skip with the
+      # reason rather than making a public run depend on learn.microsoft.com four times over. A
+      # runner that cannot reach the pages at all reports the same skip, naming them.
+      - name: Test
+        env:
+          SLIDERULE_LINK_CHECK: ${{ matrix.os == 'ubuntu-latest' && 'true' || '' }}
+        run: dotnet test SlideRule.slnx --no-build --output Detailed
+
+  # Packs on Linux, then does two things with the result. First, asserts the MCP manifest lands at
+  # exactly `.mcp/server.json` — the path nuget.org scans to generate the VS Code MCP config. A
+  # backslash PackagePath mis-packs only on non-Windows (the `.mcp//server.json` double-slash class
+  # of bug), so a single ubuntu job — not the 3-OS matrix — is the leg that catches it. Second,
+  # installs the packed tool and walks what a new user runs with it: GETTING-STARTED.md and the
+  # README quickstart, the shipped path this repository never took itself.
+  pack-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+
+      # Relock for Dependabot NuGet PRs, so the pack below is of the bump rather than of a failed
+      # restore. Identical text in build-and-test, which carries the rationale.
+      - name: Regenerate NuGet lock files (Dependabot NuGet PRs)
+        if: startsWith(github.head_ref, 'dependabot/nuget/')
+        shell: bash
+        env:
+          CI: ''
+        run: |
+          dotnet restore SlideRule.slnx --force-evaluate
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- '*packages.lock.json'
+          git diff --cached --quiet || git commit -q -m 'Regenerate NuGet lock files'
+
+      # This step restores implicitly, so without the property its locked mode would be contingent on
+      # the runner setting CI=true — the exposure build-and-test's Restore step names in full.
+      - name: Pack
+        run: dotnet pack SlideRule.slnx -c Release -o artifacts -p:RestoreLockedMode=true
+
+      # Target the Cli package explicitly: the solution pack emits four nupkgs and only the
+      # Cli one carries the MCP manifest. A bare artifacts/*.nupkg glob would hand unzip four
+      # files and break, so glob the single Cli package here.
+      - name: Verify server.json is packed at .mcp/server.json
+        run: |
+          entries="$(unzip -Z1 artifacts/SlideRule.Cli.*.nupkg)"
+          grep -Fxq '.mcp/server.json' <<<"$entries" || {
+            echo "::error::MCP manifest missing or mis-pathed in the packed nupkg (need .mcp/server.json)"
+            printf '%s\n' "$entries" | grep -i 'server\.json' || true
+            exit 1
+          }
+
+      # Both workflows run the same check, so the package-to-TFM table it reads lives in the script
+      # rather than in each of them — a framework bump has one place to find.
+      - name: Verify the XML documentation is packed
+        run: bash .github/scripts/verify-xml-docs-packed.sh artifacts
+
+      # The analyzer package is the one with no lib/ folder, so none of the checks above say anything
+      # about it. Its shape lives in the same place for the same reason.
+      - name: Verify the analyzer package shape
+        run: bash .github/scripts/verify-analyzer-package-shape.sh artifacts
+
+      # The contract package carries an analyzer of its own, inside the package every spec project already
+      # references. Nothing above would notice it going missing: the package still restores, still compiles
+      # a spec, and says nothing about the literals in it.
+      - name: Verify the contract package shape
+        run: bash .github/scripts/verify-contract-package-shape.sh artifacts
+
+      # The xUnit adapter reaches every project in this repository by project reference, so nothing here sees the
+      # package a test project takes from nuget.org, and a release once failed there twice over: Microsoft.Build.Locator
+      # refused the build (MSBL001), because the workspace packages brought MSBuild's engine assemblies into the
+      # test output, and past that no solution loaded, because the MSBuild workspace's build host is content that
+      # NuGet withholds from a package that arrives transitively. So a fresh test project here takes the contract and
+      # the adapter from the pack and nothing else (package source mapping sends SlideRule and every SlideRule.* id to
+      # it; a prefix pattern alone misses the bare contract id), builds, asserts the build host is beside the output
+      # and no engine assembly is, and runs: the adapter's own completeness test, one rule over a one-project
+      # solution, and a spec validated through the public entry.
+      - name: Build and run a fresh test project on the packed xUnit adapter
+        run: |
+          . .github/scripts/local-pack.sh
+          version="$(pack_version)"
+          # The metapackage goes in at the adapter's authoring-pair version, the oldest a consumer can use. It is
+          # read from the adapter's project rather than written out, so a bump of the pair cannot leave it behind.
+          xunit="$(sed -n 's:.*<PackageReference Include="xunit.v3.assert" Version="\([^"]*\)".*:\1:p' src/SlideRule.Xunit/SlideRule.Xunit.csproj)"
+          [ -n "$xunit" ] || {
+            echo "::error::Could not read the xUnit adapter's xunit.v3.assert version from its project file"
+            exit 1
+          }
+          tree="$RUNNER_TEMP/adapter-consumer"
+          export NUGET_PACKAGES="$RUNNER_TEMP/adapter-consumer-packages"
+          mkdir -p "$tree/App" "$tree/App.Tests"
+          cat > "$tree/nuget.config" <<CONFIG
+          <?xml version="1.0" encoding="utf-8"?>
+          <configuration>
+              <packageSources>
+                  <clear />
+                  <add key="local-pack" value="$GITHUB_WORKSPACE/artifacts" />
+                  <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+              </packageSources>
+              <packageSourceMapping>
+                  <packageSource key="local-pack">
+                      <package pattern="SlideRule" />
+                      <package pattern="SlideRule.*" />
+                  </packageSource>
+                  <packageSource key="nuget.org">
+                      <package pattern="*" />
+                  </packageSource>
+              </packageSourceMapping>
+          </configuration>
+          CONFIG
+          cat > "$tree/App.slnx" <<'SLN'
+          <Solution>
+            <Project Path="App/App.csproj" />
+            <Project Path="App.Tests/App.Tests.csproj" />
+          </Solution>
+          SLN
+          cat > "$tree/App/App.csproj" <<'PROJ'
+          <Project Sdk="Microsoft.NET.Sdk">
+            <PropertyGroup>
+              <TargetFramework>net10.0</TargetFramework>
+              <ImplicitUsings>enable</ImplicitUsings>
+              <Nullable>enable</Nullable>
+            </PropertyGroup>
+          </Project>
+          PROJ
+          cat > "$tree/App/Widget.cs" <<'CS'
+          namespace App;
+
+          public sealed class Widget
+          {
+              public string Name { get; } = "widget";
+          }
+          CS
+          cat > "$tree/App.Tests/App.Tests.csproj" <<PROJ
+          <Project Sdk="Microsoft.NET.Sdk">
+            <PropertyGroup>
+              <TargetFramework>net10.0</TargetFramework>
+              <ImplicitUsings>enable</ImplicitUsings>
+              <Nullable>enable</Nullable>
+              <OutputType>Exe</OutputType>
+              <IsPackable>false</IsPackable>
+            </PropertyGroup>
+            <ItemGroup>
+              <PackageReference Include="xunit.v3" Version="$xunit" />
+              <PackageReference Include="SlideRule" Version="$version" />
+              <PackageReference Include="SlideRule.Xunit" Version="$version" />
+            </ItemGroup>
+          </Project>
+          PROJ
+          cat > "$tree/App.Tests/ArchitectureTests.cs" <<'CS'
+          using SlideRule;
+          using SlideRule.Xunit;
+
+          namespace App.Tests;
+
+          public sealed class AppSpec : IArchitectureSpec
+          {
+              public void Define(Arch arch)
+              {
+                  Layer app = arch.Layer("App", "App.*");
+
+                  arch.Rule("app/offline")
+                      .Enforce(app.MustNotReference(arch.Namespace("System.Net.*")))
+                      .Because("The widget library makes no network calls.");
+              }
+          }
+
+          public sealed class ArchitectureTests : ArchRuleTests<AppSpec>
+          {
+              protected override string SolutionPath => FindSolutionUp("App.slnx");
+          }
+
+          public sealed class SpecTests
+          {
+              [Xunit.Fact]
+              public void Spec_IsValid()
+              {
+                  Xunit.Assert.Empty(SpecValidation.Validate(new AppSpec()));
+              }
+          }
+          CS
+          cd "$tree"
+          dotnet build App.slnx || {
+            echo "::error::A fresh test project on the packed contract and adapter does not build"
+            exit 1
+          }
+          output="App.Tests/bin/Debug/net10.0"
+          [ -f "$output/BuildHost-netcore/Microsoft.CodeAnalysis.Workspaces.MSBuild.BuildHost.dll" ] || {
+            echo "::error::The MSBuild workspace's build host is not beside the test output, so no solution can load"
+            exit 1
+          }
+          if ls "$output"/Microsoft.Build.*.dll 2> /dev/null | grep -v 'Microsoft.Build.Locator.dll'; then
+            echo "::error::MSBuild engine assemblies reached the test output, where they load in place of the SDK's"
+            exit 1
+          fi
+          dotnet run --project App.Tests/App.Tests.csproj --no-build || {
+            echo "::error::The adapter's tests failed in a fresh test project on the packed packages"
+            exit 1
+          }
+
+      # A new user installs the tool with `dotnet tool install -g SlideRule.Cli`, and nothing
+      # else here runs it that way: CI drives the CLI through `dotnet run`, the agent hook through
+      # `dotnet exec`, and there is no tool manifest. This installs the nupkg packed above, proves the
+      # installed command is that build, and checks one example with it. The steps below run the
+      # installed command too, and the last of them walks the published first run line by line.
+      #
+      # The version is read from Directory.Build.props rather than written out, so a release bump
+      # cannot quietly stop pinning. --add-source puts the local pack in front of nuget.org, which
+      # is still needed for the third-party dependencies, so the pin alone does not prove which
+      # build ran once this version is also published — the informational version does.
+      # `<version>+<commit>` is the format SECURITY.md documents as the source cross-check, and
+      # holding it to this commit's SHA is what makes this a test of the tool just packed rather
+      # than of whatever nuget.org happens to serve.
+      #
+      # Meridian.Quoting is the target because it is small, Enforce-only, and carries no baselines,
+      # so a green exit is the rules passing and nothing else.
+      - name: Install the packed tool and check Meridian.Quoting with it
+        run: |
+          . .github/scripts/local-pack.sh
+          version="$(pack_version)"
+          dotnet tool install -g SlideRule.Cli --add-source artifacts --version "$version"
+          export PATH="$PATH:$HOME/.dotnet/tools"
+          # Substring, not a whole-line match: the CLI's console writes CRLF on Windows, and a
+          # verification of this same line by hand there would fail on the trailing \r for no reason.
+          expected="$version+$(git rev-parse HEAD)"
+          sliderule --version | grep -Fq "$expected" || {
+            echo "::error::sliderule --version is not '$expected' — the tool that ran is not the one packed above"
+            sliderule --version
+            exit 1
+          }
+          dotnet build examples/Meridian.Quoting/Meridian.Quoting.slnx
+          sliderule check examples/Meridian.Quoting/Meridian.Quoting.slnx
+
+      # Above proves the tool. Nothing proves the package a spec project actually references.
+      # `derive_spec` hands every adopter a spec csproj built on
+      # `<PackageReference Include="SlideRule" ... />`, and not one spec in this tree is built
+      # that way: the four examples, the self-spec and every fixture use a ProjectReference. So spec
+      # discovery — the unique declared solution member whose reference paths hold a
+      # SlideRule.dll — has only ever run here against a project reference, while a metadata
+      # reference into the packages folder is what every reader gets. This scaffolds the reader's tree
+      # out of the pack above and checks it. It is also the first time anything compiles the scaffold
+      # the recipe publishes.
+      #
+      # The csproj and the spec class are cut from the recipe rather than written here, and the csproj
+      # gets the same Version="..." substitution ArchPrompts applies when the server serves the
+      # prompt. So this executes the published recipe instead of a copy that could drift from it, and
+      # a recipe edit that breaks the scaffold reddens here rather than reaching a reader. The cut is
+      # anchored on content rather than on fence order, and an empty cut is a loud failure: a
+      # restructure must redden this leg, never quietly scaffold nothing.
+      #
+      # One rule is authored here, in its own file, because the recipe's Define() is empty by design
+      # and a spec with no rules would prove loading and evaluate nothing. A second spec class is the
+      # honest seam — the model runs every IArchitectureSpec in the assembly over one shared Arch — so
+      # the recipe's own file stays byte for byte what it publishes, and the csproj, the artifact
+      # actually under test, is untouched.
+      #
+      # Under $RUNNER_TEMP, outside the working tree: nothing inherits this repository's
+      # Directory.Build.props (which would stamp its version, binding identity and package metadata
+      # onto the scaffold), and nothing lands where a git gate could see it. NUGET_PACKAGES is
+      # scaffold-local and the only feed is the local pack, so the restore cannot be answered by a
+      # copy of this version already on the machine or on nuget.org — which is the whole difference
+      # between testing the bytes packed above and testing whatever is published. Debug, not Release:
+      # the sibling-configuration fallback in spec resolution is a separate property, and a red here
+      # should mean exactly one thing.
+      #
+      # Then the negative control, because loading is not enforcing. A non-conforming interface goes
+      # into the product, it is rebuilt, and `check` must exit exactly 1. Not merely non-zero: exit 2
+      # is an unresolved spec or a workspace that failed to load, which would satisfy a "non-zero"
+      # test for precisely the reason this leg exists to rule out.
+      #
+      # The whole thing then runs a second time against a repository that manages package versions
+      # centrally — a large and growing class of modern .NET repositories, and the shape the scaffold
+      # was invalid on until it carried `ManagePackageVersionsCentrally`: an inline version on a
+      # PackageReference is NU1008 there, an error whose text never mentions this tool. The recipe
+      # opts its one project out rather than telling the adopter to edit a central file they may
+      # treat as protected, and this leg is what stops that from being prose. Its own negative
+      # control strips the opt-out and requires NU1008 back — not merely a failure, since any other
+      # error would satisfy a bare non-zero test for the reason the control exists to rule out.
+      - name: Scaffold the documented PackageReference spec project — plain and CPM — and check it
+        run: |
+          . .github/scripts/local-pack.sh
+          version="$(pack_version)"
+          export PATH="$PATH:$HOME/.dotnet/tools"
+
+          recipe="src/SlideRule.Cli/Mcp/Prompts/derive-spec.md"
+          plain="$RUNNER_TEMP/packageref"
+          cpm="$RUNNER_TEMP/packageref-cpm"
+          # One package folder for both legs: warm for the second, and still isolated from the machine
+          # cache and from nuget.org, which is what makes the restore assertion below name the pack.
+          export NUGET_PACKAGES="$plain/.packages"
+
+          # fence <file> <lang> <marker>: the first fenced block in <lang> whose body carries <marker>. A
+          # marker that has gone yields nothing and trips the guard below.
+          . .github/scripts/fence.sh
+
+          csproj="$(fence "$recipe" xml 'PackageReference Include="SlideRule"')"
+          spec="$(fence "$recipe" csharp 'IArchitectureSpec')"
+          [ -n "$csproj" ] && [ -n "$spec" ] || {
+            echo "::error::Could not cut the spec scaffold out of $recipe — the xml fence carrying the PackageReference, or the csharp fence carrying the IArchitectureSpec class, has moved or changed shape. That recipe is what adopters follow, so fix it or fix this cut; do not delete the assertion."
+            exit 1
+          }
+
+          # The Version="..." substitution ArchPrompts applies when it serves the prompt, done once so
+          # both legs scaffold the identical csproj an adopter is handed.
+          csproj="$(printf '%s\n' "$csproj" | sed 's|Version="\.\.\."|Version="'"$version"'"|')"
+
+          # scaffold <root> — the reader's tree, written under <root>. The body is deliberately not
+          # indented: these heredocs are quoted (<<'CS', never <<-), so every terminator has to reach
+          # column 0 once YAML strips this block's indentation.
+          scaffold() {
+          mkdir -p "$1/src/MyApp" "$1/arch/MyApp.Architecture"
+          printf '%s\n' "$csproj" > "$1/arch/MyApp.Architecture/MyApp.Architecture.csproj"
+          printf '%s\n' "$spec" > "$1/arch/MyApp.Architecture/ArchitectureSpec.cs"
+
+          # The same line DeriveSpecPromptTests pins the served prompt to, asserted from the other
+          # side: the csproj under test is the one an adopter is handed, pinned to the pack above.
+          grep -Fq "<PackageReference Include=\"SlideRule\" Version=\"$version\" />" \
+            "$1/arch/MyApp.Architecture/MyApp.Architecture.csproj" || {
+            echo "::error::The scaffold csproj did not come out pinned to $version — the Version=\"...\" placeholder ArchPrompts substitutes is no longer where the recipe spells it"
+            cat "$1/arch/MyApp.Architecture/MyApp.Architecture.csproj"
+            exit 1
+          }
+
+          cat > "$1/arch/MyApp.Architecture/CheckedRule.cs" <<'CS'
+          using SlideRule;
+
+          namespace MyApp.Architecture;
+
+          public sealed class PackageReferenceProof : IArchitectureSpec
+          {
+              public void Define(Arch arch)
+              {
+                  arch.Rule("naming/interfaces")
+                      .Enforce(arch.Project("MyApp").OfKind(TypeKind.Interface).MustHavePrefix("I"))
+                      .Because("The scaffolded spec has to evaluate over real symbols for a green run to mean anything, so it states the one convention the product below obeys and the violation below breaks.");
+              }
+          }
+          CS
+
+          cat > "$1/src/MyApp/MyApp.csproj" <<'CSPROJ'
+          <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                  <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+          </Project>
+          CSPROJ
+
+          cat > "$1/src/MyApp/Shipments.cs" <<'CS'
+          namespace MyApp;
+
+          public interface IShipmentPort
+          {
+              string Describe();
+          }
+
+          public sealed class ShipmentPort : IShipmentPort
+          {
+              public string Describe() => "shipment";
+          }
+          CS
+
+          cat > "$1/MyApp.slnx" <<'SLNX'
+          <Solution>
+            <Folder Name="/src/">
+              <Project Path="src/MyApp/MyApp.csproj" />
+            </Folder>
+            <Folder Name="/arch/">
+              <Project Path="arch/MyApp.Architecture/MyApp.Architecture.csproj" />
+            </Folder>
+          </Solution>
+          SLNX
+
+          local_pack_feed "$1"
+          }
+
+          # ── Leg A: a repository that pins package versions per project ──────────────────────────
+          scaffold "$plain"
+          dotnet build "$plain/MyApp.slnx"
+          require_contract_from_pack "$version" "The scaffold's PackageReference"
+
+          # No --spec: convention discovery is the documented path and the thing under test.
+          sliderule check "$plain/MyApp.slnx" || {
+            echo "::error::A spec project consuming SlideRule as a PackageReference — the shape derive_spec publishes — was not discovered, or did not pass over conforming code"
+            exit 1
+          }
+
+          cat > "$plain/src/MyApp/Broken.cs" <<'CS'
+          namespace MyApp;
+
+          public interface ShipmentPortWithoutThePrefix
+          {
+          }
+          CS
+          dotnet build "$plain/MyApp.slnx"
+          rc=0
+          sliderule check "$plain/MyApp.slnx" || rc=$?
+          [ "$rc" -eq 1 ] || {
+            echo "::error::check exited $rc over a deliberate violation; 1 is the only right answer (2 means the spec or the workspace did not resolve, which would make the green above meaningless)"
+            exit 1
+          }
+
+          # ── Leg B: the same csproj on a repository that manages versions centrally ──────────────
+          scaffold "$cpm"
+          cat > "$cpm/Directory.Packages.props" <<'PROPS'
+          <Project>
+              <PropertyGroup>
+                  <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+              </PropertyGroup>
+          </Project>
+          PROPS
+
+          dotnet build "$cpm/MyApp.slnx" || {
+            echo "::error::The scaffold csproj did not restore or build on a repository carrying a Directory.Packages.props — the shape derive_spec publishes has to be valid there, and valid without the adopter editing that file"
+            exit 1
+          }
+          sliderule check "$cpm/MyApp.slnx" || {
+            echo "::error::The scaffolded spec project built under central package management but was not discovered, or did not pass over conforming code"
+            exit 1
+          }
+
+          # Leg B's negative control: strip the opt-out back out and the build must fail with NU1008.
+          sed -i '/<ManagePackageVersionsCentrally>/d' "$cpm/arch/MyApp.Architecture/MyApp.Architecture.csproj"
+          rc=0
+          dotnet build "$cpm/MyApp.slnx" > "$RUNNER_TEMP/cpm-without-opt-out.log" 2>&1 || rc=$?
+          if [ "$rc" -eq 0 ] || ! grep -q NU1008 "$RUNNER_TEMP/cpm-without-opt-out.log"; then
+            echo "::error::Removing ManagePackageVersionsCentrally from the scaffold csproj did not produce NU1008 (build exited $rc) — that line is no longer what makes the published scaffold valid under central package management, so the leg above proves nothing"
+            cat "$RUNNER_TEMP/cpm-without-opt-out.log"
+            exit 1
+          fi
+
+      # Above proves the contract package restores and that `check` finds the scaffold. Nothing yet proves
+      # the other half of what that one PackageReference delivers: a spec author who references the contract
+      # and nothing else gets the spec-literal analyzer with it, and a literal the matcher can prove dead is
+      # a warning on the line carrying it before `check` ever runs.
+      #
+      # Deliberately before the analyzer-package step, and with no Directory.Build.props in the tree: the
+      # contract reference is then the only thing that could have produced the line, which is the claim.
+      #
+      # The control comes first and is what makes the positive mean anything. A build of the conforming
+      # scaffold must print no SR line and none of CS8032, CS8033, CS9057 or AD0001 — a package whose
+      # analyzer failed to load prints one of those once and then goes silent, which reads exactly like
+      # nothing being wrong if only the positive is asserted. CS8033 is there for the completion provider,
+      # which carries no analyzer at all: the compiler builds its analyzer map from metadata and never
+      # loads an assembly that declares none, so the warning it has for that case has to stay absent.
+      #
+      # The completion provider gets an item assertion and nothing more, because what it does happens
+      # inside an editor. No build can show that a list appears, what is in it, or where its rows rank;
+      # that is checked by hand, in each of the three editors. What CI can say is that the
+      # assembly reached the consumer's Analyzer items from one PackageReference, which is the half a
+      # merge can break.
+      #
+      # The no-incremental switch on all three builds: an unchanged project skips CoreCompile and prints
+      # nothing, so an analyzer assertion over an incremental build can pass or fail on whether MSBuild
+      # bothered to compile at all. Adding and removing a file does move the compile inputs, so this is belt
+      # over brace, kept because the failure it prevents reads as a missing diagnostic rather than as a
+      # skipped build.
+      - name: The contract package's own analyzer reports a dead literal, with no second reference
+        run: |
+          export PATH="$PATH:$HOME/.dotnet/tools"
+          root="$RUNNER_TEMP/packageref"
+          export NUGET_PACKAGES="$root/.packages"
+          spec="$root/arch/MyApp.Architecture/DeadPattern.cs"
+
+          [ ! -f "$root/Directory.Build.props" ] || {
+            echo "::error::A Directory.Build.props is already in the scaffold, so a second package could be supplying the analyzer and this step proves nothing about the contract package. It has to run before the step that adds one."
+            exit 1
+          }
+
+          control="$RUNNER_TEMP/spec-literal-control.log"
+          dotnet build "$root/MyApp.slnx" --no-incremental > "$control" 2>&1 || {
+            echo "::error::The scaffold stopped building once the contract package carried an analyzer"
+            cat "$control"
+            exit 1
+          }
+          if grep -Eq ': (warning|error) SR[0-9]{4}|CS8032|CS8033|CS9057|AD0001' "$control"; then
+            echo "::error::The conforming scaffold was not silent. An SR line is a false positive; CS8032 or CS9057 is a compiler that could not load the analyzer; CS8033 is a compiler that looked for analyzers in the completion provider and found none; AD0001 is the analyzer faulting."
+            grep -E ': (warning|error) SR[0-9]{4}|CS8032|CS8033|CS9057|AD0001' "$control"
+            exit 1
+          fi
+
+          # Both extensions reached the consumer's Analyzer items from the same one PackageReference. An
+          # editor is what loads the completion provider, so this is the whole of what a build can say
+          # about it; the list itself is read by hand in each editor.
+          #
+          # The target is named, and has to be. A package's analyzers are not evaluation-time items:
+          # they arrive from the lock file when ResolveLockFileAnalyzers runs, and a bare -getItem
+          # short-circuits before any target does, so it reports the two the SDK adds and nothing of
+          # this package's three. Measured 2026-09-22: bare, two rows; with the target,
+          # five.
+          items="$RUNNER_TEMP/scaffold-analyzers.txt"
+          dotnet build "$root/arch/MyApp.Architecture/MyApp.Architecture.csproj" -t:ResolveLockFileAnalyzers -getItem:Analyzer > "$items" 2>&1 || {
+            echo "::error::Could not read the scaffold's Analyzer items"
+            cat "$items"
+            exit 1
+          }
+          for extension in SlideRule.SpecAnalyzers.dll SlideRule.SpecCompletion.dll; do
+            grep -Fq "$extension" "$items" || {
+              echo "::error::The scaffold's Analyzer items do not name $extension. The contract package puts it under analyzers/dotnet/cs, and a consumer who references the contract and nothing else has to get it from there."
+              cat "$items"
+              exit 1
+            }
+          done
+
+          # One rule, one bad literal. 'MyApp.*.Controllers.*' is a subtree glob whose literal prefix itself
+          # carries a wildcard, so it can never match anything — a deduction from the matcher's own
+          # semantics, which is the line the catalog draws and the analyzer holds to.
+          cat > "$spec" <<'CS'
+          using SlideRule;
+
+          namespace MyApp.Architecture;
+
+          public sealed class DeadPatternProof : IArchitectureSpec
+          {
+              public void Define(Arch arch)
+              {
+                  arch.Rule("naming/dead-pattern")
+                      .Enforce(arch.Namespace("MyApp.*.Controllers.*").MustHavePrefix("I"))
+                      .Because("The pattern this rule selects on can never match a namespace, so the rule holds nothing to anything.")
+                      .Fix("Anchor the subtree on a literal prefix, so the pattern names the namespaces it means.");
+              }
+          }
+          CS
+
+          # The position is asserted, not just the ID: a diagnostic on the statement rather than on the
+          # literal would pass a bare ID grep and be useless in an editor. The line is computed from the file
+          # so a reflow of the heredoc moves the expectation with it; the column is the literal's opening
+          # quote, which awk's index reports 1-based as C# numbers columns.
+          line="$(grep -n 'MyApp\.\*\.Controllers\.\*' "$spec" | cut -d: -f1)"
+          column="$(awk -v n="$line" 'NR==n { print index($0, "\"MyApp.*.Controllers.*\"") }' "$spec")"
+
+          planted="$RUNNER_TEMP/spec-literal-planted.log"
+          dotnet build "$root/MyApp.slnx" --no-incremental > "$planted" 2>&1 || {
+            echo "::error::A dead literal failed the build. The spec-literal analyzer reports warnings and must never stop one — check is the gate."
+            cat "$planted"
+            exit 1
+          }
+          grep -Fq "DeadPattern.cs($line,$column): warning SR1017" "$planted" || {
+            echo "::error::The build reported no 'warning SR1017' at DeadPattern.cs($line,$column). A spec author referencing only the contract package has to get this squiggle with no second reference; a package that installs and then stays silent is the failure the green 'sliderule check' leg above cannot catch."
+            grep -E 'SR[0-9]{4}|CS8032|CS8033|CS9057|AD0001' "$planted" || echo '(no SR, CS8032, CS8033, CS9057 or AD0001 line in the log at all)'
+            exit 1
+          }
+
+          # Put the tree back: the next step asserts total SR silence over conforming code, and a literal
+          # left here would redden it in the name of the wrong package.
+          rm -f "$spec"
+          restored="$RUNNER_TEMP/spec-literal-restored.log"
+          dotnet build "$root/MyApp.slnx" --no-incremental > "$restored" 2>&1
+          grep -Eq ': (warning|error) SR[0-9]{4}' "$restored" && {
+            echo "::error::Removing the planted file did not return the scaffold to silence"
+            grep -E ': (warning|error) SR[0-9]{4}' "$restored"
+            exit 1
+          }
+          exit 0
+
+      # Above proves the contract package a spec project references, and `check` over what it scaffolds.
+      # Nothing proves the analyzer package, whose whole job happens inside somebody else's build: a reader
+      # adds it, builds, and expects the rule they just broke to be a warning on the line that broke it. So
+      # this takes the tree the plain leg left behind and adds the package the way its own README documents
+      # it — one PackageReference in a Directory.Build.props above the projects — over the pack above rather
+      # than over anything a feed might serve, the leg's nuget.config and NUGET_PACKAGES being what settle
+      # that.
+      #
+      # `render --model` comes first because the package reads its rules from sliderule.model.json and
+      # reports SR2090 without one. It is also the line the README tells a reader to run once and commit, so
+      # the file under test is written the documented way rather than by a convenience here.
+      #
+      # The conforming half asserts on every SR ID, not on SR2001 alone. A model file the package could not
+      # read (SR2091) or an analyzer that faulted (SR2093) says nothing about the code either way, and would
+      # leave the violation half below to pass or fail for a reason that has nothing to do with the rule.
+      - name: Reference the analyzer package from the scaffold and build a broken rule
+        run: |
+          . .github/scripts/local-pack.sh
+          version="$(pack_version)"
+          export PATH="$PATH:$HOME/.dotnet/tools"
+          root="$RUNNER_TEMP/packageref"
+          export NUGET_PACKAGES="$root/.packages"
+
+          # The plain leg ended on its deliberate violation; this half is about a tree that conforms.
+          rm -f "$root/src/MyApp/Broken.cs"
+          sliderule render "$root/MyApp.slnx" --model
+          [ -f "$root/sliderule.model.json" ] || {
+            echo "::error::'sliderule render --model' wrote no sliderule.model.json beside the solution, so the analyzer package has no rules to read and everything below would be vacuous"
+            exit 1
+          }
+
+          cat > "$root/Directory.Build.props" <<PROPS
+          <Project>
+              <ItemGroup>
+                  <PackageReference Include="SlideRule.Analyzers" Version="$version" PrivateAssets="all" />
+              </ItemGroup>
+          </Project>
+          PROPS
+
+          clean="$RUNNER_TEMP/analyzer-clean.log"
+          dotnet build "$root/MyApp.slnx" > "$clean" 2>&1 || {
+            echo "::error::The scaffold stopped building once it referenced the analyzer package"
+            cat "$clean"
+            exit 1
+          }
+          if grep -Eq ': (warning|error) SR[0-9]{4}' "$clean"; then
+            echo "::error::The analyzer said something about conforming code. SR2001 or SR2002 is a violation 'sliderule check' does not give; SR2090 or SR2091 means it never read the model file; SR2093 is a fault in the analyzer itself, or the two packages at two different versions."
+            grep -E ': (warning|error) SR[0-9]{4}' "$clean"
+            exit 1
+          fi
+
+          cat > "$root/src/MyApp/Broken.cs" <<'CS'
+          namespace MyApp;
+
+          public interface ShipmentPortWithoutThePrefix
+          {
+          }
+          CS
+          broken="$RUNNER_TEMP/analyzer-broken.log"
+          dotnet build "$root/MyApp.slnx" > "$broken" 2>&1 || {
+            echo "::error::A broken rule failed the build; the analyzer reports warnings and must never stop one"
+            cat "$broken"
+            exit 1
+          }
+          grep -Fq 'warning SR2001' "$broken" || {
+            echo "::error::The build reported no 'warning SR2001' over an interface the scaffolded rule requires an I prefix of. A package that installs and then stays silent is the one failure the green 'sliderule check' leg above cannot catch."
+            cat "$broken"
+            exit 1
+          }
+
+      # The refusal a reader is most likely to meet first, on a real runner rather than only in unit tests.
+      # `sliderule check` with no argument walks up from the working directory, and a repository whose root
+      # holds several solutions is a normal layout rather than an exotic one — so this text is the tool's
+      # first impression, and it is the one message the suite pins only against a synthesized filesystem.
+      #
+      # What is asserted is the whole refusal, because each part earns its place: exit 2, the directory that
+      # held them (a refusal that will not say where is a dead end), both candidates by name, the .slnf
+      # absent — a filter is a view of a solution standing beside it, and naming it would invite a fix that
+      # resolves nothing — the fix line in both dialects, and a stdout nothing wrote to, which is what makes
+      # --json parseable on every other path.
+      #
+      # The walk-up climbs to the filesystem root, so a single solution file in any ancestor of $RUNNER_TEMP
+      # would resolve and this assertion would be testing nothing. That shows up here as a plain red; the
+      # ancestor listing below is what turns it into a diagnosis rather than a puzzle.
+      - name: Assert the walk-up refusal when a directory holds several solutions
+        run: |
+          export PATH="$PATH:$HOME/.dotnet/tools"
+
+          root="$RUNNER_TEMP/walk-up-ambiguity/repo"
+          mkdir -p "$root"
+          touch "$root/Storefront.sln" "$root/Storefront.Legacy.slnx" "$root/BillingOnly.slnf"
+          cd "$root"
+          here="$(pwd -P)"
+
+          rc=0
+          sliderule check > stdout.txt 2> stderr.txt || rc=$?
+          cat stderr.txt
+
+          bad=''
+          if [ "$rc" -ne 2 ]; then
+            bad="check exited $rc, and a refusal is exit 2"
+          elif ! grep -Fq "Multiple solution files found in '$here':" stderr.txt; then
+            bad='the refusal does not name the directory that held them'
+          # Substrings carrying the indentation, never whole-line matches: the CLI's console writes CRLF on
+          # Windows, so a -Fx here would pass on this runner and fail anyone verifying the same line by hand.
+          elif ! grep -Fq '  Storefront.sln' stderr.txt || ! grep -Fq '  Storefront.Legacy.slnx' stderr.txt; then
+            bad='the refusal does not list both candidates, one indented line each'
+          elif grep -Fq 'BillingOnly.slnf' stderr.txt; then
+            bad='the refusal names the .slnf, which is a view of the solutions beside it rather than a rival candidate'
+          elif ! grep -Fq "Pass the solution as the argument (<command> <solution>, or in your MCP client config's args), or set SLIDERULE_SOLUTION_PATH to it." stderr.txt; then
+            bad='the refusal does not carry the fix line naming the argument, the MCP client config and the environment variable'
+          elif [ -s stdout.txt ]; then
+            bad='the refusal wrote to stdout, which every --json consumer parses'
+          fi
+
+          if [ -n "$bad" ]; then
+            echo "::error::The walk-up ambiguity refusal is not what SolutionDiscovery publishes: $bad"
+            echo "Solution files in the ancestors of $here — any one of them standing alone wins the walk-up and makes this assertion vacuous:"
+            d="$here"
+            while :; do
+              ls -1 "$d"/*.sln "$d"/*.slnf "$d"/*.slnx 2>/dev/null || true
+              p="$(dirname "$d")"
+              if [ "$p" = "$d" ]; then break; fi
+              d="$p"
+            done
+            exit 1
+          fi
+
+      # GETTING-STARTED.md is the first run a new user takes: a spec project made from the package in
+      # their own solution, then build, check and render. The README quickstart is the three lines in
+      # front of it, and on a solution with no spec project those lines stop at a refusal. Nothing ran
+      # either page as written, so this walks both with the packages packed above, cutting every command
+      # out of the published pages rather than restating it here. QuoteSyncTests holds each cut below to
+      # the fence it names, by marker and by language, so a reworded marker or a retagged fence reds in the
+      # suite before it can empty a cut here.
+      #
+      # The tree is the reader's solution before the page: MyApp.sln with a Domain and a Web class
+      # library, under $RUNNER_TEMP for the reasons the scaffold step gives, with the local pack as its
+      # only feed and a package folder of its own. The walk runs in the order a reader meets it:
+      #   - the quickstart on the bare solution, which has to exit 2 with the refusal the page quotes,
+      #     the dead end the page exists for, held to the words the page uses;
+      #   - the page: its install line compared with the one this job ran (which adds the pack as a
+      #     source), its spec-project commands, its spec class written where it says, then its build,
+      #     check and render, with the contract asserted to come from the pack and AGENTS.md to carry
+      #     the page's rule;
+      #   - the quickstart again, now green;
+      #   - the page's sliderule.json, written where the page says, and then its CI lines, which name no
+      #     path and so run on what the file names;
+      #   - the negative control the scaffold step also runs, because a green check proves nothing until
+      #     the same tree can fail it: a Domain type that holds a Web type must exit exactly 1.
+      #
+      # Every cut runs through `bash -e -c`, never `eval ... ||`. Errexit is suspended on the left of
+      # `||`, so a fence whose middle line failed would pass on the strength of its last.
+      - name: Walk GETTING-STARTED.md and the README quickstart from the packed package
+        run: |
+          . .github/scripts/local-pack.sh
+          version="$(pack_version)"
+          export PATH="$PATH:$HOME/.dotnet/tools"
+          . .github/scripts/fence.sh
+
+          install_line='dotnet tool install -g SlideRule.Cli'
+          refusal='No spec project found: no solution project references SlideRule.dll. Pass --spec to name one.'
+
+          install="$(fence GETTING-STARTED.md bash 'dotnet tool install -g SlideRule.Cli')"
+          project="$(fence GETTING-STARTED.md bash 'dotnet new classlib')"
+          spec="$(fence GETTING-STARTED.md csharp 'public sealed class ArchitectureSpec : IArchitectureSpec')"
+          first="$(fence GETTING-STARTED.md bash 'dotnet build MyApp.sln')"
+          settings="$(fence GETTING-STARTED.md json '"solution": "MyApp.sln"')"
+          ci="$(fence GETTING-STARTED.md bash 'sliderule render --check')"
+          quickstart="$(fence README.md bash 'dotnet tool install -g SlideRule.Cli')"
+          [ -n "$install" ] && [ -n "$project" ] && [ -n "$spec" ] && [ -n "$first" ] && [ -n "$settings" ] && [ -n "$ci" ] && [ -n "$quickstart" ] || {
+            echo "::error::Could not cut every fence this step runs out of GETTING-STARTED.md and README.md; one of them has moved or changed shape. Those pages are what a new user follows, so fix the page or fix this cut; do not delete the assertion."
+            exit 1
+          }
+          grep -Fq "$refusal" GETTING-STARTED.md || {
+            echo "::error::GETTING-STARTED.md no longer quotes the refusal a solution with no spec project gets: $refusal"
+            exit 1
+          }
+
+          tree="$RUNNER_TEMP/getting-started"
+          export NUGET_PACKAGES="$RUNNER_TEMP/getting-started-packages"
+          mkdir -p "$tree"
+          local_pack_feed "$tree"
+          cd "$tree"
+          dotnet new sln -n MyApp --format sln
+          dotnet new classlib -n MyApp.Domain -o src/MyApp.Domain
+          dotnet new classlib -n MyApp.Web -o src/MyApp.Web
+          dotnet sln MyApp.sln add src/MyApp.Domain/MyApp.Domain.csproj src/MyApp.Web/MyApp.Web.csproj
+
+          # The quickstart's first line is the install this job ran from the pack; the rest runs as written.
+          quickstart_first="${quickstart%%$'\n'*}"
+          quickstart_rest="${quickstart#*$'\n'}"
+          [ "$quickstart_first" = "$install_line" ] || {
+            echo "::error::The README quickstart no longer opens with '$install_line', so this job's own install cannot stand in for its first line: $quickstart_first"
+            exit 1
+          }
+          rc=0
+          bash -e -c "$quickstart_rest" > "$RUNNER_TEMP/quickstart-bare.out" 2> "$RUNNER_TEMP/quickstart-bare.err" || rc=$?
+          if [ "$rc" -ne 2 ] || ! grep -Fq "$refusal" "$RUNNER_TEMP/quickstart-bare.err"; then
+            echo "::error::On a solution with no spec project the README quickstart exited $rc; GETTING-STARTED.md is written for exit 2 and the refusal it quotes"
+            cat "$RUNNER_TEMP/quickstart-bare.out" "$RUNNER_TEMP/quickstart-bare.err"
+            exit 1
+          fi
+
+          [ "$install" = "$install_line" ] || {
+            echo "::error::GETTING-STARTED.md's install fence is no longer the one line '$install_line' this job runs from the pack in its place: $install"
+            exit 1
+          }
+          bash -e -c "$project" || {
+            echo "::error::GETTING-STARTED.md's spec-project commands failed on a fresh solution"
+            exit 1
+          }
+          require_contract_from_pack "$version" "The page's dotnet add"
+          printf '%s\n' "$spec" > arch/MyApp.Architecture/ArchitectureSpec.cs
+          rm -f arch/MyApp.Architecture/Class1.cs
+          bash -e -c "$first" || {
+            echo "::error::GETTING-STARTED.md's build, check and render did not all pass over the solution the page walks a reader through"
+            exit 1
+          }
+          grep -Fq 'layering/domain-independent' AGENTS.md || {
+            echo "::error::render wrote no AGENTS.md carrying the page's rule, layering/domain-independent, beside the solution"
+            cat AGENTS.md || true
+            exit 1
+          }
+
+          bash -e -c "$quickstart_rest" || {
+            echo "::error::The README quickstart failed on the solution GETTING-STARTED.md leaves behind"
+            exit 1
+          }
+
+          printf '%s\n' "$settings" > sliderule.json
+          bash -e -c "$ci" || {
+            echo "::error::GETTING-STARTED.md's CI lines failed on a conforming tree beside the page's sliderule.json: the SARIF check or the render check"
+            exit 1
+          }
+          [ -s sliderule.sarif ] || {
+            echo "::error::The page's check --sarif wrote no sliderule.sarif"
+            exit 1
+          }
+
+          # Exit 2 would mean the spec or the workspace did not resolve, which would make every green above
+          # meaningless, so the control asks for exactly 1.
+          dotnet add src/MyApp.Domain/MyApp.Domain.csproj reference src/MyApp.Web/MyApp.Web.csproj
+          cat > src/MyApp.Domain/Order.cs <<'CS'
+          namespace MyApp.Domain;
+
+          public sealed class Order
+          {
+              public MyApp.Web.Class1 Page { get; } = new();
+          }
+          CS
+          dotnet build MyApp.sln
+          rc=0
+          sliderule check MyApp.sln || rc=$?
+          [ "$rc" -eq 1 ] || {
+            echo "::error::check exited $rc over a Domain type that holds a Web type; 1 is the only right answer"
+            exit 1
+          }
+
+          echo "Walked GETTING-STARTED.md and the README quickstart from the packed package"
+
+  # The one thing release.yml structurally cannot check. It cross-checks the tag against
+  # `Directory.Build.props` and both `.mcp/server.json` fields — but only at tag time, so nothing
+  # looks at the window between a bumped manifest landing on `main` and the tag arriving behind it.
+  # That window is not hypothetical: once a bump reached the public branch, the tag never
+  # followed, and for weeks the manifest nuget.org scans told every MCP registry client to fetch a
+  # package version that 404s.
+  #
+  # The property held here is the reader's, not the maintainer's: a version this repository
+  # advertises must be one a stranger can actually resolve. Either nuget.org already serves it, or
+  # the tag that publishes it is in this repository — which is why the release flow pushes both refs
+  # in one command (`git push origin main v<x.y.z>`), so the tag is on the server before this job
+  # checks out. A bump pushed alone is exactly the state this reddens on.
+  #
+  # fetch-depth: 0 is required: the default single-commit checkout fetches no tags, so every
+  # released version would read as untagged and the job would ask nuget.org about all of them.
+  manifest-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      # Three outcomes, deliberately worded apart. A manifest defect names the fix; a registry that
+      # could not be reached says so and asks for a re-run, because a network blip that reads as a
+      # manifest defect trains people to ignore this job. Whether the two version fields agree with
+      # each other and with the props file is ManifestVersionTests' question, not this one — but the
+      # cheap half of it is repeated here so a partial bump cannot be answered about the wrong field.
+      - name: The advertised version is published, or tagged for publication
+        run: |
+          version="$(jq -r '.version' .mcp/server.json)"
+          package="$(jq -r '.packages[0].version' .mcp/server.json)"
+          if [ "$version" != "$package" ]; then
+            echo "::error::.mcp/server.json advertises $version at .version and $package at .packages[0].version. A registry client reads both, so a half-finished bump points it at two different packages."
+            exit 1
+          fi
+
+          if git rev-parse -q --verify "refs/tags/v$version" >/dev/null; then
+            echo "v$version is tagged here, so release.yml has published it or is publishing it now."
+            exit 0
+          fi
+
+          index='https://api.nuget.org/v3-flatcontainer/sliderule.cli/index.json'
+          body="$RUNNER_TEMP/flatcontainer.json"
+          code="$(curl -sS --retry 3 --retry-delay 2 --retry-all-errors --max-time 30 -o "$body" -w '%{http_code}' "$index")" || code=''
+          if [ "$code" != '200' ]; then
+            echo "::error::nuget.org did not answer $index (${code:-no response}), so whether $version is published is unknown. That is a registry or network failure, not a manifest defect — re-run this job."
+            exit 1
+          fi
+
+          if jq -e --arg v "$version" '.versions | index($v)' "$body" > /dev/null; then
+            echo "$version is on nuget.org and carries no v$version tag here — a release tagged before this gate existed, or a tag that was never pushed."
+            exit 0
+          fi
+
+          echo "::error::.mcp/server.json advertises $version, which nuget.org does not serve and no v$version tag here will publish. Every MCP registry client reading this manifest would ask dnx for a version that 404s. Push the tag alongside the branch — 'git push origin main v$version' — or return the manifest to the published version."
+          jq -r '"published: " + (.versions | join(", "))' "$body"
+          exit 1
+
+  # Self-scan: SlideRule checks its own solution and publishes the result to GitHub code
+  # scanning as SARIF. The self-spec exits 0 today, so the job is green; a future violation
+  # reddens the check step and the alerts still upload (if: always()). Forked-PR and
+  # Dependabot runs lack the security-events token, so the upload is guarded off for them. It is
+  # also off while the repository is private, where code scanning is unavailable, and comes back
+  # by itself once the repository is public again.
+  self-check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read           # checkout
+      security-events: write   # upload SARIF to code scanning
+    steps:
+      # fetch-depth: 0 so origin/main exists as a local ref for --diff-base below; the default
+      # single-commit checkout leaves nothing to diff against.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+      # Relock for Dependabot NuGet PRs, so the build below is of the bump. Identical text in
+      # build-and-test, which carries the rationale.
+      - name: Regenerate NuGet lock files (Dependabot NuGet PRs)
+        if: startsWith(github.head_ref, 'dependabot/nuget/')
+        shell: bash
+        env:
+          CI: ''
+        run: |
+          dotnet restore SlideRule.slnx --force-evaluate
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- '*packages.lock.json'
+          git diff --cached --quiet || git commit -q -m 'Regenerate NuGet lock files'
+      # Build the whole solution (CLI + the arch spec) so --no-build can run the check over
+      # the real MSBuildWorkspace, exactly as build-and-test does. The solution and the spec come
+      # from sliderule.json at the repository root: the self-solution has many Core-referencing
+      # members, so the one-spec convention cannot pick. The restore is implicit here, so the
+      # locked mode is named as a property rather than left to CI=true — build-and-test's
+      # Restore step carries the reason.
+      - name: Build
+        run: dotnet build SlideRule.slnx -p:RestoreLockedMode=true
+      # --diff-base arms the Quarantine tripwire: a change set touching roslyn/msbuild-bootstrap
+      # draws a warning naming the file, which is the recommended CI shape and the one this
+      # repository owed its own quarantined scope. Without the flag the tripwire reports skipped
+      # on every run. Warnings never move the exit code, so this cannot redden CI on its own;
+      # containment, which needs no diff, already could. On a push to main origin/main is HEAD
+      # and the diff is empty; on a pull request it is the base tip, so the warning covers
+      # exactly the proposed change. The warning reaches code scanning too: it uploads as a
+      # warning-level result on the tripwire rule, whose descriptor declares that level.
+      - name: Check self and emit SARIF
+        run: dotnet run --no-build --project src/SlideRule.Cli -- check --diff-base origin/main --sarif sliderule.sarif
+      # The same self-spec through the xUnit adapter, as its own step so the log reads one line per rule
+      # ID — the run the landing page's xUnit beat links. The 3-OS matrix already runs these tests inside
+      # the full suite; this leg exists to be readable, not to add coverage.
+      - name: Self-spec as named xUnit tests (one test per rule)
+        run: dotnet test tests/SlideRule.Tests/SlideRule.Tests.csproj --no-build --filter "FullyQualifiedName~AdapterSelfSpecTests" --output Detailed
+      # Render this repo's own spec and require every rendered file current — the same provably-current
+      # property the examples job holds, over the root block, the model file, the diagram, and the whole
+      # class of per-directory cards. `render --check` composes every target sliderule.json declares,
+      # writes nothing, and exits 1 on any file a render would change, a card whose file does not exist
+      # yet included, so a card placed somewhere nobody predicted still fails the job. ARCHITECTURE.md
+      # publishes the plain `sliderule render` as the way to redraw it, and both read the drawing's
+      # scope from the same file. Cost: render pays two extractions (scoped cards, then the diagram with
+      # no project exclusions) on top of check's one. Accepted — this is the only leg that runs `render`
+      # against this solution at all.
+      - name: Render self and require every rendered file current
+        run: dotnet run --no-build --project src/SlideRule.Cli -- render --check
+      # The read verbs, against this solution. `check` used to be the only command that ever ran on this
+      # repository under any gate; a shipped verb nobody points at its own codebase is a verb whose first
+      # real consumer is a stranger. With render above, that leaves only `baseline`, which stays out
+      # deliberately — it is the human escape valve, and a gate that ran it would be moving the ratchet.
+      # Exit 0 is the whole assertion — red rules never fail `status` or `graph`, and `explain` needs no
+      # workspace — so this is a smoke test, not a second check. Since 2026-08-04 it does carry one real
+      # assertion beyond "the command ran": `status` and `graph` exit 2 on a workspace that loaded only
+      # partially, so exit 0 here says this solution loads completely on the runner.
+      - name: Read verbs against this solution (status, graph, explain)
+        run: |
+          dotnet run --no-build --project src/SlideRule.Cli -- status
+          dotnet run --no-build --project src/SlideRule.Cli -- graph
+          dotnet run --no-build --project src/SlideRule.Cli -- explain layering/model-independent
+      - name: Upload SARIF to code scanning
+        if: always() && (github.event_name != 'pull_request' || (!github.event.pull_request.head.repo.fork && github.actor != 'dependabot[bot]')) && !github.event.repository.private
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          sarif_file: sliderule.sarif
+          category: sliderule
+
+  # Provably-current examples: build each example solution, run `check` (exit 0 on the
+  # committed baselines), then run `render --check` over each of them and fail on any file a render would change
+  # across examples/ — root blocks, the scoped per-directory cards, the committed
+  # ARCHITECTURE.md drawings, AND the committed sliderule.model.json files, which render
+  # refreshes wherever one exists. If a spec drifts from its example code, this job fails. The
+  # Meridian.Quoting on-ramp also runs its xUnit adapter (one named test per rule). Ubuntu-only
+  # initially, so the drawings' file shape is gated on every OS by
+  # tests/SlideRule.Tests/DocHygiene/ExampleArchitectureDocTests.cs instead.
+  examples:
+    runs-on: ubuntu-latest
+    env:
+      SR_BUILD_TIER_IDS: 'SR2001,SR2002,SR2090,SR2091,SR2092,SR2093'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+      # Relock for Dependabot NuGet PRs, so the CLI build below is of the bump. Identical text in
+      # build-and-test, which carries the rationale.
+      - name: Regenerate NuGet lock files (Dependabot NuGet PRs)
+        if: startsWith(github.head_ref, 'dependabot/nuget/')
+        shell: bash
+        env:
+          CI: ''
+        run: |
+          dotnet restore SlideRule.slnx --force-evaluate
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- '*packages.lock.json'
+          git diff --cached --quiet || git commit -q -m 'Regenerate NuGet lock files'
+      # The CLI never builds the target; build the example solutions first. Every step below restores
+      # IMPLICITLY, so each names -p:RestoreLockedMode=true rather than leaving the locked mode to
+      # CI=true — build-and-test's Restore step carries the reason in full.
+      #
+      # It goes on the example builds too, not only on the CLI, because each example's spec project
+      # carries a ProjectReference to src/SlideRule: the first example build here is the first
+      # restore of that project in this job, and an unlocked one would rewrite its lock file before the
+      # CLI build below could hold it to the committed one. The property costs the examples nothing —
+      # locked mode only bites where a lock file exists, and nothing under examples/ carries one, which
+      # is why they still restore unlocked exactly as before.
+      #
+      # Every example csproj now declares RestoreLockedMode under $(CI) for itself, so on this runner
+      # the flag is redundant. It is kept for the same reason --locked-mode is spelled above: the
+      # declaration is conditioned on a variable the runner sets, and the flag holds whether or not
+      # it keeps setting it.
+      #
+      # Each example attaches the build analyzer (examples/Directory.Build.targets), so these builds
+      # are also what holds it to saying nothing here. All six of its IDs are errors: a broken rule
+      # or an unheld ratchet (SR2001, SR2002) would be a finding `check` below does not have, and the
+      # other four report the analyzer's own state — no model file, a file it could not read, a
+      # ratcheted rule it had no baseline for, a fault inside it. Each example commits a
+      # sliderule.model.json and checks green on its committed baselines, so any of the six is news.
+      - name: Build the Meridian example solution
+        run: dotnet build examples/Meridian/Meridian.slnx -p:RestoreLockedMode=true -warnaserror:${{ env.SR_BUILD_TIER_IDS }}
+      - name: Build the Meridian.Quoting example solution
+        run: dotnet build examples/Meridian.Quoting/Meridian.Quoting.slnx -p:RestoreLockedMode=true -warnaserror:${{ env.SR_BUILD_TIER_IDS }}
+      - name: Build the Meridian.Operations example solution
+        run: dotnet build examples/Meridian.Operations/Meridian.Operations.slnx -p:RestoreLockedMode=true -warnaserror:${{ env.SR_BUILD_TIER_IDS }}
+      - name: Build the Meridian.Interchange example solution
+        run: dotnet build examples/Meridian.Interchange/Meridian.Interchange.slnx -p:RestoreLockedMode=true -warnaserror:${{ env.SR_BUILD_TIER_IDS }}
+      - name: Build the SlideRule CLI
+        run: dotnet build src/SlideRule.Cli/SlideRule.Cli.csproj -p:RestoreLockedMode=true
+      - name: Check Meridian (expect exit 0 on the committed baselines)
+        run: dotnet run --no-build --project src/SlideRule.Cli -- check examples/Meridian/Meridian.slnx
+      - name: Check Meridian.Quoting (expect exit 0; Enforce-only, no baselines)
+        run: dotnet run --no-build --project src/SlideRule.Cli -- check examples/Meridian.Quoting/Meridian.Quoting.slnx
+      - name: Check Meridian.Operations (expect exit 0 on the committed containment baseline)
+        run: dotnet run --no-build --project src/SlideRule.Cli -- check examples/Meridian.Operations/Meridian.Operations.slnx
+      - name: Check Meridian.Interchange (expect exit 0 on the committed baseline)
+        run: dotnet run --no-build --project src/SlideRule.Cli -- check examples/Meridian.Interchange/Meridian.Interchange.slnx
+      # No --no-build here: the adapter test project is not a member of any slnx, so nothing
+      # above builds it. dotnet test restores and builds it (and the Xunit adapter it references) —
+      # src/SlideRule.Xunit, which carries a lock file, hence the property here too.
+      - name: Test the Meridian.Quoting xUnit adapter (one named test per rule)
+        run: dotnet test examples/Meridian.Quoting/tests/Meridian.Quoting.ArchTests/Meridian.Quoting.ArchTests.csproj --output Detailed -p:RestoreLockedMode=true
+      # The examples on the model-file round-trip pin, which only this job can run: the suite loads
+      # every other spec in the repository, and the example solutions are the ones it cannot. Each row
+      # skips unless that example is built, which the four steps above are — so this is the one place
+      # the rows actually run. The self-check page's two fences cut from a check over Meridian, a SARIF
+      # result and a check-document entry, skip on the same condition, so this is also where a fresh
+      # check re-runs them; and so do the example walkthroughs' output fences, which the replay re-makes
+      # over each example with the edit its page imagines. No --no-build, for the reason the adapter step
+      # above gives: nothing in this job builds the test project, so dotnet test restores and builds it,
+      # and it carries a lock file. It reaches the same conclusion about the committed model files as the
+      # render check below, one step earlier.
+      - name: The examples' committed model files round trip and are current, the self-check page's Meridian fences match a fresh check, and the walkthroughs' output fences match their replay
+        run: dotnet test tests/SlideRule.Tests/SlideRule.Tests.csproj --filter "FullyQualifiedName~ExampleModelRoundTripTests|FullyQualifiedName~SelfCheckMeridianFenceTests|FullyQualifiedName~WalkthroughReplayTests" --output Detailed -p:RestoreLockedMode=true
+      # No scope flag on any of these four, which is the property being exercised: every example spec
+      # project references the SlideRule packages it is written against, so the workspace loads this
+      # repository's projects on each render and only the survey fence's declared-members default keeps
+      # them off a page captioned "Projects in this solution". These lines are also what an adopter copies,
+      # so they carry nothing an adopter would not need. Each runs whatever the one before it reported,
+      # so a red names every stale file across the four rather than stopping at the first example.
+      - name: Check all four renders current, drawings included (the provably-current property)
+        run: |
+          rc=0
+          dotnet run --no-build --project src/SlideRule.Cli -- render examples/Meridian/Meridian.slnx --diagram examples/Meridian/ARCHITECTURE.md --check || rc=$?
+          dotnet run --no-build --project src/SlideRule.Cli -- render examples/Meridian.Quoting/Meridian.Quoting.slnx --diagram examples/Meridian.Quoting/ARCHITECTURE.md --check || rc=$?
+          dotnet run --no-build --project src/SlideRule.Cli -- render examples/Meridian.Operations/Meridian.Operations.slnx --diagram examples/Meridian.Operations/ARCHITECTURE.md --check || rc=$?
+          dotnet run --no-build --project src/SlideRule.Cli -- render examples/Meridian.Interchange/Meridian.Interchange.slnx --diagram examples/Meridian.Interchange/ARCHITECTURE.md --check || rc=$?
+          exit "$rc"
+
+  # The one check a Dependabot NuGet PR is meant to fail. Every job above relocks so it can test the
+  # bump; this one relocks and requires a zero diff, so the PR carries real signal about the update
+  # and exactly one red naming the command that closes it.
+  #
+  # It runs on every pull request and on every push to main. This repository pushes straight to
+  # main, so a check that ran only on pull requests never saw the commits that actually land: a
+  # stale tests lock file reached main unseen from 7f5f50f4, because a plain restore still accepts
+  # an old lock as valid and only a force-evaluated one rewrites it. The job is cheap to run
+  # everywhere: one ubuntu runner, and the one job on a push that relocks rather than builds.
+  lock-files:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+      # CI: '' for the same reason as the relock step in build-and-test: in locked mode this restore
+      # would fail rather than rewrite the files this job exists to compare. The remedy is a command
+      # rather than an artifact, so the summary carries the fix and nothing is uploaded.
+      #
+      # Two questions, because a diff answers only one of them. `git diff` names a committed lock
+      # file the projects have moved away from; `ls-files --others` names one that was never added
+      # at all, which is what a lock file for a newly locked project looks like and what a diff is
+      # structurally blind to. Both are "somebody forgot to commit this".
+      - name: Regenerate the lock files and require a zero diff
+        env:
+          CI: ''
+        run: |
+          dotnet restore SlideRule.slnx --force-evaluate
+          stale="$(git diff --name-only -- '*packages.lock.json'; git ls-files --others --exclude-standard -- '*packages.lock.json')"
+          if [ -z "$stale" ]; then exit 0; fi
+          {
+            echo '### NuGet lock files are out of date'
+            echo
+            echo 'These `packages.lock.json` no longer match the projects, or are not committed at all:'
+            echo
+            printf '%s\n' "$stale" | sed 's/^/- `/; s/$/`/'
+            echo
+            echo 'Regenerate them on this branch and push:'
+            echo
+            echo '```'
+            echo 'dotnet restore SlideRule.slnx --force-evaluate'
+            echo 'git add -- "*packages.lock.json"'
+            echo 'git commit -m "Regenerate NuGet lock files"'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo '::error::NuGet lock files are out of date — see the job summary for the fix'
+          git diff -- '*packages.lock.json'
+          exit 1

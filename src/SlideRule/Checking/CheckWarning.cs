@@ -1,0 +1,207 @@
+using SlideRule.Baselines;
+
+namespace SlideRule.Checking;
+
+/// <summary>
+///     A note about something the check noticed without failing anything: a warning never changes its
+///     rule's <see cref="RuleResult.Status" /> or the check's exit code, so it can sit on a rule that passed
+///     or on one that failed. Read one rule's warnings from <see cref="RuleResult.Warnings" /> and the run's
+///     total from <see cref="CheckReport.WarningCount" />. Each is printed by the check report, carried in
+///     <c>--json</c> output, and published as a warning-level result in SARIF output, and one that carries
+///     a <see cref="Hint" /> prints it beside the message on the first two.
+/// </summary>
+internal sealed class CheckWarning
+{
+    private CheckWarning(
+        CheckWarningKind kind,
+        string message,
+        string? file,
+        string? hint,
+        string? key,
+        DeadOperandRole role = DeadOperandRole.None)
+    {
+        Kind = kind;
+        Message = message;
+        File = file;
+        Hint = hint;
+        Key = key;
+        Role = role;
+    }
+
+    /// <summary>Gets what raised the warning.</summary>
+    public CheckWarningKind Kind { get; }
+
+    /// <summary>
+    ///     Gets the line saying what was noticed. The check report, <c>--json</c> output and SARIF output all
+    ///     carry it; the first two also carry <see cref="Hint" /> beside it where there is one.
+    /// </summary>
+    public string Message { get; }
+
+    /// <summary>
+    ///     Gets what to change in response to the warning, or null where there is nothing general to advise:
+    ///     every warning about a file that changed, and a warning that the exemplar could not be resolved,
+    ///     whose message already carries the fault. On a warning about a selection, a pattern or an exemplar
+    ///     part that matched nothing it carries that selection's own semantics and the choice left to make; on
+    ///     a warning about a baseline section no rule names it gives the <c>sliderule baseline rename</c> that
+    ///     would move the section to the rule. The check report prints it on a line under the warning, once
+    ///     however many warnings of a rule share it, and <c>--json</c> output carries it as <c>hint</c>; SARIF
+    ///     output does not.
+    /// </summary>
+    public string? Hint { get; }
+
+    /// <summary>
+    ///     Gets the file the warning is about, relative to the solution directory and with forward slashes:
+    ///     the same path <see cref="Message" /> names, held apart for in-process readers, and the location
+    ///     SARIF output reports the warning at. <c>check --json</c> does not carry it, since the warning's
+    ///     message there names the path. On an <see cref="CheckWarningKind.OrphanedBaseline" /> warning it is
+    ///     the baseline file holding the section. Null when the warning is about the spec rather than about the
+    ///     code or a baseline, which is every <see cref="CheckWarningKind.InertTarget" />,
+    ///     <see cref="CheckWarningKind.DeadOperand" /> and <see cref="CheckWarningKind.DeadExemplar" /> warning.
+    /// </summary>
+    // Solution-relative because that is the one spelling every surface can use: an absolute path would
+    // have to be relativized again by each of them, and against the same solution directory the tripwire
+    // already resolved it against.
+    public string? File { get; }
+
+    /// <summary>
+    ///     Gets what keeps two warnings of one kind on one rule apart: the pattern a
+    ///     <see cref="CheckWarningKind.DeadOperand" /> warning is about, spelled exactly as <see cref="Message" />
+    ///     quotes it (for example <c>the Legacy layer</c>, or <c>types named `B`</c> for one name of a <c>Named</c>
+    ///     list that matched nothing); the rule ID the section an <see cref="CheckWarningKind.OrphanedBaseline" />
+    ///     warning names is filed under; or the exemplar part a <see cref="CheckWarningKind.DeadExemplar" />
+    ///     warning is about, spelled as <see cref="Message" /> quotes it, or the whole exemplar's reference on a
+    ///     warning that it could not be resolved. Null on every other kind. <c>status</c> and <c>baseline</c> name
+    ///     dead patterns by it, through <see cref="RuleResult.UntestedOperands" /> and
+    ///     <see cref="RuleResult.StricterOperands" />, which <c>status --json</c> lists under <c>ratchet</c>; SARIF
+    ///     output puts it in the target slot of the warning's fingerprint. <c>check --json</c> does not carry it,
+    ///     since the message quotes the same string, except on a warning that the exemplar could not be resolved,
+    ///     whose message carries the fault instead.
+    /// </summary>
+    public string? Key { get; }
+
+    /// <summary>
+    ///     Which position the dead pattern held, and so which way the rule now errs, on a
+    ///     <see cref="CheckWarningKind.DeadOperand" /> warning; <see cref="DeadOperandRole.None" /> on every
+    ///     other kind.
+    /// </summary>
+    internal DeadOperandRole Role { get; }
+
+    /// <summary>A warning that a rule's whole target selection matched no types.</summary>
+    internal static CheckWarning InertTarget(string message, string? hint)
+    {
+        return new CheckWarning(CheckWarningKind.InertTarget, message, file: null, hint: hint, key: null);
+    }
+
+    /// <summary>
+    ///     A warning that the target pattern <paramref name="operand" /> matched no types while the rule's other
+    ///     targets matched some. The message is composed from the operand so that the two cannot disagree: the
+    ///     operand is what keeps two such warnings on one rule apart in the SARIF fingerprint and in what status
+    ///     and baseline name.
+    /// </summary>
+    internal static CheckWarning InertTargetOperand(string operand, string? hint)
+    {
+        string message = InertTargetOperandMessage(operand);
+        return new CheckWarning(
+            CheckWarningKind.DeadOperand, message, file: null, hint: hint, key: operand, role: DeadOperandRole.Target);
+    }
+
+    /// <summary>
+    ///     A warning that the allow-list pattern <paramref name="operand" /> matched no types, so the rule is
+    ///     stricter than written. The same kind as <see cref="InertTargetOperand" />, keyed the same way, because
+    ///     a rule carrying either was not measured as written and must not be captured into a baseline; its
+    ///     <see cref="Role" /> is what tells the two directions apart.
+    /// </summary>
+    internal static CheckWarning DeadAllowedOperand(string operand, string? hint)
+    {
+        var message = $"This rule is stricter than written: its allow-list operand \"{operand}\" matched no types.";
+        return new CheckWarning(
+            CheckWarningKind.DeadOperand, message, file: null, hint: hint, key: operand, role: DeadOperandRole.AllowList);
+    }
+
+    /// <summary>
+    ///     A warning that the membership <paramref name="operand" /> — a selection a subject must belong to, or
+    ///     the reside pair's namespace glob or project name — matched no types, so the rule is stricter than
+    ///     written. The same kind and key as <see cref="DeadAllowedOperand" />, and the same direction.
+    /// </summary>
+    internal static CheckWarning DeadMembership(string operand, string? hint)
+    {
+        var message = $"This rule is stricter than written: its membership \"{operand}\" matched no types.";
+        return new CheckWarning(
+            CheckWarningKind.DeadOperand, message, file: null, hint: hint, key: operand, role: DeadOperandRole.Membership);
+    }
+
+    /// <summary>
+    ///     A warning that the part <paramref name="operand" /> of a counterpart verb's <c>among:</c> matched no
+    ///     types. It errs both ways — a subject it held the one counterpart of reds, a subject it would have made
+    ///     ambiguous passes — so the rule is not measured as written, in the direction of
+    ///     <see cref="InertTargetOperand" />.
+    /// </summary>
+    internal static CheckWarning DeadAmongOperand(string operand, string? hint)
+    {
+        var message = $"This rule is not measured as written: its among operand \"{operand}\" matched no types.";
+        return new CheckWarning(
+            CheckWarningKind.DeadOperand, message, file: null, hint: hint, key: operand, role: DeadOperandRole.Among);
+    }
+
+    /// <summary>
+    ///     A warning that the changed <paramref name="file" /> declares a type inside a cautioned scope, or a
+    ///     quarantined one where <paramref name="caution" /> is false.
+    /// </summary>
+    internal static CheckWarning ScopeTouched(bool caution, string message, string file)
+    {
+        CheckWarningKind kind = caution
+            ? CheckWarningKind.CautionedScopeTouched
+            : CheckWarningKind.QuarantinedScopeTouched;
+        return new CheckWarning(kind, message, file: file, hint: null, key: null);
+    }
+
+    /// <summary>
+    ///     A warning that <paramref name="ruleId" /> failed with no baseline captured beside
+    ///     <paramref name="orphan" />, a section filed under an ID no rule declares. The hint names the rename that
+    ///     would move that section to the rule, and <c>sliderule baseline init</c> as well where
+    ///     <paramref name="offerInit" /> is true: init skips a rule the run did not measure in full.
+    /// </summary>
+    internal static CheckWarning OrphanedBaseline(string ruleId, BaselineOrphan orphan, bool offerInit)
+    {
+        var message = $"No baseline is captured for this rule, and {orphan.Describe()}.";
+        string rename =
+            $"If this rule was renamed from '{orphan.RuleId}', run '{orphan.RenameCommand(ruleId)}' "
+            + "to keep its entries";
+        string hint = offerInit ? $"{rename}; if the rule is new, run 'sliderule baseline init'." : $"{rename}.";
+        return new CheckWarning(
+            CheckWarningKind.OrphanedBaseline, message, file: orphan.Path, hint: hint, key: orphan.RuleId);
+    }
+
+    /// <summary>
+    ///     A warning that the exemplar part <paramref name="reference" /> matched no solution-declared types. The
+    ///     message is composed from the reference, as <see cref="InertTargetOperand" />'s is and for the same
+    ///     reason: the reference is what keeps two such warnings on one rule apart.
+    /// </summary>
+    internal static CheckWarning DeadExemplar(string reference, string? hint)
+    {
+        var message = $"This rule's exemplar \"{reference}\" matched no solution-declared types.";
+        return new CheckWarning(CheckWarningKind.DeadExemplar, message, file: null, hint: hint, key: reference);
+    }
+
+    /// <summary>
+    ///     A warning that the exemplar <paramref name="reference" /> could not be resolved at all, carrying the
+    ///     evaluation's own <paramref name="fault" />: a closed generic where the open definition is wanted, or a
+    ///     predicate that threw. No hint, since the fault already says what is wrong.
+    /// </summary>
+    internal static CheckWarning ExemplarFault(string reference, string fault)
+    {
+        var message = $"This rule's exemplar could not be resolved: {fault}";
+        return new CheckWarning(CheckWarningKind.DeadExemplar, message, file: null, hint: null, key: reference);
+    }
+
+    /// <summary>
+    ///     The pinned warning on a single dead target <em>operand</em> beside a live sibling — the
+    ///     target-position twin of <see cref="ConstraintEvaluator.EmptyOperandMessage" /> (GRAMMAR §4.1, §5.1). Its
+    ///     own wording rather than the whole-target one, because the rule is still enforcing what its other
+    ///     operands name: what has stopped is one clause of the ban, not the ban.
+    /// </summary>
+    private static string InertTargetOperandMessage(string operandReference)
+    {
+        return $"This rule is partly inert: its target selection operand \"{operandReference}\" matched no types.";
+    }
+}

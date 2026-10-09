@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <!-- The deliberately-unloadable sibling of SlideRule.LegacySpec. It exists so the spec-load
+         catch arms in ModelPipeline.LoadModel can be driven end to end rather than pinned only as
+         fabricated exceptions: LegacySpec must keep loading cleanly (a passing model is what its own
+         tests assert), so the failing anchor cannot live there.
+
+         Built exactly like LegacySpec — net48, no <LangVersion> so C# 7.3 stays the default, and
+         CopyLocalLockFileAssemblies so the product DLL is staged beside the spec. Withholding that
+         staged DLL at test time is what turns this one fixture into two different failures; see
+         SpecOutputStager. -->
+    <PropertyGroup>
+        <TargetFramework>net48</TargetFramework>
+        <IsPackable>false</IsPackable>
+        <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+        <RestoreLockedMode Condition="'$(CI)' == 'true'">true</RestoreLockedMode>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\..\src\SlideRule\SlideRule.csproj" />
+        <ProjectReference Include="..\SlideRule.LegacyProduct\SlideRule.LegacyProduct.csproj" />
+    </ItemGroup>
+
+</Project>

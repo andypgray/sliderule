@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!-- A consumer of the satellite alone. Its one ProjectReference is to DriftedApp.Core.Ansi, so when it names
+         DriftedApp.StringExtensions the copy it binds is the satellite's, never the core's, whose facts the
+         shared node carries. The survey must render DriftedApp.Markup -> DriftedApp.Core.Ansi and no edge to
+         the core, which this project cannot even see. Do not add a reference to the core: with both copies
+         visible the name is ambiguous and the project stops compiling. -->
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>disable</Nullable>
+        <ImplicitUsings>disable</ImplicitUsings> <!-- parity: raw CSharpCompilation has no implicit usings -->
+        <RestoreLockedMode Condition="'$(CI)' == 'true'">true</RestoreLockedMode>
+    </PropertyGroup>
+    <ItemGroup>
+        <ProjectReference Include="..\DriftedApp.Core.Ansi\DriftedApp.Core.Ansi.csproj" />
+    </ItemGroup>
+</Project>

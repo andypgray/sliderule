@@ -1,0 +1,45 @@
+{
+  "permissions": {
+    "deny": [
+      "Bash(sliderule baseline*)",
+      "Bash(*dnx SlideRule.Cli* baseline*)",
+      "PowerShell(sliderule baseline*)",
+      "PowerShell(*dnx SlideRule.Cli* baseline*)"
+    ]
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sliderule hook",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sliderule hook",
+            "timeout": 600
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sliderule hook",
+            "timeout": 600
+          }
+        ]
+      }
+    ]
+  }
+}

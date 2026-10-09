@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 2,
+  "rules": {
+    "data-access/no-inline-sql": {
+      "entries": [
+        { "source": "T:MyApp.Web.InvoiceController", "target": "T:System.Data.DataTable", "siteCount": 2, "seal": "428f83ba26391f1c" }
+      ]
+    }
+  }
+}

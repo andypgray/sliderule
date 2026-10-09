@@ -1,0 +1,258 @@
+using Microsoft.CodeAnalysis;
+using Shouldly;
+using Xunit;
+using SlideRule.Roslyn.Diagnostics;
+using SlideRule.Roslyn.Solutions;
+using SlideRule.Tests.TestSupport;
+
+namespace SlideRule.Tests.Roslyn;
+
+/// <summary>
+///     The measurement behind <see cref="SdkStyleProject.IsSdkStyle" />, taken before anything was allowed to
+///     gate on it: whether an SDK-style project can be told from a non-SDK-style one reliably enough that a
+///     missing <c>project.assets.json</c> may be blamed on the first and never on the second.
+/// </summary>
+/// <remarks>
+///     <para>
+///         A measurement rather than a description, because the predicate on its own only says what the XML
+///         contains while the claim it is used for is larger —
+///         <em>SDK-style projects write an assets file when they restore, and legacy ones never do</em>.
+///         So the corpus below pairs each verdict with the file it predicts: every project under the three
+///         roots it scans, classified, and beside each one whether an assets file is actually on disk at a
+///         location <see cref="IntermediateOutputTree.AssetsPathsOf" /> stamps. The only rows where the two
+///         columns come apart are the beds deliberately left unrestored — the state the gate exists to
+///         catch — and the output-layout and render-containment beds, which are restored only inside the
+///         temp copies that drive them.
+///     </para>
+///     <para>
+///         Real files rather than only written shapes: the written ones fix the boundaries — a comment
+///         mentioning an SDK, malformed XML, a legacy project that happens to declare a property called
+///         <c>Sdk</c> — but they are written by the same reading of MSBuild that wrote the predicate, so only
+///         the real corpus could refute it. <c>FieldMini.Core.csproj</c> and <c>BrokenApp.Web.csproj</c> are
+///         its awkward ones on purpose, each carrying its root element under dozens of lines of XML comment.
+///     </para>
+///     <para>
+///         Where the corpus stops: three roots — the fixture trees as the test output holds them,
+///         <c>src/</c> and <c>arch/</c> — and not every project file this repository tracks. Out are the
+///         spec-fixture projects under <c>tests/Fixtures/</c> and the test project itself, which are solution
+///         members and so would every one read <c>SDK-style, assets file present</c>; and everything under
+///         <c>examples/</c>, which no run of this suite restores, so their assets column would report
+///         whether somebody had built the examples lately rather than anything about the discriminator. What
+///         is licensed here is the gate over the trees the suite loads through <c>MSBuildWorkspace</c> — a
+///         legacy or unrestored project appearing in either of those places would not be caught by this
+///         table.
+///     </para>
+/// </remarks>
+public sealed class SdkStyleProjectTests
+{
+    // Every project under the three roots RealProjectFiles scans, hand-written: the name, whether it is
+    // SDK-style, and whether a restore has actually left an assets file where the layout in force puts it. A
+    // row that moves is either a new fixture (extend this) or the discriminator failing on a real file (stop
+    // and restate the limit instead of gating). Order is irrelevant — both sides are sorted before the
+    // compare. The roots are not the whole repository; the class remarks say what is out and why.
+    private static readonly string[] GroundTruth =
+    [
+        // The one non-SDK-style project in the corpus: 2003 XML namespace, net48, and no assets file — the
+        // shape "absent ⇒ failed" would have refused wholesale.
+        "Classic.Billing.csproj: legacy, no assets file",
+        // The three beds deliberately left unrestored. SDK-style with no assets file is exactly the state
+        // that used to pass check silently, and these are the only rows that show it.
+        "BrokenApp.Core.csproj: SDK-style, no assets file",
+        "BrokenApp.Web.csproj: SDK-style, no assets file",
+        "FieldMini.Core.csproj: SDK-style, no assets file",
+        // The output-layout bed. Not a fourth unrestored gate bed: this fixture is restored and really
+        // built, but only ever inside the temp copy each arm of Cli/OutputLayoutSpecResolutionE2ETests
+        // makes — nothing restores it in the output tree, so the assets column reads absent here.
+        "LayoutApp.Core.csproj: SDK-style, no assets file",
+        "LayoutApp.Spec.csproj: SDK-style, no assets file",
+        // The render-containment bed, in the same position: Cli/RenderContainmentE2ETests restores it only inside
+        // the temp copy each fact makes, against a package the test manufactures, so the output tree holds no
+        // assets file for it.
+        "Acme.Json.csproj: SDK-style, no assets file",
+        // The restored fixture solutions: SDK-style, and the assets file the classification predicts is
+        // there. This is the pairing — the predicate earns the right to gate here, not in the XML.
+        "DriftedApp.Client.csproj: SDK-style, assets file present",
+        "DriftedApp.Core.Ansi.csproj: SDK-style, assets file present",
+        "DriftedApp.Core.csproj: SDK-style, assets file present",
+        "DriftedApp.Json.csproj: SDK-style, assets file present",
+        "DriftedApp.Markup.csproj: SDK-style, assets file present",
+        "DriftedApp.Testing.csproj: SDK-style, assets file present",
+        "LinkedApp.Client.csproj: SDK-style, assets file present",
+        "LinkedApp.Core.csproj: SDK-style, assets file present",
+        "LinkedApp.Tool.csproj: SDK-style, assets file present",
+        "MultiTfm.Core.csproj: SDK-style, assets file present",
+        "MultiTfm.Web.csproj: SDK-style, assets file present",
+        "MyApp.Domain.csproj: SDK-style, assets file present",
+        "MyApp.Legacy.Billing.csproj: SDK-style, assets file present",
+        "MyApp.Web.csproj: SDK-style, assets file present",
+        // The polyglot bed's C# half. Its .fsproj sibling is deliberately not a row: the corpus scans
+        // *.csproj, and RestoreFailures skips a project in another language before it ever asks this
+        // predicate — so a row for one would describe a path that cannot be reached.
+        "PolyglotApp.Core.csproj: SDK-style, assets file present",
+        // The Razor bed. RazorApp.Web is the corpus's only Microsoft.NET.Sdk.Web project, which is the point
+        // of it elsewhere and makes no difference here — the discriminator reads the root element's Sdk
+        // attribute, and every SDK names one.
+        "RazorApp.Core.csproj: SDK-style, assets file present",
+        "RazorApp.Web.csproj: SDK-style, assets file present",
+        "ShadowedApp.Product.Tests.csproj: SDK-style, assets file present",
+        "ShadowedApp.Product.csproj: SDK-style, assets file present",
+        "SlnxApp.Core.csproj: SDK-style, assets file present",
+        // This repo's own projects, which are always restored — the same pairing over files nobody wrote to
+        // be a fixture.
+        "SlideRule.Analyzers.csproj: SDK-style, assets file present",
+        "SlideRule.Architecture.csproj: SDK-style, assets file present",
+        "SlideRule.Cli.csproj: SDK-style, assets file present",
+        "SlideRule.Extraction.csproj: SDK-style, assets file present",
+        "SlideRule.Packs.DotNet.csproj: SDK-style, assets file present",
+        "SlideRule.Roslyn.csproj: SDK-style, assets file present",
+        "SlideRule.SpecAnalyzers.csproj: SDK-style, assets file present",
+        "SlideRule.SpecCompletion.csproj: SDK-style, assets file present",
+        "SlideRule.Xunit.csproj: SDK-style, assets file present",
+        "SlideRule.csproj: SDK-style, assets file present"
+    ];
+
+    [Theory]
+    // The three shapes MSBuild accepts as an SDK declaration. The attribute is what every template writes;
+    // the element and the import pair are what a project pinning an SDK version has to use.
+    [InlineData("""<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup /></Project>""", true)]
+    [InlineData("""<Project><Sdk Name="Microsoft.NET.Sdk" Version="10.0.100" /><PropertyGroup /></Project>""", true)]
+    [InlineData(
+        """<Project><Import Sdk="Microsoft.NET.Sdk" Project="Sdk.props" /><PropertyGroup /></Project>""", true)]
+    // An Import may legitimately sit inside an ImportGroup, so that arm reads descendants rather than the
+    // root's own children.
+    [InlineData(
+        """<Project><ImportGroup><Import Sdk="Microsoft.NET.Sdk" Project="Sdk.props" /></ImportGroup></Project>""",
+        true)]
+    // The namespace is not the discriminator, in either direction: MSBuild accepts an SDK-style project that
+    // declares the 2003 namespace anyway, and the attribute is what decides. Reading local names is what
+    // makes both of these come out right rather than one being inferred from the other.
+    [InlineData(
+        """<Project Sdk="Microsoft.NET.Sdk" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" />""",
+        true)]
+    [InlineData(
+        """
+        <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003"><PropertyGroup>
+        <TargetFrameworkVersion>v4.8</TargetFrameworkVersion></PropertyGroup></Project>
+        """,
+        false)]
+    // A legacy project need not declare the namespace at all, and one that does not is still legacy.
+    [InlineData("""<Project ToolsVersion="15.0" DefaultTargets="Build"><PropertyGroup /></Project>""", false)]
+    // The negative controls. "Sdk" inside a comment, inside a property value, and as a property name are all
+    // things a legacy project may contain — and reading any of them as a declaration would blame a healthy
+    // legacy project for a file it was never going to write.
+    [InlineData("""<Project ToolsVersion="15.0"><!-- ported off Sdk="Microsoft.NET.Sdk" --></Project>""", false)]
+    [InlineData("""<Project ToolsVersion="15.0"><PropertyGroup><Flavour>Sdk</Flavour></PropertyGroup></Project>""",
+        false)]
+    [InlineData("""<Project ToolsVersion="15.0"><PropertyGroup><Sdk>Microsoft.NET.Sdk</Sdk></PropertyGroup></Project>""",
+        false)]
+    // A root element that is not Project is not a project file, whatever it carries.
+    [InlineData("""<Package Sdk="Microsoft.NET.Sdk" />""", false)]
+    // Malformed XML answers false rather than throwing mid-load: a false negative leaves a partial model
+    // undetected, which is the state that already existed, while a false positive refuses a healthy solution.
+    [InlineData("""<Project Sdk="Microsoft.NET.Sdk">""", false)]
+    [InlineData("not xml at all", false)]
+    // A DOCTYPE is refused rather than parsed, whether or not it declares an entity the root then uses, so a
+    // project file carrying one answers false like any other file this cannot read.
+    [InlineData("""<!DOCTYPE Project [ <!ENTITY sdk "Microsoft.NET.Sdk"> ]><Project Sdk="&sdk;" />""", false)]
+    [InlineData("""<!DOCTYPE Project><Project Sdk="Microsoft.NET.Sdk" />""", false)]
+    public void IsSdkStyle_OverTheShapesAProjectFileCanTake_ClassifiesEachOne(string projectXml, bool expected)
+    {
+        using TempDirectory temp = TestTempRoot.Fresh("sdk-style-shapes");
+        string projectPath = Path.Combine(temp.Path, "Shape.csproj");
+        File.WriteAllText(projectPath, projectXml);
+
+        SdkStyleProject.IsSdkStyle(projectPath)
+            .ShouldBe(expected, projectXml);
+    }
+
+    [Fact]
+    public void IsSdkStyle_AnEmptyFile_IsNotSdkStyle()
+    {
+        // A truncated write leaves this, and an empty document has no root at all.
+        using TempDirectory temp = TestTempRoot.Fresh("sdk-style-empty");
+        string projectPath = Path.Combine(temp.Path, "Empty.csproj");
+        File.WriteAllText(projectPath, "");
+
+        SdkStyleProject.IsSdkStyle(projectPath)
+            .ShouldBeFalse();
+    }
+
+    [Fact]
+    public void IsSdkStyle_AFileThatIsNotThere_IsNotSdkStyle()
+    {
+        // The path a solution declares for a project the tree does not contain. ProjectLoadFailures already
+        // blames that project, and this must not answer a second time — nor throw where nothing is caught.
+        using TempDirectory temp = TestTempRoot.Fresh("sdk-style-absent");
+
+        SdkStyleProject.IsSdkStyle(Path.Combine(temp.Path, "Gone.csproj"))
+            .ShouldBeFalse();
+    }
+
+    [Fact]
+    public void IsSdkStyle_OverEveryRealProjectFile_MatchesTheGroundTruthAndPredictsTheAssetsFile()
+    {
+        // The measurement the gate rests on. Both columns in one table, because the classification alone would
+        // only describe the XML: what licenses the gate is that "SDK-style" and "has an assets file" agree
+        // everywhere except where a bed was deliberately left unrestored.
+        List<string> measured = RealProjectFiles()
+            .Select(Describe)
+            .Order(StringComparer.Ordinal)
+            .ToList();
+
+        // Case.Sensitive is the suite's default posture anyway; it is spelled out because it is the overload
+        // that also takes the message, and the message is what a moved row needs to read.
+        measured.ShouldBe(
+            GroundTruth.Order(StringComparer.Ordinal),
+            Case.Sensitive,
+            "The SDK-style discriminator was measured against a hand-written map of every project under "
+            + "the three roots this corpus scans. A row that moved is either a fixture that was added or "
+            + "removed — extend the map — or the discriminator being wrong about a real file, which is the "
+            + "measurement refusing to license the gate in RestoreFailures.");
+    }
+
+    [Fact]
+    public void Detect_TheLegacyBedWithNoAssetsFile_IsStillNotBlamed()
+    {
+        // The legacy bed at the predicate's own level, over the real ClassicApp tree rather than a written stand-in:
+        // the one project in the corpus that is not SDK-style is the one the restore gate must never blame,
+        // because it was never going to write the file whose absence is being read.
+        string classicBilling = Path.Combine(
+            FixturesRoot, "LegacySolutions", "ClassicApp", "Classic.Billing", "Classic.Billing.csproj");
+        using var workspace = new AdhocWorkspace();
+        Solution solution = AdhocSolution.Of(workspace, AdhocSolution.Loaded("Classic.Billing", classicBilling));
+
+        RestoreFailures.Detect(solution, [])
+            .ShouldBeEmpty();
+    }
+
+    // ── harness ───────────────────────────────────────────────────────────────────────────────────────────
+
+    private static string FixturesRoot => Path.Combine(AppContext.BaseDirectory, "Fixtures");
+
+    // Every project file the corpus covers: the fixture trees as the test output holds them (which is what
+    // FixtureRestorer restores, so the assets column reads the same files the suite runs against), plus this
+    // repo's own shipping and dogfood projects. These three roots are the whole scan — nothing under
+    // tests/Fixtures/ or examples/ is read, which the class remarks state as a limit rather than an omission.
+    private static IEnumerable<string> RealProjectFiles()
+    {
+        string[] roots = [FixturesRoot, RepoRoot.Absolute("src"), RepoRoot.Absolute("arch")];
+
+        return roots
+            .Where(Directory.Exists)
+            .SelectMany(root => Directory.EnumerateFiles(root, "*.csproj", SearchOption.AllDirectories));
+    }
+
+    // One row of the table: the classification, and whether the file it predicts is on disk. The candidate
+    // paths come from production's own derivation rather than a spelled obj/, so a layout this corpus does
+    // not use could not silently read as "absent".
+    private static string Describe(string projectPath)
+    {
+        bool sdkStyle = SdkStyleProject.IsSdkStyle(projectPath);
+        bool assets = IntermediateOutputTree
+            .AssetsPathsOf(Path.GetDirectoryName(Path.GetFullPath(projectPath))!, null, null)
+            .Any(File.Exists);
+
+        return $"{Path.GetFileName(projectPath)}: {(sdkStyle ? "SDK-style" : "legacy")}, "
+               + $"{(assets ? "assets file present" : "no assets file")}";
+    }
+}

@@ -1,0 +1,756 @@
+using Shouldly;
+using Xunit;
+using SlideRule.Codebase;
+
+namespace SlideRule.Tests.Extraction;
+
+/// <summary>
+///     Container-registration facts (GRAMMAR §4.7), over the MSBuild-free fast path compiled against the real
+///     DI/Hosting abstractions (and, for EF Core / Microsoft.Extensions.Http — absent from the suite — source
+///     stubs in the <c>Microsoft.Extensions.DependencyInjection</c> namespace, faithful because recognition is
+///     namespace + name + first-parameter).
+/// </summary>
+public sealed class CodebaseExtractorRegistrationTests
+{
+    // ── AddDbContext / AddDbContextPool (source stubs; EF Core absent repo-wide) ───────────────────────────
+
+    private const string DbContextStub = """
+                                         namespace Microsoft.Extensions.DependencyInjection
+                                         {
+                                             public static class EntityFrameworkServiceCollectionExtensions
+                                             {
+                                                 public static IServiceCollection AddDbContext<TContext>(
+                                                     this IServiceCollection services,
+                                                     System.Action<object>? optionsAction = null,
+                                                     ServiceLifetime contextLifetime = ServiceLifetime.Scoped,
+                                                     ServiceLifetime optionsLifetime = ServiceLifetime.Scoped)
+                                                     where TContext : class => services;
+
+                                                 public static IServiceCollection AddDbContextPool<TContext>(
+                                                     this IServiceCollection services,
+                                                     System.Action<object> optionsAction,
+                                                     int poolSize = 1024)
+                                                     where TContext : class => services;
+                                             }
+                                         }
+                                         """;
+
+    // ── AddHttpClient (source stubs; Microsoft.Extensions.Http absent from the suite) ──────────────────────
+
+    private const string HttpClientStub = """
+                                          namespace Microsoft.Extensions.DependencyInjection
+                                          {
+                                              public interface IHttpClientBuilder {}
+                                              public static class HttpClientFactoryServiceCollectionExtensions
+                                              {
+                                                  public static IHttpClientBuilder AddHttpClient<TClient>(this IServiceCollection services)
+                                                      where TClient : class => null!;
+                                                  public static IHttpClientBuilder AddHttpClient<TClient, TImplementation>(this IServiceCollection services)
+                                                      where TClient : class where TImplementation : class, TClient => null!;
+                                                  public static IHttpClientBuilder AddHttpClient(this IServiceCollection services, string name) => null!;
+                                              }
+                                          }
+                                          """;
+    // ── Add{Singleton,Scoped,Transient} — generic forms ───────────────────────────────────────────────────
+
+    [Fact]
+    public void Recognize_AddFamilyTwoTypeArgs_RecordsServiceAndImplementationPerLifetime()
+    {
+        CodebaseModel model = CompilationFactory.ExtractWithDi(("Reg.cs", """
+                                                                          using Microsoft.Extensions.DependencyInjection;
+                                                                          namespace N;
+                                                                          public interface IFoo {}
+                                                                          public class Foo : IFoo {}
+                                                                          public interface IBar {}
+                                                                          public class Bar : IBar {}
+                                                                          public interface IBaz {}
+                                                                          public class Baz : IBaz {}
+                                                                          public static class Reg
+                                                                          {
+                                                                              public static void Configure(IServiceCollection services)
+                                                                              {
+                                                                                  services.AddSingleton<IFoo, Foo>();
+                                                                                  services.AddScoped<IBar, Bar>();
+                                                                                  services.AddTransient<IBaz, Baz>();
+                                                                              }
+                                                                          }
+                                                                          """));
+
+        model.HasRegistration(Lifetime.Singleton, "N.IFoo", "N.Foo")
+            .ShouldBeTrue();
+        model.HasRegistration(Lifetime.Scoped, "N.IBar", "N.Bar")
+            .ShouldBeTrue();
+        model.HasRegistration(Lifetime.Transient, "N.IBaz", "N.Baz")
+            .ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Recognize_AddSingletonOneTypeArgReceiverOnly_RecordsSelfRegistration()
+    {
+        CodebaseModel model = CompilationFactory.ExtractWithDi(("Reg.cs", """
+                                                                          using Microsoft.Extensions.DependencyInjection;
+                                                                          namespace N;
+                                                                          public class Foo {}
+                                                                          public static class Reg
+                                                                          {
+                                                                              public static void Configure(IServiceCollection services) => services.AddSingleton<Foo>();
+                                                                          }
+                                                                          """));
+
+        model.HasRegistration(Lifetime.Singleton, "N.Foo", "N.Foo")
+            .ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Recognize_AddSingletonOneTypeArgWithFactory_RecordsNoImplementation()
+    {
+        CodebaseModel model = CompilationFactory.ExtractWithDi(("Reg.cs", """
+                                                                          using Microsoft.Extensions.DependencyInjection;
+                                                                          namespace N;
+                                                                          public class Foo {}
+                                                                          public static class Reg
+                                                                          {
+                                                                              public static void Configure(IServiceCollection services) => services.AddSingleton<Foo>(sp => new Foo());
+                                                                          }
+                                                                          """));
+
+        // A factory registration names no implementation type — (Foo, null), not (Foo, Foo).
+        model.HasRegistration(Lifetime.Singleton, "N.Foo", null)
+            .ShouldBeTrue();
+        model.HasRegistration(Lifetime.Singleton, "N.Foo", "N.Foo")
+            .ShouldBeFalse();
+    }
+
+    // ── Add{...} — typeof forms ───────────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Recognize_AddTypeofTwoArgs_RecordsServiceAndImplementation()
+    {
+        CodebaseModel model = CompilationFactory.ExtractWithDi(("Reg.cs", """
+                                                                          using Microsoft.Extensions.DependencyInjection;
+                                                                          namespace N;
+                                                                          public interface IFoo {}
+                                                                          public class Foo : IFoo {}
+                                                                          public static class Reg
+                                                                          {
+                                                                              public static void Configure(IServiceCollection services) => services.AddSingleton(typeof(IFoo), typeof(Foo));
+                                                                          }
+                                                                          """));
+
+        model.HasRegistration(Lifetime.Singleton, "N.IFoo", "N.Foo")
+            .ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Recognize_AddTypeofOneArg_RecordsSelfRegistration()
+    {
+        CodebaseModel model = CompilationFactory.ExtractWithDi(("Reg.cs", """
+                                                                          using Microsoft.Extensions.DependencyInjection;
+                                                                          namespace N;
+                                                                          public class Bar {}
+                                                                          public static class Reg
+                                                                          {
+                                                                              public static void Configure(IServiceCollection services) => services.AddScoped(typeof(Bar));
+                                                                          }
+                                                                          """));
+
+        model.HasRegistration(Lifetime.Scoped, "N.Bar", "N.Bar")
+            .ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Recognize_AddTypeofWithFactory_RecordsNoImplementation()
+    {
+        CodebaseModel model = CompilationFactory.ExtractWithDi(("Reg.cs", """
+                                                                          using Microsoft.Extensions.DependencyInjection;
+                                                                          namespace N;
+                                                                          public interface IFoo {}
+                                                                          public class Foo : IFoo {}
+                                                                          public static class Reg
+                                                                          {
+                                                                              public static void Configure(IServiceCollection services) => services.AddSingleton(typeof(IFoo), sp => new Foo());
+                                                                          }
+                                                                          """));
+
+        model.HasRegistration(Lifetime.Singleton, "N.IFoo", null)
+            .ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Recognize_OpenGenericTypeofRegistration_RecordsDefinitionLevelFqns()
+    {
+        CodebaseModel model = CompilationFactory.ExtractWithDi(("Reg.cs", """
+                                                                          using Microsoft.Extensions.DependencyInjection;
+                                                                          namespace N;
+                                                                          public interface IRepo<T> {}
+                                                                          public class Repo<T> : IRepo<T> {}
+                                                                          public static class Reg
+                                                                          {
+                                                                              public static void Configure(IServiceCollection services) => services.AddSingleton(typeof(IRepo<>), typeof(Repo<>));
+                                                                          }
+                                                                          """));
+
+        model.HasRegistration(Lifetime.Singleton, "N.IRepo<T>", "N.Repo<T>")
+            .ShouldBeTrue();
+    }
+
+    // ── Type arguments the compiler could not bind exactly ────────────────────────────────────────────────
+
+    // One composition root for every row below. Outer.Hidden is inaccessible, Dup is ambiguous between the two
+    // imported namespaces, and Missing and Elsewhere.Missing are declared nowhere, Elsewhere being a namespace that
+    // exists. None of these calls compiles, which is the point: extraction reads code that does not.
+    private static CodebaseModel ExtractRegistration(string call)
+    {
+        return CompilationFactory.ExtractWithDi(
+            ("DbStub.cs", DbContextStub),
+            ("HttpStub.cs", HttpClientStub),
+            ("Elsewhere.cs", """
+                             namespace A { public class Dup {} }
+                             namespace B { public class Dup {} }
+                             namespace Elsewhere { public class Present {} }
+                             """),
+            ("Reg.cs", $$"""
+                         using Microsoft.Extensions.DependencyInjection;
+                         using Microsoft.Extensions.DependencyInjection.Extensions;
+                         using A;
+                         using B;
+                         namespace N;
+                         public interface IFoo {}
+                         public class Foo : IFoo {}
+                         public class Outer { private class Hidden {} }
+                         public static class Reg
+                         {
+                             public static void Configure(IServiceCollection services) => {{call}};
+                         }
+                         """));
+    }
+
+    private static (Lifetime Lifetime, string Service, string? Implementation)[] Registrations(CodebaseModel model)
+    {
+        return model.ServiceRegistrations
+            .Select(registration => (registration.Lifetime, registration.ServiceFullName, registration.ImplementationFullName))
+            .ToArray();
+    }
+
+    [Fact]
+    public void Recognize_TypeofNamingAnInaccessibleType_RecordsTheCandidate()
+    {
+        // The code does not compile: Hidden is private to Outer. The compiler still names the one type the
+        // operand could mean, and extraction takes that candidate here as it does for every other name, so the
+        // registration is in the model rather than silently dropped.
+        CodebaseModel model = ExtractRegistration("services.AddSingleton(typeof(Outer.Hidden))");
+
+        model.HasRegistration(Lifetime.Singleton, "N.Outer.Hidden", "N.Outer.Hidden")
+            .ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Recognize_TypeofNamingNothingTheCompilerCanFind_RecordsNoFact()
+    {
+        // The boundary of the tolerance: a name with no candidate at all is not a guess, so there is nothing to
+        // record it under.
+        CodebaseModel model = ExtractRegistration("services.AddSingleton(typeof(Missing))");
+
+        model.ServiceRegistrations.ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData("services.AddSingleton<Outer.Hidden>()", Lifetime.Singleton, "N.Outer.Hidden", "N.Outer.Hidden")]
+    [InlineData("services.AddSingleton<Dup>()", Lifetime.Singleton, "A.Dup", "A.Dup")]
+    [InlineData("services.AddSingleton<Missing>()", Lifetime.Singleton, null, null)]
+    [InlineData("services.AddSingleton<Elsewhere.Missing>()", Lifetime.Singleton, null, null)]
+    [InlineData("services.AddSingleton<Outer.Hidden>(sp => null!)", Lifetime.Singleton, "N.Outer.Hidden", null)]
+    [InlineData("services.AddSingleton<Dup>(sp => null!)", Lifetime.Singleton, "A.Dup", null)]
+    [InlineData("services.AddSingleton<Missing>(sp => null!)", Lifetime.Singleton, null, null)]
+    [InlineData("services.AddScoped<IFoo, Outer.Hidden>()", Lifetime.Scoped, "N.IFoo", "N.Outer.Hidden")]
+    [InlineData("services.AddScoped<IFoo, Dup>()", Lifetime.Scoped, "N.IFoo", "A.Dup")]
+    [InlineData("services.AddScoped<IFoo, Missing>()", Lifetime.Scoped, "N.IFoo", null)]
+    [InlineData("services.AddScoped<IFoo, Elsewhere.Missing>()", Lifetime.Scoped, "N.IFoo", null)]
+    [InlineData("services.AddTransient<Outer.Hidden, Foo>()", Lifetime.Transient, "N.Outer.Hidden", "N.Foo")]
+    [InlineData("services.AddTransient<Dup, Foo>()", Lifetime.Transient, "A.Dup", "N.Foo")]
+    [InlineData("services.AddTransient<Missing, Foo>()", Lifetime.Transient, null, null)]
+    [InlineData("services.TryAddSingleton<Outer.Hidden>()", Lifetime.Singleton, "N.Outer.Hidden", "N.Outer.Hidden")]
+    [InlineData("services.TryAddSingleton<Dup>()", Lifetime.Singleton, "A.Dup", "A.Dup")]
+    [InlineData("services.TryAddSingleton<Missing>()", Lifetime.Singleton, null, null)]
+    [InlineData("services.TryAddTransient<IFoo, Outer.Hidden>()", Lifetime.Transient, "N.IFoo", "N.Outer.Hidden")]
+    [InlineData("services.TryAddTransient<IFoo, Dup>()", Lifetime.Transient, "N.IFoo", "A.Dup")]
+    [InlineData("services.TryAddTransient<IFoo, Missing>()", Lifetime.Transient, "N.IFoo", null)]
+    [InlineData("services.AddHostedService<Outer.Hidden>()", Lifetime.Singleton, "Microsoft.Extensions.Hosting.IHostedService", "N.Outer.Hidden")]
+    [InlineData("services.AddHostedService<Dup>()", Lifetime.Singleton, "Microsoft.Extensions.Hosting.IHostedService", "A.Dup")]
+    [InlineData("services.AddHostedService<Missing>()", Lifetime.Singleton, null, null)]
+    [InlineData("services.AddDbContext<Outer.Hidden>()", Lifetime.Scoped, "N.Outer.Hidden", "N.Outer.Hidden")]
+    [InlineData("services.AddDbContext<Dup>()", Lifetime.Scoped, "A.Dup", "A.Dup")]
+    [InlineData("services.AddDbContext<Missing>()", Lifetime.Scoped, null, null)]
+    [InlineData("services.AddDbContextPool<Outer.Hidden>(_ => {})", Lifetime.Scoped, "N.Outer.Hidden", "N.Outer.Hidden")]
+    [InlineData("services.AddDbContextPool<Dup>(_ => {})", Lifetime.Scoped, "A.Dup", "A.Dup")]
+    [InlineData("services.AddDbContextPool<Missing>(_ => {})", Lifetime.Scoped, null, null)]
+    [InlineData("services.AddHttpClient<Outer.Hidden>()", Lifetime.Transient, "N.Outer.Hidden", "N.Outer.Hidden")]
+    [InlineData("services.AddHttpClient<Dup>()", Lifetime.Transient, "A.Dup", "A.Dup")]
+    [InlineData("services.AddHttpClient<Missing>()", Lifetime.Transient, null, null)]
+    [InlineData("services.AddHttpClient<IFoo, Outer.Hidden>()", Lifetime.Transient, "N.IFoo", "N.Outer.Hidden")]
+    [InlineData("services.AddHttpClient<IFoo, Dup>()", Lifetime.Transient, "N.IFoo", "A.Dup")]
+    [InlineData("services.AddHttpClient<IFoo, Missing>()", Lifetime.Transient, "N.IFoo", null)]
+    public void Recognize_GenericFormOverATypeTheCompilerCouldNotBindExactly_RecordsTheCandidateOrNothing(
+        string call, Lifetime lifetime, string? service, string? implementation)
+    {
+        // A type the compiler can only guess at (inaccessible, ambiguous) is recorded under its candidate, as the
+        // typeof operand is. One it cannot find at all has no candidate: the call records nothing where that type
+        // is the service, and no implementation where it is the implementation.
+        (Lifetime, string, string?)[] expected = service is null ? [] : [(lifetime, service, implementation)];
+
+        CodebaseModel model = ExtractRegistration(call);
+
+        Registrations(model)
+            .ShouldBe(expected);
+    }
+
+    public static TheoryData<string, string> GenericAndTypeofTwins
+    {
+        get
+        {
+            var twins = new TheoryData<string, string>();
+            foreach (string written in new[] { "Outer.Hidden", "Dup", "Missing", "Elsewhere.Missing" })
+            {
+                twins.Add($"services.AddSingleton<{written}>()", $"services.AddSingleton(typeof({written}))");
+                twins.Add($"services.AddScoped<IFoo, {written}>()", $"services.AddScoped(typeof(IFoo), typeof({written}))");
+                twins.Add($"services.AddTransient<{written}, Foo>()", $"services.AddTransient(typeof({written}), typeof(Foo))");
+                twins.Add($"services.AddSingleton<{written}>(sp => null!)", $"services.AddSingleton(typeof({written}), sp => null!)");
+            }
+
+            return twins;
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(GenericAndTypeofTwins))]
+    public void Recognize_TypeTheCompilerCouldNotBindExactly_RecordsTheSameInTheGenericAndTypeofForms(
+        string genericCall, string typeofCall)
+    {
+        // The two spellings of one registration must not disagree about a type the code names imperfectly: the
+        // forms theory above pins what the generic side records, so this pins the typeof side to the same.
+        CodebaseModel genericModel = ExtractRegistration(genericCall);
+        CodebaseModel typeofModel = ExtractRegistration(typeofCall);
+        (Lifetime Lifetime, string Service, string? Implementation)[] expected = Registrations(typeofModel);
+
+        Registrations(genericModel)
+            .ShouldBe(expected);
+    }
+
+    // ── TryAdd twins ──────────────────────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Recognize_TryAddTwins_RecordPerLifetimeLikeTheirAddSiblings()
+    {
+        CodebaseModel model = CompilationFactory.ExtractWithDi(("Reg.cs", """
+                                                                          using Microsoft.Extensions.DependencyInjection;
+                                                                          using Microsoft.Extensions.DependencyInjection.Extensions;
+                                                                          namespace N;
+                                                                          public interface IFoo {}
+                                                                          public class Foo : IFoo {}
+                                                                          public interface IBar {}
+                                                                          public class Bar : IBar {}
+                                                                          public static class Reg
+                                                                          {
+                                                                              public static void Configure(IServiceCollection services)
+                                                                              {
+                                                                                  services.TryAddSingleton<IFoo, Foo>();
+                                                                                  services.TryAddScoped<IBar, Bar>();
+                                                                              }
+                                                                          }
+                                                                          """));
+
+        model.HasRegistration(Lifetime.Singleton, "N.IFoo", "N.Foo")
+            .ShouldBeTrue();
+        model.HasRegistration(Lifetime.Scoped, "N.IBar", "N.Bar")
+            .ShouldBeTrue();
+    }
+
+    // ── AddHostedService ──────────────────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Recognize_AddHostedService_RecordsSynthesizedIHostedServiceAsServiceAndTAsImplementation()
+    {
+        CodebaseModel model = CompilationFactory.ExtractWithDi(("Reg.cs", """
+                                                                          using Microsoft.Extensions.DependencyInjection;
+                                                                          using Microsoft.Extensions.Hosting;
+                                                                          using System.Threading;
+                                                                          using System.Threading.Tasks;
+                                                                          namespace N;
+                                                                          public class Worker : IHostedService
+                                                                          {
+                                                                              public Task StartAsync(CancellationToken ct) => Task.CompletedTask;
+                                                                              public Task StopAsync(CancellationToken ct) => Task.CompletedTask;
+                                                                          }
+                                                                          public static class Reg
+                                                                          {
+                                                                              public static void Configure(IServiceCollection services) => services.AddHostedService<Worker>();
+                                                                          }
+                                                                          """));
+
+        model.HasRegistration(Lifetime.Singleton, "Microsoft.Extensions.Hosting.IHostedService", "N.Worker")
+            .ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Recognize_AddHostedServiceWhenIHostedServiceUnresolvable_RecordsImplementationOnly()
+    {
+        // Hosting.Abstractions absent, so IHostedService does not resolve; the recognizer falls back to the
+        // implementation-only form (the worker in the service slot, no implementation). The call is a source
+        // stub (the real extension lives in the removed assembly).
+        CodebaseModel model = CompilationFactory.ExtractWithDiNoHosting(("Reg.cs", """
+                                                                                   namespace Microsoft.Extensions.DependencyInjection
+                                                                                   {
+                                                                                       public static class HostedServiceStub
+                                                                                       {
+                                                                                           public static IServiceCollection AddHostedService<THostedService>(this IServiceCollection services)
+                                                                                               where THostedService : class => services;
+                                                                                       }
+                                                                                   }
+                                                                                   namespace N
+                                                                                   {
+                                                                                       using Microsoft.Extensions.DependencyInjection;
+                                                                                       public class Worker {}
+                                                                                       public static class Reg
+                                                                                       {
+                                                                                           public static void Configure(IServiceCollection services) => services.AddHostedService<Worker>();
+                                                                                       }
+                                                                                   }
+                                                                                   """));
+
+        model.HasRegistration(Lifetime.Singleton, "N.Worker", null)
+            .ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Recognize_AddDbContextDefault_RecordsScoped()
+    {
+        CodebaseModel model = CompilationFactory.ExtractWithDi(
+            ("Stub.cs", DbContextStub),
+            ("Reg.cs", """
+                       using Microsoft.Extensions.DependencyInjection;
+                       namespace N;
+                       public class MyContext {}
+                       public static class Reg
+                       {
+                           public static void Configure(IServiceCollection services) => services.AddDbContext<MyContext>();
+                       }
+                       """));
+
+        model.HasRegistration(Lifetime.Scoped, "N.MyContext", "N.MyContext")
+            .ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Recognize_AddDbContextLiteralLifetime_IsHonored()
+    {
+        CodebaseModel model = CompilationFactory.ExtractWithDi(
+            ("Stub.cs", DbContextStub),
+            ("Reg.cs", """
+                       using Microsoft.Extensions.DependencyInjection;
+                       namespace N;
+                       public class MyContext {}
+                       public static class Reg
+                       {
+                           public static void Configure(IServiceCollection services) =>
+                               services.AddDbContext<MyContext>(null, ServiceLifetime.Singleton);
+                       }
+                       """));
+
+        model.HasRegistration(Lifetime.Singleton, "N.MyContext", "N.MyContext")
+            .ShouldBeTrue();
+        model.HasRegistration(Lifetime.Scoped, "N.MyContext", "N.MyContext")
+            .ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Recognize_AddDbContextNonLiteralLifetime_RecordsNoFact()
+    {
+        // A non-literal lifetime argument (a variable) is not guessed — no fact is recorded at all.
+        CodebaseModel model = CompilationFactory.ExtractWithDi(
+            ("Stub.cs", DbContextStub),
+            ("Reg.cs", """
+                       using Microsoft.Extensions.DependencyInjection;
+                       namespace N;
+                       public class MyContext {}
+                       public static class Reg
+                       {
+                           public static void Configure(IServiceCollection services, ServiceLifetime lifetime) =>
+                               services.AddDbContext<MyContext>(null, lifetime);
+                       }
+                       """));
+
+        model.ServiceRegistrations.Any(r => r.ServiceFullName == "N.MyContext")
+            .ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Recognize_AddDbContextPool_RecordsScoped()
+    {
+        CodebaseModel model = CompilationFactory.ExtractWithDi(
+            ("Stub.cs", DbContextStub),
+            ("Reg.cs", """
+                       using Microsoft.Extensions.DependencyInjection;
+                       namespace N;
+                       public class MyContext {}
+                       public static class Reg
+                       {
+                           public static void Configure(IServiceCollection services) => services.AddDbContextPool<MyContext>(_ => {});
+                       }
+                       """));
+
+        model.HasRegistration(Lifetime.Scoped, "N.MyContext", "N.MyContext")
+            .ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Recognize_AddHttpClientOneTypeArg_RecordsTransientSelfClient()
+    {
+        CodebaseModel model = CompilationFactory.ExtractWithDi(
+            ("Stub.cs", HttpClientStub),
+            ("Reg.cs", """
+                       using Microsoft.Extensions.DependencyInjection;
+                       namespace N;
+                       public class Client {}
+                       public static class Reg
+                       {
+                           public static void Configure(IServiceCollection services) => services.AddHttpClient<Client>();
+                       }
+                       """));
+
+        model.HasRegistration(Lifetime.Transient, "N.Client", "N.Client")
+            .ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Recognize_AddHttpClientTwoTypeArgs_RecordsTransientClientAndImplementation()
+    {
+        CodebaseModel model = CompilationFactory.ExtractWithDi(
+            ("Stub.cs", HttpClientStub),
+            ("Reg.cs", """
+                       using Microsoft.Extensions.DependencyInjection;
+                       namespace N;
+                       public interface IClient {}
+                       public class Client : IClient {}
+                       public static class Reg
+                       {
+                           public static void Configure(IServiceCollection services) => services.AddHttpClient<IClient, Client>();
+                       }
+                       """));
+
+        model.HasRegistration(Lifetime.Transient, "N.IClient", "N.Client")
+            .ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Recognize_AddHttpClientNamedOnly_RecordsNoFact()
+    {
+        CodebaseModel model = CompilationFactory.ExtractWithDi(
+            ("Stub.cs", HttpClientStub),
+            ("Reg.cs", """
+                       using Microsoft.Extensions.DependencyInjection;
+                       namespace N;
+                       public static class Reg
+                       {
+                           public static void Configure(IServiceCollection services) => services.AddHttpClient("named");
+                       }
+                       """));
+
+        model.ServiceRegistrations.ShouldBeEmpty();
+    }
+
+    // ── Gate negatives ────────────────────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Recognize_UserNamespaceLookAlike_IsNotRecognized()
+    {
+        // AddSingleton in a user namespace (only it is in scope — MEDI's extension is not imported here) fails
+        // the namespace gate.
+        CodebaseModel model = CompilationFactory.ExtractWithDi(("Reg.cs", """
+                                                                          namespace MyApp
+                                                                          {
+                                                                              public static class DiExtensions
+                                                                              {
+                                                                                  public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddSingleton<T>(
+                                                                                      this Microsoft.Extensions.DependencyInjection.IServiceCollection services) => services;
+                                                                              }
+                                                                          }
+                                                                          namespace Consumer
+                                                                          {
+                                                                              using MyApp;
+                                                                              public class Foo {}
+                                                                              public static class Root
+                                                                              {
+                                                                                  public static void Configure(Microsoft.Extensions.DependencyInjection.IServiceCollection services) =>
+                                                                                      services.AddSingleton<Foo>();
+                                                                              }
+                                                                          }
+                                                                          """));
+
+        model.ServiceRegistrations.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Recognize_NonServiceCollectionFirstParameter_IsNotRecognized()
+    {
+        // A MEDI-namespace extension whose receiver is not IServiceCollection fails the first-parameter gate.
+        CodebaseModel model = CompilationFactory.ExtractWithDi(("Reg.cs", """
+                                                                          using System.Text;
+                                                                          namespace Microsoft.Extensions.DependencyInjection
+                                                                          {
+                                                                              public static class FakeExtensions
+                                                                              {
+                                                                                  public static void AddSingleton<T>(this StringBuilder sb) {}
+                                                                              }
+                                                                          }
+                                                                          namespace N
+                                                                          {
+                                                                              using Microsoft.Extensions.DependencyInjection;
+                                                                              public class Foo {}
+                                                                              public static class Root
+                                                                              {
+                                                                                  public static void Configure()
+                                                                                  {
+                                                                                      var sb = new StringBuilder();
+                                                                                      sb.AddSingleton<Foo>();
+                                                                                  }
+                                                                              }
+                                                                          }
+                                                                          """));
+
+        model.ServiceRegistrations.ShouldBeEmpty();
+    }
+
+    // ── Wrapper body seen ─────────────────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Recognize_InSolutionWrapperBody_SeesTheRealCallInside()
+    {
+        // The wrapper call (AddMyServices, a user-namespace extension) is not recognized, but the real
+        // AddSingleton inside its body IS — the pass walks every tree, wrapper bodies included.
+        CodebaseModel model = CompilationFactory.ExtractWithDi(("Reg.cs", """
+                                                                          using Microsoft.Extensions.DependencyInjection;
+                                                                          namespace N;
+                                                                          public interface IFoo {}
+                                                                          public class Foo : IFoo {}
+                                                                          public static class MyWiring
+                                                                          {
+                                                                              public static IServiceCollection AddMyServices(this IServiceCollection services)
+                                                                              {
+                                                                                  services.AddSingleton<IFoo, Foo>();
+                                                                                  return services;
+                                                                              }
+                                                                          }
+                                                                          public static class Root
+                                                                          {
+                                                                              public static void Configure(IServiceCollection services) => services.AddMyServices();
+                                                                          }
+                                                                          """));
+
+        model.HasRegistration(Lifetime.Singleton, "N.IFoo", "N.Foo")
+            .ShouldBeTrue();
+        model.ServiceRegistrations.ShouldHaveSingleItem(); // only the inner real call; AddMyServices is not recognized
+    }
+
+    // ── Honesty boundary ──────────────────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Recognize_Configure_IsNotRecognized()
+    {
+        // Configure passes the namespace + first-parameter gate but its name is not in the recognized-call
+        // table — the options interfaces are framework-registered and invisible (GRAMMAR §4.7).
+        CodebaseModel model = CompilationFactory.ExtractWithDi(("Reg.cs", """
+                                                                          using Microsoft.Extensions.DependencyInjection;
+                                                                          namespace N;
+                                                                          public class MyOptions {}
+                                                                          public static class Reg
+                                                                          {
+                                                                              public static void Configure(IServiceCollection services) => services.Configure<MyOptions>(o => {});
+                                                                          }
+                                                                          """));
+
+        model.ServiceRegistrations.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Recognize_KeyedService_IsNotRecognized()
+    {
+        CodebaseModel model = CompilationFactory.ExtractWithDi(("Reg.cs", """
+                                                                          using Microsoft.Extensions.DependencyInjection;
+                                                                          namespace N;
+                                                                          public interface IFoo {}
+                                                                          public class Foo : IFoo {}
+                                                                          public static class Reg
+                                                                          {
+                                                                              public static void Configure(IServiceCollection services) => services.AddKeyedSingleton<IFoo, Foo>("key");
+                                                                          }
+                                                                          """));
+
+        model.ServiceRegistrations.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Recognize_ServiceDescriptorTryAddEnumerable_IsNotRecognized()
+    {
+        CodebaseModel model = CompilationFactory.ExtractWithDi(("Reg.cs", """
+                                                                          using Microsoft.Extensions.DependencyInjection;
+                                                                          using Microsoft.Extensions.DependencyInjection.Extensions;
+                                                                          namespace N;
+                                                                          public interface IFoo {}
+                                                                          public class Foo : IFoo {}
+                                                                          public static class Reg
+                                                                          {
+                                                                              public static void Configure(IServiceCollection services) =>
+                                                                                  services.TryAddEnumerable(ServiceDescriptor.Singleton<IFoo, Foo>());
+                                                                          }
+                                                                          """));
+
+        model.ServiceRegistrations.ShouldBeEmpty();
+    }
+
+    // ── Whole-compilation reach (top-level Program) ───────────────────────────────────────────────────────
+
+    [Fact]
+    public void Recognize_RegistrationInTopLevelProgram_IsSeen()
+    {
+        // A top-level-statements Program is not a declared type, so this only holds because the registration
+        // pass walks every syntax tree, not each declared type.
+        CodebaseModel model = CompilationFactory.ExtractConsoleAppWithDi(("Program.cs", """
+                                                                                        using Microsoft.Extensions.DependencyInjection;
+                                                                                        var services = new ServiceCollection();
+                                                                                        services.AddSingleton<N.IFoo, N.Foo>();
+
+                                                                                        namespace N
+                                                                                        {
+                                                                                            public interface IFoo {}
+                                                                                            public class Foo : IFoo {}
+                                                                                        }
+                                                                                        """));
+
+        model.HasRegistration(Lifetime.Singleton, "N.IFoo", "N.Foo")
+            .ShouldBeTrue();
+    }
+
+    // ── Sites ─────────────────────────────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Recognize_RegistrationSite_IsTheCallLine()
+    {
+        CodebaseModel model = CompilationFactory.ExtractWithDi(("Reg.cs", """
+                                                                          using Microsoft.Extensions.DependencyInjection;
+                                                                          namespace N;
+                                                                          public interface IFoo {}
+                                                                          public class Foo : IFoo {}
+                                                                          public static class Reg
+                                                                          {
+                                                                              public static void Configure(IServiceCollection services)
+                                                                              {
+                                                                                  services.AddSingleton<IFoo, Foo>();
+                                                                              }
+                                                                          }
+                                                                          """));
+
+        model.Registration(Lifetime.Singleton, "N.IFoo", "N.Foo")
+            .Sites.Lines()
+            .ShouldBe([9]);
+    }
+}

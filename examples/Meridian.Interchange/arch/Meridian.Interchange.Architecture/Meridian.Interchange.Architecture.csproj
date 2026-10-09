@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+        <RestoreLockedMode Condition="'$(CI)' == 'true'">true</RestoreLockedMode>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\..\..\src\SlideRule\SlideRule.csproj" />
+        <ProjectReference Include="..\..\..\..\src\SlideRule.Packs.DotNet\SlideRule.Packs.DotNet.csproj" />
+        <ProjectReference Include="..\..\src\Meridian.Interchange\Meridian.Interchange.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- What the three local rules name: BackgroundService and IOptionsSnapshot. The DI packages are
+             deliberately absent — the nine canonical rules moved to the DotNetGuidance pack, which brings
+             Microsoft.Extensions.DependencyInjection[.Abstractions] with it. Naming them here as well
+             would pin this project to its own version and turn the pack's newer one into a downgrade. -->
+        <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.11" />
+        <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.11" />
+    </ItemGroup>
+
+</Project>

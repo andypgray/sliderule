@@ -1,0 +1,169 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <!-- netstandard2.0 is the only TFM referenceable from both a legacy net48 spec project
+             (typeof() over net48 product types) and the net10 CLI/Roslyn/tests. It forces the
+             desirable Core(model)/Roslyn split. LangVersion 13.0 is pinned
+             because netstandard2.0 otherwise defaults to C# 7.3, losing primary constructors,
+             file-scoped namespaces, and get-only auto-props set from a primary-ctor param
+             (which need no IsExternalInit — so no records/init, no PolySharp shim). -->
+        <TargetFramework>netstandard2.0</TargetFramework>
+        <LangVersion>13.0</LangVersion>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+
+        <!-- The spec-contract package: what a spec project references. PackageId is explicit for
+             clarity; version + shared metadata come from the repo-root Directory.Build.props. -->
+        <PackageId>SlideRule</PackageId>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <Description>SlideRule is the spec contract: the fluent builder and reified rule model an architecture spec is written against. It is the one package a spec project references. A spec declares layers, rules and scopes. A rule is either the law (Enforce) or a ratchet over a counted baseline (Migrate). A scope either fails a new reference into it (Quarantine) or only warns when a change touches it (Caution). Checking and rendering come from the sliderule tool (SlideRule.Cli) or the xUnit adapter (SlideRule.Xunit). The package carries a Roslyn analyzer that reports a spec's bad string literals as compiler warnings while the spec is written. It also carries a completion provider that offers the referenced projects' namespaces and type names inside the editor. This package is netstandard2.0 with zero dependencies, so a spec project can target anything from net48 up.</Description>
+        <PackageTags>architecture;architecture-as-code;fitness-functions;dependency-rules;layering;tech-debt;legacy;csharp;dotnet</PackageTags>
+
+        <!-- ApiCompat, at pack time, against the bytes actually on nuget.org — not against a text
+             file this repo also writes, which can only say what someone last approved. A published
+             NuGet version can never be replaced, only unlisted, and this is the contract package
+             every consumer's spec compiles against, so the moment worth checking is the moment the
+             nupkg is built. The SDK loads the comparison task from inside itself and fetches the
+             baseline with a PackageDownload, which is a different MSBuild item from
+             PackageReference — so the self-spec rule packaging/core-carries-nothing stays green and
+             the nuspec <dependencies> stays empty, which is what lets both READMEs keep claiming
+             zero dependencies.
+
+             Strict mode is shared with the xUnit adapter, the other validated package, and so is the
+             baseline version once there is one to name: no version under this package ID is published
+             yet, so until the first release under it there is nothing on nuget.org to compare against.
+             src/Directory.Build.props declares both with its reasons. -->
+        <EnablePackageValidation>true</EnablePackageValidation>
+        <RestoreLockedMode Condition="'$(CI)' == 'true'">true</RestoreLockedMode>
+
+        <!-- The spec-literal analyzer and the completion provider ride inside this package under
+             analyzers/dotnet/cs, with a second copy of this project's own assembly beside them: a compiler
+             and an editor both resolve an extension's dependencies from the directory it sits in and never
+             from the consumer's package graph.
+
+             TargetsForTfmSpecificContentInPackage is the hook that names those files, and naming them is
+             all it may do. It runs in the per-TFM configuration, so a build started from inside it would
+             hand the analyzer project a TargetFramework global property, which makes its reference back
+             to here a different configuration of this project and rebuilds this project re-entrantly.
+             The build and the guard hang on GenerateNuspecDependsOn instead, because that list is ordered
+             and ends after Build and after the hook, which BeforeTargets does not promise. -->
+        <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);_SlideRulePackSpecAnalyzerClosure</TargetsForTfmSpecificContentInPackage>
+        <GenerateNuspecDependsOn>$(GenerateNuspecDependsOn);_SlideRuleBuildSpecAnalyzers;_SlideRuleAssertSpecAnalyzerClosure</GenerateNuspecDependsOn>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <!-- Normalised once, so every path built from it carries the host's own separator throughout and
+             no "..": the guard below prints these paths in its error, and a path that changes separator
+             halfway is a bad thing to read in a failing release. -->
+        <_SlideRuleSpecAnalyzerDirectory>$([MSBuild]::NormalizeDirectory('$(MSBuildThisFileDirectory)', '..', 'SlideRule.SpecAnalyzers'))</_SlideRuleSpecAnalyzerDirectory>
+        <_SlideRuleSpecAnalyzerProject>$(_SlideRuleSpecAnalyzerDirectory)SlideRule.SpecAnalyzers.csproj</_SlideRuleSpecAnalyzerProject>
+        <!-- netstandard2.0 because that is the analyzer project's only target framework. $(Configuration)
+             is defined by the time this is evaluated and $(OutputPath) is not, which is why the file list
+             itself is built inside a target. -->
+        <_SlideRuleSpecAnalyzerOutput>$([MSBuild]::NormalizeDirectory('$(_SlideRuleSpecAnalyzerDirectory)', 'bin', '$(Configuration)', 'netstandard2.0'))</_SlideRuleSpecAnalyzerOutput>
+        <_SlideRuleSpecCompletionDirectory>$([MSBuild]::NormalizeDirectory('$(MSBuildThisFileDirectory)', '..', 'SlideRule.SpecCompletion'))</_SlideRuleSpecCompletionDirectory>
+        <_SlideRuleSpecCompletionProject>$(_SlideRuleSpecCompletionDirectory)SlideRule.SpecCompletion.csproj</_SlideRuleSpecCompletionProject>
+        <_SlideRuleSpecCompletionOutput>$([MSBuild]::NormalizeDirectory('$(_SlideRuleSpecCompletionDirectory)', 'bin', '$(Configuration)', 'netstandard2.0'))</_SlideRuleSpecCompletionOutput>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <None Include="README.md" Pack="true" PackagePath="/" />
+        <!-- One source file packed to two paths, as the analyzer package does it. buildTransitive/ is
+             where an SDK-style consumer reads it and is the only one that also flows through a package
+             dependency; build/ is the only place an older client or a packages.config project looks. A
+             consumer can import both, which the file is written to survive. -->
+        <None Include="buildTransitive/*.targets" Pack="true" PackagePath="buildTransitive/" />
+        <None Include="buildTransitive/*.targets" Pack="true" PackagePath="build/" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- The public surface is the authoring language alone; the engine behind it (the codebase model, the
+             checker, the renderers, the model builder, the baselines, discovery and validation) is internal, and
+             every product assembly that runs it reads it through a grant here. `sliderule` is the CLI: its
+             AssemblyName, not its project name, which is what an InternalsVisibleTo entry has to match. The xUnit
+             adapter ships in a package of its own, so a grant to it crosses a package boundary and fails at run
+             time rather than at compile time when the two versions differ; the adapter checks at the start of its
+             run that the copy it loaded is its own version. -->
+        <InternalsVisibleTo Include="SlideRule.Extraction" />
+        <InternalsVisibleTo Include="SlideRule.Analyzers" />
+        <InternalsVisibleTo Include="SlideRule.SpecAnalyzers" />
+        <InternalsVisibleTo Include="SlideRule.Roslyn" />
+        <InternalsVisibleTo Include="sliderule-cli" />
+        <InternalsVisibleTo Include="SlideRule.Xunit" />
+        <InternalsVisibleTo Include="SlideRule.Tests" />
+        <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
+    </ItemGroup>
+
+    <!-- The closure the compiler and the editor have to load, named once for the two targets that need
+         it: the hook that packs it and the guard that refuses to pack without it. In a target rather than
+         a top-level ItemGroup because $(OutputPath) is undefined until the SDK's targets are imported.
+         The last entry is the same file lib/netstandard2.0/ is packed from, listed a second time, so the
+         two copies are byte-identical by construction rather than by luck.
+
+         This one list is what the hook, the guard and .github/scripts/verify-contract-package-shape.sh
+         all read, so an assembly that joins the closure is added here and in that script. No wildcards:
+         a wildcard is resolved when the project is evaluated and would silently name nothing on a tree
+         where the analyzer has not been built yet, which is the tree this has to survive. -->
+    <Target Name="_SlideRuleSpecAnalyzerClosure">
+        <ItemGroup>
+            <SlideRuleSpecAnalyzerFile Include="$(_SlideRuleSpecAnalyzerOutput)SlideRule.SpecAnalyzers.dll" />
+            <SlideRuleSpecAnalyzerFile Include="$(_SlideRuleSpecCompletionOutput)SlideRule.SpecCompletion.dll" />
+            <SlideRuleSpecAnalyzerFile Include="$(OutputPath)SlideRule.dll" />
+        </ItemGroup>
+    </Target>
+
+    <Target Name="_SlideRulePackSpecAnalyzerClosure" DependsOnTargets="_SlideRuleSpecAnalyzerClosure">
+        <ItemGroup>
+            <TfmSpecificPackageFile Include="@(SlideRuleSpecAnalyzerFile)" PackagePath="analyzers/dotnet/cs" />
+        </ItemGroup>
+    </Target>
+
+    <!-- The analyzer project is outside this project's reference closure by design: it references THIS
+         project, so a reference back would be a cycle, and the workspace loader follows a ProjectReference
+         even where it carries ReferenceOutputAssembly="false" (examples/Directory.Build.targets says what
+         that costs). The ordering is expressed as a build request instead.
+
+         The restore leg exists because nothing else restores that project on the way here: a standalone
+         pack of this csproj from a clean tree fails NETSDK1004 without it. It is skipped wherever an
+         assets file already sits beside the project, which is every solution-shaped invocation, the
+         solution's own implicit restore having written it, so a parallel solution pack never has two
+         writers in one obj directory. A fresh MSBuildRestoreSessionId is NuGet's own answer to restoring
+         inside a build: the differing global property set keeps the restore's evaluation out of the
+         build's cache, so the Build leg below evaluates the project after its obj props exist.
+
+         The Build leg passes NO Properties and NO RemoveProperties. The global property set has to stay
+         byte-identical to this build's, or the analyzer's reference back to here is a different cache key
+         and rebuilds this project re-entrantly. If this project ever multi-targets, that needs
+         re-measuring: TargetFramework would then be global in the outer build too. -->
+    <Target Name="_SlideRuleBuildSpecAnalyzers" Condition="'$(NoBuild)' != 'true'">
+        <MSBuild Projects="$(_SlideRuleSpecAnalyzerProject)"
+                 Targets="Restore"
+                 Properties="MSBuildRestoreSessionId=$([System.Guid]::NewGuid())"
+                 Condition="!Exists('$(_SlideRuleSpecAnalyzerDirectory)obj/project.assets.json')" />
+        <MSBuild Projects="$(_SlideRuleSpecAnalyzerProject)" Targets="Build" />
+        <!-- The completion provider, on the same terms and for the same reasons. It passes no Properties
+             either, and here that is not about a cache key at all: this project references nothing in
+             this repository, so its build cannot re-enter this one however it is invoked. The empty
+             property set is what keeps the two legs reading alike. -->
+        <MSBuild Projects="$(_SlideRuleSpecCompletionProject)"
+                 Targets="Restore"
+                 Properties="MSBuildRestoreSessionId=$([System.Guid]::NewGuid())"
+                 Condition="!Exists('$(_SlideRuleSpecCompletionDirectory)obj/project.assets.json')" />
+        <MSBuild Projects="$(_SlideRuleSpecCompletionProject)" Targets="Build" />
+    </Target>
+
+    <!-- The loud stop. Where the pack is told not to build, the target above does not run, so a pack
+         after a build that did not include the analyzer project would otherwise ship this package with no
+         analyzer in it, in a version that can never be withdrawn. NU5019 would eventually say "file not
+         found"; this says which file, why it matters and what to run. Unconditional on purpose: it has to
+         hold when nothing is built as well, which is the only shape that can reach it empty-handed. -->
+    <Target Name="_SlideRuleAssertSpecAnalyzerClosure" DependsOnTargets="_SlideRuleSpecAnalyzerClosure">
+        <Error Condition="'@(SlideRuleSpecAnalyzerFile)' == ''"
+               Code="SR9001"
+               Text="_SlideRuleSpecAnalyzerClosure listed no files, so this pack would put nothing under analyzers/dotnet/cs and the contract package would ship without the assemblies a spec author's build and editor load." />
+        <Error Condition="!Exists('%(SlideRuleSpecAnalyzerFile.Identity)')"
+               Code="SR9001"
+               Text="%(SlideRuleSpecAnalyzerFile.Identity) is not on disk, so this pack would ship the contract package without one of the assemblies a spec author's build and editor load. Build the solution first, since a pack told not to build packs what a build left behind, or let this pack build." />
+    </Target>
+
+</Project>

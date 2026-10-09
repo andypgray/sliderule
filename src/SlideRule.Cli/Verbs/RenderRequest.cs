@@ -1,0 +1,56 @@
+namespace SlideRule.Cli.Verbs;
+
+/// <summary>The parsed inputs to a <c>render</c> run — free of Roslyn types so it crosses the MSBuild gate.</summary>
+/// <param name="Solution">
+///     The solution to load: the settings file's where one applies, otherwise the positional argument (a file, a
+///     directory, or null for discovery).
+/// </param>
+/// <param name="Spec">
+///     The <c>--spec</c> value (a built DLL or a solution-member csproj), else the settings file's spec, else null
+///     for the convention.
+/// </param>
+/// <param name="WorkingDirectory">The directory solution discovery walks up from.</param>
+/// <param name="NoCache">
+///     Whether to bypass the persisted extraction cache entirely (no read, no write). Render fronts it
+///     because its output is additive and reviewed: a stale card is corrected by the next run and never
+///     removes anything, unlike the two <c>baseline</c> modes that read absence as evidence.
+/// </param>
+/// <param name="AllowWorkspaceDiagnostics">
+///     Whether to render from the partial model when a project fails to load. Default (<c>false</c>): any
+///     workspace-load failure refuses the whole command with exit 2 and writes nothing, because the files
+///     render writes are committed context — a card whose project failed to load places nowhere, and
+///     <c>--diagram</c> would draw a survey missing whole projects. Keys on exactly what <c>check</c> keys
+///     on (<c>IncompleteModelGate</c>).
+/// </param>
+/// <param name="Diagram">
+///     The <c>--diagram</c> target file, or the settings file's when the command line names none, or null to
+///     render no diagram.
+/// </param>
+/// <param name="DiagramOnly">
+///     The <c>--diagram-only</c> allow-list, or the settings file's beside its diagram: project-name globs,
+///     semicolon-separated.
+/// </param>
+/// <param name="DiagramExclude">
+///     The <c>--diagram-exclude</c> deny-list, or the settings file's beside its diagram: project-name globs,
+///     semicolon-separated.
+/// </param>
+/// <param name="Model">
+///     Whether <c>--model</c> was passed or the settings file asks for the model file beside the root
+///     <c>AGENTS.md</c>. It is the opt-<em>in</em> alone, never the whole answer: a file that already exists is
+///     refreshed without it, so the runner asks this <em>or</em> the file's presence.
+/// </param>
+/// <param name="Check">
+///     Whether <c>--check</c> was passed: compose every target as a render would, write nothing, and report
+///     each target as current or stale, exiting 1 when any is stale.
+/// </param>
+internal sealed record RenderRequest(
+    string? Solution,
+    string? Spec,
+    string WorkingDirectory,
+    bool NoCache,
+    bool AllowWorkspaceDiagnostics,
+    string? Diagram = null,
+    string? DiagramOnly = null,
+    string? DiagramExclude = null,
+    bool Model = false,
+    bool Check = false);

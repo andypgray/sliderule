@@ -1,0 +1,72 @@
+using Shouldly;
+using Xunit;
+using SlideRule.Fluent;
+
+namespace SlideRule.Tests;
+
+/// <summary>The GRAMMAR §4.2 namespace-pattern table, pinned verbatim (every match and non-match).</summary>
+public class NamespacePatternTests
+{
+    [Theory]
+    // MyApp.Domain.* — self-inclusive subtree.
+    [InlineData("MyApp.Domain.*", "MyApp.Domain", true)]
+    [InlineData("MyApp.Domain.*", "MyApp.Domain.Orders", true)]
+    [InlineData("MyApp.Domain.*", "MyApp.Domain.Orders.Internal", true)]
+    [InlineData("MyApp.Domain.*", "MyApp.DomainX", false)]
+    [InlineData("MyApp.Domain.*", "MyApp", false)]
+    // MyApp.Domain — exact.
+    [InlineData("MyApp.Domain", "MyApp.Domain", true)]
+    [InlineData("MyApp.Domain", "MyApp.Domain.Orders", false)]
+    // Matching is case-sensitive.
+    [InlineData("MyApp.Domain", "myapp.domain", false)]
+    // MyApp.*.Orders — interior single-segment wildcard.
+    [InlineData("MyApp.*.Orders", "MyApp.Sales.Orders", true)]
+    [InlineData("MyApp.*.Orders", "MyApp.Orders", false)]
+    [InlineData("MyApp.*.Orders", "MyApp.A.B.Orders", false)]
+    // MyApp.Legacy* — partial-segment wildcard, never crosses a dot.
+    [InlineData("MyApp.Legacy*", "MyApp.Legacy", true)]
+    [InlineData("MyApp.Legacy*", "MyApp.LegacyBilling", true)]
+    [InlineData("MyApp.Legacy*", "MyApp.Legacy.Billing", false)]
+    // A within-segment `*` match that dead-ends with no earlier `*` to backtrack to returns false
+    // (Wildcard.Match's final else): `Legacy*` diverges from `Ledger` at the third character.
+    [InlineData("MyApp.Legacy*", "MyApp.Ledger", false)]
+    // * — everything.
+    [InlineData("*", "MyApp", true)]
+    [InlineData("*", "MyApp.Domain.Orders", true)]
+    public void Matches_TablePins(string pattern, string @namespace, bool expected)
+    {
+        new NamespacePattern(pattern).Matches(@namespace)
+            .ShouldBe(expected);
+    }
+
+    [Theory]
+    // Well-formed globs — every pattern of the match table above.
+    [InlineData("MyApp.Domain.*")]
+    [InlineData("MyApp.Domain")]
+    [InlineData("MyApp.*.Orders")]
+    [InlineData("MyApp.Legacy*")]
+    [InlineData("*")]
+    public void Validate_WellFormedGlob_ReturnsNull(string pattern)
+    {
+        NamespacePattern.Validate(pattern)
+            .ShouldBeNull();
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Validate_BlankGlob_ReturnsBlankReason(string pattern)
+    {
+        NamespacePattern.Validate(pattern)
+            .ShouldBe("is blank");
+    }
+
+    [Fact]
+    public void Validate_WildcardInSubtreePrefix_ReturnsDeadSubtreeReason()
+    {
+        // The trailing `.*` prefix is matched literally, so a `*` there can never match (GRAMMAR §8 item 16).
+        NamespacePattern.Validate("MyApp.*.Controllers.*")
+            .ShouldBe("has a trailing `.*` subtree operator but its literal prefix contains a `*`, " +
+                      "which never matches; anchor the subtree on a literal prefix");
+    }
+}

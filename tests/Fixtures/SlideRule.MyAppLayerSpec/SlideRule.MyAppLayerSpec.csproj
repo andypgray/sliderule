@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <!-- The layer-card render e2e fixture: a Web layer and a Billing layer, each with one anchored
+         Enforce rule, plus a quarantined scope over the Billing layer (sanctioned facade surface + dragons)
+         so MyApp.Legacy.Billing/ receives both a layer card and a quarantine card. References Core plus the
+         MyApp project whose facade types BoundaryOnlyVia names; its DLL path is baked into the test
+         assembly's metadata and loaded via the spec flag. That reference replaced name-carrier stubs: this
+         DLL is never a MyApp solution member, but it IS a member of the SlideRule solution, where a stub
+         declares a MyApp FQN a second time and every check of this repo reports the conflation. -->
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <IsPackable>false</IsPackable>
+        <RestoreLockedMode Condition="'$(CI)' == 'true'">true</RestoreLockedMode>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\..\src\SlideRule\SlideRule.csproj" />
+        <ProjectReference Include="..\..\SlideRule.Tests\Fixtures\TestSolutions\MyApp\MyApp.Legacy.Billing\MyApp.Legacy.Billing.csproj" />
+    </ItemGroup>
+
+</Project>

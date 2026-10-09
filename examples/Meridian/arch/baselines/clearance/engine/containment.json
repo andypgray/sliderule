@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 2,
+  "rules": {
+    "clearance/engine/containment": {
+      "entries": [
+        { "source": "T:Meridian.Web.Controllers.CustomsController", "target": "T:Meridian.Clearance.ContainerNumberValidator", "siteCount": 2, "seal": "020b1e2784b598d2" }
+      ]
+    }
+  }
+}

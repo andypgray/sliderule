@@ -1,0 +1,18 @@
+<Project>
+    <!-- A stand-in for a source-only package. Restoring a package that ships C# files as content files with
+         buildAction Compile writes Compile items like these two into the project's obj/*.nuget.g.props, and the
+         compiler takes each file into the importing project's own compilation. So every project importing this
+         file declares the Polyfills types itself: DriftedApp.Json and DriftedApp.Testing each compile a copy of
+         Guard on both of their frameworks, and a copy of MD5Polyfill on netstandard2.1 alone, as a package's
+         framework-specific folder would. Both files open with the banner such a package carries.
+         An import rather than a real package keeps the bed package-free, so the startup sweep restores it with no
+         feed at all. The compiler receives the same Compile item either way. -->
+    <ItemGroup>
+        <Compile Include="$(MSBuildThisFileDirectory)contentFiles\cs\any\Polyfills\Guard.cs"
+                 Link="Polyfills\Guard.cs" Visible="false" />
+    </ItemGroup>
+    <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.1'">
+        <Compile Include="$(MSBuildThisFileDirectory)contentFiles\cs\netstandard2.1\Polyfills\MD5Polyfill.cs"
+                 Link="Polyfills\MD5Polyfill.cs" Visible="false" />
+    </ItemGroup>
+</Project>

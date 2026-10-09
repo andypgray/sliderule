@@ -1,0 +1,226 @@
+# Publishes the four SlideRule packages to NuGet, creates a GitHub release, and lists
+# the new version in the official MCP registry when a v* tag is pushed.
+#
+# Auth: NuGet trusted publishing (OIDC). The job trades a GitHub-signed OIDC token for
+# a short-lived (1-hour, single-use) nuget.org API key at run time via the NuGet/login
+# step — there is NO long-lived NUGET_API_KEY secret to store or rotate. This requires a
+# trusted-publishing policy on nuget.org (owner + repo + this workflow's file name) and
+# the `id-token: write` permission below.
+#
+# Why pack in CI rather than locally: packing here means SourceLink embeds a commit
+# that actually exists on GitHub, so debugger source-stepping resolves. The symbol
+# packages (.snupkg) are produced alongside the .nupkg and `dotnet nuget push` uploads
+# them automatically. ContinuousIntegrationBuild engages via Directory.Build.props's
+# `$(CI)` condition (GitHub Actions sets CI=true), which normalizes embedded paths.
+#
+# Build/test scope: the whole solution is built and tested directly — the slnx is the
+# entire tree here (no transitive-proxy trick needed). The pack step then repacks the
+# solution so ContinuousIntegrationBuild applies to the four shipped packages. That test
+# run is ubuntu-only, so every Windows-gated fact skips here — the .NET Framework fixtures
+# above all. This is not the gate for those: ci.yml's four-image matrix is, and it runs on
+# this same commit because the release flow pushes the branch and the tag together.
+#
+# Provenance: after packing, actions/attest emits signed SLSA build provenance for the
+# .nupkg/.snupkg, and the Sigstore bundle ships as a release asset (offline verification,
+# plus Scorecard's Signed-Releases check). Permissions moved from the workflow level down
+# to the release job (top level is now contents: read) so the attestations: write and
+# id-token: write grants stay scoped to the single job that needs them.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write      # create the GitHub release
+      id-token: write      # OIDC: NuGet trusted publishing + Sigstore signing for attestations
+      attestations: write  # persist the build provenance attestation
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+
+      # The tag drives publication, so it must agree with every place the version is
+      # declared: the single <Version> in Directory.Build.props (declared once for all four
+      # lockstep-versioned packages) and BOTH version fields in .mcp/server.json (the
+      # top-level `version` and the package entry's `version`). Any mismatch fails the
+      # release before anything is pushed. jq ships on the ubuntu-latest runner.
+      #
+      # The `(?=</Version>)` lookahead is required, not redundant: Directory.Build.props's
+      # own comment says the literal "<Version>", and a bare `(?<=<Version>)[^<]+` matches that
+      # prose too, so PROPS becomes two lines and never equals the tag. Anchoring on the closing
+      # tag keeps only the real element. Do not remove it.
+      - name: Verify tag matches Directory.Build.props and server.json versions
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PROPS=$(grep -oP '(?<=<Version>)[^<]+(?=</Version>)' Directory.Build.props)
+          SERVER_TOP=$(jq -r '.version' .mcp/server.json)
+          SERVER_PKG=$(jq -r '.packages[0].version' .mcp/server.json)
+          echo "tag=$TAG props=$PROPS server.json/.version=$SERVER_TOP server.json/.packages[0].version=$SERVER_PKG"
+          rc=0
+          [ "$PROPS" = "$TAG" ]      || { echo "::error::Directory.Build.props <Version> ($PROPS) != tag ($TAG)"; rc=1; }
+          [ "$SERVER_TOP" = "$TAG" ] || { echo "::error::server.json .version ($SERVER_TOP) != tag ($TAG)"; rc=1; }
+          [ "$SERVER_PKG" = "$TAG" ] || { echo "::error::server.json .packages[0].version ($SERVER_PKG) != tag ($TAG)"; rc=1; }
+          exit $rc
+
+      # Build the whole solution — the slnx is the entire tree here, so this compiles every
+      # shipping project directly.
+      #
+      # There is no explicit restore step in this job, so this is the restore, and it is implicit:
+      # -p:RestoreLockedMode=true is what holds every shipping project to its committed lock file
+      # here, rather than the runner happening to set CI=true. This is the job that pushes to
+      # nuget.org, so it is the one place a graph nobody committed must not be publishable. The pack
+      # below restores implicitly too and names the property for the same reason, even though the
+      # build above has already satisfied it. ci.yml's build-and-test Restore step carries the full
+      # rationale; the measurement behind it is on ci.yml's line too.
+      - name: Build
+        run: dotnet build SlideRule.slnx -c Release -p:RestoreLockedMode=true
+
+      # SLIDERULE_LINK_CHECK opts the citation link check in. It is off by default and ci.yml runs
+      # it on one leg of four, but the chore it automates is "re-verify the cited pages at first
+      # publish", and this job is that publish. A page that cannot be reached reports as a skip, so
+      # a network blip cannot fail a release; only a page that answers 404 or 410 does, which is the
+      # release this must not make.
+      - name: Test
+        env:
+          SLIDERULE_LINK_CHECK: 'true'
+        run: dotnet test SlideRule.slnx -c Release --no-build
+
+      - name: Pack (produces four .nupkg + three .snupkg)
+        run: dotnet pack SlideRule.slnx -c Release -o artifacts -p:RestoreLockedMode=true
+
+      # nuget.org generates the VS Code MCP config only if the package holds an entry at
+      # exactly `.mcp/server.json`. A backslash PackagePath mis-packs it as `.mcp//server.json`
+      # on Linux — a bug Windows packs cannot reproduce, so this runner is the only place the
+      # path is truly verified. Fail here, before the immutable nuget push. The solution pack
+      # emits four nupkgs and only the Cli one carries the manifest, so glob that package
+      # explicitly (a bare artifacts/*.nupkg would hand unzip four files and break). -Z1 lists
+      # one entry per line; -Fxq is a whole-line literal match, so the double-slash form fails
+      # it. Capturing into a variable first avoids a SIGPIPE false-failure from a live
+      # unzip|grep pipe.
+      - name: Verify server.json is packed at .mcp/server.json
+        run: |
+          entries="$(unzip -Z1 artifacts/SlideRule.Cli.*.nupkg)"
+          grep -Fxq '.mcp/server.json' <<<"$entries" || {
+            echo "::error::MCP manifest missing or mis-pathed in the packed nupkg (need .mcp/server.json)"
+            printf '%s\n' "$entries" | grep -i 'server\.json' || true
+            exit 1
+          }
+
+      # Both workflows run the same check, so the package-to-TFM table it reads lives in the script
+      # rather than in each of them — a framework bump has one place to find.
+      - name: Verify the XML documentation is packed
+        run: bash .github/scripts/verify-xml-docs-packed.sh artifacts
+
+      # The analyzer package is the one with no lib/ folder, so none of the checks above say anything
+      # about it. Its shape lives in the same place for the same reason, and this is the last moment
+      # it can be read before the push makes the version permanent.
+      - name: Verify the analyzer package shape
+        run: bash .github/scripts/verify-analyzer-package-shape.sh artifacts
+
+      # The contract package carries an analyzer and a completion provider inside it, neither of which
+      # any check above would notice going missing, and this is the last moment that shape can be read
+      # before the push makes the version permanent.
+      - name: Verify the contract package shape
+        run: bash .github/scripts/verify-contract-package-shape.sh artifacts
+
+      # Signed SLSA build provenance for the exact bytes built here (actions/attest emits
+      # provenance by default when no predicate is given). subject-path covers all seven
+      # artifacts — four .nupkg + three .snupkg, the analyzer package carrying no symbols of its
+      # own. Verify with:
+      #   gh attestation verify <file> --repo andypgray/sliderule
+      # Permissions: id-token + attestations only. Do NOT add artifact-metadata: write —
+      # that is for create-storage-record/push-to-registry, which file subjects don't use.
+      - name: Attest build provenance
+        id: attest
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            artifacts/*.nupkg
+            artifacts/*.snupkg
+
+      # Ship the Sigstore bundle as a release asset: enables offline verification
+      # (gh attestation verify --bundle) and is what Scorecard's Signed-Releases
+      # check looks for (it scans release assets for *.intoto.jsonl, not the API).
+      - name: Stage attestation bundle for the release
+        run: cp "${{ steps.attest.outputs.bundle-path }}" artifacts/attestation.intoto.jsonl
+
+      # Requested right before the push (not earlier) so the 1-hour, single-use key can't
+      # expire behind the slow build/test steps. `user` is the nuget.org profile name
+      # (not an email); the OIDC token is minted by the id-token: write permission above.
+      - name: NuGet login (OIDC → short-lived API key)
+        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1.2.0
+        id: login
+        with:
+          user: andypgray
+
+      # The glob pushes all four .nupkg; each .snupkg rides along automatically with its .nupkg.
+      - name: Push to NuGet
+        run: dotnet nuget push "artifacts/*.nupkg" --api-key "${{ steps.login.outputs.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
+
+      - name: Create GitHub release
+        run: gh release create "$GITHUB_REF_NAME" artifacts/*.nupkg artifacts/*.snupkg artifacts/attestation.intoto.jsonl --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  # Lists the released version in the official MCP registry (registry.modelcontextprotocol.io),
+  # which is the discovery surface for clients that do not read nuget.org. A separate job on
+  # purpose: it needs the packages to be live, so `needs: release` keeps a failed NuGet push
+  # from ever being advertised, and a registry outage cannot touch the publish it rides behind.
+  #
+  # Ownership is proven twice, with no stored credential. The login trades this job's GitHub
+  # OIDC token for publish rights on the io.github.andypgray/* namespace — the same id-token
+  # mechanism as the NuGet login above. The registry then validates the server independently:
+  # it fetches the package readme from nuget.org and requires the
+  # `mcp-name: io.github.andypgray/sliderule` marker the README carries. That second check is
+  # why the wait step polls for the marker rather than for the package: nuget.org serves the
+  # readme only after indexing, measurably later than the flat container has the bytes
+  # (~18 minutes, measured), and publishing before then fails validation.
+  mcp-registry:
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write  # OIDC: the registry's namespace grant; no long-lived registry token exists
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Capturing into a variable keeps a first-match grep from SIGPIPE-failing a live curl
+      # pipe, same as the unzip check above; `|| true` keeps a 404 (not yet indexed) polling.
+      - name: Wait for nuget.org to serve the readme the registry validates
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          for attempt in $(seq 1 45); do
+            readme="$(curl -fsS "https://api.nuget.org/v3-flatcontainer/sliderule.cli/$VERSION/readme" || true)"
+            if grep -q 'mcp-name: io.github.andypgray/sliderule' <<<"$readme"; then
+              echo "readme indexed with the mcp-name marker (attempt $attempt)"
+              exit 0
+            fi
+            sleep 60
+          done
+          echo "::error::nuget.org did not serve the readme with the mcp-name marker within 45 minutes; rerun this job once it does"
+          exit 1
+
+      # A release binary rather than an action, so the pin is the version plus its published
+      # sha256 digest — the same standing the SHA-pinned actions above have.
+      - name: Install mcp-publisher 1.8.1
+        run: |
+          curl -fsSLo mcp-publisher.tar.gz https://github.com/modelcontextprotocol/registry/releases/download/v1.8.1/mcp-publisher_linux_amd64.tar.gz
+          echo "a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc  mcp-publisher.tar.gz" | sha256sum -c -
+          tar -xzf mcp-publisher.tar.gz mcp-publisher
+
+      - name: Publish to the MCP registry
+        run: |
+          ./mcp-publisher login github-oidc
+          ./mcp-publisher publish .mcp/server.json

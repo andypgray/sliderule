@@ -1,0 +1,34 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/SlideRule/SlideRule.csproj" />
+    <Project Path="src/SlideRule.Analyzers/SlideRule.Analyzers.csproj" />
+    <Project Path="src/SlideRule.Cli/SlideRule.Cli.csproj" />
+    <Project Path="src/SlideRule.Extraction/SlideRule.Extraction.csproj" />
+    <Project Path="src/SlideRule.Packs.DotNet/SlideRule.Packs.DotNet.csproj" />
+    <Project Path="src/SlideRule.Roslyn/SlideRule.Roslyn.csproj" />
+    <Project Path="src/SlideRule.SpecAnalyzers/SlideRule.SpecAnalyzers.csproj" />
+    <Project Path="src/SlideRule.SpecCompletion/SlideRule.SpecCompletion.csproj" />
+    <Project Path="src/SlideRule.Xunit/SlideRule.Xunit.csproj" />
+  </Folder>
+  <Folder Name="/arch/">
+    <Project Path="arch/SlideRule.Architecture/SlideRule.Architecture.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/SlideRule.Tests/SlideRule.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/Fixtures/">
+    <Project Path="tests/Fixtures/SlideRule.ClassicAppSpec/SlideRule.ClassicAppSpec.csproj" />
+    <Project Path="tests/Fixtures/SlideRule.LegacyBrokenSpec/SlideRule.LegacyBrokenSpec.csproj" />
+    <Project Path="tests/Fixtures/SlideRule.LegacyProduct/SlideRule.LegacyProduct.csproj" />
+    <Project Path="tests/Fixtures/SlideRule.LegacySpec/SlideRule.LegacySpec.csproj" />
+    <Project Path="tests/Fixtures/SlideRule.MyAppCleanSpec/SlideRule.MyAppCleanSpec.csproj" />
+    <Project Path="tests/Fixtures/SlideRule.MyAppDerivedSpec/SlideRule.MyAppDerivedSpec.csproj" />
+    <Project Path="tests/Fixtures/SlideRule.MyAppQuarantinedSpec/SlideRule.MyAppQuarantinedSpec.csproj" />
+    <Project Path="tests/Fixtures/SlideRule.MyAppLayerSpec/SlideRule.MyAppLayerSpec.csproj" />
+    <Project Path="tests/Fixtures/SlideRule.MyAppRenderSpec/SlideRule.MyAppRenderSpec.csproj" />
+    <Project Path="tests/Fixtures/SlideRule.MyAppViolatedSpec/SlideRule.MyAppViolatedSpec.csproj" />
+    <Project Path="tests/Fixtures/SlideRule.PolyglotAppSpec/SlideRule.PolyglotAppSpec.csproj" />
+    <Project Path="tests/Fixtures/SlideRule.SharedFrameworkSpec/SlideRule.SharedFrameworkSpec.csproj" />
+    <Project Path="tests/Fixtures/SlideRule.SpecFixture/SlideRule.SpecFixture.csproj" />
+  </Folder>
+</Solution>

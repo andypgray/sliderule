@@ -1,0 +1,139 @@
+using System.Text;
+
+namespace SlideRule.Prose;
+
+/// <summary>
+///     Renders a <see cref="Type" /> to prose (GRAMMAR §5–6). Simple names are generic-aware and
+///     use declared type-parameter names (<c>IHandler&lt;T&gt;</c>, <c>IDictionary&lt;TKey, TValue&gt;</c>);
+///     the full-path helpers back the colliding-simple-name qualification rule.
+/// </summary>
+internal static class TypeName
+{
+    /// <summary>The simple (unqualified) display name, generic-aware: <c>IHandler&lt;T&gt;</c>, <c>Order</c>.</summary>
+    internal static string Simple(Type type)
+    {
+        if (!type.IsGenericType) return type.Name;
+
+        string baseName = StripArity(type.Name);
+
+        // A nested type's GetGenericArguments() lists the WHOLE chain's parameters, outermost-first; the leaf
+        // owns only the last IntroducedArity of them (the same distribution FullDisplay performs across the
+        // chain). A leaf that introduces none (a non-generic type nested in a generic one) has no <...> at all.
+        int arity = IntroducedArity(type);
+        if (arity == 0) return baseName;
+
+        Type[] all = type.GetGenericArguments();
+        string arguments = string.Join(", ", all.Skip(all.Length - arity).Select(Simple));
+        return baseName + "<" + arguments + ">";
+    }
+
+    /// <summary>
+    ///     The extraction-format fully-qualified name for a reflection type — byte-identical to what
+    ///     Roslyn's <c>SymbolDisplayFormat</c> (omitted global namespace, name-and-containing-types-
+    ///     and-namespaces, include-type-parameters, no special-type keywords) produces for the
+    ///     equivalent symbol.
+    /// </summary>
+    /// <exception cref="UnrepresentableTypeException">
+    ///     The type is a pointer, by-ref, or partially-open construction — no source-level form exists.
+    /// </exception>
+    /// <remarks>
+    ///     This is the essential correspondence that lets a spec's <c>typeof(...)</c> match an
+    ///     extracted <see cref="Codebase.TypeNode.FullName" /> /
+    ///     <see cref="Codebase.TypeConstruction.FullName" /> (GRAMMAR §4.1, §5.2). Forms:
+    ///     <list type="bullet">
+    ///         <item>non-generic: namespace + <see cref="Type.DeclaringType" /> chain dotted (<c>MyApp.Domain.Order.Line</c>)</item>
+    ///         <item>open generic: declared parameter names (<c>MyApp.Web.IHandler&lt;T&gt;</c>)</item>
+    ///         <item>
+    ///             closed generic: fully-qualified recursive arguments (<c>IHandler&lt;MyApp.Web.InvoiceCreated&gt;</c>,
+    ///             <c>IHandler&lt;System.Int32&gt;</c>)
+    ///         </item>
+    ///         <item>arrays: <c>Elem[]</c>; global-namespace types: bare simple name</item>
+    ///     </list>
+    /// </remarks>
+    internal static string FullDisplay(Type type)
+    {
+        if (type.IsByRef || type.IsPointer) throw new UnrepresentableTypeException(type);
+
+        // Emit the array rank: a rank-1 (SZ) array is `[]`, a rank-2 is `[,]`, a rank-3 `[,,]`, matching the
+        // form Roslyn's SymbolDisplay produces (a dropped rank would silently conflate `Elem[]` and `Elem[,]`).
+        if (type.IsArray) return FullDisplay(type.GetElementType()!) + "[" + new string(',', type.GetArrayRank() - 1) + "]";
+
+        if (type.IsGenericParameter) return type.Name;
+
+        // A partially-open construction (some arguments bound, some free) is not source-writable and
+        // has no extraction analog — the definition or a fully-closed construction do.
+        if (type is { ContainsGenericParameters: true, IsGenericTypeDefinition: false }) throw new UnrepresentableTypeException(type);
+
+        // The containing-type chain, outermost-first (includes the type itself). Namespace is taken
+        // once from the outermost link; nested types inherit it.
+        var chain = new List<Type>();
+        for (Type? link = type; link is not null; link = link.DeclaringType) chain.Insert(0, link);
+
+        Type[] arguments = type.IsGenericType ? type.GetGenericArguments() : Array.Empty<Type>();
+
+        var builder = new StringBuilder();
+        string? @namespace = chain[0].Namespace;
+        if (!string.IsNullOrEmpty(@namespace)) builder.Append(@namespace).Append('.');
+
+        var consumed = 0;
+        for (var i = 0; i < chain.Count; i++)
+        {
+            if (i > 0) builder.Append('.');
+            builder.Append(StripArity(chain[i].Name));
+
+            // Roslyn distributes the leaf's generic arguments across the chain: each link consumes
+            // the number of parameters it introduces (its own arity minus its parent's).
+            int arity = IntroducedArity(chain[i]);
+            if (arity == 0) continue;
+
+            builder.Append('<');
+            for (var a = 0; a < arity; a++)
+            {
+                if (a > 0) builder.Append(", ");
+                builder.Append(FullDisplay(arguments[consumed + a]));
+            }
+
+            builder.Append('>');
+            consumed += arity;
+        }
+
+        return builder.ToString();
+    }
+
+    private static int IntroducedArity(Type type)
+    {
+        if (!type.IsGenericType) return 0;
+
+        int own = type.GetGenericArguments().Length;
+        int parent = type.DeclaringType is { IsGenericType: true } declaring ? declaring.GetGenericArguments().Length : 0;
+        return own - parent;
+    }
+
+    /// <summary>
+    ///     The type's dot-separated path — namespace segments then the simple name — which the
+    ///     colliding-simple-name rule widens outward along (GRAMMAR §6).
+    /// </summary>
+    /// <remarks>
+    ///     This is the reflection arm of that rule's input; a string anchor supplies the same shape from
+    ///     its own FQN (<see cref="Model.TypeAnchor" />), so the widening algorithm itself
+    ///     (<see cref="ProseFormat.ResolvePathDisplays" />) never sees a <see cref="Type" />.
+    /// </remarks>
+    internal static IReadOnlyList<string> PathSegments(Type type)
+    {
+        var segments = new List<string>();
+        if (!string.IsNullOrEmpty(type.Namespace)) segments.AddRange(type.Namespace!.Split('.'));
+
+        segments.Add(Simple(type));
+        return segments;
+    }
+
+    /// <summary>
+    ///     The reflection name with any backtick arity suffix removed: <c>IHandler`1</c> →
+    ///     <c>IHandler</c>. Shared with validation, whose <c>typeof(...)</c> steer spells the same bare name.
+    /// </summary>
+    internal static string StripArity(string name)
+    {
+        int tick = name.IndexOf('`');
+        return tick < 0 ? name : name.Substring(0, tick);
+    }
+}

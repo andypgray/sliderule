@@ -1,0 +1,197 @@
+using Shouldly;
+using Xunit;
+using SlideRule.Baselines;
+using SlideRule.Checking;
+using SlideRule.Cli.Verbs;
+using SlideRule.Codebase;
+using SlideRule.Hosting;
+using SlideRule.Roslyn.Baselines;
+using SlideRule.Tests.Checking;
+using SlideRule.Tests.Extraction;
+using SlideRule.Tests.TestSupport;
+
+namespace SlideRule.Tests.Cli;
+
+/// <summary>
+///     The <c>baseline add</c> runner path (<see cref="BaselineRunner.AddEntry" />) over an in-memory
+///     fast-tier check — no workspace, unlike the fixture e2e.
+/// </summary>
+/// <remarks>
+///     The valve resolves a violation by its full-name pair and appends the entry its kind's identity keys
+///     (GRAMMAR §4.3). A <see cref="ViolationKind.MemberUse" /> violation resolved by a full-name
+///     <c>--target</c> carries a null <c>Target</c> slot (the regression the member row pins), so the echo
+///     renders through the shared full-name form (<c>Source -&gt; member display</c>, GRAMMAR §4.5) and the
+///     entry keys the member's <c>P:</c> symbol ID. A <see cref="ViolationKind.Construction" /> and an
+///     unfiltered catch (GRAMMAR §4.8) each key a plain <c>T:</c>-&gt;<c>T:</c>
+///     <see cref="BaselineEntry.ForEdge" /> entry, as a reference edge does, because their recorded sites are
+///     evidence, never identity.
+/// </remarks>
+public sealed class BaselineRunnerAddTests : IDisposable
+{
+    private const string RuleId = "time/inject-clock";
+    private const string CtorRuleId = "data-access/no-new";
+    private const string UnfilteredCatchRuleId = "exceptions/no-unfiltered-catch";
+
+    private const string Source = """
+                                  using System;
+                                  namespace MyApp.Web;
+                                  public class HomeController { public DateTime Stamp() => DateTime.Now; }
+                                  """;
+
+    private const string CtorSource = """
+                                      namespace MyApp.Data { public class Db {} }
+                                      namespace MyApp.Web { public class OrderController { public MyApp.Data.Db Load() => new MyApp.Data.Db(); } }
+                                      """;
+
+    // Three handlers catch the same domain error: two unfiltered (the ratchet's two current reds) and one
+    // behind a `when` filter, which the verb never counts at all — so the valve's candidate set is the two,
+    // and grandfathering one leaves the other red.
+    private const string UnfilteredCatchSource = """
+                                                 namespace Errors { public class DbError : System.Exception {} }
+                                                 namespace App
+                                                 {
+                                                     public class LegacyHandler { public void Run() { try { } catch (Errors.DbError) { } } }
+                                                     public class ImportHandler { public void Run() { try { } catch (Errors.DbError) { } } }
+                                                     public class GuardedHandler { public void Run(bool flag) { try { } catch (Errors.DbError) when (flag) { } } }
+                                                 }
+                                                 """;
+
+    private readonly TempDirectory _temp = TestTempRoot.Fresh("baseline-runner");
+
+    public void Dispose()
+    {
+        _temp.Dispose();
+    }
+
+    [Fact]
+    public void AddEntry_MemberUseViolationByFullNameTarget_AppendsMemberEntryWithPinnedEcho()
+    {
+        // Arrange — a captured (empty-section) member ratchet and one observed DateTime.Now use.
+        ArchitectureModel model = Checker.Model(arch => arch.Rule(RuleId)
+            .Migrate(
+                "controllers read the ambient clock",
+                arch.Types.MustNotUse(arch.Member(typeof(DateTime), nameof(DateTime.Now))))
+            .Baseline("member.json")
+            .Because("b"));
+        CheckReport report = ArchChecker.Check(model, CompilationFactory.Extract(Source), BaselineIndex.Empty);
+        string path = Path.Combine(_temp.Path, "member.json");
+        File.WriteAllText(path, BaselineComposer.Compose(RuleId));
+
+        var output = new StringWriter();
+        var runner = new BaselineRunner(output, TextWriter.Null);
+        BaselineRequest request = BaselineRequests.Add(
+            RuleId, "INC-1234", "MyApp.Web.HomeController", "System.DateTime.Now", _temp.Path);
+
+        // Act — the MemberUse violation reaches the added-entry echo with a null Target slot.
+        int exit = runner.AddEntry(request, report, _temp.Path);
+
+        // Assert — the pinned echo renders the member display, and the entry keys the P: member ID.
+        exit.ShouldBe(0);
+        var echo = output.ToString();
+        echo.ShouldContain(
+            "time/inject-clock: added 1 grandfathered entry — MyApp.Web.HomeController -> System.DateTime.Now (because: INC-1234).");
+        echo.ShouldContain("wrote member.json");
+
+        string written = File.ReadAllText(path)
+            .NormalizedLines();
+        written.ShouldContain(
+            "        { \"source\": \"T:MyApp.Web.HomeController\", \"target\": \"P:System.DateTime.Now\", \"siteCount\": 1, \"because\": \"INC-1234\", \"seal\": ");
+        // Composer as oracle: the whole file is the canonical composition of exactly that one entry.
+        written.ShouldBe(BaselineComposer.Compose(
+            RuleId,
+            BaselineEntry.ForEdge("T:MyApp.Web.HomeController", "P:System.DateTime.Now")
+                .WithSiteCount(1)
+                .WithBecause("INC-1234")));
+    }
+
+    [Fact]
+    public void AddEntry_ConstructionViolationByFullNameTarget_AppendsEdgeEntryWithPinnedEcho()
+    {
+        // Arrange — a captured (empty-section) construction ratchet and one observed `new MyApp.Data.Db()`.
+        ArchitectureModel model = Checker.Model(arch => arch.Rule(CtorRuleId)
+            .Migrate(
+                "controllers `new` the data layer directly",
+                arch.Namespace("MyApp.Web.*").MustNotConstruct(arch.Namespace("MyApp.Data.*")))
+            .Baseline("ctor.json")
+            .Because("b"));
+        CheckReport report = ArchChecker.Check(model, CompilationFactory.Extract(CtorSource), BaselineIndex.Empty);
+        string path = Path.Combine(_temp.Path, "ctor.json");
+        File.WriteAllText(path, BaselineComposer.Compose(CtorRuleId));
+
+        var output = new StringWriter();
+        var runner = new BaselineRunner(output, TextWriter.Null);
+        BaselineRequest request = BaselineRequests.Add(
+            CtorRuleId, "INC-9", "MyApp.Web.OrderController", "MyApp.Data.Db", _temp.Path);
+
+        // Act — the Construction violation reaches the added-entry echo; the constructed type rides the Target slot.
+        int exit = runner.AddEntry(request, report, _temp.Path);
+
+        // Assert — the echo renders Source -> Constructed via the shared full-name form, and the entry keys a
+        // plain T:->T: ForEdge (identical to a reference edge, GRAMMAR §4.3).
+        exit.ShouldBe(0);
+        var echo = output.ToString();
+        echo.ShouldContain(
+            "data-access/no-new: added 1 grandfathered entry — MyApp.Web.OrderController -> MyApp.Data.Db (because: INC-9).");
+        echo.ShouldContain("wrote ctor.json");
+
+        string written = File.ReadAllText(path)
+            .NormalizedLines();
+        written.ShouldContain(
+            "        { \"source\": \"T:MyApp.Web.OrderController\", \"target\": \"T:MyApp.Data.Db\", \"siteCount\": 1, \"because\": \"INC-9\", \"seal\": ");
+        // Composer as oracle: the whole file is the canonical composition of exactly that one edge entry.
+        written.ShouldBe(BaselineComposer.Compose(
+            CtorRuleId,
+            BaselineEntry.ForEdge("T:MyApp.Web.OrderController", "T:MyApp.Data.Db")
+                .WithSiteCount(1)
+                .WithBecause("INC-9")));
+    }
+
+    [Fact]
+    public void AddEntry_UnfilteredCatchViolation_AppendsEdgeEntryAndLeavesTheBystanderRed()
+    {
+        // Arrange — a captured (empty-section) ratchet over the filter-aware catch verb, and a codebase with two
+        // unfiltered catches of the banned type plus one behind a `when` filter.
+        ArchitectureModel model = Checker.Model(arch => arch.Rule(UnfilteredCatchRuleId)
+            .Migrate(
+                "legacy handlers wrap their work in an unfiltered broad catch",
+                arch.Namespace("App.*").MustNotCatchUnfiltered(arch.Namespace("Errors.*")))
+            .Baseline("catch.json")
+            .Because("b"));
+        CodebaseModel codebase = CompilationFactory.Extract(UnfilteredCatchSource);
+        CheckReport report = ArchChecker.Check(model, codebase, BaselineIndex.Empty);
+        report.Single()
+            .ShouldHaveFailedWithEdges(
+                ViolationKind.Catch, ["App.ImportHandler -> Errors.DbError", "App.LegacyHandler -> Errors.DbError"]);
+        string path = Path.Combine(_temp.Path, "catch.json");
+        File.WriteAllText(path, BaselineComposer.Compose(UnfilteredCatchRuleId));
+
+        var output = new StringWriter();
+        var runner = new BaselineRunner(output, TextWriter.Null);
+        BaselineRequest request = BaselineRequests.Add(
+            UnfilteredCatchRuleId, "INC-77", "App.LegacyHandler", "Errors.DbError", _temp.Path);
+
+        // Act — the valve resolves the unfiltered-catch violation by its (source, caught) type pair.
+        int exit = runner.AddEntry(request, report, _temp.Path);
+
+        // Assert — the echo and the appended entry are a plain T:->T: ForEdge, indistinguishable from the
+        // sibling catch verb's: this verb reads a different fact but keys the same identity.
+        exit.ShouldBe(0);
+        output.ToString()
+            .ShouldContain(
+                "exceptions/no-unfiltered-catch: added 1 grandfathered entry — App.LegacyHandler -> Errors.DbError (because: INC-77).");
+        File.ReadAllText(path)
+            .NormalizedLines()
+            .ShouldBe(BaselineComposer.Compose(
+                UnfilteredCatchRuleId,
+                BaselineEntry.ForEdge("T:App.LegacyHandler", "T:Errors.DbError")
+                    .WithSiteCount(1)
+                    .WithBecause("INC-77")));
+
+        // …and the ratchet holds on the bytes the valve wrote: re-checking against the file grandfathers the
+        // added edge and leaves ImportHandler's identical-looking catch — a distinct identity — red.
+        RuleResult ratcheted = ArchChecker.Check(model, codebase, BaselineStore.LoadForModel(model, _temp.Path))
+            .Single();
+        ratcheted.ShouldHaveFailedWithEdges(ViolationKind.Catch, ["App.ImportHandler -> Errors.DbError"]);
+        ratcheted.ShouldHaveGrandfathered(1);
+    }
+}

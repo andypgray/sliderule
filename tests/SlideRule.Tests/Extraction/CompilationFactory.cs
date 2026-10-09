@@ -1,0 +1,248 @@
+using System.Collections.Immutable;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Emit;
+using SlideRule.Codebase;
+using SlideRule.Extraction;
+using SlideRule.Roslyn;
+using SlideRule.Tests.TestSupport;
+
+namespace SlideRule.Tests.Extraction;
+
+/// <summary>
+///     Builds <see cref="CompilationInput" />s and <see cref="CodebaseModel" />s from source strings
+///     for the MSBuild-free fast path. Each source is parsed with an explicit file path so edge and
+///     declaration sites carry a stable, assertable path; by default the only metadata reference is the runtime
+///     core library (so BCL targets resolve, keeping predefined-type keywords out of the model).
+/// </summary>
+internal static class CompilationFactory
+{
+    // The full trusted-platform-assemblies set for the DI-aware overloads: the shared-framework assemblies
+    // plus the test project's own dependency assemblies (deployed to the output directory), which include the
+    // real Microsoft.Extensions.DependencyInjection.Abstractions (IServiceCollection, ServiceLifetime, the
+    // Add*/TryAdd* extensions) and Microsoft.Extensions.Hosting.Abstractions (IHostedService, AddHostedService)
+    // that the RegistrationRecognizer's symbol-first gate resolves against. Referencing the whole set is the
+    // robust way to give the metadata reference closure everything the abstractions' public signatures bind to.
+    private static readonly ImmutableArray<MetadataReference> DiReferences = TrustedPlatform.References;
+
+    // The same set minus Microsoft.Extensions.Hosting.Abstractions, which defines IHostedService — so
+    // GetTypeByMetadataName("...IHostedService") returns null and AddHostedService (supplied as a source stub)
+    // exercises the recognizer's implementation-only fallback (GRAMMAR §4.7).
+    private static readonly ImmutableArray<MetadataReference> DiReferencesNoHosting =
+        TrustedPlatform.Less("Microsoft.Extensions.Hosting.Abstractions.dll");
+
+    public static CompilationInput Compile(string projectName, params (string Path, string Source)[] files)
+    {
+        return new CompilationInput(CreateCompilation(projectName, [CoreLibrary], files), projectName, []);
+    }
+
+    public static CompilationInput Compile(string projectName, string source)
+    {
+        return Compile(projectName, ("Test.cs", source));
+    }
+
+    /// <summary>
+    ///     A second-project input that references <paramref name="referenced" /> as a compilation reference
+    ///     — so its types arrive as the referenced compilation's own <em>source</em> symbols, complete with
+    ///     declaring syntax, which is the form a whole-solution load and a live editor session hand over.
+    ///     <see cref="Reference" /> also builds the other form, a metadata image, and a fact about a referenced
+    ///     project holds only if it holds on both.
+    /// </summary>
+    public static CompilationInput CompileReferencing(
+        string projectName, Compilation referenced, string referencedProjectName, params (string Path, string Source)[] files)
+    {
+        return new CompilationInput(CreateCompilation(projectName, [CoreLibrary, referenced.ToMetadataReference()], files), projectName, [referencedProjectName]);
+    }
+
+    /// <summary>
+    ///     <paramref name="compilation" /> as a reference-assembly image. Takes a whole
+    ///     <see cref="Compilation" /> rather than sources, so a chain deeper than two projects is built
+    ///     bottom-up by feeding each image into the next compilation.
+    /// </summary>
+    public static MetadataReference ImageOf(Compilation compilation, MetadataReferenceProperties properties = default)
+    {
+        using var image = new MemoryStream();
+        EmitResult result = compilation.Emit(image, options: new EmitOptions(metadataOnly: true));
+        if (!result.Success)
+        {
+            IEnumerable<string> failures = result.Diagnostics.Select(diagnostic => diagnostic.ToString());
+            throw new InvalidOperationException(
+                $"Emitting '{compilation.AssemblyName}' metadata-only failed:\n{string.Join("\n", failures)}");
+        }
+
+        return MetadataReference.CreateFromImage(image.ToArray(), properties);
+    }
+
+    /// <summary>
+    ///     A reference to <paramref name="compilation" /> in either form a project reference takes: its own
+    ///     source symbols, or its <see cref="ImageOf">metadata image</see> when <paramref name="asImage" /> is set.
+    /// </summary>
+    public static MetadataReference Reference(Compilation compilation, bool asImage)
+    {
+        return asImage ? ImageOf(compilation) : compilation.ToMetadataReference();
+    }
+
+    /// <summary>
+    ///     A project input compiled against <paramref name="packages" /> as bare metadata references — the
+    ///     MSBuild-free stand-in for a <c>PackageReference</c>. Each package compilation must be handed here
+    ///     and <em>never</em> extracted as an input of its own, or it is a project of the solution rather
+    ///     than a package it references.
+    /// </summary>
+    /// <remarks>
+    ///     The difference from <see cref="CompileReferencing" /> is the empty project-reference list, and it
+    ///     matters: the merged project roster, the survey's declared-reference graph and the cache's Merkle
+    ///     edges all read that list, so naming a package there would have a fixture assert a project graph no
+    ///     csproj declares.
+    /// </remarks>
+    public static CompilationInput CompileAgainstPackages(
+        string projectName, IReadOnlyList<Compilation> packages, params (string Path, string Source)[] files)
+    {
+        MetadataReference[] references =
+        [
+            CoreLibrary,
+            .. packages.Select(package => package.ToMetadataReference())
+        ];
+
+        return new CompilationInput(CreateCompilation(projectName, references, files), projectName, []);
+    }
+
+    /// <summary>The runtime core library — the one metadata reference the MSBuild-free path needs.</summary>
+    public static MetadataReference CoreLibrary { get; } = TrustedPlatform.At(typeof(object).Assembly.Location);
+
+    public static CSharpCompilation CreateCompilation(
+        string name, IReadOnlyList<MetadataReference> references, params (string Path, string Source)[] files)
+    {
+        return CreateCompilation(name, references, OutputKind.DynamicallyLinkedLibrary, files);
+    }
+
+    /// <summary>
+    ///     The same, at <paramref name="kind" /> — <see cref="OutputKind.ConsoleApplication" /> being the kind
+    ///     that makes Roslyn synthesize the top-level-statements <c>Program</c> entry point.
+    /// </summary>
+    public static CSharpCompilation CreateCompilation(
+        string name, IReadOnlyList<MetadataReference> references, OutputKind kind, params (string Path, string Source)[] files)
+    {
+        SyntaxTree[] trees = files
+            .Select(f => CSharpSyntaxTree.ParseText(f.Source, path: f.Path))
+            .ToArray();
+        return CSharpCompilation.Create(name, trees, references, new CSharpCompilationOptions(kind));
+    }
+
+    /// <summary>Single-source convenience: extracts a model from one file in project <c>TestProject</c>.</summary>
+    public static CodebaseModel Extract(string source)
+    {
+        return CodebaseExtractor.ExtractFromCompilations([Compile("TestProject", source)]);
+    }
+
+    /// <summary>
+    ///     Extracts a model from a <see cref="OutputKind.ConsoleApplication" /> compilation — the output kind
+    ///     that makes Roslyn synthesize the top-level-statements <c>Program</c> entry point (a library has no
+    ///     entry point, so this is the only way to exercise it on the fast path).
+    /// </summary>
+    public static CodebaseModel ExtractConsoleApp(params (string Path, string Source)[] files)
+    {
+        CSharpCompilation compilation = CreateCompilation("TestProject", [CoreLibrary], OutputKind.ConsoleApplication, files);
+        return CodebaseExtractor.ExtractFromCompilations([new CompilationInput(compilation, "TestProject", [])]);
+    }
+
+    /// <summary>
+    ///     As <see cref="ExtractConsoleApp" />, but the sources are first run through
+    ///     <paramref name="generator" /> and the model is extracted from the <em>updated</em> compilation — so
+    ///     generator-emitted types enter extraction exactly as they do in a real build (GRAMMAR §4.1), beside
+    ///     the synthesized <c>Program</c> the console output kind brings. The driver's own generated trees ride
+    ///     through as the run's provenance, the way a workspace load reports its source-generated documents.
+    /// </summary>
+    public static CodebaseModel ExtractConsoleAppWithGenerator(
+        IIncrementalGenerator generator, params (string Path, string Source)[] files)
+    {
+        return ExtractConsoleAppWithGenerator(generator, true, files);
+    }
+
+    /// <summary>
+    ///     The same run with <paramref name="reportProvenance" /> deciding whether the driver's generated
+    ///     trees reach extraction at all. Passing <see langword="false" /> models every host that cannot say
+    ///     which trees a generator produced — a hand-built compilation, a replayed build log — and so leaves
+    ///     the banner as the only signal. Running one generator both ways is what separates the two arms:
+    ///     whatever changes verdict between them moved on provenance alone.
+    /// </summary>
+    public static CodebaseModel ExtractConsoleAppWithGenerator(
+        IIncrementalGenerator generator, bool reportProvenance, params (string Path, string Source)[] files)
+    {
+        CSharpCompilation compilation = CreateCompilation("TestProject", [CoreLibrary], OutputKind.ConsoleApplication, files);
+
+        // The driver is the return value, not the receiver: RunGeneratorsAndUpdateCompilation leaves the
+        // ORIGINAL driver empty, so discarding this hands GetRunResult an empty tree list.
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(generator)
+            .RunGeneratorsAndUpdateCompilation(compilation, out Compilation generated, out _);
+
+        IReadOnlySet<SyntaxTree>? generatedTrees = reportProvenance
+            ? driver.GetRunResult().GeneratedTrees.ToHashSet()
+            : null;
+
+        return CodebaseExtractor.ExtractFromCompilations(
+            [new CompilationInput(generated, "TestProject", [], GeneratedTrees: generatedTrees)]);
+    }
+
+    /// <summary>Multi-file convenience: extracts a model from several files in one project.</summary>
+    public static CodebaseModel Extract(string projectName, params (string Path, string Source)[] files)
+    {
+        return CodebaseExtractor.ExtractFromCompilations([Compile(projectName, files)]);
+    }
+
+    /// <summary>
+    ///     Extracts from a compilation with NO metadata references — not even the core library — so
+    ///     <c>Compilation.GetTypeByMetadataName</c> cannot resolve BCL types like <c>System.Exception</c>.
+    ///     Exercises the defensive null-lookup guards (a synthesized-type lookup that returns null mints
+    ///     nothing rather than throwing).
+    /// </summary>
+    public static CodebaseModel ExtractWithoutReferences(params (string Path, string Source)[] files)
+    {
+        CSharpCompilation compilation = CreateCompilation("NoRefs", [], files);
+        return CodebaseExtractor.ExtractFromCompilations([new CompilationInput(compilation, "NoRefs", [])]);
+    }
+
+    /// <summary>
+    ///     A single-project input compiled against the DI/Hosting abstractions (see <see cref="DiReferences" />),
+    ///     so <c>AddSingleton&lt;IFoo, Foo&gt;()</c>, <c>AddHostedService&lt;T&gt;()</c>, and the rest bind to
+    ///     the real framework symbols the registration recognizer (GRAMMAR §4.7) gates on. EF Core and
+    ///     Microsoft.Extensions.Http are absent from the suite, so <c>AddDbContext</c> / <c>AddHttpClient</c> tests
+    ///     add source stubs (a class in namespace <c>Microsoft.Extensions.DependencyInjection</c> with the right
+    ///     signature) as extra files — recognition is namespace + name + first-parameter, so a stub is faithful.
+    /// </summary>
+    public static CompilationInput CompileWithDi(string projectName, params (string Path, string Source)[] files)
+    {
+        return new CompilationInput(CreateCompilation(projectName, DiReferences, files), projectName, []);
+    }
+
+    /// <summary>
+    ///     Single-project convenience: extracts a model from DI-referencing source in project <c>TestProject</c>.
+    /// </summary>
+    public static CodebaseModel ExtractWithDi(params (string Path, string Source)[] files)
+    {
+        return CodebaseExtractor.ExtractFromCompilations([CompileWithDi("TestProject", files)]);
+    }
+
+    /// <summary>
+    ///     As <see cref="ExtractWithDi" /> but with Microsoft.Extensions.Hosting.Abstractions absent, so
+    ///     <c>IHostedService</c> does not resolve — for the <c>AddHostedService</c> implementation-only
+    ///     fallback (the call is supplied as a source stub, since the real extension lives in the removed
+    ///     assembly).
+    /// </summary>
+    public static CodebaseModel ExtractWithDiNoHosting(params (string Path, string Source)[] files)
+    {
+        CSharpCompilation compilation = CreateCompilation("TestProject", DiReferencesNoHosting, files);
+        return CodebaseExtractor.ExtractFromCompilations([new CompilationInput(compilation, "TestProject", [])]);
+    }
+
+    /// <summary>
+    ///     Extracts a model from a <see cref="OutputKind.ConsoleApplication" /> compilation against the
+    ///     DI/Hosting abstractions — the output kind that makes Roslyn synthesize the top-level-statements
+    ///     <c>Program</c>, so a registration call in top-level statements (the most common composition root,
+    ///     not a declared type) is exercised through the whole-compilation registration walk.
+    /// </summary>
+    public static CodebaseModel ExtractConsoleAppWithDi(params (string Path, string Source)[] files)
+    {
+        CSharpCompilation compilation = CreateCompilation("TestProject", DiReferences, OutputKind.ConsoleApplication, files);
+        return CodebaseExtractor.ExtractFromCompilations([new CompilationInput(compilation, "TestProject", [])]);
+    }
+}
