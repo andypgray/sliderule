@@ -81,7 +81,7 @@
              the description above and README.md state, and XunitRequirementSyncTests holds all three
              to one version. -->
         <PackageReference Include="xunit.v3.extensibility.core" Version="4.0.1" />
-        <PackageReference Include="xunit.v3.assert" Version="4.0.1" />
+        <PackageReference Include="xunit.v3.assert" Version="4.0.2" />
     </ItemGroup>
 
     <ItemGroup>
