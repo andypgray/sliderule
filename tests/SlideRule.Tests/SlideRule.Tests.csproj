@@ -64,7 +64,7 @@
         <!-- Differential-testing oracle: the ArchUnitNET core builds a rival architecture
              model from compiled MyApp IL (Mono.Cecil), cross-checking SlideRule's Roslyn-source model. -->
         <PackageReference Include="TngTech.ArchUnitNET" Version="0.13.4" />
-        <PackageReference Include="xunit.v3" Version="4.0.1" />
+        <PackageReference Include="xunit.v3" Version="4.0.2" />
     </ItemGroup>
 
     <ItemGroup>
