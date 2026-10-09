@@ -21,6 +21,6 @@
          OpenSSF Scorecard, which reads csproj files only and credits the property all-or-nothing across
          every one of them. -->
     <ItemGroup>
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.11" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.12" />
     </ItemGroup>
 </Project>
