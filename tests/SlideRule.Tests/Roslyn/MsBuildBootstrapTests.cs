@@ -1,8 +1,8 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Roslyn.Hosting;
 using SlideRule.Roslyn.MsBuild;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.Roslyn;
 
@@ -95,6 +95,29 @@ public sealed class MsBuildBootstrapTests
         // names the version it fell back to, which is the fact a load failure on such a machine turns on.
         description.ShouldBe(
             "Visual Studio Enterprise 2026 (18.7, via vswhere) — outside the tested VS 2019/2022 envelope");
+    }
+
+    [Theory]
+    [InlineData(null, "MSBuildLocator default (no Visual Studio install detected via vswhere)")]
+    [InlineData("vswhere did not answer within 10 s",
+        "MSBuildLocator default (no Visual Studio install detected via vswhere; vswhere did not answer within 10 s)")]
+    public void DescribeDefaultFallback_CarriesVswheresReasonWhenThereIsOne(string? whyNone, string expected)
+    {
+        // The bare form is what a host that never asks vswhere reports, and ci.yml matches it exactly there;
+        // on Windows the reason is what tells a missing vswhere from a wedged or failing one.
+        MsBuildBootstrap.DescribeDefaultFallback(whyNone)
+            .ShouldBe(expected);
+    }
+
+    [Fact]
+    public void DescribeDefaultFallback_NeverReadsAsAVisualStudioPick()
+    {
+        // ci.yml tells a Visual Studio pick from the fallback by the ', via vswhere)' that closes every
+        // DescribeSelection; the fallback's own 'via vswhere' must never be followed by that comma-led tail.
+        MsBuildBootstrap.DescribeDefaultFallback("vswhere listed no instances")
+            .ShouldNotContain(", via vswhere)");
+        MsBuildBootstrap.DescribeDefaultFallback(null)
+            .ShouldNotContain(", via vswhere)");
     }
 
     [Fact]

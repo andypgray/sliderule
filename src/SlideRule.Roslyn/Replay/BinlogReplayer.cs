@@ -185,7 +185,7 @@ internal static class BinlogReplayer
     // is unusable here — a dotted assembly name ("MyApp.Legacy.Billing") reads as extension ".Billing" — so
     // the guard tests the known assembly extensions explicitly.
     // Exposed internal (rather than kept private) so unit tests can drive the (path, OutputKind) → extension
-    // arms directly without a binlog, mirroring VsWhereLocator.ParseInstances / MsBuildBootstrap.SelectBestInstance.
+    // arms directly without a binlog, mirroring VsWhereLocator.Interpret / MsBuildBootstrap.SelectBestInstance.
     internal static string EnsureAssemblyExtension(string outputPath, OutputKind? outputKind)
     {
         string[] assemblyExtensions = [".dll", ".exe", ".netmodule", ".winmdobj"];

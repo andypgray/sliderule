@@ -151,14 +151,28 @@ internal static class MsBuildBootstrap
         string? overridePath = Environment.GetEnvironmentVariable(SlideRuleEnvVars.VsInstallPath);
         if (!string.IsNullOrWhiteSpace(overridePath)) return RegisterFromOverride(overridePath);
 
+        string? whyNone = null;
         if (OperatingSystem.IsWindows())
         {
-            VsInstance? best = SelectBestInstance(VsWhereLocator.Query());
+            (IReadOnlyList<VsInstance> instances, whyNone) = VsWhereLocator.Query();
+            VsInstance? best = SelectBestInstance(instances);
             if (best is not null) return RegisterFromVsInstance(best);
         }
 
         MSBuildLocator.RegisterDefaults();
-        return new MsBuildSelection("MSBuildLocator default (no Visual Studio install detected via vswhere)");
+        return new MsBuildSelection(DescribeDefaultFallback(whyNone));
+    }
+
+    /// <summary>
+    ///     The selection reported when no Visual Studio was taken, carrying vswhere's reason when there is one.
+    ///     Pure, like <see cref="DescribeSelection" />, so it can be pinned on any machine.
+    /// </summary>
+    // The bare form is what every non-Windows host reports, where vswhere is never asked, and ci.yml's MSBuild
+    // assertion matches it exactly on those legs; only the Windows arm grows a reason.
+    internal static string DescribeDefaultFallback(string? whyNone)
+    {
+        const string fallback = "MSBuildLocator default (no Visual Studio install detected via vswhere";
+        return whyNone is null ? fallback + ")" : $"{fallback}; {whyNone})";
     }
 
     private static MsBuildSelection RegisterFromOverride(string overridePath)

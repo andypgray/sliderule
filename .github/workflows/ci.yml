@@ -146,8 +146,11 @@ jobs:
             exit 1
           fi
 
-          # 'via vswhere)' is the VS-or-SDK answer; the envelope tail is which side of the VS 16/17 preference
-          # the image landed on. The tail is matched without its leading em dash so the comparison stays ASCII.
+          # ', via vswhere)' closes every Visual Studio pick and nothing else: the SDK fallback also says 'via
+          # vswhere', with a reason after it on Windows, so the comma is what tells the two apart. The envelope
+          # tail is which side of the VS 16/17 preference the image landed on, matched without its leading em
+          # dash so the comparison stays ASCII.
+          vs=', via vswhere)'
           outside='outside the tested VS 2019/2022 envelope'
           sdk='MSBuildLocator default (no Visual Studio install detected via vswhere)'
           bad=''
@@ -155,7 +158,7 @@ jobs:
             windows-2022)
               # The leg that gives the suite a VS 17 machine, which is what keeps the README's legacy claim
               # proven on an MSBuild inside the tested envelope.
-              if ! grep -Fq 'via vswhere)' <<<"$selection"; then
+              if ! grep -Fq "$vs" <<<"$selection"; then
                 bad='vswhere found no Visual Studio, so the tool fell back to the SDK MSBuild and this leg no longer tests VS 17'
               elif grep -Fq "$outside" <<<"$selection"; then
                 bad='the selected Visual Studio is outside the VS 16/17 preference, so this is no longer the VS 2022 leg'
@@ -164,7 +167,7 @@ jobs:
             windows-latest)
               # The VS-2026-only image. The comment at the top of this job asserts that in prose; this is the
               # line that checks it, and green here means the gap is still exposed rather than quietly closed.
-              if ! grep -Fq 'via vswhere)' <<<"$selection"; then
+              if ! grep -Fq "$vs" <<<"$selection"; then
                 bad='vswhere found no Visual Studio, so the tool fell back to the SDK MSBuild'
               elif ! grep -Fq "$outside" <<<"$selection"; then
                 bad='a VS 2019/2022 turned up on the image this job describes as shipping VS 2026 alone'
