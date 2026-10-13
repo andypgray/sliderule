@@ -1,7 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Shouldly;
-using Xunit;
 using SlideRule.Roslyn.Replay;
+using Xunit;
 
 namespace SlideRule.Tests.Replay;
 
@@ -10,7 +10,7 @@ namespace SlideRule.Tests.Replay;
 ///     blank-path guard that throws on the first line before any reader is opened, and
 ///     <see cref="BinlogReplayer.EnsureAssemblyExtension" />'s OutputKind → assembly-extension mapping (a pure
 ///     string function, exposed <c>internal</c> for this test). The full replay path is exercised end-to-end by
-///     the Serial <c>BinlogReplayFidelityTests</c>; these need no binlog fixture, so they are not Serial.
+///     <c>BinlogReplayFidelityTests</c>; these need no binlog fixture.
 /// </summary>
 public sealed class BinlogReplayerUnitTests
 {

@@ -1,5 +1,4 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Codebase;
 using SlideRule.Extraction;
 using SlideRule.Extraction.Fragments;
@@ -9,29 +8,37 @@ using SlideRule.Roslyn.Sessions;
 using SlideRule.Roslyn.Solutions;
 using SlideRule.Tests.Extraction;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.Roslyn;
 
 /// <summary>
 ///     Workspace-tier tests for <see cref="SessionFragmentStore" /> — the warm server's session-scoped
-///     incremental fragment store. Each test drives a real <see cref="WorkspaceSession" />, taken from the
-///     <see cref="WarmWorkspacePool" />, over its own restored fixture copy (MyApp, or MultiTfm for the
-///     multi-targeting rows) to obtain genuine <see cref="WorkspaceSnapshot" />s (generation + edit versions),
-///     then feeds them to the store and asserts on which projects it re-walked and on model equivalence — never
-///     on wall time. The MyApp reference graph is Domain → Web → Billing (Domain references Web, Web references
-///     Billing, Billing references nothing), so a Web edit's reverse-dependent closure is {Web, Domain} and
-///     Billing is reused. In the <see cref="SerialCollection">"Serial"</see> collection because each test
-///     reads two snapshots from one pooled session, and a class renting other solutions in between could
-///     evict it.
+///     incremental fragment store. Each test drives a real <see cref="WorkspaceSession" /> over a restored
+///     fixture copy (MyApp, or MultiTfm for the multi-targeting rows) to obtain genuine
+///     <see cref="WorkspaceSnapshot" />s (generation + edit versions), then feeds them to the store and asserts on
+///     which projects it re-walked and on model equivalence — never on wall time. The MyApp reference graph is
+///     Domain → Web → Billing (Domain references Web, Web references Billing, Billing references nothing), so a
+///     Web edit's reverse-dependent closure is {Web, Domain} and Billing is reused.
 /// </summary>
 /// <remarks>
-///     Nothing here needs a cold session, which is why the pool serves them all: a store starts with nothing
-///     extracted, so its first call full-walks whatever absolute generation the session is at, and every
-///     assertion is either on the store's own counters or on a relative generation comparison between two
-///     snapshots of one test.
+///     <para>
+///         Nearly every test reads two or more snapshots from one session and compares them, so the session has
+///         to be the same one throughout. The class owns one per solution (<see cref="Sessions" />) rather than renting
+///         from <see cref="WarmWorkspacePool" />, whose eviction a class running beside this one could trigger
+///         between two snapshots, bringing a new generation the test never caused.
+///     </para>
+///     <para>
+///         Nothing here needs a cold session: a store starts with nothing extracted, so its first call full-walks
+///         whatever absolute generation the session is at, and every assertion is either on the store's own
+///         counters or on a relative generation comparison between two snapshots of one test. What a test changes
+///         on disk it changes through <see cref="EditOnDisk" /> or after <see cref="Sessions.WillChange" />, and
+///         <see cref="Dispose" /> puts it back, bytes and mtime, so the next test's first acquisition reconciles
+///         the session to the pristine tree.
+///     </para>
 /// </remarks>
-[Collection("Serial")]
-public sealed class SessionFragmentStoreTests
+public sealed class SessionFragmentStoreTests(SessionFragmentStoreTests.Sessions sessions)
+    : IClassFixture<SessionFragmentStoreTests.Sessions>, IDisposable
 {
     private const string Domain = "MyApp.Domain";
     private const string Web = "MyApp.Web";
@@ -41,15 +48,21 @@ public sealed class SessionFragmentStoreTests
     private const string MultiTfmWidget = "MultiTfm.Core.Widget";
     private const string MultiTfmLegacyOnly = "MultiTfm.Core.Legacy.LegacyOnly";
 
+    /// <summary>Puts back every fixture file this test changed, whether it passed or not.</summary>
+    public void Dispose()
+    {
+        sessions.RestoreChanged();
+    }
+
     [Fact]
     public async Task GetFragmentsAsync_FirstCallThenSteadyState_ExtractsAllThenReusesAll()
     {
         // Arrange
-        using var fixture = new TempFixtureWorkspace();
+        SharedWorkspaceSession fixture = sessions.MyApp;
         using var store = new SessionFragmentStore();
 
         // Act 1 — the first call has nothing cached, so it flushes and walks every C# project.
-        WorkspaceSnapshot snap1 = await WarmWorkspacePool.GetCurrentAsync(fixture.SolutionPath, Ct);
+        WorkspaceSnapshot snap1 = await fixture.Session.GetCurrentAsync(fixture.SolutionPath, Ct);
         SessionFragmentSet first = await store.GetFragmentsAsync(snap1, null, Ct);
 
         // Assert 1 — all three re-extracted, and the merged model is byte-identical to a cold full extraction.
@@ -62,7 +75,7 @@ public sealed class SessionFragmentStoreTests
             .ShouldModelTheSameAs(coldModel);
 
         // Act 2 — a second call with disk untouched must reuse everything.
-        WorkspaceSnapshot snap2 = await WarmWorkspacePool.GetCurrentAsync(fixture.SolutionPath, Ct);
+        WorkspaceSnapshot snap2 = await fixture.Session.GetCurrentAsync(fixture.SolutionPath, Ct);
         SessionFragmentSet second = await store.GetFragmentsAsync(snap2, null, Ct);
 
         // Assert 2 — zero re-extraction, no extra full walk, and the reused fragments merge to the same model.
@@ -77,15 +90,15 @@ public sealed class SessionFragmentStoreTests
     public async Task GetFragmentsAsync_SourceEditedInOneProject_ReExtractsDirtyPlusDependents()
     {
         // Arrange — populate the store from the clean tree.
-        using var fixture = new TempFixtureWorkspace();
+        SharedWorkspaceSession fixture = sessions.MyApp;
         using var store = new SessionFragmentStore();
-        WorkspaceSnapshot snap1 = await WarmWorkspacePool.GetCurrentAsync(fixture.SolutionPath, Ct);
+        WorkspaceSnapshot snap1 = await fixture.Session.GetCurrentAsync(fixture.SolutionPath, Ct);
         await store.GetFragmentsAsync(snap1, null, Ct);
 
         // Act — append a new type to a Web source file (a content edit the sweep folds in place), then re-get.
         string webFile = fixture.PathOf(Web, "WebTextExtensions.cs");
-        FixtureEdits.EditOnDisk(webFile, content => content + "\npublic class WebIncrementalProbe { }\n");
-        WorkspaceSnapshot snap2 = await WarmWorkspacePool.GetCurrentAsync(fixture.SolutionPath, Ct);
+        EditOnDisk(webFile, content => content + "\npublic class WebIncrementalProbe { }\n");
+        WorkspaceSnapshot snap2 = await fixture.Session.GetCurrentAsync(fixture.SolutionPath, Ct);
         SessionFragmentSet edited = await store.GetFragmentsAsync(snap2, null, Ct);
 
         // Assert — re-extraction is EXACTLY Web (content-dirty) ∪ Domain (its only reverse-dependent); Billing,
@@ -106,15 +119,17 @@ public sealed class SessionFragmentStoreTests
     public async Task GetFragmentsAsync_CsprojTouched_FlushesAndFullReWalks()
     {
         // Arrange
-        using var fixture = new TempFixtureWorkspace();
+        SharedWorkspaceSession fixture = sessions.MyApp;
         using var store = new SessionFragmentStore();
-        WorkspaceSnapshot snap1 = await WarmWorkspacePool.GetCurrentAsync(fixture.SolutionPath, Ct);
+        WorkspaceSnapshot snap1 = await fixture.Session.GetCurrentAsync(fixture.SolutionPath, Ct);
         await store.GetFragmentsAsync(snap1, null, Ct);
         long walksBefore = store.FullWalkCount;
 
         // Act — a structural touch forces a full session reload (new generation), the store's flush signal.
-        File.SetLastWriteTimeUtc(fixture.PathOf(Domain, "MyApp.Domain.csproj"), DateTime.UtcNow.AddSeconds(2));
-        WorkspaceSnapshot snap2 = await WarmWorkspacePool.GetCurrentAsync(fixture.SolutionPath, Ct);
+        string csproj = fixture.PathOf(Domain, "MyApp.Domain.csproj");
+        sessions.WillChange(csproj);
+        File.SetLastWriteTimeUtc(csproj, DateTime.UtcNow.AddSeconds(2));
+        WorkspaceSnapshot snap2 = await fixture.Session.GetCurrentAsync(fixture.SolutionPath, Ct);
         SessionFragmentSet reloaded = await store.GetFragmentsAsync(snap2, null, Ct);
 
         // Assert — the generation moved, so the store flushed and re-walked every project via the reload path.
@@ -128,9 +143,9 @@ public sealed class SessionFragmentStoreTests
     {
         // Arrange — the store always holds fragments for every project (spec included); a tool drops its own
         // at merge time. This pins that the merge-time drop is byte-identical to never extracting the project.
-        using var fixture = new TempFixtureWorkspace();
+        SharedWorkspaceSession fixture = sessions.MyApp;
         using var store = new SessionFragmentStore();
-        WorkspaceSnapshot snapshot = await WarmWorkspacePool.GetCurrentAsync(fixture.SolutionPath, Ct);
+        WorkspaceSnapshot snapshot = await fixture.Session.GetCurrentAsync(fixture.SolutionPath, Ct);
         SessionFragmentSet all = await store.GetFragmentsAsync(snapshot, null, Ct);
 
         // Act — merge the store's fragments minus Billing (as CodebaseSource.Retain does) versus a cold
@@ -153,9 +168,9 @@ public sealed class SessionFragmentStoreTests
         // project is its single reverse-dependent. Three separately-keyed pieces of the store meet on that
         // one name — the edit-version dirty set, the per-name fragment eviction, and the includeProjects
         // filter re-extraction passes — so a project spelled two ways anywhere would strand a stale fragment.
-        using var fixture = new TempFixtureWorkspace("TestSolutions/MultiTfm", "MultiTfm.sln");
+        SharedWorkspaceSession fixture = sessions.MultiTfm;
         using var store = new SessionFragmentStore();
-        WorkspaceSnapshot clean = await WarmWorkspacePool.GetCurrentAsync(fixture.SolutionPath, Ct);
+        WorkspaceSnapshot clean = await fixture.Session.GetCurrentAsync(fixture.SolutionPath, Ct);
         SessionFragmentSet first = await store.GetFragmentsAsync(clean, null, Ct);
 
         // Both frameworks' fragments are held under the one project name from the start.
@@ -165,10 +180,10 @@ public sealed class SessionFragmentStoreTests
 
         // Act — an edit to a file both frameworks compile.
         string widget = fixture.PathOf(MultiTfmCore, "Widget.cs");
-        FixtureEdits.EditOnDisk(
+        EditOnDisk(
             widget,
             content => content + "\nnamespace MultiTfm.Core\n{\n    public class WidgetProbe\n    {\n    }\n}\n");
-        WorkspaceSnapshot edited = await WarmWorkspacePool.GetCurrentAsync(fixture.SolutionPath, Ct);
+        WorkspaceSnapshot edited = await fixture.Session.GetCurrentAsync(fixture.SolutionPath, Ct);
         SessionFragmentSet reExtracted = await store.GetFragmentsAsync(edited, null, Ct);
 
         // Assert — one name went dirty (plus its reverse-dependent), and BOTH of its fragments came back,
@@ -186,17 +201,17 @@ public sealed class SessionFragmentStoreTests
     public async Task GetFragmentsAsync_CommentOnlyEditInOneProject_RemapsSitesWithoutReWalking()
     {
         // Arrange — populate the store from the clean tree, and record where Web's sites sat.
-        using var fixture = new TempFixtureWorkspace();
+        SharedWorkspaceSession fixture = sessions.MyApp;
         using var store = new SessionFragmentStore();
-        WorkspaceSnapshot snap1 = await WarmWorkspacePool.GetCurrentAsync(fixture.SolutionPath, Ct);
+        WorkspaceSnapshot snap1 = await fixture.Session.GetCurrentAsync(fixture.SolutionPath, Ct);
         SessionFragmentSet clean = await store.GetFragmentsAsync(snap1, null, Ct);
         List<FragmentSite> sitesBefore = WebEdgeSites(clean);
 
         // Act — two comment lines at the top of a Web file: no fact changes, and every site below them moves
         // down exactly two lines.
         string homeController = fixture.PathOf(Web, "HomeController.cs");
-        FixtureEdits.EditOnDisk(homeController, content => "// probe one\n// probe two\n" + content);
-        WorkspaceSnapshot snap2 = await WarmWorkspacePool.GetCurrentAsync(fixture.SolutionPath, Ct);
+        EditOnDisk(homeController, content => "// probe one\n// probe two\n" + content);
+        WorkspaceSnapshot snap2 = await fixture.Session.GetCurrentAsync(fixture.SolutionPath, Ct);
         SessionFragmentSet edited = await store.GetFragmentsAsync(snap2, null, Ct);
 
         // Assert — nothing was re-walked. Web's stored fragments were moved instead, and Domain, its only
@@ -261,40 +276,40 @@ public sealed class SessionFragmentStoreTests
     {
         // Arrange — each call classifies against the text the STORED fragments describe, not against the load,
         // so a remap has to move that reference forward or the second trivia edit would be measured twice.
-        using var fixture = new TempFixtureWorkspace();
+        SharedWorkspaceSession fixture = sessions.MyApp;
         using var store = new SessionFragmentStore();
-        WorkspaceSnapshot snap1 = await WarmWorkspacePool.GetCurrentAsync(fixture.SolutionPath, Ct);
+        WorkspaceSnapshot snap1 = await fixture.Session.GetCurrentAsync(fixture.SolutionPath, Ct);
         await store.GetFragmentsAsync(snap1, null, Ct);
         string homeController = fixture.PathOf(Web, "HomeController.cs");
 
         // Act/Assert 1 — a comment edit remaps Web.
-        FixtureEdits.EditOnDisk(homeController, content => "// probe one\n" + content);
-        WorkspaceSnapshot snap2 = await WarmWorkspacePool.GetCurrentAsync(fixture.SolutionPath, Ct);
+        EditOnDisk(homeController, content => "// probe one\n" + content);
+        WorkspaceSnapshot snap2 = await fixture.Session.GetCurrentAsync(fixture.SolutionPath, Ct);
         SessionFragmentSet first = await store.GetFragmentsAsync(snap2, null, Ct);
         first.ReExtractedProjects.ShouldBeEmpty();
         store.LastRemappedProjects.ShouldBe([Web]);
         await ShouldMergeToTheColdModelAsync(first, snap2);
 
         // Act/Assert 2 — a second comment edit remaps again, against the sites the first one left behind.
-        FixtureEdits.EditOnDisk(homeController, content => "// probe two\n" + content);
-        WorkspaceSnapshot snap3 = await WarmWorkspacePool.GetCurrentAsync(fixture.SolutionPath, Ct);
+        EditOnDisk(homeController, content => "// probe two\n" + content);
+        WorkspaceSnapshot snap3 = await fixture.Session.GetCurrentAsync(fixture.SolutionPath, Ct);
         SessionFragmentSet second = await store.GetFragmentsAsync(snap3, null, Ct);
         second.ReExtractedProjects.ShouldBeEmpty();
         store.LastRemappedProjects.ShouldBe([Web]);
         await ShouldMergeToTheColdModelAsync(second, snap3);
 
         // Act/Assert 3 — a real edit re-walks Web and its dependent, and remaps nothing.
-        FixtureEdits.EditOnDisk(
+        EditOnDisk(
             homeController, content => content.Replace("\"total requested\"", "\"total requested!\""));
-        WorkspaceSnapshot snap4 = await WarmWorkspacePool.GetCurrentAsync(fixture.SolutionPath, Ct);
+        WorkspaceSnapshot snap4 = await fixture.Session.GetCurrentAsync(fixture.SolutionPath, Ct);
         SessionFragmentSet third = await store.GetFragmentsAsync(snap4, null, Ct);
         third.ReExtractedProjects.ShouldBe([Web, Domain], true);
         store.LastRemappedProjects.ShouldBeEmpty();
         await ShouldMergeToTheColdModelAsync(third, snap4);
 
         // Act/Assert 4 — and a comment edit after the re-walk remaps once more.
-        FixtureEdits.EditOnDisk(homeController, content => "// probe three\n" + content);
-        WorkspaceSnapshot snap5 = await WarmWorkspacePool.GetCurrentAsync(fixture.SolutionPath, Ct);
+        EditOnDisk(homeController, content => "// probe three\n" + content);
+        WorkspaceSnapshot snap5 = await fixture.Session.GetCurrentAsync(fixture.SolutionPath, Ct);
         SessionFragmentSet fourth = await store.GetFragmentsAsync(snap5, null, Ct);
         fourth.ReExtractedProjects.ShouldBeEmpty();
         store.LastRemappedProjects.ShouldBe([Web]);
@@ -307,15 +322,15 @@ public sealed class SessionFragmentStoreTests
     {
         // Arrange — one name, two compilations, and one file both of them compile and read alike: each
         // framework's fragment moves by its own map of that file.
-        using var fixture = new TempFixtureWorkspace("TestSolutions/MultiTfm", "MultiTfm.sln");
+        SharedWorkspaceSession fixture = sessions.MultiTfm;
         using var store = new SessionFragmentStore();
-        WorkspaceSnapshot clean = await WarmWorkspacePool.GetCurrentAsync(fixture.SolutionPath, Ct);
+        WorkspaceSnapshot clean = await fixture.Session.GetCurrentAsync(fixture.SolutionPath, Ct);
         await store.GetFragmentsAsync(clean, null, Ct);
 
         // Act
         string widget = fixture.PathOf(MultiTfmCore, "Widget.cs");
-        FixtureEdits.EditOnDisk(widget, content => "// probe one\n// probe two\n" + content);
-        WorkspaceSnapshot edited = await WarmWorkspacePool.GetCurrentAsync(fixture.SolutionPath, Ct);
+        EditOnDisk(widget, content => "// probe one\n// probe two\n" + content);
+        WorkspaceSnapshot edited = await fixture.Session.GetCurrentAsync(fixture.SolutionPath, Ct);
         SessionFragmentSet remapped = await store.GetFragmentsAsync(edited, null, Ct);
 
         // Assert — one name remapped, nothing re-walked, and BOTH of its fragments are still there under their
@@ -330,16 +345,16 @@ public sealed class SessionFragmentStoreTests
     {
         // Arrange — the sibling of the row above, over a file of the same project that the frameworks do NOT
         // read alike: Widget's other partial, which carries an #if.
-        using var fixture = new TempFixtureWorkspace("TestSolutions/MultiTfm", "MultiTfm.sln");
+        SharedWorkspaceSession fixture = sessions.MultiTfm;
         using var store = new SessionFragmentStore();
-        WorkspaceSnapshot clean = await WarmWorkspacePool.GetCurrentAsync(fixture.SolutionPath, Ct);
+        WorkspaceSnapshot clean = await fixture.Session.GetCurrentAsync(fixture.SolutionPath, Ct);
         SessionFragmentSet first = await store.GetFragmentsAsync(clean, null, Ct);
         string widgetLegacy = fixture.PathOf(MultiTfmCore, "Widget.Legacy.cs");
         List<int> linesBefore = LegacyEdgeLines(first, "netstandard2.0", widgetLegacy);
 
         // Act — the same trivia-only edit as above, on the file with the region.
-        FixtureEdits.EditOnDisk(widgetLegacy, content => "// probe one\n// probe two\n" + content);
-        WorkspaceSnapshot edited = await WarmWorkspacePool.GetCurrentAsync(fixture.SolutionPath, Ct);
+        EditOnDisk(widgetLegacy, content => "// probe one\n// probe two\n" + content);
+        WorkspaceSnapshot edited = await fixture.Session.GetCurrentAsync(fixture.SolutionPath, Ct);
         SessionFragmentSet remapped = await store.GetFragmentsAsync(edited, null, Ct);
 
         // Assert — one name remapped and nothing re-walked, the dependent included. Under net10.0 the region's
@@ -363,17 +378,17 @@ public sealed class SessionFragmentStoreTests
     {
         // Arrange — the row above's file, edited where only netstandard2.0 reads code. Text a framework disables
         // is part of its shape, so a comment inside the region is a shape change under net10.0.
-        using var fixture = new TempFixtureWorkspace("TestSolutions/MultiTfm", "MultiTfm.sln");
+        SharedWorkspaceSession fixture = sessions.MultiTfm;
         using var store = new SessionFragmentStore();
-        WorkspaceSnapshot clean = await WarmWorkspacePool.GetCurrentAsync(fixture.SolutionPath, Ct);
+        WorkspaceSnapshot clean = await fixture.Session.GetCurrentAsync(fixture.SolutionPath, Ct);
         await store.GetFragmentsAsync(clean, null, Ct);
 
         // Act — reword the comment above the field, which moves no line.
         string widgetLegacy = fixture.PathOf(MultiTfmCore, "Widget.Legacy.cs");
-        FixtureEdits.EditOnDisk(
+        EditOnDisk(
             widgetLegacy,
             content => content.Replace("this field is not in the model", "this field is absent from the model"));
-        WorkspaceSnapshot edited = await WarmWorkspacePool.GetCurrentAsync(fixture.SolutionPath, Ct);
+        WorkspaceSnapshot edited = await fixture.Session.GetCurrentAsync(fixture.SolutionPath, Ct);
         SessionFragmentSet reWalked = await store.GetFragmentsAsync(edited, null, Ct);
 
         // Assert — net10.0's shape changed, so the name re-walks together with its reverse-dependent: safe, only
@@ -407,17 +422,17 @@ public sealed class SessionFragmentStoreTests
     {
         // Arrange — a file net10.0's compile items leave out, so an edit to it changes netstandard2.0's
         // compilation alone and net10.0's has no maps to move its fragment by.
-        using var fixture = new TempFixtureWorkspace("TestSolutions/MultiTfm", "MultiTfm.sln");
+        SharedWorkspaceSession fixture = sessions.MultiTfm;
         using var store = new SessionFragmentStore();
-        WorkspaceSnapshot clean = await WarmWorkspacePool.GetCurrentAsync(fixture.SolutionPath, Ct);
+        WorkspaceSnapshot clean = await fixture.Session.GetCurrentAsync(fixture.SolutionPath, Ct);
         string legacyBuildOnly = fixture.PathOf(MultiTfmCore, "LegacyBuildOnly.cs");
         FrameworksCompiling(clean, legacyBuildOnly)
             .ShouldBe(["netstandard2.0"]);
         await store.GetFragmentsAsync(clean, null, Ct);
 
         // Act
-        FixtureEdits.EditOnDisk(legacyBuildOnly, content => "// probe one\n// probe two\n" + content);
-        WorkspaceSnapshot edited = await WarmWorkspacePool.GetCurrentAsync(fixture.SolutionPath, Ct);
+        EditOnDisk(legacyBuildOnly, content => "// probe one\n// probe two\n" + content);
+        WorkspaceSnapshot edited = await fixture.Session.GetCurrentAsync(fixture.SolutionPath, Ct);
         SessionFragmentSet remapped = await store.GetFragmentsAsync(edited, null, Ct);
 
         // Assert — one name remapped and nothing re-walked: the framework that saw no changed document is not a
@@ -433,17 +448,17 @@ public sealed class SessionFragmentStoreTests
     // the clean tree, edit one Web source file, re-get. Four [Fact]s rather than a [Theory] because they are
     // four distinct facts about what reaches a document's shape, and theory data carrying source text lands
     // in every display name.
-    private static async Task ShouldReWalkWebAndDomain(Func<string, string> edit)
+    private async Task ShouldReWalkWebAndDomain(Func<string, string> edit)
     {
         // Arrange
-        using var fixture = new TempFixtureWorkspace();
+        SharedWorkspaceSession fixture = sessions.MyApp;
         using var store = new SessionFragmentStore();
-        WorkspaceSnapshot snap1 = await WarmWorkspacePool.GetCurrentAsync(fixture.SolutionPath, Ct);
+        WorkspaceSnapshot snap1 = await fixture.Session.GetCurrentAsync(fixture.SolutionPath, Ct);
         await store.GetFragmentsAsync(snap1, null, Ct);
 
         // Act
-        FixtureEdits.EditOnDisk(fixture.PathOf(Web, "HomeController.cs"), edit);
-        WorkspaceSnapshot snap2 = await WarmWorkspacePool.GetCurrentAsync(fixture.SolutionPath, Ct);
+        EditOnDisk(fixture.PathOf(Web, "HomeController.cs"), edit);
+        WorkspaceSnapshot snap2 = await fixture.Session.GetCurrentAsync(fixture.SolutionPath, Ct);
         SessionFragmentSet edited = await store.GetFragmentsAsync(snap2, null, Ct);
 
         // Assert — the shape changed, so Web and its reverse-dependent Domain were re-walked, nothing was
@@ -462,20 +477,20 @@ public sealed class SessionFragmentStoreTests
     // differently. Both compilations file their maps for it under one key, the maps disagree, and the store refuses
     // rather than resolving: the name re-walks with its reverse-dependent. They are separate [Fact]s rather than a
     // [Theory] because each is a distinct fact about when the store refuses.
-    private static async Task ShouldReWalkCoreAndWebWithNoRecordedFrameworksAsync(string fileName)
+    private async Task ShouldReWalkCoreAndWebWithNoRecordedFrameworksAsync(string fileName)
     {
         // Arrange
-        using var fixture = new TempFixtureWorkspace("TestSolutions/MultiTfm", "MultiTfm.sln");
+        SharedWorkspaceSession fixture = sessions.MultiTfm;
         using var store = new SessionFragmentStore();
-        WorkspaceSnapshot clean = await WarmWorkspacePool.GetCurrentAsync(fixture.SolutionPath, Ct);
+        WorkspaceSnapshot clean = await fixture.Session.GetCurrentAsync(fixture.SolutionPath, Ct);
         string path = fixture.PathOf(MultiTfmCore, fileName);
         FrameworksCompiling(clean, path)
             .ShouldBe(["net10.0", "netstandard2.0"]);
         await store.GetFragmentsAsync(clean with { TargetFrameworks = TargetFrameworkMaps.None }, null, Ct);
 
         // Act
-        FixtureEdits.EditOnDisk(path, content => "// probe one\n// probe two\n" + content);
-        WorkspaceSnapshot edited = await WarmWorkspacePool.GetCurrentAsync(fixture.SolutionPath, Ct);
+        EditOnDisk(path, content => "// probe one\n// probe two\n" + content);
+        WorkspaceSnapshot edited = await fixture.Session.GetCurrentAsync(fixture.SolutionPath, Ct);
         WorkspaceSnapshot unattributed = edited with { TargetFrameworks = TargetFrameworkMaps.None };
         SessionFragmentSet reWalked = await store.GetFragmentsAsync(unattributed, null, Ct);
 
@@ -566,5 +581,53 @@ public sealed class SessionFragmentStoreTests
             .Distinct(PathComparison.Comparer)
             .Order(PathComparison.Comparer)
             .ToList();
+    }
+
+    // FixtureEdits.EditOnDisk on a class-shared copy: the file is recorded first, so Dispose puts it back.
+    private void EditOnDisk(string path, Func<string, string> transform)
+    {
+        sessions.WillChange(path);
+        FixtureEdits.EditOnDisk(path, transform);
+    }
+
+    /// <summary>
+    ///     The class's two sessions, one per solution it reads, each over a copy of its own, and the record of
+    ///     what the running test changed in either copy.
+    /// </summary>
+    /// <remarks>
+    ///     A session per test would add a cold load to every test; one per class costs about what the pool did.
+    ///     The copies outlive each test, so a test that changes a file must put it back, and
+    ///     <see cref="RestoreChanged" /> does that for every file recorded through <see cref="WillChange" />.
+    /// </remarks>
+    public sealed class Sessions : IAsyncDisposable
+    {
+        private readonly Dictionary<string, (byte[] bytes, DateTime mtime)> _changed = new(PathComparison.Comparer);
+
+        /// <summary>The MyApp fixture's session.</summary>
+        internal SharedWorkspaceSession MyApp { get; } = new();
+
+        /// <summary>The MultiTfm fixture's session.</summary>
+        internal SharedWorkspaceSession MultiTfm { get; } = new("TestSolutions/MultiTfm", "MultiTfm.sln");
+
+        /// <summary>Disposes both sessions and deletes their copies.</summary>
+        public async ValueTask DisposeAsync()
+        {
+            await MyApp.DisposeAsync();
+            await MultiTfm.DisposeAsync();
+        }
+
+        /// <summary>Records a file's bytes and mtime before the running test first changes it.</summary>
+        internal void WillChange(string path)
+        {
+            if (!_changed.ContainsKey(path)) _changed[path] = FileSnapshot.Capture(path);
+        }
+
+        /// <summary>Puts back every recorded file, bytes and mtime, and forgets them.</summary>
+        internal void RestoreChanged()
+        {
+            foreach (KeyValuePair<string, (byte[] bytes, DateTime mtime)> changed in _changed)
+                FileSnapshot.Restore(changed.Key, changed.Value);
+            _changed.Clear();
+        }
     }
 }

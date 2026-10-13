@@ -679,9 +679,9 @@ public sealed class SlideRuleArchitectureSpec : IArchitectureSpec
 
     private static void StaticState(Arch arch, Selection shipping)
     {
-        // The subject is fields only, so the two static `{ get; private set; }` diagnostics properties
-        // (MsBuildBootstrap.LastSelection, MsBuildGate.LastAcquisition) are outside it. Leaving them out is
-        // a choice: `.Properties.ThatAreStatic().MustBeGetOnly()` would reach them (GRAMMAR §11).
+        // The subject is fields only, so the static `{ get; private set; }` diagnostics property
+        // (MsBuildBootstrap.LastSelection) is outside it. Leaving it out is a choice:
+        // `.Properties.ThatAreStatic().MustBeGetOnly()` would reach it (GRAMMAR §11).
         arch.Rule("state/no-static-mutable")
             .Enforce(shipping
                 .Authored()

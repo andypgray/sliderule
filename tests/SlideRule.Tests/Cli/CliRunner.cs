@@ -1,8 +1,11 @@
 using System.CommandLine;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using SlideRule.Cli;
 using SlideRule.Cli.Mcp.Infrastructure;
 using SlideRule.Cli.Pipeline;
+using SlideRule.Cli.Replay;
+using SlideRule.Roslyn;
 using SlideRule.Tests.TestSupport;
 
 namespace SlideRule.Tests.Cli;
@@ -10,19 +13,31 @@ namespace SlideRule.Tests.Cli;
 /// <summary>The result of an in-process CLI invocation.</summary>
 internal sealed record CliResult(int Exit, string Out, string Err)
 {
+    /// <summary>The workspace loads of this one invocation, exact whatever runs beside it.</summary>
+    internal long Loads { get; init; }
+
     /// <summary>
-    ///     Runs <paramref name="invoke" /> against a fresh writer pair and captures both channels beside the
-    ///     exit code — the shape every in-process driver shares, whether it goes through the whole CLI or
-    ///     constructs one runner directly to inject a seam the command line cannot spell.
+    ///     The MSBuild-gate branch of this one invocation, exact whatever runs beside it; <c>null</c> when the
+    ///     invocation never reaches the gate (explain, render, baseline, or a runner driven directly).
+    /// </summary>
+    internal GateAcquisition? Gate { get; init; }
+
+    /// <summary>
+    ///     Runs <paramref name="invoke" /> against a fresh writer pair and captures both channels, the workspace
+    ///     loads and the gate branch beside the exit code — the shape every in-process driver shares, whether it
+    ///     goes through the whole CLI or constructs one runner directly to inject a seam the command line cannot
+    ///     spell.
     /// </summary>
     internal static async Task<CliResult> CapturedAsync(Func<TextWriter, TextWriter, Task<int>> invoke)
     {
         var output = new StringWriter();
         var error = new StringWriter();
+        StrongBox<long> loads = WorkspaceLoader.CountLoadsOnThisFlow();
+        StrongBox<GateAcquisition?> gate = MsBuildGate.RecordAcquisitionOnThisFlow();
 
         int exit = await invoke(output, error);
 
-        return new CliResult(exit, output.ToString(), error.ToString());
+        return new CliResult(exit, output.ToString(), error.ToString()) { Loads = loads.Value, Gate = gate.Value };
     }
 }
 
@@ -124,8 +139,8 @@ internal static class CliRunner
 
     /// <summary>
     ///     Runs the CLI with no host source, so every workspace command opens (and disposes) its own
-    ///     <c>MSBuildWorkspace</c>. For tests that assert on <see cref="SlideRule.Roslyn.WorkspaceLoader.LoadCount" />
-    ///     or otherwise measure whether a design-time build ran.
+    ///     <c>MSBuildWorkspace</c>. For tests that read <see cref="CliResult.Loads" /> or otherwise measure
+    ///     whether a design-time build ran: the warm pool would answer from a session it already loaded.
     /// </summary>
     public static Task<CliResult> InvokeColdAsync(params string[] args)
     {

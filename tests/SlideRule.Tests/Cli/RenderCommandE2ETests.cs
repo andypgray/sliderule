@@ -1,16 +1,15 @@
 using System.Text;
 using System.Text.Json;
 using Shouldly;
-using Xunit;
 using SlideRule.Cli.Pipeline;
 using SlideRule.Cli.Settings;
 using SlideRule.Cli.Verbs;
 using SlideRule.ModelFile;
 using SlideRule.Rendering;
-using SlideRule.Roslyn;
 using SlideRule.Tests.Mcp.TestDoubles;
 using SlideRule.Tests.ModelFile;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.Cli;
 
@@ -32,7 +31,6 @@ namespace SlideRule.Tests.Cli;
 ///     <c>unchanged</c> where it expects <c>wrote</c> — decided by whichever spec wrote the bed last.
 ///     The copy's reset closes that off, so no row needs a teardown of its own.
 /// </remarks>
-[Collection("Serial")]
 public sealed class RenderCommandE2ETests : IDisposable
 {
     // The provenance line every rendered block opens with, per spec, and the install note the ROOT block
@@ -523,16 +521,15 @@ public sealed class RenderCommandE2ETests : IDisposable
     }
 
     // Renders cold — every invocation opens (or declines to open) its own workspace, which is what makes the
-    // load-count delta mean "did this run reach MSBuild" — with the persisted cache isolated at a private root.
+    // load count mean "did this run reach MSBuild" — with the persisted cache isolated at a private root.
     private async Task<(CliResult Result, long Loads)> RenderAsync(string cacheRoot, params string[] extra)
     {
         FakeEnvironment environment = FakeEnvironment.WithCacheRoot(cacheRoot);
         string[] args =
             ["render", _workspace.SolutionPath, "--spec", CliRunner.RenderSpecDll, .. extra];
 
-        long before = WorkspaceLoader.LoadCount;
         CliResult result = await CliRunner.InvokeColdAsync(environment, args);
-        return (result, WorkspaceLoader.LoadCount - before);
+        return (result, result.Loads);
     }
 
     // The runner directly rather than the command tree, because the walk count is a runner observable the

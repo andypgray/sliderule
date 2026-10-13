@@ -1,8 +1,7 @@
 using Shouldly;
-using Xunit;
-using SlideRule.Roslyn;
 using SlideRule.Tests.Mcp.TestDoubles;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.Cli;
 
@@ -23,12 +22,9 @@ namespace SlideRule.Tests.Cli;
 ///     <para>
 ///         Every run is by convention rather than <c>--spec</c>, because the recorded resolution is keyed on
 ///         the normalized spec argument: the filling run and the reading run have to spell it the same way
-///         or the hit falls back to a cold resolve and the fact would pass for the wrong reason. In the
-///         "Serial" collection because it reads the change in <c>WorkspaceLoader.LoadCount</c>, which a
-///         load anywhere else in the process would move.
+///         or the hit falls back to a cold resolve and the fact would pass for the wrong reason.
 ///     </para>
 /// </remarks>
-[Collection("Serial")]
 public sealed class ExplainCacheE2ETests
 {
     private const string RuleId = LayoutAppFixture.RuleId;
@@ -84,15 +80,14 @@ public sealed class ExplainCacheE2ETests
         return RunAsync(cacheRoot, ["explain", RuleId, workspace.SolutionPath, .. extra]);
     }
 
-    // Cold, so the load-count delta means "did this run reach MSBuild", with the persisted caches isolated at
-    // a private root.
+    // Cold, so the load count means "did this run reach MSBuild", with the persisted caches isolated at a
+    // private root.
     private static async Task<(CliResult Result, long Loads)> RunAsync(string cacheRoot, params string[] args)
     {
         FakeEnvironment environment = FakeEnvironment.WithCacheRoot(cacheRoot);
 
-        long before = WorkspaceLoader.LoadCount;
         CliResult result = await CliRunner.InvokeColdAsync(environment, args);
-        return (result, WorkspaceLoader.LoadCount - before);
+        return (result, result.Loads);
     }
 
     // The output-layout fixture, copied, restored and really built under the default layout. Leased per class

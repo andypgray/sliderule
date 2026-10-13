@@ -16,15 +16,37 @@ namespace SlideRule.Roslyn;
 /// </summary>
 internal static class WorkspaceLoader
 {
+    // Every box counting this flow, outermost first. Replaced, never mutated, so an inner install is invisible
+    // once the async method that made it returns, and an outer counter keeps counting through it.
+    private static readonly AsyncLocal<StrongBox<long>[]?> LoadsOnThisFlow = new();
+
     private static long _loadCount;
 
     /// <summary>
     ///     The number of times <see cref="LoadAsync" /> has opened an <see cref="MSBuildWorkspace" /> in
-    ///     this process — the "a design-time build ran" pin. The binlog-replay path deliberately
-    ///     bypasses this method, so a run that replays a capture leaves this counter unchanged. Internal
-    ///     test observable, incremented with <see cref="Interlocked" />; never consulted in production.
+    ///     this process, whoever caused it — the run's total. The binlog-replay path deliberately bypasses
+    ///     this method, so a run that replays a capture leaves this counter unchanged. A test that needs the
+    ///     loads of one call alone, whatever runs beside it, reads <see cref="CountLoadsOnThisFlow" />
+    ///     instead. Internal test observable, incremented with <see cref="Interlocked" />; never consulted in
+    ///     production.
     /// </summary>
     internal static long LoadCount => Interlocked.Read(ref _loadCount);
+
+    /// <summary>
+    ///     Starts counting the loads of this async flow and the tasks it starts, and returns the box
+    ///     <see cref="LoadAsync" /> increments for each. Install it before the call whose loads it should
+    ///     count. A counter installed further out keeps counting too, so a per-test count and a per-call count
+    ///     can nest. Synchronous on purpose: a value an async method sets is discarded when it returns, so only
+    ///     a synchronous installer leaves the box in place for its caller. Internal test observable; never
+    ///     consulted in production.
+    /// </summary>
+    internal static StrongBox<long> CountLoadsOnThisFlow()
+    {
+        var box = new StrongBox<long>();
+        StrongBox<long>[] outer = LoadsOnThisFlow.Value ?? [];
+        LoadsOnThisFlow.Value = [.. outer, box];
+        return box;
+    }
 
     /// <summary>
     ///     Opens <paramref name="solutionPath" /> through a fresh MSBuild workspace and returns the loaded
@@ -60,6 +82,7 @@ internal static class WorkspaceLoader
         string solutionPath, Action<string>? diagnosticLog = null, CancellationToken ct = default)
     {
         Interlocked.Increment(ref _loadCount);
+        foreach (StrongBox<long> box in LoadsOnThisFlow.Value ?? []) Interlocked.Increment(ref box.Value);
 
         var workspace = MSBuildWorkspace.Create();
         workspace.RegisterWorkspaceFailedHandler(e =>

@@ -1,8 +1,9 @@
 using System.Collections.Concurrent;
 using System.Reflection;
-using Xunit.v3;
+using System.Runtime.CompilerServices;
 using SlideRule.Roslyn;
 using SlideRule.Tests.TestSupport;
+using Xunit.v3;
 
 [assembly: WorkspaceLoadProbe]
 
@@ -18,10 +19,8 @@ namespace SlideRule.Tests.TestSupport;
 ///     <para>
 ///         Set <c>SLIDERULE_LOAD_PROBE</c> to a path and run the suite; the file is written at pipeline
 ///         shutdown as TSV (<c>class</c>, <c>method</c>, <c>loads</c>, <c>ms</c>), one row per test that
-///         opened at least one workspace, plus a trailing total. The count is process-wide, so attribution
-///         is exact only for a test nothing overlaps: one in the <see cref="SerialCollection">"Serial"</see>
-///         collection, or any test under <c>-parallelMode none</c>. In a parallel run a test's row also counts
-///         the loads of whatever ran beside it, and the total counts those loads more than once.
+///         opened at least one workspace, plus a trailing total. Each row counts the loads on its own test's
+///         async flow, so it is exact in a parallel run too; the total is the process-wide count.
 ///     </para>
 /// </remarks>
 internal sealed class WorkspaceLoadProbeAttribute : BeforeAfterTestAttribute
@@ -33,8 +32,6 @@ internal sealed class WorkspaceLoadProbeAttribute : BeforeAfterTestAttribute
 
     private static readonly ConcurrentDictionary<IXunitTest, Reading> Started = new();
 
-    private static long _totalLoads;
-
     private static bool Enabled => !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(ProbeFileVariable));
 
     /// <inheritdoc />
@@ -42,7 +39,9 @@ internal sealed class WorkspaceLoadProbeAttribute : BeforeAfterTestAttribute
     {
         if (!Enabled) return;
 
-        Started[test] = new Reading(WorkspaceLoader.LoadCount, Environment.TickCount64);
+        // Installed here, on the flow the test body then runs on, so the box counts this test's loads alone.
+        StrongBox<long> loads = WorkspaceLoader.CountLoadsOnThisFlow();
+        Started[test] = new Reading(loads, Environment.TickCount64);
     }
 
     /// <inheritdoc />
@@ -50,10 +49,9 @@ internal sealed class WorkspaceLoadProbeAttribute : BeforeAfterTestAttribute
     {
         if (!Started.TryRemove(test, out Reading before)) return;
 
-        long loads = WorkspaceLoader.LoadCount - before.Loads;
+        long loads = Interlocked.Read(ref before.Loads.Value);
         if (loads == 0) return;
 
-        Interlocked.Add(ref _totalLoads, loads);
         long elapsed = Environment.TickCount64 - before.Ticks;
         string testClass = methodUnderTest.DeclaringType?.Name ?? "(unknown)";
         Rows.Enqueue($"{testClass}\t{methodUnderTest.Name}\t{loads}\t{elapsed}");
@@ -70,7 +68,7 @@ internal sealed class WorkspaceLoadProbeAttribute : BeforeAfterTestAttribute
         {
             var lines = new List<string> { "class\tmethod\tloads\tms" };
             lines.AddRange(Rows.OrderBy(r => r, StringComparer.Ordinal));
-            lines.Add($"TOTAL\t\t{Interlocked.Read(ref _totalLoads)}\t");
+            lines.Add($"TOTAL\t\t{WorkspaceLoader.LoadCount}\t");
             // The other half of the story: how many acquisitions a warm pooled session answered instead.
             lines.Add($"POOL-REUSED\t\t{WarmWorkspacePool.ReuseCount}\t");
             File.WriteAllLines(path, lines);
@@ -81,5 +79,5 @@ internal sealed class WorkspaceLoadProbeAttribute : BeforeAfterTestAttribute
         }
     }
 
-    private readonly record struct Reading(long Loads, long Ticks);
+    private readonly record struct Reading(StrongBox<long> Loads, long Ticks);
 }

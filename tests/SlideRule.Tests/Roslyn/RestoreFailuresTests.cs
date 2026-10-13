@@ -34,7 +34,7 @@ namespace SlideRule.Tests.Roslyn;
 ///         The end-to-end fact — a rule that reds on the restored tree does not pass on the same tree with
 ///         the restore broken — belongs to <c>RestoreFailureSilentEdgeE2ETests</c>, which pays a real
 ///         <c>dotnet restore</c> for it. What is pinned here is the predicate itself, so a change to it reds
-///         in milliseconds rather than only in the serial lane.
+///         in milliseconds rather than only in the end-to-end class.
 ///     </para>
 ///     <para>
 ///         <b>The limit this file inherits.</b> <c>CompilationOutputInfo</c> has no public constructor, so an

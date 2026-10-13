@@ -37,12 +37,23 @@ namespace SlideRule.Cli.Pipeline;
 /// </remarks>
 internal static class MsBuildGate
 {
+    private static readonly AsyncLocal<StrongBox<GateAcquisition?>?> AcquisitionOnThisFlow = new();
+
     /// <summary>
-    ///     Which source-selection branch the last <c>check</c>/<c>status</c>/<c>graph</c> run took. Internal
-    ///     test observable — output is byte-identical whichever branch runs, so this only tells a test which
-    ///     path was chosen; never printed.
+    ///     Starts recording, for this async flow and any task it starts, which source-selection branch a
+    ///     <c>check</c>/<c>status</c>/<c>graph</c> run takes, and returns the box the gate writes the branch into;
+    ///     the box stays <c>null</c> for a verb that never reaches the decision. Install it before the call it should record.
+    ///     Synchronous on purpose: a value an async method sets is discarded when it returns, so only a
+    ///     synchronous installer leaves the box in place for its caller. Internal test observable — output is
+    ///     byte-identical whichever branch runs, so this only tells a test which path was chosen; never
+    ///     printed, and a run with no box installed records nothing.
     /// </summary>
-    internal static GateAcquisition? LastAcquisition { get; private set; }
+    internal static StrongBox<GateAcquisition?> RecordAcquisitionOnThisFlow()
+    {
+        var box = new StrongBox<GateAcquisition?>();
+        AcquisitionOnThisFlow.Value = box;
+        return box;
+    }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     public static Task<int> RunCheckAsync(
@@ -174,7 +185,7 @@ internal static class MsBuildGate
         IReplayableRequest request, string binlog, IEnvironment environment,
         Func<string?, ISolutionSource, Task<int>> invokeRunner, CancellationToken ct)
     {
-        LastAcquisition = GateAcquisition.ExplicitReplay;
+        Record(GateAcquisition.ExplicitReplay);
 
         string binlogFullPath = Path.GetFullPath(binlog);
         if (!File.Exists(binlogFullPath))
@@ -211,7 +222,7 @@ internal static class MsBuildGate
         string binlogCopyPath, string solutionPath, TextWriter error, ISolutionSource? hostSource,
         Func<string?, ISolutionSource, Task<int>> invokeRunner)
     {
-        LastAcquisition = GateAcquisition.CaptureReplay;
+        Record(GateAcquisition.CaptureReplay);
 
         using var source = new LazyCaptureReplaySource(binlogCopyPath);
         try
@@ -221,7 +232,7 @@ internal static class MsBuildGate
         catch (CaptureReplayFailedException ex)
         {
             await error.WriteLineAsync($"warning: {ex.Message}");
-            LastAcquisition = GateAcquisition.CaptureReplayFellBackToCold;
+            Record(GateAcquisition.CaptureReplayFellBackToCold);
             return await invokeRunner(solutionPath, SourceOrCold(hostSource));
         }
     }
@@ -232,7 +243,7 @@ internal static class MsBuildGate
         string notice, string solutionPath, TextWriter error, ISolutionSource? hostSource,
         Func<string?, ISolutionSource, Task<int>> invokeRunner)
     {
-        LastAcquisition = GateAcquisition.NoticeCold;
+        Record(GateAcquisition.NoticeCold);
         var source = new NoticingSolutionSource(notice, error, SourceOrCold(hostSource));
         return await invokeRunner(solutionPath, source);
     }
@@ -241,8 +252,15 @@ internal static class MsBuildGate
     private static async Task<int> RunColdAsync(
         string? solution, ISolutionSource? hostSource, Func<string?, ISolutionSource, Task<int>> invokeRunner)
     {
-        LastAcquisition = GateAcquisition.Cold;
+        Record(GateAcquisition.Cold);
         return await invokeRunner(solution, SourceOrCold(hostSource));
+    }
+
+    // Writes into the box a caller installed on this flow, and nowhere else: a run with none installed — every
+    // production run — records nothing, so no value outlives the run it describes.
+    private static void Record(GateAcquisition acquisition)
+    {
+        if (AcquisitionOnThisFlow.Value is { } box) box.Value = acquisition;
     }
 
     private static ReplayedSolution ReplayOrThrow(

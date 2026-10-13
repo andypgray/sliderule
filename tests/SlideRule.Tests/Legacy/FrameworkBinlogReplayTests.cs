@@ -1,12 +1,10 @@
 using System.Diagnostics;
 using Shouldly;
-using Xunit;
-using SlideRule.Cli.Pipeline;
 using SlideRule.Cli.Replay;
-using SlideRule.Roslyn;
 using SlideRule.Roslyn.Hosting;
 using SlideRule.Tests.Cli;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.Legacy;
 
@@ -25,10 +23,7 @@ namespace SlideRule.Tests.Legacy;
 ///     MSBuild it drives is the one the product picked. Going through <c>VsWhereLocator</c> directly would
 ///     reach inside the <c>roslyn/msbuild-bootstrap</c> quarantine, which this repository's own spec
 ///     forbids outside <c>MsBuildBootstrap</c>.
-///     In the "Serial" collection because it reads <c>MsBuildGate.LastAcquisition</c>, which any other
-///     run in the process would overwrite.
 /// </remarks>
-[Collection("Serial")]
 public sealed class FrameworkBinlogReplayTests
 {
     [Fact]
@@ -55,18 +50,12 @@ public sealed class FrameworkBinlogReplayTests
 
         // Act: the same check twice — replaying the Framework build, and opening the workspace itself.
         // --no-cache on both so neither run reads or writes persisted state and the comparison is clean.
-        // Both legs run cold (no host workspace source): the LoadCount deltas below are what tell the
-        // replayed leg from the built one, so each has to open, or decline to open, its own workspace.
-        long loaderBeforeReplay = WorkspaceLoader.LoadCount;
+        // Both legs run cold (no host workspace source): the load counts below are what tell the replayed
+        // leg from the built one, so each has to open, or decline to open, its own workspace.
         CliResult replay = await CliRunner.InvokeColdAsync(
             "check", fixture.SolutionPath, "--spec", CliRunner.ClassicAppSpecDll, "--binlog", binlog, "--no-cache");
-        long replayLoads = WorkspaceLoader.LoadCount - loaderBeforeReplay;
-        GateAcquisition? replayGate = MsBuildGate.LastAcquisition;
-
-        long loaderBeforeCold = WorkspaceLoader.LoadCount;
         CliResult cold = await CliRunner.InvokeColdAsync(
             "check", fixture.SolutionPath, "--spec", CliRunner.ClassicAppSpecDll, "--no-cache");
-        long coldLoads = WorkspaceLoader.LoadCount - loaderBeforeCold;
 
         // Assert: byte parity across the two paths, and the replay leg never opened a workspace. Both runs
         // ride every assertion message — a parity break or a wrong exit code is a question about what the
@@ -77,9 +66,9 @@ public sealed class FrameworkBinlogReplayTests
         replay.Err.ShouldBe(cold.Err, context);
         replay.Exit.ShouldBe(cold.Exit, context);
         replay.Exit.ShouldBe(1, context);
-        replayGate.ShouldBe(GateAcquisition.ExplicitReplay, context);
-        replayLoads.ShouldBe(0, context);
-        coldLoads.ShouldBe(1, context);
+        replay.Gate.ShouldBe(GateAcquisition.ExplicitReplay, context);
+        replay.Loads.ShouldBe(0, context);
+        cold.Loads.ShouldBe(1, context);
     }
 
     // The tool's own MSBuild choice, read back rather than re-derived. MsBuildBootstrap publishes the

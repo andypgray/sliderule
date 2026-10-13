@@ -31,9 +31,9 @@ namespace SlideRule.Tests.TestSupport;
 ///         back. <c>WarmWorkspacePoolTests</c> pins this end to end.
 ///     </para>
 ///     <para>
-///         <b>Not every test may use it.</b> A test that pins the
-///         <see cref="WorkspaceLoader.LoadCount" /> delta, that needs a cold run as an oracle against a
-///         warm one, or that has workspace loading itself as its subject must keep opening real
+///         <b>Not every test may use it.</b> A test that pins how many workspaces one call loads (its
+///         <see cref="WorkspaceLoader.CountLoadsOnThisFlow" /> count), that needs a cold run as an oracle
+///         against a warm one, or that has workspace loading itself as its subject must keep opening real
 ///         workspaces; each such test says so at its own call site.
 ///     </para>
 ///     <para>

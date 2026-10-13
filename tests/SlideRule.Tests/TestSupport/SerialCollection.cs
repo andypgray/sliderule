@@ -13,11 +13,11 @@ namespace SlideRule.Tests.TestSupport;
 ///         assembly. That is the whole guarantee, and it is what a member needs: a class belongs here when
 ///         it sets a process environment variable (<see cref="ScopedEnvironmentVariable" />), reads or resets
 ///         <see cref="SlideRule.Cli.Mcp.Infrastructure.IdleTimeoutWatchdog" />'s in-flight counter or
-///         <see cref="SlideRule.Cli.Mcp.Infrastructure.ServerShutdown" />'s static state, asserts on
-///         the change in a process-wide static (<see cref="SlideRule.Roslyn.WorkspaceLoader" />'s
-///         load count, the MSBuild gate's last acquisition), needs <see cref="WarmWorkspacePool" /> to keep
-///         one session across two calls or asserts on the sessions it holds, shares a fixture tree that a
-///         member mutates in place, or times a deadline that a busy machine would miss.
+///         <see cref="SlideRule.Cli.Mcp.Infrastructure.ServerShutdown" />'s static state, needs
+///         <see cref="WarmWorkspacePool" /> to keep one session across two calls or asserts on the sessions it
+///         holds, or times a deadline that a busy machine would miss. A test that needs the workspace loads or
+///         the MSBuild-gate branch of one call reads it off <c>CliResult</c>, which counts that call alone, so
+///         that is no reason to be a member.
 ///     </para>
 ///     <para>
 ///         Spawning a child process or loading an MSBuild workspace is not a reason to be here: those

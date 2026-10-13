@@ -1,23 +1,21 @@
 using System.CommandLine;
 using Shouldly;
-using Xunit;
 using SlideRule.Cli;
 using SlideRule.Cli.Mcp.Infrastructure;
-using SlideRule.Cli.Pipeline;
 using SlideRule.Cli.Replay;
-using SlideRule.Roslyn;
 using SlideRule.Roslyn.Caching;
 using SlideRule.Roslyn.Replay;
 using SlideRule.Tests.Cli;
 using SlideRule.Tests.Mcp.TestDoubles;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.Replay;
 
 /// <summary>
 ///     End-to-end tests for the CLI wiring of binlog replay: <c>--binlog</c> on <c>check</c>, <c>status</c>
 ///     and <c>graph</c>, and the capture it persists. Each scenario drives the <em>real</em> command
-///     tree in-process through <see cref="CliRunner" /> against the shared <see cref="BinlogFixtureWorkspace" />
+///     tree in-process through <see cref="CliRunner" /> against this class's own <see cref="BinlogFixtureWorkspace" />
 ///     binlog, isolating the persisted caches by pointing <c>SLIDERULE_CACHE_DIR</c> at a throwaway
 ///     directory per run — the same isolation knob the fragment-cache e2e suite uses, and through the same
 ///     <see cref="IEnvironment" /> seam, which <see cref="CliRunner.InvokeColdAsync(IEnvironment,string[])" />
@@ -25,19 +23,18 @@ namespace SlideRule.Tests.Replay;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         Two internal observables ride every run, never printed: <see cref="MsBuildGate.LastAcquisition" />
-///         (which source-selection branch the gate took) and the delta of
-///         <see cref="WorkspaceLoader.LoadCount" /> (whether a design-time build ran) — together the "replayed,
-///         no MSBuild" pin. Output stays byte-identical to a cold run in every mode, which is the headline
-///         guarantee.
+///         Two internal observables ride every run, never printed: <see cref="CliResult.Gate" /> (which
+///         source-selection branch the gate took) and <see cref="CliResult.Loads" /> (whether a design-time
+///         build ran) — together the "replayed, no MSBuild" pin. Each counts its own invocation alone, so the
+///         class runs beside others. Output stays byte-identical to a cold run in every mode, which is the
+///         headline guarantee.
 ///     </para>
 ///     <para>
-///         In the "Serial" collection because both observables are process-wide. The class has its own binlog
-///         fixture; any mutation of it is reverted byte- and mtime-safely in a <c>finally</c> (a structural
-///         file left newer than the binlog would trip a later test's ingest staleness check).
+///         The class has its own binlog fixture; any mutation of it is reverted byte- and mtime-safely in a
+///         <c>finally</c> (a structural file left newer than the binlog would trip a later test's ingest
+///         staleness check).
 ///     </para>
 /// </remarks>
-[Collection("Serial")]
 public sealed class BinlogCliE2ETests(BinlogFixtureWorkspace fixture)
     : IClassFixture<BinlogFixtureWorkspace>, IDisposable
 {
@@ -60,17 +57,17 @@ public sealed class BinlogCliE2ETests(BinlogFixtureWorkspace fixture)
     {
         // (a) plain cold check, fresh cache — the byte-parity baseline (opens a workspace, one design-time build).
         string coldCache = FreshCache();
-        GateRun cold = await RunAsync(coldCache, "check", Sln, "--spec", CleanSpec);
+        CliResult cold = await RunAsync(coldCache, "check", Sln, "--spec", CleanSpec);
         cold.Gate.ShouldBe(GateAcquisition.Cold);
-        cold.LoaderDelta.ShouldBe(1);
+        cold.Loads.ShouldBe(1);
 
         // (b) check --binlog, fresh cache — replays the user's binlog: byte-identical, no design-time build,
         //     and the capture (manifest + binlog copy) now sits beside the fragment cache the run also wrote.
         string replayCache = FreshCache();
-        GateRun replay = await RunAsync(replayCache, "check", Sln, "--binlog", Binlog, "--spec", CleanSpec);
-        replay.Result.ShouldMatchTheOutputOf(cold.Result);
+        CliResult replay = await RunAsync(replayCache, "check", Sln, "--binlog", Binlog, "--spec", CleanSpec);
+        replay.ShouldMatchTheOutputOf(cold);
         replay.Gate.ShouldBe(GateAcquisition.ExplicitReplay);
-        replay.LoaderDelta.ShouldBe(0);
+        replay.Loads.ShouldBe(0);
         File.Exists(CacheLocations.CaptureManifestPath(Sln, replayCache))
             .ShouldBeTrue();
         File.Exists(CacheLocations.CaptureBinlogPath(Sln, replayCache))
@@ -78,18 +75,18 @@ public sealed class BinlogCliE2ETests(BinlogFixtureWorkspace fixture)
 
         // (c) rerun WITHOUT --binlog on the same cache: (b) wrote fragments, so this is a fragment-cache hit —
         //     no workspace acquired at all, and the gate still decided the capture is usable. Byte-identical.
-        GateRun autoHit = await RunAsync(replayCache, "check", Sln, "--spec", CleanSpec);
-        autoHit.Result.ShouldMatchTheOutputOf(cold.Result);
+        CliResult autoHit = await RunAsync(replayCache, "check", Sln, "--spec", CleanSpec);
+        autoHit.ShouldMatchTheOutputOf(cold);
         autoHit.Gate.ShouldBe(GateAcquisition.CaptureReplay);
-        autoHit.LoaderDelta.ShouldBe(0);
+        autoHit.Loads.ShouldBe(0);
 
         // Invalidate ONLY the fragment cache (delete cache.json), leave the capture: now the run must actually
         // replay the capture's binlog copy to get a solution — still no design-time build, still byte-identical.
         File.Delete(CacheLocations.CacheFilePath(Sln, replayCache));
-        GateRun autoReplay = await RunAsync(replayCache, "check", Sln, "--spec", CleanSpec);
-        autoReplay.Result.ShouldMatchTheOutputOf(cold.Result);
+        CliResult autoReplay = await RunAsync(replayCache, "check", Sln, "--spec", CleanSpec);
+        autoReplay.ShouldMatchTheOutputOf(cold);
         autoReplay.Gate.ShouldBe(GateAcquisition.CaptureReplay);
-        autoReplay.LoaderDelta.ShouldBe(0);
+        autoReplay.Loads.ShouldBe(0);
     }
 
     // ── invalid capture ⇒ one notice + cold fallback ─────────────────────────────────────────────────────
@@ -111,20 +108,20 @@ public sealed class BinlogCliE2ETests(BinlogFixtureWorkspace fixture)
             File.WriteAllText(csproj, edited);
 
             // Baseline: a plain cold run over the edited tree with no capture (fresh cache) — one build, silent.
-            GateRun cold = await RunAsync(FreshCache(), "check", Sln, "--spec", CleanSpec);
-            cold.LoaderDelta.ShouldBe(1);
+            CliResult cold = await RunAsync(FreshCache(), "check", Sln, "--spec", CleanSpec);
+            cold.Loads.ShouldBe(1);
 
             // The seeded cache now holds a stale capture: the gate notices once at acquisition, then builds.
-            GateRun invalid = await RunAsync(cache, "check", Sln, "--spec", CleanSpec);
+            CliResult invalid = await RunAsync(cache, "check", Sln, "--spec", CleanSpec);
             var notice = $"warning: {BinlogCaptureStore.StaleNotice(Path.GetFullPath(csproj))}";
 
             // Not ShouldMatchTheOutputOf: two channels match the cold run and the third is composed from it.
-            invalid.Result.Out.ShouldBe(cold.Result.Out); // stdout byte-identical to the cold run
-            invalid.Result.Exit.ShouldBe(cold.Result.Exit);
-            invalid.LoaderDelta.ShouldBe(1); // the design-time build ran
+            invalid.Out.ShouldBe(cold.Out); // stdout byte-identical to the cold run
+            invalid.Exit.ShouldBe(cold.Exit);
+            invalid.Loads.ShouldBe(1); // the design-time build ran
             invalid.Gate.ShouldBe(GateAcquisition.NoticeCold);
             // stderr is exactly the one notice line (printed first, at acquisition) followed by the cold stderr.
-            invalid.Result.Err.ShouldBe($"{notice}{Environment.NewLine}{cold.Result.Err}");
+            invalid.Err.ShouldBe($"{notice}{Environment.NewLine}{cold.Err}");
         }
         finally
         {
@@ -146,12 +143,12 @@ public sealed class BinlogCliE2ETests(BinlogFixtureWorkspace fixture)
             File.SetLastWriteTimeUtc(csproj, File.GetLastWriteTimeUtc(Binlog)
                 .AddHours(1));
 
-            GateRun run = await RunAsync(cache, "check", Sln, "--binlog", Binlog, "--spec", CleanSpec);
+            CliResult run = await RunAsync(cache, "check", Sln, "--binlog", Binlog, "--spec", CleanSpec);
 
             // Not ShouldRefuseWith: that is a ShouldContain over fragments, and the refusal is claimed here
             // in full — the whole of stderr, and nothing else on it.
-            run.Result.Exit.ShouldBe(2);
-            run.Result.Err.Trim()
+            run.Exit.ShouldBe(2);
+            run.Err.Trim()
                 .ShouldBe(BinlogCaptureStore.StaleAtIngestMessage(Binlog, Path.GetFullPath(csproj)));
             // The refusal fired before persistence: nothing was written.
             File.Exists(CacheLocations.CaptureManifestPath(Sln, cache))
@@ -168,11 +165,11 @@ public sealed class BinlogCliE2ETests(BinlogFixtureWorkspace fixture)
     [Fact]
     public async Task Check_MissingBinlog_ExitsTwoWithWasNotFound()
     {
-        GateRun run = await RunAsync(FreshCache(), "check", Sln, "--binlog", "nope.binlog", "--spec", CleanSpec);
+        CliResult run = await RunAsync(FreshCache(), "check", Sln, "--binlog", "nope.binlog", "--spec", CleanSpec);
 
         // Exact rather than ShouldRefuseWith's fragments, for the reason given on the stale-at-ingest row.
-        run.Result.Exit.ShouldBe(2);
-        run.Result.Err.Trim()
+        run.Exit.ShouldBe(2);
+        run.Err.Trim()
             .ShouldBe(BinlogReplayMessages.MissingFileMessage("nope.binlog"));
     }
 
@@ -182,9 +179,9 @@ public sealed class BinlogCliE2ETests(BinlogFixtureWorkspace fixture)
         string junk = _cacheRootBase.PathOf("junk.binlog");
         await File.WriteAllTextAsync(junk, "this is not a binlog");
 
-        GateRun run = await RunAsync(FreshCache(), "check", Sln, "--binlog", junk, "--spec", CleanSpec);
+        CliResult run = await RunAsync(FreshCache(), "check", Sln, "--binlog", junk, "--spec", CleanSpec);
 
-        run.Result.ShouldRefuseWith(
+        run.ShouldRefuseWith(
             $"--binlog '{junk}' could not be replayed:",
             "Rebuild with -bl and pass the fresh binlog.");
     }
@@ -199,10 +196,10 @@ public sealed class BinlogCliE2ETests(BinlogFixtureWorkspace fixture)
         await RunAsync(seededCache, "check", Sln, "--binlog", Binlog, "--spec", CleanSpec); // seed (replay)
         byte[] captureBefore = await File.ReadAllBytesAsync(CacheLocations.CaptureBinlogPath(Sln, seededCache));
 
-        GateRun cold = await RunAsync(seededCache, "check", Sln, "--spec", CleanSpec, "--no-cache");
-        cold.LoaderDelta.ShouldBe(1); // cold: the design-time build ran
+        CliResult cold = await RunAsync(seededCache, "check", Sln, "--spec", CleanSpec, "--no-cache");
+        cold.Loads.ShouldBe(1); // cold: the design-time build ran
         cold.Gate.ShouldBe(GateAcquisition.Cold);
-        cold.Result.Err.ShouldNotContain("build capture"); // no capture notice on the --no-cache path
+        cold.Err.ShouldNotContain("build capture"); // no capture notice on the --no-cache path
         (await File.ReadAllBytesAsync(CacheLocations.CaptureBinlogPath(Sln, seededCache))).ShouldBe(captureBefore);
         File.Exists(CacheLocations.CaptureManifestPath(Sln, seededCache))
             .ShouldBeTrue();
@@ -210,10 +207,10 @@ public sealed class BinlogCliE2ETests(BinlogFixtureWorkspace fixture)
         // An explicit --binlog under --no-cache still replays for this run (an input, not persisted state) —
         // byte-identical to the cold run above, no design-time build, and it writes nothing anywhere.
         string freshCache = FreshCache();
-        GateRun replay = await RunAsync(freshCache, "check", Sln, "--binlog", Binlog, "--spec", CleanSpec, "--no-cache");
-        replay.Result.ShouldMatchTheOutputOf(cold.Result);
+        CliResult replay = await RunAsync(freshCache, "check", Sln, "--binlog", Binlog, "--spec", CleanSpec, "--no-cache");
+        replay.ShouldMatchTheOutputOf(cold);
         replay.Gate.ShouldBe(GateAcquisition.ExplicitReplay);
-        replay.LoaderDelta.ShouldBe(0);
+        replay.Loads.ShouldBe(0);
         File.Exists(CacheLocations.CaptureManifestPath(Sln, freshCache))
             .ShouldBeFalse();
         File.Exists(CacheLocations.CaptureBinlogPath(Sln, freshCache))
@@ -227,13 +224,13 @@ public sealed class BinlogCliE2ETests(BinlogFixtureWorkspace fixture)
     [Fact]
     public async Task Graph_ExplicitBinlog_ByteIdenticalToCold()
     {
-        GateRun cold = await RunAsync(FreshCache(), "graph", Sln);
-        GateRun replay = await RunAsync(FreshCache(), "graph", Sln, "--binlog", Binlog);
+        CliResult cold = await RunAsync(FreshCache(), "graph", Sln);
+        CliResult replay = await RunAsync(FreshCache(), "graph", Sln, "--binlog", Binlog);
 
-        replay.Result.ShouldMatchTheOutputOf(cold.Result);
+        replay.ShouldMatchTheOutputOf(cold);
         replay.Gate.ShouldBe(GateAcquisition.ExplicitReplay);
-        replay.LoaderDelta.ShouldBe(0);
-        cold.LoaderDelta.ShouldBe(1);
+        replay.Loads.ShouldBe(0);
+        cold.Loads.ShouldBe(1);
     }
 
     // ── runtime replay failure of a usable capture ⇒ notice + cold re-run (no double-render) ──────────────
@@ -250,14 +247,14 @@ public sealed class BinlogCliE2ETests(BinlogFixtureWorkspace fixture)
         // Delete the fragment cache so the runner must actually acquire (and thus replay) rather than hit.
         File.Delete(CacheLocations.CacheFilePath(Sln, cache));
 
-        GateRun run = await RunAsync(cache, "check", Sln, "--spec", CleanSpec);
+        CliResult run = await RunAsync(cache, "check", Sln, "--spec", CleanSpec);
 
         // Not ShouldSucceed: its fragments are checked against stdout, and these are on stderr.
-        run.Result.Exit.ShouldBe(0); // the cold re-run succeeded — a torn capture never breaks the run
+        run.Exit.ShouldBe(0); // the cold re-run succeeded — a torn capture never breaks the run
         run.Gate.ShouldBe(GateAcquisition.CaptureReplayFellBackToCold);
-        run.LoaderDelta.ShouldBe(1); // exactly one design-time build (the retry), never two renders
-        run.Result.Err.ShouldContain("warning: build capture could not be replayed (");
-        run.Result.Err.ShouldContain("); running a design-time build instead. Re-capture: rebuild with -bl and re-run with --binlog.");
+        run.Loads.ShouldBe(1); // exactly one design-time build (the retry), never two renders
+        run.Err.ShouldContain("warning: build capture could not be replayed (");
+        run.Err.ShouldContain("); running a design-time build instead. Re-capture: rebuild with -bl and re-run with --binlog.");
     }
 
     // ── help-text pins for --binlog and --no-cache ───────────────────────────────────────────────────────
@@ -291,23 +288,16 @@ public sealed class BinlogCliE2ETests(BinlogFixtureWorkspace fixture)
         return _cacheRootBase.UniqueChildPath();
     }
 
-    // Drives the real command tree, isolating the persisted caches at SLIDERULE_CACHE_DIR and capturing both
-    // internal observables.
-    private static async Task<GateRun> RunAsync(string cacheDir, params string[] args)
+    // Drives the real command tree, isolating the persisted caches at SLIDERULE_CACHE_DIR; the returned result
+    // carries both internal observables, the gate branch and the workspace loads.
+    private static Task<CliResult> RunAsync(string cacheDir, params string[] args)
     {
         // The cache root rides the invocation's own IEnvironment, so this class isolates its caches without
-        // writing a variable the rest of the process can see. What still needs the serial collection is the
-        // pair of static observables read below (and the shared fixture tree), not the cache root.
+        // writing a variable the rest of the process can see.
         FakeEnvironment environment = FakeEnvironment.WithCacheRoot(cacheDir);
-        long loaderBefore = WorkspaceLoader.LoadCount;
 
-        // Cold, deliberately: every fact here reads the LoadCount delta to tell "replayed" from "built",
-        // so each invocation has to open (or decline to open) its own workspace.
-        CliResult result = await CliRunner.InvokeColdAsync(environment, args);
-        return new GateRun(result, MsBuildGate.LastAcquisition, WorkspaceLoader.LoadCount - loaderBefore);
+        // Cold, deliberately: every fact here reads the load count to tell "replayed" from "built", so each
+        // invocation has to open (or decline to open) its own workspace.
+        return CliRunner.InvokeColdAsync(environment, args);
     }
-
-    // Carries the CliResult whole rather than destructuring its channels: the parity rows are assertions
-    // about a run, and CliResultAssertions is the vocabulary for those.
-    private sealed record GateRun(CliResult Result, GateAcquisition? Gate, long LoaderDelta);
 }
