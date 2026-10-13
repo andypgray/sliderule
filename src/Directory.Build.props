@@ -101,24 +101,22 @@
          but it is also the one surface change that breaks no compile anywhere, so it is the one most worth
          catching in seconds.
 
-         The baseline names the last PUBLISHED version, which is one number for both packages because they
-         release in lockstep, so it lags <Version> by design. No version under these package IDs is published
-         yet, so no baseline is declared: the SDK downloads the baseline by package ID, and a version that does
-         not exist fails the pack. The first release under these IDs puts PackageValidationBaselineVersion back
-         in the group below at its own number. From then on, bumping it is part of the release ritual,
-         deliberately NOT a fifth site in ManifestVersionTests' four-way version equality;
-         PublicSurfaceSyncTests asserts only that a declared baseline is no newer, and that no csproj
-         overrides it.
+         The baseline lags <Version> by design: it names the last PUBLISHED version, which is one number for
+         both packages because they release in lockstep. Between releases it sits equal to <Version> and the
+         accumulated delta is visible. Bumping it is part of the release ritual, deliberately NOT a fifth site
+         in ManifestVersionTests' four-way version equality; PublicSurfaceSyncTests asserts only that it is no
+         newer, and that no csproj overrides it.
 
          Acknowledgement is a CompatibilitySuppressions.xml beside the csproj it acknowledges for, regenerated
-         with -p:ApiCompatGenerateSuppressionFile=true and reviewed per symbol. With no baseline there is
-         nothing to acknowledge, so neither package carries one.
+         with -p:ApiCompatGenerateSuppressionFile=true and reviewed per symbol. A package with nothing to
+         acknowledge carries none.
 
          The group is unconditioned on purpose and inert in every project that does not validate: the SDK
          gates both the baseline's download and the comparison on EnablePackageValidation and IsPackable. A
          condition on $(EnablePackageValidation) or $(PackageId) would never hold here, because this file is
          evaluated before a project body sets either. -->
     <PropertyGroup>
+        <PackageValidationBaselineVersion>0.1.0</PackageValidationBaselineVersion>
         <EnableStrictModeForBaselineValidation>true</EnableStrictModeForBaselineValidation>
     </PropertyGroup>
 

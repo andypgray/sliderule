@@ -13,9 +13,8 @@ namespace SlideRule.Tests.DocHygiene;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         The csprojs run ApiCompat against the bytes on nuget.org once a version under their package IDs
-///         is published, but only at pack time, in one CI job and in the release gate. This reds in the
-///         suite, in seconds, and names the line.
+///         The csprojs already run ApiCompat against the bytes on nuget.org, but only at pack time, in one CI
+///         job and in the release gate. This reds in the suite, in seconds, and names the line.
 ///     </para>
 ///     <para>
 ///         The pin never rewrites itself. On drift it writes the regenerated text beside the test assembly
@@ -233,20 +232,21 @@ public sealed class PublicSurfaceSyncTests
     }
 
     [Fact]
-    public void EveryValidationBaseline_IsNoNewerThanTheVersion()
+    public void EveryValidatedProject_NamesABaselineNoNewerThanTheVersion()
     {
         // Arrange: the baseline names the last PUBLISHED version, so it lags <Version> by design and is
         // deliberately not a fifth site in the four-way version equality ManifestVersionTests holds. What
         // it can never be is ahead: a baseline nobody has pushed cannot be downloaded, and the pack-time
-        // check then fails at release time with a restore error rather than an API one. A package with no
-        // baseline yet has no published version to name, and MissingValidation says why that is allowed.
+        // check then fails at release time with a restore error rather than an API one.
         Version version = NumericPart(PropertyOf(PropsPath, "Version"));
         List<string> findings = new();
 
         // Act
         foreach ((string csproj, Assembly _) in PinnedPackages)
         {
-            if (Effective(csproj, BaselineProperty) is not { } declared) continue;
+            Declaration declared = Effective(csproj, BaselineProperty)
+                                   ?? throw new InvalidOperationException(
+                                       $"Neither {csproj} nor {ScopedProps} declares <{BaselineProperty}>.");
 
             Version baseline = NumericPart(declared.Value);
             if (baseline <= version) continue;
@@ -353,10 +353,9 @@ public sealed class PublicSurfaceSyncTests
                              + "already published.")
             .ToList();
 
-        // No baseline is required until the first release under these package IDs: the SDK downloads the
-        // baseline by package ID, and naming a version nobody has published fails every pack. That release
-        // declares it in the scoped props and restores the check here that requires one, so a package that
-        // validates cannot go on comparing against nothing unnoticed.
+        if (Effective(csproj, BaselineProperty) is null)
+            missing.Add($"{csproj} switches package validation on but neither it nor {ScopedProps} names a "
+                        + "baseline version, which silently compares it against nothing.");
 
         return missing;
     }
