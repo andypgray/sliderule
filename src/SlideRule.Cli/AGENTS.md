@@ -3,7 +3,7 @@
 
 ## Layer `Host`
 
-This directory holds the `Host` layer. Host is the `sliderule` command: the CLI verbs, the MCP server, and the spec loading and pipeline behind both. Its architecture rules:
+This directory contains the `Host` layer. Host is the `sliderule` command: the CLI commands, the MCP server, and the spec loading and pipeline behind both. Its architecture rules:
 
 - `layering/leaves-independent` — Each of the Host, Adapter, Pack, Analyzers, SpecAnalyzers and SpecCompletion layers must not reference the others. Host, Adapter, Pack, Analyzers, SpecAnalyzers and SpecCompletion are the six leaves of the project graph: each is a different way to consume Core, and none is a dependency of another. A reference between two leaves would pull one consumer's closure — the CLI's MSBuild and MCP machinery, the adapter's xunit, the pack's canonical rules, an analyzer's compiler host — into a project that ships without it.
 - `di/no-service-locator` — Types in the Host layer, except types named `McpServerCommand` or `GlobalCallToolFilter`, must not use `IServiceProvider.GetService()`, `ServiceProviderServiceExtensions.GetService()` or `ServiceProviderServiceExtensions.GetRequiredService()`. Resolving services from IServiceProvider at call sites hides a type's real dependencies; declare them as constructor parameters. See <https://learn.microsoft.com/dotnet/core/extensions/dependency-injection/guidelines>.

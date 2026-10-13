@@ -26,8 +26,8 @@ internal static class RenderedLawText
     /// <summary>MyAppRenderSpec's quarantined <c>legacy/billing</c> scope card.</summary>
     internal const string BillingScopeCard =
         "## Quarantined scope `legacy/billing`\n\n" +
-        "This directory holds the quarantined `legacy/billing` scope: types in `MyApp.Legacy.Billing.*`. " +
-        "Here be dragons — do not spread references into it.\n\n" +
+        "This directory contains the quarantined `legacy/billing` scope: types in `MyApp.Legacy.Billing.*`. " +
+        "Here be dragons: do not spread references into it.\n\n" +
         "Dragons: Banker's rounding happens at line-item level, NOT invoice level. " +
         "Nightly reconciliation depends on this. Do not normalize.\n\n" +
         "- `legacy/billing/containment` — Types in `MyApp.Legacy.Billing.*`, except `IBillingFacade` or " +
@@ -43,8 +43,8 @@ internal static class RenderedLawText
     /// </summary>
     internal const string DomainCautionCard =
         "## Cautioned scope `domain/retry-budget`\n\n" +
-        "This directory holds the cautioned `domain/retry-budget` scope: types named `RetryPolicy`. " +
-        "Here be dragons — the weirdness below is structural; read it before you edit, and do not " +
+        "This directory contains the cautioned `domain/retry-budget` scope: types named `RetryPolicy`. " +
+        "Here be dragons: the weirdness below is structural; read it before you edit, and do not " +
         "tidy it away.\n\n" +
         "Dragons: RetryPolicy's broad catch is filtered on purpose: the `when` clause is what keeps it green " +
         "under the unfiltered-catch rule, and it is the fixture's one sanctioned broad handler. Keep the " +
@@ -62,13 +62,13 @@ internal static class RenderedLawText
     /// </summary>
     internal const string WebLayerCards =
         "## Layer `Web`\n\n" +
-        "This directory holds the `Web` layer. The HTTP surface: controllers and the views they serve. " +
+        "This directory contains the `Web` layer. The HTTP surface: controllers and the views they serve. " +
         "Its architecture rules:\n\n" +
         "- `layering/web-not-billing` — The Web layer must not reference types in `MyApp.Legacy.Billing.*`. " +
         "The web layer must reach billing only through the sanctioned facade.\n" +
         "- Expand any rule above with `sliderule explain <rule-id>`.\n\n" +
         "## Layer `Reporting`\n\n" +
-        "This directory holds the `Reporting` layer. Its architecture rules:\n\n" +
+        "This directory contains the `Reporting` layer. Its architecture rules:\n\n" +
         "- `layering/reporting-not-billing` — The Reporting layer must not reference types in " +
         "`MyApp.Legacy.Billing.*`. The reporting slice takes its numbers from the domain, never from the " +
         "legacy biller.\n" +

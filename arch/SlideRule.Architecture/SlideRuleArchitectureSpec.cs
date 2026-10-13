@@ -52,7 +52,7 @@ public sealed class SlideRuleArchitectureSpec : IArchitectureSpec
             .Purpose("Workspace is the Roslyn host: it loads a solution through MSBuild or a build log, hands each " +
                      "compilation to Extraction, and keeps the extraction cache and the baseline files.");
         Layer host = arch.Layer("Host", arch.Project("SlideRule.Cli"))
-            .Purpose("Host is the `sliderule` command: the CLI verbs, the MCP server, and the spec loading and " +
+            .Purpose("Host is the `sliderule` command: the CLI commands, the MCP server, and the spec loading and " +
                      "pipeline behind both.");
         Layer adapter = arch.Layer("Adapter", arch.Project("SlideRule.Xunit"))
             .Purpose("Adapter runs every rule of a spec as an individually named xUnit test in the consumer's own " +

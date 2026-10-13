@@ -3,7 +3,7 @@
 
 ## Layer `Extraction`
 
-This directory holds the `Extraction` layer. Extraction reads a compilation into a fragment of the codebase model and merges the fragments into the model the checker evaluates against, using the compiler API and nothing else. Its architecture rules:
+This directory contains the `Extraction` layer. Extraction reads a compilation into a fragment of the codebase model and merges the fragments into the model the checker evaluates against, using the compiler API and nothing else. Its architecture rules:
 
 - `layering/extraction-compiler-only` — The Extraction layer must not reference the Workspace layer, the Host layer, the Adapter layer, the Pack layer, types in `Microsoft.Build.*` or types in `Microsoft.CodeAnalysis.MSBuild.*`. The extractor runs wherever a compilation exists, with no workspace and no build engine behind it, and that holds only while the compiler API is the whole of what it needs. The build already refuses a project reference up to Workspace, Host or Adapter, since each of them depends on this project. What it does not refuse is a package: a reference to Microsoft.Build or to the MSBuild workspace compiles, passes every test, and leaves an assembly that loads only in a process that can also load MSBuild.
 - Expand any rule above with `sliderule explain <rule-id>`.

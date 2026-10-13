@@ -3,7 +3,7 @@
 
 ## Layer `Dispatch`
 
-This directory holds the `Dispatch` layer. Dispatch assigns haulage legs to drivers: the dispatch board and the driver roster behind its Contracts surface. Its architecture rules:
+This directory contains the `Dispatch` layer. Dispatch assigns haulage legs to drivers: the dispatch board and the driver roster behind its Contracts surface. Its architecture rules:
 
 - `modules/internals` — Types in each of the Dispatch, Tracking and Invoicing layers, except types in `Meridian.Operations.Dispatch.Contracts.*`, `Meridian.Operations.Tracking.Contracts.*` or `Meridian.Operations.Invoicing.Contracts.*`, must be referenced only by their own layer. Every module is reached only through its Contracts surface, so the dispatch board and roster, the milestone store and log, and the invoice assembler and reconciler all stay swappable; a reference into any of them from another module turns a private implementation detail into a contract its owner can no longer revise without breaking a caller.
 - `modules/dispatch/outbound` — The Dispatch layer must reference only types in `Meridian.Operations.Tracking.Contracts.*` (external packages are not constrained by this rule). The module dependency graph is kept explicit and acyclic: dispatch consumes tracking's milestone contracts to gate a haulage leg and reaches nothing else, so the only arrow out of dispatch is the one drawn here and the monolith can still be split along its module lines.

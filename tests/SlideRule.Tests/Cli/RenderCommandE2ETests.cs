@@ -78,7 +78,7 @@ public sealed class RenderCommandE2ETests : IDisposable
 
     private const string InstallNote =
         "*If the `sliderule` command is missing (a configured MCP server dies without it), " +
-        "install the tool with `dotnet tool install -g SlideRule.Cli`, or run any verb " +
+        "install the tool with `dotnet tool install -g SlideRule.Cli`, or run any command " +
         "without installing: `dotnet dnx SlideRule.Cli --yes -- check <solution>`. " +
         "Inside a repository whose `global.json` pins an SDK below 10, both commands fail, so run them " +
         "from outside it and pass the solution's absolute path.*\n\n";
@@ -154,15 +154,15 @@ public sealed class RenderCommandE2ETests : IDisposable
     private const string BillingMergedBody =
         LayerSpecProvenance +
         "## Layer `Billing`\n\n" +
-        "This directory holds the `Billing` layer. Its architecture rules:\n\n" +
+        "This directory contains the `Billing` layer. Its architecture rules:\n\n" +
         "- `layering/billing-not-web` — The Billing layer must not reference types in `MyApp.Web.*`. " +
         "Billing must not reach up into the web layer.\n" +
         RenderedLawText.LeavesBullet +
         RenderedLawText.LeavesNotCircularBullet +
         "- Expand any rule above with `sliderule explain <rule-id>`.\n\n" +
         "## Quarantined scope `legacy/billing`\n\n" +
-        "This directory holds the quarantined `legacy/billing` scope: the Billing layer. " +
-        "Here be dragons — do not spread references into it.\n\n" +
+        "This directory contains the quarantined `legacy/billing` scope: the Billing layer. " +
+        "Here be dragons: do not spread references into it.\n\n" +
         "Dragons: Banker's rounding happens at line-item level, NOT invoice level. " +
         "Nightly reconciliation depends on this. Do not normalize.\n\n" +
         "- `legacy/billing/containment` — Types in the Billing layer, except `IBillingFacade` or `BillingFacade`, " +
@@ -177,8 +177,8 @@ public sealed class RenderCommandE2ETests : IDisposable
     private const string WebShellScopeBody =
         QuarantinedSpecProvenance +
         "## Quarantined scope `legacy/web-shell`\n\n" +
-        "This directory holds the quarantined `legacy/web-shell` scope: types in `MyApp.Web.*`. " +
-        "Here be dragons — do not spread references into it.\n\n" +
+        "This directory contains the quarantined `legacy/web-shell` scope: types in `MyApp.Web.*`. " +
+        "Here be dragons: do not spread references into it.\n\n" +
         "Dragons: The shell's rendering path is order-sensitive. Drive it through OrderService only.\n\n" +
         "- `legacy/web-shell/containment` — Types in `MyApp.Web.*`, except types named `OrderService`, " +
         "must be referenced only by types in `MyApp.Web.*` or types named `OrderService`. " +
@@ -865,7 +865,7 @@ public sealed class RenderCommandE2ETests : IDisposable
         (await CliRunner.InvokeAsync("render", _workspace.SolutionPath, "--spec", CliRunner.RenderSpecDll))
             .ShouldSucceed();
         string edited = File.ReadAllText(DomainAgents)
-            .Replace("This directory holds", "This folder holds");
+            .Replace("This directory contains", "This folder contains");
         File.WriteAllText(DomainAgents, edited);
 
         // Act

@@ -395,10 +395,10 @@ arch.Rule("data-access/no-inline-sql")
   bypasses discovery. `.Except` the composition root that legitimately `new`s them.
 - DI-lifetime candidates: where the composition root registers services with
   `AddSingleton`/`AddScoped`/`AddTransient` (or `TryAdd*`, `AddHostedService`, `AddDbContext`,
-  `AddHttpClient<TClient>`), the captive-dependency rule is one line —
+  `AddDbContextPool`, `AddHttpClient<TClient>`), the captive-dependency rule is one line —
   `arch.Registered(Lifetime.Singleton).MustNotInject(arch.Registered(Lifetime.Scoped),
-  arch.Registered(Lifetime.Transient))`. Registrations made by assembly scanning, factory
-  internals, or framework defaults are not seen, so an empty-subject failure here means the
+  arch.Registered(Lifetime.Transient))`. Keyed-service and raw `ServiceDescriptor` registrations,
+  assembly scanning, factory internals and framework defaults are not seen, so an empty-subject failure here means the
   registrations live outside the recognized calls — drop the rule rather than guessing.
 - Anchor a rule on the `Layer` handle wherever one exists (`tools.MustHaveSuffix("Tools")`,
   not `arch.Types.InNamespace("MyApp.Tools.*").MustHaveSuffix("Tools")`, and `web.MustNot…`
@@ -943,8 +943,8 @@ expression's static type (bare rethrows `throw;` are not recorded); "expose" mea
 not caught; a factory lambda that genuinely `new`s the type IS caught, so `.Except` the sanctioned
 composition root or baseline the edge. `Registered` membership comes only from source-visible
 registration calls (`AddSingleton`/`AddScoped`/`AddTransient`/`TryAdd*`/`AddHostedService`/
-`AddDbContext`/`AddHttpClient<TClient>`) — assembly scanning, factory-lambda internals, and
-framework defaults are invisible; an empty `Registered` subject fails loud (check the visibility
+`AddDbContext`/`AddDbContextPool`/`AddHttpClient<TClient>`) — keyed and raw-descriptor
+registrations, assembly scanning, factory-lambda internals, and framework defaults are invisible; an empty `Registered` subject fails loud (check the visibility
 boundary before blaming the code), while an empty `MustNotInject` operand is the win condition
 and never warns. Member bans are
 source-visibility bans, not runtime-dispatch bans — a ban on a concrete member does not catch

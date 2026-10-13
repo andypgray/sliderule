@@ -108,7 +108,7 @@ The ISO 6346 check-digit table looks broken. It assigns A=10, B=12, C=13, and sk
 ```markdown
 ## Quarantined scope `clearance/engine`
 
-This directory holds the quarantined `clearance/engine` scope: types in `Meridian.Clearance.*`. Here be dragons — do not spread references into it.
+This directory contains the quarantined `clearance/engine` scope: types in `Meridian.Clearance.*`. Here be dragons: do not spread references into it.
 
 Dragons: ISO 6346 check digit: the letter-value table skips every multiple of 11 (A=10, B=12 … U=32); the gaps are structural — linearizing the table breaks every real container number. Call in only through IClearanceGateway.
 ```

@@ -3,7 +3,7 @@
 
 ## Layer `Adapter`
 
-This directory holds the `Adapter` layer. Adapter runs every rule of a spec as an individually named xUnit test in the consumer's own test project. Its architecture rules:
+This directory contains the `Adapter` layer. Adapter runs every rule of a spec as an individually named xUnit test in the consumer's own test project. Its architecture rules:
 
 - `layering/leaves-independent` — Each of the Host, Adapter, Pack, Analyzers, SpecAnalyzers and SpecCompletion layers must not reference the others. Host, Adapter, Pack, Analyzers, SpecAnalyzers and SpecCompletion are the six leaves of the project graph: each is a different way to consume Core, and none is a dependency of another. A reference between two leaves would pull one consumer's closure — the CLI's MSBuild and MCP machinery, the adapter's xunit, the pack's canonical rules, an analyzer's compiler host — into a project that ships without it.
 - `layering/adapter-is-a-leaf` — The Adapter layer must not be referenced by the Core layer, the Extraction layer or the Workspace layer. The adapter rides xunit.v3; a product reference would ship a test framework to every consumer of the referencing package. Host, Pack, Analyzers, SpecAnalyzers and SpecCompletion are the other five leaves, and layering/leaves-independent already holds all six off each other, so this rule names only what sits below the adapter.

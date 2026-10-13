@@ -3,7 +3,7 @@
 
 ## Layer `Tracking`
 
-This directory holds the `Tracking` layer. Tracking owns the shipment milestone timeline that every other module reads. Its architecture rules:
+This directory contains the `Tracking` layer. Tracking owns the shipment milestone timeline that every other module reads. Its architecture rules:
 
 - `modules/internals` — Types in each of the Dispatch, Tracking and Invoicing layers, except types in `Meridian.Operations.Dispatch.Contracts.*`, `Meridian.Operations.Tracking.Contracts.*` or `Meridian.Operations.Invoicing.Contracts.*`, must be referenced only by their own layer. Every module is reached only through its Contracts surface, so the dispatch board and roster, the milestone store and log, and the invoice assembler and reconciler all stay swappable; a reference into any of them from another module turns a private implementation detail into a contract its owner can no longer revise without breaking a caller.
 - `modules/tracking/outbound` — The Tracking layer must reference only itself (external packages are not constrained by this rule). Tracking is the leaf of the module graph: it owns the shipment milestone timeline that every other module reads and depends on no module in turn, so nothing it does can pull another module's state into that shared source of truth.

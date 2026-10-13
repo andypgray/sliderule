@@ -17,7 +17,7 @@
       "posture": "enforce",
       "sentence": "Types in each of the Dispatch, Tracking and Invoicing layers, except types in `Meridian.Operations.Dispatch.Contracts.*`, `Meridian.Operations.Tracking.Contracts.*` or `Meridian.Operations.Invoicing.Contracts.*`, must be referenced only by their own layer.",
       "because": "Every module is reached only through its Contracts surface, so the dispatch board and roster, the milestone store and log, and the invoice assembler and reconciler all stay swappable; a reference into any of them from another module turns a private implementation detail into a contract its owner can no longer revise without breaking a caller.",
-      "fix": "Depend on the module's `Contracts` type — `IDispatchBoard`, `ITrackingLog`, `IInvoiceRun` — instead of reaching into its internals.",
+      "fix": "Depend on the module's `Contracts` type (`IDispatchBoard`, `ITrackingLog` or `IInvoiceRun`), not on its internals.",
       "constraint": { "node": "mustOnlyBeReferencedByItself", "subject": { "noun": { "node": "each", "layers": ["Dispatch", "Tracking", "Invoicing"] }, "adjectives": [{ "node": "except", "payload": { "union": [{ "noun": { "node": "namespace", "glob": "Meridian.Operations.Dispatch.Contracts.*" } }, { "noun": { "node": "namespace", "glob": "Meridian.Operations.Tracking.Contracts.*" } }, { "noun": { "node": "namespace", "glob": "Meridian.Operations.Invoicing.Contracts.*" } }] } }] } }
     },
     {
@@ -45,14 +45,14 @@
       "id": "modules/host/outbound",
       "posture": "enforce",
       "sentence": "The Host layer must reference only types in `Meridian.Operations.Dispatch.Contracts.*`, types in `Meridian.Operations.Tracking.Contracts.*`, types in `Meridian.Operations.Invoicing.Contracts.*`, `IDemurrageCalculator` or `DemurrageCalculator` (external packages are not constrained by this rule).",
-      "because": "The host is the composition root and the only place that sees every module at once; it wires them through their Contracts surfaces and the demurrage calculator facade alone, so no module's internals leak into the wiring and the boundaries the other rules draw are not quietly bypassed here.",
+      "because": "The host is the composition root and the only place that sees every module at once; it wires them through their Contracts surfaces and the demurrage calculator facade alone, so no module's internals leak into the wiring and the composition root cannot route around the boundaries the other rules draw.",
       "constraint": { "node": "mustOnlyReference", "subject": { "noun": { "node": "layer", "name": "Host" } }, "operands": [{ "noun": { "node": "namespace", "glob": "Meridian.Operations.Dispatch.Contracts.*" } }, { "noun": { "node": "namespace", "glob": "Meridian.Operations.Tracking.Contracts.*" } }, { "noun": { "node": "namespace", "glob": "Meridian.Operations.Invoicing.Contracts.*" } }, { "noun": { "node": "type", "anchor": { "name": "Meridian.Operations.Demurrage.IDemurrageCalculator" } } }, { "noun": { "node": "type", "anchor": { "name": "Meridian.Operations.Demurrage.DemurrageCalculator" } } }] }
     },
     {
       "id": "demurrage/engine/containment",
       "posture": "quarantine",
       "sentence": "Types in the Demurrage layer, except `IDemurrageCalculator` or `DemurrageCalculator`, must be referenced only by the Demurrage layer, `IDemurrageCalculator` or `DemurrageCalculator`.",
-      "because": "The day counting and the tariff table encode a published carrier tariff sheet with no cleaner target shape; the charges come out right precisely because of the conventions that read like bugs, so the engine is contained behind its calculator facade rather than tidied.",
+      "because": "The day counting and the tariff table encode a published carrier tariff sheet with no cleaner target shape; the charges come out right because of the conventions that read like bugs, so the engine is contained behind its calculator facade and left as written.",
       "fix": "use `IDemurrageCalculator`",
       "constraint": { "node": "mustOnlyBeReferencedBy", "subject": { "noun": { "node": "layer", "name": "Demurrage" }, "adjectives": [{ "node": "except", "payload": { "union": [{ "noun": { "node": "type", "anchor": { "name": "Meridian.Operations.Demurrage.IDemurrageCalculator" } } }, { "noun": { "node": "type", "anchor": { "name": "Meridian.Operations.Demurrage.DemurrageCalculator" } } }] } }] }, "operands": [{ "noun": { "node": "layer", "name": "Demurrage" } }, { "noun": { "node": "type", "anchor": { "name": "Meridian.Operations.Demurrage.IDemurrageCalculator" } } }, { "noun": { "node": "type", "anchor": { "name": "Meridian.Operations.Demurrage.DemurrageCalculator" } } }] },
       "scope": { "role": "containment", "scopeId": "demurrage/engine", "scoped": { "noun": { "node": "layer", "name": "Demurrage" } }, "surface": ["`IDemurrageCalculator`", "`DemurrageCalculator`"], "baselinePath": "arch/baselines/demurrage/engine/containment.json", "dragons": "Demurrage engine: it counts free-time then billable days between discharge and gate-out and prices them across tariff tiers. The free-time clock advances only on port working days, and billing is first-day-exclusive, last-day-inclusive per the carrier tariff sheet; counting calendar days instead, or 'correcting' that off-by-one, reprices every real container. The tariff tiers are non-contiguous and keyed by a day's billable ordinal, not by calendar span. Call in only through IDemurrageCalculator." }
@@ -61,7 +61,7 @@
       "id": "demurrage/engine/tripwire",
       "posture": "quarantine",
       "sentence": "",
-      "because": "The day counting and the tariff table encode a published carrier tariff sheet with no cleaner target shape; the charges come out right precisely because of the conventions that read like bugs, so the engine is contained behind its calculator facade rather than tidied.",
+      "because": "The day counting and the tariff table encode a published carrier tariff sheet with no cleaner target shape; the charges come out right because of the conventions that read like bugs, so the engine is contained behind its calculator facade and left as written.",
       "scope": { "role": "tripwire", "scopeId": "demurrage/engine", "scoped": { "noun": { "node": "layer", "name": "Demurrage" } }, "surface": [], "dragons": "Demurrage engine: it counts free-time then billable days between discharge and gate-out and prices them across tariff tiers. The free-time clock advances only on port working days, and billing is first-day-exclusive, last-day-inclusive per the carrier tariff sheet; counting calendar days instead, or 'correcting' that off-by-one, reprices every real container. The tariff tiers are non-contiguous and keyed by a day's billable ordinal, not by calendar span. Call in only through IDemurrageCalculator." }
     }
   ],

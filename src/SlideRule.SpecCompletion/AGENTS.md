@@ -3,7 +3,7 @@
 
 ## Layer `SpecCompletion`
 
-This directory holds the `SpecCompletion` layer. SpecCompletion offers the namespaces and types a spec can anchor on inside the editor a spec is written in, reading the same slot markers the spec analyzer reads. Its architecture rules:
+This directory contains the `SpecCompletion` layer. SpecCompletion offers the namespaces and types a spec can anchor on inside the editor a spec is written in, reading the same slot markers the spec analyzer reads. Its architecture rules:
 
 - `layering/leaves-independent` — Each of the Host, Adapter, Pack, Analyzers, SpecAnalyzers and SpecCompletion layers must not reference the others. Host, Adapter, Pack, Analyzers, SpecAnalyzers and SpecCompletion are the six leaves of the project graph: each is a different way to consume Core, and none is a dependency of another. A reference between two leaves would pull one consumer's closure — the CLI's MSBuild and MCP machinery, the adapter's xunit, the pack's canonical rules, an analyzer's compiler host — into a project that ships without it.
 - `layering/spec-completion-stands-alone` — The SpecCompletion layer must reference only itself (external packages are not constrained by this rule). An editor builds a project's completion providers by reflection, inside handlers that report nothing, so an assembly it cannot load produces no list and no message anywhere. This one ships in the contract package's analyzer directory beside the contract and the spec analyzer, and a reference to either compiles, passes every test and then fails to load in the editor of everyone who references the package, where the only symptom is a list that never appears. Nothing in the project graph stops it, because this project is a leaf.

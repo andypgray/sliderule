@@ -128,12 +128,12 @@ arch.Rule("modules/internals")
                  .Except(dispatchContracts, trackingContracts, invoicingContracts)
                  .MustOnlyBeReferencedByItself())
     .Because("Every module is reached only through its Contracts surface, so the dispatch board and roster, the milestone store and log, and the invoice assembler and reconciler all stay swappable; a reference into any of them from another module turns a private implementation detail into a contract its owner can no longer revise without breaking a caller.")
-    .Fix("Depend on the module's `Contracts` type — `IDispatchBoard`, `ITrackingLog`, `IInvoiceRun` — instead of reaching into its internals.");
+    .Fix("Depend on the module's `Contracts` type (`IDispatchBoard`, `ITrackingLog` or `IInvoiceRun`), not on its internals.");
 ```
 
 The family verbs `MustNotReferenceEachOther`, `MustOnlyBeReferencedByItself` and `MustNotHaveCircularReferences` judge the cells against one another. A family can also take a project selection, as `arch.Each(arch.Projects.Matching("Nop.Plugin.*"))`, where each project is a cell. Either form stands only as a rule's subject. A type that belongs to two cells fails the rule, which names the type and both cells. `MustNotHaveCircularReferences` takes a family of layers alone, because the build rejects a circular project reference.
 
-`arch.Registered(Lifetime.Singleton)` selects the service and implementation types a container registration in the source names with that lifetime, and `arch.Registered()` takes any lifetime. The registrations it sees are calls to `AddSingleton`, `AddScoped` and `AddTransient`, their `TryAdd` forms, `AddHostedService`, `AddDbContext`, `AddDbContextPool` and `AddHttpClient` on an `IServiceCollection`. Registrations made any other way are not seen, including those made by assembly scanning, factory internals and framework defaults. This repository's own spec uses it on both sides of `MustNotInject`, so a singleton that injects a scoped or transient service fails the rule.
+`arch.Registered(Lifetime.Singleton)` selects the service and implementation types a container registration in the source names with that lifetime, and `arch.Registered()` takes any lifetime. The registrations it sees are calls to `AddSingleton`, `AddScoped` and `AddTransient`, their `TryAdd` forms, `AddHostedService`, `AddDbContext`, `AddDbContextPool` and `AddHttpClient` on an `IServiceCollection`. Registrations made any other way are not seen, including keyed-service and raw `ServiceDescriptor` registrations and those made by assembly scanning, factory internals and framework defaults. This repository's own spec uses it on both sides of `MustNotInject`, so a singleton that injects a scoped or transient service fails the rule.
 
 `.Where(predicate, description:)` filters a selection by any condition C# can state, and `Must(condition, description:)` states a constraint the vocabulary has no verb for. The `description:` is how the rule reads, so both require it. A rule with either one is left out of the model file the [build analyzer](https://github.com/andypgray/sliderule/blob/main/src/SlideRule.Analyzers/README.md) reads, so the analyzer leaves it to `check` and the xUnit adapter.
 
@@ -190,7 +190,7 @@ arch.Scope("model/prose-fragments")
 
 ## The spec project
 
-A rule that names a type with `typeof()` needs a spec project that can reference that type's project, so the projects a spec names decide its target framework. The contract package is `netstandard2.0`, so a spec project can target anything from `net48` up. A spec project on `net48` or `netstandard2.0` compiles at C# 7.3 unless it sets `<LangVersion>latest</LangVersion>`.
+A rule that names a type with `typeof()` needs a spec project that can reference that type's project, so the projects a spec names determine its target framework. The contract package is `netstandard2.0`, so a spec project can target anything from `net48` up. A spec project on `net48` or `netstandard2.0` compiles at C# 7.3 unless it sets `<LangVersion>latest</LangVersion>`.
 
 A .NET shared-framework type, such as an ASP.NET Core or WPF type, is never copied into a class library's output. A type that exists only on .NET Framework, such as one from `System.Web`, cannot load in the tool's .NET host. Name either by string or by namespace pattern. A spec that names NuGet package types with `typeof()` sets `<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>`, which copies the package assemblies next to the spec DLL, where the checker loads them from. Without it, `check` fails to load the spec and names the setting.
 
@@ -198,7 +198,7 @@ In a repository on central package management, the spec project can set `<Manage
 
 ## Rule packs
 
-A rule pack is a static class whose methods declare rules on the spec's `Arch`, so several specs share one definition of a rule. The pack decides the reason and the citation, and the spec decides the posture and the subject. [`SlideRule.Packs.DotNet`](https://github.com/andypgray/sliderule/blob/main/src/SlideRule.Packs.DotNet/README.md) is a worked example with nine .NET rules, and the Meridian and Interchange examples take rules from it. It is not published as a package and targets `net10.0`, so copy its source or write a pack of your own. `SpecValidation.Validate(new MySpec())` returns every mistake in the spec, one message each, in the words `sliderule check` prints them, and an empty list proves a pack's rules valid without loading a solution.
+A rule pack is a static class whose methods declare rules on the spec's `Arch`, so several specs share one definition of a rule. The pack supplies the reason and the citation, and the spec chooses the posture and the subject. [`SlideRule.Packs.DotNet`](https://github.com/andypgray/sliderule/blob/main/src/SlideRule.Packs.DotNet/README.md) is a worked example with nine .NET rules, and the Meridian and Interchange examples take rules from it. It is not published as a package and targets `net10.0`, so copy its source or write a pack of your own. `SpecValidation.Validate(new MySpec())` returns every mistake in the spec, one message each, in the words `sliderule check` prints them, and an empty list proves a pack's rules valid without loading a solution.
 
 ## Checking a spec as you write it
 

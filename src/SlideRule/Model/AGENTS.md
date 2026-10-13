@@ -3,7 +3,7 @@
 
 ## Layer `Model`
 
-This directory holds the `Model` layer. Model is the reified spec: the nodes a spec compiles to, and the one thing the checker and the renderers both read. Its architecture rules:
+This directory contains the `Model` layer. Model is the reified spec: the nodes a spec compiles to, and the one thing the checker and the renderers both read. Its architecture rules:
 
 - `layering/model-independent` — The Model layer must not reference the Checking layer or the Rendering layer. The Model is the one reified thing this product is built around: a spec compiles to it, and checking and rendering are two independent readers of it. A reference the other way would make the model know about a consumer, and the next render target could no longer be added without touching it.
 - `layering/no-circular-references` — Each of the Model, Checking and Rendering layers must not have circular references with the others. Model, Checking and Rendering are three cuts inside one assembly with one intended direction: a model and two readers of it. A circle among them means a reader has become something the other reader depends on, and the next render target or checker change could no longer land without touching both.
@@ -11,7 +11,7 @@ This directory holds the `Model` layer. Model is the reified spec: the nodes a s
 
 ## Cautioned scope `model/prose-fragments`
 
-This directory holds the cautioned `model/prose-fragments` scope: the Model layer. Here be dragons — the weirdness below is structural; read it before you edit, and do not tidy it away.
+This directory contains the cautioned `model/prose-fragments` scope: the Model layer. Here be dragons: the weirdness below is structural; read it before you edit, and do not tidy it away.
 
 Dragons: Every node here declares the prose fragment the renderers assemble into its sentence, and the fragments are position-blind: one phrase serves subject and reference position, so a fragment never closes its own parenthetical — the closing comma belongs to the junction (SentenceRenderer.EndsOpen and CloseBefore). A strict verb renders its strictness by the absence of the external-packages caveat; do not add one. A changed fragment moves its pin in the same commit.
 

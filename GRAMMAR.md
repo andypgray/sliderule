@@ -1592,7 +1592,7 @@ no-reference string, and the generic sugar (§10).
 |---|---|
 | `.Because(prose)` | **required** on every rule and scope (§8 item 3) |
 | `.Fix(prose)` | optional; for Quarantine containment it is auto-derived from `BoundaryOnlyVia` ("use `IBillingFacade`") and not author-overridable — `IQuarantinedScope` carries no `.Fix`, and neither does `ICautionedScope`: a caution's "what to do instead" is the sanctioned-interaction clause its dragons prose already carries |
-| `.Purpose(prose)` | optional; `Layer` only: the one trailer on a definition (§3.2). Renders verbatim after the definition fragment in the module-map row (§5.1) and after the first sentence of the layer card's lede ("This directory holds the `Host` layer. {purpose} Its architecture rules:"); never places a card of its own — a layer earns a card only through an anchored Enforce/Migrate rule. Blank or multi-line is §8 item 5 and a second call item 6, both spec-wide and named by layer. |
+| `.Purpose(prose)` | optional; `Layer` only: the one trailer on a definition (§3.2). Renders verbatim after the definition fragment in the module-map row (§5.1) and after the first sentence of the layer card's lede ("This directory contains the `Host` layer. {purpose} Its architecture rules:"); never places a card of its own — a layer earns a card only through an anchored Enforce/Migrate rule. Blank or multi-line is §8 item 5 and a second call item 6, both spec-wide and named by layer. |
 | `.Citation(uri)` | optional; `Enforce` and `Migrate` rules only — a scope documents itself through `Dragons`/`DragonsDoc`. The canonical page the rationale rests on, as an absolute `http`/`https` URL (§8 item 30; blank or multi-line is item 5, a second call item 6). Renders as a sentence of its own, `See <{url}>.`, after the reason in the rule's context bullet — and for a Migrate rule between the reason and the boy-scout policy, so the policy still ends the paragraph. `explain` and a failed rule's `check` block print it as a `citation:` line after `because:`; `check --json` carries it as `citation` after `fix`, elided at index grain with the rest of the prose; SARIF publishes it as the descriptor's `helpUri` and, joined to the `Fix`, inside `help.text`/`help.markdown`. |
 | `.Exemplar(selection)` | optional; `Enforce` and `Migrate` rules only, one call (a second is §8 item 6), several types through one union (§5.1). Names the type to copy when fixing a violation, and never takes part in the verdict. `check` resolves it after the verdict, against solution-declared types as it resolves a subject. A failed rule's block prints `exemplar: {Name} ({file}:{line})` after `fix:`, each resolved type at its first declaration site, joined with `, `, and prints no line when nothing resolved. `check --json` carries it as `exemplar` after `citation`, a list of `{type, sites}` (full name, ordinal order, every declaration site), absent when nothing resolved and elided at index grain with the prose. SARIF appends `Exemplar: {Name} ({file}:{line}).` to `help` after the `Fix`. `explain` prints it as written (`exemplar:` after `fix:`), and so does the build-time warning (`Exemplar: {phrase}.` after `Fix:`); neither extracts. Each part that matches nothing (a union operand, one name of a `Named` list, or the whole) raises its own `deadExemplar` warning, `` This rule's exemplar "{reference}" matched no solution-declared types. ``, each part quoted as it would read alone and hinted with the exact-name cure. That warning turns a passing rule's marker to `warn` and counts in `status`, and never feeds the empty-subject skip, the measured-in-full reading, promotion or the baseline refusal. A narrowed run treats it as it treats a subject: under a solution filter dead parts stay silent (§4.1), and a run over one project's compilation skips the exemplar. An exemplar that throws while resolving (a closed generic, a throwing `Where`) warns `This rule's exemplar could not be resolved: {fault}` and leaves the verdict alone. A `Where` anywhere in the exemplar keeps the rule out of the model file the build reads, as a `Where` anywhere else in the rule does. |
 
@@ -2177,7 +2177,7 @@ description item 5, an undefined `Lifetime` item 19 and a family item 27. Whethe
 matches any type is check-time, like an operand's emptiness: a warning, never an error.
 
 Enforced at compile time instead (no catalog entry): zero-target dependency verbs — the shapes
-that legitimately name no target have verbs of their own, `MustOnlyReferenceItself()` and
+that are meant to name no target have verbs of their own, `MustOnlyReferenceItself()` and
 `MustOnlyBeReferencedByItself()`, and `MustNotReferenceEachOther()` and
 `MustNotHaveCircularReferences()` name their targets through the subject's cells (§5.3) —
 zero-member `MustNotUse`, zero-glob layers and zero-cell families
@@ -2298,8 +2298,8 @@ this catalog.
   that noun's (§4.7), additionally gates its own glossary line on the same
   byte-identical-without-it terms: *"registered = named in a source-level container registration
   (`AddSingleton`/`AddScoped`/`AddTransient`/`TryAdd*`/`AddHostedService`/`AddDbContext`/
-  `AddHttpClient<TClient>`); registrations made by assembly scanning, factory internals, or
-  framework defaults are not seen."*
+  `AddDbContextPool`/`AddHttpClient<TClient>`); keyed-service and raw `ServiceDescriptor`
+  registrations, assembly scanning, factory internals and framework defaults are not seen."*
 - **Posture verbs**: imperative (`Enforce`, `Migrate`, `Quarantine`, `Caution`). **Options**: nouns
   (`Baseline`) or deliberate idiom (`WhileYoureThere` — it names the boy-scout rule). Its policies
   each answer the question the option asks, as imperatives (`MigrateIfSmall`, `AlwaysMigrate`,

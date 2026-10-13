@@ -14,7 +14,7 @@ Two rules govern the Invoicing module. They come from [arch/Meridian.Operations.
                                  arch.Namespace("Meridian.Operations.Invoicing.Contracts.*"))
                          .MustOnlyBeReferencedByItself())
             .Because("Every module is reached only through its Contracts surface, so the dispatch board and roster, the milestone store and log, and the invoice assembler and reconciler all stay swappable; a reference into any of them from another module turns a private implementation detail into a contract its owner can no longer revise without breaking a caller.")
-            .Fix("Depend on the module's `Contracts` type — `IDispatchBoard`, `ITrackingLog`, `IInvoiceRun` — instead of reaching into its internals.");
+            .Fix("Depend on the module's `Contracts` type (`IDispatchBoard`, `ITrackingLog` or `IInvoiceRun`), not on its internals.");
 
         arch.Rule("modules/invoicing/outbound")
             .Enforce(invoicing.MustOnlyReference(
@@ -33,7 +33,7 @@ Two rules govern the Invoicing module. They come from [arch/Meridian.Operations.
 
 ## Layer `Invoicing`
 
-This directory holds the `Invoicing` layer. Invoicing assembles a shipment's invoice from its milestones and its demurrage charge. Its architecture rules:
+This directory contains the `Invoicing` layer. Invoicing assembles a shipment's invoice from its milestones and its demurrage charge. Its architecture rules:
 
 - `modules/internals` — Types in each of the Dispatch, Tracking and Invoicing layers, except types in `Meridian.Operations.Dispatch.Contracts.*`, `Meridian.Operations.Tracking.Contracts.*` or `Meridian.Operations.Invoicing.Contracts.*`, must be referenced only by their own layer. Every module is reached only through its Contracts surface, so the dispatch board and roster, the milestone store and log, and the invoice assembler and reconciler all stay swappable; a reference into any of them from another module turns a private implementation detail into a contract its owner can no longer revise without breaking a caller.
 - `modules/invoicing/outbound` — The Invoicing layer must reference only types in `Meridian.Operations.Tracking.Contracts.*` or the Demurrage layer (external packages are not constrained by this rule). Invoicing prices a shipment from tracking's milestone contracts and the demurrage charge and integrates with nothing else, so billing's dependencies stay the two it actually needs and the module graph stays legible.
@@ -77,7 +77,7 @@ An agent working in Dispatch wants a quick invoice preview and constructs Invoic
 ```text
 FAIL modules/internals — Types in each of the Dispatch, Tracking and Invoicing layers, except types in `Meridian.Operations.Dispatch.Contracts.*`, `Meridian.Operations.Tracking.Contracts.*` or `Meridian.Operations.Invoicing.Contracts.*`, must be referenced only by their own layer.
   because: Every module is reached only through its Contracts surface, so the dispatch board and roster, the milestone store and log, and the invoice assembler and reconciler all stay swappable; a reference into any of them from another module turns a private implementation detail into a contract its owner can no longer revise without breaking a caller.
-  fix: Depend on the module's `Contracts` type — `IDispatchBoard`, `ITrackingLog`, `IInvoiceRun` — instead of reaching into its internals.
+  fix: Depend on the module's `Contracts` type (`IDispatchBoard`, `ITrackingLog` or `IInvoiceRun`), not on its internals.
   src/Meridian.Operations/Dispatch/InvoicePreview.cs:9 — Meridian.Operations.Dispatch.InvoicePreview references Meridian.Operations.Invoicing.InvoiceAssembler
 FAIL modules/dispatch/outbound — The Dispatch layer must reference only types in `Meridian.Operations.Tracking.Contracts.*` (external packages are not constrained by this rule).
   because: The module dependency graph is kept explicit and acyclic: dispatch consumes tracking's milestone contracts to gate a haulage leg and reaches nothing else, so the only arrow out of dispatch is the one drawn here and the monolith can still be split along its module lines.
@@ -98,11 +98,11 @@ Demurrage is in the map as a module and pinned again as a quarantined scope. It 
 
 ## Quarantined scope `demurrage/engine`
 
-This directory holds the quarantined `demurrage/engine` scope: the Demurrage layer. Here be dragons — do not spread references into it.
+This directory contains the quarantined `demurrage/engine` scope: the Demurrage layer. Here be dragons: do not spread references into it.
 
 Dragons: Demurrage engine: it counts free-time then billable days between discharge and gate-out and prices them across tariff tiers. The free-time clock advances only on port working days, and billing is first-day-exclusive, last-day-inclusive per the carrier tariff sheet; counting calendar days instead, or 'correcting' that off-by-one, reprices every real container. The tariff tiers are non-contiguous and keyed by a day's billable ordinal, not by calendar span. Call in only through IDemurrageCalculator.
 
-- `demurrage/engine/containment` — Types in the Demurrage layer, except `IDemurrageCalculator` or `DemurrageCalculator`, must be referenced only by the Demurrage layer, `IDemurrageCalculator` or `DemurrageCalculator`. The day counting and the tariff table encode a published carrier tariff sheet with no cleaner target shape; the charges come out right precisely because of the conventions that read like bugs, so the engine is contained behind its calculator facade rather than tidied.
+- `demurrage/engine/containment` — Types in the Demurrage layer, except `IDemurrageCalculator` or `DemurrageCalculator`, must be referenced only by the Demurrage layer, `IDemurrageCalculator` or `DemurrageCalculator`. The day counting and the tariff table encode a published carrier tariff sheet with no cleaner target shape; the charges come out right because of the conventions that read like bugs, so the engine is contained behind its calculator facade and left as written.
 - Sanctioned surface: `IDemurrageCalculator`, `DemurrageCalculator`.
 - Expand: `sliderule explain demurrage/engine/containment`.
 <!-- sliderule:end -->

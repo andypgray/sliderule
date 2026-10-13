@@ -25,7 +25,7 @@ public class AgentContextRendererTests
     // drift apart on it. Sibling RenderCommandE2ETests holds the same paragraph for its own goldens.
     private const string InstallNote =
         "*If the `sliderule` command is missing (a configured MCP server dies without it), " +
-        "install the tool with `dotnet tool install -g SlideRule.Cli`, or run any verb " +
+        "install the tool with `dotnet tool install -g SlideRule.Cli`, or run any command " +
         "without installing: `dotnet dnx SlideRule.Cli --yes -- check <solution>`. " +
         SdkPinSentence + "*\n\n";
 
@@ -149,8 +149,8 @@ public class AgentContextRendererTests
 
         const string expected =
             "## Quarantined scope `legacy/billing`\n\n" +
-            "This directory holds the quarantined `legacy/billing` scope: types in `MyApp.Legacy.Billing.*`. " +
-            "Here be dragons — do not spread references into it.\n\n" +
+            "This directory contains the quarantined `legacy/billing` scope: types in `MyApp.Legacy.Billing.*`. " +
+            "Here be dragons: do not spread references into it.\n\n" +
             "Dragons: Banker's rounding happens at line-item level, NOT invoice level. " +
             "Nightly reconciliation depends on this. Do not normalize.\n\n" +
             "- `legacy/billing/containment` — Types in `MyApp.Legacy.Billing.*`, except `IBillingFacade` or " +
@@ -197,7 +197,7 @@ public class AgentContextRendererTests
             .Rule("legacy/billing/containment");
 
         AgentContextRenderer.ScopeCard(containment)
-            .ShouldContain("This directory holds the quarantined `legacy/billing` scope: the Billing layer.");
+            .ShouldContain("This directory contains the quarantined `legacy/billing` scope: the Billing layer.");
     }
 
     [Fact]
@@ -243,8 +243,8 @@ public class AgentContextRendererTests
 
         const string expected =
             "## Cautioned scope `shared/utilities`\n\n" +
-            "This directory holds the cautioned `shared/utilities` scope: types in `MyApp.Shared.*`. " +
-            "Here be dragons — the weirdness below is structural; read it before you edit, and do not " +
+            "This directory contains the cautioned `shared/utilities` scope: types in `MyApp.Shared.*`. " +
+            "Here be dragons: the weirdness below is structural; read it before you edit, and do not " +
             "tidy it away.\n\n" +
             "Dragons: Argument order is structural: every caller passes them positionally.\n\n" +
             "- `shared/utilities/tripwire` — a change set touching this scope is flagged by " +
@@ -286,7 +286,7 @@ public class AgentContextRendererTests
                 .Because("Every caller depends on the exact timings."));
 
         AgentContextRenderer.CautionCard(tripwire)
-            .ShouldContain("This directory holds the cautioned `resilience/retry` scope: types named `RetryPolicy`.");
+            .ShouldContain("This directory contains the cautioned `resilience/retry` scope: types named `RetryPolicy`.");
     }
 
     [Fact]
@@ -301,7 +301,7 @@ public class AgentContextRendererTests
                 .Because("Regeneration overwrites anything moved out of the partial half."));
 
         AgentContextRenderer.CautionCard(tripwire)
-            .ShouldContain("This directory holds the cautioned `model/legacy` scope: the Model layer.");
+            .ShouldContain("This directory contains the cautioned `model/legacy` scope: the Model layer.");
     }
 
     [Fact]
@@ -340,7 +340,7 @@ public class AgentContextRendererTests
 
         const string expected =
             "## Layer `Dispatch`\n\n" +
-            "This directory holds the `Dispatch` layer. Its architecture rules:\n\n" +
+            "This directory contains the `Dispatch` layer. Its architecture rules:\n\n" +
             "- `modules/dispatch/internals` — The Dispatch layer must not reference types in `Acme.Web.*`. " +
             "Dispatch is a leaf module.\n" +
             "- `modules/dispatch/outbound` — The Dispatch layer must not be referenced by types in `Acme.Legacy.*`. " +
@@ -378,7 +378,7 @@ public class AgentContextRendererTests
 
         const string expected =
             "## Layer `Dispatch`\n\n" +
-            "This directory holds the `Dispatch` layer. Plans haulage legs and assigns them to drivers. " +
+            "This directory contains the `Dispatch` layer. Plans haulage legs and assigns them to drivers. " +
             "Its architecture rules:\n\n" +
             "- `modules/dispatch/internals` — The Dispatch layer must not reference types in `Acme.Web.*`. " +
             "Dispatch is a leaf module.\n" +
@@ -626,8 +626,9 @@ public class AgentContextRendererTests
         // A Registered noun (here on a MustNotReference subject, not MustNotInject) gates its own line.
         block.ShouldContain(
             "registered = named in a source-level container registration " +
-            "(`AddSingleton`/`AddScoped`/`AddTransient`/`TryAdd*`/`AddHostedService`/`AddDbContext`/`AddHttpClient<TClient>`); " +
-            "registrations made by assembly scanning, factory internals, or framework defaults are not seen.");
+            "(`AddSingleton`/`AddScoped`/`AddTransient`/`TryAdd*`/`AddHostedService`/`AddDbContext`/`AddDbContextPool`/`AddHttpClient<TClient>`); " +
+            "keyed-service and raw `ServiceDescriptor` registrations, assembly scanning, factory internals and " +
+            "framework defaults are not seen.");
         // The verb is MustNotReference, not MustNotInject → no inject clause.
         block.ShouldNotContain("inject = a source-level constructor-parameter dependency");
     }
@@ -659,8 +660,9 @@ public class AgentContextRendererTests
         // ...and the Registered noun gates the separate registered line.
         block.ShouldContain(
             "registered = named in a source-level container registration " +
-            "(`AddSingleton`/`AddScoped`/`AddTransient`/`TryAdd*`/`AddHostedService`/`AddDbContext`/`AddHttpClient<TClient>`); " +
-            "registrations made by assembly scanning, factory internals, or framework defaults are not seen.");
+            "(`AddSingleton`/`AddScoped`/`AddTransient`/`TryAdd*`/`AddHostedService`/`AddDbContext`/`AddDbContextPool`/`AddHttpClient<TClient>`); " +
+            "keyed-service and raw `ServiceDescriptor` registrations, assembly scanning, factory internals and " +
+            "framework defaults are not seen.");
         // The rendered law keeps its qualified subject head — never a false bare "Types, …".
         block.ShouldContain(
             "Singleton-registered types must not inject scoped-registered types or transient-registered types.");

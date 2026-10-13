@@ -16,8 +16,8 @@ namespace Meridian.Architecture;
 // This example's README quotes rules from the class below as they are written here, continuation
 // columns included, and the compiled spec is the same whichever way they are laid out. The marker
 // holds the formatter off everything after it, so the shape a reader meets here is the shape they
-// meet there, and the file still goes through cleanup with the rest of the tree rather than being
-// remembered as an exception. It is unbalanced on purpose: the quoted blocks sit throughout Define.
+// meet there, and the file still goes through cleanup with the rest of the tree, with no exception
+// to remember. It is unbalanced on purpose: the quoted blocks sit throughout Define.
 // @formatter:off
 public sealed class MeridianArchitectureSpec : IArchitectureSpec
 {

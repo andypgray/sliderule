@@ -29,7 +29,7 @@ internal static class AgentContextRenderer
     // verb, and the install cannot take a net10.0 tool); only a client launching the dnx script skips the pin.
     private const string InstallRecoveryLine =
         "*If the `sliderule` command is missing (a configured MCP server dies without it), " +
-        "install the tool with `dotnet tool install -g SlideRule.Cli`, or run any verb " +
+        "install the tool with `dotnet tool install -g SlideRule.Cli`, or run any command " +
         "without installing: `dotnet dnx SlideRule.Cli --yes -- check <solution>`. " +
         "Inside a repository whose `global.json` pins an SDK below 10, both commands fail, so run them " +
         "from outside it and pass the solution's absolute path.*";
@@ -62,8 +62,9 @@ internal static class AgentContextRenderer
     // discipline as the axis clauses (GRAMMAR §4.7/§10). The backticked method list is literal output.
     private const string GlossaryRegisteredLine =
         "registered = named in a source-level container registration " +
-        "(`AddSingleton`/`AddScoped`/`AddTransient`/`TryAdd*`/`AddHostedService`/`AddDbContext`/`AddHttpClient<TClient>`); " +
-        "registrations made by assembly scanning, factory internals, or framework defaults are not seen.";
+        "(`AddSingleton`/`AddScoped`/`AddTransient`/`TryAdd*`/`AddHostedService`/`AddDbContext`/`AddDbContextPool`/`AddHttpClient<TClient>`); " +
+        "keyed-service and raw `ServiceDescriptor` registrations, assembly scanning, factory internals and " +
+        "framework defaults are not seen.";
 
     private const string GlossaryTail = "Expand any rule ID with `sliderule explain <rule-id>`.";
 
@@ -272,8 +273,8 @@ internal static class AgentContextRenderer
         bullets.Add($"- Expand: {ProseFormat.Backtick($"sliderule explain {ruleId}")}.");
 
         var heading = $"## {ProseFormat.Capitalize(posture)} scope {ProseFormat.Backtick(scope.ScopeId)}";
-        string lede = $"This directory holds the {posture} {ProseFormat.Backtick(scope.ScopeId)} scope: " +
-                      $"{SentenceRenderer.Reference(scope.Scoped)}. Here be dragons — {warning}";
+        string lede = $"This directory contains the {posture} {ProseFormat.Backtick(scope.ScopeId)} scope: " +
+                      $"{SentenceRenderer.Reference(scope.Scoped)}. Here be dragons: {warning}";
 
         var sections = new List<string> { heading, lede };
         if (scope.Dragons is { } dragons) sections.Add($"Dragons: {dragons}");
@@ -303,7 +304,7 @@ internal static class AgentContextRenderer
         List<string> bullets = rules.Select(rule => RuleBullet(rule)).ToList();
         bullets.Add($"- Expand any rule above with {ProseFormat.Backtick("sliderule explain <rule-id>")}.");
 
-        var lede = $"This directory holds the {ProseFormat.Backtick(layerName)} layer.";
+        var lede = $"This directory contains the {ProseFormat.Backtick(layerName)} layer.";
         if (purpose is not null) lede += $" {purpose}";
         lede += " Its architecture rules:";
 

@@ -3,7 +3,7 @@
 
 ## Layer `Rendering`
 
-This directory holds the `Rendering` layer. Rendering turns the model and a check's results into what people and agents read: the managed block and cards, the diagrams, and the reports. Its architecture rules:
+This directory contains the `Rendering` layer. Rendering turns the model and a check's results into what people and agents read: the managed block and cards, the diagrams, and the reports. Its architecture rules:
 
 - `layering/no-circular-references` — Each of the Model, Checking and Rendering layers must not have circular references with the others. Model, Checking and Rendering are three cuts inside one assembly with one intended direction: a model and two readers of it. A circle among them means a reader has become something the other reader depends on, and the next render target or checker change could no longer land without touching both.
 - Expand any rule above with `sliderule explain <rule-id>`.

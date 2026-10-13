@@ -5,7 +5,7 @@ namespace Meridian.Operations.Architecture;
 
 /// <summary>
 ///     The operations subsystem's architecture spec — Meridian's modular monolith, where the
-///     module boundaries are drawn by namespace inside one project rather than by separate
+///     module boundaries are drawn by namespace inside one project, not by separate
 ///     assemblies. Each module keeps its internals to itself and is reached through a Contracts
 ///     surface; the module dependency graph is explicit and acyclic; and the demurrage engine is
 ///     quarantined behind its calculator facade.
@@ -13,8 +13,8 @@ namespace Meridian.Operations.Architecture;
 // This example's README quotes rules from the class below in the layout they have here, continuation
 // columns included, and the compiled spec is the same whichever way they are laid out. The marker
 // holds the formatter off everything after it, so the shape a reader meets here is the shape they
-// meet there, and the file still goes through cleanup with the rest of the tree rather than being
-// remembered as an exception. It is unbalanced on purpose: the quoted blocks sit throughout Define.
+// meet there, and the file still goes through cleanup with the rest of the tree, with no exception
+// to remember. It is unbalanced on purpose: the quoted blocks sit throughout Define.
 // The README writes the Selection locals out in place, so its quote is not a substring of this file
 // and no test holds it: a change to a quoted rule is copied there by hand.
 // @formatter:off
@@ -46,7 +46,7 @@ public sealed class OperationsArchitectureSpec : IArchitectureSpec
                          .Except(dispatchContracts, trackingContracts, invoicingContracts)
                          .MustOnlyBeReferencedByItself())
             .Because("Every module is reached only through its Contracts surface, so the dispatch board and roster, the milestone store and log, and the invoice assembler and reconciler all stay swappable; a reference into any of them from another module turns a private implementation detail into a contract its owner can no longer revise without breaking a caller.")
-            .Fix("Depend on the module's `Contracts` type — `IDispatchBoard`, `ITrackingLog`, `IInvoiceRun` — instead of reaching into its internals.");
+            .Fix("Depend on the module's `Contracts` type (`IDispatchBoard`, `ITrackingLog` or `IInvoiceRun`), not on its internals.");
 
         arch.Rule("modules/dispatch/outbound")
             .Enforce(dispatch.MustOnlyReference(trackingContracts))
@@ -77,12 +77,12 @@ public sealed class OperationsArchitectureSpec : IArchitectureSpec
                 invoicingContracts,
                 arch.Type<IDemurrageCalculator>(),
                 arch.Type<DemurrageCalculator>()))
-            .Because("The host is the composition root and the only place that sees every module at once; it wires them through their Contracts surfaces and the demurrage calculator facade alone, so no module's internals leak into the wiring and the boundaries the other rules draw are not quietly bypassed here.");
+            .Because("The host is the composition root and the only place that sees every module at once; it wires them through their Contracts surfaces and the demurrage calculator facade alone, so no module's internals leak into the wiring and the composition root cannot route around the boundaries the other rules draw.");
 
         arch.Scope("demurrage/engine")
             .Quarantine(demurrage)
             .BoundaryOnlyVia(typeof(IDemurrageCalculator), typeof(DemurrageCalculator))
             .Dragons("Demurrage engine: it counts free-time then billable days between discharge and gate-out and prices them across tariff tiers. The free-time clock advances only on port working days, and billing is first-day-exclusive, last-day-inclusive per the carrier tariff sheet; counting calendar days instead, or 'correcting' that off-by-one, reprices every real container. The tariff tiers are non-contiguous and keyed by a day's billable ordinal, not by calendar span. Call in only through IDemurrageCalculator.")
-            .Because("The day counting and the tariff table encode a published carrier tariff sheet with no cleaner target shape; the charges come out right precisely because of the conventions that read like bugs, so the engine is contained behind its calculator facade rather than tidied.");
+            .Because("The day counting and the tariff table encode a published carrier tariff sheet with no cleaner target shape; the charges come out right because of the conventions that read like bugs, so the engine is contained behind its calculator facade and left as written.");
     }
 }

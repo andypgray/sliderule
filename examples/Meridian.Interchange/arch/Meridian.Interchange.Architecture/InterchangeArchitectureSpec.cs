@@ -13,19 +13,19 @@ namespace Meridian.Interchange.Architecture;
 ///     partners over HTTP. Its rules encode canonical Microsoft .NET guidance, and the one legacy
 ///     manifest corner that still blocks on async work is grandfathered until its gateway goes async.
 ///     <para>
-///         Nine of the twelve are canonical .NET guidance that nothing here makes special, so they
-///         come from the shared <c>DotNetGuidance</c> pack rather than being written again: the pack
-///         owns each rule's <c>Because</c>, this spec chooses the posture and the selections, four of the
-///         nine override the <c>Fix</c> where remediation needs local words, and three name an
-///         <c>Exemplar</c>, a type that already shows the fix (<c>CarrierClient</c>, <c>ScopedDispatchRunner</c>,
-///         <c>OutboxProcessor</c>). The other three name domain types and stay here, where they belong.
+///         Nine of the twelve rules are canonical .NET guidance with nothing specific to this subsystem,
+///         so they come from the shared <c>DotNetGuidance</c> pack. The pack supplies each rule's
+///         <c>Because</c>, and this spec chooses the posture and the selections. Four of the nine override
+///         the <c>Fix</c> where the remedy needs local detail, and three name an <c>Exemplar</c>, a type
+///         that already shows the fix (<c>CarrierClient</c>, <c>ScopedDispatchRunner</c>,
+///         <c>OutboxProcessor</c>). The other three rules name domain types and are written here.
 ///     </para>
 /// </summary>
 // This example's README quotes rules from the class below as they are written here, continuation
 // columns included, and the compiled spec is the same whichever way they are laid out. The marker
 // holds the formatter off everything after it, so the shape a reader meets here is the shape they
-// meet there, and the file still goes through cleanup with the rest of the tree rather than being
-// remembered as an exception. It is unbalanced on purpose: the quoted blocks sit throughout Define.
+// meet there, and the file still goes through cleanup with the rest of the tree, with no exception
+// to remember. It is unbalanced on purpose: the quoted blocks sit throughout Define.
 // Where a quote writes the `interchange` local out in place, it is not a substring of this file and no
 // test holds it, so a change to that rule is copied to the README by hand.
 // @formatter:off
