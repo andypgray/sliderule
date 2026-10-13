@@ -79,6 +79,20 @@ internal static class HookRunAssertions
         return run;
     }
 
+    /// <summary>
+    ///     Asserts the hook spent exactly one check, and spent it on <paramref name="directory" />: no other tree was
+    ///     checked beside it.
+    /// </summary>
+    internal static HookRun ShouldHaveOnlyRunTheCheckIn(this HookRun run, string directory, string because)
+    {
+        string explained = Explain(run, because);
+        run.Checks.Count.ShouldBe(1, explained);
+        SameDirectory(run.Checks[0].WorkingDirectory, directory)
+            .ShouldBeTrue(explained);
+
+        return run;
+    }
+
     /// <summary>Asserts the hook spent no check at all.</summary>
     internal static HookRun ShouldNotHaveRunTheCheck(this HookRun run, string because)
     {

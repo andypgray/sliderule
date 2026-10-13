@@ -1,3 +1,4 @@
+using System.Text.Json;
 using SlideRule.Cli.Diff;
 using SlideRule.Cli.Hooks;
 using SlideRule.Cli.Mcp.Infrastructure;
@@ -20,6 +21,13 @@ namespace SlideRule.Cli.Verbs;
 ///         made and no tool payload names. <c>UserPromptSubmit</c> is the turn's other end, where nothing is
 ///         checked and the tree is noted as the prompt found it. Any other event, and no payload at all, take
 ///         the per-edit path, which checks statelessly and skips an edit that touched no code or another tree.
+///     </para>
+///     <para>
+///         <b>The trees.</b> A stop checks the tree the session is in, and beside it each other working tree of the
+///         project that the turn, or the subagent's run, wrote code into through the agent's edit tools, as the
+///         transcript the payload names records them. Each tree is weighed by the skips below against records of
+///         its own; one round is counted per stop, and a report covering a tree other than the session's names each
+///         tree it covers. A transcript that cannot be read adds no tree.
 ///     </para>
 ///     <para>
 ///         <b>The skips.</b> A stop spends no check when no code file's bytes have changed since the last green
@@ -119,6 +127,31 @@ internal sealed class HookRunner(
     {
         string tree = await SessionTreeAsync(payload.Cwd, projectDirectory, ct) ?? request.WorkingDirectory;
         HookState state = OpenState(payload);
+        var trees = new List<TreeTurn> { await ExamineAsync(tree, state, own: true, ct) };
+
+        // The project's other trees the turn wrote code into by an absolute path, each weighed by the same skips
+        // against records of its own.
+        foreach (string other in await WrittenTreesAsync(hookEvent, payload, tree, ct))
+            trees.Add(await ExamineAsync(other, state.ForTree(other), own: false, ct));
+
+        if (!trees.Any(static turn => turn.Due)) return EndTurn(hookEvent, trees);
+
+        // Consecutive continuations for this prompt: a block and a warning passed on both count, and a silent green
+        // resets. At the cap the hook says its piece and lets the turn end. A count that cannot be kept reads as no
+        // rounds, and the continuation that fails to count it falls back to the payload's own stop_hook_active. One
+        // count per stop, on the session's own state, however many trees the stop checks.
+        string promptId = payload.PromptId ?? NoPrompt;
+        int rounds = state.RoundsFor(promptId);
+        bool atCap = rounds >= request.MaxRounds;
+
+        var firing = new Firing(hookEvent, state, trees, promptId, rounds, atCap, payload.StopHookActive);
+        return await CheckAsync(firing, request, ct);
+    }
+
+    // One tree at a stop: whether its check is due, and what its tripwires are to read. The session's own tree is
+    // weighed on the session's state, another tree on the state the session keeps for it.
+    private static async Task<TreeTurn> ExamineAsync(string tree, HookState state, bool own, CancellationToken ct)
+    {
         TreeSnapshot snapshot = state.Stateful ? await HookGit.SnapshotAsync(tree, ct) : TreeSnapshot.Unknown;
         bool known = snapshot.Known;
 
@@ -126,7 +159,7 @@ internal sealed class HookRunner(
         // code file's bytes have changed since the tree it covered.
         HookVerdict? verdict = known ? state.ReadVerdict() : null;
         if (verdict is { Green: true } && await ChangesAsync(tree, verdict.Tree, snapshot, ct) is { Count: 0 })
-            return EndTurn(hookEvent, state, snapshot);
+            return new TreeTurn(tree, state, snapshot, own, Due: false, ChangedFiles: null);
 
         // The same question put to the baseline, which a session's first stop can ask too: a turn that has changed
         // no code since its prompt has nothing of its own to check, whatever the tree carries from other sessions
@@ -134,14 +167,8 @@ internal sealed class HookRunner(
         HookBaseline? baseline = known ? state.ReadBaseline() : null;
         IReadOnlyList<string>? turnChanges =
             baseline is null ? null : await ChangesAsync(tree, baseline.Tree, snapshot, ct);
-        if (verdict is not { Green: false } && turnChanges is { Count: 0 }) return EndTurn(hookEvent, state, snapshot);
-
-        // Consecutive continuations for this prompt: a block and a warning passed on both count, and a silent green
-        // resets. At the cap the hook says its piece and lets the turn end. A count that cannot be kept reads as no
-        // rounds, and the continuation that fails to count it falls back to the payload's own stop_hook_active.
-        string promptId = payload.PromptId ?? NoPrompt;
-        int rounds = state.RoundsFor(promptId);
-        bool atCap = rounds >= request.MaxRounds;
+        if (verdict is not { Green: false } && turnChanges is { Count: 0 })
+            return new TreeTurn(tree, state, snapshot, own, Due: false, ChangedFiles: null);
 
         // What the check's tripwires read: the turn's own changes, or with no baseline every changed code file the
         // stop listed, so the check lists nothing again. With neither, it lists changed files itself.
@@ -150,9 +177,43 @@ internal sealed class HookRunner(
             ? null
             : GitChangedFiles.ComposeAbsolute(snapshot.TopLevel, changed);
 
-        var firing = new Firing(
-            hookEvent, tree, state, snapshot, changedFiles, promptId, rounds, atCap, payload.StopHookActive);
-        return await CheckAsync(firing, request, ct);
+        return new TreeTurn(tree, state, snapshot, own, Due: true, changedFiles);
+    }
+
+    // The project's trees other than the session's own that the turn, or the subagent's run, wrote code into
+    // through the agent's edit tools, read from the transcript the payload names: each written code file goes to
+    // the deepest of the project's working trees that holds it. A turn's writes are those under its prompt, and a
+    // subagent's are its whole transcript. Any doubt, such as no transcript, one that will not read, or no answer
+    // from git, names no tree, and the stop checks the session's own tree as it always has.
+    private static async Task<IReadOnlyList<string>> WrittenTreesAsync(
+        string hookEvent, HookPayload payload, string ownTree, CancellationToken ct)
+    {
+        bool subagent = hookEvent == HookReportRenderer.SubagentStopEvent;
+        string? transcript = subagent ? payload.AgentTranscriptPath : payload.TranscriptPath;
+        string? promptId = subagent ? null : payload.PromptId;
+        if (transcript is null || (!subagent && promptId is null)) return [];
+
+        IReadOnlyList<string>? written = await TurnWrites.ReadAsync(transcript, promptId, ct);
+        List<string> code = written?.Where(HookCodeFiles.IsCode)
+            .ToList() ?? [];
+        if (code.Count == 0) return [];
+
+        IReadOnlyList<string>? roots = await HookGit.WorktreesAsync(ownTree, ct);
+        if (roots is null) return [];
+
+        return code.Select(path => DeepestRootOf(path, roots))
+            .OfType<string>()
+            .Distinct(PathComparison.Comparer)
+            .Where(root => !SameDirectory(root, ownTree) && Directory.Exists(root))
+            .ToList();
+    }
+
+    // The deepest root holding `path`, or null for a path in none of them: a worktree under .claude/worktrees is
+    // inside the main checkout by path, and the file belongs to the worktree.
+    private static string? DeepestRootOf(string path, IReadOnlyList<string> roots)
+    {
+        return roots.Where(root => path.StartsWith(DirectoryForm(root).TrimEnd('/') + "/", PathComparison.Comparison))
+            .MaxBy(static root => root.Length);
     }
 
     // The per-edit path, and a hand run. The check reads code, so an edit to anything else skips it, and so does an
@@ -170,37 +231,56 @@ internal sealed class HookRunner(
             return HookExitCodes.Proceed;
 
         string tree = projectDirectory ?? request.WorkingDirectory;
+        TreeTurn[] trees =
+            [new(tree, HookState.None, TreeSnapshot.Unknown, Own: true, Due: true, ChangedFiles: null)];
         var firing = new Firing(
-            HookReportRenderer.DefaultEvent, tree, HookState.None, TreeSnapshot.Unknown, null, NoPrompt, 0,
-            AtCap: false, StopHookActive: false);
+            HookReportRenderer.DefaultEvent, HookState.None, trees, NoPrompt, 0, AtCap: false, StopHookActive: false);
         return await CheckAsync(firing, request, ct);
     }
 
+    // Each due tree's check in turn, the session's own first, answered as one: SlideRule's own failure in any of
+    // them ends the turn, a red rule in any blocks, and otherwise the warnings go out together. Each tree records
+    // the verdict its own check gave.
     private async Task<int> CheckAsync(Firing firing, HookRequest request, CancellationToken ct)
     {
-        HookCheckResult result = await RunCheckAsync(firing, request, ct);
-        switch (result.ExitCode)
+        var checks = new List<(TreeTurn Tree, HookCheckResult Result)>();
+        foreach (TreeTurn tree in firing.Trees.Where(static turn => turn.Due))
+            checks.Add((tree, await RunCheckAsync(firing.Event, tree, request, ct)));
+
+        // Named when a tree other than the session's own was checked, so the agent can tell which tree a report
+        // is about; a stop that checked only its own tree reads exactly as it always has.
+        bool named = checks.Any(static check => !check.Tree.Own);
+        foreach ((TreeTurn tree, HookCheckResult result) in checks)
+            if (result.ExitCode is ExitCodes.Clean or ExitCodes.Violations)
+                tree.State.RecordVerdict(result.ExitCode == ExitCodes.Clean, tree.Snapshot);
+
+        List<(TreeTurn Tree, HookCheckResult Result)> failed = checks.Where(static check => check.Result.ExitCode is not (ExitCodes.Clean or ExitCodes.Violations))
+            .ToList();
+        if (failed.Count > 0)
         {
-            case ExitCodes.Clean:
-                return await CleanAsync(firing, result);
-            case ExitCodes.Violations:
-                return await RedAsync(firing, result, request.MaxRounds);
-            default:
-                int reported = await ReportConfigErrorAsync(error, Report(result));
-                return EndTurn(firing, reported);
+            int reported = await ReportConfigErrorAsync(error, Reports(failed, named));
+            return EndTurn(firing, reported);
         }
+
+        List<(TreeTurn Tree, HookCheckResult Result)> red = checks.Where(static check => check.Result.ExitCode == ExitCodes.Violations)
+            .ToList();
+        if (red.Count > 0) return await RedAsync(firing, Reports(red, named), request.MaxRounds);
+
+        return await CleanAsync(firing, checks, named);
     }
 
-    private async Task<int> CleanAsync(Firing firing, HookCheckResult result)
+    private async Task<int> CleanAsync(
+        Firing firing, IReadOnlyList<(TreeTurn Tree, HookCheckResult Result)> checks, bool named)
     {
         HookState state = firing.State;
-        state.RecordVerdict(green: true, firing.Snapshot);
 
         // Stdout belongs to the hook document alone. A notice the run printed goes to stderr, where an exit-0 hook's
         // text reaches only the debug log, rather than into the document Claude Code parses.
-        if (result.Error.Length > 0) await error.WriteAsync(result.Error);
+        foreach ((_, HookCheckResult result) in checks)
+            if (result.Error.Length > 0)
+                await error.WriteAsync(result.Error);
 
-        string document = result.Output.TrimEnd('\r', '\n');
+        string document = Document(firing.Event, checks, named);
         if (document.Length == 0)
         {
             // Nothing to say. Users switch off a hook that prints something on every clean run.
@@ -224,12 +304,8 @@ internal sealed class HookRunner(
         return HookExitCodes.Proceed;
     }
 
-    private async Task<int> RedAsync(Firing firing, HookCheckResult result, int maxRounds)
+    private async Task<int> RedAsync(Firing firing, string report, int maxRounds)
     {
-        HookState state = firing.State;
-        state.RecordVerdict(green: false, firing.Snapshot);
-        string report = Report(result);
-
         if (firing.AtCap)
         {
             // The user reads it and the turn ends: a rule the agent cannot satisfy stops being a loop.
@@ -247,11 +323,12 @@ internal sealed class HookRunner(
     // Resolution and the check, each under the command handler, so whatever the CLI would refuse with exit 2 comes
     // back as a result with that code and its message: a malformed settings file, a solution that is not there, a
     // check that fails. The exit map then reports it as SlideRule's own error and ends the turn, as for any other.
-    private async Task<HookCheckResult> RunCheckAsync(Firing firing, HookRequest request, CancellationToken ct)
+    private async Task<HookCheckResult> RunCheckAsync(
+        string hookEvent, TreeTurn tree, HookRequest request, CancellationToken ct)
     {
         var refusal = new StringWriter();
         (bool resolved, CheckRequest? checkRequest) = await CommandEntryPoint.TryRunAsync(
-            () => Task.FromResult(CheckRequestFor(firing, request)), refusal, ct);
+            () => Task.FromResult(CheckRequestFor(hookEvent, tree, request)), refusal, ct);
 
         return resolved
             ? await check.RunAsync(checkRequest!, ct)
@@ -261,9 +338,9 @@ internal sealed class HookRunner(
     // The check this firing calls for, rendered for the hook, with the solution and spec resolved from the tree
     // rather than from where the process started: relative paths are the tree's, and so is the settings file. Given
     // the changed files, the check reads them rather than listing its own since the diff base.
-    private CheckRequest CheckRequestFor(Firing firing, HookRequest request)
+    private CheckRequest CheckRequestFor(string hookEvent, TreeTurn turn, HookRequest request)
     {
-        string tree = Path.GetFullPath(firing.Tree);
+        string tree = Path.GetFullPath(turn.Tree);
         string? solution = FullPath(request.Solution, tree);
         string? spec = FullPath(request.Spec, tree);
         InvocationTargets targets = InvocationTargets.Resolve(solution, spec, tree, environment);
@@ -273,7 +350,7 @@ internal sealed class HookRunner(
             targets.Spec,
             Json: false,
             HookJson: true,
-            firing.ChangedFiles is null ? request.DiffBase : null,
+            turn.ChangedFiles is null ? request.DiffBase : null,
             tree,
             NoCache: false,
             Binlog: null,
@@ -281,8 +358,8 @@ internal sealed class HookRunner(
             Sarif: null,
             Rules: null,
             DocumentGrain.Full,
-            firing.Event,
-            firing.ChangedFiles);
+            hookEvent,
+            turn.ChangedFiles);
     }
 
     // The tree the session is in. The payload names the directory the session ran from and git names the working
@@ -370,17 +447,21 @@ internal sealed class HookRunner(
 
     // A stop that stands ends the turn. Its baseline becomes the tree the stop found, for a subagent that stops after
     // the turn has ended, and the next prompt replaces it with its own. Only the main agent's stop ends a turn: a
-    // subagent stops inside one.
+    // subagent stops inside one. Another tree has no prompt's baseline to keep, so every stop that weighed it rolls
+    // its baseline, and the next turn that writes there is compared with the tree as that stop left it.
     private static int EndTurn(
-        string hookEvent, HookState state, TreeSnapshot snapshot, int exitCode = HookExitCodes.Proceed)
+        string hookEvent, IReadOnlyList<TreeTurn> trees, int exitCode = HookExitCodes.Proceed)
     {
-        if (hookEvent == HookReportRenderer.StopEvent) state.RollBaseline(snapshot);
+        foreach (TreeTurn tree in trees)
+            if (!tree.Own || hookEvent == HookReportRenderer.StopEvent)
+                tree.State.RollBaseline(tree.Snapshot);
+
         return exitCode;
     }
 
     private static int EndTurn(Firing firing, int exitCode = HookExitCodes.Proceed)
     {
-        return EndTurn(firing.Event, firing.State, firing.Snapshot, exitCode);
+        return EndTurn(firing.Event, firing.Trees, exitCode);
     }
 
     private HookState OpenState(HookPayload payload)
@@ -403,6 +484,54 @@ internal sealed class HookRunner(
     private static string Report(HookCheckResult result)
     {
         return (result.Error + result.Output).TrimEnd('\r', '\n');
+    }
+
+    // The reports of several checks as one, each under a line naming its tree when the stop is `named`.
+    private static string Reports(IReadOnlyList<(TreeTurn Tree, HookCheckResult Result)> checks, bool named)
+    {
+        IEnumerable<string> reports = checks.Select(check => named
+            ? $"{TreeLine(check.Tree)}\n{Report(check.Result)}"
+            : Report(check.Result));
+        return string.Join("\n\n", reports);
+    }
+
+    // The hook document for the clean checks, or "" when none had anything to say. A stop that is not `named`
+    // checked one tree, and passes its document through as the check wrote it. Otherwise each check's context goes
+    // under a line naming its tree, in one document.
+    private static string Document(
+        string hookEvent, IReadOnlyList<(TreeTurn Tree, HookCheckResult Result)> checks, bool named)
+    {
+        if (!named) return checks.Count == 0 ? "" : checks[0].Result.Output.TrimEnd('\r', '\n');
+
+        List<string> contexts = checks.Select(check => (check.Tree, Context: ContextOf(check.Result.Output)))
+            .Where(static check => check.Context.Length > 0)
+            .Select(static check => $"{TreeLine(check.Tree)}\n{check.Context}")
+            .ToList();
+        return contexts.Count == 0 ? "" : HookReportRenderer.Document(string.Join("\n\n", contexts), hookEvent);
+    }
+
+    // The context a check's hook document carries, or the output itself should it not read as one.
+    private static string ContextOf(string output)
+    {
+        string trimmed = output.TrimEnd('\r', '\n');
+        if (trimmed.Length == 0) return "";
+
+        try
+        {
+            HookJson? document = JsonSerializer.Deserialize(trimmed, SlideRuleJson.Context.HookJson);
+            // A document without the object deserializes with it null, whatever the annotation says.
+            // ReSharper disable once ConditionalAccessQualifierIsNonNullableAccordingToAPIContract
+            return document?.HookSpecificOutput?.AdditionalContext ?? trimmed;
+        }
+        catch (JsonException)
+        {
+            return trimmed;
+        }
+    }
+
+    private static string TreeLine(TreeTurn tree)
+    {
+        return $"sliderule: {DirectoryForm(tree.Tree)}";
     }
 
     // The parent of a forward-slashed path, as POSIX dirname spells it.
@@ -431,18 +560,27 @@ internal sealed class HookRunner(
         return counted || !firing.StopHookActive;
     }
 
-    // One firing that reached the check: the event the document answers, the tree the check reads, the session's
-    // state, the tree as it stood, the changed files the tripwires are to read (null for the check to list its own),
-    // the round the prompt is on, whether that round is the cap, where the hook reports once and lets the turn end,
-    // and whether the payload says a stop hook has already continued this turn.
+    // One firing that reached the check: the event the document answers, the session's state, which keeps the round
+    // count and what was said, the trees it weighed, the round the prompt is on, whether that round is the cap, where
+    // the hook reports once and lets the turn end, and whether the payload says a stop hook has already continued
+    // this turn.
     private sealed record Firing(
         string Event,
-        string Tree,
         HookState State,
-        TreeSnapshot Snapshot,
-        IReadOnlyList<string>? ChangedFiles,
+        IReadOnlyList<TreeTurn> Trees,
         string PromptId,
         int Rounds,
         bool AtCap,
         bool StopHookActive);
+
+    // One tree a firing weighed: its top level, the state its verdict and baseline are kept in, the tree as it
+    // stood, whether it is the session's own, whether its check is due, and the changed files its tripwires are to
+    // read (null for the check to list its own).
+    private sealed record TreeTurn(
+        string Tree,
+        HookState State,
+        TreeSnapshot Snapshot,
+        bool Own,
+        bool Due,
+        IReadOnlyList<string>? ChangedFiles);
 }

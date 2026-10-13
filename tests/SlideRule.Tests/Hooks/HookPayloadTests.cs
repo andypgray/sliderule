@@ -1,6 +1,6 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Cli.Hooks;
+using Xunit;
 
 namespace SlideRule.Tests.Hooks;
 
@@ -16,14 +16,16 @@ public sealed class HookPayloadTests
         // Arrange
         const string text = """
                             {"hook_event_name":"SubagentStop","session_id":"s1","prompt_id":"p1","agent_id":"a1",
-                             "stop_hook_active":true,"cwd":"C:\\work\\repo","transcript_path":"t.jsonl"}
+                             "stop_hook_active":true,"cwd":"C:\\work\\repo","transcript_path":"C:\\t\\s.jsonl",
+                             "agent_transcript_path":"C:\\t\\s\\agent-a1.jsonl"}
                             """;
 
         // Act
         HookPayload payload = HookPayload.Parse(text);
 
-        // Assert: the directory comes back forward-slashed, the one spelling everything downstream compares.
-        payload.ShouldBe(new HookPayload("SubagentStop", "s1", "p1", "a1", "C:/work/repo", null, true));
+        // Assert: every path comes back forward-slashed, the one spelling everything downstream compares.
+        payload.ShouldBe(new HookPayload(
+            "SubagentStop", "s1", "p1", "a1", "C:/work/repo", null, true, "C:/t/s.jsonl", "C:/t/s/agent-a1.jsonl"));
     }
 
     [Fact]

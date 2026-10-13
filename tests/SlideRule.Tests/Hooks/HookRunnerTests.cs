@@ -1,12 +1,14 @@
 using System.Diagnostics;
+using System.Text.Json.Nodes;
 using Shouldly;
-using Xunit;
 using SlideRule.Cli.Hooks;
+using SlideRule.Cli.Rendering;
 using SlideRule.Cli.Verbs;
 using SlideRule.Roslyn.Hosting;
 using SlideRule.Tests.Cli;
 using SlideRule.Tests.Mcp.TestDoubles;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.Hooks;
 
@@ -556,6 +558,220 @@ public sealed class HookRunnerTests
     }
 
     [Fact]
+    public async Task StopPayload_TurnThatWroteALinkedWorktree_ChecksItBesideTheSessionsTree()
+    {
+        // Arrange
+        HookSandbox sandbox = ArrangeRepository();
+        (string worktree, string probe) = AddWrittenWorktree(sandbox);
+        string transcript = SaveTranscript(sandbox, new HookTranscript().Wrote(probe));
+
+        // Act
+        HookRun run = await FireAsync(
+            sandbox, StopPayload(sandbox, transcriptPath: transcript), ExitCodes.Clean, quiet: true);
+
+        // Assert: the session stayed in the main checkout and wrote the worktree by its absolute path. Its directory
+        // names only the main checkout, so the transcript is the one place that says where the turn's code went.
+        run.Result.ShouldProceedSilently();
+        run.ShouldHaveRunTheCheckIn(
+            worktree, "A linked worktree the turn wrote code into must be checked, though the session never sat in it.");
+        run.ShouldHaveRunTheCheckIn(
+            sandbox.ProjectDirectory,
+            "and the session's own tree still: a shell write never shows in the transcript, so it is checked as ever.");
+    }
+
+    [Fact]
+    public async Task SubagentStopPayload_RunThatWroteALinkedWorktree_ChecksItBesideTheSessionsTree()
+    {
+        // Arrange: the worker's own transcript is its run, so a write there counts under any prompt.
+        HookSandbox sandbox = ArrangeRepository();
+        (string worktree, string probe) = AddWrittenWorktree(sandbox);
+        string transcript = SaveTranscript(sandbox, new HookTranscript().Wrote(probe, promptId: "p0"));
+        string payload = StopPayload(
+            sandbox, eventName: "SubagentStop", agentId: "a1", agentTranscriptPath: transcript);
+
+        // Act
+        HookRun run = await FireAsync(sandbox, payload, ExitCodes.Clean, quiet: true);
+
+        // Assert: a subagent's directory never follows its cd, so this is the shape every worker in a worktree has.
+        run.ShouldHaveRunTheCheckIn(
+            worktree, "A worktree a subagent wrote into by absolute path must be checked at the subagent's stop.");
+        run.ShouldHaveRunTheCheckIn(sandbox.ProjectDirectory, "and the session's own tree beside it.");
+    }
+
+    [Theory]
+    [InlineData("missing")]
+    [InlineData("garbage")]
+    public async Task StopPayload_TranscriptThatCannotBeRead_ChecksOnlyTheSessionsTree(string shape)
+    {
+        // Arrange
+        HookSandbox sandbox = ArrangeRepository();
+        AddWrittenWorktree(sandbox);
+        string transcript = Path.Combine(sandbox.Root, "transcripts", "t.jsonl");
+        if (shape == "garbage")
+            new HookTranscript().Raw("not json {")
+                .Raw("\0\u0001")
+                .SaveTo(transcript);
+
+        // Act
+        HookRun run = await FireAsync(
+            sandbox, StopPayload(sandbox, transcriptPath: transcript), ExitCodes.Clean, quiet: true);
+
+        // Assert: the transcript is the client's private format. When it will not read, the stop is what it was
+        // before the transcript was ever read: the session's own tree, and never a failed stop.
+        run.Result.ShouldProceedSilently();
+        run.ShouldHaveOnlyRunTheCheckIn(sandbox.ProjectDirectory, "An unreadable transcript names no other tree.");
+    }
+
+    [Fact]
+    public async Task StopPayload_WriteUnderAnotherPrompt_LeavesTheWorktreeUnchecked()
+    {
+        // Arrange
+        HookSandbox sandbox = ArrangeRepository();
+        (_, string probe) = AddWrittenWorktree(sandbox);
+        string transcript = SaveTranscript(sandbox, new HookTranscript().Wrote(probe, promptId: "p0"));
+
+        // Act
+        HookRun run = await FireAsync(
+            sandbox, StopPayload(sandbox, transcriptPath: transcript), ExitCodes.Clean, quiet: true);
+
+        // Assert: an earlier turn's write was that turn's stop to check.
+        run.ShouldHaveOnlyRunTheCheckIn(
+            sandbox.ProjectDirectory, "A write under another prompt is not this turn's, so it adds no tree.");
+    }
+
+    [Fact]
+    public async Task StopPayload_WriteIntoAnotherRepository_LeavesItUnchecked()
+    {
+        // Arrange
+        HookSandbox sandbox = ArrangeRepository();
+        string beside = Path.Combine(sandbox.Root, "beside");
+        Directory.CreateDirectory(beside);
+        GitCommand.Run(beside, "init");
+        string transcript = SaveTranscript(
+            sandbox, new HookTranscript().Wrote(Path.Combine(beside, "src", "Other.cs")));
+
+        // Act
+        HookRun run = await FireAsync(
+            sandbox, StopPayload(sandbox, transcriptPath: transcript), ExitCodes.Clean, quiet: true);
+
+        // Assert: only a tree that shares the project's git directory is one of its trees.
+        run.ShouldHaveOnlyRunTheCheckIn(
+            sandbox.ProjectDirectory, "A repository beside the project is not one of its trees, however it was written.");
+    }
+
+    [Fact]
+    public async Task StopPayload_TurnThatWroteOnlyItsOwnTree_ReadsAsItAlwaysHas()
+    {
+        // Arrange
+        HookSandbox sandbox = ArrangeRepository();
+        string probe = WriteProbe(sandbox);
+        string transcript = SaveTranscript(sandbox, new HookTranscript().Wrote(probe));
+
+        // Act
+        HookRun run = await FireAsync(sandbox, StopPayload(sandbox, transcriptPath: transcript), ExitCodes.Violations);
+
+        // Assert: one tree, so the report is the check's own, with no line naming a tree.
+        run.Result.ShouldBlockWith(CannedReport);
+        run.Result.Err.ShouldNotContain("sliderule: ");
+        run.ShouldHaveOnlyRunTheCheckIn(sandbox.ProjectDirectory, "The session's own tree is the one tree here.");
+    }
+
+    [Fact]
+    public async Task StopPayload_RedRuleInTheWrittenWorktree_BlocksNamingIt()
+    {
+        // Arrange
+        HookSandbox sandbox = ArrangeRepository();
+        (string worktree, string probe) = AddWrittenWorktree(sandbox);
+        string transcript = SaveTranscript(sandbox, new HookTranscript().Wrote(probe));
+
+        // Act
+        HookRun run = await FireAsync(
+            sandbox, StopPayload(sandbox, transcriptPath: transcript), ExitCodes.Clean, quiet: true, redTree: worktree);
+
+        // Assert: a red rule in any tree the turn wrote blocks the stop, and the report says which tree it is in.
+        run.Result.ShouldBlockWith("sliderule: ", "/.claude/worktrees/w1");
+        ReadState(sandbox, "rounds")
+            .Trim()
+            .ShouldBe("p1 1", "One stop is one round, however many trees it checked.");
+        ReadState(sandbox, "verdict")
+            .ShouldStartWith("green", customMessage: "The session's own tree was clean, and keeps its own verdict.");
+        ReadTreeState(sandbox, "verdict")
+            .ShouldStartWith("red", customMessage: "The worktree keeps the verdict its own check gave.");
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task StopPayload_WarningsInTwoTrees_GoOutInOneDocumentNamingEach(bool checkWritesADocument)
+    {
+        // Arrange: the check writes the document hook mode writes for a clean run with warnings, or, in the second
+        // row, plain text that does not read as one, which is carried over as it stands.
+        HookSandbox sandbox = ArrangeRepository();
+        (_, string probe) = AddWrittenWorktree(sandbox);
+        string transcript = SaveTranscript(sandbox, new HookTranscript().Wrote(probe));
+        string checkOutput = checkWritesADocument ? HookReportRenderer.Document(CannedReport, "Stop") : CannedReport;
+
+        // Act
+        HookRun run = await FireAsync(
+            sandbox, StopPayload(sandbox, transcriptPath: transcript), ExitCodes.Clean, stdout: checkOutput + "\n");
+
+        // Assert: Claude Code parses one document from stdout, so both trees' warnings ride in it, each under its tree.
+        run.ShouldExitWith(HookExitCodes.Proceed);
+        var context = JsonNode.Parse(run.Result.Out)!["hookSpecificOutput"]!["additionalContext"]!
+            .GetValue<string>();
+        context.Split("sliderule: ")
+            .Length.ShouldBe(3, context);
+        context.ShouldContain("/.claude/worktrees/w1\n" + CannedReport);
+        ReadState(sandbox, "rounds")
+            .Trim()
+            .ShouldBe("p1 1");
+    }
+
+    [Fact]
+    public async Task StopPayload_NowhereToKeepAWorktreesRecords_ChecksItEveryStop()
+    {
+        // Arrange: a file stands where the session's tree records would go, so none can be made.
+        HookSandbox sandbox = ArrangeRepository();
+        (string worktree, string probe) = AddWrittenWorktree(sandbox);
+        string transcript = SaveTranscript(sandbox, new HookTranscript().Wrote(probe));
+        string payload = StopPayload(sandbox, transcriptPath: transcript);
+        Directory.CreateDirectory(Path.GetDirectoryName(StatePath(sandbox, "trees"))!);
+        File.WriteAllText(StatePath(sandbox, "trees"), "");
+
+        // Act
+        HookRun first = await FireAsync(sandbox, payload, ExitCodes.Clean, quiet: true);
+        HookRun second = await FireAsync(sandbox, payload, ExitCodes.Clean, quiet: true);
+
+        // Assert: with no record to skip on, the worktree is checked whenever the turn wrote it, never skipped on
+        // a verdict it could not keep.
+        first.ShouldHaveRunTheCheckIn(worktree, "A worktree with nowhere to keep records is still checked.");
+        second.ShouldHaveOnlyRunTheCheckIn(
+            worktree, "and checked again: only the session's own tree has a green verdict to skip on.");
+    }
+
+    [Fact]
+    public async Task StopPayload_WrittenWorktreeUnchangedSinceItsGreenVerdict_SkipsIt()
+    {
+        // Arrange
+        HookSandbox sandbox = ArrangeRepository();
+        (string worktree, string probe) = AddWrittenWorktree(sandbox);
+        string transcript = SaveTranscript(sandbox, new HookTranscript().Wrote(probe));
+        string payload = StopPayload(sandbox, transcriptPath: transcript);
+        HookRun first = await FireAsync(sandbox, payload, ExitCodes.Clean, quiet: true);
+        first.ShouldHaveRunTheCheckIn(worktree, "The first stop has no verdict for the worktree, so it checks.");
+
+        // Act
+        HookRun second = await FireAsync(sandbox, payload, ExitCodes.Clean, quiet: true);
+        Rewrite(probe);
+        HookRun third = await FireAsync(sandbox, payload, ExitCodes.Clean, quiet: true);
+
+        // Assert: the worktree keeps a verdict of its own, so the skip that makes a quiet turn free holds there too,
+        // and gives way when its bytes move.
+        second.ShouldNotHaveRunTheCheck("Neither tree has changed since its green verdict.");
+        third.ShouldHaveOnlyRunTheCheckIn(worktree, "Only the worktree's bytes moved, so only it is checked.");
+    }
+
+    [Fact]
     public async Task StopPayload_StateDirThatCannotBeMade_HonoursStopHookActive()
     {
         // Arrange: a file where the state root should be, so nothing under it can be made.
@@ -1056,7 +1272,9 @@ public sealed class HookRunnerTests
     ///     session sits name a directory of their own. <paramref name="withProjectDirectory" /> decides whether
     ///     <c>CLAUDE_PROJECT_DIR</c> is set at all: false is the hand run outside Claude Code.
     ///     <paramref name="quiet" /> silences the check, which is how a clean check with no warnings, the check's
-    ///     own silence under hook mode, is put in front of the hook.
+    ///     own silence under hook mode, is put in front of the hook. <paramref name="redTree" /> names a tree whose
+    ///     check reports violations whatever <paramref name="checkExit" /> says, for the rows that check two, and
+    ///     <paramref name="stdout" /> replaces what every check writes to stdout.
     /// </remarks>
     private static async Task<HookRun> FireAsync(
         HookSandbox sandbox,
@@ -1068,10 +1286,13 @@ public sealed class HookRunnerTests
         string? stateDirectory = null,
         int maxRounds = 3,
         string? solution = null,
-        string? spec = null)
+        string? spec = null,
+        string? redTree = null,
+        string? stdout = null)
     {
         string launchDirectory = workingDirectory ?? sandbox.Root;
-        var check = new ScriptedHookCheck(checkExit, quiet ? "" : CannedReport + Environment.NewLine);
+        string checkOutput = stdout ?? (quiet ? "" : CannedReport + Environment.NewLine);
+        var check = new ScriptedHookCheck(checkExit, checkOutput, redTree);
         FakeEnvironment environment = new FakeEnvironment()
             .SetVariable(SlideRuleEnvVars.HookStateDirectory, stateDirectory ?? sandbox.StateDirectory)
             .SetVariable(SlideRuleEnvVars.ClaudeProjectDirectory, withProjectDirectory ? sandbox.ProjectDirectory : null);
@@ -1157,11 +1378,37 @@ public sealed class HookRunnerTests
         bool stopHookActive = false,
         string eventName = "Stop",
         string? cwd = null,
-        string? agentId = null)
+        string? agentId = null,
+        string? transcriptPath = null,
+        string? agentTranscriptPath = null)
     {
         string directory = cwd ?? sandbox.ProjectDirectory;
 
-        return HookPayloads.Stop(directory, sessionId, promptId, stopHookActive, eventName, agentId);
+        return HookPayloads.Stop(
+            directory, sessionId, promptId, stopHookActive, eventName, agentId, transcriptPath, agentTranscriptPath);
+    }
+
+    /// <summary>
+    ///     Writes <paramref name="transcript" /> beside the sandbox's state, where no tree of the project can see it,
+    ///     and returns its path.
+    /// </summary>
+    private static string SaveTranscript(HookSandbox sandbox, HookTranscript transcript)
+    {
+        return transcript.SaveTo(Path.Combine(sandbox.Root, "transcripts", $"{Guid.NewGuid():N}.jsonl"));
+    }
+
+    /// <summary>
+    ///     A linked worktree with <c>src/Probe.cs</c> written into it, as an agent whose directory stayed in the main
+    ///     checkout writes one by its absolute path: the worktree's root and the file.
+    /// </summary>
+    private static (string Worktree, string Probe) AddWrittenWorktree(HookSandbox sandbox)
+    {
+        string worktree = AddLinkedWorktree(sandbox);
+        string probe = Path.Combine(worktree, "src", "Probe.cs");
+        Directory.CreateDirectory(Path.GetDirectoryName(probe)!);
+        File.WriteAllText(probe, "public sealed class Probe;\n");
+
+        return (worktree, probe);
     }
 
     /// <summary>A <c>UserPromptSubmit</c> payload, with the session's own tree as its directory.</summary>
@@ -1205,6 +1452,21 @@ public sealed class HookRunnerTests
     {
         foreach (string name in new[] { "verdict", "rounds", "baseline", "said" })
             Directory.CreateDirectory(StatePath(sandbox, name));
+    }
+
+    /// <summary>
+    ///     The <paramref name="name" /> record the session keeps for the one other tree a row wrote into, found under
+    ///     the session's <c>trees</c> directory whatever digest names it.
+    /// </summary>
+    private static string ReadTreeState(HookSandbox sandbox, string name)
+    {
+        string trees = StatePath(sandbox, "trees");
+        string[] records = Directory.Exists(trees)
+            ? Directory.GetFiles(trees, name, SearchOption.AllDirectories)
+            : [];
+        records.Length.ShouldBe(1, $"The hook should have kept one {name} record for the other tree under {trees}.");
+
+        return File.ReadAllText(records[0]);
     }
 
     private static string ReadState(HookSandbox sandbox, string name)

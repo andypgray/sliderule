@@ -1,4 +1,6 @@
+using System.Security.Cryptography;
 using System.Text;
+using SlideRule.Internal;
 
 namespace SlideRule.Cli.Hooks;
 
@@ -64,6 +66,33 @@ internal sealed class HookState
         }
 
         return new HookState(directory, agentId is null ? SaidFile : $"{SaidFile}-{agentId}");
+    }
+
+    /// <summary>
+    ///     The state this session keeps for <paramref name="topLevel" />, another tree of the project that a turn
+    ///     wrote into: a directory of its own under the session's, keyed by a digest of the top level.
+    /// </summary>
+    /// <remarks>
+    ///     Only the verdict and the baseline are kept there. The round count and what an agent was told belong to
+    ///     the stop, however many trees it checks, so they stay on the session's own state.
+    /// </remarks>
+    /// <returns>The tree's state, or <see cref="None" /> when the session has none or the directory cannot be made.</returns>
+    public HookState ForTree(string topLevel)
+    {
+        if (_directory is null) return None;
+
+        byte[] digest = SHA256.HashData(Encoding.UTF8.GetBytes(PathComparison.Fold(topLevel)));
+        string directory = Path.Combine(_directory, "trees", Convert.ToHexStringLower(digest)[..16]);
+        try
+        {
+            Directory.CreateDirectory(directory);
+        }
+        catch (Exception ex) when (IsFileSystemFailure(ex))
+        {
+            return None;
+        }
+
+        return new HookState(directory, SaidFile);
     }
 
     /// <summary>

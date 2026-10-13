@@ -4,12 +4,13 @@ namespace SlideRule.Cli.Hooks;
 
 /// <summary>
 ///     The fields of a Claude Code hook payload that <c>sliderule hook</c> reads: which event fired, whose
-///     session and prompt it belongs to, where the session is, and what an edit touched.
+///     session and prompt it belongs to, where the session is, which transcripts record the turn, and what an
+///     edit touched.
 /// </summary>
 /// <remarks>
 ///     Parsed tolerantly, because a payload that will not parse is a hand run rather than an error. Text that is
 ///     not a JSON object is no payload at all, and a field that is absent, empty or of another kind reads as
-///     absent. The two paths come back with their separators turned forward, so everything that compares them
+///     absent. The paths come back with their separators turned forward, so everything that compares them
 ///     compares one spelling.
 /// </remarks>
 /// <param name="EventName">The <c>hook_event_name</c>, or null.</param>
@@ -19,6 +20,11 @@ namespace SlideRule.Cli.Hooks;
 /// <param name="Cwd">The session's directory (<c>cwd</c>), forward-slashed, or null.</param>
 /// <param name="EditedFile">The edited file (<c>tool_input.file_path</c>), forward-slashed, or null.</param>
 /// <param name="StopHookActive">Whether <c>stop_hook_active</c> is <c>true</c>.</param>
+/// <param name="TranscriptPath">The session's transcript (<c>transcript_path</c>), forward-slashed, or null.</param>
+/// <param name="AgentTranscriptPath">
+///     The transcript of the subagent a <c>SubagentStop</c> is for (<c>agent_transcript_path</c>), forward-slashed,
+///     or null.
+/// </param>
 internal sealed record HookPayload(
     string? EventName,
     string? SessionId,
@@ -26,7 +32,9 @@ internal sealed record HookPayload(
     string? AgentId,
     string? Cwd,
     string? EditedFile,
-    bool StopHookActive)
+    bool StopHookActive,
+    string? TranscriptPath = null,
+    string? AgentTranscriptPath = null)
 {
     /// <summary>No payload: what a hand run at a terminal, and text that is not a JSON object, both read as.</summary>
     public static HookPayload None { get; } = new(null, null, null, null, null, null, false);
@@ -57,7 +65,9 @@ internal sealed record HookPayload(
                 StringOf(root, "agent_id"),
                 Forward(StringOf(root, "cwd")),
                 Forward(editedFile),
-                stopHookActive);
+                stopHookActive,
+                Forward(StringOf(root, "transcript_path")),
+                Forward(StringOf(root, "agent_transcript_path")));
         }
         catch (JsonException)
         {

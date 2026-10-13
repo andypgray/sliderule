@@ -46,6 +46,25 @@ internal static class HookGit
     }
 
     /// <summary>
+    ///     The root of every working tree of the repository <paramref name="tree" /> belongs to, the main checkout
+    ///     and each linked worktree, as git spells them, or null when git could not say.
+    /// </summary>
+    /// <remarks>
+    ///     A worktree git still lists after its directory was deleted is listed here too, so a caller that reads
+    ///     one checks that it is there.
+    /// </remarks>
+    public static async Task<IReadOnlyList<string>?> WorktreesAsync(string tree, CancellationToken ct)
+    {
+        const string prefix = "worktree ";
+        string? output = await RunAsync(tree, ct, "worktree", "list", "--porcelain");
+        return output?.Split('\n')
+            .Select(static line => line.TrimEnd('\r'))
+            .Where(static line => line.StartsWith(prefix, StringComparison.Ordinal))
+            .Select(static line => line[prefix.Length..])
+            .ToList();
+    }
+
+    /// <summary>
     ///     The git directory <paramref name="common" /> names, resolved against <paramref name="topLevel" /> and
     ///     folded by the per-OS path rule, so two spellings of one directory compare equal wherever that rule
     ///     ignores case.

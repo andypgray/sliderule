@@ -14,7 +14,8 @@ internal static class HookPayloads
     /// <summary>
     ///     A turn-end payload: the fields the hook reads out of a <c>Stop</c> or <c>SubagentStop</c> document, for a
     ///     session that ran from <paramref name="cwd" />. <paramref name="agentId" /> is carried only on a worker's
-    ///     stop, as Claude Code sends it: the main agent's payload has no such key.
+    ///     stop, as Claude Code sends it: the main agent's payload has no such key. The two transcripts are carried
+    ///     only when a row names them.
     /// </summary>
     internal static string Stop(
         string cwd,
@@ -22,7 +23,9 @@ internal static class HookPayloads
         string promptId = "p1",
         bool stopHookActive = false,
         string eventName = "Stop",
-        string? agentId = null)
+        string? agentId = null,
+        string? transcriptPath = null,
+        string? agentTranscriptPath = null)
     {
         var payload = new JsonObject
         {
@@ -32,6 +35,8 @@ internal static class HookPayloads
             ["stop_hook_active"] = stopHookActive
         };
         if (agentId is not null) payload["agent_id"] = agentId;
+        if (transcriptPath is not null) payload["transcript_path"] = transcriptPath;
+        if (agentTranscriptPath is not null) payload["agent_transcript_path"] = agentTranscriptPath;
         payload["cwd"] = cwd;
 
         return payload.ToJsonString();
