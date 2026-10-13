@@ -35,28 +35,60 @@ namespace SlideRule.Roslyn.Caching;
 ///         lines they were never on.
 ///     </para>
 ///     <para>
+///         <see cref="SurfaceHash" /> is the same digest over the document's declaration surface alone —
+///         everything another project could bind to, with member bodies and non-constant initializers
+///         left out (<see cref="DeclarationSurface" />). Two texts with equal surfaces cannot change what a
+///         dependent project's extraction reads, because a dependent reads a referenced project only through
+///         the symbols it binds to and never through that project's syntax or lines; so a body-only edit
+///         dirties the edited project and leaves its dependents' fragments standing.
+///     </para>
+///     <para>
 ///         Equality is spelled out because a record compares a list member by reference: a caller deciding
 ///         whether to rewrite a persisted stamp by comparing shapes would otherwise rewrite it every run.
 ///     </para>
 /// </remarks>
-internal sealed record SourceShape(string Hash, IReadOnlyList<int> TokensPerLine)
+internal sealed record SourceShape(string Hash, IReadOnlyList<int> TokensPerLine, string SurfaceHash)
 {
     // The kind and the UTF-8 byte length that prefix every element fed to the digest.
     private const int HeaderBytes = 2 * sizeof(int);
 
     /// <summary>The shape of <paramref name="tree" />'s text as it stands.</summary>
+    // The surface digest is the shape digest minus the tokens of every opaque span (DeclarationSurface): what
+    // another project can bind to. A marker element per opaque span keeps a body's presence in it, so a
+    // property gaining or losing an accessor body still moves the surface. Trivia goes into both digests
+    // whether its token is opaque or not, which keeps every directive and every disabled region in the
+    // surface — conservative in the same way, and for the same reason, the shape digest is.
     internal static SourceShape Of(SyntaxTree tree)
     {
         SyntaxNode root = tree.GetRoot();
         SourceText text = tree.GetText();
         var tokensPerLine = new int[text.Lines.Count];
+        IReadOnlyList<(TextSpan Span, int RawKind)> opaque = DeclarationSurface.OpaqueSpans(root);
+        var next = 0;
+        int marked = -1;
 
         using var digest = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        using var surface = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         foreach (SyntaxToken token in root.DescendantTokens())
         {
             Append(digest, token.RawKind, token.Text);
             AppendSignificantTrivia(digest, token.LeadingTrivia);
             AppendSignificantTrivia(digest, token.TrailingTrivia);
+
+            while (next < opaque.Count && opaque[next].Span.End <= token.SpanStart) next++;
+            bool isOpaque = next < opaque.Count && opaque[next].Span.Start <= token.SpanStart;
+            if (!isOpaque)
+            {
+                Append(surface, token.RawKind, token.Text);
+            }
+            else if (marked != next)
+            {
+                Append(surface, opaque[next].RawKind, "");
+                marked = next;
+            }
+
+            AppendSignificantTrivia(surface, token.LeadingTrivia);
+            AppendSignificantTrivia(surface, token.TrailingTrivia);
 
             if (token.Span.IsEmpty) continue;
 
@@ -65,9 +97,11 @@ internal sealed record SourceShape(string Hash, IReadOnlyList<int> TokensPerLine
         }
 
         AppendBannerVerdict(digest, tree);
+        AppendBannerVerdict(surface, tree);
 
         string hash = Convert.ToHexStringLower(digest.GetHashAndReset());
-        return new SourceShape(hash, tokensPerLine);
+        string surfaceHash = Convert.ToHexStringLower(surface.GetHashAndReset());
+        return new SourceShape(hash, tokensPerLine, surfaceHash);
     }
 
     /// <summary>
@@ -118,6 +152,7 @@ internal sealed record SourceShape(string Hash, IReadOnlyList<int> TokensPerLine
         if (other is null) return false;
         if (ReferenceEquals(this, other)) return true;
         if (!string.Equals(Hash, other.Hash, StringComparison.Ordinal)) return false;
+        if (!string.Equals(SurfaceHash, other.SurfaceHash, StringComparison.Ordinal)) return false;
         if (TokensPerLine.Count != other.TokensPerLine.Count) return false;
 
         for (var line = 0; line < TokensPerLine.Count; line++)
@@ -132,6 +167,7 @@ internal sealed record SourceShape(string Hash, IReadOnlyList<int> TokensPerLine
     {
         var code = new HashCode();
         code.Add(Hash, StringComparer.Ordinal);
+        code.Add(SurfaceHash, StringComparer.Ordinal);
         code.Add(TokensPerLine.Count);
         foreach (int tokens in TokensPerLine) code.Add(tokens);
 

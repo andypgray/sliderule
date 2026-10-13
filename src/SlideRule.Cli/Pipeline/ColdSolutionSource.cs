@@ -20,4 +20,21 @@ internal sealed class ColdSolutionSource : ISolutionSource
             loaded.Solution, solutionPath, loaded.LoadDiagnosticsWith(diagnostics), loaded,
             targetFrameworks: loaded.TargetFrameworks);
     }
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     Loads the closure through a temporary solution filter, and the whole solution when the subset cannot
+    ///     be expressed as one; only the closure load marks the handle.
+    /// </remarks>
+    public async Task<SolutionHandle> AcquireClosureAsync(
+        string solutionPath, IReadOnlyCollection<string> projectFiles, CancellationToken ct)
+    {
+        var diagnostics = new List<string>();
+        LoadedSolution? loaded = await WorkspaceLoader.LoadClosureAsync(solutionPath, projectFiles, diagnostics.Add, ct);
+        if (loaded is null) return await AcquireAsync(solutionPath, ct);
+
+        return new SolutionHandle(
+            loaded.Solution, solutionPath, loaded.LoadDiagnosticsWith(diagnostics), loaded,
+            targetFrameworks: loaded.TargetFrameworks, isClosure: true);
+    }
 }

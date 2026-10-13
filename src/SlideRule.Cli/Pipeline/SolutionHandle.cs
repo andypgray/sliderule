@@ -23,8 +23,16 @@ internal sealed class SolutionHandle(
     IDisposable? owned,
     Func<IReadOnlyCollection<string>, IReadOnlySet<string>?, CancellationToken, Task<SessionCodebase>>? warmCodebase = null,
     Func<string, Func<SessionSpecResolution>, SessionSpecResolution>? warmSpecResolution = null,
-    IReadOnlyDictionary<ProjectId, string>? targetFrameworks = null) : IDisposable
+    IReadOnlyDictionary<ProjectId, string>? targetFrameworks = null,
+    bool isClosure = false) : IDisposable
 {
+    /// <summary>
+    ///     Whether <see cref="Solution" /> holds only the projects a caller asked
+    ///     <see cref="ISolutionSource.AcquireClosureAsync" /> for and their references, rather than the whole
+    ///     solution. Its <see cref="LoadDiagnostics" /> then speak only for the projects it loaded.
+    /// </summary>
+    public bool IsClosure { get; } = isClosure;
+
     /// <summary>The loaded, unresolved-reference-stripped solution the command reads.</summary>
     public Solution Solution { get; } = solution;
 

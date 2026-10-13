@@ -1,7 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using ModelContextProtocol.Protocol;
 using Shouldly;
-using Xunit;
 using SlideRule.Cli.Mcp.Infrastructure;
 using SlideRule.Cli.Pipeline;
 using SlideRule.Cli.SpecLoading;
@@ -10,6 +9,7 @@ using SlideRule.Roslyn.Hosting;
 using SlideRule.Roslyn.Sessions;
 using SlideRule.Tests.Cli;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.Mcp;
 
@@ -282,9 +282,9 @@ public sealed class WarmWorkspaceMcpTests
         after.NormalizedTrimmed()
             .ShouldBe(coldEdited.Out.NormalizedTrimmed());
 
-        // …and the incremental store re-walked exactly the edited project (ServiceWiring is in Web) plus its
-        // reverse-dependent Domain.
-        store.LastReExtractedProjects.ShouldBe([Web, Domain], true);
+        // …and the incremental store re-walked exactly the edited project (ServiceWiring is in Web) and nothing
+        // else: the registration call is inside a method body, so Domain's view of Web did not move.
+        store.LastReExtractedProjects.ShouldBe([Web]);
     }
 
     [Fact]
@@ -368,9 +368,9 @@ public sealed class WarmWorkspaceMcpTests
         after.NormalizedTrimmed()
             .ShouldBe(coldEdited.Out.NormalizedTrimmed());
 
-        // …and the incremental store re-walked exactly the edited project (ReportEndpoint is in Web) plus its
-        // reverse-dependent Domain.
-        store.LastReExtractedProjects.ShouldBe([Web, Domain], true);
+        // …and the incremental store re-walked exactly the edited project (ReportEndpoint is in Web) and nothing
+        // else: the filter is inside a method body, so Domain's view of Web did not move.
+        store.LastReExtractedProjects.ShouldBe([Web]);
     }
 
     [Fact]

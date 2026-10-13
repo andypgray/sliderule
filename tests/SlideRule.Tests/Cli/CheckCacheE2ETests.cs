@@ -1,6 +1,5 @@
 using System.Text.Json;
 using Shouldly;
-using Xunit;
 using SlideRule.Cli.Pipeline;
 using SlideRule.Cli.SpecLoading;
 using SlideRule.Cli.Verbs;
@@ -8,6 +7,7 @@ using SlideRule.Roslyn;
 using SlideRule.Roslyn.Caching;
 using SlideRule.Tests.Mcp.TestDoubles;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.Cli;
 
@@ -91,6 +91,35 @@ public sealed class CheckCacheE2ETests
         partial.ReExtracted.ShouldBe([Web, Domain], true);
 
         // The partial model equals a full cold extraction on the edited tree, and the edit really was seen.
+        partial.Out.ShouldBe(freshCold.Out);
+        partial.Err.ShouldBe(freshCold.Err);
+        partial.Exit.ShouldBe(freshCold.Exit);
+        partial.Out.ShouldNotBe(cold.Out);
+    }
+
+    [Fact]
+    public async Task Check_MethodBodyEditBetweenRuns_PartialReExtractsThatProjectOnlyAndMatchesAFreshColdRun()
+    {
+        using var workspace = new TempFixtureWorkspace();
+        using var cache = new TempCacheRoot("check-cache");
+
+        // Populate the cache from the clean tree.
+        CacheRun cold = await RunCheckAsync(workspace.SolutionPath, CliRunner.ViolatedSpecDll, cache.Root);
+        cold.Outcome.ShouldBe(CodebaseSourceOutcome.Miss);
+
+        // One more ambient-clock read, inside an existing method body. Web's own facts change — a new red site —
+        // but no declaration does, so Domain, which references Web, reads nothing new.
+        FixtureEdits.EditOnDisk(
+            workspace.PathOf(Web, "HomeController.cs"),
+            content => content.Replace(
+                "        log.Append(description);", "        log.Append(System.DateTime.Now);\n        log.Append(description);"));
+
+        CacheRun partial = await RunCheckAsync(workspace.SolutionPath, CliRunner.ViolatedSpecDll, cache.Root);
+        CacheRun freshCold = await RunCheckAsync(workspace.SolutionPath, CliRunner.ViolatedSpecDll, cache.Root, true);
+
+        // Web alone re-walks, and the verdict still equals a full cold check of the edited tree.
+        partial.Outcome.ShouldBe(CodebaseSourceOutcome.Partial);
+        partial.ReExtracted.ShouldBe([Web]);
         partial.Out.ShouldBe(freshCold.Out);
         partial.Err.ShouldBe(freshCold.Err);
         partial.Exit.ShouldBe(freshCold.Exit);

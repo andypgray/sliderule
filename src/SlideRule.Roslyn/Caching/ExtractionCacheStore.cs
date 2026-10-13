@@ -43,12 +43,18 @@ internal enum CacheOutcome
 ///     multi-targeted projects, are empty: the cache stores fragments, and every path regenerates both
 ///     from them at merge time.
 /// </param>
+/// <param name="Validated">
+///     On a <see cref="CacheOutcome.Partial" /> read, the stamps and keys the validation already took, for
+///     <see cref="ExtractionCacheStore.TryCaptureOverValidation" /> to carry rather than re-read; null on a hit and a
+///     miss.
+/// </param>
 internal sealed record CacheReadResult(
     CacheOutcome Outcome,
     IReadOnlyList<CodebaseFragment> ReusableFragments,
     IReadOnlySet<string> DirtyProjects,
     IReadOnlyList<SpecResolutionRecord> SpecResolutions,
-    WorkspaceDiagnostics LoadDiagnostics)
+    WorkspaceDiagnostics LoadDiagnostics,
+    ValidatedStamps? Validated = null)
 {
     private static readonly IReadOnlySet<string> EmptySet = new HashSet<string>();
 
@@ -69,12 +75,61 @@ internal sealed record CacheReadResult(
         IReadOnlyList<CodebaseFragment> reusableFragments,
         IReadOnlySet<string> dirtyProjects,
         IReadOnlyList<SpecResolutionRecord> specResolutions,
-        WorkspaceDiagnostics loadDiagnostics)
+        WorkspaceDiagnostics loadDiagnostics,
+        ValidatedStamps validated)
     {
         return new CacheReadResult(
-            CacheOutcome.Partial, reusableFragments, dirtyProjects, specResolutions, loadDiagnostics);
+            CacheOutcome.Partial, reusableFragments, dirtyProjects, specResolutions, loadDiagnostics, validated);
     }
 }
+
+/// <summary>
+///     What a <see cref="CacheOutcome.Partial" /> validation already knows about disk, handed on so the capture
+///     that follows the re-extraction reads only what changed rather than every document of the solution.
+/// </summary>
+/// <remarks>
+///     <para>
+///         A partial is never a structural change: any change to the solution, a project file, an assets file or
+///         a probe file is a miss. So the structural stamps, the project set and the reference graph a partial
+///         validated are the ones the capture would take again, and a clean project's documents, true content
+///         key and surface key are exactly what a full re-stamp would recompute.
+///     </para>
+///     <para>
+///         Every carried stamp is older than the extraction it vouches for. An edit after validation leaves a
+///         stamp that no longer matches disk, so the next validation's stat sees it and re-reads the file, under
+///         the same racy-window rule as any other stamp. That is why <see cref="ExtractionCacheStore.Write" />
+///         need not re-stat what was carried.
+///     </para>
+/// </remarks>
+/// <param name="StructuralStamps">The validated structural stamps, in manifest order.</param>
+/// <param name="Projects">Every manifest project as validation left it, in manifest order.</param>
+/// <param name="DirtyProjects">The projects the run re-extracts; every other one is carried whole.</param>
+internal sealed record ValidatedStamps(
+    IReadOnlyList<FileStamp> StructuralStamps,
+    IReadOnlyList<ValidatedProject> Projects,
+    IReadOnlySet<string> DirtyProjects)
+{
+    /// <summary>The project files of <see cref="DirtyProjects" />: what a run that re-extracts them must load.</summary>
+    internal IReadOnlyList<string> DirtyProjectFiles =>
+        Projects
+            .Where(project => DirtyProjects.Contains(project.Entry.ProjectName))
+            .Select(project => project.Entry.CsprojPath)
+            .Distinct(PathComparison.Comparer)
+            .ToList();
+}
+
+/// <summary>One manifest project as a <see cref="CacheOutcome.Partial" /> validation left it.</summary>
+/// <param name="Entry">
+///     The manifest entry with the refreshed document stamps, the true content key and the surface key. Its
+///     Merkle key is the recorded one, which a capture recomputes.
+/// </param>
+/// <param name="UnchangedDocuments">
+///     The refreshed stamps of the documents whose bytes validation found unchanged, by path. A capture reuses
+///     these for a dirty project and stamps only the rest.
+/// </param>
+internal sealed record ValidatedProject(
+    ProjectCacheEntry Entry,
+    IReadOnlyDictionary<string, FileStamp> UnchangedDocuments);
 
 /// <summary>
 ///     One project's identity as the caller knows it before any file is statted — the store fills in every
@@ -109,9 +164,16 @@ internal sealed record ProjectInputs(
 ///     <see cref="ExtractionCacheStore.Write" />, which re-stats every input and commits only if nothing has
 ///     changed since — the guard that stops a mid-run edit from poisoning the cache.
 /// </summary>
+/// <param name="StructuralStamps">The structural stamps, as the manifest will record them.</param>
+/// <param name="Projects">The per-project entries, as the manifest will record them.</param>
+/// <param name="FreshStamps">
+///     The stamps this capture took from disk when it carried the rest from a partial validation, and so the
+///     only ones <see cref="ExtractionCacheStore.Write" /> re-stats; null when the capture stamped everything.
+/// </param>
 internal sealed record CacheFingerprint(
     IReadOnlyList<FileStamp> StructuralStamps,
-    IReadOnlyList<ProjectCacheEntry> Projects);
+    IReadOnlyList<ProjectCacheEntry> Projects,
+    IReadOnlyList<FileStamp>? FreshStamps = null);
 
 /// <summary>
 ///     What a workspace-loaded run produced and wants persisted: the fragments, the spec resolutions to
@@ -152,6 +214,13 @@ internal sealed record ExtractionResult(
 ///         replays the project's fragments with their sites moved through the line map
 ///         (<see cref="FragmentSiteRemapper" />).
 ///     </para>
+///     <para>
+///         A body-only edit dirties its own project and no dependent: a dependent's Merkle key folds in its
+///         dependencies' <em>surface</em> keys (<see cref="SourceShape.SurfaceHash" />), not their content
+///         keys, because a dependent's fragment reads a referenced project only through the declarations it
+///         binds to. A project's own Merkle key still folds in its own content key, so it re-walks on any
+///         token edit of its own.
+///     </para>
 /// </remarks>
 internal sealed class ExtractionCacheStore
 {
@@ -163,12 +232,13 @@ internal sealed class ExtractionCacheStore
     // one that deserializes to a harmless default, so a reader never reasons about which slots a file
     // predates. The suite cannot catch a missed bump — every run gets a fresh cache directory — so the
     // discipline is the only guard.
-    private const int CurrentSchemaVersion = 33;
+    private const int CurrentSchemaVersion = 34;
 
     private static readonly IReadOnlySet<string> NoDocuments = new HashSet<string>(PathComparison.Comparer);
 
     private readonly string cacheFilePath;
     private readonly string solutionPath;
+    private long captureStampCount;
     private long contentHashCount;
 
     /// <summary>
@@ -204,11 +274,176 @@ internal sealed class ExtractionCacheStore
     internal IReadOnlySet<string> LastRemappedDocuments { get; private set; } = NoDocuments;
 
     /// <summary>
+    ///     The number of documents a capture read from disk to stamp. A capture handed a partial validation's
+    ///     stamps reads only the documents that changed or are new. Internal test observable, counted through
+    ///     <see cref="Interlocked" /> for the same reason <see cref="ContentHashCount" /> is; never consulted in
+    ///     production.
+    /// </summary>
+    internal long CaptureStampCount => Volatile.Read(ref captureStampCount);
+
+    /// <summary>
     ///     Stats and hashes every input <em>now</em>, returning the pre-extraction fingerprint to hand to
     ///     <see cref="Write" /> after extraction. Does not touch <see cref="ContentHashCount" /> (that counts
     ///     validation reads only) and writes nothing.
     /// </summary>
     public CacheFingerprint CaptureFingerprint(IReadOnlyList<ProjectInputs> projects, CancellationToken ct = default)
+    {
+        return CaptureFingerprint(projects, null, ct);
+    }
+
+    /// <summary>
+    ///     The fingerprint to hand to <see cref="Write" />, carrying what <paramref name="validated" /> already
+    ///     stamped. A clean project is taken whole from the validation; a dirty project keeps the stamps of the
+    ///     documents validation found unchanged and stamps only the ones that changed or are new, from the
+    ///     loaded <paramref name="projects" />, which decide its document list. Without a validation, or when
+    ///     <paramref name="projects" /> holds a project the validation does not know or lacks a dirty one, every
+    ///     input is stamped now.
+    /// </summary>
+    /// <param name="projects">
+    ///     The loaded projects. Under a load of only the dirty projects' closure this is a subset of the
+    ///     manifest's, which is enough: every clean project comes from <paramref name="validated" />.
+    /// </param>
+    /// <param name="validated">The partial validation's stamps, or null to stamp everything.</param>
+    /// <param name="ct">Cancellation token.</param>
+    public CacheFingerprint CaptureFingerprint(
+        IReadOnlyList<ProjectInputs> projects, ValidatedStamps? validated, CancellationToken ct = default)
+    {
+        return TryCaptureOverValidation(projects, validated, ct) ?? CaptureEverything(projects, ct);
+    }
+
+    /// <summary>
+    ///     The fingerprint that carries <paramref name="validated" />, or null when it cannot: no validation, or
+    ///     <paramref name="projects" /> holds a project the validation does not know or lacks a dirty one. A
+    ///     caller whose <paramref name="projects" /> are only a closure must not fall back to stamping them alone,
+    ///     because a manifest without the projects it did not load would leave their fragments unvalidated.
+    /// </summary>
+    /// <param name="projects">The loaded projects: the whole solution's, or the dirty projects' closure.</param>
+    /// <param name="validated">The partial validation's stamps.</param>
+    /// <param name="ct">Cancellation token.</param>
+    public CacheFingerprint? TryCaptureOverValidation(
+        IReadOnlyList<ProjectInputs> projects, ValidatedStamps? validated, CancellationToken ct = default)
+    {
+        return validated is not null && Covers(validated, projects)
+            ? CaptureOverValidation(projects, validated, ct)
+            : null;
+    }
+
+    // The loaded projects must name every dirty project, so each has a document list to stamp, and nothing the
+    // validation does not know, so the written project set stays the manifest's.
+    private static bool Covers(ValidatedStamps validated, IReadOnlyList<ProjectInputs> projects)
+    {
+        HashSet<string> known = validated.Projects.Select(project => project.Entry.ProjectName).ToHashSet(StringComparer.Ordinal);
+        HashSet<string> loaded = projects.Select(project => project.ProjectName).ToHashSet(StringComparer.Ordinal);
+        return loaded.IsSubsetOf(known) && validated.DirtyProjects.All(loaded.Contains);
+    }
+
+    private CacheFingerprint CaptureOverValidation(
+        IReadOnlyList<ProjectInputs> projects, ValidatedStamps validated, CancellationToken ct)
+    {
+        Dictionary<string, string?> structuralShaByPath = BuildStructuralShaLookup(validated.StructuralStamps);
+
+        // Re-keyed by name in input order, so a repeated name resolves to its last occurrence, as in a full capture.
+        var loadedByName = new Dictionary<string, ProjectInputs>(StringComparer.Ordinal);
+        foreach (ProjectInputs project in projects) loadedByName[project.ProjectName] = project;
+
+        int count = validated.Projects.Count;
+        var entryByIndex = new ProjectCacheEntry[count];
+        var freshByIndex = new IReadOnlyList<FileStamp>[count];
+
+        Parallel.For(0, count, new ParallelOptions { CancellationToken = ct }, index =>
+        {
+            ValidatedProject carried = validated.Projects[index];
+            if (!validated.DirtyProjects.Contains(carried.Entry.ProjectName))
+            {
+                entryByIndex[index] = carried.Entry;
+                freshByIndex[index] = [];
+                return;
+            }
+
+            (entryByIndex[index], freshByIndex[index]) = RestampDirty(
+                loadedByName[carried.Entry.ProjectName], carried.UnchangedDocuments, structuralShaByPath, ct);
+        });
+
+        var contentKeys = new Dictionary<string, string>(StringComparer.Ordinal);
+        var surfaceKeys = new Dictionary<string, string>(StringComparer.Ordinal);
+        var referencesByName = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
+        foreach (ProjectCacheEntry entry in entryByIndex)
+        {
+            contentKeys[entry.ProjectName] = entry.ContentKey;
+            surfaceKeys[entry.ProjectName] = entry.SurfaceKey;
+            referencesByName[entry.ProjectName] = entry.ProjectReferences;
+        }
+
+        // The same Merkle pass a full capture runs, over the same kinds of key, so capture and validation still
+        // agree by construction.
+        var surfaceMemo = new Dictionary<string, string>(StringComparer.Ordinal);
+        List<ProjectCacheEntry> entries = entryByIndex
+            .Select(entry => entry with
+            {
+                MerkleKey = ComputeMerkleKey(entry.ProjectName, contentKeys, surfaceKeys, referencesByName, surfaceMemo)
+            })
+            .ToList();
+
+        return new CacheFingerprint(validated.StructuralStamps, entries, freshByIndex.SelectMany(stamps => stamps).ToList());
+    }
+
+    // One dirty project's entry: the loaded document list, each document's validated stamp where its bytes were
+    // unchanged and a fresh stamp otherwise, and the keys over them. The Merkle key is left for the caller.
+    private (ProjectCacheEntry Entry, IReadOnlyList<FileStamp> Fresh) RestampDirty(
+        ProjectInputs project,
+        IReadOnlyDictionary<string, FileStamp> unchanged,
+        IReadOnlyDictionary<string, string?> structuralShaByPath,
+        CancellationToken ct)
+    {
+        var documents = new List<FileStamp>(project.DocumentPaths.Count);
+        var fresh = new List<FileStamp>();
+        foreach (string path in project.DocumentPaths)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (unchanged.TryGetValue(Path.GetFullPath(path), out FileStamp? carried))
+            {
+                documents.Add(carried);
+                continue;
+            }
+
+            FileStamp stamp = StampDocumentForCapture(path);
+            documents.Add(stamp);
+            fresh.Add(stamp);
+        }
+
+        (string contentKey, string surfaceKey) = ProjectKeysOf(project, documents, structuralShaByPath);
+        var entry = new ProjectCacheEntry(
+            project.ProjectName,
+            Path.GetFullPath(project.CsprojPath),
+            Path.GetFullPath(project.ProjectDirectory),
+            project.ProjectReferences,
+            documents,
+            contentKey,
+            "",
+            surfaceKey);
+        return (entry, fresh);
+    }
+
+    // A project's content and surface keys over its document stamps, its structural inputs and its cone-adds.
+    // Cone-adds are computed exactly as validation does, over the same known-document set (the stamps' full
+    // paths). Hardcoding an empty adds list here would be wrong: a *.cs on disk under the project but excluded
+    // from compilation is a validation-time add, so the capture would never validate and the project would stay
+    // dirty forever. With capture and validation running the one routine, they agree.
+    private static (string ContentKey, string SurfaceKey) ProjectKeysOf(
+        ProjectInputs project, IReadOnlyList<FileStamp> documents, IReadOnlyDictionary<string, string?> structuralShaByPath)
+    {
+        List<(string Path, string? Sha256)> documentShas = documents.Select(d => (d.Path, d.Sha256)).ToList();
+        string? csprojSha = structuralShaByPath.GetValueOrDefault(Path.GetFullPath(project.CsprojPath));
+        string? assetsSha = structuralShaByPath.GetValueOrDefault(
+            IntermediateOutputTree.DefaultAssetsPathOf(project.ProjectDirectory));
+
+        var knownDocuments = new HashSet<string>(documents.Select(d => d.Path), PathComparison.Comparer);
+        IReadOnlyList<string> adds = ProjectCone.Adds(Path.GetFullPath(project.ProjectDirectory), knownDocuments);
+        return (ComputeContentKey(project.ProjectName, documentShas, csprojSha, assetsSha, adds),
+            ComputeContentKey(project.ProjectName, SurfacesOf(documents), csprojSha, assetsSha, adds));
+    }
+
+    private CacheFingerprint CaptureEverything(IReadOnlyList<ProjectInputs> projects, CancellationToken ct)
     {
         List<FileStamp> structuralStamps = StructuralPathsOf(projects)
             .Select(FileStamping.StampOf)
@@ -221,6 +456,7 @@ internal sealed class ExtractionCacheStore
         // in position-indexed slots. The Merkle pass below needs every content key before it can start, so
         // it stays sequential.
         var contentKeyByIndex = new string[projects.Count];
+        var surfaceKeyByIndex = new string[projects.Count];
         var documentsByIndex = new IReadOnlyList<FileStamp>[projects.Count];
 
         Parallel.For(0, projects.Count, new ParallelOptions { CancellationToken = ct }, index =>
@@ -228,40 +464,29 @@ internal sealed class ExtractionCacheStore
             ProjectInputs project = projects[index];
 
             IReadOnlyList<FileStamp> documents = StampDocuments(project.DocumentPaths, ct);
-            List<(string Path, string? Sha256)> documentShas = documents.Select(d => (d.Path, d.Sha256)).ToList();
-            string? csprojSha = structuralShaByPath.GetValueOrDefault(Path.GetFullPath(project.CsprojPath));
-            string? assetsSha = structuralShaByPath.GetValueOrDefault(
-                IntermediateOutputTree.DefaultAssetsPathOf(project.ProjectDirectory));
-
-            // Compute cone-adds exactly as validation does, over the same known-document set (the stamps'
-            // full paths). Hardcoding an empty adds list here would be wrong: a *.cs on disk under the
-            // project but excluded from compilation is a validation-time add, so the capture would never
-            // validate and the project would stay dirty forever. With capture and validation running the one
-            // routine, they agree.
-            var knownDocuments = new HashSet<string>(documents.Select(d => d.Path), PathComparison.Comparer);
-            IReadOnlyList<string> adds = ProjectCone.Adds(Path.GetFullPath(project.ProjectDirectory), knownDocuments);
-            contentKeyByIndex[index] = ComputeContentKey(project.ProjectName, documentShas, csprojSha, assetsSha, adds);
+            (contentKeyByIndex[index], surfaceKeyByIndex[index]) = ProjectKeysOf(project, documents, structuralShaByPath);
             documentsByIndex[index] = documents;
         });
 
         // Re-keyed by name in input order, so a repeated name resolves to its last occurrence.
         var contentKeys = new Dictionary<string, string>(StringComparer.Ordinal);
+        var surfaceKeys = new Dictionary<string, string>(StringComparer.Ordinal);
         var referencesByName = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
         var documentsByName = new Dictionary<string, IReadOnlyList<FileStamp>>(StringComparer.Ordinal);
         for (var index = 0; index < projects.Count; index++)
         {
             ProjectInputs project = projects[index];
             contentKeys[project.ProjectName] = contentKeyByIndex[index];
+            surfaceKeys[project.ProjectName] = surfaceKeyByIndex[index];
             referencesByName[project.ProjectName] = project.ProjectReferences;
             documentsByName[project.ProjectName] = documentsByIndex[index];
         }
 
-        var memo = new Dictionary<string, string>(StringComparer.Ordinal);
+        var surfaceMemo = new Dictionary<string, string>(StringComparer.Ordinal);
         var entries = new List<ProjectCacheEntry>(projects.Count);
         foreach (ProjectInputs project in projects)
         {
-            string merkleKey = ComputeMerkleKey(
-                project.ProjectName, contentKeys, referencesByName, memo, new HashSet<string>(StringComparer.Ordinal));
+            string merkleKey = ComputeMerkleKey(project.ProjectName, contentKeys, surfaceKeys, referencesByName, surfaceMemo);
             entries.Add(new ProjectCacheEntry(
                 project.ProjectName,
                 Path.GetFullPath(project.CsprojPath),
@@ -269,7 +494,8 @@ internal sealed class ExtractionCacheStore
                 project.ProjectReferences,
                 documentsByName[project.ProjectName],
                 contentKeys[project.ProjectName],
-                merkleKey));
+                merkleKey,
+                surfaceKeys[project.ProjectName]));
         }
 
         return new CacheFingerprint(structuralStamps, entries);
@@ -277,23 +503,24 @@ internal sealed class ExtractionCacheStore
 
     /// <summary>
     ///     Commits <paramref name="extraction" /> to the cache, keyed to <paramref name="fingerprint" />.
-    ///     Re-stats every fingerprinted input first; if any changed since <see cref="CaptureFingerprint" />
-    ///     (a mid-run edit), skips the write and returns <c>false</c>. A best-effort I/O failure also returns
-    ///     <c>false</c>. Otherwise writes atomically and returns <c>true</c>.
+    ///     Re-stats every input the capture took from disk first; if any changed since
+    ///     <see cref="CaptureFingerprint(IReadOnlyList{ProjectInputs}, CancellationToken)" /> (a mid-run edit),
+    ///     skips the write and returns <c>false</c>. A best-effort I/O failure also returns <c>false</c>.
+    ///     Otherwise writes atomically and returns <c>true</c>.
     /// </summary>
+    /// <remarks>
+    ///     A stamp carried from a partial validation is not re-statted. It was taken before the extraction began,
+    ///     so an edit since then leaves it unequal to disk, and the next validation catches that by its stat.
+    /// </remarks>
     public bool Write(CacheFingerprint fingerprint, ExtractionResult extraction, CancellationToken ct = default)
     {
-        foreach (FileStamp stamp in fingerprint.StructuralStamps)
+        IEnumerable<FileStamp> guarded = fingerprint.FreshStamps
+                                         ?? fingerprint.StructuralStamps.Concat(
+                                             fingerprint.Projects.SelectMany(project => project.Documents));
+        foreach (FileStamp stamp in guarded)
         {
             ct.ThrowIfCancellationRequested();
             if (StatChangedSinceCapture(stamp)) return false;
-        }
-
-        foreach (ProjectCacheEntry project in fingerprint.Projects)
-        foreach (FileStamp document in project.Documents)
-        {
-            ct.ThrowIfCancellationRequested();
-            if (StatChangedSinceCapture(document)) return false;
         }
 
         var manifest = new CacheManifest(
@@ -363,25 +590,28 @@ internal sealed class ExtractionCacheStore
 
         var decisionContentKeys = new Dictionary<string, string>(StringComparer.Ordinal);
         var trueContentKeys = new Dictionary<string, string>(StringComparer.Ordinal);
+        var surfaceKeys = new Dictionary<string, string>(StringComparer.Ordinal);
         var referencesByName = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
         var mapsByProject = new Dictionary<string, IReadOnlyDictionary<string, LineMap>>(StringComparer.Ordinal);
         foreach (ProjectCheck check in checkedByIndex)
         {
             decisionContentKeys[check.ProjectName] = check.DecisionContentKey;
             trueContentKeys[check.ProjectName] = check.TrueContentKey;
+            surfaceKeys[check.ProjectName] = check.SurfaceKey;
             referencesByName[check.ProjectName] = check.ProjectReferences;
             if (check.Maps is { } maps) mapsByProject[check.ProjectName] = maps;
         }
 
-        // Recompute Merkle keys bottom-up over the DECISION keys, in which a trivia-only edit still shows the
-        // hash its fragments were extracted from; the dirty set is exactly the projects whose key no longer
-        // matches — content-dirty projects plus every dependent reachable through the Merkle edges.
+        // Recompute Merkle keys over the DECISION keys, in which a trivia-only edit still shows the hash its
+        // fragments were extracted from, and the dependencies' surface keys, which no body-only edit moves; the
+        // dirty set is exactly the projects whose key no longer matches — content-dirty projects plus every
+        // dependent of a project whose declaration surface changed.
         var dirtyProjects = new HashSet<string>(StringComparer.Ordinal);
-        var decisionMemo = new Dictionary<string, string>(StringComparer.Ordinal);
+        var surfaceMemo = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (ProjectCacheEntry project in manifest.Projects)
         {
             string recomputedMerkle = ComputeMerkleKey(
-                project.ProjectName, decisionContentKeys, referencesByName, decisionMemo, new HashSet<string>(StringComparer.Ordinal));
+                project.ProjectName, decisionContentKeys, surfaceKeys, referencesByName, surfaceMemo);
             if (!string.Equals(recomputedMerkle, project.MerkleKey, StringComparison.Ordinal))
                 dirtyProjects.Add(project.ProjectName);
         }
@@ -399,21 +629,60 @@ internal sealed class ExtractionCacheStore
 
         if (dirtyProjects.Count == 0)
         {
-            // The true keys differ from the decision keys only where a remap stood, so with no maps the pass
-            // above already computed every Merkle key and the memo answers each one without hashing.
-            bool remapped = mapsByProject.Count > 0;
-            IReadOnlyDictionary<string, string> promotedKeys = remapped ? trueContentKeys : decisionContentKeys;
-            Dictionary<string, string> promotedMemo =
-                remapped ? new Dictionary<string, string>(StringComparer.Ordinal) : decisionMemo;
-
+            // The surface keys are the same on both sides of a remap, so the memo the pass above filled holds
+            // every surface Merkle key the promotion needs.
             IReadOnlyList<ProjectCacheEntry> refreshedProjects = RefreshedProjects(
-                manifest.Projects, checkedByIndex, promotedKeys, referencesByName, promotedMemo);
+                manifest.Projects, checkedByIndex, trueContentKeys, surfaceKeys, referencesByName, surfaceMemo);
             PromoteIfChanged(manifest, refreshedStructural, refreshedProjects, replayedFragments);
             return CacheReadResult.Hit(replayedFragments, manifest.SpecResolutions, loadDiagnostics);
         }
 
         List<CodebaseFragment> reusable = replayedFragments.Where(f => !dirtyProjects.Contains(f.ProjectName)).ToList();
-        return CacheReadResult.Partial(reusable, dirtyProjects, manifest.SpecResolutions, loadDiagnostics);
+        ValidatedStamps validated = ValidatedStampsOf(manifest.Projects, checkedByIndex, refreshedStructural, dirtyProjects);
+        return CacheReadResult.Partial(reusable, dirtyProjects, manifest.SpecResolutions, loadDiagnostics, validated);
+    }
+
+    /// <summary>
+    ///     What a partial hands the capture: every manifest project with its refreshed stamps and its
+    ///     <em>true</em> keys, the same ones a hit promotes, and for a dirty project the documents whose bytes
+    ///     did not change.
+    /// </summary>
+    /// <remarks>
+    ///     A document counts as unchanged only when it still exists, its hash matches the recorded one and its
+    ///     stamp carries a shape: a stamp with none would give its project a different surface key than a fresh
+    ///     stamp of the same bytes, so it is stamped again.
+    /// </remarks>
+    private static ValidatedStamps ValidatedStampsOf(
+        IReadOnlyList<ProjectCacheEntry> projects,
+        IReadOnlyList<ProjectCheck> checkedByIndex,
+        IReadOnlyList<FileStamp> refreshedStructural,
+        IReadOnlySet<string> dirtyProjects)
+    {
+        var validated = new List<ValidatedProject>(projects.Count);
+        for (var index = 0; index < projects.Count; index++)
+        {
+            ProjectCacheEntry project = projects[index];
+            ProjectCheck check = checkedByIndex[index];
+            ProjectCacheEntry entry = project with
+            {
+                Documents = check.RefreshedDocuments, ContentKey = check.TrueContentKey, SurfaceKey = check.SurfaceKey
+            };
+
+            var unchanged = new Dictionary<string, FileStamp>(PathComparison.Comparer);
+            if (dirtyProjects.Contains(project.ProjectName))
+                for (var document = 0; document < project.Documents.Count; document++)
+                {
+                    FileStamp recorded = project.Documents[document];
+                    FileStamp refreshed = check.RefreshedDocuments[document];
+                    if (refreshed is { Exists: true, Shape: not null, Sha256: not null }
+                        && string.Equals(refreshed.Sha256, recorded.Sha256, StringComparison.Ordinal))
+                        unchanged[refreshed.Path] = refreshed;
+                }
+
+            validated.Add(new ValidatedProject(entry, unchanged));
+        }
+
+        return new ValidatedStamps(refreshedStructural, validated, dirtyProjects);
     }
 
     /// <summary>
@@ -424,16 +693,16 @@ internal sealed class ExtractionCacheStore
     /// <remarks>
     ///     The keys must be the true ones because that manifest is what the next validation stats against:
     ///     write the decision key and the next run compares a fresh hash to a stale key and calls the project
-    ///     dirty forever. Where no remap stood the two are the same string, so the caller hands the decision
-    ///     keys along with the <paramref name="memo" /> already holding their Merkle keys, and this pass
-    ///     degrades to one lookup per project instead of re-hashing the graph.
+    ///     dirty forever. The surface keys need no such care: a remap is a trivia-only edit, which no surface
+    ///     sees, so the <paramref name="surfaceMemo" /> the dirty pass filled answers every dependency here.
     /// </remarks>
     private static IReadOnlyList<ProjectCacheEntry> RefreshedProjects(
         IReadOnlyList<ProjectCacheEntry> projects,
         IReadOnlyList<ProjectCheck> checkedByIndex,
         IReadOnlyDictionary<string, string> trueContentKeys,
+        IReadOnlyDictionary<string, string> surfaceKeys,
         IReadOnlyDictionary<string, IReadOnlyList<string>> referencesByName,
-        Dictionary<string, string> memo)
+        Dictionary<string, string> surfaceMemo)
     {
         var refreshed = new List<ProjectCacheEntry>(projects.Count);
         for (var index = 0; index < projects.Count; index++)
@@ -441,10 +710,13 @@ internal sealed class ExtractionCacheStore
             ProjectCacheEntry project = projects[index];
             ProjectCheck check = checkedByIndex[index];
             string trueMerkle = ComputeMerkleKey(
-                project.ProjectName, trueContentKeys, referencesByName, memo, new HashSet<string>(StringComparer.Ordinal));
+                project.ProjectName, trueContentKeys, surfaceKeys, referencesByName, surfaceMemo);
             refreshed.Add(project with
             {
-                Documents = check.RefreshedDocuments, ContentKey = check.TrueContentKey, MerkleKey = trueMerkle
+                Documents = check.RefreshedDocuments,
+                ContentKey = check.TrueContentKey,
+                MerkleKey = trueMerkle,
+                SurfaceKey = check.SurfaceKey
             });
         }
 
@@ -511,13 +783,15 @@ internal sealed class ExtractionCacheStore
     ///     <see cref="DecisionContentKey" /> is keyed on the hashes the stored fragments were extracted from,
     ///     so it — and every Merkle key above it — is what decides dirtiness; <see cref="TrueContentKey" />
     ///     is keyed on the bytes now on disk and belongs to the manifest a hit promotes, whose whole job is
-    ///     to describe disk.
+    ///     to describe disk. <see cref="SurfaceKey" /> is one key, not two, because the edit that splits the
+    ///     content keys is the one edit no surface can see.
     /// </remarks>
     private sealed record ProjectCheck(
         string ProjectName,
         IReadOnlyList<string> ProjectReferences,
         string DecisionContentKey,
         string TrueContentKey,
+        string SurfaceKey,
         IReadOnlyList<FileStamp> RefreshedDocuments,
         IReadOnlyDictionary<string, LineMap>? Maps);
 
@@ -563,8 +837,20 @@ internal sealed class ExtractionCacheStore
         string trueKey = maps is null
             ? decisionKey
             : ComputeContentKey(project.ProjectName, trueShas, csprojSha, assetsSha, adds);
+        string surfaceKey = ComputeContentKey(project.ProjectName, SurfacesOf(refreshedDocuments), csprojSha, assetsSha, adds);
         return new ProjectCheck(
-            project.ProjectName, project.ProjectReferences, decisionKey, trueKey, refreshedDocuments, maps);
+            project.ProjectName, project.ProjectReferences, decisionKey, trueKey, surfaceKey, refreshedDocuments, maps);
+    }
+
+    // What each document contributes to its project's surface key. The stamp is the one CheckDocument carries
+    // forward, whose shape describes exactly the bytes its hash does in every branch, so its surface is
+    // right whatever the sweep found. A stamp with no shape — unreadable at capture, or a structural-style
+    // stamp — contributes its hash, which can only make a dependent re-walk more often, never less.
+    private static List<(string Path, string? Surface)> SurfacesOf(IReadOnlyList<FileStamp> documents)
+    {
+        return documents
+            .Select(d => (d.Path, d.Exists ? d.Shape?.SurfaceHash ?? d.Sha256 : null))
+            .ToList();
     }
 
     private DocumentCheck CheckDocument(FileStamp document)
@@ -660,27 +946,49 @@ internal sealed class ExtractionCacheStore
         hash.AppendData(Encoding.UTF8.GetBytes(line));
     }
 
-    // MerkleKey(P) = hash(ContentKey(P), MerkleKey(dep) for each dep in name order). Memoized; a visiting set
-    // guards against a (should-not-happen) reference cycle. A change to any dependency's content changes its
-    // Merkle key and therefore every dependent's.
+    // MerkleKey(P) = hash(ContentKey(P), SurfaceMerkle(dep) for each dep in name order), where
+    // SurfaceMerkle(P) = hash(SurfaceKey(P), SurfaceMerkle(dep) for each dep in name order). So P re-walks on
+    // any change to its own content and on a change to the declaration surface of anything it references,
+    // transitively, and on nothing else: a body-only edit in a dependency moves that dependency's content key
+    // and leaves every surface key in the graph where it was.
     private static string ComputeMerkleKey(
         string name,
         IReadOnlyDictionary<string, string> contentKeys,
+        IReadOnlyDictionary<string, string> surfaceKeys,
+        IReadOnlyDictionary<string, IReadOnlyList<string>> referencesByName,
+        Dictionary<string, string> surfaceMemo)
+    {
+        var builder = new StringBuilder();
+        builder.Append(contentKeys.GetValueOrDefault(name, "UNKNOWN"));
+        if (referencesByName.TryGetValue(name, out IReadOnlyList<string>? dependencies))
+            foreach (string dependency in dependencies.OrderBy(d => d, StringComparer.Ordinal))
+                if (surfaceKeys.ContainsKey(dependency))
+                    builder.Append('\0').Append(ComputeSurfaceMerkleKey(
+                        dependency, surfaceKeys, referencesByName, surfaceMemo, new HashSet<string>(StringComparer.Ordinal)));
+
+        return FileStamping.HashText(builder.ToString());
+    }
+
+    // Memoized, since every dependent asks for the same dependencies' keys; a visiting set guards against a
+    // (should-not-happen) reference cycle.
+    private static string ComputeSurfaceMerkleKey(
+        string name,
+        IReadOnlyDictionary<string, string> surfaceKeys,
         IReadOnlyDictionary<string, IReadOnlyList<string>> referencesByName,
         Dictionary<string, string> memo,
         HashSet<string> visiting)
     {
         if (memo.TryGetValue(name, out string? cached)) return cached;
 
-        string self = contentKeys.GetValueOrDefault(name, "UNKNOWN");
+        string self = surfaceKeys.GetValueOrDefault(name, "UNKNOWN");
         if (!visiting.Add(name)) return self; // cycle backstop
 
         var builder = new StringBuilder();
         builder.Append(self);
         if (referencesByName.TryGetValue(name, out IReadOnlyList<string>? dependencies))
             foreach (string dependency in dependencies.OrderBy(d => d, StringComparer.Ordinal))
-                if (contentKeys.ContainsKey(dependency))
-                    builder.Append('\0').Append(ComputeMerkleKey(dependency, contentKeys, referencesByName, memo, visiting));
+                if (surfaceKeys.ContainsKey(dependency))
+                    builder.Append('\0').Append(ComputeSurfaceMerkleKey(dependency, surfaceKeys, referencesByName, memo, visiting));
 
         visiting.Remove(name);
         string key = FileStamping.HashText(builder.ToString());
@@ -722,12 +1030,18 @@ internal sealed class ExtractionCacheStore
     // A document stamp parses the document for its shape, so one project's documents are stamped in
     // parallel too: stamped one after another, the largest project would be the whole capture's critical
     // path. Position-indexed, so the stamps keep the document order the manifest is compared in.
-    private static IReadOnlyList<FileStamp> StampDocuments(IReadOnlyList<string> paths, CancellationToken ct)
+    private IReadOnlyList<FileStamp> StampDocuments(IReadOnlyList<string> paths, CancellationToken ct)
     {
         var stamps = new FileStamp[paths.Count];
         Parallel.For(0, paths.Count, new ParallelOptions { CancellationToken = ct },
-            index => stamps[index] = FileStamping.StampDocument(paths[index]));
+            index => stamps[index] = StampDocumentForCapture(paths[index]));
         return stamps;
+    }
+
+    private FileStamp StampDocumentForCapture(string path)
+    {
+        Interlocked.Increment(ref captureStampCount);
+        return FileStamping.StampDocument(path);
     }
 
     private static bool StatChangedSinceCapture(FileStamp stamp)

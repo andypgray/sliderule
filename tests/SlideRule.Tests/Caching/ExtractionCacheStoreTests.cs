@@ -1,11 +1,11 @@
 using System.Reflection;
 using System.Text.Json.Nodes;
 using Shouldly;
-using Xunit;
 using SlideRule.Extraction.Fragments;
 using SlideRule.Roslyn.Caching;
 using SlideRule.Roslyn.Diagnostics;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.Caching;
 
@@ -87,6 +87,10 @@ public sealed class ExtractionCacheStoreTests
     // imported namespaces both declare, replays with no edge of its channel, where a fresh extraction records the
     // compiler's candidate.
     [InlineData(32)]
+    // A v33 cache predates the declaration surface (schema bumped 33→34): its Merkle keys fold in every
+    // dependency's content key, so a body-only edit in a dependency would read as a change to every dependent
+    // whose stored key was taken that way, and its document shapes carry no surface hash to compare.
+    [InlineData(33)]
     public void ReadAndValidate_SchemaVersionOtherThanTheCurrentOne_ReturnsMiss(int schemaVersion)
     {
         // Arrange
@@ -116,7 +120,7 @@ public sealed class ExtractionCacheStoreTests
 
         version.ShouldNotBeNull("the extraction cache still declares a schema version");
         version.GetRawConstantValue()
-            .ShouldBe(33);
+            .ShouldBe(34);
     }
 
     [Fact]
@@ -413,6 +417,198 @@ public sealed class ExtractionCacheStoreTests
     }
 
     [Fact]
+    public void CaptureFingerprint_AfterAPartial_CarriesTheCleanProjectsValidatedStampsAndReadsOnlyTheEdit()
+    {
+        // Arrange — A and B independent, both cached; then a body edit to A.
+        using var solution = new SyntheticSolution();
+        solution.AddProject("A", [], ("A.cs", ClassWithMethod("A", "return 1;")));
+        solution.AddProject("B", [], ("B.cs", TwoFieldClass("B")), ("B2.cs", TwoFieldClass("B2")));
+        solution.BackdateAll();
+        ExtractionCacheStore store = solution.NewStore();
+        store.Write(store.CaptureFingerprint(solution.Projects), TrivialExtraction(solution))
+            .ShouldBeTrue();
+        RewriteBackdated(solution.PathOf("A", "A.cs"), ClassWithMethod("A", "return 2;"));
+        CacheReadResult partial = store.ReadAndValidate();
+        partial.DirtyProjects.ShouldBe(["A"]);
+
+        // Act
+        long beforeCapture = store.CaptureStampCount;
+        CacheFingerprint fingerprint = store.CaptureFingerprint(solution.Projects, partial.Validated);
+
+        // Assert — only the edited document was read, B's stamps are the ones validation took, and the written
+        // cache validates as a pure-stat hit, so capture and validation still agree on every key.
+        (store.CaptureStampCount - beforeCapture).ShouldBe(1);
+        fingerprint.FreshStamps.ShouldNotBeNull()
+            .Select(stamp => stamp.Path)
+            .ShouldBe([Path.GetFullPath(solution.PathOf("A", "A.cs"))]);
+        fingerprint.Projects.Single(project => project.ProjectName == "B")
+            .Documents.ShouldBe(partial.Validated.ShouldNotBeNull().Projects.Single(project => project.Entry.ProjectName == "B").Entry.Documents);
+        store.Write(fingerprint, TrivialExtraction(solution))
+            .ShouldBeTrue();
+        ShouldValidateAsAPureStatHit(store);
+    }
+
+    [Fact]
+    public void CaptureFingerprint_AfterAPartial_RereadsOnlyTheDirtyProjectsChangedDocuments()
+    {
+        // Arrange — one project of three documents; one of them edited.
+        using var solution = new SyntheticSolution();
+        solution.AddProject(
+            "A", [], ("A1.cs", ClassWithMethod("A1", "return 1;")), ("A2.cs", TwoFieldClass("A2")),
+            ("A3.cs", TwoFieldClass("A3")));
+        solution.BackdateAll();
+        ExtractionCacheStore store = solution.NewStore();
+        store.Write(store.CaptureFingerprint(solution.Projects), TrivialExtraction(solution))
+            .ShouldBeTrue();
+        RewriteBackdated(solution.PathOf("A", "A1.cs"), ClassWithMethod("A1", "return 2;"));
+        CacheReadResult partial = store.ReadAndValidate();
+
+        // Act
+        long beforeCapture = store.CaptureStampCount;
+        CacheFingerprint fingerprint = store.CaptureFingerprint(solution.Projects, partial.Validated);
+
+        // Assert — the two unchanged documents rode in from validation.
+        (store.CaptureStampCount - beforeCapture).ShouldBe(1);
+        store.Write(fingerprint, TrivialExtraction(solution))
+            .ShouldBeTrue();
+        ShouldValidateAsAPureStatHit(store);
+    }
+
+    [Fact]
+    public void CaptureFingerprint_AfterAPartial_StampsAnAddedDocument()
+    {
+        // Arrange — a new source file appears in A's cone, which the load then lists as a document.
+        using var solution = new SyntheticSolution();
+        solution.AddProject("A", [], ("A1.cs", TwoFieldClass("A1")));
+        solution.AddProject("B", [], ("B.cs", TwoFieldClass("B")));
+        solution.BackdateAll();
+        ExtractionCacheStore store = solution.NewStore();
+        store.Write(store.CaptureFingerprint(solution.Projects), TrivialExtraction(solution))
+            .ShouldBeTrue();
+        string added = solution.PathOf("A", "A2.cs");
+        RewriteBackdated(added, TwoFieldClass("A2"));
+        CacheReadResult partial = store.ReadAndValidate();
+        partial.DirtyProjects.ShouldBe(["A"]);
+        IReadOnlyList<ProjectInputs> loaded = WithDocuments(solution, "A", solution.PathOf("A", "A1.cs"), added);
+
+        // Act
+        long beforeCapture = store.CaptureStampCount;
+        CacheFingerprint fingerprint = store.CaptureFingerprint(loaded, partial.Validated);
+
+        // Assert — the added document is the one read, and it is in the written entry.
+        (store.CaptureStampCount - beforeCapture).ShouldBe(1);
+        fingerprint.Projects.Single(project => project.ProjectName == "A")
+            .Documents.Select(stamp => stamp.Path)
+            .ShouldBe([Path.GetFullPath(solution.PathOf("A", "A1.cs")), Path.GetFullPath(added)]);
+        store.Write(fingerprint, TrivialExtraction(solution))
+            .ShouldBeTrue();
+        ShouldValidateAsAPureStatHit(store);
+    }
+
+    [Fact]
+    public void CaptureFingerprint_AfterAPartial_DropsADeletedDocument()
+    {
+        // Arrange — one of A's two documents is deleted, and the load no longer lists it.
+        using var solution = new SyntheticSolution();
+        solution.AddProject("A", [], ("A1.cs", TwoFieldClass("A1")), ("A2.cs", TwoFieldClass("A2")));
+        solution.BackdateAll();
+        ExtractionCacheStore store = solution.NewStore();
+        store.Write(store.CaptureFingerprint(solution.Projects), TrivialExtraction(solution))
+            .ShouldBeTrue();
+        File.Delete(solution.PathOf("A", "A2.cs"));
+        CacheReadResult partial = store.ReadAndValidate();
+        partial.DirtyProjects.ShouldBe(["A"]);
+        IReadOnlyList<ProjectInputs> loaded = WithDocuments(solution, "A", solution.PathOf("A", "A1.cs"));
+
+        // Act
+        long beforeCapture = store.CaptureStampCount;
+        CacheFingerprint fingerprint = store.CaptureFingerprint(loaded, partial.Validated);
+
+        // Assert — nothing was read, and the deleted document is gone from the entry.
+        (store.CaptureStampCount - beforeCapture).ShouldBe(0);
+        fingerprint.Projects.Single()
+            .Documents.Select(stamp => stamp.Path)
+            .ShouldBe([Path.GetFullPath(solution.PathOf("A", "A1.cs"))]);
+        store.Write(fingerprint, TrivialExtraction(solution))
+            .ShouldBeTrue();
+        ShouldValidateAsAPureStatHit(store);
+    }
+
+    [Fact]
+    public void Write_AfterAPartial_ACleanFileEditedSinceValidationIsCaughtByTheNextValidation()
+    {
+        // Arrange — A edited, so B is clean and its stamp is carried from validation.
+        using var solution = new SyntheticSolution();
+        solution.AddProject("A", [], ("A.cs", ClassWithMethod("A", "return 1;")));
+        solution.AddProject("B", [], ("B.cs", ClassWithMethod("B", "return 1;")));
+        solution.BackdateAll();
+        ExtractionCacheStore store = solution.NewStore();
+        store.Write(store.CaptureFingerprint(solution.Projects), TrivialExtraction(solution))
+            .ShouldBeTrue();
+        RewriteBackdated(solution.PathOf("A", "A.cs"), ClassWithMethod("A", "return 2;"));
+        CacheReadResult partial = store.ReadAndValidate();
+        CacheFingerprint fingerprint = store.CaptureFingerprint(solution.Projects, partial.Validated);
+
+        // Act — B changes after validation, before the write.
+        File.WriteAllText(solution.PathOf("B", "B.cs"), ClassWithMethod("B", "return 2;"));
+        File.SetLastWriteTimeUtc(solution.PathOf("B", "B.cs"), DateTime.UtcNow.AddMinutes(-30));
+        bool wrote = store.Write(fingerprint, TrivialExtraction(solution));
+
+        // Assert — the carried stamp is not re-statted, so the write lands, and the next validation re-walks B.
+        wrote.ShouldBeTrue();
+        CacheReadResult next = store.ReadAndValidate();
+        next.Outcome.ShouldBe(CacheOutcome.Partial);
+        next.DirtyProjects.ShouldBe(["B"]);
+    }
+
+    [Fact]
+    public void Write_AfterAPartial_ADocumentStampedFreshAndThenEditedSkipsTheWrite()
+    {
+        // Arrange — A's edited document is the one the capture stamps fresh.
+        using var solution = new SyntheticSolution();
+        solution.AddProject("A", [], ("A.cs", ClassWithMethod("A", "return 1;")));
+        solution.BackdateAll();
+        ExtractionCacheStore store = solution.NewStore();
+        store.Write(store.CaptureFingerprint(solution.Projects), TrivialExtraction(solution))
+            .ShouldBeTrue();
+        RewriteBackdated(solution.PathOf("A", "A.cs"), ClassWithMethod("A", "return 2;"));
+        CacheReadResult partial = store.ReadAndValidate();
+        CacheFingerprint fingerprint = store.CaptureFingerprint(solution.Projects, partial.Validated);
+
+        // Act — it changes again before the write.
+        File.WriteAllText(solution.PathOf("A", "A.cs"), ClassWithMethod("A", "return 3;"));
+        File.SetLastWriteTimeUtc(solution.PathOf("A", "A.cs"), DateTime.UtcNow);
+        bool wrote = store.Write(fingerprint, TrivialExtraction(solution));
+
+        // Assert — the guard still covers what the capture read.
+        wrote.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void CaptureFingerprint_LoadedProjectsMissingADirtyOne_StampsEverything()
+    {
+        // Arrange — A dirty, but the inputs handed in name only B.
+        using var solution = new SyntheticSolution();
+        solution.AddProject("A", [], ("A.cs", ClassWithMethod("A", "return 1;")));
+        solution.AddProject("B", [], ("B.cs", TwoFieldClass("B")));
+        solution.BackdateAll();
+        ExtractionCacheStore store = solution.NewStore();
+        store.Write(store.CaptureFingerprint(solution.Projects), TrivialExtraction(solution))
+            .ShouldBeTrue();
+        RewriteBackdated(solution.PathOf("A", "A.cs"), ClassWithMethod("A", "return 2;"));
+        CacheReadResult partial = store.ReadAndValidate();
+        List<ProjectInputs> onlyB = solution.Projects.Where(project => project.ProjectName == "B").ToList();
+
+        // Act
+        CacheFingerprint fingerprint = store.CaptureFingerprint(onlyB, partial.Validated);
+
+        // Assert — a validation that cannot account for a dirty project is not carried at all.
+        fingerprint.FreshStamps.ShouldBeNull();
+        fingerprint.Projects.Select(project => project.ProjectName)
+            .ShouldBe(["B"]);
+    }
+
+    [Fact]
     public void ReadAndValidate_CleanHit_ReplaysAllFragmentsAndRecordedSidecars()
     {
         // Arrange
@@ -580,11 +776,61 @@ public sealed class ExtractionCacheStoreTests
     }
 
     [Fact]
-    public void ReadAndValidate_StringLiteralEdit_PartialWithDependents()
+    public void ReadAndValidate_StringLiteralEditInAFieldInitializer_DirtiesThatProjectOnly()
     {
-        // A's document carries a string literal, which is a token and therefore part of its shape. An edit
-        // inside a token is an ordinary content change, so the dependent goes with it.
-        ShouldDirtyBothProjects(ClassWithLiteral("A", "before"), ClassWithLiteral("A", "after"));
+        // A's document carries a string literal, which is a token and therefore part of its shape, so A
+        // re-walks. It sits in a non-constant field's initializer, which no dependent can bind to, so B stays.
+        ShouldDirtyTheEditedProjectOnly(ClassWithLiteral("A", "before"), ClassWithLiteral("A", "after"));
+    }
+
+    [Fact]
+    public void ReadAndValidate_MethodBodyEdit_DirtiesThatProjectOnly()
+    {
+        ShouldDirtyTheEditedProjectOnly(ClassWithMethod("A", "return 1;"), ClassWithMethod("A", "_ = 0;\n        return 2;"));
+    }
+
+    [Fact]
+    public void ReadAndValidate_ConstantValueEdit_PartialWithDependents()
+    {
+        // A constant's value is surface: a dependent folds it into its own code.
+        ShouldDirtyBothProjects(ClassWithConstant("A", "1"), ClassWithConstant("A", "2"));
+    }
+
+    [Fact]
+    public void ReadAndValidate_InternalSignatureEdit_PartialWithDependents()
+    {
+        // Internal is surface: InternalsVisibleTo lets a dependent bind to it.
+        ShouldDirtyBothProjects(ClassWithMethod("A", "return 1;"), ClassWithMethod("A", "return 1;").Replace("int M()", "int M(int unused)", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void ReadAndValidate_AttributeAdded_PartialWithDependents()
+    {
+        ShouldDirtyBothProjects(TwoFieldClass("A"), "[System.CodeDom.Compiler.GeneratedCode(\"t\", \"1\")]\n" + TwoFieldClass("A"));
+    }
+
+    [Fact]
+    public void ReadAndValidate_BodyEditInATransitiveDependency_DirtiesThatProjectOnly()
+    {
+        // Arrange — A <- B <- C, as in the Merkle-dependents case, but the edit stays inside a method body.
+        using var solution = new SyntheticSolution();
+        solution.AddProject("A", [], ("A.cs", ClassWithMethod("A", "return 1;")));
+        solution.AddProject("B", ["A"], ("B.cs", "class B {}"));
+        solution.AddProject("C", ["B", "A"], ("C.cs", "class C {}"));
+        solution.BackdateAll();
+        ExtractionCacheStore store = solution.NewStore();
+        store.Write(store.CaptureFingerprint(solution.Projects), TrivialExtraction(solution))
+            .ShouldBeTrue();
+
+        // Act
+        RewriteBackdated(solution.PathOf("A", "A.cs"), ClassWithMethod("A", "return 2;"));
+        CacheReadResult result = store.ReadAndValidate();
+
+        // Assert — neither the direct nor the transitive dependent re-walks.
+        result.Outcome.ShouldBe(CacheOutcome.Partial);
+        result.DirtyProjects.ShouldBe(["A"]);
+        result.ReusableFragments.Select(f => f.ProjectName)
+            .ShouldBe(["B", "C"], true);
     }
 
     [Fact]
@@ -612,11 +858,12 @@ public sealed class ExtractionCacheStoreTests
     }
 
     [Fact]
-    public void ReadAndValidate_TokenBearingLineSplit_PartialWithDependents()
+    public void ReadAndValidate_TokenBearingLineSplit_DirtiesThatProjectOnly()
     {
         // The same tokens, on more lines: `int x;` becomes `int` and `x;`. The shape is unchanged, but one
-        // old line's tokens now sit on two, so no line map can say where that line went.
-        ShouldDirtyBothProjects(TwoFieldClass("A"), "class A\n{\n    int\n        x;\n    int y;\n}\n");
+        // old line's tokens now sit on two, so no line map can say where that line went and A re-walks. The
+        // same tokens are the same surface, so B does not.
+        ShouldDirtyTheEditedProjectOnly(TwoFieldClass("A"), "class A\n{\n    int\n        x;\n    int y;\n}\n");
     }
 
     [Fact]
@@ -642,6 +889,8 @@ public sealed class ExtractionCacheStoreTests
             var path = document["Path"]!.GetValue<string>();
             JsonNode shape = document["Shape"].ShouldNotBeNull();
             shape["Hash"]!.GetValue<string>()
+                .ShouldMatch("^[0-9a-f]{64}$");
+            shape["SurfaceHash"]!.GetValue<string>()
                 .ShouldMatch("^[0-9a-f]{64}$");
             shape["TokensPerLine"]!.AsArray()
                 .Count.ShouldBe(File.ReadAllText(path)
@@ -680,8 +929,11 @@ public sealed class ExtractionCacheStoreTests
         long beforeRestore = store.ContentHashCount;
         CacheReadResult restored = store.ReadAndValidate();
 
-        // Assert 2 — one read, a hash equal to the recorded one, and so a hit with the sites where they were.
-        restored.Outcome.ShouldBe(CacheOutcome.Hit);
+        // Assert 2 — one read and a hash equal to the recorded one, so A is clean with its sites where they were.
+        // B re-walks: its stored key was taken over A's surface, which the cleared stamp can no longer offer, so
+        // A's hash stands in for it, and a stand-in may only ever make a dependent re-walk, never spare it.
+        restored.Outcome.ShouldBe(CacheOutcome.Partial);
+        restored.DirtyProjects.ShouldBe(["B"]);
         (store.ContentHashCount - beforeRestore).ShouldBe(1);
         SiteLinesOf(restored, "A")
             .ShouldBe([3, 4]);
@@ -729,6 +981,24 @@ public sealed class ExtractionCacheStoreTests
 
     // ── helpers ─────────────────────────────────────────────────────────────────────────────────────────
 
+    // The written cache is a hit that reads no content at all: every key the capture wrote is the one the next
+    // validation recomputes, and every stamp is promoted.
+    private static void ShouldValidateAsAPureStatHit(ExtractionCacheStore store)
+    {
+        long before = store.ContentHashCount;
+        store.ReadAndValidate()
+            .Outcome.ShouldBe(CacheOutcome.Hit);
+        (store.ContentHashCount - before).ShouldBe(0);
+    }
+
+    // The solution's inputs as a load would list them after one project's documents changed on disk.
+    private static IReadOnlyList<ProjectInputs> WithDocuments(SyntheticSolution solution, string projectName, params string[] documentPaths)
+    {
+        return solution.Projects
+            .Select(project => project.ProjectName == projectName ? project with { DocumentPaths = documentPaths } : project)
+            .ToList();
+    }
+
     // Real C# whose every named line starts with a token, so a site on one is a site a line map can move.
     private static string TwoFieldClass(string name)
     {
@@ -753,11 +1023,41 @@ public sealed class ExtractionCacheStoreTests
         return $"class {name}\n{{\n    string s = \"{literal}\";\n    int y;\n}}\n";
     }
 
+    private static string ClassWithConstant(string name, string value)
+    {
+        return $"class {name}\n{{\n    public const int C = {value};\n    int y;\n}}\n";
+    }
+
+    private static string ClassWithMethod(string name, string body)
+    {
+        return $"class {name}\n{{\n    internal int M()\n    {{\n        {body}\n    }}\n}}\n";
+    }
+
     // A cached two-project solution — B referencing A, A's fragment sited on A.cs's two field lines — whose
     // one document is then rewritten from the first text to the second. Every caller's rewrite reaches A's
-    // shape, so the verdict is the same: A goes dirty, and B, which relies on what A's compilation exposes,
-    // goes with it.
+    // declaration surface, so the verdict is the same: A goes dirty, and B, which relies on what A's
+    // compilation exposes, goes with it.
     private static void ShouldDirtyBothProjects(string before, string after)
+    {
+        CacheReadResult result = RewriteADependency(before, after);
+
+        result.Outcome.ShouldBe(CacheOutcome.Partial);
+        result.DirtyProjects.ShouldBe(["A", "B"], true);
+    }
+
+    // The same solution and rewrite, for a rewrite that reaches A's shape but not its declaration surface: A
+    // re-walks, and B's fragment rides through.
+    private static void ShouldDirtyTheEditedProjectOnly(string before, string after)
+    {
+        CacheReadResult result = RewriteADependency(before, after);
+
+        result.Outcome.ShouldBe(CacheOutcome.Partial);
+        result.DirtyProjects.ShouldBe(["A"]);
+        result.ReusableFragments.Select(fragment => fragment.ProjectName)
+            .ShouldBe(["B"]);
+    }
+
+    private static CacheReadResult RewriteADependency(string before, string after)
     {
         using var solution = new SyntheticSolution();
         solution.AddProject("A", [], ("A.cs", before));
@@ -768,10 +1068,7 @@ public sealed class ExtractionCacheStoreTests
             .ShouldBeTrue();
 
         RewriteBackdated(solution.PathOf("A", "A.cs"), after);
-        CacheReadResult result = store.ReadAndValidate();
-
-        result.Outcome.ShouldBe(CacheOutcome.Partial);
-        result.DirtyProjects.ShouldBe(["A", "B"], true);
+        return store.ReadAndValidate();
     }
 
     // A cached two-project solution, B referencing A, with A's fragment sited on the given lines of A.cs and B's on its

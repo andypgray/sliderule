@@ -20,12 +20,23 @@ internal sealed class NoticingSolutionSource(string notice, TextWriter error, IS
     /// <inheritdoc />
     public Task<SolutionHandle> AcquireAsync(string solutionPath, CancellationToken ct)
     {
-        if (!_noticed)
-        {
-            error.WriteLine($"warning: {notice}");
-            _noticed = true;
-        }
-
+        Notice();
         return inner.AcquireAsync(solutionPath, ct);
+    }
+
+    /// <inheritdoc />
+    public Task<SolutionHandle> AcquireClosureAsync(
+        string solutionPath, IReadOnlyCollection<string> projectFiles, CancellationToken ct)
+    {
+        Notice();
+        return inner.AcquireClosureAsync(solutionPath, projectFiles, ct);
+    }
+
+    private void Notice()
+    {
+        if (_noticed) return;
+
+        error.WriteLine($"warning: {notice}");
+        _noticed = true;
     }
 }

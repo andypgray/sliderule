@@ -7,7 +7,7 @@ using Xunit;
 namespace SlideRule.Tests.Roslyn;
 
 /// <summary>
-///     The two pieces of <see cref="WorkspaceLoader" /> that pin without loading a workspace.
+///     The pieces of <see cref="WorkspaceLoader" /> that pin without loading a workspace.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -23,6 +23,10 @@ namespace SlideRule.Tests.Roslyn;
 ///         running at once never count into each other's counter. The load is counted before the workspace
 ///         opens anything, so a missing solution is enough to drive it, and the assertions read only the
 ///         per-flow counters, never the process-wide total that the rest of the suite moves.
+///     </para>
+///     <para>
+///         The closure load's refusals: a subset the solution cannot express as a filter answers null, so the caller
+///         loads the whole solution instead, and it answers before any workspace opens.
 ///     </para>
 /// </remarks>
 public sealed class WorkspaceLoaderTests
@@ -48,6 +52,30 @@ public sealed class WorkspaceLoaderTests
 
         inner.ShouldBe([1L, 1L]);
         outer.Value.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task LoadClosureAsync_AProjectTheSolutionDoesNotDeclare_ReturnsNullWithoutLoading()
+    {
+        using TempDirectory temp = TestTempRoot.Fresh("loader-closure");
+        string solution = temp.WriteFile(["App.slnx"], "<Solution>\n  <Project Path=\"A/A.csproj\" />\n</Solution>\n");
+        StrongBox<long> loads = WorkspaceLoader.CountLoadsOnThisFlow();
+
+        LoadedSolution? loaded = await WorkspaceLoader.LoadClosureAsync(solution, [temp.PathOf("B", "B.csproj")], ct: Ct);
+
+        loaded.ShouldBeNull();
+        loads.Value.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task LoadClosureAsync_ASolutionThatDoesNotParse_ReturnsNullRatherThanThrowing()
+    {
+        using TempDirectory temp = TestTempRoot.Fresh("loader-closure");
+        string solution = temp.WriteFile(["App.slnx"], "<Solution>\n  <Project Path=\"A/A.csproj\"\n");
+
+        LoadedSolution? loaded = await WorkspaceLoader.LoadClosureAsync(solution, [temp.PathOf("A", "A.csproj")], ct: Ct);
+
+        loaded.ShouldBeNull();
     }
 
     private static async Task<long> LoadOnceAsync(string missingSolution)

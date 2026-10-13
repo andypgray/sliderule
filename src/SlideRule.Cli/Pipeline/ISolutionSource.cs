@@ -28,6 +28,21 @@ internal interface ISolutionSource
     Task<SolutionHandle> AcquireAsync(string solutionPath, CancellationToken ct);
 
     /// <summary>
+    ///     Returns the solution at <paramref name="solutionPath" /> with at least <paramref name="projectFiles" />
+    ///     and their transitive references loaded. A source that can load that subset alone marks the handle
+    ///     <see cref="SolutionHandle.IsClosure" />; the default serves the whole solution, which is always
+    ///     correct and only slower.
+    /// </summary>
+    /// <param name="solutionPath">The discovered, absolute solution file to serve.</param>
+    /// <param name="projectFiles">The project files the caller needs, each with its references.</param>
+    /// <param name="ct">Cancellation token.</param>
+    Task<SolutionHandle> AcquireClosureAsync(
+        string solutionPath, IReadOnlyCollection<string> projectFiles, CancellationToken ct)
+    {
+        return AcquireAsync(solutionPath, ct);
+    }
+
+    /// <summary>
     ///     The validated model behind <paramref name="specDllPath" />. The default is a full one-shot load —
     ///     what a one-shot process wants — and a host whose lifetime spans many runs overrides it to cache
     ///     the model against the DLL's file stamp, since a spec changes only when its project is rebuilt.

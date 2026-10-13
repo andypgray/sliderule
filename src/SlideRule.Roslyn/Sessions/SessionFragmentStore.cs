@@ -38,8 +38,9 @@ internal readonly record struct SessionCodebase(
 ///     A session-lifetime, incremental fragment store for the warm MCP server. It holds the
 ///     last-extracted <see cref="CodebaseFragment" />s keyed by project name and, on each
 ///     <see cref="GetFragmentsAsync" />, reuses the clean projects' fragments, re-extracts only the ones
-///     whose shape changed — expanded to their reference-graph dependents — and moves the sites of the ones
-///     where only trivia moved, before returning the whole set, which the caller feeds to the one
+///     whose shape changed — expanded to the reference-graph dependents of those whose declaration surface
+///     changed — and moves the sites of the ones where only trivia moved, before returning the whole set,
+///     which the caller feeds to the one
 ///     <see cref="FragmentMerger" /> every extraction path terminates in. One store pairs with one
 ///     <see cref="WorkspaceSession" /> for its whole lifetime.
 /// </summary>
@@ -54,11 +55,13 @@ internal readonly record struct SessionCodebase(
 ///         so a generation value is never aliased by a foreign session's — true by construction.
 ///     </para>
 ///     <para>
-///         <b>Dirty ∪ reference-graph dependents.</b> A shape change in project P dirties P plus every
-///         project that transitively references P, because P's change can alter what a dependent compilation
-///         sees as an external type (or flip a declared-vs-external classification at merge time) — the same
-///         reason the persisted extraction cache propagates dirtiness up its Merkle keys. Re-extracting the
-///         dependents is conservative but never wrong; reusing them could strand a stale fact.
+///         <b>Dirty ∪ the dependents of a surface change.</b> A change to project P's declaration surface
+///         (<see cref="SourceShape.SurfaceHash" />) dirties P plus every project that transitively references
+///         P, because it can alter what a dependent compilation binds to or sees as an external type — the
+///         same rule the persisted extraction cache folds into its Merkle keys. A body-only edit dirties P
+///         alone: a dependent reads P only through the declarations it binds to, never through P's syntax or
+///         lines, so its fragment cannot move. An added or removed document, or a changed additional or
+///         analyzer-config document, counts as a surface change.
 ///     </para>
 ///     <para>
 ///         <b>Trivia-only edits remap; everything else re-walks.</b> A content-dirty project is re-walked
@@ -70,8 +73,8 @@ internal readonly record struct SessionCodebase(
 ///         and never from comments or whitespace, and every site is a token-start line. Dependents of a
 ///         remapped project are left alone: their compilations see the same metadata, and their sites are in
 ///         their own files. Any doubt — a split line, two maps for one path under one framework that
-///         disagree, an added or removed document, a shape that changed — puts the project back on the
-///         re-walk path, which is never wrong, only slower.
+///         disagree, a shape that changed — puts the project back on the re-walk path, which is never wrong,
+///         only slower; and since none of those moves its surface, it re-walks alone.
 ///     </para>
 ///     <para>
 ///         <b>No exclusion in the stored set.</b> The store always holds and returns fragments for
@@ -172,8 +175,9 @@ internal sealed class SessionFragmentStore : IDisposable
     /// <summary>
     ///     Returns the full fragment set for <paramref name="snapshot" />, reusing everything it can. A new
     ///     generation (or the first call) flushes and re-extracts all C# projects; otherwise it re-extracts
-    ///     exactly the projects a changed document re-shaped since the last call, expanded to their transitive
-    ///     reference-graph dependents, remaps the stored sites of the projects only trivia moved within, and
+    ///     exactly the projects a changed document re-shaped since the last call, expanded to the transitive
+    ///     reference-graph dependents of those whose declaration surface moved, remaps the stored sites of the
+    ///     projects only trivia moved within, and
     ///     reuses the rest. The fragments come back in the ordinal-project-name order a cold run produces, so
     ///     the caller's <see cref="FragmentMerger" /> yields the identical model.
     /// </summary>
@@ -271,28 +275,31 @@ internal sealed class SessionFragmentStore : IDisposable
     {
         HashSet<string> contentDirty = ContentDirtyProjects(snapshot);
         var seed = new HashSet<string>(StringComparer.Ordinal);
+        var walkAlone = new HashSet<string>(StringComparer.Ordinal);
         var candidates = new Dictionary<string, List<CodebaseFragment>>(StringComparer.Ordinal);
         if (contentDirty.Count > 0)
         {
-            Dictionary<string, Dictionary<string, Dictionary<string, LineMap>>> mapsByProject =
-                await TriviaOnlyMapsAsync(snapshot, contentDirty, ct).ConfigureAwait(false);
+            Dictionary<string, ProjectEdit> edits = await ClassifyEditsAsync(snapshot, contentDirty, ct).ConfigureAwait(false);
 
             foreach (string name in contentDirty)
             {
-                if (!mapsByProject.TryGetValue(
-                        name, out Dictionary<string, Dictionary<string, LineMap>>? mapsByFramework))
+                if (!edits.TryGetValue(name, out ProjectEdit? edit))
                 {
                     seed.Add(name);
                     continue;
                 }
 
-                List<CodebaseFragment>? moved = RemapStored(name, mapsByFramework);
-                if (moved is null) seed.Add(name);
-                else candidates[name] = moved;
+                if (edit.MapsByFramework is { } mapsByFramework && RemapStored(name, mapsByFramework) is { } moved)
+                    candidates[name] = moved;
+                else if (edit.SurfaceHeld)
+                    walkAlone.Add(name);
+                else
+                    seed.Add(name);
             }
         }
 
         HashSet<string> dirty = ExpandToDependents(seed, snapshot.Solution);
+        dirty.UnionWith(walkAlone);
         var remapped = new HashSet<string>(StringComparer.Ordinal);
 
         // A candidate the expansion pulled in through a dependent edge is re-walked instead and its remap
@@ -326,23 +333,21 @@ internal sealed class SessionFragmentStore : IDisposable
     }
 
     /// <summary>
-    ///     The line maps for each content-dirty project whose changed documents all kept their
-    ///     <see cref="SourceShape" />, keyed by project name, then by target framework, then by document path.
-    ///     A dirty name absent from the result is one the caller must re-walk, which covers every name this
-    ///     cannot answer for: the solution reports no change under it, or <see cref="TryMapProjectAsync" />
-    ///     refused.
+    ///     What each content-dirty project's edits were, keyed by project name: the line maps where every
+    ///     changed document kept its <see cref="SourceShape" />, and whether every changed document kept its
+    ///     declaration surface. A dirty name absent from the result is one the caller must re-walk with its
+    ///     dependents, which covers every name this cannot answer for: the solution reports no change under it.
     /// </summary>
     /// <remarks>
     ///     The comparison is against <see cref="extractedSolution" /> rather than against the previous call's
     ///     snapshot, so a project remapped on one call is classified on the next against the text its stored
     ///     fragments now describe — successive trivia edits each cost one remap rather than compounding.
     /// </remarks>
-    private async Task<Dictionary<string, Dictionary<string, Dictionary<string, LineMap>>>> TriviaOnlyMapsAsync(
+    private async Task<Dictionary<string, ProjectEdit>> ClassifyEditsAsync(
         WorkspaceSnapshot snapshot, HashSet<string> contentDirty, CancellationToken ct)
     {
-        var mapsByProject =
-            new Dictionary<string, Dictionary<string, Dictionary<string, LineMap>>>(StringComparer.Ordinal);
-        if (extractedSolution is not { } extracted) return mapsByProject;
+        var edits = new Dictionary<string, ProjectEdit>(StringComparer.Ordinal);
+        if (extractedSolution is not { } extracted) return edits;
 
         SolutionChanges changes = snapshot.Solution.GetChanges(extracted);
         IEnumerable<IGrouping<string, ProjectChanges>> byName = changes.GetProjectChanges()
@@ -352,18 +357,17 @@ internal sealed class SessionFragmentStore : IDisposable
         {
             if (!contentDirty.Contains(group.Key)) continue;
 
-            Dictionary<string, Dictionary<string, LineMap>>? mapsByFramework =
-                await TryMapProjectAsync(group, snapshot.TargetFrameworks, ct).ConfigureAwait(false);
-            if (mapsByFramework is not null) mapsByProject[group.Key] = mapsByFramework;
+            edits[group.Key] = await ClassifyProjectAsync(group, snapshot.TargetFrameworks, ct).ConfigureAwait(false);
         }
 
-        return mapsByProject;
+        return edits;
     }
 
     /// <summary>
-    ///     One project name's maps across every <see cref="ProjectChanges" /> it carries — several where a
-    ///     multi-target-framework project's frameworks each compile the file — keyed by target framework and
-    ///     then by path, or <see langword="null" /> where any of them says re-walk.
+    ///     One project name's edits across every <see cref="ProjectChanges" /> it carries — several where a
+    ///     multi-target-framework project's frameworks each compile the file: its maps, keyed by target
+    ///     framework and then by path, or <see langword="null" /> where any of them says re-walk; and whether
+    ///     its declaration surface held.
     /// </summary>
     /// <remarks>
     ///     Each framework keeps its own maps because a map is a reading of one compilation's parse: inside a
@@ -372,21 +376,21 @@ internal sealed class SessionFragmentStore : IDisposable
     ///     one path must still agree. That happens where the load split a project without recording its
     ///     frameworks, and there a disagreement cannot be told apart from a shape read that cannot be trusted
     ///     to move a site, so it is refused rather than resolved. Paths are keyed by
-    ///     <see cref="PathComparison.Comparer" /> because a site spells the tree's own file path.
+    ///     <see cref="PathComparison.Comparer" /> because a site spells the tree's own file path. The surface
+    ///     verdict is the conservative one: an added or removed document, or any change to an additional or
+    ///     analyzer-config document, which a generator can read, counts as a surface change.
     /// </remarks>
-    private static async Task<Dictionary<string, Dictionary<string, LineMap>>?> TryMapProjectAsync(
+    private static async Task<ProjectEdit> ClassifyProjectAsync(
         IEnumerable<ProjectChanges> group,
         IReadOnlyDictionary<ProjectId, string> targetFrameworks,
         CancellationToken ct)
     {
         var mapsByFramework = new Dictionary<string, Dictionary<string, LineMap>>(StringComparer.Ordinal);
+        var mappable = true;
         foreach (ProjectChanges change in group)
         {
-            if (change.GetAddedDocuments()
-                    .Any()
-                || change.GetRemovedDocuments()
-                    .Any())
-                return null;
+            if (change.GetAddedDocuments().Any() || change.GetRemovedDocuments().Any() || TouchesNonSourceDocuments(change))
+                return new ProjectEdit(null, SurfaceHeld: false);
 
             string framework = FrameworkKey(targetFrameworks.GetValueOrDefault(change.NewProject.Id));
             if (!mapsByFramework.TryGetValue(framework, out Dictionary<string, LineMap>? maps))
@@ -399,24 +403,52 @@ internal sealed class SessionFragmentStore : IDisposable
             {
                 Document? before = change.OldProject.GetDocument(id);
                 Document? after = change.NewProject.GetDocument(id);
-                if (before is null || after is null) return null;
+                if (before is null || after is null) return new ProjectEdit(null, SurfaceHeld: false);
 
                 SyntaxTree? beforeTree = await before.GetSyntaxTreeAsync(ct).ConfigureAwait(false);
                 SyntaxTree? afterTree = await after.GetSyntaxTreeAsync(ct).ConfigureAwait(false);
-                if (beforeTree is null || afterTree is null) return null;
+                if (beforeTree is null || afterTree is null) return new ProjectEdit(null, SurfaceHeld: false);
 
-                LineMap? map = SourceShape.TryMapLines(SourceShape.Of(beforeTree), SourceShape.Of(afterTree));
-                if (map is null) return null;
+                SourceShape beforeShape = SourceShape.Of(beforeTree);
+                SourceShape afterShape = SourceShape.Of(afterTree);
+                if (!string.Equals(beforeShape.SurfaceHash, afterShape.SurfaceHash, StringComparison.Ordinal))
+                    return new ProjectEdit(null, SurfaceHeld: false);
 
+                if (!mappable) continue;
+
+                LineMap? map = SourceShape.TryMapLines(beforeShape, afterShape);
                 string path = afterTree.FilePath;
-                if (maps.TryGetValue(path, out LineMap? agreed) && !agreed.Equals(map)) return null;
+                if (map is null || (maps.TryGetValue(path, out LineMap? agreed) && !agreed.Equals(map)))
+                {
+                    mappable = false;
+                    continue;
+                }
 
                 maps[path] = map;
             }
         }
 
-        return mapsByFramework;
+        return new ProjectEdit(mappable ? mapsByFramework : null, SurfaceHeld: true);
     }
+
+    private static bool TouchesNonSourceDocuments(ProjectChanges change)
+    {
+        return change.GetAddedAdditionalDocuments().Any()
+               || change.GetRemovedAdditionalDocuments().Any()
+               || change.GetChangedAdditionalDocuments().Any()
+               || change.GetAddedAnalyzerConfigDocuments().Any()
+               || change.GetRemovedAnalyzerConfigDocuments().Any()
+               || change.GetChangedAnalyzerConfigDocuments().Any();
+    }
+
+    /// <summary>
+    ///     One content-dirty project's classified edits. <see cref="MapsByFramework" /> is non-null only where
+    ///     every changed document was trivia-only, and then <see cref="SurfaceHeld" /> is true too, since no
+    ///     surface sees trivia.
+    /// </summary>
+    private sealed record ProjectEdit(
+        Dictionary<string, Dictionary<string, LineMap>>? MapsByFramework,
+        bool SurfaceHeld);
 
     // One project's stored fragments, each with every site moved through the maps of the framework it was
     // extracted under, or null where any fragment carries a site those maps cannot place — the remapper's own

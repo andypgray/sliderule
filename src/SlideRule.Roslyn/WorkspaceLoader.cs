@@ -1,6 +1,9 @@
 using System.Runtime.CompilerServices;
+using System.Text.Json.Nodes;
+using System.Xml;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.MSBuild;
+using SlideRule.Internal;
 using SlideRule.Roslyn.Diagnostics;
 using SlideRule.Roslyn.Solutions;
 
@@ -103,6 +106,98 @@ internal static class WorkspaceLoader
         IReadOnlyList<string> restoreFailed = RestoreFailures.Detect(normalized, report.Failed);
 
         return new LoadedSolution(workspace, normalized, targetFrameworks, report, restoreFailed);
+    }
+
+    /// <summary>
+    ///     Loads only <paramref name="projectFiles" /> and their transitive project references out of
+    ///     <paramref name="solutionPath" />, through a temporary solution filter over the solution: the same load a
+    ///     whole solution takes, seeded with fewer projects, so each project it loads compiles exactly as it does
+    ///     in a whole load. Returns null when the subset cannot be expressed as a filter: a project the solution
+    ///     does not declare, a solution format the filter cannot name, or a filter the load refuses.
+    /// </summary>
+    /// <remarks>
+    ///     The verdict on the result is measured against the temporary filter, so its unchecked projects are
+    ///     everything outside the closure. Only the loaded projects' failures and restore failures speak for
+    ///     the solution; the caller answers for the rest.
+    /// </remarks>
+    /// <param name="solutionPath">The solution, or a filter over one, whose projects to load a subset of.</param>
+    /// <param name="projectFiles">The project files to load, each with its transitive references.</param>
+    /// <param name="diagnosticLog">Optional sink for the workspace's own failure messages.</param>
+    /// <param name="ct">Cancellation token.</param>
+    internal static async Task<LoadedSolution?> LoadClosureAsync(
+        string solutionPath, IReadOnlyCollection<string> projectFiles, Action<string>? diagnosticLog = null,
+        CancellationToken ct = default)
+    {
+        // A filter names its solution absolutely here, so where it sits changes nothing: the load resolves it
+        // to that solution before reading any project. It sits in a directory of its own because a solution
+        // file in the temp root itself would be found by every solution walk that starts below it, another
+        // process's included, for as long as the load runs.
+        string filterDirectory = Path.Combine(Path.GetTempPath(), $"sliderule-closure-{Guid.NewGuid():N}");
+        string filterPath = Path.Combine(filterDirectory, "closure.slnf");
+        try
+        {
+            if (ClosureFilterText(solutionPath, projectFiles) is not { } filterText) return null;
+
+            Directory.CreateDirectory(filterDirectory);
+            await File.WriteAllTextAsync(filterPath, filterText, ct);
+            return await LoadAsync(filterPath, diagnosticLog, ct);
+        }
+        catch (Exception ex) when (ex is UserErrorException or IOException or UnauthorizedAccessException
+                                       or FormatException or XmlException)
+        {
+            return null;
+        }
+        finally
+        {
+            TryDeleteDirectory(filterDirectory);
+        }
+    }
+
+    // The filter's JSON, naming each requested project by the spelling the solution declares it with, or null
+    // when one is not declared there: a filter may only select a solution's own members.
+    private static string? ClosureFilterText(string solutionPath, IReadOnlyCollection<string> projectFiles)
+    {
+        if (!SolutionProjectFileParser.OwnsFormat(solutionPath)) return null;
+
+        string fullPath = Path.GetFullPath(solutionPath);
+        string referencedSolution = SolutionProjectFileParser.IsFilterFormat(fullPath)
+            ? SolutionProjectFileParser.TryReadReferencedSolution(fullPath) ?? ""
+            : fullPath;
+        if (!File.Exists(referencedSolution)) return null;
+
+        Dictionary<string, string> declared = SolutionProjectFileParser.ReadCsprojMembers(referencedSolution)
+            .ToDictionary(path => path, path => path, PathComparison.Comparer);
+        string solutionDirectory = Path.GetDirectoryName(referencedSolution)!;
+
+        var selected = new List<string>(projectFiles.Count);
+        foreach (string projectFile in projectFiles)
+        {
+            if (!declared.TryGetValue(Path.GetFullPath(projectFile), out string? member)) return null;
+
+            selected.Add(Path.GetRelativePath(solutionDirectory, member));
+        }
+
+        var filter = new JsonObject
+        {
+            ["solution"] = new JsonObject
+            {
+                ["path"] = referencedSolution,
+                ["projects"] = new JsonArray(selected.Select(path => (JsonNode)JsonValue.Create(path)).ToArray())
+            }
+        };
+        return filter.ToJsonString();
+    }
+
+    private static void TryDeleteDirectory(string path)
+    {
+        try
+        {
+            if (Directory.Exists(path)) Directory.Delete(path, recursive: true);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // A temporary filter left behind is harmless; the load already read it.
+        }
     }
 
     /// <summary>

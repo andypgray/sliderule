@@ -235,11 +235,19 @@ public sealed class SessionFragmentStoreTests(SessionFragmentStoreTests.Sessions
     }
 
     [Fact]
-    public async Task GetFragmentsAsync_StringLiteralEdit_ReWalksDirtyPlusDependents()
+    public async Task GetFragmentsAsync_StringLiteralEditInAMethodBody_ReWalksThatProjectOnly()
     {
         // A token's text changes and nothing moves line. The shape digest reads token text, so this is the
-        // cheapest edit that is still not trivia.
-        await ShouldReWalkWebAndDomain(content => content.Replace("\"total requested\"", "\"total requested!\""));
+        // cheapest edit that is still not trivia; it sits in a method body, so no dependent can see it.
+        await ShouldReWalkWebAlone(content => content.Replace("\"total requested\"", "\"total requested!\""));
+    }
+
+    [Fact]
+    public async Task GetFragmentsAsync_PublicMethodAdded_ReWalksDirtyPlusDependents()
+    {
+        // A new member is declaration surface, which a dependent can bind to.
+        await ShouldReWalkWebAndDomain(content => content.Replace(
+            "    public string RenderOrder(", "    public int Probe() => 1;\n\n    public string RenderOrder("));
     }
 
     [Fact]
@@ -262,12 +270,12 @@ public sealed class SessionFragmentStoreTests(SessionFragmentStoreTests.Sessions
     }
 
     [Fact]
-    public async Task GetFragmentsAsync_TokenBearingLineSplit_ReWalks()
+    public async Task GetFragmentsAsync_TokenBearingLineSplit_ReWalksThatProjectOnly()
     {
         // Chop one statement across two lines. The shapes stay equal (only whitespace moved), so this is the
         // fallback the line map itself refuses rather than the digest: a split line's sites cannot be moved
-        // by line alone.
-        await ShouldReWalkWebAndDomain(content => content.Replace(
+        // by line alone. The surface is the same tokens, so the dependent stays.
+        await ShouldReWalkWebAlone(content => content.Replace(
             "        log.Append(description);", "        log\n            .Append(description);"));
     }
 
@@ -298,12 +306,13 @@ public sealed class SessionFragmentStoreTests(SessionFragmentStoreTests.Sessions
         store.LastRemappedProjects.ShouldBe([Web]);
         await ShouldMergeToTheColdModelAsync(second, snap3);
 
-        // Act/Assert 3 — a real edit re-walks Web and its dependent, and remaps nothing.
+        // Act/Assert 3 — a real edit re-walks Web, and remaps nothing; it is inside a method body, so Web's
+        // dependent stays.
         EditOnDisk(
             homeController, content => content.Replace("\"total requested\"", "\"total requested!\""));
         WorkspaceSnapshot snap4 = await fixture.Session.GetCurrentAsync(fixture.SolutionPath, Ct);
         SessionFragmentSet third = await store.GetFragmentsAsync(snap4, null, Ct);
-        third.ReExtractedProjects.ShouldBe([Web, Domain], true);
+        third.ReExtractedProjects.ShouldBe([Web]);
         store.LastRemappedProjects.ShouldBeEmpty();
         await ShouldMergeToTheColdModelAsync(third, snap4);
 
@@ -405,7 +414,7 @@ public sealed class SessionFragmentStoreTests(SessionFragmentStoreTests.Sessions
     {
         // Widget's other partial, whose framework-conditional region holds a field that carries a site, so the
         // two maps disagree on lines where sites are.
-        await ShouldReWalkCoreAndWebWithNoRecordedFrameworksAsync("Widget.Legacy.cs");
+        await ShouldReWalkCoreAloneWithNoRecordedFrameworksAsync("Widget.Legacy.cs");
     }
 
     [Fact]
@@ -414,7 +423,7 @@ public sealed class SessionFragmentStoreTests(SessionFragmentStoreTests.Sessions
         // A file whose framework-conditional region holds only a using directive. The two maps disagree on that one
         // line, which carries no site in either compilation, so every stored fragment could be moved through either
         // map: the store's agreement check is the only thing here that can refuse.
-        await ShouldReWalkCoreAndWebWithNoRecordedFrameworksAsync("LegacyUsings.cs");
+        await ShouldReWalkCoreAloneWithNoRecordedFrameworksAsync("LegacyUsings.cs");
     }
 
     [Fact]
@@ -444,10 +453,10 @@ public sealed class SessionFragmentStoreTests(SessionFragmentStoreTests.Sessions
 
     // ── helpers ───────────────────────────────────────────────────────────────────────────────────────
 
-    // The scene four of the rows above share, differing only in the edit they make: populate the store from
-    // the clean tree, edit one Web source file, re-get. Four [Fact]s rather than a [Theory] because they are
-    // four distinct facts about what reaches a document's shape, and theory data carrying source text lands
-    // in every display name.
+    // The scene three of the rows above share, differing only in the edit they make: populate the store from
+    // the clean tree, edit one Web source file, re-get. Three [Fact]s rather than a [Theory] because they are
+    // three distinct facts about what reaches a document's declaration surface, and theory data carrying
+    // source text lands in every display name.
     private async Task ShouldReWalkWebAndDomain(Func<string, string> edit)
     {
         // Arrange
@@ -461,10 +470,33 @@ public sealed class SessionFragmentStoreTests(SessionFragmentStoreTests.Sessions
         WorkspaceSnapshot snap2 = await fixture.Session.GetCurrentAsync(fixture.SolutionPath, Ct);
         SessionFragmentSet edited = await store.GetFragmentsAsync(snap2, null, Ct);
 
-        // Assert — the shape changed, so Web and its reverse-dependent Domain were re-walked, nothing was
-        // remapped, and no new full walk was needed.
+        // Assert — the declaration surface changed, so Web and its reverse-dependent Domain were re-walked,
+        // nothing was remapped, and no new full walk was needed.
         edited.ReExtractedProjects.ShouldBe([Web, Domain], true);
         store.LastReExtractedProjects.ShouldBe([Web, Domain], true);
+        store.LastRemappedProjects.ShouldBeEmpty();
+        store.FullWalkCount.ShouldBe(1);
+
+        await ShouldMergeToTheColdModelAsync(edited, snap2);
+    }
+
+    // The same scene for an edit that changes the file's shape but not its declaration surface: Web re-walks
+    // alone, because its reverse-dependent Domain reads Web only through declarations that did not move.
+    private async Task ShouldReWalkWebAlone(Func<string, string> edit)
+    {
+        // Arrange
+        SharedWorkspaceSession fixture = sessions.MyApp;
+        using var store = new SessionFragmentStore();
+        WorkspaceSnapshot snap1 = await fixture.Session.GetCurrentAsync(fixture.SolutionPath, Ct);
+        await store.GetFragmentsAsync(snap1, null, Ct);
+
+        // Act
+        EditOnDisk(fixture.PathOf(Web, "HomeController.cs"), edit);
+        WorkspaceSnapshot snap2 = await fixture.Session.GetCurrentAsync(fixture.SolutionPath, Ct);
+        SessionFragmentSet edited = await store.GetFragmentsAsync(snap2, null, Ct);
+
+        // Assert — the cold model is the oracle that Domain's stored fragment is still right.
+        edited.ReExtractedProjects.ShouldBe([Web]);
         store.LastRemappedProjects.ShouldBeEmpty();
         store.FullWalkCount.ShouldBe(1);
 
@@ -475,9 +507,10 @@ public sealed class SessionFragmentStoreTests(SessionFragmentStoreTests.Sessions
     // record no framework for either compilation, as a replayed build log does for a project that leaves the
     // framework out of its output path. Two comment lines go at the top of a file both frameworks compile but read
     // differently. Both compilations file their maps for it under one key, the maps disagree, and the store refuses
-    // rather than resolving: the name re-walks with its reverse-dependent. They are separate [Fact]s rather than a
-    // [Theory] because each is a distinct fact about when the store refuses.
-    private async Task ShouldReWalkCoreAndWebWithNoRecordedFrameworksAsync(string fileName)
+    // rather than resolving: the name re-walks. A comment moves no declaration surface, so its reverse-dependent
+    // stays. They are separate [Fact]s rather than a [Theory] because each is a distinct fact about when the store
+    // refuses.
+    private async Task ShouldReWalkCoreAloneWithNoRecordedFrameworksAsync(string fileName)
     {
         // Arrange
         SharedWorkspaceSession fixture = sessions.MultiTfm;
@@ -495,7 +528,7 @@ public sealed class SessionFragmentStoreTests(SessionFragmentStoreTests.Sessions
         SessionFragmentSet reWalked = await store.GetFragmentsAsync(unattributed, null, Ct);
 
         // Assert
-        reWalked.ReExtractedProjects.ShouldBe([MultiTfmCore, MultiTfmWeb], true);
+        reWalked.ReExtractedProjects.ShouldBe([MultiTfmCore]);
         store.LastRemappedProjects.ShouldBeEmpty();
         store.FullWalkCount.ShouldBe(1);
         await ShouldMergeToTheColdModelAsync(reWalked, unattributed);

@@ -128,13 +128,18 @@ internal sealed record FileStamp(
 ///     changes.
 /// </param>
 /// <param name="MerkleKey">
-///     A hash over this project's <see cref="ContentKey" /> and its dependencies' <see cref="MerkleKey" />s
-///     in a deterministic order, so a change anywhere in the dependency cone changes this key. The dirty set
-///     is exactly the projects whose recomputed <see cref="MerkleKey" /> no longer matches.
+///     A hash over this project's <see cref="ContentKey" /> and, in a deterministic order, the surface keys
+///     of its dependency cone, so a change to its own content or to the declaration surface of anything it
+///     references changes this key, and a body-only edit in a dependency does not. The dirty set is exactly
+///     the projects whose recomputed <see cref="MerkleKey" /> no longer matches.
 /// </param>
-// ContentKey is persisted schema: validation recomputes keys bottom-up from documents rather than reading
-// the stored value, which exists so a manifest diff shows whether a project's own content or only its
-// dependency cone moved.
+/// <param name="SurfaceKey">
+///     The same hash as <see cref="ContentKey" /> taken over each document's <see cref="SourceShape.SurfaceHash" />
+///     instead of its bytes: what a dependent's Merkle key folds in for this project.
+/// </param>
+// ContentKey and SurfaceKey are persisted schema: validation recomputes keys bottom-up from documents rather
+// than reading the stored values, which exist so a manifest diff shows whether a project's own content, its
+// declaration surface, or only its dependency cone moved.
 internal sealed record ProjectCacheEntry(
     string ProjectName,
     string CsprojPath,
@@ -142,7 +147,8 @@ internal sealed record ProjectCacheEntry(
     IReadOnlyList<string> ProjectReferences,
     IReadOnlyList<FileStamp> Documents,
     string ContentKey,
-    string MerkleKey);
+    string MerkleKey,
+    string SurfaceKey);
 
 /// <summary>
 ///     A recorded spec resolution, keyed by the normalized <c>--spec</c> argument that produced it. Stored

@@ -5,6 +5,7 @@ using SlideRule.Codebase;
 using SlideRule.Extraction;
 using SlideRule.Extraction.Fragments;
 using SlideRule.Hosting;
+using SlideRule.Internal;
 using SlideRule.Roslyn;
 using SlideRule.Roslyn.Caching;
 using SlideRule.Roslyn.Diagnostics;
@@ -416,9 +417,22 @@ internal sealed class CodebaseSource : IDisposable
         ISolutionSource source, string solutionPath, string? spec, string normalizedSpec,
         ExtractionCacheStore? store, CacheReadResult cacheRead, CodebaseSourceOutcome outcome, CancellationToken ct)
     {
-        SolutionHandle handle = await source.AcquireAsync(solutionPath, ct);
+        // A partial resolves its spec from the record a hit replays, because resolving it cold scans the whole
+        // solution. Only then can it load just its dirty projects' closure.
+        SpecResolution? replayed = outcome == CodebaseSourceOutcome.Partial
+            ? ResolveSpecOnHit(spec, cacheRead.SpecResolutions)
+            : null;
+        SolutionHandle handle = await AcquireForRunAsync(source, solutionPath, cacheRead, replayed is not null, ct);
         try
         {
+            if (handle.IsClosure)
+            {
+                ArchitectureModel closureModel = source.LoadSpecModel(replayed!.DllPath);
+                return new CodebaseSource(
+                    outcome, solutionPath, cacheRead.LoadDiagnostics, closureModel, replayed, handle, store, cacheRead,
+                    normalizedSpec);
+            }
+
             SessionSpecResolution resolved = ResolveSpec(handle, solutionPath, spec, normalizedSpec);
             ArchitectureModel model = source.LoadSpecModel(resolved.Resolution.DllPath);
             // The membership set travels on as the one resolution read (or replayed), so what resolution
@@ -469,9 +483,52 @@ internal sealed class CodebaseSource : IDisposable
         ISolutionSource source, string solutionPath, ExtractionCacheStore? store, CacheReadResult cacheRead,
         CodebaseSourceOutcome outcome, CancellationToken ct)
     {
-        SolutionHandle handle = await source.AcquireAsync(solutionPath, ct);
-        return new CodebaseSource(
-            outcome, solutionPath, handle.LoadDiagnostics, null, null, handle, store, cacheRead, "");
+        SolutionHandle handle = await AcquireForRunAsync(
+            source, solutionPath, cacheRead, outcome == CodebaseSourceOutcome.Partial, ct);
+        WorkspaceDiagnostics loadDiagnostics = handle.IsClosure ? cacheRead.LoadDiagnostics : handle.LoadDiagnostics;
+        return new CodebaseSource(outcome, solutionPath, loadDiagnostics, null, null, handle, store, cacheRead, "");
+    }
+
+    /// <summary>
+    ///     The workspace a run that cannot be served from the cache alone opens. A partial that may load only its
+    ///     dirty projects' closure asks for it; any other run, and a closure that cannot stand in for the whole
+    ///     solution, gets the whole solution.
+    /// </summary>
+    /// <remarks>
+    ///     A closure reports the recorded load verdict, the one a hit replays, because a partial is never a
+    ///     structural change: the projects it did not load are the projects the last whole load measured. What
+    ///     the closure measured itself has to agree with that record, or the run loads the whole solution and
+    ///     reports what it finds there. Nothing is printed either way, so the output stays byte-identical to a
+    ///     cold run.
+    /// </remarks>
+    private static async Task<SolutionHandle> AcquireForRunAsync(
+        ISolutionSource source, string solutionPath, CacheReadResult cacheRead, bool closureAllowed, CancellationToken ct)
+    {
+        if (!closureAllowed || cacheRead.Validated is not { } validated) return await source.AcquireAsync(solutionPath, ct);
+
+        SolutionHandle closure = await source.AcquireClosureAsync(solutionPath, validated.DirtyProjectFiles, ct);
+        if (!closure.IsClosure || ClosureServes(closure, cacheRead)) return closure;
+
+        closure.Dispose();
+        return await source.AcquireAsync(solutionPath, ct);
+    }
+
+    // Whether a closure load can stand in for the whole solution: it loaded every dirty project, nothing in it
+    // failed to load, and every restore failure and workspace message it saw is one the recorded verdict holds.
+    private static bool ClosureServes(SolutionHandle closure, CacheReadResult cacheRead)
+    {
+        WorkspaceDiagnostics measured = closure.LoadDiagnostics;
+        WorkspaceDiagnostics recorded = cacheRead.LoadDiagnostics;
+        HashSet<string> loaded = closure.Solution.Projects
+            .Select(project => project.Name)
+            .ToHashSet(StringComparer.Ordinal);
+        var recordedRestoreFailures = new HashSet<string>(recorded.RestoreFailedProjects, PathComparison.Comparer);
+        var recordedMessages = new HashSet<string>(recorded.LoadFailures, StringComparer.Ordinal);
+
+        return cacheRead.DirtyProjects.All(loaded.Contains)
+               && measured.FailedProjects.Count == 0
+               && measured.RestoreFailedProjects.All(recordedRestoreFailures.Contains)
+               && measured.LoadFailures.All(recordedMessages.Contains);
     }
 
     /// <summary>
@@ -505,8 +562,13 @@ internal sealed class CodebaseSource : IDisposable
     {
         try
         {
+            // On a partial the validation's stamps ride in, so only the dirty projects' changed documents are read
+            // again; on a miss there are none and every input is stamped. A closure holds only some projects, so
+            // it writes back only by carrying the rest.
             IReadOnlyList<ProjectInputs> inputs = SolutionCacheInputs.Collect(solution);
-            return store!.CaptureFingerprint(inputs, ct);
+            return handle!.IsClosure
+                ? store!.TryCaptureOverValidation(inputs, cacheRead.Validated, ct)
+                : store!.CaptureFingerprint(inputs, cacheRead.Validated, ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

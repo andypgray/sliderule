@@ -29,7 +29,8 @@ namespace SlideRule.Tests.TestSupport;
 ///         the list alone, so paying that cost again per surface would buy nothing.
 ///     </para>
 ///     <para>
-///         The inner source is the shared warm pool: nothing here asserts on whether a workspace was opened,
+///         The inner source is the shared warm pool unless a caller passes its own: nothing here asserts on whether a
+///         workspace was opened,
 ///         only on what the gate does with what rides the handle. The real handle rides as the owned
 ///         disposable so the ownership chain still holds — it is the pool's, so disposing it is a no-op.
 ///         Injected values never reach a real workspace, so the pooled session stays clean for the next
@@ -42,7 +43,8 @@ internal sealed class DiagnosticInjectingSolutionSource(
     IReadOnlyList<string> diagnostics,
     IReadOnlyList<string>? failedProjects = null,
     IReadOnlyList<string>? uncheckedProjects = null,
-    IReadOnlyList<string>? restoreFailedProjects = null) : ISolutionSource
+    IReadOnlyList<string>? restoreFailedProjects = null,
+    ISolutionSource? inner = null) : ISolutionSource
 {
     /// <summary>The load failure the gate rows inject as a diagnostic: it renders, and decides nothing.</summary>
     internal const string SimulatedLoadFailure =
@@ -53,7 +55,7 @@ internal sealed class DiagnosticInjectingSolutionSource(
 
     public async Task<SolutionHandle> AcquireAsync(string solutionPath, CancellationToken ct)
     {
-        SolutionHandle real = await WarmWorkspacePool.Source.AcquireAsync(solutionPath, ct);
+        SolutionHandle real = await (inner ?? WarmWorkspacePool.Source).AcquireAsync(solutionPath, ct);
         WorkspaceDiagnostics injected = WorkspaceDiagnostics.None with
         {
             LoadFailures = diagnostics,

@@ -4,11 +4,11 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
 using Shouldly;
-using Xunit;
 using SlideRule.Extraction.Fragments;
 using SlideRule.Roslyn.Caching;
 using SlideRule.Roslyn.Diagnostics;
 using SlideRule.Roslyn.Replay;
+using Xunit;
 
 namespace SlideRule.Tests.Caching;
 
@@ -204,7 +204,7 @@ public sealed class ManifestJsonTests
             Length: 96,
             Sha256: "7b40",
             Promoted: true,
-            Shape: new SourceShape("3c1a", [1, 0, 2]));
+            Shape: new SourceShape("3c1a", [1, 0, 2], "5e07"));
 
         var project = new ProjectCacheEntry(
             ProjectName: "App",
@@ -213,7 +213,8 @@ public sealed class ManifestJsonTests
             ProjectReferences: ["Lib"],
             Documents: [documentStamp, shapedDocumentStamp],
             ContentKey: "content-9f2c",
-            MerkleKey: "merkle-4d81");
+            MerkleKey: "merkle-4d81",
+            SurfaceKey: "surface-0b6e");
 
         var specResolution = new SpecResolutionRecord(
             NormalizedSpecArgument: "C:/repo/arch/Arch.csproj",
