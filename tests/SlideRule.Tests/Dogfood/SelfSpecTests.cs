@@ -181,7 +181,7 @@ public sealed class SelfSpecTests
             "It prints {count} project lines",
             "the project lines the survey prints",
             summary.Projects.Count,
-            GrandfatheredCounts.CountStyle.Word);
+            GrandfatheredCounts.CountStyle.WordToTen);
 
         drift.ShouldReportNothing("The self-check page states a project-line count the survey contradicts");
     }

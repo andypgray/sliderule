@@ -446,6 +446,20 @@ public sealed class GrandfatheredCountsTests
             .ShouldBe("Thirty-three");
     }
 
+    [Theory]
+    [InlineData(0, "zero")]
+    [InlineData(10, "ten")]
+    [InlineData(11, "11")]
+    [InlineData(24, "24")]
+    [InlineData(41, "41")]
+    [InlineData(100, "100")]
+    public void Spell_WordToTenStyle_SpellsToTenAndWritesDigitsAbove(int count, string expected)
+    {
+        // Act & Assert
+        GrandfatheredCounts.Spell(count, GrandfatheredCounts.CountStyle.WordToTen)
+            .ShouldBe(expected);
+    }
+
     [Fact]
     public void Spell_CountBeyondTheWordTable_Throws()
     {
@@ -465,6 +479,19 @@ public sealed class GrandfatheredCountsTests
 
         // Assert
         fragment.ShouldBe("holding twelve inline-SQL references and one inbound reach");
+    }
+
+    [Fact]
+    public void Compose_WordToTenStyle_MixesWordsAndDigitsAsTheCountsFall()
+    {
+        // Act
+        string fragment = GrandfatheredCounts.Compose(
+            "holding {0} inline-SQL references and {1} inbound reach",
+            [12, 1],
+            GrandfatheredCounts.CountStyle.WordToTen);
+
+        // Assert
+        fragment.ShouldBe("holding 12 inline-SQL references and one inbound reach");
     }
 
     [Fact]

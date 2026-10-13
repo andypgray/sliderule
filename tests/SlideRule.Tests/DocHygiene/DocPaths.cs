@@ -27,6 +27,12 @@ internal static class DocPaths
     /// <summary>The command-line reference: each command's help as it prints, and what every command shares.</summary>
     internal const string Cli = "CLI.md";
 
+    /// <summary>The spec author's guide: the parts of a rule, the postures, the subjects, the scopes and the anchors.</summary>
+    internal const string WritingSpecs = "WRITING-SPECS.md";
+
+    /// <summary>The operator's guide: where the check runs, CI, the ratchet, the analyzer, upgrades and failed runs.</summary>
+    internal const string Operating = "OPERATING.md";
+
     /// <summary>The page carrying the rendered diagram, and the command that redraws it.</summary>
     internal const string Architecture = "ARCHITECTURE.md";
 

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- A check after an edit, which is what `hook` runs when an agent's turn ends, loads only the
+  projects it re-extracts and the projects they reference instead of the whole solution. A project
+  that references an edited one, directly or through another, is re-extracted only when the edit
+  changed a declaration, even a private one, and an edit inside member bodies, non-constant
+  initializers or top-level statements re-extracts only its own project. The cache write-back
+  re-stamps only the documents that changed, and the output is byte for byte what a cold run prints.
+
 ## [0.1.0] - 2026-10-09
 
 The first release. SlideRule checks a .NET solution against an architecture spec written in C#, and
@@ -28,17 +37,18 @@ renders the same rules as context for coding agents.
   `--json` or as SARIF 2.1.0 with `--sarif`, and `--diff-base <ref>` fires the scope tripwires for a
   change set. `render` writes the managed `AGENTS.md` block and a rule card in each directory a rule
   or scope places one, plus with `--model` the model file the build analyzer reads; `render --check`
-  fails when a committed file would change. `explain` expands a rule ID, or says which layers, rules and scopes
-  claim a type with `--type` or a path with `--path`. `status` reports each ratchet's burndown.
-  `baseline` records, shrinks, renames and attributes a `Migrate` rule's grandfathered sites, and a
-  sealed entry edited by hand is refused. `graph` surveys a solution's projects, namespaces and
-  reference edges without a spec. `hook` runs `check` when a coding agent's turn ends and refuses
-  the stop on a red rule.
-- **The MCP server** (`sliderule mcp`). Five read-only tools, `arch_check`, `arch_status`,
-  `arch_explain`, `arch_context` and `arch_graph`, return the CLI's JSON documents byte for byte,
-  and the `derive_spec` prompt walks an agent through writing a first spec. The server stays warm
-  across calls and reuses an extraction cache. It is listed in the MCP registry as
-  `io.github.andypgray/sliderule`.
+  fails when a committed file would change. `explain` expands a rule ID, or names the layers, rules
+  and scopes that claim a type with `--type` or a path with `--path`. `status` reports each
+  ratchet's burndown. `baseline` records, shrinks, renames and attributes the grandfathered sites of
+  a `Migrate` rule and the existing references into a `Quarantine` scope, and a sealed entry edited
+  by hand is rejected. `graph` surveys a solution's projects, namespaces and reference edges without
+  a spec. `hook` runs `check` when a coding agent's turn ends and blocks the stop on a red rule.
+- **The MCP server** (`sliderule mcp`). Five read-only tools: `arch_check`, `arch_status` and
+  `arch_graph` return the CLI's JSON documents byte for byte, `arch_explain` returns the text
+  `explain` prints, and `arch_context` returns the cards that cover a path. The `derive_spec` prompt
+  walks an agent through writing a first spec. The server keeps the solution loaded across calls and
+  checks it against the disk before each answer; it never reads the persisted cache. It is listed in
+  the MCP registry as `io.github.andypgray/sliderule`.
 - **The xUnit adapter** (`SlideRule.Xunit`). Every rule in the spec runs as an individually named
   test in the consumer's test project, with failure text identical to the CLI's.
 - **The build analyzer** (`SlideRule.Analyzers`). It reads the rendered model file and reports a

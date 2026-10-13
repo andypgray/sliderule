@@ -1,10 +1,10 @@
 # SlideRule on itself
 
-SlideRule is a .NET architecture checker, and it governs itself. Forty-one rules over this repository's real code, across twelve declared layers, live in [`SlideRuleArchitectureSpec.cs`](https://github.com/andypgray/sliderule/blob/main/arch/SlideRule.Architecture/SlideRuleArchitectureSpec.cs). Every fence on this page is that spec, or this solution under it, on one surface after another. The fences under [As SARIF](#as-sarif) are the exception. They come from the Meridian example, because showing a ratchet needs live debt and this repository has paid its own off. The section [Why these excerpts can be trusted](#why-these-excerpts-can-be-trusted) says which tests hold every fence on this page.
+SlideRule is a .NET architecture checker, and it governs itself. Its spec, [`SlideRuleArchitectureSpec.cs`](https://github.com/andypgray/sliderule/blob/main/arch/SlideRule.Architecture/SlideRuleArchitectureSpec.cs), states 41 rules over this repository's real code, across 12 declared layers. That rule count includes the spec's one [quarantined scope](https://github.com/andypgray/sliderule/blob/main/WRITING-SPECS.md#scopes) and leaves out its Caution scope, which only warns. A `check` run counts more rules, because it runs the quarantine as a containment rule and a tripwire, and the Caution scope as a tripwire. Each fence on this page shows that spec, or this solution under it, on one surface after another. The fences under [As SARIF](#as-sarif) are the exception, because showing a ratchet needs live debt and this repository has paid its own off. They come from the Meridian example. The section [Why these excerpts can be trusted](#why-these-excerpts-can-be-trusted) explains how each fence on this page is checked or registered.
 
 ## This repo's own spec
 
-Take the rule that keeps the CLI off stdout. `host` is the layer the CLI project defines:
+Take the rule that keeps the CLI off stdout. `host` is the layer declared as `arch.Layer("Host", arch.Project("SlideRule.Cli"))`, which is every type in the CLI project:
 
 ```csharp
         arch.Rule("cli/no-stdout")
@@ -21,23 +21,25 @@ Take the rule that keeps the CLI off stdout. `host` is the layer the CLI project
                  "diagnostics to the logger or Console.Error.");
 ```
 
-Nothing in the build system stops the CLI writing to `Console`. The MCP server on the other side of that stdout speaks JSON-RPC over it. This rule is the only thing standing between those two facts.
+Each of the three `arch.Member` forms names a member by its declaring type and its name. A ban covers every overload of that name, `Console.WriteLine("x")` included. `Console.Write` is named by type and name because the expression form needs a call it can compile, and `Write` has no overload without arguments.
+
+The compiler accepts a `Console.WriteLine` anywhere in the CLI, while the MCP server speaks JSON-RPC over that same stdout. A stray write that runs in the server corrupts the protocol, and this rule fails the check as soon as one is in the code.
 
 ## The prose it generates
 
-`sliderule render` derives the rule sentence from the constraint and carries the `Because` across verbatim. It writes the result into the managed block of this repository's committed [`AGENTS.md`](https://github.com/andypgray/sliderule/blob/main/AGENTS.md), the file [coding agents read](https://github.com/andypgray/sliderule/blob/main/CODING-AGENTS.md#the-context-files):
+`sliderule render` derives the rule sentence from the constraint and copies the `Because` word for word. It writes the result into the managed block of this repository's committed [`AGENTS.md`](https://github.com/andypgray/sliderule/blob/main/AGENTS.md), the file [coding agents read](https://github.com/andypgray/sliderule/blob/main/CODING-AGENTS.md#the-context-files):
 
 ```markdown
 - `cli/no-stdout` — The Host layer must not use `Console.Out`, `Console.Write()` or `Console.WriteLine()`. Stdout is a protocol channel here — the MCP server speaks JSON-RPC over it and CLI output flows through System.CommandLine's console — so a direct Console write corrupts the wire and is invisible to the in-process tests. See <https://modelcontextprotocol.io/specification/2025-06-18/basic/transports#stdio>.
 ```
 
-Nobody wrote that sentence, and nobody can let it go stale. The test [`SelfSpecTests.AgentsMd_IsCurrent`](https://github.com/andypgray/sliderule/blob/main/tests/SlideRule.Tests/Dogfood/SelfSpecTests.cs) composes the block in process and asserts the committed file already equals it. Its sibling `ScopedCards_AreCurrent` holds every per-directory card this repository commits the same way. It also fails on a card that no rule placement produced, so one orphaned by a spec change cannot stay behind being read. The prose an agent reads is provably the spec the build enforces. Agents that query over MCP (`sliderule mcp`) get the same model.
+The renderer wrote that sentence from the spec. The test [`SelfSpecTests.AgentsMd_IsCurrent`](https://github.com/andypgray/sliderule/blob/main/tests/SlideRule.Tests/Dogfood/SelfSpecTests.cs) composes the block in process and fails unless the committed block already equals it. Its sibling `ScopedCards_AreCurrent` checks every per-directory card this repository commits the same way. It also fails on a committed card that no rule placement produced, such as one a spec change left behind. So the prose an agent reads is the spec `check` enforces, and agents that query over MCP (`sliderule mcp`) get the same model.
 
-The block is as current as the CLI that renders it. Nothing inside it records a version, so an older `sliderule` re-renders it to that older tool's content without warning. Keep the tool and the spec's package reference in lockstep; the README covers that under [Installing](https://github.com/andypgray/sliderule/blob/main/README.md#installing). Re-render in CI to fail on a diff, the way this repository does for its [examples](https://github.com/andypgray/sliderule/blob/main/README.md#examples).
+The block is as current as the CLI that renders it. It records no version, so an older `sliderule` re-renders it to that older tool's content without a warning. Keep the tool at the version of the spec's package reference, as [Operating SlideRule](https://github.com/andypgray/sliderule/blob/main/OPERATING.md#upgrading) explains. Then run `render --check` in [CI](https://github.com/andypgray/sliderule/blob/main/OPERATING.md#ci) to fail on a stale file, as this repository does for itself and for its [examples](https://github.com/andypgray/sliderule/blob/main/README.md#examples).
 
 ## When an agent breaks it
 
-Suppose an agent adds a progress printer to the CLI so a slow solution load stops looking hung, and reaches for `Console.WriteLine`. The agent finishes and tries to hand the work back. The `Stop` hook in [`hooks/`](https://github.com/andypgray/sliderule/tree/main/hooks) runs `check` over the working tree, and the rule goes red. The hook exits 2, which is how a Claude Code hook refuses a stop, with the report on the agent's stderr:
+Suppose an agent adds a progress printer to the CLI so a slow solution load stops looking hung, and reaches for `Console.WriteLine`. The agent finishes and tries to end its turn. The `Stop` hook in [`hooks/`](https://github.com/andypgray/sliderule/tree/main/hooks) runs `check` over the working tree, and the rule goes red. The hook exits 2, the exit code that blocks a Claude Code stop, and writes the report to stderr, where the agent reads it:
 
 ```text
 FAIL cli/no-stdout — The Host layer must not use `Console.Out`, `Console.Write()` or `Console.WriteLine()`.
@@ -49,11 +51,11 @@ FAIL cli/no-stdout — The Host layer must not use `Console.Out`, `Console.Write
   src/SlideRule.Cli/Rendering/ProgressPrinter.cs:15 — SlideRule.Cli.Rendering.ProgressPrinter uses System.Console.WriteLine()
 ```
 
-That stanza is one rule's worth of the board the hook hands back whole. It carries the five things an agent needs to act without asking a human. They are the rule ID, the reason, the page that reason rests on, the fix, and the exact `file:line` of every offending write. The `subject:` line is scope, not a finding, and appears only when a generator wrote some of what the rule swept. The agent routes the output through the command's console instead, and the next stop is clean.
+The hook's report lists every rule, and each red one gets a stanza like this. A stanza gives the agent what it needs to act without asking anyone: the rule ID and its sentence, the reason, the page the reason cites, the fix, and the `file:line` of every offending use. The `subject:` line counts the types the rule covered, and appears only when generated code is among them. The agent moves the output to the command's console, and the next stop passes.
 
 ## When a rule reaches a type you did not expect
 
-`explain --type` names every layer, rule and scope that claims a type, and why. An agent asks it when a rule fires somewhere it did not expect, and an author asks it when an exemption seems not to hold. Here is this repository's spec answering for `CommandEntryPoint`, the shell every CLI command runs inside. The excerpt keeps the lines above and below its list of rules:
+`explain --type` names every layer, rule and scope that claims a type, and why. An agent asks it when a rule fires somewhere it did not expect, and an author asks it when an exemption seems not to apply. Here is this repository's spec answering for `CommandEntryPoint`, the shell every CLI command runs inside. The excerpt keeps the lines above and below its list of rules:
 
 ```text
 SlideRule.Cli.CommandEntryPoint (class)
@@ -74,7 +76,7 @@ The shell catches every exception so that a failed command prints its error and 
 
 ## In xUnit
 
-The same spec runs inside a test project, where a team already looks. `ArchRuleTests<TSpec>` from the xUnit adapter turns each rule into an individually named test, and this repository's whole adapter dogfood is [one class declaration](https://github.com/andypgray/sliderule/blob/main/tests/SlideRule.Tests/Dogfood/AdapterSelfSpecTests.cs):
+The same spec runs in a test project. `ArchRuleTests<TSpec>` from the [xUnit adapter](https://github.com/andypgray/sliderule/blob/main/src/SlideRule.Xunit/README.md) turns each rule into a named test, and this repository's use of it is [one class declaration](https://github.com/andypgray/sliderule/blob/main/tests/SlideRule.Tests/Dogfood/AdapterSelfSpecTests.cs):
 
 ```csharp
 public sealed class AdapterSelfSpecTests : ArchRuleTests<SlideRuleArchitectureSpec>
@@ -83,11 +85,15 @@ public sealed class AdapterSelfSpecTests : ArchRuleTests<SlideRuleArchitectureSp
 }
 ```
 
-Each test's display name is its rule ID, so a broken rule is named in the run summary rather than buried in an assertion message. A `Migrate` rule's grandfathered sites keep their test green while the ratchet holds. The [CI](https://github.com/andypgray/sliderule/blob/main/.github/workflows/ci.yml) workflow runs the class as a step of its own, "Self-spec as named xUnit tests (one test per rule)". That step's log carries one line per rule ID.
+Each test's display name is its rule ID, so the run summary names a broken rule. A `Migrate` rule's test stays green while every violation it finds is in its baseline. The [CI](https://github.com/andypgray/sliderule/blob/main/.github/workflows/ci.yml) workflow runs the class as a step of its own, "Self-spec as named xUnit tests (one test per rule)", and that step's log has a line for each rule ID. The adapter needs an xUnit v3 test project on .NET 10 or later, as its [requirements](https://github.com/andypgray/sliderule/blob/main/src/SlideRule.Xunit/README.md#requirements) list.
+
+## In the build
+
+The [build analyzer](https://github.com/andypgray/sliderule/blob/main/src/SlideRule.Analyzers/README.md) reports a broken rule as a compiler warning at the offending code, in the editor and in `dotnet build`. It reads the rules from the model file `render --model` writes. The four example solutions attach it, and CI's [`examples` job](https://github.com/andypgray/sliderule/blob/main/.github/workflows/ci.yml) builds each of them with the analyzer's six diagnostic IDs promoted to errors. Any diagnostic from the analyzer then fails the job. This repository's own projects do not attach the analyzer, so it is proven on the example solutions instead.
 
 ## As SARIF
 
-`check --sarif` writes the same verdict as SARIF 2.1.0, which is what GitHub code scanning reads. A `Migrate` rule is where that matters most, and this repository no longer has one. Its own ratchet reached zero and was promoted, which is how the recipe is meant to end. So this section's fences come from the [Meridian example](https://github.com/andypgray/sliderule/tree/main/examples/Meridian), a mid-migration monolith retiring inline SQL out of its controllers over a counted baseline:
+`check --sarif` writes the same verdict as SARIF 2.1.0, which is what GitHub code scanning reads. A `Migrate` rule is where that matters most, and this repository no longer has one. Its own ratchet reached zero and was promoted, which is how the recipe is meant to end. So this section's fences come from the [Meridian example](https://github.com/andypgray/sliderule/tree/main/examples/Meridian), a mid-migration monolith moving inline SQL out of its controllers over a counted baseline:
 
 ```csharp
         arch.Rule("data-access/no-inline-sql")
@@ -100,7 +106,7 @@ Each test's display name is its rule ID, so a broken rule is named in the run su
             .Exemplar(arch.Types.Named("BookingRepository"));
 ```
 
-Its twelve baselined sites keep the rule green at the command line and still reach code scanning as note-level alerts. The burndown is then visible to anyone reviewing, without ever failing a build. Code scanning reads a result's `level` and message and ignores both the suppression and the baseline state. So each site repeats its baseline attribution in the message, which is the line the alert shows. One result object from a fresh run:
+Its 12 baselined violations keep the rule green at the command line, and their sites still reach code scanning as note-level alerts. A reviewer therefore sees the burndown without a build failing. Code scanning shows a result's `level` and message, and acts on neither its suppression nor its baseline state. So each baselined site's message ends with its attribution, which is the baseline entry's reason or, without one, the baseline file. One result object from a fresh run:
 
 ```json
 {
@@ -135,14 +141,14 @@ Its twelve baselined sites keep the rule green at the command line and still rea
 }
 ```
 
-A rule that is red lands the same shape at `error` level, with `"baselineState": "new"` and no `suppressions` array. In code scanning a reviewer tells house debt from a fresh breach by severity; a consumer that honours `baselineState` or `suppressions` can use either. Reproduce the file from a checkout:
+A violation of a red rule has the same shape at `error` level, with `"baselineState": "new"` and no `suppressions` array. In code scanning a reviewer tells baselined debt from a new violation by severity, and a SARIF consumer that reads `baselineState` or `suppressions` can use either. Reproduce the file from a checkout:
 
 ```bash
 dotnet build examples/Meridian/Meridian.slnx
 sliderule check examples/Meridian/Meridian.slnx --sarif sliderule.sarif
 ```
 
-CI's [`self-check` job](https://github.com/andypgray/sliderule/blob/main/.github/workflows/ci.yml) runs the same check over this repository's own spec on every push and uploads the SARIF it writes.
+CI's [`self-check` job](https://github.com/andypgray/sliderule/blob/main/.github/workflows/ci.yml) runs the same check over this repository's own spec on every pull request and every push to `main`, and uploads the SARIF it writes. A pull request from a fork or from Dependabot skips the upload, because its token cannot write to code scanning.
 
 The same rule from `check --json`, the document `arch_check` returns over MCP, shows the ratchet as counters instead of suppressions:
 
@@ -176,11 +182,11 @@ The same rule from `check --json`, the document `arch_check` returns over MCP, s
 }
 ```
 
-Both counters go to zero when the last controller moves its SQL behind a repository. The rule is then narrowed to what it actually meant, promoted to `Enforce`, and its baseline file deleted. That is what happened to this repository's own ratchet. The MCP infrastructure had migrated its environment reads to the `IEnvironment` seam, leaving two baselined sites the seam could not take. So the law was narrowed to the environment-variable members it was always about, and the baseline file went with it.
+`grandfathered` counts the violations the baseline still covers, where a violation is a controller's use of a SQL type, at however many sites. `stale` counts the entries whose violation is gone and that `sliderule baseline accept-reductions` has yet to remove. When a controller stops using a SQL type, the first count falls and the second rises until the next `accept-reductions`. Once the baseline is empty, the rule can be promoted to `Enforce` and its baseline file deleted. This repository's own ratchet, `mcp/env-through-seam`, ended that way after its rule was narrowed to the environment-variable members, which left out its last two sites.
 
 ## The graph
 
-`sliderule graph` surveys the codebase a spec is written against: projects and their references, namespaces and their sizes, every external dependency by root. It prints twenty-seven project lines for this solution. These are the lines for its ten projects outside the tests and their fixtures:
+`sliderule graph` surveys the codebase a spec is written against: projects and their references, namespaces and their sizes, and every external dependency by root. It needs no spec. It prints 27 project lines for this solution, one for every project the load reaches, so the projects that test fixtures reference are among them. These are the lines for its ten projects outside the tests and their fixtures:
 
 ```text
   SlideRule — 363 types; targets netstandard2.0; references: (none); packages: (none); locks restore
@@ -195,7 +201,7 @@ Both counters go to zero when the last controller moves its SQL behind a reposit
   SlideRule.Xunit — 3 types; targets net10.0; references: SlideRule, SlideRule.Roslyn; packages: Basic.CompilerLog.Util, Microsoft.Build.Framework (private), Microsoft.Build.Locator, Microsoft.Build.Utilities.Core (private), Microsoft.CodeAnalysis, Microsoft.CodeAnalysis.CSharp.Workspaces, Microsoft.CodeAnalysis.Workspaces.MSBuild, Microsoft.NET.StringTools (private), xunit.v3.assert, xunit.v3.extensibility.core; locks restore
 ```
 
-The `references: (none)` on the first line is `layering/core-no-roslyn` seen from the other side. The rule forbids the reified model from reaching for the Roslyn project or the compiler packages behind it. The survey shows it reaching for no other project in the solution. The count of generated types in parentheses is the one to check before writing a rule on a project. `arch.Project` names everything the assembly declares, generated files included. On a web tier where compiled views outnumber the code around them, that number shows whether a project rule would mostly judge generated code. `locks restore` and `does not pack` are the facts the packaging rules judge, so a project's line already shows what those rules read.
+The `references: (none)` on the first line is the rule `layering/core-no-roslyn` seen from the other side. That rule forbids Core, the model every spec compiles to, from referencing the Roslyn project or the compiler packages, and the survey shows Core referencing no project at all. The count of generated types in parentheses is worth checking before writing a rule on a project, because `arch.Project` selects everything the assembly declares, generated files included. On a web project where compiled views outnumber the code around them, that number shows whether a project rule would mostly judge generated code. `locks restore` and `does not pack` are facts the packaging rules judge. A rule can check a project's target frameworks, package references and lock file as well as its types, as [Writing specs](https://github.com/andypgray/sliderule/blob/main/WRITING-SPECS.md#what-a-rule-covers) shows.
 
 `render --diagram <path>` draws that same survey as a Mermaid diagram inside a committed file's managed block. Pointed at this repository and scoped to the projects shown above, it writes [`ARCHITECTURE.md`](https://github.com/andypgray/sliderule/blob/main/ARCHITECTURE.md):
 
@@ -231,9 +237,9 @@ flowchart LR
     p_SlideRule_Xunit --> p_SlideRule_Roslyn
 ```
 
-A solid arrow is a reference some type actually makes. A dotted arrow is a project reference that is declared and never exercised. The text survey leaves you to work that out by reading two of its sections against each other. There are no dotted arrows above, so no project here declares a reference it never uses. Nobody drew that diagram either. The test [`SelfSpecTests.ArchitectureMd_IsCurrent`](https://github.com/andypgray/sliderule/blob/main/tests/SlideRule.Tests/Dogfood/SelfSpecTests.cs) holds it the way `AgentsMd_IsCurrent` holds the block above. A hand-drawn architecture diagram is the artifact that rots first; this one is held to the code the same way the rules are.
+A solid arrow is a reference some type makes. A dotted arrow would be a project reference that is declared and never used, which the text survey shows only when two of its sections are read against each other. The drawing has no dotted arrows, so every project reference here is used. The test [`SelfSpecTests.ArchitectureMd_IsCurrent`](https://github.com/andypgray/sliderule/blob/main/tests/SlideRule.Tests/Dogfood/SelfSpecTests.cs) fails when the committed drawing differs from what the code gives, as `AgentsMd_IsCurrent` does for the block above.
 
-That fence is drawn from what the code does. The same block carries a second one, drawn from what the spec forbids:
+That drawing comes from what the code does. The same block has a second one, drawn from what the spec forbids:
 
 ```mermaid
 flowchart LR
@@ -289,16 +295,14 @@ flowchart LR
     end
 ```
 
-Nothing in that drawing is a shape somebody chose for it. A bare `--x` is a reference this spec forbids, and the labelled arrows are the verbs that need naming. The box holding a doubled node is the quarantined scope with its sanctioned surface. The spec defines Model, Checking and Rendering as namespace cones inside the Core layer, so the drawing nests them inside Core. The legend is generated with the rest, one row per construct this particular drawing uses. A `Migrate` rule would draw a dotted arrow and add a legend row for it, but this spec has none left, so neither appears.
+The renderer takes every shape in that drawing from the spec. A bare `--x` is a reference the spec forbids, and an arrow labelled `only` points at the only places a layer may reference. The node `Quarantine: roslyn/msbuild-bootstrap` inside Workspace is the quarantined scope. Its sanctioned surface, `MsBuildBootstrap`, is selected by name, which the drawing cannot place. So no doubled box appears, and the scope's containment rule is listed under the drawing. The spec declares Model, Checking and Rendering as namespaces inside the Core project, so the drawing nests them inside Core. The legend is generated too, with one row for each kind of mark the drawing uses. In this drawing a dotted arrow would be a `Migrate` rule's ban, labelled `grandfathered` and explained by a legend row of its own, as in [Meridian's drawing](https://github.com/andypgray/sliderule/blob/main/examples/Meridian/ARCHITECTURE.md). This spec has no `Migrate` rule left, so neither appears.
 
-`ARCHITECTURE.md` carries one more line under that fence, for the rules not drawn in full. A diagram can only draw a rule whose subject and targets are *places*. Most of this spec's rules are about shapes, names, attributes and members instead. Those rules are listed by ID, so the picture is never mistaken for the whole law.
+`ARCHITECTURE.md` has one more line under that drawing, listing by ID every rule the drawing cannot place in full. Most are rules about names, shapes, attributes and members, which have no arrow to draw. The others include rules with no single direction, such as the ban on circular references, and the scopes' tripwires. `sliderule explain <rule-id>` expands any of them.
 
 ## Why these excerpts can be trusted
 
-The excerpts on this page are under gate. The [`QuoteSyncTests`](https://github.com/andypgray/sliderule/blob/main/tests/SlideRule.Tests/DocHygiene/QuoteSyncTests.cs) gate holds each quoted excerpt to the committed file it was cut from. Each of the two rules must equal its whole statement there, line for line. The `AGENTS.md` line must appear in that file verbatim. The gate holds the two drawings to `ARCHITECTURE.md` whole, line for line, and the adapter class to its test file from the attribute line down. Change the spec and leave this page alone, and the suite goes red. A second gate, [`ReadmeAnchorGateTests`](https://github.com/andypgray/sliderule/blob/main/tests/SlideRule.Tests/DocHygiene/ReadmeAnchorGateTests.cs), resolves the `file:line` anchors inside the quoted reports against the sources they name. The two `ProgressPrinter.cs` lines in the hook report are the exception, here and on the README. That file is the change the agent is imagined to have made. So the gate pins those lines as a demonstration and fails the day they match committed code.
+Each fence that quotes a file or a tool's output is checked against its source by a test that fails when the two differ. [`QuoteSyncTests`](https://github.com/andypgray/sliderule/blob/main/tests/SlideRule.Tests/DocHygiene/QuoteSyncTests.cs) compares each quoted excerpt with the committed file it was cut from: both rules with their whole statements, the `AGENTS.md` line with that file, the two drawings with `ARCHITECTURE.md`, and the adapter class with its test file. Change the spec and leave this page alone, and the suite goes red. The build commands under [As SARIF](#as-sarif) are registered as commands, since they quote no file. `QuoteSyncTests` also fails on any fence on this page that no registry names. The hook report, the `explain --type` answer, the SARIF object, the check document and the graph survey are captured output. Each is registered in [`CapturedFences`](https://github.com/andypgray/sliderule/blob/main/tests/SlideRule.Tests/DocHygiene/CapturedFences.cs) with the test that runs the tool again. Each line of the `explain --type` excerpt must be a line of that run, in order. When an output no longer matches its run, that test fails and prints the text to paste in its place.
 
-Five fences here are captured tool output (the hook report, the claims answer, the SARIF object, the check document and the graph survey). Each one is registered in [`CapturedFences`](https://github.com/andypgray/sliderule/blob/main/tests/SlideRule.Tests/DocHygiene/CapturedFences.cs) with the test that runs the tool again. The hook report's test compiles the imagined `ProgressPrinter.cs` into the CLI project in memory and checks that project. The claims answer comes from `explain --type` over this solution, and each line it quotes must be a line of that run, in order. The SARIF object and the check document come from `check` over a built Meridian, and the graph survey from `graph` over this solution. When a fence stops matching its run, the test fails and prints the text to paste in its place. The build commands under [As SARIF](#as-sarif) quote nothing, so they are registered as commands. `QuoteSyncTests` fails on any fence on this page that nothing registers.
+The test [`ReadmeAnchorGateTests`](https://github.com/andypgray/sliderule/blob/main/tests/SlideRule.Tests/DocHygiene/ReadmeAnchorGateTests.cs) resolves each `file:line` in a quoted report against the source it names. The two `ProgressPrinter.cs` lines are the exception, here and on the README, because that file is the change the agent was imagined to make. The hook report's test compiles it into the CLI project in memory, and the anchor test fails the day a committed file matches those lines.
 
-Other tests hold the prose around the fences. The rule count in the first line and the `FAIL` line's sentence are held to this repository's committed `AGENTS.md` block. The baseline size under [As SARIF](#as-sarif) is held to Meridian's committed baseline file. The fences on the [README](https://github.com/andypgray/sliderule/blob/main/README.md) are held too. Its starter rule is held to the whole statement it is cut from in the example spec. Its hook report is held to the same run as this page's. Its Framework check is re-run on Windows, and each line it quotes must be a line of that run, in order.
-
-The page is the tool's output, and [CI](https://github.com/andypgray/sliderule/actions/workflows/ci.yml) is what keeps it that way.
+Other tests check the counts in the prose. The rule count in the first paragraph is checked against the `AGENTS.md` block, the layer count against the spec, the project-line count against the survey, and the baseline size under [As SARIF](#as-sarif) against Meridian's committed baseline. The rule sentence on the hook report's `FAIL` line is checked against the `AGENTS.md` block too. The README's fences are registered the same way. Its starter rule is checked against the whole statement it is cut from in the example spec. Its hook report is checked against the same run as this page's, and its .NET Framework check is run again on Windows. Every one of these tests runs in [CI](https://github.com/andypgray/sliderule/actions/workflows/ci.yml) on each pull request and each push to `main`.

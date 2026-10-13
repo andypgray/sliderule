@@ -647,9 +647,9 @@ internal static class CommandFactory
         Option<string> diffBase = new("--diff-base")
         {
             Description =
-                "The git ref the check's scope tripwires read changed files from when no turn record stands: an "
-                + "edit, a hand run, or a stop with no state. A stop with one reads the files the turn changed. "
-                + "Warnings only, never failures.",
+                "The git ref the check's scope tripwires list changed files from. The hook reads it on an edit, a "
+                + "hand run, or a stop with no snapshot of the tree (no state, or no answer from git). Any other "
+                + "stop passes the check the changed code files it listed itself. Warnings only, never failures.",
             DefaultValueFactory = static _ => "HEAD"
         };
         Option<int> maxRounds = new("--max-rounds")

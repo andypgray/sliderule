@@ -66,7 +66,10 @@ internal static class GrandfatheredCounts
         Word,
 
         /// <summary>The number word starting a sentence: <c>Thirty-three</c>.</summary>
-        TitleWord
+        TitleWord,
+
+        /// <summary>The number word up to ten and digits above: <c>seven</c>, <c>12</c>.</summary>
+        WordToTen
     }
 
     /// <summary>
@@ -80,8 +83,8 @@ internal static class GrandfatheredCounts
     private const string BaselineDirectory = "arch/baselines";
 
     // How far from the word "grandfathered" a numeral or number word still reads as its count. Wide
-    // enough for "the generated baseline carries three entries. Because they are grandfathered", which is
-    // the furthest any prose in this repository puts them apart.
+    // enough for a count that stands a sentence boundary away from the word, as in "the generated
+    // baseline contains three entries. The entries are grandfathered".
     private const int CountWindow = 8;
 
     private static readonly string[] Units =
@@ -102,7 +105,8 @@ internal static class GrandfatheredCounts
         {
             Spell(count, CountStyle.Word),
             Spell(count, CountStyle.TitleWord),
-            Spell(count, CountStyle.Numeral)
+            Spell(count, CountStyle.Numeral),
+            Spell(count, CountStyle.WordToTen)
         })
         .ToHashSet(StringComparer.Ordinal);
 
@@ -400,11 +404,13 @@ internal static class GrandfatheredCounts
     /// <summary>
     ///     Spells <paramref name="count" /> the way <paramref name="style" /> writes it. Only 0 to 99 are
     ///     spellable as words; anything else throws, because a silently unspellable number would compose
-    ///     a fragment that matches nothing and read as a passing gate.
+    ///     a fragment that matches nothing and read as a passing gate. <see cref="CountStyle.WordToTen" /> spells
+    ///     0 to 10 as words and anything above in digits.
     /// </summary>
     public static string Spell(int count, CountStyle style)
     {
-        if (style == CountStyle.Numeral) return count.ToString(CultureInfo.InvariantCulture);
+        bool digits = style == CountStyle.Numeral || (style == CountStyle.WordToTen && count > 10);
+        if (digits) return count.ToString(CultureInfo.InvariantCulture);
 
         if (count is < 0 or > 99)
             throw new ArgumentOutOfRangeException(nameof(count), count, "Only 0 to 99 are spelled as number words.");

@@ -21,10 +21,10 @@ namespace SlideRule.Xunit;
 ///     <see cref="SolutionPath" /> is the only required override.
 /// </summary>
 /// <remarks>
-///     The adapter never builds and never restores: build the target solution first, or the verdicts
-///     are stale. It needs a .NET SDK on the test host, since it loads the solution through MSBuild,
-///     and it registers MSBuild itself, so your test project needs no <c>[ModuleInitializer]</c> of
-///     its own.
+///     The adapter never builds and never restores: restore the target solution first. It reads the
+///     code from source, built or not, and runs the spec your test project's build compiled. It needs
+///     a .NET SDK on the test host, since it loads the solution through MSBuild, and it registers
+///     MSBuild itself, so your test project needs no <c>[ModuleInitializer]</c> of its own.
 /// </remarks>
 /// <typeparam name="TSpec">The architecture spec to check — must be default-constructible.</typeparam>
 public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new()
@@ -194,7 +194,8 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
     ///     solution was checked. A solution can be both at once, and then it reports one block for each; a
     ///     solution that failed to load outranks both and is reported alone. Before any of that it fails, naming
     ///     both versions, when the test project loaded a version of SlideRule other than the adapter's own,
-    ///     and every rule case then skips: keep the two packages on one version.
+    ///     and a single skipped case named after the spec replaces the rule cases: keep the two packages on one
+    ///     version.
     /// </summary>
     [Fact]
     public async Task Workspace_LoadedCompletely()

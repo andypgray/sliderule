@@ -4,7 +4,7 @@ SlideRule exposes this codebase's architecture spec — one reified model, enfor
 - `arch_status` — the migration burndown: per-rule grandfathered/stale counts and promotion suggestions.
 - `arch_explain` — a rule's because / fix / posture; or, given `type` or `path`, who claims a type and why.
 - `arch_context` — the scope card(s) covering a path. Call before editing an unfamiliar directory to learn its rules or whether it is dragon territory.
-- `arch_graph` — the codebase survey: projects, namespace inventories, reference edges, who declares what. Needs no spec — orient on an unfamiliar solution or plan new rules; narrow with `overview` or `projects`.
+- `arch_graph` — the codebase survey: projects, namespace inventories, reference edges, who declares what. Needs no spec — orient on an unfamiliar solution or plan new rules; narrow with `grain` or `projects`.
 
 One prompt, `derive_spec` — the onboarding recipe to run when spec resolution reports no spec project yet.
 

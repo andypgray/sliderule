@@ -1,6 +1,6 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.DocHygiene;
 
@@ -30,14 +30,14 @@ public sealed class SpecCountSyncTests
 
     /// <summary>
     ///     Every claim spells the number of rule bullets the committed board renders. The comparison is
-    ///     against the count spelled as a title-case word, which is the form the sentence is written in;
-    ///     a claim that moves to a numeral fails here rather than silently passing a looser parse.
+    ///     against the count written as a number word up to ten and digits above, which is how the sentence
+    ///     writes it; a claim spelled any other way fails here rather than passing a looser parse.
     /// </summary>
     [Fact]
     public void EveryClaimedRuleCount_MatchesTheRenderedBoard()
     {
         int rendered = SpecRuleCounts.RenderedRuleCount(File.ReadAllText(RepoRoot.AgentsMd));
-        string expected = GrandfatheredCounts.Spell(rendered, GrandfatheredCounts.CountStyle.TitleWord);
+        string expected = GrandfatheredCounts.Spell(rendered, GrandfatheredCounts.CountStyle.WordToTen);
 
         List<string> drift = CountDocs
             .SelectMany(Gate.Scan)

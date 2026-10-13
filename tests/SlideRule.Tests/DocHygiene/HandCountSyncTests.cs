@@ -1,7 +1,7 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Tests.Dogfood;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.DocHygiene;
 
@@ -41,29 +41,27 @@ public sealed class HandCountSyncTests
     private static readonly CountClaim[] Claims =
     [
         new(DocPaths.Contributing, "There are {count}:", "the committed lock files", CommittedLockFiles,
-            GrandfatheredCounts.CountStyle.Word),
+            GrandfatheredCounts.CountStyle.WordToTen),
         new(DocPaths.Contributing, "one for each of the {count} packages", ShippingPackages, PackableCount,
-            GrandfatheredCounts.CountStyle.Word),
+            GrandfatheredCounts.CountStyle.WordToTen),
         new(DocPaths.Contributing, "The {count} packages (", ShippingPackages, PackableCount,
-            GrandfatheredCounts.CountStyle.Word),
+            GrandfatheredCounts.CountStyle.WordToTen),
         new(DocPaths.RootReadme, "{count} lockstep-versioned packages make up a release", ShippingPackages,
             PackableCount, GrandfatheredCounts.CountStyle.TitleWord),
-        new(DocPaths.RootReadme, "The {count} packages version in lockstep", ShippingPackages, PackableCount,
-            GrandfatheredCounts.CountStyle.Word),
         new(DocPaths.Security, "covering all {count} packages", ShippingPackages, PackableCount,
-            GrandfatheredCounts.CountStyle.Word),
+            GrandfatheredCounts.CountStyle.WordToTen),
         new(DocPaths.ContractReadme, "The {count} SlideRule packages ship one version in lockstep", ShippingPackages,
-            PackableCount, GrandfatheredCounts.CountStyle.Word),
+            PackableCount, GrandfatheredCounts.CountStyle.WordToTen),
         new(DocPaths.AdapterReadme, "All {count} SlideRule packages ship one version in lockstep",
-            ShippingPackages, PackableCount, GrandfatheredCounts.CountStyle.Word),
+            ShippingPackages, PackableCount, GrandfatheredCounts.CountStyle.WordToTen),
         new(DocPaths.DeriveSpecPrompt, "The {count} SlideRule packages ship one version in lockstep",
-            ShippingPackages, PackableCount, GrandfatheredCounts.CountStyle.Word),
+            ShippingPackages, PackableCount, GrandfatheredCounts.CountStyle.WordToTen),
         new(DocPaths.Architecture, "{count} declared projects", "the projects the solution declares", DeclaredCount,
-            GrandfatheredCounts.CountStyle.Word),
+            GrandfatheredCounts.CountStyle.WordToTen),
         new(DocPaths.SelfCheck, "across {count} declared layers", "the layers the self-spec declares", LayerCount,
-            GrandfatheredCounts.CountStyle.Word),
+            GrandfatheredCounts.CountStyle.WordToTen),
         new(DocPaths.SelfCheck, "its {count} projects outside the tests", "the projects the diagram draws",
-            DrawnCount, GrandfatheredCounts.CountStyle.Word)
+            DrawnCount, GrandfatheredCounts.CountStyle.WordToTen)
     ];
 
     [Fact]

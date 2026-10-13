@@ -4,9 +4,9 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
 using Shouldly;
-using Xunit;
 using SlideRule.Tests.DocHygiene.Walkthroughs;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.DocHygiene;
 
@@ -51,6 +51,7 @@ public sealed class QuoteSyncTests
     private const string QuotingSpec = "examples/Meridian.Quoting/arch/Meridian.Quoting.Architecture/QuotingArchitectureSpec.cs";
     private const string MeridianSpec = "examples/Meridian/arch/Meridian.Architecture/MeridianArchitectureSpec.cs";
     private const string InterchangeSpec = "examples/Meridian.Interchange/arch/Meridian.Interchange.Architecture/InterchangeArchitectureSpec.cs";
+    private const string OperationsSpec = "examples/Meridian.Operations/arch/Meridian.Operations.Architecture/OperationsArchitectureSpec.cs";
     private const string CanonicalSample = "tests/SlideRule.Tests/CanonicalSampleSpec.cs";
 
     private const string Workflow = ".github/workflows/ci.yml";
@@ -234,7 +235,24 @@ public sealed class QuoteSyncTests
             "adopting-spec-csproj",
             "<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>",
             "examples/Meridian/arch/Meridian.Architecture/Meridian.Architecture.csproj",
-            Extent.WholeFile)
+            Extent.WholeFile),
+        new(
+            // The authoring guide teaches from committed rules rather than invented ones, so each of its samples
+            // is held to the whole statement it is cut from: a rule or scope that changes in its spec reds here
+            // instead of leaving the guide teaching the old shape.
+            DocPaths.WritingSpecs,
+            "writing-specs-layers",
+            "Layer domain = arch.Layer(\"Domain\", \"Meridian.Domain.*\")",
+            MeridianSpec,
+            Extent.WholeStatements),
+        new(DocPaths.WritingSpecs, "writing-specs-rule-parts", "arch.Rule(\"naming/interfaces\")", QuotingSpec, Extent.WholeStatements),
+        new(DocPaths.WritingSpecs, "writing-specs-migrate", "arch.Rule(\"data-access/no-inline-sql\")", MeridianSpec, Extent.WholeStatements),
+        new(DocPaths.WritingSpecs, "writing-specs-derived-from", "arch.Rule(\"naming/controllers\")", MeridianSpec, Extent.WholeStatements),
+        new(DocPaths.WritingSpecs, "writing-specs-members", "arch.Rule(\"mcp/tools-accept-cancellation\")", SelfSpec, Extent.WholeStatements),
+        new(DocPaths.WritingSpecs, "writing-specs-projects", "arch.Rule(\"packaging/core-netstandard-only\")", SelfSpec, Extent.WholeStatements),
+        new(DocPaths.WritingSpecs, "writing-specs-family", "arch.Rule(\"modules/internals\")", OperationsSpec, Extent.WholeStatements),
+        new(DocPaths.WritingSpecs, "writing-specs-quarantine", "arch.Scope(\"clearance/engine\")", MeridianSpec, Extent.WholeStatements),
+        new(DocPaths.WritingSpecs, "writing-specs-caution", "arch.Scope(\"model/prose-fragments\")", SelfSpec, Extent.WholeStatements)
     ];
 
     /// <summary>
@@ -288,7 +306,12 @@ public sealed class QuoteSyncTests
         new(DocPaths.RootReadme, "readme-building", "dotnet build SlideRule.slnx"),
         new(DocPaths.Contributing, "contributing-build-and-test", "dotnet build SlideRule.slnx"),
         new(DocPaths.Contributing, "contributing-lock-files", "gh pr checkout <number>"),
-        new(DocPaths.Security, "security-attestation", "gh attestation verify")
+        new(DocPaths.Security, "security-attestation", "gh attestation verify"),
+
+        // The operations guide's pull-request job and its upgrade line, both commands for the reader to run.
+        new(DocPaths.Operating, "operating-ci", "sliderule render --check"),
+        new(DocPaths.Operating, "operating-ratchet", "baseline accept-reductions"),
+        new(DocPaths.Operating, "operating-upgrade", "dotnet tool update -g SlideRule.Cli")
     ];
 
     /// <summary>

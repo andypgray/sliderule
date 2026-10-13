@@ -2,9 +2,9 @@
 
 This page replays the derivation of a real spec, one real command at a time.
 
-You have a working codebase and no architecture spec. Where do you start? You survey what is there, scaffold a spec project, and draft candidate rules. You run them to gather evidence and assign each rule a posture from that evidence. Then you baseline the acknowledged debt and render the agent context. Meridian, the worked instance, is a freight-forwarding monolith of three projects and eight controllers. The walk keeps its shape at three projects or three hundred, so nothing here depends on Meridian being small.
+You have a working codebase and no architecture spec. You start by surveying what is there, then scaffold a spec project and draft candidate rules. You run those rules to gather evidence, and you assign each one a posture from it. A rule is `Enforce` or `Migrate`, and a scope is `Quarantine` or `Caution`. Then you baseline the acknowledged debt and render the agent context. Meridian, the worked instance, is a freight-forwarding monolith of three projects and eight controllers. The walk keeps its shape at 3 projects or 300, so every step works the same on a larger solution.
 
-This is [derive-spec.md](../../src/SlideRule.Cli/Mcp/Prompts/derive-spec.md) applied to real code, step for step (the MCP server serves that same text to agents as the `derive_spec` prompt). The [README](README.md) beside this file owns the destination, with the finished spec table, the rendered block, the failure-mode demos, and the burndown board. This page owns the journey to it. To run the whole thing yourself against a scratch copy, jump to [Try it yourself](#try-it-yourself).
+This is the [derive-spec.md](../../src/SlideRule.Cli/Mcp/Prompts/derive-spec.md) recipe applied to real code (the MCP server serves the same text to agents as the `derive_spec` prompt). The recipe's step 0, which this walk skips, is a search for architecture the team already wrote down, such as architecture tests and ADRs. On your solution, start there. The [README](README.md) in this directory shows the destination, with the finished spec table, the rendered block, the failure-mode demos, and the burndown board. This page covers the steps that lead there. To run the whole thing yourself against a scratch copy, jump to [Try it yourself](#try-it-yourself).
 
 ## What you'll do
 
@@ -16,13 +16,13 @@ This is [derive-spec.md](../../src/SlideRule.Cli/Mcp/Prompts/derive-spec.md) app
 6. Curate, then baseline
 7. Render and commit
 
-Hold onto two things before you start. First, violations during the derive are data, not failures. You will author rules your code breaks on purpose, because the count of what breaks is the measurement that assigns the posture. A red check in the middle of this flow means the evidence pass is working. Second, the tool proposes nothing and you decide everything. It surveys, it checks, it renders. The curation, the `baseline init`, and the commit belong to you.
+Hold onto two things before you start. First, the violations you see during the derivation are data. You will write rules your code breaks on purpose, because the count of what breaks is the measurement you assign the posture from. A red check in the middle of this flow means the evidence pass is working. Second, SlideRule surveys, checks and renders, and you make every decision. The curation, the `baseline init`, and the commit belong to you.
 
 This recipe was proven before any example existed. A cold agent, given only the recipe and SlideRule's own test fixture, walked it end to end. The agent produced a compiling spec, and the curated result became a committed test fixture. The walk also caught a real defect in spec discovery. The page you are reading is that same walk, run against Meridian and written down.
 
 ## Step 1: survey the estate
 
-On your solution, build first, then start with the one verb that needs no spec. `sliderule graph` reads the compiled code the way extraction does and returns projects, namespace inventories, project-to-project edges, and external references. On a large estate, this is how you find the layers without opening every file. The edge matrix shows what references what, and the namespace inventory is the raw material for layer globs. Read all of it as hypotheses to test.
+On your solution, restore or build first, then start with the one verb that needs no spec. `sliderule graph` reads the code from source the way `check` does and returns projects, namespace inventories, project-to-project edges, and external references. On a large estate, this is how you find the layers without opening every file. The edge matrix shows what references what, and the namespace inventory is the raw material for layer globs. Read all of it as hypotheses to test.
 
 ```text
 $ sliderule graph examples/Meridian/Meridian.slnx --json
@@ -135,7 +135,11 @@ $ sliderule graph examples/Meridian/Meridian.slnx --json
 exit: 0
 ```
 
-The type counts are Clearance 5, Domain 7, and Web 18. Web splits across `Controllers` (8 types), `Data` (4), `Models` (5), and one type at global scope. Two candidate layers fall out immediately, `Meridian.Domain.*` and `Meridian.Web.*`. The `projectEdges` show Web reaching Domain (23) and Clearance (4) with nothing pointing back. Domain never references Web, so that direction goes on the list. Eight types under `Controllers` is a naming hypothesis (`*Controller`). The clue is in the external edges, where Web reaches `Microsoft.Data` 35 times and `System.Data` 8, the shape of inline SQL. Grouped per project, though, the survey cannot yet say how many of those land in controllers (a question for `check`). The wall clock is invisible at this altitude, a hypothesis to test later. Clearance sits behind one thin inbound edge with five types of its own, the module-behind-a-facade shape and the candidate dragon zone. The capture is trimmed to three external roots, the two SQL-shaped ones plus `System.Threading`. It drops the framework roots (`Microsoft.AspNetCore` at 47, `Microsoft.Extensions` at 20), Web's `System` and `System.Collections` rows, and every row whose source is Clearance or Domain.
+The type counts are Clearance 5, Domain 7, and Web 18. Web splits across `Controllers` (8 types), `Data` (4), `Models` (5), and one type at global scope. Two candidate layers fall out immediately, `Meridian.Domain.*` and `Meridian.Web.*`. The `projectEdges` show Web reaching Domain (23) and Clearance (4), and no edge runs the other way. Domain never references Web, so that direction goes on the list. Eight types under `Controllers` is a naming hypothesis (`*Controller`).
+
+The clue is in the external edges, where Web reaches `Microsoft.Data` 35 times and `System.Data` 8, the shape of inline SQL. Grouped per project, though, the survey cannot yet show how many of those land in controllers (a question for `check`). `Task` lives under the `System.Threading` root, and Web's async methods return it. The wall clock is invisible at this altitude, a hypothesis to test later. Clearance has five types of its own behind one thin inbound edge, the module-behind-a-facade shape. That shape makes Clearance the candidate dragon zone, a module whose hidden hazards the spec should warn about.
+
+The capture is trimmed to three external roots, the two SQL-shaped ones plus `System.Threading`. It drops the framework roots (`Microsoft.AspNetCore` at 47, `Microsoft.Extensions` at 20), Web's `System` and `System.Collections` rows, and every row whose source is Clearance or Domain.
 
 ## Step 2: scaffold the spec project
 
@@ -167,15 +171,15 @@ Here is Meridian's spec project, exactly as committed:
 </Project>
 ```
 
-The `RestoreLockedMode` line takes effect only where a `packages.lock.json` sits beside the project, and none does here. OpenSSF Scorecard's pinned-dependencies check reads the setting from each project file, so this repository declares it in every one. Your spec project can leave it out unless you commit a lock file beside it.
+The `RestoreLockedMode` line takes effect only where a `packages.lock.json` is next to the project file, and this project has none. OpenSSF Scorecard's pinned-dependencies check reads the setting from each project file, so this repository declares it in every one. Your spec project can leave it out unless you commit a lock file next to it.
 
 The other line to explain is `CopyLocalLockFileAssemblies`. It stages NuGet package assemblies (here SqlClient) into the spec's build output, where `check` looks for the `typeof()` targets that live in those packages. Strictly, the spec does not need the line. The loader also reads the spec's `.deps.json` and will resolve a package assembly out of the machine's NuGet folder. The line is insurance that makes the spec's output self-contained, so a check does not depend on what a given machine happens to have restored. It is harmless when every target is a project type or a namespace pattern.
 
-The line cannot reach a **.NET shared framework**. An ASP.NET Core `ControllerBase`, or anything else arriving through `<FrameworkReference>`, is never staged into a class library's output. Such a type is not in the NuGet folder either, so a `typeof()` anchor on one fails however the spec project is built. Anchor those by string — `.DerivedFrom("Microsoft.AspNetCore.Mvc.ControllerBase")` renders exactly like the `typeof()` form and loads no assembly at all.
+The line cannot reach a **.NET shared framework**. An ASP.NET Core `ControllerBase`, or anything else arriving through `<FrameworkReference>`, is never staged into a class library's output. Such a type is not in the NuGet folder either, so a `typeof()` anchor on one fails however the spec project is built. Anchor those by string instead. `.DerivedFrom("Microsoft.AspNetCore.Mvc.ControllerBase")` renders exactly like the `typeof()` form and loads no assembly at all.
 
-The second `ProjectReference` is that rule pack, `DotNetGuidance`. A pack is an ordinary class library of static methods that declare rules onto your `Arch`; you reference it and call the ones you want. Nothing is discovered and nothing is implicit, so this reference on its own adds no rules. Step 3 is where the calls go in.
+Of the three project references, the first is the SlideRule contract library, which your own spec takes as the `SlideRule` package. The third, `Meridian.Clearance`, lets the spec name the clearance gateway's types with `typeof()`. The second is a rule pack, `DotNetGuidance`. A pack is an ordinary class library of static methods that declare rules onto your `Arch`, and you call the ones you want. A pack rule applies only when your spec calls its method, so this reference on its own adds no rules. Step 3 is where the calls go in.
 
-`DotNetGuidance` is not a package you can install. It ships inside the SlideRule repository as a working example. That is why the reference above is a relative path into `src/`, which resolves in a source checkout and nowhere else. On your solution the pack is one you write, and its [README](../../src/SlideRule.Packs.DotNet/README.md) is the shape to copy. What the steps below do with `DotNetGuidance` is what your spec will do with yours.
+`DotNetGuidance` is not a package you can install. It ships inside the SlideRule repository as a working example. That is why the pack's reference is a relative path into `src/`, which resolves only in a source checkout. On your solution the pack is one you write, and its [README](../../src/SlideRule.Packs.DotNet/README.md) is the shape to copy. What the steps below do with `DotNetGuidance` is what your spec will do with yours.
 
 The class starts empty and grows in step 3:
 
@@ -193,7 +197,7 @@ public sealed class MeridianArchitectureSpec : IArchitectureSpec
 }
 ```
 
-Add it to the solution, then build it before you check. In a source checkout the add step prints three lines instead of one, quoted here as the .NET SDK printed them:
+Add it to the solution, then build it before you check. In a source checkout the add step prints three lines, quoted here as the .NET SDK printed them:
 
 ```text
 $ dotnet sln examples/Meridian/Meridian.slnx add examples/Meridian/arch/Meridian.Architecture/Meridian.Architecture.csproj --solution-folder arch
@@ -203,13 +207,13 @@ Project `..\..\src\SlideRule.Packs.DotNet\SlideRule.Packs.DotNet.csproj` added t
 exit: 0
 ```
 
-In a source checkout like this repository, `dotnet sln add` follows the spec's project references transitively. The command also adds the SlideRule contract library and the rule pack (the second and third `added` lines above). The recipe's step 2 lists the errors you may see in that setup, verbatim, and [Try it yourself](#try-it-yourself) below shows the exact removal. A published-package setup references SlideRule as a `PackageReference` and sees none of this.
+In a source checkout like this repository, `dotnet sln add` follows the spec's project references transitively. The command also adds the SlideRule contract library and the rule pack (the second and third `added` lines above). The recipe's step 2 lists the errors you may see in that setup, verbatim, and [Try it yourself](#try-it-yourself) below shows the exact removal. A published-package setup references SlideRule as a `PackageReference` and avoids all of this.
 
 ## Step 3: draft candidate rules
 
-On your solution, turn every hypothesis from the survey into a rule, and draft them all as `Enforce`. Do not pre-judge the posture; the check in the next step supplies the evidence that decides it. Write the already-true directions too, the ones the edge matrix showed clean. A clean direction made law is the cheapest rule you will ever own. Candidate `Because` notes are fine at this stage; you will upgrade them once the rules are real. The one exception is a dragon zone. A boundary has no `Enforce` form, so you draft it as a `Quarantine` scope directly. Step 5 decides whether it stays one or becomes a `Caution`.
+On your solution, turn every hypothesis from the survey into a rule, and draft them all as `Enforce`. Do not pre-judge the posture; the check in the next step supplies the evidence you assign it from. Write the already-true directions too, the ones the edge matrix showed clean. A clean direction made law is the cheapest rule you will ever own. Candidate `Because` notes are fine at this stage; you will upgrade them once the rules are real. The one exception is a dragon zone. A boundary has no `Enforce` form, so you draft it as a `Quarantine` scope directly. In step 5 you decide whether it stays one or becomes a `Caution`.
 
-Before you write any of them, check what you can take instead. Canonical .NET guidance is the same in every codebase, so those rules belong in a pack, written once with their reasons and citations attached. Every spec that wants one afterwards spends a line on it. This walk takes those rules from `DotNetGuidance`. On your solution the first pack is yours to write, and it starts paying at the second spec that calls it. Take the ones that could plausibly apply to your estate and leave the rest. You opt out of a rule by not calling its method. Draft the taken rules as `Enforce` too, for the same reason as the ones you write. Let step 4 tell you which of them your code already obeys.
+Before you write any of them, check what you can take instead. Canonical .NET guidance is the same in every codebase, so those rules belong in a pack, written once with their reasons and citations attached. Every spec that takes one afterwards spends a line on it. This walk takes those rules from `DotNetGuidance`. On your solution the first pack is yours to write, and it starts paying at the second spec that calls it. Take the ones that could plausibly apply to your estate and leave the rest. You opt out of a rule by not calling its method. Draft the taken rules as `Enforce` too, for the same reason as the ones you write. Step 4 shows which of them your code already obeys.
 
 Meridian's survey produced four direction-and-convention candidates plus one quarantined scope, and two rules come from the pack. One is the `Async` naming convention, taken because Web and Domain are full of `Task`-returning methods. The other is the `BuildServiceProvider` antipattern, taken because the app has a composition root worth guarding.
 
@@ -262,15 +266,15 @@ public sealed class MeridianArchitectureSpec : IArchitectureSpec
 }
 ```
 
-That is five candidate rules you wrote plus two you took. The quarantined scope desugars into two checkable rules (a containment rule and a diff-aware tripwire), so `check` will report eight. The controllers rule anchors `ControllerBase` by string, which is the shared-framework case step 2 flagged. The spec project cannot reference that type at all. The rule therefore names it by fully-qualified name, and the check resolves it out of the codebase it is reading. Notice the clock rule bans `DateTime.Now` and `DateTime.UtcNow` across the whole Web layer with no exception yet. The draft states the blunt hypothesis. Letting the check find the one type that legitimately reads the clock is the whole job of the next step.
+That is five candidate rules you wrote plus two you took. The quarantined scope expands into two checkable rules (a containment rule and a diff-aware tripwire), so `check` will report eight. The controllers rule anchors `ControllerBase` by string, which is the shared-framework case step 2 flagged. The spec project cannot reference that type at all. The rule therefore names it by fully-qualified name, and the check resolves it out of the codebase it is reading. Notice the clock rule bans `DateTime.Now` and `DateTime.UtcNow` across the whole Web layer with no exception yet. The draft states the blunt hypothesis, and the check in the next step finds the one type whose job is to read the clock.
 
-The two pack calls carry no `Because` here, since the pack wrote one for each rule, with the learn.microsoft.com citation attached. Each reason reads the same in every codebase that takes the rule. What you choose is the posture and the selections. The naming rule takes the two layers instead of a project, so it reaches Domain's interfaces without sweeping `Program.cs`'s top-level statements.
+The two pack calls have no `Because` here. The pack supplies one for each rule, with a learn.microsoft.com citation attached, and each reason reads the same in every codebase that takes the rule. What you choose is the posture and the selections. The naming rule selects the two layers, so it reaches Domain's interfaces and leaves out the top-level statements in `Program.cs`.
 
-The CLI never builds your code; it reads compiled assemblies. Build the spec before every check, or the check reads a stale build and reports stale results.
+The CLI never builds your code. It reads the code from source and runs the spec from the spec project's last build, so rebuild the spec project after each change to the spec, or the check runs the old rules.
 
 ## Step 4: check as the evidence pass
 
-On your solution, run `check`. Exit 1 is the expected outcome here, because the reds are the data you came for. Every violation arrives with its rule ID, the reason you wrote, and the exact `file:line` of each offending site. The counts are the measurements you assign a posture from in the next step.
+On your solution, run `check`. Exit 1 is the expected outcome here, because the reds are the data you came for. Every violation arrives with its rule ID, its reason, and the exact `file:line` of each offending site. The counts are the measurements you assign a posture from in the next step.
 
 ```text
 $ sliderule check examples/Meridian/Meridian.slnx
@@ -324,13 +328,17 @@ Checked 8 rules: 3 passed, 4 failed, 1 skipped (34 violations, 0 warnings).
 exit: 1
 ```
 
-The two direction-and-naming rules pass with zero violations, which already tells you their posture. The same goes for one of the two pack rules, `di/no-buildserviceprovider`, which is green on the first run. The four that fail are the evidence. `data-access/no-inline-sql` reports twelve violations across six controllers, with thirty-one reference sites in the full output. Of those, the capture above shows CustomsController's five and drops the other five controllers. The inline-SQL result answers the survey's open question. The `Microsoft.Data` references do land in controllers, and in six of the eight. `time/inject-clock` reports eight sites, shown in full, and one of them is the answer to step 3's setup. That site is `src/Meridian.Web/Data/SystemClock.cs:7`, in a type whose job is to read the clock. `naming/async-suffix` reports thirteen, shown in full. Five are interface declarations in Domain, and eight are implementations and actions in Web. That is the shape of a convention the codebase never adopted rather than one it drifted from. `clearance/engine/containment` reports one inbound reference the gateway does not sanction, with the hint that no baseline exists yet. The tripwire reports `skip`, as expected, because it is diff-aware and does nothing without `--diff-base`. In all, the check reports thirty-four located, named violations, ready to price.
+The two direction-and-naming rules pass with zero violations, which already settles their posture. The same goes for one of the two pack rules, `di/no-buildserviceprovider`, which is green on the first run. The four that fail are the evidence. `data-access/no-inline-sql` reports 12 violations across six controllers, with 31 reference sites in the full output. Of those, the capture above shows CustomsController's five and drops the other five controllers. The inline-SQL result answers the survey's open question. The `Microsoft.Data` references do land in controllers, and in six of the eight.
 
-Notice that the pack rule was measured exactly like the ones written by hand. A pack ships a rule and the reason for it, with no opinion on whether your code obeys yet. The check is what tells you.
+`time/inject-clock` reports eight sites, shown in full, and one of them is the answer to step 3's setup. That site is `src/Meridian.Web/Data/SystemClock.cs:7`, in a type whose job is to read the clock. `naming/async-suffix` reports 13, shown in full. Five are interface declarations in Domain, and eight are implementations and actions in Web. That is the shape of a convention the codebase never adopted rather than one it drifted from. `clearance/engine/containment` reports one inbound reference the gateway does not sanction, with the hint that no baseline exists yet. The tripwire reports `skip`, as expected, because a plain `check` takes its changed files only from a `--diff-base` ref, and this run gives none. In all, the check reports 34 located, named violations, ready to price.
+
+Notice that the pack rules were checked exactly like the ones written by hand. A pack ships a rule and its reason, and the check reports whether your code obeys it.
 
 ## Step 5: assign postures from the evidence
 
-On your solution, the violation count decides each rule's posture. Zero violations means the code already obeys, so the rule becomes `Enforce` law that costs nothing. Violations plus a target state the team actually wants means `Migrate`. The current sites are grandfathered, and new code goes red. A region with no target state, code nobody plans to change, is a scope, and what you want from its future callers decides which kind. Where nothing new may reference it, the scope is `Quarantine`. It holds the boundary, grandfathers the reaches that already exist, and documents what is dangerous inside. Where new callers are welcome (a shared utility or a public interop layer), the scope is `Caution`. Containing it would grandfather every legitimate caller as debt and fail the next caller. A `Caution` scope therefore keeps the dragons card and never goes red. A rule nothing on the team stands behind gets dropped, because an unratified rule is the stale doc this tool exists to kill.
+On your solution, you assign each rule's posture from its violation count. Zero violations means the code already obeys, so the rule becomes `Enforce` law at no cost. Violations plus a target state the team actually wants means `Migrate`. The current sites are grandfathered, and new code goes red.
+
+A region with no target state, code the team plans to leave as it is, is a scope. What you want from its future callers decides which kind. Where new code must not reference it, the scope is `Quarantine`. A `Quarantine` scope enforces the boundary, grandfathers the reaches that already exist, and documents what is dangerous inside. Where new callers are welcome (a shared utility or a public interop layer), the scope is `Caution`. Containing it would grandfather every legitimate caller as debt and fail the next caller. A `Caution` scope therefore keeps the dragons card and never goes red. A rule the team will not stand behind gets dropped, because an unratified rule is the stale doc SlideRule exists to kill.
 
 Meridian's evidence assigns cleanly:
 
@@ -344,22 +352,23 @@ Meridian's evidence assigns cleanly:
 | `di/no-buildserviceprovider` | 0 violations | Enforce |
 | `clearance/engine` | 1 non-facade inbound | Quarantine |
 
-The three zero-violation rules become law. The inline-SQL rule has twelve violations (six controllers, each referencing both `SqlConnection` and `SqlCommand`), and the team wants repositories, so it is a `Migrate`. The majority pattern is the one being retired, and the two already-migrated controllers show the target. The clock rule has eight sites and the same shape, so `Migrate` again, with one refinement. The naming rule has thirteen and the team wants the convention, so `Migrate` as well. The single non-facade reach into Clearance has no target state (the ISO 6346 table stays as it is). Nothing new should reach past the gateway, so the scope is `Quarantine`.
+The three zero-violation rules become law. The inline-SQL rule has 12 violations (six controllers, each referencing both `SqlConnection` and `SqlCommand`), and the team wants repositories, so it is a `Migrate`. The majority pattern is the one being retired, and the two already-migrated controllers show the target. The clock rule has eight sites and the same shape, so `Migrate` again, with one refinement. The naming rule has 13 and the team wants the convention, so `Migrate` as well. The single non-facade reach into Clearance has no target state (the ISO 6346 table stays as it is). New code should reach Clearance only through the gateway, so the scope is `Quarantine`.
 
-The two pack rules land on opposite sides of that line, from the same source, on the same run. In the [Interchange example](../Meridian.Interchange/) the identical `naming/async-suffix` is `Enforce`, because that codebase already keeps it. A pack therefore hands you the rule and its reason and leaves the posture alone, since only your check knows what your code does.
+The two pack rules come from the same source on the same run and land on opposite sides of that line. `di/no-buildserviceprovider` is `Enforce`, and `naming/async-suffix` is `Migrate`. In the [Interchange example](../Meridian.Interchange/) the identical `naming/async-suffix` is `Enforce`, because that codebase already keeps it. A pack therefore gives you the rule and its reason and leaves the posture to you, since only your own check measures your code.
 
-The refinement comes from the evidence, where the draft flagged `SystemClock.cs:7` alongside the seven controller reads. But `SystemClock` implements `IClock` as the one sanctioned seam that must read the wall clock, so nothing else has to. The blunt draft rule surfaced the seam. The curated rule keeps it by adding `.Except(arch.Types.Named("SystemClock"))`, which leaves seven grandfathered controller reads and one type doing its job. That signal is authoring feedback, and it tells you to fix the rule. An empty subject or a glob that matched nothing would speak the same way.
+The refinement comes from the evidence, where the draft flagged `SystemClock.cs:7` alongside the seven controller reads. `SystemClock` implements `IClock` as the one sanctioned seam that reads the wall clock, so every other type can take the time from `IClock`. The blunt draft rule surfaced the seam. The curated rule keeps it by adding `.Except(arch.Types.Named("SystemClock"))`, which leaves seven grandfathered controller reads and one type doing its job. That signal is authoring feedback, so the fix goes in the rule. An empty subject, or a glob that matches no type, is the same kind of feedback.
 
 ## Step 6: curate, then baseline
 
-On your solution, this is the gate the tool will not cross for you. Go rule by rule, and accept, edit, or drop each one. Then upgrade every `Because` from a candidate note into the reason a reviewer would sign in a design review. That text renders into the agent context and into every violation message as the team's stated rationale. Only then run `baseline init`, which grandfathers exactly what is red at that moment. Curation comes first because day zero is the one moment when current and accepted are the same set. The baseline is also your signature on the debt.
+On your solution, this step is the curation gate, and every decision in it is yours. Go rule by rule, and accept, edit, or drop each one. Then upgrade every `Because` from a candidate note into the reason a reviewer would sign in a design review. That text renders into the agent context and into every violation message as the team's stated rationale. Only then run `baseline init`, which grandfathers exactly what is red at that moment. Curation comes first because day zero is the one moment when current and accepted are the same set. The baseline is also your signature on the debt.
 
 For Meridian the curation is a small set of edits against the draft (the finished result is [the committed spec](arch/Meridian.Architecture/MeridianArchitectureSpec.cs)):
 
+- Each layer gains a `Purpose` sentence, which `render` writes into the agent context. `layering/domain-independent` and `naming/controllers` stay `Enforce` and gain a real `Because`, and the first also gains a `Fix`.
 - The two data rules move from `Enforce` to `Migrate`. Each gains a factual `from:` line describing the old pattern ("Controllers open SqlConnection and run inline SQL directly"; "Code reads the ambient clock directly"). Each also gains a real `Because`, a `Fix`, and an `Exemplar` naming the type to copy (`BookingRepository` for the SQL, `BookingsController` for the clock). `check` resolves each exemplar to a file and line.
-- The clock rule gains the `.Except(SystemClock)` refinement from step 5.
-- The naming rule moves from `PackPosture.Enforce` to `PackPosture.Migrate` with its own `from:` line ("Repository and controller methods return Task without the Async suffix"). The rule also gains a `Fix` override. Renaming an interface method means moving its implementations with it, and the pack's generic hint does not say so. The rule's `Because` is untouched, since that reason was never Meridian's to write.
-- `di/no-buildserviceprovider` is left exactly as drafted. It was green on the evidence pass and the pack's own prose says everything worth saying, so there is nothing to curate.
+- The clock rule gains the `.Except(SystemClock)` refinement from step 5 and names its two members with lambdas (`() => DateTime.Now`), which render the same.
+- The naming rule moves from `PackPosture.Enforce` to `PackPosture.Migrate` with its own `from:` line ("Repository and controller methods return Task without the Async suffix"). The rule also gains a `Fix` override. Renaming an interface method means moving its implementations with it, and the pack's generic hint does not mention that. The rule's `Because` is untouched, since that reason was never Meridian's to write.
+- `di/no-buildserviceprovider` is left exactly as drafted. It was green on the evidence pass, and the pack's own reason, citation and fix already cover it, so it needs no curation.
 - The quarantined scope keeps its dragons prose and gains its real `Because`.
 
 Curating a taken rule is the same job as curating one you wrote, minus the part the pack already did. The reason is universal, so it ships in the pack. The posture and the remediation are local, so they stay yours.
@@ -379,7 +388,7 @@ wrote arch/baselines/clearance/engine/containment.json
 exit: 0
 ```
 
-`baseline init` writes four baselines, one per ratcheted rule, holding twelve inline-SQL references, seven clock reads, thirteen unsuffixed methods, and one inbound reach. Re-run `check` and the same code is green, because every red is now grandfathered:
+`baseline init` writes four baselines, one per ratcheted rule, holding 12 inline-SQL references, 7 clock reads, 13 unsuffixed methods, and 1 inbound reach. Re-run `check` and the same code is green, because every red is now grandfathered:
 
 ```text
 $ sliderule check examples/Meridian/Meridian.slnx
@@ -403,7 +412,7 @@ The rule IDs you commit here are the keys of those files. If you rename a rule l
 
 ## Step 7: render and commit
 
-On your solution, `render` turns the spec into agent-readable context. It writes one managed block into the root `AGENTS.md`. It also drops a scoped card into each quarantined scope's directory (the dragons) and each layer's directory (the local rules). Everything outside the managed markers is preserved byte for byte, so `render` is safe to run over hand-written files.
+On your solution, `render` turns the spec into agent-readable context. It writes one managed block into the root `AGENTS.md`. It also writes a scoped card into each scope's directory (the dragons). A layer with rules anchored on it gets a card in its directory too (the local rules). Everything outside the managed markers is preserved byte for byte, so `render` is safe to run over hand-written files.
 
 ```text
 $ sliderule render examples/Meridian/Meridian.slnx
@@ -415,11 +424,11 @@ unchanged sliderule.model.json
 exit: 0
 ```
 
-Read that carefully, because on your codebase the first `render` writes these files. Here every line says `unchanged` because the committed example already carries what `render` writes. That is exactly the property CI holds. `render` must be a no-op against the committed tree, or the build fails. The last line is the model file, `sliderule.model.json`, which the [build analyzer](../../src/SlideRule.Analyzers/README.md) reads. Your first `render` writes it only when you pass `--model`, and every later `render` keeps it current. The block itself is Meridian's spec in the words an agent reads before it writes. The [README shows what it contains](README.md#what-the-agent-reads), so this page does not repeat it.
+Read that output carefully, because on your codebase the first `render` writes these files. Here every line reports `unchanged` because the committed example already contains what `render` writes. CI runs `render --check` over this example and fails the build on any file a render would change. The last line is the model file, `sliderule.model.json`, which the [build analyzer](../../src/SlideRule.Analyzers/README.md) reads. Your first `render` writes it only when you pass `--model`, and every later `render` keeps it current. The block itself is Meridian's spec in the words an agent reads before it writes. The [README shows what it contains](README.md#what-the-agent-reads), so this page does not repeat it.
 
-If a `CLAUDE.md`, `.claude/CLAUDE.md` or `CLAUDE.local.md` sits in your solution directory or above it, Claude Code reads it instead of `AGENTS.md`, and `render` warns. Your own `~/.claude/CLAUDE.md` does not count. A `CLAUDE.md` beside `AGENTS.md` holding the line `@AGENTS.md` brings the block back.
+If a `CLAUDE.md`, `.claude/CLAUDE.md` or `CLAUDE.local.md` is in your solution directory or above it, Claude Code reads it instead of `AGENTS.md`, and `render` warns. Your own `~/.claude/CLAUDE.md` does not count. A `CLAUDE.md` next to `AGENTS.md` that contains the line `@AGENTS.md` brings the block back.
 
-Then commit the spec project, `arch/baselines/**`, the rendered `AGENTS.md` files, and the model file if you asked for one, all in one reviewable diff. A reviewer reads that change as three things at once (the proposed law, the acknowledged debt, and the generated context that will keep them true). That is the whole point of doing it in one commit.
+Then commit the spec project, `arch/baselines/**`, the rendered `AGENTS.md` files, and the model file if you asked for one, all in one reviewable diff. In one commit, a reviewer reads the proposed law, the acknowledged debt, and the generated context that will keep them true.
 
 ## Try it yourself
 
@@ -429,7 +438,9 @@ Everything above is reproducible against a scratch copy of this repository. Work
 git worktree add ../meridian-sandbox
 ```
 
-To reset to day zero inside the sandbox, delete `examples/Meridian/arch/` and remove the `Meridian.Architecture` entry (and the now-empty `arch` folder) from `examples/Meridian/Meridian.slnx`. Keep all four `AGENTS.md` files, because `render` only rewrites the managed blocks between its markers, and the root file's hand-written preamble cannot be regenerated. Build the example solution (`dotnet build examples/Meridian/Meridian.slnx`), then walk steps 1 through 7.
+To reset to day zero inside the sandbox, delete `examples/Meridian/arch/` and `examples/Meridian/sliderule.model.json`. Then remove the `Meridian.Architecture` entry (and the now-empty `arch` folder) from `examples/Meridian/Meridian.slnx`. Keep all four `AGENTS.md` files, because `render` only rewrites the managed blocks between its markers, and the root file's hand-written preamble cannot be regenerated. Build the example solution (`dotnet build examples/Meridian/Meridian.slnx`), then walk steps 1 through 7. At step 7, pass `--model` to `render` once, so it writes the model file again.
+
+Every example build attaches the [build analyzer](../../src/SlideRule.Analyzers/README.md), which reads the nearest `sliderule.model.json` at or above each project. Until step 7 writes the example's own, the nearest one is this repository's root model file, whose rules select no Meridian code.
 
 One substitution applies throughout. This repository is a source checkout, so each `sliderule <verb> …` line above runs as `dotnet run --no-build --project src/SlideRule.Cli -- <verb> …` from the repository root. Build the CLI first with `dotnet build src/SlideRule.Cli`. To use the `sliderule` command directly, install the global tool per the [README](README.md#run-it-yourself).
 
@@ -440,9 +451,9 @@ dotnet sln examples/Meridian/Meridian.slnx remove src/SlideRule/SlideRule.csproj
 dotnet sln examples/Meridian/Meridian.slnx remove src/SlideRule.Packs.DotNet/SlideRule.Packs.DotNet.csproj
 ```
 
-The path resolves against your working directory instead of the solution file, and a path that matches nothing is reported and ignored. Re-run `dotnet sln examples/Meridian/Meridian.slnx list` and expect exactly four projects. Second, `dotnet sln add` reformats the solution file, so a little `Meridian.slnx` churn in your final diff is expected.
+Each `remove` path is relative to your working directory. A path that matches no project is reported and ignored, so re-run `dotnet sln examples/Meridian/Meridian.slnx list` and expect exactly four projects. Second, `dotnet sln add` reformats the solution file, so a little `Meridian.slnx` churn in your final diff is expected.
 
-At the end, `git diff` lands on the committed spec and baselines byte for byte, the per-entry content seals included. In the sandbox the only change left is that solution-file formatting, as `git status` reported it after one such walk:
+At the end, the spec and the baselines match the committed files byte for byte, the per-entry content seals included. In the sandbox the only change left is that solution-file formatting, as `git status` reported it after one such walk:
 
 ```text
 $ git status --porcelain
@@ -450,4 +461,4 @@ $ git status --porcelain
 exit: 0
 ```
 
-The spec project, the four baselines, and the four `AGENTS.md` files are absent from the diff because the walk reproduced them exactly. That byte-identical landing proves the recipe is deterministic. The same code produced the same evidence and the same spec.
+The spec project is absent from the diff because you finished it to match the committed one. The four baselines, the model file and the four `AGENTS.md` files are absent because the walk reproduced them exactly. The same code and the same spec produced the same evidence and the same files, so the recipe's commands are deterministic.

@@ -19,6 +19,8 @@ public sealed class DocHygieneTests
         "GETTING-STARTED.md",
         "CODING-AGENTS.md",
         "CLI.md",
+        "WRITING-SPECS.md",
+        "OPERATING.md",
         "ARCHITECTURE.md",
         "CHANGELOG.md",
         "AGENTS.md"

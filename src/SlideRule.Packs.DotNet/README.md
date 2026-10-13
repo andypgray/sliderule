@@ -1,11 +1,14 @@
 # SlideRule.Packs.DotNet
 
 `SlideRule.Packs.DotNet` is a rule pack: nine canonical .NET rules as an ordinary class
-library, so a spec that wants them does not write them again. There is no plugin host, no
-manifest, and no discovery. You reference the project and call the methods you want.
+library, so a spec that wants them does not write them again. You reference the project and call
+the methods you want, with no plugin host, manifest or discovery step in between.
 
-This project is not published. It ships inside this repository as a working example and as the
-pack three of the repository's own specs consume.
+This project is not published to NuGet. It ships inside this repository as a working example, and
+three of the repository's own specs take rules from it. It targets `net10.0`, so a spec project that
+references it targets `net10.0` or later. To use it elsewhere, copy its source and package
+references into a class library that references the `SlideRule` package. You can also write a pack
+of your own the same way.
 
 ## Taking a rule
 
@@ -27,55 +30,56 @@ public sealed class MyArchitectureSpec : IArchitectureSpec
 }
 ```
 
-Add a `ProjectReference` to this project alongside the one to `SlideRule`. Also set
-`<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>`. The checker loads a spec through
-a resolver rooted at the spec's own DLL. Staging the pack's package dependencies beside it makes
-that resolution independent of what the checking machine has restored. Note where the failure would
-land if the setting is missing — at check time, not at build time.
+In the spec project, add a `ProjectReference` to this project alongside the one to `SlideRule`, and
+set `<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>`. The checker loads a spec
+through a resolver rooted at the spec's own DLL. Staging the pack's package dependencies next to that
+DLL makes the load independent of what the checking machine has restored. Without the setting the
+spec still builds, and a missing dependency is reported later, as an error when `check` loads the spec.
 
-A `typeof()` anchor on a **.NET shared framework** type is the one case no build setting reaches.
-An ASP.NET Core or WPF type arriving through `<FrameworkReference>` is never staged into a class
-library's output. Anchor those by string (`.DerivedFrom("Microsoft.AspNetCore.Mvc.ControllerBase")`,
-which renders identically) rather than by `typeof()`.
+A `typeof()` anchor on a .NET shared framework type is the one case a build setting cannot fix. An
+ASP.NET Core or WPF type that arrives through `<FrameworkReference>` is never staged into a class
+library's output. Anchor such a type by its full name, as in
+`.DerivedFrom("Microsoft.AspNetCore.Mvc.ControllerBase")`, which renders the same as the `typeof()`
+form.
 
 ## The nine rules
 
-| Method | Rule ID | What it says |
+| Method | Rule ID | What it requires |
 |---|---|---|
-| `ReuseHttpClient` | `http/reuse-httpclient` | nothing outside the composition root constructs an `HttpClient` |
-| `NoServiceLocator` | `di/no-service-locator` | nothing outside the resolve seam resolves from an `IServiceProvider` |
-| `NoBuildServiceProvider` | `di/no-buildserviceprovider` | nothing builds a second container while configuring services |
-| `NoSyncOverAsync` | `async/no-sync-over-async` | nothing blocks on a `Task` or a `ValueTask` |
-| `NoCaptiveDependencies` | `di/no-captive-dependencies` | singletons inject nothing scoped or transient |
-| `AsyncSuffix` | `naming/async-suffix` | authored `Task`/`ValueTask`-returning methods carry the `Async` suffix |
+| `ReuseHttpClient` | `http/reuse-httpclient` | only the composition root constructs an `HttpClient` |
+| `NoServiceLocator` | `di/no-service-locator` | only the resolve seam resolves from an `IServiceProvider` |
+| `NoBuildServiceProvider` | `di/no-buildserviceprovider` | no second container is built while configuring services |
+| `NoSyncOverAsync` | `async/no-sync-over-async` | no blocking on a `Task` or a `ValueTask` |
+| `NoCaptiveDependencies` | `di/no-captive-dependencies` | singletons inject no scoped or transient type |
+| `AsyncSuffix` | `naming/async-suffix` | authored `Task`/`ValueTask`-returning methods end in `Async` |
 | `NoGeneralCatch` | `exceptions/no-general-catch` | only the top-level handler swallows base `Exception` |
 | `AcceptCancellation` | `async/accept-cancellation` | authored `Task`/`ValueTask`-returning methods accept a `CancellationToken` |
-| `NoMappingAttributes` | `persistence/no-mapping-attributes` | persisted types carry no ORM mapping attribute |
+| `NoMappingAttributes` | `persistence/no-mapping-attributes` | persisted types have no `[Table]` or `[ComplexType]` |
 
-The method name is the rule-name half of the ID, PascalCased with the area dropped, so the
-mapping needs no table to use. Each method takes
-`(Arch arch, Selection subject, …, PackPosture posture, string? fix = null, Selection? exemplar = null)`;
-three of them take
-one extra `Selection` naming a seam (`compositionRoot`, `resolveSeam`, `topLevelHandler`).
+A method's name is the rule-name half of its ID, in PascalCase and with the area dropped, so
+`http/reuse-httpclient` is `ReuseHttpClient`. Every method
+takes
+`(Arch arch, Selection subject, …, PackPosture posture, string? fix = null, Selection? exemplar = null)`,
+and three of them take one extra `Selection` naming a seam (`compositionRoot`, `resolveSeam`,
+`topLevelHandler`).
 
 ## What the pack owns, and what you own
 
 The pack owns `Because` and `Citation`. The reason to reuse an `HttpClient` is the same in every
-codebase, and so is the page that says so. Both ship with the rule, and you can override neither.
-If a rule's rationale is different for you, that is a signal to write the rule yourself instead of
-taking it.
+codebase, and so is the page that explains it. Both ship with the rule, and you can override
+neither. If a rule's reason is different for you, write the rule yourself.
 
 You own the posture. Pass `PackPosture.Enforce` for law, or
 `PackPosture.Migrate("<what the code does today>")` for a ratchet against a baseline. The same rule
-is `Enforce` in a codebase that already keeps it and `Migrate` in one working it off. The pack
-has never seen your code and does not guess. Baseline paths stay conventional, so the pack never
-names a path.
+is `Enforce` in a codebase that already keeps it and `Migrate` in one working it off, and only you
+know which applies. The baseline path stays conventional (`arch/baselines/<rule-id>.json`), so the
+pack never names one.
 
-You own the selections: which types the rule governs, and which seam is exempt.
+You own the selections, which choose the types the rule governs and the seam it exempts.
 
-You may override `Fix`. Remediation names local types, and the pack's generic hint cannot.
-Pass it as the `fix` argument, not as a `.Fix(...)` trailer. Pack methods return `void`, so exactly
-one `Because`, one `Citation` and one `Fix` reach the rule and a second trailer will not compile.
+You may override `Fix`, since remediation names local types and the pack's generic hint cannot.
+Pass your hint as the `fix` argument. Pack methods return `void`, so a `.Fix(...)` trailer does not
+compile, and exactly one `Because`, one `Citation` and one `Fix` reach the rule.
 
 You may also name the type to copy. Pass a selection as the `exemplar` argument, such as
 `exemplar: arch.Types.Named("CarrierClient")`. `check` resolves it like any rule's exemplar,
@@ -84,13 +88,13 @@ prints where the type is declared beneath a failed rule, and warns when no type 
 ## Sharing a definition without taking the rule
 
 Sometimes the rule is yours and only the list is the pack's. This repository's own
-`mcp/no-blocking-waits` bans the same members as `async/no-sync-over-async`, but its reason names
-what a block costs inside a long-lived MCP server and its subject exempts one type by name. Neither
-of those is something a consumer can pass to a pack method, so the rule is written locally.
+`mcp/no-blocking-waits` bans the same members as `async/no-sync-over-async`. Its reason names what a
+block costs inside a long-lived MCP server, and a pack method takes no reason, so the rule is written
+locally.
 
-`BlockingWaitAnchors` hands that member set back for a local rule to ban. You keep the ID, the
-posture, the selections, the reason and the fix; the pack keeps one definition of what blocking on
-a task means, so a member added to it is added to both rules at once.
+`BlockingWaitAnchors` returns that member set for a local rule to ban. You keep the ID, the posture,
+the selections, the reason and the fix. The pack keeps one definition of what blocking on a task
+means, so a member added to it reaches both rules at once.
 
 ```csharp
 Selection host = arch.Namespace("MyApp.Host.*");
@@ -105,31 +109,37 @@ arch.Rule("host/no-blocking-waits")
     .Fix("Await the call and flow the CancellationToken.");
 ```
 
-The set arrives split because `MustNotUse` takes one member and the rest, not because the first one
-differs from the others. It is the only export of this kind in the pack today.
+The set comes in two parts only because `MustNotUse` takes one member and then the rest. It is the
+only export of this kind in the pack today.
 
 ## Opting out, and colliding
 
-Opting out is not calling the method. There is no suppression mechanism and no severity dial,
-because a rule you did not ask for cannot arrive.
+To opt out of a rule, leave its method uncalled. A rule arrives only where your spec calls for it, so
+the pack needs no suppression mechanism or severity dial.
 
-Taking a rule from the pack **and** writing it yourself is a duplicate ID, which fails the spec
-build with both sites reported. That is deliberate. Rule IDs are the baseline key and the
-`explain` handle, so one loud error beats two quiet reports of the same law under different names.
-It is also why the pack uses no ID prefix.
+Taking a rule from the pack and writing it yourself gives two rules one ID. The spec then fails to
+load, with the error at the first of the two declarations. The pack adds no prefix to its IDs, which
+is what makes the collision an error. Rule IDs are the baseline key and the `explain` handle, so one
+error beats the same law reported twice under two names.
 
 ## `ApplyAll`
 
-`ApplyAll` declares all nine at one posture, with no `Fix` overrides. Its only consumer is the
-test that proves the pack's full surface in one call. No real spec wants all nine at the same
-posture over the same subject; name the ones you mean.
+`ApplyAll` declares all nine at one posture, each with the pack's own `Fix`. Its only callers are the
+pack's own tests, which use it to cover the full surface in one call. A real spec names the rules it
+means, each at its own posture and over its own subject.
+
+To test a pack of your own without loading a solution, pass a spec that calls its methods to
+`SpecValidation.Validate`, from the contract package. It returns every mistake `sliderule check`
+would report before reading any code, and the test asserts that the list is empty.
 
 ## Anchor doctrine
 
-Every member anchor in this pack is written `arch.Member(typeof(X), nameof(X.M))`, never the
-expression form. The pack ships inside a codebase its own rules govern, and an expression anchor
-is real syntax. `arch.Member<IServiceProvider>(sp => sp.GetService(...))` would mint a use edge
-attributed to `DotNetGuidance` and make the pack a violator of `di/no-service-locator`. A `nameof`
-operand mints nothing, and both forms reify to the same anchor, so the doctrine costs nothing.
+Every member anchor in this pack uses the `nameof` form, `arch.Member(typeof(X), nameof(X.M))`. The
+pack ships inside a codebase its own rules govern, and the expression form is real code that the
+checker reads. Written as `arch.Member<IServiceProvider>(sp => sp.GetService(...))`, an anchor would
+record a use edge from `DotNetGuidance`, which `di/no-service-locator` reports as a violation wherever
+it governs the pack. A `nameof` operand records no edge, and both forms produce the same anchor, so
+every rule checks the same members either way.
 
-A test pins it by reading this project's source, so the rule survives a reformat.
+A test reads this project's source and fails on an expression anchor, so the doctrine survives a
+reformat.

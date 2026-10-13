@@ -1,5 +1,5 @@
-using Xunit;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.DocHygiene;
 
@@ -86,15 +86,16 @@ public sealed class GrandfatheredCountSyncTests
         new(DocPaths.MeridianReadme, MeridianRoot,
             "{0} current violations are grandfathered",
             [GrandfatheredCounts.RootTotal],
-            GrandfatheredCounts.CountStyle.TitleWord),
+            GrandfatheredCounts.CountStyle.WordToTen),
         new(DocPaths.MeridianReadme, MeridianRoot,
+            // A series mixing counts above and below ten reads as one list in digits.
             "{0} inline-SQL references, {1} wall-clock reads, {2} `Task`-returning methods missing the `Async` suffix, and {3} reach into the quarantined module",
             [InlineSql, InjectClock, AsyncSuffix, ClearanceContainment],
-            GrandfatheredCounts.CountStyle.Word),
+            GrandfatheredCounts.CountStyle.Numeral),
         new(DocPaths.MeridianReadme, MeridianRoot,
             "the {0} grandfathered ones stay quiet",
             [InlineSql],
-            GrandfatheredCounts.CountStyle.Word),
+            GrandfatheredCounts.CountStyle.WordToTen),
         new(DocPaths.MeridianReadme, MeridianRoot,
             "{0} reach into the module already exists",
             [ClearanceContainment],
@@ -103,37 +104,37 @@ public sealed class GrandfatheredCountSyncTests
             // Step 5's refinement, and the one place the walkthrough states the curated rule's own count.
             "which leaves {0} grandfathered controller reads and one type doing its job",
             [InjectClock],
-            GrandfatheredCounts.CountStyle.Word),
+            GrandfatheredCounts.CountStyle.WordToTen),
         new(MeridianAdopting, MeridianRoot,
             "holding {0} inline-SQL references, {1} clock reads, {2} unsuffixed methods, and {3} inbound reach",
             [InlineSql, InjectClock, AsyncSuffix, ClearanceContainment],
-            GrandfatheredCounts.CountStyle.Word),
+            GrandfatheredCounts.CountStyle.Numeral),
         new(MeridianAdopting, MeridianRoot,
             "prints its grandfathered count ({0}, {1}, {2}, and {3})",
             [InlineSql, InjectClock, AsyncSuffix, ClearanceContainment],
             GrandfatheredCounts.CountStyle.Numeral),
         new(MeridianStoryboard, MeridianRoot,
             // Beat 2: what the rendered block told the agent, and what made the name it chose debt.
-            "the {0} inline-SQL sites are grandfathered debt",
+            "the {0} inline-SQL references are grandfathered debt",
             [InlineSql],
-            GrandfatheredCounts.CountStyle.Word),
+            GrandfatheredCounts.CountStyle.WordToTen),
         new(MeridianStoryboard, MeridianRoot,
             "a second ratchet with {0} sites already on the record",
             [AsyncSuffix],
-            GrandfatheredCounts.CountStyle.Word),
+            GrandfatheredCounts.CountStyle.WordToTen),
         new(MeridianStoryboard, MeridianRoot,
             "is one of the {0}",
             [AsyncSuffix],
-            GrandfatheredCounts.CountStyle.Word),
+            GrandfatheredCounts.CountStyle.WordToTen),
         new(MeridianStoryboard, MeridianRoot,
             // Beat 3 points at the captured board rather than restating the count in words.
-            "reported as a passing rule with `grandfathered: {0}`",
+            "counted in the same block as `grandfathered: {0}`",
             [AsyncSuffix],
             GrandfatheredCounts.CountStyle.Numeral),
         new(InterchangeReadme, InterchangeRoot,
-            "the generated baseline carries {0} entries",
+            "the generated baseline contains {0} entries",
             [NoSyncOverAsync],
-            GrandfatheredCounts.CountStyle.Word),
+            GrandfatheredCounts.CountStyle.WordToTen),
         new(OperationsReadme, OperationsRoot,
             // The closing line of the quarantine argument: the count of grandfathered edges is the point.
             "{0} edge, one owner",
@@ -142,9 +143,9 @@ public sealed class GrandfatheredCountSyncTests
         new(DocPaths.SelfCheck, MeridianRoot,
             // The SARIF section's claim about the Meridian ratchet it is cut from. Its predecessor said
             // "four" for two days after that baseline shrank to two, which is the drift this gate catches.
-            "Its {0} baselined sites keep the rule green",
+            "Its {0} baselined violations keep the rule green",
             [InlineSql],
-            GrandfatheredCounts.CountStyle.Word)
+            GrandfatheredCounts.CountStyle.WordToTen)
     ];
 
     /// <summary>
@@ -194,11 +195,7 @@ public sealed class GrandfatheredCountSyncTests
             + "the violations any of them grandfathers."),
         (DocPaths.MeridianReadme,
             "Move a controller onto a repository and its grandfathered count drops",
-            "The zero is where a burndown ends, not a count the baseline holds today."),
-        (InterchangeReadme,
-            "grandfathers the one legacy corner on a counted baseline",
-            "The one is the legacy corner the rule ratchets — a single adapter type — while its baseline "
-            + "carries three entries, one per blocking member it touches.")
+            "The zero is where a burndown ends, not a count the baseline holds today.")
     ];
 
     [Fact]

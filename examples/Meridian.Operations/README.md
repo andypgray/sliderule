@@ -1,10 +1,10 @@
 # Module isolation as law: Meridian.Operations
 
-Module isolation is the enforceable law here. The subsystem's five modules are namespace subtrees inside one ASP.NET Core web project. This example is the only one that foregrounds a scoped rules card in every module directory, which `sliderule render` writes beside each module's code. The fiction is the same freight-forwarding company as [`../Meridian/`](../Meridian/), built this time as modules inside one deployable.
+Module isolation is the enforceable law here. The subsystem's five modules are namespace subtrees inside one ASP.NET Core web project. This example is the only one that foregrounds a scoped rules card in every module directory, which `sliderule render` writes next to each module's code. The fiction is the same freight-forwarding company as [`../Meridian/`](../Meridian/), built this time as modules inside one deployable.
 
-## The card beside the rules
+## The rules and their rendered card
 
-Two rules govern the Invoicing module, from [arch/Meridian.Operations.Architecture/OperationsArchitectureSpec.cs](arch/Meridian.Operations.Architecture/OperationsArchitectureSpec.cs), the first of them over all three modules at once:
+Two rules govern the Invoicing module. They come from [arch/Meridian.Operations.Architecture/OperationsArchitectureSpec.cs](arch/Meridian.Operations.Architecture/OperationsArchitectureSpec.cs), with the spec's three `Contracts` selections written out inline:
 
 ```csharp
         arch.Rule("modules/internals")
@@ -23,9 +23,9 @@ Two rules govern the Invoicing module, from [arch/Meridian.Operations.Architectu
             .Because("Invoicing prices a shipment from tracking's milestone contracts and the demurrage charge and integrates with nothing else, so billing's dependencies stay the two it actually needs and the module graph stays legible.");
 ```
 
-`modules/internals` is one rule where the spec used to carry three. `arch.Each` makes the three modules the subject, one cell each. The phrase "their own layer" means the cell a type sits in. Invoicing's `Contracts` types, carved out of the subject, therefore still count as Invoicing's own. A reference into the assembler from another module is red, and one from inside Invoicing, `Contracts` included, is not.
+`modules/internals` covers Dispatch, Tracking and Invoicing in one rule, because `arch.Each` makes the three modules the subject, one cell each. In the rendered sentence below, "their own layer" means the cell a type is in. Invoicing's `Contracts` types, carved out of the subject, therefore still count as Invoicing's own. A reference into the assembler from another module is red, and one from inside Invoicing, `Contracts` included, is allowed.
 
-`sliderule render` turns those into the card it writes beside the module's code, [src/Meridian.Operations/Invoicing/AGENTS.md](src/Meridian.Operations/Invoicing/AGENTS.md):
+`sliderule render` turns those two rules into the card it writes in the module's directory, [src/Meridian.Operations/Invoicing/AGENTS.md](src/Meridian.Operations/Invoicing/AGENTS.md):
 
 ```markdown
 <!-- sliderule:begin -->
@@ -53,7 +53,7 @@ unchanged src/Meridian.Operations/Demurrage/AGENTS.md
 unchanged sliderule.model.json
 ```
 
-Every line reads `unchanged` because the committed cards and model file already match the spec. CI runs `render --check` on every push, which fails on any file a render would change, so these cards are provably the rules the build enforces.
+Every line reads `unchanged` because the committed cards and model file already match the spec. CI runs `render --check` on every push, and the check fails on any file a render would change. These cards are therefore the rules the build enforces.
 
 ## The module map
 
@@ -62,17 +62,17 @@ The whole subsystem is one `Microsoft.NET.Sdk.Web` project. Its five modules are
 The three law modules each publish a `Contracts` namespace and keep the rest to themselves. Demurrage's public surface is its calculator facade, and Host consumes surfaces without publishing one. The spec pins the dependency arrows one module at a time:
 
 - Tracking is the leaf. It owns the shipment milestone timeline the others read, and references no module in turn (`tracking.MustOnlyReferenceItself()`).
-- Dispatch reads `Tracking.Contracts` to gate a haulage leg on a Booked milestone, and reaches nothing else.
+- Dispatch reads only `Tracking.Contracts`, to gate a haulage leg on a Booked milestone.
 - Invoicing reads `Tracking.Contracts` and the Demurrage layer to price a shipment.
 - Host is the composition root. It wires the three module `Contracts` surfaces and the demurrage calculator facade, and sees no module's internals.
 
-Those allow-lists are the module graph. The language has a cycle gate, `arch.Each(dispatch, tracking, invoicing).MustNotHaveCircularReferences()`, which would let the three modules reference each other so long as no circle closes. Operations does not write that gate, because its allow-lists say more. Each module's `MustOnlyReference` names its outbound arrows by hand, and none of them points back. An arrow the spec does not list is red whether or not it closes a circle. The cycle gate is the law for peers whose order nobody has stated yet. Here the spec states the order.
+Those allow-lists are the module graph. Demurrage has no outbound rule of its own. Its code references no other module, and the quarantine's containment rule covers references into it. The language also has a cycle gate, `arch.Each(dispatch, tracking, invoicing).MustNotHaveCircularReferences()`, which would let the three modules reference each other so long as no circle closes. Operations does not use that gate, because its allow-lists are stricter. The other four modules each name their outbound arrows by hand in an allow-list, and none of them points back. An arrow the spec does not list is red whether or not it closes a circle. The cycle gate suits peers whose order is still open, and here the spec states the order.
 
-[ARCHITECTURE.md](ARCHITECTURE.md) is that map, drawn rather than listed. Its law fence has ten nodes. The codebase survey beside it has two, because MSBuild sees one project and the module lines exist only in the spec. Tracking's leaf rule names no target at all, and `modules/internals` ranges over three modules whose far end is a different module for every cell. Both are therefore listed under the fence instead of drawn as arrows to themselves.
+[ARCHITECTURE.md](ARCHITECTURE.md) shows that map as a drawing. Its law fence has ten nodes. The codebase survey next to it has two, the web project and the spec project, because the module lines exist only in the spec. Tracking's leaf rule and `modules/internals` are in the list under the law fence, because each would point a module back at itself.
 
 ## One edit, two rules
 
-An agent working in Dispatch wants a quick invoice preview and constructs Invoicing's internal `InvoiceAssembler` directly. It compiles, because in a monolith `internal` is assembly-wide. Nothing at the language level stops one module from reaching into another's internals. `dotnet build` is green. `check` is not, and it fails twice on the one reference. The report below keeps the two failures and the summary line:
+An agent working in Dispatch wants a quick invoice preview and constructs Invoicing's internal `InvoiceAssembler` directly. It compiles, because in a monolith `internal` is assembly-wide, and the language lets one module reach into another's internals. Every example build attaches the [build analyzer](../../src/SlideRule.Analyzers/README.md#what-the-build-checks-and-what-it-leaves-to-check), so `dotnet build` warns `SR2001` for `modules/dispatch/outbound` at the reference and exits 0. This repository's CI promotes the analyzer's warnings to errors, so there the same build fails. `modules/internals` covers a family of modules, and the build leaves every family rule to `check`. `check` fails twice on the one reference. The report below keeps the two failures and the summary line:
 
 ```text
 FAIL modules/internals — Types in each of the Dispatch, Tracking and Invoicing layers, except types in `Meridian.Operations.Dispatch.Contracts.*`, `Meridian.Operations.Tracking.Contracts.*` or `Meridian.Operations.Invoicing.Contracts.*`, must be referenced only by their own layer.
@@ -86,11 +86,11 @@ FAIL modules/dispatch/outbound — The Dispatch layer must reference only types 
 Checked 8 rules: 5 passed, 2 failed, 1 skipped (2 violations, 0 warnings).
 ```
 
-`modules/internals` is the reached module's guard, one rule over the three modules that fires here because the reach lands inside Invoicing's cell. It carries all four message components: the rule ID, the `because`, the `fix` naming the `Contracts` types to use instead, and the exact `file:line`. `modules/dispatch/outbound` is the reaching module's cap. Dispatch may point only at itself and `Tracking.Contracts`, and the new arrow into Invoicing is neither. Both fire on one reference, and that double fire is the modularity guarantee. The guarded side and the reaching side catch the reference independently, so deleting either rule would still leave the reach red. Remove the file, rebuild, and `check` is back to `7 passed, 0 failed, 1 skipped`.
+`modules/internals` is the reached module's guard, one rule over the three modules that fires here because the reach lands inside Invoicing's cell. Its block has all four message components: the rule ID, the `because`, the `fix` naming the `Contracts` types to use instead, and the exact `file:line`. `modules/dispatch/outbound` is the reaching module's cap. Dispatch may point only at itself and `Tracking.Contracts`, and the new arrow into Invoicing is neither. Both fire on one reference, and that double fire is the modularity guarantee. The guarded side and the reaching side catch the reference independently, so deleting either rule would still leave the reach red. The [agent hook](../../hooks/README.md#when-it-fires) runs the same `check` when an agent's turn ends, and the same two failures block the stop. Remove the file, rebuild, and `check` is back to `7 passed, 0 failed, 1 skipped`.
 
 ## A module can also be quarantined
 
-Demurrage is in the map as a module and pinned again as a quarantined scope. It is the demurrage engine, the code that counts free-time and billable days between discharge and gate-out and prices them across non-contiguous tariff tiers. It follows a carrier tariff sheet whose conventions read like bugs. `render` drops its dragons card into the module directory, [src/Meridian.Operations/Demurrage/AGENTS.md](src/Meridian.Operations/Demurrage/AGENTS.md):
+Demurrage is in the map as a module and pinned again as a quarantined scope. It is the demurrage engine, the code that counts free-time and billable days between discharge and gate-out and prices them across non-contiguous tariff tiers. It follows a carrier tariff sheet whose conventions read like bugs. `render` writes its dragons card into the module directory, [src/Meridian.Operations/Demurrage/AGENTS.md](src/Meridian.Operations/Demurrage/AGENTS.md):
 
 ```markdown
 <!-- sliderule:begin -->
@@ -108,19 +108,19 @@ Dragons: Demurrage engine: it counts free-time then billable days between discha
 <!-- sliderule:end -->
 ```
 
-One legacy reach into the engine already exists. The invoicing reconciler needs the per-day breakdown that `IDemurrageCalculator` does not expose, so it constructs `FreeTimeCalendar` from inside Invoicing. That edge is grandfathered by symbol ID on the quarantine baseline, and every new reach is red. `sliderule status` prints the burndown, where the quarantine's line reads:
+One reach into the engine already exists. The invoicing reconciler needs the per-day breakdown that `IDemurrageCalculator` does not expose, so it constructs `FreeTimeCalendar` from inside Invoicing. That edge is grandfathered by symbol ID on the quarantine baseline, and every new reach is red. `sliderule status` prints the burndown, where the quarantine's line reads:
 
 ```text
 pass demurrage/engine/containment (quarantine) — 1 grandfathered remaining (2 sites), 0 new, 0 fixed awaiting acceptance
 ```
 
-`modules/invoicing/outbound` allows the entire Demurrage layer, internals included, so the quarantine alone owns facade discipline. The quarantine can baseline that one edge, but an `Enforce` rule cannot carry a baseline. If the outbound rule named only the facade, the reconciler's reach would therefore have nowhere to be grandfathered and would fail as new. One edge, one owner.
+`modules/invoicing/outbound` allows the entire Demurrage layer, internals included, so the quarantine alone owns facade discipline. The quarantine can baseline that one edge, but an `Enforce` rule cannot have a baseline. If the outbound rule named only the facade, the reconciler's reach would break that rule too and fail as new. One edge, one owner.
 
 ## Spring Modulith
 
-Spring Modulith is the nearest tool in another ecosystem, and the idea it shares with this tool is real. In both tools, one module model drives verification and generated documentation, so the docs and the checks cannot drift apart.
+Spring Modulith is the nearest tool in another ecosystem, and it shares SlideRule's central idea. In both tools, one module model drives verification and generated documentation, so the docs and the checks cannot drift apart.
 
-The differences are as real. Spring Modulith is Java and Spring, and it reads the module model from package conventions and annotations. Its `verify()` adds automatic cycle detection, and its `Documenter` emits human-facing component diagrams and module canvases; it also carries runtime module features. This tool is .NET, and its boundaries are explicit reified rules, each carrying its own `because` and `fix`. It renders two targets from the one spec. One is a deterministic `check` for CI and agent hooks. The other is generated agent context, including the per-directory cards this example is built around. Postures compose, so a module can be law and a quarantined scope at once, as Demurrage is. Where Spring Modulith detects cycles automatically, this spec states the order. Its `MustOnlyReference` allow-lists pin the DAG by hand. The language does have a cycle gate, `MustNotHaveCircularReferences()`, but it goes unused here because an allow-list says more than "not in a circle".
+The details differ. Spring Modulith is Java and Spring, and it reads the module model from package conventions and annotations. Its `verify()` adds automatic cycle detection, and its `Documenter` emits human-facing component diagrams and module canvases. Spring Modulith also includes runtime module features. SlideRule is .NET, and its boundaries are explicit reified rules, each with its own `because` and an optional `fix`. SlideRule renders two targets from the one spec. One is a deterministic `check` for CI and agent hooks. The other is generated agent context, including the per-directory cards this example is built around. Postures compose, so a module can be law and a quarantined scope at once, as Demurrage is. Where Spring Modulith detects cycles automatically, this spec states the order in allow-lists, as [The module map](#the-module-map) explains.
 
 ## Run it yourself
 
@@ -137,8 +137,10 @@ dotnet build examples/Meridian.Operations/Meridian.Operations.slnx
 sliderule check examples/Meridian.Operations/Meridian.Operations.slnx
 ```
 
-Without the global tool, run the CLI from source with `dotnet run --project src/SlideRule.Cli -- check examples/Meridian.Operations/Meridian.Operations.slnx`. `check` exits 0 here, and its summary reads `Checked 8 rules: 7 passed, 0 failed, 1 skipped (0 violations, 0 warnings)`. `sliderule render` regenerates the root block, all five module cards and the [ARCHITECTURE.md](ARCHITECTURE.md) drawings. `sliderule status` prints the quarantine burndown, and `sliderule explain <rule-id>` expands any rule, as does the `arch_explain` MCP tool. Introduce the reach from "One edit, two rules" and `check` exits 1 with the two blocks shown there.
+Without the global tool, run the CLI from source with `dotnet run --project src/SlideRule.Cli -- check examples/Meridian.Operations/Meridian.Operations.slnx`. `check` exits 0 here, and its summary reads `Checked 8 rules: 7 passed, 0 failed, 1 skipped (0 violations, 0 warnings)`. The skipped rule is the quarantine's tripwire, `demurrage/engine/tripwire`. It runs only on a check that has a list of changed files. `check` builds that list from a `--diff-base` ref, and the `hook` verb gives its check the files the turn changed. The tripwire then warns on each changed file that declares an engine type.
+
+`sliderule render` regenerates the six cards, and the `render --diagram` command at the foot of [ARCHITECTURE.md](ARCHITECTURE.md) redraws its drawings. `sliderule status` prints the quarantine burndown, and `sliderule explain <rule-id>` expands any rule, as does the `arch_explain` MCP tool. Introduce the reach from [One edit, two rules](#one-edit-two-rules) and `check` exits 1 with the two blocks shown there.
 
 ## From here
 
-[`../Meridian/`](../Meridian/) contains one quarantined engine behind a facade. Meridian.Operations generalizes that containment to a five-module map, the law modules each behind a `Contracts` surface and the engine still behind its facade. This example also renders a scoped card into every module directory. The [`../Meridian.Quoting/`](../Meridian.Quoting/) example applies clean-architecture layering as the discipline inside a single module. Here the same `Enforce` vocabulary draws the lines between modules instead. Each example uses the same spec language at a different grain.
+[`../Meridian/`](../Meridian/) contains one quarantined engine behind a facade. Meridian.Operations generalizes that containment to a five-module map, the law modules each behind a `Contracts` surface and the engine still behind its facade. The [`../Meridian.Quoting/`](../Meridian.Quoting/) example applies clean-architecture layering as the discipline inside a single module. Here the same `Enforce` vocabulary draws the lines between modules instead. Each example uses the same spec language at a different grain.

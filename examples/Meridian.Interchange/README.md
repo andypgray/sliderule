@@ -1,36 +1,36 @@
 # Microsoft guidance, enforced and cited: Meridian.Interchange
 
-Twelve rules encode canonical Microsoft .NET guidance, each citing the learn.microsoft.com page it enforces. Every rule pairs a one-sentence reason with a `Citation` naming the Microsoft page behind it. The rendered agent context therefore quotes the guidance with its provenance, and a reviewer can follow the link to the source.
+Meridian.Interchange is Meridian's outbound interchange worker, governed by 12 rules, each citing the learn.microsoft.com page it enforces. Every rule pairs a one-sentence reason with a `Citation` naming the Microsoft page behind it. The rendered agent context therefore quotes the guidance with its provenance, and a reviewer can follow the link to the source.
 
-The other examples state house rules. This one states Microsoft's rules and shows its work. An agent dropped into the worker reads the rules before it writes, and here each rule cites the canonical page. "Reuse HttpClient" arrives as the documented .NET guideline with the page that says so, not as one team's preference. The rule the agent reads is the rule the build enforces, and both carry the citation. This page reads as a cookbook. Each recipe gives a canon sentence, then the spec line that encodes it, then the captured `check` output when the code breaks it. That output is cut to the rules that went red.
+The other examples state house rules. This one states Microsoft's rules and shows its work. An agent dropped into the worker reads the rules before it writes, and each rule cites the canonical page. "Reuse HttpClient" arrives as the documented .NET guideline, with the page behind it. The rule the agent reads is the rule the build enforces, and both include the citation. This page is a cookbook. Each recipe gives the guidance sentence, the spec line that encodes it, and the captured `check` output when the code breaks it. That output is cut to the rules that went red.
 
-The worked codebase is Meridian's outbound interchange worker, the freight-forwarding fiction shared with [`../Meridian/`](../Meridian/). The worker is long-lived and business-critical, the transmit path other teams depend on.
+The worker belongs to the freight-forwarding fiction shared with [`../Meridian/`](../Meridian/). It is long-lived and business-critical, the transmit path other teams depend on.
 
 ## The worker
 
-Meridian.Interchange drains an outbox and transmits booking confirmations, status updates, and customs filings to trading partners (carriers, customs systems, terminals) over HTTP. It is one `Microsoft.NET.Sdk.Worker` project; the modules are namespace subtrees inside it, the [`Meridian.Operations`](../Meridian.Operations/) shape.
+Meridian.Interchange drains an outbox and transmits booking confirmations, status updates, and customs filings to trading partners (carriers, customs systems, terminals) over HTTP. It is one `Microsoft.NET.Sdk.Worker` project whose modules are namespace subtrees, the shape [`Meridian.Operations`](../Meridian.Operations/) uses.
 
 The parts the rules act on:
 
-- `Partners` holds the `IPartnerClient` family. `CarrierClient`, `CustomsFilingClient`, and `TerminalClient` are typed clients whose `HttpClient` comes from `IHttpClientFactory`. `LegacyManifestClient` is the one corner that still blocks.
-- `Outbox` holds `OutboxMessage` and the scoped `IOutboxStore`. `Processing` holds the scoped `OutboxProcessor`, which reads its settings from an `IOptionsSnapshot<InterchangeOptions>` (the correct options type for a scoped consumer).
-- `Dispatch` holds `OutboxDispatcher`, a `BackgroundService`. A hosted service is a singleton, so it captures no scoped service itself. The dispatcher delegates each poll to a seam in the composition root.
-- `Host` is that composition root. `InterchangeServiceCollectionExtensions` wires every service, and `ScopedDispatchRunner` opens a DI scope per poll and resolves the scoped processor inside it. Construction and service-location live here and nowhere else, which is why three of the rules except this one namespace.
+- `Partners` contains the `IPartnerClient` family. `CarrierClient`, `CustomsFilingClient` and `TerminalClient` are typed clients whose `HttpClient` comes from `IHttpClientFactory`. `LegacyManifestClient` is the one corner that still blocks.
+- `Outbox` contains `OutboxMessage` and the scoped `IOutboxStore`. `Processing` contains the scoped `OutboxProcessor`, which reads its settings from an `IOptionsSnapshot<InterchangeOptions>`, the options type for a scoped consumer.
+- `Dispatch` contains `OutboxDispatcher`, a `BackgroundService`. A hosted service is a singleton, so it captures no scoped service itself and delegates each poll to a seam in the composition root.
+- `Host` is that composition root. `InterchangeServiceCollectionExtensions` wires every service, and `ScopedDispatchRunner` opens a DI scope per poll and resolves the scoped processor inside it. Construction and service location happen in this namespace alone, which is why three of the rules except it.
 
-[ARCHITECTURE.md](ARCHITECTURE.md) draws the worker beside its law, and it is the thinnest pair in the example set on purpose. Eleven of the twelve rules here are about how a type is built, called or named. They draw nothing, so they are listed under the fence.
+The drawings in [ARCHITECTURE.md](ARCHITECTURE.md) are the thinnest pair in the example set. The law fence has arrows for reference and exposure rules between named places. All but one of the rules here use another verb, or a subject the drawing cannot place, so they are listed under the fence.
 
-That last point is the crux the app is built around. The dispatcher is a singleton that must run scoped work. The sanctioned way to do that is an `IServiceScopeFactory` scope, and the resolve inside it (`scope.ServiceProvider.GetRequiredService<IOutboxProcessor>()`) is the service-locator call rule 3 bans. Confining both to `Meridian.Interchange.Host.*` lets the ban stay total everywhere else while the one legitimate resolve site is excepted.
+The crux of the design is the dispatcher, a singleton that must run scoped work. The sanctioned way is an `IServiceScopeFactory` scope, and the resolve inside it (`scope.ServiceProvider.GetRequiredService<IOutboxProcessor>()`) is the service-locator call `di/no-service-locator` bans. Confining both to `Meridian.Interchange.Host.*` keeps the ban total everywhere else while the one sanctioned resolve site is excepted.
 
 ## The spec
 
-Twelve rules of ordinary C# in [arch/Meridian.Interchange.Architecture/InterchangeArchitectureSpec.cs](arch/Meridian.Interchange.Architecture/InterchangeArchitectureSpec.cs). Each carries a posture, a reason, the page it cites, and a fix.
+The spec is one class of ordinary C#, [arch/Meridian.Interchange.Architecture/InterchangeArchitectureSpec.cs](arch/Meridian.Interchange.Architecture/InterchangeArchitectureSpec.cs). Each rule has a posture, a reason, the page it cites and a fix.
 
-| Rule | Posture | What it says |
+| Rule | Posture | Requirement |
 |---|---|---|
 | `di/construct-via-container` | Enforce | construct partner clients only in the root |
 | `http/reuse-httpclient` | Enforce | do not `new HttpClient()` |
 | `di/no-service-locator` | Enforce | do not resolve from the provider |
-| `di/no-buildserviceprovider` | Enforce | no `BuildServiceProvider` while configuring |
+| `di/no-buildserviceprovider` | Enforce | do not call `BuildServiceProvider` |
 | `async/no-sync-over-async` | Migrate | do not block on a `Task` or a `ValueTask` |
 | `di/hosted-services-scope-their-work` | Enforce | a hosted service captures no scoped service |
 | `di/no-captive-dependencies` | Enforce | a singleton injects no scoped or transient service |
@@ -40,9 +40,9 @@ Twelve rules of ordinary C# in [arch/Meridian.Interchange.Architecture/Interchan
 | `persistence/no-mapping-attributes` | Enforce | no `[Table]`/`[ComplexType]` on a persisted type |
 | `contracts/no-entity-exposure` | Enforce | do not expose `OutboxMessage` outside the `Outbox` cone |
 
-Eleven rules are already true, so they are law (`Enforce`). One describes the blocking corner with a target, so it ratchets (`Migrate`). The current blocking is grandfathered, and any new blocking is red.
+The code already keeps 11 of them, so they are law (`Enforce`). The remaining rule, `async/no-sync-over-async`, describes the blocking corner as debt with a target, so it ratchets (`Migrate`). The blocking that exists is grandfathered, and new blocking is red.
 
-Nine of the twelve say nothing this worker makes special, so they are not written here at all. They come from `DotNetGuidance`, a shared rule pack that is an ordinary class library the spec project references. The pack ships inside this repository rather than as a package to install; on your own solution it is a class library you write. The reason to reuse an `HttpClient` is the same in every codebase, and so is the page that says so. The pack therefore owns each rule's `Because` and its `Citation`. This spec picks the posture and the selections. Where remediation needs local words, it overrides the `Fix`. Where one of Meridian's types already shows the fix, it names that type as the `Exemplar`. The three rules that name Meridian's own types are written out in full. Both forms sit in the same `Define`:
+Of the 12 rules, nine are general .NET guidance, so they come from `DotNetGuidance`, a shared rule pack. The pack is an ordinary class library the spec project references, and it ships inside this repository. On your own solution it is a class library you write. The reason to reuse an `HttpClient` is the same in every codebase, and so is the page behind it. The pack therefore provides each rule's `Because` and `Citation`. This spec picks the posture and the selections. Where remediation needs local words, it overrides the `Fix`. Where one of Meridian's types already shows the fix, it names that type as the `Exemplar`. The three rules whose constraint names one of Meridian's own types (`IPartnerClient`, `IOutboxStore` and `OutboxMessage`) are written out in full. Both forms appear in the same `Define`:
 
 ```csharp
 DotNetGuidance.ReuseHttpClient(arch, arch.Types, host, PackPosture.Enforce,
@@ -57,41 +57,18 @@ arch.Rule("di/hosted-services-scope-their-work")
     .Exemplar(arch.Types.Named("OutboxDispatcher", "ScopedDispatchRunner"));
 ```
 
-They reify to the same kind of rule, so nothing downstream can tell you which came from where. The rendered context, the violation message, and the citation read identically either way.
+They reify to the same kind of rule, so the rendered context, the violation message and the citation read the same either way. The [Rule packs](../../WRITING-SPECS.md#rule-packs) section of Writing specs explains the split between a pack and the spec that takes it.
 
-`sliderule render` writes those into the managed block in [AGENTS.md](AGENTS.md), citation and all. CI re-renders on every push and fails on any diff, so the context an agent reads is provably the spec the build enforces:
+`sliderule render` writes those into the managed block in [AGENTS.md](AGENTS.md), citation and all. CI runs `render --check` over this example and fails on a stale block, so the context an agent reads is the spec the build enforces:
 
 ```markdown
 - `http/reuse-httpclient` — Types, except types in `Meridian.Interchange.Host.*`, must not construct `HttpClient`. A new HttpClient per call exhausts sockets under load; IHttpClientFactory pools handlers. See <https://learn.microsoft.com/dotnet/fundamentals/networking/http/httpclient-guidelines>.
 - `di/hosted-services-scope-their-work` — Types derived from `BackgroundService` must not reference `IOptionsSnapshot<TOptions>` or `IOutboxStore`. A BackgroundService is a singleton; a captured scoped IOptionsSnapshot or scoped store outlives its scope; resolve per work item from an IServiceScopeFactory scope. See <https://learn.microsoft.com/dotnet/core/extensions/scoped-service>.
 ```
 
-## The silent win
-
-`http/reuse-httpclient` is green over a codebase that never breaks it. No type constructs an `HttpClient`. The three typed clients receive theirs from `IHttpClientFactory`, and the legacy adapter takes a named client from the factory in the composition root. The rule's target is absent, so the rule passes by guarding a state that is already clean. A silent win stays silent only while the code stays right. It goes loud the moment an agent reaches for the shortcut the guideline warns about.
-
-Add one line to `CarrierClient.SendAsync`, the shortcut a socket-exhaustion bug is made of:
-
-```csharp
-using var probe = new HttpClient();
-```
-
-`dotnet build` is green, because `new HttpClient()` is valid C#. `check` is not:
-
-```text
-FAIL http/reuse-httpclient — Types, except types in `Meridian.Interchange.Host.*`, must not construct `HttpClient`.
-  because: A new HttpClient per call exhausts sockets under load; IHttpClientFactory pools handlers.
-  citation: https://learn.microsoft.com/dotnet/fundamentals/networking/http/httpclient-guidelines
-  fix: Take a typed or named client from IHttpClientFactory; the exemplar receives its HttpClient through its constructor.
-  exemplar: CarrierClient (src/Meridian.Interchange/Partners/CarrierClient.cs:9)
-  src/Meridian.Interchange/Partners/CarrierClient.cs:15 — Meridian.Interchange.Partners.CarrierClient constructs System.Net.Http.HttpClient
-```
-
-The message carries six components: the rule ID, the `because`, the `citation` naming the Microsoft page, the `fix`, the `exemplar`, and the exact `file:line`. The `exemplar` line points at the file that declares `CarrierClient`, which already receives its client through its constructor. `check` warns if that type is ever renamed away. An agent that reads this failure gets the guideline and its source in the same breath, then corrects the code. Revert the line and `check` is green again.
-
 ## The burndown
 
-One rule ratchets. `LegacyManifestClient` adapts Meridian's own legacy manifest gateway, whose SDK exposes only synchronous entry points. The adapter therefore blocks at three points: serializing the manifest, taking the single-flight gate, and posting it. Those three lines touch three distinct blocking members (`TaskAwaiter<T>.GetResult`, `Task.Wait`, and `Task<T>.Result`), so the generated baseline carries three entries. Because they are grandfathered, `check` exits 0, and `sliderule status` prints what is left to work off:
+The one `Migrate` rule governs every type, and all of its debt is in `LegacyManifestClient`. The adapter wraps Meridian's own legacy manifest gateway, whose SDK exposes only synchronous entry points. It therefore blocks at three points: serializing the manifest, taking the single-flight gate, and posting it. Those three lines touch three distinct blocking members (`TaskAwaiter<T>.GetResult`, `Task.Wait` and `Task<T>.Result`), so the generated baseline contains three entries. The entries are grandfathered, so `check` exits 0 and `sliderule status` prints what is left to work off:
 
 ```text
 pass di/construct-via-container
@@ -109,28 +86,51 @@ pass contracts/no-entity-exposure
 Checked 12 rules: 12 passed, 0 failed, 0 skipped. Burndown: 3 grandfathered remaining, 0 fixed awaiting acceptance.
 ```
 
-The three blocking calls are recorded, not accepted. New blocking anywhere in the worker is red on sight. When the legacy SDK exposes an async surface and the corner is rewritten, the count drops to zero. The rule is then ready to promote to `Enforce`.
+The three blocking calls are recorded as debt, and new blocking anywhere in the worker is red on sight. When the legacy SDK exposes an async surface and the corner is rewritten, the entries become fixed awaiting acceptance. After `baseline accept-reductions` empties the baseline, `status` suggests promoting the rule to `Enforce`. The [Working a ratchet down](../../OPERATING.md#working-a-ratchet-down) section of Operating covers the commands that shrink a baseline and the promotion.
+
+## The silent win
+
+`http/reuse-httpclient` is green over a codebase that never breaks it. No type constructs an `HttpClient`. The three typed clients receive theirs from `IHttpClientFactory`, and the legacy adapter takes a named client from the factory in the composition root. The rule's target is absent, so the rule passes by guarding a state that is already clean.
+
+Add one line to `CarrierClient.SendAsync`, the shortcut a socket-exhaustion bug is made of:
+
+```csharp
+using var probe = new HttpClient();
+```
+
+`dotnet build` still exits 0, because `new HttpClient()` is valid C#, and it prints `SR2001`, the broken-rule warning, at the new line. Every example build attaches the [build analyzer](../../src/SlideRule.Analyzers/README.md), which decides this rule from one project's compilation. This repository's CI promotes the analyzer's warnings to errors, so there the same build fails. `check` exits 1:
+
+```text
+FAIL http/reuse-httpclient — Types, except types in `Meridian.Interchange.Host.*`, must not construct `HttpClient`.
+  because: A new HttpClient per call exhausts sockets under load; IHttpClientFactory pools handlers.
+  citation: https://learn.microsoft.com/dotnet/fundamentals/networking/http/httpclient-guidelines
+  fix: Take a typed or named client from IHttpClientFactory; the exemplar receives its HttpClient through its constructor.
+  exemplar: CarrierClient (src/Meridian.Interchange/Partners/CarrierClient.cs:9)
+  src/Meridian.Interchange/Partners/CarrierClient.cs:15 — Meridian.Interchange.Partners.CarrierClient constructs System.Net.Http.HttpClient
+```
+
+The message has six components: the rule ID, the `because`, the `citation` naming the Microsoft page, the `fix`, the `exemplar`, and the exact `file:line`. The `exemplar` line points at the file that declares `CarrierClient`, which already receives its client through its constructor. `check` warns if that type is ever renamed away. An agent that reads this failure gets the guideline and its source together, then corrects the code. Revert the line and `check` is green again.
 
 ## The captive dependency
 
-`di/no-captive-dependencies` reads two facts the other rules don't: which types are registered with which lifetime, and which types inject which. It states the general captive-dependency antipattern (a singleton must not inject a scoped or transient service). `di/hosted-services-scope-their-work` reaches that case only where the type hierarchy already reveals it.
+`di/no-captive-dependencies` reads two facts the other rules don't: which types are registered with which lifetime, and which types inject which. It states the general captive-dependency antipattern, that a singleton must not inject a scoped or transient service. `di/hosted-services-scope-their-work` reaches the same case only where the type hierarchy reveals it.
 
-It is a pack rule, so the spec says only which singletons it governs and which type already does the work the right way:
+It is a pack rule, so the spec names only which singletons it governs and which type already shows the fix:
 
 ```csharp
 DotNetGuidance.NoCaptiveDependencies(arch, arch.Registered(Lifetime.Singleton), PackPosture.Enforce,
     exemplar: arch.Types.Named("ScopedDispatchRunner"));
 ```
 
-The worker is green under it, because both singletons take only singleton-safe dependencies. `ScopedDispatchRunner` injects `IServiceScopeFactory`, and `OutboxDispatcher` injects that runner and an `IOptions<InterchangeOptions>` (`IOptions<T>` is a singleton, unlike the scoped `IOptionsSnapshot<T>` its processor uses). The scoped work stays behind the scope seam.
+The worker is green under it, because both singletons take only singleton-safe dependencies. `ScopedDispatchRunner` injects `IServiceScopeFactory`, and `OutboxDispatcher` injects that runner, an `IOptions<InterchangeOptions>` and an `ILogger<OutboxDispatcher>`. `IOptions<T>` is a singleton, unlike the scoped `IOptionsSnapshot<T>` the processor uses, so the scoped work stays behind the scope seam.
 
-`OutboxDispatcher` reaches the rule through `AddHostedService<OutboxDispatcher>`. A hosted service registers as a singleton, so the dispatcher is a singleton-registered type even though no `AddSingleton` names it. Take the scoped `IOutboxStore` in the dispatcher and read the outbox directly, in place of the scoped runner, and the capture is on:
+`OutboxDispatcher` reaches the rule through `AddHostedService<OutboxDispatcher>`. A hosted service registers as a singleton, so the dispatcher is a singleton-registered type even though no `AddSingleton` names it. Take the scoped `IOutboxStore` in the dispatcher and read the outbox directly, in place of the singleton runner, and the capture is on:
 
 ```csharp
 internal sealed class OutboxDispatcher(IOutboxStore store, IOptions<InterchangeOptions> options, ILogger<OutboxDispatcher> logger) : BackgroundService
 ```
 
-`dotnet build` stays green. `check` returns exit 1, with two failures on that one edit:
+The build warns `SR2001` twice for `di/hosted-services-scope-their-work`, once per site, and exits 0. It stays silent on `di/no-captive-dependencies`, because a registration rule needs the whole solution and is left to `check`. `check` exits 1, with two failures on that one edit:
 
 ```text
 FAIL di/hosted-services-scope-their-work — Types derived from `BackgroundService` must not reference `IOptionsSnapshot<TOptions>` or `IOutboxStore`.
@@ -148,17 +148,17 @@ FAIL di/no-captive-dependencies — Singleton-registered types must not inject s
   src/Meridian.Interchange/Dispatch/OutboxDispatcher.cs:15 — Meridian.Interchange.Dispatch.OutboxDispatcher injects Meridian.Interchange.Outbox.IOutboxStore
 ```
 
-`di/no-captive-dependencies` reads the capture from the registrations, where `IOutboxStore` is registered scoped. `di/hosted-services-scope-their-work` reads the same edit from the hierarchy, because `IOutboxStore` is its named target and the dispatcher derives from `BackgroundService`. The two overlap on this dependency, and neither replaces the other. The registration rule also catches a captured scoped `IOutboxProcessor`, or a transient partner client, that the hierarchy rule never names. The hierarchy rule also catches `IOptionsSnapshot<InterchangeOptions>`, which is framework-registered and never spelled in a source-level registration. The snapshot therefore stays invisible to the registration rule. Swap the parameter to that snapshot type and only the hierarchy rule fires. Revert the parameter and `check` is exit 0 again.
+`di/no-captive-dependencies` reads the capture from the registrations, where `IOutboxStore` is registered scoped. `di/hosted-services-scope-their-work` reads the same edit from the hierarchy, because `IOutboxStore` is its named target and the dispatcher derives from `BackgroundService`. The two overlap on this dependency, and neither replaces the other. The registration rule also catches a captured scoped `IOutboxProcessor`, or a transient partner client, that the hierarchy rule never names. The hierarchy rule also catches `IOptionsSnapshot<InterchangeOptions>`, which is framework-registered and never spelled in a source-level registration, so the registration rule cannot see it. Swap the parameter to that snapshot type and only the hierarchy rule fires, as [Introduce a violation](#introduce-a-violation) shows. Revert the parameter and `check` is exit 0 again.
 
-The registrations this rule reads are the ones the source spells: `AddSingleton`, `AddScoped`, `AddTransient`, their `TryAdd` twins, `AddHostedService`, `AddDbContext`, and `AddHttpClient<TClient>`. A registration made by assembly scanning, a factory body, or a framework default falls outside that boundary. The rendered glossary names the boundary, so an agent reading the context sees the edge of what the rule knows.
+The registrations this rule reads are the ones the source spells: `AddSingleton`, `AddScoped`, `AddTransient`, their `TryAdd` twins, `AddHostedService`, `AddDbContext`, and `AddHttpClient<TClient>`. A registration made by assembly scanning, a factory body, or a framework default is outside that boundary. The rendered glossary names the boundary, so an agent reading the context sees the edge of what the rule knows.
 
 ## The scoped catch
 
-`exceptions/no-general-catch` is green over a worker that catches narrowly. `OutboxProcessor` retries a failed send inside `catch (HttpRequestException)` and lets everything else surface. No type in the worker wraps its work in a blanket `catch (Exception)`, except the one that is meant to. The rule bans swallowing base `Exception` across `Meridian.Interchange.*`. Swallowing means catching base `Exception` with no `when` filter and no rethrow, the composite a handler needs to hold a failure and carry on. The rule excepts the types that derive from `BackgroundService`, here the dispatcher alone.
+`exceptions/no-general-catch` is green over a worker that catches narrowly. `OutboxProcessor` retries a failed send inside `catch (HttpRequestException)` and lets everything else surface. The rule bans swallowing base `Exception` across `Meridian.Interchange.*`, and swallowing means catching base `Exception` with no `when` filter and no rethrow. The rule excepts the types that derive from `BackgroundService`, here the dispatcher alone.
 
-That one exception is the essential part. `OutboxDispatcher.ExecuteAsync` wraps each poll in `catch (Exception)` and logs, because on modern .NET an unhandled exception out of a `BackgroundService` stops the host. The poll loop is the worker's top-level handler, the one site the guidance sanctions a catch-all. CA1031 (Do not catch general exception types) would flag the dispatcher's site; the spec sanctions it by scope and holds the ban everywhere else.
+That one exception is the essential part. `OutboxDispatcher.ExecuteAsync` wraps each poll in `catch (Exception)` and logs, because an unhandled exception out of a `BackgroundService` stops the host on .NET 6 and later. The poll loop is the worker's top-level handler, the one site the guidance sanctions for a catch-all. CA1031 (Do not catch general exception types) would flag the dispatcher's site; the spec sanctions it by scope, and the ban applies everywhere else.
 
-Add the blanket catch one layer down, in `OutboxProcessor`, where a failed delivery should surface instead of vanishing. Wrap the per-message loop body in a catch-all:
+Add the blanket catch one layer down, in `OutboxProcessor`, where a failed delivery should surface. Wrap the per-message loop body in a catch-all:
 
 ```csharp
 catch (Exception)
@@ -167,7 +167,7 @@ catch (Exception)
 }
 ```
 
-`dotnet build` is green, because a blanket `catch (Exception)` is valid C#. `check` is not:
+The build warns `SR2001` at the new catch and exits 0, and `check` exits 1:
 
 ```text
 FAIL exceptions/no-general-catch — Types in `Meridian.Interchange.*`, except types derived from `BackgroundService`, must not swallow `Exception`.
@@ -177,11 +177,11 @@ FAIL exceptions/no-general-catch — Types in `Meridian.Interchange.*`, except t
   src/Meridian.Interchange/Processing/OutboxProcessor.cs:32 — Meridian.Interchange.Processing.OutboxProcessor catches System.Exception
 ```
 
-The match is exact, so `MustNotSwallow(typeof(Exception))` flags a catch of base `Exception`, and a `catch (TimeoutException)` beside it stays invisible to the rule. That narrow catch is the good state the guidance wants. Add a `when` filter to the blanket catch, or end its block in `throw`, and the site goes green without narrowing the type. Either one leaves the failure visible, so neither is a swallow. Revert the catch and `check` is exit 0 again.
+The match is exact, so `MustNotSwallow(typeof(Exception))` flags a catch of base `Exception`, and a `catch (TimeoutException)` in the same method stays invisible to the rule. That narrow catch is the state the guidance wants. Add a `when` filter to the blanket catch, or end its block in `throw`, and the site goes green without narrowing the type. Either leaves the failure visible, so neither is a swallow. Revert the catch and `check` is exit 0 again.
 
 ## The flowed token
 
-`async/accept-cancellation` is green over a worker that carries a token the whole way down. Every `Task`-returning method on an authored type in `Meridian.Interchange.*` accepts a `CancellationToken`. `OutboxDispatcher.ExecuteAsync` receives the host's `stoppingToken`. `ScopedDispatchRunner` and `OutboxProcessor` pass it to the calls they make, and the partner clients and the outbox store take it at the leaf. The rule requires the parameter on every one of them.
+`async/accept-cancellation` is green over a worker that passes a token the whole way down. Every `Task`-returning method on an authored type in `Meridian.Interchange.*` accepts a `CancellationToken`. `OutboxDispatcher.ExecuteAsync` receives the host's `stoppingToken`, and `ScopedDispatchRunner` and `OutboxProcessor` pass it to the calls they make. The partner clients and the outbox store take it at the leaf, and the rule requires the parameter on every one of them.
 
 ```csharp
 DotNetGuidance.AcceptCancellation(arch, arch.Types.InNamespace("Meridian.Interchange.*"), PackPosture.Enforce,
@@ -191,7 +191,7 @@ DotNetGuidance.AcceptCancellation(arch, arch.Types.InNamespace("Meridian.Interch
 
 The pack applies the method projection, so the spec passes the types and the rule narrows to their `Task`-returning methods.
 
-The rule reads the declared parameter list. A method satisfies the rule by declaring a `CancellationToken` parameter. Whether the body then forwards that token to the calls it makes is a separate question of flow this presence rule does not answer. What it guarantees is that the token is on the surface for a caller to pass.
+The rule reads the declared parameter list, and the match is exact. A `CancellationToken?` or a `params CancellationToken[]` parameter is a different declared type and does not satisfy it. Whether the body forwards the token to the calls it makes is a separate question of flow, which this presence rule does not answer. What it guarantees is that the token is on the surface for a caller to pass.
 
 Drop the token from `ScopedDispatchRunner.RunPendingAsync`, the seam the dispatcher's `stoppingToken` flows through. The parameter is structural, so removing it takes three touches to compile. The signature loses the parameter, the interior `ProcessPendingAsync` call falls back to `CancellationToken.None`, and the `OutboxDispatcher` call site drops its argument.
 
@@ -208,7 +208,7 @@ public async Task RunPendingAsync()
 await runner.RunPendingAsync();
 ```
 
-`dotnet build` is green, because dropping a parameter is valid C#. `check` is not:
+The build warns `SR2001` at the method and exits 0, and `check` exits 1:
 
 ```text
 FAIL async/accept-cancellation — Methods of authored types in `Meridian.Interchange.*` returning `Task`, `Task<TResult>`, `ValueTask` or `ValueTask<TResult>` must accept a parameter of type `CancellationToken`.
@@ -223,15 +223,15 @@ The violation is keyed to the method at its declaration site, `ScopedDispatchRun
 
 ## The persistence-ignorant outbox
 
-`persistence/no-mapping-attributes` is green over a worker whose persisted type stays a plain record. `OutboxMessage` is a POCO (three properties, no base class, no mapping attribute). The outbox that holds it is an in-memory list a real deployment would back with a table. The rule encodes persistence ignorance. Microsoft defines it as "types that need to be persisted, but whose code is unaffected by the choice of persistence technology". The same page lists "persistence-specific required attributes" among the couplings that violate it. The rule bans the two type-level mapping attributes, `[Table]` and `[ComplexType]`, across `Meridian.Interchange.*`.
+`persistence/no-mapping-attributes` is green over a worker whose persisted type stays a plain record. `OutboxMessage` is a POCO (three properties, no base class, no mapping attribute). The outbox that contains it is an in-memory list a real deployment would back with a table. The rule encodes persistence ignorance. Microsoft defines it as "types that need to be persisted, but whose code is unaffected by the choice of persistence technology". The same page lists "persistence-specific required attributes" among the couplings that violate it. The rule bans the two type-level mapping attributes, `[Table]` and `[ComplexType]`, across `Meridian.Interchange.*`.
 
-Another pack rule, and one where the pack's own `Fix` says everything worth saying, so the spec takes it as it comes:
+It is another pack rule, and one where the pack's own `Fix` covers the remedy, so the spec takes it as it comes:
 
 ```csharp
 DotNetGuidance.NoMappingAttributes(arch, arch.Types.InNamespace("Meridian.Interchange.*"), PackPosture.Enforce);
 ```
 
-The rule reads the type's own declared attributes and names only `[Table]` and `[ComplexType]`. The two persistence markers live in the `Schema` sub-namespace of `DataAnnotations` and tag the type itself as a mapped entity. `DataAnnotations` also carries the validation attributes a domain may legitimately want, so the rule does not ban it wholesale. A mapping attribute on a property (a `[Column]` or `[Key]`) sits below the type surface this rule reads, so v1 does not see it. Keeping that mapping out of the domain type is the same discipline the `Fix` names, fluent configuration in the persistence layer.
+The rule reads the type's own declared attributes and names only `[Table]` and `[ComplexType]`. The two persistence markers live in the `Schema` sub-namespace of `DataAnnotations` and tag the type itself as a mapped entity. `DataAnnotations` also contains the validation attributes a domain may want, so the rule does not ban it wholesale. A mapping attribute on a property (a `[Column]` or `[Key]`) is below the type surface this rule reads, so this rule does not see it. A rule over the type's properties can ban it. Keeping that mapping out of the domain type is the same discipline the `Fix` names, fluent configuration in the persistence layer.
 
 Attribute the record as a mapped entity, the coupling the guideline warns about, and give it a table name:
 
@@ -242,7 +242,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 public sealed record OutboxMessage(string MessageId, string Channel, string Payload);
 ```
 
-`dotnet build` is green, because `[Table]` is a valid attribute. `check` is not:
+The build warns `SR2001` at the record and exits 0, and `check` exits 1:
 
 ```text
 FAIL persistence/no-mapping-attributes — Types in `Meridian.Interchange.*` must not be attributed with `[Table]` or `[ComplexType]`.
@@ -256,7 +256,7 @@ The violation is keyed to the record at its declaration site, `OutboxMessage.cs:
 
 ## The partner envelope
 
-`contracts/no-entity-exposure` is green over a worker that hands partners a DTO, not its persisted entity. `IPartnerClient.SendAsync` takes a `PartnerEnvelope` (a transport-facing record of a message's id and its serialized payload). The public partner contract therefore carries the wire shape, not the stored one. `OutboxMessage`, the persisted record, surfaces only inside the `Outbox` module that owns it; the partner clients consume only the envelope. The rule bans exposing `OutboxMessage` on a public signature across `Meridian.Interchange.*`, excepting the `Outbox` cone where the entity lives.
+`contracts/no-entity-exposure` is green over a worker whose partner contract takes a DTO. `IPartnerClient.SendAsync` takes a `PartnerEnvelope`, a transport-facing record of a message's id and its serialized payload, so the public partner contract is the wire shape. `OutboxMessage`, the persisted record, surfaces only inside the `Outbox` module that declares it, and the partner clients consume only the envelope. The rule bans exposing `OutboxMessage` on a public signature across `Meridian.Interchange.*`, excepting the `Outbox` cone where the entity lives.
 
 ```csharp
 arch.Rule("contracts/no-entity-exposure")
@@ -268,13 +268,13 @@ arch.Rule("contracts/no-entity-exposure")
     .Fix("Map the message to a PartnerEnvelope at the OutboxProcessor boundary and expose that; keep OutboxMessage inside the Outbox module.");
 ```
 
-The rule reads the public signature surface of a type (the return, parameter, property, field, and event types of its effectively-public members). The rule mints an exposure edge when the banned type appears there. It reads only what is *effectively* public. A `public` member of an `internal` type puts nothing on that surface. The three typed clients and the legacy adapter, all `internal`, therefore expose nothing, even though each takes the envelope on a `public` method. The `.Except` sanctions the entity's home in `Meridian.Interchange.Outbox`, where `IOutboxStore` legitimately returns `OutboxMessage` from `GetPendingAsync`. The `Outbox` cone is therefore excepted, and the ban holds across the rest of the worker.
+The rule reads the public signature surface of a type: the return, parameter, property, field and event types of its effectively public members. It mints an exposure edge when the banned type appears there. It reads only what is effectively public, so a `public` member of an `internal` type adds no position to that surface. The three typed clients and the legacy adapter, all `internal`, therefore expose no entity, even though each takes the envelope on a `public` method. The `.Except` sanctions the entity's home in `Meridian.Interchange.Outbox`, where `IOutboxStore` returns `OutboxMessage` from `GetPendingAsync`, and the ban applies across the rest of the worker.
 
-Exposure is a public-signature fact, not a body-reference fact, and the two come apart in `OutboxProcessor`. It references `OutboxMessage` throughout its body (the loop variable it drains, the parameter of its private delivery helper). None of that reaches a public signature, so the processor mints not one exposure edge. Its single public method returns `Task` and takes a `CancellationToken`, and it maps each message to a `PartnerEnvelope` at the call to the partner. Referencing the entity to do its work is what a boundary is for; putting it on a contract is what the rule stops.
+Exposure is a fact about public signatures, and a reference in a method body is a different fact. The two come apart in `OutboxProcessor`. It references `OutboxMessage` throughout its body, in the loop variable it drains and the parameter of its private delivery helper, and mints no exposure edge. Its single public method returns `Task` and takes a `CancellationToken`, and it maps each message to a `PartnerEnvelope` at the call to the partner.
 
-Revert the contract to carry the entity, the coupling the guideline warns about, by changing `IPartnerClient.SendAsync` back to take `OutboxMessage`. It is a multi-touch edit. The interface, all four implementations, and the `OutboxProcessor` call site must change together or the worker does not compile. The [flowed token](#the-flowed-token) shows the same structural shape for one method, and here it spans a whole contract.
+Change `IPartnerClient.SendAsync` back to take `OutboxMessage`, the coupling the guideline warns about. It is a multi-touch edit: the interface, all four implementations and the `OutboxProcessor` call site must change together or the worker does not compile. The [flowed token](#the-flowed-token) shows the same structural shape for one method, and here it spans a whole contract.
 
-`dotnet build` is green, because an entity on a contract is valid C#. `check` is not:
+The build warns `SR2001` at the interface and exits 0, and `check` exits 1:
 
 ```text
 FAIL contracts/no-entity-exposure — Types in `Meridian.Interchange.*`, except types in `Meridian.Interchange.Outbox.*`, must not expose `OutboxMessage`.
@@ -284,16 +284,16 @@ FAIL contracts/no-entity-exposure — Types in `Meridian.Interchange.*`, except 
   src/Meridian.Interchange/Partners/IPartnerClient.cs:15 — Meridian.Interchange.Partners.IPartnerClient exposes Meridian.Interchange.Outbox.OutboxMessage
 ```
 
-The edit touches six files, yet the violation is a single red. It is keyed to the interface at `IPartnerClient.cs:15`, the one public signature that now carries the entity. The four partner clients stay invisible to the rule because they are `internal`, and `OutboxProcessor`'s references stay references. Revert the contract to `PartnerEnvelope` and `check` is exit 0 again.
+The edit touches six files, and the violation is a single red. It is keyed to the interface at `IPartnerClient.cs:15`, the one public signature that now exposes the entity. The four partner clients stay invisible to the rule because they are `internal`, and `OutboxProcessor`'s references stay references. Revert the contract to `PartnerEnvelope` and `check` is exit 0 again.
 
 ## The citations
 
-Every rule cites the page it enforces. The quoted phrase below is drawn from that page, verified against the live doc.
+The quoted phrase in each row is drawn from the cited page, verified against the live doc.
 
 | Rule | Microsoft guidance | Source |
 |---|---|---|
 | `di/construct-via-container` | "Avoid direct instantiation of dependent classes within services" | [Dependency injection guidelines](https://learn.microsoft.com/dotnet/core/extensions/dependency-injection/guidelines) |
-| `http/reuse-httpclient` | "reusing HttpClient instances for as many HTTP requests as possible" | [HttpClient guidelines](https://learn.microsoft.com/dotnet/fundamentals/networking/http/httpclient-guidelines) |
+| `http/reuse-httpclient` | "reuse HttpClient instances for as many HTTP requests as possible" | [HttpClient guidelines](https://learn.microsoft.com/dotnet/fundamentals/networking/http/httpclient-guidelines) |
 | `di/no-service-locator` | "Avoid using the service locator pattern" | [Dependency injection guidelines](https://learn.microsoft.com/dotnet/core/extensions/dependency-injection/guidelines) |
 | `di/no-buildserviceprovider` | "Avoid calls to BuildServiceProvider when configuring services" | [Dependency injection guidelines](https://learn.microsoft.com/dotnet/core/extensions/dependency-injection/guidelines) |
 | `async/no-sync-over-async` | "can result in deadlocks and blocked context threads" | [Asynchronous programming scenarios](https://learn.microsoft.com/dotnet/csharp/asynchronous-programming/async-scenarios) |
@@ -305,29 +305,36 @@ Every rule cites the page it enforces. The quoted phrase below is drawn from tha
 | `persistence/no-mapping-attributes` | "Persistence-specific required attributes" | [Architectural principles](https://learn.microsoft.com/dotnet/architecture/modern-web-apps-azure/architectural-principles) |
 | `contracts/no-entity-exposure` | "Use ViewModels specifically made for client apps, independent from domain model constraints" | [CQRS reads/queries](https://learn.microsoft.com/dotnet/architecture/microservices/microservice-ddd-cqrs-patterns/cqrs-microservice-reads) |
 
-Four rules share the DI guidelines page. It is one document covering construction, the service-locator anti-pattern, `BuildServiceProvider`, and the captive-dependency anti-pattern across its recommendations and anti-patterns sections. The TAP page is cited twice, once for the `Async` suffix and once for the `CancellationToken` parameter. Those are the two conventions the page fixes for a method returning a `Task` or a `ValueTask`.
+The DI guidelines page is cited by four rules. Its design, recommendations and anti-patterns sections cover construction, the service-locator anti-pattern, `BuildServiceProvider` and the captive-dependency anti-pattern. The TAP page is cited twice, once for the `Async` suffix and once for the `CancellationToken` parameter. Those are the two conventions it fixes for a method returning a `Task` or a `ValueTask`.
 
 ## Pairing with analyzers
 
-Several rules have a neighbor in the analyzer ecosystem. What none of those neighbors offers is turnkey, whole-solution, scoped enforcement with the citation and the ratchet, which is the gap this pack fills. Where a neighbor exists, the list below says what it covers and where the rule differs.
+Several rules have a neighbor in the analyzer ecosystem, and the table names the nearest one and what differs. The differences repeat. A rule here runs over the whole solution and names the cone it governs and the seam it excepts. Under `Migrate` it ratchets against a baseline, and its citation renders into the agent's context. The same check runs at the end of an agent's turn through the [agent hook](../../hooks/README.md#when-it-fires).
 
-- `http/reuse-httpclient`: no analyzer bans `new HttpClient()`. The guideline is documented and widely cited, and nothing enforces it in the general case. This rule does, everywhere outside the composition root.
-- `di/no-buildserviceprovider`: ASP0000 warns on `BuildServiceProvider`, but only in the ASP.NET Core `Startup`/`ConfigureServices` shape. This rule is solution-wide and independent of that shape.
-- `async/no-sync-over-async`: VSTHRD002, VSTHRD103, MA0045, and AsyncFixer02 all detect blocking on a `Task`, blanket-wide. The delta is the posture. This rule grandfathers the one legacy corner on a counted baseline and holds the line against new blocking. The analyzers give one global on/off with no scoped exemption and no ratchet.
-- `di/hosted-services-scope-their-work`: the container's `ValidateOnBuild`/`ValidateScopes` catches a captured scoped service, but at runtime, when the host builds. This rule catches the capture statically, in CI and in the agent's edit loop, before the app runs.
-- `di/no-captive-dependencies`: two community analyzers, Excubo.Analyzers.DependencyInjectionValidation and georgepwall1991/DependencyInjection.Lifetime.Analyzers, flag a captive dependency statically, each within a single compilation. The runtime scope validation named above throws only when the host builds. The delta is whole-solution reach across a registration and a constructor that can live in different projects, and the citation the rule carries.
-- `naming/async-suffix`: VSTHRD200 enforces the `Async` suffix, blanket-wide. The delta is scoping. This rule names the `Meridian.Interchange.*` cone and, within it, the types an author wrote. A generator that emits a `Task`-returning method under another convention is therefore out of reach and needs no suppression one attribute at a time. The citation rides on the rule.
-- `exceptions/no-general-catch`: CA1031 (Do not catch general exception types) flags every `catch (System.Exception)`, blanket-wide. CA1031 is widely turned off, because the one place a catch-all belongs (the top-level handler) trips it too. Two things differ. The rule excepts `BackgroundService`-derived types, so the dispatcher's poll loop is sanctioned while the ban holds across the rest of the worker. The rule also reads the filter and the rethrow, so a `catch (Exception) when (…)` and a catch ending in `throw` are lawful where CA1031 flags them anyway. The citation rides on the rule.
-- `async/accept-cancellation`: CA1068 (CancellationToken parameters must come last) governs the position of a token that is already present, not whether one is present. Meziantou's MA0032, MA0040, and MA0079 flag a call site that forwards no token when one is in scope. Both act only once a token exists on the surface. Requiring the parameter there in the first place is the white space this rule fills across `Meridian.Interchange.*`. The match is definition-level and exact. A `CancellationToken?` or a `params CancellationToken[]` parameter is a different declared type and does not satisfy the rule.
-- `persistence/no-mapping-attributes`: ArchUnitNET and NetArchTest can both assert that a type does not carry a given attribute, in hand-written test code, so the check is expressible elsewhere. The delta is the usual one. This rule is turnkey and declarative, runs whole-solution, and renders into the agent's context with its citation. No analyzer polices mapping attributes on a domain type; persistence ignorance is a documented principle with no build-time enforcer of its own.
-- `contracts/no-entity-exposure`: CA1002 (Do not expose generic lists) is the closest shadow, and it fires on one shape only (a `List<T>` surfacing on a public member). CA1002 does not fire on the exposure of an arbitrary named type across a layer boundary. No analyzer polices a domain entity reaching a public signature. This rule does, scoped to the `Meridian.Interchange.*` cone (excepting the entity's `Outbox` home), turnkey and declarative, with the citation the rule carries.
-- `di/no-service-locator`: this rule bans the `GetService`/`GetRequiredService` members, with one caveat. A ban on an interface member catches a call through that interface, not a call through a concrete type that re-declares the member. In this worker every resolve goes through `IServiceProvider` or the `ServiceProviderServiceExtensions` methods, so the ban is complete here. A codebase that resolved through a concrete container type would need that type named too.
+| Rule | Nearest analyzer | What differs |
+|---|---|---|
+| `http/reuse-httpclient` | no analyzer bans `new HttpClient()` | enforced everywhere outside the composition root |
+| `di/no-buildserviceprovider` | ASP0000, in the ASP.NET Core `Startup` shape only | solution-wide, whatever the shape |
+| `async/no-sync-over-async` | VSTHRD002, VSTHRD103, MA0045, AsyncFixer02, blanket-wide | ratchets the legacy corner; new blocking is red |
+| `di/hosted-services-scope-their-work` | `ValidateOnBuild`/`ValidateScopes`, at runtime when the host builds | caught statically, before the app runs |
+| `di/no-captive-dependencies` | two community analyzers, one compilation each | registration and constructor can be in different projects |
+| `naming/async-suffix` | VSTHRD200, blanket-wide | scoped to the cone and to authored types |
+| `exceptions/no-general-catch` | CA1031, blanket-wide, so widely turned off | excepts the top-level handler; filters and rethrows pass |
+| `async/accept-cancellation` | CA1068 and MA0032/MA0040/MA0079, once a token exists | requires the parameter itself |
+| `persistence/no-mapping-attributes` | ArchUnitNET and NetArchTest, in hand-written test code | declarative, whole-solution, cited in the agent's context |
+| `contracts/no-entity-exposure` | CA1002, a `List<T>` on a public member only | any named type crossing the boundary |
+
+The two community analyzers for `di/no-captive-dependencies` are Excubo.Analyzers.DependencyInjectionValidation and georgepwall1991/DependencyInjection.Lifetime.Analyzers. CA1068 (CancellationToken parameters must come last) governs the position of a token already present. Meziantou's MA0032, MA0040 and MA0079 flag a call site that passes no token to a method that can take one.
+
+`naming/async-suffix` narrows to authored types, so a type a generator emits whole, or marks with `[GeneratedCode]`, is out of reach and needs no suppression. A method a generator adds to a partial class you wrote is still checked. No analyzer polices a domain entity reaching a public signature or a mapping attribute on a domain type. Persistence ignorance is a documented principle with no build-time enforcer of its own.
+
+`di/no-service-locator` has no row, because what differs there is a caveat about the rule itself. A ban on an interface member catches a call through that interface. A call through a concrete container type that re-declares the member is a different member, so such a type has to be named too. Every resolve in this worker goes through `IServiceProvider` or the `ServiceProviderServiceExtensions` methods, so the ban is complete here.
 
 ## Introduce a violation
 
-Each posture goes red on a small edit and back to green on revert. The `new HttpClient()` edit is [the silent win](#the-silent-win), the captured store is [the captive dependency](#the-captive-dependency), and the blanket `catch` is [the scoped catch](#the-scoped-catch). The dropped token is [the flowed token](#the-flowed-token), the mapping attribute is [the persistence-ignorant outbox](#the-persistence-ignorant-outbox), and the entity on the partner contract is [the partner envelope](#the-partner-envelope). All of them are above, and two more show the rest.
+Each rule goes red on a small edit and back to green on revert, and six of the edits are above. The [silent win](#the-silent-win) and the [captive dependency](#the-captive-dependency) are the `new HttpClient()` and the captured store. The [scoped catch](#the-scoped-catch) and the [flowed token](#the-flowed-token) are the blanket `catch` and the dropped parameter. The [persistence-ignorant outbox](#the-persistence-ignorant-outbox) and the [partner envelope](#the-partner-envelope) are the mapping attribute and the entity on the contract. The two edits below add `naming/async-suffix` and a second route into `di/hosted-services-scope-their-work`. The four rules without a worked edit on this page are `di/construct-via-container`, `di/no-service-locator`, `di/no-buildserviceprovider` and `async/no-sync-over-async`.
 
-Change `OutboxDispatcher`'s constructor parameter from `IOptions<InterchangeOptions>` to `IOptionsSnapshot<InterchangeOptions>`. It compiles, and it would even resolve. But `IOptionsSnapshot` is scoped and the dispatcher is a singleton, so the snapshot would be captured for the whole process. `OutboxProcessor`, being scoped, uses `IOptionsSnapshot` correctly; the singleton dispatcher must not. The rule reads that from the type hierarchy alone:
+Change `OutboxDispatcher`'s constructor parameter from `IOptions<InterchangeOptions>` to `IOptionsSnapshot<InterchangeOptions>`. It compiles and would even resolve. But `IOptionsSnapshot` is scoped, as [the captive dependency](#the-captive-dependency) explains, so the singleton dispatcher would capture it for the whole process. The build warns `SR2001` at the parameter, and the rule reads the capture from the type hierarchy alone:
 
 ```text
 FAIL di/hosted-services-scope-their-work — Types derived from `BackgroundService` must not reference `IOptionsSnapshot<TOptions>` or `IOutboxStore`.
@@ -338,7 +345,7 @@ FAIL di/hosted-services-scope-their-work — Types derived from `BackgroundServi
   src/Meridian.Interchange/Dispatch/OutboxDispatcher.cs:14 — Meridian.Interchange.Dispatch.OutboxDispatcher references Microsoft.Extensions.Options.IOptionsSnapshot<TOptions>
 ```
 
-Rename `IOutboxProcessor.ProcessPendingAsync` to `ProcessPending` (with its implementation and the one call site in `ScopedDispatchRunner`, so it compiles). Both the interface and the class now declare a `Task`-returning method without the suffix, so the rule fires on both:
+Rename `IOutboxProcessor.ProcessPendingAsync` to `ProcessPending`, with its implementation and the one call site in `ScopedDispatchRunner`, so it compiles. Both the interface and the class now declare a `Task`-returning method without the suffix. The build warns `SR2001` twice, and the rule fires on both:
 
 ```text
 FAIL naming/async-suffix — Methods of authored types in `Meridian.Interchange.*` returning `Task`, `Task<TResult>`, `ValueTask` or `ValueTask<TResult>` must be named `*Async`.
@@ -366,8 +373,8 @@ dotnet build examples/Meridian.Interchange/Meridian.Interchange.slnx
 sliderule check examples/Meridian.Interchange/Meridian.Interchange.slnx
 ```
 
-`check` exits 0 here and prints `Checked 12 rules: 12 passed, 0 failed, 0 skipped (0 violations, 0 warnings)`. Without the global tool, run the CLI from source with `dotnet run --project src/SlideRule.Cli -- check examples/Meridian.Interchange/Meridian.Interchange.slnx`. `sliderule status` prints the burndown, and `sliderule render` regenerates the `AGENTS.md` block and the [ARCHITECTURE.md](ARCHITECTURE.md) drawings from the spec. `sliderule explain <rule-id>` expands any rule, as does the `arch_explain` MCP tool. Introduce the `new HttpClient()` edit above and `check` exits 1 with the block shown.
+`check` exits 0 here and prints `Checked 12 rules: 12 passed, 0 failed, 0 skipped (0 violations, 0 warnings)`. Without the global tool, run the CLI from source with `dotnet run --project src/SlideRule.Cli -- check examples/Meridian.Interchange/Meridian.Interchange.slnx`. `sliderule status` prints the burndown. `sliderule render` rewrites the `AGENTS.md` block and refreshes `sliderule.model.json`, the file the build analyzer reads. The drawings in [ARCHITECTURE.md](ARCHITECTURE.md) need `--diagram`, and that page prints the command. `sliderule explain <rule-id>` expands any rule, as does the `arch_explain` MCP tool. Introduce the `new HttpClient()` edit above and `check` exits 1 with the block shown.
 
 ## From here
 
-[`../Meridian/`](../Meridian/) carries three postures on one migrating codebase, and [`../Meridian.Operations/`](../Meridian.Operations/) draws module boundaries and renders a card into every module directory. Meridian.Interchange keeps the same fluent vocabulary and points it at a single question: for each rule, which Microsoft page says so. The answer travels with the rule into the code review and into the agent's context.
+The [`../Meridian/`](../Meridian/) example shows three postures on one migrating codebase, and [`../Meridian.Operations/`](../Meridian.Operations/) draws module boundaries and renders a card into every module directory. Meridian.Interchange keeps the same fluent vocabulary and points it at one question per rule: which Microsoft page requires this. The cited page's address is printed with the rule in the `check` report and in the agent's context.

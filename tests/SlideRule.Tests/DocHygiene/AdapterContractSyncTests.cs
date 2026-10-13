@@ -69,7 +69,7 @@ public sealed class AdapterContractSyncTests
             "A scope's tripwire rule, Quarantine or Caution, reports as skipped (a test run has no diff context)"),
         ("never-builds-and-never-restores",
             "The adapter never builds and never restores",
-            "The checker never builds; stale builds give stale verdicts"),
+            "The checker never builds it and reads"),
         ("needs-an-sdk-on-the-test-host",
             "It needs a .NET SDK on the test host",
             "A .NET SDK on the test host"),
@@ -90,7 +90,10 @@ public sealed class AdapterContractSyncTests
             "checks the projects the filter selects plus everything they reference"),
         ("one-run-per-spec-type",
             "every rule case of that type reads its verdict from that one run",
-            "every rule case reads its verdict from that shared run")
+            "every rule case reads its verdict from that shared run"),
+        ("unreadable-projects-narrow-the-run",
+            "a solution declaring projects the checker cannot read",
+            "a solution declaring projects the checker cannot read")
     ];
 
     /// <summary>
@@ -106,13 +109,6 @@ public sealed class AdapterContractSyncTests
             "[ModuleInitializer]",
             Surface.Xmldoc,
             "answers a question only a consumer mid-edit asks"),
-
-        // The unreadable-project arm is an edge of one member's behaviour. The README documents the
-        // solution-filter arm, which a reader chooses, and leaves this one to the member that reports it.
-        ("unreadable-projects-narrow-the-run",
-            "a solution declaring projects the checker cannot read",
-            Surface.Xmldoc,
-            "an edge of one member, not a decision the reader makes"),
 
         // A Caution scope's tripwire being permanently skipped is a consequence a reader derives from
         // two rules the README already states; spelling it out belongs beside the test that skips.

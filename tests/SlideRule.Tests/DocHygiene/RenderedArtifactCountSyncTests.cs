@@ -1,7 +1,7 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Rendering;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.DocHygiene;
 
@@ -35,8 +35,8 @@ public sealed class RenderedArtifactCountSyncTests
 
     /// <summary>
     ///     Every claim about the whole set spells the number of artifacts this repository commits. Both
-    ///     sentences write the count mid-sentence as a word, so the comparison ignores case rather than
-    ///     failing a sentence that happens to open with it.
+    ///     sentences write the count mid-sentence, as a number word up to ten and digits above, so the
+    ///     comparison is exact.
     /// </summary>
     [Fact]
     public void EveryClaimedArtifactCount_MatchesTheCommittedSet()
@@ -142,12 +142,12 @@ public sealed class RenderedArtifactCountSyncTests
         string noun,
         string header)
     {
-        string expected = GrandfatheredCounts.Spell(committed, GrandfatheredCounts.CountStyle.Word);
+        string expected = GrandfatheredCounts.Spell(committed, GrandfatheredCounts.CountStyle.WordToTen);
 
         List<string> drift = CountDocs
             .SelectMany(Gate.Scan)
             .Where(claim => claim.Kind == kind)
-            .Where(claim => !string.Equals(claim.Written, expected, StringComparison.OrdinalIgnoreCase))
+            .Where(claim => !string.Equals(claim.Written, expected, StringComparison.Ordinal))
             .Select(claim =>
                 $"{claim.Doc}:{claim.DocLine} claims '{claim.Written} {noun}' but this repository commits "
                 + $"{committed} ('{expected}').")

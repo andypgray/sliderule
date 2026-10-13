@@ -1,20 +1,20 @@
 # Enforce-only clean architecture: Meridian.Quoting
 
-Nine rules hold a four-layer clean architecture, every one `Enforce`, with zero baselines. ArchUnitNET already shows exactly that. The difference is the generated agent context beside the spec. The worked codebase is a greenfield customer-quoting service, the strangler step after the monolith in [`../Meridian/`](../Meridian/) migrated its quoting controllers.
+Meridian.Quoting is a greenfield customer-quoting service with nine `Enforce` rules and no baseline. Enforce-only layering is what ArchUnitNET shows as well, and the difference here is the agent context rendered from the same spec. The service is the strangler step after the monolith in [`../Meridian/`](../Meridian/) migrated its quoting controllers.
 
 ## The subsystem
 
-Four layers run one direction. The module map at the top of [AGENTS.md](AGENTS.md) says what each is for, rendered from the `.Purpose` each layer declares in the spec. The rules hold that shape; the subsystem was born conforming, so there is nothing to ratchet.
+The four layers run one direction. The Layers list at the top of [AGENTS.md](AGENTS.md) explains what each is for, rendered from the `.Purpose` each layer declares in the spec. The rules keep that shape, and the subsystem was born conforming, so there is no debt to ratchet.
 
-Writes go through a command bus that opens a unit of work only around a handler marked `[Transactional]`. `RequestQuoteHandler` writes twice, first to reserve a quote number and then to persist the quote. An unmarked command handler would commit each write on its own. A failure between the two would burn a quote number with no quote to show for it.
+Writes go through a command bus that opens a unit of work only around a handler marked `[Transactional]`. `RequestQuoteHandler` writes twice, first to reserve a quote number and then to persist the quote. An unmarked command handler would commit each write on its own. A failure between the two would then burn a quote number with no quote to show for it.
 
 Time enters through `IClock`, and `SystemClock` is the single adapter that reads the machine clock. A quote's 14-day validity window is therefore computed from an injected instant, and a test can check the window at a fixed moment.
 
-[ARCHITECTURE.md](ARCHITECTURE.md) draws the four layers as the code actually references them, beside the law the spec holds them to. The law fence is nearly empty, because only two of the nine rules have an arrow to draw.
+The drawing in [ARCHITECTURE.md](ARCHITECTURE.md) shows the four layers as the code references them, with the law the spec states for them under it. The law fence is nearly empty, because only two of the nine rules have an arrow to draw.
 
-## The block beside the rules
+## The rendered block
 
-Three rules from [arch/Meridian.Quoting.Architecture/QuotingArchitectureSpec.cs](arch/Meridian.Quoting.Architecture/QuotingArchitectureSpec.cs):
+These three rules come from [arch/Meridian.Quoting.Architecture/QuotingArchitectureSpec.cs](arch/Meridian.Quoting.Architecture/QuotingArchitectureSpec.cs):
 
 ```csharp
         arch.Rule("layering/application-boundaries")
@@ -47,7 +47,24 @@ The exact lines those three produce in [AGENTS.md](AGENTS.md):
 - `time/injected-clock` — Types in `Meridian.Quoting.*`, except types named `SystemClock`, must not use `DateTime.Now` or `DateTime.UtcNow`. A quote's validity window is computed from the current instant; read straight from the wall clock it cannot be tested at a fixed moment, so time enters through IClock and SystemClock is the one adapter that reads the machine clock.
 ```
 
-Each rendered rule opens with a sentence generated from the fluent call, then carries its `Because` string verbatim. `sliderule render` writes the whole block into `AGENTS.md`. CI re-runs `render` on every push and fails on any diff, so the block an agent reads is provably the spec the build enforces. `layering/application-boundaries` renders a caveat about its own scope. `MustOnlyReference` bounds the Application layer against the other layers, and the parenthetical `(external packages are not constrained by this rule)` says so, because a use case still depends on framework types. The call names only `domain` and the sentence only the Domain layer, because a `MustOnly*` subject may always reach itself. An Application-to-Application reference needs no permission written down.
+Each rendered rule opens with a sentence generated from the fluent call, followed by its `Because` string verbatim. `sliderule render` writes the whole block into `AGENTS.md`. CI runs `render --check` on every pull request and push to `main`, which fails on any file a render would change. The block an agent reads is therefore the spec the build enforces. `layering/application-boundaries` renders a caveat about its own scope. `MustOnlyReference` bounds the Application layer against every type the solution declares and the call does not allow. The parenthetical `(external packages are not constrained by this rule)` states the limit, because a use case still depends on framework types. The call names only `domain` and the sentence only the Domain layer, because a `MustOnly*` subject may always reach itself. An Application-to-Application reference needs no permission written down.
+
+## One edit, four message components
+
+Layers here are namespace patterns (`Meridian.Quoting.Application.*`), and each maps onto one project. A direct `Application -> Infrastructure` project reference cannot break the boundary, because Infrastructure already references Application and MSBuild rejects the cycle. A namespace breach compiles, and that is the breach the checker catches.
+
+The agent-failure story is an agent that wires the concrete repository instead of the port. Drop one file into the Api project, which already references Infrastructure, declaring the Application namespace and newing up `InMemoryQuoteRepository` over a new `InMemoryDatabase`. The layer is the namespace, so the type lands in Application while the file is in Api. Every example build attaches the [build analyzer](../../src/SlideRule.Analyzers/README.md#what-the-build-checks-and-what-it-leaves-to-check), which decides a namespace layer's rule inside the compilation. So `dotnet build` warns `SR2001` for `layering/application-boundaries` at each of the three sites and still exits 0, and this repository's CI promotes those warnings to errors. `check` goes red. Here is the failing rule's block from its report:
+
+```text
+FAIL layering/application-boundaries — The Application layer must reference only the Domain layer (external packages are not constrained by this rule).
+  because: Use cases depend on the Domain and on abstractions they own, never on a concrete adapter; keeping Infrastructure and Api out of Application is what lets persistence and transport be swapped or faked in a test.
+  fix: Depend on a port (an interface in Domain or Application) instead of the concrete type; wire the implementation in the Api composition root.
+  src/Meridian.Quoting.Api/Handlers/ExpireQuotesHandler.cs:12 — Meridian.Quoting.Application.Handlers.ExpireQuotesHandler references Meridian.Quoting.Infrastructure.Persistence.InMemoryDatabase
+  src/Meridian.Quoting.Api/Handlers/ExpireQuotesHandler.cs:16 — Meridian.Quoting.Application.Handlers.ExpireQuotesHandler references Meridian.Quoting.Infrastructure.Persistence.InMemoryQuoteRepository
+  src/Meridian.Quoting.Api/Handlers/ExpireQuotesHandler.cs:17 — Meridian.Quoting.Application.Handlers.ExpireQuotesHandler references Meridian.Quoting.Infrastructure.Persistence.InMemoryQuoteRepository
+```
+
+`check` exits 1 and the summary reads `Checked 9 rules: 8 passed, 1 failed, 0 skipped (2 violations, 0 warnings)`, so exactly one rule is red. Its two violations are the two Infrastructure types referenced, at three sites. The block has the ID, the reason, the fix and the exact `file:line`, and no `grandfathered:` line, because this is day-one law with no baseline. That is the contrast with the ratcheted blocks in [`../Meridian/`](../Meridian/), where every current violation is on a counted baseline. Delete the file, rebuild, and `check` is green again.
 
 ## Every rule as a named test
 
@@ -73,9 +90,9 @@ Test run summary: Passed!
   duration: 10s 089ms
 ```
 
-The one-time MSBuild workspace load bills to whichever case runs first (here `Workspace_LoadedCompletely`, at 8.7 s). The nine rule tests then read the shared verdict in a millisecond or less. The adapter adds that tenth test so the run fails when a project does not load.
+The one-time MSBuild workspace load bills to whichever case runs first (here `Workspace_LoadedCompletely`, at 8.7 s). The nine rule tests then read the shared verdict in a millisecond or less. The adapter adds that tenth test so the run fails when a project does not load, as its [readme](../../src/SlideRule.Xunit/README.md#when-the-workspace-does-not-load-completely) explains.
 
-Delete the `[Transactional]` attribute from `RequestQuoteHandler` and the test named `handlers/transactional` is the one that fails, with the message:
+Delete the `[Transactional]` attribute from `RequestQuoteHandler`. The attribute rule is decided inside the compilation too, so `dotnet build` warns `SR2001` on the class and exits 0. The test named `handlers/transactional` is the one that fails, with the message:
 
 ```text
 FAIL handlers/transactional — Types implementing `ICommandHandler<TCommand>` must be attributed with `[Transactional]`.
@@ -85,24 +102,7 @@ FAIL handlers/transactional — Types implementing `ICommandHandler<TCommand>` m
   src/Meridian.Quoting.Application/Handlers/RequestQuoteHandler.cs:13 — Meridian.Quoting.Application.Handlers.RequestQuoteHandler
 ```
 
-That text is byte-identical to the CLI's FAIL block by construction. The adapter and the CLI share one renderer, and a product test pins them equal. Restore the attribute and the test is green.
-
-## One edit, four message components
-
-Layers here are namespace patterns (`Meridian.Quoting.Application.*`), not project references. You cannot break the boundary with a direct `Application -> Infrastructure` project reference. Infrastructure already references Application, and MSBuild rejects the cycle. A namespace violation compiles anyway, and the checker catches what the project graph cannot see.
-
-The agent-failure story is an agent that wires the concrete repository instead of the port. Drop one file into the Api project (which already references Infrastructure, so it compiles) declaring the Application namespace and newing up `InMemoryQuoteRepository`. The layer is the namespace, so the type lands in Application while the file sits in Api, and `check` goes red. Here is the failing rule's block from its report:
-
-```text
-FAIL layering/application-boundaries — The Application layer must reference only the Domain layer (external packages are not constrained by this rule).
-  because: Use cases depend on the Domain and on abstractions they own, never on a concrete adapter; keeping Infrastructure and Api out of Application is what lets persistence and transport be swapped or faked in a test.
-  fix: Depend on a port (an interface in Domain or Application) instead of the concrete type; wire the implementation in the Api composition root.
-  src/Meridian.Quoting.Api/Handlers/ExpireQuotesHandler.cs:12 — Meridian.Quoting.Application.Handlers.ExpireQuotesHandler references Meridian.Quoting.Infrastructure.Persistence.InMemoryDatabase
-  src/Meridian.Quoting.Api/Handlers/ExpireQuotesHandler.cs:16 — Meridian.Quoting.Application.Handlers.ExpireQuotesHandler references Meridian.Quoting.Infrastructure.Persistence.InMemoryQuoteRepository
-  src/Meridian.Quoting.Api/Handlers/ExpireQuotesHandler.cs:17 — Meridian.Quoting.Application.Handlers.ExpireQuotesHandler references Meridian.Quoting.Infrastructure.Persistence.InMemoryQuoteRepository
-```
-
-`check` exits 1 and the summary reads `Checked 9 rules: 8 passed, 1 failed, 0 skipped (2 violations, 0 warnings)`, so exactly one rule is red. The block carries the ID, the reason, the fix, and the exact `file:line`, and no `grandfathered:` line, because this is day-one law with nothing baselined. That is the contrast with the ratcheted blocks in [`../Meridian/`](../Meridian/), where every current violation sits on a counted baseline. Delete the file, rebuild, and `check` is green again.
+That text is byte-identical to the CLI's FAIL block by construction. The adapter and the CLI share one renderer, and a product test pins them equal. The `exemplar:` line comes from the rule's `.Exemplar` trailer, which names the type to copy when fixing a violation; here that is `RequestQuoteHandler` itself, as it was before the attribute came off. The block prints that type with the file and line that declare it. Restore the attribute and the test is green.
 
 ## Run it yourself
 
@@ -112,15 +112,15 @@ SlideRule ships as a .NET global tool (solution-loading commands need a .NET 10 
 dotnet tool install -g SlideRule.Cli
 ```
 
-The test leg is a package too. A consumer adds `SlideRule.Xunit` to its own test project and derives one class per spec, as `tests/Meridian.Quoting.ArchTests` does here. From a checkout of this repository, build the subsystem and check it:
+The test leg is a package too. A consumer adds `SlideRule.Xunit` to its own test project and derives one class per spec, as [tests/Meridian.Quoting.ArchTests](tests/Meridian.Quoting.ArchTests/QuotingArchitectureTests.cs) does here with one overridden property. The adapter's [readme](../../src/SlideRule.Xunit/README.md#requirements) lists the xunit version and the test runner such a project needs. From a checkout of this repository, build the subsystem and check it:
 
 ```bash
 dotnet build examples/Meridian.Quoting/Meridian.Quoting.slnx
 sliderule check examples/Meridian.Quoting/Meridian.Quoting.slnx
 ```
 
-`check` exits 0 because every rule holds. `sliderule render` regenerates the `AGENTS.md` block and the [ARCHITECTURE.md](ARCHITECTURE.md) drawings from the spec. `dotnet test examples/Meridian.Quoting/tests/Meridian.Quoting.ArchTests/Meridian.Quoting.ArchTests.csproj` runs the nine named rule tests (add `--output Detailed` for a line per test).
+`check` exits 0 because every rule passes. `sliderule render` rewrites the root `AGENTS.md` block and the Domain and Application cards, and refreshes `sliderule.model.json`. A layer gets a card when a rule names it as its subject, which is why Infrastructure and Api have none. The drawings in [ARCHITECTURE.md](ARCHITECTURE.md) need `render --diagram`, and that page ends with the command. `dotnet test examples/Meridian.Quoting/tests/Meridian.Quoting.ArchTests/Meridian.Quoting.ArchTests.csproj` runs the nine named rule tests (add `--output Detailed` for a line per test).
 
 ## From here
 
-[`../Meridian/`](../Meridian/) is the monolith that ratchets its debt as `Migrate` rules. Its `time/inject-clock` target is `time/injected-clock` here, the same ban on `DateTime.Now` and `DateTime.UtcNow` with no baseline to grandfather. Its `data-access/no-inline-sql` target is the shape this subsystem was built in, with data access behind repository interfaces. Here `persistence/repository-ports` keeps those interfaces in Domain, and `layering/application-boundaries` keeps the use cases off their implementations. Its `naming/async-suffix` has no counterpart here. Two rules match by name across both specs, domain independence and controller naming, `Enforce` in each.
+The [`../Meridian/`](../Meridian/) monolith ratchets its debt as `Migrate` rules. Its `time/inject-clock` target is `time/injected-clock` here, the same ban on `DateTime.Now` and `DateTime.UtcNow` with no baseline to grandfather. Its `data-access/no-inline-sql` target is the shape this subsystem was built in, with data access behind repository interfaces. Here `persistence/repository-ports` requires those interfaces to reside in Domain, and `layering/application-boundaries` keeps the use cases off their implementations. Meridian's `naming/async-suffix` has no counterpart here. The two rules that match by name across both specs are domain independence and controller naming, `Enforce` in each.

@@ -1,18 +1,7 @@
 # The agent loop, closed by a hook
 
-This directory exists for [storyboard.md](storyboard.md). There, a coding agent working a routine
-task writes the pattern Meridian is retiring, and the architecture rule reaches it before the turn
-is over. The storyboard walks that loop beat by beat with real captured output. It runs from the
-task brief to the refused stop to the self-correction that lands instead. A fifth beat walks the
-other outcome, the one an exit code cannot carry. That outcome is an edit the rules allow, into the
-quarantined clearance engine. The tripwire there warns rather than blocks, and the warning reaches
-the agent as hook context.
+This directory exists for [storyboard.md](storyboard.md), which walks one agent loop on Meridian with real captured output. The storyboard has five beats. In the first four, a coding agent working a routine task writes a method name in a pattern Meridian is retiring. The architecture rule reaches it before the turn is over, and the agent corrects the code. The fifth walks the other outcome, an edit the rules allow into the quarantined clearance engine. The tripwire there warns without blocking. The warning reaches the agent as hook context, a message Claude Code passes to the agent before the turn ends.
 
-Beside the storyboard sits the one piece that makes the loop run. `settings.snippet.json` is the
-paste-in that wires the `UserPromptSubmit`, `Stop` and `SubagentStop` entries into a repo's own
-Claude Code configuration. Each entry runs `sliderule hook` on Meridian's solution, and the verb
-maps a red check to the exit code a Claude Code hook treats as blocking. The storyboard's file table
-says what the snippet holds and how to lift it into your repo.
+The one other file here, [`settings.snippet.json`](settings.snippet.json), makes the loop run. It is the snippet to paste into a repository's `.claude/settings.json`, with `UserPromptSubmit`, `Stop` and `SubagentStop` entries that each run `sliderule hook` on Meridian's solution. The `Stop` and `SubagentStop` entries check the tree when a turn ends. The `UserPromptSubmit` entry records the tree as each prompt finds it, so a stop can tell the code its turn wrote from the code it found. `sliderule hook` maps a red check to the exit code that blocks a Claude Code stop. The storyboard's [file table](storyboard.md#the-file-in-this-directory) explains how to lift the snippet into your own repository.
 
-The general recipe this snippet instantiates lives at the repository root under
-[hooks/](../../../hooks/), and the codebase it guards is [Meridian itself](../README.md).
+The general recipe this snippet follows is under [hooks/](../../../hooks/) at the repository root, with its install steps and its exit-code contract. The codebase it guards is [Meridian itself](../README.md).
