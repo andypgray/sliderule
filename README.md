@@ -186,7 +186,7 @@ The command is `sliderule`. Four lockstep-versioned packages make up a release, 
 
 ## Connecting an MCP client
 
-An MCP client launches the same tool with the `mcp` verb; the server speaks stdio. The `.mcp.json` shape:
+An MCP client launches the same tool with the `mcp` command; the server speaks stdio. The `.mcp.json` shape:
 
 ```json
 {

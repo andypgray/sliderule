@@ -22,7 +22,7 @@ This recipe was proven before any example existed. A cold agent, given only the 
 
 ## Step 1: survey the estate
 
-On your solution, restore or build first, then start with the one verb that needs no spec. `sliderule graph` reads the code from source the way `check` does and returns projects, namespace inventories, project-to-project edges, and external references. On a large estate, this is how you find the layers without opening every file. The edge matrix shows what references what, and the namespace inventory is the raw material for layer globs. Read all of it as hypotheses to test.
+On your solution, restore or build first, then start with the one command that needs no spec. `sliderule graph` reads the code from source the way `check` does and returns projects, namespace inventories, project-to-project edges, and external references. On a large estate, this is how you find the layers without opening every file. The edge matrix shows what references what, and the namespace inventory is the raw material for layer globs. Read all of it as hypotheses to test.
 
 ```text
 $ sliderule graph examples/Meridian/Meridian.slnx --json
@@ -442,7 +442,7 @@ To reset to day zero inside the sandbox, delete `examples/Meridian/arch/` and `e
 
 Every example build attaches the [build analyzer](../../src/SlideRule.Analyzers/README.md), which reads the nearest `sliderule.model.json` at or above each project. Until step 7 writes the example's own, the nearest one is this repository's root model file, whose rules select no Meridian code.
 
-One substitution applies throughout. This repository is a source checkout, so each `sliderule <verb> …` line above runs as `dotnet run --no-build --project src/SlideRule.Cli -- <verb> …` from the repository root. Build the CLI first with `dotnet build src/SlideRule.Cli`. To use the `sliderule` command directly, install the global tool per the [README](README.md#run-it-yourself).
+One substitution applies throughout. This repository is a source checkout, so each `sliderule <command> …` line above runs as `dotnet run --no-build --project src/SlideRule.Cli -- <command> …` from the repository root. Build the CLI first with `dotnet build src/SlideRule.Cli`. To use the `sliderule` command directly, install the global tool per the [README](README.md#run-it-yourself).
 
 The walk hits two SDK behaviors, and neither affects what `check` reports. First, `dotnet sln add` follows the spec's project references and adds both the SlideRule contract library and the rule pack to the solution. Remove the two of them and confirm four projects remain:
 

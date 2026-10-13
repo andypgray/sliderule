@@ -137,7 +137,7 @@ dotnet build examples/Meridian.Operations/Meridian.Operations.slnx
 sliderule check examples/Meridian.Operations/Meridian.Operations.slnx
 ```
 
-Without the global tool, run the CLI from source with `dotnet run --project src/SlideRule.Cli -- check examples/Meridian.Operations/Meridian.Operations.slnx`. `check` exits 0 here, and its summary reads `Checked 8 rules: 7 passed, 0 failed, 1 skipped (0 violations, 0 warnings)`. The skipped rule is the quarantine's tripwire, `demurrage/engine/tripwire`. It runs only on a check that has a list of changed files. `check` builds that list from a `--diff-base` ref, and the `hook` verb gives its check the files the turn changed. The tripwire then warns on each changed file that declares an engine type.
+Without the global tool, run the CLI from source with `dotnet run --project src/SlideRule.Cli -- check examples/Meridian.Operations/Meridian.Operations.slnx`. `check` exits 0 here, and its summary reads `Checked 8 rules: 7 passed, 0 failed, 1 skipped (0 violations, 0 warnings)`. The skipped rule is the quarantine's tripwire, `demurrage/engine/tripwire`. It runs only on a check that has a list of changed files. `check` builds that list from a `--diff-base` ref, and the `hook` command gives its check the files the turn changed. The tripwire then warns on each changed file that declares an engine type.
 
 `sliderule render` regenerates the six cards, and the `render --diagram` command at the foot of [ARCHITECTURE.md](ARCHITECTURE.md) redraws its drawings. `sliderule status` prints the quarantine burndown, and `sliderule explain <rule-id>` expands any rule, as does the `arch_explain` MCP tool. Introduce the reach from [One edit, two rules](#one-edit-two-rules) and `check` exits 1 with the two blocks shown there.
 

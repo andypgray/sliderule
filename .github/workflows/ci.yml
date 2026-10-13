@@ -8,6 +8,12 @@ on:
 permissions:
   contents: read
 
+# The build analyzer's six diagnostic IDs. Two builds promote them to errors: self-check's build of
+# this solution, whose src projects take the analyzer package, and the examples job's builds of the
+# four example solutions, which attach it by project path. The examples job says why all six.
+env:
+  SR_BUILD_TIER_IDS: 'SR2001,SR2002,SR2090,SR2091,SR2092,SR2093'
+
 jobs:
   # Two Windows legs, because the .NET Framework fixtures make the Visual Studio on the image
   # required rather than incidental. `windows-latest` is now the VS-2026-only image (VS
@@ -33,9 +39,10 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      # Dependabot bumps a PackageReference and leaves packages.lock.json alone, so a NuGet update
-      # PR arrives failing NU1004 at Restore, before a single test runs — a red check that says
-      # nothing about the bump it was raised for. Relocking first means everything below tests what
+      # Dependabot bumps a PackageReference and that project's own packages.lock.json, but leaves the
+      # lock file of every project downstream of it stale, so a NuGet update PR arrives failing
+      # NU1004 at Restore, before a single test runs — a red check that says nothing about the bump
+      # it was raised for. Relocking first means everything below tests what
       # Dependabot actually proposed. The same step runs in pack-check, self-check and examples; the
       # rationale lives here only, so the four copies cannot drift apart in wording.
       #
@@ -1115,8 +1122,13 @@ jobs:
       # members, so the one-spec convention cannot pick. The restore is implicit here, so the
       # locked mode is named as a property rather than left to CI=true — build-and-test's
       # Restore step carries the reason.
+      #
+      # The src projects run the build analyzer over themselves (src/Directory.Build.props), so this
+      # build is also its verdict on this repository, with all six IDs as errors for the reasons the
+      # examples job gives. It is the one build that gates them: build-and-test prints them as
+      # warnings, and check below decides the rules a single project cannot.
       - name: Build
-        run: dotnet build SlideRule.slnx -p:RestoreLockedMode=true
+        run: dotnet build SlideRule.slnx -p:RestoreLockedMode=true -warnaserror:${{ env.SR_BUILD_TIER_IDS }}
       # --diff-base arms the Quarantine tripwire: a change set touching roslyn/msbuild-bootstrap
       # draws a warning naming the file, which is the recommended CI shape and the one this
       # repository owed its own quarantined scope. Without the flag the tripwire reports skipped
@@ -1173,8 +1185,6 @@ jobs:
   # tests/SlideRule.Tests/DocHygiene/ExampleArchitectureDocTests.cs instead.
   examples:
     runs-on: ubuntu-latest
-    env:
-      SR_BUILD_TIER_IDS: 'SR2001,SR2002,SR2090,SR2091,SR2092,SR2093'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

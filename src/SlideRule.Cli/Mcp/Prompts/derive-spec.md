@@ -18,20 +18,19 @@ Work the steps in order. Do not skip the curation gate.
   claims to be provably true, so every rule in it must be something the team actually stands
   behind.
 - **Violations during this flow are data, not failures.** You will deliberately author rules
-  the codebase violates, precisely to measure the violations. A red `arch_check` mid-derive
-  means the evidence pass is working.
+  the codebase violates, precisely to measure the violations.
 - Everything here uses the read-only tools (`arch_graph`, `arch_check`, `arch_explain`,
-  `arch_status`) or their identical CLI verbs (`sliderule graph|check|explain|status`, add
+  `arch_status`) or their identical CLI commands (`sliderule graph|check|explain|status`, add
   `--json` for the same documents). Prefer the tools: they are already bound to the solution,
   the workspace stays warm between calls, and their narrowing parameters (`overview`,
   `skeleton` and `index` for grain, `projects` for scope on the survey, `rules` on the check)
-  keep a big solution's answer a complete document rather than a truncated one. The CLI verbs are for when a document belongs in a
+  keep a big solution's answer a complete document rather than a truncated one. The CLI commands are for when a document belongs in a
   file. They take the solution path as their first argument — `sliderule graph MyApp.sln
   --json` — or walk up from the working directory when omitted (`explain` differs: its rule
-  ID comes first, the solution second — `sliderule explain area/rule MyApp.sln`). The two
-  ratchet mutations that end the flow — `sliderule baseline init` and the commit — belong
-  to the human. A session launched from the MCP registry manifest has no `sliderule` command:
-  there, prefix every CLI verb in this recipe with `dotnet dnx SlideRule.Cli@... --yes --`,
+  ID comes first, the solution second — `sliderule explain area/rule MyApp.sln`). The writes
+  that end the flow — `sliderule baseline init`, `sliderule render --model` and the commit —
+  belong to the human. A session launched from the MCP registry manifest has no `sliderule` command:
+  there, prefix every CLI command in this recipe with `dotnet dnx SlideRule.Cli@... --yes --`,
   run from outside any `global.json` that pins an SDK below 10.
 
 ## 0. Discover stated intent first
@@ -51,12 +50,13 @@ describes the target; the code is the debt).
 
 ## 1. Survey the estate
 
-Call `arch_graph` (CLI: `sliderule graph MyApp.sln --json`). It needs no spec — it is the
-one tool that works before any spec exists — and returns the codebase as extraction sees it.
+Call `arch_graph` (CLI: `sliderule graph MyApp.sln --json`). It needs no spec and returns the
+codebase as extraction sees it.
 
-It does need the solution **restored and built**. If a project fails to load, the call returns an
-error naming it instead of a survey: a map missing whole projects would send the whole derivation
-down a wrong path, and there is no later step that would catch it. Restore and build, then retry.
+It does need the solution **restored**, not built: the code is read from source. If a project
+fails to load, the call returns an error naming it instead of a survey: a map missing whole
+projects would send the whole derivation down a wrong path, and there is no later step that
+would catch it. Do what the error says, then retry.
 Survey the partial model deliberately (`allowWorkspaceDiagnostics: true`) only if some project
 genuinely cannot be made to load, and then treat every conclusion below as provisional.
 
@@ -116,8 +116,7 @@ genuinely cannot be made to load, and then treat every conclusion below as provi
   project that imports it, so its code is already surveyed under those names. Read this **first**,
   before treating `projects[]` as the estate: without it the roster is simply shorter than the
   solution and nothing says so, and a spec derived from it silently cannot reach whatever ships
-  from those projects. Absent when the survey covers every declared project. Unlike the two
-  coverage keys above it is never elided — it is bounded by the solution, not the codebase.
+  from those projects. Absent when the survey covers every declared project.
 
 The document's keys, exactly (camelCase; an optional field is absent, never null):
 
@@ -159,8 +158,7 @@ outside the roster, and a `multiplyDeclaredTypes[]` entry survives when any of i
 in scope. A `shadowedTypes[]` entry survives on either end too — its declaring project, or any
 project binding the assembly. `unsupportedProjects[]` does not scope either: it is a fact about
 the load rather than about the roster. On a solution too big to survey whole even at index
-grain, scope is the knob left — grain has nowhere further to go, and the index document you
-are holding names every project you can scope to.
+grain, scope is the knob left.
 
 From the survey, write down **hypotheses, not conclusions**:
 
@@ -266,8 +264,7 @@ spec's private plumbing and stays out of the checked universe. It appears in the
 way, because `arch_graph` is spec-less and excludes nothing. Ignore it there, and scope broad
 subjects to your product namespaces
 (`arch.Types.OfKind(TypeKind.Interface).InNamespace("MyApp.*")`, not bare
-`arch.Types.OfKind(...)`) so convention rules never bite the tooling. A `PackageReference`
-setup has none of this — the package is a metadata reference, not a project.
+`arch.Types.OfKind(...)`) so convention rules never bite the tooling.
 
 Test projects need the same subject-scoping care in ANY setup: a test project sharing the
 product root namespace (`MyApp.Tests.*` inside `MyApp.*`) is solution-declared, so
@@ -319,7 +316,9 @@ Errors you may see, verbatim, and what they mean:
   references the contract library; the listed lines name each one's `.csproj`, so pass yours.
   A project that multi-targets is listed once: its frameworks are one spec project.
 - `The spec project '…' has no built output … Build the solution first (dotnet build).` —
-  the CLI and this server **never build**; build before every check, or the results are stale.
+  the CLI and this server **never build**. They read the code from source, so an edit counts
+  unbuilt, and run the spec from the spec project's last build: rebuild that project after each
+  spec edit, and the next check reads it.
 - `The spec assembly '…' failed to load its dependency '…' while running Define().` — a
   `typeof()` anchor names a type whose assembly the loader cannot reach. The message says which
   of two situations you are in, so read its second line rather than reaching for the setting.
@@ -333,7 +332,7 @@ Errors you may see, verbatim, and what they mean:
   pattern.
 
 If discovery still cannot find your spec project, do not stall: pass
-`--spec path/to/YourSpec.csproj` to every verb and continue — nothing downstream depends on
+`--spec path/to/YourSpec.csproj` to every command and continue — nothing downstream depends on
 convention discovery.
 
 ## 3. Draft candidate rules — all as `Enforce`, all of them hypotheses
@@ -341,7 +340,7 @@ convention discovery.
 Turn every step-1 hypothesis into a rule. Do not pre-judge postures — the checker assigns the
 evidence in step 4; postures come in step 5. **Author the already-true directions too**: every
 layer pair the survey's edge matrix shows clean becomes an Enforce candidate — the cheapest
-law you will ever get. A derive that only writes rules about problems under-produces law.
+law you will ever get.
 
 Define each layer by whatever honestly says where it is. A namespace cone where the namespaces are
 disciplined; `arch.Project("MyApp.Web")` where the unit of architecture is the assembly, or where the
@@ -438,8 +437,7 @@ not this document's), camelCase and exact like the step-1 key map:
 
 - `violations[]` with `sites[]` — the real edges, each with `file:line`. One violation per
   offending type pair; multiple reference sites between the same pair ride together in
-  `sites[]` — and the baseline records how many, so a grandfathered pair that grows is red.
-  This is your edge summary at rule precision. Beside them, `violationCount` and
+  `sites[]`. Beside them, `violationCount` and
   `siteCount` are present at every grain — script against the counts (step 5 reads the
   violation count); the arrays are their expansion and are elided at coarser grain.
 - The **authoring signals** are about your selection, not the code. A violation of kind
@@ -464,10 +462,10 @@ nonconforming names — against a count you can read off the document: per rule,
 `emptySubject` violations plus its inert and partly inert warnings. Re-check while that count reaches a
 new low; when two consecutive re-checks leave a rule's count at its best so far, stop working
 that rule and carry it to step 6 as `undecided`, while every other rule keeps iterating on its
-own count. No derivation has needed the bound yet; it is there so that none can run away.
-Iterating is cheap over MCP: the server holds the workspace warm and reconciles your edits per
-call, so a re-check after the first load answers in milliseconds; one-shot CLI runs pay a
-workspace load each time (a clean tree with a valid extraction cache skips it). On a big
+own count. Iterating is cheap over MCP: the server holds the workspace warm, reconciles your edits
+per call and picks a rebuilt spec up on the next call, so a re-check after the first load answers
+in milliseconds; a one-shot CLI run with a valid extraction cache reloads only the projects edited
+since it was written, and nothing on a clean tree. On a big
 solution, narrow instead of leaving: `rules` takes rule-ID globs (`rules: "data-access/*"`; the
 CLI twin is `--rules`), so the evidence pass can walk the draft area by area with every
 response a complete document, and `arch_explain` returns one rule whole. You never have to page
@@ -480,9 +478,9 @@ which is the menu those globs pick from.
 For each surviving rule, the violation count decides the honest posture:
 
 - **Zero violations → `Enforce`.** The codebase already obeys — on a complete model only: a
-  check stamped `modelIncomplete` has *not observed* the rule, and a rule not observed can never
-  be called already-obeyed. Making it law costs nothing and protects it from the next change.
-  Keep the rule exactly as drafted; upgrade `Because` to the real rationale.
+  check stamped `modelIncomplete` has *not observed* the rule. Making it law costs nothing and
+  protects it from the next change. Keep the rule exactly as drafted; upgrade `Because` to the
+  real rationale.
 - **Violations, and the team wants the target → `Migrate`.** Rewrite as a pair:
 
   ```csharp
@@ -558,12 +556,11 @@ For each surviving rule, the violation count decides the honest posture:
 - **Nothing the team will stand behind → drop the rule.** An unratified rule in the spec is
   exactly the stale-doc problem this tool exists to kill.
 
-Before moving on, check the invariant those four bullets exist to leave true: **`Enforce`
+Before moving on, check the invariant those bullets exist to leave true: **`Enforce`
 carries no baseline**, so `baseline init` cannot grandfather it and a red Enforce rule
 stays red for good. Every rule that still has violations must leave this step re-postured to
 `Migrate`, fenced inside a `Quarantine`, dropped, or named in the handoff as work the team is
-choosing to do now. An unexplained red is the one outcome the flow cannot recover from,
-because the reader cannot tell it from a mistake they made.
+choosing to do now. An unexplained red is the one outcome the flow cannot recover from.
 
 ## 6. The curation gate — **do not guess**
 
@@ -604,10 +601,9 @@ red, and so does a grandfathered pair that gains sites past its recorded count.
 
 When a failing rule was left `Enforce`, `baseline init` says so rather than staying quiet: a notice
 names each rule failing with no baseline to capture, with its violation count (on a spec with
-no ratcheted rules at all, it leads with `nothing to capture`). Enforce is the one posture a
-baseline cannot absorb, so every rule in that list is either a step-5 miss — go back and
-re-posture, fence, or drop it — or work the team is choosing to do now, which the handoff
-must say.
+no ratcheted rules at all, it leads with `nothing to capture`). Every rule in that list is either
+a step-5 miss — go back and re-posture, fence, or drop it — or work the team is choosing to do
+now, which the handoff must say.
 
 Re-run `arch_check`. If step 5 ratcheted every violating rule, expect exit 0,
 `rulesFailed: 0`, with the grandfathered counts visible. If reds were left deliberately, the
@@ -618,19 +614,24 @@ watches shrink.
 
 ## 8. Render and commit
 
-Have the human run `sliderule render MyApp.sln`: it writes the managed block into the root `AGENTS.md`
-(everything outside the markers is preserved byte-for-byte) and drops a second managed
-`AGENTS.md` into each scope's directory (the dragons card) and into each layer's
-directory when rules are anchored on that layer (the local-rules card). If a `CLAUDE.md`,
+Have the human run `sliderule render --model MyApp.sln`: it writes the managed block into the
+root `AGENTS.md` (everything outside the markers is preserved byte-for-byte), drops a second
+managed `AGENTS.md` into each scope's directory (the dragons card) and into each layer's
+directory when rules are anchored on that layer (the local-rules card), and writes
+`sliderule.model.json` beside the solution: the file the `SlideRule.Analyzers` package reads to
+report a broken rule as a compiler warning in each governed project's build. `--model` is needed
+once; every later render refreshes the file. If a `CLAUDE.md`,
 `.claude/CLAUDE.md` or `CLAUDE.local.md` sits in the solution directory or above it (a
 `~/.claude/CLAUDE.md` of the user's own does not count), Claude Code reads that instead of
 `AGENTS.md`, and `render` warns: propose a `CLAUDE.md` beside `AGENTS.md` holding the line
 `@AGENTS.md`, and leave that edit to the human. Then commit —
-spec project, `arch/baselines/**`, and the rendered
+spec project, `arch/baselines/**`, `sliderule.model.json`, and the rendered
 `AGENTS.md` files — as **one reviewable diff**: the reviewer sees the proposed law, the
 acknowledged debt, and the generated context in a single change. On a multi-configuration `.sln`
 the largest hunk in that diff is often the solution file itself: the configuration-table expansion
-from step 2, which is mechanical, expected, and not to be trimmed by hand.
+from step 2, which is mechanical, expected, and not to be trimmed by hand. Rolling the analyzer
+out — the package reference and what a warning does in CI — is the human's; see
+[Rolling out the build analyzer](https://github.com/andypgray/sliderule/blob/main/OPERATING.md#rolling-out-the-build-analyzer).
 
 Where the human wires `check` into CI, say that the pipeline's invocation wants
 `--diff-base <the pull request's base ref>`: without one every scope's tripwire is skipped rather
@@ -661,7 +662,7 @@ once per rule, `dropped` with the reason, and read `none` when there is nothing 
 receipt keeps three claims apart — that the spec builds, that the evidence pass ran on a
 complete model, and that a human curated — and none implies another, so the last three lines
 stay as written: you stop at the gate and cannot witness your own curation, and the two write
-verbs are the human's. Beside the receipt, list each Migrate rule's current violation count and
+commands are the human's. Beside the receipt, list each Migrate rule's current violation count and
 the dragons you documented.
 
 ---

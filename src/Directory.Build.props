@@ -56,6 +56,34 @@
         <GlobalAnalyzerConfigFiles Include="$(MSBuildThisFileDirectory)../analyzers.globalconfig" />
     </ItemGroup>
 
+    <!-- The build analyzer, run over this repository's own projects against the committed
+         sliderule.model.json at the root, which the package's targets find by searching upward. It is
+         the last released package and never a reference to the project beside it: Core and Extraction
+         cannot be analyzed by an analyzer built from themselves in the same build, an editor does not
+         reload an analyzer that was rebuilt under it, and this way the model file is read by the
+         previous release's reader, so a format change that release cannot read reds here first. The
+         version names the last published release, as PackageValidationBaselineVersion below does, and
+         moves with it.
+
+         Six projects take it as an ordinary private PackageReference, the way a consumer does. The
+         analyzer project and the two it references, Core and Extraction, cannot: NuGet walks a project's
+         references for cycles before PrivateAssets prunes anything, so a reference in either of those
+         two reaches the analyzer project's own graph as the package of its own name, and restore fails
+         with NU1108. Those three download the package instead, which keeps it out of the dependency
+         graph, and src/Directory.Build.targets hands the compiler what a reference would have: the
+         three assemblies as Analyzer items and the package's own targets file. A download is recorded
+         in no lock file, which is why the version is pinned exactly there. -->
+    <PropertyGroup>
+        <SlideRuleAnalyzersVersion>0.1.0</SlideRuleAnalyzersVersion>
+        <_SlideRuleAnalyzersByDownload Condition="'$(MSBuildProjectName)' == 'SlideRule' Or '$(MSBuildProjectName)' == 'SlideRule.Extraction' Or '$(MSBuildProjectName)' == 'SlideRule.Analyzers'">true</_SlideRuleAnalyzersByDownload>
+    </PropertyGroup>
+    <ItemGroup Condition="'$(_SlideRuleAnalyzersByDownload)' != 'true'">
+        <PackageReference Include="SlideRule.Analyzers" Version="$(SlideRuleAnalyzersVersion)" PrivateAssets="all" />
+    </ItemGroup>
+    <ItemGroup Condition="'$(_SlideRuleAnalyzersByDownload)' == 'true'">
+        <PackageDownload Include="SlideRule.Analyzers" Version="[$(SlideRuleAnalyzersVersion)]" />
+    </ItemGroup>
+
     <!-- The compiler writes each project's XML documentation file, and the packages carry it beside
          the assembly, so a consumer's editor shows the doc comments the source already carries. The
          file is also what turns the documentation-mode diagnostics on: without it the compiler

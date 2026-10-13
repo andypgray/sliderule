@@ -59,7 +59,7 @@ That report leaves out the rules that passed without a warning. What remains is 
 
 Each agent is told a given set of warnings once. A file the agent keeps editing is changed again at each stop, so the hook stores the last report it passed to each agent and does not pass the same one again. A clean run with no warning clears that record, and warnings that come back after it are passed on again.
 
-Tests exercise every behaviour above. `HookRunnerTests` drives the verb in process against a scripted check, once per row of the table and once per turn-end outcome. It also runs the verb once per shape the working-tree question has to tell apart, against real git repositories and a real linked worktree. `HookCommandE2ETests` runs it end to end, from the command line through a full check of a fixture solution. `HookReadmeTests` checks the table's two code columns against the rows those runs use.
+Tests exercise every behaviour above. `HookRunnerTests` drives the command in process against a scripted check, once per row of the table and once per turn-end outcome. It also runs the command once per shape the working-tree question has to tell apart, against real git repositories and a real linked worktree. `HookCommandE2ETests` runs it end to end, from the command line through a full check of a fixture solution. `HookReadmeTests` checks the table's two code columns against the rows those runs use.
 
 ## Options
 

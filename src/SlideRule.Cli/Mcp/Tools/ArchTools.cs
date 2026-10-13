@@ -105,9 +105,10 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         "is the one reported; packageReferences is what the project declares, never the transitive closure, " +
         "and privatePackageReferences (absent when empty) names the ones whose PrivateAssets is all — " +
         "analyzers and build tools that ship to no consumer, which MustReferenceNoPackages passes. " +
-        "Needs no spec — call it before one exists to plan layers and rules. Needs the solution restored and " +
-        "built: if projects fail to load, or their NuGet packages did not resolve, it returns an error naming " +
-        "them rather than a survey missing them or missing their external edges. " +
+        "Needs no spec — call it before one exists to plan layers and rules. Needs the solution restored, " +
+        "not built (the code is read from source): if projects fail to load, or their NuGet packages did " +
+        "not resolve, it returns an error naming them rather than a survey missing them or missing their " +
+        "external edges. " +
         "Narrow with grain (overview, skeleton or index) or projects (fewer projects); an " +
         "over-budget survey coarsens its own grain, as far as index, rather than being cut — and index lists " +
         "every project name, which is what projects globs match. " +

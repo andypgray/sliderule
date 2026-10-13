@@ -16,6 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   initializers or top-level statements re-extracts only its own project. The cache write-back
   re-stamps only the documents that changed, and the output is byte for byte what a cold run prints.
 
+### Fixed
+
+- The MCP server instructions, the `arch_graph` description and the `derive_spec` recipe said to
+  build before every call. They now say that code is read from source and only the spec project's
+  build is read, and the recipe's last step adds `render --model` and the build analyzer.
+
 ## [0.1.0] - 2026-10-09
 
 The first release. SlideRule checks a .NET solution against an architecture spec written in C#, and
@@ -54,7 +60,7 @@ renders the same rules as context for coding agents.
 - **The build analyzer** (`SlideRule.Analyzers`). It reads the rendered model file and reports a
   broken rule as a warning at the offending code, in the editor and in the build, with IDs `SR2001`
   to `SR2093`.
-- **Self-hosting.** This repository's own spec governs its code. CI runs every read verb against it,
+- **Self-hosting.** This repository's own spec governs its code. CI runs every read command against it,
   and `render` keeps fifteen committed artifacts here current.
 
 [Unreleased]: https://github.com/andypgray/sliderule/compare/v0.1.0...HEAD

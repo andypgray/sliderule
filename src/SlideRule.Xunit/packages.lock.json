@@ -97,6 +97,12 @@
         "resolved": "18.9.6",
         "contentHash": "CNZfh4P65tHm1Wh/uuIbYfvHlPnb0dJ9SCaIZbXRzOMn+8JEorSqSdXdGRsrDbKBDJfNG6nmgleYhnfL2pd1oQ=="
       },
+      "SlideRule.Analyzers": {
+        "type": "Direct",
+        "requested": "[0.1.0, )",
+        "resolved": "0.1.0",
+        "contentHash": "QV1tn1g4DBIvifd+iTwSyN3GZABs0yAkMu1ozYMxvUb3GJrlkDVr86yNpVnURumM1LFfp2jGqHDOr1kWzHoOeg=="
+      },
       "xunit.v3.assert": {
         "type": "Direct",
         "requested": "[4.0.1, )",

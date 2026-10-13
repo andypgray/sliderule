@@ -28,7 +28,7 @@ A repository that already has a `CLAUDE.md` brings the managed block in with one
 
 ## Connecting the MCP server
 
-Install the tool first, as [Getting started](https://github.com/andypgray/sliderule/blob/main/GETTING-STARTED.md#requirements) shows. An MCP client launches the tool with the `mcp` verb, and the server speaks stdio. In a project's `.mcp.json`, the entry looks like this:
+Install the tool first, as [Getting started](https://github.com/andypgray/sliderule/blob/main/GETTING-STARTED.md#requirements) shows. An MCP client launches the tool with the `mcp` command, and the server speaks stdio. In a project's `.mcp.json`, the entry looks like this:
 
 ```json
 {
@@ -57,7 +57,7 @@ Without a solution argument, the server starts even when it cannot bind one. Eve
 dotnet dnx SlideRule.Cli -- mcp MyApp.sln
 ```
 
-This is how MCP registry clients launch the server. Keep the `mcp` after `--`, since that verb is what starts the server. Pin a release by writing the package as `SlideRule.Cli@<version>`. In a shell, spell the command `dotnet dnx`, because on Windows the short `dnx` is a `.cmd` file that a POSIX shell does not resolve.
+This is how MCP registry clients launch the server. Keep the `mcp` after `--`, since that command is what starts the server. Pin a release by writing the package as `SlideRule.Cli@<version>`. In a shell, spell the command `dotnet dnx`, because on Windows the short `dnx` is a `.cmd` file that a POSIX shell does not resolve.
 
 A config generated from the registry manifest passes no solution argument, so a repository the walk cannot resolve gets an unbound server. Its replies then give the survey command as `dotnet dnx SlideRule.Cli@<version> --yes -- graph <solution>`, because `dnx` installs no `sliderule` command, and `--yes` accepts the download without a prompt. Bind such a repository with a committed `sliderule.json` at its root, which needs no change to the config when the client starts the server inside the repository. Otherwise bind it at install time, with the solution in the config's `args` after `mcp`, or with `SLIDERULE_SOLUTION_PATH` in its `env`.
 
@@ -82,7 +82,7 @@ None of the tools takes a solution, because the server is bound to one at launch
 
 Violations are data, returned as findings in the document. A call returns an error when the run itself fails, and the error has the message the CLI would print. A call with an unknown argument key returns an error that lists the tool's parameters.
 
-`arch_check`, `arch_status` and `arch_graph` return the document their verb's `--json` writes, line for line. `arch_explain` returns the text `explain` prints. Given a `type` or a `path`, it names the layers, rules and scopes that claim each type, as `explain --type` does. Call it when a rule fires on a type you did not expect it to govern. `arch_context` is the one tool with no CLI verb. It returns the cards `render` writes for that path, or a line saying no card covers it. An MCP reply has no exit code to fail on. So where the CLI exits 2 on a partial model, `arch_check` and `arch_status` still return their document, stamped `modelIncomplete`. `arch_graph` stops as `graph` does, unless `allowWorkspaceDiagnostics` is set. The [command-line reference](https://github.com/andypgray/sliderule/blob/main/CLI.md#documents-and-versions) gives each document's `schemaVersion`.
+`arch_check`, `arch_status` and `arch_graph` return the document their command's `--json` writes, line for line. `arch_explain` returns the text `explain` prints. Given a `type` or a `path`, it names the layers, rules and scopes that claim each type, as `explain --type` does. Call it when a rule fires on a type you did not expect it to govern. `arch_context` is the one tool with no CLI command. It returns the cards `render` writes for that path, or a line saying no card covers it. An MCP reply has no exit code to fail on. So where the CLI exits 2 on a partial model, `arch_check` and `arch_status` still return their document, stamped `modelIncomplete`. `arch_graph` stops as `graph` does, unless `allowWorkspaceDiagnostics` is set. The [command-line reference](https://github.com/andypgray/sliderule/blob/main/CLI.md#documents-and-versions) gives each document's `schemaVersion`.
 
 ## The response budget
 

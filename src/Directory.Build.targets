@@ -1,0 +1,22 @@
+<Project>
+
+    <!-- The other half of the build analyzer's wiring in src/Directory.Build.props, for the three
+         projects that download the package rather than reference it. A download restores the files and
+         nothing else, so what a PackageReference would add is added here by hand: the analyzer's
+         assemblies, and the package's targets file, which finds the model and the baselines and makes
+         the tier switch visible to the compiler. It sits in a targets file because NuGetPackageRoot is
+         defined only after Directory.Build.props has been read, and an Import's condition is evaluated
+         where the Import stands. The Exists guard covers the restore's own evaluation, which runs before
+         the package is on disk. -->
+    <PropertyGroup Condition="'$(_SlideRuleAnalyzersByDownload)' == 'true'">
+        <_SlideRuleAnalyzersPackage>$(NuGetPackageRoot)sliderule.analyzers/$(SlideRuleAnalyzersVersion)/</_SlideRuleAnalyzersPackage>
+    </PropertyGroup>
+
+    <ItemGroup Condition="'$(_SlideRuleAnalyzersByDownload)' == 'true'">
+        <Analyzer Include="$(_SlideRuleAnalyzersPackage)analyzers/dotnet/cs/*.dll" />
+    </ItemGroup>
+
+    <Import Project="$(_SlideRuleAnalyzersPackage)buildTransitive/SlideRule.Analyzers.targets"
+            Condition="'$(_SlideRuleAnalyzersByDownload)' == 'true' And Exists('$(_SlideRuleAnalyzersPackage)buildTransitive/SlideRule.Analyzers.targets')" />
+
+</Project>

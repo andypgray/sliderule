@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Text.RegularExpressions;
+using Shouldly;
 using SlideRule.Tests.TestSupport;
 using SlideRule.Xunit;
 using Xunit;
@@ -41,6 +42,8 @@ public sealed class PublicSurfaceSyncTests
     private const string BaselineProperty = "PackageValidationBaselineVersion";
 
     private const string StrictModeProperty = "EnableStrictModeForBaselineValidation";
+
+    private const string AnalyzerVersionProperty = "SlideRuleAnalyzersVersion";
 
     private const string CoreCsproj = "src/SlideRule/SlideRule.csproj";
 
@@ -283,6 +286,24 @@ public sealed class PublicSurfaceSyncTests
         overrides.ShouldReportNothing(
             $"The package-validation baseline and mode belong to {ScopedProps} alone, so a release moves them "
             + "for every validated package at once");
+    }
+
+    [Fact]
+    public void TheBuildAnalyzerVersion_IsTheValidationBaseline()
+    {
+        // Arrange: the src projects run the last released build analyzer over themselves, and the baseline
+        // names the last released version too. Both move in the commit after a release indexes, so a
+        // difference means one of them was left behind, and an analyzer that lags reads the committed model
+        // with a reader two releases old.
+        string baseline = PropertyOf(ScopedProps, BaselineProperty);
+
+        // Act
+        string analyzer = PropertyOf(ScopedProps, AnalyzerVersionProperty);
+
+        // Assert
+        analyzer.ShouldBe(baseline,
+            customMessage: $"{ScopedProps} runs build analyzer {analyzer} over src but validates against "
+                           + $"{baseline}. Both name the last published release; move them together.");
     }
 
     [Fact]
