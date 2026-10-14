@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-14
+
 ### Changed
 
 - A check after an edit, which is what `hook` runs when an agent's turn ends, loads only the
@@ -67,5 +69,6 @@ renders the same rules as context for coding agents.
 - **Self-hosting.** This repository's own spec governs its code. CI runs every read command against it,
   and `render` keeps fifteen committed artifacts here current.
 
-[Unreleased]: https://github.com/andypgray/sliderule/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/andypgray/sliderule/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/andypgray/sliderule/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/andypgray/sliderule/releases/tag/v0.1.0
