@@ -15,11 +15,22 @@ namespace SlideRule.Roslyn.Caching;
 ///     silently-dropped write to a user-owned, version-controlled file would be a lie. A caller persisting
 ///     disposable derived data — which is simply rebuilt next run — wraps this and re-swallows the throw
 ///     itself. The temp file is deleted on the failure path.
+///     On Windows the move is retried for under a second while another process holds the target or the temp
+///     open, which is a passing hold rather than a failure of the write itself; any other I/O failure surfaces
+///     at once.
 ///     Lives in the Roslyn (net10.0) project because the overwriting
 ///     <see cref="File.Move(string,string,bool)" /> overload does not exist on Core's netstandard2.0.
 /// </remarks>
 internal static class AtomicFile
 {
+    private const int SharingViolation = unchecked((int)0x80070020);
+    private const int LockViolation = unchecked((int)0x80070021);
+
+    // About 750 ms in all. The holds this outlasts are an antivirus or indexer scan of a file seconds old and
+    // an editor re-reading a file it has open, each measured in milliseconds; hosted Windows CI lost a
+    // baseline add's rewrite to one.
+    private static readonly int[] MoveRetryDelaysMs = [50, 100, 200, 400];
+
     /// <summary>
     ///     Writes <paramref name="bytes" /> to <paramref name="path" /> atomically and durably — a temp
     ///     sibling, flushed to disk, then an overwriting move — creating the target directory if it is absent.
@@ -58,13 +69,44 @@ internal static class AtomicFile
         try
         {
             produce(tempPath);
-            File.Move(tempPath, fullPath, true);
+            MoveOverWithRetry(tempPath, fullPath);
         }
         catch
         {
             TryDelete(tempPath);
             throw;
         }
+    }
+
+    // POSIX renames over open files, so there the first attempt is the only one.
+    internal static void MoveOverWithRetry(string source, string destination)
+    {
+        foreach (int delayMs in MoveRetryDelaysMs)
+            try
+            {
+                File.Move(source, destination, true);
+                return;
+            }
+            catch (Exception ex) when (IsHeldOpen(ex, destination))
+            {
+                Thread.Sleep(delayMs);
+            }
+
+        File.Move(source, destination, true);
+    }
+
+    // Measured on Windows 10 NTFS: a source held open without FILE_SHARE_DELETE fails the move as a sharing
+    // violation, and a destination held open in any sharing mode fails it as access denied. A destination that is
+    // a directory or read-only fails as access denied too, and no wait cures it, so that is not retried.
+    private static bool IsHeldOpen(Exception exception, string destination)
+    {
+        return exception switch
+        {
+            IOException io => io.HResult is SharingViolation or LockViolation,
+            UnauthorizedAccessException => File.Exists(destination)
+                                           && !File.GetAttributes(destination).HasFlag(FileAttributes.ReadOnly),
+            _ => false
+        };
     }
 
     // Streams the bytes to disk and fsyncs them before returning, so the caller's subsequent File.Move promotes

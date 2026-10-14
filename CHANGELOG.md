@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- On Windows, `baseline`, `render` and `check --sarif` no longer fail with "being used by another
+  process" when an antivirus scan or another program briefly holds the file they are replacing. The
+  write waits up to about three quarters of a second for the hold to end, and still fails at once on
+  a read-only file.
 - The MCP server instructions, the `arch_graph` description and the `derive_spec` recipe said to
   build before every call. They now say that code is read from source and only the spec project's
   build is read, and the recipe's last step adds `render --model` and the build analyzer.
