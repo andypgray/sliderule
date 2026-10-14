@@ -28,9 +28,9 @@
       },
       "SlideRule.Analyzers": {
         "type": "Direct",
-        "requested": "[0.1.0, )",
-        "resolved": "0.1.0",
-        "contentHash": "QV1tn1g4DBIvifd+iTwSyN3GZABs0yAkMu1ozYMxvUb3GJrlkDVr86yNpVnURumM1LFfp2jGqHDOr1kWzHoOeg=="
+        "requested": "[0.1.1, )",
+        "resolved": "0.1.1",
+        "contentHash": "LcxP7Mfj6WIIyXhIBism68edjWiXQXhflTLp+7KtJFOQF+W7C73rrqrWk/ay/rTe8CqJmTdtIrHH2zsyKhKFVA=="
       },
       "Microsoft.CodeAnalysis.Common": {
         "type": "Transitive",
