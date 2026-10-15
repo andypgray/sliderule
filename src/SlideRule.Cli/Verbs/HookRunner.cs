@@ -19,7 +19,8 @@ namespace SlideRule.Cli.Verbs;
 ///         <b>The events.</b> <c>Stop</c> and <c>SubagentStop</c> are the turn boundary: the agent has said it is
 ///         done, so the check reads the working tree, which also covers the edits a shell or a language server
 ///         made and no tool payload names. <c>UserPromptSubmit</c> is the turn's other end, where nothing is
-///         checked and the tree is noted as the prompt found it. Any other event, and no payload at all, take
+///         checked and the session's tree, and each other tree the session keeps records for, is noted as the
+///         prompt found it. Any other event, and no payload at all, take
 ///         the per-edit path, which checks statelessly and skips an edit that touched no code or another tree.
 ///     </para>
 ///     <para>
@@ -32,7 +33,9 @@ namespace SlideRule.Cli.Verbs;
 ///     <para>
 ///         <b>The skips.</b> A stop spends no check when no code file's bytes have changed since the last green
 ///         verdict, or since the turn's baseline: the tree its prompt found, or for a subagent that stops after the
-///         turn has ended, the tree the turn's stop left. Bytes, not timestamps and not HEAD, so a file rewritten as
+///         turn has ended, the tree the turn's stop left. Another tree's baseline is the tree the turn's prompt
+///         found there, or the tree the last stop that weighed it left, whichever came later; a tree no stop of the
+///         session has weighed has none. Bytes, not timestamps and not HEAD, so a file rewritten as
 ///         it was and a commit of code as it stood both leave the skip standing. Nothing skips past a red verdict.
 ///         Any doubt, such as no state, no HEAD or a record that will not read, runs the check.
 ///     </para>
@@ -106,9 +109,10 @@ internal sealed class HookRunner(
 
     // The prompt's end of the turn: the tree as the prompt found it, so the stop can tell the code its turn wrote
     // from the code it found there. A prompt's baseline still standing belongs to a turn no stop has ended, and it is
-    // kept: it predates everything since, and replacing it would hide what that turn wrote. The baseline the last
-    // turn's stop left is replaced. Never a word on stdout and never an exit but 0, because a prompt hook's stdout
-    // joins the prompt and its exit 2 refuses it.
+    // kept, along with every other tree's: it predates everything since, and replacing it would hide what that turn
+    // wrote. The baseline the last turn's stop left is replaced, and so is each other tree's the session keeps
+    // records for. Never a word on stdout and never an exit but 0, because a prompt hook's stdout joins the prompt
+    // and its exit 2 refuses it.
     private async Task<int> OpenTurnAsync(
         HookPayload payload, string? projectDirectory, HookRequest request, CancellationToken ct)
     {
@@ -117,9 +121,32 @@ internal sealed class HookRunner(
 
         string tree = await SessionTreeAsync(payload.Cwd, projectDirectory, ct) ?? request.WorkingDirectory;
         TreeSnapshot snapshot = await HookGit.SnapshotAsync(tree, ct);
-        if (snapshot.Head is not null) state.RecordBaseline(snapshot);
+        if (!snapshot.Known) return HookExitCodes.Proceed;
+
+        state.RecordBaseline(snapshot);
+        await RecordOtherBaselinesAsync(state, tree, ct);
 
         return HookExitCodes.Proceed;
+    }
+
+    // Each other tree a stop of this session has weighed gets the prompt's baseline too, replacing whatever stands
+    // there, so the next stop that weighs it reads the turn's own changes rather than everything since the last stop
+    // that weighed it. The prompt waits on them, and they share nothing, so they are snapshotted together. A tree
+    // that is gone, or whose directory git no longer answers for as that top level, keeps its records as they are;
+    // so does a record that names no tree.
+    private static async Task RecordOtherBaselinesAsync(HookState state, string ownTree, CancellationToken ct)
+    {
+        IEnumerable<Task> recordings = state.RecordedTrees()
+            .Where(other => IsOtherTreeOnDisk(other.TopLevel, ownTree))
+            .Select(other => RecordBaselineAsync(other.TopLevel, other.State, ct));
+        await Task.WhenAll(recordings);
+    }
+
+    private static async Task RecordBaselineAsync(string tree, HookState state, CancellationToken ct)
+    {
+        TreeSnapshot snapshot = await HookGit.SnapshotAsync(tree, ct);
+        if (snapshot.Known && snapshot.TopLevel is { } topLevel && SameDirectory(topLevel, tree))
+            state.RecordBaseline(snapshot);
     }
 
     private async Task<int> CloseTurnAsync(
@@ -204,8 +231,15 @@ internal sealed class HookRunner(
         return code.Select(path => DeepestRootOf(path, roots))
             .OfType<string>()
             .Distinct(PathComparison.Comparer)
-            .Where(root => !SameDirectory(root, ownTree) && Directory.Exists(root))
+            .Where(root => IsOtherTreeOnDisk(root, ownTree))
             .ToList();
+    }
+
+    // A tree of the project other than the session's own that is still on disk: a worktree list, like the records a
+    // session keeps, can outlive the removal of a worktree it names.
+    private static bool IsOtherTreeOnDisk(string root, string ownTree)
+    {
+        return !SameDirectory(root, ownTree) && Directory.Exists(root);
     }
 
     // The deepest root holding `path`, or null for a path in none of them: a worktree under .claude/worktrees is
@@ -447,8 +481,9 @@ internal sealed class HookRunner(
 
     // A stop that stands ends the turn. Its baseline becomes the tree the stop found, for a subagent that stops after
     // the turn has ended, and the next prompt replaces it with its own. Only the main agent's stop ends a turn: a
-    // subagent stops inside one. Another tree has no prompt's baseline to keep, so every stop that weighed it rolls
-    // its baseline, and the next turn that writes there is compared with the tree as that stop left it.
+    // subagent stops inside one. Every stop that weighed another tree rolls that tree's baseline, the subagent's
+    // included: a stop that writes there before the next prompt is compared with the tree as this stop left it, and
+    // the next prompt records its own.
     private static int EndTurn(
         string hookEvent, IReadOnlyList<TreeTurn> trees, int exitCode = HookExitCodes.Proceed)
     {

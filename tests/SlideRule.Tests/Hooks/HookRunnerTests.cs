@@ -772,6 +772,85 @@ public sealed class HookRunnerTests
     }
 
     [Fact]
+    public async Task PromptPayload_AfterAStopCheckedAWorktree_GivesItABaseline()
+    {
+        // Arrange: a turn that wrote the worktree, checked green there, then a second code file written into the
+        // worktree between turns, as another session or a shell would write it.
+        HookSandbox sandbox = ArrangeRepository();
+        (string worktree, string probe, string payload) = await ArrangeCheckedWorktreeAsync(sandbox);
+        WriteOther(worktree, "Other.cs");
+
+        // Act
+        await FireAsync(sandbox, PromptPayload(sandbox), ExitCodes.Clean);
+        Rewrite(probe);
+        HookRun stop = await FireAsync(sandbox, payload, ExitCodes.Clean, quiet: true);
+
+        // Assert: the prompt recorded the worktree as it found it, so the file written before the turn began is
+        // not the turn's.
+        stop.ShouldHaveHandedTheCheckChangedFiles(
+            [".claude/worktrees/w1/src/Probe.cs"],
+            "A worktree the session has checked gets the prompt's baseline, so its tripwires read only the turn's "
+            + "own write there, not a file another writer changed between turns.");
+    }
+
+    [Fact]
+    public async Task PromptPayload_RecordedWorktreeThatIsGone_IsSkipped()
+    {
+        // Arrange
+        HookSandbox sandbox = ArrangeRepository();
+        (string worktree, _, _) = await ArrangeCheckedWorktreeAsync(sandbox);
+        string before = ReadTreeState(sandbox, "baseline");
+        GitCommand.Run(sandbox.ProjectDirectory, "worktree", "remove", "--force", worktree);
+
+        // Act
+        HookRun prompt = await FireAsync(sandbox, PromptPayload(sandbox), ExitCodes.Clean);
+
+        // Assert
+        prompt.Result.ShouldProceedSilently();
+        ReadState(sandbox, "baseline")
+            .ShouldStartWith("prompt\n", customMessage: "The session's own tree still gets the prompt's baseline.");
+        ReadTreeState(sandbox, "baseline")
+            .ShouldBe(before, "A recorded worktree that no longer exists is skipped, its record left as it was.");
+    }
+
+    [Fact]
+    public async Task PromptPayload_TreeRecordWithNoName_IsLeftAsItWas()
+    {
+        // Arrange: the worktree's records as an older build wrote them, with no file naming the tree.
+        HookSandbox sandbox = ArrangeRepository();
+        (_, string probe, _) = await ArrangeCheckedWorktreeAsync(sandbox);
+        string before = ReadTreeState(sandbox, "baseline");
+        File.Delete(TreeStatePath(sandbox, "tree"));
+        Rewrite(probe);
+
+        // Act
+        await FireAsync(sandbox, PromptPayload(sandbox), ExitCodes.Clean);
+
+        // Assert: a record that names no tree cannot be matched to one, so the prompt never writes to it.
+        ReadTreeState(sandbox, "baseline")
+            .ShouldBe(before, "A tree record with no name must be left as the stop left it.");
+    }
+
+    [Fact]
+    public async Task PromptPayload_WithABaselineStanding_LeavesTheWorktreesAlone()
+    {
+        // Arrange
+        HookSandbox sandbox = ArrangeRepository();
+        (_, string probe, _) = await ArrangeCheckedWorktreeAsync(sandbox);
+        await FireAsync(sandbox, PromptPayload(sandbox), ExitCodes.Clean);
+        string first = ReadTreeState(sandbox, "baseline");
+        Rewrite(probe);
+
+        // Act: a second prompt with no stop between, which keeps the session's baseline.
+        await FireAsync(sandbox, PromptPayload(sandbox), ExitCodes.Clean);
+
+        // Assert: the turn the standing baseline belongs to may have written the worktree too, so its baseline there
+        // stands as well.
+        ReadTreeState(sandbox, "baseline")
+            .ShouldBe(first, "A prompt that keeps the session's baseline must keep the worktrees' baselines too.");
+    }
+
+    [Fact]
     public async Task StopPayload_StateDirThatCannotBeMade_HonoursStopHookActive()
     {
         // Arrange: a file where the state root should be, so nothing under it can be made.
@@ -1003,7 +1082,7 @@ public sealed class HookRunnerTests
         HookSandbox sandbox = ArrangeRepository();
         WriteProbe(sandbox);
         await FireAsync(sandbox, PromptPayload(sandbox), ExitCodes.Clean);
-        WriteOther(sandbox, "Concurrent.cs");
+        WriteOther(sandbox.ProjectDirectory, "Concurrent.cs");
 
         // Act
         HookRun stop = await FireAsync(sandbox, StopPayload(sandbox), ExitCodes.Clean);
@@ -1041,7 +1120,7 @@ public sealed class HookRunnerTests
         // Arrange: a clean tree at the prompt, then a commit that adds code, as an integration into this checkout does.
         HookSandbox sandbox = ArrangeRepository();
         await FireAsync(sandbox, PromptPayload(sandbox), ExitCodes.Clean);
-        WriteOther(sandbox, "Brought.cs");
+        WriteOther(sandbox.ProjectDirectory, "Brought.cs");
         GitCommand.Run(sandbox.ProjectDirectory, "add", "src/Brought.cs");
         GitCommand.Commit(sandbox.ProjectDirectory, "-m", "brought");
 
@@ -1065,7 +1144,7 @@ public sealed class HookRunnerTests
 
         // Act
         HookRun idle = await FireAsync(sandbox, worker, ExitCodes.Violations);
-        WriteOther(sandbox, "Late.cs");
+        WriteOther(sandbox.ProjectDirectory, "Late.cs");
         HookRun wrote = await FireAsync(sandbox, worker, ExitCodes.Clean);
 
         // Assert: the turn's stop left its tree as the baseline, so a subagent that stops later has something to be
@@ -1084,7 +1163,7 @@ public sealed class HookRunnerTests
         WriteProbe(sandbox);
         await FireAsync(sandbox, PromptPayload(sandbox), ExitCodes.Clean);
         await FireAsync(sandbox, StopPayload(sandbox), ExitCodes.Clean);
-        string second = WriteOther(sandbox, "Second.cs");
+        string second = WriteOther(sandbox.ProjectDirectory, "Second.cs");
 
         // Act
         await FireAsync(sandbox, PromptPayload(sandbox), ExitCodes.Clean);
@@ -1101,7 +1180,7 @@ public sealed class HookRunnerTests
         // Arrange: a hook wired without the prompt entry, so the first stop has no baseline to compare with.
         HookSandbox sandbox = ArrangeRepository();
         WriteProbe(sandbox);
-        WriteOther(sandbox, "Other.cs");
+        WriteOther(sandbox.ProjectDirectory, "Other.cs");
         File.WriteAllText(Path.Combine(sandbox.ProjectDirectory, "notes.md"), "not code\n");
 
         // Act
@@ -1411,6 +1490,21 @@ public sealed class HookRunnerTests
         return (worktree, probe);
     }
 
+    /// <summary>
+    ///     A written worktree, as <see cref="AddWrittenWorktree" /> adds one, through a turn whose stop checked it
+    ///     green: the worktree's root, the file, and that stop's payload for a row to fire again.
+    /// </summary>
+    private static async Task<(string Worktree, string Probe, string StopPayload)> ArrangeCheckedWorktreeAsync(
+        HookSandbox sandbox)
+    {
+        (string worktree, string probe) = AddWrittenWorktree(sandbox);
+        string payload = StopPayload(sandbox, transcriptPath: SaveTranscript(sandbox, new HookTranscript().Wrote(probe)));
+        await FireAsync(sandbox, PromptPayload(sandbox), ExitCodes.Clean);
+        await FireAsync(sandbox, payload, ExitCodes.Clean, quiet: true);
+
+        return (worktree, probe, payload);
+    }
+
     /// <summary>A <c>UserPromptSubmit</c> payload, with the session's own tree as its directory.</summary>
     private static string PromptPayload(HookSandbox sandbox)
     {
@@ -1427,12 +1521,12 @@ public sealed class HookRunnerTests
     }
 
     /// <summary>
-    ///     A second code file, <c>src/<paramref name="name" /></c>, written into the sandbox as another session or a
-    ///     subagent would write it.
+    ///     A second code file, <c>src/<paramref name="name" /></c>, written into the working tree at
+    ///     <paramref name="tree" /> as another session, a subagent or a shell would write it.
     /// </summary>
-    private static string WriteOther(HookSandbox sandbox, string name)
+    private static string WriteOther(string tree, string name)
     {
-        string file = Path.Combine(sandbox.ProjectDirectory, "src", name);
+        string file = Path.Combine(tree, "src", name);
         Directory.CreateDirectory(Path.GetDirectoryName(file)!);
         File.WriteAllText(file, $"public sealed class {Path.GetFileNameWithoutExtension(name)};\n");
 
@@ -1460,13 +1554,22 @@ public sealed class HookRunnerTests
     /// </summary>
     private static string ReadTreeState(HookSandbox sandbox, string name)
     {
+        return File.ReadAllText(TreeStatePath(sandbox, name));
+    }
+
+    /// <summary>
+    ///     Where the session keeps the <paramref name="name" /> record for the one other tree a row wrote into,
+    ///     whatever digest names its directory.
+    /// </summary>
+    private static string TreeStatePath(HookSandbox sandbox, string name)
+    {
         string trees = StatePath(sandbox, "trees");
         string[] records = Directory.Exists(trees)
             ? Directory.GetFiles(trees, name, SearchOption.AllDirectories)
             : [];
         records.Length.ShouldBe(1, $"The hook should have kept one {name} record for the other tree under {trees}.");
 
-        return File.ReadAllText(records[0]);
+        return records[0];
     }
 
     private static string ReadState(HookSandbox sandbox, string name)

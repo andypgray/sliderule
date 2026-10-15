@@ -16,7 +16,9 @@ namespace SlideRule.Cli.Hooks;
 ///     <see cref="Stateful" /> is false, every read is empty and every write does nothing, so the exit mapping
 ///     reads the same whether or not there is anywhere to keep state. The files are plain text, one fact per
 ///     line, with a tree kept as its HEAD and then one <c>&lt;digest&gt; &lt;path&gt;</c> line per changed code
-///     file. A record that does not read that way, such as one an older build wrote, reads as no record.
+///     file. A record that does not read that way, such as one an older build wrote, reads as no record. Each
+///     other tree a stop weighed keeps its verdict, its baseline and its own top level under <c>trees</c>, so a
+///     prompt can list the trees the session holds records for.
 /// </remarks>
 internal sealed class HookState
 {
@@ -24,6 +26,8 @@ internal sealed class HookState
     private const string RoundsFile = "rounds";
     private const string BaselineFile = "baseline";
     private const string SaidFile = "said";
+    private const string TreeFile = "tree";
+    private const string TreesDirectory = "trees";
     private const string GreenWord = "green";
     private const string RedWord = "red";
     private const string PromptWord = "prompt";
@@ -73,8 +77,10 @@ internal sealed class HookState
     ///     wrote into: a directory of its own under the session's, keyed by a digest of the top level.
     /// </summary>
     /// <remarks>
-    ///     Only the verdict and the baseline are kept there. The round count and what an agent was told belong to
-    ///     the stop, however many trees it checks, so they stay on the session's own state.
+    ///     The verdict, the baseline and a <c>tree</c> file holding <paramref name="topLevel" /> are kept there. The
+    ///     digest cannot be turned back into a path, so that file is what <see cref="RecordedTrees" /> reads. The
+    ///     round count and what an agent was told belong to the stop, however many trees it checks, so they stay on
+    ///     the session's own state.
     /// </remarks>
     /// <returns>The tree's state, or <see cref="None" /> when the session has none or the directory cannot be made.</returns>
     public HookState ForTree(string topLevel)
@@ -82,7 +88,7 @@ internal sealed class HookState
         if (_directory is null) return None;
 
         byte[] digest = SHA256.HashData(Encoding.UTF8.GetBytes(PathComparison.Fold(topLevel)));
-        string directory = Path.Combine(_directory, "trees", Convert.ToHexStringLower(digest)[..16]);
+        string directory = Path.Combine(_directory, TreesDirectory, Convert.ToHexStringLower(digest)[..16]);
         try
         {
             Directory.CreateDirectory(directory);
@@ -92,7 +98,40 @@ internal sealed class HookState
             return None;
         }
 
-        return new HookState(directory, SaidFile);
+        var tree = new HookState(directory, SaidFile);
+        if (tree.ReadTreeName() != topLevel) tree.Write(TreeFile, topLevel + "\n");
+
+        return tree;
+    }
+
+    /// <summary>
+    ///     The other trees this session keeps records for: each top level as <see cref="ForTree" /> was given it,
+    ///     with the state kept for it. A record that names no tree, such as one an older build wrote, is not among
+    ///     them.
+    /// </summary>
+    /// <returns>The recorded trees, or none when the session has no state or its records cannot be listed.</returns>
+    public IReadOnlyList<(string TopLevel, HookState State)> RecordedTrees()
+    {
+        if (_directory is null) return [];
+
+        string trees = Path.Combine(_directory, TreesDirectory);
+        try
+        {
+            if (!Directory.Exists(trees)) return [];
+
+            var recorded = new List<(string TopLevel, HookState State)>();
+            foreach (string directory in Directory.EnumerateDirectories(trees))
+            {
+                var tree = new HookState(directory, SaidFile);
+                if (tree.ReadTreeName() is { } topLevel) recorded.Add((topLevel, tree));
+            }
+
+            return recorded;
+        }
+        catch (Exception ex) when (IsFileSystemFailure(ex))
+        {
+            return [];
+        }
     }
 
     /// <summary>
@@ -215,6 +254,15 @@ internal sealed class HookState
     public void ForgetSaid()
     {
         Delete(_said);
+    }
+
+    // The top level a tree's records name: their tree file's one line, or null for a file that is missing, blank or
+    // holds more than one line.
+    private string? ReadTreeName()
+    {
+        string? name = ReadText(TreeFile)
+            ?.TrimEnd('\r', '\n');
+        return string.IsNullOrWhiteSpace(name) || name.Contains('\n') ? null : name;
     }
 
     // A tree as a record keeps it: HEAD, then one line per changed code file, the digest first because a path may
