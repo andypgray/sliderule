@@ -159,11 +159,9 @@ internal static class WorkspaceLoader
     {
         if (!SolutionProjectFileParser.OwnsFormat(solutionPath)) return null;
 
-        string fullPath = Path.GetFullPath(solutionPath);
-        string referencedSolution = SolutionProjectFileParser.IsFilterFormat(fullPath)
-            ? SolutionProjectFileParser.TryReadReferencedSolution(fullPath) ?? ""
-            : fullPath;
-        if (!File.Exists(referencedSolution)) return null;
+        if (SolutionProjectFileParser.SolutionFileOf(solutionPath) is not { } referencedSolution
+            || !File.Exists(referencedSolution))
+            return null;
 
         Dictionary<string, string> declared = SolutionProjectFileParser.ReadCsprojMembers(referencedSolution)
             .ToDictionary(path => path, path => path, PathComparison.Comparer);

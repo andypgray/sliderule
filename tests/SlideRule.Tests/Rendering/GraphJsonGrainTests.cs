@@ -1,11 +1,11 @@
 using System.Text.Json;
 using Shouldly;
-using Xunit;
 using SlideRule.Cli.Rendering;
 using SlideRule.Codebase;
 using SlideRule.Roslyn.Diagnostics;
 using SlideRule.Tests.Checking;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.Rendering;
 
@@ -13,8 +13,9 @@ namespace SlideRule.Tests.Rendering;
 ///     The survey document's floor rung, driven through <see cref="GraphJsonRenderer.Document" /> directly
 ///     rather than through the runner — because the slots under test are the load's own diagnostic stream and
 ///     the advisories grouped beside it, and the MyApp fixture loads cleanly, so no end-to-end row can populate
-///     them. The project row's private package references are here for the same reason: no MyApp project
-///     declares one, so the golden rungs cannot show where the key rides and where it is absent.
+///     them. The project row's private package references and undeclared project references are here for the
+///     same reason: no MyApp project has either, so the golden rungs cannot show where the keys ride and where
+///     they are absent.
 /// </summary>
 /// <remarks>
 ///     <see cref="Cli.GraphCommandTests" /> pins the rungs over the real fixture, including the goldens. What is
@@ -137,7 +138,7 @@ public sealed class GraphJsonGrainTests
         ];
 
         foreach (DocumentGrain grain in new[] { DocumentGrain.Full, DocumentGrain.Overview })
-            PrivatePackageReferences(Render(grain, [], packageReferences: packageReferences))
+            ProjectStrings(Render(grain, [], packageReferences: packageReferences), "privatePackageReferences")
                 .ShouldBe(["StyleCop.Analyzers"], $"at {grain} grain");
 
         foreach (DocumentGrain grain in new[] { DocumentGrain.Skeleton, DocumentGrain.Index })
@@ -157,23 +158,47 @@ public sealed class GraphJsonGrainTests
         full.ShouldNotContain("\"privatePackageReferences\"");
     }
 
-    private static IReadOnlyList<string> PrivatePackageReferences(string document)
+    [Fact]
+    public void Document_UndeclaredProjectReferences_RideEveryRungAboveIndex()
+    {
+        // They qualify the declared list, so they ride every rung it does and leave with it at index.
+        foreach (DocumentGrain grain in new[] { DocumentGrain.Full, DocumentGrain.Overview, DocumentGrain.Skeleton })
+            ProjectStrings(Render(grain, [], undeclaredProjectReferences: ["Acme.Data"]), "undeclaredProjectReferences")
+                .ShouldBe(["Acme.Data"], $"at {grain} grain");
+
+        Render(DocumentGrain.Index, [], undeclaredProjectReferences: ["Acme.Data"])
+            .ShouldNotContain("\"undeclaredProjectReferences\"");
+    }
+
+    [Fact]
+    public void Document_NoUndeclaredProjectReferences_WritesNoKey()
+    {
+        // Absent rather than an empty array, so the survey of a solution whose declarations explain every
+        // reference has no undeclaredProjectReferences key; the graph goldens hold that over MyApp.
+        string full = Render(DocumentGrain.Full, []);
+
+        full.ShouldContain("\"projectReferences\"");
+        full.ShouldNotContain("\"undeclaredProjectReferences\"");
+    }
+
+    private static IReadOnlyList<string> ProjectStrings(string document, string property)
     {
         using JsonDocument json = JsonDocument.Parse(document);
         JsonElement project = GraphSurveyJson.Project(json, "Acme.App");
 
-        return GraphSurveyJson.Strings(project, "privatePackageReferences");
+        return GraphSurveyJson.Strings(project, property);
     }
 
     private static string Render(
         DocumentGrain grain,
         IReadOnlyList<string> workspaceDiagnostics,
         IReadOnlyList<string>? loadFailures = null,
-        IReadOnlyList<PackageReference>? packageReferences = null)
+        IReadOnlyList<PackageReference>? packageReferences = null,
+        IReadOnlyList<string>? undeclaredProjectReferences = null)
     {
         ProjectSummary project = new(
             "Acme.App", ["Acme.Core"], 3, 0, [new NamespaceCount("Acme.App", 3, 0)],
-            packageReferences: packageReferences);
+            packageReferences: packageReferences, undeclaredProjectReferences: undeclaredProjectReferences);
         GraphSummary summary = new([project], [], [], [], []);
 
         // Named, because five of the seven slots are IReadOnlyList<string> and this test's whole subject

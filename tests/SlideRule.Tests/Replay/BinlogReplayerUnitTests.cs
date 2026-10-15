@@ -18,7 +18,7 @@ public sealed class BinlogReplayerUnitTests
     public void Replay_BlankPath_ThrowsArgumentExceptionBeforeAnyBuild()
     {
         // ArgumentException.ThrowIfNullOrWhiteSpace is the very first statement — no SolutionReader, no MSBuild.
-        Should.Throw<ArgumentException>(() => BinlogReplayer.Replay(""));
+        Should.Throw<ArgumentException>(() => BinlogReplayer.Replay("", solutionPath: null));
     }
 
     [Theory]

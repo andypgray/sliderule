@@ -91,7 +91,8 @@ internal static class GraphJsonRenderer
     // for the frameworks means no evaluation happened at all. The declared project references are the reason
     // index exists: they scale with the solution's edges rather than its projects, so on a large solution
     // they are most of the roster's bulk. The declared packages leave a rung earlier, at skeleton, beside
-    // the external-reference rows they are the build-side twin of, and the private subset leaves with them.
+    // the external-reference rows they are the build-side twin of, and the private subset leaves with them. The
+    // undeclared references qualify the declared ones, so they leave at index with them and are absent when empty.
     // Both elide bare, as the namespaces do at overview — a row's array needs no count of its own when the
     // document already stamps the grain that dropped it. The private subset is also absent where it is
     // empty, because a non-null empty list serializes as [] on every row of every solution without one.
@@ -108,6 +109,7 @@ internal static class GraphJsonRenderer
             index ? null : project.IsPackable,
             index ? null : project.LocksPackages,
             index ? null : project.ProjectReferences,
+            index ? null : SlideRuleJson.OmitEmpty(project.UndeclaredProjectReferences),
             skeleton ? null : PackageNames(project.PackageReferences, privateOnly: false),
             skeleton ? null : SlideRuleJson.OmitEmpty(PackageNames(project.PackageReferences, privateOnly: true)),
             project.Types,

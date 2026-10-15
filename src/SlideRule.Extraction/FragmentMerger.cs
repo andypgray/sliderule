@@ -940,11 +940,15 @@ internal static class FragmentMerger
         private List<ProjectNode> BuildProjects()
         {
             Dictionary<string, SortedSet<string>> refsByProject = new(StringComparer.Ordinal);
+            Dictionary<string, SortedSet<string>> undeclaredByProject = new(StringComparer.Ordinal);
             Dictionary<string, ProjectArtifacts> artifactsByProject = new(StringComparer.Ordinal);
             foreach (CodebaseFragment fragment in _fragments)
             {
                 SortedSet<string> refs = FragmentSiteSets.OrdinalNamesFor(refsByProject, fragment.ProjectName);
                 foreach (string reference in fragment.ProjectReferences) refs.Add(reference);
+
+                SortedSet<string> undeclared = FragmentSiteSets.OrdinalNamesFor(undeclaredByProject, fragment.ProjectName);
+                foreach (string reference in fragment.UndeclaredProjectReferences ?? []) undeclared.Add(reference);
 
                 if (!artifactsByProject.TryGetValue(fragment.ProjectName, out ProjectArtifacts? artifacts))
                     artifactsByProject[fragment.ProjectName] = artifacts = new ProjectArtifacts();
@@ -954,18 +958,25 @@ internal static class FragmentMerger
 
             return refsByProject
                 .OrderBy(kv => kv.Key, StringComparer.Ordinal)
-                .Select(kv => BuildProject(kv.Key, kv.Value, artifactsByProject[kv.Key]))
+                .Select(kv => BuildProject(kv.Key, kv.Value, undeclaredByProject[kv.Key], artifactsByProject[kv.Key]))
                 .ToList();
         }
 
+        // A name one compilation of a multi-targeted project left undeclared and another declared is declared:
+        // the row states the project, not one compilation of it, and must not name a reference in both lists.
         private ProjectNode BuildProject(
-            string projectName, SortedSet<string> projectReferences, ProjectArtifacts artifacts)
+            string projectName,
+            SortedSet<string> projectReferences,
+            SortedSet<string> undeclaredReferences,
+            ProjectArtifacts artifacts)
         {
             _multiFrameworkWinners.TryGetValue(projectName, out SortedSet<string>? winners);
+            undeclaredReferences.ExceptWith(projectReferences);
 
             return new ProjectNode(
                 name: projectName,
                 projectReferences: projectReferences.ToList(),
+                undeclaredProjectReferences: undeclaredReferences.ToList(),
                 solutionMember: artifacts.SolutionMember,
                 targetFrameworks: TargetFrameworksOf(projectName, artifacts),
                 targetFrameworksSite: FragmentSiteSets.Location(artifacts.TargetFrameworksSite),

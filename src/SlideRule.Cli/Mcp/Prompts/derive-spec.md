@@ -62,12 +62,14 @@ genuinely cannot be made to load, and then treat every conclusion below as provi
 
 - `projects[]` — each project's declared `projectReferences`, type count, and exact namespace
   inventory with type counts. The namespace inventory is your raw material for layer globs.
+  `undeclaredProjectReferences` names projects it compiles against that no declared reference
+  reaches: the declared list is short, so trust its edges.
   `solutionMember: false` marks a project a `ProjectReference` dragged into the workspace that
   the solution file does not declare — a passenger, not part of the estate you are writing law
   for, so keep it out of your layer globs. An absent key means membership could not be read.
   `targetFrameworks` lists every framework the project declares, ordinal-ordered by framework
-  name — extraction's own order, never the csproj's — normalized to the short moniker, so a
-  project predating the SDK reads `net48` beside everything else. A type several frameworks
+  name and normalized to the short moniker, so a project predating the SDK reads `net48` beside
+  everything else. A type several frameworks
   declare takes its facts from the first of them in that order, and `factsFollow` names the
   first framework to win one; it is absent when the frameworks share no type (every type then
   keeps its own framework's facts) and for every project that compiled once. Read both before
@@ -121,7 +123,7 @@ genuinely cannot be made to load, and then treat every conclusion below as provi
 The document's keys, exactly (camelCase; an optional field is absent, never null):
 
 ```text
-projects[]              { name, solutionMember?, targetFrameworks?, factsFollow?, isPackable?, locksPackages?, projectReferences[], packageReferences[], privatePackageReferences?, types, generated?, namespaces[]{ namespace, types, generated? } }
+projects[]              { name, solutionMember?, targetFrameworks?, factsFollow?, isPackable?, locksPackages?, projectReferences[], undeclaredProjectReferences?, packageReferences[], privatePackageReferences?, types, generated?, namespaces[]{ namespace, types, generated? } }
 projectEdges[]          { source, target, references }
 externalEdges[]         { source, targetNamespaceRoot, references }
 multiplyDeclaredTypes[] { type, declaredBy[], factsFollow }

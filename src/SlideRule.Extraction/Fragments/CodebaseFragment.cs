@@ -52,6 +52,11 @@ namespace SlideRule.Extraction.Fragments;
 ///         is every framework the project file names, which stays the same across the fragments of one
 ///         multi-targeted project.
 ///     </para>
+///     <para>
+///         <see cref="UndeclaredProjectReferences" /> trails them all: the projects this compilation references
+///         that <see cref="ProjectReferences" /> does not account for, read beside the declarations, and
+///         <see langword="null" /> or empty wherever there is nothing to report.
+///     </para>
 /// </remarks>
 internal sealed record CodebaseFragment(
     string ProjectName,
@@ -75,4 +80,5 @@ internal sealed record CodebaseFragment(
     bool? IsPackable = null,
     FragmentSite? IsPackableSite = null,
     bool? LocksPackages = null,
-    FragmentSite? LocksPackagesSite = null);
+    FragmentSite? LocksPackagesSite = null,
+    IReadOnlyList<string>? UndeclaredProjectReferences = null);

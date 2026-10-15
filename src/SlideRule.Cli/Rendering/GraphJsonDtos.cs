@@ -204,6 +204,15 @@ internal sealed record GraphJson(
 ///         byte-identical to the one before the key existed.
 ///     </para>
 ///     <para>
+///         <c>undeclaredProjectReferences</c> names the projects this project compiles against that its
+///         <c>projectReferences</c> do not account for, directly or through what a declared project references in
+///         turn. A non-empty list says the declared list is short: the project file declares a reference this
+///         survey could not read, most often through a property only a solution build defines. It leaves at index
+///         with the list it qualifies, and is absent rather than empty where the declarations explain every
+///         reference, which is the norm, so a survey of a solution with none is byte-identical to the one before
+///         the key existed.
+///     </para>
+///     <para>
 ///         <c>generated</c> is a qualifier on the number it qualifies, in both places that number
 ///         appears — deliberately never a top-level coverage statement, because a generated type already
 ///         has a home in this project's <c>types</c> and in its namespace's.
@@ -217,6 +226,7 @@ internal sealed record GraphProjectJson(
     bool? IsPackable,
     bool? LocksPackages,
     IReadOnlyList<string>? ProjectReferences,
+    IReadOnlyList<string>? UndeclaredProjectReferences,
     IReadOnlyList<string>? PackageReferences,
     IReadOnlyList<string>? PrivatePackageReferences,
     int Types,

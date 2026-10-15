@@ -38,7 +38,7 @@ internal sealed class LazyCaptureReplaySource(string binlogCopyPath) : ISolution
         ReplayedSolution replayed;
         try
         {
-            replayed = BinlogReplayer.Replay(binlogCopyPath, diagnostics.Add, ct);
+            replayed = BinlogReplayer.Replay(binlogCopyPath, solutionPath, diagnostics.Add, ct);
         }
         catch (OperationCanceledException)
         {

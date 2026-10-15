@@ -1506,7 +1506,8 @@ internal static class FragmentExtractor
             return new CodebaseFragment(
                 input.ProjectName, input.TargetFramework, projectReferences, declaredTypes, externals, edges,
                 memberEdges, constructorEdges, injectionEdges, catchEdges, throwEdges, exposureEdges,
-                serviceRegistrations, input.SolutionMember, input.Compilation.Assembly.Name);
+                serviceRegistrations, input.SolutionMember, input.Compilation.Assembly.Name,
+                UndeclaredProjectReferences: input.UndeclaredProjectReferences);
         }
 
         /// <summary>

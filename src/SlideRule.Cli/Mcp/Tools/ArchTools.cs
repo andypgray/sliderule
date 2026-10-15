@@ -85,6 +85,8 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         "namespace root. " +
         "Every project the workspace loaded is here, which is wider than the solution: solutionMember false " +
         "marks a passenger a ProjectReference dragged in, and an absent key means membership was unreadable. " +
+        "undeclaredProjectReferences (absent when empty) names the projects a project compiles against that " +
+        "no declared projectReferences entry reaches: its declared list is short, so trust its edges. " +
         "projectEdges[] carry only references the code declares: where several projects declare one type, a " +
         "project referencing its own copy is not an edge to the declarer the type was attributed to, nor is a " +
         "reference one copy makes an edge from the others, and multiplyDeclaredTypes[] names those types with " +
@@ -248,9 +250,10 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
             + "inventory; skeleton also elides each project's packageReferences and privatePackageReferences, "
             + "and reports the external-reference rows, the multiply-declared types and the shadowed types as "
             + "counts (externalEdgeCount, multiplyDeclaredTypeCount, shadowedTypeCount), keeping every project "
-            + "with its targetFrameworks, factsFollow, isPackable, locksPackages, projectReferences and type "
-            + "count, and the observed project edges; index also elides each project's targetFrameworks, "
-            + "factsFollow, isPackable, locksPackages and projectReferences, and reports the observed project "
+            + "with its targetFrameworks, factsFollow, isPackable, locksPackages, projectReferences, "
+            + "undeclaredProjectReferences and type count, and the observed project edges; index also elides each "
+            + "project's targetFrameworks, factsFollow, isPackable, locksPackages, projectReferences and "
+            + "undeclaredProjectReferences, and reports the observed project "
             + "edges and the packageAudit and workspaceDiagnostics arrays as counts (projectEdgeCount, "
             + "packageAuditCount, workspaceDiagnosticCount), keeping every project's name, solution membership "
             + "and type count and every trust stamp — the menu the projects parameter picks from.")]

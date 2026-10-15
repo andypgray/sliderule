@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!-- The solution-directory fixture: its two other projects reference their dependencies through
+         $(SolutionDir), the legacy spelling that resolves only where a solution defines the property. This
+         one references nothing, so the plugin reaches it only through the closure of its one declared
+         reference. Deliberately package-free: the whole restore resolves from the SDK. -->
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <RestoreLockedMode Condition="'$(CI)' == 'true'">true</RestoreLockedMode>
+    </PropertyGroup>
+</Project>

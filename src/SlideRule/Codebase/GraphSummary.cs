@@ -80,10 +80,12 @@ internal sealed class ProjectSummary
         string? factsFollow = null,
         IReadOnlyList<PackageReference>? packageReferences = null,
         bool? isPackable = null,
-        bool? locksPackages = null)
+        bool? locksPackages = null,
+        IReadOnlyList<string>? undeclaredProjectReferences = null)
     {
         Name = name;
         ProjectReferences = projectReferences;
+        UndeclaredProjectReferences = undeclaredProjectReferences ?? [];
         Types = types;
         Generated = generated;
         Namespaces = namespaces;
@@ -104,6 +106,12 @@ internal sealed class ProjectSummary
     ///     Gets the names of the projects this project declares a reference to, ordinal-ordered.
     /// </summary>
     public IReadOnlyList<string> ProjectReferences { get; }
+
+    /// <summary>
+    ///     Gets the names of the projects this project compiles against that <see cref="ProjectReferences" /> does
+    ///     not account for, ordinal-ordered; empty where the declarations explain every reference.
+    /// </summary>
+    public IReadOnlyList<string> UndeclaredProjectReferences { get; }
 
     /// <summary>
     ///     Gets the count of this project's solution-declared (non-external) types.

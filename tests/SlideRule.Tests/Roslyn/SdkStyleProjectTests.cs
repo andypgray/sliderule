@@ -1,9 +1,9 @@
 using Microsoft.CodeAnalysis;
 using Shouldly;
-using Xunit;
 using SlideRule.Roslyn.Diagnostics;
 using SlideRule.Roslyn.Solutions;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.Roslyn;
 
@@ -97,6 +97,9 @@ public sealed class SdkStyleProjectTests
         "ShadowedApp.Product.Tests.csproj: SDK-style, assets file present",
         "ShadowedApp.Product.csproj: SDK-style, assets file present",
         "SlnxApp.Core.csproj: SDK-style, assets file present",
+        "SolutionDirApp.Core.csproj: SDK-style, assets file present",
+        "SolutionDirApp.Plugin.csproj: SDK-style, assets file present",
+        "SolutionDirApp.Web.csproj: SDK-style, assets file present",
         // This repo's own projects, which are always restored — the same pairing over files nobody wrote to
         // be a fixture.
         "SlideRule.Analyzers.csproj: SDK-style, assets file present",

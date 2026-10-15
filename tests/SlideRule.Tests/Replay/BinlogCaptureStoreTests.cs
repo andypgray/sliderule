@@ -1,12 +1,12 @@
 using System.Text.Json.Nodes;
 using Microsoft.CodeAnalysis;
 using Shouldly;
-using Xunit;
 using SlideRule.Roslyn;
 using SlideRule.Roslyn.Caching;
 using SlideRule.Roslyn.Replay;
 using SlideRule.Roslyn.Solutions;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.Replay;
 
@@ -40,7 +40,7 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
     public void Ingest_HappyPath_PersistsPairAndValidatesUsable()
     {
         // Arrange + Act
-        using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath);
+        using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath, Fixture.SolutionPath);
         var store = new BinlogCaptureStore(Fixture.SolutionPath, _cacheRoot.Path);
         bool persisted = store.Ingest(replayed.Solution, Fixture.BinlogPath, Fixture.BinlogPath);
 
@@ -126,7 +126,7 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
     public void Validate_CsprojContentEdit_InvalidNamingCsproj()
     {
         // Arrange
-        using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath);
+        using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath, Fixture.SolutionPath);
         var store = new BinlogCaptureStore(Fixture.SolutionPath, _cacheRoot.Path);
         store.Ingest(replayed.Solution, Fixture.BinlogPath, Fixture.BinlogPath)
             .ShouldBeTrue();
@@ -218,7 +218,7 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
     public void Validate_DeletedRecordedDocument_InvalidNamingFile()
     {
         // Arrange
-        using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath);
+        using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath, Fixture.SolutionPath);
         var store = new BinlogCaptureStore(Fixture.SolutionPath, _cacheRoot.Path);
         store.Ingest(replayed.Solution, Fixture.BinlogPath, Fixture.BinlogPath)
             .ShouldBeTrue();
@@ -323,7 +323,7 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
     public void Ingest_StructuralFileNewerThanBinlog_ThrowsStaleRefusal()
     {
         // Arrange — make one csproj newer than the binlog (a rebuild the binlog no longer reflects).
-        using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath);
+        using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath, Fixture.SolutionPath);
         string csproj = CsprojPathOf(replayed.Solution, "MyApp.Domain");
         (byte[] bytes, DateTime mtime) original = FileSnapshot.Capture(csproj);
         try
@@ -356,7 +356,7 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
             $"build \"{leafCsproj}\" -bl:LogFile=\"{leafBinlog}\" --no-incremental --disable-build-servers",
             Fixture.PathOf());
 
-        using ReplayedSolution replayed = BinlogReplayer.Replay(leafBinlog);
+        using ReplayedSolution replayed = BinlogReplayer.Replay(leafBinlog, Fixture.SolutionPath);
         var store = new BinlogCaptureStore(Fixture.SolutionPath, _cacheRoot.Path);
 
         // The two solution members the leaf binlog does not build.
@@ -392,7 +392,7 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
         string reducedSln = WriteReducedSolutionWithoutWeb();
         try
         {
-            using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath);
+            using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath, Fixture.SolutionPath);
             var store = new BinlogCaptureStore(reducedSln, _cacheRoot.Path);
             string webCsproj = CsprojPathOf(replayed.Solution, "MyApp.Web");
 
@@ -464,7 +464,7 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
     // Replays the shared full binlog and ingests it against the full solution — the common Arrange.
     private BinlogCaptureStore IngestFullCapture()
     {
-        using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath);
+        using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath, Fixture.SolutionPath);
         var store = new BinlogCaptureStore(Fixture.SolutionPath, _cacheRoot.Path);
         store.Ingest(replayed.Solution, Fixture.BinlogPath, Fixture.BinlogPath)
             .ShouldBeTrue();

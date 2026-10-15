@@ -217,6 +217,18 @@ internal static partial class SolutionProjectFileParser
     }
 
     /// <summary>
+    ///     The full path of the solution file a load of <paramref name="solutionPath" /> opens: the
+    ///     <c>.sln</c>/<c>.slnx</c> a filter points at, the file itself for any other format, or
+    ///     <see langword="null" /> for a filter too malformed to resolve. Whether that file exists is the
+    ///     caller's question.
+    /// </summary>
+    internal static string? SolutionFileOf(string solutionPath)
+    {
+        string fullPath = Path.GetFullPath(solutionPath);
+        return IsFilterFormat(fullPath) ? TryReadReferencedSolution(fullPath) : fullPath;
+    }
+
+    /// <summary>
     ///     The directory every convention-relative path of a run over <paramref name="solutionPath" /> anchors
     ///     at: the referenced solution's directory under a <c>.slnf</c>, and the file's own directory
     ///     otherwise. Never throws — a filter that cannot be resolved, or names a solution that is not there,

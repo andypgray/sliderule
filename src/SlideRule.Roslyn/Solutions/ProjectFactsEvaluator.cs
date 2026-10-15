@@ -66,12 +66,17 @@ internal static class ProjectFactsEvaluator
     ///     <see langword="null" /> where that project could not be evaluated at all.
     /// </summary>
     /// <param name="requests">The project files and frameworks to evaluate, in the caller's order.</param>
+    /// <param name="solutionFile">
+    ///     The solution file the projects were loaded from, which <see cref="SolutionProperties" /> turns into the
+    ///     solution-level properties the load evaluated under; <see langword="null" /> evaluates each project as a
+    ///     build of that project alone would.
+    /// </param>
     /// <param name="ct">Cancellation token.</param>
     internal static IReadOnlyList<ProjectArtifactFacts?> EvaluateAll(
-        IReadOnlyList<ProjectEvaluationRequest> requests, CancellationToken ct)
+        IReadOnlyList<ProjectEvaluationRequest> requests, string? solutionFile, CancellationToken ct)
     {
         int shardCount = Math.Clamp(Environment.ProcessorCount / 2, 1, MaxShards);
-        return EvaluateAll(requests, shardCount, ct);
+        return EvaluateAll(requests, solutionFile, shardCount, ct);
     }
 
     /// <summary>
@@ -80,19 +85,26 @@ internal static class ProjectFactsEvaluator
     ///     evaluated at all.
     /// </summary>
     /// <param name="requests">The project files and frameworks to evaluate, in the caller's order.</param>
+    /// <param name="solutionFile">
+    ///     The solution file the projects were loaded from, or <see langword="null" /> for none; see the overload
+    ///     without a shard count.
+    /// </param>
     /// <param name="shardCount">The most shards to evaluate at once; one evaluates the batch serially.</param>
     /// <param name="ct">Cancellation token.</param>
     internal static IReadOnlyList<ProjectArtifactFacts?> EvaluateAll(
-        IReadOnlyList<ProjectEvaluationRequest> requests, int shardCount, CancellationToken ct)
+        IReadOnlyList<ProjectEvaluationRequest> requests, string? solutionFile, int shardCount, CancellationToken ct)
     {
         var facts = new ProjectArtifactFacts?[requests.Count];
         if (requests.Count == 0) return facts;
 
+        IReadOnlyDictionary<string, string> solutionProperties = SolutionProperties(solutionFile);
         IReadOnlyList<IReadOnlyList<int>> shards = Shards(requests, shardCount);
         try
         {
             var options = new ParallelOptions { CancellationToken = ct, MaxDegreeOfParallelism = shards.Count };
-            Parallel.For(0, shards.Count, options, shard => EvaluateInto(facts, requests, shards[shard], ct));
+            Parallel.For(
+                0, shards.Count, options,
+                shard => EvaluateInto(facts, requests, shards[shard], solutionProperties, ct));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -106,6 +118,32 @@ internal static class ProjectFactsEvaluator
         }
 
         return facts;
+    }
+
+    /// <summary>
+    ///     The global properties a project loaded from <paramref name="solutionFile" /> is evaluated under:
+    ///     <c>SolutionDir</c>, the solution's directory with a trailing separator, when that directory exists, and
+    ///     nothing otherwise.
+    /// </summary>
+    /// <param name="solutionFile">The solution file the projects were loaded from, or <see langword="null" />.</param>
+    // These must be the properties the workspace load evaluated under, or a declared reference that the load
+    // followed is lost here and the two reference lists differ by more than the closure: MSBuild's common targets
+    // define an unset SolutionDir as *Undefined*, so an include spelled with it becomes a wildcard that matches no
+    // file and evaluates to no item at all. Roslyn's
+    // MSBuildProjectLoader.SetSolutionProperties defines SolutionDir alone, with this value and under this
+    // condition (Workspaces.MSBuild 5.9.0), and WorkspaceLoader passes no properties of its own to
+    // MSBuildWorkspace.Create. A solution build also defines SolutionName, SolutionPath, SolutionExt and
+    // SolutionFileName; the load does not, so neither does this. If either side changes, this set moves with it.
+    internal static IReadOnlyDictionary<string, string> SolutionProperties(string? solutionFile)
+    {
+        string? directory = solutionFile is { Length: > 0 } ? Path.GetDirectoryName(solutionFile) : null;
+        if (directory is not { Length: > 0 } || !Directory.Exists(directory))
+            return new Dictionary<string, string>(StringComparer.Ordinal);
+
+        return new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["SolutionDir"] = directory + Path.DirectorySeparatorChar
+        };
     }
 
     /// <summary>
@@ -146,9 +184,12 @@ internal static class ProjectFactsEvaluator
         ProjectArtifactFacts?[] facts,
         IReadOnlyList<ProjectEvaluationRequest> requests,
         IReadOnlyList<int> shard,
+        IReadOnlyDictionary<string, string> solutionProperties,
         CancellationToken ct)
     {
-        using var collection = new ProjectCollection();
+        // Every project of the batch evaluates under the solution's properties, so the collection carries them:
+        // MSBuild lays a project's own global properties, its framework here, over its collection's.
+        using var collection = new ProjectCollection(solutionProperties.ToDictionary());
         var evaluated = new Dictionary<(string File, string? Framework), ProjectArtifactFacts?>();
         var cones = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
 

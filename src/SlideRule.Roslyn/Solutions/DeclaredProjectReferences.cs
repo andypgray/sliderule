@@ -4,9 +4,10 @@ namespace SlideRule.Roslyn.Solutions;
 
 /// <summary>
 ///     Turns the project files a project's evaluation declared references to into the names of the loaded
-///     projects they are. Split into a map over the loaded projects and a lookup through it, both taking the
-///     canonicalizer as a delegate, so the pair is unit-testable over synthetic paths with no workspace and no
-///     disk.
+///     projects they are, and names the workspace references those declarations do not account for. Split into
+///     a map over the loaded projects and a lookup through it, both taking the canonicalizer as a delegate, plus
+///     a difference taking a declared project's reach as one, so all of it is unit-testable over synthetic input
+///     with no workspace and no disk.
 /// </summary>
 /// <remarks>
 ///     Both sides of the lookup are canonicalized, because the two spellings of one project file come from
@@ -48,5 +49,29 @@ internal static class DeclaredProjectReferences
                 names.Add(name);
 
         return names.ToList();
+    }
+
+    /// <summary>
+    ///     The projects in <paramref name="workspaceReferences" /> that <paramref name="declared" /> does not
+    ///     account for, distinct and in ordinal order. A reference is accounted for when it is declared, or when a
+    ///     declared project reaches it through <paramref name="reach" />, which is how the SDK's transitive
+    ///     references arrive.
+    /// </summary>
+    // The workspace's list is what the compilation was built against, and every name on it comes from some
+    // declaration somewhere in the project graph. A name nothing declared reaches is a declaration this
+    // evaluation did not see, which is what an include spelled with a property the evaluation lacks looks like.
+    internal static IReadOnlyList<string> Undeclared(
+        IEnumerable<string> workspaceReferences,
+        IReadOnlyList<string> declared,
+        Func<string, IEnumerable<string>> reach)
+    {
+        var accounted = new HashSet<string>(declared, StringComparer.Ordinal);
+        foreach (string name in declared) accounted.UnionWith(reach(name));
+
+        return workspaceReferences
+            .Where(reference => !accounted.Contains(reference))
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(reference => reference, StringComparer.Ordinal)
+            .ToList();
     }
 }

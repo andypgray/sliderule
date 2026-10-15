@@ -32,6 +32,12 @@ namespace SlideRule.Extraction;
 ///         <see langword="null" /> leaves the banner as the only signal. The file signals are read for the
 ///         compilation's own types only: a type from a referenced assembly is judged by the attribute alone.
 ///     </para>
+///     <para>
+///         <see cref="UndeclaredProjectReferences" /> names the projects the compilation references that
+///         <see cref="ProjectReferences" /> does not account for, either directly or through what a declared
+///         project references in turn. A load fills it in where it read the declarations from the project file;
+///         <see langword="null" /> or empty says there is nothing to report, which is every input built by hand.
+///     </para>
 /// </remarks>
 // GeneratedTrees holds trees by reference rather than document paths because a build that sets
 // EmitCompilerGeneratedFiles moves every generated document off its pseudo-path.
@@ -41,4 +47,5 @@ internal sealed record CompilationInput(
     IReadOnlyList<string> ProjectReferences,
     string? TargetFramework = null,
     bool? SolutionMember = null,
-    IReadOnlyCollection<SyntaxTree>? GeneratedTrees = null);
+    IReadOnlyCollection<SyntaxTree>? GeneratedTrees = null,
+    IReadOnlyList<string>? UndeclaredProjectReferences = null);

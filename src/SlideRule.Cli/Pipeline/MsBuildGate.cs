@@ -194,7 +194,7 @@ internal static class MsBuildGate
         string solutionPath = ModelPipeline.DiscoverSolution(request.Solution, request.WorkingDirectory, environment);
 
         var diagnostics = new List<string>();
-        ReplayedSolution replayed = ReplayOrThrow(binlogFullPath, binlog, diagnostics, ct);
+        ReplayedSolution replayed = ReplayOrThrow(binlogFullPath, solutionPath, binlog, diagnostics, ct);
         try
         {
             if (!request.NoCache)
@@ -264,11 +264,11 @@ internal static class MsBuildGate
     }
 
     private static ReplayedSolution ReplayOrThrow(
-        string binlogFullPath, string binlogArgument, List<string> diagnostics, CancellationToken ct)
+        string binlogFullPath, string solutionPath, string binlogArgument, List<string> diagnostics, CancellationToken ct)
     {
         try
         {
-            return BinlogReplayer.Replay(binlogFullPath, diagnostics.Add, ct);
+            return BinlogReplayer.Replay(binlogFullPath, solutionPath, diagnostics.Add, ct);
         }
         catch (OperationCanceledException)
         {

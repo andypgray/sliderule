@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- A project row in `graph --json` and `arch_graph` can carry `undeclaredProjectReferences`. It names
+  the projects the project compiles against that its declared `projectReferences` do not reach, either
+  directly or through a declared project's own references. The key appears only when the declared list
+  is short, which means the project file declares a reference the survey could not read. The human
+  survey adds the same names to the project's line.
+
+### Fixed
+
+- A project reference written as `$(SolutionDir)\…`, a common spelling in older solutions, now appears in
+  the project's declared references: `projectReferences` in `graph` and `arch_graph`, and
+  `IProjectInfo.ProjectReferences` in a spec. Each project file is now read with the solution's
+  directory defined, as a solution build reads it. Before, such a reference was missing, and a project
+  whose references were all spelled this way was reported as declaring none.
+
 ## [0.1.1] - 2026-10-14
 
 ### Changed

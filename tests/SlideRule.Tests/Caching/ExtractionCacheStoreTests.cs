@@ -91,6 +91,11 @@ public sealed class ExtractionCacheStoreTests
     // dependency's content key, so a body-only edit in a dependency would read as a change to every dependent
     // whose stored key was taken that way, and its document shapes carry no surface hash to compare.
     [InlineData(33)]
+    // A v34 cache predates evaluating project files under the solution's directory and the undeclared project
+    // references (schema bumped 34→35): a project that spells a reference with $(SolutionDir) replays with that
+    // reference missing from its declared list, where a fresh extraction resolves it against the solution the
+    // workspace loaded, and no fragment says which compiled-against projects its declarations do not reach.
+    [InlineData(34)]
     public void ReadAndValidate_SchemaVersionOtherThanTheCurrentOne_ReturnsMiss(int schemaVersion)
     {
         // Arrange
@@ -120,7 +125,7 @@ public sealed class ExtractionCacheStoreTests
 
         version.ShouldNotBeNull("the extraction cache still declares a schema version");
         version.GetRawConstantValue()
-            .ShouldBe(34);
+            .ShouldBe(35);
     }
 
     [Fact]

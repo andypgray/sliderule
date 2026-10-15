@@ -120,7 +120,17 @@ internal static class GraphFormatter
 
         string references = project.ProjectReferences.Count > 0 ? string.Join(", ", project.ProjectReferences) : "(none)";
         return $"{line}; {FrameworksClause(project)}references: {references}"
-               + PackagesClause(project, grain) + PackagingClause(project);
+               + UndeclaredClause(project) + PackagesClause(project, grain) + PackagingClause(project);
+    }
+
+    // "; undeclared references: C" — the projects compiled against that the declared list does not reach, and
+    // only where there are any, on the passenger's rule: the clause marks the one line worth reading, and every
+    // healthy line goes without it.
+    private static string UndeclaredClause(ProjectSummary project)
+    {
+        return project.UndeclaredProjectReferences.Count > 0
+            ? $"; undeclared references: {string.Join(", ", project.UndeclaredProjectReferences)}"
+            : "";
     }
 
     // "; packages: A, B (private)" — the build-side twin of the external references, and elided at the grain

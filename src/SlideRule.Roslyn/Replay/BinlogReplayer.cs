@@ -41,6 +41,12 @@ internal static class BinlogReplayer
     ///     as <see cref="WorkspaceLoader" /> does so downstream behaviour is identical.
     /// </summary>
     /// <param name="binlogPath">Absolute path to the <c>.binlog</c> produced by a real build of the current tree.</param>
+    /// <param name="solutionPath">
+    ///     The solution the build was run over — a <c>.sln</c>, <c>.slnx</c> or <c>.slnf</c> — stamped on the
+    ///     replayed solution as the file a workspace load would have opened (the referenced solution, under a
+    ///     filter), or <see langword="null" /> when there is none. The capture records no solution of its own, and
+    ///     the project files' evaluation reads its solution properties from this one.
+    /// </param>
     /// <param name="diagnosticSink">
     ///     Optional sink for replay diagnostics that do not abort the load: workspace-load failures and a
     ///     note when unresolved references had to be stripped (a build artifact missing from disk). Mirrors
@@ -73,7 +79,7 @@ internal static class BinlogReplayer
     ///     choice.
     /// </remarks>
     public static ReplayedSolution Replay(
-        string binlogPath, Action<string>? diagnosticSink = null, CancellationToken ct = default)
+        string binlogPath, string? solutionPath, Action<string>? diagnosticSink = null, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(binlogPath);
         if (!File.Exists(binlogPath))
@@ -98,7 +104,12 @@ internal static class BinlogReplayer
                     + "replays C# projects only; a Visual Basic-only or empty binlog cannot produce a model.");
 
             ct.ThrowIfCancellationRequested();
-            SolutionInfo solutionInfo = reader.ReadSolutionInfo();
+            string? solutionFile = solutionPath is { Length: > 0 }
+                ? SolutionProjectFileParser.SolutionFileOf(solutionPath)
+                : null;
+            SolutionInfo captured = reader.ReadSolutionInfo();
+            var solutionInfo = SolutionInfo.Create(
+                captured.Id, captured.Version, solutionFile, captured.Projects, captured.AnalyzerReferences);
 
             workspace = new AdhocWorkspace();
             workspace.RegisterWorkspaceFailedHandler(e =>

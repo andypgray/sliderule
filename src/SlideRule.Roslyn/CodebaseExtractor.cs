@@ -129,12 +129,16 @@ internal static class CodebaseExtractor
         // The artifact facts come from MSBuild rather than from Roslyn, so this batch shares nothing with the
         // binding below and runs beside it: evaluation is a few serial walks, each of its own ProjectCollection,
         // and binding is the half it would otherwise wait behind. One request per input, in input order, so the
-        // results read back by the same index as everything else here.
+        // results read back by the same index as everything else here. The solution's own file, not the path a
+        // caller was handed, because it is what the workspace load derived its solution properties from: under a
+        // solution filter it is the solution the filter names, and a replayed solution carries the one it was
+        // stamped with.
         List<ProjectEvaluationRequest> evaluationRequests = projects
             .Select(project => new ProjectEvaluationRequest(project.FilePath, TargetFrameworkOf(targetFrameworks, project)))
             .ToList();
+        string? solutionFile = solution.FilePath;
         Task<IReadOnlyList<ProjectArtifactFacts?>> artifactFactsTask =
-            Task.Run(() => ProjectFactsEvaluator.EvaluateAll(evaluationRequests, ct), ct);
+            Task.Run(() => ProjectFactsEvaluator.EvaluateAll(evaluationRequests, solutionFile, ct), ct);
 
         // Binding is the expensive half and the projects are independent, so they bind together rather than
         // one after another. The ordered list above decides input order — the results are read back by
@@ -162,6 +166,7 @@ internal static class CodebaseExtractor
         IEnumerable<(string? FilePath, string Name)> loadedProjects = solution.Projects.Select(p => (p.FilePath, p.Name));
         IReadOnlyDictionary<string, string> namesByProjectFile =
             DeclaredProjectReferences.NamesByProjectFile(loadedProjects, canonicalProjectFiles.Resolve);
+        Func<string, IEnumerable<string>> workspaceReach = WorkspaceReach(solution);
 
         List<CompilationInput> inputs = [];
         List<ProjectArtifactFacts?> artifactFacts = [];
@@ -169,23 +174,44 @@ internal static class CodebaseExtractor
         {
             if (compilations[i] is not { } compilation) continue;
 
-            // The references the project file declares. Without an evaluation the workspace's own list is
-            // all there is, and that list carries the closure the SDK adds.
+            // The references the project file declares, and the workspace references they do not account for.
+            // Without an evaluation the workspace's own list is all there is, and that list carries the closure
+            // the SDK adds, so it accounts for itself.
             Project project = projects[i];
+            IReadOnlyList<string> workspaceReferences = WorkspaceReferenceNames(solution, project);
             IReadOnlyList<string> projectReferences = evaluated[i] is { } facts
                 ? DeclaredProjectReferences.Names(
                     facts.ProjectReferencePaths, namesByProjectFile, canonicalProjectFiles.Resolve)
-                : WorkspaceReferenceNames(solution, project);
+                : workspaceReferences;
+            IReadOnlyList<string> undeclared = evaluated[i] is null
+                ? []
+                : DeclaredProjectReferences.Undeclared(workspaceReferences, projectReferences, workspaceReach);
 
             inputs.Add(new CompilationInput(
                 compilation, project.Name, projectReferences, TargetFrameworkOf(targetFrameworks, project),
                 SpecExclusion.SolutionMembershipOf(
                     declaredMembers, project.FilePath, canonicalProjectFiles.Resolve(project.FilePath)),
-                generatedTrees[i]));
+                generatedTrees[i],
+                undeclared));
             artifactFacts.Add(evaluated[i]);
         }
 
         return new ExtractionInputs(inputs, artifactFacts);
+    }
+
+    // What each loaded project reaches through the workspace's own references, transitively, by project name: a
+    // multi-targeted project's compilations are unioned under the one name they share. Read off the solution's
+    // dependency graph, which spans every project of the workspace, because a declared project need not be one
+    // this call extracts.
+    private static Func<string, IEnumerable<string>> WorkspaceReach(Solution solution)
+    {
+        ProjectDependencyGraph graph = solution.GetProjectDependencyGraph();
+        ILookup<string, ProjectId> idsByName = solution.Projects.ToLookup(p => p.Name, p => p.Id, StringComparer.Ordinal);
+
+        return name => idsByName[name]
+            .SelectMany(graph.GetProjectsThatThisProjectTransitivelyDependsOn)
+            .Select(id => solution.GetProject(id)?.Name)
+            .OfType<string>();
     }
 
     private static IReadOnlyList<string> WorkspaceReferenceNames(Solution solution, Project project)

@@ -22,6 +22,19 @@ internal static class AdhocSolution
         return workspace.CurrentSolution;
     }
 
+    /// <summary>
+    ///     A solution of <paramref name="projects" />, in order, whose file is <paramref name="solutionFilePath" /> —
+    ///     the path a workspace load stamps on the solution it opened, and the one the artifact-facts evaluation
+    ///     derives <c>$(SolutionDir)</c> from.
+    /// </summary>
+    internal static Solution InSolutionFile(
+        AdhocWorkspace workspace, string solutionFilePath, params ProjectInfo[] projects)
+    {
+        var solution = SolutionInfo.Create(
+            SolutionId.CreateNewId(), VersionStamp.Default, solutionFilePath, projects);
+        return workspace.AddSolution(solution);
+    }
+
     /// <summary>Roslyn's <c>CreateEmpty</c> shape: no documents, no references, and neither output path.</summary>
     internal static ProjectInfo Empty(string name, string projectFilePath)
     {

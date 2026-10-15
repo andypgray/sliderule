@@ -32,7 +32,8 @@ internal sealed class ProjectNode : IProjectInfo
         SourceLocation? isPackableSite = null,
         bool? locksPackages = null,
         SourceLocation? locksPackagesSite = null,
-        IReadOnlyList<string>? assemblyNames = null)
+        IReadOnlyList<string>? assemblyNames = null,
+        IReadOnlyList<string>? undeclaredProjectReferences = null)
     {
         Name = name;
         ProjectReferences = projectReferences;
@@ -46,6 +47,7 @@ internal sealed class ProjectNode : IProjectInfo
         LocksPackages = locksPackages;
         LocksPackagesSite = locksPackagesSite;
         AssemblyNames = assemblyNames ?? [];
+        UndeclaredProjectReferences = undeclaredProjectReferences ?? [];
     }
 
     /// <summary>
@@ -72,6 +74,16 @@ internal sealed class ProjectNode : IProjectInfo
     ///     (<c>ReferenceOutputAssembly="false"</c>).
     /// </summary>
     public IReadOnlyList<string> ProjectReferences { get; }
+
+    /// <summary>
+    ///     The projects this project's compilation references that <see cref="ProjectReferences" /> does not account
+    ///     for, directly or through what a declared project references in turn, ordinal-ordered. Empty for a project
+    ///     whose declarations explain everything it compiles against, which is every project whose file evaluated
+    ///     the way the workspace load did, and for any model built from compilations.
+    /// </summary>
+    // Not on IProjectInfo: it describes how far the declared list can be trusted rather than the project, and the
+    // survey is where a reader needs it. A non-empty list means an evaluation lost a declaration the load saw.
+    internal IReadOnlyList<string> UndeclaredProjectReferences { get; }
 
     /// <summary>
     ///     Gets whether the solution file declares this project, or <see langword="null" /> when membership was never

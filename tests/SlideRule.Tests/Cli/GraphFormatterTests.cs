@@ -1,11 +1,11 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Cli.Rendering;
 using SlideRule.Codebase;
 using SlideRule.Extraction;
 using SlideRule.Roslyn;
 using SlideRule.Tests.Checking;
 using SlideRule.Tests.Extraction;
+using Xunit;
 
 namespace SlideRule.Tests.Cli;
 
@@ -193,6 +193,29 @@ public sealed class GraphFormatterTests
                 + "packages: Newtonsoft.Json, StyleCop.Analyzers (private)",
                 "  Acme.Tooling — 0 types; targets net10.0; references: (none); "
                 + "packages: Microsoft.SourceLink.GitHub (private), StyleCop.Analyzers (private)"
+            ]);
+    }
+
+    [Fact]
+    public void Lines_UndeclaredReferences_FollowTheDeclaredOnesOnlyWhereThereAreAny()
+    {
+        // Arrange — a plugin whose declaration was lost, beside a project whose declarations explain everything.
+        List<ProjectSummary> projects =
+        [
+            new("Acme.Plugin", [], 0, 0, [], true, ["net10.0"], undeclaredProjectReferences: ["Acme.Core", "Acme.Web"]),
+            new("Acme.Web", ["Acme.Core"], 0, 0, [], true, ["net10.0"])
+        ];
+
+        // Act
+        IReadOnlyList<string> lines = GraphFormatter.Lines(
+            new GraphSummary(projects, [], [], [], []), "Acme.slnx", DocumentGrain.Full, []);
+
+        // Assert — the healthy line reads exactly as it did before the clause existed.
+        Roster(lines)
+            .ShouldBe([
+                "  Acme.Plugin — 0 types; targets net10.0; references: (none); "
+                + "undeclared references: Acme.Core, Acme.Web; packages: (none)",
+                "  Acme.Web — 0 types; targets net10.0; references: Acme.Core; packages: (none)"
             ]);
     }
 

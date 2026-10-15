@@ -1,12 +1,12 @@
 using Microsoft.CodeAnalysis;
 using Shouldly;
-using Xunit;
 using SlideRule.Codebase;
 using SlideRule.Extraction;
 using SlideRule.Extraction.Fragments;
 using SlideRule.Roslyn;
 using SlideRule.Roslyn.Solutions;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.Roslyn;
 
@@ -234,13 +234,7 @@ public sealed class ProjectArtifactFactsTests
                                                          </ItemGroup>
                                                      </Project>
                                                      """);
-        string projectFile = temp.WriteFile(["Widget", "Widget.csproj"], """
-                                                                         <Project Sdk="Microsoft.NET.Sdk">
-                                                                             <PropertyGroup>
-                                                                                 <TargetFramework>net10.0</TargetFramework>
-                                                                             </PropertyGroup>
-                                                                         </Project>
-                                                                         """);
+        string projectFile = temp.WriteFile(["Widget", "Widget.csproj"], ReferencelessProject);
 
         // Act
         ProjectArtifactFacts facts = EvaluatedFacts(projectFile).ShouldNotBeNull();
@@ -358,8 +352,8 @@ public sealed class ProjectArtifactFactsTests
         ];
 
         // Act
-        IReadOnlyList<ProjectArtifactFacts?> serial = ProjectFactsEvaluator.EvaluateAll(requests, shardCount: 1, Ct);
-        IReadOnlyList<ProjectArtifactFacts?> sharded = ProjectFactsEvaluator.EvaluateAll(requests, shardCount: 3, Ct);
+        IReadOnlyList<ProjectArtifactFacts?> serial = ProjectFactsEvaluator.EvaluateAll(requests, solutionFile: null, shardCount: 1, Ct);
+        IReadOnlyList<ProjectArtifactFacts?> sharded = ProjectFactsEvaluator.EvaluateAll(requests, solutionFile: null, shardCount: 3, Ct);
 
         // Assert — the batch really split and every file evaluated, so the comparison below is not two empty
         // answers agreeing; then the repeat answered from its shard's dedup, and every answer the serial one.
@@ -384,7 +378,7 @@ public sealed class ProjectArtifactFactsTests
 
         // Act + Assert — the cancellation travels rather than reading as every project absent.
         Should.Throw<OperationCanceledException>(() =>
-            ProjectFactsEvaluator.EvaluateAll(requests, shardCount: 2, cancelled.Token));
+            ProjectFactsEvaluator.EvaluateAll(requests, solutionFile: null, shardCount: 2, cancelled.Token));
     }
 
     [Fact]
@@ -402,17 +396,189 @@ public sealed class ProjectArtifactFactsTests
         // Act
         CodebaseModel model = await CodebaseExtractor.ExtractFromSolutionAsync(solution, ct: Ct);
 
+        // Assert — and the workspace's list accounts for itself, so nothing reads as undeclared.
+        ProjectNode node = model.Projects.Single(project => project.Name == "App");
+        node.ProjectReferences.ShouldBe(["Library"]);
+        node.UndeclaredProjectReferences.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task ExtractFromSolutionAsync_AWorkspaceReferenceTheProjectFileDoesNotDeclare_IsNamedUndeclared()
+    {
+        // Arrange — the workspace compiled App against Library, and App's project file, evaluated, declares
+        // nothing: what a declaration the evaluation lost looks like from the model's side.
+        using TempDirectory temp = TestTempRoot.Fresh("artifact-facts-undeclared");
+        string solutionFile = temp.WriteFile(["App.sln"], "");
+        string libraryFile = temp.WriteFile(["Library", "Library.csproj"], ReferencelessProject);
+        string appFile = temp.WriteFile(["App", "App.csproj"], ReferencelessProject);
+        using var workspace = new AdhocWorkspace();
+        ProjectInfo library = AdhocSolution.Loaded("Library", libraryFile);
+        ProjectInfo app = AdhocSolution.Loaded("App", appFile)
+            .WithProjectReferences([new ProjectReference(library.Id)]);
+        Solution solution = AdhocSolution.InSolutionFile(workspace, solutionFile, library, app);
+
+        // Act
+        CodebaseModel model = await CodebaseExtractor.ExtractFromSolutionAsync(solution, ct: Ct);
+
+        // Assert
+        ProjectNode node = model.Projects.Single(project => project.Name == "App");
+        node.ProjectReferences.ShouldBeEmpty();
+        node.UndeclaredProjectReferences.ShouldBe(["Library"]);
+    }
+
+    [Fact]
+    public async Task ExtractFromSolutionAsync_ADeclaredProjectThatListsOnlyItsDirectReferences_AccountsForItsWholeReach()
+    {
+        // Arrange — App declares Legacy alone and compiles against Legacy's whole closure, as the SDK adds it. Legacy
+        // and Middle list only their direct references, as a project file predating the SDK does, so reaching only
+        // one level down from Legacy would call Bottom undeclared.
+        using TempDirectory temp = TestTempRoot.Fresh("artifact-facts-reach");
+        string solutionFile = temp.WriteFile(["App.sln"], "");
+        string bottomFile = temp.WriteFile(["Bottom", "Bottom.csproj"], ReferencelessProject);
+        string middleFile = temp.WriteFile(["Middle", "Middle.csproj"], ReferencelessProject);
+        string legacyFile = temp.WriteFile(["Legacy", "Legacy.csproj"], ReferencelessProject);
+        string appFile = temp.WriteFile(["App", "App.csproj"], OneReferenceProject("../Legacy/Legacy.csproj"));
+        using var workspace = new AdhocWorkspace();
+        ProjectInfo bottom = AdhocSolution.Loaded("Bottom", bottomFile);
+        ProjectInfo middle = AdhocSolution.Loaded("Middle", middleFile)
+            .WithProjectReferences([new ProjectReference(bottom.Id)]);
+        ProjectInfo legacy = AdhocSolution.Loaded("Legacy", legacyFile)
+            .WithProjectReferences([new ProjectReference(middle.Id)]);
+        ProjectInfo app = AdhocSolution.Loaded("App", appFile)
+            .WithProjectReferences(
+            [
+                new ProjectReference(legacy.Id),
+                new ProjectReference(middle.Id),
+                new ProjectReference(bottom.Id)
+            ]);
+        Solution solution = AdhocSolution.InSolutionFile(workspace, solutionFile, bottom, middle, legacy, app);
+
+        // Act
+        CodebaseModel model = await CodebaseExtractor.ExtractFromSolutionAsync(solution, ct: Ct);
+
+        // Assert
+        ProjectNode node = model.Projects.Single(project => project.Name == "App");
+        node.ProjectReferences.ShouldBe(["Legacy"]);
+        node.UndeclaredProjectReferences.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task ExtractFromSolutionAsync_AReferenceSpelledWithSolutionDir_ResolvesAgainstTheSolutionsDirectory()
+    {
+        // Arrange — the legacy spelling nopCommerce uses throughout: an include rooted at $(SolutionDir), with its
+        // own separator after the property. A solution build and the workspace load both define the property; a
+        // project evaluated on its own does not, and its include then matches no file. The workspace records no
+        // reference here, so the declared list is the evaluation's alone.
+        using TempDirectory temp = TestTempRoot.Fresh("artifact-facts-solution-dir");
+        string solutionFile = temp.WriteFile(["App.sln"], "");
+        string libraryFile = temp.WriteFile(["Libraries", "Library", "Library.csproj"], ReferencelessProject);
+        string appFile = temp.WriteFile(["Presentation", "App", "App.csproj"], SolutionDirReferencingProject);
+        using var workspace = new AdhocWorkspace();
+        Solution solution = AdhocSolution.InSolutionFile(
+            workspace, solutionFile, AdhocSolution.Loaded("Library", libraryFile), AdhocSolution.Loaded("App", appFile));
+
+        // Act
+        CodebaseModel model = await CodebaseExtractor.ExtractFromSolutionAsync(solution, ct: Ct);
+
         // Assert
         model.Projects.Single(project => project.Name == "App")
             .ProjectReferences.ShouldBe(["Library"]);
     }
 
+    [Fact]
+    public void EvaluateAll_AReferenceSpelledWithSolutionDir_ResolvesUnderTheSolutionsDirectory()
+    {
+        using TempDirectory temp = TestTempRoot.Fresh("artifact-facts-solution-dir");
+        string solutionFile = temp.WriteFile(["App.sln"], "");
+        string projectFile = temp.WriteFile(["Presentation", "App", "App.csproj"], SolutionDirReferencingProject);
+
+        // Act
+        ProjectArtifactFacts facts = EvaluatedFacts(projectFile, solutionFile).ShouldNotBeNull();
+
+        // Assert
+        facts.ProjectReferencePaths.ShouldBe([temp.PathOf("Libraries", "Library", "Library.csproj")]);
+    }
+
+    [Fact]
+    public void EvaluateAll_AReferenceSpelledWithSolutionDirAndNoSolution_EvaluatesToNoReferenceAtAll()
+    {
+        // No solution, so MSBuild's common targets define the property as *Undefined*, and items evaluate after
+        // properties: the include reads *Undefined*\Libraries\Library\Library.csproj, a wildcard that matches no
+        // file, and the reference is not an item at all. A build of this project file on its own sees the same,
+        // which is why the solution has to be passed.
+        using TempDirectory temp = TestTempRoot.Fresh("artifact-facts-solution-dir");
+        string projectFile = temp.WriteFile(["Presentation", "App", "App.csproj"], SolutionDirReferencingProject);
+
+        // Act
+        ProjectArtifactFacts facts = EvaluatedFacts(projectFile).ShouldNotBeNull();
+
+        // Assert
+        facts.ProjectReferencePaths.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void SolutionProperties_ASolutionFile_IsSolutionDirWithATrailingSeparator()
+    {
+        using TempDirectory temp = TestTempRoot.Fresh("artifact-facts-solution-properties");
+        string solutionFile = temp.WriteFile(["App.sln"], "");
+
+        IReadOnlyDictionary<string, string> properties = ProjectFactsEvaluator.SolutionProperties(solutionFile);
+
+        properties.ShouldBe(new Dictionary<string, string> { ["SolutionDir"] = temp.Path + Path.DirectorySeparatorChar });
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    public void SolutionProperties_NoSolutionFile_IsEmpty(string? solutionFile)
+    {
+        ProjectFactsEvaluator.SolutionProperties(solutionFile).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void SolutionProperties_ASolutionInADirectoryThatIsNotThere_IsEmpty()
+    {
+        // The workspace load defines the property only for a directory that exists, so neither does this.
+        string solutionFile = Path.Combine(TestTempRoot.For("artifact-facts-solution-properties"), "absent", "App.sln");
+
+        ProjectFactsEvaluator.SolutionProperties(solutionFile).ShouldBeEmpty();
+    }
+
     // One project evaluated on its own, the Act every evaluation row here takes. Non-asserting, so the row
     // keeps its own ShouldNotBeNull and reds on the null with its own name.
-    private static ProjectArtifactFacts? EvaluatedFacts(string projectFile)
+    private static ProjectArtifactFacts? EvaluatedFacts(string projectFile, string? solutionFile = null)
     {
-        return ProjectFactsEvaluator.EvaluateAll([new ProjectEvaluationRequest(projectFile, null)], Ct)
+        return ProjectFactsEvaluator.EvaluateAll([new ProjectEvaluationRequest(projectFile, null)], solutionFile, Ct)
             .Single();
+    }
+
+    // An SDK project that declares no project reference.
+    private const string ReferencelessProject = """
+                                                <Project Sdk="Microsoft.NET.Sdk">
+                                                    <PropertyGroup>
+                                                        <TargetFramework>net10.0</TargetFramework>
+                                                    </PropertyGroup>
+                                                </Project>
+                                                """;
+
+    // An SDK project two directories below its solution that declares one reference the way nopCommerce does:
+    // rooted at $(SolutionDir), with its own separator after the property.
+    private static readonly string SolutionDirReferencingProject =
+        OneReferenceProject(@"$(SolutionDir)\Libraries\Library\Library.csproj");
+
+    // An SDK project declaring one project reference, included as written, and nothing else about it.
+    private static string OneReferenceProject(string include)
+    {
+        return $"""
+                <Project Sdk="Microsoft.NET.Sdk">
+                    <PropertyGroup>
+                        <TargetFramework>net10.0</TargetFramework>
+                    </PropertyGroup>
+                    <ItemGroup>
+                        <ProjectReference Include="{include}" />
+                    </ItemGroup>
+                </Project>
+                """;
     }
 
     // An SDK project declaring one package on line 6 and nothing else about it.

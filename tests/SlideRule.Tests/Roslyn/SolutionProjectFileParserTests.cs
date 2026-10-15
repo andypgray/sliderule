@@ -1,8 +1,8 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Roslyn.Diagnostics;
 using SlideRule.Roslyn.Solutions;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.Roslyn;
 
@@ -354,6 +354,37 @@ public sealed class SolutionProjectFileParserTests
 
         SolutionProjectFileParser.AnchorDirectory(filter)
             .ShouldBe(Path.GetDirectoryName(filter));
+    }
+
+    [Fact]
+    public void SolutionFileOf_Filter_IsTheSolutionItReferences()
+    {
+        // The file a workspace load opens under a filter, which is where its solution properties come from.
+        using TempDirectory temp = TestTempRoot.Fresh("solution-file-of");
+        string solution = WriteReferencedSolution(temp);
+        string filter = WriteFilter(temp, """{ "solution": { "path": "../solutions/App.sln", "projects": [] } }""");
+
+        SolutionProjectFileParser.SolutionFileOf(filter)
+            .ShouldBe(solution);
+    }
+
+    [Fact]
+    public void SolutionFileOf_BothSolutionFormats_AreThemselvesAndCostNoRead()
+    {
+        SolutionProjectFileParser.SolutionFileOf(Path.Combine(SolutionDirectory, "App.sln"))
+            .ShouldBe(Path.Combine(SolutionDirectory, "App.sln"));
+        SolutionProjectFileParser.SolutionFileOf(Path.Combine(SolutionDirectory, "App.slnx"))
+            .ShouldBe(Path.Combine(SolutionDirectory, "App.slnx"));
+    }
+
+    [Fact]
+    public void SolutionFileOf_MalformedFilter_IsNullWithoutThrowing()
+    {
+        using TempDirectory temp = TestTempRoot.Fresh("solution-file-of");
+        string filter = WriteFilter(temp, """{ "solution": { "path": "../solutions/App.sln", """);
+
+        SolutionProjectFileParser.SolutionFileOf(filter)
+            .ShouldBeNull();
     }
 
     // The filter and the solution it points at, on real disk in the two-directory arrangement the constants
