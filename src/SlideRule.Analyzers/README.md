@@ -23,6 +23,11 @@ above them reaches all of them:
 Under central package management, a `GlobalPackageReference` in `Directory.Packages.props` does the
 same. The package is a development dependency, so the packages you publish do not depend on it.
 
+A repository that restores with lock files needs them refreshed once. The new reference is missing
+from each `packages.lock.json` it reaches, so a locked restore fails with `NU1004`. Run
+`dotnet restore --force-evaluate` over the solution after adding the reference, and commit the
+changed lock files with it.
+
 The analyzer cannot run your spec, because the spec project builds after the projects it describes.
 It reads the rules from a file instead. Write that file once, and commit it:
 

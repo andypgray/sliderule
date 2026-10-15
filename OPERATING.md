@@ -65,7 +65,7 @@ Each baseline entry is sealed, so an edit by hand fails the next run. Restore th
 ## Rolling out the build analyzer
 
 1. Turn on the model file with `sliderule render --model`, or with `"render": { "model": true }` in the settings file, and commit `sliderule.model.json`.
-2. Add `SlideRule.Analyzers` to the projects the spec governs, from a `Directory.Build.props`, or with a `GlobalPackageReference` under central package management, at the tool's version.
+2. Add `SlideRule.Analyzers` to the projects the spec governs, from a `Directory.Build.props`, or with a `GlobalPackageReference` under central package management, at the tool's version. If the repository restores with lock files, run `dotnet restore --force-evaluate` next and commit the changed `packages.lock.json` files with the reference. Otherwise the next locked restore fails with `NU1004`.
 3. Decide what a warning does. The analyzer reports warnings, so builds keep passing. A build that treats warnings as errors needs the IDs in `WarningsNotAsErrors`, and an `.editorconfig` can make `SR2001` an error one folder at a time. In CI, promote the analyzer's six IDs to errors by passing `-warnaserror:SR2001,SR2002,SR2090,SR2091,SR2092,SR2093` to the solution build. A broken rule or a model file the build could not read then fails the build.
 4. Keep the default tier, `live`, in the builds a coding agent runs, which is where an agent reads the warning. `-p:SlideRuleTier=off` skips the analyzer in an inner-loop build.
 

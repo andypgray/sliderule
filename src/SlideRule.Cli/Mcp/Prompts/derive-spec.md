@@ -629,10 +629,10 @@ once; every later render refreshes the file. If a `CLAUDE.md`,
 `@AGENTS.md`, and leave that edit to the human. Then commit —
 spec project, `arch/baselines/**`, `sliderule.model.json`, and the rendered
 `AGENTS.md` files — as **one reviewable diff**: the reviewer sees the proposed law, the
-acknowledged debt, and the generated context in a single change. On a multi-configuration `.sln`
-the largest hunk in that diff is often the solution file itself: the configuration-table expansion
-from step 2, which is mechanical, expected, and not to be trimmed by hand. Rolling the analyzer
-out — the package reference and what a warning does in CI — is the human's; see
+acknowledged debt, and the generated context. On a multi-configuration `.sln` the largest hunk in
+that diff is often the solution file: the configuration-table expansion from step 2, which is
+expected and not to be trimmed by hand. Rolling the analyzer out — the package reference, a
+lock-file refresh under locked restore, and what a warning does in CI — is the human's; see
 [Rolling out the build analyzer](https://github.com/andypgray/sliderule/blob/main/OPERATING.md#rolling-out-the-build-analyzer).
 
 Where the human wires `check` into CI, say that the pipeline's invocation wants
