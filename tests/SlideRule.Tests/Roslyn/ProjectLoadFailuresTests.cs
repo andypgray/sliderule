@@ -1,8 +1,8 @@
 using Microsoft.CodeAnalysis;
 using Shouldly;
-using Xunit;
 using SlideRule.Roslyn.Diagnostics;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.Roslyn;
 
@@ -199,6 +199,25 @@ public sealed class ProjectLoadFailuresTests
 
         ProjectLoadFailures.Detect(solution, solutionPath)
             .ShouldHaveFailed(temp.PathOf("Absent", "Absent.csproj"), temp.PathOf("Zed", "Zed.csproj"));
+    }
+
+    [Fact]
+    public void Detect_LoadedPathSpelledThroughALinkTarget_MatchesTheDeclaredMember()
+    {
+        // A replayed project carries the path its build was run under, which can be a symlink's target where
+        // the solution was opened through the link (macOS's /var against /private/var). Arm 1 compares the
+        // two canonically, so that member is not blamed, while a member that really is absent is still named
+        // in the solution's own spelling.
+        using TempDirectory real = TestTempRoot.Fresh("declared-real");
+        using TempDirectory links = TestTempRoot.Fresh("declared-link");
+        WriteSolution(real, "Present", "Absent");
+        string via = links.PathOf("via");
+        SymlinkSupport.CreateDirectorySymlink(via, real.Path);
+        using var workspace = new AdhocWorkspace();
+        Solution solution = AdhocSolution.Of(workspace, AdhocSolution.Loaded("Present", real.PathOf("Present", "Present.csproj")));
+
+        ProjectLoadFailures.Detect(solution, Path.Combine(via, "Solution.sln"))
+            .ShouldHaveFailed(Path.Combine(via, "Absent", "Absent.csproj"));
     }
 
     // ── harness ───────────────────────────────────────────────────────────────────────────────────────────

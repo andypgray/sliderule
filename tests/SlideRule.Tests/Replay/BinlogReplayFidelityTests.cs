@@ -80,15 +80,46 @@ public sealed class BinlogReplayFidelityTests(BinlogFixtureWorkspace fixture) : 
     }
 
     [Fact]
-    public void Replay_ReportsNoFailedProjects_BecauseEveryReplayedProjectWasReallyBuilt()
+    public void Replay_BinlogOfTheWholeSolution_ReportsNoFailedProjects()
     {
-        // The gate's input on this path, pinned empty rather than assumed empty. A replayed project comes
-        // from a compiler invocation a real build actually made, so it carries an output path and cannot
-        // present the failed shape; and a binlog records what was built rather than what a .sln declares, so
-        // the declared-but-absent arm has nothing to compare against. The value is still computed by the one
-        // routine the MSBuild path uses — a replay that started answering "incomplete" would be a real
-        // regression, and hardcoding empty here would hide it.
-        using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath, Fixture.SolutionPath);
+        // The gate's input on this path, computed by the one routine the MSBuild path uses. A replayed project
+        // comes from a compiler invocation a real build made, so it cannot present the loaded-but-empty shape,
+        // and this binlog builds every member the solution declares, so the declared-but-absent arm finds
+        // nothing either.
+        var diagnostics = new List<string>();
+        using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath, Fixture.SolutionPath, diagnostics.Add);
+
+        replayed.FailedProjects.ShouldBeEmpty();
+        replayed.UncheckedProjects.ShouldBeEmpty();
+        diagnostics.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Replay_SolutionDeclaresAMemberTheBinlogNeverBuilt_ReportsItAsFailedWithAReason()
+    {
+        // A binlog of less than the solution. A capture's ingest refuses one, but a run that ingests nothing
+        // replays it as given, and only this answer stops it checking a model missing that project.
+        string widerSolution = Fixture.WriteSolutionWithUnbuiltMember("MyApp.Unbuilt");
+        try
+        {
+            string unbuilt = Fixture.PathOf("MyApp.Unbuilt", "MyApp.Unbuilt.csproj");
+            var diagnostics = new List<string>();
+
+            using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath, widerSolution, diagnostics.Add);
+
+            replayed.FailedProjects.ShouldBe([unbuilt]);
+            diagnostics.ShouldBe([BinlogReplayer.UnbuiltMemberMessage(unbuilt)]);
+        }
+        finally
+        {
+            File.Delete(widerSolution);
+        }
+    }
+
+    [Fact]
+    public void Replay_NoSolutionFile_SkipsTheDeclaredMembershipArm()
+    {
+        using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath, null);
 
         replayed.FailedProjects.ShouldBeEmpty();
     }

@@ -29,6 +29,7 @@ internal sealed class ReplayedSolution : IDisposable
         AdhocWorkspace workspace, SolutionReader reader, Solution solution,
         IReadOnlyDictionary<ProjectId, string>? targetFrameworks = null,
         IReadOnlyList<string>? failedProjects = null,
+        IReadOnlyList<string>? uncheckedProjects = null,
         IReadOnlyList<UnsupportedProject>? unsupportedProjects = null)
     {
         Workspace = workspace;
@@ -36,6 +37,7 @@ internal sealed class ReplayedSolution : IDisposable
         Solution = solution;
         TargetFrameworks = targetFrameworks ?? TargetFrameworkMaps.None;
         FailedProjects = failedProjects ?? [];
+        UncheckedProjects = uncheckedProjects ?? [];
         UnsupportedProjects = unsupportedProjects ?? [];
     }
 
@@ -58,13 +60,21 @@ internal sealed class ReplayedSolution : IDisposable
     ///     <see cref="LoadedSolution.FailedProjects" /> carries, so the gate reads one thing on both paths.
     /// </summary>
     /// <remarks>
-    ///     Empty by construction on this path, and pinned so: a replayed project comes from a compiler
-    ///     invocation a real build actually made, so it carries an output path and cannot present the empty
-    ///     shape. There is also no solution file here to read declared membership from — a binlog records
-    ///     what was built, not what a <c>.sln</c> declares — so the declared-but-absent arm has nothing to
-    ///     compare against and is skipped.
+    ///     On this path every entry is a project the solution declares and the binlog never built. A replayed
+    ///     project comes from a compiler invocation a real build actually made, so it carries an output path
+    ///     and cannot present the loaded-but-empty shape; what can go missing is a whole member, when the
+    ///     binlog is a build of less than the solution. A capture's ingest refuses such a binlog outright, so
+    ///     this list is what holds the gate when no capture is ingested. Empty when the replay was given no
+    ///     solution file.
     /// </remarks>
     public IReadOnlyList<string> FailedProjects { get; }
+
+    /// <summary>
+    ///     The absolute <c>.csproj</c> paths the solution declares that a solution filter left out of this run
+    ///     and the binlog did not build — the same fact <see cref="LoadedSolution.UncheckedProjects" />
+    ///     carries. Empty unless the replay was given a solution filter.
+    /// </summary>
+    public IReadOnlyList<string> UncheckedProjects { get; }
 
     /// <summary>
     ///     The absolute <c>.csproj</c> paths of the projects whose NuGet packages are not in the model — the
@@ -97,16 +107,15 @@ internal sealed class ReplayedSolution : IDisposable
     internal IReadOnlyList<UnsupportedProject> UnsupportedProjects { get; }
 
     /// <summary>
-    ///     This replay's verdict as the one value every surface reads — the three project lists above beside
-    ///     the replay messages the caller's own sink collected, which never land on this type. Unchecked
-    ///     projects are empty: a binlog records what was built, not what a solution declares, so there is
-    ///     nothing to have left out. The merge's two facts are empty by construction, as on the MSBuild path.
+    ///     This replay's verdict as the one value every surface reads — the four project lists above beside
+    ///     the replay messages the caller's own sink collected, which never land on this type. The merge's two
+    ///     facts are empty by construction, as on the MSBuild path.
     /// </summary>
     /// <param name="loadFailures">The replay messages this load wrote to the caller's sink.</param>
     internal WorkspaceDiagnostics LoadDiagnosticsWith(IReadOnlyList<string> loadFailures)
     {
         return new WorkspaceDiagnostics(
-            loadFailures, [], FailedProjects, [], RestoreFailedProjects, UnsupportedProjects, []);
+            loadFailures, [], FailedProjects, UncheckedProjects, RestoreFailedProjects, UnsupportedProjects, []);
     }
 
     /// <summary>Disposes the workspace and the binlog reader (releasing its stream and analyzer host).</summary>

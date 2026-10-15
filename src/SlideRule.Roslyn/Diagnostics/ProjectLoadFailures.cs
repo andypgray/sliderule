@@ -74,9 +74,9 @@ internal static class ProjectLoadFailures
     /// </summary>
     /// <param name="solution">The loaded solution.</param>
     /// <param name="solutionPath">
-    ///     The solution file the load came from, or null when there is none to read declared membership from
-    ///     (a binlog replay, which reconstructs a solution from compiler invocations). Arm 1 needs a solution
-    ///     file and is skipped without one; arm 2 runs either way.
+    ///     The solution file the load came from, or the one a replayed build was run over, or null when no
+    ///     solution file is known. Arm 1 needs a solution file in a format the parser owns and is skipped
+    ///     without one; arm 2 runs either way.
     /// </param>
     internal static ProjectLoadReport Detect(Solution solution, string? solutionPath)
     {
@@ -94,21 +94,24 @@ internal static class ProjectLoadFailures
 
         if (solutionPath is not null && SolutionProjectFileParser.OwnsFormat(solutionPath))
         {
+            // Both sides canonical: a replayed project carries the path its build was run under, which need
+            // not be the spelling the solution file resolves to (macOS's /var against /private/var, a junction),
+            // and a mismatch here would blame a member that loaded. The reports keep the solution's spelling.
+            var canonicalizer = new ProjectFileCanonicalizer();
             HashSet<string> loadedFiles = solution.Projects
-                .Select(project => project.FilePath)
-                .Where(filePath => !string.IsNullOrEmpty(filePath))
-                .Select(filePath => Path.GetFullPath(filePath!))
+                .Select(project => canonicalizer.Resolve(project.FilePath))
+                .OfType<string>()
                 .ToHashSet(PathComparison.Comparer);
 
             SolutionMembership membership = SolutionProjectFileParser.ReadDeclaredMembership(solutionPath);
 
             foreach (string required in membership.Required)
-                if (!loadedFiles.Contains(required))
+                if (!loadedFiles.Contains(canonicalizer.Resolve(required)!))
                     failed.Add(required);
 
             // Declared, not loaded, and not blamed — the only thing left for it to be is out of scope.
             foreach (string declared in membership.Declared)
-                if (!loadedFiles.Contains(declared) && !failed.Contains(declared))
+                if (!loadedFiles.Contains(canonicalizer.Resolve(declared)!) && !failed.Contains(declared))
                     uncheckedMembers.Add(declared);
 
             // Not measured against the load at all: this is what the solution file says, and an entry here

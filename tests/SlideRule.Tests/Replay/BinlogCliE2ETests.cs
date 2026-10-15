@@ -219,6 +219,59 @@ public sealed class BinlogCliE2ETests(BinlogFixtureWorkspace fixture)
             .ShouldBeFalse();
     }
 
+    [Fact]
+    public async Task Check_NoCache_BinlogMissingADeclaredMember_RefusesAsAnIncompleteModel()
+    {
+        // No capture is ingested under --no-cache, so the coverage refusal never runs; the replay's own
+        // declared-membership answer is what keeps a binlog of less than the solution from checking green.
+        string widerSolution = Fixture.WriteSolutionWithUnbuiltMember("MyApp.Unbuilt");
+        try
+        {
+            string unbuilt = Fixture.PathOf("MyApp.Unbuilt", "MyApp.Unbuilt.csproj");
+
+            CliResult run = await RunAsync(
+                FreshCache(), "check", widerSolution, "--binlog", Binlog, "--spec", CleanSpec, "--no-cache");
+
+            run.ShouldRefuseWith(
+                BinlogReplayer.UnbuiltMemberMessage(unbuilt),
+                "error: the model is incomplete — 1 project failed to load, so check cannot pass:",
+                unbuilt);
+            run.Gate.ShouldBe(GateAcquisition.ExplicitReplay);
+            run.Loads.ShouldBe(0);
+        }
+        finally
+        {
+            File.Delete(widerSolution);
+        }
+    }
+
+    [Fact]
+    public async Task Check_BinlogMissingADeclaredMember_IngestRefusesBeforeTheModelGate()
+    {
+        // The same binlog with a capture to ingest: the coverage refusal fires first and alone, so the replay's
+        // failed-project answer changes nothing a user sees on this path.
+        string widerSolution = Fixture.WriteSolutionWithUnbuiltMember("MyApp.Unbuilt");
+        try
+        {
+            string unbuilt = Fixture.PathOf("MyApp.Unbuilt", "MyApp.Unbuilt.csproj");
+
+            CliResult run = await RunAsync(FreshCache(), "check", widerSolution, "--binlog", Binlog, "--spec", CleanSpec);
+
+            // Exact, for the reason given on the stale-at-ingest row: the whole of stderr is the coverage
+            // refusal, so no model-incomplete block follows it. The refusal is several lines, and the console
+            // ends them its own way.
+            run.Exit.ShouldBe(2);
+            run.Err.Trim()
+                .ReplaceLineEndings("\n")
+                .ShouldBe(BinlogCaptureStore.MissingCoverageMessage(Binlog, [unbuilt])
+                    .ReplaceLineEndings("\n"));
+        }
+        finally
+        {
+            File.Delete(widerSolution);
+        }
+    }
+
     // ── graph parity ─────────────────────────────────────────────────────────────────────────────────────
 
     [Fact]

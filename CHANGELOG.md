@@ -36,6 +36,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `IProjectInfo.ProjectReferences` in a spec. Each project file is now read with the solution's
   directory defined, as a solution build reads it. Before, such a reference was missing, and a project
   whose references were all spelled this way was reported as declaring none.
+- `--binlog` with `--no-cache` no longer checks only part of the solution when the binlog is a build of
+  fewer projects than the solution declares. Each project the binlog did not build is now named in a
+  warning and in `failedProjects`, and the run refuses as it does for a project that failed to load.
+  Without `--no-cache`, such a binlog was already refused when it was saved as the build capture.
 
 ## [0.1.1] - 2026-10-14
 

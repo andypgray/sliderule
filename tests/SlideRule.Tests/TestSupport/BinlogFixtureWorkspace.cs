@@ -55,4 +55,26 @@ public sealed class BinlogFixtureWorkspace : IDisposable
     {
         return _copy.PathOf(relativeSegments);
     }
+
+    /// <summary>
+    ///     Writes a second solution file beside <see cref="SolutionPath" /> declaring its members plus
+    ///     <c>{projectName}\{projectName}.csproj</c>, a project with no file on disk that the binlog therefore
+    ///     never built, and returns its path. It carries the original's write time, so a capture's ingest reads
+    ///     it as no newer than the build rather than refusing the binlog as stale. The caller deletes it in a
+    ///     <c>finally</c>.
+    /// </summary>
+    internal string WriteSolutionWithUnbuiltMember(string projectName)
+    {
+        string declared = File.ReadAllText(SolutionPath);
+        int global = declared.IndexOf("Global", StringComparison.Ordinal);
+        string member =
+            $"Project(\"{{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}}\") = \"{projectName}\", "
+            + $"\"{projectName}\\{projectName}.csproj\", \"{{44444444-4444-4444-4444-444444444444}}\"{Environment.NewLine}"
+            + $"EndProject{Environment.NewLine}";
+
+        string widerPath = PathOf("MyApp.Wider.sln");
+        File.WriteAllText(widerPath, declared.Insert(global, member));
+        File.SetLastWriteTimeUtc(widerPath, File.GetLastWriteTimeUtc(SolutionPath));
+        return widerPath;
+    }
 }

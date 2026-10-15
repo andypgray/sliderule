@@ -45,7 +45,9 @@ internal static class BinlogReplayer
     ///     The solution the build was run over — a <c>.sln</c>, <c>.slnx</c> or <c>.slnf</c> — stamped on the
     ///     replayed solution as the file a workspace load would have opened (the referenced solution, under a
     ///     filter), or <see langword="null" /> when there is none. The capture records no solution of its own, and
-    ///     the project files' evaluation reads its solution properties from this one.
+    ///     the project files' evaluation reads its solution properties from this one. A project it declares that
+    ///     the binlog never built is reported in <see cref="ReplayedSolution.FailedProjects" />, with a line to
+    ///     <paramref name="diagnosticSink" />.
     /// </param>
     /// <param name="diagnosticSink">
     ///     Optional sink for replay diagnostics that do not abort the load: workspace-load failures and a
@@ -126,10 +128,13 @@ internal static class BinlogReplayer
                     $"Replay stripped {analyzerCount} unresolved analyzer and {metadataCount} unresolved "
                     + "metadata reference(s); a build artifact recorded in the binlog was missing from disk.");
 
-            // No solution file to read declared membership from, so only the loaded-but-empty arm can fire —
-            // and it cannot, because every replayed project came from a compiler invocation that ran. Asked
-            // anyway rather than hardcoded empty: the gate must key on the same computation on both paths.
-            IReadOnlyList<string> failedProjects = ProjectLoadFailures.Detect(stripped, null).Failed;
+            // The same computation the MSBuild path's gate keys on. The loaded-but-empty arm cannot fire here,
+            // because every replayed project came from a compiler invocation that ran, so each failure is a
+            // member the solution declares and this binlog never built: the gap a capture's ingest refuses,
+            // and the only thing that catches it when no capture is ingested.
+            ProjectLoadReport report = ProjectLoadFailures.Detect(stripped, solutionPath);
+            foreach (string unbuilt in report.Failed)
+                diagnosticSink?.Invoke(UnbuiltMemberMessage(unbuilt));
 
             // Every one of them is NotCsharp by construction: the predicate below drops a compiler call for
             // exactly one reason, and a shared project mints no compiler call of its own to be dropped.
@@ -139,7 +144,7 @@ internal static class BinlogReplayer
                 .ToList();
 
             return new ReplayedSolution(
-                workspace, reader, stripped, targetFrameworks, failedProjects, unsupported);
+                workspace, reader, stripped, targetFrameworks, report.Failed, report.Unchecked, unsupported);
         }
         catch
         {
@@ -147,6 +152,16 @@ internal static class BinlogReplayer
             reader.Dispose();
             throw;
         }
+    }
+
+    /// <summary>
+    ///     The replay diagnostic for a project the solution declares and the replayed binlog never built, one
+    ///     line per project, so the incomplete-model refusal that follows has a reason above it to point at.
+    /// </summary>
+    internal static string UnbuiltMemberMessage(string csprojPath)
+    {
+        return $"The binlog does not build '{csprojPath}', which the solution declares, so the model has none of "
+               + "its types. Build the whole solution with -bl and pass that binlog.";
     }
 
     // Two SolutionReader project-metadata spellings need aligning with what MSBuildWorkspace produces, so
@@ -218,7 +233,7 @@ internal static class BinlogReplayer
     // C#-only contract is enforced, so a mixed-language capture replays its C# projects and states the rest.
     //
     // The dropped paths are collected rather than discarded because nothing downstream could recover them:
-    // a binlog records what was built, so there is no solution file here to read the answer off instead.
+    // the solution file says what was declared, and only these invocations say what this build dropped.
     private static bool IsReplayableCSharpCall(CompilerCall call, ICollection<string> droppedProjects)
     {
         if (call.Kind != CompilerCallKind.Regular) return false;
