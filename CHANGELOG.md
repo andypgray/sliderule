@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is short, which means the project file declares a reference the survey could not read. The human
   survey adds the same names to the project's line.
 
+### Changed
+
+- After a stop has checked a linked worktree the turn wrote, `hook` records that worktree at each
+  later prompt as well as the session's own tree. A file changed there between turns, by another
+  session or a shell, no longer appears in the next turn's tripwire warnings.
+
 ### Fixed
 
 - A project reference written as `$(SolutionDir)\…`, a common spelling in older solutions, now appears in
@@ -24,6 +30,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   whose references were all spelled this way was reported as declaring none.
 
 ## [0.1.1] - 2026-10-14
+
+### Added
+
+- At an agent's stop, `hook` also checks each linked worktree of the project that the turn wrote
+  code into with the agent's edit tools, as the transcript the payload names records them. Each of
+  those trees is a check of its own, run after the session's tree inside the one hook timeout, and
+  a report that covers more than one tree names each. Allow the timeout one check for each tree a
+  turn may write.
 
 ### Changed
 
