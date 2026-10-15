@@ -360,8 +360,8 @@ internal static class SpecResolver
     //     restore rather than name a project.
     //  3. Nothing failed either way, but the load reported problems about this solution — diagnostics with no
     //     project blamed. It says "may", because that is all it knows.
-    //  4. A clean load means the solution really has no spec project. The sentence stays byte-identical (the
-    //     derive_spec prompt quotes it), plus how many projects were considered, which is what tells a reader
+    //  4. A clean load means the solution really has no spec project. The sentence stays byte-identical
+    //     (GETTING-STARTED.md quotes it), plus how many projects were considered, which is what tells a reader
     //     whether the workspace held what they expected.
     //
     // NuGetAudit advisories are excluded from arm 3's input, and only from arm 3's: an advisory's publication

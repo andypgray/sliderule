@@ -20,6 +20,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - After a stop has checked a linked worktree the turn wrote, `hook` records that worktree at each
   later prompt as well as the session's own tree. A file changed there between turns, by another
   session or a shell, no longer appears in the next turn's tripwire warnings.
+- The `derive_spec` recipe's first step now has the agent list the architecture the team already
+  wrote down, each statement with its source. To build that list, the agent follows the links the
+  README and CONTRIBUTING give to the project's published developer docs. It also writes each rule's
+  posture into the spec before your review. The receipt it closes with gains a `statedIntent` key,
+  and its `postures` and `leftRed` lines are copied from the last check. New warnings, each at the
+  step where its trap is met, cover an SDK pinned below 10, the package references a
+  `Directory.Build.props` adds under central package management, MVC action names under the
+  async-suffix rule, registrations made in test projects, and the analyzer rollout.
 
 ### Fixed
 

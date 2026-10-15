@@ -188,7 +188,7 @@ public sealed class GrandfatheredCountSyncTests
             "The 7 is the recipe's step number, not a count of anything baselined."),
         (DocPaths.DeriveSpecPrompt,
             "with the grandfathered counts visible",
-            "The 0 is the expected `rulesFailed` of the re-check, not a grandfathered count."),
+            "The zeros are the re-check's expected exit code and `rulesFailed`, not a grandfathered count."),
         (DocPaths.MeridianReadme,
             "Three describe debt with a target",
             "The counts are of rules by posture — three law, three ratcheting, one quarantine — not of "

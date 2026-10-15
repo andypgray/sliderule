@@ -98,15 +98,17 @@ The tools have no paging, so narrow a large answer with `rules` or `projects`. `
 
 SlideRule does not guess at an architecture, so the recipe has the agent work from evidence, in this order:
 
-1. It reads what the team already wrote down about the architecture, such as ADRs, architecture tests and agent instruction files.
+1. It lists what the team already wrote down about the architecture, with where each statement was found. That includes ADRs, architecture tests, agent instruction files and the developer docs the README links to.
 2. It surveys the solution with `arch_graph`.
 3. It scaffolds a spec project.
 4. It drafts every candidate rule as `Enforce`, including the directions the code already keeps.
 5. It runs `arch_check` to count each rule's violations.
-6. It proposes a posture for each rule from that count.
+6. It writes a posture for each rule into the spec from that count.
 7. It stops for your review, where you accept, edit or drop each rule.
 8. You run `sliderule baseline init`, which records each `Migrate` rule's current violations and the existing references into each `Quarantine` scope.
-9. You run `sliderule render` and commit the spec, the baselines and the rendered files as one change.
+9. You run `sliderule render --model` and commit the spec, the baselines and the rendered files as one change.
+
+The agent closes with a receipt. Its posture counts and the `Enforce` rules it left failing are copied from the last `arch_check` result.
 
 A baseline accepts a rule's current violations, so an agent able to record one could turn a red `Migrate` rule green without fixing anything. The server has no tool that writes a baseline, and the [hook settings](https://github.com/andypgray/sliderule/blob/main/hooks/settings.snippet.json) deny the agent `baseline`, whether it runs the installed command or `dotnet dnx`. A baseline entry edited by hand fails its seal on the next run. The seal can be recomputed, so review a baseline change as you would a change to the spec. The [adoption walk](https://github.com/andypgray/sliderule/blob/main/examples/Meridian/ADOPTING.md) runs the whole recipe on a committed example. The [Getting started](https://github.com/andypgray/sliderule/blob/main/GETTING-STARTED.md#path-2-rules-an-agent-drafts) page offers the recipe as its path 2, and writing the rules yourself as path 1.
 

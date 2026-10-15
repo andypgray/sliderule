@@ -212,8 +212,9 @@ internal static class IncompleteModelGate
     ///         reason — a reader who cannot reach the warnings cannot read the selection off them either.
     ///     </para>
     ///     <para>
-    ///         The derive_spec prompt's troubleshooting list quotes both ledes (their counts glossed as
-    ///         "N projects"), so a wording change here moves that entry too.
+    ///         Both ledes keep the <c>No spec project found</c> prefix every arm of spec resolution's refusal
+    ///         shares: the docs and the derive_spec prompt quote that prefix alone, so the rest of each lede is
+    ///         free to change.
     ///     </para>
     /// </remarks>
     internal static string SpecRefusal(WorkspaceDiagnostics diagnostics)

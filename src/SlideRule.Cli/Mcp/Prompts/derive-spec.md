@@ -1,124 +1,30 @@
 # Derive an architecture spec for an existing codebase
 
-Your goal is a **compiling SlideRule spec that states this codebase's architecture honestly,
-as it is today**: the target rules new code must follow (`Enforce`), the known debt being
-worked off (`Migrate`), the dragons nothing new may reference (`Quarantine`), and the dragons
-that stay open to callers (`Caution`). A legacy codebase's
-architecture is partly descriptive, not prescriptive — a spec that only states the ideal is
-useless on day one, and a spec that launders the mess into law is worse. The postures exist so
-you never have to choose between the two.
+Your goal is a **compiling SlideRule spec that states this codebase's architecture honestly, as it is today**: the target rules new code must follow (`Enforce`), the known debt being worked off (`Migrate`), the dragons nothing new may reference (`Quarantine`), and the dragons that stay open to callers (`Caution`). A legacy codebase's architecture is partly descriptive, not prescriptive — a spec that only states the ideal is useless on day one, and a spec that launders the mess into law is worse. The postures exist so you never have to choose between the two.
 
-Work the steps in order. Do not skip the curation gate.
+Work the steps in order. Do not skip the curation gate. Each step ends in an artifact, named on its **Done when** line, and the receipt you close with transcribes those artifacts.
 
 ## What this recipe is — and is not (binding, not a disclaimer)
 
-- **This server does not infer the architecture.** There is no "derive" command. *You* derive
-  a proposal from evidence; the deterministic checker validates every claim; the human decides
-  what becomes law. A spec nobody confirmed is worse than no spec — the rendered agent context
-  claims to be provably true, so every rule in it must be something the team actually stands
-  behind.
-- **Violations during this flow are data, not failures.** You will deliberately author rules
-  the codebase violates, precisely to measure the violations.
-- Everything here uses the read-only tools (`arch_graph`, `arch_check`, `arch_explain`,
-  `arch_status`) or their identical CLI commands (`sliderule graph|check|explain|status`, add
-  `--json` for the same documents). Prefer the tools: they are already bound to the solution,
-  the workspace stays warm between calls, and their narrowing parameters (`overview`,
-  `skeleton` and `index` for grain, `projects` for scope on the survey, `rules` on the check)
-  keep a big solution's answer a complete document rather than a truncated one. The CLI commands are for when a document belongs in a
-  file. They take the solution path as their first argument — `sliderule graph MyApp.sln
-  --json` — or walk up from the working directory when omitted (`explain` differs: its rule
-  ID comes first, the solution second — `sliderule explain area/rule MyApp.sln`). The writes
-  that end the flow — `sliderule baseline init`, `sliderule render --model` and the commit —
-  belong to the human. A session launched from the MCP registry manifest has no `sliderule` command:
-  there, prefix every CLI command in this recipe with `dotnet dnx SlideRule.Cli@... --yes --`,
-  run from outside any `global.json` that pins an SDK below 10.
+- **This server does not infer the architecture.** There is no "derive" command. *You* derive a proposal from evidence; the deterministic checker validates every claim; the human decides what becomes law. A spec nobody confirmed is worse than no spec — the rendered agent context claims to be provably true, so every rule in it must be something the team actually stands behind.
+- **Violations during this flow are data, not failures.** You will deliberately author rules the codebase violates, precisely to measure the violations.
+- Everything here uses the read-only tools, chiefly `arch_graph` and `arch_check`, or their identical CLI commands (`sliderule graph` and `sliderule check`; add `--json` for the same documents). Prefer the tools, which are bound to the solution and keep its workspace warm; the CLI is for a document that belongs in a file. The writes that end the flow — `sliderule baseline init`, `sliderule render --model` and the commit — belong to the human. A session launched from the MCP registry manifest has no `sliderule` command: there, prefix every CLI command in this recipe with `dotnet dnx SlideRule.Cli@... --yes --`, run from outside any `global.json` that pins an SDK below 10.
 
-## 0. Discover stated intent first
+## 0. Collect stated intent: read, then fetch
 
-Before proposing anything, look for architecture the team already wrote down:
+Architecture the team already wrote down outranks anything you infer, so collect it before the survey. The artifact is the **stated-intent list**: one line per statement, with its words as written, its source (a path in this repository, or a URL) and, from step 3 on, the rule it became.
 
-- Existing architecture tests (ArchUnitNET, NetArchTest) — these are rules someone already
-  ratified; carry them over rather than re-deriving them.
-- Analyzers or lint config enforcing boundaries; `Directory.Build.props` conventions.
-- ADRs, `docs/architecture*`, wiki exports checked into the repo.
-- `AGENTS.md` / `CLAUDE.md` / Cursor rules prose about layers or "do not touch" zones.
-- Solution folders and project naming — they encode intended grouping.
+1. **Read this repository.** Architecture tests (ArchUnitNET, NetArchTest) are rules someone already ratified: carry them over rather than re-deriving them. Then analyzer or lint config enforcing boundaries, `Directory.Build.props` conventions, ADRs, `docs/architecture*`, wiki exports, `AGENTS.md` / `CLAUDE.md` / Cursor rules prose about layers or "do not touch" zones, and the solution folders and project names, which encode intended grouping.
+2. **Fetch what it links.** Open every link the README and CONTRIBUTING give to developer documentation (a docs site, a wiki, an architecture page) and read its architecture pages. A project's published documentation is part of the project wherever it is hosted: reading it is reading this codebase, not leaving it. If no fetch tool is in your list, your client may load tools on request, the same way it loads the `arch_*` tools when they are first needed: search for a fetch tool before deciding you cannot fetch. Where a site refuses, read the repository it is built from. Where both fail, or you were told not to use the network, the link goes on the list as `unread`, with the reason.
+3. **Keep the source with the statement.** A rule drawn from a page carries its URL as `.Citation(url)` (a scope: in its `Because`), and a layer's `.Purpose` is lifted from the line that describes it.
 
-**Already-stated intent wins over inference.** Where a document and the code disagree, that
-disagreement is not noise — it is a posture decision waiting for step 5 (the document
-describes the target; the code is the debt).
+**Already-stated intent wins over inference.** Where a statement and the code disagree, that disagreement is not noise: the statement describes the target and the code is the debt, which step 5 writes as `Migrate` and step 6 puts to the human.
+
+**Done when** every source item 1 names has been looked for and every link is read or listed `unread`. The list becomes the receipt's `statedIntent:` lines; with no statement found and no docs link to list, that is the one line `statedIntent: none`.
 
 ## 1. Survey the estate
 
-Call `arch_graph` (CLI: `sliderule graph MyApp.sln --json`). It needs no spec and returns the
-codebase as extraction sees it.
-
-It does need the solution **restored**, not built: the code is read from source. If a project
-fails to load, the call returns an error naming it instead of a survey: a map missing whole
-projects would send the whole derivation down a wrong path, and there is no later step that
-would catch it. Do what the error says, then retry.
-Survey the partial model deliberately (`allowWorkspaceDiagnostics: true`) only if some project
-genuinely cannot be made to load, and then treat every conclusion below as provisional.
-
-- `projects[]` — each project's declared `projectReferences`, type count, and exact namespace
-  inventory with type counts. The namespace inventory is your raw material for layer globs.
-  `undeclaredProjectReferences` names projects it compiles against that no declared reference
-  reaches: the declared list is short, so trust its edges.
-  `solutionMember: false` marks a project a `ProjectReference` dragged into the workspace that
-  the solution file does not declare — a passenger, not part of the estate you are writing law
-  for, so keep it out of your layer globs. An absent key means membership could not be read.
-  `targetFrameworks` lists every framework the project declares, ordinal-ordered by framework
-  name and normalized to the short moniker, so a project predating the SDK reads `net48` beside
-  everything else. A type several frameworks
-  declare takes its facts from the first of them in that order, and `factsFollow` names the
-  first framework to win one; it is absent when the frameworks share no type (every type then
-  keeps its own framework's facts) and for every project that compiled once. Read both before
-  writing a rule whose subject is a multi-targeting project: a rule about what its shared types
-  reference sees every framework; their members and hierarchy come from one framework alone.
-  `isPackable`, `locksPackages` and `packageReferences[]` are the artifact facts, and they are
-  evaluated rather than read off the project file. The SDK makes a project packable without
-  anybody writing it down, and a lock-file policy is regularly declared once in a props file
-  above the whole solution. `packageReferences[]` is what the project declares, never the
-  transitive closure. An absent key means no answer: nothing evaluated the project, or — for
-  `isPackable` alone — the project is outside the SDK's pack machinery and has none.
-  `privatePackageReferences` lists the ones whose `PrivateAssets` is `all` (analyzers and build
-  tooling, which reach neither the project's package nor a project referencing it), absent when
-  there are none; `MustReferenceNoPackages()` passes them.
-  `generated` qualifies a type count — on the project, and on each namespace — with how many of
-  those types a generator emitted; it is absent when none were. **A namespace whose `generated`
-  equals its `types` is wholly generator output: never make it a layer glob and never anchor a
-  rule on it.** A compiled view tier collects hundreds of such types under one namespace nobody
-  typed, and naming it would aim your law at code no one can fix. Where a project's `generated`
-  is a large share of its `types`, narrow the project noun with `.Authored()`.
-- `projectEdges[]` — **observed** project→project references (distinct type pairs), and only
-  references the code declares: a project reaching a type it compiles itself is not an edge,
-  however extraction attributed that type (see `multiplyDeclaredTypes[]` below). Compare
-  against the declared references: a declared reference with no observed edge is a dead
-  reference (note it for the human; it is cleanup evidence, not a rule). An observed edge you
-  did not expect is the interesting kind.
-- `externalEdges[]` — external references grouped by namespace root. Scan for the classic
-  dangerous externals: `System.Data` (inline SQL), `System.Web` (HttpContext-era coupling),
-  direct driver namespaces, and anything the team says it is migrating away from.
-- `multiplyDeclaredTypes[]` — the types more than one project declares, from one file compiled
-  into several (a `<Compile Include>` link, shared source) or from a copy in each (a polyfill).
-  Each entry names the type, every project declaring it, and the one whose facts and project
-  attribution it follows. Read this **before** anchoring a subject on a project:
-  `arch.Project(...)` on any declarer selects the type, and its facts answer from the declarer
-  the entry names. The key is absent when the solution has none, which is the common case.
-- `shadowedTypes[]` — the full names a project declares that a referenced assembly also supplies:
-  a stand-in written under a package's own namespace, a polyfill under a BCL one. The name means
-  two types, and each reference reaches whichever the referencing project bound, so a rule naming
-  the type reaches both while `arch.Project(...)` over the declaring project reaches only the
-  declaration. Each entry names the type, that project, the supplying assemblies, and the projects
-  binding the assembly instead. Absent when the solution has none.
-- `unsupportedProjects[]` — the projects the solution declares that this survey does not cover,
-  each with its reason. A project in another language (an `.fsproj`, a `.vbproj`, a `.sqlproj`) is
-  not in `projects[]`, contributes no edges, and can never violate a rule you write. A shared
-  project (`.shproj`) is not in `projects[]` either, but its `.projitems` are compiled into every
-  project that imports it, so its code is already surveyed under those names. Read this **first**,
-  before treating `projects[]` as the estate: without it the roster is simply shorter than the
-  solution and nothing says so, and a spec derived from it silently cannot reach whatever ships
-  from those projects. Absent when the survey covers every declared project.
+Call `arch_graph` (CLI: `sliderule graph MyApp.sln --json`). It needs no spec, and the solution **restored**, not built: the code is read from source. A project that fails to load comes back as an error naming it: do what it says and retry, and survey a partial model (`allowWorkspaceDiagnostics: true`) only if some project genuinely cannot load, treating every conclusion below as provisional.
 
 The document's keys, exactly (camelCase; an optional field is absent, never null):
 
@@ -131,55 +37,29 @@ shadowedTypes[]         { type, declaredBy, suppliedBy[], boundFromAssemblyBy[] 
 unsupportedProjects[]   { project, reason }
 ```
 
-Grain is a ladder, and an over-budget survey walks down it by itself rather than coming back
-cut. At overview grain — `grain: "overview"`, or the server's own first step — the document
-stamps `"grain": "overview"` and elides each project's `namespaces`; every project, edge and
-external row survives. At skeleton grain — `grain: "skeleton"`, or the server's second step when
-the overview is still too big — it stamps `"grain": "skeleton"` and drops `externalEdges[]`
-and `multiplyDeclaredTypes[]` and `shadowedTypes[]` too, reporting how many rows went as
-`externalEdgeCount`, `multiplyDeclaredTypeCount` and `shadowedTypeCount`; each project's
-`packageReferences[]` and `privatePackageReferences` go with them, being the build-side twin of the
-external rows. The
-projects and their edges stay. At index grain — `grain: "index"`, the ladder's floor — it stamps
-`"grain": "index"` and keeps the roster alone: every project's `name`, `solutionMember` and
-`types`, with its `projectReferences`, framework pair and packaging pair gone and
-`projectEdges[]` reported as `projectEdgeCount`. That is the list `projects` globs match, so a
-survey that degrades this far hands you the argument for the next call. `unsupportedProjects[]`
-survives every rung whole, having no count key at all, and so does a project's own `generated`,
-riding its row; the framework pair (`targetFrameworks`, `factsFollow`) and the packaging pair
-(`isPackable`, `locksPackages`) ride it the same way down to skeleton.
-Only the per-namespace `generated` goes with the inventory that carries it — so at any grain
-you can still see which projects are mostly generator output, and drop to full grain to see
-which namespaces. Read the stamp: a survey with no `grain` is the complete one. An absent
-coverage key with no count beside it means the solution has none; the count key is what tells
-elision from absence.
+Read it in this order:
 
-Scope is the other axis. `projects` (name globs) narrows the survey and stamps
-`projectsScope`; edges keep both directions, so a scoped `projectEdges[]` can name a project
-outside the roster, and a `multiplyDeclaredTypes[]` entry survives when any of its declarers is
-in scope. A `shadowedTypes[]` entry survives on either end too — its declaring project, or any
-project binding the assembly. `unsupportedProjects[]` does not scope either: it is a fact about
-the load rather than about the roster. On a solution too big to survey whole even at index
-grain, scope is the knob left.
+1. `unsupportedProjects[]` first: the declared projects the survey does not cover, each with its reason. No rule can be violated in one, and nothing else flags the gap.
+2. `projects[]`: the namespace inventory is your raw material for layer globs. Keep a `solutionMember: false` row out of your layer globs: a passenger a `ProjectReference` dragged in, not part of the estate you are writing law for. `generated` counts the types a generator emitted. **A namespace whose `generated` equals its `types` is wholly generator output: never make it a layer glob and never anchor a rule on it.** Where a project's `generated` is a large share of its `types`, narrow the project noun with `.Authored()`. `factsFollow` marks a multi-targeting project whose frameworks share types, and `isPackable`, `locksPackages` and `packageReferences[]` are evaluated facts: evidence for `arch.Projects` rules.
+3. `multiplyDeclaredTypes[]` and `shadowedTypes[]`, before anchoring a subject on a project: `arch.Project(...)` on any declarer selects a multiply declared type, with the facts of the declarer the entry names, and a shadowed name is two types, of which a rule naming it reaches both and `arch.Project(...)` over the declarer only its own.
+4. `projectEdges[]`: the observed references. A declared reference with no observed edge is a dead reference, cleanup for the handoff and not a rule; an observed edge you did not expect is the interesting kind.
+5. `externalEdges[]`: scan for the classic dangerous externals — `System.Data` (inline SQL), `System.Web` (HttpContext-era coupling), direct driver namespaces, and anything the team says it is migrating away from.
 
-From the survey, write down **hypotheses, not conclusions**:
+A survey over your client's budget comes back whole at a coarser `grain` rather than cut: narrow it with `projects` globs instead of paging.
 
-- Candidate layers: coherent namespace subtrees or project groups (Domain-shaped, Web-shaped,
-  Infrastructure-shaped). Either can be a layer — a layer is defined by namespace globs or by a
-  selection, so a project is one. Keep them disjoint: overlapping layers double-count evidence.
-- Candidate direction rules: which layer should never reference which (the `projectEdges`
-  matrix tells you which of those are already true and which are aspirational).
-- Candidate conventions: naming patterns the inventory suggests (interfaces, handlers,
-  controllers, repositories).
-- Candidate dragon zones: "Legacy"/"Old"/"V1" names, a facade-shaped surface guarding a blob,
-  areas with no tests that everything fears. If a spec project already exists in the solution
-  it will appear in the survey like any other project — ignore it (and in a source-checkout
-  setup, the SlideRule contract library and its types appear too; ignore both — see step 2).
+From the survey and the stated-intent list, write down **hypotheses, not conclusions**:
+
+- Candidate layers: coherent namespace subtrees or project groups (Domain-shaped, Web-shaped, Infrastructure-shaped), kept disjoint: overlapping layers double-count evidence.
+- Candidate direction rules: which layer should never reference which (the `projectEdges` matrix tells you which of those are already true and which are aspirational).
+- Candidate conventions: naming patterns the inventory suggests (interfaces, handlers, controllers, repositories).
+- Candidate families: like units — plugins, modules, bounded contexts — that should each keep to themselves.
+- Candidate dragon zones: "Legacy"/"Old"/"V1" names, a facade-shaped surface guarding a blob, areas with no tests that everything fears. If a spec project already exists in the solution it will appear in the survey like any other project — ignore it.
+
+**Done when** the hypotheses list is written, with the dead references and any other cleanup noted for the handoff.
 
 ## 2. Scaffold the spec project
 
-Create a small class library for the spec (convention: an `arch/` folder next to the
-solution):
+Create a small class library for the spec (convention: an `arch/` folder next to the solution):
 
 ```xml
 <Project Sdk="Microsoft.NET.Sdk">
@@ -201,27 +81,13 @@ solution):
 </Project>
 ```
 
-The four SlideRule packages ship one version in lockstep: reference the version
-`sliderule --version` prints. Where the repository manages package versions centrally, leave its
-`Directory.Packages.props` alone — the property above opts this one project out, so the spec keeps
-its own pin and the central file needs no entry for it.
+The four SlideRule packages ship one version in lockstep: reference the version `sliderule --version` prints. Where the repository manages package versions centrally, leave its `Directory.Packages.props` alone — the property above opts this one project out, so the spec keeps its own pin and the central file needs no entry for it.
 
-**Pick the TFM by one rule: the spec project must be able to reference the product projects
-it will `typeof()`.** On a `net48` estate, the spec targets `net48` — the SlideRule contract
-library is `netstandard2.0` precisely so that works. Several frameworks go in the plural
-`<TargetFrameworks>` element. Where referencing a product project is awkward, you do not need
-it: namespace-pattern targets (`arch.Namespace("System.Data.*")`) need no compile-time reference
-at all, and matching is by full name.
+**A `Directory.Build.props` above the spec project applies to it too.** Where it adds `PackageReference` items whose versions live in the central file (MinVer, SourceLink, analyzers), the opt-out leaves them versionless, and restore fails with NU1015 naming packages the spec never asked for. Switch them off in the spec csproj with the property the props file conditions them on (one repository spells it `UseBuildTimeTools`), or `<PackageReference Remove="…" />` them there; never turn central management back on.
 
-`typeof()` targets must also be **accessible** to the spec assembly: anchoring an `internal`
-type fails the spec build with CS0122. Every set-valued position has a spelling that needs no
-load, so reach for one before reaching for accessibility: dependency-verb targets take namespace
-patterns, a `BoundaryOnlyVia` facade takes `arch.Types.Named("BillingFacade")`, and
-`Implementing` / `DerivedFrom` / `AttributedWith` each take the fully-qualified name as a string,
-matching byte-identically to their `typeof` twin. Where the type must genuinely be reflected —
-an `arch.Member(typeof(X), nameof(X.M))` anchor — have the product project grant
-`[InternalsVisibleTo("MyApp.Architecture")]` (or the csproj
-`<InternalsVisibleTo Include="MyApp.Architecture" />`) and rebuild.
+**Pick the TFM by one rule: the spec project must be able to reference the product projects it will `typeof()`.** On a `net48` estate, the spec targets `net48` — the SlideRule contract library is `netstandard2.0` precisely so that works. Several frameworks go in the plural `<TargetFrameworks>` element. **Read `global.json` before keeping `net10.0`:** a pin below SDK 10 builds the spec project with that SDK, which cannot target `net10.0` (NETSDK1045), so target what the product projects target (`net9.0`, say) and leave the pin alone.
+
+`typeof()` targets must also be **accessible** to the spec assembly: anchoring an `internal` type fails the spec build with CS0122. Every set-valued position has a spelling that needs no load and no reference, so reach for one first: a namespace pattern (`arch.Namespace("System.Data.*")`), `arch.Types.Named("BillingFacade")`, or the fully-qualified name as a string where `Implementing` / `DerivedFrom` / `AttributedWith` take a type. Only where the type must genuinely be reflected — an `arch.Member(typeof(X), nameof(X.M))` anchor — have the product project grant `[InternalsVisibleTo("MyApp.Architecture")]` and rebuild.
 
 ```csharp
 using SlideRule;
@@ -236,126 +102,31 @@ public sealed class ArchitectureSpec : IArchitectureSpec
 }
 ```
 
-Name the project — and with it its root namespace — so the **last segment is not `Arch`**: inside
-a namespace ending in `.Arch`, the simple name `Arch` binds to that namespace rather than to the
-`Arch` type `Define` takes, and the spec does not compile (CS0118, verbatim below).
-`MyApp.Architecture` is safe, and so is the `arch/` folder — only the namespace segment collides.
+Name the project — and with it its root namespace — so the **last segment is not `Arch`**: inside a namespace ending in `.Arch`, the simple name `Arch` binds to that namespace rather than to the `Arch` type `Define` takes, and the spec does not compile (CS0118, verbatim below). `MyApp.Architecture` is safe, and so is the `arch/` folder — only the namespace segment collides.
 
-Add it to the solution (`dotnet sln add arch/MyApp.Architecture/MyApp.Architecture.csproj`) and build.
-Spec discovery is by convention: **the unique solution project that references
-`SlideRule.dll`** — via the package or via a project reference. As a solution member,
-the spec project is excluded from the checked universe — its own types never trip your rules.
+Add it to the solution (`dotnet sln add arch/MyApp.Architecture/MyApp.Architecture.csproj`) and build. Spec discovery is by convention: **the unique solution project that references `SlideRule.dll`** — via the package or via a project reference. As a solution member, the spec project is excluded from the checked universe — its own types never trip your rules.
 
-**Expect `dotnet sln add` to rewrite more of a `.sln` than the one project it adds.** The CLI
-unions its default platforms (`x64`, `x86`) into the solution's configuration list, then writes the
-project-configuration table out complete: an `ActiveCfg`/`Build.0` pair per project per
-configuration × platform combination. On a dozen-project solution that is a hundred-plus inserted
-lines for the one project you added. The rewrite is legitimate, not damage: those mappings are what
-make the spec project, and every other member, build under every combination the solution declares.
-Do not revert it to hand-write a narrower entry mapping only `Debug|Any CPU` and `Release|Any CPU`.
-The project registers either way (`dotnet sln list` shows it), but a solution build under any other
-declared combination skips a project with no mapping for it — MSBuild names it in an `MSB4121`
-warning and still exits 0, so the build stays green while `check` reads a stale spec assembly, or
-none at all.
+**Expect `dotnet sln add` to rewrite more of a `.sln` than the one project it adds.** It writes an `ActiveCfg`/`Build.0` pair for every project under every configuration × platform combination, its default `x64` and `x86` included, and that rewrite is legitimate, not damage. Do not trim it back to a hand-written entry mapping only `Debug|Any CPU` and `Release|Any CPU`: a solution build under any other declared combination skips a project with no mapping for it — MSBuild names it in an `MSB4121` warning and still exits 0, so the build stays green while `check` reads a stale spec assembly, or none at all.
 
-**Source-checkout setups only**: `dotnet sln add` follows project references, so it may also
-add the SlideRule contract library to the solution — and **solution membership decides
-whether its types come under your rules**. A contract library the solution declares is checked
-like any other member; one that only rides in as a project reference of the spec counts as the
-spec's private plumbing and stays out of the checked universe. It appears in the survey either
-way, because `arch_graph` is spec-less and excludes nothing. Ignore it there, and scope broad
-subjects to your product namespaces
-(`arch.Types.OfKind(TypeKind.Interface).InNamespace("MyApp.*")`, not bare
-`arch.Types.OfKind(...)`) so convention rules never bite the tooling.
-
-Test projects need the same subject-scoping care in ANY setup: a test project sharing the
-product root namespace (`MyApp.Tests.*` inside `MyApp.*`) is solution-declared, so
-`.InNamespace("MyApp.*")` subjects include its types — fakes and test helpers then pollute
-naming, member, and hierarchy rules. Anchor product-wide subjects on `arch.Project("MyApp")`
-instead; a project noun never crosses project boundaries. When the product is several projects,
-name them as one union — `arch.AnyOf(arch.Project("MyApp"), arch.Project("MyApp.Data"))` — rather
-than a namespace cone minus an `.Except`: the union names exactly what you mean, while the cone
-also sweeps every other solution member that happens to sit inside it.
+**Source-checkout setups only**: `dotnet sln add` follows project references, so it may also add the SlideRule contract library to the solution, and **solution membership decides whether its types come under your rules**: declared, it is checked like any other member; riding in only as the spec's project reference, it is not. The survey lists it either way, so ignore it there.
 
 Errors you may see, verbatim, and what they mean:
 
-- `error NU1008: The following PackageReference items cannot define a value for Version:
-  SlideRule. Projects using Central Package Management must define a Version value on a
-  PackageVersion item.` — NuGet's, not this tool's, so nothing in it names SlideRule as the cause.
-  The repository has a `Directory.Packages.props` at or above the spec project and the
-  `<ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>` line is missing from the
-  spec csproj. Put it back rather than adding a `PackageVersion` entry to the central file: the
-  spec's pin belongs to SlideRule and moves when the tool does, not with the repository's own
-  dependencies.
-- `error CS0118: 'Arch' is a namespace but is used like a type`, beside a CS0535 that the spec
-  class does not implement `IArchitectureSpec.Define(Arch)` — the compiler's, not this tool's, so
-  nothing in either names the cause. The spec project's namespace ends in `.Arch`, and inside that
-  namespace the simple name `Arch` is the namespace itself, shadowing the contract type. Rename the
-  project and namespace so the last segment is not `Arch` (the scaffold's `MyApp.Architecture` shape);
-  qualifying `SlideRule.Arch` in the signature also compiles, but leaves the shadow armed
-  for every file the spec grows.
-- `No spec project found: no solution project references SlideRule.dll. Pass --spec
-  to name one.` — the spec project is not in the solution yet (`dotnet sln add`), or you need
-  an explicit `--spec`. The line below it says how many C# projects the workspace held: a count
-  far short of the solution's is the real finding, not the missing spec project.
-- `No spec project found: N projects failed to load, so a project that references
-  SlideRule.dll may be among them:` — followed by every failed project, uncapped. The
-  one that would have matched may be among the casualties, and `--spec` cannot repair a load,
-  so the remedy is the one the refusal names: restore and build, then retry.
-- `No spec project found: NuGet packages did not resolve for N projects, so a project that
-  references SlideRule.dll may have failed to resolve it:` — the quieter break: every
-  named project loaded completely, but without its package references, so a reference to the
-  contract library resolves to nothing and convention discovery cannot see it. Restore, then
-  retry. One broken tree can raise this and the previous refusal at once — they compose, each
-  naming its own projects.
-- `No spec project found: the workspace did not load cleanly, so a project that references
-  SlideRule.dll may have failed to resolve it:` — followed by the diagnostics, up to
-  three of them: load problems that blame no project in particular, which is why this one says
-  "may" — that is all it knows. The spec project may well be there, its reference to the
-  contract library hidden by whatever the diagnostics describe. Restore and build, then retry.
-  `--spec` cannot help here — an unresolved reference is unresolved whichever project you name.
-- `Multiple spec projects found; pass --spec to disambiguate:` — more than one project
-  references the contract library; the listed lines name each one's `.csproj`, so pass yours.
-  A project that multi-targets is listed once: its frameworks are one spec project.
-- `The spec project '…' has no built output … Build the solution first (dotnet build).` —
-  the CLI and this server **never build**. They read the code from source, so an edit counts
-  unbuilt, and run the spec from the spec project's last build: rebuild that project after each
-  spec edit, and the next check reads it.
-- `The spec assembly '…' failed to load its dependency '…' while running Define().` — a
-  `typeof()` anchor names a type whose assembly the loader cannot reach. The message says which
-  of two situations you are in, so read its second line rather than reaching for the setting.
-  If the assembly is a **NuGet package**, `<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>`
-  in the spec csproj (the scaffold above carries it) plus a rebuild stages it. If it is a **.NET
-  shared framework** — anything reached through `<FrameworkReference Include="Microsoft.AspNetCore.App" />`,
-  such as an MVC `ControllerBase` or a `Microsoft.WindowsDesktop.App` type — **no build setting
-  can help**: that assembly is never staged into a spec's output and the tool's own host does not
-  carry it. Anchor those by string instead — `.DerivedFrom("Microsoft.AspNetCore.Mvc.ControllerBase")`
-  renders exactly like the `typeof()` form and needs no assembly load — or target a namespace
-  pattern.
+- `error NU1008: The following PackageReference items cannot define a value for Version: SlideRule. Projects using Central Package Management must define a Version value on a PackageVersion item.` — NuGet's, not this tool's: the `<ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>` line is missing from the spec csproj. Put it back rather than adding a `PackageVersion` entry to the central file: the spec's pin moves with the tool, not with the repository's own dependencies.
+- `error CS0118: 'Arch' is a namespace but is used like a type`, beside a CS0535 that the spec class does not implement `IArchitectureSpec.Define(Arch)` — the compiler's, so neither names the cause: the namespace ends in `.Arch`. Rename the project and namespace; qualifying `SlideRule.Arch` in the signature also compiles, but leaves the shadow armed for every file the spec grows.
+- `The spec assembly '…' failed to load its dependency '…' while running Define().` — a `typeof()` anchor names a type whose assembly the loader cannot reach, and the message's second line says which case you are in. A **NuGet package** is staged by the scaffold's `CopyLocalLockFileAssemblies` plus a rebuild. A **.NET shared framework** type, anything reached through `<FrameworkReference Include="Microsoft.AspNetCore.App" />` such as an MVC `ControllerBase`, never is, and **no build setting can help**: anchor it by string (`.DerivedFrom("Microsoft.AspNetCore.Mvc.ControllerBase")` renders exactly like the `typeof()` form) or by namespace pattern.
+- `The spec project '…' has no built output`: nothing here builds — the code is read from source and the spec from its project's last build, so rebuild that project after each spec edit.
+- `No spec project found` or `Multiple spec projects found`: the refusal names its cause and its cure, so do what it says; `--spec path/to/YourSpec.csproj` names or picks a spec project, but cannot repair a load or a restore.
 
-If discovery still cannot find your spec project, do not stall: pass
-`--spec path/to/YourSpec.csproj` to every command and continue — nothing downstream depends on
-convention discovery.
+**Done when** the spec project builds with no errors. The receipt's `specBuild:` reports the last build, after step 5's edits.
 
 ## 3. Draft candidate rules — all as `Enforce`, all of them hypotheses
 
-Turn every step-1 hypothesis into a rule. Do not pre-judge postures — the checker assigns the
-evidence in step 4; postures come in step 5. **Author the already-true directions too**: every
-layer pair the survey's edge matrix shows clean becomes an Enforce candidate — the cheapest
-law you will ever get.
+Turn every step-1 hypothesis and every stated-intent line the language can express into a rule, and write the rule's ID onto the line it came from. Do not pre-judge postures — the checker assigns the evidence in step 4; postures come in step 5. **Author the already-true directions too**: every layer pair the survey's edge matrix shows clean becomes an Enforce candidate — the cheapest law you will ever get.
 
-Define each layer by whatever honestly says where it is. A namespace cone where the namespaces are
-disciplined; `arch.Project("MyApp.Web")` where the unit of architecture is the assembly, or where the
-survey's `multiplyDeclaredTypes[]` or a shared `RootNamespace` says the namespaces do not separate
-the projects; a refinement — `core.InNamespace("MyApp.Core.Model.*")` — where one cone nests inside
-another and a glob would swallow it. A layer names exactly what its definition names and checks
-identically to it, so the choice costs nothing at the checker and buys the row, the card and the
-collective voice.
+Define each layer by whatever honestly says where it is. A namespace cone where the namespaces are disciplined; `arch.Project("MyApp.Web")` where the unit of architecture is the assembly, or where the survey's `multiplyDeclaredTypes[]` or a shared `RootNamespace` says the namespaces do not separate the projects; a refinement — `core.InNamespace("MyApp.Core.Model.*")` — where one cone nests inside another and a glob would swallow it. A layer names exactly what its definition names and checks identically to it, so the choice costs nothing at the checker and buys the row, the card and the collective voice.
 
-Give each layer a `.Purpose(prose)`: one sentence on what the layer is for, lifted from the step 0
-prose that already says it (the ADR, the wiki page, the `AGENTS.md` paragraph). It renders into the
-layer's module-map row and its card, so the sentence that rotted in a document now sits beside the
-definition it describes and re-renders with it.
+Give each layer a `.Purpose(prose)`: one sentence on what the layer is for, lifted from the stated-intent line that already says it. It renders into the layer's module-map row and its card, so the sentence that rotted in a document now sits beside the definition it describes and re-renders with it.
 
 ```csharp
 Layer domain = arch.Layer("Domain", "MyApp.Domain.*").Purpose("Domain holds the order and customer model.");
@@ -363,7 +134,8 @@ Layer web    = arch.Layer("Web",    arch.Project("MyApp.Web")).Purpose("Web is t
 
 arch.Rule("layering/domain-independent")
     .Enforce(domain.MustNotReference(web))
-    .Because("Candidate: Domain looked UI-agnostic in the survey.");
+    .Because("Candidate: the architecture page says the model knows nothing of the web tier.")
+    .Citation("https://docs.example.org/developer/architecture");
 
 arch.Rule("data-access/no-inline-sql")
     .Enforce(web.WithSuffix("Controller").MustNotReference(arch.Namespace("System.Data.*")))
@@ -371,119 +143,45 @@ arch.Rule("data-access/no-inline-sql")
 ```
 
 - One hypothesis per rule — a rule is one sentence; compound requirements are multiple rules.
-- IDs are `area/rule-name`, matching `^[a-z0-9-]+(/[a-z0-9-]+)*$`. They are permanent handles
-  (baseline keys, violation citations), so name them as if they will survive — they will.
-- `Because` is **required** and will not pass spec build when blank. During drafting a
-  candidate note is fine ("Candidate: …"); by step 6 every kept rule needs the real reason.
-- Prefer **namespace-pattern targets** for external bans. A bare `typeof(SomeType)` target
-  that does not exist in the codebase passes silently (absence is the win condition), so a
-  typo'd type name looks like success; a pattern target that matches nothing raises an inert
-  warning — the misspelling check comes free.
-- Naming/shape candidates come straight from the inventory: interfaces `MustHavePrefix("I")`,
-  handler types `MustHaveSuffix("Handler")`, `MustBeSealed()` where the convention looks
-  intended. Member-level conventions are candidates too:
-  `web.Methods.Returning(typeof(Task), typeof(Task<>)).MustHaveSuffix("Async")` where the
-  codebase names its async methods `*Async`.
-- Token-presence candidates: where the codebase's `Task`-returning methods already accept a
-  `CancellationToken`, the convention is one line —
-  `web.Methods.Returning(typeof(Task), typeof(Task<>)).MustAcceptParameter(typeof(CancellationToken))`.
-  Matching is declaration-level and exact (a `CancellationToken?` or `params CancellationToken[]`
-  parameter is a different declared type and does not count); whether a body *flows* the token
-  is call-site analyzer territory, not this rule's.
-- DI-construction candidates: a type resolved through a container or a discovery registry may be
-  *referenced* but must not be *constructed* — `arch.Types.Except(arch.Type<HandlerRegistry>())
-  .MustNotConstruct(arch.Types.Implementing(typeof(IHandler<>)))` where a family of types
-  (handlers, commands, services) is meant to arrive via one sanctioned root, so a stray `new`
-  bypasses discovery. `.Except` the composition root that legitimately `new`s them.
-- DI-lifetime candidates: where the composition root registers services with
-  `AddSingleton`/`AddScoped`/`AddTransient` (or `TryAdd*`, `AddHostedService`, `AddDbContext`,
-  `AddDbContextPool`, `AddHttpClient<TClient>`), the captive-dependency rule is one line —
-  `arch.Registered(Lifetime.Singleton).MustNotInject(arch.Registered(Lifetime.Scoped),
-  arch.Registered(Lifetime.Transient))`. Keyed-service and raw `ServiceDescriptor` registrations,
-  assembly scanning, factory internals and framework defaults are not seen, so an empty-subject failure here means the
-  registrations live outside the recognized calls — drop the rule rather than guessing.
-- Anchor a rule on the `Layer` handle wherever one exists (`tools.MustHaveSuffix("Tools")`,
-  not `arch.Types.InNamespace("MyApp.Tools.*").MustHaveSuffix("Tools")`, and `web.MustNot…`
-  rather than a bare `arch.Project("MyApp.Web").MustNot…` where a Web layer names that
-  project). The two check identically, but render's per-directory local-rules card is keyed on
-  the layer-anchored subject — the anonymous twin emits no card in that layer's directory, so
-  agents editing there never see the rule locally, and it earns no module-map row and no
-  purpose either.
-- Family candidates: where the estate has a family of like units — plugins, modules, bounded
-  contexts, one project or one layer each — the law that every unit keeps to itself is one rule
-  over the family, not one per unit. `arch.Each(arch.Projects.Matching("MyApp.Plugin.*"))
-  .MustNotReferenceEachOther()` says no plugin reaches another;
-  `arch.Each(dispatch, tracking, invoicing).Except(<each module's Contracts cone>)
-  .MustOnlyBeReferencedByItself()` says each module's internals are reached only from its own
-  module; `arch.Each(a, b, c).MustNotHaveCircularReferences()` says the units may reference each
-  other but never in a circle — the law for peers whose order nobody has stated, and the first
-  law to write on an estate before its order is known (layers only: MSBuild already forbids a
-  circle among projects). On a family, "itself" and "their own" mean the cell — the whole layer
-  or project the type sits in, as declared — so the `MustOnly*` verbs read the same way per
-  cell, and the survey's edge matrix over the family's projects is the evidence. One rule, one
-  ID, one baseline; write one rule per cell only where each cell needs its own `Because` or `Fix`.
-- Dragon-zone candidates are the one exception to "all as Enforce": a scope has no Enforce
-  form, so draft them as `arch.Scope(id).Quarantine(...)` directly (step 5 shows the full shape
-  of both scope postures). The scope's containment violations arrive in step 4 alongside every
-  other rule's evidence, and they are what decides in step 5 whether the scope stays a
-  `Quarantine` or becomes a `Caution`.
+- IDs are `area/rule-name`, matching `^[a-z0-9-]+(/[a-z0-9-]+)*$`. They are permanent handles (baseline keys, violation citations), so name them as if they will survive — they will.
+- `Because` is **required** and will not pass spec build when blank. Write each as a candidate note ("Candidate: …") and leave it that way: the real reason is the human's to give at step 6.
+- Anchor a rule on the `Layer` handle wherever one exists (`web.MustNot…`, not `arch.Project("MyApp.Web").MustNot…`): the two check identically, but only the layer-anchored one renders on that layer's card and module-map row.
+- Keep product-wide subjects off the test projects: a test project inside the product's root namespace (`MyApp.Tests.*` inside `MyApp.*`) is solution-declared, so an `.InNamespace("MyApp.*")` subject sweeps its fakes and helpers into naming, member and hierarchy rules. Anchor on `arch.Project("MyApp")`, or a union such as `arch.AnyOf(arch.Project("MyApp"), arch.Project("MyApp.Data"))`, rather than a namespace cone minus an `.Except`.
 
-Build the spec. Spec-build validation reports **every** error at once (missing `Because`,
-malformed IDs, dangling rules, blank prose) — fix them in one pass.
+Then draft one candidate for each question the codebase answers yes to:
+
+- **Which layer must never reach which?** `domain.MustNotReference(web)`, one rule per pair, for every clean pair and every pair a stated-intent line names. Not for peers whose order nobody has stated: that is the family law below.
+- **Which externals are banned, and from where?** `web.MustNotReference(arch.Namespace("System.Data.*"))`. Use a namespace pattern, not `typeof`: a `typeof` target that does not exist passes silently (absence is the win condition), while a pattern that matches nothing raises an inert warning — the misspelling check comes free. Not for an external the code reaches everywhere on purpose.
+- **Do names follow a convention?** `arch.Project("MyApp").OfKind(TypeKind.Interface).MustHavePrefix("I")`, handler types `MustHaveSuffix("Handler")`, `MustBeSealed()` where the convention looks intended. Not for a pattern a few types share by accident.
+- **Are async methods named `*Async`?** `web.Methods.Returning(typeof(Task), typeof(Task<>)).MustHaveSuffix("Async")`, where the codebase names them so. **On an MVC estate, take the controllers out first** — `web.Except(arch.Types.DerivedFrom("Microsoft.AspNetCore.Mvc.ControllerBase")).Methods.Returning(typeof(Task), typeof(Task<>)).MustHaveSuffix("Async")`, or `System.Web.Mvc.Controller` on .NET Framework — because action methods are named for the routes they serve and usually carry no `Async` suffix, and they can be nearly every violation the rule reports.
+- **Do `Task`-returning methods take a `CancellationToken`?** `web.Methods.Returning(typeof(Task), typeof(Task<>)).MustAcceptParameter(typeof(CancellationToken))`, where most already do. Matching is declaration-level and exact (a `CancellationToken?` parameter does not count), and whether a body *flows* the token is not this rule's question.
+- **Must a set of types arrive through one root?** `arch.Types.Except(arch.Type<HandlerRegistry>()).MustNotConstruct(arch.Types.Implementing(typeof(IHandler<>)))`: handlers or services resolved through a container may be *referenced* but never *constructed* outside the root the `.Except` names. Not for plain values the code is meant to `new`.
+- **Does a singleton capture a shorter-lived service?** `arch.Registered(Lifetime.Singleton).MustNotInject(arch.Registered(Lifetime.Scoped), arch.Registered(Lifetime.Transient))`. **Registrations are read from every solution project, test projects included**, and membership is per type, so a test host that registers a product service as a singleton makes it one for this rule. Before calling a hit captive, find where its singleton registration is; where only a test project makes it one, `.Except` that type (or the test project's own types) and say so in the `Because`. A test registration can put a type on the operand side the same way, so check both ends of a hit before calling it captive. Not where registration goes through calls the checker cannot see (Semantics, below): an empty-subject failure here means exactly that, so drop the rule rather than guessing.
+- **Is there a family of like units — plugins, modules, bounded contexts, one project or one layer each?** The law that every unit keeps to itself is one rule over the family, not one per unit. `arch.Each(arch.Projects.Matching("MyApp.Plugin.*")).MustNotReferenceEachOther()` says no plugin reaches another; `arch.Each(dispatch, tracking, invoicing).Except(<each module's Contracts cone>).MustOnlyBeReferencedByItself()` says each module's internals are reached only from its own module; `arch.Each(a, b, c).MustNotHaveCircularReferences()` says the units may reference each other but never in a circle — the law for peers whose order nobody has stated, and the first law to write on an estate before its order is known (layers only: MSBuild already forbids a circle among projects). On a family, "itself" and "their own" mean the cell — the whole layer or project the type sits in, as declared — so the `MustOnly*` verbs read the same way per cell, and the survey's edge matrix over the family's projects is the evidence. One rule, one ID, one baseline; write one rule per cell only where each cell needs its own `Because` or `Fix`.
+- **Is there a dragon zone?** Dragon-zone candidates are the one exception to "all as Enforce": a scope has no Enforce form, so draft them as `arch.Scope(id).Quarantine(...)` directly (step 5 shows the full shape of both scope postures). The scope's containment violations arrive in step 4 alongside every other rule's evidence, and they are what decides in step 5 whether the scope stays a `Quarantine` or becomes a `Caution`. Not for code that is merely old: a dragon zone is one a change would break in a way the code does not show.
+
+Build the spec. Spec-build validation reports **every** error at once (missing `Because`, malformed IDs, dangling rules, blank prose) — fix them in one pass.
+
+**Done when** the draft spec builds, and every hypothesis and every stated-intent line carries a rule ID or a note saying why none.
 
 ## 4. Check = the evidence pass
 
-Run `arch_check` (CLI: `sliderule check MyApp.sln --json`; exit 1 is expected — violations
-are the data). For each rule, read `rules[]` — keyed by `id` (`ruleId` is SARIF's spelling,
-not this document's), camelCase and exact like the step-1 key map:
+Run `arch_check` (CLI: `sliderule check MyApp.sln --json`; exit 1 is expected — violations are the data). Each entry of `rules[]` carries `violationCount`, and at full grain each violation's `file:line` sites.
 
-- `violations[]` with `sites[]` — the real edges, each with `file:line`. One violation per
-  offending type pair; multiple reference sites between the same pair ride together in
-  `sites[]`. Beside them, `violationCount` and
-  `siteCount` are present at every grain — script against the counts (step 5 reads the
-  violation count); the arrays are their expansion and are elided at coarser grain.
-- The **authoring signals** are about your selection, not the code. A violation of kind
-  `emptySubject` ("The subject selection matched no solution-declared types.") fails the rule;
-  the warning "This rule is inert: its target selection matched no types." leaves a rule that
-  passes forever. Its twins name one dead pattern: "This rule is partly inert…" a target,
-  "…stricter than written…" an allow-list or a membership, "…not measured as written…" an
-  `among:` part. Each carries a `hint` (a `hint:` line in the report) with the cure read off the
-  selection that came up empty — a glob, a project name and a `typeof` anchor each fail
-  differently — so apply the hint rather than guessing, and where an inert target names a layer
-  that genuinely declares no types yet, decide before keeping the rule.
-- `modelIncomplete: true` on the document, with `failedProjects` and `restoreFailedProjects`
-  naming the casualties, means the check ran on a partial model: a rule that passed was **not
-  observed**, not obeyed, and an inert target may be an edge that was never extracted. The
-  document arrives either way; the CLI also exits 2 unless `--allow-workspace-diagnostics` is
-  passed. Restore and build the named projects before reading any verdict as evidence.
-- An **error result** (not a violations document) means the run itself failed — an
-  unresolvable or unbuilt spec, or spec validation errors. Fix, rebuild, rerun.
+- The **authoring signals** are about your selection, not the code. A violation of kind `emptySubject` ("The subject selection matched no solution-declared types.") fails the rule; the warning "This rule is inert: its target selection matched no types." leaves a rule that passes forever. Its twins name one dead pattern: "This rule is partly inert…" a target, "…stricter than written…" an allow-list or a membership, "…not measured as written…" an `among:` part. Each carries a `hint` (a `hint:` line in the report) with the cure read off the selection that came up empty — a glob, a project name and a `typeof` anchor each fail differently — so apply the hint rather than guessing, and where an inert target names a layer that genuinely declares no types yet, decide before keeping the rule.
+- A document stamped `modelIncomplete: true` ran on a partial model: restore and build the projects its `failedProjects` and `restoreFailedProjects` name before reading any verdict as evidence.
+- An **error result** (not a violations document) means the run itself failed — an unresolvable or unbuilt spec, or spec validation errors. Fix, rebuild, rerun.
 
-Iterate selections until the failures that remain are *genuine* — real edges, real
-nonconforming names — against a count you can read off the document: per rule, its
-`emptySubject` violations plus its inert and partly inert warnings. Re-check while that count reaches a
-new low; when two consecutive re-checks leave a rule's count at its best so far, stop working
-that rule and carry it to step 6 as `undecided`, while every other rule keeps iterating on its
-own count. Iterating is cheap over MCP: the server holds the workspace warm, reconciles your edits
-per call and picks a rebuilt spec up on the next call, so a re-check after the first load answers
-in milliseconds; a one-shot CLI run with a valid extraction cache reloads only the projects edited
-since it was written, and nothing on a clean tree. On a big
-solution, narrow instead of leaving: `rules` takes rule-ID globs (`rules: "data-access/*"`; the
-CLI twin is `--rules`), so the evidence pass can walk the draft area by area with every
-response a complete document, and `arch_explain` returns one rule whole. You never have to page
-a report out to read it entire: over your client's budget it comes back whole at a coarser
-grain rather than cut, down to `index` — every rule ID with its verdict and violation count,
-which is the menu those globs pick from.
+Iterate selections until the failures that remain are *genuine* — real edges, real nonconforming names — against a count you can read off the document: per rule, its `emptySubject` violations plus its inert and partly inert warnings. Rebuild the spec project before every re-check: the check reads its last build, so a re-check of an unbuilt edit shows no progress. Re-check while that count reaches a new low; when two consecutive re-checks leave a rule's count at its best so far, stop working that rule and carry it to step 6 as `undecided`, while every other rule keeps iterating on its own count. On a big solution, narrow with `rules` globs (`rules: "data-access/*"`; CLI `--rules`). A report over your client's budget comes back whole at a coarser grain, down to `index`: every rule ID with its verdict, the menu those globs pick from. `arch_explain` returns any one rule whole.
 
-## 5. Assign postures from the evidence
+**Done when** every rule's signal count is zero or the rule is `undecided`. That pass is the receipt's `undecided:` lines; `evidencePass:` is read off the last whole check.
 
-For each surviving rule, the violation count decides the honest posture:
+## 5. Write each posture into the spec, rebuild, re-check
 
-- **Zero violations → `Enforce`.** The codebase already obeys — on a complete model only: a
-  check stamped `modelIncomplete` has *not observed* the rule. Making it law costs nothing and
-  protects it from the next change. Keep the rule exactly as drafted; upgrade `Because` to the
-  real rationale.
-- **Violations, and the team wants the target → `Migrate`.** Rewrite as a pair:
+The step-4 counts decide each rule's posture, and the posture goes into the code now, not into a table: **`Enforce` carries no baseline**, so `baseline init` cannot capture an `Enforce` rule, and a red one stays red for good. For each rule:
+
+- **Zero violations → `Enforce`.** The codebase already obeys — on a complete model only: a check stamped `modelIncomplete` has *not observed* the rule. Keep the rule exactly as drafted.
+- **Violations → `Migrate`**, the default: it keeps the evidence and costs the team nothing until it decides. Rewrite as a pair:
 
   ```csharp
   arch.Rule("data-access/no-inline-sql")
@@ -495,14 +193,9 @@ For each surviving rule, the violation count decides the honest posture:
       .Exemplar(arch.Types.Named("OrdersRepository"));
   ```
 
-  `from:` is **descriptive prose about the OLD pattern, stated factually** — never
-  aspiration, never blame. The current violations become the grandfathered baseline in
-  step 7; new code in the old pattern goes red from then on. The boy-scout policy defaults to
-  `MigrateIfSmall` (override with `.WhileYoureThere(...)`), and the baseline path defaults to
-  `arch/baselines/<rule-id>.json` — omit `.Baseline(...)` unless the team wants it elsewhere.
+  `from:` is **descriptive prose about the OLD pattern, stated factually** — never aspiration, never blame. The current violations become the baseline the human captures in step 7, and new code in the old pattern goes red from then on. The boy-scout policy defaults to `MigrateIfSmall` (override with `.WhileYoureThere(...)`), and the baseline path to `arch/baselines/<rule-id>.json`.
 
-- **A region with no target state, which nothing new may reference → `Quarantine`.** No one will
-  fix it; the enforceable thing is the boundary:
+- **A region with no target state, which nothing new may reference → `Quarantine`.** No one will fix it; the enforceable thing is the boundary:
 
   ```csharp
   arch.Scope("legacy/billing")
@@ -513,33 +206,15 @@ For each surviving rule, the violation count decides the honest posture:
       .Because("Replacement scheduled (BillingV2, ADR-019); not worth stabilizing.");
   ```
 
-  **List the facade implementation type(s) in `BoundaryOnlyVia` alongside the interface** —
-  the composition root's DI registration references the concrete type, and forgetting it puts
-  that registration red on day one. Omit `BoundaryOnlyVia` entirely for a hermetic quarantine.
+  **List the facade implementation type(s) in `BoundaryOnlyVia` alongside the interface** — the composition root's DI registration references the concrete type, and forgetting it puts that registration red on day one. Omit `BoundaryOnlyVia` entirely for a hermetic quarantine.
 
-  **The boundary takes selections, not only types**, so a facade the spec cannot compile against
-  is still law: `.BoundaryOnlyVia(arch.Types.Named("IBillingFacade", "BillingFacade"))` for an
-  `internal` facade or one in a project the spec does not reference,
-  `.BoundaryOnlyVia(arch.Namespace("MyApp.Legacy.Billing.Contracts.*"))` where the surface is a
-  region. The formula does not care whether the surface is inside the scope or outside it, so a
-  legacy region's one sanctioned *caller* is spelled the same way. Write that caller into the
-  boundary rather than grandfathering it, or the rendered law will call your sanctioned entry
-  point debt to burn down while the dragons prose says the opposite.
+  **The boundary takes selections, not only types**, so a facade the spec cannot compile against is still law: `.BoundaryOnlyVia(arch.Types.Named("IBillingFacade", "BillingFacade"))` for an `internal` facade or one in a project the spec does not reference, `.BoundaryOnlyVia(arch.Namespace("MyApp.Legacy.Billing.Contracts.*"))` where the surface is a region. The formula does not care whether the surface is inside the scope or outside it, so a legacy region's one sanctioned *caller* is spelled the same way. Write that caller into the boundary rather than grandfathering it, or the rendered law will call your sanctioned entry point debt to burn down while the dragons prose says the opposite.
 
-  `Dragons` must carry three things: what the code does, **which weirdness is structural**
-  (the behavior a "fix" would break), and the sanctioned interaction surface. "Don't touch,
-  it's bad" is not dragons prose — agents still have to call into this code.
+  `Dragons` must carry three things: what the code does, **which weirdness is structural** (the behavior a "fix" would break), and the sanctioned interaction surface. "Don't touch, it's bad" is not dragons prose — agents still have to call into this code.
 
-  A Quarantine desugars to two checkable rules under the scope ID: `{id}/containment` (red on any
-  new reference into the scope not via the facade; existing inbound references get
-  grandfathered in step 7) and `{id}/tripwire` (a diff-aware warning; it reports as *skipped*
-  in `check` runs without `--diff-base` — expected, not a bug).
+  A Quarantine desugars to two checkable rules under the scope ID: `{id}/containment` (red on any new reference into the scope not via the facade; existing inbound references get grandfathered in step 7) and `{id}/tripwire` (a diff-aware warning, *skipped* without `--diff-base`).
 
-- **Structural weirdness that new callers are welcome to → `Caution`.** The decision rule between
-  the two scope postures is whether anything new may reference the code: nothing new may reference
-  it → `Quarantine`; new callers welcome → `Caution`. A shared utility, a God class, a native-interop
-  layer that is ordinary public API: containing it would grandfather every legitimate caller as debt
-  and red the next one, and the card is still worth having.
+- **Structural weirdness that new callers are welcome to → `Caution`.** The decision rule between the two scope postures is whether anything new may reference the code: nothing new may reference it → `Quarantine`; new callers welcome → `Caution`. A shared utility, a God class, a native-interop layer that is ordinary public API: containing it would grandfather every legitimate caller as debt and red the next one, and the card is still worth having.
 
   ```csharp
   arch.Scope("interop/native-signatures")
@@ -550,105 +225,67 @@ For each surviving rule, the violation count decides the honest posture:
       .Because("The native layer is public API for the whole solution; the compiler checks none of it.");
   ```
 
-  `Dragons` carries the same three things a quarantine's does. A Caution desugars to one checkable
-  rule, `{id}/tripwire`: nothing is ever red, a change set touching the scope draws a warning under
-  `--diff-base` (and reports as *skipped* without it), and `render` puts the dragons on the scope's
-  directory as a card. A caution that later gains a facade becomes a `Quarantine` under the same ID.
+  `Dragons` carries the same three things a quarantine's does. A Caution desugars to one checkable rule, `{id}/tripwire`: nothing is ever red, and `render` puts the dragons on the scope's directory as a card. A caution that later gains a facade becomes a `Quarantine` under the same ID.
 
-- **Nothing the team will stand behind → drop the rule.** An unratified rule in the spec is
-  exactly the stale-doc problem this tool exists to kill.
+- **Nothing the team would stand behind → drop the rule**, with the reason for `dropped:`. An unratified rule in the spec is exactly the stale-doc problem this tool exists to kill.
+- **Work the team has said it is doing now, or a rule step 4 left `undecided` → leave it as drafted** (`Enforce`, or the scope as written). The team has said so only in a stated-intent line or in the human's own words this session; a red with neither takes the posture its evidence sets, `Migrate`. Which of these reach `leftRed:` is the last check's to say, through the receipt's transcription rule.
 
-Before moving on, check the invariant those bullets exist to leave true: **`Enforce`
-carries no baseline**, so `baseline init` cannot grandfather it and a red Enforce rule
-stays red for good. Every rule that still has violations must leave this step re-postured to
-`Migrate`, fenced inside a `Quarantine`, dropped, or named in the handoff as work the team is
-choosing to do now. An unexplained red is the one outcome the flow cannot recover from.
+Then rebuild the spec project and run the whole check again. That document is what the receipt transcribes, and it is this step's test: every rule it shows with `posture: enforce` and `status: failed` must be one of the last bullet's two kinds. Any other is a miss: re-posture it, fence it or drop it, rebuild, and check again. A different posture you would argue for belongs in the curation table's note; the code carries the one the evidence set.
+
+**Done when** the last whole check passes that test.
 
 ## 6. The curation gate — **do not guess**
 
-Stop. Present every proposed rule to the human with its evidence, one row per rule: ID,
-proposed posture, the rule sentence, violation count, one example `file:line`, and your draft
-`Because`. The human accepts, edits, or drops **each rule individually**. Conflicts you found
-in step 0 (doc says X, code does Y) are decided here, not by you. A rule the step-4 loop could
-not make match takes `undecided` in the posture column, and in place of its evidence
-`subject could not be made to match; human to resolve`: it is never dropped for the human and
-never kept silently.
+Stop. Present every rule to the human with its evidence, one row per rule: ID, posture, the rule sentence, violation count, one example `file:line`, your draft `Because`, and a note. The posture column is what the last check document shows for the rule, or `dropped`, or `undecided` — never a proposal; a posture you would argue for instead goes in the note. The human accepts, edits, or drops **each rule individually**. Where a stated-intent line and the code disagree, the human decides, not you. A rule the step-4 loop could not make match takes `undecided` in the posture column, and in place of its evidence `subject could not be made to match; human to resolve`: it is never dropped for the human and never kept silently.
 
-**Author nothing final until every rule is decided**, and never write a `Because` the human
-would not say in a design review — it renders into the generated context and into every
-violation message as the team's stated rationale.
+What waits for the human is each `Because`, not the postures. Every kept rule keeps its `Candidate: …` `Because` until the human has decided it, and you never write a `Because` the human would not say in a design review — it renders into the generated context and into every violation message as the team's stated rationale. Postures and selections are already written in the code, as the evidence set them. When the human moves one, edit the spec, rebuild, re-check, and transcribe the receipt again.
+
+**Done when** the table is in front of the human. You cannot witness the curation, so the receipt reads `curation: pending`.
 
 ## 7. The human baselines the remainder
 
-With the curated spec built and checked, the remaining reds are exactly the acknowledged debt:
-each Migrate rule's current violations and each quarantined scope's existing inbound references.
-Grandfather them:
+With the curated spec built and checked, the remaining reds are the acknowledged debt: each Migrate rule's current violations and each quarantined scope's existing inbound references. The human records them:
 
 ```
 sliderule baseline init MyApp.sln
 ```
 
-**`baseline init` is run by the human, never by you.** The baseline is the team's signature
-on its debt — an attributed, reviewable artifact, not an agent convenience. It captures every
-uncaptured ratcheted rule's *current* violations in one pass (a rule whose selection matched
-nothing, or that holds a dead target pattern, is skipped and named), writing one entry per line
-under `arch/baselines/` (paths resolve against the solution root) — everything red right now,
-including code written five minutes ago; day
-zero is the one moment "current" and "accepted" coincide, which is why curation comes first.
-From then on the ratchet holds: baselined violations pass, new ones go red, and the file only
-shrinks (`baseline accept-reductions`). One precision worth knowing: entries key
-subject×target pairs, not sites — every reference site between one pair rides in a single
-entry that records how many sites it grandfathered, and `status` counts pairs. A new pair goes
-red, and so does a grandfathered pair that gains sites past its recorded count.
+**`baseline init` is run by the human, never by you.** The baseline is the team's signature on its debt — an attributed, reviewable artifact, not an agent convenience. It captures every uncaptured ratcheted rule's *current* violations in one pass (a rule whose selection matched nothing, or that holds a dead target pattern, is skipped and named), writing them under `arch/baselines/` — everything red right now, including code written five minutes ago; day zero is the one moment "current" and "accepted" coincide, which is why curation comes first. From then on baselined violations pass, new ones go red, and the file only shrinks (`baseline accept-reductions`).
 
-When a failing rule was left `Enforce`, `baseline init` says so rather than staying quiet: a notice
-names each rule failing with no baseline to capture, with its violation count (on a spec with
-no ratcheted rules at all, it leads with `nothing to capture`). Every rule in that list is either
-a step-5 miss — go back and re-posture, fence, or drop it — or work the team is choosing to do
-now, which the handoff must say.
+It also names each rule failing with no baseline to capture, and that list must be exactly your `leftRed:` lines. A re-check then expects exit 0, `rulesFailed: 0`, with the grandfathered counts visible; if reds were left deliberately, or a scope is `undecided`, it still exits 1, on those alone.
 
-Re-run `arch_check`. If step 5 ratcheted every violating rule, expect exit 0,
-`rulesFailed: 0`, with the grandfathered counts visible. If reds were left deliberately, the
-re-check still exits 1 and those rules — and only those — are what remains: state each one
-with its violation count in the outcome report, so the reader can tell a chosen red from a
-mistake they made. `arch_status` now shows the per-rule burndown — the numbers the team
-watches shrink.
+**Done when** the human has run it. Until then the receipt reads `baseline: not run (human)`.
 
 ## 8. Render and commit
 
-Have the human run `sliderule render --model MyApp.sln`: it writes the managed block into the
-root `AGENTS.md` (everything outside the markers is preserved byte-for-byte), drops a second
-managed `AGENTS.md` into each scope's directory (the dragons card) and into each layer's
-directory when rules are anchored on that layer (the local-rules card), and writes
-`sliderule.model.json` beside the solution: the file the `SlideRule.Analyzers` package reads to
-report a broken rule as a compiler warning in each governed project's build. `--model` is needed
-once; every later render refreshes the file. If a `CLAUDE.md`,
-`.claude/CLAUDE.md` or `CLAUDE.local.md` sits in the solution directory or above it (a
-`~/.claude/CLAUDE.md` of the user's own does not count), Claude Code reads that instead of
-`AGENTS.md`, and `render` warns: propose a `CLAUDE.md` beside `AGENTS.md` holding the line
-`@AGENTS.md`, and leave that edit to the human. Then commit —
-spec project, `arch/baselines/**`, `sliderule.model.json`, and the rendered
-`AGENTS.md` files — as **one reviewable diff**: the reviewer sees the proposed law, the
-acknowledged debt, and the generated context. On a multi-configuration `.sln` the largest hunk in
-that diff is often the solution file: the configuration-table expansion from step 2, which is
-expected and not to be trimmed by hand. Rolling the analyzer out — the package reference, a
-lock-file refresh under locked restore, and what a warning does in CI — is the human's; see
-[Rolling out the build analyzer](https://github.com/andypgray/sliderule/blob/main/OPERATING.md#rolling-out-the-build-analyzer).
+Have the human run `sliderule render --model MyApp.sln`: it writes the managed block into the root `AGENTS.md` (everything outside the markers is preserved byte-for-byte), drops a second managed `AGENTS.md` into each scope's directory (the dragons card) and into each layer's directory when rules are anchored on that layer (the local-rules card), and writes `sliderule.model.json` beside the solution: the file the `SlideRule.Analyzers` package reads to report a broken rule as a compiler warning in each governed project's build. If a `CLAUDE.md`, `.claude/CLAUDE.md` or `CLAUDE.local.md` sits in the solution directory or above it (a `~/.claude/CLAUDE.md` of the user's own does not count), Claude Code reads that instead of `AGENTS.md`, and `render` warns: propose a `CLAUDE.md` beside `AGENTS.md` holding the line `@AGENTS.md`, and leave that edit to the human.
 
-Where the human wires `check` into CI, say that the pipeline's invocation wants
-`--diff-base <the pull request's base ref>`: without one every scope's tripwire is skipped rather
-than clean, so the code fenced or flagged because it is dangerous to edit is the one thing CI never
-mentions. The checkout has to be deep enough for that ref to resolve.
-
-Close with a receipt in exactly this shape, one key per line, so a reader — or a script — finds
-each claim where it expects it:
+After the curation table, hand the human the next steps as one block; its analyzer line follows [Rolling out the build analyzer](https://github.com/andypgray/sliderule/blob/main/OPERATING.md#rolling-out-the-build-analyzer):
 
 ```text
+next: after your edits, build the spec project (dotnet build arch/MyApp.Architecture/MyApp.Architecture.csproj): every command below reads its last build
+next: sliderule baseline init MyApp.sln
+next: sliderule render --model MyApp.sln
+next: if render warns that a CLAUDE file shadows AGENTS.md, add a CLAUDE.md beside AGENTS.md holding the line @AGENTS.md
+next: commit as one reviewable diff: the spec project, arch/baselines/**, sliderule.model.json, the rendered AGENTS.md files, and the .sln configuration-table expansion from step 2, which is expected and not to be trimmed by hand
+next: roll out the build analyzer: add SlideRule.Analyzers at the tool's version to the governed projects (from a Directory.Build.props, or a GlobalPackageReference under central management); where they lock packages, run dotnet restore --force-evaluate and commit the lock files, or the next locked restore fails with NU1004; see https://github.com/andypgray/sliderule/blob/main/OPERATING.md#rolling-out-the-build-analyzer
+next: in CI, check with --diff-base <the pull request's base ref>, from a checkout deep enough to resolve it; without it every scope's tripwire is skipped rather than clean, so the code fenced or flagged because it is dangerous to edit is the one thing CI never mentions
+```
+
+**Done when** the human has rendered and committed. Until then the receipt reads `render: not run (human)`.
+
+Close with a receipt in exactly this shape, one key per line, so a reader — or a script — finds each claim where it expects it:
+
+```text
+statedIntent: CONTRIBUTING.md: "Controllers never open a connection" -> data-access/no-inline-sql
+statedIntent: https://docs.example.org/developer/architecture: "the model knows nothing of the web tier" -> layering/domain-independent
+statedIntent: unread: https://wiki.example.org/design (site refused; no source repository)
 specBuild: ok
 evidencePass: complete
-check: exit 1, rules 31, passed 2, failed 27, skipped 2, violations 51
-postures: enforce 12 / migrate 6 / quarantine 2 / caution 1
+check: exit 1, rules 23, passed 12, failed 9, skipped 2, violations 70
+postures: enforce 14 / migrate 6 / quarantine 2 / caution 1
 leftRed: layering/no-ghost: 3
+leftRed: data/legacy-sql: 1
 dropped: naming/handlers: no owner would stand behind it
 undecided: data/legacy-sql: subject could not be made to match; human to resolve
 curation: pending
@@ -656,23 +293,25 @@ baseline: not run (human)
 render: not run (human)
 ```
 
-The `check:` line transcribes the last document's exit code and its `summary` (`rulesChecked`,
-`rulesPassed`, `rulesFailed`, `rulesSkipped`, `violations`) — a transcription, never a recount.
-`evidencePass` reads `incomplete (failedProjects: …; restoreFailedProjects: …)` whenever that
-document was stamped `modelIncomplete`. `leftRed`, `dropped` and `undecided` repeat their key
-once per rule, `dropped` with the reason, and read `none` when there is nothing to list. The
-receipt keeps three claims apart — that the spec builds, that the evidence pass ran on a
-complete model, and that a human curated — and none implies another, so the last three lines
-stay as written: you stop at the gate and cannot witness your own curation, and the two write
-commands are the human's. Beside the receipt, list each Migrate rule's current violation count and
-the dragons you documented.
+`check:`, `postures:` and `leftRed:` transcribe one document: the last whole check, run after the final rebuild with no `rules` filter. Every rule in it carries `posture`, `status` and `violationCount` at every grain, so a coarse report serves.
+
+- `check:` is that document's exit code (over MCP, which returns none: 1 when `rulesFailed` is above zero, else 0; the CLI exits 2 first on a document stamped `modelIncomplete`) and its `summary` (`rulesChecked`, `rulesPassed`, `rulesFailed`, `rulesSkipped`, `violations`) — a transcription, never a recount.
+- `postures:` counts its `rules[]` by `posture`, each entry once, so the four numbers add up to the `rules` on the `check:` line. A Quarantine scope is two entries (`{id}/containment` and `{id}/tripwire`), a Caution one (`{id}/tripwire`).
+- `leftRed:` is every entry with `posture: enforce` and `status: failed`, with its `violationCount`: the reds no baseline can hold. Each is work the team has said it is doing now, or an `undecided` rule; any other sends you back to step 5.
+- `evidencePass` reads `incomplete (failedProjects: …; restoreFailedProjects: …)` whenever that document was stamped `modelIncomplete`.
+- `statedIntent:` is the step-0 list, `<source>: "<statement>" -> <rule ID, or why none>`. Every developer-docs link appears on at least one line: as a source, as `read: <url> (no architecture stated)`, or as `unread: <url> (<why>)`.
+- `statedIntent`, `leftRed`, `dropped` and `undecided` repeat their key once per entry, `dropped` with the reason, and read `none` when there is nothing to list.
+
+The receipt keeps three claims apart — that the spec builds, that the evidence pass ran on a complete model, and that a human curated — and none implies another, so the last three lines stay as written: you stop at the gate and cannot witness your own curation, and the two write commands are the human's. Beside the receipt, list each Migrate rule's current violation count and the dragons you documented.
 
 ---
 
 ## Authoring reference (condensed)
 
 A spec is one class implementing `IArchitectureSpec` with one method `Define(Arch arch)`, and
-three statement forms: definitions, rules, scopes.
+three statement forms: definitions, rules, scopes. The full language, with each member's pinned
+semantics, is [GRAMMAR.md](https://github.com/andypgray/sliderule/blob/main/GRAMMAR.md): look there
+before improvising a form not shown here.
 
 `Define` may delegate: selections and constraints are ordinary values, so a method can build and
 return them. A spec of a dozen rules stays one method. Past roughly a hundred lines or three
@@ -821,18 +460,14 @@ line.
 
 **Nouns and adjectives** — `arch.Layer(name, glob, ...)` and `arch.Layer(name, selection)` both
 define a layer; the selection form (`arch.Project("MyApp.Web")`, say) names exactly what the
-selection names. Its optional `.Purpose(prose)` trailer is one sentence on what the layer is for,
-rendered into the module map and the layer's card. `arch.AnyOf(a, b, ...)` is the way to say
+selection names. `arch.AnyOf(a, b, ...)` is the way to say
 "these four projects" in one subject; adjectives apply to the union, not through it, and
 every operand must match at least one type in subject
 position, so a typo'd operand fails loudly. `arch.Each(...)` is a family, one rule over a partition
 into cells, each cell a declared layer or a project. It may stand only as a rule subject, adjectives
-on it narrow every cell, and the `MustOnly*` reference verbs and the two leaf verbs read "itself" and
-"their own" as the cell the type sits in, so `arch.Each(a, b, c).MustOnlyReference(core)` lets each
-cell reach itself and Core, never a sibling. `arch.Registered(Lifetime.Singleton)` names service and
-implementation alike, and `arch.Registered()` is any lifetime;
-`arch.Registered(Lifetime.Singleton).MustNotInject(arch.Registered(Lifetime.Scoped),
-arch.Registered(Lifetime.Transient))` is the captive-dependency rule. `arch.Member(typeof(X),
+on it narrow every cell, and `arch.Each(a, b, c).MustOnlyReference(core)` lets each cell reach itself
+and Core, never a sibling. `arch.Registered(Lifetime.Singleton)` names service and implementation
+alike, and `arch.Registered()` is any lifetime. `arch.Member(typeof(X),
 nameof(X.M))` matches by declaring type and member name, so one ban covers every overload. The
 expression forms `arch.Member<X>(x => x.M)` and `arch.Member(() => X.M)` verify the pairing at
 compile time, and `MustNotUse` takes static lambdas bare (`MustNotUse(() => DateTime.Now)`); none of
@@ -847,8 +482,7 @@ the type or its container, or declared only in files a source generator emitted 
 declared accessibility, and `.Except(arch.Types.ThatArePrivate())` is how a subject drops private
 nested types.
 
-**Verbs** — `MustNotBeReferencedBy` and `MustOnlyBeReferencedBy` are the inbound pair, and
-`MustOnlyBeReferencedByItself()` on a family is the modular-monolith law in one line. `MustNotCatch`
+**Verbs** — `MustNotBeReferencedBy` and `MustOnlyBeReferencedBy` are the inbound pair. `MustNotCatch`
 bans every `catch` clause naming the target; `MustNotCatchUnfiltered` reaches only the clauses that
 carry no `when` filter, and `MustNotSwallow` only those that neither filter nor end their block in a
 `throw`. `MustNotExpose` bans surfacing a type on the public API. `MustResideInNamespace(glob)` and
@@ -878,10 +512,12 @@ artifacts, not sets of types (`arch.Project(name)` is the unrelated type noun).
 `.Matching(glob, ...)` reads `*` over one token, because a project name carries no dot-segment
 structure, and `.Packable()` is the projects an evaluation reported packable.
 `MustOnlyTarget(tfm, ...)` is strict, with no external exemption, because a project's frameworks are
-a closed set; `MustLockPackages()` reads `RestorePackagesWithLockFile`; `MustNotBePackable()` makes
-an internal project's opt-out checkable, since the SDK defaults `IsPackable` on. Every project fact
-is evaluated rather than parsed, so a violation points at the declaration that won, often a
-`Directory.Build.props` above the project, and a fact nothing evaluated passes. The flagship:
+a closed set; `MustLockPackages()` reads `RestorePackagesWithLockFile`; `MustReferenceNoPackages()`
+passes only private references, whose `PrivateAssets` is `all` (analyzers and build tooling);
+`MustNotBePackable()` makes an internal project's opt-out checkable, since the SDK defaults
+`IsPackable` on. Every project fact is evaluated rather than parsed, so a violation points at the
+declaration that won, often a `Directory.Build.props` above the project, and a fact nothing
+evaluated passes. The flagship:
 `arch.Projects.Matching("MyApp.*").Except(arch.Projects.Named("MyApp.Cli")).MustNotBePackable()` —
 *"Projects matching `MyApp.*`, except project `MyApp.Cli`, must not be packable."*
 
@@ -891,10 +527,10 @@ verbs, and `.Returning` / `MustAcceptParameter` on a member subject — is the e
 for a type the spec project cannot compile against, and it renders
 byte-identically to the `typeof()` form. Reach for it whenever a reference on the spec project
 would be the only reason to add one, and *always* for a **.NET shared framework** type such as an
-MVC `ControllerBase`, which no build setting can stage into a spec's output (see the load-failure
-message in step 2). It anchors fine either way: only an external **subject** carries a shallow
-hierarchy, while a declared subject's base chain and interface closure are walked through metadata,
-so `arch.Types.DerivedFrom("Microsoft.AspNetCore.Mvc.ControllerBase")` selects your controllers. A
+MVC `ControllerBase`, which no build setting can stage into a spec's output. It anchors fine either
+way: only an external **subject** carries a shallow hierarchy, while a declared subject's base chain
+and interface closure are walked through metadata, so
+`arch.Types.DerivedFrom("Microsoft.AspNetCore.Mvc.ControllerBase")` selects your controllers. A
 string always names the **definition**, so it reads like the open-generic `typeof` form
 (`"IHandler<T>"` matches every construction) and a constructed spelling matches nothing.
 
@@ -973,16 +609,3 @@ hierarchy verbs share these three matchers, negated per subject over the anchor 
 subject reds iff it matches ANY anchor). Hierarchy
 adjectives never match external types (their hierarchy is not extracted). Closed generics are
 refused in reference positions — ban the open definition and/or the argument type.
-
-## Where to go deeper
-
-- `arch_explain <rule-id>` (CLI: `sliderule explain`) — any rule's because / citation / fix / exemplar /
-  posture payload, including desugared `{scope-id}/containment` and `{scope-id}/tripwire` children.
-- `arch_context <path>` — the architecture scope cards covering a directory (a quarantined or
-  cautioned scope's dragons, a layer's local rules).
-- `sliderule status` — the burndown after baselining.
-- [GRAMMAR.md](https://github.com/andypgray/sliderule/blob/main/GRAMMAR.md) — the canonical
-  fluent-language spec: the table above with each member's pinned semantics, sentence assembly and
-  the validation catalog. When a rule needs a form not shown here, look there before improvising.
-- The generated `AGENTS.md` block is the always-on summary; this recipe's output is what
-  keeps it true.

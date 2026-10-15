@@ -1,10 +1,10 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Cli.SpecLoading;
 using SlideRule.Roslyn;
 using SlideRule.Roslyn.Diagnostics;
 using SlideRule.Roslyn.MsBuild;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.Cli;
 
@@ -344,7 +344,7 @@ public sealed class SpecResolverTests
     [Fact]
     public void ResolveConventionProject_CleanLoad_NamesHowManyProjectsWereConsidered()
     {
-        // The first sentence stays byte-identical — the derive_spec prompt quotes it — and the count is a new
+        // The first sentence stays byte-identical — GETTING-STARTED.md quotes it — and the count is a new
         // line below it, because "no project references the contract library" reads very differently once you
         // can see that the workspace held two projects rather than the thirty you expected.
         var error = Should.Throw<UserErrorException>(() =>

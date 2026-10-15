@@ -4,7 +4,7 @@ This page replays the derivation of a real spec, one real command at a time.
 
 You have a working codebase and no architecture spec. You start by surveying what is there, then scaffold a spec project and draft candidate rules. You run those rules to gather evidence, and you assign each one a posture from it. A rule is `Enforce` or `Migrate`, and a scope is `Quarantine` or `Caution`. Then you baseline the acknowledged debt and render the agent context. Meridian, the worked instance, is a freight-forwarding monolith of three projects and eight controllers. The walk keeps its shape at 3 projects or 300, so every step works the same on a larger solution.
 
-This is the [derive-spec.md](../../src/SlideRule.Cli/Mcp/Prompts/derive-spec.md) recipe applied to real code (the MCP server serves the same text to agents as the `derive_spec` prompt). The recipe's step 0, which this walk skips, is a search for architecture the team already wrote down, such as architecture tests and ADRs. On your solution, start there. The [README](README.md) in this directory shows the destination, with the finished spec table, the rendered block, the failure-mode demos, and the burndown board. This page covers the steps that lead there. To run the whole thing yourself against a scratch copy, jump to [Try it yourself](#try-it-yourself).
+This is the [derive-spec.md](../../src/SlideRule.Cli/Mcp/Prompts/derive-spec.md) recipe applied to real code (the MCP server serves the same text to agents as the `derive_spec` prompt). The recipe's step 0, which this walk skips, lists the architecture the team already wrote down, each statement with its source. That includes architecture tests, ADRs and the developer docs the README links to. On your solution, start there. The [README](README.md) in this directory shows the destination, with the finished spec table, the rendered block, the failure-mode demos, and the burndown board. This page covers the steps that lead there. To run the whole thing yourself against a scratch copy, jump to [Try it yourself](#try-it-yourself).
 
 ## What you'll do
 
@@ -207,7 +207,7 @@ Project `..\..\src\SlideRule.Packs.DotNet\SlideRule.Packs.DotNet.csproj` added t
 exit: 0
 ```
 
-In a source checkout like this repository, `dotnet sln add` follows the spec's project references transitively. The command also adds the SlideRule contract library and the rule pack (the second and third `added` lines above). The recipe's step 2 lists the errors you may see in that setup, verbatim, and [Try it yourself](#try-it-yourself) below shows the exact removal. A published-package setup references SlideRule as a `PackageReference` and avoids all of this.
+In a source checkout like this repository, `dotnet sln add` follows the spec's project references transitively. The command also adds the SlideRule contract library and the rule pack (the second and third `added` lines above). The recipe's step 2 says how that setup changes which types your rules govern, and [Try it yourself](#try-it-yourself) below shows the exact removal. A published-package setup references SlideRule as a `PackageReference` and avoids all of this.
 
 ## Step 3: draft candidate rules
 

@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
@@ -31,17 +32,27 @@ public sealed class DeriveSpecPromptTests
     ///     rounded up to the next 500 — and standing at 70,000 since 2026-09-22.
     /// </summary>
     /// <remarks>
-    ///     The recipe arrives whole at every kickoff — some 14,000 tokens before the reader has done
-    ///     anything — and it has only ever grown: 39,348 characters on 2026-08-09, 56,555 on 2026-08-26, 69,418
-    ///     when this was set. Each of those figures was measured on its date and none of them gated
-    ///     anything, so every addition so far has been free. That is what this constant changes, and the
-    ///     reason it is set close rather than generously.
+    ///     The recipe arrives whole at every kickoff, before the reader has done anything, and it only grew
+    ///     until it met this constant: 39,348 characters on 2026-08-09, 56,555 on 2026-08-26, 69,418 when
+    ///     this was set. Each of those figures was measured on its date and none of them gated anything, so
+    ///     every addition was free. That is what this constant changes, and the reason it was set close
+    ///     rather than generously.
     ///     Raised once, to 70,000 on 2026-09-22, and what it bought is the accessibility adjectives
     ///     (<c>.ThatArePublic()</c> / <c>.ThatAreInternal()</c> / <c>.ThatArePrivate()</c>, GRAMMAR §5.2)
     ///     with the <c>Except</c> idiom that is the only way to spell their negation. The ceiling had 50
     ///     characters of headroom, so the vocabulary alone did not fit, and the floor below says
     ///     vocabulary is not what gets cut. Two asides were trimmed first and recovered 65 of the 134
     ///     needed; the rest is this.
+    ///     <para>
+    ///         Cut once, from 69,999 to 62,236 on 2026-10-15, by rewriting the procedure. What paid for it: the
+    ///         survey's key glossary and grain ladder, which the <c>arch_graph</c> description already carries
+    ///         when the tool is called; the spec-discovery refusals, which carry their own cures; a
+    ///         closing list of routes no derivation followed; and what the recipe said twice. The rewrite added
+    ///         the stated-intent list, five warnings at the steps where their traps are met, and a receipt whose
+    ///         posture lines are copied from the check. The ceiling stays at 70,000: set at the new length, it
+    ///         would restore the zero headroom that made each of the three additions before the rewrite pay for
+    ///         itself with a trim.
+    ///     </para>
     ///     <see cref="DeriveSpecVocabularyTests" /> holds the other side as a floor on content — every
     ///     shipped constraint verb and adjective must be named in the prose outside the generated table —
     ///     so vocabulary can never be the thing that gets cut here.
@@ -57,6 +68,17 @@ public sealed class DeriveSpecPromptTests
     ///     </para>
     /// </remarks>
     private const int ServedBodyCeiling = 70_000;
+
+    // The text only the receipt's fence carries, which picks that fence out of the recipe's others.
+    private const string ReceiptMarker = "curation: pending";
+
+    private static readonly Regex CheckLine = new(
+        @"^check: exit (?<exit>\d+), rules (?<rules>\d+), passed (?<passed>\d+), failed (?<failed>\d+), skipped (?<skipped>\d+), violations (?<violations>\d+)$",
+        RegexOptions.CultureInvariant);
+
+    private static readonly Regex PosturesLine = new(
+        @"^postures: enforce (?<enforce>\d+) / migrate (?<migrate>\d+) / quarantine (?<quarantine>\d+) / caution (?<caution>\d+)$",
+        RegexOptions.CultureInvariant);
 
     // A prompt call never resolves the binding (prompts read no solution/spec), so any working directory
     // serves; a real one keeps StartAsync's host build honest.
@@ -118,6 +140,51 @@ public sealed class DeriveSpecPromptTests
     }
 
     [Fact]
+    public async Task GetPrompt_DeriveSpec_CollectsStatedIntentWithItsSources()
+    {
+        string text = await ServedRecipeAsync();
+
+        // Assert — the first step was a conditional bullet inside a checklist, and derivations read it as one grep
+        // over the repository: none followed a link to the project's published documentation. It is now an action
+        // whose artifact the receipt transcribes, so what is pinned is the artifact's three fields, the reason a
+        // published page counts as part of the codebase, and the receipt lines the list becomes.
+        text.ShouldContain(
+            "with its words as written, its source (a path in this repository, or a URL) and, from step 3 on, the rule it became");
+        text.ShouldContain("part of the project wherever it is hosted");
+        text.ShouldContain("the receipt's `statedIntent:` lines");
+    }
+
+    [Fact]
+    public async Task GetPrompt_DeriveSpec_WritesEachPostureIntoTheSpecBeforeTheGate()
+    {
+        string text = await ServedRecipeAsync();
+
+        // Assert — postures proposed in the curation table alone left the spec all Enforce, and Enforce has no
+        // baseline, so the human's baseline captured nothing and the check stayed red. The recipe has the agent
+        // write each posture into the code, test the rebuilt spec's check for a red Enforce rule it cannot explain,
+        // and show the human what the code says rather than what the agent meant.
+        text.ShouldContain("the posture goes into the code now, not into a table");
+        text.ShouldContain("`posture: enforce` and `status: failed`");
+        text.ShouldContain("never a proposal");
+    }
+
+    [Fact]
+    public async Task GetPrompt_DeriveSpec_WarnsAtTheStepWhereEachTrapIsMet()
+    {
+        string text = await ServedRecipeAsync();
+
+        // Assert — each warning sits where its trap is met: an SDK pinned below 10 at the scaffold's framework, a
+        // props file's versionless package references under the central-management opt-out, MVC action names under
+        // the async-suffix rule, a test host's registrations under the captive-dependency rule, and the analyzer
+        // rollout in the next steps handed to the human.
+        text.ShouldContain("NETSDK1045");
+        text.ShouldContain("NU1015");
+        text.ShouldContain("take the controllers out first");
+        text.ShouldContain("test projects included");
+        text.ShouldContain("roll out the build analyzer");
+    }
+
+    [Fact]
     public async Task GetPrompt_DeriveSpec_EmbedsAuthoringSignalAnchors()
     {
         string text = await ServedRecipeAsync();
@@ -147,9 +214,10 @@ public sealed class DeriveSpecPromptTests
         // read as a spec somebody curated, or a pass on a partial model from being read as obedience.
         string[] receiptKeys =
         [
+            "statedIntent:",
             "specBuild: ok",
             "evidencePass: complete",
-            "check: exit 1, rules 31, passed 2, failed 27, skipped 2, violations 51",
+            "check: exit 1, rules 23, passed 12, failed 9, skipped 2, violations 70",
             "postures: enforce",
             "leftRed:",
             "dropped:",
@@ -161,6 +229,57 @@ public sealed class DeriveSpecPromptTests
         foreach (string key in receiptKeys) text.ShouldContain(key);
         text.ShouldContain("none implies another");
         text.ShouldContain("has *not observed* the rule");
+
+        // The posture and red-rule lines once had no defined source, so a derivation wrote its own proposal into
+        // them. Each is now a copy of the last whole check, defined by the fields it is copied from.
+        text.ShouldContain("a transcription, never a recount");
+        text.ShouldContain("counts its `rules[]` by `posture`");
+        text.ShouldContain("is every entry with `posture: enforce` and `status: failed`");
+    }
+
+    [Fact]
+    public void DeriveSpec_ReceiptFence_PrescribesEachKeyInOrder()
+    {
+        // Arrange: the recipe's one fence carrying the receipt. A receipt is read by its keys, each at the start of
+        // a line and in this order, so the fence is the contract every derivation closes on.
+        QuotedFence fence = ShouldFindReceiptFence();
+        string[] lineKeys = fence.Lines
+            .Select(static line => line.Split(':')[0])
+            .ToArray();
+
+        // Act: a key written once per entry reads as the one key it is.
+        List<string> keys = lineKeys
+            .Where((key, index) => index == 0 || key != lineKeys[index - 1])
+            .ToList();
+
+        // Assert
+        keys.ShouldBe([
+            "statedIntent", "specBuild", "evidencePass", "check", "postures", "leftRed", "dropped", "undecided",
+            "curation", "baseline", "render"
+        ]);
+    }
+
+    [Fact]
+    public void DeriveSpec_ReceiptExample_IsATranscriptionACheckCouldProduce()
+    {
+        // Arrange: the example is the one receipt every derivation sees, and its numbers are copied as readily as
+        // its keys, so they must add up the way a check document's do.
+        QuotedFence fence = ShouldFindReceiptFence();
+
+        // Act
+        Match check = ShouldFindReceiptLine(fence, CheckLine);
+        Match postures = ShouldFindReceiptLine(fence, PosturesLine);
+        int rules = NumberIn(check, "rules");
+        int failed = NumberIn(check, "failed");
+        int exitCode = NumberIn(check, "exit");
+        int accountedFor = NumberIn(check, "passed") + failed + NumberIn(check, "skipped");
+        int postured = NumberIn(postures, "enforce") + NumberIn(postures, "migrate") + NumberIn(postures, "quarantine")
+                       + NumberIn(postures, "caution");
+
+        // Assert
+        accountedFor.ShouldBe(rules, "a check's passed, failed and skipped rules account for every rule it checked");
+        postured.ShouldBe(rules, "the postures line counts each entry of the same document once");
+        exitCode.ShouldBe(failed > 0 ? 1 : 0, "a check with a failed rule exits 1");
     }
 
     [Fact]
@@ -179,11 +298,11 @@ public sealed class DeriveSpecPromptTests
     {
         string text = await ServedRecipeAsync();
 
-        // Assert — the recipe names `sliderule` eleven times and is served to a session that may have no
+        // Assert — the recipe names `sliderule` commands throughout and is served to a session that may have no
         // such command: the registry manifest's dnx launch runs the package without installing the tool.
-        // The eleven spellings stay right for every installed reader, so what the recipe owes the other
-        // population is the prefix, pinned to the running build for the same reason the scaffold's version
-        // is. Bare `dnx` would not resolve in the shell an agent drives — see ServerInstructionsTests.
+        // Those spellings stay right for every installed reader, so what the recipe owes the other population
+        // is the prefix, pinned to the running build for the same reason the scaffold's version is. Bare
+        // `dnx` would not resolve in the shell an agent drives — see ServerInstructionsTests.
         text.ShouldContain($"`dotnet dnx SlideRule.Cli@{ServerVersion.SemVer} --yes --`");
         text.ShouldNotContain(ArchPrompts.CliPackagePlaceholder);
 
@@ -324,5 +443,28 @@ public sealed class DeriveSpecPromptTests
         GetPromptResult result = await GetDeriveSpecAsync();
 
         return result.ShouldHaveTextContent();
+    }
+
+    // The recipe's one fence carrying the receipt, failing when none does or several do.
+    private static QuotedFence ShouldFindReceiptFence()
+    {
+        return QuotedFence.ShouldFindOne(
+            DocPaths.DeriveSpecPrompt, ReceiptMarker, "where the receipt's example should be exactly one");
+    }
+
+    // The one line of the receipt fence that the pattern reads whole, failing when none does or several do.
+    private static Match ShouldFindReceiptLine(QuotedFence fence, Regex pattern)
+    {
+        List<Match> matches = fence.Lines
+            .Select(line => pattern.Match(line))
+            .Where(static match => match.Success)
+            .ToList();
+
+        return matches.ShouldHaveSingleItem($"the receipt fence should carry exactly one line reading {pattern}");
+    }
+
+    private static int NumberIn(Match line, string group)
+    {
+        return int.Parse(line.Groups[group].Value);
     }
 }
