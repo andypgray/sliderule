@@ -74,7 +74,7 @@
          three assemblies as Analyzer items and the package's own targets file. A download is recorded
          in no lock file, which is why the version is pinned exactly there. -->
     <PropertyGroup>
-        <SlideRuleAnalyzersVersion>0.1.1</SlideRuleAnalyzersVersion>
+        <SlideRuleAnalyzersVersion>0.1.2</SlideRuleAnalyzersVersion>
         <_SlideRuleAnalyzersByDownload Condition="'$(MSBuildProjectName)' == 'SlideRule' Or '$(MSBuildProjectName)' == 'SlideRule.Extraction' Or '$(MSBuildProjectName)' == 'SlideRule.Analyzers'">true</_SlideRuleAnalyzersByDownload>
     </PropertyGroup>
     <ItemGroup Condition="'$(_SlideRuleAnalyzersByDownload)' != 'true'">
