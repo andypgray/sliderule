@@ -1432,6 +1432,8 @@ internal sealed class ConstraintEvaluator
                 return MemberShape(members, m => m.Accessibility == Accessibility.Public);
             case MemberMustBeInternalConstraint:
                 return MemberShape(members, m => m.Accessibility == Accessibility.Internal);
+            case MemberMustBeProtectedConstraint:
+                return MemberShape(members, m => m.Accessibility == Accessibility.Protected);
             case MemberMustBePrivateConstraint:
                 return MemberShape(members, m => m.Accessibility == Accessibility.Private);
             case MemberMustBeStaticConstraint:

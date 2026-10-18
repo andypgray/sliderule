@@ -312,6 +312,14 @@ public class VocabularyFragmentTests
     }
 
     [Fact]
+    public void Member_MustBeProtected_RendersFragment()
+    {
+        // Member-only vocabulary (no type-side twin), like MustBePrivate.
+        SentenceRenderer.Sentence(Arch.Types.Fields.MustBeProtected())
+            .ShouldBe("Fields of types must be protected.");
+    }
+
+    [Fact]
     public void Member_MustBePrivate_RendersFragment()
     {
         // Member-only vocabulary (no type-side twin).
@@ -411,6 +419,25 @@ public class VocabularyFragmentTests
         SentenceRenderer.Sentence(Arch.Types.Fields.ThatAreStatic()
                 .MustBeReadonly())
             .ShouldBe("Static fields of types must be readonly.");
+    }
+
+    [Fact]
+    public void Member_AccessibilityAdjectives_PremodifyTheKindPlural()
+    {
+        // All six declared levels, where the type side carries three; each prefix names the one level it
+        // matched, the compound ones included.
+        SentenceRenderer.MemberSubject(Arch.Types.Methods.ThatArePublic())
+            .ShouldBe("Public methods of types");
+        SentenceRenderer.MemberSubject(Arch.Types.Methods.ThatAreInternal())
+            .ShouldBe("Internal methods of types");
+        SentenceRenderer.MemberSubject(Arch.Types.Fields.ThatAreProtected())
+            .ShouldBe("Protected fields of types");
+        SentenceRenderer.MemberSubject(Arch.Types.Fields.ThatArePrivate())
+            .ShouldBe("Private fields of types");
+        SentenceRenderer.MemberSubject(Arch.Types.Methods.ThatAreProtectedInternal())
+            .ShouldBe("Protected internal methods of types");
+        SentenceRenderer.MemberSubject(Arch.Types.Methods.ThatArePrivateProtected())
+            .ShouldBe("Private protected methods of types");
     }
 
     // ---- Registered noun fragments + the injection-ban verb (GRAMMAR §4.7, §5.1, §5.3) ----

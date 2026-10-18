@@ -118,6 +118,25 @@ public sealed class MemberSubjectVerbTests
                                       }
                                       """;
 
+    // The six declared accessibility levels side by side, so each accessibility adjective and MustBeProtected
+    // meet every level they must leave out. Implicit carries no modifier, which in a class is private.
+    private const string Access = """
+                                  namespace App.Access
+                                  {
+                                      public class Ledger
+                                      {
+                                          public int Open;
+                                          internal int Shared;
+                                          protected int Inherited;
+                                          protected internal int Either;
+                                          private protected int Both;
+                                          private int Own;
+                                          int Implicit;
+                                      }
+                                  }
+                                  """;
+
+    private static readonly CodebaseModel AccessModel = CompilationFactory.Extract(Access);
     private static readonly CodebaseModel MembersModel = CompilationFactory.Extract(Members);
     private static readonly CodebaseModel AsyncModel = CompilationFactory.Extract(Async);
     private static readonly CodebaseModel KindsModel = CompilationFactory.Extract(Kinds);
@@ -237,6 +256,60 @@ public sealed class MemberSubjectVerbTests
 
         FailedMemberIds(MembersModel, arch => arch.Namespace("App.Members.*").Methods.WithPrefix("Run").MustBePrivate())
             .ShouldBe(["M:App.Members.Widget.RunAsync"]);
+    }
+
+    [Fact]
+    public void MustBeProtected_HoldsAndFlagsEveryOtherLevel()
+    {
+        Pass(AccessModel, arch => arch.Namespace("App.Access.*").Fields.ThatAreProtected().MustBeProtected());
+
+        // Exact, like the other accessibility verbs: the two compound levels fail beside the plain ones.
+        FailedMemberIds(AccessModel, arch => arch.Namespace("App.Access.*").Fields.MustBeProtected())
+            .ShouldBe([
+                "F:App.Access.Ledger.Both",
+                "F:App.Access.Ledger.Either",
+                "F:App.Access.Ledger.Implicit",
+                "F:App.Access.Ledger.Open",
+                "F:App.Access.Ledger.Own",
+                "F:App.Access.Ledger.Shared"
+            ]);
+    }
+
+    // ── accessibility adjectives ──────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void AccessibilityAdjectives_EachKeepExactlyItsOwnLevel()
+    {
+        // MustBeStatic reds every instance field, so each failure list is exactly the set the adjective kept:
+        // one level apiece, the compound levels apart from the plain ones, and a field with no modifier private.
+        FailedMemberIds(AccessModel, arch => arch.Namespace("App.Access.*").Fields.ThatArePublic().MustBeStatic())
+            .ShouldBe(["F:App.Access.Ledger.Open"]);
+        FailedMemberIds(AccessModel, arch => arch.Namespace("App.Access.*").Fields.ThatAreInternal().MustBeStatic())
+            .ShouldBe(["F:App.Access.Ledger.Shared"]);
+        FailedMemberIds(AccessModel, arch => arch.Namespace("App.Access.*").Fields.ThatAreProtected().MustBeStatic())
+            .ShouldBe(["F:App.Access.Ledger.Inherited"]);
+        FailedMemberIds(AccessModel, arch => arch.Namespace("App.Access.*").Fields.ThatArePrivate().MustBeStatic())
+            .ShouldBe(["F:App.Access.Ledger.Implicit", "F:App.Access.Ledger.Own"]);
+        FailedMemberIds(AccessModel, arch => arch.Namespace("App.Access.*").Fields.ThatAreProtectedInternal()
+                .MustBeStatic())
+            .ShouldBe(["F:App.Access.Ledger.Either"]);
+        FailedMemberIds(AccessModel, arch => arch.Namespace("App.Access.*").Fields.ThatArePrivateProtected()
+                .MustBeStatic())
+            .ShouldBe(["F:App.Access.Ledger.Both"]);
+    }
+
+    [Fact]
+    public void AccessibilityAdjectives_Stacked_Intersect()
+    {
+        // Two levels are disjoint, so the subject empties and the rule reds on the empty-member gate rather
+        // than passing over nothing.
+        RuleResult result = Checker.Run(AccessModel, arch =>
+                arch.Rule("member/x")
+                    .Enforce(arch.Namespace("App.Access.*").Fields.ThatArePrivate().ThatAreProtected().MustBeStatic())
+                    .Because("b"))
+            .Single();
+
+        result.ShouldHaveFailedWithDetail(ViolationKind.EmptySubject, ConstraintEvaluator.EmptyMemberSubjectMessage);
     }
 
     // ── static / abstract / virtual verbs ─────────────────────────────────────────────────────────────

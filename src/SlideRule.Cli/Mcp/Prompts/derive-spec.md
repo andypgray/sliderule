@@ -432,6 +432,12 @@ line.
 | `.Returning` | `(Type, …)` · `(string, …)` on `.Methods` | Methods of types returning `Task` |
 | `.AttributedWith` | `(Type)` · `(string)` · `<T>()` | `[ApiController]`-attributed methods of types |
 | `.ThatAreStatic` | `()` | Static fields of types |
+| `.ThatArePublic` | `()` | Public methods of types |
+| `.ThatAreInternal` | `()` | Internal methods of types |
+| `.ThatAreProtected` | `()` | Protected fields of types |
+| `.ThatArePrivate` | `()` | Private fields of types |
+| `.ThatAreProtectedInternal` | `()` | Protected internal methods of types |
+| `.ThatArePrivateProtected` | `()` | Private protected methods of types |
 | `.Where` | `(Func<IMemberInfo, bool>, string)` | Methods of types that are async |
 
 | Verb | Overloads | Fragment |
@@ -441,6 +447,7 @@ line.
 | `.MustHaveNameMatching` | `(string)` | must have a name matching `*Async` |
 | `.MustBePublic` | `()` | must be public |
 | `.MustBeInternal` | `()` | must be internal |
+| `.MustBeProtected` | `()` | must be protected |
 | `.MustBePrivate` | `()` | must be private |
 | `.MustBeStatic` | `()` | must be static |
 | `.MustBeAbstract` | `()` | must be abstract |
@@ -523,11 +530,13 @@ checker cannot see reds a correctly registered type. `MustImplement`, `MustDeriv
 `MustBeStatic`, `MustBeAbstract`, `MustBePublic` and `MustBeInternal` carry C# declaration semantics:
 a static class is neither sealed nor abstract, and an interface is abstract.
 
-**Member and project subjects** — The member verbs reuse the type-side names, with four of their own:
-`MustBePrivate` and `MustBeVirtual` have no type-side twin, `MustBeGetOnly()` chains only off
+**Member and project subjects** — The member verbs reuse the type-side names, with five of their own:
+`MustBeProtected`, `MustBePrivate` and `MustBeVirtual` have no type-side twin, `MustBeGetOnly()` chains only off
 `.Properties` and is strict about the declaration (an `init`-only setter is a setter, so it reds), and
 `MustBeReadonly()` chains only off `.Fields` (a `const` field satisfies it, const being readonly's
-superset). `.ThatAreStatic()` prefixes the subject head ("static fields of ..."). The flagship:
+superset). `.ThatAreStatic()` prefixes the subject head ("static fields of ..."), as does each
+accessibility adjective, which on members also has `.ThatAreProtected()`, `.ThatAreProtectedInternal()`
+and `.ThatArePrivateProtected()`, each matching its level exactly. The flagship:
 `web.Methods.Returning(typeof(Task)).MustHaveSuffix("Async")` — *"Methods of types in `MyApp.Web.*`
 returning `Task` must be named `*Async`."* `arch.Projects` names the solution's projects as build
 artifacts, not sets of types (`arch.Project(name)` is the unrelated type noun).

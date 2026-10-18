@@ -162,6 +162,7 @@ internal static class NodeWriters
         Add<ReturningAdjective>(arms, (w, a) => w.DefinitionAnchors("anchors", a.Anchors));
         Add<MemberAttributedWithAdjective>(arms, (w, a) => w.ConstructionAnchor("anchor", a.Anchor));
         Add<MemberThatAreStaticAdjective>(arms, (_, _) => { });
+        Add<MemberAccessibilityAdjective>(arms, (w, a) => w.EnumField("accessibility", a.Accessibility));
     }
 
     private static void AddProjectAdjectives(Dictionary<Type, Action<NodeWriter, object>> arms)
@@ -277,6 +278,7 @@ internal static class NodeWriters
     {
         MemberSubject<MemberMustBePublicConstraint>(arms);
         MemberSubject<MemberMustBeInternalConstraint>(arms);
+        MemberSubject<MemberMustBeProtectedConstraint>(arms);
         MemberSubject<MemberMustBePrivateConstraint>(arms);
         MemberSubject<MemberMustBeStaticConstraint>(arms);
         MemberSubject<MemberMustBeAbstractConstraint>(arms);

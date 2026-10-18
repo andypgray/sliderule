@@ -1418,6 +1418,35 @@ public class SentenceAssemblyTests
             .ShouldBe("Static fields of types that are not constants");
     }
 
+    [Fact]
+    public void MemberAccessibility_PremodifiesTheKindPlural_AheadOfTheTypeReference()
+    {
+        // The accessibility leads the kind plural, so it reads as a fact about the fields and never about the
+        // types the reference names after it.
+        Layer services = Arch.Layer("Services", "MyApp.Services.*");
+        SentenceRenderer.Sentence(services.Fields.ThatArePrivate()
+                .MustBeProtected())
+            .ShouldBe("Private fields of the Services layer must be protected.");
+    }
+
+    [Fact]
+    public void MemberAccessibility_StacksWithTheOtherHeadPrefixes_InAuthoringOrder()
+    {
+        // An accessibility prefix is one more member head prefix: it concatenates with the static and the
+        // attribute prefixes in the order written, because the three are an intersection.
+        SentenceRenderer.MemberSubject(Arch.Types.Fields.ThatAreStatic()
+                .ThatArePrivate())
+            .ShouldBe("Static private fields of types");
+
+        SentenceRenderer.MemberSubject(Arch.Types.Fields.ThatArePrivate()
+                .ThatAreStatic())
+            .ShouldBe("Private static fields of types");
+
+        SentenceRenderer.MemberSubject(Arch.Types.Methods.AttributedWith(typeof(AuditAttribute))
+                .ThatAreProtectedInternal())
+            .ShouldBe("`[Audit]`-attributed protected internal methods of types");
+    }
+
     // ---- The coverage verb (GRAMMAR §5.3, §6, §10): its memberships render in reference position through
     //      the SHARED target list, so layers read as layers and colliding types widen like any other list ----
 

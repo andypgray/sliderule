@@ -109,6 +109,81 @@ public static class MemberSelectionAdjectives
         return Append(selection, new MemberThatAreStaticAdjective());
     }
 
+    /// <summary>
+    ///     Narrows the selection to the members declared <c>public</c>, such as
+    ///     <c>arch.Types.InNamespace("MyApp.Services.*").Methods.ThatArePublic()</c>. The accessibility is the
+    ///     one the member's declaration writes, compared exactly, so a <c>protected internal</c> member is
+    ///     not public; an interface member with no modifier is public. It reads as a premodifier in the
+    ///     rendered sentence: "public methods of types in <c>MyApp.Services.*</c>".
+    /// </summary>
+    public static TSelf ThatArePublic<TSelf>(this TSelf selection)
+        where TSelf : MemberSelection
+    {
+        return Append(selection, new MemberAccessibilityAdjective(Accessibility.Public));
+    }
+
+    /// <summary>
+    ///     Narrows the selection to the members declared <c>internal</c>, such as
+    ///     <c>arch.Types.Methods.ThatAreInternal()</c>. The accessibility is compared exactly, so a
+    ///     <c>protected internal</c> member is not internal. It reads as a premodifier in the rendered
+    ///     sentence: "internal methods of types".
+    /// </summary>
+    public static TSelf ThatAreInternal<TSelf>(this TSelf selection)
+        where TSelf : MemberSelection
+    {
+        return Append(selection, new MemberAccessibilityAdjective(Accessibility.Internal));
+    }
+
+    /// <summary>
+    ///     Narrows the selection to the members declared <c>protected</c>, such as
+    ///     <c>arch.Types.InNamespace("MyApp.Services.*").Fields.ThatAreProtected()</c>. The accessibility is
+    ///     compared exactly: <c>protected internal</c> and <c>private protected</c> are levels of their own,
+    ///     selected by <see cref="ThatAreProtectedInternal{TSelf}" /> and
+    ///     <see cref="ThatArePrivateProtected{TSelf}" />. It reads as a premodifier in the rendered sentence:
+    ///     "protected fields of types in <c>MyApp.Services.*</c>".
+    /// </summary>
+    public static TSelf ThatAreProtected<TSelf>(this TSelf selection)
+        where TSelf : MemberSelection
+    {
+        return Append(selection, new MemberAccessibilityAdjective(Accessibility.Protected));
+    }
+
+    /// <summary>
+    ///     Narrows the selection to the members declared <c>private</c>, such as
+    ///     <c>arch.Types.Fields.ThatArePrivate().MustHavePrefix("_")</c>. A member of a class or struct
+    ///     written with no accessibility modifier is private, so this reaches it. The accessibility is
+    ///     compared exactly, so a <c>private protected</c> member is not private. It reads as a premodifier
+    ///     in the rendered sentence: "private fields of types".
+    /// </summary>
+    public static TSelf ThatArePrivate<TSelf>(this TSelf selection)
+        where TSelf : MemberSelection
+    {
+        return Append(selection, new MemberAccessibilityAdjective(Accessibility.Private));
+    }
+
+    /// <summary>
+    ///     Narrows the selection to the members declared <c>protected internal</c>, which a derived type or
+    ///     any code in the declaring assembly can reach, such as
+    ///     <c>arch.Types.Methods.ThatAreProtectedInternal()</c>. It reads as a premodifier in the rendered
+    ///     sentence: "protected internal methods of types".
+    /// </summary>
+    public static TSelf ThatAreProtectedInternal<TSelf>(this TSelf selection)
+        where TSelf : MemberSelection
+    {
+        return Append(selection, new MemberAccessibilityAdjective(Accessibility.ProtectedInternal));
+    }
+
+    /// <summary>
+    ///     Narrows the selection to the members declared <c>private protected</c>, which only a derived type
+    ///     in the declaring assembly can reach, such as <c>arch.Types.Methods.ThatArePrivateProtected()</c>.
+    ///     It reads as a premodifier in the rendered sentence: "private protected methods of types".
+    /// </summary>
+    public static TSelf ThatArePrivateProtected<TSelf>(this TSelf selection)
+        where TSelf : MemberSelection
+    {
+        return Append(selection, new MemberAccessibilityAdjective(Accessibility.PrivateProtected));
+    }
+
     // The generic twin is receiver-typed rather than TSelf-generic, and that asymmetry with every other
     // adjective in this file is deliberate: C# has no PARTIAL type inference, so a two-type-parameter
     // AttributedWith<TSelf, T>(this TSelf, ...) would force `selection.AttributedWith<MethodSelection,

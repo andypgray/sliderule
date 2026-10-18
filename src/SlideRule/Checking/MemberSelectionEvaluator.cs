@@ -71,6 +71,8 @@ internal static class MemberSelectionEvaluator
                 return current.Where(attributeMatch);
             case MemberThatAreStaticAdjective:
                 return current.Where(member => member.IsStatic);
+            case MemberAccessibilityAdjective accessibility:
+                return current.Where(member => member.Accessibility == accessibility.Accessibility);
             case MemberWhereAdjective where:
                 return current.Where(member => SelectionEvaluator.InvokePredicate(where.Predicate, member, "Where"));
             default:

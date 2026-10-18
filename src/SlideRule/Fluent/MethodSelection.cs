@@ -7,7 +7,8 @@ namespace SlideRule.Fluent;
 ///     The methods the selected types declare, reached with <c>.Methods</c> on a
 ///     <see cref="Selection" />. Narrow it with <c>Returning</c> and with the member adjectives
 ///     (<c>WithSuffix</c>, <c>WithPrefix</c>, <c>WithNameMatching</c>, <c>AttributedWith</c>,
-///     <c>ThatAreStatic</c>, <c>Where</c>), each of which hands back a method selection again, so the
+///     <c>ThatAreStatic</c>, the accessibility adjectives such as <c>ThatArePublic</c>, <c>Where</c>), each
+///     of which hands back a method selection again, so the
 ///     method-only calls stay reachable whatever the order
 ///     (<c>.Methods.WithSuffix("Async").Returning(typeof(Task))</c> compiles, and so does the reverse).
 ///     Finish it with a member verb such as <c>MustHaveSuffix</c>, <c>MustBePublic</c> or

@@ -148,6 +148,12 @@ internal static class VocabularyRemainderSpec
                 .Fields.MustBePrivate())
             .Because("A field anyone may write is state with no invariant, and the constructor's checks stop meaning anything.");
 
+        arch.Rule("remainder/policy-state-is-protected")
+            .Enforce(arch.Types.InNamespace("Remainder.Policies.*")
+                .Fields.ThatArePrivate()
+                .MustBeProtected())
+            .Because("A policy case reads the base's state directly, which a private field puts out of its reach.");
+
         arch.Rule("remainder/factories-are-static")
             .Enforce(arch.Types.InNamespace("Remainder.Api.*")
                 .Methods.WithNameMatching("Create*")

@@ -301,6 +301,16 @@ internal static class NodeReaders
         map.Add(Key<MemberThatAreStaticAdjective>(),
             (r, v) => r.OnlyKeys(v, MemberAdjectiveWhere, "node") ? new MemberThatAreStaticAdjective() : null);
 
+        map.Add(Key<MemberAccessibilityAdjective>(), (r, v) =>
+        {
+            if (!r.OnlyKeys(v, MemberAdjectiveWhere, "node", "accessibility")) return null;
+
+            return r.RequiredEnum(v, MemberAdjectiveWhere, "accessibility", "an accessibility",
+                out Accessibility accessibility)
+                ? new MemberAccessibilityAdjective(accessibility)
+                : null;
+        });
+
         return map;
     }
 
@@ -465,6 +475,7 @@ internal static class NodeReaders
     {
         MemberSubject<MemberMustBePublicConstraint>(map, s => new MemberMustBePublicConstraint(s));
         MemberSubject<MemberMustBeInternalConstraint>(map, s => new MemberMustBeInternalConstraint(s));
+        MemberSubject<MemberMustBeProtectedConstraint>(map, s => new MemberMustBeProtectedConstraint(s));
         MemberSubject<MemberMustBePrivateConstraint>(map, s => new MemberMustBePrivateConstraint(s));
         MemberSubject<MemberMustBeStaticConstraint>(map, s => new MemberMustBeStaticConstraint(s));
         MemberSubject<MemberMustBeAbstractConstraint>(map, s => new MemberMustBeAbstractConstraint(s));

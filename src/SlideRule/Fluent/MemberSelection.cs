@@ -7,7 +7,8 @@ namespace SlideRule.Fluent;
 ///     types declare, reached with <c>.Members</c>, <c>.Methods</c>, <c>.Properties</c>,
 ///     <c>.Fields</c> or <c>.Events</c> on a <see cref="Selection" />. Narrow it with adjectives such
 ///     as <c>WithSuffix</c>, <c>WithPrefix</c>, <c>WithNameMatching</c>, <c>AttributedWith</c>,
-///     <c>ThatAreStatic</c> or <c>Where</c>, each of which returns a new selection of the same kind so
+///     <c>ThatAreStatic</c>, the accessibility adjectives such as <c>ThatArePublic</c> and
+///     <c>ThatAreProtected</c>, or <c>Where</c>, each of which returns a new selection of the same kind so
 ///     that a projection's own calls stay reachable; finish it with a verb such as
 ///     <c>MustHaveSuffix</c>, <c>MustBePublic</c>, <c>MustBeStatic</c> or <c>MustBeAttributedWith</c>,
 ///     which yields the <see cref="Constraint" /> a rule takes. What counts as a member is what the

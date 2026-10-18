@@ -70,6 +70,7 @@ internal static class VerbLedger
             [nameof(ProjectSelectionConstraints.MustTarget)] = AwaitsTheAnalyzerRelease,
             [nameof(ProjectSelectionConstraints.MustOnlyReferencePackages)] = AwaitsTheAnalyzerRelease,
             [nameof(ProjectSelectionConstraints.MustNotReferencePackages)] = AwaitsTheAnalyzerRelease,
-            [nameof(ProjectSelectionConstraints.MustSetProperty)] = AwaitsTheAnalyzerRelease
+            [nameof(ProjectSelectionConstraints.MustSetProperty)] = AwaitsTheAnalyzerRelease,
+            [nameof(MemberSelectionConstraints.MustBeProtected)] = AwaitsTheAnalyzerRelease
         };
 }

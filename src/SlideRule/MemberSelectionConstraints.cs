@@ -81,6 +81,19 @@ public static class MemberSelectionConstraints
     }
 
     /// <summary>
+    ///     States that every selected member must be declared <c>protected</c>, such as
+    ///     <c>arch.Types.InNamespace("MyApp.Services.*").Fields.MustBeProtected()</c>, the law for a base
+    ///     class whose state an inheritor is meant to reach. Accessibility is compared exactly, so a
+    ///     <c>protected internal</c> or <c>private protected</c> member fails the check, as does a
+    ///     <c>public</c>, <c>internal</c> or <c>private</c> one. There is no counterpart to this verb on a
+    ///     type selection.
+    /// </summary>
+    public static Constraint MustBeProtected(this MemberSelection subject)
+    {
+        return new MemberMustBeProtectedConstraint(Subject(subject));
+    }
+
+    /// <summary>
     ///     States that every selected member must be declared <c>private</c>. Accessibility is compared
     ///     exactly, so a <c>private protected</c> member fails the check, as does any wider one. There is
     ///     no counterpart to this verb on a type selection.

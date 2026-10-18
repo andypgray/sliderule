@@ -2,7 +2,8 @@ namespace SlideRule;
 
 /// <summary>
 ///     The accessibility a declaration writes, reported by <c>ITypeInfo.Accessibility</c> and
-///     <c>IMemberInfo.Accessibility</c> and tested by <c>MustBePublic</c>, <c>MustBeInternal</c> and
+///     <c>IMemberInfo.Accessibility</c>, selected by the <c>ThatArePublic</c> family of adjectives and
+///     tested by <c>MustBePublic</c>, <c>MustBeInternal</c>, <c>MustBeProtected</c> and
 ///     <c>MustBePrivate</c>. A top-level type is <see cref="Public" /> or <see cref="Internal" />; the
 ///     other four values reach only a nested type or a member.
 /// </summary>

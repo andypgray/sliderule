@@ -506,6 +506,23 @@ public class ModelReificationTests
     }
 
     [Fact]
+    public void AccessibilityAdjective_ReifiesOntoTheMemberSelection_CarryingItsLevel()
+    {
+        // One node carries all six levels, the member twin of the type-side accessibility node.
+        var constraint = Checker.Model(arch => arch.Rule("state/fields-are-protected")
+                .Enforce(arch.Namespace("MyApp.Web.*").Fields.ThatArePrivate().MustBeProtected())
+                .Because("An inheritor reaches the base's state through protected fields."))
+            .Rules.Single()
+            .Constraint
+            .ShouldBeOfType<MemberMustBeProtectedConstraint>();
+
+        constraint.MemberSubject.Adjectives.OfType<MemberAccessibilityAdjective>()
+            .ShouldHaveSingleItem()
+            .Accessibility.ShouldBe(Accessibility.Private);
+        constraint.MemberSubject.ShouldBeOfType<FieldSelection>();
+    }
+
+    [Fact]
     public void ProjectSubjectRule_ReifiesToWalkableProjectConstraintWithNoTypeSubject()
     {
         // The third subject stratum (GRAMMAR §4.10). Its ProjectSubject carries the selection, and the

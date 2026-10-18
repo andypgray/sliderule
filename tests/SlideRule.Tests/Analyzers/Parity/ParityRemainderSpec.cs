@@ -330,6 +330,10 @@ internal static class ParityRemainderSpec
             .Enforce(arch.Types.Named("Fields").Fields.WithPrefix("Writable").MustBePrivate())
             .Because("A field anyone may write is state with no invariant.");
 
+        arch.Rule("remainder/members-are-protected")
+            .Enforce(arch.Types.Named("Fields").Fields.ThatArePublic().MustBeProtected())
+            .Because("An inheritor reaches the base's state through the fields it is given, and no one else does.");
+
         arch.Rule("remainder/members-are-static")
             .Enforce(arch.Types.Named("Methods").Methods.WithPrefix("Instance").MustBeStatic())
             .Because("A factory that needs an instance to call cannot be the way that instance is made.");

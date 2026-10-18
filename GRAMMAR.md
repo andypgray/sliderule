@@ -1351,6 +1351,12 @@ posture verbs, trailers and escape hatches of §5.4–§5.6 are written by hand.
 | `.Returning` | `(Type, …)` · `(string, …)` on `.Methods` | Methods of types returning `Task` |
 | `.AttributedWith` | `(Type)` · `(string)` · `<T>()` | `[ApiController]`-attributed methods of types |
 | `.ThatAreStatic` | `()` | Static fields of types |
+| `.ThatArePublic` | `()` | Public methods of types |
+| `.ThatAreInternal` | `()` | Internal methods of types |
+| `.ThatAreProtected` | `()` | Protected fields of types |
+| `.ThatArePrivate` | `()` | Private fields of types |
+| `.ThatAreProtectedInternal` | `()` | Protected internal methods of types |
+| `.ThatArePrivateProtected` | `()` | Private protected methods of types |
 | `.Where` | `(Func<IMemberInfo, bool>, string)` | Methods of types that are async |
 
 | Verb | Overloads | Fragment |
@@ -1360,6 +1366,7 @@ posture verbs, trailers and escape hatches of §5.4–§5.6 are written by hand.
 | `.MustHaveNameMatching` | `(string)` | must have a name matching `*Async` |
 | `.MustBePublic` | `()` | must be public |
 | `.MustBeInternal` | `()` | must be internal |
+| `.MustBeProtected` | `()` | must be protected |
 | `.MustBePrivate` | `()` | must be private |
 | `.MustBeStatic` | `()` | must be static |
 | `.MustBeAbstract` | `()` | must be abstract |
@@ -1763,11 +1770,13 @@ form cannot reach, because a string anchor still names one definition rather tha
 - `.Returning(typeof(Task))` / `.Returning("System.Threading.Tasks.Task")` — declaration-level (§4.6); an open generic renders declared type-parameter names ("returning `Task<TResult>`"); multiple anchors join "returning `Task` or `Task<TResult>`", colliding simple names widening as in §6; the string form is §5.2's escape hatch, rendering byte-identically. Methods-only.
 - `.AttributedWith(typeof(McpServerToolAttribute))` / `.AttributedWith("ModelContextProtocol.Server.McpServerToolAttribute")` — head prefix: "`[McpServerTool]`-attributed" — premodifies the kind-plural (§6), so the subject reads "`[McpServerTool]`-attributed methods of types in `SlideRule.*`". Declared member attributes only (§4.6); the string form is §5.2's escape hatch, rendering byte-identically
 - `.ThatAreStatic()` — head prefix: "static" — premodifies the kind-plural (§6), so the subject reads "static fields of the Core layer". A member **shape** adjective (§11); head prefixes stack across families and concatenate in authoring order
+- `.ThatArePublic()` / `.ThatAreInternal()` / `.ThatAreProtected()` / `.ThatArePrivate()` / `.ThatAreProtectedInternal()` / `.ThatArePrivateProtected()` — head prefix naming the declared accessibility: "protected fields of types in `MyApp.Services.*`", "private protected methods of types". Each matches its level exactly, so `.ThatAreProtected()` leaves out the `protected internal` and `private protected` members, which have adjectives of their own, and a class member written with no modifier is private. All six levels ship where the type side ships three (§5.2), because the laws that need the protected levels are laws about members: a base class's fields and hooks are what an inheritor reaches. The adjective half of the family `MustBePublic`, `MustBeInternal`, `MustBeProtected` and `MustBePrivate` constrain; the prefixes stack with `.ThatAreStatic()` and the attribute prefix in authoring order
 - `.Where(pred, description:)` — description verbatim — canonicalized to sentence-final (§6)
 
 **Member modal verbs** (turn a `MemberSelection` into a terminal `Constraint`):
 
 - `.MustHaveSuffix("Async")` — reuses the type-side naming fragment (§5.3)
+- `.MustBeProtected()` — member-only vocabulary (no type-side twin, deliberate); exact like its siblings, so a `protected internal` or `private protected` member fails it
 - `.MustBePrivate()` — member-only vocabulary (no type-side twin, deliberate)
 - `.MustBeVirtual()` — member-only vocabulary (no type-side twin, deliberate)
 - `.MustBeAttributedWith(typeof(X))` — reuses the type-side fragment verbatim (§5.3); also anchors by string (§5.2) and carries a generic twin (§10)
@@ -1778,7 +1787,7 @@ form cannot reach, because a string anchor still names one definition rather tha
 - `.Must(pred, description:)` — `pred` is `Func<IMemberInfo, bool>` (§5.6)
 
 The naming verbs reuse the type-side "must be named" / "must have a name matching" strings
-verbatim; `MustBePrivate` and `MustBeVirtual` are member-only vocabulary.
+verbatim; `MustBeProtected`, `MustBePrivate` and `MustBeVirtual` are member-only vocabulary.
 
 The member attribute vocabulary (`AttributedWith` + `Must[Not]BeAttributedWith`) reads the
 §4.6 attribute facts. The **verbs** reuse the
@@ -1799,7 +1808,7 @@ short name, so `Billing.AuditAttribute` and `Sales.AuditAttribute` both read
 "`[Audit]`-attributed", and dropping the second would widen the subject. The shape
 adjective `.ThatAreStatic()` head-prefixes for the same reason and stacks the same way, so
 prefixes concatenate across both families ("static `[Audit]`-attributed fields of
-types"). The generic twin is receiver-typed rather than `TSelf`-generic (§10): C# has no
+types"), and so do the six accessibility adjectives ("static private fields of types"). The generic twin is receiver-typed rather than `TSelf`-generic (§10): C# has no
 partial type inference, so the sugar ships as one overload per concrete member selection —
 `MemberSelection` for `.Members`/`.Events`, and `MethodSelection`, `PropertySelection` and
 `FieldSelection`, each keeping its own kind-only vocabulary reachable after it.
@@ -1912,7 +1921,10 @@ carries its sugar overload too, or the verb silently stops compiling after the s
   fact attached to the noun it narrows. A member subject renders its type selection in
   *reference* position (below), so a trailing clause would land between the types and the
   member's own adjectives — "…layers, excluding source-generated types returning `Task`" reads
-  as narrowing the generated `Task`-returning types, which is not the set the checker uses.
+  as narrowing the generated `Task`-returning types, which is not the set the checker uses. The
+  member side's own accessibility adjectives (§5.7) prefix the kind-plural on these grounds —
+  "protected fields of types in `MyApp.*`" — and, as member prefixes, concatenate rather than
+  collapse.
 - **Union collapse** (§5.1): a union of two or more operands, each adjective-free and all of the
   same noun kind, hoists one head and one locative and or-joins the operand names — *"Types in
   projects `A`, `B`, `C` or `D`"*, *"Types in `A.*` or `B.*`"*, *"The Domain or Web layers"*,
@@ -1968,9 +1980,10 @@ carries its sugar overload too, or the verb silently stops compiling after the s
   `Where`. The flagship: `web.Methods.Returning(typeof(Task)).MustHaveSuffix("Async")` (where
   `web` is `MyApp.Web.*`) → *"Methods of types in `MyApp.Web.*` returning `Task` must be named
   `*Async`."* The member attribute adjective premodifies the kind-plural
-  ("`[McpServerTool]`-attributed methods of types in `SlideRule.*`"), and stacked
-  member prefixes concatenate in authoring order (§5.7), so both
-  narrowing facts reach the sentence — the member-side twin of the `.Authored()` head
+  ("`[McpServerTool]`-attributed methods of types in `SlideRule.*`"), as do `.ThatAreStatic()` and
+  the accessibility adjectives ("private fields of types"), and stacked
+  member prefixes concatenate in authoring order (§5.7), so every
+  narrowing fact reaches the sentence — the member-side twin of the `.Authored()` head
   premodification above, on the same grounds: a trailing clause would read as narrowing the
   wrong set.
 - Posture voices consume these same fragments: Enforce renders as law; Migrate renders the
@@ -2493,9 +2506,7 @@ negative twin; multi-`Type` arity (an argument list has no join word, so a list 
 reads as both as readily as either, §10); richer `IParameterInfo` facts (ref kind, optionality,
 default values, `params`, ordinal position); hierarchy- or assignability-aware parameter
 matching (the exception-axis bar applies: an explicitly named new semantic, never a widening of
-definition-level-exact); accessibility-scoped member subjects (`.Methods.ThatArePublic()` — the
-canon's literal "public surface" scope; the escape hatch reaches `Accessibility`); and
-`graph` parameter data.
+definition-level-exact); and `graph` parameter data.
 
 On the mutability facts (§4.6): `MustBeInitOnly` — the fact is recorded (`HasInitOnlySetter`) and
 no verb reads it, so "a plain setter is banned, `init` is fine" is expressible through the escape

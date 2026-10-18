@@ -112,4 +112,25 @@ public sealed class MemberSelectionAdjectivesTests
             .MustBeReadonly()
             .ShouldNotBeNull();
     }
+
+    [Fact]
+    public void AccessibilityAdjectives_PreserveTheConcreteSelectionType()
+    {
+        // The same compile-time pin for the six accessibility adjectives, which share their names with the
+        // type-side three: the receiver decides which binds, and each kind-only verb stays reachable.
+        Arch.Types.Methods.ThatArePublic()
+            .ThatAreInternal()
+            .ThatAreProtectedInternal()
+            .ThatArePrivateProtected()
+            .Returning(typeof(Task))
+            .ShouldBeOfType<MethodSelection>();
+        Arch.Types.Properties.ThatAreProtected()
+            .MustBeGetOnly()
+            .ShouldNotBeNull();
+        Arch.Types.Fields.ThatArePrivate()
+            .MustBeReadonly()
+            .ShouldNotBeNull();
+        Arch.Types.ThatArePublic()
+            .ShouldBeAssignableTo<Selection>();
+    }
 }

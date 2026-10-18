@@ -406,7 +406,8 @@ internal static class OneProjectDecidability
             typeof(MemberWithNameMatchingAdjective),
             typeof(ReturningAdjective),
             typeof(MemberAttributedWithAdjective),
-            typeof(MemberThatAreStaticAdjective));
+            typeof(MemberThatAreStaticAdjective),
+            typeof(MemberAccessibilityAdjective));
     }
 
     private static void AddProjectAdjectives(Dictionary<Type, Func<OneProjectPosition, string?>> rows)
@@ -466,6 +467,7 @@ internal static class OneProjectDecidability
         In(rows,
             typeof(MemberMustBePublicConstraint),
             typeof(MemberMustBeInternalConstraint),
+            typeof(MemberMustBeProtectedConstraint),
             typeof(MemberMustBePrivateConstraint),
             typeof(MemberMustBeStaticConstraint),
             typeof(MemberMustBeAbstractConstraint),

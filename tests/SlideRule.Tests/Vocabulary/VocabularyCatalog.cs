@@ -174,6 +174,14 @@ internal static class VocabularyCatalog
             MemberAdjective(nameof(MemberSelectionAdjectives.AttributedWith),
                 arch => arch.Types.Methods.AttributedWith(typeof(ApiControllerAttribute))),
             MemberAdjective(nameof(MemberSelectionAdjectives.ThatAreStatic), arch => arch.Types.Fields.ThatAreStatic()),
+            MemberAdjective(nameof(MemberSelectionAdjectives.ThatArePublic), arch => arch.Types.Methods.ThatArePublic()),
+            MemberAdjective(nameof(MemberSelectionAdjectives.ThatAreInternal), arch => arch.Types.Methods.ThatAreInternal()),
+            MemberAdjective(nameof(MemberSelectionAdjectives.ThatAreProtected), arch => arch.Types.Fields.ThatAreProtected()),
+            MemberAdjective(nameof(MemberSelectionAdjectives.ThatArePrivate), arch => arch.Types.Fields.ThatArePrivate()),
+            MemberAdjective(nameof(MemberSelectionAdjectives.ThatAreProtectedInternal),
+                arch => arch.Types.Methods.ThatAreProtectedInternal()),
+            MemberAdjective(nameof(MemberSelectionAdjectives.ThatArePrivateProtected),
+                arch => arch.Types.Methods.ThatArePrivateProtected()),
             MemberAdjective(nameof(MemberSelectionAdjectives.Where),
                 arch => arch.Types.Methods.Where(member => member.IsAsync, description: "that are async"))
         ];
@@ -188,6 +196,7 @@ internal static class VocabularyCatalog
             MemberVerb(nameof(MemberSelectionConstraints.MustHaveNameMatching), arch => arch.Types.Methods.MustHaveNameMatching("*Async")),
             MemberVerb(nameof(MemberSelectionConstraints.MustBePublic), arch => arch.Types.Methods.MustBePublic()),
             MemberVerb(nameof(MemberSelectionConstraints.MustBeInternal), arch => arch.Types.Methods.MustBeInternal()),
+            MemberVerb(nameof(MemberSelectionConstraints.MustBeProtected), arch => arch.Types.Fields.MustBeProtected()),
             MemberVerb(nameof(MemberSelectionConstraints.MustBePrivate), arch => arch.Types.Methods.MustBePrivate()),
             MemberVerb(nameof(MemberSelectionConstraints.MustBeStatic), arch => arch.Types.Methods.MustBeStatic()),
             MemberVerb(nameof(MemberSelectionConstraints.MustBeAbstract), arch => arch.Types.Methods.MustBeAbstract()),
