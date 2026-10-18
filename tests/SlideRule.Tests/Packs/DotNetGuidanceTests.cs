@@ -93,9 +93,8 @@ public class DotNetGuidanceTests
     [Fact]
     public void RuleProse_ReasonAndCitation_AreSeparateFields()
     {
-        // The reason ends as a sentence and the page rides beside it. Pinned on one rule because the split
-        // is what the whole corpus migration did: before the trailer, the URL was the reason's last token
-        // and every consuming surface had to read it back out of prose.
+        // The reason ends as a sentence and the page rides beside it, so no consuming surface has to read
+        // the URL back out of prose.
         ArchRule rule = Checker.Model(arch => DeclareOne(arch, "http/reuse-httpclient", PackPosture.Enforce))
             .Rules.Single();
 

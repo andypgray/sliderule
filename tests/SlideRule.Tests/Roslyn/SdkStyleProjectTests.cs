@@ -8,15 +8,15 @@ using Xunit;
 namespace SlideRule.Tests.Roslyn;
 
 /// <summary>
-///     The measurement behind <see cref="SdkStyleProject.IsSdkStyle" />, taken before anything was allowed to
-///     gate on it: whether an SDK-style project can be told from a non-SDK-style one reliably enough that a
-///     missing <c>project.assets.json</c> may be blamed on the first and never on the second.
+///     The measurement that licenses gating on <see cref="SdkStyleProject.IsSdkStyle" />: whether an SDK-style
+///     project can be told from a non-SDK-style one reliably enough that a missing <c>project.assets.json</c>
+///     may be blamed on the first and never on the second.
 /// </summary>
 /// <remarks>
 ///     <para>
 ///         A measurement rather than a description, because the predicate on its own only says what the XML
-///         contains while the claim it is used for is larger —
-///         <em>SDK-style projects write an assets file when they restore, and legacy ones never do</em>.
+///         contains while the claim it is used for is larger: that SDK-style projects write an assets file
+///         when they restore, and legacy ones never do.
 ///         So the corpus below pairs each verdict with the file it predicts: every project under the three
 ///         roots it scans, classified, and beside each one whether an assets file is actually on disk at a
 ///         location <see cref="IntermediateOutputTree.AssetsPathsOf" /> stamps. The only rows where the two
@@ -55,8 +55,8 @@ public sealed class SdkStyleProjectTests
         // The one non-SDK-style project in the corpus: 2003 XML namespace, net48, and no assets file — the
         // shape "absent ⇒ failed" would have refused wholesale.
         "Classic.Billing.csproj: legacy, no assets file",
-        // The three beds deliberately left unrestored. SDK-style with no assets file is exactly the state
-        // that used to pass check silently, and these are the only rows that show it.
+        // The three beds deliberately left unrestored. SDK-style with no assets file is the state the restore
+        // gate exists to catch, and these are the only rows that show it.
         "BrokenApp.Core.csproj: SDK-style, no assets file",
         "BrokenApp.Web.csproj: SDK-style, no assets file",
         "FieldMini.Core.csproj: SDK-style, no assets file",
@@ -151,7 +151,7 @@ public sealed class SdkStyleProjectTests
     // A root element that is not Project is not a project file, whatever it carries.
     [InlineData("""<Package Sdk="Microsoft.NET.Sdk" />""", false)]
     // Malformed XML answers false rather than throwing mid-load: a false negative leaves a partial model
-    // undetected, which is the state that already existed, while a false positive refuses a healthy solution.
+    // undetected, which is no worse than having no gate, while a false positive refuses a healthy solution.
     [InlineData("""<Project Sdk="Microsoft.NET.Sdk">""", false)]
     [InlineData("not xml at all", false)]
     // A DOCTYPE is refused rather than parsed, whether or not it declares an entity the root then uses, so a
@@ -227,8 +227,6 @@ public sealed class SdkStyleProjectTests
         RestoreFailures.Detect(solution, [])
             .ShouldBeEmpty();
     }
-
-    // ── harness ───────────────────────────────────────────────────────────────────────────────────────────
 
     private static string FixturesRoot => Path.Combine(AppContext.BaseDirectory, "Fixtures");
 

@@ -8,7 +8,7 @@ using Xunit;
 namespace SlideRule.Tests;
 
 /// <summary>
-///     Pins which overload a list argument binds now that seven calls carry a sequence form beside their
+///     Pins which overload a list argument binds on the seven calls that carry a sequence form beside their
 ///     <c>(first, more)</c> form: a single operand stays on the params form, an array or a list binds the
 ///     sequence form, a lambda keeps its expression form, and a covariant list needs no cast.
 /// </summary>

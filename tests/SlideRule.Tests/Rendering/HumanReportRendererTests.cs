@@ -356,11 +356,10 @@ public sealed class HumanReportRendererTests
     [Fact]
     public void RuleBlock_RatchetedRuleThatErrored_OmitsTheBaselineHintAsWell()
     {
-        // The latent half of the same defect. `baseline init` grandfathers by identity, and a rule error has none
-        // either (GRAMMAR §4.3) — so a ratcheted, errored rule was told to run a command that would silently
-        // record nothing, which is the instruction the empty-subject gate removed for its sibling kind. Keying
-        // the gate on the identity rather than on the kinds that lack one is what covered this without anyone
-        // having to remember it.
+        // `baseline init` grandfathers by identity, and a rule error has none either (GRAMMAR §4.3), so the
+        // hint would tell a ratcheted, errored rule to run a command that silently records nothing. The gate
+        // is keyed on the identity rather than on the kinds that lack one, so it covers this kind and the
+        // empty subject alike.
         var result = new RuleResult(
             MigrateRule("data/x"), RuleStatus.Failed, [Violation.RuleError("boom")]);
 

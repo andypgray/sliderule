@@ -78,8 +78,8 @@ public sealed class PublicSurfaceSyncTests
     /// <summary>
     ///     Every assembly a release puts in front of a consumer, by assembly name rather than package id,
     ///     because the CLI's two differ: it packs as <c>SlideRule.Cli</c> and its assembly is
-    ///     <c>sliderule</c>, which is the name the tool command and the internals-visible entry both
-    ///     use. What packs is read from what the solution declares, so a new package is held to the
+    ///     <c>sliderule-cli</c>, which is the name the internals-visible entries use. What packs is read
+    ///     from what the solution declares, so a new package is held to the
     ///     binding identity from the day it packs; what a package carries without packing itself has to be
     ///     named, and is.
     /// </summary>

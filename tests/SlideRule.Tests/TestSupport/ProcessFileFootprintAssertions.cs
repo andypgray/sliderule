@@ -7,6 +7,11 @@ namespace SlideRule.Tests.TestSupport;
 ///     The Shouldly surface over <see cref="ProcessFileFootprint" />: one assertion, phrased as the property
 ///     it is checking rather than as a scan.
 /// </summary>
+/// <remarks>
+///     Not attributed <c>[ShouldlyMethods]</c>: its one assertion throws its own
+///     <see cref="ShouldAssertException" /> and makes no inner Shouldly call, so the attribute would change
+///     nothing here.
+/// </remarks>
 internal static class ProcessFileFootprintAssertions
 {
     private static readonly TimeSpan DefaultBudget = TimeSpan.FromSeconds(15);

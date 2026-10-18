@@ -451,8 +451,6 @@ public sealed class SessionFragmentStoreTests(SessionFragmentStoreTests.Sessions
         await ShouldMergeToTheColdModelAsync(remapped, edited);
     }
 
-    // ── helpers ───────────────────────────────────────────────────────────────────────────────────────
-
     // The scene three of the rows above share, differing only in the edit they make: populate the store from
     // the clean tree, edit one Web source file, re-get. Three [Fact]s rather than a [Theory] because they are
     // three distinct facts about what reaches a document's declaration surface, and theory data carrying
@@ -628,8 +626,8 @@ public sealed class SessionFragmentStoreTests(SessionFragmentStoreTests.Sessions
     ///     what the running test changed in either copy.
     /// </summary>
     /// <remarks>
-    ///     A session per test would add a cold load to every test; one per class costs about what the pool did.
-    ///     The copies outlive each test, so a test that changes a file must put it back, and
+    ///     A session per test would add a cold load to every test; one per class costs about what renting from
+    ///     the pool would. The copies outlive each test, so a test that changes a file must put it back, and
     ///     <see cref="RestoreChanged" /> does that for every file recorded through <see cref="WillChange" />.
     /// </remarks>
     public sealed class Sessions : IAsyncDisposable

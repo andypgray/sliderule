@@ -29,7 +29,7 @@ internal sealed class LocalCollidingSpec : IArchitectureSpec
     }
 }
 
-/// <summary>A spec class whose rule ID nothing in the pack claims, so both simply land.</summary>
+/// <summary>A spec class whose rule ID nothing in the pack claims, so both land.</summary>
 internal sealed class LocalDistinctSpec : IArchitectureSpec
 {
     public void Define(Arch arch)

@@ -57,8 +57,8 @@ public sealed class GeneratedTypeSurveyE2ETests
         CliResult result = await CliRunner.InvokeAsync("graph", fixture.SolutionPath, "--json");
 
         // Assert — the omit-at-zero rule, which keeps the key out of every survey of a generator-free
-        // solution. Asserted on the contrast project inside the same document
-        // as the one above, so the two shapes cannot drift apart.
+        // solution. Asserted on the contrast project inside the same document as the one above, so the two
+        // shapes cannot drift apart.
         result.ShouldSucceed();
         using JsonDocument document = result.ShouldHaveJsonStdout();
         JsonElement core = GraphSurveyJson.Project(document, Core);

@@ -12,7 +12,7 @@ namespace SlideRule.Tests.Mcp;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         Deliberately <em>not</em> attributed <c>[ShouldlyMethods]</c>, for the reason given on
+///         Deliberately not attributed <c>[ShouldlyMethods]</c>, for the reason given on
 ///         <see cref="SlideRule.Tests.Checking.RuleResultAssertions" />.
 ///     </para>
 ///     <para>
@@ -47,7 +47,7 @@ internal static class McpResultAssertions
     /// <summary>
     ///     The text payload of a <c>tools/call</c> response frame. A JSON-RPC error always fails — the tool
     ///     never ran — but a tool-level <c>isError</c> does not, because for some callers a refusal
-    ///     <em>is</em> the subject and for others a rule the fixture spec cannot answer is legitimate. Read
+    ///     is the subject and for others a rule the fixture spec cannot answer is legitimate. Read
     ///     that flag separately with <see cref="McpChildHarness.IsToolError" />.
     /// </summary>
     internal static string ShouldHaveToolText(this string frame, string toolName)

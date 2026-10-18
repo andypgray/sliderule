@@ -157,8 +157,8 @@ public sealed class SpecResolverTests
     [Fact]
     public void ResolveConventionProject_TwoCandidatesWithKnownProjectFiles_NamesEachCsprojInTheError()
     {
-        // Real ambiguity survives, and now the error names what the reader has to pass to --spec: the
-        // project names alone were not typeable.
+        // Real ambiguity survives, and the error names what the reader has to pass to --spec: the project
+        // names alone are not typeable.
         var error = Should.Throw<UserErrorException>(() =>
             SpecResolver.ResolveConventionProject([
                 CandidateAt("Arch.One", @"C:\repo\src\Arch.One\Arch.One.csproj", @"C:\out\Arch.One.dll"),
@@ -229,13 +229,12 @@ public sealed class SpecResolverTests
     [Fact]
     public void ResolveConventionProject_PackagesDidNotResolve_BlamesTheRestoreAndNamesTheProject()
     {
-        // The measured locked-mode shape, and the defect this pin exists to keep out of the field. A broken
-        // restore leaves the spec project's reference to the contract library unresolved while the project
-        // itself still loads completely, so the convention finds zero candidates and the model is incomplete
-        // for the second cause alone. The refusal used to quote the load failures whichever cause fired —
-        // and that list is empty here, so a colon promising the projects was answered by the remedy line.
-        // Hence the colon and its first line of evidence asserted together: an empty list reds here now,
-        // rather than on a bed.
+        // The measured locked-mode shape. A broken restore leaves the spec project's reference to the contract
+        // library unresolved while the project itself still loads completely, so the convention finds zero
+        // candidates and the model is incomplete for the second cause alone. The load-failure list is empty
+        // here, so a refusal that quoted it whichever cause fired would answer a colon promising the projects
+        // with the remedy line. Hence the colon and its first line of evidence asserted together: an empty
+        // list reds here rather than on a bed.
         WorkspaceDiagnostics diagnostics = WorkspaceDiagnostics.None with { RestoreFailedProjects = [BrokenProject] };
 
         var error = Should.Throw<UserErrorException>(() =>
@@ -328,7 +327,7 @@ public sealed class SpecResolverTests
     public void ResolveConventionProject_OnlyNuGetAuditAdvisories_KeepsTheCleanLoadMessage()
     {
         // An advisory's publication date says nothing about whether this solution's references resolved, so
-        // a solution that genuinely has no spec project must not be told to go and fix its restore. The audit
+        // a solution that has no spec project must not be told to go and fix its restore. The audit
         // classifier decides no verdict here: it only chooses which spelling of the refusal the reader gets.
         WorkspaceDiagnostics diagnostics = WorkspaceDiagnostics.None with { LoadFailures = [Advisory] };
 
@@ -446,8 +445,8 @@ public sealed class SpecResolverTests
     [Fact]
     public void RequireBuiltOutput_MissingFile_ThrowsUserErrorPointingAtBuild()
     {
-        // Pinned whole: naming every path tried widened this message, and the one-output rendering has to
-        // stay byte-identical to what a single-target-framework spec project has always produced.
+        // Pinned whole: the message names every path tried, joined by "or", and with a single path it must stay
+        // the plain one-path sentence below, with no list form.
         var error = Should.Throw<UserErrorException>(() =>
             SpecResolver.RequireBuiltOutput("MyApp.Arch", ["C:/nope/does-not-exist.dll"]));
 
@@ -467,7 +466,7 @@ public sealed class SpecResolverTests
     [Fact]
     public void RequireBuiltOutput_EvaluatedConfigMissingButSiblingBuilt_ResolvesSiblingConfiguration()
     {
-        // The release-CI regression, and one of several ways an evaluated path names a DLL nobody built:
+        // The release-CI shape, one of several ways an evaluated path names a DLL nobody built:
         // MSBuildWorkspace evaluated OutputFilePath in Debug while `dotnet build -c Release` produced only the
         // Release output. Resolution must find the assembly that is actually on disk. It resolves because the
         // anchor walk stops at <temp>/bin — the deepest directory in the evaluated path's own chain that

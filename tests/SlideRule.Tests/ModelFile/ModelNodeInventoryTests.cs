@@ -32,8 +32,8 @@ public sealed class ModelNodeInventoryTests
 {
     private static readonly Assembly Core = typeof(Constraint).Assembly;
 
-    // A discriminated node writes its discriminator as its first key, so the file's own text is the
-    // honest record of which node classes a corpus ever reached.
+    // A discriminated node writes its discriminator as its first key, so the file's own text records
+    // which node classes a corpus ever reached.
     private static readonly Regex Discriminator = new("\"node\": \"([A-Za-z]+)\"");
 
     private static readonly (NodeFamily Family, Type Base, int Floor)[] Families =

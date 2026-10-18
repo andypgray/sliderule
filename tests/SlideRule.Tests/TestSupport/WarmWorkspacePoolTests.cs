@@ -14,9 +14,8 @@ namespace SlideRule.Tests.TestSupport;
 /// <remarks>
 ///     The two facts split on how <c>WorkspaceSession</c> has to notice the reset. An in-place content
 ///     restore is folded into the snapshot chain; a deleted file forces a full reload. The first is the one
-///     with a
-///     <see cref="SlideRule.Roslyn.Caching.FileFreshness.RacyWindow">racy window</see>, so it gets
-///     the load-count assertion too.
+///     with a <see cref="SlideRule.Roslyn.Caching.FileFreshness.RacyWindow">racy window</see>, so it gets the
+///     load-count assertion too.
 /// </remarks>
 [Collection("Serial")]
 public sealed class WarmWorkspacePoolTests

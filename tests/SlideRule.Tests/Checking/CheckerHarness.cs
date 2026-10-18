@@ -231,7 +231,7 @@ internal static class Checker
     ///     <para>
     ///         Its callers therefore keep this raw list rather than stating
     ///         <c>ShouldHaveFailedWithSubjects</c>: they hold no <see cref="RuleResult" />, and the probe
-    ///         rule's redness is precisely the incidental fact above — a row that asserted it would be
+    ///         rule's redness is the incidental fact above — a row that asserted it would be
     ///         claiming the scaffolding.
     ///     </para>
     /// </remarks>

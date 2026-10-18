@@ -315,11 +315,10 @@ public sealed class GraphCommandTests
     [Fact]
     public async Task Graph_JsonDocumentOverTheBudgetAtOverviewGrain_KeepsDegradingToSkeleton()
     {
-        // Arrange — the regression this ladder exists for. A budget below even the overview's size used to
-        // stop after one step and hand the truncator an over-budget document to cut mid-array; measured on a
-        // 34-project solution, the full survey was ~147k characters and its overview still ~82k. The budget
-        // is the skeleton's own size rather than a round number, because a round number stops naming this
-        // rung the moment a coarser one is added below it.
+        // Arrange — a budget below even the overview's size must keep the ladder walking rather than hand the
+        // truncator an over-budget document to cut mid-array; a large solution's overview can overrun a client
+        // budget. The budget is the skeleton's own size rather than a round number, because a round number
+        // stops naming this rung the moment a coarser one is added below it.
         var degraded = new StringWriter();
         var skeleton = new StringWriter();
         int skeletonLength = await LengthAt(DocumentGrain.Skeleton);
@@ -343,8 +342,8 @@ public sealed class GraphCommandTests
     public async Task Graph_ExplicitOverviewOverTheBudget_StillDegrades()
     {
         // Arrange — a caller naming a grain is declaring a floor on detail, not opting out of their own
-        // transport's budget. This was the exact hole: the old guard skipped degrading whenever the caller
-        // had asked for overview, which is what an MCP client does the moment a survey is large.
+        // transport's budget. An MCP client asks for overview the moment a survey is large, so a guard that
+        // skipped degrading on an explicit grain would leave exactly that caller cut.
         var degraded = new StringWriter();
         int skeletonLength = await LengthAt(DocumentGrain.Skeleton);
 
@@ -414,11 +413,10 @@ public sealed class GraphCommandTests
     [InlineData(50_000)]
     public async Task Graph_DegradedDocument_SurvivesTheTruncatorThatRunsAfterIt(int headroom)
     {
-        // Arrange — the two stages composed, which is the gap that let a cut survey ship. The runner was
-        // pinned in isolation and the truncator was pinned in isolation, so nothing noticed that the runner
-        // deliberately emitted an over-budget document and the filter behind it then cut that very document
-        // at the same number. Budgets are taken from the skeleton's own size upward, because that is the
-        // range where the ladder can deliver a whole answer and therefore must.
+        // Arrange — the two stages composed. A pin of the runner alone and a pin of the truncator alone cannot
+        // see a runner that emits an over-budget document for the filter behind it to cut at the same number.
+        // Budgets are taken from the skeleton's own size upward, because that is the range where the ladder
+        // can deliver a whole answer and therefore must.
         int budget = await LengthAt(DocumentGrain.Skeleton) + headroom;
         var output = new StringWriter();
 
@@ -439,10 +437,9 @@ public sealed class GraphCommandTests
     [Fact]
     public async Task Graph_BudgetBelowEvenTheSkeleton_DegradesToIndexRatherThanTruncating()
     {
-        // Arrange — the case the field found and this rung answers. A 56-project solution's skeleton was
-        // 66,593 characters against a 50,000 budget, so the ladder ran out and the survey came back cut;
-        // the agent that received it left the tool surface. One character below the skeleton is the same
-        // condition in miniature.
+        // Arrange — the case this rung answers: a large solution's skeleton can itself overrun a client budget,
+        // and a cut survey drives the agent holding it off the tool surface. One character below the skeleton
+        // is the same condition in miniature.
         int belowSkeleton = await LengthAt(DocumentGrain.Skeleton) - 1;
         var output = new StringWriter();
 

@@ -120,7 +120,7 @@ public sealed class SpecFixtureCorpus : IAsyncLifetime
 
     // The inventory is taken from the syntax rather than from the assembly, because the question parity
     // asks is about the fixtures this file holds: a type reached by reflection alone could be declared
-    // anywhere, and a class the walk failed to recognise would simply go unmeasured.
+    // anywhere, and a class the walk failed to recognise would go unmeasured.
     private void TakeInventory(string source)
     {
         SyntaxTree tree = CSharpSyntaxTree.ParseText(source, SpecSnippet.Language, FixtureFile);

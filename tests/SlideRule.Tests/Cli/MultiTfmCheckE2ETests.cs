@@ -81,7 +81,7 @@ public sealed class MultiTfmCheckE2ETests
             "check", fixture.SolutionPath, "--spec", specDll, "--json");
 
         // Assert — the rule passed, and the stamp says what that pass covers. Both are read off the one
-        // document, because the point of the stamp is precisely that it qualifies this verdict.
+        // document, because the point of the stamp is that it qualifies this verdict.
         result.ShouldSucceed();
         result.Out.ShouldHavePassed(RuleId);
 

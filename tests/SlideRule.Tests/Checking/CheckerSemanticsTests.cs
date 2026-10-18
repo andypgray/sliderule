@@ -53,9 +53,9 @@ public sealed class CheckerSemanticsTests
     public void InertTarget_DeadOperandBesideALiveOne_WarnsNamingThatOperand()
     {
         // The grain the whole-target gate cannot reach: `App.Domain.*` matched, so the folded operand
-        // set is non-empty and the per-rule gate above stays quiet however dead the sibling is. Before
-        // this report the rule read as banning two things and banned one, forever and in silence — the
-        // same masking the subject side has refused since GRAMMAR §4.1.
+        // set is non-empty and the per-rule gate above stays quiet however dead the sibling is. Without
+        // this report the rule would read as banning two things and ban one, forever and in silence — the
+        // same masking GRAMMAR §4.1 refuses on the subject side.
         RuleResult result = Checker.Run(Sources.LayeredModel, arch =>
                 arch.Rule("inert/operand")
                     .Enforce(arch.Namespace("App.Web.*")
@@ -178,10 +178,10 @@ public sealed class CheckerSemanticsTests
     [Fact]
     public void InertTarget_DeadNameInANamedListBesideALiveName_WarnsNamingThatName()
     {
-        // A Named list is one operand, so a list with one rotted name was a live operand and the rule read as
-        // banning both while it banned one. Every type adjective filters one type at a time, so the list names
-        // what the union of its one-name spellings names, and the dead name is that union's dead operand
-        // (GRAMMAR §4.1). Not measured in full, like any partly inert rule.
+        // A Named list is one operand, so a list with one rotted name is a live operand, and without this
+        // warning the rule would read as banning both while banning one. Every type adjective filters one
+        // type at a time, so the list names what the union of its one-name spellings names, and the dead name
+        // is that union's dead operand (GRAMMAR §4.1). Not measured in full, like any partly inert rule.
         RuleResult result = Checker.Run(Sources.LayeredModel, arch =>
                 arch.Rule("inert/name")
                     .Enforce(arch.Namespace("App.Web.*")

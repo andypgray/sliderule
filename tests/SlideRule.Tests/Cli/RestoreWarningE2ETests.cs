@@ -46,7 +46,7 @@ public sealed class RestoreWarningE2ETests
         // Exit 0: the rule passed and nothing failed to load, so there is nothing to refuse.
         check.ShouldSucceed();
         // The warning is real and present — without this the assertion above would pass vacuously on a
-        // solution that simply never raised one.
+        // solution that never raised one.
         check.Err.ShouldContain("warning: ");
         check.Err.ShouldContain("will not be pruned");
         check.Err.ShouldNotContain("error: the model is incomplete");

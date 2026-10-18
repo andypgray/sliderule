@@ -438,9 +438,8 @@ public sealed class BaselineStoreTests : IDisposable
     [Fact]
     public void TryReadDocument_ARuleSectionRepeated_IsRefusedRatherThanTakingTheLastOne()
     {
-        // The one file that used to load and now does not. A repeated section was silently accepted with
-        // the last one winning, so a shared baseline could carry two lists for one rule and enforce only
-        // one of them, with nothing anywhere saying which.
+        // Accepted with the last one winning, a repeated section would let a shared baseline carry two lists
+        // for one rule and enforce only one of them, with nothing anywhere saying which.
         string path = Write("twice-section.json", """
                                                   {
                                                     "schemaVersion": 2,
@@ -640,7 +639,7 @@ public sealed class BaselineStoreTests : IDisposable
             "typo.json", """{ "subject": "T:A", "becuase": "x", "seal": "0000000000000000" }""");
 
         // The same message the source-and-subject entry gets, for a different reason: an entry is classified
-        // by the ID slots it carries, and a typo'd `becuase` is simply an unknown property beside a subject
+        // by the ID slots it carries, and a typo'd `becuase` is an unknown property beside a subject
         // — so the entry never resolves to either shape. Keeping this a named fact of its own is what
         // records that; a shared table row would leave only the message.
         Should.Throw<UserErrorException>(() => BaselineStore.TryReadDocument(path))
@@ -667,8 +666,8 @@ public sealed class BaselineStoreTests : IDisposable
     public void TryReadDocument_DigestUnderTheCurrentVersion_IsAStranger()
     {
         // The root's property set is version-dependent, so the field that carries a v1 file's integrity
-        // is not a key v2 has — a v1 file relabelled v2 fails as the
-        // hand-edit it is rather than being read with its digest ignored.
+        // is not a key v2 has — a v1 file relabelled v2 fails as the hand-edit it is rather than being read
+        // with its digest ignored.
         string path = Write("digest-v2.json", """
                                               {
                                                 "schemaVersion": 2,

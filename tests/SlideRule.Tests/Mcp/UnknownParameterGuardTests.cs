@@ -121,8 +121,8 @@ public sealed class UnknownParameterGuardTests
     [InlineData("arch_graph")]
     public void Validate_RetiredGrainBooleans_AreUnknownAndTheRefusalNamesGrain(string tool)
     {
-        // Act — overview, skeleton and index were three booleans until one grain parameter replaced them, so a
-        // client still sending them is told the new name rather than silently served a full document.
+        // Act — overview, skeleton and index are the retired grain booleans, so a client still sending them is
+        // told the grain parameter's name rather than silently served a full document.
         string? message = UnknownParameterGuard.Validate(
             tool,
             new Dictionary<string, JsonElement>

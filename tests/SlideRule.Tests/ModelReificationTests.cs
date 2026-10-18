@@ -234,8 +234,8 @@ public class ModelReificationTests
     [Fact]
     public void QuarantineScope_StillDesugarsIntoContainmentThenTripwire()
     {
-        // The zero-move guard for the desugarer's fork: a quarantine mints the same two children in the
-        // same order it always did, whatever the other posture mints.
+        // The guard on the desugarer's fork: a quarantine mints both children, containment then tripwire,
+        // whatever the caution posture mints.
         ArchModelBuilder.Build(DragonsDocScopeSpec)
             .Rules.Select(rule => rule.Id)
             .ShouldBe(["legacy/billing/containment", "legacy/billing/tripwire"]);
@@ -984,8 +984,7 @@ public class ModelReificationTests
     [Fact]
     public void Except_OneOperand_IsThePayloadItself()
     {
-        // One operand passes through unchanged rather than becoming a one-part union, so the single-operand
-        // spelling reifies to exactly the model it always did.
+        // One operand passes through unchanged rather than becoming a one-part union.
         var arch = new Arch();
         Selection exclusion = arch.Type(typeof(SqlConnection));
         var except = arch.Types.Except(exclusion)

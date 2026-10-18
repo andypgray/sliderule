@@ -13,7 +13,7 @@ namespace SlideRule.Tests.Rendering;
 /// <summary>
 ///     Where a scoped card may land: inside the solution directory, placed by the files a selection declares
 ///     there. A project that compiles a source file out of a package folder declares a type whose file sits
-///     outside the checkout, and collapsing that file with the project's own put the card in the directory above
+///     outside the checkout, and collapsing that file with the project's own would put the card in the directory above
 ///     both. No MSBuild and nothing written: the geometry is synthesized through <see cref="CompilationFactory" />.
 /// </summary>
 public sealed class CardContainmentTests
@@ -122,8 +122,8 @@ public sealed class CardContainmentTests
     [Fact]
     public void Compose_TwoProjectLayersSharingAName_PlaceEachCardOnItsOwnProject()
     {
-        // One node, two declarers: counting both copies for each layer collapsed both cards into the directory
-        // the two projects share.
+        // One node, two declarers: counting both copies for each layer would collapse both cards into the
+        // directory the two projects share.
         TwoCopies.Type("Acme.Internal.Constants")
             .AlsoDeclaredBy.ShouldBe(["Acme.Console"]);
 
@@ -250,7 +250,7 @@ public sealed class CardContainmentTests
     [Fact]
     public void DeepestCommonDirectory_ProjectAndPackageFolder_IsTheirSharedAncestor()
     {
-        // The arithmetic that put a card above the checkout, pinned on its own: the collapse is right, and what
+        // The arithmetic that would put a card above the checkout, pinned on its own: the collapse is right, and what
         // keeps the card inside is which files are allowed to reach it.
         string projectFile = Path.Combine(ProjectDirectory, "JsonWriter.cs");
 

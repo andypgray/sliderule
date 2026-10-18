@@ -503,9 +503,8 @@ public sealed class CheckCommandE2ETests
     [InlineData("skeleton")]
     public async Task Check_JsonAtEveryGrain_ADefensiveReadOfAFailedRulesCountNeverAnswersZero(string? grain)
     {
-        // The field-test repro: a consumer scripting the Python idiom rule.get('violationCount', 0) over a
-        // fine-grain report read 0 for rules that had failed, because the count key used to substitute for
-        // the rendered array. Absent-means-zero is the ordinary defensive read, so the count must be present
+        // A consumer scripting the Python idiom rule.get('violationCount', 0) reads 0 for a failed rule whose
+        // count key is missing. Absent-means-zero is the ordinary defensive read, so the count must be present
         // and non-zero for every failed rule at every grain — that is what makes the read safe.
         string[] arguments = grain is null
             ? ["check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json"]
@@ -689,8 +688,8 @@ public sealed class CheckCommandE2ETests
     public async Task Check_RulesAsAStringifiedArray_RefusesOnTheShapeAndOmitsTheRoster()
     {
         // Act — what a client sends when it serializes a JSON array into the string parameter the schema
-        // advertises. The ID inside the brackets is a real one, which is what made the roster read as a
-        // contradiction: it named back the very ID the lead said nothing matched.
+        // advertises. The ID inside the brackets is a real one, which is what makes a roster read as a
+        // contradiction: it would name back the very ID the lead says nothing matched.
         CliResult result = await CliRunner.InvokeAsync(
             "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll,
             "--rules", """["layering/domain-independent"]""");
@@ -714,7 +713,7 @@ public sealed class CheckCommandE2ETests
             "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll,
             "--diff-base", """["HEAD","main"]""");
 
-        // Assert — git's own words are the absence that matters. Unguarded this reached git, which called
+        // Assert — git's own words are the absence that matters. Unguarded this would reach git, which calls
         // the token an ambiguous argument: a message that quotes what arrived without naming what is wrong
         // with it, under a lede that spells a CLI flag the MCP caller never passed.
         result.ShouldRefuseWith(

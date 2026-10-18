@@ -102,7 +102,7 @@ public sealed class BuiltOutputProbeTests
     {
         // What the live run measured and the tree above cannot: check's own workspace load runs a design-time
         // build, and the SDK creates the evaluated output directory — empty — before resolution reads the
-        // disk. Anchoring on bare existence trapped the search in that empty directory and refused a fully
+        // disk. Anchoring on bare existence would trap the search in that empty directory and refuse a fully
         // built solution; the widening is what makes the artifacts layout resolve in a live run rather than
         // only in this suite. The decoy pins that widening stops at the first anchor that answers, so
         // MyApp.Web's copy is still never in scope.
@@ -191,7 +191,7 @@ public sealed class BuiltOutputProbeTests
     public void Find_TwoBuiltConfigurations_PrefersTheMostRecentlyWritten()
     {
         // Ranking key two, at equal depth. Debug sorts first ordinally, so the last-written rule — the one
-        // the release-CI behaviour rests on — is provably what picks Release here.
+        // the release-CI behaviour rests on — is what picks Release here.
         using TempDirectory temp = TestTempRoot.Fresh("built-output-probe");
         WriteAssemblyAt(Older, temp, "bin", "Debug", "net10.0", Assembly);
         string newest = WriteAssemblyAt(Newer, temp, "bin", "Release", "net10.0", Assembly);

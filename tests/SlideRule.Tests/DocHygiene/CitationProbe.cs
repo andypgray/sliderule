@@ -104,7 +104,7 @@ internal sealed class CitationProbe(HttpClient client)
     ///     What one probe established: the bucket, and the detail a report quotes after the page —
     ///     <c>404</c>, <c>HEAD 405 → GET 200</c>, or the exception type and message.
     /// </summary>
-    /// <param name="Bucket">Whether the page is live, gone, or simply not reached on this run.</param>
+    /// <param name="Bucket">Whether the page is live, gone, or not reached on this run.</param>
     /// <param name="Detail">The evidence behind that verdict, as a failure or a skip quotes it.</param>
     public sealed record PageStatus(PageBucket Bucket, string Detail);
 }

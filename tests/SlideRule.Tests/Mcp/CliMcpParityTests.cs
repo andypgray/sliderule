@@ -13,13 +13,16 @@ namespace SlideRule.Tests.Mcp;
 /// <summary>
 ///     The acceptance table: every <c>arch_*</c> tool returns output identical (after newline
 ///     normalization) to the CLI verb it shells over — parity by construction (each tool runs the same
-///     runner into a captured writer). Each method starts one harness over one solution+spec binding, and
-///     several share the violated spec's. The rule-ID explain rows ride the DLL fast path (no workspace), while
-///     the type and path rows extract the codebase their claims are traced over. <c>arch_context</c> is pinned
-///     against the render card text, and the <c>diffBase</c> row mirrors <see cref="TripwireDiffE2ETests" />
-///     over a real git repo.
+///     runner into a captured writer).
 /// </summary>
 /// <remarks>
+///     <para>
+///         Each method starts one harness over one solution+spec binding, and several share the violated
+///         spec's. The rule-ID explain rows ride the DLL fast path (no workspace), while the type and path
+///         rows extract the codebase their claims are traced over. <c>arch_context</c> is pinned against the
+///         render card text, and the <c>diffBase</c> row mirrors <see cref="TripwireDiffE2ETests" /> over a
+///         real git repo.
+///     </para>
 ///     <para>
 ///         The filter brackets each call with the shared
 ///         <see cref="SlideRule.Cli.Mcp.Infrastructure.IdleTimeoutWatchdog" /> in-flight counter.

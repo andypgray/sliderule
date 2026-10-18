@@ -2,7 +2,7 @@ namespace SlideRule.PolyglotAppSpec;
 
 /// <summary>
 ///     A spec for the PolyglotApp fixture whose one rule holds over the project this product can read, so
-///     <c>check</c> exits 0 with a genuinely clean report. The rule is deliberately unremarkable — the
+///     <c>check</c> exits 0 with a clean report. The rule is deliberately unremarkable — the
 ///     fixture's subject is the <em>solution</em>, not the law — and the assertion it enables is that a clean
 ///     verdict still names the <c>.fsproj</c> the model never contained.
 /// </summary>

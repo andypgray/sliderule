@@ -14,8 +14,8 @@ public sealed class DeadTargetPartTests
     [Fact]
     public void DeadPartOfAUnionOperand_WarnsNamingThatPart()
     {
-        // One operand, so the per-operand report used to see only the union, which matched App.Web: the
-        // ghost clause of the ban went quiet with nothing said.
+        // One operand, so a per-operand report that saw only the union, which matched App.Web, would let the
+        // ghost clause of the ban go quiet with nothing said.
         RuleResult result = Checker.Run(Sources.LayeredModel, arch =>
                 arch.Rule("part/union")
                     .Enforce(arch.Namespace("App.Domain.*")

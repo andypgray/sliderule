@@ -14,7 +14,7 @@ namespace SlideRule.Tests.Replay;
 
 /// <summary>
 ///     End-to-end tests for the CLI wiring of binlog replay: <c>--binlog</c> on <c>check</c>, <c>status</c>
-///     and <c>graph</c>, and the capture it persists. Each scenario drives the <em>real</em> command
+///     and <c>graph</c>, and the capture it persists. Each scenario drives the real command
 ///     tree in-process through <see cref="CliRunner" /> against this class's own <see cref="BinlogFixtureWorkspace" />
 ///     binlog, isolating the persisted caches by pointing <c>SLIDERULE_CACHE_DIR</c> at a throwaway
 ///     directory per run — the same isolation knob the fragment-cache e2e suite uses, and through the same

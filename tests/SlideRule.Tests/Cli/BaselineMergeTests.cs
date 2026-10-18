@@ -80,7 +80,7 @@ public sealed class BaselineMergeTests : IDisposable
     [Fact]
     public void MergeFile_AdjacentPayoffsResolvedByKeepingWholeEntryLines_Verifies()
     {
-        // The narrow claim, held honestly. Paying off the last entry closes the line before it, so a branch
+        // The narrow claim. Paying off the last entry closes the line before it, so a branch
         // that pays off D collides with one that pays off E — adjacent lines, and git cannot merge them.
         // What the seal buys is that every line either side committed is a complete, self-sealed entry, so
         // the resolution below chooses whole lines and closes the new last one. A trailing comma is JSON

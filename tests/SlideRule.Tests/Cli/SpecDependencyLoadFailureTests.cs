@@ -39,7 +39,7 @@ public sealed class SpecDependencyLoadFailureTests
     public void Map_ManifestNamingTheAssembly_OffersTheStagingRemedy()
     {
         // Arrange: the manifest declares the assembly as a package runtime asset, so it resolved at build
-        // time and is simply not where the loader can reach it now.
+        // time and is not where the loader can reach it now.
         using TempDirectory output = TestTempRoot.Fresh("spec-load-failure");
         string specDllPath = WriteManifest(output, ManifestNamingSqlClient);
         var exception = new FileNotFoundException("Could not load file or assembly ...", MissingAssembly);
@@ -58,7 +58,7 @@ public sealed class SpecDependencyLoadFailureTests
     [Fact]
     public void Map_ManifestWithoutTheAssembly_WithholdsTheStagingRemedy()
     {
-        // Arrange: a well-formed manifest that simply does not mention the assembly — a <FrameworkReference>
+        // Arrange: a well-formed manifest that does not mention the assembly — a <FrameworkReference>
         // contributes nothing to one, which is why the staging remedy cannot work here.
         using TempDirectory output = TestTempRoot.Fresh("spec-load-failure");
         string specDllPath = WriteManifest(output, ManifestWithoutSqlClient);

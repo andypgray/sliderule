@@ -22,7 +22,7 @@ namespace SlideRule.Tests.Cli;
 ///     have deliberately different exclusion sets, so a memo keyed on nothing would hand the survey fence
 ///     the cards' model and draw a diagram missing the spec project's neighbours. These pin both halves
 ///     against the same oracle the cold path uses, which is what makes "identical by construction" checkable
-///     rather than merely argued.
+///     rather than argued.
 /// </remarks>
 public sealed class CodebaseSourceMemoTests
 {
@@ -74,7 +74,7 @@ public sealed class CodebaseSourceMemoTests
         CodebaseModel second = await source.ExtractAsync([Billing], Ct);
 
         // The same instance, not merely an equal one: a merged model is read-only once built, so there is
-        // nothing to gain by rebuilding it and every consumer reads.
+        // nothing to gain by rebuilding it and every consumer only reads it.
         second.ShouldBeSameAs(first);
         source.ExtractionCount.ShouldBe(1);
 
@@ -117,7 +117,7 @@ public sealed class CodebaseSourceMemoTests
     }
 
     // The cache root only matters where a fact turns the cache on; elsewhere the run is disabled and reads
-    // nothing, so an environment with no override is the honest thing to hand it.
+    // nothing, so an environment with no override is all it needs.
     private static FakeEnvironment EnvironmentFor(string? cacheRoot = null)
     {
         return cacheRoot is null ? new FakeEnvironment() : FakeEnvironment.WithCacheRoot(cacheRoot);

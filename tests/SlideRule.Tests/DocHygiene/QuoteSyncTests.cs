@@ -396,8 +396,7 @@ public sealed class QuoteSyncTests
         List<string> drift = new();
 
         // Act: a quote that presents itself as whole must be its source line for line, as much of the source as
-        // its extent names. The in-order substring check above passes a quote with lines left out, which is how
-        // an abridged drawing went on calling itself the committed one.
+        // its extent names. The in-order substring check above passes a quote with lines left out.
         foreach (Excerpt excerpt in Excerpts.Where(static excerpt => excerpt.Extent != Extent.Slice))
         {
             IReadOnlyList<string> fence = FenceOf(excerpt);

@@ -18,9 +18,9 @@ namespace SlideRule.Tests.Mcp;
 public sealed class CoercerCoverageTests
 {
     /// <summary>
-    ///     The factories registered <em>ahead</em> of the surface: shapes no <c>arch_*</c> parameter has yet,
+    ///     The factories registered ahead of the surface: shapes no <c>arch_*</c> parameter has yet,
     ///     kept deliberately rather than retired. Retiring them would also delete their schema-repair
-    ///     branches, and the enum branch's loss is silent — the tool keeps working and the model simply
+    ///     branches, and the enum branch's loss is silent — the tool keeps working and the model
     ///     stops being told which values are allowed.
     /// </summary>
     private static readonly string[] DeclaredAheadOfTheSurface =
@@ -35,8 +35,7 @@ public sealed class CoercerCoverageTests
     [Fact]
     public void EveryJsonBoundParameterType_HasARegisteredCoercer()
     {
-        // The drift guard. A new parameter of an uncovered type reds here and forces the choice — write a
-        // coercer, or say in the ledger below why the SDK default is good enough for it.
+        // The drift guard. A new parameter of an uncovered type reds here until a coercer covers it.
         List<string> uncovered = [];
         List<string> checkedParameters = [];
 
@@ -50,8 +49,7 @@ public sealed class CoercerCoverageTests
         // Shouldly prints the offenders itself; the message says what to do about them.
         uncovered.ShouldBeEmpty(
             "each of these binds through the SDK default, where a mis-spelled argument comes back as a "
-            + "byte-position error the CLI's error mapper reads as a bug — write a coercer for the type, "
-            + "or record here why the default is good enough for it");
+            + "byte-position error the CLI's error mapper reads as a bug — write a coercer for the type");
         // Otherwise a reflection slip that found no parameters at all would read as a pass.
         checkedParameters.ShouldNotBeEmpty("the live arch_* tools declare no JSON-bound parameters to check");
     }

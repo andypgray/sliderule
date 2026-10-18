@@ -400,8 +400,8 @@ public sealed class StatusFormatterTests
     public void Migrate_RottedTarget_ReadsNotMeasuredAndWithholdsTheAcceptReductionsNudge()
     {
         // The harm this whole shape exists to prevent. A forbidden target that matched nothing warns and
-        // passes with no violations, so every captured entry goes unmatched — which read as "fixed awaiting
-        // acceptance" under a nudge to run the one command that then deleted the section outright.
+        // passes with no violations, so every captured entry goes unmatched — which would read as "fixed
+        // awaiting acceptance" under a nudge to run the one command that then deletes the section outright.
         IReadOnlyList<string> lines = StatusFormatter.Lines(
             new CheckReport(
             [
@@ -684,9 +684,9 @@ public sealed class StatusFormatterTests
     [Fact]
     public void Summary_RottedAndMeasuredRules_PartitionTheUnmatchedEntriesBetweenTwoTerms()
     {
-        // The roll-up stops counting rot as fixed debt, and the two terms partition every unmatched entry
-        // between them: two were really fixed, twelve were never tested. One total for both read the rotted
-        // rule's whole section as a migration somebody had finished.
+        // The roll-up does not count rot as fixed debt, and the two terms partition every unmatched entry
+        // between them: two were really fixed, twelve were never tested. One total for both would read the
+        // rotted rule's whole section as a migration somebody had finished.
         var report = new CheckReport(
         [
             Result(Model.Rule("data-access/no-inline-sql"), RuleStatus.Passed, stale: 2, captured: true),

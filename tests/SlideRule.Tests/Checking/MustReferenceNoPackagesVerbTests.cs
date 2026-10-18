@@ -18,7 +18,8 @@ namespace SlideRule.Tests.Checking;
 ///     <b>Empty passes</b>: a project that declares none and a project nothing evaluated are
 ///     indistinguishable by design — both carry an empty list — so both pass.
 ///     <b>Private passes</b>: a reference whose <c>PrivateAssets</c> is all reaches no consumer, so it is no
-///     dependency, and the law that forbids it too is a <c>Must</c> predicate over the full list.
+///     dependency. The law that forbids it too is <c>MustNotReferencePackages("*")</c>, one finding per package,
+///     or a <c>Must</c> predicate over the full list, one finding per project.
 /// </remarks>
 public sealed class MustReferenceNoPackagesVerbTests
 {
@@ -129,8 +130,8 @@ public sealed class MustReferenceNoPackagesVerbTests
     [Fact]
     public void Must_NoPackageReferencesAtAll_IsTheStrictForm()
     {
-        // The law that counts private references too has no verb of its own: a predicate over the full list
-        // states it, and reds the project the verb passes.
+        // The law that counts private references too, stated as a predicate over the full list: one finding for
+        // the project the verb passes, where MustNotReferencePackages("*") would report each package.
         Checker.Run(PrivateScene, arch => arch.Rule("packaging/contract-bare")
                 .Enforce(arch.Projects.Named("Contract")
                     .Must(project => project.PackageReferences.Count == 0, description: "declare no package references at all"))

@@ -74,8 +74,8 @@ public sealed class SelfSpecTests
     /// <remarks>
     ///     The model is immutable and already shared assembly-wide by <see cref="WorkspaceFixture" />, so
     ///     several gates reading one instance is the established shape rather than a new risk — internal so
-    ///     that the model-file corpus, which needs this repository as a real codebase, shares it too rather
-    ///     than paying the Roslyn walk a second time. The two gates that need a <em>different</em> model —
+    ///     that a gate elsewhere that needs this repository as a real codebase shares it too rather than
+    ///     paying the Roslyn walk a second time. The two gates that need a <em>different</em> model —
     ///     <see cref="ScopedCards_AreCurrent" /> and <see cref="ModelFile_IsCurrent" />, which must exclude
     ///     what <c>render</c> excludes — share <see cref="RenderCodebase" /> instead.
     /// </remarks>
@@ -89,7 +89,7 @@ public sealed class SelfSpecTests
     private static readonly Lazy<Task<CodebaseModel>> RenderCodebase = new(async () => (await SelfCodebase.Value).Governed);
 
     /// <summary>
-    ///     This repository's own spec, built once for the gates in this folder that render or read it. The
+    ///     This repository's own spec, built once for the gates that render or read it. The
     ///     model is immutable and each of them only reads it, so one instance answers them all.
     /// </summary>
     internal static readonly ArchitectureModel SelfModel = ArchModelBuilder.Build(new SlideRuleArchitectureSpec());
@@ -113,8 +113,8 @@ public sealed class SelfSpecTests
         CliResult result = await CliRunner.InvokeAsync(
             "check", RepoRoot.Solution, "--spec", RepoRoot.ArchitectureSpecCsproj, "--json");
 
-        // The assertion surfaces the CLI's own output on failure — otherwise a red self-check (e.g. the
-        // Release-only spec-resolution regression) shows only "2 != 0" with no clue why, as the release run did.
+        // The assertion surfaces the CLI's own output on failure — otherwise a red self-check shows only
+        // "2 != 0" with no clue why.
         result.ShouldSucceed();
 
         using JsonDocument report = result.ShouldHaveJsonStdout();
@@ -425,9 +425,9 @@ public sealed class SelfSpecTests
     ///     One definition of a blocking wait, held across two rules. <c>mcp/no-blocking-waits</c> keeps its
     ///     own ID, subject, <c>ServerShutdown</c> exemption and reason — that is what makes it a local rule
     ///     rather than a pack call — but it takes the member set from the pack instead of restating it, so
-    ///     widening the pack's ban cannot leave this repository's own spec the laxer of the two. It did:
-    ///     three <c>ValueTask</c> members were added to the pack and the copy here stood still. This is the
-    ///     pin that would have caught that, and it reds again if someone inlines the list.
+    ///     widening the pack's ban cannot leave this repository's own spec the laxer of the two. This pin
+    ///     compares the two member sets, so an inlined copy passes until the pack's ban moves without it, and
+    ///     then reds.
     /// </summary>
     [Fact]
     public void BlockingWaitBan_IsThePacksOwnMemberSet()

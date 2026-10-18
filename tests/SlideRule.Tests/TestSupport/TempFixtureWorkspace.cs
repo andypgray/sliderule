@@ -272,8 +272,8 @@ internal sealed class TempFixtureWorkspace : IDisposable
             if (IsBuildArtifact(file, destination) || expected.Contains(file)) continue;
 
             // Read-only-tolerant because a TempGitRepo consumer leaves a .git/ here and git writes its loose
-            // objects read-only: a plain File.Delete threw partway through the prune, failed the whole reset,
-            // and cost the caller a private copy and a restore.
+            // objects read-only: a plain File.Delete throws partway through the prune, fails the whole reset,
+            // and costs the caller a private copy and a restore.
             ReadOnlyTolerant.Delete(file);
             projectsChanged |= IsProjectFile(file);
         }

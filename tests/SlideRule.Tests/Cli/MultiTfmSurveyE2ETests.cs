@@ -8,9 +8,9 @@ namespace SlideRule.Tests.Cli;
 /// <summary>
 ///     The survey's target-framework pair end to end, over the <c>MultiTfm</c> fixture:
 ///     <c>Roslyn.MultiTargetFrameworkTests</c> pins the model and <c>Extraction.GraphSummarizerTests</c> the
-///     summary; these pin the two documents a reader actually holds. A project that compiles four times and
-///     says so nowhere was the whole defect — an agent deriving a spec from the survey could not see that
-///     the noun it was about to anchor a rule on is one compilation of several.
+///     summary; these pin the two documents a reader actually holds. A project that compiles more than once
+///     must say so, or an agent deriving a spec from the survey cannot see that the noun it is about to
+///     anchor a rule on is one compilation of several.
 /// </summary>
 /// <remarks>
 ///     Targeted assertions and no golden, deliberately. Both keys ride the project row rather than a
@@ -34,7 +34,7 @@ public sealed class MultiTfmSurveyE2ETests
         // Assert — the pair a reader needs before writing arch.Project("MultiTfm.Core"): how many
         // compilations that noun spans, and which one a rule about a type they share is measured against.
         // net10.0 wins on extraction's ordinal order, not on the csproj's, which declares netstandard2.0
-        // first precisely so this pin means something.
+        // first so this pin means something.
         result.ShouldSucceed();
         using JsonDocument document = result.ShouldHaveJsonStdout();
         JsonElement core = GraphSurveyJson.Project(document, Core);

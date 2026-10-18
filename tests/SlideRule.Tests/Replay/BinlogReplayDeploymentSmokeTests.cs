@@ -9,12 +9,12 @@ using Xunit;
 namespace SlideRule.Tests.Replay;
 
 /// <summary>
-///     The deployment-shaped regression net for the binlog-replay MSBuildLocator crash: it runs
-///     the shipped <c>sliderule-cli.dll</c> as a <em>child process</em> so it exercises the exact condition that
-///     masked the bug from the rest of the suite. Every other replay E2E drives the command tree in-process,
-///     where a <c>[ModuleInitializer]</c> (<see cref="MsBuildInitializer" />) has already registered MSBuild
-///     for the whole test process — so the replay path found <c>Microsoft.Build.Framework</c> regardless of
-///     whether it registered the locator itself, and the deployed tool crashed while the tests stayed green.
+///     The deployment-shaped net under binlog replay's MSBuildLocator registration: it runs the shipped
+///     <c>sliderule-cli.dll</c> as a child process, the one condition in which a missing registration shows.
+///     Every other replay E2E drives the command tree in-process, where a <c>[ModuleInitializer]</c>
+///     (<see cref="MsBuildInitializer" />) has already registered MSBuild for the whole test process, so the
+///     replay path finds <c>Microsoft.Build.Framework</c> whether or not it registers the locator itself, and a
+///     deployed tool that crashes leaves those tests green.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -25,8 +25,8 @@ namespace SlideRule.Tests.Replay;
 ///         <c>Could not load file or assembly 'Microsoft.Build.Framework …'</c>. This is the only test that
 ///         runs the shipped registration path for replay: a fresh child process with no module initializer and
 ///         no pre-registration, launched with the test host's MSBuild poison vars stripped
-///         (<see cref="DotnetCli.ApplyCleanSdkEnvironment" />) so the child sees a normal user environment —
-///         precisely what a user typing <c>sliderule check --binlog</c> gets.
+///         (<see cref="DotnetCli.ApplyCleanSdkEnvironment" />) so the child sees a normal user environment,
+///         which is what a user typing <c>sliderule check --binlog</c> gets.
 ///     </para>
 ///     <para>
 ///         One method, two legs, each costing seconds: the replay leg must exit clean with no loader error, and
@@ -52,10 +52,10 @@ public sealed class BinlogReplayDeploymentSmokeTests(BinlogFixtureWorkspace fixt
     {
         string cli = TestsBinCli.Dll();
 
-        // (a) the shipped condition: `check --binlog` in a child process with no pre-registered MSBuild. Before
-        //     the fix this crashed here with "could not be replayed: Could not load file or assembly
-        //     'Microsoft.Build.Framework …'"; the gate now registers MSBuildLocator up front, so the parser
-        //     resolves the SDK's engine assemblies and the run completes clean.
+        // (a) the shipped condition: `check --binlog` in a child process with no pre-registered MSBuild. The gate
+        //     registers MSBuildLocator up front, so the parser resolves the SDK's engine assemblies and the run
+        //     completes clean; without that registration it fails here with "could not be replayed: Could not
+        //     load file or assembly 'Microsoft.Build.Framework …'".
         ChildProcess.ProcessResult replay = RunCliOutOfProcess(
             cli, FreshCache(),
             "check", Fixture.SolutionPath, "--binlog", Fixture.BinlogPath, "--spec", CliRunner.CleanSpecDll);

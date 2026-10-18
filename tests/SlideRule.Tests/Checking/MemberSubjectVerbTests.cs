@@ -230,7 +230,7 @@ public sealed class MemberSubjectVerbTests
     // The next two pin the one thing that separates a member affix from a member glob: a `*` inside an
     // affix is a literal character, because only the *NameMatching family reaches the glob matcher.
     // Every `*`-free affix reads the same under either rule, so the contrast against the glob spelling
-    // is the only honest way to state it — `*` is not a legal identifier character, so no codebase can
+    // is the only way to state it — `*` is not a legal identifier character, so no codebase can
     // declare the name the literal reading looks for.
 
     [Fact]
@@ -311,7 +311,7 @@ public sealed class MemberSubjectVerbTests
     public void Named_KeepsExactlyTheNamedMembers_CaseSensitively()
     {
         // MustBeStatic reds each instance method, so the failures are the set Named kept: the exact names,
-        // in the case written, and nothing whose name merely contains one.
+        // in the case written, and no member whose name holds one inside a longer name.
         FailedMemberIds(MembersModel, arch => arch.Namespace("App.Members.*").Methods.Named("Walk", "Idle").MustBeStatic())
             .ShouldBe(["M:App.Members.Machine.Idle", "M:App.Members.Widget.Walk"]);
 

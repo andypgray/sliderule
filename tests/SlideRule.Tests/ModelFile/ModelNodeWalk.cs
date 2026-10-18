@@ -17,10 +17,8 @@ namespace SlideRule.Tests.ModelFile;
 ///         consulted the writer's registries could only ever agree with itself.
 ///     </para>
 ///     <para>
-///         The spine is stated rather than reflected — constraint subject, operands, member operands,
-///         member and project subjects, union parts, adjectives, a noun's layer definition, a family's
-///         cells, the scope's scoped selection, the rule's exemplar — because a selection's noun is not always
-///         readable (a union has none and says so by throwing) and because the member projections a selection offers
+///         The spine is stated rather than reflected, because a selection's noun is not always readable (a
+///         union has none and says so by throwing) and because the member projections a selection offers
 ///         mint a fresh object on every read, which reflection would follow forever. Everything hanging off
 ///         a noun, an adjective, a member or a constraint is reflected, so a node class that grows a slot
 ///         is walked the day it does.

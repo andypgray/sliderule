@@ -409,9 +409,9 @@ internal static class BuildTier
     ///     compilation carries them, so two trees under one path are two entries rather than one.
     /// </summary>
     /// <remarks>
-    ///     What <see cref="DiagnosePerDocumentAsync" /> is built on, and the form to ask for wherever the
-    ///     union over the documents has to be the whole of what they said: keying by path throws wherever a
-    ///     second tree carries the same path, which a compilation built by hand can do and a build cannot.
+    ///     The form to ask for, rather than <see cref="DiagnosePerDocumentAsync" />, wherever the union over
+    ///     the documents has to be the whole of what they said: keying by path throws wherever a second tree
+    ///     carries the same path, which a compilation built by hand can do and a build cannot.
     /// </remarks>
     /// <param name="compilation">The compilation being built.</param>
     /// <param name="additionalFiles">The files the build hands over.</param>

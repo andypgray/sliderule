@@ -16,13 +16,12 @@ namespace SlideRule.Tests.Cli;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>Why a live restore rather than a fabricated tree.</b>
-///         <c>Caching/ExtractionCacheStoreTests</c> already pins the store's behaviour over a hand-built
-///         artifacts-shaped tree, and <c>Roslyn/IntermediateOutputTreeTests</c> pins the derivation as
-///         arithmetic. Neither can know where the SDK actually writes <c>project.assets.json</c>, and that is
-///         exactly what a field run found wrong: the probe watched
-///         <c>&lt;projectDirectory&gt;/obj/project.assets.json</c>, a path this layout never creates, so a
-///         re-restore that changed the model was served from cache as though nothing had moved.
+///         The restore is live because the sibling tests use hand-built trees:
+///         <c>Caching/ExtractionCacheStoreTests</c> pins the store's behaviour over an artifacts-shaped tree,
+///         and <c>Roslyn/IntermediateOutputTreeTests</c> pins the derivation as arithmetic. Neither can know
+///         where the SDK actually writes <c>project.assets.json</c>. A probe watching
+///         <c>&lt;projectDirectory&gt;/obj/project.assets.json</c>, a path this layout never creates, would
+///         serve a re-restore that changed the model from cache as though nothing had moved.
 ///     </para>
 ///     <para>
 ///         <b>Why the mutation is a byte append.</b> The third run has to load a workspace, so the assets

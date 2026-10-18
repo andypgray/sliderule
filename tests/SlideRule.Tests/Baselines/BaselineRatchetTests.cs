@@ -13,9 +13,9 @@ namespace SlideRule.Tests.Baselines;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         Both routes to "nothing to measure" are rows because the two callers used to disagree about an
-///         edge seen with no sited evidence, and the disagreement was invisible precisely because neither
-///         side's tests could see the other's reading.
+///         Both routes to "nothing to measure" are rows because an edge seen with no sited evidence is where
+///         two callers each making their own call would disagree, and neither side's tests could see the
+///         other's reading.
 ///     </para>
 ///     <para>
 ///         The expected arm is spelled in each row's name rather than passed to it: the states are internal

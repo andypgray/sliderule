@@ -10,42 +10,42 @@ namespace SlideRule.Tests.Oracle;
 
 /// <summary>
 ///     The differential-testing oracle. SlideRule's checker builds its
-///     dependency model from <em>Roslyn source</em>; ArchUnitNET builds its model from <em>compiled IL</em>
+///     dependency model from Roslyn source; ArchUnitNET builds its model from compiled IL
 ///     (Mono.Cecil). Each row below expresses the same architecture rule on both substrates over the same
-///     <c>MyApp</c> fixture and asserts they reach the <em>same verdict</em> — the set of type FullNames
-///     that violate. Every row pins that set against a hand-derived expected truth <em>and</em> asserts the
+///     <c>MyApp</c> fixture and asserts they reach the same verdict — the set of type FullNames
+///     that violate. Every row pins that set against a hand-derived expected truth and asserts the
 ///     two substrates equal each other: agreeing with each other alone could mean both are wrong the same
 ///     way, so the pinned truth is the third leg.
 /// </summary>
 /// <remarks>
 ///     <para>
-///         The comparison is deliberately <b>raw-constraint, verdict-level, type granularity</b>. The
-///         following SlideRule behaviour is <b>out of oracle scope</b> — a documented boundary, not a
+///         The comparison is deliberately raw-constraint, verdict-level, type granularity. The
+///         following SlideRule behaviour is out of oracle scope — a documented boundary, not a
 ///         silent omission:
 ///     </para>
 ///     <list type="bullet">
 ///         <item>
-///             <b>Escape hatches</b> (<c>.Where(...)</c> / <c>.Must(...)</c>): arbitrary C# predicates that
+///             Escape hatches (<c>.Where(...)</c> / <c>.Must(...)</c>): arbitrary C# predicates that
 ///             ArchUnitNET cannot see, so there is no analog to compare against.
 ///         </item>
 ///         <item>
-///             <b>Posture machinery</b>: Migrate/Quarantine baselines, ratchet grandfathering, and the Quarantine
+///             Posture machinery: Migrate/Quarantine baselines, ratchet grandfathering, and the Quarantine
 ///             tripwire's diff-aware touch check. ArchUnitNET has no posture concept; only the raw
 ///             constraint a posture reduces to (e.g. Quarantine → <c>MustOnlyBeReferencedBy</c>, row 7) is
 ///             compared.
 ///         </item>
 ///         <item>
-///             <b>SlideRule-specific verdict rules</b>: the inert-target warning (a matched-nothing
+///             SlideRule-specific verdict rules: the inert-target warning (a matched-nothing
 ///             forbidden set) and the empty-subject fail-by-default. These are asserted directly in the
 ///             checker's own tests; the oracle rows are all non-empty-subject, non-inert by construction.
 ///         </item>
 ///         <item>
-///             <b><c>file:line</c> locations</b>: ArchUnitNET carries none. This is precisely why the
+///             <c>file:line</c> locations: ArchUnitNET carries none. This is why the
 ///             comparison is at type granularity — SlideRule's per-site locations have nothing to compare
 ///             against.
 ///         </item>
 ///         <item>
-///             <b>Correspondence counting</b> (<c>MustHaveExactlyOneCounterpart</c>): ArchUnitNET asserts facts
+///             Correspondence counting (<c>MustHaveExactlyOneCounterpart</c>): ArchUnitNET asserts facts
 ///             about a type itself and has no form that counts the other types a name template derives — there is
 ///             nothing to build a row against, only a wrong one.
 ///         </item>
@@ -351,7 +351,7 @@ public sealed class OracleCaseTableTests(WorkspaceFixture workspace, OracleArchi
     // const-satisfies at all: FieldMember carries no IsConst. At member granularity the two therefore diverge
     // on ReportBudget.MaxRows. The oracle's contract is verdict-level at type granularity (the class remarks'
     // documented boundary), and at that granularity the divergence is not observable: both substrates reduce
-    // to { MyApp.Web.ReportBudget }, which genuinely declares a static field that is not readonly on either
+    // to { MyApp.Web.ReportBudget }, which declares a static field that is not readonly on either
     // reading. const-satisfies is pinned by MustBeReadonlyVerbTests.MustBeReadonly_ConstField_Passes, not here.
     [Fact]
     public void Row13_WebStaticFieldsMustBeReadonlyAtDeclaringTypeGranularity()

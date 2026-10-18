@@ -10,12 +10,12 @@ namespace SlideRule.Tests.Cli;
 /// <summary>The workspace-diagnostics contract on <c>baseline</c>, run after a failing <c>check</c>.</summary>
 /// <remarks>
 ///     <para>
-///         The sequence a team actually runs is <c>check</c> then <c>baseline init</c>. <c>check</c> has
-///         failed closed on a partial model since the gate existed; <c>baseline</c> used to render the same
-///         warnings, carry on, write a baseline from that partial model, and exit 0. That is the worst of
-///         the three answers, because a baseline is the team's signature on its debt: unloaded projects
-///         declare no types, so <c>init</c> captures "zero debt" for rules that were never measured, and
-///         every later ratchet reading is taken against that signature.
+///         The sequence a team actually runs is <c>check</c> then <c>baseline init</c>, and both fail closed
+///         on a partial model. Rendering the warnings, carrying on, writing a baseline from that model and
+///         exiting 0 is the worst answer <c>baseline</c> could give, because a baseline is the team's
+///         signature on its debt: unloaded projects declare no types, so <c>init</c> would capture "zero
+///         debt" for rules that were never measured, and every later ratchet reading would be taken against
+///         that signature.
 ///     </para>
 ///     <para>
 ///         Driven through <see cref="BaselineRunner" /> with a
@@ -66,7 +66,7 @@ public sealed class BaselineWorkspaceDiagnosticsGateE2ETests
     [Fact]
     public async Task CheckThenBaselineInit_WorkspaceLoadDiagnostic_BothFailClosedAndNothingIsWritten()
     {
-        // The reported sequence, in order: check, then baseline init. The second command is what used to exit 0.
+        // The sequence a team runs, in order: check, then baseline init, and both must refuse.
         using var workspace = new TempFixtureWorkspace();
         string baselineFile = workspace.PathOf(ConventionalBaselineFile);
         File.Delete(baselineFile); // uncaptured, so a run that reached the write would create it

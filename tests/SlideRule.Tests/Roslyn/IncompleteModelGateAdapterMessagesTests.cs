@@ -10,8 +10,8 @@ namespace SlideRule.Tests.Roslyn;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <c>AdapterTests</c> owns the adapter's <em>behaviour</em> — which test fails, which cases skip —
-///         over the real <c>BrokenApp</c> bed that genuinely loads partially. There is no such bed for a
+///         <c>AdapterTests</c> owns the adapter's behaviour — which test fails, which cases skip — over the
+///         real <c>BrokenApp</c> bed that loads partially. There is no such bed for a
 ///         failed restore, and building one would cost a live SDK and a private package feed to prove
 ///         something these two methods already decide on their own: both are pure functions of the
 ///         diagnostics, and everything downstream of them is
@@ -47,8 +47,8 @@ public sealed class IncompleteModelGateAdapterMessagesTests
     [Fact]
     public void AdapterRefusal_LoadFailureOnly_IsUnchanged()
     {
-        // The byte-identity guard the whole two-block design rests on: a run with one cause reads exactly as
-        // this class read before the second cause could gate, so no existing pin moves.
+        // The guard the two-block design rests on: a run with one cause carries nothing of the other
+        // cause's block.
         string refusal = IncompleteModelGate.AdapterRefusal(Diagnostics(failed: [BrokenProject]));
 
         refusal.ShouldStartWith(

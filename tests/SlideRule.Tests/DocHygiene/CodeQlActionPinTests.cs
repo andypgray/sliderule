@@ -28,7 +28,7 @@ namespace SlideRule.Tests.DocHygiene;
 ///         <b>Agreement is per workflow, not repository-wide.</b> What the action requires is that the
 ///         steps sharing a run share a version, and the <c>upload-sarif</c> steps in other workflows
 ///         upload a file rather than reading that configuration. Pinning those to the same revision
-///         too would fail a standalone bump that is genuinely fine.
+///         too would fail a standalone bump that is fine.
 ///     </para>
 /// </remarks>
 public sealed class CodeQlActionPinTests

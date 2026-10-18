@@ -129,9 +129,9 @@ public sealed class RestoreFailureSilentEdgeE2ETests
 
         CliResult broken = await Check(workspace, specDll);
 
-        // The assertion that carries the whole bed. Exit 0 here is the measured defect: the rule reported
-        // itself inert — its target selection matched no types — because the edge it rests on was never
-        // extracted, and a green run said so to CI.
+        // The assertion that carries the whole bed. Exit 0 here would be the defect: the rule reports itself
+        // inert — its target selection matches no types — because the edge it rests on was never extracted,
+        // and a green run would tell CI the tree is clean.
         broken.Exit.ShouldNotBe(0, broken.Transcript());
         broken.ShouldRefuseWith("NuGet packages did not resolve for 1 project", "dotnet restore");
     }
@@ -141,9 +141,9 @@ public sealed class RestoreFailureSilentEdgeE2ETests
     {
         // The third arm, and the cheapest: no feed, no restore, no network. A restore that never ran leaves
         // the model in exactly the state a failed one does — every package edge missing — but leaves no
-        // assets file to read it off, so this arm used to exit 0 with the rule reporting itself inert. What
-        // decides it is the csproj: an SDK-style project writes an assets file on every restore, so not
-        // having one is a fact about this project rather than a shrug.
+        // assets file to read it off, so a gate that read only assets files would let this arm exit 0 with the
+        // rule reporting itself inert. What decides it is the csproj: an SDK-style project writes an assets
+        // file on every restore, so not having one is a fact about this project rather than a shrug.
         using TempFixtureWorkspace workspace = TempFixtureWorkspace.Dedicated(
             "RestoreFailureSolutions/FieldMini", "FieldMini.sln", false);
 
@@ -160,8 +160,8 @@ public sealed class RestoreFailureSilentEdgeE2ETests
         // refusal has to be honest about that rather than sending the reader up the terminal.
         never.Err.ShouldNotContain("See the warnings above", customMessage: never.Transcript());
         // check renders before it gates, so the rule's own report is on stdout beside the refusal — and this
-        // is the one place the inert warning's cure is read. Without the stamp reaching it, the cure here was
-        // about namespace globs: advice to check the selection against what the solution declares, for a
+        // is the one place the inert warning's cure is read. Without the stamp reaching it, the cure here would
+        // be about namespace globs: advice to check the selection against what the solution declares, for a
         // selection that came up empty because a package never resolved.
         never.Out.ShouldContain(
             "hint: The model is incomplete: NuGet packages did not resolve for 1 project, so this selection "

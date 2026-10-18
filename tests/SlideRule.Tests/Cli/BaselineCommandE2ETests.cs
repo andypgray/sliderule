@@ -70,7 +70,7 @@ public sealed class BaselineCommandE2ETests
             .NormalizedLines()
             .ShouldBe(BothPairsComposed());
         // init also grandfathers the quarantine containment rule into its explicit (uncommitted) baseline —
-        // InvoiceController's two interior references into the quarantined billing scope. (The quarantine init e2e.)
+        // InvoiceController's two interior references into the quarantined billing scope.
         File.ReadAllText(workspace.PathOf("arch", "violated-quarantine-baseline.json"))
             .NormalizedLines()
             .ShouldBe(ContainmentPairsComposed());
@@ -133,7 +133,7 @@ public sealed class BaselineCommandE2ETests
         string file = workspace.PathOf(ConventionalFile);
         // Append a HomeController entry by hand — the tamper the ratchet refuses. Forged in the shape of the
         // entry beside it, site count and all, down to a seal that is sixteen lowercase hex characters and
-        // simply not this entry's, so what the refusal rests on is the seal rather than anything the walk
+        // not this entry's, so what the refusal rests on is the seal rather than anything the walk
         // could notice about the line. HomeController sorts first, so the forgery takes the comma and the
         // captured entry stays last.
         const string forged =
@@ -161,10 +161,9 @@ public sealed class BaselineCommandE2ETests
         using var workspace = new TempFixtureWorkspace();
         string file = workspace.PathOf(ConventionalFile);
         // A whole-file digest beside the entries: the legacy envelope, under a version that describes a
-        // sealed file. The digest's own value
-        // is never reached — the key is a stranger under this version before anything recomputes it — so
-        // sixty-four zeros stand in for a real one, and what the row is about is which of two diagnoses
-        // a reader gives a file it cannot read.
+        // sealed file. The digest's own value is never reached — the key is a stranger under this version
+        // before anything recomputes it — so sixty-four zeros stand in for a real one, and what the row is
+        // about is which of two diagnoses a reader gives a file it cannot read.
         var envelope = $"  \"schemaVersion\": {BaselineFormat.SchemaVersion},\n";
         var digest = $"  \"digest\": \"{new string('0', 64)}\",\n";
         File.WriteAllText(file, File.ReadAllText(file).Replace(envelope, envelope + digest));

@@ -141,8 +141,8 @@ public sealed class FilteredSolutionE2ETests
     [Fact]
     public async Task Check_NarrowingFilter_StampsTheNarrowingAboveTheVerdict()
     {
-        // The field failure this class exists to prevent: check over a filter said nothing about the two
-        // projects it never looked at, so a verdict over a subset read as a verdict over the solution.
+        // The failure this class exists to prevent: a check over a filter that says nothing about the two
+        // projects it never looked at makes a verdict over a subset read as a verdict over the solution.
         CliResult result = await NarrowedCheck.Value;
 
         // Exit 0: the clean spec is clean over this solution, and it stays clean read through a filter. The
@@ -156,10 +156,10 @@ public sealed class FilteredSolutionE2ETests
     [Fact]
     public async Task Check_NarrowingFilter_SkipsTheRuleWhoseSubjectTheFilterDropped()
     {
-        // The second half of the field failure, and the sharper one: the clean spec's ratcheted rule is
-        // scoped to MyApp.Web, which this filter leaves out, so it selected nothing and red with "the
-        // subject selection matched no solution-declared types" — a spec defect for a spec that has none,
-        // and exit 1 for a solution that is clean. It skips now, and the reason names the filter that did it.
+        // The second half of the same failure, and the sharper one: the clean spec's ratcheted rule is scoped
+        // to MyApp.Web, which this filter leaves out, so it selects nothing. Red with "the subject selection
+        // matched no solution-declared types" would report a spec defect for a spec that has none, and exit 1
+        // for a solution that is clean, so the rule skips, and the reason names the filter that did it.
         CliResult result = await NarrowedCheck.Value;
 
         result.ShouldSucceed();
@@ -176,8 +176,7 @@ public sealed class FilteredSolutionE2ETests
     {
         // The warning in that verdict. layering/billing-independent keeps its subject, since Billing loaded,
         // and loses its target, since MyApp.Web is one of the projects the filter leaves out, so it warns
-        // inert and the warning is true. Its hint used to advise on how `MyApp.Web.*` was spelled, which is
-        // right, and close by inviting a decision about a rule that holds across the solution.
+        // inert and the warning is true.
         CliResult result = await NarrowedCheck.Value;
 
         result.ShouldSucceed();
@@ -217,7 +216,7 @@ public sealed class FilteredSolutionE2ETests
     public async Task Graph_NarrowingFilter_StampsTheSurveyWithItsOwnTail()
     {
         // graph needs no spec and is the first verb a stranger runs, where a project out of view reads as a
-        // codebase that simply does not have one.
+        // codebase that does not have one.
         CliResult result = await CliRunner.InvokeColdAsync("graph", BillingOnlyFilter(), "--no-cache");
 
         result.ShouldSucceed();
@@ -318,11 +317,12 @@ public sealed class FilteredSolutionE2ETests
     [Fact]
     public async Task Check_FilterThatNarrowsNothing_ResolvesBaselinesAgainstTheReferencedSolution()
     {
-        // The false red an anchor at the filter's own directory produced, and the reason the anchor moved.
-        // The clean spec grandfathers its two DataTable sites through arch/clean-baseline.json, a
-        // solution-relative convention path; resolved beside the filter that file is simply absent, so both
-        // sites went red and check exited 1. This filter narrows nothing, so no stamp fired to explain it —
-        // a run that changed nothing about the universe must reach the solution's own verdict.
+        // The false red an anchor at the filter's own directory would produce, and why the anchor is the
+        // referenced solution. The clean spec grandfathers its two DataTable sites through
+        // arch/clean-baseline.json, a solution-relative convention path; resolved beside the filter that file
+        // is absent, so both sites would go red and check would exit 1. This filter narrows nothing, so no
+        // stamp would explain it — a run that changes nothing about the universe must reach the solution's own
+        // verdict.
         string filter = Path.Combine(FilterDirectory, "DomainAndWeb.slnf");
 
         CliResult result = await CliRunner.InvokeColdAsync(
@@ -350,7 +350,7 @@ public sealed class FilteredSolutionE2ETests
     [Fact]
     public async Task Check_MalformedFilter_RefusesNamingTheFile()
     {
-        // Roslyn throws a bare exception for every filter fault alike, so without the mapping this reached
+        // Roslyn throws a bare exception for every filter fault alike, so without the mapping this would reach
         // the operator as a stack trace over a file it never named.
         CliResult result = await CliRunner.InvokeColdAsync(
             "check", Path.Combine(FilterDirectory, "Malformed.slnf"), "--spec", CliRunner.CleanSpecDll,
@@ -401,10 +401,10 @@ public sealed class FilteredSolutionE2ETests
     [Fact]
     public async Task BaselineInit_NarrowingFilter_RefusesWithoutWritingAnything()
     {
-        // A baseline is the team's signature on its debt, and init through a filter
-        // signs "zero debt" for every rule whose subject the filter left out. A filtered run anchors at the
-        // solution it references, so the baseline this would write lands in MyApp's own arch/ — beside the
-        // baseline a real team committed, which is exactly what makes writing it unrecoverable.
+        // A baseline is the team's signature on its debt, and init through a filter signs "zero debt" for
+        // every rule whose subject the filter left out. A filtered run anchors at the solution it references,
+        // so the baseline this would write lands in MyApp's own arch/ — beside the baseline a real team
+        // committed, which is exactly what makes writing it unrecoverable.
         string[] before = FilesWhereAWriteWouldLand();
 
         CliResult result = await CliRunner.InvokeColdAsync(

@@ -76,7 +76,7 @@ internal static class CliRunner
     /// <summary>The spec that references Core alone — the one built outside <c>tests/Fixtures</c>' globs.</summary>
     public static string SpecFixtureDll => Metadata("SpecFixturePath");
 
-    /// <summary>The spec for the polyglot bed, whose one rule holds — so its report is genuinely clean.</summary>
+    /// <summary>The spec for the polyglot bed, whose one rule holds — so its report is clean.</summary>
     public static string PolyglotSpecDll => Metadata("PolyglotSpecPath");
 
     /// <summary>The net10 spec whose <c>Define()</c> anchors a type from a .NET shared framework.</summary>

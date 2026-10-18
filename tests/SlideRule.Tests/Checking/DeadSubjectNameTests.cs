@@ -37,7 +37,7 @@ public sealed class DeadSubjectNameTests
     [Fact]
     public void TheSameNamesWrittenAsAUnion_FailWithTheSameText()
     {
-        // The regression this row holds: two spellings of one subject used to answer differently.
+        // The regression this row holds is two spellings of one subject answering differently.
         RuleResult listed = Checker.Run(Sources.LayeredModel, arch =>
                 arch.Rule("layering/named")
                     .Enforce(arch.Types.Named("Service", "Ghost").MustNotReference(arch.Namespace("App.Web.*")))

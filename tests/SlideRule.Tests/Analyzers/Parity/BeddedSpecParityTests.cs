@@ -18,7 +18,7 @@ namespace SlideRule.Tests.Analyzers.Parity;
 ///         <see cref="WarmWorkspacePool" />.
 ///     </para>
 ///     <para>
-///         The unmeasured list is part of each row rather than derived, so a rule that quietly stops being
+///         The unmeasured list is part of each row rather than derived, so a rule that stops being
 ///         measured — an operand that matched nothing after a fixture moved — cannot silently leave the
 ///         pin.
 ///     </para>

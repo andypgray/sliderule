@@ -20,8 +20,8 @@ namespace SlideRule.Tests.Cli;
 /// <remarks>
 ///     <para>
 ///         Beside the counting, rows pin what else a write must not do, each because nothing else would
-///         notice it moving: emit one identity twice (a write once emitted one line per violation sharing
-///         it), upgrade a legacy file it reports unchanged, or create a file it put nothing into.
+///         notice it moving: emit one identity twice, upgrade a legacy file it reports unchanged, or create
+///         a file it put nothing into.
 ///     </para>
 ///     <para>
 ///         The runner is driven through <see cref="BaselineRunner.AddEntry" /> and
@@ -376,10 +376,10 @@ public sealed class BaselineRunnerCountTests : IDisposable
     [Fact]
     public void AcceptReductions_RuleWhoseTargetRotted_RefusesRatherThanDeletingTheWholeSection()
     {
-        // The harm that made the status wording matter. The target selection matched nothing, so the
-        // rule warns itself inert and reports no violations — which is indistinguishable, to an intersection,
-        // from every violation having been fixed. Before the guard this echoed "accepted 2 reductions" and
-        // wrote an empty section over two live entries, on the command status itself told the reader to run.
+        // The harm the status wording guards against. The target selection matched nothing, so the rule
+        // warns itself inert and reports no violations — which is indistinguishable, to an intersection,
+        // from every violation having been fixed. Unguarded, this would echo "accepted 2 reductions" and
+        // write an empty section over two live entries, on the command status itself tells the reader to run.
         CheckReport report = Check(NoDataSource);
         string before = BaselineComposer.Compose(RuleId, ExportPair.WithSiteCount(2), Pair.WithSiteCount(2));
         string path = WriteBaseline(before);

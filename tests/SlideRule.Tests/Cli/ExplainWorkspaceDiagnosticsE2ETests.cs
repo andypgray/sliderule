@@ -8,11 +8,9 @@ namespace SlideRule.Tests.Cli;
 /// <summary>The workspace-diagnostics contract on <c>explain</c> — the verb that renders but never gates.</summary>
 /// <remarks>
 ///     <para>
-///         <c>explain</c> took no error writer at all, so a load failure on the workspace it opens for
-///         resolution was discarded: not gated, not rendered, not recorded anywhere. It renders the composed
-///         diagnostics now and still answers, because the rule it dumps comes from the spec and not from the
-///         codebase — a project that failed to load cannot make the answer wrong, only leave the reader
-///         unaware that anything failed.
+///         <c>explain</c> renders the composed diagnostics of the workspace it opens for resolution and still
+///         answers, because the rule it dumps comes from the spec and not from the codebase — a project that
+///         failed to load cannot make the answer wrong, only leave the reader unaware that anything failed.
 ///     </para>
 ///     <para>
 ///         Driven through <see cref="ExplainRunner" /> with a

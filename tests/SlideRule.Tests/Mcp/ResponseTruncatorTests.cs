@@ -160,10 +160,10 @@ public sealed class ResponseTruncatorTests
     [InlineData("arch_check")]
     public void TruncateIfNeeded_ToolWithAGrainLadder_FooterNeverOffersToPageTheDocumentOut(string toolName)
     {
-        // The trailer these hints used to carry — "or redirect sliderule <verb> --json to a file and slice
-        // it there" — contradicted the served instruction not to page, and a field test caught an agent
-        // quoting it back as its reason for leaving the tool surface entirely. Text at the moment of failure
-        // beats text in a system prompt, so the product must not say both.
+        // A trailer such as "or redirect sliderule <verb> --json to a file and slice it there" contradicts the
+        // served instruction not to page, and an agent that reads both can take the trailer as its reason for leaving
+        // the tool surface entirely. Text at the moment of failure beats text in a system prompt, so the
+        // product must not say both.
         string result = ResponseTruncator.TruncateIfNeeded(new string('x', 50), toolName, 20);
 
         result.ShouldNotContain("redirect");

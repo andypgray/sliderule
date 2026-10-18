@@ -12,13 +12,11 @@ namespace SlideRule.Tests.Cli;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         The defect these pin: the survey read what the C#/Roslyn extractor could and said nothing
-///         about the rest, so its <c>projects</c> array was simply shorter than the solution: on a real
-///         codebase 10 of the 12 projects a solution declared, with no count, no list and no note, and two
-///         <c>.fsproj</c> under no key at all. A spec derived from that survey cannot reach whatever ships
-///         from those projects, and nothing in the document says so. <c>check</c> had the identical silence
-///         from the other side — a clean verdict over a polyglot solution never mentioning the projects it
-///         never measured.
+///         What these pin: a survey that reads only what the C#/Roslyn extractor can must say so about the
+///         rest. Otherwise its <c>projects</c> array is shorter than the solution with no count, no list and
+///         no note, and a spec derived from it cannot reach whatever ships from the missing projects.
+///         <c>check</c> owes the same statement from the other side, or a clean verdict over a polyglot
+///         solution never mentions the projects it never measured.
 ///     </para>
 ///     <para>
 ///         The bed uses an <c>.fsproj</c> because F# is the one
@@ -51,7 +49,7 @@ public sealed class PolyglotSurveyE2ETests
 
         // Assert — the whole content of the coverage statement, as data: which project, and why it is not
         // in the survey. A reader holding this document alone can tell a two-project codebase from a survey
-        // that read one project of two, which is precisely what they could not do before.
+        // that read one project of two.
         result.ShouldSucceed();
         using JsonDocument document = result.ShouldHaveJsonStdout();
         JsonElement entry = document.RootElement.GetProperty("unsupportedProjects")
@@ -149,10 +147,10 @@ public sealed class PolyglotSurveyE2ETests
     [Fact]
     public async Task Check_CleanVerdictOverAPolyglotSolution_StillNamesWhatItNeverMeasured()
     {
-        // Arrange — the spec's one rule holds over the C# project, so this report is genuinely clean. That
-        // is the whole point: a green check over a solution holding projects the model never contained used
-        // to read as a green over the solution, because no rule can be violated in a project that is not
-        // there and the report had no way to say one was missing.
+        // Arrange — the spec's one rule holds over the C# project, so this report is clean. That is the
+        // point: a green check over a solution holding projects the model never contained must not read as a
+        // green over the solution, because no rule can be violated in a project that is not there, so only
+        // the report can say one is missing.
         using var fixture = new TempFixtureWorkspace("TestSolutions/PolyglotApp", "PolyglotApp.slnx");
 
         // Act

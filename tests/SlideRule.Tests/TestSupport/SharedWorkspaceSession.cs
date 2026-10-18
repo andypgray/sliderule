@@ -4,8 +4,7 @@ namespace SlideRule.Tests.TestSupport;
 
 /// <summary>
 ///     One <see cref="WorkspaceSession" /> over one private copy of a fixture solution, shared by every case of
-///     the class that owns it: the delta-measuring cases of <c>WorkspaceSessionTests</c> over MyApp, and
-///     <c>SessionFragmentStoreTests</c> over MyApp and MultiTfm.
+///     the class that owns it.
 /// </summary>
 /// <remarks>
 ///     <para>

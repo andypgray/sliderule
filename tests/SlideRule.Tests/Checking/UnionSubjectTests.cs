@@ -109,8 +109,7 @@ public sealed class UnionSubjectTests(WorkspaceFixture fixture)
     [Fact]
     public void EmptyOperand_UnderAMemberSubject_FailsThroughTheSameGate()
     {
-        // MemberConstraint.Subject IS the underlying type selection, so the one gate covers the member path —
-        // which is the path the repo's own flagship union rule takes.
+        // MemberConstraint.Subject IS the underlying type selection, so the one gate covers the member path.
         RuleResult result = Checker.Run(fixture.Model, arch =>
                 arch.Rule("naming/union-members")
                     .Enforce(arch.AnyOf(arch.Project("MyApp.Domain"), arch.Project("MyApp.Domian"))

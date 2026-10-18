@@ -29,9 +29,9 @@ namespace SlideRule.Tests.TestSupport;
 ///         the list alone, so paying that cost again per surface would buy nothing.
 ///     </para>
 ///     <para>
-///         The inner source is the shared warm pool unless a caller passes its own: nothing here asserts on whether a
-///         workspace was opened,
-///         only on what the gate does with what rides the handle. The real handle rides as the owned
+///         The inner source is the shared warm pool unless a caller passes its own: nothing here asserts on
+///         whether a workspace was opened, only on what the gate does with what rides the handle. The real
+///         handle rides as the owned
 ///         disposable so the ownership chain still holds — it is the pool's, so disposing it is a no-op.
 ///         Injected values never reach a real workspace, so the pooled session stays clean for the next
 ///         test; a genuinely partial load belongs in

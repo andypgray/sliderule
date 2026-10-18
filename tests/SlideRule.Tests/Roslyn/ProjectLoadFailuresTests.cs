@@ -32,8 +32,7 @@ public sealed class ProjectLoadFailuresTests
     public void Detect_ProjectWithAnEvaluatedOutputPath_IsNotAFailure()
     {
         // The negative control. A healthy project carries an evaluated output path whatever its reference or
-        // analyzer counts — which is exactly why those counts are not the predicate: two healthy projects
-        // measured had zero analyzer references, and one had four metadata references.
+        // analyzer counts, which is why those counts are not the predicate.
         using var workspace = new AdhocWorkspace();
         string csproj = ProjectPath("P", "P.csproj");
         Solution solution = AdhocSolution.Of(workspace, AdhocSolution.Loaded("P", csproj));
@@ -135,10 +134,9 @@ public sealed class ProjectLoadFailuresTests
     [Fact]
     public void Detect_SolutionFilterSelectsAProjectThatDidNotLoad_IsAFailure()
     {
-        // The strengthening the filter-aware arm buys. This case was invisible while the arm was skipped
-        // wholesale for a filter: the run asked for Kept, did not get it, and exited green. It is sound to
-        // demand it because Roslyn refuses a filter naming a non-member outright, so everything a
-        // well-formed filter selects is something the load was obliged to produce.
+        // The strengthening the filter-aware arm buys: without it, the run asks for Kept, does not get it, and
+        // exits green. It is sound to demand it because Roslyn refuses a filter naming a non-member outright,
+        // so everything a well-formed filter selects is something the load was obliged to produce.
         using TempDirectory temp = TestTempRoot.Fresh("filtered-absent");
         string filterPath = WriteFilter(temp, ["Kept", "Dropped"], "Kept");
         using var workspace = new AdhocWorkspace();
@@ -219,8 +217,6 @@ public sealed class ProjectLoadFailuresTests
         ProjectLoadFailures.Detect(solution, Path.Combine(via, "Solution.sln"))
             .ShouldHaveFailed(Path.Combine(via, "Absent", "Absent.csproj"));
     }
-
-    // ── harness ───────────────────────────────────────────────────────────────────────────────────────────
 
     // A classic .sln declaring one project line per name. Only the project paths are read, so the rest of the
     // file is the minimum a real solution carries.

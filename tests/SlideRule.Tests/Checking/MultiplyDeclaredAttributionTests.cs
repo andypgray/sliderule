@@ -31,7 +31,7 @@ namespace SlideRule.Tests.Checking;
 ///         So <c>Split.Alpha</c> is declared by <c>Middle</c> and <c>Shell</c>, <c>Split.Beta</c> by
 ///         <c>Anchor</c> and <c>Middle</c>, and the one <c>Split.Alpha → Split.Beta</c> edge stands for two
 ///         instances that reach different projects: Middle's own copy, and Anchor's declaration from Shell.
-///         <c>Anchor</c> wins Beta's facts precisely so the cross-project instance names a project the
+///         <c>Anchor</c> wins Beta's facts so the cross-project instance names a project the
 ///         source is not declared by, which is the case a single edge-global intra/cross decision cannot
 ///         state.
 ///     </para>
@@ -104,8 +104,7 @@ internal static class MixedDeclarerCodebase
 ///         made by one copy alone: <c>Drift.Formatter → Cells.Cell</c> by Core's, and
 ///         <c>Drift.Formatter → Palettes.Palette</c> by Satellite's. Each is a reference, a construction and an
 ///         exposure at once, so the verbs over those three families read the same two type pairs. The one edge
-///         into it, <c>Reader.Page → Drift.Formatter</c>, reached Satellite. The field found the outward shape on
-///         Spectre.Console, whose core and Ansi projects each declare the same seven helpers.
+///         into it, <c>Reader.Page → Drift.Formatter</c>, reached Satellite.
 ///     </para>
 /// </remarks>
 internal static class DriftedCopiesCodebase
@@ -322,8 +321,8 @@ internal static class DriftedSitesCodebase
 ///     <para>
 ///         Where the claim is about the target end alone, a row anchors its subject on a namespace, so the
 ///         outward edge of the shared type itself cannot ride into a verdict the row is not making. That
-///         avoidance is also why the field found this class of defect and the suite did not, so the rows
-///         naming a project-headed subject over both endpoints exist to make that very shape the subject.
+///         avoidance would leave a project-headed subject over both endpoints untested, so the rows naming
+///         one exist to make that very shape the subject.
 ///     </para>
 /// </remarks>
 public sealed class MultiplyDeclaredAttributionTests
@@ -372,9 +371,9 @@ public sealed class MultiplyDeclaredAttributionTests
     {
         // The field's shape in miniature: a project-headed subject, and an edge BOTH of whose endpoints
         // every declarer shares. Anchored on Tool, the rule owns Tool's instance alone — Tool's Widget
-        // reaching Tool's WidgetPart — which neither operand names, so nothing is forbidden. In earlier
-        // builds this red on Shared.Widget -> Shared.WidgetPart, because the operand's own declarers were
-        // tested against the source's roster instead of against the project the instance reached.
+        // reaching Tool's WidgetPart — which neither operand names, so nothing is forbidden. Testing the
+        // operand's own declarers against the source's roster, instead of against the project the instance
+        // reached, would red this on Shared.Widget -> Shared.WidgetPart.
         Checker.Run(MultiplyDeclaredCodebase.Model, arch =>
                 arch.Rule("layering/tool-not-core-or-stub")
                     .Enforce(arch.Project("Tool")
@@ -389,9 +388,9 @@ public sealed class MultiplyDeclaredAttributionTests
     {
         // The inbound mirror of the row above, and it needs both ends of one test: anchored on Core the
         // subject owns Core's instance of the shared edge, and Core's copy of Widget is not something
-        // Project("Tool") names. In earlier builds the two ends were filtered independently — the subject
-        // admitted the edge, then the source was tested by plain membership, which Project("Tool")
-        // satisfies for a type Tool declares — and the same edge red.
+        // Project("Tool") names. Filtering the two ends independently — the subject admitting the edge, then
+        // the source tested by plain membership, which Project("Tool") satisfies for a type Tool declares —
+        // would red the same edge.
         Checker.Run(MultiplyDeclaredCodebase.Model, arch =>
                 arch.Rule("layering/core-not-from-tool-project")
                     .Enforce(arch.Project("Core").MustNotBeReferencedBy(arch.Project("Tool")))
@@ -494,9 +493,9 @@ public sealed class MultiplyDeclaredAttributionTests
     [Fact]
     public void MustNotBeReferencedBy_SourceOperandNamingALoserDeclarer_ReachesEdgesFromTheSharedType()
     {
-        // An edge's source belongs to every declarer, because each one's compilation genuinely makes the
-        // reference. So Project("Tool") in source position reaches Command's edge and the shared type's own
-        // outward edge alike, while Core's and Client's references stay outside it.
+        // An edge's source belongs to every declarer, because each one's compilation makes the reference. So
+        // Project("Tool") in source position reaches Command's edge and the shared type's own outward edge alike,
+        // while Core's and Client's references stay outside it.
         Checker.Run(MultiplyDeclaredCodebase.Model, arch =>
                 arch.Rule("layering/shared-not-from-tool")
                     .Enforce(arch.Namespace("Shared.*").MustNotBeReferencedBy(arch.Project("Tool")))
@@ -556,7 +555,7 @@ public sealed class MultiplyDeclaredAttributionTests
     [Fact]
     public void MustOnlyReference_IntraCopyEdge_TypeofAllowEntryContainingTheTypeSatisfies()
     {
-        // The other way an intra-copy edge is satisfied: an allow entry that is not a project at all simply
+        // The other way an intra-copy edge is satisfied: an allow entry that is not a project at all
         // contains the type, and containment is all this verb asks of it.
         Checker.Run(MultiplyDeclaredCodebase.Model, arch =>
                 arch.Rule("layering/tool-only-widget")
@@ -606,7 +605,7 @@ public sealed class MultiplyDeclaredAttributionTests
         // The boundary for the inbound verb, in the same attribution context: anchored on Core the subject
         // owns Consumer's reference into Core's copy, and Consumer is declared by Client alone, outside the
         // subject and outside Project("Stub"). The two edges the subject owns at its own copy stay green on
-        // the implicit entry, so the one violation names the source that is genuinely elsewhere.
+        // the implicit entry, so the one violation names the source that is elsewhere.
         Checker.Run(MultiplyDeclaredCodebase.Model, arch =>
                 arch.Rule("layering/core-only-from-stub")
                     .Enforce(arch.Project("Core").MustOnlyBeReferencedBy(arch.Project("Stub")))
@@ -620,8 +619,8 @@ public sealed class MultiplyDeclaredAttributionTests
     {
         // Overlapping-but-different declarer sets, which is where one intra/cross decision for the whole
         // edge cannot be right for both instances. Shell's copy of Alpha declares no Beta, so its
-        // reference crosses into Anchor's declaration, and a ban on Anchor catches it. In earlier builds the
-        // edge counted as intra-project outright — Middle declares both ends — and this stayed green.
+        // reference crosses into Anchor's declaration, and a ban on Anchor catches it. Counting the edge as
+        // intra-project outright, because Middle declares both ends, would leave this green.
         Checker.Run(MixedDeclarerCodebase.Model, arch =>
                 arch.Rule("layering/shell-not-anchor")
                     .Enforce(arch.Project("Shell").MustNotReference(arch.Project("Anchor")))
@@ -630,8 +629,8 @@ public sealed class MultiplyDeclaredAttributionTests
             .ShouldHaveFailedWithSingleEdge(ViolationKind.Reference, "Split.Alpha", "Split.Beta");
 
         // The same edge under a ban on the project it never reached. Middle's instance is Middle's own
-        // business, and Shell's reached Anchor; in earlier builds this red, because the intra branch admitted
-        // every head the SOURCE was declared by rather than the one each instance actually compiled into.
+        // business, and Shell's reached Anchor. An intra branch that admitted every head the SOURCE is declared
+        // by, rather than the one each instance compiled into, would red this.
         Checker.Run(MixedDeclarerCodebase.Model, arch =>
                 arch.Rule("layering/shell-not-middle")
                     .Enforce(arch.Project("Shell").MustNotReference(arch.Project("Middle")))
@@ -644,8 +643,8 @@ public sealed class MultiplyDeclaredAttributionTests
     public void MustOnlyReference_DriftedCopies_AnotherCopysReferenceDoesNotCountAgainstTheSatellite()
     {
         // The field's own rule. Satellite's copy of Formatter reaches nothing outside Satellite; it is Core's
-        // copy that reaches Cell. In earlier builds every declarer of Formatter was charged with every reference any
-        // copy made, so this red on Drift.Formatter -> Cells.Cell, a line in a file Satellite never compiles.
+        // copy that reaches Cell. Charging every declarer of Formatter with every reference any copy made would red
+        // this on Drift.Formatter -> Cells.Cell, a line in a file Satellite never compiles.
         Checker.Run(DriftedCopiesCodebase.Model, arch =>
                 arch.Rule("layering/satellite-is-foundation")
                     .Enforce(arch.Project("Satellite").MustOnlyReference(arch.Project("Satellite")))
@@ -711,8 +710,8 @@ public sealed class MultiplyDeclaredAttributionTests
     public void MustNotReference_ReferenceIntoALosersCopy_CountsAgainstTheLoserAndNotTheWinner()
     {
         // Reader declares no copy of Formatter and references Satellite alone, so the copy its field binds is
-        // Satellite's. In earlier builds a reference from a project declaring no copy was attributed to the first
-        // declarer, whose facts the node carries, and these two verdicts came out the other way round.
+        // Satellite's. Attributing a reference from a project declaring no copy to the first declarer, whose facts
+        // the node carries, would turn these two verdicts the other way round.
         Checker.Run(DriftedCopiesCodebase.Model, arch =>
                 arch.Rule("layering/reader-not-satellite")
                     .Enforce(arch.Project("Reader").MustNotReference(arch.Project("Satellite")))

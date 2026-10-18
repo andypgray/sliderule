@@ -628,10 +628,10 @@ internal static class RuleResultAssertions
 
     /// <summary>
     ///     Asserts the rule failed on exactly the project violations <paramref name="projects" /> names,
-    ///     each rendered as the offending project's name — or, for the per-item violations
-    ///     <c>MustReferenceNoPackages</c> and <c>MustOnlyTarget</c> mint, as <c>{project} -&gt; {package}</c> or
-    ///     <c>{project} -&gt; {framework}</c> (GRAMMAR §4.10). In any
-    ///     order, for the reason given on <see cref="ShouldHaveFailedWithEdges" />.
+    ///     each rendered as the offending project's name — or, for a per-item violation, as
+    ///     <c>{project} -&gt; {item}</c>, the item a package, a framework, or a property at its framework
+    ///     (<c>Nullable@net8.0</c>) (GRAMMAR §4.10). In any order, for the reason given on
+    ///     <see cref="ShouldHaveFailedWithEdges" />.
     /// </summary>
     internal static RuleResult ShouldHaveFailedWithProjectSubjects(this RuleResult result, string[] projects)
     {

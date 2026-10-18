@@ -32,7 +32,7 @@ namespace SlideRule.Tests.Mcp;
 ///         <see cref="McpChildServerRepoHandleTests" /> drives the same conversation over the same
 ///         plumbing, so the setups are near-identical, but every one of its facts opens with
 ///         <c>Assert.SkipUnless(ProcessFileFootprint.IsSupported, …)</c>, and the footprint scan
-///         is Windows-x64 only. CI runs ubuntu and macos legs too, and on those this is the <em>only</em>
+///         is Windows-x64 only. CI runs ubuntu and macos legs too, and on those this is the only
 ///         real-child-over-real-stdio coverage there is. Deleting it would leave the stdin-inheritance
 ///         wedge unguarded on two of four legs.
 ///     </para>

@@ -10,8 +10,8 @@ namespace SlideRule.Tests.Cli;
 ///     <c>SolutionDirApp</c> fixture, whose web and plugin projects reach their dependencies only that way. The
 ///     property is defined by a solution build and by the workspace load and by nothing else; a project file
 ///     evaluated without it sees MSBuild's <c>*Undefined*</c> placeholder, which turns each such include into a
-///     wildcard that matches no file, and the survey used to report these projects as declaring no references
-///     while their edges still showed.
+///     wildcard that matches no file, so a survey reading the declarations that way reports these projects as
+///     declaring no references while their edges still show.
 /// </summary>
 public sealed class SolutionDirSurveyE2ETests
 {

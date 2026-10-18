@@ -92,7 +92,7 @@ public sealed class SarifReportRendererTests
         string json = report.ToSarif();
 
         IReadOnlyList<JsonElement> results = json.SarifResults();
-        results.Count.ShouldBeGreaterThan(1); // genuinely multi-site
+        results.Count.ShouldBeGreaterThan(1); // multi-site
         // All sites belong to the one Page -> Db violation, so the fingerprints share every slot but the ordinal.
         IReadOnlyList<string> fingerprints = results.Select(Fingerprint)
             .ToList();
@@ -361,8 +361,8 @@ public sealed class SarifReportRendererTests
     [Fact]
     public void Serialize_CitedRuleWithoutFix_MakesTheCitationTheWholeHelp()
     {
-        // A rule with no fix used to carry no help at all, which GitHub marks as a required field. The
-        // citation fills it on its own rather than being dropped for want of a fix to join.
+        // GitHub marks help as a required field, so a rule with no fix still carries it: the citation fills
+        // it on its own rather than being dropped for want of a fix to join.
         var report = new CheckReport(
         [
             new RuleResult(
@@ -530,9 +530,9 @@ public sealed class SarifReportRendererTests
     [Fact]
     public void Serialize_TripwireWarning_EmitsAWarningResultAtTheChangedFileWithNoRegion()
     {
-        // The finding a tripwire produces is a warning, and before this it produced no SARIF result at all: the
-        // walk covered violations and grandfathered entries only, so the one rule in the vocabulary that
-        // reports by warning reported nothing at all through this channel. The location is the changed file and
+        // The finding a tripwire produces is a warning, and it is a result of its own: a walk over violations
+        // and grandfathered entries alone would leave the one rule in the vocabulary that reports by warning
+        // with nothing to report through this channel. The location is the changed file and
         // nothing narrower — the finding is that the file was touched, and a start line would anchor the alert
         // wherever the renderer chose rather than where anything happened.
         CheckReport report = Checker.Run(QuarantinedCodebase, BaselineIndex.Empty, TouchedAlpha, QuarantinedScope);

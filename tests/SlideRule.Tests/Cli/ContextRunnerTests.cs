@@ -17,9 +17,9 @@ public sealed class ContextRunnerTests
     [Fact]
     public async Task Context_PathAsAStringifiedArray_RefusesOnTheShapeAndEchoesTheOneValue()
     {
-        // The defect this closes: brackets resolve to a directory no card covers, so the verb used to answer
-        // "no architecture scope covers …" and exit 0 — a well-formed proven negative to a question nobody
-        // asked, on the exact call an agent is told to make before editing unfamiliar territory.
+        // Unrefused, brackets resolve to a directory no card covers, so the verb would answer "no architecture
+        // scope covers …" and exit 0 — a well-formed proven negative to a question nobody asked, on the exact
+        // call an agent is told to make before editing unfamiliar territory.
         UserErrorException refusal = await ShouldRefuse("""["src/Foo"]""");
 
         refusal.Message.ShouldBe(
@@ -80,7 +80,7 @@ public sealed class ContextRunnerTests
     }
 
     // The solution and spec are never read — every case here throws before the load — so the shortest
-    // request that compiles is the honest one.
+    // request that compiles is enough.
     private static ContextRequest Request(string path)
     {
         return new ContextRequest(path, CliRunner.MyAppSolution, CliRunner.CleanSpecDll, Path.GetTempPath());

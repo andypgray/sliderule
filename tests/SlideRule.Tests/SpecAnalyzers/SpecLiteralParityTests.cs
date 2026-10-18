@@ -78,7 +78,7 @@ namespace SlideRule.Tests.SpecAnalyzers;
 public sealed class SpecLiteralParityTests(SpecFixtureCorpus corpus) : IClassFixture<SpecFixtureCorpus>
 {
     // The fixture count stands on its own rather than being read off the walk, because the walk is what
-    // would go quiet: a class the syntax pass stopped recognising would simply not be measured, and parity
+    // would go quiet: a class the syntax pass stopped recognising would not be measured, and parity
     // over fewer fixtures reads exactly like parity over all of them.
     private const int FixtureCount = 161;
 

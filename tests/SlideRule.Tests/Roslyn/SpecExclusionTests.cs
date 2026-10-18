@@ -190,10 +190,9 @@ public sealed class SpecExclusionTests : IDisposable
     [Fact]
     public void TryReadDeclaredMembers_SolutionFilter_ReadsThroughToTheFilteredSolutionsWholeMembership()
     {
-        // A filter used to degrade to null here, which subtracted the spec's whole closure. It now resolves
-        // to the solution it points at — and to that solution's WHOLE membership, not the filter's
-        // selection: a member left out of the selection is still solution material, so excluding it would
-        // silently shrink the codebase under law.
+        // A filter resolves to the solution it points at — and to that solution's WHOLE membership, not the
+        // filter's selection: a member left out of the selection is still solution material, so excluding it
+        // would silently shrink the codebase under law.
         File.WriteAllText(_temp.PathOf("App.slnx"), """
                                                     <Solution>
                                                       <Project Path="src/App/App.csproj" />
@@ -215,7 +214,7 @@ public sealed class SpecExclusionTests : IDisposable
     [Fact]
     public void TryReadDeclaredMembers_MalformedSolutionFilter_ReturnsNullRatherThanAnEmptySet()
     {
-        // The "never fail open" pin, kept alive at the one site that can still reach it. Reporting "nothing
+        // The "never fail open" pin, at the one site that can reach it. Reporting "nothing
         // is declared" for an unreadable filter would subtract the spec's whole closure; null is the fallback.
         string solutionPath = _temp.PathOf("Malformed.slnf");
         File.WriteAllText(solutionPath, "{ this is not json");

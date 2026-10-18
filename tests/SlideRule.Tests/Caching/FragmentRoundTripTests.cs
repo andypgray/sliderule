@@ -454,8 +454,8 @@ public sealed class FragmentRoundTripTests
     public void RoundTrip_SolutionMembership_SurvivesAllThreeStatesOntoTheProjectNodes()
     {
         // Arrange — a declared member, a passenger, and a project nothing was read about. The cache is the
-        // one place all three can be flattened into the same absent-or-default value, which is precisely the
-        // failure this pins: a hit replaying a passenger as a member would have `render` draw it.
+        // one place all three can be flattened into the same absent-or-default value, which is the failure
+        // this pins: a hit replaying a passenger as a member would have `render` draw it.
         CompilationInput member = CompilationFactory.Compile("Member", ("Member.cs", """
                                                                                      namespace Member;
                                                                                      public class A {}

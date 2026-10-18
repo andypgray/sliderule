@@ -25,7 +25,7 @@ namespace SlideRule.Tests.Mcp;
 ///         A detector that silently sees nothing reports every process as clean.
 ///         <see cref="InRepoServer_MapsAndHoldsPathsUnderTheRepository" /> is therefore a committed negative
 ///         control: the same server launched the in-repo way (its images mapped out of the test output, its
-///         working directory inside the repository) must be caught by <em>both</em> scans. It proves that
+///         working directory inside the repository) must be caught by both scans. It proves that
 ///         the zero its sibling asserts means something, and it reds if either scan or the device-path
 ///         translation behind it regresses.
 ///     </para>
@@ -117,7 +117,7 @@ public sealed class McpChildServerRepoHandleTests
         conversation.StillAlive.ShouldBeTrue(
             $"the server exited during the run, so its footprint proves nothing.\nstderr:\n{conversation.Diagnostics}");
 
-        // arch_check must have genuinely run the whole diff path, spec load included — otherwise a server
+        // arch_check must have run the whole diff path, spec load included — otherwise a server
         // that answered five errors would hold nothing and pass.
         conversation.Answers["arch_check"]!
             .ShouldHaveToolText("arch_check")

@@ -17,7 +17,7 @@ namespace SlideRule.Tests.TestSupport;
 ///         path. The staged copy is a directory of its own: <c>SpecLoadContext</c> resolves through an
 ///         <c>AssemblyDependencyResolver</c> rooted at the spec DLL, which for a net48 build (no
 ///         <c>.deps.json</c>) falls back to the spec's own directory — so what is absent from the staged
-///         directory is genuinely absent from resolution.
+///         directory is absent from resolution.
 ///     </para>
 ///     <para>
 ///         <b>Staging intact and then deleting is a different case, not a longer way to withhold.</b> A net10

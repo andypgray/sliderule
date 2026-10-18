@@ -47,7 +47,7 @@ public sealed class AccessibilityMapperTests
         // The case the fallback exists for, and the negative control for the extraction-tolerance tests: a
         // type the compiler could not resolve — what a partially-loaded workspace hands the external-mint
         // path — is an error symbol carrying no declared accessibility. Without a total mapper, a missing
-        // project reference surfaced as a crash naming a symbol nobody wrote.
+        // project reference surfaces as a crash naming a symbol nobody wrote.
         INamedTypeSymbol unresolved = UnresolvedBaseTypeSymbol();
 
         unresolved.TypeKind.ShouldBe(RoslynTypeKind.Error);

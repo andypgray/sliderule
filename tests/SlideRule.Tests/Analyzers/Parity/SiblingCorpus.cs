@@ -16,7 +16,7 @@ namespace SlideRule.Tests.Analyzers.Parity;
 ///     </para>
 ///     <para>
 ///         Two families sit here. The first is about what one compilation can settle — the verbs, the
-///         reference forms, the copies of a shared name. The second is about which <em>document</em> of a
+///         reference forms, the copies of a shared name. The second is about which document of a
 ///         compilation answers for a finding.
 ///     </para>
 /// </remarks>
@@ -324,7 +324,7 @@ internal static class SiblingCorpus
 
     /// <summary>
     ///     The same question at the other end of an edge: a project-headed allow-list operand over the
-    ///     <em>source</em> of a reference two projects both compile.
+    ///     source of a reference two projects both compile.
     /// </summary>
     /// <remarks>
     ///     One file's worth of source in two projects, each making the same reference out of its own copy.

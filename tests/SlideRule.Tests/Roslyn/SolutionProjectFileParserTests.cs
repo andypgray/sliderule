@@ -17,7 +17,7 @@ namespace SlideRule.Tests.Roslyn;
 /// <remarks>
 ///     <para>
 ///         The <see cref="SolutionProjectFileParser.ParseFilter" /> rows pin the half a solution filter adds:
-///         its <em>two</em> resolution bases — the referenced solution against the filter's own directory,
+///         its two resolution bases — the referenced solution against the filter's own directory,
 ///         every project entry against that solution's — and the four refusals, one of which
 ///         (<see cref="SolutionProjectFileParser.ReadDeclaredMembership" /> reaching a filter that points at
 ///         another filter) is a shape Roslyn does not support at all.
@@ -147,9 +147,9 @@ public sealed class SolutionProjectFileParserTests
     {
         // A shared project is the one entry the "ends in proj" partition catches that is not a language: it
         // is a container whose .projitems files compile into every project that imports it, so its code is
-        // very often C# and reaches the model through the importer. Classifying it with the .fsproj was the
-        // defect — a single reason string then told every reader "not a C# project" about a project whose
-        // sources usually are, and which is not missing from the model at all.
+        // very often C# and reaches the model through the importer. Classified with the .fsproj, it would tell
+        // every reader "not a C# project" about a project whose sources usually are, and which is not missing
+        // from the model at all.
         const string text = """
                             <Solution>
                               <Project Path="Alpha\Alpha.csproj" />

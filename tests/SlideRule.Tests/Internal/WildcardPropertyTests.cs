@@ -142,7 +142,7 @@ public sealed class WildcardPropertyTests
         Gen<(string Prefix, string Text)> unrelated = StringOf(TextAlphabet, 0, 6)
             .SelectMany(_ => StringOf(TextAlphabet, 0, 8), (prefix, text) => (Prefix: prefix, Text: text));
 
-        // As above: the text that genuinely extends the prefix is drawn deliberately, so every seed exercises
+        // As above: the text that extends the prefix is drawn deliberately, so every seed exercises
         // the arm where the pattern is supposed to match.
         Gen<(string Prefix, string Text)> extended = StringOf(TextAlphabet, 0, 6)
             .SelectMany(

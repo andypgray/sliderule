@@ -48,8 +48,8 @@ public sealed class CheckCommandTests
             .RunAsync(Request(DocumentGrain.Overview), Ct);
 
         // Assert — parseable (nothing was truncated), stamped, and byte-identical both to what --grain overview
-        // writes here and to the pinned --grain overview document, which is what keeps the degraded answer honest
-        // about which document a reader is holding.
+        // writes here and to the pinned --grain overview document, which is what tells a reader of the degraded
+        // answer which document they are holding.
         using JsonDocument document = JsonDocument.Parse(degraded.ToString());
         document.RootElement.GetProperty("grain")
             .GetString()
@@ -199,10 +199,8 @@ public sealed class CheckCommandTests
     [Fact]
     public async Task Check_BudgetBelowEvenTheSkeleton_DegradesToIndexRatherThanTruncating()
     {
-        // Arrange — the case the field found and this rung answers. A Spectre.Console bed's report was 67,909
-        // characters against a 50,000 budget, so the ladder ran out and the report came back cut; the agent
-        // that received it ran whole-document CLI checks instead and never called the tool again. One
-        // character below the skeleton is the same condition in miniature.
+        // Arrange — the case this rung answers: a report whose skeleton still overruns the budget, which
+        // without index would come back cut. One character below the skeleton is that condition in miniature.
         int belowSkeleton = await LengthAt(DocumentGrain.Skeleton) - 1;
         var output = new StringWriter();
 

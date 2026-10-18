@@ -49,8 +49,8 @@ public sealed class PackageShadowedNameTests
     public void ExtractFromCompilations_ProductBindsThePackage_ReachesNoTypeOfTheDeclaringProject()
     {
         // Asserted as an absence rather than a count: no ordering accident can satisfy it.
-        // This is the phantom the field test found — a product-must-not-reference-tests rule reporting two
-        // violations against a mock neither product project has a reference path to.
+        // The phantom it rules out is a product-must-not-reference-tests rule reporting violations against a
+        // mock neither product project has a reference path to.
         Model.Edges
             .Where(edge => edge.Source.ProjectName == "Product")
             .Select(edge => edge.Target.ProjectName)
@@ -219,7 +219,7 @@ public sealed class PackageShadowedNameTests
     [Fact]
     public void Check_ProductMustNotReferenceTests_PassesOverAShadowedName()
     {
-        // The rule the field test actually wrote. Green alone would prove
+        // The layering rule the shadowed name must not trip. Green alone would prove
         // nothing — an empty subject or an empty target set is green too — so the sibling below reds on the
         // same two selections in the other direction.
         RuleResult result = Checker.Run(Model, arch =>

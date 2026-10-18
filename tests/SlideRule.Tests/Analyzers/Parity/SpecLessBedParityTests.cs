@@ -176,7 +176,7 @@ public sealed class SpecLessBedParityTests
 
     /// <summary>
     ///     A layer <c>arch.Project</c> defines, as the subject of an outbound ban. The subject is the
-    ///     <em>tool's</em> compiled types, which the linked <c>Compile Include</c> makes two rather than
+    ///     tool's compiled types, which the linked <c>Compile Include</c> makes two rather than
     ///     one: <c>LinkedApp.Shared.Widget</c> is declared by the tool as much as by Core, and a build of
     ///     the tool sees exactly that. A ban only ever misses types, so both views answer the same thing.
     /// </summary>
@@ -206,7 +206,7 @@ public sealed class SpecLessBedParityTests
 
     /// <summary>
     ///     The same layer as a ban's operand, which is the position a missed declarer can only cost a
-    ///     violation in. The operand is the tool's <em>own</em> compiled surface, which the linked
+    ///     violation in. The operand is the tool's own compiled surface, which the linked
     ///     <c>Compile Include</c> makes hold the shared widget as well as the tool's own command — so the
     ///     crossing exists only because two projects compile one file, and both views find it.
     /// </summary>
@@ -245,7 +245,7 @@ public sealed class SpecLessBedParityTests
     /// </summary>
     /// <remarks>
     ///     What a linked file can show here is one half of the claim, the copy reached being the reader's
-    ///     own; the other half, where an edge reaches a copy a <em>third</em> project declares and the law
+    ///     own; the other half, where an edge reaches a copy a third project declares and the law
     ///     names either declarer in turn, is in <c>SiblingCorpusParityTests</c>, no bed having a shape
     ///     that separates the two.
     /// </remarks>

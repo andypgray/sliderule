@@ -9,9 +9,9 @@ namespace SlideRule.Tests.Cli;
 /// <summary>
 ///     The spec contract binds on the assembly, never on its version. A host carries exactly one copy of
 ///     <c>SlideRule</c>, and the default binder rejects a copy older than the reference a spec was
-///     compiled against — so while the shipped identity tracked the package version, every release minted a
-///     new one and any spec built against a newer contract failed to load at all, reported as a plain
-///     missing file. These pin the bind that replaced it, and the failures it defers to.
+///     compiled against — so a bind keyed on an identity that tracked the package version would fail any
+///     spec built against a newer contract at load, reported as a plain missing file. These pin the bind on
+///     the assembly, and the failures it defers to.
 /// </summary>
 public sealed class SpecContractBindTests
 {

@@ -195,7 +195,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
     {
         // stderr is the CLI's channel and the MCP surface discards it, so the note only reaches a client if
         // it rides the document. It does, because it is composed into the one list both renderers read
-        // rather than appended at write time — the whole of the MCP-side fix, seen from the CLI.
+        // rather than appended at write time.
         CliResult result = await LoadDiagnosticJson.Value;
 
         result.ShouldRefuseWith();
@@ -420,9 +420,9 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
     [InlineData(GermanAuditFetchFailure)]
     public async Task Check_RestoreWarningWithNoFailedProject_RendersItAndExitsClean(string diagnostic)
     {
-        // The two measured field refusals, in three spellings, all of which used to reach a decision. None of
-        // them says a project failed to build — they are restore warnings about packages and feeds — and
-        // nothing loads them into the gate any more, so the clean spec exits 0 and the warning still prints.
+        // The two measured field refusals, in three spellings. None of them says a project failed to build —
+        // they are restore warnings about packages and feeds — and nothing loads them into the gate, so the
+        // clean spec exits 0 and the warning still prints.
         // The German pair is the point of the theory: recognition cannot depend on a phrase, because NuGet
         // ships its wording in many languages and none of it is a contract.
         CliResult result = await RunWithInjectedDiagnosticAsync(
@@ -508,7 +508,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
     {
         // Code scanning has no exit code and no stdout: a clean SARIF over a filter would close every alert
         // the unchecked projects would have raised. Warning rather than error, and executionSuccessful stays
-        // true, because the results are true — they are simply not the whole solution's.
+        // true, because the results are true — they are not the whole solution's.
         using TempDirectory temp = TestTempRoot.Fresh("narrowed-sarif");
         string sarifPath = temp.PathOf("narrowed.sarif");
 
@@ -530,9 +530,10 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
     [Fact]
     public async Task Check_RestoreFailedProject_NoFlag_FailsClosedWithItsOwnGateLine()
     {
-        // The measured silent pass, closed. The project loaded completely — full document set, both output
-        // paths — so nothing in the loaded structure blames it and the old gate saw a clean solution, while
-        // every package edge it declares was missing from the model and a rule over one reported itself inert.
+        // The measured silent pass. The project loaded completely — full document set, both output paths —
+        // so nothing in the loaded structure blames it and a gate reading only that structure sees a clean
+        // solution, while every package edge it declares is missing from the model and a rule over one reports
+        // itself inert.
         CliResult result = await RestoreFailureHuman.Value;
 
         result.ShouldRefuseWith(RestoreGateLine, RestoreFailedProject);

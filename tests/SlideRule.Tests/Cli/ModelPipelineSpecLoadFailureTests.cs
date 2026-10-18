@@ -28,8 +28,8 @@ namespace SlideRule.Tests.Cli;
 ///     </para>
 ///     <para>
 ///         The missing-dependency arm reaches two different remedies, and both are driven here from real
-///         builds rather than from fabricated exceptions, because which remedy the reader is handed is the
-///         part that was wrong in the field. <c>SlideRule.SharedFrameworkSpec</c> is the one no
+///         builds rather than from fabricated exceptions, because which remedy the reader is handed depends
+///         on what the real build output holds. <c>SlideRule.SharedFrameworkSpec</c> is the one no
 ///         build setting can fix — it needs no staging trick at all, because a shared framework is absent
 ///         from a spec's output however the spec project is written.
 ///     </para>
@@ -124,7 +124,7 @@ public sealed class ModelPipelineSpecLoadFailureTests
         var thrown = Should.Throw<UserErrorException>(() => ModelPipeline.LoadModel(CliRunner.SharedFrameworkSpecDll));
 
         // Assert: the third world named by name. The packaging remedy is mentioned only to be ruled out —
-        // the field agent had already applied it before the failure, so silence about it would read as an
+        // a reader may already have applied it before the failure, so silence about it would read as an
         // omission rather than an answer.
         thrown.InnerException.ShouldBeOfType<FileNotFoundException>();
         thrown.Message.ShouldStartWith(

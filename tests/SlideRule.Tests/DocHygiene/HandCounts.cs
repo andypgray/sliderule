@@ -17,7 +17,7 @@ namespace SlideRule.Tests.DocHygiene;
 ///         holding nothing: the sentence was reworded, the number went back to being hand-maintained, and
 ///         the suite stayed green. A fragment that matches twice is a number checked in one sentence and
 ///         free in the other. So zero matches and two matches are reported as failures beside a count
-///         that simply disagrees, because all three are the same defect arriving by different routes.
+///         that disagrees, because all three are the same defect arriving by different routes.
 ///     </para>
 ///     <para>
 ///         A word where the number goes is not a count. The placeholder matches any word, so a

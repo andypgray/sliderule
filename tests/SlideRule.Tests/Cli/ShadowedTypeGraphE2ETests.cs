@@ -64,7 +64,7 @@ public sealed class ShadowedTypeGraphE2ETests
         // Act
         CliResult result = await CliRunner.InvokeAsync("graph", fixture.SolutionPath, "--json", "--grain", "skeleton");
 
-        // Assert — the count is what tells elision from absence. A section that simply vanished at the
+        // Assert — the count is what tells elision from absence. A section that vanished at the
         // coarsest grain would read as the good state, which for a coverage statement is the opposite of
         // the truth.
         result.ShouldSucceed();

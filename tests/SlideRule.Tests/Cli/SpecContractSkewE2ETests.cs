@@ -69,7 +69,7 @@ public sealed class SpecContractSkewE2ETests
 
     [Theory]
     [InlineData("0.2.0.0")] // older than the host's pinned identity…
-    [InlineData("2.0.0.0")] // …and newer, the direction that used to fail at load with a missing-file error
+    [InlineData("2.0.0.0")] // …and newer, the direction a version-keyed bind fails at load with a missing-file error
     public async Task Explain_SpecBuiltAgainstASkewedContract_BindsAndExplainsTheRule(string version)
     {
         // Arrange

@@ -17,9 +17,8 @@ namespace SlideRule.Tests.Mcp;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         Exists because the vocabulary and the recipe drifted apart silently — verbs shipped across two
-///         releases with the recipe never learning them, and nothing red; later, three accessibility adjectives
-///         reached the recipe only because they were added by hand. Name presence is the whole contract: how a
+///         Without it the vocabulary and the recipe drift apart with nothing red: a verb or adjective ships, and
+///         the recipe learns it only if someone adds it by hand. Name presence is the whole contract: how a
 ///         name is taught stays a prose judgment, so this gate checks reachability, never wording. Each withheld
 ///         registry is two-sided like the doc-hygiene exemptions: an entry for a name that no longer ships is
 ///         dead, and an entry for a name the prompt does teach is stale — both red. The nouns and the member
@@ -27,7 +26,7 @@ namespace SlideRule.Tests.Mcp;
 ///     </para>
 ///     <para>
 ///         The gate reads the served body outside the generated vocabulary table. Inside the table every name
-///         appears by construction, so a gate that read it would pass vacuously; the table's own completeness
+///         appears by construction, so a gate that read it could never red; the table's own completeness
 ///         is <see cref="Vocabulary.VocabularyCatalogTests" />' to hold.
 ///     </para>
 /// </remarks>

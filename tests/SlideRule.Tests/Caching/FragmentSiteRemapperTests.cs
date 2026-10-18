@@ -520,7 +520,7 @@ public sealed class FragmentSiteRemapperTests
         return [libInput, appInput];
     }
 
-    // Two comment lines above the file and a blank line above every brace-only line: the edit that moves
+    // Two comment lines above the file and a blank line above every opening-brace line: the edit that moves
     // every site in the fragment and changes no fact.
     private static string WithInsertedLines(string source)
     {

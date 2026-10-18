@@ -18,7 +18,7 @@ namespace SlideRule.Tests.Oracle;
 /// <remarks>
 ///     Reused across the case-table rows as an <c>IClassFixture</c>, so the (non-trivial) assembly
 ///     load and model build happen exactly once. The reference universe is deliberately the three
-///     MyApp assemblies' <em>declared</em> types (<see cref="Architecture" />'s
+///     MyApp assemblies' declared types (<see cref="Architecture" />'s
 ///     <c>Types</c>, which excludes the referenced BCL/System stubs) — the ArchUnitNET analog of
 ///     SlideRule's <c>!IsExternal</c> universe (GRAMMAR §4.1), so <c>MustOnly*</c>-style rules share
 ///     the same reference universe on both substrates.

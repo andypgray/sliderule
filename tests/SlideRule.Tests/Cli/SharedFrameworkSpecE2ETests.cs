@@ -40,7 +40,7 @@ public sealed class SharedFrameworkSpecE2ETests
         CliResult result = await CliRunner.InvokeAsync("explain", RuleId, "--spec", CliRunner.SharedFrameworkSpecDll);
 
         // Assert: the world named, the packaging remedy ruled out, and the escape hatch spelled on the very
-        // type that failed — the three things the field recovery (deleting the rules) was missing.
+        // type that failed — the three things a reader needs to keep the rules rather than delete them.
         result.ShouldRefuseWith(
             "The spec assembly 'SlideRule.SharedFrameworkSpec' failed to load its dependency",
             "'Microsoft.AspNetCore.Mvc.Core,",

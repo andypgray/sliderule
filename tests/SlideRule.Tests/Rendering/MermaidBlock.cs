@@ -1,8 +1,8 @@
 namespace SlideRule.Tests.Rendering;
 
 /// <summary>
-///     What a rendered Mermaid block actually draws, for the two diagram suites that assert on the
-///     drawing rather than on the frame around it.
+///     What a rendered Mermaid block actually draws, for a diagram suite that asserts on the drawing
+///     rather than on the frame around it.
 /// </summary>
 internal static class MermaidBlock
 {

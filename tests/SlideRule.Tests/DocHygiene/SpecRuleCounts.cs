@@ -11,10 +11,6 @@ namespace SlideRule.Tests.DocHygiene;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         The root README said <c>Eighteen rules</c> for a month and four releases,
-///         while the spec grew from 20 to 27 authored statements. No gate held that number.
-///     </para>
-///     <para>
 ///         The rendered board is the authority because it is what a reader sees. A count of
 ///         <c>arch.Rule(</c> call sites would miss the rules the <c>DotNetGuidance</c> pack contributes and
 ///         the quarantined scope's bullet. A <c>check</c> report counts more rules than the board, because

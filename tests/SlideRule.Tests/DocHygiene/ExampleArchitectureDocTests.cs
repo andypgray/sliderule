@@ -7,19 +7,23 @@ using Xunit;
 namespace SlideRule.Tests.DocHygiene;
 
 /// <summary>
-///     The shape gate over the four example solutions' committed <c>ARCHITECTURE.md</c> drawings.
-///     Byte-currency belongs to CI's examples job, which builds each example and runs
-///     <c>render --diagram … --check</c> over it. That job is ubuntu-only, so a Windows checkout gets no
-///     signal from it at all. This gate reads the committed files and nothing else, so it runs everywhere
-///     and names the failures a byte comparison would only report after somebody re-rendered: a missing
-///     fence, a caption naming the wrong spec, or a survey that drew the spec project's own package
-///     references.
+///     The shape gate over the four example solutions' committed <c>ARCHITECTURE.md</c> drawings. It reads
+///     the committed files and nothing else, so it runs everywhere and names the failures a byte comparison
+///     would only report after somebody re-rendered: a missing fence, a caption naming the wrong spec, or a
+///     survey that drew the spec project's own package references.
 /// </summary>
 /// <remarks>
-///     DocHygiene rather than Dogfood, because this needs no workspace and does not belong in
-///     <c>SelfSpecTests</c>. That class excludes <c>examples/</c> from its render
-///     and orphan gates on purpose, since those blocks belong to other specs; a file-shape assertion
-///     over a committed drawing is not that gate and does not want its exclusion.
+///     <para>
+///         Byte-currency belongs to CI's examples job, which builds each example and runs
+///         <c>render --diagram … --check</c> over it. That job is ubuntu-only, so a Windows checkout gets no
+///         signal from it at all.
+///     </para>
+///     <para>
+///         DocHygiene rather than Dogfood, because this needs no workspace and does not belong in
+///         <c>SelfSpecTests</c>. That class excludes <c>examples/</c> from its render
+///         and orphan gates on purpose, since those blocks belong to other specs; a file-shape assertion
+///         over a committed drawing is not that gate and does not want its exclusion.
+///     </para>
 /// </remarks>
 public sealed class ExampleArchitectureDocTests
 {
@@ -87,7 +91,7 @@ public sealed class ExampleArchitectureDocTests
     ///     </para>
     ///     <para>
     ///         The second half closes the same hole from the other side: whatever narrows the fence could
-    ///         narrow it too far and drop a project the example genuinely owns, and reading the drawing
+    ///         narrow it too far and drop a project the example owns, and reading the drawing
     ///         alone cannot say which it did. The solution file can.
     ///     </para>
     /// </remarks>

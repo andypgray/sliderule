@@ -14,9 +14,8 @@ namespace SlideRule.Tests.Extraction;
 /// </summary>
 /// <remarks>
 ///     It is pinned here rather than at a composer because here is where the logic lives. The slot it fills
-///     is documented as the machine-readable half of the merge notes — both from one merge, on one read — and
-///     a projection each composer wrote for itself is exactly how that promise came apart: the CLI kept it
-///     and the xUnit adapter passed an empty list while holding the model the answer comes off.
+///     is documented as the machine-readable half of the merge notes — both from one merge, on one read — so a
+///     composer takes it from here rather than projecting its own, which can drift from the notes.
 /// </remarks>
 public sealed class MultiTargetedProjectsTests
 {

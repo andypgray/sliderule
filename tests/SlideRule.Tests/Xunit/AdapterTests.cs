@@ -181,9 +181,9 @@ public sealed class AdapterTests
     [Fact]
     public async Task NarrowingFilter_SkipsTheCompletenessClaimCarryingWhatWasNotChecked()
     {
-        // A .slnf SolutionPath used to green every rule test over a subset: the adapter received the
-        // unchecked projects and surfaced them nowhere. Nothing fails here — a narrowed universe is a smaller
-        // true answer — but the one test whose name IS the completeness claim cannot pass while making it.
+        // A .slnf SolutionPath checks a subset, and the projects it leaves unchecked have to surface somewhere.
+        // Nothing fails here — a narrowed universe is a smaller true answer — but the one test whose name IS
+        // the completeness claim cannot pass while making it.
         Exception? exception = await AdapterOutcome.CaughtAsync(() => new BillingOnlyArchTests().Workspace_LoadedCompletely());
 
         var skip = exception.ShouldBeOfType<SkipException>();
@@ -222,10 +222,10 @@ public sealed class AdapterTests
     [Fact]
     public async Task PolyglotSolution_SkipsTheCompletenessClaimNamingWhatItCouldNotReach()
     {
-        // The adapter received the unsupported projects and rendered them nowhere, so a polyglot solution's
-        // rule tests went green with no coverage statement anywhere — while check and status both stamped
-        // one. Nothing here failed: this is a smaller true answer, like a filter's, and the one test whose
-        // name IS the completeness claim is the one that cannot make it.
+        // check and status both stamp a polyglot solution's unsupported projects, and the adapter has to
+        // surface them too, or its rule tests go green with no coverage statement anywhere. Nothing here
+        // failed: this is a smaller true answer, like a filter's, and the one test whose name IS the
+        // completeness claim is the one that cannot make it.
         Exception? exception = await AdapterOutcome.CaughtAsync(() => new PolyglotArchTests().Workspace_LoadedCompletely());
 
         var skip = exception.ShouldBeOfType<SkipException>();

@@ -14,9 +14,7 @@ namespace SlideRule.Tests.DocHygiene;
 ///         The SDK turns its own analyzers on by default only from net5.0 up, and most of what this
 ///         repository ships targets netstandard2.0. Naming the severity file is therefore necessary and not
 ///         sufficient: on a project the SDK left off, every promotion in that file is inert. Nothing reports
-///         it — the file is named, the build is green, the rules never run — and it held on the
-///         largest project in <c>src/</c> from the day the promotions landed until somebody read the
-///         property by hand.
+///         it: the file is named, the build is green, and the rules never run.
 ///     </para>
 ///     <para>
 ///         Nothing outside the build reads this property, so the question asked is the one MSBuild

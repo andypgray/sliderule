@@ -22,7 +22,7 @@ namespace SlideRule.Tests.DocHygiene;
 ///         <b>What to do on a red.</b> A parameter reported as unaccounted needs
 ///         <c>[SpecSlot(nameof(SpecSlot.Something))]</c> at its declaration, on whichever declaration a
 ///         chained call binds to — for a stage clause that is the interface member, not the builder
-///         class that implements it. A parameter that is genuinely not a slot goes in
+///         class that implements it. A parameter that is not a slot goes in
 ///         <see cref="NotSlots" /> with the sentence saying why. A slot name the catalog cannot resolve
 ///         means the marker and <see cref="SpecSlot" /> have drifted; add the slot there rather than
 ///         inventing a second vocabulary here. A row reported against <see cref="Slots" /> is the table

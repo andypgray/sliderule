@@ -199,9 +199,9 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
     public void Validate_ExcludedStrayInCone_StaysUsableWithNoNotice()
     {
         // Arrange — MyApp.Domain carries a <Compile Remove>'d Snippets/*.cs: it lives in the project cone on
-        // disk but is not a compiled document, so it is absent from the capture's DocumentPaths. Before the
-        // fix the cone scan read it as an add and invalidated the capture on every run; the ConeFiles
-        // snapshot recorded at ingest now covers it. This static-fixture stray needs no revert.
+        // disk but is not a compiled document, so it is absent from the capture's DocumentPaths. The ConeFiles
+        // snapshot recorded at ingest covers it; without that, the cone scan would read it as an add and
+        // invalidate the capture on every run. This static-fixture stray needs no revert.
         BinlogCaptureStore store = IngestFullCapture();
         File.Exists(Fixture.PathOf("MyApp.Domain", "Snippets", "ExcludedScratch.cs"))
             .ShouldBeTrue();
@@ -376,8 +376,8 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
     public void Ingest_SlnfSolution_RefusesEarlyWithSolutionFilterMessage()
     {
         // A store over a .slnf: Ingest must refuse before touching the solution (an empty AdhocWorkspace
-        // solution proves it never reaches CollectProjects/coverage, which is where the misleading
-        // zero-members "coverage" message used to come from).
+        // solution proves it never reaches CollectProjects/coverage, which would answer a filter with a
+        // misleading zero-members "coverage" message).
         var store = new BinlogCaptureStore(_cacheRoot.PathOf("App.slnf"), _cacheRoot.Path);
         Solution empty = new AdhocWorkspace().CurrentSolution;
 

@@ -101,8 +101,8 @@ public sealed class PartialLoadWorkspaceE2ETests
     public async Task Graph_PartiallyLoadedWorkspace_RefusesNamingTheFailuresRatherThanCrashing()
     {
         // graph is the entry point that needs no spec, so it is the first command a stranger runs on an
-        // unfamiliar codebase — and the one that used to answer with a stack trace naming a symbol from a
-        // project that did not load.
+        // unfamiliar codebase, where a stack trace naming a symbol from a project that did not load would be
+        // the first thing that stranger read.
         using TempFixtureWorkspace workspace = BrokenApp();
 
         CliResult graph = await CliRunner.InvokeColdAsync("graph", workspace.SolutionPath, "--no-cache");
@@ -135,8 +135,8 @@ public sealed class PartialLoadWorkspaceE2ETests
     [Fact]
     public async Task Graph_PartiallyLoadedWorkspaceWithFlag_SurveysAndCarriesTheVerdictInTheDocument()
     {
-        // The opt-out reaches extraction, which is the path that used to throw: the survey is produced from
-        // a compilation whose unresolved symbols now mint ordinary externals.
+        // The opt-out reaches extraction: the survey is produced from a compilation whose unresolved symbols
+        // mint ordinary externals.
         using TempFixtureWorkspace workspace = BrokenApp();
 
         CliResult human = await CliRunner.InvokeColdAsync(
@@ -163,9 +163,8 @@ public sealed class PartialLoadWorkspaceE2ETests
     [Fact]
     public async Task CheckAndStatus_PartiallyLoadedWorkspace_FailClosedAndOptBackInTogether()
     {
-        // The two verbs that render before they gate, on one workspace. check's own refusal was unreachable
-        // on a tree like this until extraction stopped throwing: it ran extraction before computing its gate,
-        // so the crash beat the refusal.
+        // The two verbs that render before they gate, on one workspace. check runs extraction before
+        // computing its gate, so on a tree like this an extraction that threw would beat the refusal.
         using TempFixtureWorkspace workspace = BrokenApp();
 
         CliResult check = await CliRunner.InvokeColdAsync(
@@ -198,13 +197,12 @@ public sealed class PartialLoadWorkspaceE2ETests
     [Fact]
     public async Task Check_PartiallyLoadedWorkspaceWithNoSpec_BlamesBothCausesRatherThanTheMissingSpec()
     {
-        // Spec resolution runs before the incomplete-model gate can fire, so on a tree like this the reader
-        // met the convention's own failure first: "no solution project references SlideRule.dll —
-        // pass --spec to name one". Both halves of that were misdirection. The project that would have
-        // matched may be one the run could not see, and no --spec argument repairs either cause. So the
-        // refusal names them — and it names them both, which is what nothing measured while it composed its
-        // own block: told only about the load, a reader on a tree broken solely by its restore was told that
-        // projects had failed to load and shown none of them.
+        // Spec resolution runs before the incomplete-model gate can fire, so on a tree like this the
+        // convention's own failure ("no solution project references SlideRule.dll — pass --spec to name one")
+        // would be misdirection in both halves: the project that would have matched may be one the run could
+        // not see, and no --spec argument repairs either cause. So the refusal names the causes, and both of
+        // them: told only about the load, a reader on a tree broken solely by its restore would hear that
+        // projects failed to load and be shown none of them.
         using TempFixtureWorkspace workspace = BrokenApp();
 
         CliResult check = await CliRunner.InvokeColdAsync("check", workspace.SolutionPath, "--no-cache");

@@ -141,8 +141,7 @@ public sealed class GrandfatheredCountSyncTests
             [DemurrageContainment],
             GrandfatheredCounts.CountStyle.TitleWord),
         new(DocPaths.SelfCheck, MeridianRoot,
-            // The SARIF section's claim about the Meridian ratchet it is cut from. Its predecessor said
-            // "four" for two days after that baseline shrank to two, which is the drift this gate catches.
+            // The SARIF section's claim about the Meridian ratchet it is cut from.
             "Its {0} baselined violations keep the rule green",
             [InlineSql],
             GrandfatheredCounts.CountStyle.WordToTen)

@@ -19,9 +19,9 @@ namespace SlideRule.Tests.Mcp;
 ///         production converter stack rather than a re-registration of it.
 ///     </para>
 ///     <para>
-///         <c>{"overview": "true"}</c> is the likeliest mis-spelling of a flag and, before this coercer,
-///         the one input that reached the client as a raw byte-position deserializer error logged as a
-///         server bug — see <c>GlobalCallToolFilterTests</c> for that row end to end.
+///         <c>{"overview": "true"}</c> is the likeliest mis-spelling of a flag, and without this coercer it
+///         reaches the client as a raw byte-position deserializer error logged as a server bug — see
+///         <c>GlobalCallToolFilterTests</c> for that row end to end.
 ///     </para>
 /// </remarks>
 public sealed class BoolCoercionTests

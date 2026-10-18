@@ -11,7 +11,7 @@ namespace SlideRule.Tests.SpecCompletion;
 ///     A spec project declares rules and nothing a rule anchors on, so its own names are the one part of
 ///     the compilation an author never writes into a slot, and the contract's are the other. Everything
 ///     else the compilation can see is in, because a rule anchored on a framework or package type is an
-///     ordinary rule — it is simply not what an author reaches for first, which is what the ranking says.
+///     ordinary rule — it is not what an author reaches for first, which is what the ranking says.
 /// </remarks>
 public sealed class UniverseBoundaryTests(SpecCompletionFixture fixture) : IClassFixture<SpecCompletionFixture>
 {

@@ -134,7 +134,7 @@ public sealed class SelfCheckMeridianFenceTests
     }
 
     // The result the fence quotes, found by the fingerprints it carries: the violation identity names the
-    // site, which is what makes one of the twelve grandfathered results the one on the page.
+    // site, which is what makes one of the grandfathered results the one on the page.
     private static JsonNode ShouldFindResult(JsonNode sarif, JsonObject quoted)
     {
         JsonNode? fingerprints = quoted["partialFingerprints"];

@@ -6,7 +6,7 @@ namespace SlideRule.Tests.Mcp.TestDoubles;
 /// <summary>
 ///     An <see cref="ILoggerProvider" /> that records every logger call into a thread-safe queue, so a test
 ///     can assert on what the server logged. It exists to pin the central error contract in
-///     <c>GlobalCallToolFilter</c>: a <c>UserErrorException</c> is surfaced <em>without</em> logging, while
+///     <c>GlobalCallToolFilter</c>: a <c>UserErrorException</c> is surfaced without logging, while
 ///     any other exception is logged as exactly one warning. Registered as the host's only logging provider
 ///     (all built-in providers cleared), so <see cref="Warnings" /> reflects the filter alone.
 /// </summary>

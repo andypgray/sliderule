@@ -28,43 +28,22 @@ public sealed class DeriveSpecPromptTests
 {
     /// <summary>
     ///     Ceiling on the body every <c>prompts/get</c> serves, in the same UTF-16 code units
-    ///     <see cref="string.Length" /> counts. First set at 69,500 — the 69,418 measured that day,
-    ///     rounded up to the next 500 — and standing at 70,250 since 2026-10-17.
+    ///     <see cref="string.Length" /> counts.
     /// </summary>
     /// <remarks>
-    ///     The recipe arrives whole at every kickoff, before the reader has done anything, and it only grew
-    ///     until it met this constant: 39,348 characters on 2026-08-09, 56,555 on 2026-08-26, 69,418 when
-    ///     this was set. Each of those figures was measured on its date and none of them gated anything, so
-    ///     every addition was free. That is what this constant changes, and the reason it was set close
-    ///     rather than generously.
-    ///     Raised first to 70,000 on 2026-09-22, and what that bought is the accessibility adjectives
-    ///     (<c>.ThatArePublic()</c> / <c>.ThatAreInternal()</c> / <c>.ThatArePrivate()</c>, GRAMMAR §5.2)
-    ///     with the <c>Except</c> idiom that is the only way to spell their negation. The ceiling had 50
-    ///     characters of headroom, so the vocabulary alone did not fit, and the floor below says
-    ///     vocabulary is not what gets cut. Two asides were trimmed first and recovered 65 of the 134
-    ///     needed; the rest is this.
-    ///     <para>
-    ///         Cut once, from 69,999 to 62,236 on 2026-10-15, by rewriting the procedure. What paid for it: the
-    ///         survey's key glossary and grain ladder, which the <c>arch_graph</c> description already carries
-    ///         when the tool is called; the spec-discovery refusals, which carry their own cures; a
-    ///         closing list of routes no derivation followed; and what the recipe said twice. The rewrite added
-    ///         the stated-intent list, five warnings at the steps where their traps are met, and a receipt whose
-    ///         posture lines are copied from the check. The ceiling stays at 70,000: set at the new length, it
-    ///         would restore the zero headroom that made each of the three additions before the rewrite pay for
-    ///         itself with a trim.
-    ///     </para>
-    ///     <para>
-    ///         Raised to 70,250 on 2026-10-17, after five restated sentences were cut, for the member vocabulary
-    ///         an extensibility contract is written in: the six accessibility adjectives, <c>MustBeProtected</c>,
-    ///         <c>MustBeOverridable</c>, and member <c>Named</c> and <c>Except</c>.
-    ///     </para>
+    ///     The recipe arrives whole at every kickoff, before the reader has done anything, so every session
+    ///     pays for each character whether or not it reads the paragraph that holds it. Without a gate,
+    ///     every addition is free; this constant is that gate, and it was set close to the served length
+    ///     rather than generously. A cut does not lower it: the room a cut frees is what later additions
+    ///     spend, and a ceiling reset to each new length would make every addition pay for itself with a
+    ///     trim.
     ///     <see cref="DeriveSpecVocabularyTests" /> holds the other side as a floor on content — every
-    ///     shipped constraint verb and adjective must be named in the prose outside the generated table —
-    ///     so vocabulary can never be the thing that gets cut here.
+    ///     shipped constraint verb and adjective must be named in the prose outside the generated table, or
+    ///     carry a withheld entry saying why — so vocabulary is never the thing that gets cut here.
     ///     <para>
     ///         When this reds, cut or move content before reaching for the number. Raising it is a
     ///         decision in its own right: move the constant in the same commit as the text that needed
-    ///         the room, and record here what it bought.
+    ///         the room, and let that commit, not this comment, say what the room bought.
     ///     </para>
     ///     <para>
     ///         The ceiling is not a claim that a shorter recipe derives better. Nothing here measures the
@@ -170,9 +149,9 @@ public sealed class DeriveSpecPromptTests
     {
         string text = await ServedRecipeAsync();
 
-        // Assert — the first step was a conditional bullet inside a checklist, and derivations read it as one grep
-        // over the repository: none followed a link to the project's published documentation. It is now an action
-        // whose artifact the receipt transcribes, so what is pinned is the artifact's three fields, the reason a
+        // Assert — the first step is an action whose artifact the receipt transcribes. Written as a conditional
+        // bullet inside a checklist, it was read as one grep over the repository, and no derivation followed a link
+        // to the project's published documentation. What is pinned is the artifact's three fields, the reason a
         // published page counts as part of the codebase, and the receipt lines the list becomes.
         text.ShouldContain(
             "with its words as written, its source (a path in this repository, or a URL) and, from step 3 on, the rule it became");
@@ -219,10 +198,10 @@ public sealed class DeriveSpecPromptTests
     {
         string text = await ServedRecipeAsync();
 
-        // Assert — a statement that disagreed with the code made the code the debt, and every red defaulted to
-        // Migrate, so a misread sentence, a statement older than the code it describes, a policy its maintainers apply
-        // more loosely than written, and an exception the code marks as deliberate all became debt to burn down. The
-        // recipe now re-reads and dates the statement, samples the rule's sites before choosing Migrate, writes a
+        // Assert — when a statement that disagrees with the code makes the code the debt and every red defaults to
+        // Migrate, a misread sentence, a statement older than the code it describes, a policy its maintainers apply
+        // more loosely than written, and an exception the code marks as deliberate all become debt to burn down. The
+        // recipe re-reads and dates the statement, samples the rule's sites before choosing Migrate, writes a
         // deliberate exception as an Except on an Enforce rule, drops a contested statement for the human, and has
         // dragons prose checked against the code before it is written.
         text.ShouldContain("re-read the statement from raw text with its whole paragraph, and date it against the code");
@@ -297,8 +276,8 @@ public sealed class DeriveSpecPromptTests
         text.ShouldContain("none implies another");
         text.ShouldContain("has *not observed* the rule");
 
-        // The posture and red-rule lines once had no defined source, so a derivation wrote its own proposal into
-        // them. Each is now a copy of the last whole check, defined by the fields it is copied from.
+        // The posture and red-rule lines are each a copy of the last whole check, defined by the fields it is copied
+        // from; a line with no defined source is one a derivation fills with its own proposal.
         text.ShouldContain("a transcription, never a recount");
         text.ShouldContain("counts its `rules[]` by `posture`");
         text.ShouldContain("is every entry with `posture: enforce` and `status: failed`");

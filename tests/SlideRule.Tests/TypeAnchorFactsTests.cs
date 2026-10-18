@@ -124,7 +124,7 @@ public sealed class TypeAnchorFactsTests
     public void StringAnchor_IsTheVerbatimNameOnDefinition_AndRefusesNothing(string name)
     {
         // Nothing is inferred from the shape of the string: a constructed spelling is a legal name that
-        // simply matches nothing, so it keys both positions exactly as written.
+        // matches nothing, so it keys both positions exactly as written.
         TypeAnchor anchor = TypeAnchor.FromName(name);
 
         anchor.FullName.ShouldBe(name);

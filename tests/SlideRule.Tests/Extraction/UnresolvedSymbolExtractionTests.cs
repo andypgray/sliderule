@@ -8,8 +8,8 @@ namespace SlideRule.Tests.Extraction;
 ///     Extraction is total over symbols the compiler never resolved. A workspace that loads only partially
 ///     — a project whose references are missing, a package that was never restored — hands Roslyn error
 ///     symbols to the external-mint path through base types, interfaces, and attribute classes, and every
-///     fact minted from one has to have an answer. Accessibility had none, so a survey over an unbuilt tree
-///     died with an invariant violation naming a symbol nobody wrote.
+///     fact minted from one has to have an answer: a fact without one kills a survey over an unbuilt tree
+///     with an invariant violation naming a symbol nobody wrote.
 /// </summary>
 /// <remarks>
 ///     The negative control lives in <see cref="Roslyn.AccessibilityMapperTests" />: it pins that these

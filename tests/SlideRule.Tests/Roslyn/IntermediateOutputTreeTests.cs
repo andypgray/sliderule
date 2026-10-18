@@ -12,11 +12,9 @@ namespace SlideRule.Tests.Roslyn;
 ///     them onto the current drive on Windows, on both sides of each comparison.
 /// </summary>
 /// <remarks>
-///     Two subsystems rest on this. The spec resolver's built-output search refuses any candidate under the
-///     intermediate root, and the three cache probes stamp the assets file wherever the layout puts it — the
-///     second of those on a measurement rather than a reading: under <c>UseArtifactsOutput</c> the assets
-///     file lands outside the project directory, so a probe that spelled the default layout watched a path
-///     that never existed and served a stale model from cache.
+///     The assets-file rows rest on a measurement rather than a reading: under <c>UseArtifactsOutput</c> the
+///     assets file lands outside the project directory, so a cache probe that assumed the default layout would
+///     watch a path that never exists and serve a stale model from cache.
 /// </remarks>
 public sealed class IntermediateOutputTreeTests
 {

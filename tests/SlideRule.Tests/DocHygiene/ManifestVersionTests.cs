@@ -21,8 +21,8 @@ namespace SlideRule.Tests.DocHygiene;
 ///     <para>
 ///         <b>The fourth site is worse than unchecked.</b> The SARIF golden's driver version is held
 ///         only by <c>CheckCommandE2ETests</c>, which compares whole documents — so a missed bump
-///         arrives as a JSON diff roughly nine minutes into a Release suite, at the end of a publish
-///         run, reading like a rendering regression rather than like a number nobody changed.
+///         arrives as a JSON diff late in a Release suite, at the end of a publish run, reading like a
+///         rendering regression rather than like a number nobody changed.
 ///     </para>
 ///     <para>
 ///         <b>The props file is parsed as XML rather than matched.</b> Its own comment carries the

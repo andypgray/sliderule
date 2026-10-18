@@ -10,17 +10,16 @@ namespace SlideRule.Tests.Rendering;
 
 /// <summary>
 ///     How a project violation reads on the three report surfaces (GRAMMAR §4.10): the human block, the
-///     <c>--json</c> document, and SARIF. Four texts to pin per surface — a packaging violation, which
-///     names the project alone, a per-package one, which names the package it declares, a per-framework
-///     one, which names the framework it targets, and a missing-framework one, which names the framework it
-///     does not target.
+///     <c>--json</c> document, and SARIF. Each names the project, and beside it what the rule judged: nothing
+///     more for a packaging violation, the package it declares, the framework it targets or does not target,
+///     or what a framework's build holds for a property.
 /// </summary>
 /// <remarks>
 ///     The three surfaces take a violation's wording from <c>ViolationWording</c>, and each is still asserted
 ///     on its own: the pin is that every surface reaches the owner, so a surface that grows a twin of its own
 ///     reds here rather than in a consumer's scanner. What is asserted about JSON is also the slot discipline:
-///     <c>subjectProject</c>, <c>package</c> and <c>framework</c> are additive and null-omitted, so a report
-///     from a spec with no project rule carries none of them.
+///     <c>subjectProject</c>, <c>package</c>, <c>framework</c>, <c>property</c> and <c>propertyValue</c> are
+///     additive and null-omitted, so a report from a spec with no project rule carries none of them.
 /// </remarks>
 public sealed class ProjectViolationRenderTests
 {
@@ -181,7 +180,7 @@ public sealed class ProjectViolationRenderTests
     [Fact]
     public void Json_ReportWithNoProjectRule_CarriesNeitherSlot()
     {
-        // The additive-key claim: the two slots exist for project violations and are absent everywhere else,
+        // The additive-key claim: the slots exist for project violations and are absent everywhere else,
         // which is what holds the schema at version 3 for every spec that has no project rule.
         CheckReport report = Checker.Run(
             "namespace App { public class Thing {} }",

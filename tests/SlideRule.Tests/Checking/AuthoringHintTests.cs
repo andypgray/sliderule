@@ -115,8 +115,8 @@ public sealed class AuthoringHintTests
     [Fact]
     public void ANarrowedTypesSubject_FallsBackToTheNarrowingAdvice()
     {
-        // Nothing here globs a namespace, so glob semantics would be a false sentence: the honest cure is
-        // the one true of every selection.
+        // Nothing here globs a namespace, so glob semantics would be a false sentence: the cure is the one
+        // true of every selection.
         var arch = new Arch();
 
         AuthoringHints.ForSubject(arch.Types.WithSuffix("Service"), null)
@@ -265,7 +265,7 @@ public sealed class AuthoringHintTests
     {
         // Unreachable through the checker, whose gate warns only when some operand is a pattern — but the
         // floor has to hold anyway, because it is what makes the chooser total. Advice true of every
-        // selection is the only honest answer when there is no shape to read.
+        // selection is the only answer that cannot be false when there is no shape to read.
         AuthoringHints.ForInertTarget([], null, null)
             .ShouldContain(NarrowingFragment);
     }
@@ -517,7 +517,7 @@ public sealed class AuthoringHintTests
     {
         // The two fixed clauses read off no selection shape, so nothing about them would have made anyone
         // route them through the fact — and a failed project empties a member or a project subject exactly
-        // as it empties a type one. Leaving these two alone was the half-fix this row exists to prevent.
+        // as it empties a type one. Leaving these two alone would be the half-fix this row exists to prevent.
         IncompleteModel partial = Checker.PartialModel;
 
         AuthoringHints.ForMemberSubject(partial)
@@ -530,8 +530,8 @@ public sealed class AuthoringHintTests
     public void APartialModel_ReachesBothSignalsThroughTheChecker()
     {
         // The wiring, end to end on one model: a subject that matched nothing fails carrying the fact, and a
-        // target that matched nothing warns carrying the same fact. Before this, a rule reported itself inert
-        // because the edge it rests on was never extracted and the cure it printed was about globs.
+        // target that matched nothing warns carrying the same fact. Without it, a rule whose edge was never
+        // extracted would report itself inert with a cure about globs.
         IncompleteModel partial = Checker.PartialModel;
 
         RuleResult empty = Checker.Run(Sources.LayeredModel, partial, arch =>

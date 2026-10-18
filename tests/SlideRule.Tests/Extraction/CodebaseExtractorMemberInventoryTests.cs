@@ -1000,7 +1000,7 @@ public sealed class CodebaseExtractorMemberInventoryTests
                                                          public class C { public void Do() {} }
                                                          """);
 
-        // The other half of the same contract: all four mutability facts are simply false on a method, so a
+        // The other half of the same contract: all four mutability facts are false on a method, so a
         // member subject sweeping every kind can read them without a kind test first.
         MemberNode go = model.Type("N.C")
             .Member("M:N.C.Do");

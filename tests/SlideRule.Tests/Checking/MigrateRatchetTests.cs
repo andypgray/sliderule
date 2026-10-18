@@ -182,7 +182,7 @@ public sealed class MigrateRatchetTests
     public void Check_MoreSitesThanTheEntryRecords_IsRedAsGrowth()
     {
         // The hole the measure closes: without a recorded count, a second old-pattern site inside an
-        // already-grandfathered pair rides in free — which is precisely where new code in the old pattern
+        // already-grandfathered pair rides in free — which is where new code in the old pattern
         // gets written, inside a type whose surrounding code already does it.
         BaselineIndex index = Checker.Baselines(
             "data/x",

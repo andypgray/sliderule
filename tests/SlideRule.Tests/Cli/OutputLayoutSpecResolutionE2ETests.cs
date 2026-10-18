@@ -8,7 +8,7 @@ namespace SlideRule.Tests.Cli;
 ///     Spec resolution by convention against a real <c>MSBuildWorkspace</c> load, over the two output
 ///     layouts field testing found refusing a fully built solution: a parent
 ///     <c>Directory.Build.props</c> carrying a flat <c>OutputPath</c>, and <c>UseArtifactsOutput</c>. One
-///     fixture, one props overlay per arm, so the layout is provably the only variable.
+///     fixture, one props overlay per arm, so the layout is the only variable.
 /// </summary>
 /// <remarks>
 ///     <para>

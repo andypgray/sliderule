@@ -212,10 +212,9 @@ public sealed class TripwireDiffE2ETests
     public async Task CheckHookJson_CleanRunWithATripwireWarning_CarriesTheReportLessItsPassBlocks()
     {
         // The agent reading the context holds the rule board already, and a pass block per rule is what grows
-        // with the spec: on this repository's own self-check the pass blocks pushed the context past the
-        // client's inline limit, and the preview the agent was left with held no warning at all. So the
-        // context is the plain run's report with exactly those blocks gone, the stamps, the warned block and
-        // the summary line all kept.
+        // with the spec: enough of them push the context past the client's inline limit, and the preview the
+        // agent is left with then holds no warning at all. So the context is the plain run's report with
+        // exactly those blocks gone, the stamps, the warned block and the summary line all kept.
         (CliResult human, CliResult hook, _) = await Untracked.Value;
         human.Err.ShouldBeEmpty("The plain run wrote diagnostics, which hook mode composes into the same text.");
         string expected = WithoutPassBlocks(human.Out);
@@ -292,9 +291,8 @@ public sealed class TripwireDiffE2ETests
 
         // A symlink whose target is the repo root, living beside the repo (outside its working tree, so
         // it is never itself a changed file). Opening the solution through it hands the workspace a
-        // symlink-spelled path while `git rev-parse --show-toplevel` returns the canonical one — the exact
-        // divergence that silently defeated the tripwire's prefix match before the discovery-seam
-        // canonicalization. This is the product-side proof of the fix; it would have caught the original bug.
+        // symlink-spelled path while `git rev-parse --show-toplevel` returns the canonical one — a divergence
+        // that silently defeats the tripwire's prefix match unless the discovery seam canonicalizes the path.
         string linkRoot = Path.Combine(Path.GetDirectoryName(repo.Root)!, "link-" + Guid.NewGuid()
             .ToString("N"));
         SymlinkSupport.CreateDirectorySymlink(linkRoot, repo.Root);

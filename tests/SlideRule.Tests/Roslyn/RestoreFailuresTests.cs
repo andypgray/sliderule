@@ -16,7 +16,7 @@ namespace SlideRule.Tests.Roslyn;
 /// <remarks>
 ///     <para>
 ///         The JSON shapes here are the ones real restores were measured to write, not ones invented to fit
-///         the code: a clean assets file carries <em>no</em> <c>logs</c> key at all, and a failed one carries
+///         the code: a clean assets file carries no <c>logs</c> key at all, and a failed one carries
 ///         the failure as a <c>{ "code", "level", "message" }</c> entry beside an empty <c>libraries</c>
 ///         section. Both <c>code</c> and <c>level</c> are invariant fields, which is the whole reason this
 ///         predicate can be language-independent where a message match could not.
@@ -125,8 +125,8 @@ public sealed class RestoreFailuresTests
     [Fact]
     public void Detect_AssetsFileWithOnlyWarningLogs_IsNotAFailure()
     {
-        // NU1510 is the pruning advisory that refused a solution whose rules all passed under the old
-        // message-matching gate. It is level Warning, and level is what decides here — so it cannot.
+        // NU1510 is a pruning advisory that a solution whose rules all pass can carry. It is level Warning,
+        // and level is what decides here, so it cannot refuse that solution.
         using TempDirectory temp = TestTempRoot.Fresh("restore-warned");
         string csproj = WriteAssets(
             temp,
@@ -240,7 +240,7 @@ public sealed class RestoreFailuresTests
     public void Detect_MalformedAssetsFile_IsNotAFailure()
     {
         // A file we could not read says nothing about the restore, and silence is the only safe answer: the
-        // alternative is refusing a healthy solution, which is the disease the structural gate cured.
+        // alternative is refusing a healthy solution.
         using TempDirectory temp = TestTempRoot.Fresh("restore-malformed");
         string csproj = WriteAssets(temp, "Core", "{ not json at all");
         using var workspace = new AdhocWorkspace();
@@ -267,10 +267,9 @@ public sealed class RestoreFailuresTests
     [Fact]
     public void Detect_AssetsFileWithAUtf8Bom_StillReportsTheProject()
     {
-        // Every assets file a real restore writes carries a UTF-8 BOM — measured on two restored field beds,
-        // both of which needed a BOM-aware reader. The rest of this class writes them without one, so without
-        // this row the shape production actually meets would be pinned only incidentally, by an end-to-end
-        // test that pays a live restore for it.
+        // Every assets file a real restore writes carries a UTF-8 BOM. The rest of this class writes them
+        // without one, so without this row the shape production actually meets would be pinned only
+        // incidentally, by an end-to-end test that pays a live restore for it.
         using TempDirectory temp = TestTempRoot.Fresh("restore-bom");
         string csproj = WriteAssets(temp, "Core", FailedRestoreAssets, true);
         using var workspace = new AdhocWorkspace();
@@ -311,7 +310,7 @@ public sealed class RestoreFailuresTests
     {
         // The one carve-out. NU19xx is level Warning by default, but TreatWarningsAsErrors promotes it — and an
         // advisory published this morning is an external, time-varying input that says nothing about how this
-        // codebase is built, while resolution succeeded and the model is complete. Refusing one was a reported bug.
+        // codebase is built, while resolution succeeded and the model is complete.
         using TempDirectory temp = TestTempRoot.Fresh("restore-audit");
         string csproj = WriteAssets(
             temp,
@@ -400,8 +399,6 @@ public sealed class RestoreFailuresTests
         RestoreFailures.Detect(workspace.CurrentSolution, [])
             .ShouldBeEmpty();
     }
-
-    // ── harness ───────────────────────────────────────────────────────────────────────────────────────────
 
     // An assets file at the default location for a project named after the directory, returning the csproj
     // path the answer is expressed in. The obj/ spelling is the harness's, deliberately: production derives

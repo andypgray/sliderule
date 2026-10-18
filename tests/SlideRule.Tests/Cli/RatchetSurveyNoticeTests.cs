@@ -10,9 +10,7 @@ namespace SlideRule.Tests.Cli;
 
 /// <summary>
 ///     Pins the <c>baseline</c> ratchet survey's verdict lines (<see cref="RatchetSurveyNotice" />) over
-///     synthetic <see cref="RuleResult" />s — no workspace: the three survey cases (no ratcheted rule with
-///     nothing failing, no ratcheted rule with Enforce failing, and the notice appended beside ratchet
-///     work), the silence when every failure is already ratcheted, and the singular/plural wording.
+///     synthetic <see cref="RuleResult" />s, with no workspace.
 /// </summary>
 public sealed class RatchetSurveyNoticeTests
 {

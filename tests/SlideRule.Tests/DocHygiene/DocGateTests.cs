@@ -156,7 +156,7 @@ public sealed class DocGateTests
     {
         // Arrange: what the [ShouldlyMethods] attribution on DocGateAssertions buys, pinned rather than
         // argued. Take the attribute off and Shouldly reads the frame inside that file instead, so every
-        // gate's red opens with the helper's parameter name — the same word for all forty-five of them.
+        // gate's red opens with the helper's parameter name — the same word at every gate.
         string[] drift = ["a drifted quote"];
 
         // Act

@@ -39,9 +39,9 @@ public sealed class GraphFormatterTests
     [Fact]
     public void Lines_NoUnsupportedProjects_KeepsTheSectionReadingNone()
     {
-        // The formatter's standing rule, applied to the section whose absence WAS the defect: a section
-        // that appears only when it has content is one a reader never learns to look for, so a solution the
-        // survey covers whole says outright that nothing was left out rather than saying nothing at all.
+        // The formatter's standing rule: a section that appears only when it has content is one a reader
+        // never learns to look for, so a solution the survey covers whole says outright that nothing was left
+        // out rather than saying nothing at all.
         IReadOnlyList<string> lines = GraphFormatter.Lines(
             MixedMembershipSummary(), "Acme.slnx", DocumentGrain.Full, []);
 

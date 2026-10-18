@@ -15,7 +15,7 @@ public sealed class TypeNameSimpleTests
     [Fact]
     public void Simple_TopLevelOpenGeneric_UsesDeclaredParameterName()
     {
-        // Unchanged baseline: a top-level generic still renders its own parameters.
+        // The baseline: a top-level generic renders its own parameters.
         TypeName.Simple(typeof(IDictionary<,>))
             .ShouldBe("IDictionary<TKey, TValue>");
     }
@@ -23,8 +23,8 @@ public sealed class TypeNameSimpleTests
     [Fact]
     public void Simple_NestedGenericChain_RendersOnlyTheLeafsOwnArgument()
     {
-        // GenericInner introduces one parameter (TInner); TOuter belongs to GenericOuter. The buggy Simple
-        // rendered "GenericInner<String, Int32>" — the whole chain's arguments against the leaf name.
+        // GenericInner introduces one parameter (TInner); TOuter belongs to GenericOuter. The whole chain's
+        // arguments against the leaf name would read "GenericInner<String, Int32>".
         TypeName.Simple(typeof(GenericOuter<string>.GenericInner<int>))
             .ShouldBe("GenericInner<Int32>");
     }
@@ -32,7 +32,7 @@ public sealed class TypeNameSimpleTests
     [Fact]
     public void Simple_NonGenericTypeNestedInClosedGeneric_HasNoTypeArguments()
     {
-        // PlainInner introduces zero parameters though it inherits the outer's; the buggy Simple emitted
+        // PlainInner introduces zero parameters though it inherits the outer's, so it must not render as
         // "PlainInner<String>".
         TypeName.Simple(typeof(GenericOuter<string>.PlainInner))
             .ShouldBe("PlainInner");

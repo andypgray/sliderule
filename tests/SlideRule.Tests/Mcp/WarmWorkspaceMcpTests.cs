@@ -30,9 +30,8 @@ namespace SlideRule.Tests.Mcp;
 ///     <para>
 ///         Every CLI leg here goes through <see cref="CliRunner.InvokeColdAsync(string[])" />, never the
 ///         warm-by-default <see cref="CliRunner.InvokeAsync(string[])" />. The oracle in each case is a
-///         <em>freshly loaded</em> run
-///         over the edited tree: warm-equals-cold is the claim, so the reference side has to be genuinely cold or the
-///         comparison proves nothing.
+///         freshly loaded run over the edited tree: warm-equals-cold is the claim, so the reference side has
+///         to be cold or the comparison proves nothing.
 ///     </para>
 ///     <para>
 ///         The suite uses two fixtures, and they are not interchangeable. Most cases drive the MyApp copy
@@ -392,7 +391,7 @@ public sealed class WarmWorkspaceMcpTests
 
         await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct);
         WorkspaceSnapshot loaded = await session.GetCurrentAsync(solutionPath, Ct);
-        // Backdating is best-effort: a file that cannot be re-stamped stays racy and simply re-reads, which the
+        // Backdating is best-effort: a file that cannot be re-stamped stays racy and re-reads, which the
         // warmup below captures into the baseline, before the measured window opens.
         FixtureEdits.BackdateAllDocuments(loaded);
         await session.GetCurrentAsync(solutionPath, Ct); // warmup: content-verifies + promotes every document
@@ -556,7 +555,7 @@ public sealed class WarmWorkspaceMcpTests
     public async Task ArchCheck_SpecOutputDeletedAfterWarming_RefusesExactlyAsTheColdCliDoes()
     {
         // Arrange — the same declared-spec fixture, resolved by convention this time (the other branch that
-        // has to walk the workspace), warmed with a real arch_check so the resolution is genuinely cached.
+        // has to walk the workspace), warmed with a real arch_check so the resolution is cached.
         // ArchCheck_SpecDllDeletedMidSession_ReturnsSameErrorAsColdCli does NOT cover this: it binds a DLL
         // and warms through spec-free arch_graph, so no resolution is ever recorded to go stale.
         using TempFixtureWorkspace workspace = BuiltLayoutCopy();
@@ -627,7 +626,7 @@ public sealed class WarmWorkspaceMcpTests
     // The output-layout fixture, copied, restored and really built under the default layout. Leased per
     // class, and the lease's reset leaves bin/ alone — so the copy, the restore and the build are paid by
     // whichever of the two spec-resolution cases runs first and the other reuses the output. The build is
-    // re-run only when the spec assembly is absent, which is precisely the state the deleted-output case
+    // re-run only when the spec assembly is absent, which is the state the deleted-output case
     // leaves behind.
     private static TempFixtureWorkspace BuiltLayoutCopy()
     {

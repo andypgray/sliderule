@@ -5,12 +5,12 @@ using Xunit;
 namespace SlideRule.Tests.Roslyn;
 
 /// <summary>
-///     The wording of the four narrowing stamps, the two refusals and the two per-rule sentences, pinned pure —
-///     no workspace, no filter, no disk. The bytes are the whole point of the type: a filtered run's green is
-///     only auditable if the sentence above it says which projects the verdict never covered, so each verb's
-///     tail, the singular/plural subject, the writer's newline discipline and the relative-path spelling are
-///     all spec here. <see cref="SlideRule.Tests.Cli.FilteredSolutionE2ETests" /> pins the same bytes coming
-///     out of a real <c>.slnf</c> load.
+///     The wording of the five narrowing stamps, the adapter skip, the two refusals and the two per-rule
+///     sentences, pinned pure — no workspace, no filter, no disk. The bytes are the whole point of the type: a
+///     filtered run's green is only auditable if the sentence above it says which projects the verdict never
+///     covered, so each verb's tail, the singular/plural subject, the writer's newline discipline and the
+///     relative-path spelling are all spec here. <see cref="SlideRule.Tests.Cli.FilteredSolutionE2ETests" />
+///     pins the same bytes coming out of a real <c>.slnf</c> load.
 /// </summary>
 public sealed class NarrowedUniverseNoticeTests
 {
@@ -186,7 +186,7 @@ public sealed class NarrowedUniverseNoticeTests
     public void RenderRefusal_OneUncheckedProject_TakesTheSameSingularSubjectAsTheStamps()
     {
         // The refusals write their own lede but share the subject clause, which is why the count logic sits
-        // in one place rather than once per block — six blocks, one place to get the grammar wrong.
+        // in one place rather than once per message.
         string refusal = NarrowedUniverseNotice.RenderRefusal("Leaf.slnf", ["MyApp.Web/MyApp.Web.csproj"]);
 
         refusal.ShouldStartWith(

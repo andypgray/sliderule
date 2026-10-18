@@ -13,9 +13,8 @@ namespace SlideRule.Tests.Extraction;
 ///     <para>
 ///         The smallest instance to hand is this repository itself — project
 ///         <c>SlideRule.Cli</c>, assembly <c>sliderule-cli</c>, because the project is the package and the
-///         assembly must differ from the contract's <c>SlideRule</c> by more than case. Staging a fixture for
-///         it would cost a project, a restore and a bed to hold a fact one real project already states, and
-///         this one is kept honest by the tool's own name never moving.
+///         assembly must differ from the contract's <c>SlideRule</c> by more than case. The row holds only
+///         while the tool's own name does not move.
 ///     </para>
 ///     <para>
 ///         It reads the whole-codebase extraction the self-spec gates already pay for, so the fact costs

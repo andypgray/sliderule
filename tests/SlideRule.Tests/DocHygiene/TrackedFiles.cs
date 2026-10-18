@@ -10,7 +10,7 @@ namespace SlideRule.Tests.DocHygiene;
 /// <remarks>
 ///     <para>
 ///         Git decides the scope. What the hygiene gates check is that nothing internal ships
-///         publicly, and tracked-by-git is precisely what ships; every other definition of the set
+///         publicly, and tracked-by-git is what ships; every other definition of the set
 ///         approximates it — through a hand-written exclusion list whose going stale is the very
 ///         defect these gates exist to catch. Tracked-by-git also excludes the gitignored private
 ///         working layer and every build output without a list to maintain, and it cannot grow a

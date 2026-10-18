@@ -14,12 +14,7 @@ using Xunit;
 namespace SlideRule.Tests.Cli;
 
 /// <summary>
-///     End-to-end <c>render</c> against this class's own copy of the MyApp fixture solution: the files each
-///     target writes (the managed blocks, the <c>--diagram</c> target, the model file) and the lines it
-///     reports, idempotence, hand content around the markers, the persisted extraction cache, the Claude Code
-///     instruction-file warnings, a committed <c>sliderule.json</c> that gives <c>check</c> and <c>render</c>
-///     the spec and the render targets no argument names, and <c>render --check</c> comparing every target with
-///     what is on disk while writing nothing.
+///     End-to-end <c>render</c> against this class's own copy of the MyApp fixture solution.
 /// </summary>
 /// <remarks>
 ///     A render test in particular must own its copy. The render targets are this class's
@@ -487,8 +482,8 @@ public sealed class RenderCommandE2ETests : IDisposable
         RenderRun cold = await RenderRunAsync(cache.Root, noCache: true, Architecture);
 
         // This run asks its source for two models — the cards respect the spec's exclusions, the survey fence
-        // draws every declared project — and it used to pay a full walk of the solution for each. One walk
-        // now serves both: the second model is a merge over fragments already in hand.
+        // draws every declared project — and one walk of the solution serves both: the second model is a merge
+        // over fragments already in hand.
         cold.ExtractionCount.ShouldBe(1);
         cold.AcquireCount.ShouldBe(1);
         cold.Exit.ShouldBe(0);

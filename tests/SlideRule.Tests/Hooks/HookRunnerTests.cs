@@ -879,8 +879,8 @@ public sealed class HookRunnerTests
         first.ShouldExitWith(HookExitCodes.Block, "The turn's first red stop blocks whether or not it can be counted.");
 
         // Act and assert: the session's directory opens, so the hook is not stateless, but no round it counts
-        // reads back. It falls back to the one round stop_hook_active carries and blocks at most once per turn,
-        // where it used to read zero rounds at every stop and block past any cap.
+        // reads back. It falls back to the one round stop_hook_active carries and blocks at most once per turn;
+        // reading zero rounds at every stop instead would block past any cap.
         for (var stop = 2; stop <= 4; stop++)
             (await FireAsync(
                     sandbox, StopPayload(sandbox, stopHookActive: true), ExitCodes.Violations, maxRounds: 1))

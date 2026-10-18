@@ -94,8 +94,8 @@ public sealed class GlobalCallToolFilterTests
             new Dictionary<string, object?> { ["ruleId"] = """["layering/domain-independent"]""" },
             cancellationToken: Ct);
 
-        // Assert — the shape named, and no roster. Listing every other ID beside the one inside the caller's
-        // own brackets is what made the old refusal read as self-contradictory.
+        // Assert — the shape named, and no roster. A refusal that lists every other ID beside the one inside the
+        // caller's own brackets reads as self-contradictory.
         result.IsError.ShouldBe(true);
         string text = result.ShouldHaveTextContent();
         text.ShouldStartWith(
@@ -231,9 +231,9 @@ public sealed class GlobalCallToolFilterTests
     public async Task CallTool_GraphOverBudgetButFittingAtACoarserGrain_ReturnsAWholeDocument()
     {
         // Arrange — the case the ladder exists for, driven end to end through the real pipeline rather than
-        // against the runner alone. A budget between the skeleton's size and the full survey's used to come
-        // back cut, because the runner stepped once to overview and the filter then truncated that document
-        // at the same number it had just been measured against.
+        // against the runner alone. A budget between the skeleton's size and the full survey's comes back cut
+        // if the runner steps only once, to overview, because the filter then truncates that document at the
+        // same number it was just measured against.
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
             McpServerBindings.MyAppWithViolatedSpec(), Ct);
         harness.Environment.SetVariable(SlideRuleEnvVars.MaxMcpOutputTokens, "750"); // 1500-char cap
@@ -255,10 +255,10 @@ public sealed class GlobalCallToolFilterTests
     [Fact]
     public async Task CallTool_UnparseableBool_ReturnsCoercerErrorAndLogsNothing()
     {
-        // Arrange — "yes" for a flag is the mis-spelling BoolCoercerFactory exists for. Before it, Web
-        // defaults read numbers from strings but never booleans, so this threw a raw JsonException:
-        // CliErrorMapper does not recognise one as a user error, so the filter classified it as a bug and
-        // returned a byte position. Binding fails ahead of dispatch, so no workspace is ever opened.
+        // Arrange — "yes" for a flag is the mis-spelling BoolCoercerFactory exists for. Web defaults read
+        // numbers from strings but never booleans, so without it this throws a raw JsonException:
+        // CliErrorMapper does not recognise one as a user error, so the filter would classify it as a bug and
+        // return a byte position. Binding fails ahead of dispatch, so no workspace is ever opened.
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
             McpServerBindings.MyAppWithViolatedSpec(), Ct);
 

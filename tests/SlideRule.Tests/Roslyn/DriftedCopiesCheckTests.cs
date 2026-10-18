@@ -30,12 +30,6 @@ namespace SlideRule.Tests.Roslyn;
 ///         reachable only over a model that really loaded both copies.
 ///     </para>
 ///     <para>
-///         <b>The one edge both copies make.</b> Each copy also reaches <c>System.Text.StringBuilder</c>, from a
-///         file of its own, so one model edge stands for two instances whose sites lie in different files. That is
-///         the shape the evidence rows read: a violation owned at one declarer may cite that copy's lines alone,
-///         and an external target is exempt from the allow-list verb above, so the green row there is untouched.
-///     </para>
-///     <para>
 ///         The bed is read in place through <see cref="WarmWorkspacePool" /> rather than leased through
 ///         <see cref="TempFixtureWorkspace" />: nothing here writes to the tree, and
 ///         <see cref="FixtureRestorer" />'s startup sweep has already restored every <c>TestSolutions</c>
@@ -61,8 +55,9 @@ public sealed class DriftedCopiesCheckTests
     {
         CodebaseModel model = await DriftedCodebase;
 
-        // The field's rule. The satellite's copy of StringExtensions reaches nothing outside the satellite; the
-        // reference to Cell sits in the core's copy, in a file the satellite never compiles.
+        // The field's rule. The satellite's copy of StringExtensions reaches nothing else in the solution; the
+        // reference to Cell sits in the core's copy, in a file the satellite never compiles. The satellite's copy
+        // also reaches System.Text.StringBuilder, an external type, which the allow-list verb exempts.
         Checker.Run(model, arch =>
                 arch.Rule("layering/ansi-is-foundation")
                     .Enforce(arch.Project(Ansi).MustOnlyReference(arch.Project(Ansi)))

@@ -112,9 +112,9 @@ public sealed class BaselineFormatTests
 
         bytes.Take(3)
             .ShouldNotBe([0xEF, 0xBB, 0xBF]); // no UTF-8 BOM
-        composed.ShouldNotContain("\r"); // LF only
+        composed.ShouldNotContain("\r");
         composed.EndsWith("\n", StringComparison.Ordinal)
-            .ShouldBeTrue(); // trailing newline
+            .ShouldBeTrue();
     }
 
     [Fact]

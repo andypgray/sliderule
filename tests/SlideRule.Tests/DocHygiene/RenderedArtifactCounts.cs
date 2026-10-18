@@ -12,12 +12,6 @@ namespace SlideRule.Tests.DocHygiene;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         The root <c>AGENTS.md</c> and <c>CONTRIBUTING.md</c> both said
-///         "nine committed artifacts … seven directories under <c>src/</c>" until 2026-09-10, while the
-///         circular-reference rule had placed two more cards on 2026-09-07 and neither sentence moved.
-///         No gate held those numbers.
-///     </para>
-///     <para>
 ///         The committed set is the authority rather than the renderer. Counting what a render would
 ///         place needs a workspace, a spec build and an extraction; the committed files need none of
 ///         that, and that the two agree is already proved by the dogfood self-spec tests and by CI's

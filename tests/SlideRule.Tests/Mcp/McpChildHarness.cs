@@ -14,7 +14,7 @@ namespace SlideRule.Tests.Mcp;
 /// <remarks>
 ///     <para>
 ///         Hand-written JSON-RPC frames rather than an SDK client, because for these suites the pipe
-///         <em>is</em> part of the condition under test: stdin is written, flushed, and deliberately never
+///         is part of the condition under test: stdin is written, flushed, and deliberately never
 ///         closed until the assertions are done.
 ///     </para>
 ///     <para>

@@ -14,10 +14,10 @@ namespace SlideRule.Tests.Roslyn;
 /// </summary>
 /// <remarks>
 ///     Two shapes of test live here, and the difference decides which session a case gets. A test whose
-///     subject is a <em>delta</em> — one reload, a bumped edit version, the same snapshot back — takes the
+///     subject is a delta — one reload, a bumped edit version, the same snapshot back — takes the
 ///     class's <see cref="SharedWorkspaceSession" />: it re-baselines the counters after its own first
 ///     acquisition, so a tree an earlier case edited cannot skew it, and the eight of them share one
-///     MSBuild load instead of paying eight. A test whose subject is the <em>virgin</em> state — zero reads
+///     MSBuild load instead of paying eight. A test whose subject is the virgin state — zero reads
 ///     ever, exactly one load ever, first-load concurrency, recovery from a failed first load — asserts
 ///     absolute counters and so must mint its own session over its own copy.
 /// </remarks>
@@ -63,7 +63,7 @@ public sealed class WorkspaceSessionTests(SharedWorkspaceSession shared) : IClas
         using var fixture = new TempFixtureWorkspace();
         await using var session = new WorkspaceSession();
         WorkspaceSnapshot loaded = await session.GetCurrentAsync(fixture.SolutionPath, Ct);
-        // Best-effort: a file that cannot be re-stamped stays racy and simply re-reads, which the warmup
+        // Best-effort: a file that cannot be re-stamped stays racy and re-reads, which the warmup
         // below absorbs into the baseline.
         FixtureEdits.BackdateAllDocuments(loaded);
         await session.GetCurrentAsync(fixture.SolutionPath, Ct); // warmup: content-verifies + promotes
@@ -143,8 +143,8 @@ public sealed class WorkspaceSessionTests(SharedWorkspaceSession shared) : IClas
     public async Task GetCurrentAsync_ExcludedStrayInCone_NeverReloadsAndStaysOutOfModel()
     {
         // Arrange — MyApp.Domain carries a <Compile Remove>'d Snippets/*.cs: it lives in the project cone on
-        // disk but is never compiled. Before the fix the cone scan compared the disk against the COMPILED
-        // document set, so this stray read as a perpetual add and forced a full reload on every single call.
+        // disk but is never compiled. A cone scan that compared the disk against the COMPILED document set
+        // would read this stray as a perpetual add and force a full reload on every call.
         WorkspaceSession session = shared.Session;
         await session.GetCurrentAsync(shared.SolutionPath, Ct);
         long reloadsBefore = session.FullReloadCount;
@@ -286,8 +286,6 @@ public sealed class WorkspaceSessionTests(SharedWorkspaceSession shared) : IClas
         threw.ShouldBeTrue();
         recovered.Solution.Projects.ShouldNotBeEmpty();
     }
-
-    // ── helpers ───────────────────────────────────────────────────────────────────────────────────────
 
     private static async Task<string> DocumentTextAsync(WorkspaceSnapshot snapshot, string path)
     {

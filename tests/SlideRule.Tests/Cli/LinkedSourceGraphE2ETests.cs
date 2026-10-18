@@ -14,12 +14,12 @@ namespace SlideRule.Tests.Cli;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         One bed pins both halves of the defect. Extraction attributes a multiply-declared type
-///         to its first declarer, so Tool's reference to its <em>own</em> compiled-in <c>Widget</c> resolves
-///         to a node stamped <c>LinkedApp.Core</c> — which the survey used to render as
-///         <c>LinkedApp.Tool -&gt; LinkedApp.Core</c>, an edge no project file declares — while saying
-///         nothing at all about the attribution that produced it, so a reader could not see whose facts a
-///         rule anchored on <c>LinkedApp.Tool</c> answers from.
+///         One bed pins both halves. Extraction attributes a multiply-declared type to its first
+///         declarer, so Tool's reference to its <em>own</em> compiled-in <c>Widget</c> resolves to a node
+///         stamped <c>LinkedApp.Core</c>. The survey must not render that as
+///         <c>LinkedApp.Tool -&gt; LinkedApp.Core</c>, an edge no project file declares, and must not stay
+///         silent about the attribution either, or a reader cannot see whose facts a rule anchored on
+///         <c>LinkedApp.Tool</c> answers from.
 ///     </para>
 ///     <para>
 ///         The assertion is the absent edge rather than a count. Tool's only outward type

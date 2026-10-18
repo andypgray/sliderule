@@ -16,7 +16,7 @@ namespace SlideRule.Tests.Roslyn;
 ///     (<c>MultiTfm.Core</c> targets <c>netstandard2.0;net10.0</c>; <c>MultiTfm.Web</c> is single-framework
 ///     and references it). These pin that a multi-framework project has exactly one name everywhere it is
 ///     read — the model's <see cref="TypeNode.ProjectName" />, the project list, a project reference, and an
-///     <c>arch.Project</c> selection — and that the one thing normalization does <em>not</em> cure, the
+///     <c>arch.Project</c> selection — and that the one thing normalization does not cure, the
 ///     shared types taking one framework's facts, is disclosed rather than silent: as an advisory note, and
 ///     as the two facts the project node carries for every document that has to render it.
 /// </summary>
@@ -185,7 +185,7 @@ public sealed class MultiTargetFrameworkTests
         // The one thing normalization deliberately does not cure: Widget is declared by both frameworks and
         // can only carry one framework's members and hierarchy, while its references are every framework's.
         // net10.0 wins on the extractor's ordinal framework order, not on the csproj's declaration order —
-        // which lists netstandard2.0 first, precisely so this pin means something. ModernOnly and LegacyOnly,
+        // which lists netstandard2.0 first, so this pin means something. ModernOnly and LegacyOnly,
         // which one framework each declares, collapsed nothing and add no note.
         model.MergeNotes.ShouldBe([
             "Project 'MultiTfm.Core' targets 'net10.0' and 'netstandard2.0'; the types they share take "

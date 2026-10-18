@@ -89,7 +89,7 @@ public class SpecValidationTests
     [InlineData(typeof(BlankScopeBaselineSpec), nameof(Code.BlankProse), "legacy/billing")]
     // The correspondence verb's name template (GRAMMAR §8 items 25–26). Blankness rides the shared
     // BlankPattern walk under its own label, because a blank template is the same slip as a blank affix;
-    // a template that is merely missing its {Name} needs its own code, since it is well-formed text that
+    // a template that is missing its {Name} needs its own code, since it is well-formed text that
     // states the wrong kind of law.
     [InlineData(typeof(BlankCounterpartTemplateSpec), nameof(Code.BlankPattern), "area/rule")]
     [InlineData(typeof(PlaceholderFreeCounterpartTemplateSpec), nameof(Code.CounterpartTemplateWithoutPlaceholder), "area/rule")]
@@ -1164,7 +1164,7 @@ public class SpecValidationTests
     // ---- String attribute anchors (GRAMMAR §5.2–§5.3). Blank is the ONLY well-formedness a definition FQN has, and it
     //      reports through the shared Code.BlankPattern family under the "attribute name" label (§8 item 15) —
     //      no new code. The item-21 category check deliberately does not apply: there is no category to read
-    //      off a string, so a nonsense name builds clean and simply matches nothing. ----
+    //      off a string, so a nonsense name builds clean and matches nothing. ----
 
     [Fact]
     public void BlankPattern_BlankAttributeNameOnAdjective_IsReported()

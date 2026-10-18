@@ -146,7 +146,7 @@ public sealed class ExtractionCacheStoreTests
     [Fact]
     public void ReadAndValidate_PriorSchemaSpecResolutionShape_IsACleanMissNotADeserializationCrash()
     {
-        // The manifest is parsed before its schema version is checked, so a genuinely v9-shaped spec record —
+        // The manifest is parsed before its schema version is checked, so a v9-shaped spec record —
         // a scalar `ExcludeProjectName` where v10 expects an `ExcludeProjectNames` list — must not throw its
         // way out of a read. The cache is disposable derived data: every failure is a miss.
         using var solution = new SyntheticSolution();
@@ -226,9 +226,9 @@ public sealed class ExtractionCacheStoreTests
     public void ReadAndValidate_ExcludedStrayInCone_StillHits()
     {
         // Arrange — a *.cs on disk in the project cone but not among the project's documents (a <Compile
-        // Remove> file). This is the cone-stray defect: CaptureFingerprint recorded adds=[] while validation's cone
-        // scan reads the stray as an add, so the project's content key never matched and it validated dirty
-        // forever. Capture now computes adds the same way, so the stray lands in both and cancels.
+        // Remove> file). Validation's cone scan reads the stray as an add, so CaptureFingerprint must record it as
+        // one too: the stray then lands in both and cancels, where a capture that recorded adds=[] would leave the
+        // project's content key never matching and the project validating dirty forever.
         using var solution = new SyntheticSolution();
         solution.AddProject("A", [], ("A.cs", "class A {}"));
         solution.AddStrayFile("A", Path.Combine("Snippets", "Excluded.cs"), "class Excluded {}");

@@ -40,8 +40,8 @@ public sealed class UnsupportedProjectsNoticeTests
     [Fact]
     public void Reason_ANonCsharpProject_KeepsTheSentenceItAlwaysHad()
     {
-        // Unchanged text, deliberately: the taxonomy exists because one kind needed different words, not
-        // because this one's were wrong. Every document over an .fsproj reads exactly as it did.
+        // This kind keeps its plain sentence, deliberately: the taxonomy exists because one kind needed
+        // different words, not because this one's were wrong.
         UnsupportedProjectsNotice.Reason(UnsupportedProjectKind.NotCsharp)
             .ShouldBe("not a C# project");
     }

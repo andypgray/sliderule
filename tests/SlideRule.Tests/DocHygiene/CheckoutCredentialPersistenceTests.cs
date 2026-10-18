@@ -17,14 +17,14 @@ namespace SlideRule.Tests.DocHygiene;
 ///         repeated on every checkout because it is a per-step input rather than a workflow setting.
 ///     </para>
 ///     <para>
-///         <b>Why uniformity needs a gate and not review.</b> Nine of the ten checkouts carried the
-///         input and one did not, which is the shape this class exists for: nothing in the YAML
-///         complains, both spellings run green, and the odd one out is invisible until someone reads
-///         all ten side by side. Scorecard reads the pattern across the repository, so the cost of the
-///         gap is not confined to the workflow that has it.
+///         <b>Why uniformity needs a gate and not review.</b> One checkout without the input among many
+///         that carry it is the shape this class exists for: nothing in the YAML complains, both
+///         spellings run green, and the odd one out is invisible until someone reads every checkout side
+///         by side. Scorecard reads the pattern across the repository, so the cost of the gap is not
+///         confined to the workflow that has it.
 ///     </para>
 ///     <para>
-///         <b>Moving the pin.</b> A workflow that genuinely needs to push — one that commits, tags, or
+///         <b>Moving the pin.</b> A workflow that needs to push — one that commits, tags, or
 ///         opens a pull request — needs the credential, and this test will red for it. That is the
 ///         intended path: widen it deliberately as part of that change, naming the step and why it is
 ///         exempt, rather than dropping the input quietly.

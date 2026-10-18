@@ -427,7 +427,8 @@ public sealed class GraphSummarizerTests
     {
         // Arrange — Shared.Widget is compiled into BOTH projects (a <Compile Include> link in the real
         // shape). Facts follow Lib, the first declarer, so App's reference to its OWN copy resolves to a
-        // node stamped 'Lib' — and used to render as App -> Lib, an edge no project file declares.
+        // node stamped 'Lib'; attributed through that node it would render as App -> Lib, an edge no project
+        // file declares.
         GraphSummary summary = GraphSummarizer.Summarize(LinkedSourceModel());
 
         // Assert — App declares no ProjectReference to Lib and the survey must not invent one.
@@ -473,7 +474,7 @@ public sealed class GraphSummarizerTests
 
         // Assert — the two edges the project files declare and no other, while the coverage statement still names
         // the shared type: the type is multiply declared, and only the edges attributed through the name were
-        // phantom. Reader -> Satellite is the reference the first declarer used to be credited with.
+        // phantom. Reader -> Satellite, not Reader -> Core: the first declarer is not credited with Reader's reference.
         summary.ProjectEdges.Select(e => (e.Source, e.Target, e.References))
             .ShouldBe([("Client", "Core", 1), ("Reader", "Satellite", 1)]);
         summary.MultiplyDeclaredTypes.ShouldHaveSingleItem()
@@ -484,7 +485,7 @@ public sealed class GraphSummarizerTests
     public void Summarize_ExternalReferenceOneCopyMakes_CountsForThatCopysProjectAlone()
     {
         // Arrange — Satellite's copy of the shared name reaches a framework type Core's copy never mentions. The
-        // winner's facts are Core's, which is exactly the attribution that used to take the reference with it.
+        // winner's facts are Core's, so attributing the reference through the winning node would credit it to Core.
         const string coreCopy = "namespace Drift { public class Formatter {} }";
         const string satelliteCopy = """
                                      namespace Drift
@@ -514,7 +515,7 @@ public sealed class GraphSummarizerTests
         // Act
         GraphSummary summary = GraphSummarizer.Summarize(CodebaseExtractor.ExtractFromCompilations([lib, app]));
 
-        // Assert — one row per project that made it, where the first declarer's row used to stand for both.
+        // Assert — one row per project that made it, never one first-declarer row standing for both.
         summary.ExternalEdges.Select(e => (e.Source, e.TargetNamespaceRoot, e.References))
             .ShouldBe([("App", "System.Text", 1), ("Lib", "System.Text", 1)]);
     }
@@ -574,7 +575,7 @@ public sealed class GraphSummarizerTests
         GraphSummary scoped = GraphSummarizer.Scope(summary, ["App"]);
 
         // Assert — any-declarer, mirroring the either-endpoint rule the project edges take. Keying on the
-        // winner alone would drop the entry from precisely the scope whose author needs it: the reason to
+        // winner alone would drop the entry from the scope whose author needs it: the reason to
         // read it is that a subject anchored on App answers from Lib's facts for this type.
         scoped.MultiplyDeclaredTypes.Select(t => t.Type)
             .ShouldBe(["Shared.Widget"]);
@@ -598,14 +599,14 @@ public sealed class GraphSummarizerTests
     {
         // Arrange — Product.Tests declares Vendor.Widget and Product binds the package's; the scope names the
         // binder alone. The glob matcher takes a project name whole, so "Product" misses "Product.Tests" and
-        // the declaring end is genuinely out of scope rather than swept in by a prefix.
+        // the declaring end is out of scope rather than swept in by a prefix.
         GraphSummary summary = GraphSummarizer.Summarize(ShadowedSourceModel());
 
         // Act
         GraphSummary scoped = GraphSummarizer.Scope(summary, ["Product"]);
 
         // Assert — either end keeps the entry, the same rule the project edges take. Keying on the declarer
-        // alone would drop it from precisely the scope that needs it: the reader anchored on Product is the
+        // alone would drop it from the scope that needs it: the reader anchored on Product is the
         // one whose reference reaches the assembly rather than the declaration.
         scoped.ShadowedTypes.Select(t => t.Type)
             .ShouldBe(["Vendor.Widget"]);

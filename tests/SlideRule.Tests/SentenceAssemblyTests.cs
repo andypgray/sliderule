@@ -1665,7 +1665,7 @@ public class SentenceAssemblyTests
     [Fact]
     public void MustBelongTo_CollidingTypeMemberships_QualifyWithMinimalTrailingSegments()
     {
-        // The list is genuinely the shared one: a type-selection membership widens by the same minimal-
+        // The list is the shared one: a type-selection membership widens by the same minimal-
         // trailing-segments rule the dependency target lists use.
         Constraint constraint = Arch.Types.MustBelongTo(
             Arch.Type(typeof(Order)), Arch.Type(typeof(Stubs.Sales.Order)));

@@ -91,8 +91,8 @@ public sealed class MsBuildBootstrapTests
         // Act
         string description = MsBuildBootstrap.DescribeSelection(MsBuildBootstrap.SelectBestInstance([vs2026])!);
 
-        // Assert — the arm that used to be indistinguishable from a preferred pick now names itself, and
-        // names the version it fell back to, which is the fact a load failure on such a machine turns on.
+        // Assert — the fallback arm names itself apart from a preferred pick, and names the version it fell
+        // back to, which is the fact a load failure on such a machine turns on.
         description.ShouldBe(
             "Visual Studio Enterprise 2026 (18.7, via vswhere) — outside the tested VS 2019/2022 envelope");
     }

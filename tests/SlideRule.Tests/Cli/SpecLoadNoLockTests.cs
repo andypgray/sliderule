@@ -7,15 +7,16 @@ using Xunit;
 namespace SlideRule.Tests.Cli;
 
 /// <summary>
-///     Loading a spec must not leave the spec project's build output locked. The model
-///     <see cref="ModelPipeline.LoadModel" /> returns roots the spec's <c>Type</c> references, so the
-///     collectible load context is never actually collected while that model lives — which in the
-///     long-lived MCP server meant a path load pinned the spec DLL and its dependencies for the whole
-///     host lifetime. Every <c>dotnet build</c> of the spec project then failed (MSB3021/MSB3027) until
-///     the server was killed, and killing a stdio server is terminal: the client never reconnects one,
-///     so the per-edit <c>arch_check</c> hook stayed silently disarmed for the rest of the session.
-///     <c>SpecLoadContext</c> loads from bytes to keep that from happening; this pins it.
+///     Loading a spec must not leave the spec project's build output locked.
 /// </summary>
+/// <remarks>
+///     The model <see cref="ModelPipeline.LoadModel" /> returns roots the spec's <c>Type</c> references, so
+///     the collectible load context is never actually collected while that model lives. In the long-lived MCP
+///     server a path load would therefore pin the spec DLL and its dependencies for the whole host lifetime,
+///     and every <c>dotnet build</c> of the spec project would fail to overwrite them until the server was
+///     killed, which for a stdio server ends the session's architecture queries: the client never reconnects
+///     one. <c>SpecLoadContext</c> loads from bytes to keep that from happening; this pins it.
+/// </remarks>
 public sealed class SpecLoadNoLockTests
 {
     [Fact]

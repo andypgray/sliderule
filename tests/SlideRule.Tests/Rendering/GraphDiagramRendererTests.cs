@@ -195,7 +195,7 @@ public sealed class GraphDiagramRendererTests
         string block = GraphDiagramRenderer.Block(summary, SolutionName);
 
         // Assert — first come (ordinal order) keeps the plain slug and the collision takes the ordinal
-        // suffix, which the underscore keeps clear of a name that genuinely ends in a digit.
+        // suffix, which the underscore keeps clear of a name that ends in a digit.
         MermaidBlock.Diagram(block)
             .ShouldBe(["p_My_App[\"My-App\"]", "p_My_App_2[\"My.App\"]", "p_My_App2[\"My.App2\"]"]);
     }

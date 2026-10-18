@@ -11,8 +11,8 @@ namespace SlideRule.Tests.Rendering;
 ///     The composition seam: <see cref="WorkspaceDiagnostics.Rendered" /> is where the MSBuild-selection
 ///     note joins the diagnostics, so that the one list can be handed to <em>both</em> the stderr echo and
 ///     the JSON document, and where the NuGet audit advisories leave that list for
-///     <see cref="WorkspaceDiagnostics.PackageAudit" />. Appending the note at write time reached stderr alone,
-///     which is the whole reason the MCP surface lost it: the tools pass <see cref="TextWriter.Null" /> there.
+///     <see cref="WorkspaceDiagnostics.PackageAudit" />. Appending the note at write time would reach stderr
+///     alone, and the MCP tools pass <see cref="TextWriter.Null" /> there.
 ///     Pure over an in-memory value, so no workspace is opened; the note's own text and the
 ///     rendered-once-per-verb behaviour are pinned by <c>WorkspaceDiagnosticsGateE2ETests</c>.
 /// </summary>
@@ -197,10 +197,9 @@ public sealed class WorkspaceDiagnosticsRendererTests
     [Fact]
     public void From_ASharedProjectBesideAnFsproj_GivesThemDifferentReasons()
     {
-        // The mislabel, as a pin. One reason string was stamped onto every path, so a .shproj — a container
-        // whose .projitems compile into the projects that import it, very often C# and already in the model
-        // through them — was reported as "not a C# project" on every surface. Both kinds in one stamp,
-        // because what went wrong was not the wording of either but that one sentence covered both.
+        // A .shproj is a container whose .projitems compile into the projects that import it, very often C# and
+        // already in the model through them, so it must not be reported as "not a C# project". Both kinds in
+        // one stamp, because the defect this guards is one sentence covering both, not the wording of either.
         WorkspaceDiagnostics diagnostics = WorkspaceDiagnostics.None with
         {
             UnsupportedProjects =

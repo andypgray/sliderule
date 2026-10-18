@@ -57,8 +57,8 @@ public sealed class CoercedToolSchemaTests
     [Theory]
     [InlineData(nameof(Probe.WithStringArray), "names")]
     // The exporter's other erasure. A parameter carrying a description or a default lands as `{}`; one with
-    // neither lands as the bare `true` schema — "any value" — which is the same loss in a shape the
-    // object-guarded repair used to fall straight through, silently and in the direction of "anything goes".
+    // neither lands as the bare `true` schema — "any value" — which is the same loss in a shape an
+    // object-guarded repair falls straight through, silently and in the direction of "anything goes".
     [InlineData(nameof(Probe.WithUndescribedStringArray), "names")]
     public void ErasedStringArray_IsRestoredToAnArrayOfStrings(string methodName, string parameterName)
     {

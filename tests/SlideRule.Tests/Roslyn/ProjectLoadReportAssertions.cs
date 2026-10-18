@@ -9,7 +9,7 @@ namespace SlideRule.Tests.Roslyn;
 /// </summary>
 /// <remarks>
 ///     Every message carries the whole report, both lists, because the defect this type exists to prevent is
-///     precisely reading one list and forgetting the other: a message quoting only the list asserted on would
+///     reading one list and forgetting the other: a message quoting only the list asserted on would
 ///     hide the half that moved. Deliberately not attributed <c>[ShouldlyMethods]</c> — leaving it off is what
 ///     makes an inner failure name the list under test rather than this file.
 /// </remarks>

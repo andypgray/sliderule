@@ -15,11 +15,11 @@ namespace SlideRule.Tests.Cli;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>Both ends of the defect, on one bed.</b> The survey used to charge every declarer of a shared name
-///         with every reference any copy made, so the core copy's reference to <c>Cell</c> rendered as
-///         <c>DriftedApp.Core.Ansi -&gt; DriftedApp.Core</c>. And it credited a reference into the shared name
-///         to the declarer whose facts the node carries, so <c>DriftedApp.Markup</c>, which references the
-///         satellite alone, rendered as reaching the core.
+///         The bed holds two ways to draw a phantom edge through a shared name. Charging every declarer with
+///         every reference any copy made would render the core copy's reference to <c>Cell</c> as
+///         <c>DriftedApp.Core.Ansi -&gt; DriftedApp.Core</c>. Crediting a reference into the shared name to the
+///         declarer whose facts the node carries would render <c>DriftedApp.Markup</c>, which references the
+///         satellite alone, as reaching the core.
 ///     </para>
 ///     <para>
 ///         <b>Why the edge list is asserted whole.</b> The satellite declares no project reference at all, so
@@ -55,8 +55,9 @@ public sealed class DriftedCopiesGraphE2ETests
                 ("DriftedApp.Markup", "DriftedApp.Core.Ansi", 1)
             ]);
 
-        // Each shared name IS declared twice, and the coverage statement stays: only the edges drawn through one were
-        // wrong. An importer compiles the shims on two frameworks and is still one declarer of each.
+        // Each shared name IS declared twice, so the coverage statement keeps both declarers: only an edge drawn
+        // through a shared name has to be credited to the copy that made or bound it. An importer compiles the
+        // shims on two frameworks and is still one declarer of each.
         MultiplyDeclaredTypes(document)
             .ShouldBe([
                 ("DriftedApp.StringExtensions", "DriftedApp.Core, DriftedApp.Core.Ansi"),

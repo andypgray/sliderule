@@ -8,9 +8,7 @@ internal static class ModelQuery
     /// <summary>The lines of a list of sites, in recorded order: <c>edge.Sites.Lines()</c>.</summary>
     /// <remarks>
     ///     On the sites rather than on each edge: the eight edge kinds share no sited contract in the shipped
-    ///     model, naming the list at the call site says which of an edge's site lists is meant, and adding a
-    ///     contract to <c>src/</c> to buy <c>edge.Lines()</c> would put shipped API in the service of a test
-    ///     helper.
+    ///     model, and naming the list at the call site says which of an edge's site lists is meant.
     /// </remarks>
     public static IReadOnlyList<int> Lines(this IEnumerable<SourceLocation> sites)
     {

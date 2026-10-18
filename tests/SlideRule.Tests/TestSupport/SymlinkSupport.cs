@@ -6,8 +6,8 @@ namespace SlideRule.Tests.TestSupport;
 ///     Shared helper for the symlink tests. Creates a directory or file symlink, or skips the calling test (via
 ///     <see cref="Assert.Skip" />) when the host cannot: Windows without Developer Mode or elevation throws on
 ///     <see cref="Directory.CreateSymbolicLink" /> and <see cref="File.CreateSymbolicLink" />, so those runners
-///     skip while Linux and macOS CI — the platforms whose symlinked roots (macOS <c>/var</c>) motivated the
-///     canonicalization fix — exercise the real symlink path.
+///     skip while Linux and macOS CI exercise the real symlink path, which matters most on macOS, whose
+///     temp roots sit under the symlinked <c>/var</c>.
 /// </summary>
 internal static class SymlinkSupport
 {
