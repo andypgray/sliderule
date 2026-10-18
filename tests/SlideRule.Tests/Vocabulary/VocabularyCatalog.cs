@@ -201,6 +201,7 @@ internal static class VocabularyCatalog
             MemberVerb(nameof(MemberSelectionConstraints.MustBeStatic), arch => arch.Types.Methods.MustBeStatic()),
             MemberVerb(nameof(MemberSelectionConstraints.MustBeAbstract), arch => arch.Types.Methods.MustBeAbstract()),
             MemberVerb(nameof(MemberSelectionConstraints.MustBeVirtual), arch => arch.Types.Methods.MustBeVirtual()),
+            MemberVerb(nameof(MemberSelectionConstraints.MustBeOverridable), arch => arch.Types.Methods.MustBeOverridable()),
             MemberVerb(nameof(MemberSelectionConstraints.MustBeAttributedWith),
                 arch => arch.Types.Methods.MustBeAttributedWith(typeof(ApiControllerAttribute))),
             MemberVerb(nameof(MemberSelectionConstraints.MustNotBeAttributedWith),

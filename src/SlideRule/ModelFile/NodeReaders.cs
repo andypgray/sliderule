@@ -480,6 +480,7 @@ internal static class NodeReaders
         MemberSubject<MemberMustBeStaticConstraint>(map, s => new MemberMustBeStaticConstraint(s));
         MemberSubject<MemberMustBeAbstractConstraint>(map, s => new MemberMustBeAbstractConstraint(s));
         MemberSubject<MemberMustBeVirtualConstraint>(map, s => new MemberMustBeVirtualConstraint(s));
+        MemberSubject<MemberMustBeOverridableConstraint>(map, s => new MemberMustBeOverridableConstraint(s));
         MemberSubject<MemberMustBeGetOnlyConstraint>(map, s => new MemberMustBeGetOnlyConstraint(s));
         MemberSubject<MemberMustBeReadonlyConstraint>(map, s => new MemberMustBeReadonlyConstraint(s));
 

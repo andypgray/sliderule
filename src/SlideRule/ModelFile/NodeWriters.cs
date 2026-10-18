@@ -283,6 +283,7 @@ internal static class NodeWriters
         MemberSubject<MemberMustBeStaticConstraint>(arms);
         MemberSubject<MemberMustBeAbstractConstraint>(arms);
         MemberSubject<MemberMustBeVirtualConstraint>(arms);
+        MemberSubject<MemberMustBeOverridableConstraint>(arms);
         MemberSubject<MemberMustBeGetOnlyConstraint>(arms);
         MemberSubject<MemberMustBeReadonlyConstraint>(arms);
 

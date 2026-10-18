@@ -1442,6 +1442,8 @@ internal sealed class ConstraintEvaluator
                 return MemberShape(members, m => m.IsAbstract);
             case MemberMustBeVirtualConstraint:
                 return MemberShape(members, m => m.IsVirtual);
+            case MemberMustBeOverridableConstraint:
+                return MemberShape(members, m => m.IsVirtual || m.IsAbstract || (m.IsOverride && !m.IsSealed));
             case MemberMustBeGetOnlyConstraint:
                 // STRICT (GRAMMAR §5.7): lawful iff the property declares NO setter accessor at all. An
                 // init-only setter IS a setter, so `{ get; init; }` reds — get-only is a claim about the

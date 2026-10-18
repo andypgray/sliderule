@@ -472,6 +472,7 @@ internal static class OneProjectDecidability
             typeof(MemberMustBeStaticConstraint),
             typeof(MemberMustBeAbstractConstraint),
             typeof(MemberMustBeVirtualConstraint),
+            typeof(MemberMustBeOverridableConstraint),
             typeof(MemberMustBeGetOnlyConstraint),
             typeof(MemberMustBeReadonlyConstraint),
             typeof(MemberMustHaveSuffixConstraint),

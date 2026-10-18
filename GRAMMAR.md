@@ -934,7 +934,8 @@ Quarantine desugaring (§7) — is the underlying **type** selection.
   member of a sealed class reports neither by inheritance, and `sealed` on an interface member makes
   it non-virtual rather than sealed; `IsAbstract` is true for an `abstract` member and for every interface
   member without a body (interface members are abstract; a default implementation is virtual
-  instead); `IsAsync` reflects the `async` keyword; and
+  instead), and `MustBeOverridable` (§5.7) reads `IsVirtual`, `IsAbstract`, `IsOverride` and
+  `IsSealed` together; `IsAsync` reflects the `async` keyword; and
   the four mutability flags read the declaration the same way — an expression-bodied property has
   no setter, a manually written `set` accessor is one, and an `abstract` or interface property's
   `set` counts because the declaration writes it. These
@@ -1375,6 +1376,7 @@ posture verbs, trailers and escape hatches of §5.4–§5.6 are written by hand.
 | `.MustBeStatic` | `()` | must be static |
 | `.MustBeAbstract` | `()` | must be abstract |
 | `.MustBeVirtual` | `()` | must be virtual |
+| `.MustBeOverridable` | `()` | must be overridable |
 | `.MustBeAttributedWith` | `(Type)` · `(string)` · `<T>()` | must be attributed with `[ApiController]` |
 | `.MustNotBeAttributedWith` | `(Type, …)` · `(string, …)` · `<T>()` | must not be attributed with `[ApiController]` or `[Serializable]` |
 | `.MustAcceptParameter` | `(Type)` · `(string)` · `<T>()` on `.Methods` | must accept a parameter of type `CancellationToken` |
@@ -1784,6 +1786,7 @@ form cannot reach, because a string anchor still names one definition rather tha
 - `.MustBeProtected()` — member-only vocabulary (no type-side twin, deliberate); exact like its siblings, so a `protected internal` or `private protected` member fails it
 - `.MustBePrivate()` — member-only vocabulary (no type-side twin, deliberate)
 - `.MustBeVirtual()` — member-only vocabulary (no type-side twin, deliberate)
+- `.MustBeOverridable()` — member-only vocabulary, the wider twin of `MustBeVirtual`: a member passes when a derived type can still override it, `IsVirtual || IsAbstract || (IsOverride && !IsSealed)` over the §4.6 flags, so an open override passes where `MustBeVirtual` reds it. It reads the declaration alone: an unsealed override in a sealed class passes, though nothing can derive from the class (whether a class can be derived from is `MustBeSealed`'s question), an interface member passes when it has no body or a default one, and a field never passes
 - `.MustBeAttributedWith(typeof(X))` — reuses the type-side fragment verbatim (§5.3); also anchors by string (§5.2) and carries a generic twin (§10)
 - `.MustNotBeAttributedWith(type, ...)` — none-of over the anchors, the type-side negative's `(first, more)` shape and widening; string form included
 - `.MustAcceptParameter(typeof(CancellationToken))` — methods-only (it lives on `MethodSelection`, like `.Returning`, §3.2); single-anchor arity; matching is definition-level (§4.6): a non-generic anchor matches exactly, an open-generic anchor matches any construction and renders declared type-parameter names ("… of type `IProgress<T>`"), a closed-generic `typeof` anchor is refused at spec build (§8 item 20); also anchors by string (§5.2) and carries a generic twin (§10)
@@ -1792,7 +1795,8 @@ form cannot reach, because a string anchor still names one definition rather tha
 - `.Must(pred, description:)` — `pred` is `Func<IMemberInfo, bool>` (§5.6)
 
 The naming verbs reuse the type-side "must be named" / "must have a name matching" strings
-verbatim; `MustBeProtected`, `MustBePrivate` and `MustBeVirtual` are member-only vocabulary.
+verbatim; `MustBeProtected`, `MustBePrivate`, `MustBeVirtual` and `MustBeOverridable` are
+member-only vocabulary.
 
 The member attribute vocabulary (`AttributedWith` + `Must[Not]BeAttributedWith`) reads the
 §4.6 attribute facts. The **verbs** reuse the

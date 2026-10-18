@@ -136,7 +136,42 @@ public sealed class MemberSubjectVerbTests
                                   }
                                   """;
 
+    // The overridability substrate (GRAMMAR §4.6, §5.7): each shape a derived type can still override beside
+    // each it cannot — a sealed override, a non-virtual method, a sealed interface member and a field — and an
+    // open override inside a sealed class, which passes because only the declaration is read.
+    private const string Overridable = """
+                                       namespace App.Overridable
+                                       {
+                                           public abstract class Service
+                                           {
+                                               public virtual void Open() {}
+                                               public abstract void Required();
+                                               public virtual void Chained() {}
+                                               public virtual void Closing() {}
+                                               public void Fixed() {}
+                                               protected int State;
+                                           }
+                                           public class Extended : Service
+                                           {
+                                               public override void Required() {}
+                                               public override void Chained() {}
+                                               public sealed override void Closing() {}
+                                           }
+                                           public sealed class Final : Service
+                                           {
+                                               public override void Required() {}
+                                           }
+                                           public interface IContract
+                                           {
+                                               void Bare();
+                                               void Defaulted() {}
+                                               sealed void Locked() {}
+                                           }
+                                       }
+                                       """;
+
     private static readonly CodebaseModel AccessModel = CompilationFactory.Extract(Access);
+    private static readonly CodebaseModel OverridableModel = CompilationFactory.Extract(Overridable);
     private static readonly CodebaseModel MembersModel = CompilationFactory.Extract(Members);
     private static readonly CodebaseModel AsyncModel = CompilationFactory.Extract(Async);
     private static readonly CodebaseModel KindsModel = CompilationFactory.Extract(Kinds);
@@ -347,6 +382,33 @@ public sealed class MemberSubjectVerbTests
         FailedMemberIds(MembersModel, arch => arch.Namespace("App.Members.*").Methods.WithPrefix("Cycle")
                 .MustBeVirtual())
             .ShouldBe(["M:App.Members.Machine.Cycle"]);
+    }
+
+    [Fact]
+    public void MustBeOverridable_RedsOnlyWhatNoDerivedTypeCanOverride()
+    {
+        // MustBeVirtual reds every override here; this verb passes each member a derived type can still
+        // override — virtual, abstract, an open override (the one in the sealed class too), a bodiless or
+        // default-bodied interface member — and reds the four that close the door.
+        FailedMemberIds(OverridableModel, arch => arch.Namespace("App.Overridable.*").Members.MustBeOverridable())
+            .ShouldBe([
+                "M:App.Overridable.Extended.Closing",
+                "M:App.Overridable.IContract.Locked",
+                "F:App.Overridable.Service.State",
+                "M:App.Overridable.Service.Fixed"
+            ]);
+    }
+
+    [Fact]
+    public void MustBeOverridable_PassesTheOverridesMustBeVirtualReds()
+    {
+        // The contrast the verb exists for: the same open overrides, red under MustBeVirtual and green here.
+        FailedMemberIds(OverridableModel, arch => arch.Types.Named("Extended", "Final").Methods.WithPrefix("Re")
+                .MustBeVirtual())
+            .ShouldBe(["M:App.Overridable.Extended.Required", "M:App.Overridable.Final.Required"]);
+
+        Pass(OverridableModel, arch => arch.Types.Named("Extended", "Final").Methods.WithPrefix("Re")
+            .MustBeOverridable());
     }
 
     // ── projections (kind filter) ─────────────────────────────────────────────────────────────────────

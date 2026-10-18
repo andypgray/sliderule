@@ -126,11 +126,28 @@ public static class MemberSelectionConstraints
     /// <summary>
     ///     States that every selected member must be declared <c>virtual</c>. This reads the C# declaration, so
     ///     an <c>override</c> is not virtual and neither is an <c>abstract</c> member; both fail the
-    ///     check. There is no counterpart to this verb on a type selection.
+    ///     check. For the law that a derived type can override each member, which an open override and an
+    ///     abstract member keep, use <see cref="MustBeOverridable" />. There is no counterpart to this verb
+    ///     on a type selection.
     /// </summary>
     public static Constraint MustBeVirtual(this MemberSelection subject)
     {
         return new MemberMustBeVirtualConstraint(Subject(subject));
+    }
+
+    /// <summary>
+    ///     States that a derived type must be able to override every selected member, such as
+    ///     <c>arch.Types.InNamespace("MyApp.Services.*").Methods.ThatArePublic().MustBeOverridable()</c>, the
+    ///     law for a service layer whose callers extend it by inheritance. A member passes when it is declared
+    ///     <c>virtual</c> or <c>abstract</c>, or is an <c>override</c> not declared <c>sealed</c>, so an
+    ///     override that keeps its chain open passes where <see cref="MustBeVirtual" /> would fail it. An
+    ///     interface member passes when it has no body or a default one, and a field never passes. Only the
+    ///     member's own declaration is read: an unsealed override in a sealed class passes, though no type
+    ///     can derive from that class. There is no counterpart to this verb on a type selection.
+    /// </summary>
+    public static Constraint MustBeOverridable(this MemberSelection subject)
+    {
+        return new MemberMustBeOverridableConstraint(Subject(subject));
     }
 
     /// <summary>

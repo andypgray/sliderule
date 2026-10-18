@@ -232,7 +232,7 @@ The step-4 counts decide each rule's posture, and the posture goes into the code
   `Dragons` carries the same three things a quarantine's does. A Caution desugars to one checkable rule, `{id}/tripwire`: nothing is ever red, and `render` puts the dragons on the scope's directory as a card. A caution that later gains a facade becomes a `Quarantine` under the same ID.
 
 - **A statement contested by the code or its maintainers → drop the rule**, with a reason opening `contested:` that names the evidence. Contested means stale against the code, applied by its maintainers more loosely than written, or contradicted at every site after step 0's re-read. It goes to the human in the curation table, posture `dropped`, and never to `Migrate`; its `statedIntent:` line still names the rule ID.
-- **Nothing the team would stand behind → drop the rule**, with the reason for `dropped:`. An unratified rule in the spec is exactly the stale-doc problem this tool exists to kill.
+- **Nothing the team would stand behind → drop the rule**, with the reason for `dropped:`.
 - **Work the team has said it is doing now, or a rule step 4 left `undecided` → leave it as drafted** (`Enforce`, or the scope as written). The team has said so only in a stated-intent line or in the human's own words this session; a red with neither takes the posture its evidence sets, `Migrate`. Which of these reach `leftRed:` is the last check's to say, through the receipt's transcription rule.
 
 Then rebuild the spec project and run the whole check again. That document is what the receipt transcribes, and it is this step's test: every rule it shows with `posture: enforce` and `status: failed` must be one of the last bullet's two kinds. Any other is a miss: re-posture it, fence it or drop it, rebuild, and check again. A different posture you would argue for belongs in the curation table's note; the code carries the one the evidence set, the sampled sites and the re-read statement included.
@@ -452,6 +452,7 @@ line.
 | `.MustBeStatic` | `()` | must be static |
 | `.MustBeAbstract` | `()` | must be abstract |
 | `.MustBeVirtual` | `()` | must be virtual |
+| `.MustBeOverridable` | `()` | must be overridable |
 | `.MustBeAttributedWith` | `(Type)` · `(string)` · `<T>()` | must be attributed with `[ApiController]` |
 | `.MustNotBeAttributedWith` | `(Type, …)` · `(string, …)` · `<T>()` | must not be attributed with `[ApiController]` or `[Serializable]` |
 | `.MustAcceptParameter` | `(Type)` · `(string)` · `<T>()` on `.Methods` | must accept a parameter of type `CancellationToken` |
@@ -530,8 +531,9 @@ checker cannot see reds a correctly registered type. `MustImplement`, `MustDeriv
 `MustBeStatic`, `MustBeAbstract`, `MustBePublic` and `MustBeInternal` carry C# declaration semantics:
 a static class is neither sealed nor abstract, and an interface is abstract.
 
-**Member and project subjects** — The member verbs reuse the type-side names, with five of their own:
-`MustBeProtected`, `MustBePrivate` and `MustBeVirtual` have no type-side twin, `MustBeGetOnly()` chains only off
+**Member and project subjects** — The member verbs reuse the type-side names, with six of their own:
+`MustBeProtected`, `MustBePrivate`, `MustBeVirtual` and `MustBeOverridable` (an unsealed override passes it)
+have no type-side twin, `MustBeGetOnly()` chains only off
 `.Properties` and is strict about the declaration (an `init`-only setter is a setter, so it reds), and
 `MustBeReadonly()` chains only off `.Fields` (a `const` field satisfies it, const being readonly's
 superset). `.ThatAreStatic()` prefixes the subject head ("static fields of ..."), as does each
@@ -643,6 +645,5 @@ same (source, caught) edge, so a baseline entry means the same thing under any o
 are transitive with type-argument substitution; an open generic (`typeof(IHandler<>)`)
 matches any construction. `AttributedWith` sees declared attributes only. The `MustNot*`
 hierarchy verbs share these three matchers, negated per subject over the anchor list (a
-subject reds iff it matches ANY anchor). Hierarchy
-adjectives never match external types (their hierarchy is not extracted). Closed generics are
+subject reds iff it matches ANY anchor). Closed generics are
 refused in reference positions — ban the open definition and/or the argument type.

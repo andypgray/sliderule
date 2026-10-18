@@ -350,6 +350,14 @@ public class VocabularyFragmentTests
     }
 
     [Fact]
+    public void Member_MustBeOverridable_RendersFragment()
+    {
+        // Member-only vocabulary, the wider twin of MustBeVirtual: the fragment names what a derived type can do.
+        SentenceRenderer.Sentence(Arch.Types.Methods.MustBeOverridable())
+            .ShouldBe("Methods of types must be overridable.");
+    }
+
+    [Fact]
     public void Member_Must_RendersEscapeHatchDescription()
     {
         SentenceRenderer.Sentence(Arch.Types.Methods.Must(m => m.IsAsync, "return a Task"))

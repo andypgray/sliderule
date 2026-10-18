@@ -40,6 +40,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   cannot reach.
 - `IMemberInfo.IsOverride` reports a member declared `override`, and `IMemberInfo.IsSealed` a
   `sealed override`, for `.Where` and `.Must` predicates.
+- `MustBeOverridable()` states that a derived type can override every selected member: one declared
+  `virtual` or `abstract`, or an `override` not declared `sealed`, passes. `MustBeVirtual` reds an open
+  override; this verb does not, so a law that public service methods stay overridable holds over a
+  hierarchy that overrides them.
 - The extraction cache starts over once after this upgrade, because each project's evaluation now records
   the properties the solution sets, and each member whether it overrides.
 - `check --json` and `arch_check` carry a `framework` key on each `MustOnlyTarget` violation, naming

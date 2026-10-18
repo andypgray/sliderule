@@ -172,6 +172,12 @@ internal static class VocabularyRemainderSpec
                 .MustBeVirtual())
             .Because("A hook is the point a renderer is extended at; sealed, the extension has to fork the renderer instead.");
 
+        arch.Rule("remainder/service-methods-stay-overridable")
+            .Enforce(arch.Types.InNamespace("Remainder.Services.*")
+                .Methods.ThatArePublic()
+                .MustBeOverridable())
+            .Because("A host extends a service by deriving from it, which a sealed override or a plain method rules out.");
+
         arch.Rule("remainder/ambient-properties-are-named-for-it")
             .Enforce(arch.Types.InNamespace("Remainder.Api.*")
                 .Properties.MustHavePrefix("Current"))
