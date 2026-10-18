@@ -401,6 +401,12 @@ internal sealed class ModelNodeReader
         List<Selection>? parts = Each(array, element => ReadSelection(element, EntryOf("union")));
         if (parts is null) return null;
 
+        if (parts.Count == 0)
+        {
+            RefuseEmpty(array, "union");
+            return null;
+        }
+
         IReadOnlyList<SelectionAdjective>? adjectives =
             ReadAdjectives(obj, NodeReaders.AdjectiveWhere, NodeReaders.AdjectiveArms);
         if (adjectives is null) return null;
@@ -628,6 +634,20 @@ internal sealed class ModelNodeReader
         return value is null ? null : Texts(value, key);
     }
 
+    /// <summary>
+    ///     <paramref name="list" />, read from <paramref name="obj" />'s <paramref name="key" />, when it holds at
+    ///     least one entry; otherwise refuses at that array. For the lists the spec refuses empty when it loads
+    ///     (GRAMMAR §8 item 36): a file holding one was not written from a spec that loaded, and reading it would
+    ///     mint a model the spec could not.
+    /// </summary>
+    internal IReadOnlyList<T>? NonEmpty<T>(IReadOnlyList<T>? list, StrictJsonValue obj, string key)
+    {
+        if (list is not { Count: 0 }) return list;
+
+        RefuseEmpty(Optional(obj, key)!, key);
+        return null;
+    }
+
     internal bool RequiredEnum<TEnum>(StrictJsonValue obj, string where, string key, string family, out TEnum parsed)
         where TEnum : struct, Enum
     {
@@ -842,6 +862,11 @@ internal sealed class ModelNodeReader
     {
         obj.TryGetProperty(key, out StrictJsonValue? value);
         return value;
+    }
+
+    private void RefuseEmpty(StrictJsonValue array, string key)
+    {
+        RefuseAt(array, Field(key) + " must not be empty.");
     }
 
     internal void RefuseAt(StrictJsonValue at, string message)

@@ -275,5 +275,12 @@ internal enum SpecValidationErrorCode
     ///     with a <c>.</c>, <c>..</c> or empty segment or a <c>**</c> inside a longer segment. A path glob is
     ///     relative to the solution directory with <c>/</c> between segments; write it that way.
     /// </summary>
-    MalformedPathGlob
+    MalformedPathGlob,
+
+    /// <summary>
+    ///     A call that takes a list given an empty one: <c>arch.AnyOf</c>, project <c>Named</c> or <c>Matching</c>,
+    ///     member <c>Named</c> or <c>Except</c>, or <c>MustNotUse</c>. Each would select, remove or ban nothing
+    ///     while reading like a rule; pass at least one operand.
+    /// </summary>
+    EmptyOperandList
 }

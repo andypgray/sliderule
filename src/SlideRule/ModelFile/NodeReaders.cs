@@ -295,7 +295,7 @@ internal static class NodeReaders
         {
             if (!r.OnlyKeys(v, MemberAdjectiveWhere, "node", "names")) return null;
 
-            IReadOnlyList<string>? names = r.RequiredTexts(v, MemberAdjectiveWhere, "names");
+            IReadOnlyList<string>? names = r.NonEmpty(r.RequiredTexts(v, MemberAdjectiveWhere, "names"), v, "names");
             return names is null ? null : new MemberNamedAdjective(names);
         });
 
@@ -320,7 +320,8 @@ internal static class NodeReaders
         {
             if (!r.OnlyKeys(v, MemberAdjectiveWhere, "node", "payloads")) return null;
 
-            IReadOnlyList<MemberSelection>? payloads = r.RequiredMemberSelections(v, MemberAdjectiveWhere, "payloads");
+            IReadOnlyList<MemberSelection>? payloads =
+                r.NonEmpty(r.RequiredMemberSelections(v, MemberAdjectiveWhere, "payloads"), v, "payloads");
             return payloads is null ? null : new MemberExceptAdjective(payloads);
         });
 
@@ -348,7 +349,7 @@ internal static class NodeReaders
         {
             if (!r.OnlyKeys(v, ProjectAdjectiveWhere, "node", "names")) return null;
 
-            IReadOnlyList<string>? names = r.RequiredTexts(v, ProjectAdjectiveWhere, "names");
+            IReadOnlyList<string>? names = r.NonEmpty(r.RequiredTexts(v, ProjectAdjectiveWhere, "names"), v, "names");
             return names is null ? null : new ProjectNamedAdjective(names);
         });
 
@@ -356,7 +357,7 @@ internal static class NodeReaders
         {
             if (!r.OnlyKeys(v, ProjectAdjectiveWhere, "node", "globs")) return null;
 
-            IReadOnlyList<string>? globs = r.RequiredTexts(v, ProjectAdjectiveWhere, "globs");
+            IReadOnlyList<string>? globs = r.NonEmpty(r.RequiredTexts(v, ProjectAdjectiveWhere, "globs"), v, "globs");
             return globs is null ? null : new ProjectMatchingAdjective(globs);
         });
 
@@ -489,7 +490,7 @@ internal static class NodeReaders
             Selection? subject = r.RequiredSelection(v, ConstraintWhere, "subject");
             if (subject is null) return null;
 
-            IReadOnlyList<Member>? members = r.RequiredMembers(v, ConstraintWhere);
+            IReadOnlyList<Member>? members = r.NonEmpty(r.RequiredMembers(v, ConstraintWhere), v, "members");
             return members is null ? null : new MustNotUseConstraint(subject, members);
         });
     }

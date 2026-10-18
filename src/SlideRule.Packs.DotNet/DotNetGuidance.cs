@@ -164,8 +164,8 @@ public static class DotNetGuidance
         Selection? exemplar = null)
     {
         IRuleBuilder rule = arch.Rule("async/no-sync-over-async");
-        (Member first, Member[] more) = BlockingWaitAnchors(arch);
-        Constraint constraint = subject.MustNotUse(first, more);
+        IReadOnlyList<Member> blockingWaits = BlockingWaitAnchors(arch);
+        Constraint constraint = subject.MustNotUse(blockingWaits);
 
         Declare(rule, constraint, posture,
             "Blocking on a Task or ValueTask (.Result/.Wait/.GetResult) ties up a thread and can deadlock in a captured context; await instead.",
@@ -178,28 +178,29 @@ public static class DotNetGuidance
     /// <summary>
     ///     Returns the members <c>async/no-sync-over-async</c> bans, for a spec that writes its own
     ///     blocking-wait rule, with its own ID, reason and exempted types, and still wants one definition of
-    ///     what blocking on a task is. Destructure it and pass both parts to the ban:
-    ///     <c>(Member blocking, Member[] more) = BlockingWaitAnchors(arch);</c> then
-    ///     <c>subject.MustNotUse(blocking, more)</c>.
+    ///     what blocking on a task is. Pass the list to the ban as it is:
+    ///     <c>subject.MustNotUse(BlockingWaitAnchors(arch))</c>.
     /// </summary>
     /// <remarks>
     ///     The set is <c>Task.Wait</c>, <c>Result</c> on <c>Task&lt;T&gt;</c> and <c>ValueTask&lt;T&gt;</c>,
     ///     and <c>GetResult</c> on the four task awaiters, and a rule built on it picks up whatever is added
-    ///     to it later. The first member is split from the rest only because <c>MustNotUse</c> takes that
-    ///     shape. Call <see cref="NoSyncOverAsync" /> instead wherever the pack's own reason and subject fit.
+    ///     to it later. Call <see cref="NoSyncOverAsync" /> instead wherever the pack's own reason and subject
+    ///     fit.
     /// </remarks>
     /// <param name="arch">The <see cref="Arch" /> the spec is declaring on.</param>
-    /// <returns>The first banned member, and the rest.</returns>
-    public static (Member First, Member[] More) BlockingWaitAnchors(Arch arch)
+    /// <returns>The banned members.</returns>
+    public static IReadOnlyList<Member> BlockingWaitAnchors(Arch arch)
     {
-        return (arch.Member(typeof(Task), nameof(Task.Wait)), [
+        return
+        [
+            arch.Member(typeof(Task), nameof(Task.Wait)),
             arch.Member(typeof(Task<>), nameof(Task<>.Result)),
             arch.Member(typeof(ValueTask<>), nameof(ValueTask<>.Result)),
             arch.Member(typeof(TaskAwaiter), nameof(TaskAwaiter.GetResult)),
             arch.Member(typeof(TaskAwaiter<>), nameof(TaskAwaiter<>.GetResult)),
             arch.Member(typeof(ValueTaskAwaiter), nameof(ValueTaskAwaiter.GetResult)),
             arch.Member(typeof(ValueTaskAwaiter<>), nameof(ValueTaskAwaiter<>.GetResult))
-        ]);
+        ];
     }
 
     /// <summary>

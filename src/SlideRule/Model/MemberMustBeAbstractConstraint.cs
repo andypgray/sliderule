@@ -1,4 +1,3 @@
-
 namespace SlideRule.Model;
 
 /// <summary><c>.Methods.MustBeAbstract()</c> → "must be abstract" (GRAMMAR §5.7).</summary>

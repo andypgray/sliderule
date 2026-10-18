@@ -1,6 +1,5 @@
 using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
-using SlideRule.Fluent;
 using SlideRule.Internal;
 using SlideRule.Model;
 using SlideRule.Validation;
@@ -168,6 +167,20 @@ public sealed class Arch
     }
 
     /// <summary>
+    ///     Selects every type any selection in a list names, such as <c>arch.AnyOf(layers)</c> over a list
+    ///     a helper method built. The selections may be layers, narrowed selections or other unions; a
+    ///     list of one selects just that. Adjectives applied afterwards narrow the combined set. The list
+    ///     is read once, when this is called. As a rule subject, every selection must match at least one
+    ///     type, or the rule fails naming the empty one. An empty list is reported when the spec is
+    ///     loaded, and a null list or a null selection in it throws.
+    /// </summary>
+    public Selection AnyOf(IEnumerable<Selection> selections)
+    {
+        IReadOnlyList<Selection> parts = OperandList.ZeroOrMore(selections, selection => selection, nameof(selections));
+        return UnionSelection.Create(this, parts);
+    }
+
+    /// <summary>
     ///     Selects every listed type, such as <c>arch.AnyOf(typeof(A), typeof(B))</c>; types from
     ///     referenced packages and the framework are accepted, and a generic type is given as its open
     ///     definition. Adjectives applied afterwards narrow the combined set. To mix types with other
@@ -179,6 +192,21 @@ public sealed class Arch
         // naturally the System.Type the operands already are. The lambda names the call.
         // ReSharper disable once ConvertClosureToMethodGroup
         IReadOnlyList<Selection> parts = OperandList.OneOrMore(first, more, type => Type(type));
+        return UnionSelection.Create(this, parts);
+    }
+
+    /// <summary>
+    ///     Selects every type in a list, such as <c>arch.AnyOf(handlerTypes)</c> over a list a helper
+    ///     method built; types from referenced packages and the framework are accepted, and a generic type
+    ///     is given as its open definition. Adjectives applied afterwards narrow the combined set. The list
+    ///     is read once, when this is called. An empty list is reported when the spec is loaded, and a null
+    ///     list or a null type in it throws.
+    /// </summary>
+    public Selection AnyOf(IEnumerable<Type> types)
+    {
+        // As on the params form: a method group would read as the bare word Type.
+        // ReSharper disable once ConvertClosureToMethodGroup
+        IReadOnlyList<Selection> parts = OperandList.ZeroOrMore(types, type => Type(type), nameof(types));
         return UnionSelection.Create(this, parts);
     }
 

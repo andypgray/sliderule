@@ -60,6 +60,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   operating system. A glob names everything under it, and a type is under it when any file declaring it
   is. Each glob a rule's subject names is checked on its own, as `Named` names are, and a malformed glob
   is reported as `SR1035`.
+- Seven calls take a list a spec computed, such as one a helper method built: `arch.AnyOf` over
+  selections or over types, `arch.Projects.Named` and `.Matching`, member `.Named` and `.Except`, and
+  `MustNotUse` over members. Each selects what the comma-separated form selects given the same operands,
+  and reads the list once, when it is called. A `List<Layer>` passes to `arch.AnyOf` and a
+  `List<MethodSelection>` to member `.Except` as they are. An empty list is reported when the spec is
+  loaded, naming the call and what it would have done, and a null list or a null entry in it throws.
+  A model file holding an empty list for any of these is refused.
 - The extraction cache starts over once after this upgrade, because each project's evaluation now records
   the properties the solution sets, and each member whether it overrides.
 - `check --json` and `arch_check` carry a `framework` key on each `MustOnlyTarget` violation, naming

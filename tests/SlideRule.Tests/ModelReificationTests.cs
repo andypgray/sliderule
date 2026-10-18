@@ -1011,6 +1011,21 @@ public class ModelReificationTests
     }
 
     [Fact]
+    public void AnyOf_NestedEmptyUnion_StaysALeaf()
+    {
+        // Flattened, an empty inner union would vanish into its parent and leave the validator nothing to report.
+        var arch = new Arch();
+        Selection empty = arch.AnyOf(new List<Selection>());
+        var outer = arch.AnyOf(empty, arch.Project("C"))
+            .ShouldBeOfType<UnionSelection>();
+
+        outer.Parts.Count.ShouldBe(2);
+        outer.Parts[0]
+            .ShouldBeOfType<UnionSelection>()
+            .Parts.ShouldBeEmpty();
+    }
+
+    [Fact]
     public void AnyOf_Adjective_IsOwnedByTheUnionNotDistributedThroughIt()
     {
         // (a ∪ b) − c, not (a − c) ∪ (b − c): the union keeps its two operands and grows its own adjective.

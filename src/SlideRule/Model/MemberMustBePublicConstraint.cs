@@ -1,4 +1,3 @@
-
 namespace SlideRule.Model;
 
 /// <summary><c>.Methods.MustBePublic()</c> → "must be public" (GRAMMAR §5.7).</summary>

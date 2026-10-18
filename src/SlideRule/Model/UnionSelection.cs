@@ -3,7 +3,8 @@ namespace SlideRule.Model;
 /// <summary>
 ///     The union of one or more selections — <c>arch.AnyOf(a, b, …)</c> (GRAMMAR §5.1) — and the
 ///     payload the Quarantine containment desugaring feeds into an <c>Except</c> as <c>sel ∪ F</c>
-///     (§7).
+///     (§7). A sequence overload can mint one with no parts, which the validator refuses when the spec
+///     loads (§8 item 36).
 /// </summary>
 /// <remarks>
 ///     Adjectives apply to the union, not through it: <c>AnyOf(a, b).Except(c)</c> is
@@ -41,13 +42,15 @@ internal sealed class UnionSelection : Selection
     ///     Mints a union, flattening nested unions at mint so prose and evaluation both read one leaf
     ///     list: <c>AnyOf(AnyOf(a, b), c)</c> ≡ <c>AnyOf(a, b, c)</c>. Only an <em>adjective-free</em>
     ///     union operand flattens — an inner union carrying adjectives is a narrowed set of its own, so
-    ///     it stays a leaf.
+    ///     it stays a leaf. So does an <em>empty</em> one: flattened, it would vanish into its parent, and
+    ///     <c>AnyOf(AnyOf(empty), b)</c> would load as <c>AnyOf(b)</c> with nothing left for the validator
+    ///     to report.
     /// </summary>
     internal static UnionSelection Create(Arch owner, IReadOnlyList<Selection> parts)
     {
         var flattened = new List<Selection>(parts.Count);
         foreach (Selection part in parts)
-            if (part is UnionSelection { Adjectives.Count: 0 } nested) flattened.AddRange(nested.Parts);
+            if (part is UnionSelection { Adjectives.Count: 0, Parts.Count: > 0 } nested) flattened.AddRange(nested.Parts);
             else flattened.Add(part);
 
         return new UnionSelection(owner, flattened);

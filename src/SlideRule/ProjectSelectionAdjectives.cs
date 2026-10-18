@@ -22,8 +22,9 @@ public static class ProjectSelectionAdjectives
     ///     <c>arch.Projects.Named("MyApp.Web")</c> or
     ///     <c>arch.Projects.Named("MyApp.Web", "MyApp.Api")</c>, which keeps the projects carrying either
     ///     name. The name is the one the solution lists, compared case-sensitively and taken literally, so
-    ///     a <c>*</c> in it is a literal character; <see cref="Matching" /> is the glob form beside this
-    ///     one. At least one name is required, and a blank one is reported when the spec is loaded.
+    ///     a <c>*</c> in it is a literal character;
+    ///     <see cref="Matching(ProjectSelection, string, string[])" /> is the glob form beside this one. At
+    ///     least one name is required, and a blank one is reported when the spec is loaded.
     /// </summary>
     public static ProjectSelection Named(
         this ProjectSelection selection,
@@ -34,6 +35,23 @@ public static class ProjectSelectionAdjectives
     {
         IReadOnlyList<string> names = OperandList.OneOrMore(first, more, name => name);
         return Append(selection, new ProjectNamedAdjective(names));
+    }
+
+    /// <summary>
+    ///     Narrows the selection to the projects with exactly the names in a list, such as
+    ///     <c>arch.Projects.Named(serviceProjects)</c> over a list a helper method built, which keeps the
+    ///     projects carrying any of them. The name is the one the solution lists, compared case-sensitively
+    ///     and taken literally, so a <c>*</c> in it is a literal character. The list is read once, when this
+    ///     is called. An empty list or a blank name is reported when the spec is loaded, and a null list or
+    ///     a null name in it throws.
+    /// </summary>
+    public static ProjectSelection Named(
+        this ProjectSelection selection,
+        [SpecSlot(nameof(SpecSlot.ProjectNameOperand))]
+        IEnumerable<string> names)
+    {
+        IReadOnlyList<string> list = OperandList.ZeroOrMore(names, name => name, nameof(names));
+        return Append(selection, new ProjectNamedAdjective(list));
     }
 
     /// <summary>
@@ -53,6 +71,23 @@ public static class ProjectSelectionAdjectives
     {
         IReadOnlyList<string> globs = OperandList.OneOrMore(glob, more, pattern => pattern, nameof(glob));
         return Append(selection, new ProjectMatchingAdjective(globs));
+    }
+
+    /// <summary>
+    ///     Narrows the selection to the projects whose name matches any glob in a list, such as
+    ///     <c>arch.Projects.Matching(pluginGlobs)</c> over a list a helper method built. Matching is
+    ///     case-sensitive: <c>*</c> matches any run of characters including none, and every other character
+    ///     matches itself. A project name is one token, so a <c>*</c> crosses dots freely. The list is read
+    ///     once, when this is called. An empty list or a blank glob is reported when the spec is loaded, and
+    ///     a null list or a null glob in it throws.
+    /// </summary>
+    public static ProjectSelection Matching(
+        this ProjectSelection selection,
+        [SpecSlot(nameof(SpecSlot.ProjectNamePattern))]
+        IEnumerable<string> globs)
+    {
+        IReadOnlyList<string> list = OperandList.ZeroOrMore(globs, pattern => pattern, nameof(globs));
+        return Append(selection, new ProjectMatchingAdjective(list));
     }
 
     /// <summary>

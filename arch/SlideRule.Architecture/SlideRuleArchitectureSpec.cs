@@ -490,14 +490,13 @@ public sealed class SlideRuleArchitectureSpec : IArchitectureSpec
                  "references the MCP SDK.");
 
         // One definition of a blocking wait, shared with the pack instead of copied beside it: this rule
-        // keeps its own subject, exemption and reason, and picks up whatever the pack's list gains. It
-        // arrives split because MustNotUse takes one member and the rest, not because the first differs.
-        (Member blockingWait, Member[] moreBlockingWaits) = DotNetGuidance.BlockingWaitAnchors(arch);
+        // keeps its own subject, exemption and reason, and picks up whatever the pack's list gains.
+        IReadOnlyList<Member> blockingWaits = DotNetGuidance.BlockingWaitAnchors(arch);
 
         arch.Rule("mcp/no-blocking-waits")
             .Enforce(arch.AnyOf(host, workspace, extraction)
                 .Except(arch.Types.Named("ServerShutdown"))
-                .MustNotUse(blockingWait, moreBlockingWaits))
+                .MustNotUse(blockingWaits))
             .Because("The CLI and the two layers under it are one long-lived MCP server as often as they are " +
                      "a one-shot command, and a blocking wait there costs twice: it holds a thread-pool thread " +
                      "for as long as the child process or workspace load it waits on, and it drops the " +

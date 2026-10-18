@@ -1,8 +1,9 @@
 namespace SlideRule.Validation;
 
 /// <summary>
-///     Marks a string parameter of the authoring surface as the spec slot of the given name, so that a
-///     reader can tell from the declaration alone which slot a literal written at that parameter fills.
+///     Marks a parameter of the authoring surface that takes text, one string or a list of them, as the spec
+///     slot of the given name, so that a reader can tell from the declaration alone which slot a literal
+///     written at that parameter fills.
 /// </summary>
 /// <remarks>
 ///     The marker is read from metadata by a compiler extension, out of whatever copy of this assembly

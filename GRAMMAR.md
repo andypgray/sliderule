@@ -38,14 +38,16 @@ as part of the change (house test culture).
    reduced relative clauses.
 5. **Selections and constraints are first-class values** — assignable to variables, returnable
    from helpers, buildable in loops. The grammar never requires a chain to complete in one
-   expression.
+   expression. An operand list is buildable the same way: the calls a helper's list feeds take it
+   as one sequence (§3.3), and an empty one is reported at spec build (§8 item 36).
 6. **Compile-enforce the big structure; validate the fine rules; throw on what is neither.**
    Stage types make illegal sentence *shapes* uncompilable; spec-build validation reports every
    remaining error at once (§8) so an agent fixing a spec sees all problems in one pass. Between
    those two sits a third tier for arguments nobody could have written on purpose — a `null` where
-   a string, a type, a selection or a lambda belongs, a `null` `params` array, an enum value
-   outside the ones declared. Those throw the ordinary `ArgumentNullException` /
-   `ArgumentOutOfRangeException` at the call, naming the parameter the caller wrote. The split is
+   a string, a type, a selection or a lambda belongs, a `null` `params` array or sequence, or a
+   `null` inside either, an enum value outside the ones declared. Those throw the ordinary
+   `ArgumentNullException` / `ArgumentOutOfRangeException` at the call, naming the parameter the
+   caller wrote. The split is
    by kind, not by slot: `arch.Namespace(null!)` throws and `arch.Namespace("")` is collected as
    item 15, because a blank is a claim about the codebase that belongs in the one report with a
    `file:line` beside every other, while a null is a defect in whatever code built the spec and has
@@ -79,6 +81,7 @@ definition :=  var x = arch.Layer(name, glob, globs...)[.Purpose(prose)]
              | arch.Project(name) | arch.Type(typeof(X)) | arch.Type<X>()
              | arch.Registered(lifetime) | arch.Registered()
              | arch.AnyOf(selection, selections...) | arch.AnyOf(typeof(X), types...)
+             | arch.AnyOf(selection-list) | arch.AnyOf(type-list)
              | arch.Each(layer, layers...) | arch.Each(project-selection)
              | arch.Member(typeof(X), nameof(X.M))
              | arch.Member<T>(x => x.M) | arch.Member(() => X.M)
@@ -135,6 +138,8 @@ Arch
  ├─ .AnyOf(Type first, params Type[] more) → Selection
  │                                     (sugar: ≡ .AnyOf(.Type(a), .Type(b), …) — the
  │                                      multi-type noun)
+ ├─ .AnyOf(IEnumerable<Selection>) / .AnyOf(IEnumerable<Type>) → Selection
+ │                                     (the same unions over a computed list; §3.3)
  ├─ .Registered(Lifetime) → Selection  (types named in a source-visible container
  │                                      registration with that lifetime — service and
  │                                      implementation alike; §4.7)
@@ -157,7 +162,8 @@ Selection    — adjectives → Selection; modal verbs → Constraint (terminal)
 MemberSelection — member adjectives (.WithSuffix / .WithPrefix / .WithNameMatching /
                .Named / .AttributedWith / .ThatAreStatic / .ThatArePublic and the
                other accessibility adjectives / .Except / .Where) → the SAME concrete
-               member-selection type; member modal verbs → Constraint (terminal)
+               member-selection type, .Named and .Except also over a computed list
+               (§3.3); member modal verbs → Constraint (terminal)
 MethodSelection — a MemberSelection minted by .Methods that additionally offers
                .Returning(Type first, params Type[] more) /
                .Returning(string first, params string[] more) → MethodSelection (§4.6)
@@ -168,7 +174,8 @@ PropertySelection — a MemberSelection minted by .Properties that additionally 
 FieldSelection — a MemberSelection minted by .Fields that additionally offers
                .MustBeReadonly() → Constraint (terminal; §5.7)
 ProjectSelection — project adjectives (.Named / .Matching / .Packable / .Except / .Where)
-               → ProjectSelection; project modal verbs (MustOnlyTarget / MustTarget /
+               → ProjectSelection, .Named and .Matching also over a computed list (§3.3);
+               project modal verbs (MustOnlyTarget / MustTarget /
                MustReferenceNoPackages / MustOnlyReferencePackages / MustNotReferencePackages /
                MustSetProperty / MustLockPackages / MustNotBePackable / .Must) → Constraint
                (terminal; §4.10, §5.8)
@@ -251,8 +258,9 @@ Exposure-ness lives in the verb the same way: the operands name the types that m
 in a public signature position, most often through the bare `typeof` sugar
 (`MustNotExpose(typeof(DataTable))`); its edge semantics are §4.9. The
 `(first, more)` shape makes zero-argument calls **uncompilable** and keeps single-argument
-overload resolution unambiguous. Mixing selections and types in one call = wrap the type:
-`MustNotReference(web, arch.Type(typeof(SqlConnection)))`. The same `(first, more)` shape
+overload resolution unambiguous. A list computed at run time goes through the sequence forms
+instead (**Computed lists**, below), where an empty list is §8 item 36. Mixing selections and
+types in one call = wrap the type: `MustNotReference(web, arch.Type(typeof(SqlConnection)))`. The same `(first, more)` shape
 applies to `Layer(name, glob, more)` — a layer with zero globs is uncompilable — and to
 `Each(Layer first, params Layer[] more)` — a family with zero cells is uncompilable, and its cells
 are typed to `Layer`, so an adjective-bearing cell, a union cell or a nested family is a compile
@@ -298,6 +306,24 @@ single overload spans, so one call mixes neither the two static forms nor a stat
 instance — wrap the odd target with `arch.Member` and pass the uniform `Member` list, exactly
 as a mixed selection/type list wraps the type (above). The sugar applies only where the whole
 list is static and one form: `web.MustNotUse(() => DateTime.Now, () => DateTime.UtcNow)`.
+
+**Computed lists.** Seven calls also take their operands as one sequence, for a spec that builds
+the list in a helper or a loop: `arch.AnyOf(IEnumerable<Selection>)` and
+`arch.AnyOf(IEnumerable<Type>)`, project `.Named` and `.Matching(IEnumerable<string>)`, member
+`.Named(IEnumerable<string>)` and `.Except(IEnumerable<MemberSelection>)`, and
+`MustNotUse(IEnumerable<Member>)`. Each builds the node its `(first, more)` sibling builds from the
+same operands, so the model and the sentence are identical. A selection position takes a computed
+list as one operand, `arch.AnyOf(list)`. The sequence is read once, at the call, so a lazy query
+runs once and a list changed afterwards does not change the spec. A null sequence or a null entry
+throws at the call (§2 principle 6). An empty sequence compiles where the `(first, more)` shape
+would not, and is reported at spec build as §8 item 36. `IEnumerable<T>` is covariant, so a
+`List<Layer>` binds `AnyOf` and a `List<MethodSelection>` binds member `.Except` with no cast. A
+single operand still binds the `params` form. Where C# has collection expressions (12 and later),
+`arch.AnyOf([])` is ambiguous between the two union forms (CS0121), and `arch.Projects.Named([])`
+binds the sequence form and reaches item 36. The types such a helper takes or returns (`Selection`,
+`Layer`, `MemberSelection`, `MethodSelection`, `PropertySelection`, `FieldSelection`,
+`ProjectSelection`) are in the root namespace, so it compiles under `using SlideRule;` alone. The
+other `(first, more)` lists have no sequence form yet (§11).
 
 ## 4. Pinned semantics
 
@@ -1314,7 +1340,7 @@ posture verbs, trailers and escape hatches of §5.4–§5.6 are written by hand.
 | `arch.Project` | `(string)` | Types in project `MyApp.Web` |
 | `arch.Type` | `(Type)` · `<T>()` | `SqlConnection` |
 | `arch.Registered` | `()` · `(Lifetime)` | Singleton-registered types |
-| `arch.AnyOf` | `(Selection, …)` · `(Type, …)` | Types in `MyApp.Tracking.*` or `MyApp.Billing.*` |
+| `arch.AnyOf` | `(IEnumerable<Selection>)` · `(IEnumerable<Type>)` · `(Selection, …)` · `(Type, …)` | Types in `MyApp.Tracking.*` or `MyApp.Billing.*` |
 | `arch.Each` | `(Layer, …)` · `(ProjectSelection)` | Each of the Host, Adapter and Pack layers |
 | `arch.Member` | `(() => …)` · `(Type, string)` · `(x => …)` | `DateTime.Now` |
 
@@ -1347,7 +1373,7 @@ posture verbs, trailers and escape hatches of §5.4–§5.6 are written by hand.
 | `.MustOnlyBeReferencedByItself` | `()` | must be referenced only by itself |
 | `.MustNotReferenceEachOther` | `()` | must not reference the others |
 | `.MustNotHaveCircularReferences` | `()` | must not have circular references with the others |
-| `.MustNotUse` | `(() => …, …)` · `(Member, …)` | must not use `DateTime.Now` |
+| `.MustNotUse` | `(() => …, …)` · `(IEnumerable<Member>)` · `(Member, …)` | must not use `DateTime.Now` |
 | `.MustNotConstruct` | `(Selection, …)` · `(Type, …)` | must not construct `SqlConnection` |
 | `.MustNotInject` | `(Selection, …)` · `(Type, …)` | must not inject `SqlConnection` |
 | `.MustNotCatch` | `(Selection, …)` · `(Type, …)` | must not catch `InvalidOperationException` |
@@ -1392,7 +1418,7 @@ posture verbs, trailers and escape hatches of §5.4–§5.6 are written by hand.
 | `.WithSuffix` | `(string)` | `*Async` methods of types |
 | `.WithPrefix` | `(string)` | `Get*` methods of types |
 | `.WithNameMatching` | `(string)` | `*Handler*` methods of types |
-| `.Named` | `(string, …)` | `Main` methods of types |
+| `.Named` | `(IEnumerable<string>)` · `(string, …)` | `Main` methods of types |
 | `.Returning` | `(Type, …)` · `(string, …)` on `.Methods` | Methods of types returning `Task` |
 | `.AttributedWith` | `(Type)` · `(string)` · `<T>()` | `[ApiController]`-attributed methods of types |
 | `.ThatAreStatic` | `()` | Static fields of types |
@@ -1402,7 +1428,7 @@ posture verbs, trailers and escape hatches of §5.4–§5.6 are written by hand.
 | `.ThatArePrivate` | `()` | Private fields of types |
 | `.ThatAreProtectedInternal` | `()` | Protected internal methods of types |
 | `.ThatArePrivateProtected` | `()` | Private protected methods of types |
-| `.Except` | `(MemberSelection, …)` | Methods of types, except `Main` methods of types named `Program` |
+| `.Except` | `(IEnumerable<MemberSelection>)` · `(MemberSelection, …)` | Methods of types, except `Main` methods of types named `Program` |
 | `.Where` | `(Func<IMemberInfo, bool>, string)` | Methods of types that are async |
 
 | Verb | Overloads | Fragment |
@@ -1433,8 +1459,8 @@ posture verbs, trailers and escape hatches of §5.4–§5.6 are written by hand.
 
 | Adjective | Overloads | Fragment |
 |---|---|---|
-| `.Named` | `(string, …)` | Project `MyApp.Web` |
-| `.Matching` | `(string, …)` | Projects matching `MyApp.*` |
+| `.Named` | `(IEnumerable<string>)` · `(string, …)` | Project `MyApp.Web` |
+| `.Matching` | `(IEnumerable<string>)` · `(string, …)` | Projects matching `MyApp.*` |
 | `.Packable` | `()` | Packable projects |
 | `.Except` | `(ProjectSelection)` | Projects, except project `MyApp.Tests` |
 | `.Where` | `(Func<IProjectInfo, bool>, string)` | Projects that target net8.0 |
@@ -1470,10 +1496,12 @@ What the table cannot show, per noun:
   selection, or another union.
 - **Nested unions flatten at mint**: `AnyOf(AnyOf(a, b), c)` ≡ `AnyOf(a, b, c)`, so prose and
   evaluation both read one leaf list. Only an *adjective-free* union operand flattens — an inner
-  union carrying adjectives is a narrowed set of its own, so it stays a leaf.
+  union carrying adjectives is a narrowed set of its own, so it stays a leaf. An empty union stays a
+  leaf too: flattened, it would vanish into its parent, where §8 item 36 could not find it.
 - **One operand is legal and is an identity**: same model shape, and it renders exactly as the
   bare operand would in the same position. Selections are loop-buildable (§2 principle 5), so a
-  loop that happens to yield one operand must not become an error.
+  loop that happens to yield one operand must not become an error. A loop that yields none is §8
+  item 36, because a union with no operand selects no type.
 - **Adjectives apply to the union, not through it**: `AnyOf(a, b).Except(c)` = (a ∪ b) − c, and
   `.Methods` projects over the union. The evaluator applies union adjectives *after* the set union.
 - **The multi-type sugar** `AnyOf(Type first, params Type[] more)` desugars to
@@ -2338,6 +2366,15 @@ carries its sugar overload too, or the verb silently stops compiling after the s
     a longer segment, each with a reason clause of its own (§4.2). Refused rather than normalized,
     so what the model carries is what the author wrote; the matcher owns the verdict, so what it
     refuses and what this catalog reports cannot drift. A blank glob is item 15's alone.
+36. An empty operand list on a sequence form (§3.3): `arch.AnyOf` with no parts, project `.Named`
+    or `.Matching` with no names or globs, member `.Named` with no names, member `.Except` with no
+    payloads, `MustNotUse` with no members (`` `arch.AnyOf` on '{id}' was given an empty list, so
+    it selects nothing; pass at least one operand. ``). The `(first, more)` forms keep each of
+    these uncompilable, and only a list computed at run time reaches them. Each renders like a law
+    and constrains no code, so the message names the call and what an empty one does: "selects no
+    project", "selects no member", "removes nothing", "bans nothing".
+    It is reported wherever the other walks reach, and for a layer definition on a layer's
+    spec-wide terms.
 
 Item 5 also reaches the member escape-hatch descriptions: a blank or multi-line member `Where`
 (`Func<IMemberInfo,bool>`) or member `Must` description is caught by the same prose walk,
@@ -2345,32 +2382,32 @@ which descends through a member constraint's subject and verb (§4.6) — and th
 project escape-hatch descriptions the same way: a project `Must` description, and project
 `Where` descriptions wherever the subject nests one, `Except` payloads included (§4.10). A member
 `Except` payload (§4.6) is walked as the subject is, at every nesting depth: its type selection
-reaches items 10, 15, 16, 19 and 27, and its own member adjectives items 5, 14 and 15.
+reaches items 10, 15, 16, 19, 27 and 36, and its own member adjectives items 5, 14, 15 and 36.
 
 Every walk in this catalog descends through a union (§5.1) on both axes — its operands *and* its
 own adjectives — so `AnyOf(a, b).Where(p, "")` reaches item 5, `AnyOf(a, b).InNamespace("")`
-reaches items 15–16, and a foreign operand or a foreign `Except` payload inside a union reaches
-item 10. **Per-operand emptiness is not a §8 error**: whether an operand matches any type is a
-fact about the codebase, not the spec, so it is check-time — one empty-subject violation naming
+reaches items 15–16, a foreign operand or a foreign `Except` payload inside a union reaches
+item 10, and an empty union nested in another reaches item 36. **Per-operand emptiness is not a
+§8 error**: whether an operand matches any type is a fact about the codebase, not the spec, so it
+is check-time — one empty-subject violation naming
 the operand (§4.1, §5.1). The walks descend through a family the same way: a family's layer cells
 and its own adjectives are walked (a foreign cell reaches item 10, a blank glob on a family's
-adjective item 15), and the project selection inside a project family reaches items 22 and 23. Two
-of a family's cells holding one copy of a type is likewise a codebase fact and is check-time — a
+adjective item 15), and the project selection inside a project family reaches items 22, 23 and 36.
+Two of a family's cells holding one copy of a type is likewise a codebase fact and is check-time — a
 rule error naming the type and both cells (§5.1).
 
 Every walk that visits a rule's constraint also visits its `Exemplar` (§5.5): a foreign selection
 reaches item 10, a blank name or glob item 15, a dead subtree pattern item 16, a blank `Where`
-description item 5, an undefined `Lifetime` item 19 and a family item 27. Whether the exemplar
-matches any type is check-time, like an operand's emptiness: a warning, never an error.
+description item 5, an undefined `Lifetime` item 19, a family item 27 and an empty union item 36.
+Whether the exemplar matches any type is check-time, like an operand's emptiness: a warning, never an error.
 
 Enforced at compile time instead (no catalog entry): zero-target dependency verbs — the shapes
 that are meant to name no target have verbs of their own, `MustOnlyReferenceItself()` and
 `MustOnlyBeReferencedByItself()`, and `MustNotReferenceEachOther()` and
 `MustNotHaveCircularReferences()` name their targets through the subject's cells (§5.3) —
-zero-member `MustNotUse`, zero-glob layers and zero-cell families
-(`(first, more)` signatures), and adjective-bearing, union or nested family cells (`Each` takes
-`Layer`s); missing
-escape-hatch descriptions (required parameters); trailers before postures (absent from stage
+zero-member `MustNotUse` through its `(first, more)` forms (its sequence form reaches item 36),
+zero-glob layers and zero-cell families (`(first, more)` signatures), and adjective-bearing,
+union or nested family cells (`Each` takes `Layer`s); missing escape-hatch descriptions (required parameters); trailers before postures (absent from stage
 types); adjectives or modal verbs on a `Member` (a leaf outside the selection hierarchy,
 §3.2); `.Returning` and `MustAcceptParameter` off any projection but `.Methods` (they live
 only on `MethodSelection`, §3.2, §4.6, §5.7). Several member-anchor-expression mistakes are refused by the C# compiler outright,
@@ -2497,7 +2534,10 @@ this catalog.
   positions that name one type; a selection position already has all three spellings through its
   nouns (`arch.Type(typeof(X))`, `arch.Type<X>()`, `arch.Types.Named("X")`), and a `string`
   overload would sit beside `Fix(string)` and compile there by mistake.
-- `(first, params more)` signatures wherever an empty list would be meaningless.
+- `(first, params more)` signatures wherever an empty list would be meaningless. Seven of them
+  also take a sequence, for a list a helper computes (§3.3), and an empty one is §8 item 36. A
+  sequence parameter is named for what it holds (`selections`, `types`, `names`, `globs`,
+  `exclusions`, `members`), which is the name a null throws under.
   Where a verb requires a fact rather than bounding it (a `MustOnly*` list is a bound, and the
   word "only" fixes its reading), a list is licensed only where the fact admits one value per
   subject. The ambiguity sits at the call site, not in the sentence: a C# argument list has no
@@ -2688,6 +2728,12 @@ not be written without it: a namespace-scoped residency subject that has to leav
 types out, which no name and no glob can reach; a
 `.MayMatchNothing()` opt-out from the fail-on-empty default (§4.1); a `MustBeOfKind` constraint
 twin.
+
+On computed lists (§3.3): sequence forms for the other `(first, more)` lists, each waiting on a spec
+seen computing one: `Each`'s cells, the negative anchor lists (`MustNotImplement`,
+`MustNotDeriveFrom`, `MustNotBeAttributedWith`), `.Returning`, `MustOnlyTarget` and the package
+pattern pair (`MustOnlyReferencePackages`, `MustNotReferencePackages`). Until then a computed list
+reaches one of them as `(list[0], list.Skip(1).ToArray())`.
 
 ## 12. Canonical sample spec
 

@@ -352,7 +352,7 @@ line.
 | `arch.Project` | `(string)` | Types in project `MyApp.Web` |
 | `arch.Type` | `(Type)` · `<T>()` | `SqlConnection` |
 | `arch.Registered` | `()` · `(Lifetime)` | Singleton-registered types |
-| `arch.AnyOf` | `(Selection, …)` · `(Type, …)` | Types in `MyApp.Tracking.*` or `MyApp.Billing.*` |
+| `arch.AnyOf` | `(IEnumerable<Selection>)` · `(IEnumerable<Type>)` · `(Selection, …)` · `(Type, …)` | Types in `MyApp.Tracking.*` or `MyApp.Billing.*` |
 | `arch.Each` | `(Layer, …)` · `(ProjectSelection)` | Each of the Host, Adapter and Pack layers |
 | `arch.Member` | `(() => …)` · `(Type, string)` · `(x => …)` | `DateTime.Now` |
 
@@ -385,7 +385,7 @@ line.
 | `.MustOnlyBeReferencedByItself` | `()` | must be referenced only by itself |
 | `.MustNotReferenceEachOther` | `()` | must not reference the others |
 | `.MustNotHaveCircularReferences` | `()` | must not have circular references with the others |
-| `.MustNotUse` | `(() => …, …)` · `(Member, …)` | must not use `DateTime.Now` |
+| `.MustNotUse` | `(() => …, …)` · `(IEnumerable<Member>)` · `(Member, …)` | must not use `DateTime.Now` |
 | `.MustNotConstruct` | `(Selection, …)` · `(Type, …)` | must not construct `SqlConnection` |
 | `.MustNotInject` | `(Selection, …)` · `(Type, …)` | must not inject `SqlConnection` |
 | `.MustNotCatch` | `(Selection, …)` · `(Type, …)` | must not catch `InvalidOperationException` |
@@ -430,7 +430,7 @@ line.
 | `.WithSuffix` | `(string)` | `*Async` methods of types |
 | `.WithPrefix` | `(string)` | `Get*` methods of types |
 | `.WithNameMatching` | `(string)` | `*Handler*` methods of types |
-| `.Named` | `(string, …)` | `Main` methods of types |
+| `.Named` | `(IEnumerable<string>)` · `(string, …)` | `Main` methods of types |
 | `.Returning` | `(Type, …)` · `(string, …)` on `.Methods` | Methods of types returning `Task` |
 | `.AttributedWith` | `(Type)` · `(string)` · `<T>()` | `[ApiController]`-attributed methods of types |
 | `.ThatAreStatic` | `()` | Static fields of types |
@@ -440,7 +440,7 @@ line.
 | `.ThatArePrivate` | `()` | Private fields of types |
 | `.ThatAreProtectedInternal` | `()` | Protected internal methods of types |
 | `.ThatArePrivateProtected` | `()` | Private protected methods of types |
-| `.Except` | `(MemberSelection, …)` | Methods of types, except `Main` methods of types named `Program` |
+| `.Except` | `(IEnumerable<MemberSelection>)` · `(MemberSelection, …)` | Methods of types, except `Main` methods of types named `Program` |
 | `.Where` | `(Func<IMemberInfo, bool>, string)` | Methods of types that are async |
 
 | Verb | Overloads | Fragment |
@@ -471,8 +471,8 @@ line.
 
 | Adjective | Overloads | Fragment |
 |---|---|---|
-| `.Named` | `(string, …)` | Project `MyApp.Web` |
-| `.Matching` | `(string, …)` | Projects matching `MyApp.*` |
+| `.Named` | `(IEnumerable<string>)` · `(string, …)` | Project `MyApp.Web` |
+| `.Matching` | `(IEnumerable<string>)` · `(string, …)` | Projects matching `MyApp.*` |
 | `.Packable` | `()` | Packable projects |
 | `.Except` | `(ProjectSelection)` | Projects, except project `MyApp.Tests` |
 | `.Where` | `(Func<IProjectInfo, bool>, string)` | Projects that target net8.0 |
@@ -492,11 +492,10 @@ line.
 <!-- sliderule:end -->
 
 **Nouns and adjectives** — `arch.Layer(name, glob, ...)` and `arch.Layer(name, selection)` both
-define a layer; the selection form (`arch.Project("MyApp.Web")`, say) names exactly what the
-selection names. `arch.AnyOf(a, b, ...)` is the way to say
+define a layer. `arch.AnyOf(a, b, ...)` is the way to say
 "these four projects" in one subject; adjectives apply to the union, not through it, and
 every operand must match at least one type in subject
-position, so a typo'd operand fails loudly. `arch.Each(...)` is a family, one rule over a partition
+position. `arch.Each(...)` is a family, one rule over a partition
 into cells, each cell a declared layer or a project. It may stand only as a rule subject, adjectives
 on it narrow every cell, and `arch.Each(a, b, c).MustOnlyReference(core)` lets each cell reach itself
 and Core, never a sibling. `arch.Registered(Lifetime.Singleton)` names service and implementation

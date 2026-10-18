@@ -89,6 +89,27 @@ public static class MemberSelectionAdjectives
     }
 
     /// <summary>
+    ///     Narrows the selection to the members with exactly the names in a list, such as
+    ///     <c>arch.Types.Methods.Named(entryPoints)</c> over a list a helper method built, which keeps the
+    ///     members carrying any of them. The comparison is case-sensitive over the member's own name, with no
+    ///     declaring type in front of it and no signature after it, so a name reaches every overload of a
+    ///     method, and a <c>*</c> in it is a literal character. It reads as a premodifier in the rendered
+    ///     sentence: "`Main` or `Run` methods of types". The list is read once, when this is called. An empty
+    ///     list or a blank name is reported when the spec is loaded, and a null list or a null name in it
+    ///     throws. Where the selection is a rule's subject, each name is also checked on its own: one that
+    ///     matches no member while the others match fails the rule, naming it.
+    /// </summary>
+    public static TSelf Named<TSelf>(
+        this TSelf selection,
+        [SpecSlot(nameof(SpecSlot.ExactMemberName))]
+        IEnumerable<string> names)
+        where TSelf : MemberSelection
+    {
+        IReadOnlyList<string> list = OperandList.ZeroOrMore(names, name => name, nameof(names));
+        return Append(selection, new MemberNamedAdjective(list));
+    }
+
+    /// <summary>
     ///     Narrows the selection to the members carrying an attribute, such as
     ///     <c>arch.Types.Methods.AttributedWith(typeof(HttpGetAttribute))</c>. These are the members that
     ///     carry the attribute, not the members of types that carry it — for that, apply
@@ -294,6 +315,25 @@ public static class MemberSelectionAdjectives
         where TSelf : MemberSelection
     {
         IReadOnlyList<MemberSelection> payloads = OperandList.OneOrMore(first, more, exclusion => exclusion);
+        return Append(selection, new MemberExceptAdjective(payloads));
+    }
+
+    /// <summary>
+    ///     Narrows the selection by removing every member the member selections in a list name, such as
+    ///     <c>arch.Types.Methods.Except(exemptions)</c> over a list a helper method built; a
+    ///     <c>List&lt;MethodSelection&gt;</c> is accepted as it is. The members any one exclusion names are
+    ///     removed. Each exclusion is a member selection in its own right, drawn from its own types, and a
+    ///     <c>.Members</c> exclusion removes members of every kind; one of a different single kind than this
+    ///     selection, such as fields from a method selection, removes nothing and is reported when the spec
+    ///     is loaded. The list is read once, when this is called. An empty list is reported when the spec is
+    ///     loaded, and a null list or a null exclusion in it throws. The exclusion is rendered last in the
+    ///     rule's sentence: "methods of types, except `Main` methods of types named <c>Program</c>".
+    /// </summary>
+    public static TSelf Except<TSelf>(this TSelf selection, IEnumerable<MemberSelection> exclusions)
+        where TSelf : MemberSelection
+    {
+        IReadOnlyList<MemberSelection> payloads =
+            OperandList.ZeroOrMore(exclusions, exclusion => exclusion, nameof(exclusions));
         return Append(selection, new MemberExceptAdjective(payloads));
     }
 

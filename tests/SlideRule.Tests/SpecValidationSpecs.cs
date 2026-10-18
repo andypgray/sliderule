@@ -1620,7 +1620,67 @@ internal sealed class BlankSourceWhereInMemberExceptPayloadSpec : IArchitectureS
     public void Define(Arch arch)
     {
         arch.Rule("area/rule")
-            .Enforce(arch.Types.Methods.Except(arch.Types.Where(t => true, " ").Methods).MustBeStatic())
+            .Enforce(arch.Types.Methods.Except(arch.Types.Where(_ => true, " ").Methods).MustBeStatic())
             .Because("Reason.");
+    }
+}
+
+internal sealed class EmptyOperandListSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        arch.Rule("area/any-of").Enforce(arch.AnyOf(new List<Selection>()).MustBeSealed()).Because("Reason.");
+        arch.Rule("area/any-of-types").Enforce(arch.Types.MustNotReference(arch.AnyOf(new List<Type>()))).Because("Reason.");
+        arch.Rule("area/project-named").Enforce(arch.Projects.Named(new List<string>()).MustNotBePackable()).Because("Reason.");
+        arch.Rule("area/project-matching").Enforce(arch.Projects.Matching(new List<string>()).MustLockPackages()).Because("Reason.");
+        arch.Rule("area/member-named").Enforce(arch.Types.Methods.Named(new List<string>()).MustBePublic()).Because("Reason.");
+        arch.Rule("area/member-except").Enforce(arch.Types.Methods.Except(new List<MemberSelection>()).MustBePublic()).Because("Reason.");
+        arch.Rule("area/must-not-use").Enforce(arch.Types.MustNotUse(new List<Member>())).Because("Reason.");
+    }
+}
+
+internal sealed class EmptyOperandListPositionsSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        Selection none = arch.AnyOf(new List<Selection>());
+        arch.Rule("area/nested").Enforce(arch.AnyOf(none, arch.Namespace("MyApp.*")).MustBeSealed()).Because("Reason.");
+        arch.Rule("area/except-payload").Enforce(arch.Types.Except(none).MustBeSealed()).Because("Reason.");
+        arch.Rule("area/exemplar").Enforce(arch.Types.MustBeSealed()).Because("Reason.").Exemplar(none);
+        arch.Rule("area/member-payload").Enforce(arch.Types.Methods.Except(arch.Types.Methods.Named(new List<string>())).MustBePublic()).Because("Reason.");
+        arch.Rule("area/project-family").Enforce(arch.Each(arch.Projects.Named(new List<string>())).MustNotReferenceEachOther()).Because("Reason.");
+        arch.Scope("legacy/hollow").Quarantine(none).Dragons("Dragons.").Because("Quarantined.");
+    }
+}
+
+internal sealed class EmptyUnionLayerSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        arch.Layer("Hollow", arch.AnyOf(new List<Selection>()));
+    }
+}
+
+internal sealed class BlankNameInSequenceSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        arch.Rule("area/project-names").Enforce(arch.Projects.Named(new[] { "MyApp.Web", "" }).MustNotBePackable()).Because("Reason.");
+        arch.Rule("area/member-names").Enforce(arch.Types.Methods.Named([" "]).MustBePublic()).Because("Reason.");
+    }
+}
+
+internal sealed class ValidSequenceOverloadsSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        List<Selection> areas = [arch.Namespace("MyApp.Billing.*"), arch.Namespace("MyApp.Sales.*")];
+        arch.Rule("area/union").Enforce(arch.AnyOf(areas).MustBeSealed()).Because("Reason.");
+        arch.Rule("area/union-types").Enforce(arch.Types.MustNotReference(arch.AnyOf(new[] { typeof(Uri) }))).Because("Reason.");
+        arch.Rule("area/project-named").Enforce(arch.Projects.Named(new[] { "MyApp.Web" }).MustNotBePackable()).Because("Reason.");
+        arch.Rule("area/project-matching").Enforce(arch.Projects.Matching(new[] { "MyApp.*" }).MustLockPackages()).Because("Reason.");
+        arch.Rule("area/member-named").Enforce(arch.Types.Methods.Named(new[] { "Main" }).MustBePublic()).Because("Reason.");
+        arch.Rule("area/member-except").Enforce(arch.Types.Methods.Except(new List<MethodSelection> { arch.Types.Named("Program").Methods }).MustBePublic()).Because("Reason.");
+        arch.Rule("area/must-not-use").Enforce(arch.Types.MustNotUse(new[] { arch.Member(typeof(DateTime), nameof(DateTime.Now)) })).Because("Reason.");
     }
 }

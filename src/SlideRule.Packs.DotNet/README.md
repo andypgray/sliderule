@@ -98,19 +98,18 @@ means, so a member added to it reaches both rules at once.
 
 ```csharp
 Selection host = arch.Namespace("MyApp.Host.*");
-(Member blockingWait, Member[] moreBlockingWaits) = DotNetGuidance.BlockingWaitAnchors(arch);
+IReadOnlyList<Member> blockingWaits = DotNetGuidance.BlockingWaitAnchors(arch);
 
 arch.Rule("host/no-blocking-waits")
     .Enforce(host
         .Except(arch.Types.Named("ShutdownDrain"))
-        .MustNotUse(blockingWait, moreBlockingWaits))
+        .MustNotUse(blockingWaits))
     .Because("A blocking wait in the request path holds a thread for the whole call and drops the " +
              "CancellationToken, so a client cancel leaves the work running.")
     .Fix("Await the call and flow the CancellationToken.");
 ```
 
-The set comes in two parts only because `MustNotUse` takes one member and then the rest. It is the
-only export of this kind in the pack today.
+`BlockingWaitAnchors` is the only export of this kind in the pack today.
 
 ## Opting out, and colliding
 

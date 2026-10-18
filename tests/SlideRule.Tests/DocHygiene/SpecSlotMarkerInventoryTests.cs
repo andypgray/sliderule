@@ -7,8 +7,8 @@ using Xunit;
 namespace SlideRule.Tests.DocHygiene;
 
 /// <summary>
-///     The inventory that holds every string parameter of the authoring surface to carrying a slot
-///     marker, and every marker to naming the slot that parameter really is.
+///     The inventory that holds every parameter of the authoring surface that takes text, one string or a
+///     list of them, to carrying a slot marker, and every marker to naming the slot that parameter really is.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -42,7 +42,7 @@ public sealed class SpecSlotMarkerInventoryTests
 {
     // The number of string literals a spec can write, counted once so that adding a verb is a deliberate
     // edit here rather than a table that grew while nobody was counting.
-    private const int SlotCount = 85;
+    private const int SlotCount = 88;
 
     private const string RootNamespace = "SlideRule";
 
@@ -137,6 +137,7 @@ public sealed class SpecSlotMarkerInventoryTests
             ["MemberSelectionAdjectives.WithNameMatching(TSelf, string)/glob"] = nameof(SpecSlot.MemberNamePattern),
             ["MemberSelectionAdjectives.Named(TSelf, string, string[])/first"] = nameof(SpecSlot.ExactMemberName),
             ["MemberSelectionAdjectives.Named(TSelf, string, string[])/more"] = nameof(SpecSlot.ExactMemberName),
+            ["MemberSelectionAdjectives.Named(TSelf, IEnumerable<string>)/names"] = nameof(SpecSlot.ExactMemberName),
             ["MemberSelectionAdjectives.AttributedWith(TSelf, string)/attributeFullName"] = nameof(SpecSlot.AttributeName),
             ["MemberSelectionAdjectives.Where(TSelf, Func<IMemberInfo, bool>, string)/description"] = nameof(SpecSlot.Description),
 
@@ -155,8 +156,10 @@ public sealed class SpecSlotMarkerInventoryTests
 
             ["ProjectSelectionAdjectives.Named(ProjectSelection, string, string[])/first"] = nameof(SpecSlot.ProjectNameOperand),
             ["ProjectSelectionAdjectives.Named(ProjectSelection, string, string[])/more"] = nameof(SpecSlot.ProjectNameOperand),
+            ["ProjectSelectionAdjectives.Named(ProjectSelection, IEnumerable<string>)/names"] = nameof(SpecSlot.ProjectNameOperand),
             ["ProjectSelectionAdjectives.Matching(ProjectSelection, string, string[])/glob"] = nameof(SpecSlot.ProjectNamePattern),
             ["ProjectSelectionAdjectives.Matching(ProjectSelection, string, string[])/more"] = nameof(SpecSlot.ProjectNamePattern),
+            ["ProjectSelectionAdjectives.Matching(ProjectSelection, IEnumerable<string>)/globs"] = nameof(SpecSlot.ProjectNamePattern),
             ["ProjectSelectionAdjectives.Where(ProjectSelection, Func<IProjectInfo, bool>, string)/description"] = nameof(SpecSlot.Description),
 
             ["ProjectSelectionConstraints.MustOnlyTarget(ProjectSelection, string, string[])/first"] = nameof(SpecSlot.TargetFramework),
@@ -352,7 +355,9 @@ public sealed class SpecSlotMarkerInventoryTests
 
     private static bool IsSlotCandidate(ParameterInfo parameter)
     {
-        bool takesText = parameter.ParameterType == typeof(string) || parameter.ParameterType == typeof(string[]);
+        bool takesText = parameter.ParameterType == typeof(string)
+                         || parameter.ParameterType == typeof(string[])
+                         || parameter.ParameterType == typeof(IEnumerable<string>);
         if (!takesText) return false;
 
         bool fromCaller = parameter.IsDefined(typeof(CallerFilePathAttribute), inherit: false)

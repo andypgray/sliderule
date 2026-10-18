@@ -1498,4 +1498,102 @@ public class SpecValidationTests
             .Message.ShouldBe("SpecValidationSpecs.cs:1510: '(Lifetime)7' is not a defined Lifetime — " +
                               "use Lifetime.Singleton, Lifetime.Scoped, or Lifetime.Transient (used by 'area/rule').");
     }
+
+    // ---- GRAMMAR §8 item 36: an empty operand list, which only a sequence overload can pass ----
+
+    [Fact]
+    public void EmptyOperandList_EachCallThatTakesAList_IsReportedWithWhatItWouldDo()
+    {
+        // One error per rule, each naming the call and what an empty one does: "empty" alone does not say why
+        // the spec is wrong, and the six calls fail in different ways.
+        SpecValidationException ex = BuildExpectingFailure(new EmptyOperandListSpec());
+
+        ex.Errors.Select(error => error.Code)
+            .ShouldBe(Enumerable.Repeat(Code.EmptyOperandList, 7));
+        ex.ShouldHaveError(Code.EmptyOperandList, "area/any-of")
+            .Message.ShouldBe(
+                "SpecValidationSpecs.cs:1632: `arch.AnyOf` on 'area/any-of' was given an empty list, so it selects "
+                + "nothing; pass at least one operand.");
+        ex.ShouldHaveError(Code.EmptyOperandList, "area/any-of-types")
+            .Message.ShouldBe(
+                "SpecValidationSpecs.cs:1633: `arch.AnyOf` on 'area/any-of-types' was given an empty list, so it "
+                + "selects nothing; pass at least one operand.");
+        ex.ShouldHaveError(Code.EmptyOperandList, "area/project-named")
+            .Message.ShouldBe(
+                "SpecValidationSpecs.cs:1634: `Named` on 'area/project-named' was given an empty list, so it selects "
+                + "no project; pass at least one project name.");
+        ex.ShouldHaveError(Code.EmptyOperandList, "area/project-matching")
+            .Message.ShouldBe(
+                "SpecValidationSpecs.cs:1635: `Matching` on 'area/project-matching' was given an empty list, so it "
+                + "selects no project; pass at least one project name glob.");
+        ex.ShouldHaveError(Code.EmptyOperandList, "area/member-named")
+            .Message.ShouldBe(
+                "SpecValidationSpecs.cs:1636: `Named` on 'area/member-named' was given an empty list, so it selects "
+                + "no member; pass at least one member name.");
+        ex.ShouldHaveError(Code.EmptyOperandList, "area/member-except")
+            .Message.ShouldBe(
+                "SpecValidationSpecs.cs:1637: `Except` on 'area/member-except' was given an empty list, so it removes "
+                + "nothing; pass at least one member selection.");
+        ex.ShouldHaveError(Code.EmptyOperandList, "area/must-not-use")
+            .Message.ShouldBe(
+                "SpecValidationSpecs.cs:1638: `MustNotUse` on 'area/must-not-use' was given an empty list, so it bans "
+                + "nothing; pass at least one member.");
+    }
+
+    [Fact]
+    public void EmptyOperandList_WhereverTheListNests_IsReportedAtTheStatementThatReachesIt()
+    {
+        // Every walk the other checks take reaches an empty list too: a union nested in another, a type Except
+        // payload, an exemplar, a member Except payload's own adjectives, the projects of a family, a scope.
+        SpecValidationException ex = BuildExpectingFailure(new EmptyOperandListPositionsSpec());
+
+        ex.Errors.Select(error => error.RuleId)
+            .ShouldBe([
+                "area/nested", "area/except-payload", "area/exemplar", "area/member-payload",
+                "area/project-family", "legacy/hollow"
+            ]);
+        ex.ShouldHaveError(Code.EmptyOperandList, "area/nested")
+            .Message.ShouldStartWith("SpecValidationSpecs.cs:1647: `arch.AnyOf` on 'area/nested' was given");
+        ex.ShouldHaveError(Code.EmptyOperandList, "area/except-payload")
+            .Message.ShouldStartWith("SpecValidationSpecs.cs:1648: `arch.AnyOf` on 'area/except-payload' was given");
+        ex.ShouldHaveError(Code.EmptyOperandList, "area/exemplar")
+            .Message.ShouldStartWith("SpecValidationSpecs.cs:1649: `arch.AnyOf` on 'area/exemplar' was given");
+        ex.ShouldHaveError(Code.EmptyOperandList, "area/member-payload")
+            .Message.ShouldStartWith("SpecValidationSpecs.cs:1650: `Named` on 'area/member-payload' was given");
+        ex.ShouldHaveError(Code.EmptyOperandList, "area/project-family")
+            .Message.ShouldStartWith("SpecValidationSpecs.cs:1651: `Named` on 'area/project-family' was given");
+        ex.ShouldHaveError(Code.EmptyOperandList, "legacy/hollow")
+            .Message.ShouldStartWith("SpecValidationSpecs.cs:1652: `arch.AnyOf` on 'legacy/hollow' was given");
+    }
+
+    [Fact]
+    public void EmptyOperandList_AsALayerDefinition_IsReportedSpecWide()
+    {
+        // A layer's definition is validated at its declaration, used or not, on the spec-wide terms every layer
+        // error takes: no rule ID, no location, the layer named outright.
+        SpecValidationException ex = BuildExpectingFailure(new EmptyUnionLayerSpec());
+
+        SpecValidationError error = ex.ShouldHaveError(Code.EmptyOperandList);
+        error.RuleId.ShouldBeNull();
+        error.Message.ShouldBe(
+            "`arch.AnyOf` on layer 'Hollow' was given an empty list, so it selects nothing; pass at least one operand.");
+    }
+
+    [Fact]
+    public void BlankName_InASequenceOverload_IsReportedAsAtItsParamsSibling()
+    {
+        // A list a helper built rides the walk a params list rides, under the same labels and codes.
+        SpecValidationException ex = BuildExpectingFailure(new BlankNameInSequenceSpec());
+
+        ex.ShouldHaveError(Code.BlankProjectPattern, "area/project-names")
+            .Message.ShouldBe("SpecValidationSpecs.cs:1668: Blank project name on 'area/project-names'.");
+        ex.ShouldHaveError(Code.BlankPattern, "area/member-names")
+            .Message.ShouldBe("SpecValidationSpecs.cs:1669: Blank member name on 'area/member-names'.");
+    }
+
+    [Fact]
+    public void ValidSequenceOverloads_BuildWithoutError()
+    {
+        Should.NotThrow(() => ArchModelBuilder.Build(new ValidSequenceOverloadsSpec()));
+    }
 }

@@ -238,6 +238,22 @@ public static class SelectionConstraints
     }
 
     /// <summary>
+    ///     States that no type in the subject may use any member in a list, such as
+    ///     <c>legacy.MustNotUse(blockingWaits)</c> over a list of <c>arch.Member</c> results a helper method
+    ///     built. A use is a source-level member access: reading or writing a property or field, subscribing
+    ///     to an event, invoking a method, naming a method group, or reaching a member through
+    ///     <c>using static</c>. Not counted: a <c>nameof</c> operand, an indexer, a member a language
+    ///     construct consumes without naming it, and a constructor. One ban covers every overload of the name
+    ///     and matches the member the compiler resolved at the call. The list is read once, when this is
+    ///     called. An empty list is reported when the spec is loaded, and a null list or a null member in it
+    ///     throws; a banned member the codebase never uses raises no warning.
+    /// </summary>
+    public static Constraint MustNotUse(this Selection subject, IEnumerable<Member> members)
+    {
+        return new MustNotUseConstraint(subject, MemberList(subject, members));
+    }
+
+    /// <summary>
     ///     States that no type in the subject may read or invoke any of the listed static members, named by
     ///     lambda: <c>web.MustNotUse(() =&gt; DateTime.Now, () =&gt; DateTime.UtcNow)</c>. Each lambda must
     ///     read or invoke one static property, field or value-returning method directly on its declaring
@@ -1089,6 +1105,12 @@ public static class SelectionConstraints
     {
         NotNull(subject, nameof(subject));
         return OperandList.OneOrMore(first, more, member => member);
+    }
+
+    private static IReadOnlyList<Member> MemberList(Selection subject, IEnumerable<Member> members)
+    {
+        NotNull(subject, nameof(subject));
+        return OperandList.ZeroOrMore(members, member => member, nameof(members));
     }
 
     // The static-form MustNotUse sugar: each lambda resolves through MemberExpressionResolver stamped with

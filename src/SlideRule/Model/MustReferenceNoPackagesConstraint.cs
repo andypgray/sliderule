@@ -1,4 +1,3 @@
-
 namespace SlideRule.Model;
 
 /// <summary>

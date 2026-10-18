@@ -1,7 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Shouldly;
-using Xunit;
 using SlideRule.SpecAnalyzers;
+using Xunit;
 
 namespace SlideRule.Tests.SpecAnalyzers;
 
@@ -126,6 +126,78 @@ public sealed class SpecLiteralAnalyzerTests
         Diagnostic blank = reported.ShouldBeTheOnly("SR1016");
         blank.ShouldSitOn(line: 7, column: 49, "\"\"");
         blank.ShouldSay("Blank type name.");
+    }
+
+    [Fact]
+    public async Task AnArrayPassedAsASequence_IsReportedAtTheElementThatIsBlank()
+    {
+        // The array binds the sequence overload by an implicit conversion, and the elements written inside it are
+        // what the slot receives, exactly as at a params array.
+        const string source =
+            """
+            using SlideRule;
+
+            public sealed class Spec
+            {
+                public void Define(Arch arch)
+                {
+                    arch.Projects.Named(new[] { "A", "" });
+                }
+            }
+            """;
+
+        IReadOnlyList<Diagnostic> reported = await SpecSnippet.ShouldCompileAndDiagnoseAsync(source, cancellationToken: Ct);
+
+        Diagnostic blank = reported.ShouldBeTheOnly("SR1024");
+        blank.ShouldSitOn(line: 7, column: 42, "\"\"");
+        blank.ShouldSay("Blank project name.");
+    }
+
+    [Fact]
+    public async Task ACollectionExpressionPassedAsASequence_IsReportedAtTheElementThatIsBlank()
+    {
+        const string source =
+            """
+            using SlideRule;
+
+            public sealed class Spec
+            {
+                public void Define(Arch arch)
+                {
+                    arch.Types.Methods.Named([""]);
+                }
+            }
+            """;
+
+        IReadOnlyList<Diagnostic> reported = await SpecSnippet.ShouldCompileAndDiagnoseAsync(source, cancellationToken: Ct);
+
+        Diagnostic blank = reported.ShouldBeTheOnly("SR1016");
+        blank.ShouldSitOn(line: 7, column: 35, "\"\"");
+        blank.ShouldSay("Blank member name.");
+    }
+
+    [Fact]
+    public async Task AListBuiltWithAnInitializer_IsSilentAboutItsEntries()
+    {
+        // A collection initializer is a constructor and a run of Add calls, so the list the slot receives is
+        // computed, and the blank inside it is an argument to Add rather than anything the slot was written.
+        const string source =
+            """
+            using System.Collections.Generic;
+            using SlideRule;
+
+            public sealed class Spec
+            {
+                public void Define(Arch arch)
+                {
+                    arch.Projects.Named(new List<string> { "" });
+                }
+            }
+            """;
+
+        IReadOnlyList<Diagnostic> reported = await SpecSnippet.ShouldCompileAndDiagnoseAsync(source, cancellationToken: Ct);
+
+        reported.ShouldBeSilent();
     }
 
     [Fact]

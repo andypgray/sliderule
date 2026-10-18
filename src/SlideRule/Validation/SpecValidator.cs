@@ -1,4 +1,3 @@
-using SlideRule.Fluent;
 using SlideRule.Internal;
 using SlideRule.Model;
 using SlideRule.Prose;
@@ -18,6 +17,27 @@ namespace SlideRule.Validation;
 /// </remarks>
 internal static class SpecValidator
 {
+    // GRAMMAR §8 item 36: what each call a computed list can leave empty does with no operand, and what to pass
+    // instead. The call is spelled as the author wrote it, the effect completes "so it", and the cure is the
+    // instruction after the semicolon.
+    private static readonly (string Call, string Effect, string Cure) EmptyUnion =
+        ("arch.AnyOf", "selects nothing", "pass at least one operand");
+
+    private static readonly (string Call, string Effect, string Cure) EmptyProjectNamed =
+        ("Named", "selects no project", "pass at least one project name");
+
+    private static readonly (string Call, string Effect, string Cure) EmptyProjectMatching =
+        ("Matching", "selects no project", "pass at least one project name glob");
+
+    private static readonly (string Call, string Effect, string Cure) EmptyMemberNamed =
+        ("Named", "selects no member", "pass at least one member name");
+
+    private static readonly (string Call, string Effect, string Cure) EmptyMemberExcept =
+        ("Except", "removes nothing", "pass at least one member selection");
+
+    private static readonly (string Call, string Effect, string Cure) EmptyMustNotUse =
+        ("MustNotUse", "bans nothing", "pass at least one member");
+
     internal static IReadOnlyList<SpecValidationError> Validate(Arch arch)
     {
         var errors = new List<SpecValidationError>();
@@ -154,6 +174,7 @@ internal static class SpecValidator
         CheckFamilies(RuleFamilyPositions(rule), target, errors);
         CheckEachOtherSubject(rule, errors);
         CheckCircularReferencesSubject(rule, errors);
+        CheckEmptyOperandLists(RuleEmptyOperandLists(rule, selections), target, errors);
     }
 
     private static void ValidateScope(ScopeRegistration scope, Arch arch, List<SpecValidationError> errors)
@@ -237,6 +258,7 @@ internal static class SpecValidator
         CheckForeign(expanded, target, arch, errors);
         CheckPatterns(roots.SelectMany(SelectionPatterns), target, errors);
         CheckLifetimes(expanded, target, errors);
+        CheckEmptyOperandLists(EmptyUnions(expanded), target, errors);
     }
 
     // GRAMMAR §8 items 15–16. Every glob, affix and string anchor a rule carries, each already tagged with
@@ -285,6 +307,69 @@ internal static class SpecValidator
                 $"A family (`arch.Each`) used as {position} by {target.Subject}; "
                 + "a family may stand only as a rule subject.", target.Location));
         }
+    }
+
+    // GRAMMAR §8 item 36. The params forms cannot be called without a first operand, so an empty list reaches
+    // the model only through a sequence overload, and it would select, remove or ban nothing while reading like a
+    // rule. One code and one sentence shape for every call, naming the call and what an empty one does, because
+    // "empty" alone does not say why the spec is wrong.
+    private static void CheckEmptyOperandLists(
+        IEnumerable<(string Call, string Effect, string Cure)> empties, ErrorTarget target,
+        List<SpecValidationError> errors)
+    {
+        foreach ((string call, string effect, string cure) in empties)
+            errors.Add(new SpecValidationError(Code.EmptyOperandList, target.Id,
+                $"`{call}` on {target.Subject} was given an empty list, so it {effect}; {cure}.", target.Location));
+    }
+
+    // Every empty list a rule reaches: its unions on the type-side walk, then the project selections' names and
+    // globs, then the member selections' names and Except payloads, then the banned members.
+    private static IEnumerable<(string Call, string Effect, string Cure)> RuleEmptyOperandLists(
+        RuleRegistration rule, IEnumerable<Selection> selections)
+    {
+        foreach ((string, string, string) empty in EmptyUnions(selections)) yield return empty;
+
+        if (rule.Constraint is not { } constraint) yield break;
+
+        foreach (ProjectSelection selection in SelectionWalk.ConstraintProjectSelections(constraint))
+        foreach (ProjectAdjective adjective in selection.Adjectives)
+            switch (adjective)
+            {
+                case ProjectNamedAdjective { Names.Count: 0 }:
+                    yield return EmptyProjectNamed;
+                    break;
+                case ProjectMatchingAdjective { Globs.Count: 0 }:
+                    yield return EmptyProjectMatching;
+                    break;
+            }
+
+        if (constraint is MemberConstraint member)
+        {
+            MemberSelection subject = member.MemberSubject;
+            foreach (MemberSelection selection in SelectionWalk.MemberExceptPayloads(subject).Prepend(subject))
+            foreach (MemberAdjective adjective in selection.Adjectives)
+                switch (adjective)
+                {
+                    case MemberNamedAdjective { Names.Count: 0 }:
+                        yield return EmptyMemberNamed;
+                        break;
+                    case MemberExceptAdjective { Payloads.Count: 0 }:
+                        yield return EmptyMemberExcept;
+                        break;
+                }
+        }
+
+        if (constraint is MustNotUseConstraint { MemberOperands.Count: 0 }) yield return EmptyMustNotUse;
+    }
+
+    // Over a walk that has already expanded every union, so a nested empty one is found where it stands. It stays
+    // a leaf of the walk because UnionSelection.Create flattens only a non-empty inner union.
+    private static IEnumerable<(string Call, string Effect, string Cure)> EmptyUnions(IEnumerable<Selection> expanded)
+    {
+        return expanded
+            .OfType<UnionSelection>()
+            .Where(union => union.Parts.Count == 0)
+            .Select(_ => EmptyUnion);
     }
 
     // GRAMMAR §8 item 28: the cross-cell ban's targets are the subject's own cells, so a subject with no

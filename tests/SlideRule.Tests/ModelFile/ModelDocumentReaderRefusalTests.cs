@@ -287,6 +287,87 @@ public sealed class ModelDocumentReaderRefusalTests
     // One surgical edit of a text that read clean, with the three guards a refusal row needs: that the
     // text read before the edit, that the edit changed it, and that what comes back is the reader's
     // refusal rather than the JSON parser's.
+    // Each list the spec refuses empty when it loads, by the node that holds it and the key the list sits under.
+    public static TheoryData<string, string> EmptiableLists =>
+        new()
+        {
+            { "\"union\": [", "union" },
+            { "{ \"node\": \"projectNamed\"", "names" },
+            { "{ \"node\": \"projectMatching\"", "globs" },
+            { "{ \"node\": \"memberNamed\"", "names" },
+            { "{ \"node\": \"memberExcept\"", "payloads" },
+            { "{ \"node\": \"mustNotUse\"", "members" }
+        };
+
+    [Theory]
+    [MemberData(nameof(EmptiableLists))]
+    public void Read_AnEmptyListTheSpecRefusesWhenItLoads_RefusesAtTheList(string node, string key)
+    {
+        // A file holding one was not written from a spec that loaded, so reading it would mint a model no spec
+        // could have built.
+        string valid = ModelFileSpecs.TextOf(DefineEveryEmptiableList);
+        valid.ShouldReadBack();
+        (string edited, int at) = WithEmptiedArray(valid, node, key);
+
+        ModelReadResult result = ModelDocumentReader.Read(edited);
+
+        result.Document.ShouldBeNull();
+        ModelRefusal refusal = result.Refusal.ShouldNotBeNull();
+        refusal.Kind.ShouldBe(ModelRefusalKind.Malformed);
+        refusal.Describe()
+            .ShouldBe($"{PositionOf(edited, at)}: \"{key}\" must not be empty.");
+    }
+
+    private static void DefineEveryEmptiableList(Arch arch)
+    {
+        arch.Rule("lists/union")
+            .Enforce(arch.AnyOf(arch.Namespace("MyApp.Solo.*")).MustBeSealed())
+            .Because("Reason.");
+        arch.Rule("lists/project-named")
+            .Enforce(arch.Projects.Named("MyApp.Web").MustNotBePackable())
+            .Because("Reason.");
+        arch.Rule("lists/project-matching")
+            .Enforce(arch.Projects.Matching("MyApp.*").MustLockPackages())
+            .Because("Reason.");
+        arch.Rule("lists/member-named")
+            .Enforce(arch.Types.Methods.Named("Main").MustBePublic())
+            .Because("Reason.");
+        arch.Rule("lists/member-except")
+            .Enforce(arch.Types.Methods.Except(arch.Types.Named("Program").Methods).MustBePublic())
+            .Because("Reason.");
+        arch.Rule("lists/must-not-use")
+            .Enforce(arch.Types.MustNotUse(arch.Member(typeof(DateTime), nameof(DateTime.Now))))
+            .Because("Reason.");
+    }
+
+    // The text with the array under `key` in the one node opening with `node` emptied, and the offset of that
+    // array's opening bracket. The bracket is matched to its close, so the edit holds whatever the entries spell.
+    private static (string Edited, int At) WithEmptiedArray(string text, string node, string key)
+    {
+        int start = text.IndexOf(node, StringComparison.Ordinal);
+        start.ShouldBeGreaterThanOrEqualTo(0, $"the text should carry '{node}'");
+        text.IndexOf(node, start + node.Length, StringComparison.Ordinal)
+            .ShouldBe(-1, $"the text should carry '{node}' exactly once");
+
+        var keyText = $"\"{key}\": [";
+        int open = text.IndexOf(keyText, start, StringComparison.Ordinal) + keyText.Length - 1;
+        var depth = 0;
+        int close = open;
+        for (; close < text.Length; close++)
+            if (text[close] == '[') depth++;
+            else if (text[close] == ']' && --depth == 0) break;
+
+        return (text.Substring(0, open + 1) + text.Substring(close), open);
+    }
+
+    private static string PositionOf(string text, int offset)
+    {
+        int lineStart = text.LastIndexOf('\n', offset - 1) + 1;
+        int line = text.Take(offset).Count(character => character == '\n') + 1;
+
+        return $"line {line}, column {offset - lineStart + 1}";
+    }
+
     private static ModelRefusal ShouldRefuseAfterEdit(string valid, string find, string replace)
     {
         valid.ShouldReadBack();

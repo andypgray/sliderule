@@ -1,13 +1,13 @@
 using System.Reflection;
 using System.Text.RegularExpressions;
 using Shouldly;
-using Xunit;
 using SlideRule.Checking;
 using SlideRule.Hosting;
 using SlideRule.Model;
 using SlideRule.ModelFile;
 using SlideRule.Tests.DocHygiene;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.ModelFile;
 

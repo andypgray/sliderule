@@ -1,6 +1,6 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Fluent;
+using Xunit;
 
 // Each null argument is cast to the parameter type of the overload its guard is tested through, including
 // where overload resolution would pick that overload without the cast.
@@ -127,7 +127,7 @@ public sealed class AuthoringGuardTests
     {
         // The glob is handed to OperandList as its `first`, together with this overload's name for it: without
         // that the caller would be told about a parameter named `first` that this overload does not have.
-        Should.Throw<ArgumentNullException>(() => Arch.Projects.Matching(null!))
+        Should.Throw<ArgumentNullException>(() => Arch.Projects.Matching((string)null!))
             .ParamName.ShouldBe("glob");
     }
 

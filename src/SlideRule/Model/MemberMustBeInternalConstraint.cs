@@ -1,4 +1,3 @@
-
 namespace SlideRule.Model;
 
 /// <summary><c>.Methods.MustBeInternal()</c> → "must be internal" (GRAMMAR §5.7).</summary>
