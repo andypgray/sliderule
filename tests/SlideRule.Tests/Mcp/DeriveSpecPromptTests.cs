@@ -155,6 +155,26 @@ public sealed class DeriveSpecPromptTests
     }
 
     [Fact]
+    public async Task GetPrompt_DeriveSpec_ReadsDecisionRecordsWholeFromRawText()
+    {
+        string text = await ServedRecipeAsync();
+
+        // Assert — the laws maintainers care about most are often written outside the docs pages: in a ruling on a
+        // pull request, an upgrade guide, a first-party template or an approval test. The README and the analyzer
+        // configuration were read as link lists and grep targets, so a coding standard written in them was missed. A
+        // summarising fetch can drop the one sentence that carries a law and invert it, and docs written for another
+        // major version describe code that is not there. Each pin holds one of those reads in place.
+        text.ShouldContain("Search where the project records decisions.");
+        text.ShouldContain("a maintainer's merged or declined PR is a ruling");
+        text.ShouldContain("API-approval or public-surface snapshot tests");
+        text.ShouldContain("whole, not grepped");
+        text.ShouldContain("never from a fetch tool's summary");
+        text.ShouldContain("`gh api` for a GitHub file, issue, pull request or discussion");
+        text.ShouldContain("Read docs at the code's version");
+        text.ShouldContain("at the tag or commit the code is at");
+    }
+
+    [Fact]
     public async Task GetPrompt_DeriveSpec_WritesEachPostureIntoTheSpecBeforeTheGate()
     {
         string text = await ServedRecipeAsync();

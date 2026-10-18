@@ -27,6 +27,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `baseline accept-reductions` splits it into one entry per package or framework, each keeping its
   reason. A consumer keyed on SARIF `partialFingerprints` sees each of these rules' alerts re-keyed once;
   GitHub code scanning matches on its own line hash and is unaffected.
+- The `derive_spec` recipe's first step now has the agent search where a project records its
+  decisions: its issues, pull requests and discussions, release notes and upgrade guides,
+  first-party templates and sibling repositories, and API-approval tests. It reads the README,
+  CONTRIBUTING, `.editorconfig` and analyzer configuration whole, quotes each statement that becomes
+  a rule from the raw file (with `curl` or `gh api`) rather than from a fetch tool's summary, and
+  reads docs written for another major version at the tag or commit the code is at.
 
 ## [0.1.2] - 2026-10-15
 
