@@ -327,6 +327,11 @@ internal static class NodeWriters
             w.ProjectSubject(c.ProjectSubject);
             w.StringsField("frameworks", c.Frameworks);
         });
+        Add<MustTargetConstraint>(arms, (w, c) =>
+        {
+            w.ProjectSubject(c.ProjectSubject);
+            w.Field("framework", c.Framework);
+        });
     }
 
     private static void Subject<TConstraint>(Dictionary<Type, Action<NodeWriter, object>> arms)

@@ -563,6 +563,16 @@ public class ModelReificationTests
         target.Frameworks.ShouldBe(["netstandard2.0", "net8.0"]);
         target.Operands.ShouldBeEmpty();
 
+        var floor = Checker.Model(arch => arch.Rule("packaging/standard-floor")
+                .Enforce(arch.Projects.Packable().MustTarget("netstandard2.0"))
+                .Because("Every package has to load on the net48 hosts the estate still runs."))
+            .Rules.Single()
+            .Constraint
+            .ShouldBeOfType<MustTargetConstraint>();
+
+        floor.Framework.ShouldBe("netstandard2.0");
+        floor.Operands.ShouldBeEmpty();
+
         var must = Checker.Model(arch => arch.Rule("packaging/described")
                 .Enforce(arch.Projects.Named("SlideRule")
                     .Must(project => project.IsPackable == true, description: "produce a package"))

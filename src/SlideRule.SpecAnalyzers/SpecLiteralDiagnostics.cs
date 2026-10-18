@@ -212,9 +212,11 @@ internal static class SpecLiteralDiagnostics
         Category,
         DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
-        "A MustOnlyTarget was given an empty target framework. A blank moniker matches nothing, so it "
-        + "narrows the permitted list instead of widening it, and the rule stays green until some project "
-        + "targets the framework that was meant to be allowed. " + SameVerdictAtLoad,
+        "A MustOnlyTarget or MustTarget was given an empty target framework. A blank moniker matches "
+        + "nothing. On MustOnlyTarget it narrows the permitted list instead of widening it, so the rule stays "
+        + "green until some project targets the framework that was meant to be allowed; on MustTarget it "
+        + "requires a framework no project targets, so the rule fails every project it reads. "
+        + SameVerdictAtLoad,
         HelpLink);
 
     /// <summary>A counterpart name template derives one fixed name for every subject.</summary>

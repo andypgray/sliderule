@@ -283,8 +283,10 @@ internal sealed record BaselineJson(string Path, int Grandfathered, int Stale, i
 ///     siblings included.
 /// </param>
 /// <param name="Framework">
-///     The offending target framework's short moniker, for the per-framework <c>projectShape</c> violations a
-///     <c>MustOnlyTarget</c> rule mints; null (omitted) on every other violation.
+///     The target framework's short moniker, for the per-framework <c>projectShape</c> violations: one a
+///     <c>MustOnlyTarget</c> rule does not permit and the project targets, or the one a <c>MustTarget</c> rule
+///     requires and the project does not target, which the rule's sentence tells apart; null (omitted) on every
+///     other violation.
 /// </param>
 /// <param name="Detail">Kind-specific context, or null (omitted) when the kind carries none.</param>
 /// <param name="Hint">

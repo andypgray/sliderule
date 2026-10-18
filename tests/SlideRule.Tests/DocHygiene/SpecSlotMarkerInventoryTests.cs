@@ -42,7 +42,7 @@ public sealed class SpecSlotMarkerInventoryTests
 {
     // The number of string literals a spec can write, counted once so that adding a verb is a deliberate
     // edit here rather than a table that grew while nobody was counting.
-    private const int SlotCount = 74;
+    private const int SlotCount = 75;
 
     private const string RootNamespace = "SlideRule";
 
@@ -157,6 +157,7 @@ public sealed class SpecSlotMarkerInventoryTests
 
             ["ProjectSelectionConstraints.MustOnlyTarget(ProjectSelection, string, string[])/first"] = nameof(SpecSlot.TargetFramework),
             ["ProjectSelectionConstraints.MustOnlyTarget(ProjectSelection, string, string[])/more"] = nameof(SpecSlot.TargetFramework),
+            ["ProjectSelectionConstraints.MustTarget(ProjectSelection, string)/framework"] = nameof(SpecSlot.TargetFramework),
             ["ProjectSelectionConstraints.Must(ProjectSelection, Func<IProjectInfo, bool>, string)/description"] = nameof(SpecSlot.Description),
 
             ["IRuleBuilder.Migrate(string, Constraint)/from"] = nameof(SpecSlot.MigrateFrom),

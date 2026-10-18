@@ -470,6 +470,17 @@ public class SpecValidationTests
     }
 
     [Fact]
+    public void BlankTargetFramework_OnMustTarget_IsReported()
+    {
+        // The floor's one moniker rides the ceiling's slot: a blank one would require a framework no project
+        // targets, and red every evaluated project.
+        SpecValidationException ex = BuildExpectingFailure(new BlankRequiredTargetFrameworkSpec());
+
+        ex.ShouldHaveError(Code.BlankTargetFramework, "area/rule")
+            .Message.ShouldBe("SpecValidationSpecs.cs:1521: Blank target framework on 'area/rule'.");
+    }
+
+    [Fact]
     public void ValidMemberUse_MustNotUseSpec_BuildsWithoutError()
     {
         Should.NotThrow(() => ArchModelBuilder.Build(new ValidMemberUseSpec()));

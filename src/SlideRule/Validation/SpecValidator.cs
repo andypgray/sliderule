@@ -933,9 +933,13 @@ internal static class SpecValidator
                 yield return (c.Template, SpecSlot.CounterpartTemplate);
                 break;
 
-            // GRAMMAR §8 item 24: MustOnlyTarget's monikers, where a blank one would narrow the allow-list silently.
+            // GRAMMAR §8 item 24: MustOnlyTarget's monikers, where a blank one would narrow the allow-list silently,
+            // and MustTarget's, where it would red every evaluated project.
             case MustOnlyTargetConstraint c:
                 foreach (string framework in c.Frameworks) yield return (framework, SpecSlot.TargetFramework);
+                break;
+            case MustTargetConstraint c:
+                yield return (c.Framework, SpecSlot.TargetFramework);
                 break;
         }
 

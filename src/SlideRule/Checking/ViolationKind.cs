@@ -75,8 +75,11 @@ internal enum ViolationKind
     ///     A project failing a verb about projects: <c>SubjectProject</c> is the project, and <c>Sites</c>
     ///     points at where the offending fact is declared — which may be a shared props file above the
     ///     project, and may be empty where the fact has nowhere to point. One violation per rule and project,
-    ///     except <c>MustReferenceNoPackages</c>, which reports one per declared package reference that is not
-    ///     private, with <c>Package</c> naming it and the package's own declaration as the site.
+    ///     except where the verb names an item: <c>MustReferenceNoPackages</c> reports one per declared package
+    ///     reference that is not private, with <c>Package</c> naming it and the package's own declaration as
+    ///     the site, and <c>MustOnlyTarget</c> one per framework outside its list and <c>MustTarget</c> one for
+    ///     the framework a project lacks, each with <c>Framework</c> naming it and the declaration of the
+    ///     project's framework list as the site.
     /// </summary>
     ProjectShape,
 

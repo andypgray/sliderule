@@ -10,9 +10,10 @@ namespace SlideRule.Tests.Rendering;
 
 /// <summary>
 ///     How a project violation reads on the three report surfaces (GRAMMAR §4.10): the human block, the
-///     <c>--json</c> document, and SARIF. Three texts to pin per surface — a packaging violation, which
-///     names the project alone, a per-package one, which names the package it declares, and a per-framework
-///     one, which names the framework it targets.
+///     <c>--json</c> document, and SARIF. Four texts to pin per surface — a packaging violation, which
+///     names the project alone, a per-package one, which names the package it declares, a per-framework
+///     one, which names the framework it targets, and a missing-framework one, which names the framework it
+///     does not target.
 /// </summary>
 /// <remarks>
 ///     The renderers format independently by house convention, so the same sentences are asserted three
@@ -61,6 +62,17 @@ public sealed class ProjectViolationRenderTests
     }
 
     [Fact]
+    public void HumanBlock_MissingFrameworkViolation_SaysTheProjectDoesNotTargetIt()
+    {
+        // The framework slot is filled either way, so the wording is what tells the floor's finding from the
+        // ceiling's: a reader must not be told the project targets the one framework it lacks.
+        FlooredReport()
+            .Single()
+            .HumanBlock()
+            .ShouldContain("Directory.Build.props:3 — Zphil.Host does not target netstandard2.0");
+    }
+
+    [Fact]
     public void HumanBlock_UnlocatedPackagingViolation_ListsTheProjectWithNoSite()
     {
         // A fact nothing declared has nowhere to point, so the project is listed rather than dropped — the
@@ -96,6 +108,15 @@ public sealed class ProjectViolationRenderTests
     {
         TargetedReport()
             .ShouldRenderProjectShapeViolation("projectShape", "Zphil.Host", framework: "net48");
+    }
+
+    [Fact]
+    public void Json_MissingFrameworkViolation_CarriesTheFramework()
+    {
+        // The same key as the ceiling's: the rule's sentence, beside it in the document, says which reading
+        // applies.
+        FlooredReport()
+            .ShouldRenderProjectShapeViolation("projectShape", "Zphil.Host", framework: "netstandard2.0");
     }
 
     [Fact]
@@ -145,6 +166,14 @@ public sealed class ProjectViolationRenderTests
             .ShouldBeOneErrorSaying("Zphil.Host targets net48");
     }
 
+    [Fact]
+    public void Sarif_MissingFrameworkViolation_MessageSaysTheProjectDoesNotTargetIt()
+    {
+        FlooredReport()
+            .ToSarif()
+            .ShouldBeOneErrorSaying("Zphil.Host does not target netstandard2.0");
+    }
+
     private static CheckReport PackableReport()
     {
         return Checker.Run(Packable, arch => arch.Rule("packaging/internal-not-shipped")
@@ -157,6 +186,13 @@ public sealed class ProjectViolationRenderTests
         return Checker.Run(Targeted, arch => arch.Rule("packaging/supported-frameworks")
             .Enforce(arch.Projects.Matching("*").MustOnlyTarget("net8.0"))
             .Because("A framework nobody supports is a build nobody can reproduce."));
+    }
+
+    private static CheckReport FlooredReport()
+    {
+        return Checker.Run(Targeted, arch => arch.Rule("packaging/standard-floor")
+            .Enforce(arch.Projects.Matching("*").MustTarget("netstandard2.0"))
+            .Because("Every package has to load on the net48 hosts the estate still runs."));
     }
 
     private static CheckReport PackagedReport()

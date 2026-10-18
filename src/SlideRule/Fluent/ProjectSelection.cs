@@ -6,7 +6,7 @@ namespace SlideRule.Fluent;
 ///     A set of projects the spec talks about, as build artifacts rather than as the types they
 ///     contain: the subject of a project rule. Start one from <c>arch.Projects</c>; narrow it with
 ///     <c>Named</c>, <c>Matching</c>, <c>Packable</c>, <c>Except</c> or <c>Where</c>, each of which
-///     returns a new selection; finish it with a project verb (<c>MustOnlyTarget</c>,
+///     returns a new selection; finish it with a project verb (<c>MustOnlyTarget</c>, <c>MustTarget</c>,
 ///     <c>MustReferenceNoPackages</c>, <c>MustLockPackages</c>, <c>MustNotBePackable</c> or
 ///     <c>Must</c>), which yields the <see cref="Constraint" /> a rule takes. The facts these verbs
 ///     read are what a build evaluation answers, so a setting a shared props file supplies counts and a

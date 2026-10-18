@@ -167,7 +167,7 @@ PropertySelection — a MemberSelection minted by .Properties that additionally 
 FieldSelection — a MemberSelection minted by .Fields that additionally offers
                .MustBeReadonly() → Constraint (terminal; §5.7)
 ProjectSelection — project adjectives (.Named / .Matching / .Packable / .Except / .Where)
-               → ProjectSelection; project modal verbs (MustOnlyTarget /
+               → ProjectSelection; project modal verbs (MustOnlyTarget / MustTarget /
                MustReferenceNoPackages / MustLockPackages / MustNotBePackable / .Must)
                → Constraint (terminal; §4.10, §5.8)
 IRuleBuilder — ONLY .Enforce(Constraint) → IEnforceRule | .Migrate(from:, to:) → IMigrateRule
@@ -631,16 +631,18 @@ Per verb class — this is grammar-level semantics, not baseline file format:
   positions are evidence, not identity: every signature position of one exposed type within a
   source rides together and is counted, and a grandfathered exposure plus a *different*
   forbidden exposed type from the same source is NEW and red.
-- **Project item verbs** (`MustReferenceNoPackages` and `MustOnlyTarget`, §4.10/§5.8):
-  `(ruleId, project:{name}, package:{id})` and `(ruleId, project:{name}, framework:{moniker})`.
-  This is the edge-key shape, the project in the source slot and the item it declares in the target
-  slot. A grandfathered package plus a *different* package the same project declares later is NEW
-  and red, and so is a framework the project starts targeting. The package identifier is spelled as
-  the project declares it and compared ordinally; the moniker is the normalized short form. A
-  baseline file written before items had identities of their own holds one subject entry,
-  `project:{name}`, for the project. That entry still grandfathers every item of its project, and
-  `status` counts it as uncounted until `baseline accept-reductions` splits it into one counted entry
-  per item it still covers, each keeping its reason.
+- **Project item verbs** (`MustReferenceNoPackages`, `MustOnlyTarget` and `MustTarget`,
+  §4.10/§5.8): `(ruleId, project:{name}, package:{id})` and `(ruleId, project:{name},
+  framework:{moniker})`. This is the edge-key shape, the project in the source slot and the item
+  it names in the target slot. A grandfathered package plus a *different* package the same
+  project declares later is NEW and red, and so is a framework the project starts targeting.
+  `MustTarget` keys the framework a project lacks the same way, so a second project that drops
+  it is NEW and red. The package identifier is spelled as the project declares it and compared
+  ordinally; the moniker is the normalized short form. A baseline file written before items had
+  identities of their own holds one subject entry, `project:{name}`, for the project. That entry
+  still grandfathers every item of its project, and `status` counts it as uncounted until
+  `baseline accept-reductions` splits it into one counted entry per item it still covers, each
+  keeping its reason.
 - **Shape/naming/inheritance/attribute/membership verbs and escape hatches**:
   `(ruleId, subject symbol ID)`. A membership verb's operands (`MustBelongTo`'s memberships,
   §5.3) are part of the rule, never of the identity: widening or narrowing the membership list
@@ -1159,7 +1161,8 @@ declares as package references, whether it locks restore and whether it packs.
   the declared target frameworks (the list is total, and a classic project's framework
   normalizes to the short moniker, `net48`), the declared `PackageReference`s, each marked
   private where its `PrivateAssets` is `all`, `RestorePackagesWithLockFile`, and `IsPackable`.
-  `MustOnlyTarget` compares monikers ordinally against the normalized short forms.
+  `MustOnlyTarget` and `MustTarget` compare monikers ordinally against the normalized short
+  forms.
 - **Declared references only.** The package facts are the project's own declarations — the
   transitive graph is a different fact — and `MustReferenceNoPackages` says so in its
   sentence (§5.8) rather than in a doc a reader has to know to look up.
@@ -1181,19 +1184,22 @@ declares as package references, whether it locks restore and whether it packs.
 - **Unknown passes.** A load path that cannot carry a fact records absence, never a default,
   and every project verb passes on absence: a rule that reds on a project nothing evaluated
   is reporting the load's own gaps as architecture violations, which is `modelIncomplete`'s
-  channel, not a verdict's.
+  channel, not a verdict's. A verb that bounds a list passes an unevaluated project for free,
+  finding nothing in the empty list to judge. `MustTarget` asks for a framework to be present,
+  so it tests for the empty list instead of walking it, and passes the project the same way.
 - **Identity is `project:{name}`.** A project has no documentation-comment ID, so the
   identity wears the DocId shape and displays verbatim. It rides baseline entries unchanged,
-  so every posture composes. The two verbs over a list key each item apart, as an edge from the
+  so every posture composes. The verbs over a list key each item apart, as an edge from the
   project to `package:{id}` or `framework:{moniker}` (§4.3), so a migrated rule still reds on the
   next package or framework the project takes, and a TFM migration is an ordinary ratcheted
-  burndown, one framework at a time.
+  burndown, one framework at a time. `MustTarget` keys the framework it requires the same way.
 - **The site is the declaration that won the evaluation** — regularly a props file above the
   project, not the csproj — and where the defect is an absence, the site falls back to the
   project file itself. `MustReferenceNoPackages` mints one violation per declared package
   that is not private, each sited at its own declaration. `MustOnlyTarget` mints one violation
   per target framework the rule does not permit, each sited at the declaration of the project's
-  framework list.
+  framework list. `MustTarget` mints one per project whose list lacks the required framework,
+  sited at the same declaration, and its message says the project does not target it.
 - **A narrowed run skips a project rule that selects nothing**, exactly as it skips a type
   rule whose subject a filter erased.
 
@@ -1333,6 +1339,7 @@ posture verbs, trailers and escape hatches of §5.4–§5.6 are written by hand.
 | Verb | Overloads | Fragment |
 |---|---|---|
 | `.MustOnlyTarget` | `(string, …)` | must target only `netstandard2.0` |
+| `.MustTarget` | `(string)` | must target `netstandard2.0` |
 | `.MustReferenceNoPackages` | `()` | must reference no NuGet packages other than private ones, whose `PrivateAssets` is `all` (declared references only; transitive dependencies are not seen) |
 | `.MustLockPackages` | `()` | must lock package restore |
 | `.MustNotBePackable` | `()` | must not be packable |
@@ -1775,7 +1782,10 @@ carries its sugar overload too, or the verb silently stops compiling after the s
 **Project modal verbs** (turn a `ProjectSelection` into a terminal `Constraint`):
 
 - `.MustOnlyTarget("netstandard2.0")` — "must target only `netstandard2.0`" ("only `netstandard2.0` or `net8.0`" for several) — strict on the `MustOnlyThrow` model, and strict by omission: the declared-framework universe is closed, so no external remainder exists for a caveat to disclaim (contrast §4.1)
+- `.MustTarget("netstandard2.0")` — "must target `netstandard2.0`" — the floor `MustOnlyTarget` is the ceiling of, single-operand (§10), with no caveat on the same closed-universe argument
 - `.MustReferenceNoPackages()` — zero-arity (§10); both boundaries ride in the sentence, "other than" so the first cannot read as a second `, except` clause
+- `.MustLockPackages()` — "must lock package restore" — zero-arity (§10), over the evaluated `RestorePackagesWithLockFile`
+- `.MustNotBePackable()` — "must not be packable" — zero-arity (§10), over the evaluated `IsPackable`, which the SDK defaults on
 - `.Must(pred, description:)` — `pred` is `Func<IProjectInfo, bool>` (§5.6)
 
 ## 6. Sentence assembly
@@ -2118,10 +2128,11 @@ carries its sugar overload too, or the verb silently stops compiling after the s
     one; both are almost always an authoring slip, and the two failure shapes are far enough
     apart that neither is left for check time to explain. Same message shape as item 15, so
     a reader who has met one blank-operand error has met them all.
-24. Blank/whitespace target framework on `MustOnlyTarget` (`Blank target framework on
-    '{id}'.`). A blank moniker matches nothing, so it silently narrows the allow-list rather
-    than widening it — the rule stays green until a project targets the framework the author
-    meant to permit.
+24. Blank/whitespace target framework on `MustOnlyTarget` or `MustTarget` (`Blank target
+    framework on '{id}'.`). A blank moniker matches nothing, so on `MustOnlyTarget` it silently
+    narrows the allow-list rather than widening it — the rule stays green until a project
+    targets the framework the author meant to permit — and on `MustTarget` it requires a
+    framework no project targets, so the rule reds every evaluated project.
 25. Blank/whitespace counterpart name template on `MustHaveExactlyOneCounterpart` (`Blank
     counterpart name template on '{id}'.`). Rides item 15's walk — one label, one case — so a
     reader who has met one blank-operand error has met them all.
@@ -2350,9 +2361,11 @@ this catalog.
   and `MustReferenceNoPackages()` is the deliberate inversion of this bullet's rule: an empty
   list of the references a consumer receives is the law it states, so the emptiness takes its
   own verb rather than an empty argument list, while `MustOnlyTarget` keeps `(first, more)` — an empty allow-list would be meaningless
-  there. `Except` carries the pair on the type stratum (several exclusions are the union `AnyOf`
-  mints, and the `Type` sugar rides beside it exactly as on the dependency verbs, §3.3) and
-  stays single-operand on the project stratum, where `.Named(a, b)` and `.Matching(a, b)` already
+  there. `MustTarget` requires a fact a project holds several of, so it is single-operand on the
+  hierarchy verbs' argument: `("net8.0", "net48")` reads as both and as either, and a second
+  required framework is a second rule. `Except` carries the pair on the type stratum (several
+  exclusions are the union `AnyOf` mints, and the `Type` sugar rides beside it exactly as on the
+  dependency verbs, §3.3) and stays single-operand on the project stratum, where `.Named(a, b)` and `.Matching(a, b)` already
   say "either of these" and no `AnyOf` exists to desugar a list to.
 - **Anchor-form triples.** A single-type anchor position ships `Type` / `string` / `<T>`
   together — the compile-checked `typeof`, the §5.2 no-reference escape hatch, and the

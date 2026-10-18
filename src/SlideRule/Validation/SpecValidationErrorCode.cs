@@ -191,9 +191,10 @@ internal enum SpecValidationErrorCode
     BlankProjectPattern,
 
     /// <summary>
-    ///     An empty target framework on <c>MustOnlyTarget</c>. A blank moniker matches nothing, so it narrows
-    ///     the permitted list instead of widening it and the rule stays green until some project targets the
-    ///     framework that was meant to be allowed.
+    ///     An empty target framework on <c>MustOnlyTarget</c> or <c>MustTarget</c>. A blank moniker matches
+    ///     nothing. On <c>MustOnlyTarget</c> it narrows the permitted list instead of widening it, so the rule
+    ///     stays green until some project targets the framework that was meant to be allowed; on
+    ///     <c>MustTarget</c> it requires a framework no project targets, so the rule fails every project it reads.
     /// </summary>
     BlankTargetFramework,
 

@@ -42,6 +42,24 @@ public static class ProjectSelectionConstraints
     }
 
     /// <summary>
+    ///     States that every selected project must target this framework, among any others it targets, such
+    ///     as <c>arch.Projects.Packable().MustTarget("netstandard2.0")</c>: the floor a support promise
+    ///     makes, where <c>MustOnlyTarget</c> states the ceiling. A project that does not target it is one
+    ///     violation, sited at the declaration of the project's framework list, and under <c>Migrate</c> each
+    ///     project is grandfathered on its own. The moniker is compared case-sensitively against normalized
+    ///     short forms, so a classic project's <c>v4.8</c> reads <c>net48</c>. A project whose frameworks
+    ///     nothing evaluated passes. One framework per rule: to require two, write two rules. A blank moniker
+    ///     is reported when the spec is loaded.
+    /// </summary>
+    public static Constraint MustTarget(
+        this ProjectSelection subject,
+        [SpecSlot(nameof(SpecSlot.TargetFramework))]
+        string framework)
+    {
+        return new MustTargetConstraint(Subject(subject), NotNull(framework, nameof(framework)));
+    }
+
+    /// <summary>
     ///     States that every selected project must declare no <c>PackageReference</c> other than private
     ///     ones, such as <c>arch.Projects.Named("MyApp.Domain").MustReferenceNoPackages()</c>. A private
     ///     reference is one whose <c>PrivateAssets</c> is <c>all</c>, the usual way to declare an analyzer,

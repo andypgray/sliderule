@@ -1513,3 +1513,11 @@ internal sealed class UndefinedLifetimeExemplarSpec : IArchitectureSpec
             .Exemplar(arch.Registered((Lifetime)7));
     }
 }
+
+internal sealed class BlankRequiredTargetFrameworkSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        arch.Rule("area/rule").Enforce(arch.Projects.Named("A").MustTarget(" ")).Because("Reason.");
+    }
+}

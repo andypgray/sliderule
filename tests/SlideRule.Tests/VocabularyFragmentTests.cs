@@ -668,6 +668,15 @@ public class VocabularyFragmentTests
     }
 
     [Fact]
+    public void MustTarget_BackticksTheFrameworkAndCarriesNoCaveat()
+    {
+        // The floor beside the ceiling: "must target" with no "only", and no caveat for the same reason the
+        // ceiling carries none, a project's frameworks being a closed set.
+        SentenceRenderer.Sentence(Arch.Projects.Packable().MustTarget("netstandard2.0"))
+            .ShouldBe("Packable projects must target `netstandard2.0`.");
+    }
+
+    [Fact]
     public void MustReferenceNoPackages_StatesBothBoundaries()
     {
         // Two boundaries ride in the sentence. The first says which references the verb passes and defines

@@ -95,7 +95,7 @@ describes.
 | `SR1016` | A pattern, name or affix is blank. |
 | `SR1017` | A namespace pattern can never match: a `*` comes before its trailing `.*`. |
 | `SR1024` | A project name or glob on `arch.Projects` is blank. |
-| `SR1025` | A target framework on `MustOnlyTarget` is blank. |
+| `SR1025` | A target framework on `MustOnlyTarget` or `MustTarget` is blank. |
 | `SR1026` | A counterpart name template has no `{Name}` placeholder. |
 | `SR1030` | A `Citation` is not an absolute `http` or `https` URL. |
 | `SR1031` | A layer name is blank. |

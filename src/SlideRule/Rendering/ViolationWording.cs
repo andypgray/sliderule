@@ -38,18 +38,24 @@ internal static class ViolationWording
     // arm is the Shape parallel over a project: its name, at whichever declaration carried the fact the verb
     // read — which may be a props file above the project, and may be nothing at all. A per-package or
     // per-framework violation names the item too, in EdgeText's register (no backticks: these lines are jump
-    // targets, not prose).
+    // targets, not prose), and a framework the project lacks reads as one it does not target.
     internal static string SubjectText(Violation violation)
     {
         return violation.Kind switch
         {
             ViolationKind.MemberShape => MemberDisplay.Of(violation.SubjectMember!),
-            ViolationKind.ProjectShape => violation.Package is { } package
-                ? $"{violation.SubjectProject!.Name} references package {package.Name}"
-                : violation.Framework is { } framework
-                    ? $"{violation.SubjectProject!.Name} targets {framework}"
-                    : violation.SubjectProject!.Name,
+            ViolationKind.ProjectShape => ProjectText(violation),
             _ => violation.Subject!.FullName
         };
+    }
+
+    // The project arm on its own, which the SARIF renderer's twin switch mirrors line for line.
+    private static string ProjectText(Violation violation)
+    {
+        string project = violation.SubjectProject!.Name;
+        if (violation.Package is { } package) return $"{project} references package {package.Name}";
+        if (violation.Framework is not { } framework) return project;
+
+        return violation.FrameworkMissing ? $"{project} does not target {framework}" : $"{project} targets {framework}";
     }
 }

@@ -112,7 +112,7 @@ internal sealed class SpecSlot
     /// <summary>The prose of a layer's <c>Purpose</c>.</summary>
     internal static readonly SpecSlot Purpose = new(nameof(Purpose), "purpose", SlotCheck.Prose);
 
-    /// <summary>One framework moniker on <c>MustOnlyTarget</c>.</summary>
+    /// <summary>One framework moniker on <c>MustOnlyTarget</c> or <c>MustTarget</c>.</summary>
     internal static readonly SpecSlot TargetFramework = new(nameof(TargetFramework), "target framework", SlotCheck.TargetFramework);
 
     /// <summary>The name of <c>arch.Member(type, name)</c>.</summary>

@@ -13,9 +13,10 @@ namespace SlideRule.Tests.Checking;
 /// </summary>
 /// <remarks>
 ///     The rows that matter most are the per-item ones. <c>MustReferenceNoPackages</c> mints one violation
-///     per declared package and <c>MustOnlyTarget</c> one per framework it does not permit, and each keys an
-///     edge from the project to its item, so a package or framework the project takes after the capture is
-///     red. A project-wide entry written before the items were keyed apart still grandfathers every item of
+///     per declared package, <c>MustOnlyTarget</c> one per framework it does not permit and <c>MustTarget</c>
+///     one per project lacking the framework it requires, and each keys an edge from the project to its item,
+///     so a package or framework the project takes after the capture is red, and so is a project that drops
+///     the required framework. A project-wide entry written before the items were keyed apart still grandfathers every item of
 ///     its project, as an uncounted entry, until accept-reductions splits it.
 /// </remarks>
 public sealed class ProjectRatchetTests
@@ -36,6 +37,10 @@ public sealed class ProjectRatchetTests
             ]),
         ProjectFacts.Project(
             "Zphil.Web", packageReferences: [ProjectFacts.Package("Serilog", "src/Web/Web.csproj", 7)]));
+
+    private static readonly CodebaseModel FloorScene = ProjectFacts.Solution(
+        Targeting("Zphil.Domain", "net48"),
+        Targeting("Zphil.Web", "net48"));
 
     [Fact]
     public void Migrate_BaselinedProject_Grandfathers_WhileTheOtherStaysRed()
@@ -111,6 +116,37 @@ public sealed class ProjectRatchetTests
                 BaselineEntry.ForEdge("project:Zphil.Domain", "framework:net48"),
                 BaselineEntry.ForEdge("project:Zphil.Domain", "framework:net6.0")
             ]);
+    }
+
+    [Fact]
+    public void Migrate_MissingFrameworkIdentity_IsAnEdgeFromTheProjectToTheFramework()
+    {
+        // The floor keys what the ceiling keys: the framework stands in the target slot, here the one the
+        // project lacks rather than one it targets.
+        RuleResult result = Checker.Run(FloorScene, BaselineIndex.Empty, FloorRule).Single();
+
+        result.Violations.Select(violation => violation.BaselineIdentity())
+            .ShouldBe(
+            [
+                BaselineEntry.ForEdge("project:Zphil.Domain", "framework:net8.0"),
+                BaselineEntry.ForEdge("project:Zphil.Web", "framework:net8.0")
+            ]);
+    }
+
+    [Fact]
+    public void Migrate_ProjectDroppingTheRequiredFrameworkAfterCapture_IsRed()
+    {
+        // Capture one project lacking the floor; a second project that drops it later is red while the first
+        // stays grandfathered.
+        CodebaseModel captured = ProjectFacts.Solution(
+            Targeting("Zphil.Domain", "net48"),
+            Targeting("Zphil.Web", "net48", "net8.0"));
+        BaselineIndex index = Capture(captured, FloorRule);
+
+        RuleResult result = Checker.Run(FloorScene, index, FloorRule).Single();
+
+        result.ShouldHaveFailedWithProjectSubjects(["Zphil.Web -> net8.0"]);
+        result.ShouldHaveGrandfathered(1);
     }
 
     [Fact]
@@ -227,6 +263,20 @@ public sealed class ProjectRatchetTests
         arch.Rule("packaging/domain-pure")
             .Migrate("Projects still take packages directly.", arch.Projects.Matching("Zphil.*").MustReferenceNoPackages())
             .Because("b");
+    }
+
+    private static void FloorRule(Arch arch)
+    {
+        arch.Rule("packaging/floor")
+            .Migrate("Two projects still target only net48.", arch.Projects.Matching("Zphil.*").MustTarget("net8.0"))
+            .Because("b");
+    }
+
+    // A project whose frameworks were evaluated, declared on its own file's third line.
+    private static ProjectNode Targeting(string name, params string[] frameworks)
+    {
+        return ProjectFacts.Project(
+            name, targetFrameworks: frameworks, targetFrameworksSite: ProjectFacts.Site($"src/{name}/{name}.csproj", 3));
     }
 
     private static void FrameworkRule(Arch arch)

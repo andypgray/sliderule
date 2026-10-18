@@ -175,9 +175,11 @@ public sealed class SpecLiteralDescriptorTests
                 "SR1025",
                 "A target framework is blank",
                 "{0}",
-                "A MustOnlyTarget was given an empty target framework. A blank moniker matches nothing, so "
-                + "it narrows the permitted list instead of widening it, and the rule stays green until "
-                + "some project targets the framework that was meant to be allowed." + Closing
+                "A MustOnlyTarget or MustTarget was given an empty target framework. A blank moniker matches "
+                + "nothing. On MustOnlyTarget it narrows the permitted list instead of widening it, so the "
+                + "rule stays green until some project targets the framework that was meant to be allowed; "
+                + "on MustTarget it requires a framework no project targets, so the rule fails every project "
+                + "it reads." + Closing
             },
             {
                 nameof(SpecLiteralDiagnostics.CounterpartTemplateWithoutPlaceholder),

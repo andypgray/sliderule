@@ -543,6 +543,16 @@ internal static class NodeReaders
             IReadOnlyList<string>? frameworks = r.RequiredTexts(v, ConstraintWhere, "frameworks");
             return frameworks is null ? null : new MustOnlyTargetConstraint(subject, frameworks);
         });
+        map.Add(Key<MustTargetConstraint>(), (r, v) =>
+        {
+            if (!r.OnlyKeys(v, ConstraintWhere, "node", "projectSubject", "framework")) return null;
+
+            ProjectSelection? subject = r.RequiredProjectSelection(v, ConstraintWhere, "projectSubject");
+            if (subject is null) return null;
+
+            string? framework = r.RequiredText(v, ConstraintWhere, "framework");
+            return framework is null ? null : new MustTargetConstraint(subject, framework);
+        });
     }
 
     // ---- the shapes several verbs share --------------------------------------------------------

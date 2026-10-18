@@ -469,6 +469,7 @@ line.
 | Verb | Overloads | Fragment |
 |---|---|---|
 | `.MustOnlyTarget` | `(string, …)` | must target only `netstandard2.0` |
+| `.MustTarget` | `(string)` | must target `netstandard2.0` |
 | `.MustReferenceNoPackages` | `()` | must reference no NuGet packages other than private ones, whose `PrivateAssets` is `all` (declared references only; transitive dependencies are not seen) |
 | `.MustLockPackages` | `()` | must lock package restore |
 | `.MustNotBePackable` | `()` | must not be packable |
@@ -530,10 +531,10 @@ artifacts, not sets of types (`arch.Project(name)` is the unrelated type noun).
 `.Matching(glob, ...)` reads `*` over one token, because a project name carries no dot-segment
 structure, and `.Packable()` is the projects an evaluation reported packable.
 `MustOnlyTarget(tfm, ...)` is strict, with no external exemption, because a project's frameworks are
-a closed set; `MustLockPackages()` reads `RestorePackagesWithLockFile`; `MustReferenceNoPackages()`
-passes only private references, whose `PrivateAssets` is `all` (analyzers and build tooling);
-`MustNotBePackable()` makes an internal project's opt-out checkable, since the SDK defaults
-`IsPackable` on. Every project fact is evaluated rather than parsed, so a violation points at the
+a closed set, and `MustTarget(tfm)` states the floor; `MustLockPackages()` reads
+`RestorePackagesWithLockFile`; `MustReferenceNoPackages()` passes only private references, whose
+`PrivateAssets` is `all` (analyzers and build tooling); `MustNotBePackable()` makes an internal
+project's opt-out checkable, since the SDK defaults `IsPackable` on. Every project fact is evaluated rather than parsed, so a violation points at the
 declaration that won, often a `Directory.Build.props` above the project, and a fact nothing
 evaluated passes. The flagship:
 `arch.Projects.Matching("MyApp.*").Except(arch.Projects.Named("MyApp.Cli")).MustNotBePackable()` —

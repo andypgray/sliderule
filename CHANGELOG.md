@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `MustTarget(framework)` states a framework floor: every selected project must target the framework,
+  among any others it targets. A project that does not is one violation, sited at the declaration of its
+  framework list and keyed by the framework, and a project nothing evaluated passes.
 - `check --json` and `arch_check` carry a `framework` key on each `MustOnlyTarget` violation, naming
   the framework it reports.
 - `baseline add --source <project> --target <package-or-framework>` adds the entry for a project's

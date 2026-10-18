@@ -71,9 +71,19 @@ internal sealed class Violation
     /// <summary>
     ///     Gets the target framework, as a short moniker, that counts against the rule. Populated only by the
     ///     per-framework violations of <c>MustOnlyTarget</c>, one for each framework the project targets that the
-    ///     rule does not permit, and null on every other project violation and every other kind.
+    ///     rule does not permit, and by those of <c>MustTarget</c>, naming the framework the rule requires and the
+    ///     project does not target (<see cref="FrameworkMissing" />); null on every other project violation and
+    ///     every other kind.
     /// </summary>
     public string? Framework { get; private set; }
+
+    /// <summary>
+    ///     Gets whether <see cref="Framework" /> names a framework the project lacks, as on a <c>MustTarget</c>
+    ///     violation, rather than one it targets. False on every other violation.
+    /// </summary>
+    // A flag beside the moniker rather than a slot of its own: both verbs key the same framework:{moniker} item,
+    // so the identity, the JSON key and the baseline matcher read one field, and only the wording forks.
+    public bool FrameworkMissing { get; private set; }
 
     /// <summary>
     ///     Gets the package or framework a per-item project violation names, in the form its baseline identity
@@ -304,6 +314,21 @@ internal sealed class Violation
     internal static Violation ProjectFramework(ProjectNode subject, string framework, IReadOnlyList<SourceLocation> sites)
     {
         return new Violation(ViolationKind.ProjectShape, sites) { SubjectProject = subject, Framework = framework };
+    }
+
+    /// <summary>
+    ///     The target framework a <c>MustTarget</c> rule requires and the project does not target, as its short
+    ///     moniker, sited at the declaration of the project's framework list. Keyed per framework as
+    ///     <see cref="ProjectFramework" /> is; <see cref="FrameworkMissing" /> is what the wording reads to say the
+    ///     project lacks it.
+    /// </summary>
+    internal static Violation ProjectMissingFramework(
+        ProjectNode subject, string framework, IReadOnlyList<SourceLocation> sites)
+    {
+        return new Violation(ViolationKind.ProjectShape, sites)
+        {
+            SubjectProject = subject, Framework = framework, FrameworkMissing = true
+        };
     }
 
     internal static Violation EmptySubject(string detail, string hint)

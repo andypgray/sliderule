@@ -233,6 +233,8 @@ internal static class VocabularyCatalog
         [
             ProjectVerb(nameof(ProjectSelectionConstraints.MustOnlyTarget),
                 arch => arch.Projects.Named("MyApp.Web").MustOnlyTarget("netstandard2.0")),
+            ProjectVerb(nameof(ProjectSelectionConstraints.MustTarget),
+                arch => arch.Projects.Packable().MustTarget("netstandard2.0")),
             ProjectVerb(nameof(ProjectSelectionConstraints.MustReferenceNoPackages),
                 arch => arch.Projects.Named("MyApp.Web").MustReferenceNoPackages()),
             ProjectVerb(nameof(ProjectSelectionConstraints.MustLockPackages), arch => arch.Projects.Packable().MustLockPackages()),

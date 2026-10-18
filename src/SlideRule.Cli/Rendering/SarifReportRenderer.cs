@@ -437,12 +437,19 @@ internal static class SarifReportRenderer
             ViolationKind.Expose => $"{violation.Source!.FullName} exposes {violation.Target!.FullName}",
             ViolationKind.Shape => violation.Subject!.FullName,
             ViolationKind.MemberShape => MemberDisplay.Of(violation.SubjectMember!),
-            ViolationKind.ProjectShape => violation.Package is { } package
-                ? $"{violation.SubjectProject!.Name} references package {package.Name}"
-                : violation.Framework is { } framework
-                    ? $"{violation.SubjectProject!.Name} targets {framework}"
-                    : violation.SubjectProject!.Name,
+            ViolationKind.ProjectShape => ProjectMessageText(violation),
             _ => string.Empty
         };
+    }
+
+    // A project violation names its project, and a per-item one the package or framework beside it; a
+    // framework the project lacks (MustTarget) reads as one it does not target.
+    private static string ProjectMessageText(Violation violation)
+    {
+        string project = violation.SubjectProject!.Name;
+        if (violation.Package is { } package) return $"{project} references package {package.Name}";
+        if (violation.Framework is not { } framework) return project;
+
+        return violation.FrameworkMissing ? $"{project} does not target {framework}" : $"{project} targets {framework}";
     }
 }

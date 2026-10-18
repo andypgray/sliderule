@@ -1532,6 +1532,8 @@ internal sealed class ConstraintEvaluator
         {
             case MustOnlyTargetConstraint c:
                 return ForbiddenFrameworks(subjects, c.Frameworks);
+            case MustTargetConstraint c:
+                return MissingFramework(subjects, c.Framework);
             case MustReferenceNoPackagesConstraint:
                 return ForbiddenPackages(subjects);
             case MustLockPackagesConstraint:
@@ -1600,6 +1602,20 @@ internal sealed class ConstraintEvaluator
         foreach (string framework in subject.TargetFrameworks)
             if (!permitted.Contains(framework))
                 violations.Add(Violation.ProjectFramework(subject, framework, AtSite(subject.TargetFrameworksSite)));
+
+        return violations;
+    }
+
+    // MustTarget (GRAMMAR §4.10): one violation per project whose framework list lacks the required moniker,
+    // sited where that list is declared and keyed by the moniker, as MustOnlyTarget's are. The empty list is
+    // tested for rather than walked: it is what nothing evaluated looks like, and a floor verb would otherwise
+    // red every unevaluated project, where the ceiling's walk passes it for free by finding nothing to judge.
+    private static IReadOnlyList<Violation> MissingFramework(IReadOnlyList<ProjectNode> subjects, string framework)
+    {
+        var violations = new List<Violation>();
+        foreach (ProjectNode subject in subjects)
+            if (subject.TargetFrameworks.Count > 0 && !subject.TargetFrameworks.Contains(framework, StringComparer.Ordinal))
+                violations.Add(Violation.ProjectMissingFramework(subject, framework, AtSite(subject.TargetFrameworksSite)));
 
         return violations;
     }

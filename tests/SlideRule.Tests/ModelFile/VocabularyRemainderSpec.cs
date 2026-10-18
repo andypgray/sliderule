@@ -30,6 +30,17 @@ internal static class VocabularyRemainderSpec
         DefineNames(arch);
         DefineReach(arch);
         DefineMemberShapes(arch);
+        DefineProjects(arch);
+    }
+
+    // The project verbs no real spec in the corpus takes up, over projects named the way the subjects above
+    // name namespaces.
+    private static void DefineProjects(Arch arch)
+    {
+        arch.Rule("remainder/contracts-keep-the-standard-floor")
+            .Enforce(arch.Projects.Matching("Remainder.Contracts*")
+                .MustTarget("netstandard2.0"))
+            .Because("The contracts are what the net48 callers compile against, so netstandard2.0 stays among their frameworks.");
     }
 
     // The five type-shape modals. Each takes a subject narrow enough that the law reads as one a codebase
