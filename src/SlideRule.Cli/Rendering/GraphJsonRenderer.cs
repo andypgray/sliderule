@@ -95,7 +95,9 @@ internal static class GraphJsonRenderer
     // undeclared references qualify the declared ones, so they leave at index with them and are absent when empty.
     // Both elide bare, as the namespaces do at overview — a row's array needs no count of its own when the
     // document already stamps the grain that dropped it. The private subset is also absent where it is
-    // empty, because a non-null empty list serializes as [] on every row of every solution without one.
+    // empty, because a non-null empty list serializes as [] on every row of every solution without one. The
+    // package frameworks are absent where there are none, for the private subset's reason: a solution with no
+    // framework-conditioned package surveys exactly as it did before the key existed.
     private static GraphProjectJson ToProject(ProjectSummary project, DocumentGrain grain)
     {
         bool index = grain >= DocumentGrain.Index;
@@ -112,7 +114,7 @@ internal static class GraphJsonRenderer
             index ? null : SlideRuleJson.OmitEmpty(project.UndeclaredProjectReferences),
             skeleton ? null : PackageNames(project.PackageReferences, privateOnly: false),
             skeleton ? null : SlideRuleJson.OmitEmpty(PackageNames(project.PackageReferences, privateOnly: true)),
-            skeleton ? null : PackageFrameworks(project),
+            skeleton ? null : SlideRuleJson.OmitEmpty(PackageFrameworks(project)),
             project.Types,
             SlideRuleJson.OmitZero(project.Generated),
             grain >= DocumentGrain.Overview
@@ -131,16 +133,13 @@ internal static class GraphJsonRenderer
     }
 
     // The packages the project declares for only some of its frameworks, each with the frameworks that declare it,
-    // in package order. Null where there are none, for the private subset's reason: a solution with no
-    // framework-conditioned package surveys exactly as it did before the key existed.
-    private static IReadOnlyList<GraphPackageFrameworksJson>? PackageFrameworks(ProjectSummary project)
+    // in package order.
+    private static IReadOnlyList<GraphPackageFrameworksJson> PackageFrameworks(ProjectSummary project)
     {
-        List<GraphPackageFrameworksJson> scoped = project.PackageReferences
+        return project.PackageReferences
             .Where(package => package.DeclaredForOnlySomeOf(project.TargetFrameworks))
             .Select(package => new GraphPackageFrameworksJson(package.Name, package.Frameworks))
             .ToList();
-
-        return scoped.Count == 0 ? null : scoped;
     }
 
     // Omitted at zero on both keys, which is what keeps the survey of a solution with no generators exactly

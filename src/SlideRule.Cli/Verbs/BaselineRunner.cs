@@ -543,8 +543,7 @@ internal sealed class BaselineRunner(
             return false;
         }
 
-        sections[ruleId] = current.Select(observed => Counted(observed.Identity, observed.Sites))
-            .ToList();
+        sections[ruleId] = AsWritten(current);
         output.WriteLine($"{ruleId}: captured {current.Count} grandfathered {Plurals.Noun(current.Count, "violation")}.");
         return true;
     }
@@ -568,10 +567,19 @@ internal sealed class BaselineRunner(
         // Keyed by identity, so what this run observed under a captured entry is one lookup away.
         // CurrentEntries folded duplicate identities, so the keys are unique.
         Dictionary<BaselineEntry, int> observed = current.ToDictionary(entry => entry.Identity, entry => entry.Sites);
-        var existingSet = new HashSet<BaselineEntry>(captured);
+
+        // The section as check reads it, so which item a project-wide entry stands in for is RuleBaseline.TryMatch's
+        // call here, as on the verdict path, rather than a second test that agrees until one of them moves.
+        var section = new RuleBaseline(captured);
+        ILookup<BaselineEntry, (BaselineEntry Identity, int Sites)> standIns = current
+            .Select(item =>
+                (Item: item, Stored: section.TryMatch(item.Identity, out BaselineEntry? stored) ? stored : null))
+            .Where(match => match.Stored is not null && !match.Stored.Equals(match.Item.Identity))
+            .ToLookup(match => match.Stored!, match => match.Item);
 
         var kept = new List<BaselineEntry>();
         var covered = new HashSet<BaselineEntry>();
+        var removed = 0;
         var lowered = 0;
         var recorded = 0;
         var grew = 0;
@@ -581,12 +589,9 @@ internal sealed class BaselineRunner(
             // A project-wide entry from before items were keyed apart becomes one counted entry per item it
             // grandfathers now, each keeping its reason, so the next package or framework the project takes is
             // red. Items that already carry an entry of their own keep that one.
-            List<(BaselineEntry Identity, int Sites)> items = current
-                .Where(item => entry.Equals(item.Identity.ProjectWideForm) && !existingSet.Contains(item.Identity))
-                .ToList();
-            if (items.Count > 0)
+            if (standIns.Contains(entry))
             {
-                foreach ((BaselineEntry identity, int itemSites) in items)
+                foreach ((BaselineEntry identity, int itemSites) in standIns[entry])
                 {
                     BaselineEntry counted = Counted(identity, itemSites);
                     kept.Add(entry.Because is { } because ? counted.WithBecause(because) : counted);
@@ -599,7 +604,11 @@ internal sealed class BaselineRunner(
 
             // Identity intersection first: an entry no current violation matches is the reduction being
             // accepted, and it simply does not survive into the section.
-            if (!observed.TryGetValue(entry, out int sites)) continue;
+            if (!observed.TryGetValue(entry, out int sites))
+            {
+                removed++;
+                continue;
+            }
 
             // The same owner the verdict path reads, so what this mode may tighten and what 'check' counts
             // as tightenable are one discrimination rather than two that agree until one of them moves.
@@ -626,8 +635,7 @@ internal sealed class BaselineRunner(
             }
         }
 
-        int removed = captured.Count - (kept.Count - covered.Count) - split;
-        int additions = current.Count(entry => !existingSet.Contains(entry.Identity) && !covered.Contains(entry.Identity));
+        int additions = current.Count(item => !section.TryMatch(item.Identity, out _));
 
         sections[ruleId] = kept;
         // "nothing to accept" is the whole mode's verdict, so every kind of acceptance clears it: a run that
@@ -674,6 +682,22 @@ internal sealed class BaselineRunner(
         }
 
         return order.Select(identity => (Identity: identity, Sites: observed[identity])).ToList();
+    }
+
+    // What init writes for one rule's empty-baseline result once ApplyRule's refusals have passed: each current
+    // identity, duplicates max-folded, as a write records it; null where the rule is unbaselinable. Internal so the
+    // ratchet rows capture what init would write without a file.
+    internal static IReadOnlyList<BaselineEntry>? CapturedEntries(RuleResult result)
+    {
+        IReadOnlyList<(BaselineEntry Identity, int Sites)>? current = CurrentEntries(result);
+        return current is null ? null : AsWritten(current);
+    }
+
+    // The current entries as a write records each: the one composition init and CapturedEntries share.
+    private static List<BaselineEntry> AsWritten(IReadOnlyList<(BaselineEntry Identity, int Sites)> current)
+    {
+        return current.Select(observed => Counted(observed.Identity, observed.Sites))
+            .ToList();
     }
 
     // The entry as a write records it: an edge entry carrying the sites observed under its identity, or the

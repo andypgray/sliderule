@@ -420,8 +420,8 @@ internal static class SarifReportRenderer
         }
     }
 
-    // The per-kind result body, duplicated from HumanReportRenderer per house convention (each renderer
-    // formats independently). What is not duplicated is how a member is spelled: that form is also what
+    // The per-kind result body, a twin of ViolationWording's wording, kept per the house convention that each
+    // renderer formats independently. What is not duplicated is how a member is spelled: that form is also what
     // 'baseline add' resolves names against, so it lives in MemberDisplay rather than in each surface.
     // EmptySubject/RuleError are site-less, so this is never reached for them.
     private static string MessageText(Violation violation)
