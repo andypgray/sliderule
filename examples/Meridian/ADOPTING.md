@@ -79,7 +79,8 @@ $ sliderule graph examples/Meridian/Meridian.slnx --json
         "Meridian.Domain"
       ],
       "packageReferences": [
-        "Microsoft.Data.SqlClient"
+        "Microsoft.Data.SqlClient",
+        "System.Security.Cryptography.Pkcs"
       ],
       "types": 18,
       "namespaces": [
@@ -166,6 +167,8 @@ Here is Meridian's spec project, exactly as committed:
 
     <ItemGroup>
         <PackageReference Include="Microsoft.Data.SqlClient" Version="7.0.2" />
+        <!-- SqlClient 7.0.2 depends on Pkcs 9.0.13 (GHSA-2fmv-rv2c-59x7, GHSA-846f-f764-76mx). Drop this once SqlClient takes 9.0.21 or later. -->
+        <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
     </ItemGroup>
 
 </Project>
@@ -173,7 +176,9 @@ Here is Meridian's spec project, exactly as committed:
 
 The `RestoreLockedMode` line takes effect only where a `packages.lock.json` is next to the project file, and this project has none. OpenSSF Scorecard's pinned-dependencies check reads the setting from each project file, so this repository declares it in every one. Your spec project can leave it out unless you commit a lock file next to it.
 
-The other line to explain is `CopyLocalLockFileAssemblies`. It stages NuGet package assemblies (here SqlClient) into the spec's build output, where `check` looks for the `typeof()` targets that live in those packages. Strictly, the spec does not need the line. The loader also reads the spec's `.deps.json` and will resolve a package assembly out of the machine's NuGet folder. The line is insurance that makes the spec's output self-contained, so a check does not depend on what a given machine happens to have restored. It is harmless when every target is a project type or a namespace pattern.
+The `System.Security.Cryptography.Pkcs` reference keeps a vulnerable package out of the spec's build. SqlClient 7.0.2 depends on a Pkcs version with two published advisories, which NuGet's audit reports at restore. Naming the patched version directly makes NuGet restore that one instead. If a package your spec references brings in a vulnerable dependency, pin its patched version the same way.
+
+The last line to explain is `CopyLocalLockFileAssemblies`. It stages NuGet package assemblies (here SqlClient) into the spec's build output, where `check` looks for the `typeof()` targets that live in those packages. Strictly, the spec does not need the line. The loader also reads the spec's `.deps.json` and will resolve a package assembly out of the machine's NuGet folder. The line is insurance that makes the spec's output self-contained, so a check does not depend on what a given machine happens to have restored. It is harmless when every target is a project type or a namespace pattern.
 
 The line cannot reach a **.NET shared framework**. An ASP.NET Core `ControllerBase`, or anything else arriving through `<FrameworkReference>`, is never staged into a class library's output. Such a type is not in the NuGet folder either, so a `typeof()` anchor on one fails however the spec project is built. Anchor those by string instead. `.DerivedFrom("Microsoft.AspNetCore.Mvc.ControllerBase")` renders exactly like the `typeof()` form and loads no assembly at all.
 
