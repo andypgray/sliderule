@@ -146,6 +146,7 @@ internal static class SpecValidator
         CheckProjectPatterns(rule, target, errors);
         CheckMembers(rule, target, arch, errors);
         CheckMemberReturning(rule, errors);
+        CheckMemberExceptKinds(rule, errors);
         CheckMemberAcceptParameter(rule, errors);
         CheckHierarchyAnchors(rule, errors);
         CheckPatterns(RulePatterns(rule), target, errors);
@@ -343,6 +344,14 @@ internal static class SpecValidator
         foreach (Selection exemplar in rule.Exemplars)
         foreach ((Selection, string) position in FamilyPositions(exemplar, FamilyPosition.Exemplar))
             yield return position;
+
+        // A member Except payload's source consumes a set like any other payload, so a family there is refused
+        // as one; only the subject's own source is a subject.
+        if (constraint is not MemberConstraint member) yield break;
+
+        foreach (MemberSelection payload in SelectionWalk.MemberExceptPayloads(member.MemberSubject))
+        foreach ((Selection, string) position in FamilyPositions(payload.Source, FamilyPosition.ExceptPayload))
+            yield return position;
     }
 
     // The scope's twin: the quarantined interior and each sanctioned-surface operand, each named by the
@@ -500,9 +509,41 @@ internal static class SpecValidator
     {
         if (rule.Constraint is not MemberConstraint memberConstraint) return;
 
-        foreach (MemberAdjective adjective in memberConstraint.MemberSubject.Adjectives)
+        MemberSelection subject = memberConstraint.MemberSubject;
+        IEnumerable<MemberSelection> selections = SelectionWalk.MemberExceptPayloads(subject).Prepend(subject);
+        foreach (MemberSelection selection in selections)
+        foreach (MemberAdjective adjective in selection.Adjectives)
             if (adjective is ReturningAdjective returning)
                 CheckClosedGenericAnchors(rule, errors, returning.Anchors, Code.MemberReturningClosedGeneric, ".Returning");
+    }
+
+    // GRAMMAR §8 item 34: a member Except payload of a different single kind than the selection it subtracts
+    // from removes nothing, because no member is two kinds at once. Like the closed-generic refusal it is the
+    // rule's own statement, so it renders at the rule's location. A .Members selection on either side holds
+    // every kind and clashes with none.
+    private static void CheckMemberExceptKinds(RuleRegistration rule, List<SpecValidationError> errors)
+    {
+        if (rule.Constraint is not MemberConstraint memberConstraint) return;
+
+        MemberSelection subject = memberConstraint.MemberSubject;
+        IEnumerable<MemberSelection> hosts = SelectionWalk.MemberExceptPayloads(subject).Prepend(subject);
+        foreach (MemberSelection host in hosts)
+        foreach (MemberAdjective adjective in host.Adjectives)
+        {
+            if (adjective is not MemberExceptAdjective except) continue;
+
+            foreach (MemberSelection payload in except.Payloads)
+            {
+                if (host.Kind == MemberKindFilter.Any || payload.Kind == MemberKindFilter.Any) continue;
+                if (host.Kind == payload.Kind) continue;
+
+                string taken = ProseFormat.MemberKindPlural(payload.Kind);
+                string from = ProseFormat.MemberKindPlural(host.Kind);
+                errors.Add(new SpecValidationError(Code.MemberExceptKindDisjoint, rule.Id,
+                    $"`Except` on '{rule.Id}' takes {taken} from {from}, so it removes nothing: no member is both. "
+                    + $"Project the payload with `.{ProseFormat.Capitalize(from)}` or `.Members`.", rule.Location));
+            }
+        }
     }
 
     // GRAMMAR §8 item 20: a MustAcceptParameter anchor is definition-level, so a closed-generic anchor
@@ -781,6 +822,19 @@ internal static class SpecValidator
                 if (adjective is MemberWhereAdjective memberWhere)
                     yield return (SpecSlot.Description, memberWhere.Description);
 
+        // Each member Except payload is a member selection in its own right: its source's prose and its own
+        // member Where descriptions are walked as the subject's are.
+        if (constraint is MemberConstraint withPayloads)
+            foreach (MemberSelection payload in SelectionWalk.MemberExceptPayloads(withPayloads.MemberSubject))
+            {
+                foreach ((SpecSlot, string?) prose in SelectionProse(payload.Source))
+                    yield return prose;
+
+                foreach (MemberAdjective adjective in payload.Adjectives)
+                    if (adjective is MemberWhereAdjective payloadWhere)
+                        yield return (SpecSlot.Description, payloadWhere.Description);
+            }
+
         // The project escape hatches (GRAMMAR §4.10, §8 item 5 via the same extended walk): the project Must
         // description and any project Where descriptions on the project subject, including those nested under
         // its Except payloads.
@@ -970,10 +1024,22 @@ internal static class SpecValidator
 
         // The member subject's own adjectives (name/affix) — off the type-side selection walk, reached
         // like CheckMemberReturning reaches the member .Returning anchor.
-        if (constraint is MemberConstraint memberConstraint)
-            foreach (MemberAdjective adjective in memberConstraint.MemberSubject.Adjectives)
+        if (constraint is not MemberConstraint memberConstraint) yield break;
+
+        foreach (MemberAdjective adjective in memberConstraint.MemberSubject.Adjectives)
+        foreach ((string, SpecSlot) pattern in MemberAdjectivePatterns(adjective))
+            yield return pattern;
+
+        // Then each member Except payload, its source's patterns before its own, as the subject reads.
+        foreach (MemberSelection payload in SelectionWalk.MemberExceptPayloads(memberConstraint.MemberSubject))
+        {
+            foreach ((string, SpecSlot) pattern in SelectionPatterns(payload.Source))
+                yield return pattern;
+
+            foreach (MemberAdjective adjective in payload.Adjectives)
             foreach ((string, SpecSlot) pattern in MemberAdjectivePatterns(adjective))
                 yield return pattern;
+        }
     }
 
     // The string arm of an anchor list, under one slot: an anchor spelled as a definition FQN yields its

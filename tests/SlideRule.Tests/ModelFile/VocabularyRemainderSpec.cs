@@ -181,6 +181,7 @@ internal static class VocabularyRemainderSpec
         arch.Rule("remainder/service-methods-stay-overridable")
             .Enforce(arch.Types.InNamespace("Remainder.Services.*")
                 .Methods.ThatArePublic()
+                .Except(arch.Types.InNamespace("Remainder.Services.Hosting.*").Members.Named("Configure"))
                 .MustBeOverridable())
             .Because("A host extends a service by deriving from it, which a sealed override or a plain method rules out.");
 

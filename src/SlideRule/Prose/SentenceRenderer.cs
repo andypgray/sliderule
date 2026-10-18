@@ -54,6 +54,17 @@ internal static class SentenceRenderer
         return MemberPhrase(selection);
     }
 
+    /// <summary>
+    ///     A member <c>Except</c>'s payload list (GRAMMAR §6): each payload in reference position, or-joined with
+    ///     no Oxford comma, the final joiner closing a penultimate payload that ended open.
+    /// </summary>
+    internal static string MemberReferenceList(IReadOnlyList<MemberSelection> selections)
+    {
+        List<string> parts = selections.Select(MemberReference).ToList();
+        bool closesBeforeOr = selections.Count >= 2 && EndsOpen(selections[selections.Count - 2]);
+        return ProseFormat.JoinReferences(parts, closesBeforeOr);
+    }
+
     /// <summary>The capitalized project-subject phrase for a project selection (GRAMMAR §4.10, §6).</summary>
     internal static string ProjectSubject(ProjectSelection selection)
     {
@@ -360,8 +371,8 @@ internal static class SentenceRenderer
     // opens-parenthetical) triples rather than an adjective list because the strata's adjective hierarchies
     // are deliberately disjoint and share no base: the triples are the whole of what placement needs from
     // any of them. MemberPhrase keeps its own variant, and that one is a real divergence rather than a copy —
-    // its HeadPrefix arm keeps a repeat because attribute prefixes can collide, and the member stratum has no
-    // Except, so its sentence-final group has nothing to order.
+    // its HeadPrefix arm keeps a repeat because attribute prefixes can collide — while its sentence-final
+    // group orders through the same SentenceFinalOrder, so a member Except renders after a member Where.
     private static (string? Head, IReadOnlyList<string>? HeadPrefixes, string Inline, string SubjectFinal) Placements(
         IEnumerable<(AdjectivePlacement Placement, string Fragment, bool OpensParenthetical)> adjectives,
         string? head, IReadOnlyList<string>? headPrefixes)
@@ -468,9 +479,16 @@ internal static class SentenceRenderer
     }
 
     // A member subject renders its own inline and sentence-final clauses AFTER the reference, so those
-    // clauses close an Except the source left open. Only head prefixes leave the reference at the end.
+    // clauses close an Except the source left open, and its last sentence-final clause, read in rendered
+    // order, says whether it opened one of its own. Only head prefixes leave the reference at the end.
     private static bool EndsOpen(MemberSelection selection)
     {
+        IEnumerable<MemberAdjective> clauses = selection.Adjectives
+            .Where(adjective => adjective.Placement == AdjectivePlacement.SubjectFinal);
+        MemberAdjective? lastClause = SentenceFinalOrder(clauses, adjective => adjective.OpensParenthetical)
+            .LastOrDefault();
+        if (lastClause is not null) return lastClause.OpensParenthetical;
+
         return EndsOpen(selection.Source)
                && selection.Adjectives.All(adjective => adjective.Placement == AdjectivePlacement.HeadPrefix);
     }
@@ -494,9 +512,10 @@ internal static class SentenceRenderer
     }
 
     // Member-subject assembly (GRAMMAR §4.6, §6): head-prefix member adjectives + "{kind-plural} of
-    // {selection-reference}" + inline member adjectives in authoring order + the sentence-final member
-    // Where. The kind-plural is the projection head; the reference is the underlying type selection in
-    // reference position. There is no head-SUBSTITUTION arm: the projection fixes the head.
+    // {selection-reference}" + inline member adjectives in authoring order + the sentence-final member Where
+    // and Except clauses, every Where before every Except. The kind-plural is the projection head; the
+    // reference is the underlying type selection in reference position. There is no head-SUBSTITUTION arm:
+    // the projection fixes the head.
     private static string MemberPhrase(MemberSelection selection)
     {
         string head = ProseFormat.MemberKindPlural(selection.Kind);
@@ -504,7 +523,7 @@ internal static class SentenceRenderer
 
         var headPrefix = string.Empty;
         var inline = string.Empty;
-        var subjectFinal = string.Empty;
+        var clauses = new List<MemberAdjective>();
         foreach (MemberAdjective adjective in selection.Adjectives)
             switch (adjective.Placement)
             {
@@ -517,13 +536,15 @@ internal static class SentenceRenderer
                     headPrefix += adjective.Fragment;
                     break;
                 case AdjectivePlacement.SubjectFinal:
-                    subjectFinal += adjective.Fragment;
+                    clauses.Add(adjective);
                     break;
                 default:
                     inline += adjective.Fragment;
                     break;
             }
 
+        string subjectFinal = string.Concat(
+            SentenceFinalOrder(clauses, adjective => adjective.OpensParenthetical).Select(adjective => adjective.Fragment));
         return headPrefix + head + " of " + reference + CloseBefore(EndsOpen(selection.Source), inline + subjectFinal);
     }
 

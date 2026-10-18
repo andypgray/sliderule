@@ -852,6 +852,14 @@ Quarantine desugaring (§7) — is the underlying **type** selection.
   methods of types named `Program`"). A list inside an `Except` payload exempts and is not read,
   a subject that matched nothing fails once, whole, and a run over one project's compilation
   reads no member name this way, since another project's members may carry it.
+- **Member exclusions.** `.Except(memberSelection, …)` removes from a member subject every member
+  any payload names (§5.7). Each payload is a member selection over a type selection of its own,
+  resolved where an exclusion stands, over the whole solution in target position (§4.1), and then
+  narrowed by its own member adjectives, nested `Except`s included. Subtraction is by member, so a
+  payload drawn from other types removes only what it names. A payload of another single kind than
+  the selection it subtracts from would remove nothing and is refused at spec build (§8 item 34);
+  a `.Members` payload holds every kind. There is no member union: several payloads are the union,
+  and the sentence or-joins them.
 - **Violation identity is `(ruleId, member DocumentationCommentId)`** — the member's own
   `M:`/`P:`/`F:`/`E:` DocId, so the ratchet blesses the *specific* member and a renamed or
   newly-added member is a NEW red: the shape-verb identity (§4.3) with a member ID in the
@@ -1369,6 +1377,7 @@ posture verbs, trailers and escape hatches of §5.4–§5.6 are written by hand.
 | `.ThatArePrivate` | `()` | Private fields of types |
 | `.ThatAreProtectedInternal` | `()` | Protected internal methods of types |
 | `.ThatArePrivateProtected` | `()` | Private protected methods of types |
+| `.Except` | `(MemberSelection, …)` | Methods of types, except `Main` methods of types named `Program` |
 | `.Where` | `(Func<IMemberInfo, bool>, string)` | Methods of types that are async |
 
 | Verb | Overloads | Fragment |
@@ -1786,6 +1795,7 @@ form cannot reach, because a string anchor still names one definition rather tha
 - `.AttributedWith(typeof(McpServerToolAttribute))` / `.AttributedWith("ModelContextProtocol.Server.McpServerToolAttribute")` — head prefix: "`[McpServerTool]`-attributed" — premodifies the kind-plural (§6), so the subject reads "`[McpServerTool]`-attributed methods of types in `SlideRule.*`". Declared member attributes only (§4.6); the string form is §5.2's escape hatch, rendering byte-identically
 - `.ThatAreStatic()` — head prefix: "static" — premodifies the kind-plural (§6), so the subject reads "static fields of the Core layer". A member **shape** adjective (§11); head prefixes stack across families and concatenate in authoring order
 - `.ThatArePublic()` / `.ThatAreInternal()` / `.ThatAreProtected()` / `.ThatArePrivate()` / `.ThatAreProtectedInternal()` / `.ThatArePrivateProtected()` — head prefix naming the declared accessibility: "protected fields of types in `MyApp.Services.*`", "private protected methods of types". Each matches its level exactly, so `.ThatAreProtected()` leaves out the `protected internal` and `private protected` members, which have adjectives of their own, and a class member written with no modifier is private. All six levels ship where the type side ships three (§5.2), because the laws that need the protected levels are laws about members: a base class's fields and hooks are what an inheritor reaches. The adjective half of the family `MustBePublic`, `MustBeInternal`, `MustBeProtected` and `MustBePrivate` constrain; the prefixes stack with `.ThatAreStatic()` and the attribute prefix in authoring order
+- `.Except(memberSelection, …)` — ", except `Main` methods of types named `Program`" — a parenthetical canonicalized to sentence-final after any member `Where` and closed by the composer, as on the type side (§5.2, §6). Each operand is a member selection over types of its own (`arch.Types.Named("Program").Methods.Named("Main")`), several or-joined, and is resolved and subtracted on §4.6's terms. It is the exemption form for a member a law must not reach when no name or kind picks it out of the subject alone
 - `.Where(pred, description:)` — description verbatim — canonicalized to sentence-final (§6)
 
 **Member modal verbs** (turn a `MemberSelection` into a terminal `Constraint`):
@@ -1988,7 +1998,8 @@ carries its sugar overload too, or the verb silently stops compiling after the s
   because the reader must see they are different `Order`s.
 - **Member subjects** (§4.6) assemble as the member head prefixes + `{kind-plural} of
   {selection-reference}` + the inline adjectives in authoring order + the sentence-final
-  `Where`. The kind-plural is the
+  `Where` and `Except` clauses, every `Where` before every `Except` as on the type side, the member
+  `Except` rendering each payload in reference position. The kind-plural is the
   projection head ("methods", "properties", …); the `{selection-reference}` is the underlying
   type selection rendered in *reference* position (the same "types in `MyApp.Web.*`" / "the Web
   layer" form a target list uses), so a member subject reads "methods of types in `MyApp.Web.*`".
@@ -2279,12 +2290,19 @@ carries its sugar overload too, or the verb silently stops compiling after the s
     treats a property set to nothing as unset, so either way the rule asks for something no
     project can declare and reds every evaluated project. One code for both, since both fail in
     that one direction; the label says which was left out.
+34. A member `Except` payload of another single kind than the selection it subtracts from
+    (`` `Except` on '{id}' takes fields from methods, so it removes nothing: no member is both.
+    Project the payload with `.Methods` or `.Members`. ``). No member is two kinds at once, so the
+    exclusion is a no-op its author did not mean; a `.Members` selection on either side holds every
+    kind and clashes with none. Reported at the rule's location, at every nesting depth.
 
 Item 5 also reaches the member escape-hatch descriptions: a blank or multi-line member `Where`
 (`Func<IMemberInfo,bool>`) or member `Must` description is caught by the same prose walk,
 which descends through a member constraint's subject and verb (§4.6) — and the
 project escape-hatch descriptions the same way: a project `Must` description, and project
-`Where` descriptions wherever the subject nests one, `Except` payloads included (§4.10).
+`Where` descriptions wherever the subject nests one, `Except` payloads included (§4.10). A member
+`Except` payload (§4.6) is walked as the subject is, at every nesting depth: its type selection
+reaches items 10, 15, 16, 19 and 27, and its own member adjectives items 5, 14 and 15.
 
 Every walk in this catalog descends through a union (§5.1) on both axes — its operands *and* its
 own adjectives — so `AnyOf(a, b).Where(p, "")` reaches item 5, `AnyOf(a, b).InNamespace("")`
@@ -2327,10 +2345,10 @@ is already a unique greppable string).
 All-errors-at-once is a deliberate divergence from EF Core's fail-fast `ModelValidator`: an
 agent fixing a spec sees every problem in one pass.
 
-**Reported at the literal as well.** Items 1, 5, 7, 9, 11, 15, 16, 23 to 26, 30 and 31 are decided by
+**Reported at the literal as well.** Items 1, 5, 7, 9, 11, 15, 16, 23 to 26 and 30 to 33 are decided by
 string literals alone, with no model and no codebase behind them, so the contract package also carries
 a Roslyn analyzer that reports them as compiler warnings on the literal while the spec is being
-written, in the editor and in `dotnet build`. Their diagnostic IDs run from `SR1000` to `SR1031`, one
+written, in the editor and in `dotnet build`. Their diagnostic IDs run from `SR1000` to `SR1033`, one
 per kind of literal error (an unanchored subtree pattern is `SR1017`),
 and the message is the item's sentence without its `on '{id}'` clause, since the warning's location
 already says which literal. One owner in the contract decides each of these verdicts for both
@@ -2470,7 +2488,8 @@ this catalog.
   under either join. `MustSetProperty` takes exactly its pair, a name and a value: a property holds
   one value in a build, so neither operand admits a list. `Except` carries the pair on the type stratum (several
   exclusions are the union `AnyOf` mints, and the `Type` sugar rides beside it exactly as on the
-  dependency verbs, §3.3) and stays single-operand on the project stratum, where `.Named(a, b)` and `.Matching(a, b)` already
+  dependency verbs, §3.3), carries it on the member stratum with the list held as the payloads
+  themselves, no union behind it (§5.7), and stays single-operand on the project stratum, where `.Named(a, b)` and `.Matching(a, b)` already
   say "either of these" and no `AnyOf` exists to desugar a list to.
 - **Anchor-form triples.** A single-type anchor position ships `Type` / `string` / `<T>`
   together — the compile-checked `typeof`, the §5.2 no-reference escape hatch, and the
@@ -2609,7 +2628,8 @@ Elsewhere: a family whose cells are the matches
 of one namespace pattern (ArchUnit's `(*)` capture) — no consumer, the field's families being
 projects and the corpus's declared layers; an intersection
 combinator (`arch.AnyOf` is union only; `Except` covers difference); unions of *member*
-selections (the projections compose over a union subject already); a layered-architecture
+selections (the projections compose over a union subject already, and a member `Except` takes its
+payloads as a list, §5.7); a layered-architecture
 macro for the ordering half (the coverage half is `MustBelongTo`, the independence half is
 `arch.Each(…).MustNotReferenceEachOther()`, the no-order law — peers that may reference each
 other but not in a circle — is `arch.Each(…).MustNotHaveCircularReferences()`, and ordering

@@ -52,7 +52,8 @@ public sealed class EvaluatorFailClosedTests
         var selections = new SelectionEvaluator(EmptyCodebase);
         HashSet<TypeNode> sourceTypes = selections.Evaluate(memberSelection.Source, SelectionPosition.Subject);
 
-        var ex = Should.Throw<InvalidOperationException>(() => MemberSelectionEvaluator.Resolve(memberSelection, sourceTypes));
+        var ex = Should.Throw<InvalidOperationException>(() =>
+            MemberSelectionEvaluator.Resolve(memberSelection, sourceTypes, selections));
         ex.Message.ShouldBe("Unhandled member adjective 'UnknownMemberAdjective'.");
     }
 

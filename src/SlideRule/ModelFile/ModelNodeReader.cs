@@ -517,6 +517,12 @@ internal sealed class ModelNodeReader
         return value is null ? null : ReadMemberSelection(value, Field(key));
     }
 
+    internal IReadOnlyList<MemberSelection>? RequiredMemberSelections(StrictJsonValue obj, string where, string key)
+    {
+        StrictJsonValue? array = RequiredArray(obj, where, key);
+        return array is null ? null : Each(array, element => ReadMemberSelection(element, EntryOf(key)));
+    }
+
     internal ProjectSelection? RequiredProjectSelection(StrictJsonValue obj, string where, string key)
     {
         StrictJsonValue? value = Required(obj, where, key);

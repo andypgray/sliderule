@@ -342,6 +342,51 @@ public sealed class MemberSubjectVerbTests
         Pass(MembersModel, arch => arch.Namespace("App.Members.*").Methods.WithNameMatching("*Async").MustBePublic());
     }
 
+    // ── the exclusion adjective ───────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Except_SubtractsEveryMemberAnyPayloadNames()
+    {
+        // MustBeStatic reds every instance method, so the failures are what the subtraction left: two payloads,
+        // each drawn from types of its own, remove what either names.
+        FailedMemberIds(MembersModel, arch => arch.Namespace("App.Members.*").Methods
+                .Except(arch.Types.Named("Widget").Methods, arch.Types.Named("Machine").Methods.Named("Spin", "Cycle"))
+                .MustBeStatic())
+            .ShouldBe(["M:App.Members.Machine.Idle"]);
+    }
+
+    [Fact]
+    public void Except_AMembersPayload_RemovesMethodsFromAMethodSubject()
+    {
+        // A .Members payload carries no single kind, so it takes the methods it holds out of a method subject.
+        FailedMemberIds(MembersModel, arch => arch.Namespace("App.Members.*").Methods
+                .Except(arch.Types.Named("Widget").Members)
+                .MustBeStatic())
+            .ShouldBe(["M:App.Members.Machine.Cycle", "M:App.Members.Machine.Idle", "M:App.Members.Machine.Spin"]);
+    }
+
+    [Fact]
+    public void Except_ANestedExceptInAPayload_LeavesItsMembersInTheSubject()
+    {
+        // The payload is Widget's methods except Walk, so Walk stays in the subject and the rest of Widget leaves.
+        FailedMemberIds(MembersModel, arch => arch.Types.Named("Widget").Methods
+                .Except(arch.Types.Named("Widget").Methods.Except(arch.Types.Named("Widget").Methods.Named("Walk")))
+                .MustBeStatic())
+            .ShouldBe(["M:App.Members.Widget.Walk"]);
+    }
+
+    [Fact]
+    public void Except_RemovingEveryMember_FailsOnTheEmptyMemberSubject()
+    {
+        RuleResult result = Checker.Run(MembersModel, arch =>
+                arch.Rule("member/x")
+                    .Enforce(arch.Types.Named("Widget").Methods.Except(arch.Types.Named("Widget").Members).MustBeStatic())
+                    .Because("b"))
+            .Single();
+
+        result.ShouldHaveFailedWithDetail(ViolationKind.EmptySubject, ConstraintEvaluator.EmptyMemberSubjectMessage);
+    }
+
     // ── accessibility adjectives ──────────────────────────────────────────────────────────────────────
 
     [Fact]
@@ -1060,6 +1105,26 @@ public sealed class MemberSubjectVerbTests
         // construction surfaces as a RuleError, not a crash.
         var arch = new Arch();
         Constraint constraint = arch.Namespace("App.Async.*").Methods.Returning(typeof(Task<int>))
+            .MustHaveSuffix("Async");
+        ArchitectureModel model = Checker.HandBuilt("naming/x", constraint);
+
+        RuleResult result = ArchChecker.Check(model, AsyncModel)
+            .Single();
+
+        result.ShouldHaveFailedWithDetail(
+            ViolationKind.RuleError,
+            "`Task<Int32>` is a closed generic construction; member return-type matching is definition-level. " +
+            "Anchor on the open definition instead.");
+    }
+
+    [Fact]
+    public void Except_AClosedGenericReturningInAPayload_IsARuleErrorAtCheckTime()
+    {
+        // Spec build refuses this too, since item 14's walk reaches a payload; the backstop resolves the payload
+        // while the subject is resolved, so the refusal surfaces from there as a RuleError, not a crash.
+        var arch = new Arch();
+        Constraint constraint = arch.Namespace("App.Async.*").Methods
+            .Except(arch.Types.Methods.Returning(typeof(Task<int>)))
             .MustHaveSuffix("Async");
         ArchitectureModel model = Checker.HandBuilt("naming/x", constraint);
 

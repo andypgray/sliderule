@@ -86,6 +86,21 @@ public sealed class DeadSubjectMemberNameTests
     }
 
     [Fact]
+    public void ADeadNameInAnExceptPayload_IsNotRead()
+    {
+        // An exemption's dead name exempts nothing, which leaves the rule stricter, not unmeasured.
+        Checker.Run(Model, arch =>
+                arch.Rule("members/named")
+                    .Enforce(arch.Namespace("App.*").Methods
+                        .Except(arch.Types.Named("Program").Methods.Named("Main", "Ghost"))
+                        .MustBeStatic())
+                    .Because("b"))
+            .Single()
+            .MemberShapeSubjects()
+            .ShouldBe(["M:App.Program.Helper", "M:App.Worker.Run"]);
+    }
+
+    [Fact]
     public void AListWhoseEveryNameMatched_ReachesTheVerb()
     {
         // A name reaches every member carrying it across the subject's types, overloads and all.

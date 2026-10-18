@@ -15,4 +15,11 @@ internal abstract class MemberAdjective
 
     /// <summary>The rendered fragment, including its leading separator (e.g. <c> returning `Task`</c>).</summary>
     internal abstract string Fragment { get; }
+
+    /// <summary>
+    ///     Whether the fragment opens an <c>Except</c> parenthetical it leaves for the composer to close
+    ///     (GRAMMAR §6) — the member twin of <see cref="SelectionAdjective.OpensParenthetical" />, true for
+    ///     <see cref="MemberExceptAdjective" /> alone.
+    /// </summary>
+    internal virtual bool OpensParenthetical => false;
 }

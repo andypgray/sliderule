@@ -346,6 +346,12 @@ internal static class ParityRemainderSpec
             .Enforce(arch.Types.Named("Methods").Methods.WithPrefix("Fixed").MustBeVirtual())
             .Because("A hook is the point this type is extended at; without one the extension has to fork it.");
 
+        arch.Rule("remainder/members-are-static-but-the-exempt")
+            .Enforce(arch.Types.Named("Methods").Methods.WithPrefix("Instance")
+                .Except(arch.Types.Named("Methods").Methods.Named("Loud"))
+                .MustBeStatic())
+            .Because("A factory that needs an instance to call cannot be the way that instance is made.");
+
         arch.Rule("remainder/members-are-overridable")
             .Enforce(arch.Types.Named("Methods").Methods.WithPrefix("Fixed").MustBeOverridable())
             .Because("A host extends this type by deriving from it, which a plain method rules out.");

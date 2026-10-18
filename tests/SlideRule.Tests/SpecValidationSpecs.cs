@@ -1547,3 +1547,52 @@ internal sealed class BlankMemberNamedSpec : IArchitectureSpec
         arch.Rule("area/rule").Enforce(arch.Types.Methods.Named("Main", " ").MustBeStatic()).Because("Reason.");
     }
 }
+
+internal sealed class MemberExceptKindClashSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        arch.Rule("area/rule").Enforce(arch.Types.Methods.Except(arch.Types.Fields.Named("State")).MustBeStatic()).Because("Reason.");
+    }
+}
+
+internal sealed class ForeignMemberExceptPayloadSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        var other = new Arch();
+        arch.Rule("area/rule")
+            .Enforce(arch.Types.Methods.Except(other.Types.Methods.Named("Main")).MustBeStatic())
+            .Because("Reason.");
+    }
+}
+
+internal sealed class FamilyInMemberExceptPayloadSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        Layer dispatch = arch.Layer("Dispatch", "Ops.Dispatch.*");
+        Layer tracking = arch.Layer("Tracking", "Ops.Tracking.*");
+        arch.Rule("area/rule")
+            .Enforce(arch.Types.Methods.Except(arch.Each(dispatch, tracking).Methods.Named("Main")).MustBeStatic())
+            .Because("An Except payload is a set to subtract, not a partition.");
+    }
+}
+
+internal sealed class BlankNameInMemberExceptPayloadSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        arch.Rule("area/rule").Enforce(arch.Types.Methods.Except(arch.Types.Methods.Named(" ")).MustBeStatic()).Because("Reason.");
+    }
+}
+
+internal sealed class BlankWhereInMemberExceptPayloadSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        arch.Rule("area/rule")
+            .Enforce(arch.Types.Methods.Except(arch.Types.Methods.Where(m => m.IsAsync, " ")).MustBeStatic())
+            .Because("Reason.");
+    }
+}

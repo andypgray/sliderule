@@ -1412,7 +1412,8 @@ internal sealed class ConstraintEvaluator
         // MemberConstraint.Subject IS MemberSubject.Source, so the subject the gate already resolved IS
         // this member selection's source types — read from there rather than evaluated a second time. The
         // members themselves take the set alone: a member verb is shape-only, with no edge to attribute.
-        IReadOnlyList<MemberNode> members = MemberSelectionEvaluator.Resolve(constraint.MemberSubject, sourceTypes);
+        IReadOnlyList<MemberNode> members =
+            MemberSelectionEvaluator.Resolve(constraint.MemberSubject, sourceTypes, _selections);
         if (members.Count == 0)
             return (
             [

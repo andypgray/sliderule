@@ -261,5 +261,12 @@ internal enum SpecValidationErrorCode
     ///     treats a property set to nothing as unset, so either way the rule asks for something no project can
     ///     declare and fails every project it reads.
     /// </summary>
-    BlankProperty
+    BlankProperty,
+
+    /// <summary>
+    ///     A member selection's <c>Except</c> given a payload of another single kind, such as fields taken from a
+    ///     method selection. No member is two kinds at once, so the exclusion removes nothing; project the payload
+    ///     with the selection's own kind, or with <c>.Members</c>, which holds every kind.
+    /// </summary>
+    MemberExceptKindDisjoint
 }

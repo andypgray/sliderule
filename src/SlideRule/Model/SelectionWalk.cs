@@ -28,6 +28,32 @@ internal static class SelectionWalk
         foreach (Selection operand in constraint.Operands)
         foreach (Selection selection in ExpandSelection(operand))
             yield return selection;
+
+        // A member subject's own source is Constraint.Subject, walked above; each of its Except payloads draws
+        // its members from a type selection of its own, which every walk over this one must reach too.
+        if (constraint is MemberConstraint member)
+            foreach (MemberSelection payload in MemberExceptPayloads(member.MemberSubject))
+            foreach (Selection selection in ExpandSelection(payload.Source))
+                yield return selection;
+    }
+
+    /// <summary>
+    ///     Every member selection nested under <paramref name="selection" />'s <c>Except</c> adjectives, in
+    ///     authoring order, each followed by the payloads it nests in turn — the selection itself excluded.
+    /// </summary>
+    internal static IEnumerable<MemberSelection> MemberExceptPayloads(MemberSelection selection)
+    {
+        foreach (MemberAdjective adjective in selection.Adjectives)
+        {
+            if (adjective is not MemberExceptAdjective except) continue;
+
+            foreach (MemberSelection payload in except.Payloads)
+            {
+                yield return payload;
+
+                foreach (MemberSelection nested in MemberExceptPayloads(payload)) yield return nested;
+            }
+        }
     }
 
     /// <summary>

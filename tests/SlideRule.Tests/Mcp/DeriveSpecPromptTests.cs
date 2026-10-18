@@ -29,7 +29,7 @@ public sealed class DeriveSpecPromptTests
     /// <summary>
     ///     Ceiling on the body every <c>prompts/get</c> serves, in the same UTF-16 code units
     ///     <see cref="string.Length" /> counts. First set at 69,500 — the 69,418 measured that day,
-    ///     rounded up to the next 500 — and standing at 70,000 since 2026-09-22.
+    ///     rounded up to the next 500 — and standing at 70,250 since 2026-10-17.
     /// </summary>
     /// <remarks>
     ///     The recipe arrives whole at every kickoff, before the reader has done anything, and it only grew
@@ -37,7 +37,7 @@ public sealed class DeriveSpecPromptTests
     ///     this was set. Each of those figures was measured on its date and none of them gated anything, so
     ///     every addition was free. That is what this constant changes, and the reason it was set close
     ///     rather than generously.
-    ///     Raised once, to 70,000 on 2026-09-22, and what it bought is the accessibility adjectives
+    ///     Raised first to 70,000 on 2026-09-22, and what that bought is the accessibility adjectives
     ///     (<c>.ThatArePublic()</c> / <c>.ThatAreInternal()</c> / <c>.ThatArePrivate()</c>, GRAMMAR §5.2)
     ///     with the <c>Except</c> idiom that is the only way to spell their negation. The ceiling had 50
     ///     characters of headroom, so the vocabulary alone did not fit, and the floor below says
@@ -53,6 +53,11 @@ public sealed class DeriveSpecPromptTests
     ///         would restore the zero headroom that made each of the three additions before the rewrite pay for
     ///         itself with a trim.
     ///     </para>
+    ///     <para>
+    ///         Raised to 70,250 on 2026-10-17, after five restated sentences were cut, for the member vocabulary
+    ///         an extensibility contract is written in: the six accessibility adjectives, <c>MustBeProtected</c>,
+    ///         <c>MustBeOverridable</c>, and member <c>Named</c> and <c>Except</c>.
+    ///     </para>
     ///     <see cref="DeriveSpecVocabularyTests" /> holds the other side as a floor on content — every
     ///     shipped constraint verb and adjective must be named in the prose outside the generated table —
     ///     so vocabulary can never be the thing that gets cut here.
@@ -67,7 +72,7 @@ public sealed class DeriveSpecPromptTests
     ///         codebases rather than by a character count.
     ///     </para>
     /// </remarks>
-    private const int ServedBodyCeiling = 70_000;
+    private const int ServedBodyCeiling = 70_250;
 
     // The text only the receipt's fence carries, which picks that fence out of the recipe's others.
     private const string ReceiptMarker = "curation: pending";

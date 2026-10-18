@@ -248,6 +248,21 @@ internal sealed class NodeWriter
         WriteProjectSelection(selection);
     }
 
+    internal void MemberSelections(string key, IReadOnlyList<MemberSelection> selections)
+    {
+        if (Refused) return;
+
+        Key(key);
+        BeginArray();
+        foreach (MemberSelection selection in selections)
+        {
+            Element();
+            WriteMemberSelection(selection);
+        }
+
+        EndArray();
+    }
+
     internal void Operands(IReadOnlyList<Selection> operands)
     {
         if (Refused) return;

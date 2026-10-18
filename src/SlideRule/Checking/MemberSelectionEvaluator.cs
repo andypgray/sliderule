@@ -19,19 +19,48 @@ internal static class MemberSelectionEvaluator
     /// <summary>
     ///     The declared members the selection ranges over, deterministically ordered, taken from a
     ///     source-type set the caller has already evaluated in subject position (so a union member subject
-    ///     is not evaluated twice). Throws <see cref="RuleEvaluationException" /> when a <c>Returning</c>
-    ///     anchor is a closed generic construction (the check-time backstop for GRAMMAR §8 item 14) — the
+    ///     is not evaluated twice). An <c>Except</c> payload's source is resolved through
+    ///     <paramref name="selections" />, since nothing has evaluated it yet. Throws
+    ///     <see cref="RuleEvaluationException" /> when a <c>Returning</c> anchor, the selection's own or a
+    ///     payload's, is a closed generic construction (the check-time backstop for GRAMMAR §8 item 14) — the
     ///     checker surfaces it as a <see cref="ViolationKind.RuleError" /> rather than crashing the run.
     /// </summary>
-    internal static IReadOnlyList<MemberNode> Resolve(MemberSelection selection, HashSet<TypeNode> sourceTypes)
+    internal static IReadOnlyList<MemberNode> Resolve(
+        MemberSelection selection, HashSet<TypeNode> sourceTypes, SelectionEvaluator selections)
     {
-        IEnumerable<MemberNode> members = sourceTypes.SelectMany(type => type.Members).Where(KindFilter(selection.Kind));
-        foreach (MemberAdjective adjective in selection.Adjectives) members = ApplyAdjective(members, adjective);
-
-        return members
+        return Narrowed(selection, sourceTypes, selections)
             .OrderBy(member => member.DeclaringTypeFullName, StringComparer.Ordinal)
             .ThenBy(member => member.SymbolId, StringComparer.Ordinal)
             .ToList();
+    }
+
+    // The members a selection keeps, unordered: its source's declared members of its kind, then each adjective
+    // in authoring order. Every adjective that can throw does so while the chain is built, before anything is
+    // enumerated, so a caller that never enumerates still meets the fault.
+    private static IEnumerable<MemberNode> Narrowed(
+        MemberSelection selection, IEnumerable<TypeNode> sourceTypes, SelectionEvaluator selections)
+    {
+        IEnumerable<MemberNode> members = sourceTypes.SelectMany(type => type.Members).Where(KindFilter(selection.Kind));
+        foreach (MemberAdjective adjective in selection.Adjectives) members = ApplyAdjective(members, adjective, selections);
+
+        return members;
+    }
+
+    // What an Except removes (GRAMMAR §5.7): every member any payload names. Each payload's source resolves
+    // where an exclusion stands, in target position, as a type-side Except payload does (GRAMMAR §4.1), and the
+    // payload's own adjectives, nested Excepts included, narrow it from there. Built eagerly, so a payload whose
+    // adjective cannot be evaluated throws during resolution exactly as the subject's own would. Subtraction is
+    // by node: a member is one MemberNode wherever a selection reaches it.
+    private static HashSet<MemberNode> Excluded(IReadOnlyList<MemberSelection> payloads, SelectionEvaluator selections)
+    {
+        var excluded = new HashSet<MemberNode>();
+        foreach (MemberSelection payload in payloads)
+        {
+            HashSet<TypeNode> sources = selections.Evaluate(payload.Source, SelectionPosition.Target);
+            excluded.UnionWith(Narrowed(payload, sources, selections));
+        }
+
+        return excluded;
     }
 
     private static Func<MemberNode, bool> KindFilter(MemberKindFilter kind)
@@ -46,7 +75,8 @@ internal static class MemberSelectionEvaluator
         };
     }
 
-    private static IEnumerable<MemberNode> ApplyAdjective(IEnumerable<MemberNode> current, MemberAdjective adjective)
+    private static IEnumerable<MemberNode> ApplyAdjective(
+        IEnumerable<MemberNode> current, MemberAdjective adjective, SelectionEvaluator selections)
     {
         switch (adjective)
         {
@@ -76,6 +106,9 @@ internal static class MemberSelectionEvaluator
                 return current.Where(member => member.IsStatic);
             case MemberAccessibilityAdjective accessibility:
                 return current.Where(member => member.Accessibility == accessibility.Accessibility);
+            case MemberExceptAdjective except:
+                HashSet<MemberNode> excluded = Excluded(except.Payloads, selections);
+                return current.Where(member => !excluded.Contains(member));
             case MemberWhereAdjective where:
                 return current.Where(member => SelectionEvaluator.InvokePredicate(where.Predicate, member, "Where"));
             default:

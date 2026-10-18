@@ -309,6 +309,14 @@ internal static class NodeReaders
         map.Add(Key<MemberThatAreStaticAdjective>(),
             (r, v) => r.OnlyKeys(v, MemberAdjectiveWhere, "node") ? new MemberThatAreStaticAdjective() : null);
 
+        map.Add(Key<MemberExceptAdjective>(), (r, v) =>
+        {
+            if (!r.OnlyKeys(v, MemberAdjectiveWhere, "node", "payloads")) return null;
+
+            IReadOnlyList<MemberSelection>? payloads = r.RequiredMemberSelections(v, MemberAdjectiveWhere, "payloads");
+            return payloads is null ? null : new MemberExceptAdjective(payloads);
+        });
+
         map.Add(Key<MemberAccessibilityAdjective>(), (r, v) =>
         {
             if (!r.OnlyKeys(v, MemberAdjectiveWhere, "node", "accessibility")) return null;

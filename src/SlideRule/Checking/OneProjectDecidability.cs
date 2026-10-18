@@ -154,7 +154,7 @@ internal static class OneProjectDecidability
             if (WalkSelection(operand, operandPosition) is { } operandReason)
                 return operandReason;
 
-        if (constraint is MemberConstraint member) return WalkMemberSubject(member.MemberSubject);
+        if (constraint is MemberConstraint member) return WalkMemberSubject(member.MemberSubject, subjectPosition);
 
         if (constraint is ProjectConstraint project)
             return WalkProjectSelection(project.ProjectSubject, OneProjectPosition.Conservative);
@@ -231,17 +231,29 @@ internal static class OneProjectDecidability
         return bans ? OneProjectPolarity.Banning : OneProjectPolarity.Exempting;
     }
 
-    // The member subject's source is not walked here: it is the constraint's own subject, handed up as
-    // MemberConstraint.Subject, which ReasonAgainst has already walked. Neither the member selections, their
-    // adjectives nor the project hierarchy holds a position-sensitive row, so the position they are read at
-    // is not observable and they take the conservative reading.
-    private static string? WalkMemberSubject(MemberSelection subject)
+    // The member subject's own source is not walked here: it is the constraint's own subject, handed up as
+    // MemberConstraint.Subject, which ReasonAgainst has already walked. An Except payload's source is the one
+    // type selection a member selection nests, so it is walked here, at the position an exclusion stands in
+    // (AsExceptPayload) — a project noun there spares by plain membership and is out on DeclarerReason, as on
+    // the type side. No member node holds a position-sensitive row, so the member selections and their
+    // adjectives answer the same at whatever position they are read.
+    private static string? WalkMemberSubject(MemberSelection subject, OneProjectPosition position)
     {
-        if (Row(subject, OneProjectPosition.Conservative) is { } shape) return shape;
+        if (Row(subject, position) is { } shape) return shape;
 
         foreach (MemberAdjective adjective in subject.Adjectives)
-            if (Row(adjective, OneProjectPosition.Conservative) is { } reason)
-                return reason;
+        {
+            if (Row(adjective, position) is { } reason) return reason;
+
+            if (adjective is not MemberExceptAdjective except) continue;
+
+            OneProjectPosition payloadPosition = position.AsExceptPayload();
+            foreach (MemberSelection payload in except.Payloads)
+            {
+                if (WalkSelection(payload.Source, payloadPosition) is { } sourceReason) return sourceReason;
+                if (WalkMemberSubject(payload, payloadPosition) is { } payloadReason) return payloadReason;
+            }
+        }
 
         return null;
     }
@@ -408,7 +420,8 @@ internal static class OneProjectDecidability
             typeof(ReturningAdjective),
             typeof(MemberAttributedWithAdjective),
             typeof(MemberThatAreStaticAdjective),
-            typeof(MemberAccessibilityAdjective));
+            typeof(MemberAccessibilityAdjective),
+            typeof(MemberExceptAdjective));
     }
 
     private static void AddProjectAdjectives(Dictionary<Type, Func<OneProjectPosition, string?>> rows)

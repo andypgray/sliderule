@@ -441,6 +441,17 @@ public class VocabularyFragmentTests
     }
 
     [Fact]
+    public void Member_Except_RendersEachPayloadInReferencePosition()
+    {
+        // An open parenthetical the composer closes; several payloads or-join, each a member phrase of its own.
+        SentenceRenderer.MemberSubject(Arch.Types.Methods.Except(Arch.Types.Named("Program").Methods.Named("Main")))
+            .ShouldBe("Methods of types, except `Main` methods of types named `Program`");
+        SentenceRenderer.MemberSubject(Arch.Types.Methods.Except(
+                Arch.Types.Named("Program").Methods.Named("Main"), Arch.Types.Named("Worker").Members))
+            .ShouldBe("Methods of types, except `Main` methods of types named `Program` or members of types named `Worker`");
+    }
+
+    [Fact]
     public void Member_AccessibilityAdjectives_PremodifyTheKindPlural()
     {
         // All six declared levels, where the type side carries three; each prefix names the one level it

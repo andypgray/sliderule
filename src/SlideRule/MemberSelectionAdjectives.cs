@@ -278,6 +278,24 @@ public static class MemberSelectionAdjectives
     }
 
     /// <summary>
+    ///     Narrows the selection by removing every member the given member selections name, such as
+    ///     <c>arch.Types.Methods.Except(arch.Types.Named("Program").Methods.Named("Main"))</c>, which keeps
+    ///     every method but <c>Program.Main</c>. Several exclusions remove the members any one of them names,
+    ///     and at least one is required. Each exclusion is a member selection in its own right, drawn from its
+    ///     own types, so it can name members of types the selection never reaches, and a <c>.Members</c>
+    ///     exclusion removes members of every kind. An exclusion of a different single kind than this
+    ///     selection, such as fields from a method selection, removes nothing and is reported when the spec is
+    ///     loaded. The exclusion is rendered last in the rule's sentence, after any <see cref="Where{TSelf}" />
+    ///     on the same selection: "methods of types, except `Main` methods of types named <c>Program</c>".
+    /// </summary>
+    public static TSelf Except<TSelf>(this TSelf selection, MemberSelection first, params MemberSelection[] more)
+        where TSelf : MemberSelection
+    {
+        IReadOnlyList<MemberSelection> payloads = OperandList.OneOrMore(first, more, exclusion => exclusion);
+        return Append(selection, new MemberExceptAdjective(payloads));
+    }
+
+    /// <summary>
     ///     Narrows the selection with a predicate of your own, for what the member adjectives cannot say:
     ///     <c>arch.Types.Methods.Where(m =&gt; m.Parameters.Count &gt; 5, description: "with over 5 parameters")</c>.
     ///     The predicate reads the facts on <see cref="IMemberInfo" />, its

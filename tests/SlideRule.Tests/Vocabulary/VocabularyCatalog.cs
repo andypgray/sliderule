@@ -183,6 +183,8 @@ internal static class VocabularyCatalog
                 arch => arch.Types.Methods.ThatAreProtectedInternal()),
             MemberAdjective(nameof(MemberSelectionAdjectives.ThatArePrivateProtected),
                 arch => arch.Types.Methods.ThatArePrivateProtected()),
+            MemberAdjective(nameof(MemberSelectionAdjectives.Except),
+                arch => arch.Types.Methods.Except(arch.Types.Named("Program").Methods.Named("Main"))),
             MemberAdjective(nameof(MemberSelectionAdjectives.Where),
                 arch => arch.Types.Methods.Where(member => member.IsAsync, description: "that are async"))
         ];

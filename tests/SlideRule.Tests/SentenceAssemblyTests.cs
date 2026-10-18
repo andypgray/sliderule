@@ -1441,6 +1441,58 @@ public class SentenceAssemblyTests
     }
 
     [Fact]
+    public void MemberExcept_IsAParenthetical_TheVerbCloses()
+    {
+        SentenceRenderer.Sentence(Arch.Types.Methods
+                .Except(Arch.Types.Named("Program").Methods.Named("Main"))
+                .MustBeStatic())
+            .ShouldBe("Methods of types, except `Main` methods of types named `Program`, must be static.");
+    }
+
+    [Fact]
+    public void MemberExcept_RendersAfterAMemberWhere_WhateverTheChainOrder()
+    {
+        // The member stratum's sentence-final group orders as the type side's does: a Where written after the
+        // Except still describes the subject, never the exception.
+        SentenceRenderer.MemberSubject(Arch.Types.Methods
+                .Except(Arch.Types.Named("Program").Methods.Named("Main"))
+                .Where(m => m.IsAsync, "that are async"))
+            .ShouldBe("Methods of types that are async, except `Main` methods of types named `Program`");
+    }
+
+    [Fact]
+    public void MemberExcept_ANestedPayload_EndsOpen_AndTheVerbClosesIt()
+    {
+        SentenceRenderer.Sentence(Arch.Types.Methods
+                .Except(Arch.Types.Named("Worker").Methods.Except(Arch.Types.Named("Worker").Methods.Named("Run")))
+                .MustBeStatic())
+            .ShouldBe("Methods of types, except methods of types named `Worker`, except `Run` methods of types named "
+                      + "`Worker`, must be static.");
+    }
+
+    [Fact]
+    public void MemberExcept_APenultimatePayloadThatEndsOpen_IsClosedBeforeTheOr()
+    {
+        SentenceRenderer.MemberSubject(Arch.Types.Methods
+                .Except(
+                    Arch.Types.Named("Worker").Methods.Except(Arch.Types.Named("Worker").Methods.Named("Run")),
+                    Arch.Types.Named("Program").Methods.Named("Main")))
+            .ShouldBe("Methods of types, except methods of types named `Worker`, except `Run` methods of types named "
+                      + "`Worker`, or `Main` methods of types named `Program`");
+    }
+
+    [Fact]
+    public void MemberExcept_AfterATypeSideExcept_CarriesItsOwnComma()
+    {
+        // The type reference ends open, and the member clause after it opens with the comma that closes it.
+        SentenceRenderer.Sentence(Arch.Types.Except(Arch.Types.Named("Program"))
+                .Methods.Except(Arch.Types.Named("Worker").Methods.Named("Run"))
+                .MustBeStatic())
+            .ShouldBe("Methods of types, except types named `Program`, except `Run` methods of types named `Worker`, "
+                      + "must be static.");
+    }
+
+    [Fact]
     public void MemberNamed_StacksWithTheOtherHeadPrefixes_InAuthoringOrder()
     {
         SentenceRenderer.MemberSubject(Arch.Types.Methods.ThatArePublic()

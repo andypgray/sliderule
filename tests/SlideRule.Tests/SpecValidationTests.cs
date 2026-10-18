@@ -121,6 +121,13 @@ public class SpecValidationTests
     [InlineData(typeof(DeadExemplarPatternSpec), nameof(Code.UnanchoredSubtreePattern), "area/rule")]
     [InlineData(typeof(BlankExemplarWhereSpec), nameof(Code.BlankProse), "area/rule")]
     [InlineData(typeof(UndefinedLifetimeExemplarSpec), nameof(Code.UndefinedLifetime), "area/rule")]
+    // A member Except payload is a member selection with a type selection of its own, and every walk the
+    // subject takes reaches it: its source's Arch, a family standing there, its blank names and its blank
+    // member Where descriptions (GRAMMAR §8 items 5, 10, 15, 27).
+    [InlineData(typeof(ForeignMemberExceptPayloadSpec), nameof(Code.ForeignSelection), "area/rule")]
+    [InlineData(typeof(FamilyInMemberExceptPayloadSpec), nameof(Code.FamilyMisplaced), "area/rule")]
+    [InlineData(typeof(BlankNameInMemberExceptPayloadSpec), nameof(Code.BlankPattern), "area/rule")]
+    [InlineData(typeof(BlankWhereInMemberExceptPayloadSpec), nameof(Code.BlankProse), "area/rule")]
     public void Validate_FailingSpec_ReportsItsCodeAndRuleId(Type specType, string codeName, string ruleId)
     {
         // By name, because the error-code enum is internal and a public theory cannot take it as a parameter.
@@ -567,6 +574,19 @@ public class SpecValidationTests
 
         ex.ShouldHaveError(Code.BlankPattern, "area/rule")
             .Message.ShouldBe("SpecValidationSpecs.cs:267: Blank member suffix on 'area/rule'.");
+    }
+
+    [Fact]
+    public void MemberExceptKindDisjoint_FieldsFromMethods_IsRefusedWithTheCure()
+    {
+        // GRAMMAR §8 item 34: no member is both a field and a method, so the exclusion removes nothing; the
+        // message names both kinds and the two projections that would make it mean something.
+        SpecValidationException ex = BuildExpectingFailure(new MemberExceptKindClashSpec());
+
+        ex.ShouldHaveError(Code.MemberExceptKindDisjoint, "area/rule")
+            .Message.ShouldBe(
+                "SpecValidationSpecs.cs:1555: `Except` on 'area/rule' takes fields from methods, so it removes "
+                + "nothing: no member is both. Project the payload with `.Methods` or `.Members`.");
     }
 
     [Fact]

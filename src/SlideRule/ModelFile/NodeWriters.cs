@@ -164,6 +164,7 @@ internal static class NodeWriters
         Add<MemberAttributedWithAdjective>(arms, (w, a) => w.ConstructionAnchor("anchor", a.Anchor));
         Add<MemberThatAreStaticAdjective>(arms, (_, _) => { });
         Add<MemberAccessibilityAdjective>(arms, (w, a) => w.EnumField("accessibility", a.Accessibility));
+        Add<MemberExceptAdjective>(arms, (w, a) => w.MemberSelections("payloads", a.Payloads));
     }
 
     private static void AddProjectAdjectives(Dictionary<Type, Action<NodeWriter, object>> arms)

@@ -439,6 +439,7 @@ line.
 | `.ThatArePrivate` | `()` | Private fields of types |
 | `.ThatAreProtectedInternal` | `()` | Protected internal methods of types |
 | `.ThatArePrivateProtected` | `()` | Private protected methods of types |
+| `.Except` | `(MemberSelection, …)` | Methods of types, except `Main` methods of types named `Program` |
 | `.Where` | `(Func<IMemberInfo, bool>, string)` | Methods of types that are async |
 
 | Verb | Overloads | Fragment |
@@ -540,7 +541,8 @@ have no type-side twin, `MustBeGetOnly()` chains only off
 superset). `.ThatAreStatic()` prefixes the subject head ("static fields of ..."), as does each
 accessibility adjective, which on members also has `.ThatAreProtected()`, `.ThatAreProtectedInternal()`
 and `.ThatArePrivateProtected()`, each matching its level exactly; `.Named(name, ...)` picks
-members by exact name ("`Main` methods of ..."). The flagship:
+members by exact name ("`Main` methods of ..."), and `.Except(memberSelection, ...)` exempts members a
+name alone cannot: `.Methods.Except(arch.Types.Named("Program").Methods.Named("Main"))`. The flagship:
 `web.Methods.Returning(typeof(Task)).MustHaveSuffix("Async")` — *"Methods of types in `MyApp.Web.*`
 returning `Task` must be named `*Async`."* `arch.Projects` names the solution's projects as build
 artifacts, not sets of types (`arch.Project(name)` is the unrelated type noun).
@@ -564,8 +566,7 @@ adjectives, the `Must[Not]Implement` / `Must[Not]DeriveFrom` / `Must[Not]BeAttri
 verbs, and `.Returning` / `MustAcceptParameter` on a member subject — is the escape hatch
 for a type the spec project cannot compile against, and it renders
 byte-identically to the `typeof()` form. Reach for it whenever a reference on the spec project
-would be the only reason to add one, and *always* for a **.NET shared framework** type such as an
-MVC `ControllerBase`, which no build setting can stage into a spec's output. It anchors fine either
+would be the only reason to add one, and always for a shared-framework type (step 2). It anchors fine either
 way: only an external **subject** carries a shallow hierarchy, while a declared subject's base chain
 and interface closure are walked through metadata, so
 `arch.Types.DerivedFrom("Microsoft.AspNetCore.Mvc.ControllerBase")` selects your controllers. A
@@ -644,7 +645,7 @@ narrower catch or a derived throw, which is the good state — and the three cat
 same (source, caught) edge, so a baseline entry means the same thing under any of them.
 `Implementing`/`DerivedFrom`
 are transitive with type-argument substitution; an open generic (`typeof(IHandler<>)`)
-matches any construction. `AttributedWith` sees declared attributes only. The `MustNot*`
-hierarchy verbs share these three matchers, negated per subject over the anchor list (a
+matches any construction. The `MustNot*`
+hierarchy verbs share these and `AttributedWith`'s matcher, negated per subject over the anchor list (a
 subject reds iff it matches ANY anchor). Closed generics are
 refused in reference positions — ban the open definition and/or the argument type.

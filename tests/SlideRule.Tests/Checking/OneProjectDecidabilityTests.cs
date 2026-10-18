@@ -293,7 +293,7 @@ public sealed class OneProjectDecidabilityTests
     [Fact]
     public void Classify_AProjectNounThatBans_IsDecidable()
     {
-        // Arrange — the four positions where membership decides who is IN trouble. One compilation's
+        // Arrange — the positions where membership decides who is IN trouble. One compilation's
         // membership is a subset of the whole solution's, so each of these can only miss a type and report
         // fewer violations than the check does, which is the direction the build tier is allowed to err in.
         (string Shape, Func<Arch, Constraint> Rule)[] banning =
@@ -303,7 +303,13 @@ public sealed class OneProjectDecidabilityTests
                 arch => arch.Project("App.Data").MustNotReference(arch.Namespace("App.Web.*"))),
             ("the subject of an inbound ban",
                 arch => arch.Project("App.Domain").MustNotBeReferencedBy(arch.Namespace("App.Web.*"))),
-            ("a ban's operand", arch => arch.Types.MustNotReference(arch.Project("App.Data")))
+            ("a ban's operand", arch => arch.Types.MustNotReference(arch.Project("App.Data"))),
+            // A payload's own payload subtracts from an exemption, which puts its members back under the law,
+            // so the polarity flips back and a project noun there bans like a subject's.
+            ("the source of a member Except payload's own payload",
+                arch => arch.Types.Methods
+                    .Except(arch.Types.Methods.Except(arch.Project("App.Data").Methods.Named("Run")))
+                    .MustBeStatic())
         ];
 
         // Act + Assert
@@ -327,7 +333,11 @@ public sealed class OneProjectDecidabilityTests
                 arch => arch.Namespace("App.Web.*").Except(arch.Project("App.Data"))
                     .MustNotReference(arch.Namespace("App.Domain.*"))),
             ("in an Except payload of a ban's operand",
-                arch => arch.Types.MustNotReference(arch.Namespace("App.Domain.*").Except(arch.Project("App.Data"))))
+                arch => arch.Types.MustNotReference(arch.Namespace("App.Domain.*").Except(arch.Project("App.Data")))),
+            // A member Except payload draws its members from a type selection standing where the exclusion
+            // stands, so a project noun there spares by plain membership exactly as a type-side payload's does.
+            ("as the source of a member Except payload",
+                arch => arch.Types.Methods.Except(arch.Project("App.Data").Methods).MustBeStatic())
         ];
 
         // Act + Assert
@@ -503,6 +513,12 @@ public sealed class OneProjectDecidabilityTests
                 arch => arch.Types.Methods.Returning(typeof(Task), typeof(Task<>)).MustHaveSuffix("Async")),
             ("MemberMustAcceptParameter", arch => arch.Types.Methods.WithSuffix("Async")
                 .MustAcceptParameter<CancellationToken>()),
+            ("a member convention narrowed by accessibility and name",
+                arch => arch.Types.Fields.ThatArePrivate().Named("_state", "_cache").MustBeProtected()),
+            ("an overridability law with a member Except over a plain payload",
+                arch => arch.Namespace("App.Web.*").Methods.ThatArePublic()
+                    .Except(arch.Types.Named("Program").Methods.Named("Main"))
+                    .MustBeOverridable()),
             ("MustOnlyReferenceItself on a plain subject",
                 arch => arch.Namespace("App.Domain.*").MustOnlyReferenceItself()),
             ("MustOnlyBeReferencedByItself on a plain subject",

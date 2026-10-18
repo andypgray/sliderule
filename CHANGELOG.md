@@ -48,6 +48,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   of a method included, and reads as a prefix ("`Main` methods of types named `Program`"). Where it
   narrows a rule's subject, each name no member carries fails the rule naming it, as a type `Named` list
   does. A blank name is reported as `SR1016`.
+- `.Except(memberSelection, ...)` on a member selection removes every member the given member selections
+  name, so `arch.Types.Methods.Except(arch.Types.Named("Program").Methods.Named("Main"))` exempts one
+  entry point from a naming law without exempting its type. Each exclusion draws from types of its own,
+  several remove what any one names, and one of another single kind than the selection, such as fields
+  taken from methods, removes nothing and is refused when the spec is loaded.
 - The extraction cache starts over once after this upgrade, because each project's evaluation now records
   the properties the solution sets, and each member whether it overrides.
 - `check --json` and `arch_check` carry a `framework` key on each `MustOnlyTarget` violation, naming

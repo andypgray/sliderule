@@ -506,6 +506,27 @@ public class ModelReificationTests
     }
 
     [Fact]
+    public void MemberExcept_ReifiesItsPayloadsAsMemberSelections_InAuthoringOrder()
+    {
+        // No union node on the member stratum: the adjective holds the payload list itself, each payload a
+        // member selection over its own source, so a payload's kind survives for the kind-clash check.
+        var constraint = Checker.Model(arch => arch.Rule("naming/entry-points")
+                .Enforce(arch.Namespace("MyApp.*").Methods
+                    .Except(arch.Types.Named("Program").Methods.Named("Main"), arch.Types.Named("Startup").Members)
+                    .MustHaveSuffix("Async"))
+                .Because("Every method but the framework-fixed ones is awaited."))
+            .Rules.Single()
+            .Constraint
+            .ShouldBeOfType<MemberMustHaveSuffixConstraint>();
+
+        MemberExceptAdjective except = constraint.MemberSubject.Adjectives.OfType<MemberExceptAdjective>()
+            .ShouldHaveSingleItem();
+        except.Payloads.Select(payload => payload.Kind)
+            .ShouldBe([MemberKindFilter.Method, MemberKindFilter.Any]);
+        constraint.MemberSubject.ShouldBeOfType<MethodSelection>();
+    }
+
+    [Fact]
     public void AccessibilityAdjective_ReifiesOntoTheMemberSelection_CarryingItsLevel()
     {
         // One node carries all six levels, the member twin of the type-side accessibility node.
