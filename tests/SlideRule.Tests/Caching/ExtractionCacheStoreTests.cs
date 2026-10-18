@@ -107,6 +107,10 @@ public sealed class ExtractionCacheStoreTests
     // lock policy or package reference declared in a props file imported from a sibling directory replays sited
     // at the project file, where a fresh extraction cites the props file's own line.
     [InlineData(37)]
+    // A v38 cache predates leaving out a .NET install kept inside the solution (schema bumped 38→39): a repository
+    // with its own .dotnet/ replays the SDK's defaults among its projects' properties, so MustSetProperty would
+    // pass a value nobody in the repository set where a fresh extraction reds it.
+    [InlineData(38)]
     public void ReadAndValidate_SchemaVersionOtherThanTheCurrentOne_ReturnsMiss(int schemaVersion)
     {
         // Arrange
@@ -136,7 +140,7 @@ public sealed class ExtractionCacheStoreTests
 
         version.ShouldNotBeNull("the extraction cache still declares a schema version");
         version.GetRawConstantValue()
-            .ShouldBe(38);
+            .ShouldBe(39);
     }
 
     [Fact]

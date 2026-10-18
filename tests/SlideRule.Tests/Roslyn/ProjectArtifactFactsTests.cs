@@ -415,6 +415,47 @@ public sealed class ProjectArtifactFactsTests
     }
 
     [Fact]
+    public void EvaluateAll_AnSdkInsideTheSolutionsDirectory_RecordsNoneOfItsDefaults()
+    {
+        // A repository that keeps its own .NET install in its tree, an Arcade-style .dotnet/ or a global.json
+        // sdk.paths entry, has every SDK props and targets file under the solution's directory and outside its
+        // package roots. The installed SDK is put in that position by naming a solution file at its root, which the
+        // project reads back from NetCoreRoot. Every property recorded is then one the repository wrote.
+        using TempDirectory temp = TestTempRoot.Fresh("artifact-facts-sdk-inside-solution");
+        string directoryProps = temp.WriteFile(["Directory.Build.props"], """
+                                                                          <Project>
+                                                                              <PropertyGroup>
+                                                                                  <LangVersion>latest</LangVersion>
+                                                                              </PropertyGroup>
+                                                                          </Project>
+                                                                          """);
+        string projectFile = temp.WriteFile(["App", "App.csproj"], """
+                                                                   <Project Sdk="Microsoft.NET.Sdk">
+                                                                       <PropertyGroup>
+                                                                           <TargetFramework>net10.0</TargetFramework>
+                                                                           <SdkRoot>$(NetCoreRoot)</SdkRoot>
+                                                                       </PropertyGroup>
+                                                                   </Project>
+                                                                   """);
+        FragmentProperty sdkRoot = Set(EvaluatedFacts(projectFile).ShouldNotBeNull().Properties, "SdkRoot").ShouldNotBeNull();
+        sdkRoot.Value.ShouldNotBeEmpty("the SDK names the install it was resolved from");
+        string solutionFile = Path.Combine(sdkRoot.Value, "Repository.sln");
+
+        // Act
+        ProjectArtifactFacts facts = EvaluatedFacts(projectFile, solutionFile).ShouldNotBeNull();
+
+        // Assert
+        facts.Properties.Declared
+            .Select(property => property.Site.File)
+            .Distinct()
+            .ShouldBe([directoryProps, projectFile], ignoreOrder: true);
+        Set(facts.Properties, "OutputType").ShouldBeNull(customMessage: "an SDK default is nobody's declaration");
+        Set(facts.Properties, "LangVersion").ShouldBe(new FragmentProperty("LangVersion", "latest", new FragmentSite(directoryProps, 3)));
+        Set(facts.Properties, "TargetFramework").ShouldBe(new FragmentProperty("TargetFramework", "net10.0", new FragmentSite(projectFile, 3)));
+        facts.TargetFrameworksSite.ShouldBe(new FragmentSite(projectFile, 3));
+    }
+
+    [Fact]
     public void EvaluateAll_ProjectReferences_AreTheDeclaredOnesThatReferenceTheirOutput()
     {
         // One plain reference and one that only orders the build. Neither target file exists: evaluation

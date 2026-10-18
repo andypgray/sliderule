@@ -58,8 +58,15 @@ internal static class ProjectFactsEvaluator
     // The two spellings of a project's frameworks, in the order ReadTargetFrameworks tries them.
     private static readonly string[] FrameworkProperties = ["TargetFrameworks", "TargetFramework"];
 
-    // The two properties naming where a project's packages' own files sit, which ForeignRoots reads.
-    private static readonly string[] PackageRootProperties = ["MSBuildProjectExtensionsPath", "NuGetPackageRoot"];
+    // The properties naming where files sit that are not the repository's, which ForeignRoots reads: a project's
+    // packages' own files, the .NET install the SDK was resolved from (its sdk, packs and workload manifests), and
+    // the MSBuild toolset with the SDKs beside it. Each names a location rather than an import chain, because the
+    // repository's own Directory.Build.props is imported by the SDK's Microsoft.Common.props.
+    private static readonly string[] ForeignRootProperties =
+    [
+        "MSBuildProjectExtensionsPath", "NuGetPackageRoot", "NetCoreRoot", "MSBuildExtensionsPath", "MSBuildToolsPath",
+        "MSBuildSDKsPath"
+    ];
 
     // The most shards one batch is split into. Binding runs beside the batch and wants the rest of the machine:
     // past four shards it slows by as much as evaluation speeds up.
@@ -423,14 +430,15 @@ internal static class ProjectFactsEvaluator
         return new FragmentProperties(projectSite, declared);
     }
 
-    // The directories under the solution that hold packages' files rather than the repository's own: the restore
-    // output the project imports its packages' props through, the global package folder where a repository has
-    // put it inside the tree, and the packages folder packages.config restores into beside the solution. Each is
-    // split into segments, so a containment test cannot match a sibling that merely shares the name.
+    // The directories under the solution that hold files other than the repository's own: the restore output the
+    // project imports its packages' props through, the global package folder where a repository has put it inside
+    // the tree, a .NET install or MSBuild toolset kept in the tree (an Arcade-style .dotnet/, a global.json
+    // sdk.paths entry), and the packages folder packages.config restores into beside the solution. Each is split
+    // into segments, so a containment test cannot match a sibling whose name begins with the same text.
     private static IReadOnlyList<string[]> ForeignRoots(Project project, string solutionDirectory)
     {
         var roots = new List<string[]>();
-        foreach (string name in PackageRootProperties)
+        foreach (string name in ForeignRootProperties)
         {
             string value = project.GetPropertyValue(name);
             if (value.Length == 0) continue;
@@ -529,7 +537,9 @@ internal static class ProjectFactsEvaluator
     // but they name a directory on whichever machine ran the build. Each file is decided once, because an
     // evaluation holds hundreds of declarations from a handful of files. A null solution is the cone alone.
     private sealed class RepositoryDeclarations(
-        IReadOnlySet<string> projectCone, string[]? solution, IReadOnlyList<string[]> foreignRoots)
+        IReadOnlySet<string> projectCone,
+        string[]? solution,
+        IReadOnlyList<string[]> foreignRoots)
     {
         private readonly Dictionary<string, bool> owned = new(StringComparer.Ordinal);
 
