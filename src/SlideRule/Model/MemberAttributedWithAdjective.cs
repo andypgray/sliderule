@@ -11,7 +11,8 @@ namespace SlideRule.Model;
 ///     A head prefix, never the type side's inline clause: <c>arch.Types.AttributedWith(X).Methods</c>
 ///     renders "methods of types attributed with `[X]`", and the member fact must not read like that for
 ///     <c>arch.Types.Methods.AttributedWith(X)</c>, a different subject. Prefixing keeps the fact attached
-///     to the noun it narrows, as <see cref="AuthoredAdjective" /> does for the same ambiguity.
+///     to the noun it narrows, as <see cref="AuthoredAdjective" /> does, and keeps the " of " join a trailing
+///     clause would switch to " declared in ".
 /// </remarks>
 internal sealed class MemberAttributedWithAdjective(TypeAnchor anchor) : MemberAdjective
 {

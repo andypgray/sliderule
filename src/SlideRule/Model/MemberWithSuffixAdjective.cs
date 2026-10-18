@@ -8,7 +8,8 @@ namespace SlideRule.Model;
 /// </summary>
 /// <remarks>
 ///     A head prefix where the type side's twin is an inline clause, for member <see cref="MemberNamedAdjective" />'s
-///     reason: an inline " named `*Async`" after the type reference would read as naming the types.
+///     reason: the affix is the members' own and premodifies them, and the prefix keeps the " of " join, where a
+///     trailing " named `*Async`" would switch the subject to " declared in ".
 /// </remarks>
 internal sealed class MemberWithSuffixAdjective(string suffix) : MemberAdjective
 {

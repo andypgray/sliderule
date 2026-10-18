@@ -8,10 +8,14 @@ namespace SlideRule.Model;
 ///     the exact name, matched ordinally, with no <c>*</c> reading.
 /// </summary>
 /// <remarks>
-///     A head prefix where the type side's twin is an inline clause, because a member subject renders its type
-///     selection in reference position: an inline " named `Main`" after "methods of types in <c>MyApp.*</c>"
-///     would read as naming the types. Prefixing puts the names on the members they select, and they
-///     concatenate with the other member prefixes in authoring order.
+///     A head prefix where the type side's twin is an inline clause. A member subject renders its trailing
+///     clauses on the kind-plural and then joins its types with " declared in "
+///     (<c>SentenceRenderer.MemberPhrase</c>, GRAMMAR §6), so no member fragment can land after the type
+///     reference. The names are a prefix because they are the members' own, so they premodify the noun they
+///     narrow as the static and attribute prefixes do, and because a prefix keeps the short " of " join:
+///     "`Main` methods of types in <c>MyApp.*</c>", where a trailing clause would read "methods named `Main`
+///     declared in types in <c>MyApp.*</c>". The names concatenate with the other member prefixes in
+///     authoring order.
 /// </remarks>
 internal sealed class MemberNamedAdjective(IReadOnlyList<string> names) : MemberAdjective
 {

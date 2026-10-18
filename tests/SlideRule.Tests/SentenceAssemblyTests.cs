@@ -1427,9 +1427,9 @@ public class SentenceAssemblyTests
     [Fact]
     public void MemberAttributedWith_AndTypeAttributedThenProjected_RenderDifferentSentences()
     {
-        // THE disambiguation pin — the whole reason the member adjective premodifies. Two different subjects
-        // (every method of an attributed type, versus the attributed methods of any type); an inline member
-        // fragment would give them one byte-identical sentence.
+        // THE disambiguation pin: two different subjects (every method of an attributed type, versus the
+        // attributed methods of any type) must never render alike. The prefix keeps the member fact on the
+        // members, while the type-side clause follows the reference.
         string typeAttributed = SentenceRenderer.MemberSubject(Arch.Types.AttributedWith(typeof(ApiControllerAttribute))
             .Methods);
         string memberAttributed = SentenceRenderer.MemberSubject(Arch.Types.Methods.AttributedWith(typeof(ApiControllerAttribute)));

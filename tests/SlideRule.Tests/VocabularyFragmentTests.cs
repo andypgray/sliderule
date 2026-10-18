@@ -443,8 +443,8 @@ public class VocabularyFragmentTests
     [Fact]
     public void Member_Named_PremodifiesTheKindPluralWithTheNames()
     {
-        // A head prefix where the type side's Named is an inline clause: after the type reference, " named
-        // `Main`" would read as naming the types.
+        // A head prefix where the type side's Named is an inline clause: the name premodifies the members and
+        // keeps the " of " join, where a trailing clause would switch the subject to " declared in ".
         SentenceRenderer.MemberSubject(Arch.Types.Methods.Named("Main"))
             .ShouldBe("`Main` methods of types");
         SentenceRenderer.MemberSubject(Arch.Types.Methods.Named("Main", "Run"))
@@ -454,7 +454,7 @@ public class VocabularyFragmentTests
     [Fact]
     public void Member_NameAffixesAndGlob_PremodifyTheKindPlural()
     {
-        // Member Named's reason: after the type reference, " named `*Async`" would read as naming the types.
+        // Member Named's reason: the affix premodifies the members and keeps the " of " join.
         SentenceRenderer.Sentence(Arch.Types.Methods.WithSuffix("Async")
                 .MustBePublic())
             .ShouldBe("`*Async` methods of types must be public.");

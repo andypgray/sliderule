@@ -1849,8 +1849,8 @@ form cannot reach, because a string anchor still names one definition rather tha
 
 **Member adjectives** (narrow the member set; each one's placement in the sentence is given beside it, §6):
 
-- `.WithSuffix("Async")` / `.WithPrefix("Get")` / `.WithNameMatching("*Handler*")` — head prefix naming the members: "`*Async` methods of types in `MyApp.*`", "`Get*` methods of types", "`*Handler*` members of types". The affixes are literal and the glob is a §4.2 pattern, both over the member's own name. A head prefix where the type-side twins are inline clauses, for member `Named`'s reason: an inline " named `*Async`" after the type reference would read as naming the types, and `arch.Types.Methods.WithSuffix("Speak")` and `arch.Types.WithSuffix("Speak").Methods` would render one sentence for two different subjects
-- `.Named("Main")` — head prefix naming the members: "`Main` methods of types named `Program`", "`Main` or `Run` methods of types". The exact name, ordinal, reaching every overload of a method, with a `*` read as a literal character, as on the type side (§5.2). A head prefix where the type-side twin is an inline clause, because an inline " named `Main`" after the type reference would read as naming the types. Each name of a subject's list that no member carries fails on its own (§4.6)
+- `.WithSuffix("Async")` / `.WithPrefix("Get")` / `.WithNameMatching("*Handler*")` — head prefix naming the members: "`*Async` methods of types in `MyApp.*`", "`Get*` methods of types", "`*Handler*` members of types". The affixes are literal and the glob is a §4.2 pattern, both over the member's own name. A head prefix where the type-side twins are inline clauses, for member `Named`'s reason, so the two attachment sites read apart: "`*Speak` methods of types" for `arch.Types.Methods.WithSuffix("Speak")`, "methods of types named `*Speak`" for `arch.Types.WithSuffix("Speak").Methods`
+- `.Named("Main")` — head prefix naming the members: "`Main` methods of types named `Program`", "`Main` or `Run` methods of types". The exact name, ordinal, reaching every overload of a method, with a `*` read as a literal character, as on the type side (§5.2). A head prefix where the type-side twin is an inline clause: the name is the members' own, so it premodifies the kind-plural beside the other member prefixes and keeps the " of " join, where a trailing clause would switch the subject to " declared in " ("methods named `Main` declared in types in `MyApp.*`", §6). Each name of a subject's list that no member carries fails on its own (§4.6)
 - `.Returning(typeof(Task))` / `.Returning("System.Threading.Tasks.Task")` — declaration-level (§4.6); an open generic renders declared type-parameter names ("returning `Task<TResult>`"); multiple anchors join "returning `Task` or `Task<TResult>`", colliding simple names widening as in §6; the string form is §5.2's escape hatch, rendering byte-identically. Methods-only. A trailing clause on the kind-plural: the subject joins its types with "declared in" rather than "of", so the clause sits between the two nouns and cannot be read as narrowing the types: "methods returning `Task` declared in types in `MyApp.Web.*`" (§6)
 - `.AttributedWith(typeof(McpServerToolAttribute))` / `.AttributedWith("ModelContextProtocol.Server.McpServerToolAttribute")` — head prefix: "`[McpServerTool]`-attributed" — premodifies the kind-plural (§6), so the subject reads "`[McpServerTool]`-attributed methods of types in `SlideRule.*`". Declared member attributes only (§4.6); the string form is §5.2's escape hatch, rendering byte-identically
 - `.ThatAreStatic()` — head prefix: "static" — premodifies the kind-plural (§6), so the subject reads "static fields of the Core layer". A member **shape** adjective (§11); head prefixes stack across families and concatenate in authoring order
@@ -1879,14 +1879,14 @@ member-only vocabulary.
 The member attribute vocabulary (`AttributedWith` + `Must[Not]BeAttributedWith`) reads the
 §4.6 attribute facts. The **verbs** reuse the
 type-side fragments verbatim — verb position is unambiguous, so there is nothing to
-disambiguate. The **adjective** cannot: an inline " attributed with" clause would render
-the type-side adjective before a projection and the member adjective after one as **one
-byte-identical sentence** for two different subjects — every method of an attributed type,
-versus the attributed methods of any type — and both attachment sites are live in real
-specs. So the member adjective is a **head prefix**, on the same grounds as `.Authored()`
-(§5.2, §6) and for the same reference-position ambiguity: its fragment premodifies the kind-plural
-("`[McpServerTool]`-attributed methods of types in `SlideRule.*`"), and the two
-subjects can never render alike. Stacked member head prefixes **concatenate** in authoring
+disambiguate. The **adjective** does not: both attachment sites are live in real specs —
+every method of an attributed type, versus the attributed methods of any type — and two
+selections with different verdicts must not render alike. So the member adjective is a
+**head prefix**, as `.Authored()` is (§5.2, §6): its fragment premodifies the kind-plural
+("`[McpServerTool]`-attributed methods of types in `SlideRule.*`") beside the other member
+prefixes and keeps the " of " join (§6), while the type-side clause follows the reference
+("methods of types attributed with `[McpServerTool]`"). Stacked member head prefixes
+**concatenate** in authoring
 order, as the type side's do (§6): "`[ApiController]`-attributed `[Audit]`-attributed methods
 of types". Two attribute adjectives are an intersection, and a sentence that dropped one would
 describe a wider subject than the checker uses. A repeated member prefix renders each time,

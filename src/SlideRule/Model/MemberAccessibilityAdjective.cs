@@ -9,7 +9,7 @@ namespace SlideRule.Model;
 ///     six builder methods over one fact.
 /// </summary>
 /// <remarks>
-///     A head prefix for the reference-position reason <see cref="MemberThatAreStaticAdjective" /> gives,
+///     A head prefix for the reason <see cref="MemberThatAreStaticAdjective" /> gives,
 ///     concatenating with the other member prefixes in authoring order. The match is exact on the declared
 ///     accessibility, so <c>ThatAreProtected()</c> leaves the <c>protected internal</c> and
 ///     <c>private protected</c> members out, and the fragment names the level it matched.
