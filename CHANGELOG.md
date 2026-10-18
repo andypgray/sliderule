@@ -33,6 +33,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   CONTRIBUTING, `.editorconfig` and analyzer configuration whole, quotes each statement that becomes
   a rule from the raw file (with `curl` or `gh api`) rather than from a fetch tool's summary, and
   reads docs written for another major version at the tag or commit the code is at.
+- Before the `derive_spec` recipe calls a red rule debt, the agent re-reads its statement from raw
+  text, dates it against the code, and opens a sample of the rule's sites. A site the code marks as
+  deliberate, with a comment, a `#pragma`, a vendored-file banner or a maintainer's pull request,
+  becomes an `.Except` on an `Enforce` rule rather than `Migrate` debt. A statement the code or its
+  maintainers contest is dropped for you to decide, and its receipt line reads `dropped: <rule>:
+  contested: <evidence>`. Dragons prose is checked against the code or its history before it is
+  written.
 
 ## [0.1.2] - 2026-10-15
 

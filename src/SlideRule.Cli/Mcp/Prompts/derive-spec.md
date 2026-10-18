@@ -20,7 +20,7 @@ Architecture the team already wrote down outranks anything you infer, so collect
 4. **Quote from raw text.** A statement that becomes a rule is copied from the raw file, never from a fetch tool's summary: a summarising fetch can drop the sentence that carries the law. Use `curl -sL` on the raw URL, and `gh api` for a GitHub file, issue, pull request or discussion.
 5. **Keep the source with the statement.** A rule drawn from a page carries its URL as `.Citation(url)` (a scope: in its `Because`), and a layer's `.Purpose` is lifted from the line that describes it.
 
-**Already-stated intent wins over inference.** Where a statement and the code disagree, that disagreement is not noise: the statement describes the target and the code is the debt, which step 5 writes as `Migrate` and step 6 puts to the human.
+**Already-stated intent wins over inference, once re-read.** Where a statement and the code disagree, that disagreement is not noise. Before calling the code debt, re-read the statement from raw text with its whole paragraph, and date it against the code: `git log -1 --format=%cs -- <path>` on the statement's file and on the code it governs, or the forge's commit history for a page in another repository or a shallow clone. A statement the code contradicts at every site, with no conforming site, is a probable misreading or a stale statement until the re-read says otherwise. A statement that survives the re-read describes the target and the code is the debt, which step 5 writes as `Migrate` and step 6 puts to the human; one that does not is contested, and step 5 drops it for the human.
 
 **Done when** every source items 1 and 3 name has been looked for and every link is read or listed `unread`. The list becomes the receipt's `statedIntent:` lines; with no statement found and no docs link to list, that is the one line `statedIntent: none`.
 
@@ -183,7 +183,7 @@ Iterate selections until the failures that remain are *genuine* — real edges, 
 The step-4 counts decide each rule's posture, and the posture goes into the code now, not into a table: **`Enforce` carries no baseline**, so `baseline init` cannot capture an `Enforce` rule, and a red one stays red for good. For each rule:
 
 - **Zero violations → `Enforce`.** The codebase already obeys — on a complete model only: a check stamped `modelIncomplete` has *not observed* the rule. Keep the rule exactly as drafted.
-- **Violations → `Migrate`**, the default: it keeps the evidence and costs the team nothing until it decides. Rewrite as a pair:
+- **Violations → `Migrate`**, the default once the sites are read: it keeps the evidence and costs the team nothing until it decides. Before choosing it, open a sample of the rule's sites: a few, and every site where there are few. A site the code marks as deliberate is an exception, not debt: a comment saying why, a `#pragma`, a vendored-file banner, a maintainer's merged PR. Write it as `.Except(...)` on the subject; where nothing else is red, the rule stays `Enforce`. Only what remains goes to `Migrate`. Rewrite as a pair:
 
   ```csharp
   arch.Rule("data-access/no-inline-sql")
@@ -212,7 +212,7 @@ The step-4 counts decide each rule's posture, and the posture goes into the code
 
   **The boundary takes selections, not only types**, so a facade the spec cannot compile against is still law: `.BoundaryOnlyVia(arch.Types.Named("IBillingFacade", "BillingFacade"))` for an `internal` facade or one in a project the spec does not reference, `.BoundaryOnlyVia(arch.Namespace("MyApp.Legacy.Billing.Contracts.*"))` where the surface is a region. The formula does not care whether the surface is inside the scope or outside it, so a legacy region's one sanctioned *caller* is spelled the same way. Write that caller into the boundary rather than grandfathering it, or the rendered law will call your sanctioned entry point debt to burn down while the dragons prose says the opposite.
 
-  `Dragons` must carry three things: what the code does, **which weirdness is structural** (the behavior a "fix" would break), and the sanctioned interaction surface. "Don't touch, it's bad" is not dragons prose — agents still have to call into this code.
+  `Dragons` must carry three things: what the code does, **which weirdness is structural** (the behavior a "fix" would break), and the sanctioned interaction surface. "Don't touch, it's bad" is not dragons prose — agents still have to call into this code. Check each claim against the code or its history before writing it: every agent after you reads dragons prose as fact, so a claim the code contradicts is worse than none.
 
   A Quarantine desugars to two checkable rules under the scope ID: `{id}/containment` (red on any new reference into the scope not via the facade; existing inbound references get grandfathered in step 7) and `{id}/tripwire` (a diff-aware warning, *skipped* without `--diff-base`).
 
@@ -229,10 +229,11 @@ The step-4 counts decide each rule's posture, and the posture goes into the code
 
   `Dragons` carries the same three things a quarantine's does. A Caution desugars to one checkable rule, `{id}/tripwire`: nothing is ever red, and `render` puts the dragons on the scope's directory as a card. A caution that later gains a facade becomes a `Quarantine` under the same ID.
 
+- **A statement contested by the code or its maintainers → drop the rule**, with a reason opening `contested:` that names the evidence. Contested means stale against the code, applied by its maintainers more loosely than written, or contradicted at every site after step 0's re-read. It goes to the human in the curation table, posture `dropped`, and never to `Migrate`; its `statedIntent:` line still names the rule ID.
 - **Nothing the team would stand behind → drop the rule**, with the reason for `dropped:`. An unratified rule in the spec is exactly the stale-doc problem this tool exists to kill.
 - **Work the team has said it is doing now, or a rule step 4 left `undecided` → leave it as drafted** (`Enforce`, or the scope as written). The team has said so only in a stated-intent line or in the human's own words this session; a red with neither takes the posture its evidence sets, `Migrate`. Which of these reach `leftRed:` is the last check's to say, through the receipt's transcription rule.
 
-Then rebuild the spec project and run the whole check again. That document is what the receipt transcribes, and it is this step's test: every rule it shows with `posture: enforce` and `status: failed` must be one of the last bullet's two kinds. Any other is a miss: re-posture it, fence it or drop it, rebuild, and check again. A different posture you would argue for belongs in the curation table's note; the code carries the one the evidence set.
+Then rebuild the spec project and run the whole check again. That document is what the receipt transcribes, and it is this step's test: every rule it shows with `posture: enforce` and `status: failed` must be one of the last bullet's two kinds. Any other is a miss: re-posture it, fence it or drop it, rebuild, and check again. A different posture you would argue for belongs in the curation table's note; the code carries the one the evidence set, the sampled sites and the re-read statement included.
 
 **Done when** the last whole check passes that test.
 
@@ -289,6 +290,7 @@ postures: enforce 14 / migrate 6 / quarantine 2 / caution 1
 leftRed: layering/no-ghost: 3
 leftRed: data/legacy-sql: 1
 dropped: naming/handlers: no owner would stand behind it
+dropped: layering/domain-independent: contested: the model references Web at every site, and the page predates the Web project
 undecided: data/legacy-sql: subject could not be made to match; human to resolve
 curation: pending
 baseline: not run (human)
@@ -302,7 +304,7 @@ render: not run (human)
 - `leftRed:` is every entry with `posture: enforce` and `status: failed`, with its `violationCount`: the reds no baseline can hold. Each is work the team has said it is doing now, or an `undecided` rule; any other sends you back to step 5.
 - `evidencePass` reads `incomplete (failedProjects: …; restoreFailedProjects: …)` whenever that document was stamped `modelIncomplete`.
 - `statedIntent:` is the step-0 list, `<source>: "<statement>" -> <rule ID, or why none>`. Every developer-docs link appears on at least one line: as a source, as `read: <url> (no architecture stated)`, or as `unread: <url> (<why>)`.
-- `statedIntent`, `leftRed`, `dropped` and `undecided` repeat their key once per entry, `dropped` with the reason, and read `none` when there is nothing to list.
+- `statedIntent`, `leftRed`, `dropped` and `undecided` repeat their key once per entry, `dropped` with the reason (opening `contested:` for a contested statement), and read `none` when there is nothing to list.
 
 The receipt keeps three claims apart — that the spec builds, that the evidence pass ran on a complete model, and that a human curated — and none implies another, so the last three lines stay as written: you stop at the gate and cannot witness your own curation, and the two write commands are the human's. Beside the receipt, list each Migrate rule's current violation count and the dragons you documented.
 

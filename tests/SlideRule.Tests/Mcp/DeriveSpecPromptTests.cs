@@ -189,6 +189,26 @@ public sealed class DeriveSpecPromptTests
     }
 
     [Fact]
+    public async Task GetPrompt_DeriveSpec_ChecksARedBeforeCallingItDebt()
+    {
+        string text = await ServedRecipeAsync();
+
+        // Assert — a statement that disagreed with the code made the code the debt, and every red defaulted to
+        // Migrate, so a misread sentence, a statement older than the code it describes, a policy its maintainers apply
+        // more loosely than written, and an exception the code marks as deliberate all became debt to burn down. The
+        // recipe now re-reads and dates the statement, samples the rule's sites before choosing Migrate, writes a
+        // deliberate exception as an Except on an Enforce rule, drops a contested statement for the human, and has
+        // dragons prose checked against the code before it is written.
+        text.ShouldContain("re-read the statement from raw text with its whole paragraph, and date it against the code");
+        text.ShouldContain("probable misreading");
+        text.ShouldContain("open a sample of the rule's sites");
+        text.ShouldContain("A site the code marks as deliberate is an exception, not debt");
+        text.ShouldContain("Write it as `.Except(...)` on the subject; where nothing else is red, the rule stays `Enforce`");
+        text.ShouldContain("a reason opening `contested:`");
+        text.ShouldContain("Check each claim against the code or its history before writing it");
+    }
+
+    [Fact]
     public async Task GetPrompt_DeriveSpec_WarnsAtTheStepWhereEachTrapIsMet()
     {
         string text = await ServedRecipeAsync();
