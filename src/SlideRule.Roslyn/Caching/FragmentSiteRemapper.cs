@@ -187,20 +187,10 @@ internal static class FragmentSiteRemapper
         /// </summary>
         internal IReadOnlyList<FragmentPackageReference>? RemapPackages(IReadOnlyList<FragmentPackageReference>? packages)
         {
-            if (packages is null) return null;
-
-            List<FragmentPackageReference>? rebuilt = null;
-            for (var index = 0; index < packages.Count; index++)
-            {
-                FragmentPackageReference package = packages[index];
-                FragmentSite remapped = Remap(package.Site);
-                if (IsUnchanged(remapped, package.Site) && rebuilt is null) continue;
-
-                rebuilt ??= Carry(packages, index);
-                rebuilt.Add(package with { Site = remapped });
-            }
-
-            return rebuilt ?? packages;
+            return packages is null
+                ? null
+                : RemapEachSite(
+                    packages, static package => package.Site, static (package, site) => package with { Site = site });
         }
 
         /// <summary>
@@ -212,27 +202,39 @@ internal static class FragmentSiteRemapper
             if (properties is null) return null;
 
             FragmentSite projectFile = Remap(properties.ProjectFile);
-            IReadOnlyList<FragmentProperty> declared = properties.Declared;
-            List<FragmentProperty>? rebuilt = null;
-            for (var index = 0; index < declared.Count; index++)
-            {
-                FragmentProperty property = declared[index];
-                FragmentSite remapped = Remap(property.Site);
-                if (IsUnchanged(remapped, property.Site) && rebuilt is null) continue;
-
-                rebuilt ??= Carry(declared, index);
-                rebuilt.Add(property with { Site = remapped });
-            }
-
-            if (rebuilt is null && IsUnchanged(projectFile, properties.ProjectFile)) return properties;
-
-            return new FragmentProperties(projectFile, rebuilt ?? declared);
+            IReadOnlyList<FragmentProperty> declared = RemapEachSite(
+                properties.Declared,
+                static property => property.Site,
+                static (property, site) => property with { Site = site });
+            bool unchanged = ReferenceEquals(declared, properties.Declared)
+                             && IsUnchanged(projectFile, properties.ProjectFile);
+            return unchanged ? properties : new FragmentProperties(projectFile, declared);
         }
 
         private FragmentMember RemapMember(FragmentMember member)
         {
             IReadOnlyList<FragmentSite> sites = RemapSites(member.DeclarationSites);
             return ReferenceEquals(sites, member.DeclarationSites) ? member : member with { DeclarationSites = sites };
+        }
+
+        // The axes whose items are values carrying one site each: read it with siteOf, put the remapped one back with
+        // withSite.
+        private IReadOnlyList<T> RemapEachSite<T>(
+            IReadOnlyList<T> items, Func<T, FragmentSite> siteOf, Func<T, FragmentSite, T> withSite)
+        {
+            List<T>? rebuilt = null;
+            for (var index = 0; index < items.Count; index++)
+            {
+                T item = items[index];
+                FragmentSite site = siteOf(item);
+                FragmentSite remapped = Remap(site);
+                if (IsUnchanged(remapped, site) && rebuilt is null) continue;
+
+                rebuilt ??= Carry(items, index);
+                rebuilt.Add(withSite(item, remapped));
+            }
+
+            return rebuilt ?? items;
         }
 
         // The same list back where no site in it changed, so an untouched axis costs one pass and no

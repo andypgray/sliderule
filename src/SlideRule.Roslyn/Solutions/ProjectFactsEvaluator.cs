@@ -5,6 +5,7 @@ using Microsoft.Build.Evaluation;
 using SlideRule.Extraction;
 using SlideRule.Extraction.Fragments;
 using SlideRule.Internal;
+using SlideRule.Rendering;
 
 namespace SlideRule.Roslyn.Solutions;
 
@@ -57,6 +58,9 @@ internal static class ProjectFactsEvaluator
     // The two spellings of a project's frameworks, in the order ReadTargetFrameworks tries them.
     private static readonly string[] FrameworkProperties = ["TargetFrameworks", "TargetFramework"];
 
+    // The two properties naming where a project's packages' own files sit, which ForeignRoots reads.
+    private static readonly string[] PackageRootProperties = ["MSBuildProjectExtensionsPath", "NuGetPackageRoot"];
+
     // The most shards one batch is split into. Binding runs beside the batch and wants the rest of the machine:
     // past four shards it slows by as much as evaluation speeds up.
     private const int MaxShards = 4;
@@ -98,13 +102,14 @@ internal static class ProjectFactsEvaluator
         if (requests.Count == 0) return facts;
 
         IReadOnlyDictionary<string, string> solutionProperties = SolutionProperties(solutionFile);
+        string? solutionDirectory = solutionFile is { Length: > 0 } ? Path.GetDirectoryName(solutionFile) : null;
         IReadOnlyList<IReadOnlyList<int>> shards = Shards(requests, shardCount);
         try
         {
             var options = new ParallelOptions { CancellationToken = ct, MaxDegreeOfParallelism = shards.Count };
             Parallel.For(
                 0, shards.Count, options,
-                shard => EvaluateInto(facts, requests, shards[shard], solutionProperties, ct));
+                shard => EvaluateInto(facts, requests, shards[shard], solutionProperties, solutionDirectory, ct));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -185,6 +190,7 @@ internal static class ProjectFactsEvaluator
         IReadOnlyList<ProjectEvaluationRequest> requests,
         IReadOnlyList<int> shard,
         IReadOnlyDictionary<string, string> solutionProperties,
+        string? solutionDirectory,
         CancellationToken ct)
     {
         // Every project of the batch evaluates under the solution's properties, so the collection carries them:
@@ -203,7 +209,7 @@ internal static class ProjectFactsEvaluator
             (string, string?) key = (PathComparison.Fold(projectFile), request.TargetFramework);
             if (!evaluated.TryGetValue(key, out ProjectArtifactFacts? result))
             {
-                result = TryEvaluate(collection, cones, projectFile, request.TargetFramework);
+                result = TryEvaluate(collection, cones, projectFile, request.TargetFramework, solutionDirectory);
                 evaluated[key] = result;
             }
 
@@ -215,11 +221,12 @@ internal static class ProjectFactsEvaluator
         ProjectCollection collection,
         Dictionary<string, HashSet<string>> cones,
         string projectFile,
-        string? targetFramework)
+        string? targetFramework,
+        string? solutionDirectory)
     {
         try
         {
-            return Evaluate(collection, cones, projectFile, targetFramework);
+            return Evaluate(collection, cones, projectFile, targetFramework, solutionDirectory);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -231,7 +238,8 @@ internal static class ProjectFactsEvaluator
         ProjectCollection collection,
         Dictionary<string, HashSet<string>> cones,
         string projectFile,
-        string? targetFramework)
+        string? targetFramework,
+        string? solutionDirectory)
     {
         Dictionary<string, string>? globalProperties = targetFramework is { Length: > 0 }
             ? new Dictionary<string, string>(StringComparer.Ordinal) { ["TargetFramework"] = targetFramework }
@@ -259,7 +267,6 @@ internal static class ProjectFactsEvaluator
             IReadOnlyList<FragmentPackageReference> packages =
                 ReadPackageReferences(project, projectCone, projectSite);
             IReadOnlyList<string> projectReferences = ReadProjectReferences(project);
-            collection.GlobalProperties.TryGetValue("SolutionDir", out string? solutionDirectory);
             FragmentProperties properties = ReadProperties(project, projectCone, projectSite, solutionDirectory);
 
             return new ProjectArtifactFacts(
@@ -406,7 +413,14 @@ internal static class ProjectFactsEvaluator
     private static FragmentProperties ReadProperties(
         Project project, IReadOnlySet<string> projectCone, FragmentSite projectSite, string? solutionDirectory)
     {
-        IReadOnlyList<string> foreignRoots = ForeignRoots(project, solutionDirectory);
+        string[]? solution = null;
+        IReadOnlyList<string[]> foreignRoots = [];
+        if (solutionDirectory is { Length: > 0 })
+        {
+            solution = PathFormat.Segments(Path.GetFullPath(solutionDirectory));
+            foreignRoots = ForeignRoots(project, solutionDirectory);
+        }
+
         var admittedFiles = new Dictionary<string, bool>(StringComparer.Ordinal);
         var declared = new List<FragmentProperty>();
         foreach (ProjectProperty property in project.Properties)
@@ -416,7 +430,7 @@ internal static class ProjectFactsEvaluator
             if (!admittedFiles.TryGetValue(location.File, out bool admitted))
             {
                 admitted = IsUnderProjectCone(location.File, projectCone)
-                           || IsInsideSolution(location.File, solutionDirectory, foreignRoots);
+                           || (solution is not null && IsInsideSolution(location.File, solution, foreignRoots));
                 admittedFiles[location.File] = admitted;
             }
 
@@ -433,32 +447,29 @@ internal static class ProjectFactsEvaluator
     // The directories under the solution that hold packages' files rather than the repository's own: the restore
     // output the project imports its packages' props through, the global package folder where a repository has
     // put it inside the tree, and the packages folder packages.config restores into beside the solution. Each is
-    // folded and closed with a separator, so a prefix test cannot match a sibling that merely shares the name.
-    private static IReadOnlyList<string> ForeignRoots(Project project, string? solutionDirectory)
+    // split into segments, so a containment test cannot match a sibling that merely shares the name.
+    private static IReadOnlyList<string[]> ForeignRoots(Project project, string solutionDirectory)
     {
-        var roots = new List<string>();
-        foreach (string name in (string[])["MSBuildProjectExtensionsPath", "NuGetPackageRoot"])
+        var roots = new List<string[]>();
+        foreach (string name in PackageRootProperties)
         {
             string value = project.GetPropertyValue(name);
-            if (value.Length > 0) roots.Add(Path.GetFullPath(Path.Combine(project.DirectoryPath, value)));
+            if (value.Length == 0) continue;
+
+            string root = Path.GetFullPath(Path.Combine(project.DirectoryPath, value));
+            roots.Add(PathFormat.Segments(root));
         }
 
-        if (solutionDirectory is { Length: > 0 }) roots.Add(Path.Combine(solutionDirectory, "packages"));
-
-        return roots
-            .Select(root => PathComparison.Fold(Normalize(root)) + Path.DirectorySeparatorChar)
-            .ToList();
+        string packages = Path.GetFullPath(Path.Combine(solutionDirectory, "packages"));
+        roots.Add(PathFormat.Segments(packages));
+        return roots;
     }
 
-    private static bool IsInsideSolution(string file, string? solutionDirectory, IReadOnlyList<string> foreignRoots)
+    private static bool IsInsideSolution(string file, string[] solution, IReadOnlyList<string[]> foreignRoots)
     {
-        if (solutionDirectory is not { Length: > 0 }) return false;
-
-        string folded = PathComparison.Fold(Path.GetFullPath(file));
-        string solution = PathComparison.Fold(Normalize(solutionDirectory)) + Path.DirectorySeparatorChar;
-        if (!folded.StartsWith(solution, StringComparison.Ordinal)) return false;
-
-        return !foreignRoots.Any(root => folded.StartsWith(root, StringComparison.Ordinal));
+        string[] segments = PathFormat.Segments(Path.GetFullPath(file));
+        return PathFormat.IsWithin(solution, segments)
+               && !foreignRoots.Any(root => PathFormat.IsWithin(root, segments));
     }
 
     private static FragmentSite SiteOf(
