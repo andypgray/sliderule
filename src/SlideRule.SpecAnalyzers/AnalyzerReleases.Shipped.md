@@ -22,3 +22,13 @@ SR1026 | SlideRule | Warning | A counterpart name template has no {Name} placeho
 SR1030 | SlideRule | Warning | A citation is not an absolute http(s) URL
 SR1031 | SlideRule | Warning | A layer name is blank
 SR1093 | SlideRule | Warning | The SlideRule spec analyzer failed
+
+## Release 0.2.0
+
+### New Rules
+
+Rule ID | Category | Severity | Notes
+--------|----------|----------|-------
+SR1032 | SlideRule | Warning | A package pattern is blank
+SR1033 | SlideRule | Warning | A property name or value is blank
+SR1035 | SlideRule | Warning | A path glob is malformed

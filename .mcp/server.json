@@ -2,7 +2,7 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.andypgray/sliderule",
   "description": "A .NET architecture checker that enforces one C# spec and renders the same rules for coding agents.",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "repository": {
     "url": "https://github.com/andypgray/sliderule",
     "source": "github"
@@ -12,7 +12,7 @@
       "registryType": "nuget",
       "registryBaseUrl": "https://api.nuget.org/v3/index.json",
       "identifier": "SlideRule.Cli",
-      "version": "0.1.2",
+      "version": "0.2.0",
       "runtimeHint": "dnx",
       "transport": {
         "type": "stdio"

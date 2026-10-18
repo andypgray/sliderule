@@ -108,7 +108,7 @@
         "type": "Project",
         "dependencies": {
           "Microsoft.CodeAnalysis.CSharp": "[4.0.1, )",
-          "SlideRule": "[0.1.2, )"
+          "SlideRule": "[0.2.0, )"
         }
       }
     }

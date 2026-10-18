@@ -595,7 +595,7 @@
         "type": "Project",
         "dependencies": {
           "Microsoft.CodeAnalysis.CSharp": "[4.0.1, )",
-          "SlideRule": "[0.1.2, )"
+          "SlideRule": "[0.2.0, )"
         }
       },
       "sliderule.roslyn": {
@@ -606,8 +606,8 @@
           "Microsoft.CodeAnalysis": "[5.9.0, )",
           "Microsoft.CodeAnalysis.CSharp.Workspaces": "[5.9.0, )",
           "Microsoft.CodeAnalysis.Workspaces.MSBuild": "[5.9.0, )",
-          "SlideRule": "[0.1.2, )",
-          "SlideRule.Extraction": "[0.1.2, )"
+          "SlideRule": "[0.2.0, )",
+          "SlideRule.Extraction": "[0.2.0, )"
         }
       }
     }

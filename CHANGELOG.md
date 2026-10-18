@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-18
+
 ### Added
 
 - `MustTarget(framework)` states a framework floor: every selected project must target the framework,
@@ -234,7 +236,8 @@ renders the same rules as context for coding agents.
 - **Self-hosting.** This repository's own spec governs its code. CI runs every read command against it,
   and `render` keeps fifteen committed artifacts here current.
 
-[Unreleased]: https://github.com/andypgray/sliderule/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/andypgray/sliderule/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/andypgray/sliderule/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/andypgray/sliderule/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/andypgray/sliderule/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/andypgray/sliderule/releases/tag/v0.1.0

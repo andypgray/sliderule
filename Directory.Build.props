@@ -38,7 +38,7 @@
          does anything else, and reports a difference as its fault warning, SR2093 or SR1093, instead of
          checking. -->
     <PropertyGroup>
-        <Version>0.1.2</Version>
+        <Version>0.2.0</Version>
         <AssemblyVersion>1.0.0.0</AssemblyVersion>
         <!-- FileVersion defaults to AssemblyVersion, not to Version (Microsoft.NET.GenerateAssemblyInfo
              .targets), so pinning one would silently pin both. Restated from Version, with any prerelease
