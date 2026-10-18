@@ -123,6 +123,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   maintainers contest is dropped for you to decide, and its receipt line reads `dropped: <rule>:
   contested: <evidence>`. Dragons prose is checked against the code or its history before it is
   written.
+- A project's frameworks, packability, restore lock policy or package references declared in a props file
+  it imports from elsewhere in the solution, such as a sibling `build/` directory, are now cited at that
+  file's line, as the properties the same file sets already were. They were cited at line 1 of the project
+  file. A violation about any of them moves to the new site; baseline keys do not change.
 
 ## [0.1.2] - 2026-10-15
 

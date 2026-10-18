@@ -259,15 +259,16 @@ internal static class ProjectFactsEvaluator
             var projectSite = new FragmentSite(projectFile, ProjectFileLine);
             string projectDirectory = Path.GetDirectoryName(projectFile) ?? projectFile;
             HashSet<string> projectCone = ProjectCone(cones, projectDirectory);
+            RepositoryDeclarations repository = RepositoryOf(project, projectCone, solutionDirectory);
 
             (IReadOnlyList<string> frameworks, FragmentSite frameworksSite) =
-                ReadTargetFrameworks(project, projectCone, projectSite);
-            (bool? packable, FragmentSite packableSite) = ReadPackable(project, projectCone, projectSite);
-            (bool locks, FragmentSite locksSite) = ReadLockPolicy(project, projectCone, projectSite);
+                ReadTargetFrameworks(project, repository, projectSite);
+            (bool? packable, FragmentSite packableSite) = ReadPackable(project, repository, projectSite);
+            (bool locks, FragmentSite locksSite) = ReadLockPolicy(project, repository, projectSite);
             IReadOnlyList<FragmentPackageReference> packages =
-                ReadPackageReferences(project, projectCone, projectSite);
+                ReadPackageReferences(project, repository, projectSite);
             IReadOnlyList<string> projectReferences = ReadProjectReferences(project);
-            FragmentProperties properties = ReadProperties(project, projectCone, projectSite, solutionDirectory);
+            FragmentProperties properties = ReadProperties(project, repository, projectSite);
 
             return new ProjectArtifactFacts(
                 frameworks,
@@ -291,7 +292,7 @@ internal static class ProjectFactsEvaluator
     // normalizing: a project predating the SDK states a framework identifier and a version rather than a
     // moniker, and nothing downstream should have to know that two spellings of net48 exist.
     private static (IReadOnlyList<string> Frameworks, FragmentSite Site) ReadTargetFrameworks(
-        Project project, IReadOnlySet<string> projectCone, FragmentSite projectSite)
+        Project project, RepositoryDeclarations repository, FragmentSite projectSite)
     {
         foreach (string property in FrameworkProperties)
         {
@@ -303,7 +304,7 @@ internal static class ProjectFactsEvaluator
                 .OrderBy(framework => framework, StringComparer.Ordinal)
                 .ToList();
             if (frameworks.Count > 0)
-                return (frameworks, SiteOf(declared, projectCone, projectSite));
+                return (frameworks, SiteOf(declared, repository, projectSite));
         }
 
         ProjectProperty? version = project.GetProperty("TargetFrameworkVersion");
@@ -311,7 +312,7 @@ internal static class ProjectFactsEvaluator
 
         return classic is null
             ? ([], projectSite)
-            : ([classic], SiteOf(version, projectCone, projectSite));
+            : ([classic], SiteOf(version, repository, projectSite));
     }
 
     // ".NETFramework" + "v4.8" -> "net48". Only the .NET Framework identifier is spelled out, because it is
@@ -332,26 +333,26 @@ internal static class ProjectFactsEvaluator
     // true nor false is the same nothing — MSBuild would treat it as false, but a rule reading it as a
     // deliberate opt-out would be reasoning from a typo.
     private static (bool? Packable, FragmentSite Site) ReadPackable(
-        Project project, IReadOnlySet<string> projectCone, FragmentSite projectSite)
+        Project project, RepositoryDeclarations repository, FragmentSite projectSite)
     {
         ProjectProperty? declared = project.GetProperty("IsPackable");
         if (declared is null || !bool.TryParse(declared.EvaluatedValue.Trim(), out bool packable))
             return (null, projectSite);
 
-        return (packable, SiteOf(declared, projectCone, projectSite));
+        return (packable, SiteOf(declared, repository, projectSite));
     }
 
     // Undefined is false here, and that asymmetry with IsPackable is the fact rather than an inconsistency:
     // NuGet writes a lock file only when told to, so a project that says nothing has said no. Its site is
     // then the project file, which is where the missing declaration would go.
     private static (bool Locks, FragmentSite Site) ReadLockPolicy(
-        Project project, IReadOnlySet<string> projectCone, FragmentSite projectSite)
+        Project project, RepositoryDeclarations repository, FragmentSite projectSite)
     {
         ProjectProperty? declared = project.GetProperty("RestorePackagesWithLockFile");
         if (declared is null) return (false, projectSite);
 
         bool locks = bool.TryParse(declared.EvaluatedValue.Trim(), out bool parsed) && parsed;
-        return (locks, SiteOf(declared, projectCone, projectSite));
+        return (locks, SiteOf(declared, repository, projectSite));
     }
 
     // Declared references only. The SDK adds some of its own — NETStandard.Library to a netstandard project,
@@ -362,7 +363,7 @@ internal static class ProjectFactsEvaluator
     // and in what order the survivors come out, is the shared fold's business rather than this reader's: the
     // merge meets the same duplicates a framework at a time and must answer alike.
     private static IReadOnlyList<FragmentPackageReference> ReadPackageReferences(
-        Project project, IReadOnlySet<string> projectCone, FragmentSite projectSite)
+        Project project, RepositoryDeclarations repository, FragmentSite projectSite)
     {
         var declarations = new List<FragmentPackageReference>();
         foreach (ProjectItem item in project.GetItems("PackageReference"))
@@ -373,7 +374,7 @@ internal static class ProjectFactsEvaluator
             string name = item.EvaluatedInclude.Trim();
             if (name.Length == 0) continue;
 
-            FragmentSite site = SiteOf(item.Xml?.Location, projectCone, projectSite);
+            FragmentSite site = SiteOf(item.Xml?.Location, repository, projectSite);
             bool isPrivate = PrivateAssets.CoversEveryAsset(item.GetMetadataValue("PrivateAssets"));
             declarations.Add(new FragmentPackageReference(name, site, isPrivate));
         }
@@ -402,39 +403,17 @@ internal static class ProjectFactsEvaluator
         return paths;
     }
 
-    // Every property a declaration in the repository set: the definition that won sits in the project's cone, or
-    // anywhere under the solution's directory, which reaches a props file a project imports from a sibling
-    // directory the ancestor-only cone misses. Global, reserved and environment properties have no definition and
-    // are never listed, and neither is one an SDK or a package import set, which is what makes "set" mean declared
-    // by somebody who can change it. Under the solution's directory, the restore output a project imports and a
-    // package folder restored into the tree hold packages' declarations rather than the repository's, so they are
-    // left out the same way. Each file is decided once, because an evaluation holds hundreds of properties from a
-    // handful of files.
+    // Every property a declaration in the repository set, the definition that won being one the repository owns.
+    // Global, reserved and environment properties have no definition and are never listed, and neither is one an
+    // SDK or a package import set, which is what makes "set" mean declared by somebody who can change it.
     private static FragmentProperties ReadProperties(
-        Project project, IReadOnlySet<string> projectCone, FragmentSite projectSite, string? solutionDirectory)
+        Project project, RepositoryDeclarations repository, FragmentSite projectSite)
     {
-        string[]? solution = null;
-        IReadOnlyList<string[]> foreignRoots = [];
-        if (solutionDirectory is { Length: > 0 })
-        {
-            solution = PathFormat.Segments(Path.GetFullPath(solutionDirectory));
-            foreignRoots = ForeignRoots(project, solutionDirectory);
-        }
-
-        var admittedFiles = new Dictionary<string, bool>(StringComparer.Ordinal);
         var declared = new List<FragmentProperty>();
         foreach (ProjectProperty property in project.Properties)
         {
             if (property.Xml?.Location is not { File.Length: > 0 } location) continue;
-
-            if (!admittedFiles.TryGetValue(location.File, out bool admitted))
-            {
-                admitted = IsUnderProjectCone(location.File, projectCone)
-                           || (solution is not null && IsInsideSolution(location.File, solution, foreignRoots));
-                admittedFiles[location.File] = admitted;
-            }
-
-            if (!admitted) continue;
+            if (!repository.Owns(location.File)) continue;
 
             var site = new FragmentSite(location.File, Math.Max(location.Line, ProjectFileLine));
             declared.Add(new FragmentProperty(property.Name, property.EvaluatedValue, site));
@@ -472,21 +451,29 @@ internal static class ProjectFactsEvaluator
                && !foreignRoots.Any(root => PathFormat.IsWithin(root, segments));
     }
 
-    private static FragmentSite SiteOf(
-        ProjectProperty? declared, IReadOnlySet<string> projectCone, FragmentSite projectSite)
+    private static RepositoryDeclarations RepositoryOf(
+        Project project, IReadOnlySet<string> projectCone, string? solutionDirectory)
     {
-        return SiteOf(declared?.Xml?.Location, projectCone, projectSite);
+        if (solutionDirectory is not { Length: > 0 }) return new RepositoryDeclarations(projectCone, null, []);
+
+        string[] solution = PathFormat.Segments(Path.GetFullPath(solutionDirectory));
+        return new RepositoryDeclarations(projectCone, solution, ForeignRoots(project, solutionDirectory));
     }
 
-    // A declaration is only worth citing where somebody reading this repository can go and change it. The
-    // SDK's own defaults have real locations, but they name a directory on whichever machine ran the build,
-    // so they degrade to the project file — which is where the override would be written anyway.
     private static FragmentSite SiteOf(
-        ElementLocation? location, IReadOnlySet<string> projectCone, FragmentSite projectSite)
+        ProjectProperty? declared, RepositoryDeclarations repository, FragmentSite projectSite)
+    {
+        return SiteOf(declared?.Xml?.Location, repository, projectSite);
+    }
+
+    // A declaration the repository does not own degrades to the project file, which is where the override would
+    // be written anyway.
+    private static FragmentSite SiteOf(
+        ElementLocation? location, RepositoryDeclarations repository, FragmentSite projectSite)
     {
         if (location is null || location.File.Length == 0) return projectSite;
 
-        return IsUnderProjectCone(location.File, projectCone)
+        return repository.Owns(location.File)
             ? new FragmentSite(location.File, Math.Max(location.Line, ProjectFileLine))
             : projectSite;
     }
@@ -532,5 +519,30 @@ internal static class ProjectFactsEvaluator
     private static string Normalize(string directory)
     {
         return directory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+    }
+
+    // Whether a declaration is the repository's own, which is the one test both a fact's site and a property's
+    // admission take, so a props file is either cited for everything it declares or for nothing. Owned means
+    // somebody reading this repository can go and change it: the project's cone, or anywhere under the solution's
+    // directory, which reaches a props file a project imports from a sibling directory the ancestor-only cone
+    // misses, less the foreign roots under it. The SDK's own files and a package's imports have real locations,
+    // but they name a directory on whichever machine ran the build. Each file is decided once, because an
+    // evaluation holds hundreds of declarations from a handful of files. A null solution is the cone alone.
+    private sealed class RepositoryDeclarations(
+        IReadOnlySet<string> projectCone, string[]? solution, IReadOnlyList<string[]> foreignRoots)
+    {
+        private readonly Dictionary<string, bool> owned = new(StringComparer.Ordinal);
+
+        public bool Owns(string file)
+        {
+            if (!owned.TryGetValue(file, out bool owns))
+            {
+                owns = IsUnderProjectCone(file, projectCone)
+                       || (solution is not null && IsInsideSolution(file, solution, foreignRoots));
+                owned[file] = owns;
+            }
+
+            return owns;
+        }
     }
 }

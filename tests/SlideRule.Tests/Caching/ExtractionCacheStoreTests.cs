@@ -103,6 +103,10 @@ public sealed class ExtractionCacheStoreTests
     // A v36 cache predates the override and sealed member facts (schema bumped 36→37): every member replays
     // as neither, so MustBeOverridable would red every unsealed override a fresh extraction passes.
     [InlineData(36)]
+    // A v37 cache predates one ownership test for sites (schema bumped 37→38): a framework list, packability,
+    // lock policy or package reference declared in a props file imported from a sibling directory replays sited
+    // at the project file, where a fresh extraction cites the props file's own line.
+    [InlineData(37)]
     public void ReadAndValidate_SchemaVersionOtherThanTheCurrentOne_ReturnsMiss(int schemaVersion)
     {
         // Arrange
@@ -132,7 +136,7 @@ public sealed class ExtractionCacheStoreTests
 
         version.ShouldNotBeNull("the extraction cache still declares a schema version");
         version.GetRawConstantValue()
-            .ShouldBe(37);
+            .ShouldBe(38);
     }
 
     [Fact]

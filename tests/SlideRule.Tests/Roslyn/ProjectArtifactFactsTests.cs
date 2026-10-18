@@ -372,6 +372,49 @@ public sealed class ProjectArtifactFactsTests
     }
 
     [Fact]
+    public void EvaluateAll_FactsInASiblingDirectoryPropsFile_AreSitedThereLikeItsProperties()
+    {
+        // A props file in a sibling build/ directory, which the solution's directory reaches and the ancestor cone
+        // does not, declares every sited fact. One test of ownership decides both a fact's site and a property's
+        // admission, so the file is cited for the facts exactly as it is for the property it also sets.
+        using TempDirectory temp = TestTempRoot.Fresh("artifact-facts-sibling-sites");
+        string shared = WriteSiblingDeclaredProject(temp, out string projectFile);
+
+        // Act
+        ProjectArtifactFacts facts = EvaluatedFacts(projectFile, temp.PathOf("Widget.sln")).ShouldNotBeNull();
+
+        // Assert
+        facts.TargetFrameworksSite.ShouldBe(new FragmentSite(shared, 3));
+        facts.IsPackableSite.ShouldBe(new FragmentSite(shared, 4));
+        facts.LocksPackagesSite.ShouldBe(new FragmentSite(shared, 5));
+        facts.PackageReferences.ShouldBe([
+            new FragmentPackageReference("Shouldly", new FragmentSite(shared, 8), IsPrivate: false)
+        ]);
+        Set(facts.Properties, "IsPackable").ShouldBe(new FragmentProperty("IsPackable", "false", new FragmentSite(shared, 4)));
+    }
+
+    [Fact]
+    public void EvaluateAll_FactsInASiblingDirectoryPropsFileWithNoSolution_AreSitedAtTheProjectFile()
+    {
+        // The same layout evaluated as a build of the project alone: with no solution, ownership is the ancestor
+        // cone, which the sibling file is outside, so every fact falls back to the project file and the property
+        // is nobody's.
+        using TempDirectory temp = TestTempRoot.Fresh("artifact-facts-sibling-sites-alone");
+        WriteSiblingDeclaredProject(temp, out string projectFile);
+        var projectSite = new FragmentSite(projectFile, 1);
+
+        // Act
+        ProjectArtifactFacts facts = EvaluatedFacts(projectFile).ShouldNotBeNull();
+
+        // Assert
+        facts.TargetFrameworksSite.ShouldBe(projectSite);
+        facts.IsPackableSite.ShouldBe(projectSite);
+        facts.LocksPackagesSite.ShouldBe(projectSite);
+        facts.PackageReferences.ShouldBe([new FragmentPackageReference("Shouldly", projectSite, IsPrivate: false)]);
+        Set(facts.Properties, "IsPackable").ShouldBeNull();
+    }
+
+    [Fact]
     public void EvaluateAll_ProjectReferences_AreTheDeclaredOnesThatReferenceTheirOutput()
     {
         // One plain reference and one that only orders the build. Neither target file exists: evaluation
@@ -658,6 +701,30 @@ public sealed class ProjectArtifactFactsTests
     {
         return ProjectFactsEvaluator.EvaluateAll([new ProjectEvaluationRequest(projectFile, null)], solutionFile, Ct)
             .Single();
+    }
+
+    // A project at src/Widget whose every sited fact is declared in build/Shared.props, which it imports: the
+    // frameworks on line 3, packability on 4, the lock policy on 5 and one package on 8. Returns that file.
+    private static string WriteSiblingDeclaredProject(TempDirectory temp, out string projectFile)
+    {
+        string shared = temp.WriteFile(["build", "Shared.props"], """
+                                                                  <Project>
+                                                                      <PropertyGroup>
+                                                                          <TargetFrameworks>net10.0</TargetFrameworks>
+                                                                          <IsPackable>false</IsPackable>
+                                                                          <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+                                                                      </PropertyGroup>
+                                                                      <ItemGroup>
+                                                                          <PackageReference Include="Shouldly" Version="4.3.0" />
+                                                                      </ItemGroup>
+                                                                  </Project>
+                                                                  """);
+        projectFile = temp.WriteFile(["src", "Widget", "Widget.csproj"], """
+                                                                         <Project Sdk="Microsoft.NET.Sdk">
+                                                                             <Import Project="..\..\build\Shared.props" />
+                                                                         </Project>
+                                                                         """);
+        return shared;
     }
 
     // An SDK project that declares no project reference.
