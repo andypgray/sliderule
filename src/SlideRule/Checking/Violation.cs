@@ -106,26 +106,13 @@ internal sealed class Violation
     ///     identifier as declared, the short moniker, or the property as the rule names it with <c>@</c> and the
     ///     framework of the build judged. Null on every violation that names no item.
     /// </summary>
-    // The property arm comes before the framework one because a property violation fills Framework too: there it
-    // names the build judged, not the item.
-    internal string? ProjectItem => Package is { } package
-        ? PackageItemPrefix + package.Name
-        : Property is not null
-            ? PropertyItemPrefix + PropertyItemName
-            : Framework is { } framework
-                ? FrameworkItemPrefix + framework
-                : null;
+    internal string? ProjectItem { get; private set; }
 
     /// <summary>
     ///     The bare name of <see cref="ProjectItem" />: the package identifier, the property with its framework, or
     ///     the moniker, untagged.
     /// </summary>
-    internal string? ProjectItemName => Package?.Name ?? (Property is not null ? PropertyItemName : Framework);
-
-    // "Nullable@net8.0", or the property alone for a build no framework was told apart in. The framework is part of
-    // the item, not evidence: two frameworks that both lack a property share the project-file site, so an identity
-    // that left the framework out would let a migrated rule pass the next framework that loses the property.
-    private string PropertyItemName => Framework is { } framework ? $"{Property}@{framework}" : Property!;
+    internal string? ProjectItemName { get; private set; }
 
     private const string PackageItemPrefix = "package:";
     private const string FrameworkItemPrefix = "framework:";
@@ -331,7 +318,13 @@ internal sealed class Violation
     /// </summary>
     internal static Violation ProjectPackage(ProjectNode subject, PackageReference package)
     {
-        return new Violation(ViolationKind.ProjectShape, [package.Site]) { SubjectProject = subject, Package = package };
+        return new Violation(ViolationKind.ProjectShape, [package.Site])
+        {
+            SubjectProject = subject,
+            Package = package,
+            ProjectItemName = package.Name,
+            ProjectItem = PackageItemPrefix + package.Name
+        };
     }
 
     /// <summary>
@@ -341,7 +334,13 @@ internal sealed class Violation
     /// </summary>
     internal static Violation ProjectFramework(ProjectNode subject, string framework, IReadOnlyList<SourceLocation> sites)
     {
-        return new Violation(ViolationKind.ProjectShape, sites) { SubjectProject = subject, Framework = framework };
+        return new Violation(ViolationKind.ProjectShape, sites)
+        {
+            SubjectProject = subject,
+            Framework = framework,
+            ProjectItemName = framework,
+            ProjectItem = FrameworkItemPrefix + framework
+        };
     }
 
     /// <summary>
@@ -355,7 +354,11 @@ internal sealed class Violation
     {
         return new Violation(ViolationKind.ProjectShape, sites)
         {
-            SubjectProject = subject, Framework = framework, FrameworkMissing = true
+            SubjectProject = subject,
+            Framework = framework,
+            FrameworkMissing = true,
+            ProjectItemName = framework,
+            ProjectItem = FrameworkItemPrefix + framework
         };
     }
 
@@ -369,12 +372,19 @@ internal sealed class Violation
         ProjectNode subject, string property, ProjectEvaluation evaluation, EvaluatedProperty? found)
     {
         SourceLocation site = found?.Site ?? evaluation.ProjectFile;
+        // "Nullable@net8.0", or the property alone for a build no framework was told apart in. The framework is part
+        // of the item, not evidence: two frameworks that both lack a property share the project-file site, so an
+        // identity that left the framework out would let a migrated rule pass the next framework that loses the
+        // property.
+        string item = evaluation.TargetFramework is { } framework ? $"{property}@{framework}" : property;
         return new Violation(ViolationKind.ProjectShape, [site])
         {
             SubjectProject = subject,
             Property = property,
             Framework = evaluation.TargetFramework,
-            PropertyValue = found?.Value
+            PropertyValue = found?.Value,
+            ProjectItemName = item,
+            ProjectItem = PropertyItemPrefix + item
         };
     }
 
