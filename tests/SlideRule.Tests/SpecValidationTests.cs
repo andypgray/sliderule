@@ -590,6 +590,37 @@ public class SpecValidationTests
     }
 
     [Fact]
+    public void BlankPattern_BlankPathGlob_IsReported()
+    {
+        // A path glob rides the type-side selection walk under its own label (GRAMMAR §8 item 15).
+        SpecValidationException ex = BuildExpectingFailure(new BlankPathGlobSpec());
+
+        ex.ShouldHaveError(Code.BlankPattern, "area/rule")
+            .Message.ShouldBe("SpecValidationSpecs.cs:1604: Blank path glob on 'area/rule'.");
+    }
+
+    [Fact]
+    public void MalformedPathGlob_EachShapeTheMatcherRefuses_IsReportedWithItsReason()
+    {
+        // GRAMMAR §8 item 35: refused, never normalized, so the model carries what the author wrote. The reason is
+        // the matcher's own, so what it refuses and what the catalog reports cannot drift.
+        SpecValidationException ex = BuildExpectingFailure(new MalformedPathGlobSpec());
+
+        ex.ShouldHaveError(Code.MalformedPathGlob, "area/rooted")
+            .Message.ShouldBe(
+                "SpecValidationSpecs.cs:1612: The path glob '/src' on 'area/rooted' is rooted; a path glob is relative "
+                + "to the solution directory.");
+        ex.ShouldHaveError(Code.MalformedPathGlob, "area/dotted")
+            .Message.ShouldBe(
+                "SpecValidationSpecs.cs:1613: The path glob 'src/../lib' on 'area/dotted' has a `.` or `..` segment; "
+                + "name the directories from the solution directory down.");
+        ex.ShouldHaveError(Code.MalformedPathGlob, "area/doubled")
+            .Message.ShouldBe(
+                "SpecValidationSpecs.cs:1614: The path glob 'src/**Widgets' on 'area/doubled' puts `**` inside a "
+                + "segment; `**` stands alone between slashes.");
+    }
+
+    [Fact]
     public void BlankPattern_BlankMemberName_IsReported()
     {
         // A member Named list's names ride the same member-subject adjective walk (GRAMMAR §8 item 15), under

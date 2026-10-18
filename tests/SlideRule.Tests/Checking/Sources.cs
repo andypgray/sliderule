@@ -316,6 +316,24 @@ internal static class Sources
     /// <summary>The one extracted model of <see cref="Layered" />.</summary>
     public static readonly CodebaseModel LayeredModel = CompilationFactory.Extract(Layered);
 
+    /// <summary>The solution directory <see cref="FolderModel" />'s files sit under.</summary>
+    public const string FolderRoot = "/repo";
+
+    /// <summary>
+    ///     One namespace laid out in folders, the way a codebase whose folders are its only structure is: widgets
+    ///     two deep, a console with an Internal folder its writer reaches into, a partial type with one part
+    ///     vendored, and a file outside the solution directory. Every type is in <c>App</c>, so only a path can
+    ///     tell them apart.
+    /// </summary>
+    public static readonly CodebaseModel FolderModel = CompilationFactory.Extract("App",
+        ("/repo/src/Widgets/Button.cs", "namespace App; public class Button {}"),
+        ("/repo/src/Widgets/Deep/Panel.cs", "namespace App; public class Panel {}"),
+        ("/repo/src/Console/Internal/Ansi.cs", "namespace App; public class Ansi {}"),
+        ("/repo/src/Console/Writer.cs", "namespace App; public class Writer { public Ansi Codes; public System.Text.StringBuilder Buffer; }"),
+        ("/repo/src/Split/Split.cs", "namespace App; public partial class Split {}"),
+        ("/repo/vendor/Split.Vendored.cs", "namespace App; public partial class Split { public Button Face; }"),
+        ("/elsewhere/Shared.cs", "namespace App; public class Shared {}"));
+
     /// <summary>The one extracted model of <see cref="Containment" />.</summary>
     public static readonly CodebaseModel ContainmentModel = CompilationFactory.Extract(Containment);
 

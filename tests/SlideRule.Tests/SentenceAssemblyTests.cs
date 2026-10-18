@@ -386,6 +386,32 @@ public class SentenceAssemblyTests
             .ShouldBe("Types must not construct `SqlConnection` or types named `SessionStore` or `ModelCache`.");
     }
 
+    // ---- The Under adjective (GRAMMAR §5.2): where the types are declared, inline after the locative ----
+
+    [Fact]
+    public void Under_RendersAnInlineClauseAfterTheLocative()
+    {
+        SentenceRenderer.Sentence(Arch.Types.InNamespace("Spectre.Console.*")
+                .Under("src/Spectre.Console/Internal")
+                .MustBeInternal())
+            .ShouldBe("Types in `Spectre.Console.*` under `src/Spectre.Console/Internal` must be internal.");
+    }
+
+    [Fact]
+    public void Under_SeveralGlobs_OrJoinTheGlobs()
+    {
+        SentenceRenderer.Subject(Arch.Types.Under("src/Widgets", "src/Console"))
+            .ShouldBe("Types under `src/Widgets` or `src/Console`");
+    }
+
+    [Fact]
+    public void Under_InTargetPosition_ReadsAsTheSetItNames()
+    {
+        SentenceRenderer.Sentence(Arch.Types.Under("src")
+                .MustNotReference(Arch.Types.Under("src/Console/Internal")))
+            .ShouldBe("Types under `src` must not reference types under `src/Console/Internal`.");
+    }
+
     [Fact]
     public void Authored_RendersTheHeadPremodifier()
     {

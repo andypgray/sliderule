@@ -1,5 +1,6 @@
 using SlideRule.Codebase;
 using SlideRule.Fluent;
+using SlideRule.Internal;
 using SlideRule.Model;
 
 namespace SlideRule.Checking;
@@ -25,12 +26,23 @@ internal sealed class SelectionEvaluator
     private readonly Dictionary<(SelectionNoun, SelectionPosition), HashSet<TypeNode>> _admittedByNoun = new();
     private readonly Dictionary<SelectionAdjective, Func<TypeNode, bool>> _keepers = new();
     private readonly CodebaseModel _model;
+
+    // Each declaring file's segments below the root, worked out once per path: a path glob tests every file of
+    // every candidate type, and the files a partial type spans are tested again by every rule that asks.
+    private readonly Dictionary<string, IReadOnlyList<string>?> _relativeByPath = new(StringComparer.Ordinal);
+    private readonly SolutionRoot? _root;
     private readonly List<TypeNode> _solutionDeclared;
     private ILookup<string, TypeNode>? _byProjectName;
 
-    internal SelectionEvaluator(CodebaseModel model)
+    /// <summary>
+    ///     An evaluator over <paramref name="model" />, with <paramref name="root" /> the directory path globs are
+    ///     relative to: the solution directory, or in the build analyzer the model file's. A run given no root
+    ///     cannot answer a path glob, and says so where one is asked.
+    /// </summary>
+    internal SelectionEvaluator(CodebaseModel model, SolutionRoot? root = null)
     {
         _model = model;
+        _root = root;
 
         // One pass over the type universe for two answers: the subject universe, and whether any type in
         // the model is declared by more than one project. The second is what lets SelectionAdmission skip
@@ -116,6 +128,39 @@ internal sealed class SelectionEvaluator
             LayerNoun { Definition: { } definition } => [definition],
             _ => null
         };
+    }
+
+    /// <summary>
+    ///     <paramref name="filePath" />'s segments below the run's root, the file name last, or null where the file
+    ///     is outside it. Throws <see cref="RuleEvaluationException" /> where the run was given no root: a path
+    ///     glob is relative to a directory, and answering without one would select nothing and fail closed only
+    ///     by accident.
+    /// </summary>
+    internal IReadOnlyList<string>? RelativeSegments(string filePath)
+    {
+        if (_root is null) throw NoRoot();
+
+        if (_relativeByPath.TryGetValue(filePath, out IReadOnlyList<string>? segments)) return segments;
+
+        segments = _root.Relative(filePath);
+        _relativeByPath.Add(filePath, segments);
+        return segments;
+    }
+
+    /// <summary>
+    ///     Whether a file's segments below the root are under any of <paramref name="globs" /> — each glob parsed
+    ///     once, here, for every type and file it is then asked about.
+    /// </summary>
+    internal static Func<IReadOnlyList<string>, bool> UnderAny(IReadOnlyList<string> globs)
+    {
+        List<PathGlob> parsed = globs.Select(glob => new PathGlob(glob)).ToList();
+        return segments => parsed.Exists(glob => glob.Matches(segments));
+    }
+
+    private static RuleEvaluationException NoRoot()
+    {
+        return new RuleEvaluationException(
+            "A path glob is relative to the solution directory, and this run was given none.");
     }
 
     internal HashSet<TypeNode> Evaluate(Selection selection, SelectionPosition position)
@@ -448,6 +493,14 @@ internal sealed class SelectionEvaluator
                 // through containers — the same fact ITypeInfo reports and MustBePublic tests, so the
                 // adjective and the verb cannot disagree about one type.
                 return t => t.Accessibility == accessibility.Accessibility;
+            case UnderAdjective under:
+                // Any declaring file under any glob (GRAMMAR §5.2): a partial type is where any of its files
+                // is, and an external type, declared in no file of the solution, is under nothing. The root is
+                // asked for here, at the call, so a run given none refuses before any type is tested.
+                if (_root is null) throw NoRoot();
+
+                Func<IReadOnlyList<string>, bool> underAny = UnderAny(under.Globs);
+                return t => t.FilePaths.Any(path => RelativeSegments(path) is { } segments && underAny(segments));
             default:
                 // Fail closed: an unknown adjective would silently widen the selection — and in a
                 // MustOnly* target position a silently-widened allow-set is fail-open enforcement. A missing

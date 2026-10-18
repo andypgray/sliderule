@@ -80,7 +80,7 @@ public sealed class SpecLiteralParityTests(SpecFixtureCorpus corpus) : IClassFix
     // The fixture count stands on its own rather than being read off the walk, because the walk is what
     // would go quiet: a class the syntax pass stopped recognising would simply not be measured, and parity
     // over fewer fixtures reads exactly like parity over all of them.
-    private const int FixtureCount = 153;
+    private const int FixtureCount = 155;
 
     private const string SubjectClause = " on ";
 
@@ -90,7 +90,8 @@ public sealed class SpecLiteralParityTests(SpecFixtureCorpus corpus) : IClassFix
         Code.DuplicateId, Code.IdExtendsScope, Code.BlankProse, Code.MultiLineProse, Code.MalformedId,
         Code.DuplicateLayerName, Code.BlankMemberName, Code.BlankPattern, Code.UnanchoredSubtreePattern,
         Code.BlankProjectPattern, Code.BlankTargetFramework, Code.CounterpartTemplateWithoutPlaceholder,
-        Code.MalformedCitation, Code.BlankLayerName, Code.BlankPackagePattern, Code.BlankProperty
+        Code.MalformedCitation, Code.BlankLayerName, Code.BlankPackagePattern, Code.BlankProperty,
+        Code.MalformedPathGlob
     };
 
     /// <summary>

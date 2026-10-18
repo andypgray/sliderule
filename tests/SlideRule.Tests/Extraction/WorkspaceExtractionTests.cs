@@ -1,8 +1,10 @@
 using Microsoft.Build.Locator;
 using Shouldly;
-using Xunit;
+using SlideRule.Checking;
 using SlideRule.Codebase;
+using SlideRule.Internal;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.Extraction;
 
@@ -33,6 +35,29 @@ public sealed class WorkspaceExtractionTests(WorkspaceFixture fixture)
                 ("MyApp.Legacy.Billing", "MyApp.Legacy.Billing"),
                 ("MyApp.Web", "MyApp.Web")
             ]);
+    }
+
+    [Fact]
+    public void Under_AProjectsFolder_SelectsWhatThatProjectDeclares()
+    {
+        // A path glob reads the paths a workspace load records, against the solution's own directory, so the
+        // folder a project sits in selects exactly what the project declares.
+        var evaluator = new SelectionEvaluator(
+            fixture.Model, new SolutionRoot(Path.GetDirectoryName(fixture.SolutionPath)!));
+        var arch = new Arch();
+
+        List<string> underFolder = Names(evaluator.Evaluate(arch.Types.Under("MyApp.Domain"), SelectionPosition.Subject));
+        List<string> declared = Names(evaluator.Evaluate(arch.Project("MyApp.Domain"), SelectionPosition.Subject));
+
+        underFolder.ShouldNotBeEmpty();
+        underFolder.ShouldBe(declared);
+
+        static List<string> Names(IEnumerable<TypeNode> types)
+        {
+            return types.Select(type => type.FullName)
+                .OrderBy(name => name, StringComparer.Ordinal)
+                .ToList();
+        }
     }
 
     [Fact]

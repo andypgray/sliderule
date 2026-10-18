@@ -268,5 +268,12 @@ internal enum SpecValidationErrorCode
     ///     method selection. No member is two kinds at once, so the exclusion removes nothing; project the payload
     ///     with the selection's own kind, or with <c>.Members</c>, which holds every kind.
     /// </summary>
-    MemberExceptKindDisjoint
+    MemberExceptKindDisjoint,
+
+    /// <summary>
+    ///     A path glob on <c>Under</c> written in a shape no declaring file can match: rooted, with a backslash, or
+    ///     with a <c>.</c>, <c>..</c> or empty segment or a <c>**</c> inside a longer segment. A path glob is
+    ///     relative to the solution directory with <c>/</c> between segments; write it that way.
+    /// </summary>
+    MalformedPathGlob
 }

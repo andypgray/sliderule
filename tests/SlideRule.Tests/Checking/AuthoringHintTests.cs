@@ -1,7 +1,7 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Baselines;
 using SlideRule.Checking;
+using Xunit;
 
 namespace SlideRule.Tests.Checking;
 
@@ -160,6 +160,23 @@ public sealed class AuthoringHintTests
             .ShouldBe(NamedClause + "; a rule whose target matches nothing passes forever, so decide before keeping it.");
         AuthoringHints.ForInertTargetOperand(named, null, null)
             .ShouldBe(NamedClause + "; a name that matches nothing bans nothing, so decide before keeping it.");
+    }
+
+    [Fact]
+    public void AnUnderList_EarnsThePathGlobRule_WithThePatternTails()
+    {
+        // A glob list that came up empty failed on a path, so every signal says what a path glob is; a glob is a
+        // pattern, so a dead one beside live ones takes the pattern tail rather than the name tail.
+        var arch = new Arch();
+        Selection under = arch.Namespace("App.*").Under("src/Widgets", "src/Console");
+        const string pathClause =
+            "A path glob is relative to the solution directory with `/` between segments, and reaches a type when any "
+            + "file declaring it is under the glob";
+
+        AuthoringHints.ForSubject(under, null)
+            .ShouldBe(pathClause + "; check the selection against what the solution declares.");
+        AuthoringHints.ForInertTargetOperand(under, null, null)
+            .ShouldBe(pathClause + "; a pattern that matches nothing bans nothing, so decide before keeping it.");
     }
 
     [Fact]

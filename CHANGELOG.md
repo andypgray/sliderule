@@ -53,6 +53,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   entry point from a naming law without exempting its type. Each exclusion draws from types of its own,
   several remove what any one names, and one of another single kind than the selection, such as fields
   taken from methods, removes nothing and is refused when the spec is loaded.
+- `.Under(glob, ...)` narrows a type selection to the types declared under a folder or file of the
+  solution, such as `arch.Types.Under("src/Widgets")` or `arch.Types.Under("src/*/Internal")`, for a
+  codebase whose folders are its only structure. Globs are relative to the solution directory with `/`
+  between segments, `*` within a segment and `**` across any number of them, and case is ignored on every
+  operating system. A glob names everything under it, and a type is under it when any file declaring it
+  is. Each glob a rule's subject names is checked on its own, as `Named` names are, and a malformed glob
+  is reported as `SR1035`.
 - The extraction cache starts over once after this upgrade, because each project's evaluation now records
   the properties the solution sets, and each member whether it overrides.
 - `check --json` and `arch_check` carry a `framework` key on each `MustOnlyTarget` violation, naming

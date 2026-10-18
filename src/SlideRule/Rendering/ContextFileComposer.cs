@@ -108,7 +108,7 @@ internal static class ContextFileComposer
         // noun indexes in its constructor, and resolving the two keys separately would build that twice. The
         // boundary is hoisted with it and for the same reason: it splits the solution directory once and
         // memoizes each declaration site's verdict, which every card placed below shares.
-        var evaluator = new SelectionEvaluator(codebase);
+        var evaluator = new SelectionEvaluator(codebase, new SolutionRoot(solutionDirectory));
         var boundary = new DirectoryPlacement.Boundary(solutionDirectory);
         var cards = new List<ContextCard>();
 

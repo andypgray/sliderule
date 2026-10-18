@@ -211,6 +211,14 @@ internal static class NodeReaders
             return names is null ? null : new NamedAdjective(names);
         });
 
+        map.Add(Key<UnderAdjective>(), (r, v) =>
+        {
+            if (!r.OnlyKeys(v, AdjectiveWhere, "node", "globs")) return null;
+
+            IReadOnlyList<string>? globs = r.RequiredPathGlobs(v, AdjectiveWhere, "globs");
+            return globs is null ? null : new UnderAdjective(globs);
+        });
+
         map.Add(Key<ImplementingAdjective>(), (r, v) =>
         {
             TypeAnchor? anchor = OneAnchor(r, v, AdjectiveWhere);

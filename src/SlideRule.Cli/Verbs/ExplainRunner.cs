@@ -5,6 +5,7 @@ using SlideRule.Cli.Rendering;
 using SlideRule.Cli.SpecLoading;
 using SlideRule.Codebase;
 using SlideRule.Hosting;
+using SlideRule.Internal;
 using SlideRule.Rendering;
 using SlideRule.Roslyn;
 using SlideRule.Roslyn.Diagnostics;
@@ -128,7 +129,7 @@ internal sealed class ExplainRunner(
             return ExitCodes.Clean;
         }
 
-        var tracer = new ClaimTracer(codebase);
+        var tracer = new ClaimTracer(codebase, new SolutionRoot(source.SolutionDirectory));
         var first = true;
         foreach (TypeNode type in types)
         {

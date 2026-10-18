@@ -83,7 +83,7 @@ internal static class OneProjectSubject
         SelectionAdmission matched = SelectionAdmission.Collect(selections, selection, SelectionPosition.Subject);
         if (matched.Count == 0) return null;
 
-        return DeadNames.Dropped(selection, matched.Nodes);
+        return DeadNames.Dropped(selection, matched.Nodes, selections);
     }
 
     private static Selection CutFamily(

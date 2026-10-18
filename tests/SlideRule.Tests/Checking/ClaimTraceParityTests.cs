@@ -1,11 +1,12 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Checking;
 using SlideRule.Codebase;
 using SlideRule.Fluent;
 using SlideRule.Hosting;
+using SlideRule.Internal;
 using SlideRule.Tests.Dogfood;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.Checking;
 
@@ -35,10 +36,29 @@ public sealed class ClaimTraceParityTests(WorkspaceFixture fixture)
         ShouldTraceWhatItEvaluates(SelfSpecTests.SelfModel, codebase);
     }
 
-    private static void ShouldTraceWhatItEvaluates(ArchitectureModel model, CodebaseModel codebase)
+    [Fact]
+    public void AFolderSpec_OverOneNamespaceInFolders_TracesWhatItEvaluates()
     {
-        var evaluator = new SelectionEvaluator(codebase);
-        var tracer = new ClaimTracer(codebase);
+        // The source-location adjective reads files through the run's root, so the trace and the evaluator are
+        // handed the same one.
+        ArchitectureModel model = Checker.Model(arch =>
+        {
+            arch.Rule("folders/widgets")
+                .Enforce(arch.Types.Under("src/Widgets", "vendor").MustBeSealed())
+                .Because("b");
+            arch.Rule("folders/console")
+                .Enforce(arch.Types.Under("src").Except(arch.Types.Under("src/Console/Internal")).MustBeSealed())
+                .Because("b");
+        });
+
+        ShouldTraceWhatItEvaluates(model, Sources.FolderModel, new SolutionRoot(Sources.FolderRoot));
+    }
+
+    private static void ShouldTraceWhatItEvaluates(
+        ArchitectureModel model, CodebaseModel codebase, SolutionRoot? root = null)
+    {
+        var evaluator = new SelectionEvaluator(codebase, root);
+        var tracer = new ClaimTracer(codebase, root);
         List<TypeNode> declared = codebase.Types.Where(type => !type.IsExternal).ToList();
         var disagreements = new List<string>();
         var compared = 0;

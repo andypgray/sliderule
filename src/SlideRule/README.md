@@ -101,14 +101,15 @@ describes.
 | `SR1031` | A layer name is blank. |
 | `SR1032` | A package pattern on `MustOnlyReferencePackages` or `MustNotReferencePackages` is blank. |
 | `SR1033` | A property name or value on `MustSetProperty` is blank. |
+| `SR1035` | A path glob on `Under` is rooted, contains a backslash, or has a `.`, `..` or empty segment. |
 | `SR1093` | The analyzer failed, or was given another version's contract and checked no literal. Neither is about your spec. |
 
-All 17 are ordinary warnings, so `.editorconfig` severities, `#pragma` and `NoWarn` apply. A
+All 18 are ordinary warnings, so `.editorconfig` severities, `#pragma` and `NoWarn` apply. A
 build that treats warnings as errors will fail on them. To keep the early warning without the break,
 exclude the IDs:
 
 ```xml
-<WarningsNotAsErrors>$(WarningsNotAsErrors);SR1000;SR1001;SR1005;SR1006;SR1008;SR1010;SR1012;SR1016;SR1017;SR1024;SR1025;SR1026;SR1030;SR1031;SR1032;SR1033;SR1093</WarningsNotAsErrors>
+<WarningsNotAsErrors>$(WarningsNotAsErrors);SR1000;SR1001;SR1005;SR1006;SR1008;SR1010;SR1012;SR1016;SR1017;SR1024;SR1025;SR1026;SR1030;SR1031;SR1032;SR1033;SR1035;SR1093</WarningsNotAsErrors>
 ```
 
 Loading the spec validates a suppressed literal like any other, and the spec fails validation with

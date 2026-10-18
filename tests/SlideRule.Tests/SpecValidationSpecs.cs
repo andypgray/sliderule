@@ -1596,3 +1596,21 @@ internal sealed class BlankWhereInMemberExceptPayloadSpec : IArchitectureSpec
             .Because("Reason.");
     }
 }
+
+internal sealed class BlankPathGlobSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        arch.Rule("area/rule").Enforce(arch.Types.Under("src/Widgets", " ").MustBeSealed()).Because("Reason.");
+    }
+}
+
+internal sealed class MalformedPathGlobSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        arch.Rule("area/rooted").Enforce(arch.Types.Under("/src").MustBeSealed()).Because("Reason.");
+        arch.Rule("area/dotted").Enforce(arch.Types.Under("src/../lib").MustBeSealed()).Because("Reason.");
+        arch.Rule("area/doubled").Enforce(arch.Types.Under("src/**Widgets").MustBeSealed()).Because("Reason.");
+    }
+}

@@ -1,6 +1,7 @@
 using SlideRule.Codebase;
 using SlideRule.Fluent;
 using SlideRule.Hosting;
+using SlideRule.Internal;
 using SlideRule.Model;
 using SlideRule.Prose;
 
@@ -22,9 +23,9 @@ namespace SlideRule.Checking;
 ///         run where the checker would not run it.
 ///     </para>
 /// </remarks>
-internal sealed class ClaimTracer(CodebaseModel model)
+internal sealed class ClaimTracer(CodebaseModel model, SolutionRoot? root = null)
 {
-    private readonly SelectionEvaluator _evaluator = new(model);
+    private readonly SelectionEvaluator _evaluator = new(model, root);
 
     /// <summary>
     ///     A subject's verdict on <paramref name="type" />, with a failed evaluation caught as its own verdict.
@@ -192,8 +193,34 @@ internal sealed class ClaimTracer(CodebaseModel model)
             WhereAdjective where => new ClaimStep($"it passes the predicate \"{where.Description}\""),
             AuthoredAdjective => new ClaimStep("it is authored, not generated"),
             AccessibilityAdjective => new ClaimStep($"it is declared {AccessibilityWord(type.Accessibility)}"),
+            UnderAdjective under => UnderStep(under, type),
             _ => new ClaimStep($"it passes \"{adjective.Fragment.Trim()}\"")
         };
+    }
+
+    // The first declaring file under one of the globs, in file order, with the glob it is under: the adjective
+    // kept the type, so one pair exists.
+    private ClaimStep UnderStep(UnderAdjective under, TypeNode type)
+    {
+        foreach (string path in type.FilePaths)
+        {
+            if (_evaluator.RelativeSegments(path) is not { } segments) continue;
+
+            foreach (string glob in under.Globs)
+                if (SelectionEvaluator.UnderAny([glob])(segments))
+                    return new ClaimStep(
+                        $"it is declared in {ProseFormat.Backtick(string.Join("/", segments))}, under {ProseFormat.Backtick(glob)}");
+        }
+
+        return new ClaimStep($"it passes \"{under.Fragment.Trim()}\"");
+    }
+
+    // Why no file put the type under the globs: it has none in the solution, or none of them is under any.
+    private static ClaimStep NotUnderStep(UnderAdjective under, TypeNode type)
+    {
+        return type.FilePaths.Count == 0
+            ? new ClaimStep("it has no source file in the solution")
+            : new ClaimStep($"none of the files declaring it is under {ProseFormat.BacktickedList(under.Globs)}");
     }
 
     private ClaimStep Dropped(SelectionAdjective adjective, TypeNode type)
@@ -227,6 +254,7 @@ internal sealed class ClaimTracer(CodebaseModel model)
             AuthoredAdjective => new ClaimStep("it is generated, not authored"),
             AccessibilityAdjective accessibility => new ClaimStep(
                 $"it is declared {AccessibilityWord(type.Accessibility)}, not {AccessibilityWord(accessibility.Accessibility)}"),
+            UnderAdjective under => NotUnderStep(under, type),
             _ => new ClaimStep($"it fails \"{adjective.Fragment.Trim()}\"")
         };
     }

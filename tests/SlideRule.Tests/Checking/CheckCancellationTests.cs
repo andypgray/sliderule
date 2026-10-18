@@ -1,9 +1,9 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Baselines;
 using SlideRule.Checking;
 using SlideRule.Hosting;
 using SlideRule.Model;
+using Xunit;
 
 namespace SlideRule.Tests.Checking;
 
@@ -117,12 +117,12 @@ public sealed class CheckCancellationTests
                 ViolationKind.RuleError, "Rule evaluation failed: Unhandled selection adjective 'UnhandledAdjective'.");
     }
 
-    // The seven-argument seam, spelled once: every row above is about the token, and the four arguments
-    // between the codebase and it are what a whole-solution run over no baselines passes.
+    // The eight-argument seam, spelled once: every row above is about the token, and the five arguments
+    // between the codebase and it are what a whole-solution run over no baselines and no path globs passes.
     private static CheckReport Check(ArchitectureModel model, CancellationToken cancellationToken)
     {
         return ArchChecker.Check(
-            model.Rules, Sources.LayeredModel, BaselineIndex.Empty, null, null, null, cancellationToken);
+            model.Rules, Sources.LayeredModel, BaselineIndex.Empty, null, null, null, null, cancellationToken);
     }
 
     // An adjective no evaluator switch handles, so resolving the selection throws where the vocabulary runs

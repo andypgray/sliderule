@@ -2,6 +2,7 @@ using SlideRule.Internal;
 using SlideRule.Model;
 using Code = SlideRule.Validation.SpecValidationErrorCode;
 using NamespaceGlob = SlideRule.Fluent.NamespacePattern;
+using PathGlobMatcher = SlideRule.Internal.PathGlob;
 
 namespace SlideRule.Validation;
 
@@ -40,6 +41,9 @@ internal sealed class SpecSlot
 
     /// <summary>One exact type name on <c>Named</c>.</summary>
     internal static readonly SpecSlot ExactTypeName = new(nameof(ExactTypeName), "type name", SlotCheck.Pattern);
+
+    /// <summary>A path glob on <c>Under</c>, relative to the solution directory.</summary>
+    internal static readonly SpecSlot PathGlob = new(nameof(PathGlob), "path glob", SlotCheck.PathGlob);
 
     /// <summary>A type-name suffix: <c>WithSuffix</c>, <c>MustHaveSuffix</c>.</summary>
     internal static readonly SpecSlot Suffix = new(nameof(Suffix), "suffix", SlotCheck.Pattern);
@@ -155,6 +159,7 @@ internal sealed class SpecSlot
         NamespacePattern,
         NamePattern,
         ExactTypeName,
+        PathGlob,
         Suffix,
         Prefix,
         MemberNamePattern,
@@ -240,6 +245,7 @@ internal sealed class SpecSlot
         {
             SlotCheck.Pattern => Blank(literal, Code.BlankPattern),
             SlotCheck.NamespaceStructure => Blank(literal, Code.BlankPattern) ?? Unanchored(literal),
+            SlotCheck.PathGlob => Blank(literal, Code.BlankPattern) ?? MalformedGlob(literal),
             SlotCheck.CounterpartTemplate => Blank(literal, Code.BlankPattern) ?? PlaceholderFree(literal),
             SlotCheck.ProjectOperand => Blank(literal, Code.BlankProjectPattern),
             SlotCheck.Prose => Blank(literal, Code.BlankProse) ?? MultiLine(literal),
@@ -278,6 +284,16 @@ internal sealed class SpecSlot
         if (reason is null) return null;
 
         return LiteralVerdict.About(Code.UnanchoredSubtreePattern, $"The {Label} '{literal}'", $" {reason}.");
+    }
+
+    // GRAMMAR §8 item 35: a path glob in a shape the matcher refuses rather than normalizes. The clause comes back
+    // from the matcher, as the namespace glob's does, so what it refuses and what the catalog reports cannot drift.
+    private LiteralVerdict? MalformedGlob(string literal)
+    {
+        string? reason = PathGlobMatcher.Validate(literal);
+        if (reason is null) return null;
+
+        return LiteralVerdict.About(Code.MalformedPathGlob, $"The {Label} '{literal}'", $" {reason}.");
     }
 
     // GRAMMAR §8 item 26: a template with no {Name} in it is a constant predicate — every subject derives
@@ -332,6 +348,7 @@ internal sealed class SpecSlot
     {
         Pattern,
         NamespaceStructure,
+        PathGlob,
         CounterpartTemplate,
         ProjectOperand,
         Prose,

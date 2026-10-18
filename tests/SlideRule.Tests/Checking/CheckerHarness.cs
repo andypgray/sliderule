@@ -6,6 +6,7 @@ using SlideRule.Cli.Rendering;
 using SlideRule.Codebase;
 using SlideRule.Fluent;
 using SlideRule.Hosting;
+using SlideRule.Internal;
 using SlideRule.Model;
 using SlideRule.ModelFile;
 using SlideRule.Rendering;
@@ -131,6 +132,24 @@ internal static class Checker
             RoundTripSpecName, ModelDocumentProject.ListOf(codebase), check, report);
 
         return report;
+    }
+
+    /// <summary>
+    ///     Checks over a run given the directory path globs read against — the seam every host that loads a
+    ///     solution takes — so a test can put an <c>Under</c> rule in front of files at known paths.
+    /// </summary>
+    public static CheckReport Run(CodebaseModel codebase, SolutionRoot root, Action<Arch> define)
+    {
+        return Run(codebase, BaselineIndex.Empty, null, root, define);
+    }
+
+    /// <summary>The same run with a root, narrowed as a host would narrow it.</summary>
+    public static CheckReport Run(
+        CodebaseModel codebase, BaselineIndex baselines, NarrowedUniverse? narrowing, SolutionRoot root,
+        Action<Arch> define)
+    {
+        return Pinned(
+            define, codebase, rules => ArchChecker.Check(rules, codebase, baselines, null, narrowing, null, root));
     }
 
     /// <summary>The same partial-model run, extracting <paramref name="source" /> first.</summary>

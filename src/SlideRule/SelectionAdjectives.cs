@@ -114,6 +114,28 @@ public static class SelectionAdjectives
     }
 
     /// <summary>
+    ///     Narrows the selection to the types declared under a folder or file of the solution, such as
+    ///     <c>arch.Types.Under("src/Widgets")</c> or <c>arch.Types.Under("src/*/Internal", "src/Console")</c>, which
+    ///     keeps the types any one of whose declaring files is under any of the globs. Each glob is relative to the
+    ///     solution directory and separated with <c>/</c>; <c>*</c> matches within one segment, a <c>**</c> segment
+    ///     matches any number of them, and case is ignored on every operating system. A glob names everything
+    ///     under it, so <c>Under("src/Widgets")</c> means <c>Under("src/Widgets/**")</c>, and a glob may name one
+    ///     file. A partial type is under a glob when any of its files is; a type from a referenced package or the
+    ///     framework has no file in the solution and is under none. At least one glob is required, and a blank
+    ///     glob, or one that is rooted, contains a backslash, or has a <c>.</c>, <c>..</c> or empty segment, is
+    ///     reported when the spec is loaded. Where the selection is a rule's subject, each glob is also checked on
+    ///     its own: one that matches no type while the others match fails the rule, naming it.
+    /// </summary>
+    public static Selection Under(
+        this Selection selection,
+        [SpecSlot(nameof(SpecSlot.PathGlob))] string first,
+        [SpecSlot(nameof(SpecSlot.PathGlob))] params string[] more)
+    {
+        IReadOnlyList<string> globs = OperandList.OneOrMore(first, more, glob => glob);
+        return Append(selection, new UnderAdjective(globs));
+    }
+
+    /// <summary>
     ///     Narrows the selection to the types implementing an interface, such as
     ///     <c>arch.Types.Implementing(typeof(IHandler&lt;&gt;))</c>. The whole interface set is read,
     ///     with type arguments substituted, so an interface reached through a base class or through

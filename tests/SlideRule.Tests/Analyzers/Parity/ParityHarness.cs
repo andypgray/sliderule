@@ -8,6 +8,7 @@ using SlideRule.Codebase;
 using SlideRule.Extraction;
 using SlideRule.Extraction.Fragments;
 using SlideRule.Hosting;
+using SlideRule.Internal;
 using SlideRule.ModelFile;
 using SlideRule.Rendering;
 using SlideRule.Roslyn;
@@ -210,8 +211,8 @@ internal sealed class ParitySubject
 
     internal ParitySubject(
         string name, CodebaseModel codebase, ModelDocument document, string modelText,
-        IReadOnlyList<AdditionalText> files, BaselineIndex baselines, ParityExpectation expectation,
-        IReadOnlyList<ParityCompilation> compilations)
+        IReadOnlyList<AdditionalText> files, BaselineIndex baselines, string modelDirectory,
+        ParityExpectation expectation, IReadOnlyList<ParityCompilation> compilations)
     {
         Name = name;
         Codebase = codebase;
@@ -219,6 +220,7 @@ internal sealed class ParitySubject
         ModelText = modelText;
         Files = files;
         Baselines = baselines;
+        ModelDirectory = modelDirectory;
         Expectation = expectation;
         Compilations = compilations;
     }
@@ -240,6 +242,9 @@ internal sealed class ParitySubject
 
     /// <summary>The baselines the whole-solution check loads.</summary>
     internal BaselineIndex Baselines { get; }
+
+    /// <summary>Where the model file sits, which both tiers read path globs against.</summary>
+    internal string ModelDirectory { get; }
 
     /// <summary>What the whole-solution check says the build may report.</summary>
     internal ParityExpectation Expectation { get; }
@@ -339,13 +344,15 @@ internal static class ParityHarness
     /// <param name="document">The model file's rules, which are the only ones the build tier ever sees.</param>
     /// <param name="codebase">The merged model.</param>
     /// <param name="baselines">The baselines as the tool loads them.</param>
+    /// <param name="modelDirectory">The directory path globs read against, as the build tier reads them.</param>
     internal static ParityExpectation ExpectedFor(
-        ModelDocument document, CodebaseModel codebase, BaselineIndex baselines)
+        ModelDocument document, CodebaseModel codebase, BaselineIndex baselines, string modelDirectory)
     {
         List<ArchRule> inRules = document.Rules
             .Where(rule => OneProjectDecidability.Classify(rule).Decidable)
             .ToList();
-        CheckReport report = ArchChecker.Check(inRules, codebase, baselines, null);
+        CheckReport report = ArchChecker.Check(
+            inRules, codebase, baselines, null, null, null, new SolutionRoot(modelDirectory));
 
         List<string> unmeasured = report.Results
             .Where(result => result.Violations.Any(violation =>
@@ -560,8 +567,8 @@ internal static class ParityHarness
             var siblings = new SiblingProjects(BuildTierAnalyzer.ProjectTable(subject.Document), owner);
             IReadOnlyList<CodebaseFragment> fragments =
                 FragmentExtractor.ExtractOneProject(input, siblings, cancellationToken);
-            CheckReport report =
-                BuildTierAnalyzer.CheckOneProject(fragments, [rule], subject.Baselines, cancellationToken);
+            CheckReport report = BuildTierAnalyzer.CheckOneProject(
+                fragments, [rule], subject.Baselines, subject.ModelDirectory, cancellationToken);
 
             HashSet<string> owned = compilation.Compilation.SyntaxTrees
                 .Select(tree => tree.FilePath)
@@ -633,9 +640,10 @@ internal static class ParityHarness
             files.Add(BuildTier.File(resolved, baselineText));
         }
 
-        ParityExpectation expectation = ExpectedFor(document, codebase, baselines);
+        ParityExpectation expectation = ExpectedFor(document, codebase, baselines, modelDirectory);
 
-        return new ParitySubject(name, codebase, document, text, files, baselines, expectation, compilations);
+        return new ParitySubject(
+            name, codebase, document, text, files, baselines, modelDirectory, expectation, compilations);
     }
 
     // The file the tool would have read, at the path the tool resolves it to. A declared path with nothing

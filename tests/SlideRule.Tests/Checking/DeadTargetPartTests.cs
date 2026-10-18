@@ -1,6 +1,7 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Checking;
+using SlideRule.Internal;
+using Xunit;
 
 namespace SlideRule.Tests.Checking;
 
@@ -39,6 +40,22 @@ public sealed class DeadTargetPartTests
 
         result.ShouldHavePassed();
         result.ShouldHaveWarnedPartlyInertOnOperand("types named `Ghost`");
+    }
+
+    [Fact]
+    public void DeadGlobInAnUnderList_WarnsNamingTheOneGlobSpelling()
+    {
+        // A glob is read per entry as a name is: the live one bans Writer's reach into Internal, and the dead one
+        // is a clause of the ban that went quiet.
+        RuleResult result = Checker.Run(Sources.FolderModel, new SolutionRoot(Sources.FolderRoot), arch =>
+                arch.Rule("part/glob")
+                    .Enforce(arch.Types.Named("Writer")
+                        .MustNotReference(arch.Types.Under("src/Console/Internal", "src/Gone")))
+                    .Because("b"))
+            .Single();
+
+        result.ShouldHaveFailedWithSingleEdge(ViolationKind.Reference, "App.Writer", "App.Ansi");
+        result.ShouldHaveWarnedPartlyInertOnOperand("types under `src/Gone`");
     }
 
     [Fact]

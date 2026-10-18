@@ -581,6 +581,27 @@ internal sealed class ModelNodeReader
         return CheckNamespaceGlob(value, glob) ? glob : null;
     }
 
+    /// <summary>
+    ///     A list of path globs, each refused on <see cref="PathGlob.Validate" />'s terms, so a glob spec-load
+    ///     validation would have refused never reaches the matcher, which throws on one.
+    /// </summary>
+    internal IReadOnlyList<string>? RequiredPathGlobs(StrictJsonValue obj, string where, string key)
+    {
+        StrictJsonValue? array = RequiredArray(obj, where, key);
+        if (array is null) return null;
+
+        return Each(array, element =>
+        {
+            string? glob = AsText(element, EntryOf(key));
+            if (glob is null) return null;
+
+            if (PathGlob.Validate(glob) is not { } reason) return glob;
+
+            RefuseAt(element, "path glob " + JsonText.Quote(glob) + " " + reason + ".");
+            return null;
+        });
+    }
+
     internal string? RequiredTypeNameGlob(StrictJsonValue obj, string where, string key)
     {
         StrictJsonValue? value = Required(obj, where, key);

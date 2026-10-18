@@ -580,7 +580,11 @@ internal static class SiblingCorpus
         return new SiblingWorld()
             .Project(ParityRemainderSpec.SideProject, ParityRemainderSpec.SideAssembly, ParityRemainderSpec.SideSource)
             .Project(
-                ParityRemainderSpec.OwnProject, ParityRemainderSpec.OwnAssembly, ParityRemainderSpec.OwnSource,
+                ParityRemainderSpec.OwnProject, ParityRemainderSpec.OwnAssembly,
+                [
+                    ($"{ParityRemainderSpec.OwnAssembly}.cs", ParityRemainderSpec.OwnSource),
+                    (ParityRemainderSpec.FolderedPath, ParityRemainderSpec.FolderedSource)
+                ],
                 ParityRemainderSpec.SideAssembly)
             .Subject("Sibling/remainder", ParityRemainderSpec.Define);
     }

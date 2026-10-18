@@ -166,11 +166,15 @@ internal static class ArchChecker
     ///     The fact that part of the codebase never loaded, or null when the model is whole.
     /// </param>
     /// <returns>The aggregate report over <paramref name="rules" /> only, in the order they were given.</returns>
+    /// <param name="root">
+    ///     The directory path globs are relative to, or null for a run that has none to give — the public
+    ///     overloads above, among them.
+    /// </param>
     internal static CheckReport Check(
         IReadOnlyList<ArchRule> rules, CodebaseModel codebase, BaselineIndex baselines, DiffContext? diff,
-        NarrowedUniverse? narrowing, IncompleteModel? incompleteModel)
+        NarrowedUniverse? narrowing, IncompleteModel? incompleteModel, SolutionRoot? root = null)
     {
-        return Check(rules, codebase, baselines, diff, narrowing, incompleteModel, CancellationToken.None);
+        return Check(rules, codebase, baselines, diff, narrowing, incompleteModel, root, CancellationToken.None);
     }
 
     /// <summary>
@@ -187,7 +191,8 @@ internal static class ArchChecker
     /// </remarks>
     internal static CheckReport Check(
         IReadOnlyList<ArchRule> rules, CodebaseModel codebase, BaselineIndex baselines, DiffContext? diff,
-        NarrowedUniverse? narrowing, IncompleteModel? incompleteModel, CancellationToken cancellationToken)
+        NarrowedUniverse? narrowing, IncompleteModel? incompleteModel, SolutionRoot? root,
+        CancellationToken cancellationToken)
     {
         Guard.NotNull(rules, nameof(rules));
         Guard.NotNull(codebase, nameof(codebase));
@@ -196,7 +201,7 @@ internal static class ArchChecker
         // One selection evaluator for the whole run — the constraint arms and the tripwire path share it.
         // Its constructor materializes the solution-declared type list and the noun indexes, so building a
         // second would repeat a full pass over the model; it holds no per-rule mutable state.
-        var selections = new SelectionEvaluator(codebase);
+        var selections = new SelectionEvaluator(codebase, root);
         var evaluator = new ConstraintEvaluator(codebase, selections, incompleteModel, narrowing);
 
         // An explicit loop rather than a Select, so the poll sits before the rule it guards; the results

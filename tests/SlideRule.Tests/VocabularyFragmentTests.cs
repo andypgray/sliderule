@@ -206,6 +206,17 @@ public class VocabularyFragmentTests
             .ShouldBe("Types must be attributed with `[ApiController]`.");
     }
 
+    // ---- The source-location adjective (GRAMMAR §5.2): the globs as written, backticked ----
+
+    [Fact]
+    public void Under_RendersTheGlobsAsAnInlineClause()
+    {
+        SentenceRenderer.Subject(Arch.Types.Under("src/Widgets"))
+            .ShouldBe("Types under `src/Widgets`");
+        SentenceRenderer.Subject(Arch.Types.Under("src/*/Internal", "**/Generated"))
+            .ShouldBe("Types under `src/*/Internal` or `**/Generated`");
+    }
+
     // ---- Negative hierarchy/attribute verbs (GRAMMAR §5.3): none-of over the anchor list ----
 
     [Fact]

@@ -97,6 +97,12 @@ internal static class AuthoringHints
     private const string InertNameTail =
         "; a name that matches nothing bans nothing, so decide before keeping it";
 
+    // What a path glob is: the shape advice of any selection carrying an Under list, one dead glob spelled alone
+    // included. A glob is a pattern, so its dead pieces take the pattern tails.
+    private const string PathGlobClause =
+        "a path glob is relative to the solution directory with `/` between segments, and reaches a type when any "
+        + "file declaring it is under the glob";
+
     // The member twin of NamedClause. A member's name has no namespace or arity to leave out; what a reader
     // reaches for by mistake is the declaring type or the signature.
     private const string MemberNamedClause =
@@ -273,6 +279,10 @@ internal static class AuthoringHints
         // is cured as a name, not as a glob. Only the selection's own list counts; one inside an Except
         // payload exempts, and a dead exemption empties nothing.
         if (selection.Adjectives.Any(adjective => adjective is NamedAdjective)) return NamedClause;
+
+        // An Under list says where the types are declared, so a selection carrying one that matched nothing failed
+        // on a path the same way: a glob relative to the wrong directory, or one naming a folder renamed since.
+        if (selection.Adjectives.Any(adjective => adjective is UnderAdjective)) return PathGlobClause;
 
         return SelectionWalk.NounOf(selection) switch
         {

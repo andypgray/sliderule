@@ -506,6 +506,22 @@ public class ModelReificationTests
     }
 
     [Fact]
+    public void Under_ReifiesItsGlobsAsWritten()
+    {
+        // No normalization: the model carries what the author wrote, case and all, for every reader to match.
+        var constraint = Checker.Model(arch => arch.Rule("console/internal")
+                .Enforce(arch.Types.Under("src/Console/Internal", "src/*/Generated").MustBeInternal())
+                .Because("The folder is the boundary; nothing outside the assembly names what is in it."))
+            .Rules.Single()
+            .Constraint
+            .ShouldBeOfType<MustBeInternalConstraint>();
+
+        constraint.Subject!.Adjectives.OfType<UnderAdjective>()
+            .ShouldHaveSingleItem()
+            .Globs.ShouldBe(["src/Console/Internal", "src/*/Generated"]);
+    }
+
+    [Fact]
     public void MemberExcept_ReifiesItsPayloadsAsMemberSelections_InAuthoringOrder()
     {
         // No union node on the member stratum: the adjective holds the payload list itself, each payload a

@@ -108,6 +108,11 @@ public sealed class SpecLiteralSentenceTests
                 "SR1033",
                 """arch.Projects.Named("A").MustSetProperty("Nullable", " ");""",
                 "Blank property value."
+            },
+            {
+                "SR1035",
+                """arch.Types.Under("src\\Widgets");""",
+                "The path glob 'src\\Widgets' contains a backslash; separate segments with `/`."
             }
         };
 

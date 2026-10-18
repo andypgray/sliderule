@@ -1,6 +1,7 @@
 using SlideRule.Baselines;
 using SlideRule.Checking;
 using SlideRule.Hosting;
+using SlideRule.Internal;
 using SlideRule.Roslyn.Baselines;
 using SlideRule.Roslyn.Diagnostics;
 
@@ -66,7 +67,8 @@ internal static class ArchCheckSequence
         NarrowedUniverse? narrowing = Narrowing(solutionPath, extracted.Diagnostics.UncheckedProjects);
         IncompleteModel? incomplete = Incomplete(extracted.Diagnostics);
 
-        return ArchChecker.Check(rules, extracted.Codebase, baselines, diff, narrowing, incomplete);
+        return ArchChecker.Check(
+            rules, extracted.Codebase, baselines, diff, narrowing, incomplete, new SolutionRoot(solutionDirectory));
     }
 
     // Null unless this run actually checked less than the solution declares — measured from the load, never

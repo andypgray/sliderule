@@ -48,6 +48,10 @@ public sealed class OneProjectDecidabilityTests
         "Selects other types by attribute, and a project compiled against another's assembly does not see "
         + "every attribute its source declares.";
 
+    private const string Under =
+        "Selects other types by the files declaring them, and a project compiled against another's assembly does "
+        + "not see its source files.";
+
     private const string Declarer =
         "Spares a type by any project that declares it, and one project's compilation cannot tell when "
         + "another project compiles the same type, so it would report what the whole solution exempts.";
@@ -288,6 +292,37 @@ public sealed class OneProjectDecidabilityTests
         // Act + Assert
         ShouldAllClassifyAs(
             shapes, AttributedWith, "AttributedWith read over the whole solution but not classified as such");
+    }
+
+    [Fact]
+    public void Classify_UnderOnTheSubject_IsDecidable()
+    {
+        // This project compiled its own types from files it can name, so a glob over them is read off its own
+        // source, through a layer definition as much as directly.
+        OneProjectVerdict bare = Enforcing(arch => arch.Types.Under("src/Widgets").MustBeSealed());
+        OneProjectVerdict inALayer = Enforcing(arch => arch.Layer("Widgets", arch.Types.Under("src/Widgets"))
+            .MustBeSealed());
+
+        bare.Reason.ShouldBeNull();
+        inALayer.Reason.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Classify_UnderReadOverTheWholeSolution_ReportsTheUnderReason()
+    {
+        // Arrange — the three readings Authored's row leaves out, for the reason a sibling's types arrive with no
+        // declaring file to read a path from.
+        (string Where, Func<Arch, Constraint> Rule)[] shapes =
+        [
+            ("in an operand", arch => arch.Types.MustNotReference(arch.Types.Under("src/Legacy"))),
+            ("in an Except payload of the subject",
+                arch => arch.Types.Except(arch.Types.Under("src/Legacy")).MustBeSealed()),
+            ("in a layer definition an operand names",
+                arch => arch.Types.MustNotReference(arch.Layer("Legacy", arch.Types.Under("src/Legacy"))))
+        ];
+
+        // Act + Assert
+        ShouldAllClassifyAs(shapes, Under, "Under read over the whole solution but not classified as such");
     }
 
     [Fact]

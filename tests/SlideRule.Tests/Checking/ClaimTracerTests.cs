@@ -1,11 +1,12 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Checking;
 using SlideRule.Cli.Rendering;
 using SlideRule.Codebase;
 using SlideRule.Hosting;
+using SlideRule.Internal;
 using SlideRule.Tests.Extraction;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.Checking;
 
@@ -332,6 +333,38 @@ public sealed class ClaimTracerTests
 
         trace.Verdict.ShouldBe(kept ? ClaimVerdict.Claimed : ClaimVerdict.Narrowed);
         trace.Steps.Select(candidate => candidate.Text).ShouldBe([step]);
+    }
+
+    [Fact]
+    public void AnUnderAdjective_NamesTheFileAndTheGlobThatKeptTheType()
+    {
+        // The first declaring file under a glob, relative to the solution directory: a partial type answers
+        // from whichever of its files the glob reaches.
+        var tracer = new ClaimTracer(Sources.FolderModel, new SolutionRoot(Sources.FolderRoot));
+        var arch = new Arch();
+
+        ClaimTrace kept = tracer.Trace(arch.Types.Under("src/Widgets", "vendor"), Sources.FolderModel.Type("App.Split"));
+
+        kept.Verdict.ShouldBe(ClaimVerdict.Claimed);
+        kept.Steps.Select(step => step.Text).ShouldBe(["it is declared in `vendor/Split.Vendored.cs`, under `vendor`"]);
+    }
+
+    [Fact]
+    public void AnUnderAdjective_SaysWhyNoFilePutTheTypeUnderTheGlobs()
+    {
+        var tracer = new ClaimTracer(Sources.FolderModel, new SolutionRoot(Sources.FolderRoot));
+        var arch = new Arch();
+
+        ClaimTrace outside = tracer.Trace(arch.Types.Under("src/Widgets", "src/Console"), Sources.FolderModel.Type("App.Shared"));
+
+        // A declared type the model records no file for, which no glob can reach either.
+        TypeNode bare = SyntheticNodes.Type("App.Bare");
+        ClaimTrace fileless = new ClaimTracer(SyntheticNodes.Referencing([bare]), new SolutionRoot(Sources.FolderRoot))
+            .Trace(arch.Types.Under("src"), bare);
+
+        outside.Verdict.ShouldBe(ClaimVerdict.Narrowed);
+        outside.Steps.Select(step => step.Text).ShouldBe(["none of the files declaring it is under `src/Widgets` or `src/Console`"]);
+        fileless.Steps.Select(step => step.Text).ShouldBe(["it has no source file in the solution"]);
     }
 
     private static TypeClaims ClaimsOn(string fullName, Action<Arch> define)

@@ -43,7 +43,7 @@ public sealed class SpecLiteralDescriptorTests
     private static readonly string[] Ids =
     [
         "SR1000", "SR1001", "SR1005", "SR1006", "SR1008", "SR1010", "SR1012", "SR1016", "SR1017", "SR1024",
-        "SR1025", "SR1026", "SR1030", "SR1031", "SR1032", "SR1033", ToolFault, ToolFault
+        "SR1025", "SR1026", "SR1030", "SR1031", "SR1032", "SR1033", "SR1035", ToolFault, ToolFault
     ];
 
     /// <summary>The closing sentence every verdict description carries, restated here to pin it.</summary>
@@ -64,7 +64,7 @@ public sealed class SpecLiteralDescriptorTests
     ///     that is not a URL. Between them they reach every arm every slot carries.
     /// </summary>
     private static readonly string[] Probes =
-        ["", "   ", "one\ntwo", "MyApp.*.Controllers.*", "Bad ID", "IService", "ADR 7"];
+        ["", "   ", "one\ntwo", "MyApp.*.Controllers.*", "Bad ID", "IService", "ADR 7", "/src"];
 
     /// <summary>Each descriptor by its field, with the ID, title, message format and description it ships with.</summary>
     public static TheoryData<string, string, string, string, string> WordingCases =>
@@ -231,6 +231,15 @@ public sealed class SpecLiteralDescriptorTests
                 "A MustSetProperty was given an empty property name or value. No property has an empty name, and "
                 + "MSBuild treats a property set to nothing as unset, so either way the rule asks for something no "
                 + "project can declare and fails every project it reads." + Closing
+            },
+            {
+                nameof(SpecLiteralDiagnostics.MalformedPathGlob),
+                "SR1035",
+                "A path glob is malformed",
+                "{0}",
+                "An Under was given a path glob that is rooted, contains a backslash, or has a `.`, `..` or empty "
+                + "segment or a `**` inside a longer segment. A path glob is relative to the solution directory "
+                + "with `/` between segments, so a glob in any of those shapes matches no declaring file." + Closing
             },
             {
                 nameof(SpecLiteralDiagnostics.AnalyzerFault),

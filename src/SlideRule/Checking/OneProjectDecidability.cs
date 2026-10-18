@@ -63,6 +63,14 @@ internal static class OneProjectDecidability
         + "every attribute its source declares.";
 
     /// <summary>
+    ///     A path glob applied to types another project declares: a project compiled against another's assembly
+    ///     sees those types without the source files they were declared in, so it has no path to read.
+    /// </summary>
+    private const string UnderReason =
+        "Selects other types by the files declaring them, and a project compiled against another's assembly does "
+        + "not see its source files.";
+
+    /// <summary>
     ///     A project noun standing where plain membership spares a type, which asks who declares it — and
     ///     answers for every copy at once, so no edge's attribution narrows the question back down.
     /// </summary>
@@ -399,8 +407,8 @@ internal static class OneProjectDecidability
             typeof(DerivedFromAdjective),
             typeof(ExceptAdjective));
 
-        // The two side-keyed adjective rows: what each costs depends on whose types it is filtering, and
-        // neither is rescued by polarity — a filter that can answer either way over another project's types
+        // The side-keyed adjective rows: what each costs depends on whose types it is filtering. Neither of
+        // these two is rescued by polarity — a filter that can answer either way over another project's types
         // both admits types the whole solution excludes and excludes ones it admits.
         rows.Add(
             typeof(AuthoredAdjective),
@@ -408,6 +416,14 @@ internal static class OneProjectDecidability
         rows.Add(
             typeof(AttributedWithAdjective),
             position => position.Side == SelectionPosition.Target ? AttributedWithReason : null);
+
+        // The third side-keyed row. The own project's types carry the paths of the files that declare them, so a
+        // glob over them is decidable; another project's carry none here, so a glob can only exclude them. A ban
+        // would survive that, but an allow-list and an Except payload, which stand on the same side, would not, and
+        // the row keys on the side rather than on which of the three a position is.
+        rows.Add(
+            typeof(UnderAdjective),
+            position => position.Side == SelectionPosition.Target ? UnderReason : null);
     }
 
     private static void AddMemberAdjectives(Dictionary<Type, Func<OneProjectPosition, string?>> rows)

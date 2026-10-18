@@ -10,6 +10,20 @@
   </Suppression>
   <Suppression>
     <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:SlideRule.IMemberInfo.get_IsOverride</Target>
+    <Left>lib/netstandard2.0/SlideRule.dll</Left>
+    <Right>lib/netstandard2.0/SlideRule.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:SlideRule.IMemberInfo.get_IsSealed</Target>
+    <Left>lib/netstandard2.0/SlideRule.dll</Left>
+    <Right>lib/netstandard2.0/SlideRule.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
     <Target>M:SlideRule.IPackageReferenceInfo.get_Frameworks</Target>
     <Left>lib/netstandard2.0/SlideRule.dll</Left>
     <Right>lib/netstandard2.0/SlideRule.dll</Right>
@@ -18,6 +32,76 @@
   <Suppression>
     <DiagnosticId>CP0002</DiagnosticId>
     <Target>M:SlideRule.IProjectInfo.get_Properties</Target>
+    <Left>lib/netstandard2.0/SlideRule.dll</Left>
+    <Right>lib/netstandard2.0/SlideRule.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:SlideRule.MemberSelectionAdjectives.Except``1(``0,SlideRule.Fluent.MemberSelection,SlideRule.Fluent.MemberSelection[])</Target>
+    <Left>lib/netstandard2.0/SlideRule.dll</Left>
+    <Right>lib/netstandard2.0/SlideRule.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:SlideRule.MemberSelectionAdjectives.Named``1(``0,System.String,System.String[])</Target>
+    <Left>lib/netstandard2.0/SlideRule.dll</Left>
+    <Right>lib/netstandard2.0/SlideRule.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:SlideRule.MemberSelectionAdjectives.ThatAreInternal``1(``0)</Target>
+    <Left>lib/netstandard2.0/SlideRule.dll</Left>
+    <Right>lib/netstandard2.0/SlideRule.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:SlideRule.MemberSelectionAdjectives.ThatArePrivate``1(``0)</Target>
+    <Left>lib/netstandard2.0/SlideRule.dll</Left>
+    <Right>lib/netstandard2.0/SlideRule.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:SlideRule.MemberSelectionAdjectives.ThatArePrivateProtected``1(``0)</Target>
+    <Left>lib/netstandard2.0/SlideRule.dll</Left>
+    <Right>lib/netstandard2.0/SlideRule.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:SlideRule.MemberSelectionAdjectives.ThatAreProtected``1(``0)</Target>
+    <Left>lib/netstandard2.0/SlideRule.dll</Left>
+    <Right>lib/netstandard2.0/SlideRule.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:SlideRule.MemberSelectionAdjectives.ThatAreProtectedInternal``1(``0)</Target>
+    <Left>lib/netstandard2.0/SlideRule.dll</Left>
+    <Right>lib/netstandard2.0/SlideRule.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:SlideRule.MemberSelectionAdjectives.ThatArePublic``1(``0)</Target>
+    <Left>lib/netstandard2.0/SlideRule.dll</Left>
+    <Right>lib/netstandard2.0/SlideRule.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:SlideRule.MemberSelectionConstraints.MustBeOverridable(SlideRule.Fluent.MemberSelection)</Target>
+    <Left>lib/netstandard2.0/SlideRule.dll</Left>
+    <Right>lib/netstandard2.0/SlideRule.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:SlideRule.MemberSelectionConstraints.MustBeProtected(SlideRule.Fluent.MemberSelection)</Target>
     <Left>lib/netstandard2.0/SlideRule.dll</Left>
     <Right>lib/netstandard2.0/SlideRule.dll</Right>
     <IsBaselineSuppression>true</IsBaselineSuppression>
@@ -46,6 +130,27 @@
   <Suppression>
     <DiagnosticId>CP0002</DiagnosticId>
     <Target>M:SlideRule.ProjectSelectionConstraints.MustTarget(SlideRule.Fluent.ProjectSelection,System.String)</Target>
+    <Left>lib/netstandard2.0/SlideRule.dll</Left>
+    <Right>lib/netstandard2.0/SlideRule.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:SlideRule.SelectionAdjectives.Under(SlideRule.Selection,System.String,System.String[])</Target>
+    <Left>lib/netstandard2.0/SlideRule.dll</Left>
+    <Right>lib/netstandard2.0/SlideRule.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0006</DiagnosticId>
+    <Target>P:SlideRule.IMemberInfo.IsOverride</Target>
+    <Left>lib/netstandard2.0/SlideRule.dll</Left>
+    <Right>lib/netstandard2.0/SlideRule.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0006</DiagnosticId>
+    <Target>P:SlideRule.IMemberInfo.IsSealed</Target>
     <Left>lib/netstandard2.0/SlideRule.dll</Left>
     <Right>lib/netstandard2.0/SlideRule.dll</Right>
     <IsBaselineSuppression>true</IsBaselineSuppression>

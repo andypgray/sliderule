@@ -83,6 +83,7 @@ internal static class VocabularyCatalog
             TypeAdjective(nameof(SelectionAdjectives.WithPrefix), arch => arch.Types.WithPrefix("Legacy")),
             TypeAdjective(nameof(SelectionAdjectives.WithNameMatching), arch => arch.Types.WithNameMatching("*Repo*")),
             TypeAdjective(nameof(SelectionAdjectives.Named), arch => arch.Types.Named("OrdersRepository")),
+            TypeAdjective(nameof(SelectionAdjectives.Under), arch => arch.Types.Under("src/Widgets")),
             TypeAdjective(nameof(SelectionAdjectives.Implementing), arch => arch.Types.Implementing(typeof(IHandler<>))),
             TypeAdjective(nameof(SelectionAdjectives.DerivedFrom), arch => arch.Types.DerivedFrom(typeof(ControllerBase))),
             TypeAdjective(nameof(SelectionAdjectives.AttributedWith),

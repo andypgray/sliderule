@@ -86,6 +86,11 @@ internal static class VocabularyRemainderSpec
             .Enforce(arch.Types.InNamespace("Remainder.Internal.*")
                 .MustBeInternal())
             .Because("Everything under Internal is free to change, which only holds while nothing outside can name it.");
+
+        arch.Rule("remainder/internal-folders-stay-internal")
+            .Enforce(arch.Types.Under("src/*/Internal", "src/Vendored")
+                .MustBeInternal())
+            .Because("A folder is the boundary where one namespace holds everything, and a type in it is free to change.");
     }
 
     // Both directions of the two hierarchy axes.

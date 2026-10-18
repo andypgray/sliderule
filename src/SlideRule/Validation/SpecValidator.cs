@@ -1080,6 +1080,10 @@ internal static class SpecValidator
                     foreach (string name in a.Names) yield return (name, SpecSlot.ExactTypeName);
 
                     break;
+                case UnderAdjective a:
+                    foreach (string glob in a.Globs) yield return (glob, SpecSlot.PathGlob);
+
+                    break;
                 case WithSuffixAdjective a:
                     yield return (a.Suffix, SpecSlot.Suffix);
                     break;

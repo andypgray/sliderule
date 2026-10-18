@@ -332,7 +332,8 @@ internal sealed class BuildTierAnalyzer : DiagnosticAnalyzer
         var siblings = new SiblingProjects(ProjectTable(document), ownProjectName);
         var declaringTrees = new Lazy<DeclaringTrees>(() => DeclaringTrees.Of(compilation));
 
-        return new CheckState(loaded, ownProjectName, plan, siblings, TreesByPath(compilation), declaringTrees);
+        return new CheckState(
+            loaded, ownProjectName, modelDirectory, plan, siblings, TreesByPath(compilation), declaringTrees);
     }
 
     // One document's whole share of the work, from deciding whether it has any to reporting its findings.
@@ -618,15 +619,22 @@ internal sealed class BuildTierAnalyzer : DiagnosticAnalyzer
     ///     <paramref name="fragments" /> merged and <paramref name="rules" /> checked over them, narrowed to
     ///     what one project's view can decide.
     /// </summary>
+    /// <remarks>
+    ///     Path globs read against <paramref name="modelDirectory" />: the model file is rendered beside the
+    ///     solution, so its directory is the solution directory the check's own hosts read them against. The
+    ///     root is built in here rather than carried in, so no Core type enters the state that outlives this
+    ///     boundary.
+    /// </remarks>
     [MethodImpl(MethodImplOptions.NoInlining)]
     internal static CheckReport CheckOneProject(
         IReadOnlyList<CodebaseFragment> fragments, IReadOnlyList<ArchRule> rules, BaselineIndex baselines,
-        CancellationToken cancellationToken)
+        string modelDirectory, CancellationToken cancellationToken)
     {
         CodebaseModel codebase = FragmentMerger.Merge(fragments);
+        var root = new SolutionRoot(modelDirectory);
 
         return ArchChecker.Check(
-            rules, codebase, baselines, null, NarrowedUniverse.OneProject, null, cancellationToken);
+            rules, codebase, baselines, null, NarrowedUniverse.OneProject, null, root, cancellationToken);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
@@ -794,11 +802,12 @@ internal sealed class BuildTierAnalyzer : DiagnosticAnalyzer
 
         [MethodImpl(MethodImplOptions.NoInlining)]
         internal CheckState(
-            LoadedModel loaded, string ownProjectName, RulePlan plan, SiblingProjects siblings,
+            LoadedModel loaded, string ownProjectName, string modelDirectory, RulePlan plan, SiblingProjects siblings,
             IReadOnlyDictionary<string, SyntaxTree> treesByPath, Lazy<DeclaringTrees> declaringTrees)
         {
             Loaded = loaded;
             OwnProject = ownProjectName;
+            ModelDirectory = modelDirectory;
             Plan = plan;
             Siblings = siblings;
             FirstDeclarers = treesByPath;
@@ -810,6 +819,9 @@ internal sealed class BuildTierAnalyzer : DiagnosticAnalyzer
 
         /// <summary>The project this compilation's types are recorded under.</summary>
         internal string OwnProject { get; }
+
+        /// <summary>The model file's directory, which path globs read against; a string, so no Core type rides here.</summary>
+        private string ModelDirectory { get; }
 
         /// <summary>The rules to check and the baselines to check them against.</summary>
         private RulePlan Plan { get; }
@@ -848,7 +860,7 @@ internal sealed class BuildTierAnalyzer : DiagnosticAnalyzer
         internal IEnumerable<BuildFinding> Reportable(
             IReadOnlyList<CodebaseFragment> fragments, Func<string, bool> ownsFile, CancellationToken cancellationToken)
         {
-            CheckReport report = CheckOneProject(fragments, Plan.ToCheck, Plan.Baselines, cancellationToken);
+            CheckReport report = CheckOneProject(fragments, Plan.ToCheck, Plan.Baselines, ModelDirectory, cancellationToken);
 
             IReadOnlyList<BuildFinding> findings = BuildFindings.From(report, ownsFile);
 

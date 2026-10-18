@@ -142,6 +142,7 @@ internal static class NodeWriters
         Add<WithPrefixAdjective>(arms, (w, a) => w.Field("prefix", a.Prefix));
         Add<WithNameMatchingAdjective>(arms, (w, a) => w.Field("glob", a.Glob));
         Add<NamedAdjective>(arms, (w, a) => w.StringsField("names", a.Names));
+        Add<UnderAdjective>(arms, (w, a) => w.StringsField("globs", a.Globs));
         Add<ImplementingAdjective>(arms, (w, a) => w.ConstructionAnchor("anchor", a.Anchor));
         Add<DerivedFromAdjective>(arms, (w, a) => w.ConstructionAnchor("anchor", a.Anchor));
         Add<AttributedWithAdjective>(arms, (w, a) => w.ConstructionAnchor("anchor", a.Anchor));

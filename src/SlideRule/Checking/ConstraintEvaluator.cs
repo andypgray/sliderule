@@ -446,7 +446,7 @@ internal sealed class ConstraintEvaluator
                     yield return inner;
             }
 
-        foreach (Selection deadName in DeadNames.In(selection, matched.Nodes))
+        foreach (Selection deadName in DeadNames.In(selection, matched.Nodes, _selections))
             yield return deadName;
     }
 
@@ -1119,7 +1119,7 @@ internal sealed class ConstraintEvaluator
 
         if (resolved is not { Count: > 0 } whole) return (empty, resolved, family);
 
-        List<Violation> deadNames = EmptyParts(DeadNames.In(subject, whole.Nodes));
+        List<Violation> deadNames = EmptyParts(DeadNames.In(subject, whole.Nodes, _selections));
         return deadNames.Count > 0 ? (deadNames, null, null) : (empty, resolved, family);
     }
 
@@ -1149,7 +1149,7 @@ internal sealed class ConstraintEvaluator
             if (matched.Count == 0)
                 dead.Add(part);
             else
-                dead.AddRange(DeadNames.In(part, matched.Nodes));
+                dead.AddRange(DeadNames.In(part, matched.Nodes, _selections));
         }
 
         return (collected, dead);
@@ -1187,7 +1187,7 @@ internal sealed class ConstraintEvaluator
             (List<SelectionAdmission> collected, dead) = WalkParts(union.Parts);
             whole = SelectionAdmission.Folded(_selections, union, collected);
             if (whole.Count > 0)
-                dead.AddRange(DeadNames.In(union, whole.Nodes));
+                dead.AddRange(DeadNames.In(union, whole.Nodes, _selections));
             else if (dead.Count == 0)
                 dead.Add(union);
         }

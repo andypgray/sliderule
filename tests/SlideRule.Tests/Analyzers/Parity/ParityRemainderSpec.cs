@@ -53,6 +53,15 @@ internal static class ParityRemainderSpec
         public class StampAttribute : System.Attribute { }
         """;
 
+    /// <summary>
+    ///     A second file of the own project, under the directory the model file sits in, so a path glob can reach
+    ///     what it declares; the other file's path is relative and under no glob.
+    /// </summary>
+    internal const string FolderedPath = "/repo/src/Own/Internal/Foldered.cs";
+
+    /// <summary>The type the foldered file declares, public where its folder says it should not be.</summary>
+    internal const string FolderedSource = "namespace Own; public class Foldered { }";
+
     /// <summary>The own project's types, one per verb the spec below states.</summary>
     internal const string OwnSource =
         """
@@ -310,6 +319,10 @@ internal static class ParityRemainderSpec
         arch.Rule("remainder/has-the-prefix")
             .Enforce(arch.Types.Named("WrongHead").MustHavePrefix("Default"))
             .Because("The default implementation is the one a reader looks for first.");
+
+        arch.Rule("remainder/internal-folder-is-internal")
+            .Enforce(arch.Types.Under("src/Own/Internal").MustBeInternal())
+            .Because("A folder is the boundary where one namespace holds everything, so what is in it stays internal.");
 
         arch.Rule("remainder/has-the-name-shape")
             .Enforce(arch.Types.Named("WrongShape").MustHaveNameMatching("*Query"))

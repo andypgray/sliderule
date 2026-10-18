@@ -452,7 +452,9 @@ list is static and one form: `web.MustNotUse(() => DateTime.Now, () => DateTime.
   a subject that matched nothing fails once, whole, with no per-name failures beside it. A run
   over one project's compilation drops from these lists the names that project does not
   declare, as it drops a union operand that is empty there, since another project may declare
-  them. A **family** subject sharpens the same way per cell: a layer cell
+  them. An **`Under` list** (§5.2) is read per glob on all of these terms, since
+  `X.Under("a", "b")` names what `arch.AnyOf(X.Under("a"), X.Under("b"))` names: a glob no type of
+  the subject is declared under fails the rule as "types under `b`". A **family** subject sharpens the same way per cell: a layer cell
   matching nothing, or a project cell declaring no solution type, fails the rule naming that
   cell; a project form naming no project at all is the plain empty-subject failure, there being
   no cell to name. A run a solution filter (§4.4) narrowed skips instead: a rule *all* of
@@ -479,7 +481,8 @@ list is static and one form: `web.MustNotUse(() => DateTime.Now, () => DateTime.
   adjective filters one type at a time, so `X.Named("A", "B")` names exactly what
   `arch.AnyOf(X.Named("A"), X.Named("B"))` names, and a name that no type the operand matched
   carries is a dead operand of that union. It warns as one, quoted as the operand would read with
-  that name alone ("types named `B`"), beside the names that matched. A live operand's parts are
+  that name alone ("types named `B`"), beside the names that matched, and an `Under` list's globs
+  are read the same way ("types under `b`"). A live operand's parts are
   read the same way. Each part of an `arch.AnyOf(...)` passed as one operand, and the definition of
   a layer used as a target, is tested as it is written, before the union's or the layer's own
   adjectives: a part that matched nothing warns as itself, and a dead name in its list warns as
@@ -520,9 +523,8 @@ list is static and one form: `web.MustNotUse(() => DateTime.Now, () => DateTime.
 
 ### 4.2 Namespace patterns
 
-Not `Microsoft.Extensions.FileSystemGlobbing` — that library is path-segment based and stays
-for file paths (`DragonsDoc`, scope→directory mapping). Namespace patterns are dot-segment
-aware and case-sensitive:
+Namespace patterns are dot-segment aware and case-sensitive; path globs, the one pattern over
+file paths, have their own matcher (below):
 
 - **Trailing `.*` is the subtree operator and is self-inclusive**: `MyApp.Domain.*` matches
   the namespace `MyApp.Domain` itself and all descendants. (Otherwise a facade declared
@@ -571,6 +573,27 @@ checked on its own, one register softer in target position than in subject posit
 union operands (§4.1). As the target of a forbidden-set verb, a name that matches nothing while
 another name in the list matches warns that the rule is partly inert. As the subject, it fails
 the rule naming that name (§4.1).
+
+**Path globs** (`Under`, §5.2) read a different string: a declaring file's path relative to the
+solution directory. Segments are separated by `/`; `*` matches within one segment and never
+crosses a `/`; a `**` segment matches any number of segments, none included; and matching ignores
+case on every operating system, because one spec is checked on Windows and on Linux and the case
+of a folder is not a fact a law should turn on. A glob reads as a prefix: it matches a file when it
+matches the file's path or any directory leading to it, so `src/Widgets` means what
+`src/Widgets/**` means, and a glob may name one file (`vendor/Compiler.cs`). A rooted glob, a
+backslash, a `.` or `..` segment, an empty segment and a `**` written inside a longer segment are
+refused at spec build (§8 item 35) rather than normalized, so what the model carries is what the
+author wrote. A path is made relative by text alone: both separators split, `.` segments drop,
+`..` folds, the solution directory is compared segment by segment ignoring case, and a file
+outside it is under no glob.
+
+| Glob | Matches | Does not match |
+|---|---|---|
+| `src/Widgets` | `src/Widgets/Button.cs`, `src/Widgets/Deep/Panel.cs` | `src/WidgetsExtra/Button.cs` |
+| `src/*/Internal` | `src/Console/Internal/Ansi.cs` | `src/Console/Deep/Internal/Ansi.cs` |
+| `src/**/Internal` | `src/Internal/Ansi.cs`, `src/Console/Deep/Internal/Ansi.cs` | `lib/Internal/Ansi.cs` |
+| `**/*.Designer.cs` | `src/Forms/Main.Designer.cs` | `src/Forms/Main.cs` |
+| `SRC/widgets` | `src/Widgets/Button.cs` | — |
 
 ### 4.3 Violation identity (what a baseline entry keys)
 
@@ -1302,6 +1325,7 @@ posture verbs, trailers and escape hatches of §5.4–§5.6 are written by hand.
 | `.WithPrefix` | `(string)` | Types named `Legacy*` |
 | `.WithNameMatching` | `(string)` | Types whose name matches `*Repo*` |
 | `.Named` | `(string, …)` | Types named `OrdersRepository` |
+| `.Under` | `(string, …)` | Types under `src/Widgets` |
 | `.Implementing` | `(Type)` · `(string)` · `<T>()` | Types implementing `IHandler<T>` |
 | `.DerivedFrom` | `(Type)` · `(string)` · `<T>()` | Types derived from `ControllerBase` |
 | `.AttributedWith` | `(Type)` · `(string)` · `<T>()` | Types attributed with `[ApiController]` |
@@ -1515,6 +1539,13 @@ What the table cannot show, per adjective:
 
 - `.OfKind(TypeKind.Interface)` — noun substitution: "interfaces" (kinds: Class, Interface, Struct, Enum, Delegate; records via escape hatch in v1)
 - `.Named("Program")` — the exact simple name, ordinal (§4.2); "named `A` or `B`" for several. It belongs to the `WithSuffix`/`WithPrefix` family, whose fragments already say *named*, as the member whose fragment carries no `*`; all three match their argument literally
+- `.Under("src/Widgets")` / `.Under("src/*/Internal", "vendor/Compiler.cs")` — the types any one of whose declaring files is under any of the path globs (§4.2): " under `src/Widgets`", " under `A` or `B`" for several, an inline clause after the locative ("types in `Spectre.Console.*` under `src/Spectre.Console/Internal`"). For a codebase whose folders are its only structure, and for one vendored file only a path picks out. What is settled about it:
+  - **Root.** Every glob is relative to the solution directory, and in the build analyzer to the model file's directory, which `render` writes beside the solution, so both read one path alike. A run with no directory to read against fails the rule closed, as a rule error, rather than reading the subject as empty.
+  - **Several files.** A type is under a glob when *any* file declaring it is: a partial type is wherever any of its parts is, so the author's part of a generator-completed partial puts the type in the author's folder. The opposite of `.Authored()`'s every-file rule, for the opposite question: a location selects what lives there, where generated code is what a reader wants left out.
+  - **Generated files.** A generator's document carries whatever path its host gives it. A build that writes generator output puts it under the project's `obj` directory, which a source-folder glob does not reach, and a host that writes none gives a path outside the solution directory, which no glob reaches. A type only a generator declares is under a source folder only where its host put the document there.
+  - **External types** are declared in no file of the solution and are under no glob, in every position.
+  - **Dead globs** are read one at a time, as a `Named` list's names are (§4.1): beside globs that match, a glob that matches nothing fails the rule on a subject, warns partly inert on a forbidden-set target and stricter than written on an allow-list or a membership, is dropped by a run over one project's compilation, and is not read inside an `Except` payload.
+  - **One project's view.** On a subject the adjective is decidable from one project, whose own types carry their files. Read over other projects' types, as a target or in an `Except` payload, it is left to the whole solution, because a project compiled against another's assembly sees none of its source files.
 - `.Implementing(typeof(IHandler<>))` / `.Implementing("MyApp.Web.IHandler<T>")` — the string form renders byte-identically (string anchors, below)
 - `.AttributedWith(typeof(ApiControllerAttribute))` / `.AttributedWith("ModelContextProtocol.Server.McpServerToolAttribute")` — `Attribute` suffix stripped, bracketed; the string form renders byte-identically (string anchors, below)
 - `.Except(selection, …)` / `.Except(typeof(X), …)` — a parenthetical canonicalized to sentence-final, after any `Where`, and closed by the composer (§6). Several operands are the union `AnyOf` mints (§5.1): `.Except(a, b)` ≡ `.Except(arch.AnyOf(a, b))`, ", except types in `A.*` or `B.*`". The `typeof` form is the dependency verbs' sugar (§3.3): `.Except(typeof(X))` ≡ `.Except(arch.Type<X>())`
@@ -1701,7 +1732,7 @@ no-reference string, and the generic sugar (§10).
 
 Predicate input contract (`ITypeInfo`): `Name`, `Namespace`, `Kind`, `ProjectName`,
 `Accessibility`, `IsSealed`, `IsStatic`, `IsAbstract`, `IsRecord`, `IsGenerated`, `FilePaths`
-(declaration file paths; empty for external types), attributes, base type, implemented
+(declaration file paths, the ones `.Under` reads (§5.2); empty for external types), attributes, base type, implemented
 interfaces. The
 contract grows additively as extraction learns new facts. The flags carry C# declaration
 semantics — a static class is neither sealed nor abstract, interfaces are abstract,
@@ -1981,6 +2012,10 @@ carries its sugar overload too, or the verb silently stops compiling after the s
   the project form anchors none. A union subject never does (§5.1) — it has no single home
   directory even when a `Layer` is one of its operands — so a union rule renders into the root
   block only.
+- **Location** (`.Under`, §5.2) renders inline after the head and its locative, as `Named` does,
+  and reads the same in reference position: *"Types under `src` must not reference types under
+  `src/Console/Internal`."* The globs render as written, so the sentence shows the case and the
+  separators the checker matches, case aside.
 - **Colliding simple names**: when two targets in one sentence share a simple name, both are
   qualified with the minimal distinguishing trailing namespace segments
   ("`Billing.Order` or `Sales.Order`"). Pinned rule. The negative hierarchy and attribute anchor
@@ -2138,8 +2173,8 @@ carries its sugar overload too, or the verb silently stops compiling after the s
 15. Blank/whitespace glob, name or affix — a namespace pattern, a type- or member-name pattern,
     an exact type name (`Named`, reported as `Blank type name on '{id}'.` — blank is the whole
     check, a name having no structure to validate), an exact member name (member `Named`, reported
-    as `Blank member name on '{id}'.`, the label item 11 reports under a code of its own), a
-    project name, or a suffix/prefix left empty. A blank affix is vacuously true and a blank
+    as `Blank member name on '{id}'.`, the label item 11 reports under a code of its own), a path
+    glob (`Under`, `Blank path glob on '{id}'.`), a project name, or a suffix/prefix left empty. A blank affix is vacuously true and a blank
     glob throws at check time; both are almost always an authoring slip. Applies on the type and
     member sides alike, to layer globs and to every operand of a layer's selection definition,
     its `Except` payloads included (both reported spec-wide, named by layer), and to the project
@@ -2295,6 +2330,12 @@ carries its sugar overload too, or the verb silently stops compiling after the s
     Project the payload with `.Methods` or `.Members`. ``). No member is two kinds at once, so the
     exclusion is a no-op its author did not mean; a `.Members` selection on either side holds every
     kind and clashes with none. Reported at the rule's location, at every nesting depth.
+35. A path glob on `Under` written in a shape no declaring file can match (`` The path glob '/src'
+    on '{id}' is rooted; a path glob is relative to the solution directory. ``): a rooted glob, a
+    backslash, a `.` or `..` segment, an empty segment or a trailing `/`, and a `**` written inside
+    a longer segment, each with a reason clause of its own (§4.2). Refused rather than normalized,
+    so what the model carries is what the author wrote; the matcher owns the verdict, so what it
+    refuses and what this catalog reports cannot drift. A blank glob is item 15's alone.
 
 Item 5 also reaches the member escape-hatch descriptions: a blank or multi-line member `Where`
 (`Func<IMemberInfo,bool>`) or member `Must` description is caught by the same prose walk,
@@ -2345,10 +2386,10 @@ is already a unique greppable string).
 All-errors-at-once is a deliberate divergence from EF Core's fail-fast `ModelValidator`: an
 agent fixing a spec sees every problem in one pass.
 
-**Reported at the literal as well.** Items 1, 5, 7, 9, 11, 15, 16, 23 to 26 and 30 to 33 are decided by
+**Reported at the literal as well.** Items 1, 5, 7, 9, 11, 15, 16, 23 to 26, 30 to 33 and 35 are decided by
 string literals alone, with no model and no codebase behind them, so the contract package also carries
 a Roslyn analyzer that reports them as compiler warnings on the literal while the spec is being
-written, in the editor and in `dotnet build`. Their diagnostic IDs run from `SR1000` to `SR1033`, one
+written, in the editor and in `dotnet build`. Their diagnostic IDs run from `SR1000` to `SR1035`, one
 per kind of literal error (an unanchored subtree pattern is `SR1017`),
 and the message is the item's sentence without its `on '{id}'` clause, since the warning's location
 already says which literal. One owner in the contract decides each of these verdicts for both
@@ -2395,7 +2436,8 @@ this catalog.
   kind or a signature and the adjective says which of them the glob reads (the
   `WithSuffix`/`WithPrefix` family); `Matching` on projects, whose name is the whole identity, so
   a property word would say nothing. `Named` is the exact form on the type, member and project
-  strata (§5.2, §5.7, §5.8). A verb-plus-object compound is not licensed:
+  strata (§5.2, §5.7, §5.8). `Under` is a bare preposition taking path globs (§5.2): nothing else
+  about a type is a place on disk, so "types under `src`" needs no noun to say which kind of place. A verb-plus-object compound is not licensed:
   `ExceptGenerated` would both duplicate `Except` and stop reading as a modifier of the noun.
 - **Constraints**: `Must[Not]` + verb phrase; polarity lexical; the noun rides along where a
   bare preposition would be ambiguous (`MustResideInNamespace`). The member-access verb is
@@ -2592,8 +2634,9 @@ static-signature fact, and internal members are not surface), so a flow- or cast
 would be a new, explicitly named semantic, never a widening of the exact match; and `graph`
 exposure data (exposure edges stay out of the graph).
 
-On the project stratum (§4.10), each waiting on a consumer: `.Under(pathGlob…)`;
-`MustSetPackageAsset` (the `ExcludeAssets=runtime` shape); a framework-scoped package verb, an allow-list or ban over one framework's references, which
+On the project stratum (§4.10), each waiting on a consumer: a project-stratum `.Under(pathGlob…)`,
+the type side's adjective (§5.2) over a project file's directory, which also waits on a project-path
+fact; `MustSetPackageAsset` (the `ExcludeAssets=runtime` shape); a framework-scoped package verb, an allow-list or ban over one framework's references, which
 `.Must` over `IPackageReferenceInfo.Frameworks` spells today; `AnyOf` over project selections;
 and card placement for artifact selections — a project rule renders into the root block only.
 
