@@ -1,6 +1,5 @@
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using SlideRule.Fluent;
 
 namespace SlideRule.Tests.TestSupport;
 

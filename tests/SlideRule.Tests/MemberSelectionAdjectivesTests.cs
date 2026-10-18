@@ -1,5 +1,4 @@
 using Shouldly;
-using SlideRule.Fluent;
 using Xunit;
 
 namespace SlideRule.Tests;

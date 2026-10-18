@@ -1,6 +1,6 @@
 using SlideRule.Model;
 
-namespace SlideRule.Fluent;
+namespace SlideRule;
 
 /// <summary>
 ///     The properties the selected types declare, reached with <c>.Properties</c> on a

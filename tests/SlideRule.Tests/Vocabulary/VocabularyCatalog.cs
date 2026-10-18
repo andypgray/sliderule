@@ -1,4 +1,3 @@
-using SlideRule.Fluent;
 using SlideRule.Tests.Stubs;
 using SlideRule.Tests.TestSupport;
 

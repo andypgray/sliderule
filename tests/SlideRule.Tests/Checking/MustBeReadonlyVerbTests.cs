@@ -10,7 +10,7 @@ namespace SlideRule.Tests.Checking;
 /// <summary>
 ///     The mutability verb <c>MustBeReadonly</c> over the fast path (GRAMMAR §5.7, §4.6): a field is red
 ///     unless it is declared <c>readonly</c> or <c>const</c>. Fields-only by receiver type — it lives on
-///     <see cref="Fluent.FieldSelection" />, so the other projections cannot spell it.
+///     <see cref="FieldSelection" />, so the other projections cannot spell it.
 /// </summary>
 /// <remarks>
 ///     A const field satisfies the verb, const being readonly's superset (GRAMMAR §5.7), and that decision

@@ -1,4 +1,3 @@
-using SlideRule.Fluent;
 using SlideRule.Internal;
 using SlideRule.Model;
 

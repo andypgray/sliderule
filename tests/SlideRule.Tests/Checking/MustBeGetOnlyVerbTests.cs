@@ -10,7 +10,7 @@ namespace SlideRule.Tests.Checking;
 /// <summary>
 ///     The mutability verb <c>MustBeGetOnly</c> over the fast path (GRAMMAR §5.7, §4.6): a property is red
 ///     unless it declares no setter accessor at all. Properties-only by receiver type — it lives on
-///     <see cref="Fluent.PropertySelection" />, so the other projections cannot spell it.
+///     <see cref="PropertySelection" />, so the other projections cannot spell it.
 /// </summary>
 /// <remarks>
 ///     Two decisions are pinned here rather than left to be discovered. <b>Strict</b>: an init-only setter

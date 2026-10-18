@@ -85,6 +85,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "Methods of types named `*Async`". The old sentence was also what `arch.Types.WithSuffix("Async").Methods`
   renders, which selects every method of the types named `*Async`, so two rules with different verdicts
   read alike. What each selects is unchanged.
+- `MemberSelection`, `MethodSelection`, `FieldSelection`, `PropertySelection` and `ProjectSelection` moved
+  from `SlideRule.Fluent` to the `SlideRule` namespace, so a helper method that takes or returns one
+  compiles under `using SlideRule;` alone. Every member whose signature names one of them changed with
+  it, among them `Selection.Members` and `Selection.Events`, the member adjectives `ThatAreStatic` and
+  `AttributedWith`, the member verbs `MustBePublic`, `MustBeInternal`, `MustBePrivate`, `MustBeStatic`,
+  `MustBeAbstract`, `MustBeAttributedWith`, `MustNotBeAttributedWith`, `MustHavePrefix`, `MustHaveSuffix`,
+  `MustHaveNameMatching`, `MustAcceptParameter`, `MustBeGetOnly` and `MustBeReadonly`, and the project
+  vocabulary's `Packable`, `MustLockPackages` and `MustNotBePackable`. Source that calls them compiles
+  unchanged, but a spec project built against 0.1.x must be rebuilt: until it is, loading it is refused
+  with a message that says it was built against an older package and names the move. A
+  `using SlideRule.Fluent;` kept only for these types can go.
 - The `derive_spec` recipe's first step now has the agent search where a project records its
   decisions: its issues, pull requests and discussions, release notes and upgrade guides,
   first-party templates and sibling repositories, and API-approval tests. It reads the README,

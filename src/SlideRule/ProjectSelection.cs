@@ -1,6 +1,6 @@
 using SlideRule.Model;
 
-namespace SlideRule.Fluent;
+namespace SlideRule;
 
 /// <summary>
 ///     A set of projects the spec talks about, as build artifacts rather than as the types they

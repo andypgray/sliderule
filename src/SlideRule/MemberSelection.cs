@@ -1,6 +1,6 @@
 using SlideRule.Model;
 
-namespace SlideRule.Fluent;
+namespace SlideRule;
 
 /// <summary>
 ///     A set of members the spec talks about: the methods, properties, fields and events the selected

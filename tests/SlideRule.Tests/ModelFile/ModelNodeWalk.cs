@@ -1,6 +1,5 @@
 using System.Collections;
 using System.Reflection;
-using SlideRule.Fluent;
 using SlideRule.Hosting;
 using SlideRule.Model;
 

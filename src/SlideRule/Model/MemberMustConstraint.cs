@@ -1,4 +1,3 @@
-using SlideRule.Fluent;
 
 namespace SlideRule.Model;
 

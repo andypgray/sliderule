@@ -3,7 +3,6 @@ using System.Text.RegularExpressions;
 using Shouldly;
 using Xunit;
 using SlideRule.Checking;
-using SlideRule.Fluent;
 using SlideRule.Hosting;
 using SlideRule.Model;
 using SlideRule.ModelFile;

@@ -1,5 +1,4 @@
 using System.Text;
-using SlideRule.Fluent;
 using SlideRule.Hosting;
 using SlideRule.Internal;
 using SlideRule.Model;

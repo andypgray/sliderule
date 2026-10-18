@@ -7,17 +7,13 @@ SlideRule.Accessibility
     Private = 5
 SlideRule.Arch
 SlideRule.Constraint
+SlideRule.FieldSelection
 SlideRule.FieldSelectionConstraints
-SlideRule.Fluent.FieldSelection
 SlideRule.Fluent.ICautionedScope
 SlideRule.Fluent.IEnforceRule
 SlideRule.Fluent.IMigrateRule
 SlideRule.Fluent.IQuarantinedScope
-SlideRule.Fluent.MemberSelection
-SlideRule.Fluent.MethodSelection
 SlideRule.Fluent.NamespacePattern
-SlideRule.Fluent.ProjectSelection
-SlideRule.Fluent.PropertySelection
 SlideRule.Fluent.TypeNamePattern
 SlideRule.IArchitectureSpec
 SlideRule.IAttributeInfo
@@ -40,15 +36,19 @@ SlideRule.MemberKind
     Property = 1
     Field = 2
     Event = 3
+SlideRule.MemberSelection
 SlideRule.MemberSelectionAdjectives
 SlideRule.MemberSelectionConstraints
+SlideRule.MethodSelection
 SlideRule.MethodSelectionConstraints
 SlideRule.MigrationPolicy
     MigrateIfSmall = 0
     AlwaysMigrate = 1
     NeverMigrate = 2
+SlideRule.ProjectSelection
 SlideRule.ProjectSelectionAdjectives
 SlideRule.ProjectSelectionConstraints
+SlideRule.PropertySelection
 SlideRule.PropertySelectionConstraints
 SlideRule.Selection
 SlideRule.SelectionAdjectives

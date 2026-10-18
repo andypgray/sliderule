@@ -4,7 +4,6 @@ using SlideRule.Baselines;
 using SlideRule.Checking;
 using SlideRule.Cli.Rendering;
 using SlideRule.Codebase;
-using SlideRule.Fluent;
 using SlideRule.Hosting;
 using SlideRule.Internal;
 using SlideRule.Model;

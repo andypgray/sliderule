@@ -88,6 +88,56 @@ public sealed class SpecContractBindTests
     }
 
     [Fact]
+    public void MapSkew_MissingMemberNamingAMovedSelectionType_SaysTheSpecIsOlder()
+    {
+        // What a spec built before the selection types left SlideRule.Fluent raised against this contract: the
+        // projection still exists, but its return type moved. The runtime words it as any missing member, and a
+        // newer-contract refusal would tell the operator to update a tool that is already the newer side.
+        Assembly spec = SpecReferencing(HostContractVersion);
+        var missing = new MissingMethodException(
+            "Method not found: 'SlideRule.Fluent.MethodSelection SlideRule.Selection.get_Methods()'.");
+
+        string message = SpecContractMismatch.MapSkew(spec, "Sync.Architecture.dll", missing)
+            .Message;
+
+        message.ShouldBe(
+            "The spec assembly 'Sync.Architecture' uses SlideRule types under a namespace this tool's contract "
+            + "moved them out of:\n"
+            + "  Method not found: 'SlideRule.Fluent.MethodSelection SlideRule.Selection.get_Methods()'.\n"
+            + "That is a spec built against an older SlideRule package, where MemberSelection, MethodSelection, "
+            + "FieldSelection, PropertySelection and ProjectSelection were in the SlideRule.Fluent namespace; they "
+            + "are now in SlideRule.\n"
+            + $"Reference the SlideRule package that matches this tool ({ServerVersion.SemVer}) from the spec "
+            + "project and rebuild it.");
+    }
+
+    [Fact]
+    public void MapSkew_MissingTypeThatIsAMovedSelectionType_SaysTheSpecIsOlder()
+    {
+        // A spec that held a selection in a local of the old type fails as a type that will not load instead.
+        Assembly spec = SpecReferencing(HostContractVersion);
+        var missing = new TypeLoadException(
+            "Could not load type 'SlideRule.Fluent.ProjectSelection' from assembly 'SlideRule, Version=1.0.0.0'.");
+
+        string message = SpecContractMismatch.MapSkew(spec, "Sync.Architecture.dll", missing)
+            .Message;
+
+        message.ShouldContain("That is a spec built against an older SlideRule package");
+        message.ShouldNotContain("newer");
+    }
+
+    [Fact]
+    public void MapSkew_MissingMemberNamingNoMovedType_KeepsTheNewerContractRefusal()
+    {
+        Assembly spec = SpecReferencing(HostContractVersion);
+        var missing = new MissingMethodException("Method not found: 'Void SlideRule.Arch.FutureVerb()'.");
+
+        SpecContractMismatch.MapSkew(spec, "Sync.Architecture.dll", missing)
+            .Message
+            .ShouldContain("That is a spec built against a newer SlideRule package than the tool running it.");
+    }
+
+    [Fact]
     public void Map_SpecBuiltAgainstThisContract_OmitsTheVersionParenthetical()
     {
         // The normal case, with the identity pinned: the versions match and naming them twice would

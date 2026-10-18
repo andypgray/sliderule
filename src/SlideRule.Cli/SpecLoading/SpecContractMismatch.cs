@@ -41,6 +41,19 @@ internal static class SpecContractMismatch
     // or pointer form of a type the contract does define, so these are refused before the lookup, not after.
     private static readonly char[] TypeNameSyntax = [',', '[', ']', '&', '*', '+', '`', '<', '\\'];
 
+    // The selection types that moved from SlideRule.Fluent to the root namespace after 0.1.2. A spec built
+    // before the move names them under the old namespace, and the runtime reports that as a missing type or
+    // a missing member exactly as it reports one from a newer contract, so the name is the only thing that
+    // tells the two skews apart.
+    private static readonly string[] MovedSelectionTypes =
+    [
+        "SlideRule.Fluent.MemberSelection",
+        "SlideRule.Fluent.MethodSelection",
+        "SlideRule.Fluent.FieldSelection",
+        "SlideRule.Fluent.PropertySelection",
+        "SlideRule.Fluent.ProjectSelection"
+    ];
+
     /// <summary>
     ///     Renders the message for a spec built against a newer contract, keeping <paramref name="inner" /> as the
     ///     inner exception. <paramref name="spec" /> supplies the contract version it was compiled against.
@@ -75,6 +88,25 @@ internal static class SpecContractMismatch
             + "now reaches the engine only through the types in the SlideRule namespace."
             + "\nRewrite what it names with those types, reference the SlideRule package that matches this tool "
             + $"({ServerVersion.SemVer}) from the spec project, and rebuild it.";
+        return new UserErrorException(message, inner);
+    }
+
+    /// <summary>
+    ///     Renders the message for a spec built before the selection types moved out of <c>SlideRule.Fluent</c>,
+    ///     whose missing name is one of those types under its old namespace. Keeps <paramref name="inner" /> as
+    ///     the inner exception.
+    /// </summary>
+    internal static UserErrorException MapMoved(Assembly spec, string specDllPath, Exception inner)
+    {
+        string name = Path.GetFileNameWithoutExtension(specDllPath);
+        string message =
+            $"The spec assembly '{name}' uses SlideRule types under a namespace this tool's contract moved them out of{DescribeDelta(spec)}:\n"
+            + "  " + inner.Message
+            + "\nThat is a spec built against an older SlideRule package, where MemberSelection, MethodSelection, "
+            + "FieldSelection, PropertySelection and ProjectSelection were in the SlideRule.Fluent namespace; they "
+            + "are now in SlideRule."
+            + $"\nReference the SlideRule package that matches this tool ({ServerVersion.SemVer}) from the spec "
+            + "project and rebuild it.";
         return new UserErrorException(message, inner);
     }
 
@@ -122,13 +154,26 @@ internal static class SpecContractMismatch
 
     /// <summary>
     ///     The refusal for <paramref name="cause" />, a failure <see cref="SkewCause" /> returned: the older-contract
-    ///     message for an access failure, the newer-contract message for anything else.
+    ///     message for an access failure or for a missing name that is a moved selection type, the newer-contract
+    ///     message for anything else.
     /// </summary>
     internal static UserErrorException MapSkew(Assembly spec, string specDllPath, Exception cause)
     {
-        return cause is TypeAccessException or MethodAccessException or FieldAccessException
-            ? MapInaccessible(spec, specDllPath, cause)
-            : Map(spec, specDllPath, cause);
+        if (cause is TypeAccessException or MethodAccessException or FieldAccessException)
+            return MapInaccessible(spec, specDllPath, cause);
+
+        return NamesMovedSelectionType(cause) ? MapMoved(spec, specDllPath, cause) : Map(spec, specDllPath, cause);
+    }
+
+    // The message carries the missing name for both failures: a missing member quotes its signature, whose return
+    // or parameter type is where a moved type appears, and a missing type quotes the type. TypeName is read too,
+    // because it is the field the runtime is sure to fill for a type that failed to load.
+    private static bool NamesMovedSelectionType(Exception cause)
+    {
+        string typeName = cause is TypeLoadException typeLoad ? typeLoad.TypeName : "";
+
+        return MovedSelectionTypes.Any(moved => cause.Message.Contains(moved, StringComparison.Ordinal)
+                                                || string.Equals(typeName, moved, StringComparison.Ordinal));
     }
 
     /// <summary>

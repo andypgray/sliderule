@@ -3,7 +3,6 @@ using System.Globalization;
 using System.Reflection;
 using System.Runtime.Loader;
 using Microsoft.Build.Locator;
-using SlideRule.Fluent;
 using SlideRule.Packs.DotNet;
 
 namespace SlideRule.Architecture;
@@ -213,7 +212,8 @@ public sealed class SlideRuleArchitectureSpec : IArchitectureSpec
         // `using SlideRule;` and a dot: the entry point and the spec interface, the nouns and enums
         // an author writes as arguments or compares in a predicate, the static classes that hold the verbs,
         // the builder, info and Member types an author spells in type position even though a chain never has
-        // to, and the one validation entry a rule pack's own tests call. Each entry is a typeof, which the
+        // to, the selection types an author holds in a variable or a helper's signature, and the one validation
+        // entry a rule pack's own tests call. Each entry is a typeof, which the
         // checker matches by full name: a removed type fails the build, and one that leaves the root stops
         // matching anything instead of blessing a newcomer of the same name.
         arch.Rule("api/core-front-door")
@@ -222,6 +222,7 @@ public sealed class SlideRuleArchitectureSpec : IArchitectureSpec
                     typeof(Accessibility),
                     typeof(Arch),
                     typeof(Constraint),
+                    typeof(FieldSelection),
                     typeof(FieldSelectionConstraints),
                     typeof(IArchitectureSpec),
                     typeof(IAttributeInfo),
@@ -237,12 +238,16 @@ public sealed class SlideRuleArchitectureSpec : IArchitectureSpec
                     typeof(Lifetime),
                     typeof(Member),
                     typeof(MemberKind),
+                    typeof(MemberSelection),
                     typeof(MemberSelectionAdjectives),
                     typeof(MemberSelectionConstraints),
+                    typeof(MethodSelection),
                     typeof(MethodSelectionConstraints),
                     typeof(MigrationPolicy),
+                    typeof(ProjectSelection),
                     typeof(ProjectSelectionAdjectives),
                     typeof(ProjectSelectionConstraints),
+                    typeof(PropertySelection),
                     typeof(PropertySelectionConstraints),
                     typeof(Selection),
                     typeof(SelectionAdjectives),

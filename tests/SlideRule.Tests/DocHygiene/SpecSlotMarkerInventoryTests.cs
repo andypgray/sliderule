@@ -150,8 +150,8 @@ public sealed class SpecSlotMarkerInventoryTests
 
             ["MethodSelectionConstraints.MustAcceptParameter(MethodSelection, string)/parameterTypeFullName"] = nameof(SpecSlot.ParameterTypeName),
 
-            ["Fluent.MethodSelection.Returning(string, string[])/first"] = nameof(SpecSlot.ReturnTypeName),
-            ["Fluent.MethodSelection.Returning(string, string[])/more"] = nameof(SpecSlot.ReturnTypeName),
+            ["MethodSelection.Returning(string, string[])/first"] = nameof(SpecSlot.ReturnTypeName),
+            ["MethodSelection.Returning(string, string[])/more"] = nameof(SpecSlot.ReturnTypeName),
 
             ["ProjectSelectionAdjectives.Named(ProjectSelection, string, string[])/first"] = nameof(SpecSlot.ProjectNameOperand),
             ["ProjectSelectionAdjectives.Named(ProjectSelection, string, string[])/more"] = nameof(SpecSlot.ProjectNameOperand),

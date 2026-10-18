@@ -1,7 +1,7 @@
 using SlideRule.Model;
 using SlideRule.Validation;
 
-namespace SlideRule.Fluent;
+namespace SlideRule;
 
 /// <summary>
 ///     The methods the selected types declare, reached with <c>.Methods</c> on a
