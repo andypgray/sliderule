@@ -1,8 +1,8 @@
 using System.Linq.Expressions;
 using System.Reflection;
 using Shouldly;
-using Xunit;
 using SlideRule.Fluent;
+using Xunit;
 
 namespace SlideRule.Tests;
 
@@ -16,11 +16,18 @@ namespace SlideRule.Tests;
 /// <remarks>
 ///     The inventory is the point, so it fails on a shape it cannot construct an argument for rather than
 ///     skipping it: an unguarded verb and an unreachable one look identical in a green run otherwise. Add
-///     the new type to <see cref="Sample" /> when one appears.
+///     the new type to <see cref="Sample" /> when one appears. A generic verb cannot be invoked open, so the
+///     walk closes it over the first of <see cref="SampleTypeArguments" /> its constraints accept, and fails
+///     the same way when none does.
 /// </remarks>
 public sealed class ParamsArrayGuardInventoryTests
 {
     private static readonly Arch Arch = new();
+
+    // The type arguments a generic verb is closed over, in the order they are tried; each is one Sample
+    // constructs, so the closed verb's receiver and operands are too.
+    private static readonly Type[] SampleTypeArguments =
+        [typeof(MemberSelection), typeof(MethodSelection), typeof(Selection), typeof(ProjectSelection)];
 
     [Fact]
     public void EveryPublicParamsArray_RefusesANullArray_NamingItsOwnParameter()
@@ -53,21 +60,33 @@ public sealed class ParamsArrayGuardInventoryTests
         unguarded.ShouldBeEmpty();
     }
 
-    [Fact]
-    public void NoPublicParamsArray_SitsOnAGenericMethod_WhichTheInventoryWouldSkip()
-    {
-        // The walk cannot invoke an open generic method, so it leaves them out. That is only safe while
-        // there are none to leave out; this is what makes the exclusion visible rather than silent.
-        IEnumerable<string> generic = PublicMethods()
-            .Where(method => method.IsGenericMethodDefinition && HasParamsArray(method))
-            .Select(method => method.DeclaringType!.Name + "." + method.Name);
-
-        generic.ShouldBeEmpty();
-    }
-
     private static IEnumerable<MethodInfo> ParamsVerbs()
     {
-        return PublicMethods().Where(method => !method.IsGenericMethodDefinition).Where(HasParamsArray);
+        return PublicMethods()
+            .Where(HasParamsArray)
+            .Select(Closed);
+    }
+
+    private static MethodInfo Closed(MethodInfo verb)
+    {
+        if (!verb.IsGenericMethodDefinition) return verb;
+
+        Type[] typeArguments = verb.GetGenericArguments()
+            .Select(SampleTypeArgument)
+            .ToArray();
+        return verb.MakeGenericMethod(typeArguments);
+    }
+
+    private static Type SampleTypeArgument(Type typeParameter)
+    {
+        Type[] constraints = typeParameter.GetGenericParameterConstraints();
+        Type? accepted = SampleTypeArguments.FirstOrDefault(candidate =>
+            constraints.All(constraint => constraint.IsAssignableFrom(candidate)));
+
+        return accepted ?? throw new NotSupportedException(
+            $"No sample type argument for {typeParameter.Name} on {typeParameter.DeclaringMethod!.Name}: a generic "
+            + "params verb constrains its type parameter past every type this inventory can construct, so it was "
+            + "not exercised. Add one to SampleTypeArguments rather than narrowing the walk.");
     }
 
     private static IEnumerable<MethodInfo> PublicMethods()
