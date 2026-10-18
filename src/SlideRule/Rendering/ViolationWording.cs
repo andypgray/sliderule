@@ -36,8 +36,9 @@ internal static class ViolationWording
     /// <summary>The phrase a shape violation reads as: the type, member or project that failed the verb.</summary>
     // What each of the three subject kinds says, with placement left to the caller. The project
     // arm is the Shape parallel over a project: its name, at whichever declaration carried the fact the verb
-    // read — which may be a props file above the project, and may be nothing at all. A per-package violation
-    // names the package too, in EdgeText's register (no backticks: these lines are jump targets, not prose).
+    // read — which may be a props file above the project, and may be nothing at all. A per-package or
+    // per-framework violation names the item too, in EdgeText's register (no backticks: these lines are jump
+    // targets, not prose).
     internal static string SubjectText(Violation violation)
     {
         return violation.Kind switch
@@ -45,7 +46,9 @@ internal static class ViolationWording
             ViolationKind.MemberShape => MemberDisplay.Of(violation.SubjectMember!),
             ViolationKind.ProjectShape => violation.Package is { } package
                 ? $"{violation.SubjectProject!.Name} references package {package.Name}"
-                : violation.SubjectProject!.Name,
+                : violation.Framework is { } framework
+                    ? $"{violation.SubjectProject!.Name} targets {framework}"
+                    : violation.SubjectProject!.Name,
             _ => violation.Subject!.FullName
         };
     }

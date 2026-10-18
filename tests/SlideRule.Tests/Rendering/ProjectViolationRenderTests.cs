@@ -1,23 +1,24 @@
 using System.Text.Json;
 using Shouldly;
-using Xunit;
 using SlideRule.Checking;
 using SlideRule.Codebase;
 using SlideRule.Tests.Checking;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.Rendering;
 
 /// <summary>
 ///     How a project violation reads on the three report surfaces (GRAMMAR §4.10): the human block, the
-///     <c>--json</c> document, and SARIF. Two texts to pin per surface — a packaging violation, which
-///     names the project alone, and a per-package one, which names the package it declares.
+///     <c>--json</c> document, and SARIF. Three texts to pin per surface — a packaging violation, which
+///     names the project alone, a per-package one, which names the package it declares, and a per-framework
+///     one, which names the framework it targets.
 /// </summary>
 /// <remarks>
-///     The renderers format independently by house convention, so the same two sentences are asserted
-///     three times rather than shared through a helper. What is asserted about JSON is also the slot
-///     discipline: <c>subjectProject</c> and <c>package</c> are additive and null-omitted, so a report
-///     from a spec with no project rule carries neither key.
+///     The renderers format independently by house convention, so the same sentences are asserted three
+///     times rather than shared through a helper. What is asserted about JSON is also the slot discipline:
+///     <c>subjectProject</c>, <c>package</c> and <c>framework</c> are additive and null-omitted, so a report
+///     from a spec with no project rule carries none of them.
 /// </remarks>
 public sealed class ProjectViolationRenderTests
 {
@@ -28,6 +29,9 @@ public sealed class ProjectViolationRenderTests
     private static readonly CodebaseModel Packaged = ProjectFacts.Solution(
         ProjectFacts.Project(
             "Zphil.Domain", packageReferences: [ProjectFacts.Package("Serilog", "Domain.csproj", 9)]));
+
+    private static readonly CodebaseModel Targeted = ProjectFacts.Solution(
+        ProjectFacts.Project("Zphil.Host", ["net48", "net8.0"], ProjectFacts.Site("Directory.Build.props", 3)));
 
     [Fact]
     public void HumanBlock_PackagingViolation_NamesTheProjectAtItsDeclaringSite()
@@ -45,6 +49,15 @@ public sealed class ProjectViolationRenderTests
             .Single()
             .HumanBlock()
             .ShouldContain("Domain.csproj:9 — Zphil.Domain references package Serilog");
+    }
+
+    [Fact]
+    public void HumanBlock_PerFrameworkViolation_NamesTheProjectAndTheFramework()
+    {
+        TargetedReport()
+            .Single()
+            .HumanBlock()
+            .ShouldContain("Directory.Build.props:3 — Zphil.Host targets net48");
     }
 
     [Fact]
@@ -79,6 +92,13 @@ public sealed class ProjectViolationRenderTests
     }
 
     [Fact]
+    public void Json_PerFrameworkViolation_CarriesTheFrameworkAndOmitsThePackage()
+    {
+        TargetedReport()
+            .ShouldRenderProjectShapeViolation("projectShape", "Zphil.Host", framework: "net48");
+    }
+
+    [Fact]
     public void Json_ReportWithNoProjectRule_CarriesNeitherSlot()
     {
         // The additive-key claim: the two slots exist for project violations and are absent everywhere else,
@@ -96,6 +116,8 @@ public sealed class ProjectViolationRenderTests
         violation.TryGetProperty("subjectProject", out _)
             .ShouldBeFalse();
         violation.TryGetProperty("package", out _)
+            .ShouldBeFalse();
+        violation.TryGetProperty("framework", out _)
             .ShouldBeFalse();
     }
 
@@ -115,11 +137,26 @@ public sealed class ProjectViolationRenderTests
             .ShouldBeOneErrorSaying("Zphil.Domain references package Serilog");
     }
 
+    [Fact]
+    public void Sarif_PerFrameworkViolation_MessageNamesTheProjectAndTheFramework()
+    {
+        TargetedReport()
+            .ToSarif()
+            .ShouldBeOneErrorSaying("Zphil.Host targets net48");
+    }
+
     private static CheckReport PackableReport()
     {
         return Checker.Run(Packable, arch => arch.Rule("packaging/internal-not-shipped")
             .Enforce(arch.Projects.Matching("*").MustNotBePackable())
             .Because("An internal project on the feed is an API nobody meant to promise."));
+    }
+
+    private static CheckReport TargetedReport()
+    {
+        return Checker.Run(Targeted, arch => arch.Rule("packaging/supported-frameworks")
+            .Enforce(arch.Projects.Matching("*").MustOnlyTarget("net8.0"))
+            .Because("A framework nobody supports is a build nobody can reproduce."));
     }
 
     private static CheckReport PackagedReport()

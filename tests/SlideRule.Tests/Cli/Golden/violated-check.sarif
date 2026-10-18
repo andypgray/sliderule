@@ -2188,7 +2188,7 @@
           "ruleId": "packaging/supported-frameworks",
           "level": "error",
           "message": {
-            "text": "MyApp.Domain"
+            "text": "MyApp.Domain targets net10.0"
           },
           "locations": [
             {
@@ -2204,7 +2204,7 @@
             }
           ],
           "partialFingerprints": {
-            "slideRuleViolationIdentity/v1": "v1|||project:MyApp.Domain|MyApp.Domain/MyApp.Domain.csproj|0"
+            "slideRuleViolationIdentity/v1": "v1|project:MyApp.Domain|framework:net10.0||MyApp.Domain/MyApp.Domain.csproj|0"
           },
           "baselineState": "new"
         },
@@ -2212,7 +2212,7 @@
           "ruleId": "packaging/supported-frameworks",
           "level": "error",
           "message": {
-            "text": "MyApp.Legacy.Billing"
+            "text": "MyApp.Legacy.Billing targets net10.0"
           },
           "locations": [
             {
@@ -2228,7 +2228,7 @@
             }
           ],
           "partialFingerprints": {
-            "slideRuleViolationIdentity/v1": "v1|||project:MyApp.Legacy.Billing|MyApp.Legacy.Billing/MyApp.Legacy.Billing.csproj|0"
+            "slideRuleViolationIdentity/v1": "v1|project:MyApp.Legacy.Billing|framework:net10.0||MyApp.Legacy.Billing/MyApp.Legacy.Billing.csproj|0"
           },
           "baselineState": "new"
         },
@@ -2236,7 +2236,7 @@
           "ruleId": "packaging/supported-frameworks",
           "level": "error",
           "message": {
-            "text": "MyApp.Web"
+            "text": "MyApp.Web targets net10.0"
           },
           "locations": [
             {
@@ -2252,7 +2252,7 @@
             }
           ],
           "partialFingerprints": {
-            "slideRuleViolationIdentity/v1": "v1|||project:MyApp.Web|MyApp.Web/MyApp.Web.csproj|0"
+            "slideRuleViolationIdentity/v1": "v1|project:MyApp.Web|framework:net10.0||MyApp.Web/MyApp.Web.csproj|0"
           },
           "baselineState": "new"
         },
@@ -2276,7 +2276,7 @@
             }
           ],
           "partialFingerprints": {
-            "slideRuleViolationIdentity/v1": "v1||Microsoft.Extensions.DependencyInjection.Abstractions|project:MyApp.Web|MyApp.Web/MyApp.Web.csproj|0"
+            "slideRuleViolationIdentity/v1": "v1|project:MyApp.Web|package:Microsoft.Extensions.DependencyInjection.Abstractions||MyApp.Web/MyApp.Web.csproj|0"
           },
           "baselineState": "new"
         },

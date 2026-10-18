@@ -1531,13 +1531,7 @@ internal sealed class ConstraintEvaluator
         switch (constraint)
         {
             case MustOnlyTargetConstraint c:
-                // All over an empty framework list is vacuously true, which is exactly the absent-fact pass:
-                // a project nothing evaluated declares nothing to judge.
-                var permitted = new HashSet<string>(c.Frameworks, StringComparer.Ordinal);
-                return ProjectShape(
-                    subjects,
-                    project => project.TargetFrameworks.All(permitted.Contains),
-                    project => project.TargetFrameworksSite);
+                return ForbiddenFrameworks(subjects, c.Frameworks);
             case MustReferenceNoPackagesConstraint:
                 return ForbiddenPackages(subjects);
             case MustLockPackagesConstraint:
@@ -1589,6 +1583,23 @@ internal sealed class ConstraintEvaluator
         foreach (PackageReference package in subject.PackageReferences)
             if (!package.IsPrivate)
                 violations.Add(Violation.ProjectPackage(subject, package));
+
+        return violations;
+    }
+
+    // MustOnlyTarget (GRAMMAR §4.10): one violation per target framework the rule does not permit, each sited at
+    // the declaration of the project's framework list, so a migrated rule keys every framework apart and the next
+    // one a project adds is red. A project with no framework list, which is what nothing evaluated looks like,
+    // declares nothing to judge and passes.
+    private static IReadOnlyList<Violation> ForbiddenFrameworks(
+        IReadOnlyList<ProjectNode> subjects, IReadOnlyList<string> frameworks)
+    {
+        var permitted = new HashSet<string>(frameworks, StringComparer.Ordinal);
+        var violations = new List<Violation>();
+        foreach (ProjectNode subject in subjects)
+        foreach (string framework in subject.TargetFrameworks)
+            if (!permitted.Contains(framework))
+                violations.Add(Violation.ProjectFramework(subject, framework, AtSite(subject.TargetFrameworksSite)));
 
         return violations;
     }

@@ -590,8 +590,9 @@ internal static class RuleResultAssertions
 
     /// <summary>
     ///     Asserts the rule failed on exactly the project violations <paramref name="projects" /> names,
-    ///     each rendered as the offending project's name — or, for the per-package violations
-    ///     <c>MustReferenceNoPackages</c> mints, as <c>{project} -&gt; {package}</c> (GRAMMAR §4.10). In any
+    ///     each rendered as the offending project's name — or, for the per-item violations
+    ///     <c>MustReferenceNoPackages</c> and <c>MustOnlyTarget</c> mint, as <c>{project} -&gt; {package}</c> or
+    ///     <c>{project} -&gt; {framework}</c> (GRAMMAR §4.10). In any
     ///     order, for the reason given on <see cref="ShouldHaveFailedWithEdges" />.
     /// </summary>
     internal static RuleResult ShouldHaveFailedWithProjectSubjects(this RuleResult result, string[] projects)
@@ -627,16 +628,16 @@ internal static class RuleResultAssertions
     }
 
     /// <summary>
-    ///     The per-package twin of <see cref="ShouldHaveFailedWithProjectAtSites" />: exactly one project
-    ///     violation, rendered <c>{project} -&gt; {package}</c> as <paramref name="edge" /> spells it
-    ///     (GRAMMAR §4.10) and evidenced by <paramref name="sites" /> — the <c>file:line</c> that declared
-    ///     the reference.
+    ///     The per-item twin of <see cref="ShouldHaveFailedWithProjectAtSites" />: exactly one project
+    ///     violation, rendered <c>{project} -&gt; {package}</c> or <c>{project} -&gt; {framework}</c> as
+    ///     <paramref name="edge" /> spells it (GRAMMAR §4.10) and evidenced by <paramref name="sites" /> — the
+    ///     <c>file:line</c> that declared the reference or the framework list.
     /// </summary>
     /// <remarks>
     ///     An addition rather than an argument on its twin: that one compares the subject project's name
-    ///     alone, which cannot carry the package the verb names beside it.
+    ///     alone, which cannot carry the item the verb names beside it.
     /// </remarks>
-    internal static Violation ShouldHaveFailedWithPackageAtSites(
+    internal static Violation ShouldHaveFailedWithProjectItemAtSites(
         this RuleResult result, string edge, string[] sites)
     {
         string report = Describe(result);
@@ -857,7 +858,7 @@ internal static class RuleResultAssertions
                          ?? violation.SubjectProject?.Name;
         string? target = violation.Target?.FullName
                          ?? violation.Member?.SymbolId
-                         ?? violation.Package?.Name;
+                         ?? violation.ProjectItemName;
 
         if (source is null) return null;
 

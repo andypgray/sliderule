@@ -570,11 +570,32 @@ internal sealed class BaselineRunner(
         var existingSet = new HashSet<BaselineEntry>(captured);
 
         var kept = new List<BaselineEntry>();
+        var covered = new HashSet<BaselineEntry>();
         var lowered = 0;
         var recorded = 0;
         var grew = 0;
+        var split = 0;
         foreach (BaselineEntry entry in captured)
         {
+            // A project-wide entry from before items were keyed apart becomes one counted entry per item it
+            // grandfathers now, each keeping its reason, so the next package or framework the project takes is
+            // red. Items that already carry an entry of their own keep that one.
+            List<(BaselineEntry Identity, int Sites)> items = current
+                .Where(item => entry.Equals(item.Identity.ProjectWideForm) && !existingSet.Contains(item.Identity))
+                .ToList();
+            if (items.Count > 0)
+            {
+                foreach ((BaselineEntry identity, int itemSites) in items)
+                {
+                    BaselineEntry counted = Counted(identity, itemSites);
+                    kept.Add(entry.Because is { } because ? counted.WithBecause(because) : counted);
+                    covered.Add(identity);
+                }
+
+                split++;
+                continue;
+            }
+
             // Identity intersection first: an entry no current violation matches is the reduction being
             // accepted, and it simply does not survive into the section.
             if (!observed.TryGetValue(entry, out int sites)) continue;
@@ -604,19 +625,22 @@ internal sealed class BaselineRunner(
             }
         }
 
-        int removed = captured.Count - kept.Count;
-        int additions = current.Count(entry => !existingSet.Contains(entry.Identity));
+        int removed = captured.Count - (kept.Count - covered.Count) - split;
+        int additions = current.Count(entry => !existingSet.Contains(entry.Identity) && !covered.Contains(entry.Identity));
 
         sections[ruleId] = kept;
         // "nothing to accept" is the whole mode's verdict, so every kind of acceptance clears it: a run that
         // lowered or first recorded a count tightened the baseline as surely as one that removed an entry.
-        if (removed + lowered + recorded == 0) output.WriteLine($"{ruleId}: nothing to accept.");
+        if (removed + lowered + recorded + split == 0) output.WriteLine($"{ruleId}: nothing to accept.");
         if (removed > 0)
             output.WriteLine($"{ruleId}: accepted {Plurals.Counted(removed, "reduction")}.");
         if (lowered > 0)
             output.WriteLine($"{ruleId}: lowered the site count on {Plurals.Counted(lowered, "entry")}.");
         if (recorded > 0)
             output.WriteLine($"{ruleId}: recorded the site count on {Plurals.Counted(recorded, "entry")}.");
+        if (split > 0)
+            output.WriteLine(
+                $"{ruleId}: split {Plurals.Counted(split, "project-wide entry")} into {Plurals.Counted(covered.Count, "entry")}, one per package or framework.");
         if (additions > 0)
             output.WriteLine(
                 $"{ruleId}: refused {Plurals.Counted(additions, "addition")} — a captured baseline grows only via 'sliderule baseline add', one attributed entry at a time.");

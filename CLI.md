@@ -307,10 +307,12 @@ Options:
   --because <because>            Why this entry is grandfathered — recorded in the baseline entry
                                  (single line).
   --source <source>              The referencing type of the edge to grandfather — a full type name
-                                 or 'T:' symbol ID.
+                                 or 'T:' symbol ID — or the project that declares the package or
+                                 targets the framework.
   --target <target>              The referenced type of the edge to grandfather — a full type name
                                  or 'T:' symbol ID, or a banned member's full name
-                                 (System.DateTime.Now) or member symbol ID (P:System.DateTime.Now).
+                                 (System.DateTime.Now) or member symbol ID (P:System.DateTime.Now),
+                                 or the project's package or target framework (Serilog, net48).
   --subject <subject>            The offending type of the shape violation to grandfather — a full
                                  type name or 'T:' symbol ID.
   --allow-workspace-diagnostics  Write baselines from the partial model even when some projects

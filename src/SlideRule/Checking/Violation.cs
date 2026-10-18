@@ -69,6 +69,30 @@ internal sealed class Violation
     public PackageReference? Package { get; private set; }
 
     /// <summary>
+    ///     Gets the target framework, as a short moniker, that counts against the rule. Populated only by the
+    ///     per-framework violations of <c>MustOnlyTarget</c>, one for each framework the project targets that the
+    ///     rule does not permit, and null on every other project violation and every other kind.
+    /// </summary>
+    public string? Framework { get; private set; }
+
+    /// <summary>
+    ///     Gets the package or framework a per-item project violation names, in the form its baseline identity
+    ///     keys it by: <c>package:</c> or <c>framework:</c> followed by the package identifier as declared or the
+    ///     short moniker. Null on every violation that names no item.
+    /// </summary>
+    internal string? ProjectItem => Package is { } package
+        ? PackageItemPrefix + package.Name
+        : Framework is { } framework
+            ? FrameworkItemPrefix + framework
+            : null;
+
+    /// <summary>The bare name of <see cref="ProjectItem" />: the package identifier or the moniker, untagged.</summary>
+    internal string? ProjectItemName => Package?.Name ?? Framework;
+
+    private const string PackageItemPrefix = "package:";
+    private const string FrameworkItemPrefix = "framework:";
+
+    /// <summary>
     ///     Gets the source positions that evidence the violation: the sites of the offending edge, or the
     ///     declarations of the offending type, member or project fact. For a project fact that is the
     ///     declaration that won the build's evaluation, regularly a props file above the project file, and
@@ -110,8 +134,8 @@ internal sealed class Violation
     ///     FullName, Member SymbolId, Target|Subject ProjectName), compared ordinal by the checker. A
     ///     MemberUse mirrors Reference's (source, target) as (source FullName, member SymbolId); a
     ///     MemberShape mirrors Shape's subject as (declaring-type FullName, member SymbolId); a
-    ///     ProjectShape mirrors it as (project Name, package Name), the package name standing where a
-    ///     Target would, so one project's per-package violations sort by the package they name.
+    ///     ProjectShape mirrors it as (project Name, package Name or framework moniker), the item standing
+    ///     where a Target would, so one project's per-item violations sort by the item they name.
     /// </summary>
     /// <remarks>
     ///     The fourth slot exists because the first three do not separate every pair of violations: a full
@@ -132,7 +156,7 @@ internal sealed class Violation
             string primary = (Source ?? Subject)?.FullName
                              ?? SubjectProject?.Name
                              ?? (SubjectMember is { } member ? member.DeclaringTypeFullName : string.Empty);
-            string secondary = Target?.FullName ?? Package?.Name ?? string.Empty;
+            string secondary = Target?.FullName ?? ProjectItemName ?? string.Empty;
             string tertiary = Member?.SymbolId ?? SubjectMember?.SymbolId ?? string.Empty;
             string quaternary = (Target ?? Subject)?.ProjectName ?? string.Empty;
             return (primary, secondary, tertiary, quaternary);
@@ -147,10 +171,11 @@ internal sealed class Violation
     ///     An edge key for the edge kinds, pairing <see cref="Source" />'s symbol ID with
     ///     <see cref="Target" />'s, or with <see cref="Member" />'s for a banned member use. A subject key
     ///     otherwise: <see cref="Subject" />'s symbol ID for a type, <see cref="SubjectMember" />'s for a
-    ///     member, and <see cref="SubjectProject" />'s for a project — so all of one project's per-package
-    ///     violations share the single entry that blesses the project, and the entry survives the package
-    ///     list changing. Every overload, parameter, catch clause, throw and signature position of one pair
-    ///     rides under one identity, its sites being evidence rather than identity; an edge entry also
+    ///     member, and <see cref="SubjectProject" />'s for a project. A per-item project violation keys an
+    ///     edge instead, from the project's identity to <see cref="ProjectItem" />, so a package or framework
+    ///     added after the baseline was captured is a new identity and fails, as a different forbidden target
+    ///     from a grandfathered source does. Every overload, parameter, catch clause, throw and signature
+    ///     position of one pair rides under one identity, its sites being evidence rather than identity; an edge entry also
     ///     records how many sites it covered when it was captured, and a pair that has since grown past that
     ///     count fails the rule instead of being grandfathered. Null for a subject that matched nothing and
     ///     for a rule that errored: those have no stable identity.
@@ -165,10 +190,11 @@ internal sealed class Violation
             ViolationKind.MemberUse => BaselineEntry.ForEdge(Source!.SymbolId, Member!.SymbolId),
             ViolationKind.Shape => BaselineEntry.ForSubject(Subject!.SymbolId),
             ViolationKind.MemberShape => BaselineEntry.ForSubject(SubjectMember!.SymbolId),
-            // Both project factories key the same way, so the per-package violations of one project share
-            // one identity: the law is about the project, and a baseline entry blessing it must not have to
-            // be rewritten every time the package list moves.
-            ViolationKind.ProjectShape => BaselineEntry.ForSubject(SubjectProject!.SymbolId),
+            // A list-valued verb keys each item apart, so a migrated rule still reds on the next package or
+            // framework; a verb about one fact of the project keys the project alone.
+            ViolationKind.ProjectShape => ProjectItem is { } item
+                ? BaselineEntry.ForEdge(SubjectProject!.SymbolId, item)
+                : BaselineEntry.ForSubject(SubjectProject!.SymbolId),
             _ => null
         };
     }
@@ -262,12 +288,22 @@ internal sealed class Violation
     /// <summary>
     ///     One declared package reference counting against <c>MustReferenceNoPackages</c>, sited at the
     ///     reference's own declaration — which may be a props file above the project. Shares
-    ///     <see cref="ProjectShape" />'s kind and its project-keyed identity; <see cref="Package" /> is what
-    ///     tells the two apart.
+    ///     <see cref="ProjectShape" />'s kind; <see cref="Package" /> is what tells the two apart, and what
+    ///     keys its identity per package.
     /// </summary>
     internal static Violation ProjectPackage(ProjectNode subject, PackageReference package)
     {
         return new Violation(ViolationKind.ProjectShape, [package.Site]) { SubjectProject = subject, Package = package };
+    }
+
+    /// <summary>
+    ///     One target framework counting against <c>MustOnlyTarget</c>, as its short moniker, sited at the
+    ///     declaration of the project's framework list. Shares <see cref="ProjectShape" />'s kind;
+    ///     <see cref="Framework" /> keys its identity per framework.
+    /// </summary>
+    internal static Violation ProjectFramework(ProjectNode subject, string framework, IReadOnlyList<SourceLocation> sites)
+    {
+        return new Violation(ViolationKind.ProjectShape, sites) { SubjectProject = subject, Framework = framework };
     }
 
     internal static Violation EmptySubject(string detail, string hint)

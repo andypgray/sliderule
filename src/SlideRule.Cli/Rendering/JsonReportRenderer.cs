@@ -189,6 +189,7 @@ internal static class JsonReportRenderer
             violation.SubjectMember?.SymbolId,
             violation.SubjectProject?.Name,
             violation.Package?.Name,
+            violation.Framework,
             violation.Detail,
             violation.Hint,
             grandfatheredSiteCount,

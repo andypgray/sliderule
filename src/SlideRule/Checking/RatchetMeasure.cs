@@ -3,8 +3,9 @@ namespace SlideRule.Checking;
 /// <summary>
 ///     What the ratchet found in a rule's captured baseline section beyond the violations it
 ///     grandfathered: entries no current violation matched (<see cref="Stale" />), matched edge entries
-///     whose observed site count came in under the recorded one (<see cref="Shrunk" />), and matched edge
-///     entries that record no count at all (<see cref="Uncounted" />). A struct so that
+///     whose observed site count came in under the recorded one (<see cref="Shrunk" />), and matched
+///     entries that record no count at all (<see cref="Uncounted" />): an edge entry with none, or a
+///     project-wide entry standing in for the project's packages or frameworks. A struct so that
 ///     <see langword="default" /> is the zero triple — what an unratcheted rule reports, with no null to
 ///     thread through the checker.
 /// </summary>
@@ -16,7 +17,7 @@ namespace SlideRule.Checking;
 /// </remarks>
 /// <param name="stale">Captured entries no current violation matched — fixed debt awaiting acceptance.</param>
 /// <param name="shrunk">Matched edge entries whose observed site count is below the recorded one.</param>
-/// <param name="uncounted">Matched edge entries recording no site count — grandfathered at pair grain.</param>
+/// <param name="uncounted">Matched entries recording no site count — grandfathered at pair or project grain.</param>
 internal readonly struct RatchetMeasure(int stale, int shrunk, int uncounted)
 {
     /// <summary>Captured entries no current violation matched — fixed debt awaiting acceptance.</summary>
@@ -25,6 +26,6 @@ internal readonly struct RatchetMeasure(int stale, int shrunk, int uncounted)
     /// <summary>Matched edge entries whose observed site count is below the recorded one.</summary>
     public int Shrunk { get; } = shrunk;
 
-    /// <summary>Matched edge entries recording no site count — grandfathered at pair grain.</summary>
+    /// <summary>Matched entries recording no site count — grandfathered at pair or project grain.</summary>
     public int Uncounted { get; } = uncounted;
 }

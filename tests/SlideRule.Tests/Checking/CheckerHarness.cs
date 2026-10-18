@@ -477,12 +477,13 @@ internal static class Checker
 
     /// <summary>
     ///     Asserts the first violation of the first rule renders as a project subject:
-    ///     <paramref name="kind" /> over <paramref name="subjectProject" />, with <c>package</c> present
-    ///     only when <paramref name="package" /> is given, and every type- and member-level slot omitted.
+    ///     <paramref name="kind" /> over <paramref name="subjectProject" />, with <c>package</c> and
+    ///     <c>framework</c> each present only when <paramref name="package" /> or <paramref name="framework" />
+    ///     is given, and every type- and member-level slot omitted.
     ///     The fourth distinct slot combination the wire format carries.
     /// </summary>
     public static void ShouldRenderProjectShapeViolation(
-        this CheckReport report, string kind, string subjectProject, string? package = null)
+        this CheckReport report, string kind, string subjectProject, string? package = null, string? framework = null)
     {
         using JsonDocument document = JsonDocument.Parse(report.JsonReport());
         document.RootElement.GetProperty("schemaVersion")
@@ -503,6 +504,14 @@ internal static class Checker
             violation.GetProperty("package")
                 .GetString()
                 .ShouldBe(package);
+
+        if (framework is null)
+            violation.TryGetProperty("framework", out _)
+                .ShouldBeFalse();
+        else
+            violation.GetProperty("framework")
+                .GetString()
+                .ShouldBe(framework);
 
         violation.TryGetProperty("source", out _)
             .ShouldBeFalse();

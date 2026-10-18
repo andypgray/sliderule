@@ -1,7 +1,7 @@
-using Xunit;
 using SlideRule.Checking;
 using SlideRule.Codebase;
 using SlideRule.Tests.Checking;
+using Xunit;
 
 namespace SlideRule.Tests.Dogfood;
 
@@ -35,7 +35,7 @@ public sealed class CoreCarriesNothingTests
 
         // Assert — the dependency every consumer would inherit, at the line to delete, and nothing for the
         // analyzer, which ships to no one.
-        result.ShouldHaveFailedWithPackageAtSites(
+        result.ShouldHaveFailedWithProjectItemAtSites(
             "SlideRule -> System.Text.Json", [$"{CoreProjectFile}:32"]);
     }
 

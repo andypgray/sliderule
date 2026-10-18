@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `check --json` and `arch_check` carry a `framework` key on each `MustOnlyTarget` violation, naming
+  the framework it reports.
+- `baseline add --source <project> --target <package-or-framework>` adds the entry for a project's
+  package or target framework. Both ends take the bare name or the identity form, such as
+  `project:MyApp.Core` and `package:Serilog`.
+
+### Changed
+
+- A migrated `MustReferenceNoPackages` or `MustOnlyTarget` rule now fails on a package or framework a
+  project takes after its baseline was captured. Each package and each framework is a baseline entry of
+  its own, keyed from `project:{name}` to `package:{id}` or `framework:{moniker}`, where before one entry
+  per project grandfathered every package or framework the project would ever declare.
+  `MustOnlyTarget` now reports one violation per framework outside its list, where it reported one per
+  project. A baseline file captured before this release keeps working: its one entry per project still
+  grandfathers that project's packages or frameworks, `status` counts it as uncounted, and
+  `baseline accept-reductions` splits it into one entry per package or framework, each keeping its
+  reason. A consumer keyed on SARIF `partialFingerprints` sees each of these rules' alerts re-keyed once;
+  GitHub code scanning matches on its own line hash and is unaffected.
+
 ## [0.1.2] - 2026-10-15
 
 ### Added

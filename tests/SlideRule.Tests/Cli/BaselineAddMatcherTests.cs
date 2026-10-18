@@ -1,10 +1,10 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Checking;
 using SlideRule.Cli.Verbs;
 using SlideRule.Codebase;
 using SlideRule.Roslyn;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.Cli;
 
@@ -110,18 +110,42 @@ public sealed class BaselineAddMatcherTests
     }
 
     [Fact]
-    public void ResolveSubject_PerPackageViolationsOfOneProject_ResolveToFirstNotAmbiguous()
+    public void ResolveSubject_PerPackageViolations_MatchNothingAndListTheEdgeForm()
     {
-        // A MustReferenceNoPackages rule mints one violation per declared package, and they all share the
-        // project's identity — so --subject over the project name resolves rather than refusing as
-        // ambiguous, and one entry grandfathers the whole list.
+        // Each package is keyed apart, from the project to the package, so a --subject naming the project
+        // matches none of them, and the refusal lists each in the `Project -> package` form the edge flags take.
+        ProjectNode project = Project("Zphil.Domain");
+        Violation json = Violation.ProjectPackage(project, Package("Newtonsoft.Json"));
+        Violation serilog = Violation.ProjectPackage(project, Package("Serilog"));
+
+        ShouldRefuseListing(
+            () => BaselineAddMatcher.ResolveSubject("r", [json, serilog], "Zphil.Domain"),
+            "Zphil.Domain -> Newtonsoft.Json");
+    }
+
+    [Fact]
+    public void ResolveEdge_ProjectAndPackage_ByNameAndIdentityForm_ReturnsThatPackagesViolation()
+    {
         ProjectNode project = Project("Zphil.Domain");
         Violation json = Violation.ProjectPackage(project, Package("Newtonsoft.Json"));
         Violation serilog = Violation.ProjectPackage(project, Package("Serilog"));
         Violation[] violations = [json, serilog];
 
-        BaselineAddMatcher.ResolveSubject("r", violations, "Zphil.Domain")
-            .ShouldBeSameAs(json);
+        BaselineAddMatcher.ResolveEdge("r", violations, "Zphil.Domain", "Serilog").ShouldBeSameAs(serilog);
+        BaselineAddMatcher.ResolveEdge("r", violations, "project:Zphil.Domain", "package:Serilog")
+            .ShouldBeSameAs(serilog);
+    }
+
+    [Fact]
+    public void ResolveEdge_ProjectAndFramework_ByNameAndIdentityForm_ReturnsThatFrameworksViolation()
+    {
+        ProjectNode project = Project("Zphil.Host");
+        Violation net48 = Violation.ProjectFramework(project, "net48", Array.Empty<SourceLocation>());
+        Violation net6 = Violation.ProjectFramework(project, "net6.0", Array.Empty<SourceLocation>());
+        Violation[] violations = [net48, net6];
+
+        BaselineAddMatcher.ResolveEdge("r", violations, "Zphil.Host", "net48").ShouldBeSameAs(net48);
+        BaselineAddMatcher.ResolveEdge("r", violations, "Zphil.Host", "framework:net6.0").ShouldBeSameAs(net6);
     }
 
     [Fact]

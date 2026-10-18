@@ -342,7 +342,7 @@ internal static class ArchChecker
         var grown = new Dictionary<Violation, BaselineEntry>();
         var matched = new HashSet<BaselineEntry>();
         var shrunk = 0;
-        var uncounted = 0;
+        var uncounted = new HashSet<BaselineEntry>();
 
         foreach (Violation violation in violations)
         {
@@ -357,14 +357,16 @@ internal static class ArchChecker
 
             // Matched keys on identity alone, so the stale count is unchanged whether or not the entry
             // carried a because or a count — and a grown pair, matched here and red below, is never stale:
-            // it is live debt that grew, not debt that was fixed and is awaiting acceptance.
-            matched.Add(key);
+            // it is live debt that grew, not debt that was fixed and is awaiting acceptance. The stored entry
+            // rather than the key, because a project-wide entry standing in for each of the project's items is
+            // one entry however many items it matched.
             BaselineEntry entry = stored!;
+            matched.Add(entry);
 
             // The four-way call has one owner, shared with the baseline verb that writes what this
             // reports: two hand-rolled copies of it drift the first time either side is widened, and
             // BaselineRatchet carries the reading of every arm.
-            switch (BaselineRatchet.Classify(entry, violation.Sites.Count))
+            switch (BaselineRatchet.Classify(key, entry, violation.Sites.Count))
             {
                 case RatchetState.Grown:
                     // Red, and into the same list as everything else red, so one comparer orders them all
@@ -373,7 +375,7 @@ internal static class ArchChecker
                     red.Add(violation);
                     continue;
                 case RatchetState.Uncounted:
-                    uncounted++;
+                    uncounted.Add(entry);
                     break;
                 case RatchetState.Shrunk:
                     shrunk++;
@@ -402,7 +404,7 @@ internal static class ArchChecker
         int stale = section is null ? 0 : section.Count - matched.Count;
         RuleStatus status = orderedRed.Count > 0 ? RuleStatus.Failed : RuleStatus.Passed;
         var result = new RuleResult(
-            rule, status, orderedRed, warnings, null, grandfathered, new RatchetMeasure(stale, shrunk, uncounted),
+            rule, status, orderedRed, warnings, null, grandfathered, new RatchetMeasure(stale, shrunk, uncounted.Count),
             captured, grandfatheredEntries, coverage, grown);
 
         // Exactly where the report would hint a first capture, a section no rule names is named instead, one

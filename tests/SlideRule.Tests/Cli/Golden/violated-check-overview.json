@@ -663,16 +663,19 @@
         {
           "kind": "projectShape",
           "subjectProject": "MyApp.Domain",
+          "framework": "net10.0",
           "siteCount": 1
         },
         {
           "kind": "projectShape",
           "subjectProject": "MyApp.Legacy.Billing",
+          "framework": "net10.0",
           "siteCount": 1
         },
         {
           "kind": "projectShape",
           "subjectProject": "MyApp.Web",
+          "framework": "net10.0",
           "siteCount": 1
         }
       ],

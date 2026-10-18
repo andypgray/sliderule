@@ -1,8 +1,8 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Baselines;
 using SlideRule.Checking;
 using SlideRule.Codebase;
+using Xunit;
 
 namespace SlideRule.Tests.Checking;
 
@@ -12,9 +12,9 @@ namespace SlideRule.Tests.Checking;
 ///     at that reference's own declaration.
 /// </summary>
 /// <remarks>
-///     Three decisions are pinned here. <b>Per package, one identity</b>: eight packages report eight lines
-///     to delete, but they share the project's baseline identity, because the law is about the project and
-///     an entry blessing it must not have to be rewritten every time the package list moves.
+///     Three decisions are pinned here. <b>Per package, per identity</b>: eight packages report eight lines
+///     to delete, and each keys its own baseline entry, from the project to the package, so a package added
+///     after a capture is red rather than blessed by an entry written before it existed.
 ///     <b>Empty passes</b>: a project that declares none and a project nothing evaluated are
 ///     indistinguishable by design — both carry an empty list — so both pass.
 ///     <b>Private passes</b>: a reference whose <c>PrivateAssets</c> is all reaches no consumer, so it is no
@@ -63,18 +63,21 @@ public sealed class MustReferenceNoPackagesVerbTests
     }
 
     [Fact]
-    public void MustReferenceNoPackages_EveryViolation_SharesTheProjectsBaselineIdentity()
+    public void MustReferenceNoPackages_EachViolation_KeysAnEdgeFromTheProjectToItsPackage()
     {
-        // This verb's identity shape: its per-package violations collapse to one project-keyed
-        // entry, so grandfathering a project's package debt is one line rather than one line per package.
+        // This verb's identity shape: one edge per package, so a captured baseline blesses the packages it saw
+        // and no others.
         RuleResult result = Checker.Run(Scene, arch => arch.Rule("packaging/domain-pure")
                 .Enforce(arch.Projects.Named("Domain").MustReferenceNoPackages())
                 .Because("b"))
             .Single();
 
         result.Violations.Select(violation => violation.BaselineIdentity())
-            .Distinct()
-            .ShouldBe([BaselineEntry.ForSubject("project:Domain")]);
+            .ShouldBe(
+            [
+                BaselineEntry.ForEdge("project:Domain", "package:Newtonsoft.Json"),
+                BaselineEntry.ForEdge("project:Domain", "package:Serilog")
+            ]);
     }
 
     [Fact]
@@ -111,7 +114,7 @@ public sealed class MustReferenceNoPackagesVerbTests
                 .Because("b"))
             .Single();
 
-        result.ShouldHaveFailedWithPackageAtSites("Domain -> Newtonsoft.Json", ["src/Domain/Domain.csproj:9"]);
+        result.ShouldHaveFailedWithProjectItemAtSites("Domain -> Newtonsoft.Json", ["src/Domain/Domain.csproj:9"]);
     }
 
     [Fact]

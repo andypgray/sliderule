@@ -50,8 +50,17 @@ internal sealed class RuleBaseline
     /// <param name="identity">The identity to look up; its reason and site count play no part in the match.</param>
     /// <param name="stored">The entry as the baseline file stored it, or null when there is no match.</param>
     /// <returns><c>true</c> when this section grandfathers an entry with that identity.</returns>
+    /// <remarks>
+    ///     An edge from a project to one of its packages or frameworks that has no entry of its own falls back
+    ///     to the project-wide entry a file captured before items were keyed apart
+    ///     (<see cref="BaselineEntry.ProjectWideForm" />); <paramref name="stored" /> is then that subject
+    ///     entry, which is how a caller tells the fallback from an exact match.
+    /// </remarks>
     public bool TryMatch(BaselineEntry identity, out BaselineEntry? stored)
     {
-        return _lookup.TryGetValue(Guard.NotNull(identity, nameof(identity)), out stored);
+        Guard.NotNull(identity, nameof(identity));
+        if (_lookup.TryGetValue(identity, out stored)) return true;
+
+        return identity.ProjectWideForm is { } projectWide && _lookup.TryGetValue(projectWide, out stored);
     }
 }

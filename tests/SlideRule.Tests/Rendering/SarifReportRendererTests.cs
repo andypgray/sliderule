@@ -106,11 +106,10 @@ public sealed class SarifReportRendererTests
     public void Serialize_TwoPackagesDeclaredInOneFile_GetDistinctFingerprints()
     {
         // The counterpart to the ordinal fact above, for the collision an ordinal cannot separate:
-        // MustReferenceNoPackages mints one violation per package, each carrying the project's identity
-        // (project:{Name}, no source, no target) and a single site. Two packages declared in one file are
-        // then the same subject, the same path and ordinal 0 apiece, so the two results carried one
-        // fingerprint and a consumer keyed on (ruleId, fingerprint) merged two findings into one alert.
-        // The package name in the otherwise empty target slot is what separates them.
+        // MustReferenceNoPackages mints one violation per package, each with a single site, so two packages
+        // declared in one file are the same path and ordinal 0 apiece. A consumer keyed on (ruleId,
+        // fingerprint) would merge the two findings into one alert if the identity did not part them; the
+        // edge from the project to each package, its target slot, is what does.
         CodebaseModel solution = ProjectFacts.Solution(
             ProjectFacts.Project(
                 "Zphil.Domain",
@@ -131,10 +130,14 @@ public sealed class SarifReportRendererTests
             .ToList();
         fingerprints.ShouldBeUnique();
         // Not the whole string: the path slot depends on relativizing a bare relative site against the
-        // current directory. The target slot is the fix, and it reads in render order.
-        IReadOnlyList<string> targets = fingerprints.Select(f => f.Split('|')[2])
+        // current directory. The source and target slots are the identity, and they read in render order.
+        IReadOnlyList<string> edges = fingerprints.Select(f => $"{f.Split('|')[1]} -> {f.Split('|')[2]}")
             .ToList();
-        targets.ShouldBe(["Newtonsoft.Json", "Serilog"]);
+        edges.ShouldBe(
+        [
+            "project:Zphil.Domain -> package:Newtonsoft.Json",
+            "project:Zphil.Domain -> package:Serilog"
+        ]);
     }
 
     [Fact]

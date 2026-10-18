@@ -1,3 +1,4 @@
+using SlideRule.Codebase;
 using SlideRule.Internal;
 
 namespace SlideRule.Baselines;
@@ -5,14 +6,17 @@ namespace SlideRule.Baselines;
 /// <summary>
 ///     One grandfathered violation's identity in a baseline file. A violation of a verb that names a
 ///     pair (a reference, a construction, an injection, a banned member use, a catch, a throw or an
-///     exposure) is keyed by <see cref="Source" /> and <see cref="Target" />; a violation about one
-///     type, member or project (shape, naming, inheritance, attribute, or a custom <c>Must</c>
-///     predicate) is keyed by <see cref="Subject" /> alone. The unused slots are null, and
+///     exposure) is keyed by <see cref="Source" /> and <see cref="Target" />, and so is a project's
+///     violation over one of its declared packages or target frameworks, from the project to the item; a
+///     violation about one type, member or project as a whole (shape, naming, inheritance, attribute, or a
+///     custom <c>Must</c> predicate) is keyed by <see cref="Subject" /> alone. The unused slots are null, and
 ///     <c>Violation.BaselineIdentity()</c> builds the entry that identifies a given violation.
 /// </summary>
 /// <remarks>
 ///     A type or member slot holds a Roslyn <c>DocumentationCommentId</c> string, and a project slot
-///     holds <c>project:</c> followed by the project's name, so an entry survives a file move and any
+///     holds <c>project:</c> followed by the project's name, and a project item's target slot holds
+///     <c>package:</c> or <c>framework:</c> followed by the package identifier or the short moniker, so an
+///     entry survives a file move and any
 ///     amount of reformatting; renaming the type or member it names, or moving it to another namespace
 ///     or containing type, is what makes it a different entry. Two entries are equal when all three
 ///     slots match ordinally, which leaves <see cref="Because" /> and <see cref="SiteCount" /> free to
@@ -34,14 +38,15 @@ internal sealed class BaselineEntry : IEquatable<BaselineEntry>
     /// <summary>
     ///     Gets the symbol ID of the type the violation comes from: the type that holds the reference, the
     ///     <c>new</c>, the injected constructor parameter, the <c>catch</c>, the <c>throw</c>, the exposed
-    ///     signature position or the banned member access. Null on an entry keyed by a subject.
+    ///     signature position or the banned member access, or the identity of the project that declares a
+    ///     package or targets a framework. Null on an entry keyed by a subject.
     /// </summary>
     public string? Source { get; }
 
     /// <summary>
     ///     Gets the symbol ID of what the source reached: the referenced or constructed type, the injected
-    ///     parameter's type, the caught or thrown exception type, the exposed type, or the banned member
-    ///     itself. Null on an entry keyed by a subject.
+    ///     parameter's type, the caught or thrown exception type, the exposed type, the banned member
+    ///     itself, or the project's package or framework. Null on an entry keyed by a subject.
     /// </summary>
     public string? Target { get; }
 
@@ -84,6 +89,19 @@ internal sealed class BaselineEntry : IEquatable<BaselineEntry>
 
     /// <summary>The entry's identity as one line of text: its subject, or <c>source -&gt; target</c>.</summary>
     internal string SymbolForm => Subject ?? $"{Source} -> {Target}";
+
+    /// <summary>
+    ///     Gets the project-wide entry that grandfathered this identity before a project's packages and
+    ///     frameworks were keyed apart: the subject entry naming the project, for an edge from a project to one
+    ///     of its items, and null for every other identity.
+    /// </summary>
+    // A file captured before the per-item key holds one subject entry per project. It keeps grandfathering
+    // every item of that project, at any number, until accept-reductions splits it into one entry per item;
+    // reading it as stale instead would turn a tool upgrade into a wall of red nobody wrote.
+    internal BaselineEntry? ProjectWideForm =>
+        Source is { } source && source.StartsWith(ProjectNode.SymbolIdPrefix, StringComparison.Ordinal)
+            ? ForSubject(source)
+            : null;
 
     /// <inheritdoc />
     public bool Equals(BaselineEntry? other)

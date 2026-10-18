@@ -379,14 +379,9 @@ internal static class SarifReportRenderer
     // — the identity slots from BaselineIdentity() (empty slots allowed), and a per-file ordinal reset for each
     // violation, so multiple sites of one violation in one file stay distinct while code motion does not churn it.
     //
-    // The target slot falls through to the package name, which is not part of the baseline identity. That is
-    // deliberate on both sides: one baseline entry blesses a project however its package list moves, so the
-    // identity stays package-blind, while an alert stands per finding, and MustReferenceNoPackages mints one
-    // violation per package all sharing project:{Name}. Two packages declared in one file are then one site,
-    // one path and ordinal 0 apiece, so without the package name the two results would carry the same
-    // fingerprint and a consumer keyed on it would merge them. The package name goes in the target slot
-    // because that is where OrderKey already puts it (Target?.FullName ?? Package?.Name), so the two
-    // orderings of one fact agree. The six-slot v1 format holds and every other kind's string is unchanged.
+    // A per-package or per-framework project violation keys an edge from the project to its item, so two
+    // packages declared in one file, one site, one path and ordinal 0 apiece, still part on the target slot,
+    // and a consumer keyed on the fingerprint never merges them.
     // A non-null attribution is what grandfathered means here, and it mints the suppression and the message's
     // parenthetical together, so the two renderings of one fact cannot be landed separately by a later edit.
     private static IEnumerable<SarifResult> SiteResults(
@@ -399,7 +394,7 @@ internal static class SarifReportRenderer
     {
         BaselineEntry? identity = violation.BaselineIdentity();
         string source = identity?.Source ?? string.Empty;
-        string target = identity?.Target ?? violation.Package?.Name ?? string.Empty;
+        string target = identity?.Target ?? string.Empty;
         string subject = identity?.Subject ?? string.Empty;
         string body = MessageText(violation);
         var message = new SarifMessage(attribution is null ? body : $"{body} ({attribution})");
@@ -444,7 +439,9 @@ internal static class SarifReportRenderer
             ViolationKind.MemberShape => MemberDisplay.Of(violation.SubjectMember!),
             ViolationKind.ProjectShape => violation.Package is { } package
                 ? $"{violation.SubjectProject!.Name} references package {package.Name}"
-                : violation.SubjectProject!.Name,
+                : violation.Framework is { } framework
+                    ? $"{violation.SubjectProject!.Name} targets {framework}"
+                    : violation.SubjectProject!.Name,
             _ => string.Empty
         };
     }

@@ -66,7 +66,10 @@ internal sealed class ProjectNode : IProjectInfo
     // letter, and the shared display helper strips only those, printing a longer tag verbatim. This is the
     // one owner of the literal — the stored form of an existing baseline entry depends on it, so it is not
     // free to move.
-    public string SymbolId => "project:" + Name;
+    public string SymbolId => SymbolIdPrefix + Name;
+
+    /// <summary>The tag every project identity starts with, so a baseline entry can tell a project's key from a type's.</summary>
+    internal const string SymbolIdPrefix = "project:";
 
     /// <summary>
     ///     Gets the names of the projects this project declares a reference to, ordinal-ordered. Declared references

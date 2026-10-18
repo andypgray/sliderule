@@ -1,11 +1,11 @@
-using Xunit;
 using SlideRule.Codebase;
+using Xunit;
 
 namespace SlideRule.Tests.Checking;
 
 /// <summary>
 ///     The framework allow-list verb <c>MustOnlyTarget</c> over hand-built project facts (GRAMMAR §4.10):
-///     a project reds when any framework it declares sits outside the permitted list, at whichever
+///     a project reds once for each framework it declares outside the permitted list, at whichever
 ///     declaration set them.
 /// </summary>
 /// <remarks>
@@ -32,10 +32,10 @@ public sealed class MustOnlyTargetVerbTests
         // The site is the props file, not the project: the property a rule is about is very often set
         // somewhere else, and the file:line an agent jumps to has to be where the winning declaration sits.
         Checker.Run(Scene, arch => arch.Rule("packaging/contract-tfm")
-                .Enforce(arch.Projects.Named("Host").MustOnlyTarget("netstandard2.0"))
+                .Enforce(arch.Projects.Named("Host").MustOnlyTarget("net8.0"))
                 .Because("b"))
             .Single()
-            .ShouldHaveFailedWithProjectAtSites("Host", ["Directory.Build.props:3"]);
+            .ShouldHaveFailedWithProjectItemAtSites("Host -> net48", ["Directory.Build.props:3"]);
     }
 
     [Fact]
@@ -84,18 +84,18 @@ public sealed class MustOnlyTargetVerbTests
                 .Enforce(arch.Projects.Named("Legacy").MustOnlyTarget("net8.0"))
                 .Because("b"))
             .Single()
-            .ShouldHaveFailedWithProjectAtSites("Legacy", []);
+            .ShouldHaveFailedWithProjectItemAtSites("Legacy -> net48", []);
     }
 
     [Fact]
-    public void MustOnlyTarget_OneViolationPerOffendingProject_NotPerFramework()
+    public void MustOnlyTarget_OneViolationPerForbiddenFramework()
     {
-        // A project declaring two forbidden frameworks is one finding, not two: the law is about the
-        // project's target set, and the sites are evidence rather than identity (GRAMMAR §4.3).
+        // A project declaring two forbidden frameworks is two findings, each keyed by its own framework, so a
+        // migrated rule grandfathers the frameworks it saw and reds on the next one (GRAMMAR §4.3, §4.10).
         Checker.Run(Scene, arch => arch.Rule("packaging/netstandard-only")
                 .Enforce(arch.Projects.Matching("*").MustOnlyTarget("netstandard2.0"))
                 .Because("b"))
             .Single()
-            .ShouldHaveFailedWithProjectSubjects(["Host"]);
+            .ShouldHaveFailedWithProjectSubjects(["Host -> net48", "Host -> net8.0"]);
     }
 }

@@ -16,8 +16,10 @@ internal enum RatchetState
     NotMeasured,
 
     /// <summary>
-    ///     An edge entry carrying no count against sited evidence: it grandfathers its pair at any size.
-    ///     The one arm a write can clear, which is why it is reported rather than silent.
+    ///     An edge entry carrying no count against sited evidence: it grandfathers its pair at any size. Also
+    ///     a project-wide entry standing in for one of the project's packages or frameworks, which grandfathers
+    ///     every item at any number. The one arm a write can clear, which is why it is reported rather than
+    ///     silent.
     /// </summary>
     Uncounted,
 

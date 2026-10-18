@@ -393,13 +393,16 @@ internal static class CommandFactory
         };
         Option<string?> source = new("--source")
         {
-            Description = "The referencing type of the edge to grandfather — a full type name or 'T:' symbol ID."
+            Description =
+                "The referencing type of the edge to grandfather — a full type name or 'T:' symbol ID — or the project "
+                + "that declares the package or targets the framework."
         };
         Option<string?> target = new("--target")
         {
             Description =
                 "The referenced type of the edge to grandfather — a full type name or 'T:' symbol ID, or a banned "
-                + "member's full name (System.DateTime.Now) or member symbol ID (P:System.DateTime.Now)."
+                + "member's full name (System.DateTime.Now) or member symbol ID (P:System.DateTime.Now), or the "
+                + "project's package or target framework (Serilog, net48)."
         };
         Option<string?> subject = new("--subject")
         {

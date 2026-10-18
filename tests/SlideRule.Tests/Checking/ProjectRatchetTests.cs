@@ -1,22 +1,22 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Baselines;
 using SlideRule.Checking;
 using SlideRule.Codebase;
+using Xunit;
 
 namespace SlideRule.Tests.Checking;
 
 /// <summary>
 ///     The ratchet over a project subject (GRAMMAR §4.3, §4.10): a Migrate rule partitions its project
-///     violations against the captured baseline on the <c>project:{Name}</c> identity, so blessed
-///     packaging debt passes and a project nobody blessed stays red.
+///     violations against the captured baseline, so blessed packaging debt passes and a project nobody
+///     blessed stays red.
 /// </summary>
 /// <remarks>
-///     The row that matters most is the per-package one. A <c>MustReferenceNoPackages</c> rule mints one
-///     violation per declared package and they all key on the project, so a single entry grandfathers the
-///     whole list — and adding a ninth package to an already-blessed project adds no red. That is the
-///     deliberate cost of the collapse, and it is pinned here so a future change to the identity has to
-///     move this row with it.
+///     The rows that matter most are the per-item ones. <c>MustReferenceNoPackages</c> mints one violation
+///     per declared package and <c>MustOnlyTarget</c> one per framework it does not permit, and each keys an
+///     edge from the project to its item, so a package or framework the project takes after the capture is
+///     red. A project-wide entry written before the items were keyed apart still grandfathers every item of
+///     its project, as an uncounted entry, until accept-reductions splits it.
 /// </remarks>
 public sealed class ProjectRatchetTests
 {
@@ -74,22 +74,119 @@ public sealed class ProjectRatchetTests
     }
 
     [Fact]
-    public void Migrate_OneEntryGrandfathersEveryPackageOfThatProject()
+    public void Migrate_PackageIdentity_IsAnEdgeFromTheProjectToThePackage()
     {
-        // Per-package violations share one identity, so one baseline entry blesses the whole list — and the
-        // project that was not blessed still reports each of its own.
-        BaselineIndex index = Checker.Baselines(
-            "packaging/domain-pure", BaselineEntry.ForSubject("project:Zphil.Domain"));
-
-        RuleResult result = Checker.Run(PackageScene, index, arch => arch.Rule("packaging/domain-pure")
-                .Migrate(
-                    "Two projects still take packages directly.",
-                    arch.Projects.Matching("Zphil.*").MustReferenceNoPackages())
+        // The pinned per-item form: the project's identity, then the package tagged the way the project is.
+        RuleResult result = Checker.Run(PackageScene, BaselineIndex.Empty, arch => arch.Rule("packaging/domain-pure")
+                .Migrate("Packages everywhere.", arch.Projects.Matching("Zphil.*").MustReferenceNoPackages())
                 .Because("b"))
             .Single();
 
+        result.Violations.Select(violation => violation.BaselineIdentity())
+            .ShouldBe(
+            [
+                BaselineEntry.ForEdge("project:Zphil.Domain", "package:Newtonsoft.Json"),
+                BaselineEntry.ForEdge("project:Zphil.Domain", "package:Serilog"),
+                BaselineEntry.ForEdge("project:Zphil.Web", "package:Serilog")
+            ]);
+    }
+
+    [Fact]
+    public void Migrate_FrameworkIdentity_IsAnEdgeFromTheProjectToTheFramework()
+    {
+        CodebaseModel scene = ProjectFacts.Solution(
+            ProjectFacts.Project(
+                "Zphil.Domain",
+                targetFrameworks: ["net48", "net6.0", "net8.0"],
+                targetFrameworksSite: ProjectFacts.Site("src/Domain/Domain.csproj", 3)));
+
+        RuleResult result = Checker.Run(scene, BaselineIndex.Empty, arch => arch.Rule("packaging/supported")
+                .Migrate("Old frameworks linger.", arch.Projects.Matching("Zphil.*").MustOnlyTarget("net8.0"))
+                .Because("b"))
+            .Single();
+
+        result.Violations.Select(violation => violation.BaselineIdentity())
+            .ShouldBe(
+            [
+                BaselineEntry.ForEdge("project:Zphil.Domain", "framework:net48"),
+                BaselineEntry.ForEdge("project:Zphil.Domain", "framework:net6.0")
+            ]);
+    }
+
+    [Fact]
+    public void Migrate_PackageAddedAfterCapture_IsRed()
+    {
+        // The defect this key exists to close: capture a project's one package, add a second, and the second is
+        // red while the first stays grandfathered.
+        CodebaseModel captured = ProjectFacts.Solution(
+            ProjectFacts.Project(
+                "Zphil.Domain", packageReferences: [ProjectFacts.Package("Newtonsoft.Json", "src/Domain/Domain.csproj", 9)]));
+        BaselineIndex index = Capture(captured, PackageRule);
+
+        RuleResult result = Checker.Run(PackageScene, index, PackageRule).Single();
+
+        result.ShouldHaveFailedWithProjectSubjects(["Zphil.Domain -> Serilog", "Zphil.Web -> Serilog"]);
+        result.ShouldHaveGrandfathered(1);
+        result.ShouldHaveUncounted(0);
+    }
+
+    [Fact]
+    public void Migrate_FrameworkAddedAfterCapture_IsRed()
+    {
+        CodebaseModel captured = ProjectFacts.Solution(
+            ProjectFacts.Project(
+                "Zphil.Domain",
+                targetFrameworks: ["net48", "net8.0"],
+                targetFrameworksSite: ProjectFacts.Site("src/Domain/Domain.csproj", 3)));
+        CodebaseModel later = ProjectFacts.Solution(
+            ProjectFacts.Project(
+                "Zphil.Domain",
+                targetFrameworks: ["net472", "net48", "net8.0"],
+                targetFrameworksSite: ProjectFacts.Site("src/Domain/Domain.csproj", 3)));
+        BaselineIndex index = Capture(captured, FrameworkRule);
+
+        RuleResult result = Checker.Run(later, index, FrameworkRule).Single();
+
+        result.ShouldHaveFailedWithProjectSubjects(["Zphil.Domain -> net472"]);
+        result.ShouldHaveGrandfathered(1);
+    }
+
+    [Fact]
+    public void Migrate_ProjectWideEntry_GrandfathersEveryItemAsOneUncountedEntry()
+    {
+        // A file captured before items were keyed apart holds one subject entry for the project. It still
+        // blesses every package that project declares, reads as uncounted so status offers the split, and is
+        // not stale; the project nobody blessed still reports each of its own.
+        BaselineIndex index = Checker.Baselines(
+            "packaging/domain-pure", BaselineEntry.ForSubject("project:Zphil.Domain"));
+
+        RuleResult result = Checker.Run(PackageScene, index, PackageRule).Single();
+
         result.ShouldHaveFailedWithProjectSubjects(["Zphil.Web -> Serilog"]);
         result.ShouldHaveGrandfathered(2);
+        result.ShouldHaveUncounted(1);
+        result.ShouldHaveStale(0);
+    }
+
+    [Fact]
+    public void Migrate_ItemEntryBesideAProjectWideEntry_MatchesExactly()
+    {
+        // An item that carries an entry of its own matches that entry, with its count, rather than the
+        // project-wide one standing beside it; the other item still falls back.
+        BaselineIndex index = Checker.Baselines(
+            "packaging/domain-pure",
+            BaselineEntry.ForSubject("project:Zphil.Domain"),
+            BaselineEntry.ForEdge("project:Zphil.Domain", "package:Serilog").WithSiteCount(1));
+
+        RuleResult result = Checker.Run(PackageScene, index, PackageRule).Single();
+
+        result.GrandfatheredEntries.ShouldBe(
+        [
+            BaselineEntry.ForSubject("project:Zphil.Domain"),
+            BaselineEntry.ForEdge("project:Zphil.Domain", "package:Serilog")
+        ]);
+        result.ShouldHaveUncounted(1);
+        result.ShouldHaveStale(0);
     }
 
     [Fact]
@@ -110,24 +207,44 @@ public sealed class ProjectRatchetTests
     public void Migrate_ProjectWhosePackagesAreAllPrivate_LeavesItsEntryStale()
     {
         // An entry blessed this project's package debt, and every package it still declares is private, so
-        // nothing counts against the rule any more. A project entry carries no site count that could shrink,
-        // so the entry reads stale rather than grandfathering nothing.
+        // nothing counts against the rule any more and the entry reads stale rather than grandfathering nothing.
         CodebaseModel scene = ProjectFacts.Solution(
             ProjectFacts.Project(
                 "Zphil.Domain",
                 packageReferences: [ProjectFacts.Package("StyleCop.Analyzers", "src/Domain/Domain.csproj", 9, isPrivate: true)]));
         BaselineIndex index = Checker.Baselines(
-            "packaging/domain-pure", BaselineEntry.ForSubject("project:Zphil.Domain"));
+            "packaging/domain-pure", BaselineEntry.ForEdge("project:Zphil.Domain", "package:StyleCop.Analyzers"));
 
-        RuleResult result = Checker.Run(scene, index, arch => arch.Rule("packaging/domain-pure")
-                .Migrate(
-                    "One project still takes packages directly.",
-                    arch.Projects.Matching("Zphil.*").MustReferenceNoPackages())
-                .Because("b"))
-            .Single();
+        RuleResult result = Checker.Run(scene, index, PackageRule).Single();
 
         result.ShouldHavePassed();
         result.ShouldHaveGrandfathered(0);
         result.ShouldHaveStale(1);
+    }
+
+    private static void PackageRule(Arch arch)
+    {
+        arch.Rule("packaging/domain-pure")
+            .Migrate("Projects still take packages directly.", arch.Projects.Matching("Zphil.*").MustReferenceNoPackages())
+            .Because("b");
+    }
+
+    private static void FrameworkRule(Arch arch)
+    {
+        arch.Rule("packaging/supported")
+            .Migrate("Old frameworks linger.", arch.Projects.Matching("Zphil.*").MustOnlyTarget("net8.0"))
+            .Because("b");
+    }
+
+    // What a capture records, read off a first run with no baseline: each violation's identity with the sites it
+    // was seen at, which is the shape baseline init writes.
+    private static BaselineIndex Capture(CodebaseModel scene, Action<Arch> spec)
+    {
+        RuleResult first = Checker.Run(scene, BaselineIndex.Empty, spec).Single();
+        BaselineEntry[] entries = first.Violations
+            .Select(violation => violation.BaselineIdentity()!.WithSiteCount(violation.Sites.Count))
+            .ToArray();
+
+        return Checker.Baselines(first.Rule.Id, entries);
     }
 }

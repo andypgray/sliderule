@@ -43,4 +43,22 @@ internal static class BaselineRatchet
 
         return observedSites < allowance ? RatchetState.Shrunk : RatchetState.Held;
     }
+
+    /// <summary>
+    ///     Where the entry <see cref="RuleBaseline.TryMatch" /> returned for <paramref name="identity" /> stands
+    ///     against the <paramref name="observedSites" /> the run saw under it.
+    /// </summary>
+    /// <param name="identity">The identity the run synthesized for the violation.</param>
+    /// <param name="stored">The entry the section matched it to.</param>
+    /// <param name="observedSites">How many sites the run observed.</param>
+    /// <remarks>
+    ///     A project-wide entry standing in for one of the project's items is
+    ///     <see cref="RatchetState.Uncounted" />: it grandfathers every item at any number, and a write clears
+    ///     it by splitting it into one counted entry per item, as it records a count on an edge that carries
+    ///     none.
+    /// </remarks>
+    internal static RatchetState Classify(BaselineEntry identity, BaselineEntry stored, int observedSites)
+    {
+        return stored.Equals(identity) ? Classify(stored, observedSites) : RatchetState.Uncounted;
+    }
 }

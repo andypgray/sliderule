@@ -23,11 +23,12 @@ public static class ProjectSelectionConstraints
     /// <summary>
     ///     States that every selected project must target only these frameworks, such as
     ///     <c>arch.Projects.Packable().MustOnlyTarget("netstandard2.0")</c> or
-    ///     <c>MustOnlyTarget("netstandard2.0", "net8.0")</c>. A project declaring any framework outside
-    ///     the list fails the check. Monikers are compared case-sensitively against normalized short
-    ///     forms, so a classic project's <c>v4.8</c> reads <c>net48</c>. A project whose
-    ///     frameworks nothing evaluated passes. At least one moniker is required, and a blank one is
-    ///     reported when the spec is loaded.
+    ///     <c>MustOnlyTarget("netstandard2.0", "net8.0")</c>. Each framework a project declares outside
+    ///     the list is one violation, and under <c>Migrate</c> each is grandfathered on its own, so a
+    ///     framework the project adds after the baseline was captured fails the check. Monikers are
+    ///     compared case-sensitively against normalized short forms, so a classic project's <c>v4.8</c>
+    ///     reads <c>net48</c>. A project whose frameworks nothing evaluated passes. At least one moniker is
+    ///     required, and a blank one is reported when the spec is loaded.
     /// </summary>
     public static Constraint MustOnlyTarget(
         this ProjectSelection subject,
@@ -48,9 +49,9 @@ public static class ProjectSelectionConstraints
     ///     own package nor passed on to a project that references it, so it passes.
     ///     <c>IncludeAssets</c> and <c>ExcludeAssets</c> do not make a reference private, and a package
     ///     declared more than once is private only where every declaration is. Every other package a
-    ///     project declares is one violation, sited at its own declaration, and all of them share the
-    ///     project's identity, so a single baseline entry covers the whole list and does not move when the
-    ///     list does. Only what a project declares itself is seen: a package arriving through a project
+    ///     project declares is one violation, sited at its own declaration, and under <c>Migrate</c> each
+    ///     is grandfathered on its own, so a package the project adds after the baseline was captured fails
+    ///     the check. Only what a project declares itself is seen: a package arriving through a project
     ///     reference is not, and the rule's sentence in the generated agent context says so. To forbid
     ///     private references as well, state the strict form with <c>Must</c>:
     ///     <c>arch.Projects.Must(p =&gt; p.PackageReferences.Count == 0, description: "declare no packages")</c>.

@@ -282,6 +282,10 @@ internal sealed record BaselineJson(string Path, int Grandfathered, int Stale, i
 ///     <c>MustReferenceNoPackages</c> rule mints; null (omitted) on every other violation, that rule's
 ///     siblings included.
 /// </param>
+/// <param name="Framework">
+///     The offending target framework's short moniker, for the per-framework <c>projectShape</c> violations a
+///     <c>MustOnlyTarget</c> rule mints; null (omitted) on every other violation.
+/// </param>
 /// <param name="Detail">Kind-specific context, or null (omitted) when the kind carries none.</param>
 /// <param name="Hint">
 ///     What to change so the rule's subject matches something, on an <c>emptySubject</c> violation — the one
@@ -317,6 +321,7 @@ internal sealed record ViolationJson(
     string? SubjectMember,
     string? SubjectProject,
     string? Package,
+    string? Framework,
     string? Detail,
     string? Hint,
     int? GrandfatheredSiteCount,

@@ -631,6 +631,16 @@ Per verb class — this is grammar-level semantics, not baseline file format:
   positions are evidence, not identity: every signature position of one exposed type within a
   source rides together and is counted, and a grandfathered exposure plus a *different*
   forbidden exposed type from the same source is NEW and red.
+- **Project item verbs** (`MustReferenceNoPackages` and `MustOnlyTarget`, §4.10/§5.8):
+  `(ruleId, project:{name}, package:{id})` and `(ruleId, project:{name}, framework:{moniker})`.
+  This is the edge-key shape, the project in the source slot and the item it declares in the target
+  slot. A grandfathered package plus a *different* package the same project declares later is NEW
+  and red, and so is a framework the project starts targeting. The package identifier is spelled as
+  the project declares it and compared ordinally; the moniker is the normalized short form. A
+  baseline file written before items had identities of their own holds one subject entry,
+  `project:{name}`, for the project. That entry still grandfathers every item of its project, and
+  `status` counts it as uncounted until `baseline accept-reductions` splits it into one counted entry
+  per item it still covers, each keeping its reason.
 - **Shape/naming/inheritance/attribute/membership verbs and escape hatches**:
   `(ruleId, subject symbol ID)`. A membership verb's operands (`MustBelongTo`'s memberships,
   §5.3) are part of the rule, never of the identity: widening or narrowing the membership list
@@ -1174,13 +1184,16 @@ declares as package references, whether it locks restore and whether it packs.
   channel, not a verdict's.
 - **Identity is `project:{name}`.** A project has no documentation-comment ID, so the
   identity wears the DocId shape and displays verbatim. It rides baseline entries unchanged,
-  so every posture composes — a TFM migration is an ordinary ratcheted burndown.
+  so every posture composes. The two verbs over a list key each item apart, as an edge from the
+  project to `package:{id}` or `framework:{moniker}` (§4.3), so a migrated rule still reds on the
+  next package or framework the project takes, and a TFM migration is an ordinary ratcheted
+  burndown, one framework at a time.
 - **The site is the declaration that won the evaluation** — regularly a props file above the
   project, not the csproj — and where the defect is an absence, the site falls back to the
   project file itself. `MustReferenceNoPackages` mints one violation per declared package
-  that is not private, each sited at its own declaration, all sharing the project's identity:
-  the law is about the project, so one baseline entry blesses the whole list and does not move
-  when the list does.
+  that is not private, each sited at its own declaration. `MustOnlyTarget` mints one violation
+  per target framework the rule does not permit, each sited at the declaration of the project's
+  framework list.
 - **A narrowed run skips a project rule that selects nothing**, exactly as it skips a type
   rule whose subject a filter erased.
 
