@@ -1,6 +1,6 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Cli.Mcp.Infrastructure;
+using Xunit;
 
 namespace SlideRule.Tests.Mcp;
 
@@ -9,18 +9,21 @@ namespace SlideRule.Tests.Mcp;
 ///     turns up as a red here rather than as a silent cut in every session.
 /// </summary>
 /// <remarks>
-///     Claude Code renders MCP server instructions into the session system prompt whole only up to
-///     2,048 UTF-16 code units; anything longer is sliced there and suffixed "… [truncated]" —
-///     measured: the constant and the slice are in the client binary. <see cref="string.Length" />
-///     counts the same units the client slices, so this pin measures exactly what the client
-///     measures. When it reds, cut or move content — tool descriptions are the per-fetch channel —
-///     never raise the budget. The unbound banner (<see cref="ServerInstructions.For" />) prepends
-///     further text ahead of the same cliff, which is why the file keeps its most droppable lines
-///     last.
+///     Claude Code renders MCP server instructions into the session system prompt whole only up to a
+///     length in UTF-16 code units, and slices anything longer there with "… [truncated]" appended:
+///     2,048 before 2.1.296, 4,096 from it (read in the 2.1.300 binary on 2026-10-18). The pin holds
+///     the stricter of the two, because clients older than 2.1.296 are still in use. Of the other
+///     coding harnesses surveyed that day, only Codex cuts shorter: to 1,000 bytes for a server
+///     installed as a Codex plugin, and to the first line in an optional summary mode.
+///     <see cref="string.Length" /> counts the same units the client slices, so this pin measures
+///     exactly what the client measures. When it reds, cut or move content — tool descriptions are
+///     the per-fetch channel — never raise the budget. The unbound banner
+///     (<see cref="ServerInstructions.For" />) prepends further text ahead of the same cliff, which is
+///     why the file keeps its most droppable lines last.
 /// </remarks>
 public sealed class ServerInstructionsTests
 {
-    /// <summary>The observed Claude Code cliff: instructions longer than this are cut mid-text.</summary>
+    /// <summary>The cliff of Claude Code before 2.1.296: instructions longer than this are cut mid-text.</summary>
     private const int ClientTruncationCliff = 2048;
 
     /// <summary>
