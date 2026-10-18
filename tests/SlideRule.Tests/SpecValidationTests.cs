@@ -570,6 +570,17 @@ public class SpecValidationTests
     }
 
     [Fact]
+    public void BlankPattern_BlankMemberName_IsReported()
+    {
+        // A member Named list's names ride the same member-subject adjective walk (GRAMMAR §8 item 15), under
+        // the "member name" label that item 11 reports under a code of its own.
+        SpecValidationException ex = BuildExpectingFailure(new BlankMemberNamedSpec());
+
+        ex.ShouldHaveError(Code.BlankPattern, "area/rule")
+            .Message.ShouldBe("SpecValidationSpecs.cs:1547: Blank member name on 'area/rule'.");
+    }
+
+    [Fact]
     public void BlankPattern_BlankLayerGlob_IsReportedSpecWide()
     {
         // The layer flavor of §8 item 15: like the dead-subtree layer case below, layer globs are

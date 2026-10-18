@@ -159,6 +159,7 @@ internal static class NodeWriters
         Add<MemberWithSuffixAdjective>(arms, (w, a) => w.Field("suffix", a.Suffix));
         Add<MemberWithPrefixAdjective>(arms, (w, a) => w.Field("prefix", a.Prefix));
         Add<MemberWithNameMatchingAdjective>(arms, (w, a) => w.Field("glob", a.Glob));
+        Add<MemberNamedAdjective>(arms, (w, a) => w.StringsField("names", a.Names));
         Add<ReturningAdjective>(arms, (w, a) => w.DefinitionAnchors("anchors", a.Anchors));
         Add<MemberAttributedWithAdjective>(arms, (w, a) => w.ConstructionAnchor("anchor", a.Anchor));
         Add<MemberThatAreStaticAdjective>(arms, (_, _) => { });

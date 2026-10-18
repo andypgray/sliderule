@@ -284,6 +284,14 @@ internal static class NodeReaders
             return glob is null ? null : new MemberWithNameMatchingAdjective(glob);
         });
 
+        map.Add(Key<MemberNamedAdjective>(), (r, v) =>
+        {
+            if (!r.OnlyKeys(v, MemberAdjectiveWhere, "node", "names")) return null;
+
+            IReadOnlyList<string>? names = r.RequiredTexts(v, MemberAdjectiveWhere, "names");
+            return names is null ? null : new MemberNamedAdjective(names);
+        });
+
         map.Add(Key<ReturningAdjective>(), (r, v) =>
         {
             if (!r.OnlyKeys(v, MemberAdjectiveWhere, "node", "anchors")) return null;

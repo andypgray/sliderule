@@ -1539,3 +1539,11 @@ internal sealed class BlankPropertySpec : IArchitectureSpec
         arch.Rule("area/value").Enforce(arch.Projects.Named("A").MustSetProperty("Nullable", "")).Because("Reason.");
     }
 }
+
+internal sealed class BlankMemberNamedSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        arch.Rule("area/rule").Enforce(arch.Types.Methods.Named("Main", " ").MustBeStatic()).Because("Reason.");
+    }
+}

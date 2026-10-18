@@ -45,6 +45,15 @@ internal static class SentenceRenderer
         return ProseFormat.Capitalize(MemberPhrase(selection));
     }
 
+    /// <summary>
+    ///     How a member selection reads in reference position (GRAMMAR §6): its subject phrase, uncapitalized,
+    ///     as a message quotes it or an <c>Except</c> payload renders it.
+    /// </summary>
+    internal static string MemberReference(MemberSelection selection)
+    {
+        return MemberPhrase(selection);
+    }
+
     /// <summary>The capitalized project-subject phrase for a project selection (GRAMMAR §4.10, §6).</summary>
     internal static string ProjectSubject(ProjectSelection selection)
     {

@@ -429,6 +429,7 @@ line.
 | `.WithSuffix` | `(string)` | Methods of types named `*Async` |
 | `.WithPrefix` | `(string)` | Methods of types named `Get*` |
 | `.WithNameMatching` | `(string)` | Methods of types whose name matches `*Handler*` |
+| `.Named` | `(string, …)` | `Main` methods of types |
 | `.Returning` | `(Type, …)` · `(string, …)` on `.Methods` | Methods of types returning `Task` |
 | `.AttributedWith` | `(Type)` · `(string)` · `<T>()` | `[ApiController]`-attributed methods of types |
 | `.ThatAreStatic` | `()` | Static fields of types |
@@ -538,7 +539,8 @@ have no type-side twin, `MustBeGetOnly()` chains only off
 `MustBeReadonly()` chains only off `.Fields` (a `const` field satisfies it, const being readonly's
 superset). `.ThatAreStatic()` prefixes the subject head ("static fields of ..."), as does each
 accessibility adjective, which on members also has `.ThatAreProtected()`, `.ThatAreProtectedInternal()`
-and `.ThatArePrivateProtected()`, each matching its level exactly. The flagship:
+and `.ThatArePrivateProtected()`, each matching its level exactly; `.Named(name, ...)` picks
+members by exact name ("`Main` methods of ..."). The flagship:
 `web.Methods.Returning(typeof(Task)).MustHaveSuffix("Async")` — *"Methods of types in `MyApp.Web.*`
 returning `Task` must be named `*Async`."* `arch.Projects` names the solution's projects as build
 artifacts, not sets of types (`arch.Project(name)` is the unrelated type noun).
@@ -627,8 +629,7 @@ and never warns. Member bans are
 source-visibility bans, not runtime-dispatch bans — a ban on a concrete member does not catch
 calls through an interface-typed receiver, nor the reverse. Member subjects range over the
 declared members of solution-declared types (accessors, constructors, operators, indexers,
-and compiler-generated members are excluded; external types carry no member inventory), and
-an empty member subject fails the rule exactly like an empty type subject. Type subjects
+and compiler-generated members are excluded; external types carry no member inventory). Type subjects
 range over solution-declared types; targets also reach external (BCL/NuGet) types. `MustOnlyReference` constrains solution-declared targets only (external
 packages are exempt, and the rendered sentence says so) and allows the subject implicitly, after
 any `Except` it spells — list what a layer may reach BEYOND itself, and reach for

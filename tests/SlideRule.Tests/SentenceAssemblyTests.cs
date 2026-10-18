@@ -1430,6 +1430,25 @@ public class SentenceAssemblyTests
     }
 
     [Fact]
+    public void MemberNamed_OverANamedTypeSubject_KeepsEachNameOnItsOwnNoun()
+    {
+        // The flagship exemption shape: the member's name leads the kind plural, the type's trails the
+        // reference, so the two Named calls never read as one.
+        SentenceRenderer.Sentence(Arch.Types.Named("Program")
+                .Methods.Named("Main")
+                .MustBeStatic())
+            .ShouldBe("`Main` methods of types named `Program` must be static.");
+    }
+
+    [Fact]
+    public void MemberNamed_StacksWithTheOtherHeadPrefixes_InAuthoringOrder()
+    {
+        SentenceRenderer.MemberSubject(Arch.Types.Methods.ThatArePublic()
+                .Named("Main", "Run"))
+            .ShouldBe("Public `Main` or `Run` methods of types");
+    }
+
+    [Fact]
     public void MemberAccessibility_StacksWithTheOtherHeadPrefixes_InAuthoringOrder()
     {
         // An accessibility prefix is one more member head prefix: it concatenates with the static and the

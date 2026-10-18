@@ -845,7 +845,13 @@ Quarantine desugaring (§7) — is the underlying **type** selection.
   subject (§4.1), with its own pinned message *"The subject selection matched no
   solution-declared members."* (a selection that matches types none of whose members survive the
   kind filter is the ordinary way to hit it). Under a narrowed run it skips exactly as the type
-  analog does (§4.1).
+  analog does (§4.1). A member subject's own **`Named` list** sharpens per name on the type
+  side's terms (§4.1): where the member subject matched something, each listed name no member of
+  it carries fails the rule with *"The subject selection operand "…" matched no
+  solution-declared members."*, quoted as the subject would read with that name alone ("`Ghost`
+  methods of types named `Program`"). A list inside an `Except` payload exempts and is not read,
+  a subject that matched nothing fails once, whole, and a run over one project's compilation
+  reads no member name this way, since another project's members may carry it.
 - **Violation identity is `(ruleId, member DocumentationCommentId)`** — the member's own
   `M:`/`P:`/`F:`/`E:` DocId, so the ratchet blesses the *specific* member and a renamed or
   newly-added member is a NEW red: the shape-verb identity (§4.3) with a member ID in the
@@ -1353,6 +1359,7 @@ posture verbs, trailers and escape hatches of §5.4–§5.6 are written by hand.
 | `.WithSuffix` | `(string)` | Methods of types named `*Async` |
 | `.WithPrefix` | `(string)` | Methods of types named `Get*` |
 | `.WithNameMatching` | `(string)` | Methods of types whose name matches `*Handler*` |
+| `.Named` | `(string, …)` | `Main` methods of types |
 | `.Returning` | `(Type, …)` · `(string, …)` on `.Methods` | Methods of types returning `Task` |
 | `.AttributedWith` | `(Type)` · `(string)` · `<T>()` | `[ApiController]`-attributed methods of types |
 | `.ThatAreStatic` | `()` | Static fields of types |
@@ -1774,6 +1781,7 @@ form cannot reach, because a string anchor still names one definition rather tha
 **Member adjectives** (reduced relative clauses on the member set):
 
 - `.WithSuffix("Async")` — the same fragment as the type-side adjective (§5.2)
+- `.Named("Main")` — head prefix naming the members: "`Main` methods of types named `Program`", "`Main` or `Run` methods of types". The exact name, ordinal, reaching every overload of a method, with a `*` read as a literal character, as on the type side (§5.2). A head prefix where the type-side twin is an inline clause, because an inline " named `Main`" after the type reference would read as naming the types. Each name of a subject's list that no member carries fails on its own (§4.6)
 - `.Returning(typeof(Task))` / `.Returning("System.Threading.Tasks.Task")` — declaration-level (§4.6); an open generic renders declared type-parameter names ("returning `Task<TResult>`"); multiple anchors join "returning `Task` or `Task<TResult>`", colliding simple names widening as in §6; the string form is §5.2's escape hatch, rendering byte-identically. Methods-only.
 - `.AttributedWith(typeof(McpServerToolAttribute))` / `.AttributedWith("ModelContextProtocol.Server.McpServerToolAttribute")` — head prefix: "`[McpServerTool]`-attributed" — premodifies the kind-plural (§6), so the subject reads "`[McpServerTool]`-attributed methods of types in `SlideRule.*`". Declared member attributes only (§4.6); the string form is §5.2's escape hatch, rendering byte-identically
 - `.ThatAreStatic()` — head prefix: "static" — premodifies the kind-plural (§6), so the subject reads "static fields of the Core layer". A member **shape** adjective (§11); head prefixes stack across families and concatenate in authoring order
@@ -1989,8 +1997,9 @@ carries its sugar overload too, or the verb silently stops compiling after the s
   `Where`. The flagship: `web.Methods.Returning(typeof(Task)).MustHaveSuffix("Async")` (where
   `web` is `MyApp.Web.*`) → *"Methods of types in `MyApp.Web.*` returning `Task` must be named
   `*Async`."* The member attribute adjective premodifies the kind-plural
-  ("`[McpServerTool]`-attributed methods of types in `SlideRule.*`"), as do `.ThatAreStatic()` and
-  the accessibility adjectives ("private fields of types"), and stacked
+  ("`[McpServerTool]`-attributed methods of types in `SlideRule.*`"), as do `.ThatAreStatic()`,
+  the accessibility adjectives ("private fields of types") and member `Named` ("`Main` methods of
+  types named `Program`"), and stacked
   member prefixes concatenate in authoring order (§5.7), so every
   narrowing fact reaches the sentence — the member-side twin of the `.Authored()` head
   premodification above, on the same grounds: a trailing clause would read as narrowing the
@@ -2117,7 +2126,9 @@ carries its sugar overload too, or the verb silently stops compiling after the s
     inferred from a string's shape.
 15. Blank/whitespace glob, name or affix — a namespace pattern, a type- or member-name pattern,
     an exact type name (`Named`, reported as `Blank type name on '{id}'.` — blank is the whole
-    check, a name having no structure to validate), a project name, or a suffix/prefix left empty. A blank affix is vacuously true and a blank
+    check, a name having no structure to validate), an exact member name (member `Named`, reported
+    as `Blank member name on '{id}'.`, the label item 11 reports under a code of its own), a
+    project name, or a suffix/prefix left empty. A blank affix is vacuously true and a blank
     glob throws at check time; both are almost always an authoring slip. Applies on the type and
     member sides alike, to layer globs and to every operand of a layer's selection definition,
     its `Except` payloads included (both reported spec-wide, named by layer), and to the project
@@ -2365,8 +2376,8 @@ this catalog.
   information: `WithNameMatching` on types and members, where a name sits beside a namespace, a
   kind or a signature and the adjective says which of them the glob reads (the
   `WithSuffix`/`WithPrefix` family); `Matching` on projects, whose name is the whole identity, so
-  a property word would say nothing. `Named` is the exact form on both the type and project
-  strata (§5.2, §5.8). A verb-plus-object compound is not licensed:
+  a property word would say nothing. `Named` is the exact form on the type, member and project
+  strata (§5.2, §5.7, §5.8). A verb-plus-object compound is not licensed:
   `ExceptGenerated` would both duplicate `Except` and stop reading as a modifier of the noun.
 - **Constraints**: `Must[Not]` + verb phrase; polarity lexical; the noun rides along where a
   bare preposition would be ambiguous (`MustResideInNamespace`). The member-access verb is

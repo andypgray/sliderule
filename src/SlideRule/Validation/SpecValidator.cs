@@ -1047,6 +1047,10 @@ internal static class SpecValidator
             case MemberWithNameMatchingAdjective a:
                 yield return (a.Glob, SpecSlot.MemberNamePattern);
                 break;
+            case MemberNamedAdjective a:
+                foreach (string name in a.Names) yield return (name, SpecSlot.ExactMemberName);
+
+                break;
             case MemberWithSuffixAdjective a:
                 yield return (a.Suffix, SpecSlot.MemberSuffix);
                 break;

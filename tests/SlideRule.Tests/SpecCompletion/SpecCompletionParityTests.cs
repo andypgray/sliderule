@@ -53,7 +53,7 @@ public sealed class SpecCompletionParityTests(SpecCompletionFixture fixture)
     // someone decides whether it is one an editor can offer names in. The package pattern and the property
     // name and value complete nothing: the compilation a spec is written in holds no package identifiers and
     // no MSBuild properties to offer.
-    private const int CatalogSize = 34;
+    private const int CatalogSize = 35;
 
     [Fact]
     public async Task EveryProductType_IsOfferedUnderTheNameTheExtractorRendersForIt()

@@ -170,6 +170,7 @@ internal static class VocabularyCatalog
             MemberAdjective(nameof(MemberSelectionAdjectives.WithSuffix), arch => arch.Types.Methods.WithSuffix("Async")),
             MemberAdjective(nameof(MemberSelectionAdjectives.WithPrefix), arch => arch.Types.Methods.WithPrefix("Get")),
             MemberAdjective(nameof(MemberSelectionAdjectives.WithNameMatching), arch => arch.Types.Methods.WithNameMatching("*Handler*")),
+            MemberAdjective(nameof(MemberSelectionAdjectives.Named), arch => arch.Types.Methods.Named("Main")),
             MemberAdjective(nameof(MethodSelection.Returning), arch => arch.Types.Methods.Returning(typeof(Task))),
             MemberAdjective(nameof(MemberSelectionAdjectives.AttributedWith),
                 arch => arch.Types.Methods.AttributedWith(typeof(ApiControllerAttribute))),

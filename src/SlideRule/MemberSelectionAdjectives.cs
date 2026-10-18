@@ -1,4 +1,5 @@
 using SlideRule.Fluent;
+using SlideRule.Internal;
 using SlideRule.Model;
 using SlideRule.Validation;
 using static SlideRule.Internal.Guard;
@@ -59,6 +60,30 @@ public static class MemberSelectionAdjectives
         where TSelf : MemberSelection
     {
         return Append(selection, new MemberWithNameMatchingAdjective(NotNull(glob, nameof(glob))));
+    }
+
+    /// <summary>
+    ///     Narrows the selection to the members with exactly these names, such as
+    ///     <c>arch.Types.Named("Program").Methods.Named("Main")</c> or <c>.Methods.Named("Main", "Run")</c>,
+    ///     which keeps the members carrying either name. The comparison is case-sensitive over the member's
+    ///     own name, with no declaring type in front of it and no signature after it, so a name reaches every
+    ///     overload of a method; a <c>*</c> in it is a literal character, and
+    ///     <see cref="WithNameMatching{TSelf}" /> is the glob form beside this one. It reads as a premodifier in
+    ///     the rendered sentence: "`Main` methods of types named <c>Program</c>". At least one name is required,
+    ///     and a blank one is reported when the spec is loaded. Where the selection is a rule's subject, each
+    ///     name is also checked on its own: one that matches no member while the others match fails the rule,
+    ///     naming it.
+    /// </summary>
+    public static TSelf Named<TSelf>(
+        this TSelf selection,
+        [SpecSlot(nameof(SpecSlot.ExactMemberName))]
+        string first,
+        [SpecSlot(nameof(SpecSlot.ExactMemberName))]
+        params string[] more)
+        where TSelf : MemberSelection
+    {
+        IReadOnlyList<string> names = OperandList.OneOrMore(first, more, name => name);
+        return Append(selection, new MemberNamedAdjective(names));
     }
 
     /// <summary>

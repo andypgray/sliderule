@@ -22,6 +22,13 @@ namespace SlideRule.Validation;
 ///         project name and a blank project glob fail in opposite directions and the catalog entries have
 ///         to be able to say so. A verdict carries the code, so those need an instance each.
 ///     </para>
+///     <para>
+///         "member name" is shared the same way. <c>arch.Member(type, name)</c> reports a blank as
+///         <see cref="SpecValidationErrorCode.BlankMemberName" />, because a blank anchor name never resolves
+///         to a member, while a member selection's <c>Named(...)</c> reports it as
+///         <see cref="SpecValidationErrorCode.BlankPattern" /> beside the type side's exact names, because a
+///         blank exact name is the same authoring slip on either stratum.
+///     </para>
 /// </remarks>
 internal sealed class SpecSlot
 {
@@ -48,6 +55,12 @@ internal sealed class SpecSlot
 
     /// <summary>A member-name prefix.</summary>
     internal static readonly SpecSlot MemberPrefix = new(nameof(MemberPrefix), "member prefix", SlotCheck.Pattern);
+
+    /// <summary>
+    ///     One exact member name on a member selection's <c>Named</c>, which reports a blank as
+    ///     <see cref="Code.BlankPattern" />.
+    /// </summary>
+    internal static readonly SpecSlot ExactMemberName = new(nameof(ExactMemberName), "member name", SlotCheck.Pattern);
 
     /// <summary>An attribute anchor spelled as a definition FQN, on either axis and either polarity.</summary>
     internal static readonly SpecSlot AttributeName = new(nameof(AttributeName), "attribute name", SlotCheck.Pattern);
@@ -147,6 +160,7 @@ internal sealed class SpecSlot
         MemberNamePattern,
         MemberSuffix,
         MemberPrefix,
+        ExactMemberName,
         AttributeName,
         InterfaceName,
         BaseTypeName,

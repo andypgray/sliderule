@@ -99,6 +99,15 @@ internal sealed class ConstraintEvaluator
     }
 
     /// <summary>
+    ///     The member twin of <see cref="EmptyOperandMessage" /> (GRAMMAR §4.6): one name of a member subject's
+    ///     <c>Named</c> list that no member carries, quoted as the subject would read with that name alone.
+    /// </summary>
+    internal static string EmptyMemberOperandMessage(string operandReference)
+    {
+        return $"The subject selection operand \"{operandReference}\" matched no solution-declared members.";
+    }
+
+    /// <summary>
     ///     Evaluates <paramref name="constraint" /> over <paramref name="subject" />: the constraint's own
     ///     subject, or what a caller that narrowed it before evaluation hands in (GRAMMAR §4.1).
     /// </summary>
@@ -1410,6 +1419,20 @@ internal sealed class ConstraintEvaluator
                 Violation.EmptySubject(
                     EmptyMemberSubjectMessage, AuthoringHints.ForMemberSubject(_incompleteModel))
             ], NoWarnings, default);
+
+        // A member Named list is read per name in the type subject's register (ResolveSubject): Named(a, b)
+        // names what a and b each name, so a name no member carries fails as an empty operand of its own and
+        // the verb never runs. A run over one project's compilation skips the gate, since a name only another
+        // project's members carry is not that compilation's to judge.
+        if (_narrowing is not { Kind: NarrowingKind.OneProject })
+        {
+            List<Violation> deadNames = MemberDeadNames.In(constraint.MemberSubject, members)
+                .Select(dead => Violation.EmptySubject(
+                    EmptyMemberOperandMessage(SentenceRenderer.MemberReference(dead)),
+                    AuthoringHints.ForMemberName(_incompleteModel)))
+                .ToList();
+            if (deadNames.Count > 0) return (deadNames, NoWarnings, default);
+        }
 
         (IReadOnlyList<Violation> violations, IReadOnlyList<CheckWarning> warnings) = DispatchMember(constraint, members);
         return (violations, warnings, MemberCoverageOf(members));

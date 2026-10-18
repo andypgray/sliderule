@@ -6,7 +6,7 @@ namespace SlideRule.Fluent;
 /// <summary>
 ///     The methods the selected types declare, reached with <c>.Methods</c> on a
 ///     <see cref="Selection" />. Narrow it with <c>Returning</c> and with the member adjectives
-///     (<c>WithSuffix</c>, <c>WithPrefix</c>, <c>WithNameMatching</c>, <c>AttributedWith</c>,
+///     (<c>WithSuffix</c>, <c>WithPrefix</c>, <c>WithNameMatching</c>, <c>Named</c>, <c>AttributedWith</c>,
 ///     <c>ThatAreStatic</c>, the accessibility adjectives such as <c>ThatArePublic</c>, <c>Where</c>), each
 ///     of which hands back a method selection again, so the
 ///     method-only calls stay reachable whatever the order

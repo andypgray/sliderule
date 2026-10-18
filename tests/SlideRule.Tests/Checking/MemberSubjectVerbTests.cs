@@ -310,6 +310,38 @@ public sealed class MemberSubjectVerbTests
             ]);
     }
 
+    // ── the exact-name adjective ──────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Named_KeepsExactlyTheNamedMembers_CaseSensitively()
+    {
+        // MustBeStatic reds each instance method, so the failures are the set Named kept: the exact names,
+        // in the case written, and nothing whose name merely contains one.
+        FailedMemberIds(MembersModel, arch => arch.Namespace("App.Members.*").Methods.Named("Walk", "Idle").MustBeStatic())
+            .ShouldBe(["M:App.Members.Machine.Idle", "M:App.Members.Widget.Walk"]);
+
+        RuleResult result = Checker.Run(MembersModel, arch =>
+                arch.Rule("member/x")
+                    .Enforce(arch.Namespace("App.Members.*").Methods.Named("walk").MustBeStatic())
+                    .Because("b"))
+            .Single();
+        result.ShouldHaveFailedWithDetail(ViolationKind.EmptySubject, ConstraintEvaluator.EmptyMemberSubjectMessage);
+    }
+
+    [Fact]
+    public void Named_ReadsStarAsLiteral_WhereWithNameMatchingGlobs()
+    {
+        // A `*` in an exact name is a character, so it selects nothing here and the glob form selects RunAsync.
+        RuleResult result = Checker.Run(MembersModel, arch =>
+                arch.Rule("member/x")
+                    .Enforce(arch.Namespace("App.Members.*").Methods.Named("*Async").MustBePublic())
+                    .Because("b"))
+            .Single();
+        result.ShouldHaveFailedWithDetail(ViolationKind.EmptySubject, ConstraintEvaluator.EmptyMemberSubjectMessage);
+
+        Pass(MembersModel, arch => arch.Namespace("App.Members.*").Methods.WithNameMatching("*Async").MustBePublic());
+    }
+
     // ── accessibility adjectives ──────────────────────────────────────────────────────────────────────
 
     [Fact]

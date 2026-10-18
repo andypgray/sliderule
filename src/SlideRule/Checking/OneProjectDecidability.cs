@@ -404,6 +404,7 @@ internal static class OneProjectDecidability
             typeof(MemberWithSuffixAdjective),
             typeof(MemberWithPrefixAdjective),
             typeof(MemberWithNameMatchingAdjective),
+            typeof(MemberNamedAdjective),
             typeof(ReturningAdjective),
             typeof(MemberAttributedWithAdjective),
             typeof(MemberThatAreStaticAdjective),

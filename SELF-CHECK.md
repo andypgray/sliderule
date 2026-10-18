@@ -189,7 +189,7 @@ The same rule from `check --json`, the document `arch_check` returns over MCP, s
 `sliderule graph` surveys the codebase a spec is written against: projects and their references, namespaces and their sizes, and every external dependency by root. It needs no spec. It prints 27 project lines for this solution, one for every project the load reaches, so the projects that test fixtures reference are among them. These are the lines for its ten projects outside the tests and their fixtures:
 
 ```text
-  SlideRule — 373 types; targets netstandard2.0; references: (none); packages: (none); locks restore
+  SlideRule — 375 types; targets netstandard2.0; references: (none); packages: (none); locks restore
   SlideRule.Analyzers — 11 types; targets netstandard2.0; references: SlideRule, SlideRule.Extraction; packages: Microsoft.CodeAnalysis.Analyzers (private); locks restore
   SlideRule.Architecture — 1 type; targets net10.0; references: SlideRule, SlideRule.Packs.DotNet; packages: Microsoft.Build.Locator; does not pack
   SlideRule.Cli — 193 types (1 generated); targets net10.0; references: SlideRule, SlideRule.Extraction, SlideRule.Roslyn; packages: Microsoft.Extensions.Hosting, ModelContextProtocol, Serilog.Extensions.Hosting, Serilog.Sinks.File, SlideRule.Analyzers (private), System.CommandLine; locks restore

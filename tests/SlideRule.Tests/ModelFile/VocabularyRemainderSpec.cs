@@ -154,6 +154,12 @@ internal static class VocabularyRemainderSpec
                 .MustBeProtected())
             .Because("A policy case reads the base's state directly, which a private field puts out of its reach.");
 
+        arch.Rule("remainder/entry-points-are-static")
+            .Enforce(arch.Types.Named("Program")
+                .Methods.Named("Main", "Run")
+                .MustBeStatic())
+            .Because("The host calls the entry points before any instance exists, so an instance one is never reached.");
+
         arch.Rule("remainder/factories-are-static")
             .Enforce(arch.Types.InNamespace("Remainder.Api.*")
                 .Methods.WithNameMatching("Create*")

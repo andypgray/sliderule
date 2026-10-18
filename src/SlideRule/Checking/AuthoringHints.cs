@@ -97,6 +97,12 @@ internal static class AuthoringHints
     private const string InertNameTail =
         "; a name that matches nothing bans nothing, so decide before keeping it";
 
+    // The member twin of NamedClause. A member's name has no namespace or arity to leave out; what a reader
+    // reaches for by mistake is the declaring type or the signature.
+    private const string MemberNamedClause =
+        "a name in a member `Named` list is the member's own name, matched exactly, without its declaring type "
+        + "or signature";
+
     // The allow-list twins. A dead allowed pattern errs the other way: nothing is quieter, and what it was
     // meant to allow reds under the names of the callers, which is why the tail says where the reds come from.
     private const string AllowedOperandTail =
@@ -150,6 +156,15 @@ internal static class AuthoringHints
     internal static string ForMemberSubject(IncompleteModel? model)
     {
         return model?.EmptySelectionHint ?? EmptyMemberSubject;
+    }
+
+    /// <summary>
+    ///     What to change when one name of a member subject's <c>Named</c> list matched no member while the
+    ///     others matched, or the partial model where there is one.
+    /// </summary>
+    internal static string ForMemberName(IncompleteModel? model)
+    {
+        return model?.EmptySelectionHint ?? Sentence(MemberNamedClause + SubjectTail);
     }
 
     /// <summary>

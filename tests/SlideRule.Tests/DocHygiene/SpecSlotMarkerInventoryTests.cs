@@ -42,7 +42,7 @@ public sealed class SpecSlotMarkerInventoryTests
 {
     // The number of string literals a spec can write, counted once so that adding a verb is a deliberate
     // edit here rather than a table that grew while nobody was counting.
-    private const int SlotCount = 81;
+    private const int SlotCount = 83;
 
     private const string RootNamespace = "SlideRule";
 
@@ -133,6 +133,8 @@ public sealed class SpecSlotMarkerInventoryTests
             ["MemberSelectionAdjectives.WithSuffix(TSelf, string)/suffix"] = nameof(SpecSlot.MemberSuffix),
             ["MemberSelectionAdjectives.WithPrefix(TSelf, string)/prefix"] = nameof(SpecSlot.MemberPrefix),
             ["MemberSelectionAdjectives.WithNameMatching(TSelf, string)/glob"] = nameof(SpecSlot.MemberNamePattern),
+            ["MemberSelectionAdjectives.Named(TSelf, string, string[])/first"] = nameof(SpecSlot.ExactMemberName),
+            ["MemberSelectionAdjectives.Named(TSelf, string, string[])/more"] = nameof(SpecSlot.ExactMemberName),
             ["MemberSelectionAdjectives.AttributedWith(TSelf, string)/attributeFullName"] = nameof(SpecSlot.AttributeName),
             ["MemberSelectionAdjectives.Where(TSelf, Func<IMemberInfo, bool>, string)/description"] = nameof(SpecSlot.Description),
 

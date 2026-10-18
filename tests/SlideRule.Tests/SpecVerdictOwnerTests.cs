@@ -16,9 +16,9 @@ public sealed class SpecVerdictOwnerTests
     [Fact]
     public void All_HoldsEverySlotOfTheAuthoringSurface()
     {
-        // Eighteen pattern slots, nine prose slots, and seven that are neither.
+        // Nineteen pattern slots, nine prose slots, and seven that are neither.
         SpecSlot.All.Count
-            .ShouldBe(34);
+            .ShouldBe(35);
     }
 
     [Fact]
@@ -63,6 +63,7 @@ public sealed class SpecVerdictOwnerTests
             "MemberNamePattern: member name pattern",
             "MemberSuffix: member suffix",
             "MemberPrefix: member prefix",
+            "ExactMemberName: member name",
             "AttributeName: attribute name",
             "InterfaceName: interface name",
             "BaseTypeName: base type name",

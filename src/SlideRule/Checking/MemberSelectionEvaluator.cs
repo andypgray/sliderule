@@ -57,6 +57,9 @@ internal static class MemberSelectionEvaluator
             case MemberWithNameMatchingAdjective matching:
                 var pattern = new TypeNamePattern(matching.Glob);
                 return current.Where(member => pattern.Matches(member.Name));
+            case MemberNamedAdjective named:
+                var names = new HashSet<string>(named.Names, StringComparer.Ordinal);
+                return current.Where(member => names.Contains(member.Name));
             case ReturningAdjective returning:
                 // Anchor keys resolve eagerly (before the lazy Where), so a closed-generic typeof anchor throws
                 // the backstop here — during resolution — exactly like a closed-generic type noun (§4.1). A

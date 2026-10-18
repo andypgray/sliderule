@@ -430,6 +430,17 @@ public class VocabularyFragmentTests
     }
 
     [Fact]
+    public void Member_Named_PremodifiesTheKindPluralWithTheNames()
+    {
+        // A head prefix where the type side's Named is an inline clause: after the type reference, " named
+        // `Main`" would read as naming the types.
+        SentenceRenderer.MemberSubject(Arch.Types.Methods.Named("Main"))
+            .ShouldBe("`Main` methods of types");
+        SentenceRenderer.MemberSubject(Arch.Types.Methods.Named("Main", "Run"))
+            .ShouldBe("`Main` or `Run` methods of types");
+    }
+
+    [Fact]
     public void Member_AccessibilityAdjectives_PremodifyTheKindPlural()
     {
         // All six declared levels, where the type side carries three; each prefix names the one level it

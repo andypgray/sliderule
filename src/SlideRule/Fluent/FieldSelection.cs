@@ -5,7 +5,7 @@ namespace SlideRule.Fluent;
 /// <summary>
 ///     The fields the selected types declare, reached with <c>.Fields</c> on a
 ///     <see cref="Selection" />. Narrow it with the member adjectives (<c>WithSuffix</c>,
-///     <c>WithPrefix</c>, <c>WithNameMatching</c>, <c>AttributedWith</c>, <c>ThatAreStatic</c>, the
+///     <c>WithPrefix</c>, <c>WithNameMatching</c>, <c>Named</c>, <c>AttributedWith</c>, <c>ThatAreStatic</c>, the
 ///     accessibility adjectives such as <c>ThatAreProtected</c>, <c>Where</c>), each of which hands back a
 ///     field selection again, so the field-only call stays
 ///     reachable whatever the order; finish it with a member verb such as <c>MustHavePrefix</c> or

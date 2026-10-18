@@ -6,7 +6,7 @@ namespace SlideRule.Fluent;
 ///     A set of members the spec talks about: the methods, properties, fields and events the selected
 ///     types declare, reached with <c>.Members</c>, <c>.Methods</c>, <c>.Properties</c>,
 ///     <c>.Fields</c> or <c>.Events</c> on a <see cref="Selection" />. Narrow it with adjectives such
-///     as <c>WithSuffix</c>, <c>WithPrefix</c>, <c>WithNameMatching</c>, <c>AttributedWith</c>,
+///     as <c>WithSuffix</c>, <c>WithPrefix</c>, <c>WithNameMatching</c>, <c>Named</c>, <c>AttributedWith</c>,
 ///     <c>ThatAreStatic</c>, the accessibility adjectives such as <c>ThatArePublic</c> and
 ///     <c>ThatAreProtected</c>, or <c>Where</c>, each of which returns a new selection of the same kind so
 ///     that a projection's own calls stay reachable; finish it with a verb such as
@@ -53,6 +53,15 @@ public abstract class MemberSelection
     internal MemberSelection Refined(MemberAdjective adjective)
     {
         var adjectives = new List<MemberAdjective>(Adjectives) { adjective };
+        return Rebuild(adjectives);
+    }
+
+    /// <summary>
+    ///     The same projection over the same source, carrying <paramref name="adjectives" /> in place of its own
+    ///     — how a checker spells this selection with one list narrowed, without writing to it.
+    /// </summary>
+    internal MemberSelection WithAdjectives(IReadOnlyList<MemberAdjective> adjectives)
+    {
         return Rebuild(adjectives);
     }
 }
