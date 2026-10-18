@@ -100,12 +100,11 @@ public interface ITypeInfo
     ///     <c>System.CodeDom.Compiler.GeneratedCodeAttribute</c> sits on the type or on a type containing
     ///     it, so the nested types a generator emits inside an attributed container count too; or when
     ///     every file declaring the type is generator output, meaning the compiler reported the file as
-    ///     generated or the file opens with an auto-generated banner comment. Every declaring file and not
-    ///     merely one: a partial type with one part a person wrote is authored, so a violation reported
-    ///     against it is one somebody can act on. An external type (a package's, the framework's, or one
-    ///     from a project the check leaves out) is judged by the attribute alone. Nothing is inferred from
-    ///     a file path, an <c>obj</c> directory or a naming convention, and a hand-written type carrying
-    ///     the attribute is reported generated — the signals are read as they are written.
+    ///     generated or the file opens with an auto-generated banner comment. A partial type with one part
+    ///     a person wrote is therefore authored, so a violation reported against it is one somebody can act
+    ///     on. An external type (a package's, the framework's, or one from a project the check leaves out)
+    ///     is judged by the attribute alone. Nothing is inferred from a file path, an <c>obj</c> directory
+    ///     or a naming convention, and a hand-written type carrying the attribute is reported generated.
     /// </summary>
     bool IsGenerated { get; }
 

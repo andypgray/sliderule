@@ -171,7 +171,7 @@ internal static class FileStamping
         if (left.Count != right.Count) return false;
         for (var i = 0; i < left.Count; i++)
             if (left[i] != right[i])
-                return false; // FileStamp is a record ⇒ scalar value equality
+                return false;
         return true;
     }
 

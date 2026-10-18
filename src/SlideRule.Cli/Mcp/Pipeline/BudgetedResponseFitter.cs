@@ -9,8 +9,8 @@ namespace SlideRule.Cli.Mcp.Pipeline;
 /// <remarks>
 ///     <para>
 ///         It walks the whole ladder rather than stepping once, because one step is not enough on a real
-///         codebase: on a 34-project solution the full survey is ~147k characters and the overview it
-///         degrades to is still ~82k, over any default budget. Stopping there hands
+///         codebase: on a large solution the overview the full survey degrades to can itself still be over
+///         the 50,000-character ceiling that bounds every budget. Stopping there hands
 ///         <see cref="ResponseTruncator" /> exactly the document this class exists to avoid producing.
 ///     </para>
 ///     <para>

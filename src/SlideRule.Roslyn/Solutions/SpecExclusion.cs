@@ -175,8 +175,8 @@ internal static class SpecExclusion
     ///     filesystem-probing walk the slot exists to avoid on every warm call. Pass what
     ///     <see cref="PathCanonicalizer.Resolve" /> would return for the same path, or pass nothing. A
     ///     spelling the solution file never declared answers "not a member" — the silent-shrink direction
-    ///     this type says it must never be wrong in — which is why the slot is filled by the one caller
-    ///     that resolved the path itself and left null by everyone else.
+    ///     this type says it must never be wrong in — which is why only a caller that resolved the path
+    ///     itself fills the slot, and every other caller leaves it null.
     /// </remarks>
     internal static bool IsDeclaredMember(
         IReadOnlySet<string>? declaredMembers, string? projectFilePath, string? canonicalProjectFilePath = null)

@@ -81,7 +81,7 @@ internal sealed class ModelNodeReader
         if (value is null) return false;
 
         // A number too large for an int is refused the same way a string would be: no version this reader
-        // could ever grow into is one it cannot hold, so the value is simply not a version.
+        // could ever grow into is one it cannot hold, so the value is not a version.
         var version = 0;
         bool isInteger = value.ValueKind == StrictJsonKind.Number && value.TryGetInt32(out version);
         if (!isInteger)

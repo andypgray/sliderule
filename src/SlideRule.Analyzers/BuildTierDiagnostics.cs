@@ -164,8 +164,7 @@ internal static class BuildTierDiagnostics
     /// </summary>
     /// <remarks>
     ///     An absent value is an absent key, never a null one: a reader asking for <c>subject</c> on an edge
-    ///     finding gets "no such key", which is the honest answer, rather than a key whose value it must
-    ///     then test.
+    ///     finding gets "no such key" rather than a key whose value it must then test.
     /// </remarks>
     [MethodImpl(MethodImplOptions.NoInlining)]
     internal static Diagnostic Finding(BuildFinding finding, Location location)

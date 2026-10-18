@@ -20,7 +20,7 @@ public sealed class SlideRuleArchitectureSpec : IArchitectureSpec
     /// <inheritdoc />
     public void Define(Arch arch)
     {
-        // The unit of architecture here is the assembly, so each shipping layer is the project it is; the
+        // The unit of architecture here is the assembly, so each product layer is the project it is; the
         // three cuts inside Core are namespace cones, the pieces layering/model-independent needs to name.
         Layer core = arch.Layer("Core", arch.Project("SlideRule"))
             .Purpose("Core is the package a spec is written against: the fluent language, the model a spec " +
@@ -61,7 +61,7 @@ public sealed class SlideRuleArchitectureSpec : IArchitectureSpec
                      "takes one method at a time.");
 
         // `repo` is every type this repository declares, spec and test projects included; `shipping` is the
-        // nine layers that ship, which is `repo` minus those two.
+        // nine product layers, the never-published rule pack among them, which is `repo` minus those two.
         Selection repo = arch.Namespace("SlideRule.*");
         Selection shipping = arch.AnyOf(
             core, extraction, analyzers, specAnalyzers, specCompletion, workspace, host, adapter, pack);

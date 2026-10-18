@@ -10,7 +10,7 @@ namespace SlideRule.Rendering;
 ///     rule this classifier cannot place is still visible — the drawing narrows, the law never does.
 /// </summary>
 /// <remarks>
-///     The honest approximation is noun-level, with one exception. A noun names a region of the codebase,
+///     The approximation is noun-level, with one exception. A noun names a region of the codebase,
 ///     and a subtractive adjective — <c>Except</c>, <c>Named</c>, <c>Where</c>, <c>Authored</c> — narrows
 ///     which types inside it the rule governs without moving the node, because a diagram has no room to
 ///     say "except these four types" and <c>sliderule explain</c> carries the exact subject. The
@@ -297,7 +297,7 @@ internal static class LawPlaceClassifier
     }
 
     // The extraction-format name where the type admits one; a pointer or an open construction has no
-    // source-level form, and its own simple name is the honest fallback rather than a refusal out of a
+    // source-level form, and its own simple name is the fallback rather than a refusal out of a
     // renderer.
     private static string Display(TypeAnchor anchor)
     {

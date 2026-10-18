@@ -4,7 +4,7 @@ namespace SlideRule.ModelFile;
 /// <remarks>
 ///     The version arms are parted from <see cref="Malformed" /> because they mean something a caller can
 ///     act on: a file this reader is too old for is a reason to update the tool, and one it is too new
-///     for is a reason to rewrite the file. A malformed file is neither — it is simply wrong.
+///     for is a reason to rewrite the file. A malformed file is neither.
 /// </remarks>
 internal enum ModelRefusalKind
 {

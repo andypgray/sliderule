@@ -93,7 +93,7 @@ internal static class MemberExpressionResolver
             case NewExpression:
                 // An object-creation body (`() => new Foo()`, including target-typed `new()`) names a constructor,
                 // which is outside the member-anchor surface (§4.5); the cure is the MustNotConstruct verb (§5.3),
-                // not a member ban. Placed before default: so it steers instead of falling to NotMemberAccess.
+                // not a member ban. An arm of its own, so it steers instead of falling to NotMemberAccess.
                 return Poison(owner, ObjectCreation, location);
 
             default:

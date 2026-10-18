@@ -21,9 +21,7 @@ namespace SlideRule.Checking;
 ///         A one-entry list has no arm here, since its entry is dead exactly when the selection is. A list inside
 ///         an <c>Except</c> payload is not read: it exempts, and a dead exemption narrows nothing. Nor is one inside
 ///         a union's parts, a family's cells or behind a layer's definition, which fold before the selection's own
-///         list is read; a caller that wants them read reads each part itself. The pass over a rule's lists opens a
-///         union's parts and a layer's definition; the subject gate and the exemplar open a union's parts and leave
-///         a layer folded.
+///         list is read; a caller that wants them read reads each part itself.
 ///     </para>
 /// </remarks>
 internal static class DeadNames

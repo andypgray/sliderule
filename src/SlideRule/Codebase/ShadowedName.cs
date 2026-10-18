@@ -48,6 +48,6 @@ internal sealed class ShadowedName
     // Read off each project's own binding, not off the reference edges into the assembly's node: a name
     // reached solely as a member's parameter or return type mints no edge at all (GRAMMAR §4.6), and a bare
     // catch or a `throw expr;` spells no type name to mint one from — so an edge-derived roster would render
-    // a project that genuinely binds the assembly as binding nothing.
+    // a project that binds the assembly as binding nothing.
     public IReadOnlyList<string> BoundFromAssemblyBy { get; }
 }

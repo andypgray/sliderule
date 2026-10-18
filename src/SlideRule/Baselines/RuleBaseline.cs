@@ -22,8 +22,6 @@ internal sealed class RuleBaseline
         Guard.NotNull(entries, nameof(entries));
         _lookup = new Dictionary<BaselineEntry, BaselineEntry>();
 
-        // First entry of a given identity wins, so a later duplicate never overwrites an earlier one's
-        // attribution.
         foreach (BaselineEntry entry in entries)
             if (!_lookup.ContainsKey(entry))
                 _lookup.Add(entry, entry);

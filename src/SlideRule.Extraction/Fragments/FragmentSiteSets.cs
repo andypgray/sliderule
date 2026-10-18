@@ -88,9 +88,9 @@ internal static class FragmentSiteSets
     ///     no-implementation form sorting as the empty string.
     /// </summary>
     /// <remarks>
-    ///     It sits beside <see cref="OrderedPairs{TFirst,TSecond,TValue,TOut}" /> for the same reason that one exists: both
-    ///     ends of the pipeline materialize this table, and a rule spelled twice is a rule that can come to
-    ///     be spelled two ways.
+    ///     It sits beside <see cref="OrderedPairs{TFirst,TSecond,TValue,TOut}" /> for the same reason that one
+    ///     exists: both ends of the pipeline materialize this table, and a rule spelled twice is a rule that can
+    ///     come to be spelled two ways.
     /// </remarks>
     internal static List<TOut> OrderedRegistrations<TOut>(
         Dictionary<(Lifetime, string, string?), SortedSet<FragmentSite>> map,

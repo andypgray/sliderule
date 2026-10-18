@@ -97,7 +97,7 @@ internal sealed class RenderRunner(
         string solutionDirectory = source.SolutionDirectory;
 
         // The flag is the opt-in once; the file's presence is the standing request after it. So a team turns
-        // the model file on by asking for it, and then simply renders — nobody has to remember a flag to keep
+        // the model file on by asking for it, and then renders — nobody has to remember a flag to keep
         // a committed file current, and nobody gets one they never asked for.
         string modelPath = Path.Combine(solutionDirectory, ModelDocument.FileName);
         bool wantsModel = request.Model || File.Exists(modelPath);
@@ -199,10 +199,7 @@ internal sealed class RenderRunner(
     /// </summary>
     /// <remarks>
     ///     A function of the text alone, so the one branch that is unreachable without a defect in the
-    ///     writer or the reader can still be driven by a test. It belongs to this runner rather than to the
-    ///     composer for the reason the composer states about itself: the composer's job is to emit what it
-    ///     was handed, and a self-check living there would be the writer marking its own work on every call,
-    ///     including the calls that partition a model in the first place.
+    ///     writer or the reader can still be driven by a test.
     /// </remarks>
     internal static string? ModelReadBackRefusal(string composed)
     {

@@ -68,7 +68,7 @@ internal static class SolutionExtensions
     ///         discriminator whenever one project file yields more than one <see cref="Project" />, and
     ///         everything downstream keys on the undecorated csproj name. Normalizing here — at the load
     ///         boundary, where all three producers of a <see cref="Solution" /> meet — makes
-    ///         <see cref="Project.Name" /> simply <em>be</em> the right string, so no reader can get it
+    ///         <see cref="Project.Name" /> <em>be</em> the right string, so no reader can get it
     ///         wrong.
     ///     </para>
     ///     <para>
@@ -79,8 +79,8 @@ internal static class SolutionExtensions
     ///     </para>
     ///     <para>
     ///         Two <em>different</em> csprojs that share a file name still collapse to one
-    ///         <see cref="Project.Name" />. That is pre-existing (Roslyn only disambiguates within one
-    ///         project file), and nothing downstream discloses it: the merge unions the two into one
+    ///         <see cref="Project.Name" />, because Roslyn only disambiguates within one project file, and
+    ///         nothing downstream discloses it: the merge unions the two into one
     ///         project and writes no note naming two project files. A type both declare keeps the first
     ///         one's facts. Where the two compilations carry different frameworks, the multi-targeting
     ///         note reads them as one project's frameworks; otherwise no note fires at all.

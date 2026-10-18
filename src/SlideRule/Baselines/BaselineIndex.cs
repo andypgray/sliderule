@@ -17,8 +17,8 @@ internal sealed class BaselineIndex
     /// <summary>
     ///     Builds an index over sections already read from baseline files, keyed by rule ID. The sections
     ///     are copied into an ordinal dictionary, so a rule ID is matched ordinally whatever comparer the
-    ///     caller's own dictionary carried. A rule whose baseline file has not been captured is simply
-    ///     absent from the dictionary.
+    ///     caller's own dictionary carried. A rule whose baseline file has not been captured is absent
+    ///     from the dictionary.
     /// </summary>
     internal BaselineIndex(IReadOnlyDictionary<string, RuleBaseline> sections)
     {

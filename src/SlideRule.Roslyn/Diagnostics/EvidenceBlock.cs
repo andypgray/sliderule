@@ -12,8 +12,7 @@ namespace SlideRule.Roslyn.Diagnostics;
 ///         a colon and answered by the remedy line reads as truncated output. A caller whose list can be
 ///         empty therefore either guards the whole block on that list — as
 ///         <see cref="IncompleteModelGate" /> does, once per cause — or ends its lede in a full stop, as
-///         <see cref="SolutionDiscovery.NotFoundMessage" /> does; that is the one call site that
-///         legitimately composes over nothing, and the guard is what keeps it the only one.
+///         <see cref="SolutionDiscovery.NotFoundMessage" /> does.
 ///     </para>
 ///     <para>
 ///         <b>The block is LF-joined, never platform-joined.</b> A composed block is one comparable value

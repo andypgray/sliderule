@@ -62,7 +62,7 @@ internal static class NarrowedUniverseNotice
 
     /// <summary>
     ///     The stamp <c>graph</c> writes above its survey — the verb a stranger runs first on an unfamiliar
-    ///     codebase, where a missing project reads as a codebase that simply does not have one.
+    ///     codebase, where a missing project reads as a codebase that does not have one.
     /// </summary>
     /// <param name="filterName">The <c>.slnf</c>'s file name.</param>
     /// <param name="uncheckedProjects">The solution-relative paths that were not checked.</param>
@@ -110,10 +110,9 @@ internal static class NarrowedUniverseNotice
 
     /// <summary>
     ///     The stderr lines <c>baseline init</c> and <c>baseline accept-reductions</c> emit before exit 2,
-    ///     having written nothing — the one place a narrowed universe stops being a smaller true answer. A
-    ///     baseline is the team's signature on its debt, and both modes read absence as evidence: <c>init</c>
-    ///     captures "zero debt" for rules whose subjects live in projects the filter left out, and
-    ///     <c>accept-reductions</c> deletes real entries as violations that no longer occur.
+    ///     having written nothing. A baseline is the team's signature on its debt, and both modes read absence
+    ///     as evidence: <c>init</c> captures "zero debt" for rules whose subjects live in projects the filter
+    ///     left out, and <c>accept-reductions</c> deletes real entries as violations that no longer occur.
     /// </summary>
     /// <param name="filterName">The <c>.slnf</c>'s file name.</param>
     /// <param name="uncheckedProjects">The solution-relative paths that were not checked.</param>

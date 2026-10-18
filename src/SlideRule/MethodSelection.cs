@@ -27,7 +27,7 @@ public sealed class MethodSelection : MemberSelection
     ///     <c>.Methods.Returning(typeof(Task), typeof(Task&lt;&gt;))</c>. A non-generic type matches
     ///     exactly; an open generic definition (<c>typeof(Task&lt;&gt;)</c>) matches every construction of
     ///     it, <c>Task&lt;int&gt;</c> and <c>Task&lt;Order&gt;</c> alike. Matching is by the type named and
-    ///     nothing wider: a return type merely derived from it, or assignable to it, does not match. A
+    ///     nothing wider: a return type derived from it, or assignable to it, does not match. A
     ///     constructed generic (<c>typeof(Task&lt;int&gt;)</c>) is reported when the spec is loaded, naming
     ///     the open definition to use instead. At least one type is required, and one call takes types or
     ///     strings, never a mix: a list that needs a name for a type the spec project cannot reference is

@@ -231,14 +231,16 @@ internal static class IncompleteModelGate
     }
 
     /// <summary>
-    ///     The caveat block <c>context</c> writes above its answer when the model is incomplete. Context
-    ///     never gates — it is a lookup an agent runs mid-edit, and a partial answer beats none — but a
+    ///     The caveat block <c>context</c> writes above its answer when the model is incomplete.
+    /// </summary>
+    /// <remarks>
+    ///     Context never gates — it is a lookup an agent runs mid-edit, and a partial answer beats none — but a
     ///     partial load is exactly the state in which "no architecture scope covers this path" can be a
     ///     false all-clear: a card whose project failed to load resolves no directory and places nowhere, and
     ///     a rule about a package the restore never fetched answered without ever measuring anything.
     ///     Stdout is context's only channel (no CLI twin, no <c>--json</c>), so the caveat rides the body,
     ///     the blamed projects inline, ahead of whatever answer the partial model still supports.
-    /// </summary>
+    /// </remarks>
     internal static string ContextCaveat(WorkspaceDiagnostics diagnostics)
     {
         return Message(

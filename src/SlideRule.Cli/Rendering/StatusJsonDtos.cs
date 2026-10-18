@@ -43,8 +43,8 @@ namespace SlideRule.Cli.Rendering;
 ///     Which projects' NuGet packages are not in the model — solution-relative, forward-slashed
 ///     <c>.csproj</c> paths — or null (omitted) when none are. The burndown reads low in a quieter way here
 ///     than it does for <see cref="FailedProjects" />: these projects declare all their types, so the rules
-///     over them run and report — a rule whose target is a package the restore never fetched simply finds
-///     nothing to count.
+///     over them run and report — a rule whose target is a package the restore never fetched finds nothing
+///     to count.
 /// </param>
 /// <param name="UncheckedProjects">
 ///     Which projects the solution declares that this run never checked — solution-relative,

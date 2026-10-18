@@ -1,20 +1,19 @@
 namespace SlideRule.Roslyn.Caching;
 
 /// <summary>
-///     Writes or copies a file atomically <em>and</em> durably: the bytes go to a uniquely-named sibling temp
-///     file in the target's own directory, are flushed to disk, and the temp is then
-///     <see cref="File.Move(string,string,bool)" />d over the target. A reader never sees a half-written file;
-///     a crash mid-write leaves either the intact old file or the intact new one — never a truncated one; and,
-///     because the flush persists the bytes before the rename, a power loss in the move window cannot leave the
-///     renamed target pointing at content still sitting unwritten in the OS cache. The unique temp name (not a
-///     fixed <c>.tmp</c>) lets two writers of the same target coexist without clobbering each other's scratch
-///     file.
+///     Writes or copies a file atomically and durably, so a reader never sees a half-written file.
 /// </summary>
 /// <remarks>
-///     Failure semantics are deliberate: this <em>throws</em> rather than swallowing to a bool, because a
+///     The bytes go to a uniquely-named sibling temp file in the target's own directory, are flushed to disk,
+///     and the temp is then <see cref="File.Move(string,string,bool)" />d over the target. A crash mid-write
+///     leaves either the intact old file or the intact new one, never a truncated one; and, because the flush
+///     persists the bytes before the rename, a power loss in the move window cannot leave the renamed target
+///     pointing at content still sitting unwritten in the OS cache. The unique temp name (not a fixed
+///     <c>.tmp</c>) lets two writers of the same target coexist without clobbering each other's scratch file.
+///     Failure semantics are deliberate: this throws rather than swallowing to a bool, because a
 ///     silently-dropped write to a user-owned, version-controlled file would be a lie. A caller persisting
-///     disposable derived data — which is simply rebuilt next run — wraps this and re-swallows the throw
-///     itself. The temp file is deleted on the failure path.
+///     disposable derived data, which is rebuilt next run, wraps this and re-swallows the throw itself. The
+///     temp file is deleted on the failure path.
 ///     On Windows the move is retried for under a second while another process holds the target or the temp
 ///     open, which is a passing hold rather than a failure of the write itself; any other I/O failure surfaces
 ///     at once.

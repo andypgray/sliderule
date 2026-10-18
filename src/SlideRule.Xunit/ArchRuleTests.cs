@@ -93,8 +93,8 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
     ///     The row source behind <see cref="Rule_Holds" />: one row per rule in the spec, each carrying
     ///     the rule ID that becomes the test's display name. Runs at test discovery and builds the model
     ///     from the spec alone, so the test explorer can list the rules without loading a solution. The
-    ///     load, the extraction and the check then run once for each spec type, when its first case
-    ///     executes, and every rule case of that type reads its verdict from that one run. A spec that
+    ///     solution is then loaded and checked once for each spec type, when its first case executes, and
+    ///     every rule case of that type reads its verdict from that one run. A spec that
     ///     fails to build collapses to a single row, which fails when the run reaches it and carries the
     ///     spec's own errors. A test project that loaded a version of SlideRule other than the
     ///     adapter's own gets a single skipped row instead, whose reason names both versions. The test

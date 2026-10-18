@@ -5,15 +5,16 @@ using SlideRule.Prose;
 namespace SlideRule.Cli.Rendering;
 
 /// <summary>
-///     Formats one rule as the <c>explain</c> field dump: a <c>&lt;id&gt; (&lt;posture&gt;)</c>
-///     header — a scope posture carries the role, e.g. <c>(quarantine/containment)</c> or
-///     <c>(caution/tripwire)</c> — then each
-///     present field once under check's lowercase-label style (<c>sentence:</c> / <c>because:</c> /
-///     <c>citation:</c> / <c>fix:</c> / <c>exemplar:</c>) plus the posture payload. This is a data dump, not the voice
-///     templates:
-///     <c>dragons:</c> and <c>from:</c> print verbatim, and <c>dragons-doc:</c> prints the linked path
-///     only (the spec stays the index). Emitted line by line to match the check renderer.
+///     Formats one rule as the <c>explain</c> field dump: a <c>&lt;id&gt; (&lt;posture&gt;)</c> header, then each
+///     field the rule carries, once, plus the posture payload.
 /// </summary>
+/// <remarks>
+///     A scope posture's header carries the role, e.g. <c>(quarantine/containment)</c> or <c>(caution/tripwire)</c>.
+///     The fields take check's lowercase-label style (<c>sentence:</c> / <c>because:</c> / <c>citation:</c> /
+///     <c>fix:</c> / <c>exemplar:</c>). This is a data dump, not the voice templates: <c>dragons:</c> and
+///     <c>from:</c> print verbatim, and <c>dragons-doc:</c> prints the linked path only (the spec stays the index).
+///     Emitted line by line to match the check renderer.
+/// </remarks>
 internal static class ExplainFormatter
 {
     public static IReadOnlyList<string> Lines(ArchRule rule)

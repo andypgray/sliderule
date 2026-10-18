@@ -96,12 +96,9 @@ internal enum UnsupportedProjectKind
 internal sealed record UnsupportedProject(string Path, UnsupportedProjectKind Kind);
 
 /// <summary>
-///     Everything a run knows about how well its workspace loaded, as one value: the
-///     <see cref="FailedProjects" /> and <see cref="RestoreFailedProjects" /> that gate, the
-///     <see cref="LoadFailures" /> and <see cref="MergeNotes" /> that never do, the
-///     <see cref="UncheckedProjects" />, <see cref="UnsupportedProjects" /> and
-///     <see cref="MultiTargetedProjects" /> that scope the verdict instead of deciding it, plus the renderings
-///     both surfaces read and the gate decision every verb makes.
+///     Everything a run knows about how well its workspace loaded, as one value: the project lists that gate,
+///     the diagnostics that never do, the lists that scope the verdict instead of deciding it, the renderings
+///     both surfaces read, and the gate decision every verb makes.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -196,10 +193,9 @@ internal readonly record struct WorkspaceDiagnostics(
 
     /// <summary>
     ///     The same load failures <em>and</em> the merge notes, with the MSBuild-selection note appended, or
-    ///     empty when there is neither. <c>check</c> alone renders this, because it prints the violations a
-    ///     merge advisory can explain. <c>status</c> and <c>graph</c> extract too and render
-    ///     <see cref="Rendered" />: <c>status</c> reports counts rather than violations, and <c>graph</c>
-    ///     reads its diagnostics before it extracts and states the merge's findings in its own survey.
+    ///     empty when there is neither: the rendering for a verb that prints violations, which a merge
+    ///     advisory can explain. A verb that reports counts, or states the merge's findings in its own output,
+    ///     renders <see cref="Rendered" /> instead.
     /// </summary>
     internal IReadOnlyList<string> RenderedWithMergeNotes => Compose([.. ActionableDiagnostics, .. MergeNotes]);
 

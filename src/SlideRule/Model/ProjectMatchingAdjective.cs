@@ -3,7 +3,7 @@ using SlideRule.Prose;
 namespace SlideRule.Model;
 
 /// <summary>
-///     <c>.Matching(glob, …)</c> → " matching `Zphil.*`", or-joined for several globs (GRAMMAR §4.10, §6).
+///     <c>.Matching(glob, …)</c> → " matching `MyApp.*`", or-joined for several globs (GRAMMAR §4.10, §6).
 ///     An inline reduced relative clause, so it narrows whatever head stands before it — the bare
 ///     "projects" or a <see cref="ProjectNamedAdjective" /> substitution alike.
 /// </summary>

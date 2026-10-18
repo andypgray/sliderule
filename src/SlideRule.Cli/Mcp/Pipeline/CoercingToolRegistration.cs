@@ -36,9 +36,8 @@ internal static class CoercingToolRegistration
 {
     /// <summary>
     ///     The schema hook every tool registered here is created with. Internal rather than private so a
-    ///     test can create a probe tool through it: the array and enum repairs below serve parameter
-    ///     shapes no <c>arch_*</c> tool has yet, so no real tool can reach them. The scalar-string and
-    ///     bool repairs are the live ones — between them they cover every parameter this server declares.
+    ///     test can create a probe tool through it: every parameter the real <c>arch_*</c> tools declare is a
+    ///     scalar string or a bool, so only a probe reaches the array and enum repairs below.
     /// </summary>
     internal static readonly AIJsonSchemaCreateOptions SchemaOptions = new()
     {
@@ -125,7 +124,7 @@ internal static class CoercingToolRegistration
         }
         else if (t == typeof(bool) && !obj.ContainsKey("type"))
         {
-            // Live too, under BoolCoercerFactory: the tools' bool flags erase exactly as the
+            // Under BoolCoercerFactory the tools' bool flags erase exactly as the
             // scalar strings do. Their description and `default: false` survive the erasure, so this puts
             // back the one keyword that did not — all that changes in the advertised schema is where
             // `type` sits in the object, which no client reads as meaning.

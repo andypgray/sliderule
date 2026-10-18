@@ -1561,8 +1561,8 @@ internal static class FragmentExtractor
     }
 
     /// <summary>
-    ///     Mutable accumulator for one declared type: fixed facts + representative symbol, unioned declaration sites, and
-    ///     hierarchy filled in pass 2.
+    ///     Mutable accumulator for one declared type: fixed facts + representative symbol, unioned declaration
+    ///     sites, and hierarchy filled in pass 2.
     /// </summary>
     private sealed class DeclaredBuilder(
         TypeFacts facts,

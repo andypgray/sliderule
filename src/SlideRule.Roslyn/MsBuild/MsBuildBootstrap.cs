@@ -63,14 +63,16 @@ internal static class MsBuildBootstrap
 
     /// <summary>
     ///     Selects an MSBuild instance, registers an engine for this process, and points the build-host process at the
-    ///     Visual Studio install behind the selection. Call it before any Roslyn workspace type loads, and only where
-    ///     this host owns registration outright; where something else may have registered MSBuild already — a test
-    ///     project that registers in a module initializer, for instance — call <see cref="EnsureInitialized" />
-    ///     instead. Returns what was chosen, whose <see cref="MsBuildSelection.Source" /> is the one line worth
-    ///     logging. A <c>SLIDERULE_VS_INSTALL_PATH</c> that is not an existing directory, or that holds no
-    ///     <c>MSBuild.exe</c> under <c>MSBuild\Current\Bin</c>, fails with a message naming the variable and the path
-    ///     that was probed.
+    ///     Visual Studio install behind the selection. Returns what was chosen, whose
+    ///     <see cref="MsBuildSelection.Source" /> is the one line worth logging.
     /// </summary>
+    /// <remarks>
+    ///     Call it before any Roslyn workspace type loads, and only where this host owns registration outright;
+    ///     where something else may have registered MSBuild already — a test project that registers in a module
+    ///     initializer, for instance — call <see cref="EnsureInitialized" /> instead. A
+    ///     <c>SLIDERULE_VS_INSTALL_PATH</c> that is not an existing directory, or that holds no <c>MSBuild.exe</c>
+    ///     under <c>MSBuild\Current\Bin</c>, fails with a message naming the variable and the path that was probed.
+    /// </remarks>
     internal static MsBuildSelection Initialize()
     {
         return SelectAndRegister();
@@ -78,12 +80,15 @@ internal static class MsBuildBootstrap
 
     /// <summary>
     ///     Registers MSBuild if nothing has yet and returns what was chosen, or returns <see langword="null" /> when
-    ///     MSBuild is already registered. Safe to call from every entry point of a host, which is why it is the form to
-    ///     prefer over <see cref="Initialize" />. A null answer is not a failure: it says the choice was already made,
-    ///     and <see cref="MsBuildSelection.Source" /> is only available from the call that made it. A
+    ///     MSBuild is already registered.
+    /// </summary>
+    /// <remarks>
+    ///     Safe to call from every entry point of a host, which is why it is the form to prefer over
+    ///     <see cref="Initialize" />. A null answer is not a failure: it says the choice was already made, and
+    ///     <see cref="MsBuildSelection.Source" /> is only available from the call that made it. A
     ///     <c>SLIDERULE_VS_INSTALL_PATH</c> that is not an existing directory, or that holds no <c>MSBuild.exe</c>
     ///     under <c>MSBuild\Current\Bin</c>, fails with a message naming the variable and the path that was probed.
-    /// </summary>
+    /// </remarks>
     internal static MsBuildSelection? EnsureInitialized()
     {
         return MSBuildLocator.IsRegistered ? null : SelectAndRegister();

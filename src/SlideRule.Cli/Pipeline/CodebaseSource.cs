@@ -294,7 +294,7 @@ internal sealed class CodebaseSource : IDisposable
     ///     fingerprint and the write-back) happen on the first call alone, and a repeat with an exclusion set
     ///     already merged hands back that model rather than rebuilding it. A repeat with a <em>different</em>
     ///     exclusion set still merges — it is a different model — but off the fragments already in hand.
-    ///     The two facts below are re-read per call regardless, because they legitimately differ per
+    ///     The two facts below are re-read per call regardless, because they differ per
     ///     exclusion: which same-FQN types conflated, and which projects arrived multi-targeted.
     /// </remarks>
     public async Task<CodebaseModel> ExtractAsync(IReadOnlyCollection<string> excludeProjectNames, CancellationToken ct)

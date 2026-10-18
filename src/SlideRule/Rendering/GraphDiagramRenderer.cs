@@ -24,10 +24,9 @@ internal static class GraphDiagramRenderer
     // Every node ID carries this prefix, which is what keeps a project name from ever being lexed as
     // something other than a node. Mermaid's flowchart grammar reserves bare words — end, graph, class,
     // subgraph and more — none of them anchored to the start of a statement, so a project of any of
-    // those names would break the whole diagram rather than just its own node. Matching that list
-    // instead would be correct only until the grammar grows a new word, and this renderer runs against
-    // other people's solutions, where "graph" or "class" is a plausible project name. A prefix cannot
-    // rot. It also makes the grammar's case sensitivity irrelevant rather than something to rely on,
+    // those names would break the whole diagram rather than just its own node, and in someone else's
+    // solution "graph" or "class" is a plausible project name. A prefix stays safe as the grammar adds
+    // words. It also makes the grammar's case sensitivity irrelevant rather than something to rely on,
     // and it closes a second hazard for free: the link rules read a leading o or x as an arrowhead,
     // and no prefixed ID can begin with either.
     private const string NodeIdPrefix = "p_";

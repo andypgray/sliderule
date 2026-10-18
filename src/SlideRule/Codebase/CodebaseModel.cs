@@ -3,8 +3,9 @@ namespace SlideRule.Codebase;
 /// <summary>
 ///     The extracted codebase a check runs against: every type the solution declares, a shallow entry for
 ///     each external type they reference, the edges between them, the container registrations the source
-///     spells, and the projects. Build one with the extractor in the <c>SlideRule.Roslyn</c>
-///     package, then hand it to <c>ArchChecker.Check</c> beside an architecture model, or summarize it
+///     spells, and the projects. Build one with <c>CodebaseModelBuilder</c> in the <c>SlideRule.Extraction</c>
+///     assembly, which the <c>SlideRule.Roslyn</c> host's <c>CodebaseExtractor</c> calls after loading a
+///     solution, then hand it to <c>ArchChecker.Check</c> beside an architecture model, or summarize it
 ///     with <see cref="GraphSummarizer" /> for the survey the CLI's <c>graph</c> verb prints. Every list
 ///     is read-only and ordered ordinal, so two runs over unchanged source produce the same lists in the
 ///     same order; each property below names the keys it is sorted by.

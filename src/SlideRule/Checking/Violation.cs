@@ -160,8 +160,9 @@ internal sealed class Violation
     ///     FullName, Member SymbolId, Target|Subject ProjectName), compared ordinal by the checker. A
     ///     MemberUse mirrors Reference's (source, target) as (source FullName, member SymbolId); a
     ///     MemberShape mirrors Shape's subject as (declaring-type FullName, member SymbolId); a
-    ///     ProjectShape mirrors it as (project Name, package Name or framework moniker), the item standing
-    ///     where a Target would, so one project's per-item violations sort by the item they name.
+    ///     ProjectShape mirrors it as (project Name, the bare name of the package, framework or property it
+    ///     names), the item standing where a Target would, so one project's per-item violations sort by the
+    ///     item they name.
     /// </summary>
     /// <remarks>
     ///     The fourth slot exists because the first three do not separate every pair of violations: a full

@@ -41,13 +41,15 @@ internal static class MsBuildGate
 
     /// <summary>
     ///     Starts recording, for this async flow and any task it starts, which source-selection branch a
-    ///     <c>check</c>/<c>status</c>/<c>graph</c> run takes, and returns the box the gate writes the branch into;
-    ///     the box stays <c>null</c> for a verb that never reaches the decision. Install it before the call it should record.
-    ///     Synchronous on purpose: a value an async method sets is discarded when it returns, so only a
-    ///     synchronous installer leaves the box in place for its caller. Internal test observable — output is
-    ///     byte-identical whichever branch runs, so this only tells a test which path was chosen; never
-    ///     printed, and a run with no box installed records nothing.
+    ///     <c>check</c>/<c>status</c>/<c>graph</c> run takes, and returns the box the gate writes the branch into.
     /// </summary>
+    /// <remarks>
+    ///     The box stays <c>null</c> for a verb that never reaches the decision. Install it before the call it
+    ///     should record. Synchronous on purpose: a value an async method sets is discarded when it returns, so
+    ///     only a synchronous installer leaves the box in place for its caller. Internal test observable — output
+    ///     is byte-identical whichever branch runs, so this only tells a test which path was chosen; never
+    ///     printed, and a run with no box installed records nothing.
+    /// </remarks>
     internal static StrongBox<GateAcquisition?> RecordAcquisitionOnThisFlow()
     {
         var box = new StrongBox<GateAcquisition?>();

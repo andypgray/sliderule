@@ -23,8 +23,8 @@ namespace SlideRule.Model;
 ///         (<c>"N.MarkAttribute&lt;System.Int32&gt;"</c>,
 ///         <c>"MyApp.Web.IHandler&lt;MyApp.Web.InvoiceCreated&gt;"</c>) names no definition and so never
 ///         matches; that is the stated honesty boundary of the hatch, not a defect. Nothing is inferred
-///         from the shape of the string: a dotless or suffix-less name is a legal spelling that simply
-///         never matches.
+///         from the shape of the string: a dotless or suffix-less name is a legal spelling that never
+///         matches.
 ///     </para>
 ///     <para>
 ///         <see cref="PathSegments" />, <see cref="FullName" />, <see cref="OnDefinition" />,

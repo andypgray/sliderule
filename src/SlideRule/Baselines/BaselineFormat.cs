@@ -25,7 +25,7 @@ namespace SlideRule.Baselines;
 ///         refused rather than obeyed, and the file's history is the record of who widened what. The rule
 ///         ID is sealed in too, so an entry moved from one rule's section to another's fails there. What
 ///         a seal cannot see is a whole line taken away: deleting an entry, or a section, is accepted,
-///         and the violation it grandfathered simply goes red on the next check. This is tamper-evident,
+///         and the violation it grandfathered goes red on the next check. This is tamper-evident,
 ///         not tamper-proof — it catches accidents and hand edits, and review of the file's diff remains
 ///         the human gate.
 ///     </para>

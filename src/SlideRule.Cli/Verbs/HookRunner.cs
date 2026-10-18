@@ -421,7 +421,7 @@ internal sealed class HookRunner(
     // Inside by path is not inside by tree: a linked worktree lives under the project directory, and git names the
     // worktree's own root for it. A relative payload path is project-relative. An absolute one outside the project
     // directory belongs to no tree this hook speaks for, and that compare ignores case, so what it rules out is
-    // plainly somewhere else. Every doubt answers true: when in doubt, check.
+    // somewhere else. Every doubt answers true: when in doubt, check.
     private static async Task<bool> IsInProjectTreeAsync(
         string? edited, string projectDirectory, string workingDirectory, CancellationToken ct)
     {

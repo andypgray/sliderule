@@ -14,7 +14,7 @@ internal abstract class ProjectAdjective
 
     /// <summary>
     ///     The rendered fragment, including its leading separator for inline/subject-final placements
-    ///     (e.g. <c> matching `Zphil.*`</c>, <c>, except project `X`</c>); for
+    ///     (e.g. <c> matching `MyApp.*`</c>, <c>, except project `X`</c>); for
     ///     <see cref="AdjectivePlacement.Head" /> this is the whole phrase that replaces the head.
     /// </summary>
     internal abstract string Fragment { get; }

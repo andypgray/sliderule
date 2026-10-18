@@ -14,7 +14,7 @@ namespace SlideRule.ModelFile;
 ///         This is both the writer and the walk that decides what a file can carry: there is no separate
 ///         pass that asks "is this writable", because two walks can disagree and one cannot. A node it
 ///         cannot write records a reason and every method above it returns without writing, so the reason
-///         is the first thing met in file order and the half-written text is simply discarded.
+///         is the first thing met in file order and the half-written text is discarded.
 ///     </para>
 ///     <para>
 ///         Nothing here throws for a node it cannot write, and nothing here validates: the model it is

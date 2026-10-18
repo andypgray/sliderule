@@ -603,7 +603,7 @@ internal sealed class BaselineRunner(
             }
 
             // Identity intersection first: an entry no current violation matches is the reduction being
-            // accepted, and it simply does not survive into the section.
+            // accepted, and it does not survive into the section.
             if (!observed.TryGetValue(entry, out int sites))
             {
                 removed++;

@@ -120,7 +120,7 @@ internal static class ModelPipeline
     ///     The remedy names both worlds rather than asserting the packaging one, because a shared-framework
     ///     anchor reaches this arm too and no build setting can stage it. It does not pick between them the
     ///     way <see cref="SpecDependencyLoadFailure" /> does: this failure aggregates several loader
-    ///     exceptions that need not carry assembly identities at all, so one remedy line cannot honestly
+    ///     exceptions that need not carry assembly identities at all, so one remedy line cannot
     ///     branch per assembly. Naming both is what that costs.
     /// </remarks>
     internal static string LoaderFailureMessage(ReflectionTypeLoadException ex, string specDllPath)

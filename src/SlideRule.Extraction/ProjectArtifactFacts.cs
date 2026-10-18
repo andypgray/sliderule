@@ -18,7 +18,7 @@ namespace SlideRule.Extraction;
 ///     <para>
 ///         Absence of the whole value means no evaluation happened. Absence <em>inside</em> it means
 ///         something narrower and is documented per member, because the two spellings of "no" are not the
-///         same fact: an undeclared <c>RestorePackagesWithLockFile</c> genuinely says restore does not lock,
+///         same fact: an undeclared <c>RestorePackagesWithLockFile</c> says restore does not lock,
 ///         while an undefined <c>IsPackable</c> says this project is outside the machinery that would answer.
 ///     </para>
 /// </remarks>
@@ -26,7 +26,9 @@ namespace SlideRule.Extraction;
 ///     Every framework the project declares, ordinal-ordered and normalized to the short moniker. Empty
 ///     where the project declares none this reader recognises.
 /// </param>
-/// <param name="TargetFrameworksSite">Where the frameworks are declared; the project file where nothing declares them.</param>
+/// <param name="TargetFrameworksSite">
+///     Where the frameworks are declared; the project file where nothing declares them.
+/// </param>
 /// <param name="PackageReferences">
 ///     The packages the project declares, ordinal by name, each private where its evaluated
 ///     <c>PrivateAssets</c> covers every asset — never the implicit references the SDK adds, and never the
@@ -41,7 +43,9 @@ namespace SlideRule.Extraction;
 ///     local.
 /// </param>
 /// <param name="LocksPackages">Whether restore writes a lock file. Undeclared reads <see langword="false" />.</param>
-/// <param name="LocksPackagesSite">Where the lock policy was decided; the project file where nothing declares it.</param>
+/// <param name="LocksPackagesSite">
+///     Where the lock policy was decided; the project file where nothing declares it.
+/// </param>
 /// <param name="ProjectReferencePaths">
 ///     The full path of every project file the project declares a reference to, in declaration order:
 ///     never the transitive closure the SDK adds, and never an item that only orders the build

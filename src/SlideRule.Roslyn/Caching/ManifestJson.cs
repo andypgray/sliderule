@@ -13,7 +13,7 @@ namespace SlideRule.Roslyn.Caching;
 ///     <see cref="JsonSerializerOptions" />, the source-generated metadata that carries them, and the
 ///     <see cref="TryRead{T}">read</see>/<see cref="TryWriteAtomic{T}">write</see> pair they share. One
 ///     instance so the two files cannot drift in enum spelling or escaping; one context so neither document
-///     reaches disk through reflection; one read/write pair so neither store can quietly degrade differently
+///     reaches disk through reflection; one read/write pair so neither store can degrade differently
 ///     from the other.
 /// </summary>
 internal static class ManifestJson

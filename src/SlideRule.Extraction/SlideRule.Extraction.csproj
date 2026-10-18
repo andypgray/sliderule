@@ -22,7 +22,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <!-- 'sliderule' is the CLI's AssemblyName, which is what an InternalsVisibleTo entry has to
+        <!-- 'sliderule-cli' is the CLI's AssemblyName, which is what an InternalsVisibleTo entry has to
              match. The analyzer assembly is named here so that adding it needs no edit to this file. -->
         <InternalsVisibleTo Include="SlideRule.Roslyn" />
         <InternalsVisibleTo Include="sliderule-cli" />

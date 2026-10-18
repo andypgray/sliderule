@@ -11,9 +11,7 @@ namespace SlideRule.Cli.Rendering;
 ///     <c>workspaceDiagnostics</c>; stdout purity is why nothing here ever writes to it. The deliberate
 ///     exception to that rule is the incomplete-model caveat that <c>context</c> and <c>explain</c>'s type and
 ///     path forms write straight to stdout, ahead of their answer, through
-///     <see cref="IncompleteModelNotices.Caveat" />: the body is the MCP tool's only channel. <c>explain</c>
-///     echoes here as well; <c>context</c>, with no CLI verb and no <c>--json</c>, does not route through this
-///     class at all.
+///     <see cref="IncompleteModelNotices.Caveat" />: the body is the MCP tool's only channel.
 ///     What gets written is <see cref="WorkspaceDiagnostics.PackageAudit" />, one line per advisory, then
 ///     <see cref="WorkspaceDiagnostics.Rendered" /> (or, for <c>check</c>,
 ///     <see cref="WorkspaceDiagnostics.RenderedWithMergeNotes" />) — composed once by the caller and handed

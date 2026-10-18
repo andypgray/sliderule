@@ -92,7 +92,7 @@ internal static class SpecResolver
     ///     How well the workspace loaded. Not defaulted, and deliberately: an unresolved package reference
     ///     makes the convention find nothing, so "the workspace loaded cleanly" is what decides whether zero
     ///     candidates means "there is no spec project" or "the evidence for one did not resolve" — and unlike
-    ///     an intermediate assembly path, that is never genuinely unknown to a caller. A default is also
+    ///     an intermediate assembly path, that is never unknown to a caller. A default is also
     ///     untypeable: <see cref="WorkspaceDiagnostics.None" /> is a property, and
     ///     <c>default(WorkspaceDiagnostics)</c> carries null lists.
     /// </param>
@@ -320,7 +320,7 @@ internal static class SpecResolver
     ///     Zero candidates is reported against <paramref name="diagnostics" />, because a workspace that did
     ///     not load cleanly produces exactly the same zero: a project that failed to load declares no
     ///     reference to match, and an unresolved package reference means the spec project's reference to the
-    ///     contract library is simply not there to match either.
+    ///     contract library is not there to match either.
     /// </remarks>
     internal static SpecProjectCandidate ResolveConventionProject(
         IReadOnlyList<SpecProjectCandidate> candidates, WorkspaceDiagnostics diagnostics)
@@ -365,7 +365,7 @@ internal static class SpecResolver
     //     whether the workspace held what they expected.
     //
     // NuGetAudit advisories are excluded from arm 3's input, and only from arm 3's: an advisory's publication
-    // date says nothing about whether this solution's references resolved, so a solution that genuinely has
+    // date says nothing about whether this solution's references resolved, so a solution that has
     // no spec project must not be sent to go and fix its restore. Nothing here gates — every arm is the same
     // refusal with different evidence — so no exit code turns on that distinction.
     private static UserErrorException NoSpecProjectFound(

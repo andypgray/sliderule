@@ -13,7 +13,7 @@ namespace SlideRule.Roslyn.Solutions;
 ///     <see cref="Unsupported">projects in another language</see> that no load can reach. For an unfiltered
 ///     <c>.sln</c>/<c>.slnx</c> the first two are the same list. Which solution a filter points at is
 ///     <see cref="SolutionProjectFileParser.TryReadReferencedSolution">its own question</see>, asked where it
-///     arises: both callers ask before the load, where no membership object exists to read.
+///     arises: before the load, where no membership object exists to read.
 /// </summary>
 /// <param name="Required">
 ///     The members the load must produce — a filter's selected projects, or every member when there is no
@@ -77,8 +77,8 @@ internal sealed record DeclaredProjects(
 ///         This is a membership oracle, not a solution loader: it only needs the project <em>paths</em>, so it
 ///         does not evaluate configurations, conditions, or nested-project ownership. Paths are made absolute
 ///         against the solution file's directory but not symlink-canonicalized — callers canonicalize both
-///         sides at comparison time (matching <c>SpecResolver.IsProjectFile</c>), so this stays pure and
-///         disk-independent for its <see cref="ParseDeclaredProjects" /> core.
+///         sides at comparison time, so this stays pure and disk-independent for its
+///         <see cref="ParseDeclaredProjects" /> core.
 ///     </para>
 /// </remarks>
 internal static partial class SolutionProjectFileParser
@@ -194,7 +194,7 @@ internal static partial class SolutionProjectFileParser
     ///     format test comes first, so a plain solution costs no I/O at all.
     /// </summary>
     /// <remarks>
-    ///     Best-effort by design, and deliberately not <see cref="ReadDeclaredMembership" />: both callers ask
+    ///     Best-effort by design, and deliberately not <see cref="ReadDeclaredMembership" />: it is asked
     ///     before the workspace load, where a throw would pre-empt the load's own filter refusal — the one
     ///     that names the file and says what a filter must be — with a worse-placed one.
     /// </remarks>

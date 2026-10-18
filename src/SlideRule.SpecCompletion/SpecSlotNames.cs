@@ -86,7 +86,7 @@ internal static class SpecSlotNames
     /// <remarks>
     ///     An unknown name maps to <see cref="SlotKind.None" /> rather than throwing, which is what lets a
     ///     spec project compile against a newer contract than this assembly was built beside: a slot added
-    ///     to the contract simply completes nothing here until this list grows.
+    ///     to the contract completes nothing here until this list grows.
     /// </remarks>
     /// <param name="slotName">The name the marker carried, or null where no marker was found.</param>
     internal static SlotKind KindOf(string? slotName)

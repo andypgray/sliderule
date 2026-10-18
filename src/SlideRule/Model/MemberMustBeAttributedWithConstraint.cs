@@ -4,11 +4,10 @@ namespace SlideRule.Model;
 
 /// <summary>
 ///     <c>.Methods.MustBeAttributedWith(typeof(McpServerToolAttribute))</c> → "must be attributed with
-///     `[McpServerTool]`" (GRAMMAR §5.7) — the type-side verb phrase reused verbatim. Verb position is
-///     unambiguous (nothing else can occupy it), so there is nothing to disambiguate and no reason for the
-///     member wording to diverge from <see cref="MustBeAttributedWithConstraint" />; only the
-///     <em>adjective</em> had to move (<see cref="MemberAttributedWithAdjective" />). The anchor is a
-///     <see cref="TypeAnchor" />, so the string form renders the identical verb phrase.
+///     `[McpServerTool]`" (GRAMMAR §5.7) — the verb phrase of <see cref="MustBeAttributedWithConstraint" />
+///     reused verbatim, because verb position is unambiguous; only the adjective form differs
+///     (<see cref="MemberAttributedWithAdjective" />). The anchor is a <see cref="TypeAnchor" />, so the
+///     string form renders the identical verb phrase.
 /// </summary>
 internal sealed class MemberMustBeAttributedWithConstraint(MemberSelection subject, TypeAnchor anchor) : MemberConstraint(subject)
 {

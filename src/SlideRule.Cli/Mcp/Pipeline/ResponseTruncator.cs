@@ -49,17 +49,22 @@ internal static class ResponseTruncator
     ///     <see cref="SlideRule.Roslyn.Hosting.SlideRuleEnvVars.MaxMcpOutputTokens" /> budget: four
     ///     characters for every whole pair of tokens, and never more than 50,000. An unset, blank, unparseable
     ///     or non-positive value reads as the client's own 25,000-token default, which gives 50,000 exactly.
-    ///     An odd budget therefore lands two characters below twice itself, and that is the sum, not a rounding
-    ///     slip in it: the gate below is read from half the budget, so a cap that floors is one the gate can
-    ///     never be the wrong side of, while a cap that rounded up could be.
     /// </summary>
     /// <remarks>
-    ///     This rule is mirrored out of process. Nothing reports the effective budget, so a consumer that
-    ///     needs it — a tool deriving what a reply was allowed to be, for a run whose binary it cannot
-    ///     call because that release is not installed where the tool runs — carries its
-    ///     own copy of the arithmetic in its own language. A change here is therefore a breaking change for
-    ///     a copy this repository cannot edit, and the <c>ComputeMaxChars_*</c> rows are the tripwire that
-    ///     says so: whoever reds them is moving a rule with readers elsewhere, not just a method.
+    ///     <para>
+    ///         Because only whole pairs count, an odd budget lands two characters below twice itself, and the
+    ///         floor is intended: the client's token gate, described in the method body, is read from half the
+    ///         budget, so a cap that floors can never be on the wrong side of it, while a cap that rounded up
+    ///         could be.
+    ///     </para>
+    ///     <para>
+    ///         This rule is mirrored out of process. Nothing reports the effective budget, so a consumer that
+    ///         needs it — a tool deriving what a reply was allowed to be, for a run whose binary it cannot
+    ///         call because that release is not installed where the tool runs — carries its
+    ///         own copy of the arithmetic in its own language. A change here is therefore a breaking change for
+    ///         a copy this repository cannot edit, and the <c>ComputeMaxChars_*</c> rows are the tripwire that
+    ///         says so.
+    ///     </para>
     /// </remarks>
     internal static int ComputeMaxChars(string? maxMcpOutputTokens)
     {

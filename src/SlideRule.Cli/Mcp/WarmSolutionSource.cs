@@ -16,9 +16,6 @@ namespace SlideRule.Cli.Mcp;
 ///     the workspace, so disposing the handle is a no-op and a later reconcile cannot pull the solution out
 ///     from under an in-flight reader (a Roslyn <see cref="Microsoft.CodeAnalysis.Solution" /> survives its
 ///     workspace's disposal).
-///     The handle also carries two closures over this call's snapshot: the incremental codebase producer
-///     over <see cref="SessionFragmentStore" /> and the spec-resolution memo over
-///     <see cref="SpecResolutionCache" />. <see cref="LoadSpecModel" /> reads through <see cref="SpecModelCache" />.
 /// </remarks>
 internal sealed class WarmSolutionSource(
     WorkspaceSession session,

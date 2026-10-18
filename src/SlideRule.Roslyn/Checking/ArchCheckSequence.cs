@@ -87,7 +87,7 @@ internal static class ArchCheckSequence
     // The second Core-side value composed here, and composed the same way and for the same reason as the
     // first: both are facts about a load that only this side can word, handed down as a sentence because Core
     // cannot name a project path. Not gated on the operator's opt-in — that changes the exit code, never the
-    // truth about the model, and a rule whose selection matched nothing is owed the honest cure either way.
+    // truth about the model, and a rule whose selection matched nothing is owed the cure either way.
     private static IncompleteModel? Incomplete(WorkspaceDiagnostics diagnostics)
     {
         return diagnostics.IsIncomplete

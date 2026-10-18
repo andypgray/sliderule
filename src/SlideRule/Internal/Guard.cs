@@ -54,7 +54,7 @@ internal static class Guard
         string name = typeof(TEnum).Name;
         var numeric = Convert.ToInt32(value, CultureInfo.InvariantCulture);
 
-        // Plainly comma-joined, introduced by a phrase that needs no final conjunction. Writing "A, B, or
+        // Comma-joined, introduced by a phrase that needs no final conjunction. Writing "A, B, or
         // C" would mean branching on how many members there are, and every arm but one would be code no
         // enum on this surface can reach.
         string members = string.Join(", ", Enum.GetNames(typeof(TEnum)).Select(member => name + "." + member));

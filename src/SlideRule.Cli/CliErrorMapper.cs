@@ -18,12 +18,14 @@ namespace SlideRule.Cli;
 internal static class CliErrorMapper
 {
     /// <summary>
-    ///     The multi-line user-facing message for an expected error, or null when the exception is an
-    ///     unexpected bug (which the CLI dumps as a stack trace and the MCP filter logs as a warning).
-    ///     Both surfaces render this identical text — a <see cref="UserErrorException" />'s message
-    ///     verbatim, or a <see cref="SpecValidationException" />'s "Spec validation failed:" header
-    ///     followed by one indented line per error, so every validation error is fixable in one pass.
+    ///     The multi-line user-facing message for an expected error: the identical text both surfaces render.
     /// </summary>
+    /// <remarks>
+    ///     A <see cref="UserErrorException" />'s message verbatim, or a <see cref="SpecValidationException" />'s
+    ///     "Spec validation failed:" header followed by one indented line per error, so every validation error is
+    ///     fixable in one pass. Null when the exception is an unexpected bug, which the CLI dumps as a stack trace
+    ///     and the MCP filter logs as a warning.
+    /// </remarks>
     public static string? UserFacingMessage(Exception exception)
     {
         return exception switch

@@ -176,16 +176,21 @@ internal sealed class BinlogCaptureStore
 
     /// <summary>
     ///     Sanity-checks <paramref name="replayedSolution" /> against <paramref name="binlogFullPath" /> and,
-    ///     if it passes, persists the capture. In order: (1) refuse if any structural file is strictly newer
-    ///     than the binlog (a stale build); (2) refuse if the binlog does not cover exactly the solution's
-    ///     csproj set; (3) copy the binlog and write the manifest, both atomically and best-effort.
+    ///     if it passes, persists the capture.
     /// </summary>
+    /// <remarks>
+    ///     In order: refuse a solution filter; refuse if any structural file is strictly newer than the binlog
+    ///     (a stale build); refuse if the binlog does not cover exactly the solution's csproj set; then copy the
+    ///     binlog and write the manifest, both atomically and best-effort.
+    /// </remarks>
     /// <param name="replayedSolution">The solution just produced by replaying <paramref name="binlogFullPath" />.</param>
     /// <param name="binlogFullPath">The absolute path to the binlog that was replayed.</param>
     /// <param name="binlogArgument">The user's as-typed <c>--binlog</c> value, used verbatim in refusals.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns><c>true</c> if the capture was persisted; <c>false</c> if a best-effort I/O step failed.</returns>
-    /// <exception cref="UserErrorException">The binlog is stale, or does not cover exactly the solution.</exception>
+    /// <exception cref="UserErrorException">
+    ///     The solution is a solution filter, or the binlog is stale or does not cover exactly the solution.
+    /// </exception>
     public bool Ingest(
         Solution replayedSolution, string binlogFullPath, string binlogArgument, CancellationToken ct = default)
     {
@@ -303,13 +308,15 @@ internal sealed class BinlogCaptureStore
     /// <summary>
     ///     Validates the persisted capture against disk with zero MSBuild. Reports <see cref="CaptureState.Absent" />
     ///     (no capture — silent cold path), <see cref="CaptureState.Usable" /> (replay the binlog copy), or
-    ///     <see cref="CaptureState.Invalid" /> (a notice to print, then fall back). Existence flips and
-    ///     content changes on structural inputs invalidate; a bare mtime touch with unchanged bytes does not
-    ///     (hash-verified on a stat mismatch, then the manifest is rewritten with promoted stamps so the next
-    ///     run is pure-stat). Every recorded document must still exist, and no <c>*.cs</c> may have appeared
-    ///     in a project cone. Never throws (bar cancellation): an unexpected failure is the unreadable variant
-    ///     — a capture must never break a run.
+    ///     <see cref="CaptureState.Invalid" /> (a notice to print, then fall back).
     /// </summary>
+    /// <remarks>
+    ///     Existence flips and content changes on structural inputs invalidate; a bare mtime touch with unchanged
+    ///     bytes does not (hash-verified on a stat mismatch, then the manifest is rewritten with promoted stamps so
+    ///     the next run is pure-stat). Every recorded document must still exist, and no <c>*.cs</c> may have
+    ///     appeared in a project cone. Never throws (bar cancellation): an unexpected failure is the unreadable
+    ///     variant — a capture must never break a run.
+    /// </remarks>
     public CaptureValidation Validate(CancellationToken ct = default)
     {
         try

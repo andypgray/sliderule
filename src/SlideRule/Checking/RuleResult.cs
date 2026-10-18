@@ -13,8 +13,7 @@ namespace SlideRule.Checking;
 ///     run, so two runs over unchanged code list them identically, and a warning never changes
 ///     <see cref="Status" />.
 /// </summary>
-// Both lists come out of ArchChecker's one report comparer — ordinal by (source|subject FullName,
-// target FullName|package name, member SymbolId, target|subject ProjectName) — so the red list and
+// Both lists come out of ArchChecker's one report comparer over Violation.OrderKey, so the red list and
 // the grandfathered list agree, and a grown pair interleaves in report order rather than trailing.
 internal sealed class RuleResult
 {

@@ -65,7 +65,7 @@ internal sealed class CheckRunner(
 
     // Ahead of the load and of the stamps, because a shape check needs neither the spec model nor the
     // codebase, and a narrowing preamble above a refusal qualifies nothing. Genuine ref validation cannot
-    // move up here — git runs in the solution directory the load resolves — so a ref that simply does not
+    // move up here — git runs in the solution directory the load resolves — so a ref that does not
     // exist stays GitChangedFiles' answer to give.
     private static void RefuseAStringifiedArrayDiffBase(string diffBase)
     {

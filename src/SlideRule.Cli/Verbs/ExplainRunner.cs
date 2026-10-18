@@ -82,7 +82,7 @@ internal sealed class ExplainRunner(
 
         // Convention or csproj --spec: load the workspace for resolution only; never extract. The acquisition
         // seam is the shared one, so explain's model is the model every other verb would have loaded — its
-        // lazy ExtractAsync is simply never called. On a cache hit the recorded resolution replays and no
+        // lazy ExtractAsync is never called. On a cache hit the recorded resolution replays and no
         // workspace opens either, which is this verb's entire cost.
         using var source = await CodebaseSource.CreateWithSpecAsync(
             SolutionSource, Environment, request.Solution, request.Spec, request.WorkingDirectory,

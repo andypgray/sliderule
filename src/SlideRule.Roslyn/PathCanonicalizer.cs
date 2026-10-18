@@ -51,7 +51,7 @@ internal static class PathCanonicalizer
     /// <remarks>
     ///     For a caller that has already resolved every ancestor and only needs to know whether the leaf can
     ///     be reattached as-is. A <c>.csproj</c> that is a symlink resolves here exactly as a directory does,
-    ///     which is precisely why the question has to be asked rather than assumed away.
+    ///     which is why the question has to be asked rather than assumed away.
     /// </remarks>
     internal static bool IsLink(string path)
     {

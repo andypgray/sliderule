@@ -4,13 +4,11 @@ namespace SlideRule.Internal;
 /// <remarks>
 ///     Every string inflected here is pinned output, so the English rule has one owner rather than a copy
 ///     per renderer, and a refinement (an irregular noun, an <c>s</c>/<c>es</c> split, a zero case) lands
-///     once instead of being hunted for across two assemblies. In Core rather than beside the CLI renderers
-///     because English is not a property of the host: the Roslyn host's refusals count projects in the same
-///     sentence shapes the CLI counts violations in, and a second copy over there is exactly the drift this
-///     owner exists to prevent. In Core's internal namespace rather than its rendering one because the checker
-///     counts too (the orphaned-baseline warning counts a section's entries), and Checking may not reference
-///     Rendering, which references it. Not to be confused with <c>ProseFormat.KindPlural</c>, which looks up a
-///     grammar term's plural rather than inflecting by count.
+///     once instead of being hunted for across two assemblies. It sits in Core because the Roslyn host
+///     inflects counts too, and in Core's internal namespace rather than its rendering one because the checker
+///     does as well (the orphaned-baseline warning) and Checking may not reference Rendering. Not to be
+///     confused with <c>ProseFormat.KindPlural</c>, which looks up a grammar term's plural rather than
+///     inflecting by count.
 /// </remarks>
 internal static class Plurals
 {

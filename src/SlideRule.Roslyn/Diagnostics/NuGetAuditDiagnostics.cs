@@ -27,7 +27,7 @@ internal sealed record PackageAuditEntry(string Message, IReadOnlyList<string>? 
     /// <summary>
     ///     The entry as one line — the message, then the projects that reported it, quoted as the merge notes
     ///     quote them (<c>… (2 projects: 'App' and 'App.Tests')</c>) — or the message alone when no project is
-    ///     known. What stderr and SARIF print for it.
+    ///     known.
     /// </summary>
     internal string Describe()
     {
@@ -139,13 +139,10 @@ internal static partial class NuGetAuditDiagnostics
     ///     <see cref="IsAudit" /> recognises, matched on the code alone.
     /// </summary>
     /// <remarks>
-    ///     For the one caller that has a real code to match rather than a sentence:
-    ///     <see cref="RestoreFailures" /> reads <c>project.assets.json</c>, where NuGet records <c>code</c> and
-    ///     <c>level</c> as separate invariant fields. That makes the carve-out this class could never perform
-    ///     on the diagnostic stream — where <c>.Code</c> is discarded before a host sees it — exact and
-    ///     language-independent there, and it is essential there in a way it is not here: it keeps an
-    ///     advisory promoted to an error by <c>TreatWarningsAsErrors</c> from refusing a solution whose
-    ///     resolution succeeded and whose model is complete.
+    ///     For a reader that has a real code to match rather than a sentence, such as a
+    ///     <c>project.assets.json</c> logs entry, where NuGet records <c>code</c> and <c>level</c> as separate
+    ///     invariant fields. There the match is exact and language-independent; on the diagnostic stream,
+    ///     where <c>.Code</c> is discarded before a host sees it, it cannot be made at all.
     /// </remarks>
     internal static bool IsAuditCode(string code)
     {

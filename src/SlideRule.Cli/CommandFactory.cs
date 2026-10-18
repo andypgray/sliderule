@@ -803,7 +803,7 @@ internal static class CommandFactory
         };
     }
 
-    // The one opt-out out of the incomplete-model gate, worded per verb but always the same flag name: the
+    // The one opt-out of the incomplete-model gate, worded per verb but always the same flag name: the
     // five verbs the gate guards answer a partial load the same way, so an operator learns one flag.
     private static Option<bool> AllowWorkspaceDiagnosticsOption(string description)
     {

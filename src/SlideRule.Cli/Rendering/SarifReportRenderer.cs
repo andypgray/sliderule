@@ -239,7 +239,7 @@ internal static class SarifReportRenderer
 
     // A narrowed run's results describe part of the solution, and code scanning has no exit code to read
     // that from — a clean SARIF over a filter would close every alert the unchecked projects would have
-    // raised. Warning rather than error: the results are true, they are simply not the whole solution's.
+    // raised. Warning rather than error: the results are true, they are not the whole solution's.
     // Composed here rather than shared with the human stamp, per this file's convention that each renderer
     // composes its own stamps and notifications; the paths arrive already solution-relative, like every other
     // path in the log.
@@ -259,8 +259,8 @@ internal static class SarifReportRenderer
     // The other half of "these results cover part of the solution", and the half no filter explains: a
     // project written in a language this product cannot read is never in the model, so no alert can ever be
     // raised in it and a clean scan over a polyglot solution silently reads as clean over all of it. Warning
-    // rather than error, beside the narrowing one and for its reason: the results are true, they are simply
-    // not the whole solution's. Composed here per this file's convention that each renderer composes its own
+    // rather than error, beside the narrowing one and for its reason: the results are true, they are not the
+    // whole solution's. Composed here per this file's convention that each renderer composes its own
     // stamps and notifications; the reason each entry carries is the shared stamp's, so the prose and the JSON
     // key cannot disagree about what the run could read.
     private static SarifNotification UnsupportedNotification(IReadOnlyList<UnsupportedProjectStamp> unsupportedProjects)

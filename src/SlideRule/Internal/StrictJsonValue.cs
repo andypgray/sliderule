@@ -32,8 +32,8 @@ internal sealed class StrictJsonValue
     private readonly Dictionary<string, StrictJsonValue>? _byName;
 
     // A string's resolved text, or a number exactly as it was written. Holding the number as text is
-    // what lets an integer of any length read as a Number while TryGetInt32 still answers honestly
-    // about whether it fits.
+    // what lets an integer of any length read as a Number while TryGetInt32 still answers
+    // whether it fits.
     private readonly string? _text;
 
     /// <summary>A literal: <see cref="StrictJsonKind.True" /> or <see cref="StrictJsonKind.False" />.</summary>
@@ -134,7 +134,7 @@ internal sealed class StrictJsonValue
 
     /// <summary>
     ///     The number as an <see cref="int" />, or false when it does not fit. An integer of any length
-    ///     reads as a number, so a file may legitimately carry one this cannot return — that is content,
+    ///     reads as a number, so a file may carry one this cannot return — that is content,
     ///     not a caller bug, and it is reported rather than thrown.
     /// </summary>
     internal bool TryGetInt32(out int value)

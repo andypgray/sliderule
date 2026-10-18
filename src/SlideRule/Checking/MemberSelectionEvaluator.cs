@@ -157,7 +157,7 @@ internal static class MemberSelectionEvaluator
     // written out, so it passes through verbatim. DefinitionFullName refuses a closed generic on the typeof
     // arm here — the check-time backstop for the spec-build refusal (GRAMMAR §8 item 14), which is a
     // typeof-arm fact: nothing is inferred from a string's shape, so a constructed spelling is a legal name
-    // that simply matches nothing.
+    // that matches nothing.
     private static HashSet<string> ReturningAnchors(IReadOnlyList<TypeAnchor> anchors)
     {
         var names = new HashSet<string>(StringComparer.Ordinal);

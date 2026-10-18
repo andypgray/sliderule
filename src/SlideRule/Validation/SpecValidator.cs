@@ -6,7 +6,7 @@ using Code = SlideRule.Validation.SpecValidationErrorCode;
 namespace SlideRule.Validation;
 
 /// <summary>
-///     Runs the whole GRAMMAR §8 catalog and collects <em>every</em> error in one pass.
+///     Runs the whole GRAMMAR §8 catalog and collects every error in one pass.
 /// </summary>
 /// <remarks>
 ///     ID checks run over the post-desugar ID set; authored-field checks run over the original
@@ -585,7 +585,7 @@ internal static class SpecValidator
     // anchor is the consuming rule's statement, so it renders at the rule's location.
     // A string anchor carries no reflected type, so TypedAnchors filters it out and nothing here judges it:
     // blankness (item 15) is the whole of what a string anchor is validated for, and a constructed spelling
-    // is a legal name that simply matches nothing.
+    // is a legal name that matches nothing.
     private static void CheckMemberReturning(RuleRegistration rule, List<SpecValidationError> errors)
     {
         if (rule.Constraint is null) return;
@@ -711,7 +711,7 @@ internal static class SpecValidator
 
     // Walks a hierarchy verb's anchors (one for a positive, the whole list for a negative), emitting the
     // shared Code.HierarchyAnchorWrongCategory with the caller's message core plus the "(used by '{id}')" tail
-    // and the rule's spec-source location — the items-19/20 convention, no new location plumbing.
+    // and the rule's spec-source location, the items-19/20 convention.
     private static void CheckAnchorCategory(
         RuleRegistration rule, List<SpecValidationError> errors, IReadOnlyList<Type> anchors,
         Func<Type, bool> invalid, Func<Type, string> message)

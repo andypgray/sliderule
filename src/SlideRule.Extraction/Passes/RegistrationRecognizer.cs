@@ -135,7 +135,7 @@ internal sealed class RegistrationRecognizer
     ///     The three generic arms decode the same shape and must keep deciding it identically, so the split
     ///     lives here once: two type arguments are (service, implementation) with an unusable second slot
     ///     recorded as "no distinct implementation"; one is the service, whose implementation is either
-    ///     itself or nothing, and <paramref name="selfWhenSingle" /> is the axis the arms genuinely differ on
+    ///     itself or nothing, and <paramref name="selfWhenSingle" /> is the axis the arms differ on
     ///     — <c>AddHttpClient&lt;TClient&gt;</c> and <c>AddDbContext&lt;TContext&gt;</c> always register the
     ///     type as its own implementation, while the Add family does so only in the receiver-only form (a
     ///     factory or instance overload names no implementation type). An unusable <em>first</em> type

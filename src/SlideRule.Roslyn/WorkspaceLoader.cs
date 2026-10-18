@@ -215,7 +215,7 @@ internal static class WorkspaceLoader
     // missing 'solution' key, a solution path that does not resolve, and a project entry naming a
     // non-member. Unmapped it reaches the user as a stack trace. The gate is the extension, never the
     // message: matching wording is the mistake ProjectLoadFailures exists to undo. The original is kept as
-    // the inner exception, so a fault that is genuinely not the filter's is still recoverable from a log.
+    // the inner exception, so a fault that is not the filter's is still recoverable from a log.
     private static async Task<Solution> OpenAsync(
         MSBuildWorkspace workspace, string solutionPath, CancellationToken ct)
     {

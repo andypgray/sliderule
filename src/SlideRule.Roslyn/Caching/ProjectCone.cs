@@ -20,7 +20,7 @@ internal static class ProjectCone
 {
     // Compatible-mode enumeration, matched deliberately to the DirectoryInfo walk this scan is defined
     // against: hidden and system entries are kept (the framework's own default skips both) and an
-    // inaccessible directory throws rather than quietly yielding nothing. Either default would shrink the
+    // inaccessible directory throws rather than yielding nothing. Either default would shrink the
     // cone silently, and a file the cone never sees is an add that is never detected — a stale model served
     // confidently, which is the one failure these probes exist to prevent.
     private static readonly EnumerationOptions ConeEnumeration = new()
@@ -42,10 +42,9 @@ internal static class ProjectCone
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         <b>Lazy, and that is the point.</b> Two of the three callers ask only whether the walk finds
-    ///         <em>anything</em> new and stop at the first hit — the warm session's per-call reconcile sweep
-    ///         among them, which runs on every MCP tool call — so the walk streams; the callers that need
-    ///         the whole set are unaffected.
+    ///         The walk streams, so a caller that asks only whether the cone holds anything new stops at the
+    ///         first hit. The warm session's reconcile sweep asks exactly that on every MCP tool call; the
+    ///         callers that need the whole set are unaffected.
     ///     </para>
     ///     <para>
     ///         Both tests are ordinal — the <c>.cs</c> suffix and the pruned directory names — so a
@@ -149,10 +148,7 @@ internal static class ProjectCone
     ///         the other, with nothing to show for it.
     ///     </para>
     ///     <para>
-    ///         The filter leg costs a non-filter solution nothing — the format test comes before any I/O —
-    ///         and is unreachable for the build capture, which refuses a <c>.slnf</c> at ingest. It stays
-    ///         unconditional anyway, because the alternative is a parameter that exists only to be passed
-    ///         the same way twice.
+    ///         The filter leg costs a non-filter solution nothing: the format test comes before any I/O.
     ///     </para>
     /// </remarks>
     /// <param name="solutionPath">The solution (or solution-filter) file the run was pointed at.</param>

@@ -7,11 +7,7 @@ namespace SlideRule.Model;
 ///     {template} among {list}" (GRAMMAR §5.3). The correspondence verb: per subject the template
 ///     derives a name — every <c>{Name}</c> replaced by the subject's simple name — and exactly one
 ///     type in the among selection must carry it; zero counterparts and several are both red.
-///     Structurally an operand-carrying verb — the among selection rides
-///     <see cref="Constraint.Operands" />, exactly like <see cref="MustBelongToConstraint" /> — so the
-///     generic operand walks (foreign-<see cref="Arch" /> validation, the selection walk, Quarantine
-///     desugaring) reach it with no special-casing, while evaluation is a per-subject name count rather
-///     than an edge walk.
+///     Evaluation is a per-subject name count rather than an edge walk.
 /// </summary>
 internal sealed class MustHaveExactlyOneCounterpartConstraint(Selection subject, IReadOnlyList<Selection> among, string template)
     : OperandConstraint(subject, among)

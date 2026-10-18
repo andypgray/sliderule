@@ -59,8 +59,8 @@ public static class MethodSelectionConstraints
     /// <summary>
     ///     States that every selected method must declare a parameter of type <typeparamref name="T" />, such
     ///     as <c>arch.Types.Methods.MustAcceptParameter&lt;CancellationToken&gt;()</c>. A method passes
-    ///     when any one of its parameters has that type and fails the check otherwise; a value type reads
-    ///     as naturally here as a reference type, nothing being required of <typeparamref name="T" />. An
+    ///     when any one of its parameters has that type and fails the check otherwise.
+    ///     <typeparamref name="T" /> may be a value type or a reference type. An
     ///     open generic has no type-argument form: for <c>IProgress&lt;&gt;</c> use the
     ///     <see cref="System.Type" /> overload and pass <c>typeof(IProgress&lt;&gt;)</c>, which accepts
     ///     every construction of it.

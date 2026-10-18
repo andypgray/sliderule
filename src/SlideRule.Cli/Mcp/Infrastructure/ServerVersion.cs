@@ -5,7 +5,7 @@ namespace SlideRule.Cli.Mcp.Infrastructure;
 /// <summary>
 ///     The running server's version, read once from the assembly's
 ///     <see cref="AssemblyInformationalVersionAttribute" />. <see cref="SemVer" /> is that value
-///     truncated at the first <c>+</c> (build metadata dropped), for the MCP <c>serverInfo</c> handshake.
+///     truncated at the first <c>+</c> (build metadata dropped).
 /// </summary>
 internal static class ServerVersion
 {

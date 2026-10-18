@@ -660,8 +660,9 @@ internal static class FragmentMerger
         // that drifted apart makes its own — so the edge's source node, whose facts are the first declarer's, cannot
         // say which declarers made it; and a project that declares no copy of a shared target binds the copy of
         // whichever declarer it references, which the target node cannot say either. The fragment's project made the
-        // reference, so both halves are facts here and nowhere after. An edge between names one project each declares
-        // keeps no record — null — because its two nodes already name its one instance, which made every site it has.
+        // reference, so both halves are facts here and nowhere after. An edge between names one project each
+        // declares keeps no record — null — because its two nodes already name its one instance, which made every
+        // site it has.
         //
         // A target this fragment bound from an assembly shadowing the name is the assembly's node rather than the
         // declaration, so it is not a shared target however many projects declare the name: its one copy is the
@@ -700,10 +701,10 @@ internal static class FragmentMerger
         // per compilation rather than per project: a compilation that declares the name records no external for it,
         // and binds its own copy, since a compilation binds its own source ahead of any referenced assembly's; one
         // that records an external bound the copy of the declarer producing that assembly. Asking the project instead
-        // would be wrong for a multi-targeted project whose #if declares the name under one framework only, and whose
-        // other framework binds a referenced declarer's copy. Every unknown — the assembly unrecorded, produced by two
-        // projects, or by no declarer of the name — falls back to the first declarer, the copy whose facts the node
-        // carries, which is where an edge with nothing better to go on is attributed.
+        // would be wrong for a multi-targeted project whose #if declares the name under one framework only, and
+        // whose other framework binds a referenced declarer's copy. Every unknown — the assembly unrecorded, produced
+        // by two projects, or by no declarer of the name — falls back to the first declarer, the copy whose facts the
+        // node carries, which is where an edge with nothing better to go on is attributed.
         private string ReachedCopy(
             IReadOnlyDictionary<string, string> suppliers, string projectName, string fqn, DeclarerRoster roster)
         {
@@ -935,8 +936,8 @@ internal static class FragmentMerger
                     _nodes[src], MemberReferenceFor(symbolId), _memberEdges.EvidenceOf((src, symbolId), sites)));
         }
 
-        // The only ProjectNode construction site outside the tests, so every per-project table the merge keeps
-        // reaches the model here or nowhere.
+        // The only ProjectNode construction outside the tests, so every per-project table the merge keeps
+        // reaches the model here or nowhere: a table this method does not read is lost.
         private List<ProjectNode> BuildProjects()
         {
             Dictionary<string, SortedSet<string>> refsByProject = new(StringComparer.Ordinal);
@@ -1047,9 +1048,9 @@ internal static class FragmentMerger
         ///         <b>Each fact folds in the direction that cannot invent a clean answer.</b> A package any
         ///         framework declares is a package the project declares, so the references union, and the package
         ///         is private only where every framework's declaration of it is. Which frameworks declared it
-        ///         unions beside that fold, keyed by the same name, from each evaluation whose framework is known. Packability
-        ///         unions for the same reason read the other way round: if one framework produces a package,
-        ///         the project ships one. The lock policy <em>intersects</em> — a framework whose restore
+        ///         unions beside that fold, keyed by the same name, from each evaluation whose framework is known.
+        ///         Packability unions for the same reason read the other way round: if one framework produces a
+        ///         package, the project ships one. The lock policy <em>intersects</em> — a framework whose restore
         ///         writes no lock file leaves that restore unlocked however the others are configured — and
         ///         that opposition between the two flags is the fact rather than an inconsistency, because
         ///         one is a property of what gets built and the other of how it is resolved.

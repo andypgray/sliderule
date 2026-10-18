@@ -99,7 +99,7 @@ internal sealed record WorkspaceSnapshot(Solution Solution, IReadOnlyList<string
     ///     input — it states coverage.
     /// </summary>
     /// <remarks>
-    ///     Generation-scoped like its three siblings, and the most plainly so: it is read off the solution
+    ///     Generation-scoped like its three siblings: it is read off the solution
     ///     file, which is a structural input the reconcile sweep already watches, so adding or removing an
     ///     <c>.fsproj</c> forces a full reload and the fact is recomputed there.
     /// </remarks>

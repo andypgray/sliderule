@@ -40,11 +40,10 @@ namespace SlideRule.Analyzers;
 ///         keep one read per path and replace it when the text at that path changes, so a host that analyses
 ///         many projects in one process reads a given file once rather than once per project. The instance
 ///         holds the test seams and the reads it goes through, which are those two unless a seam over a read
-///         is armed, when they are reads of its own. The live
-///         tier's per-compilation state lives in the closure the start action builds, never in a field,
-///         because the compiler shares one analyzer instance across compilations. Nothing is read from disk,
-///         the environment or a clock: the compilation and the additional files the build supplies are the
-///         whole input.
+///         is armed, when they are reads of its own. The live tier's per-compilation state lives in the closure
+///         the start action builds, never in a field, because the compiler shares one analyzer instance across
+///         compilations. Nothing is read from disk, the environment or a clock: the compilation and the
+///         additional files the build supplies are the whole input.
 ///     </para>
 ///     <para>
 ///         The compiler binds this analyzer to whichever copy of SlideRule it loaded, which can be

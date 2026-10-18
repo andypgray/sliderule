@@ -88,6 +88,8 @@ internal sealed class HookState
         if (_directory is null) return None;
 
         byte[] digest = SHA256.HashData(Encoding.UTF8.GetBytes(PathComparison.Fold(topLevel)));
+        // 16 hex characters (64 bits) of the digest, the same cut the extraction cache keys its directories by:
+        // ample to keep two trees from colliding while keeping the path short.
         string directory = Path.Combine(_directory, TreesDirectory, Convert.ToHexStringLower(digest)[..16]);
         try
         {

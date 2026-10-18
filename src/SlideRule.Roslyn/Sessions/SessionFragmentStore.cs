@@ -184,7 +184,7 @@ internal sealed class SessionFragmentStore : IDisposable
     /// <remarks>
     ///     <paramref name="declaredMembers" /> rides down to the extraction rather than being applied to the
     ///     stored set, and a reused fragment therefore keeps the membership it was extracted with. That is
-    ///     safe for the one reason worth stating: membership can only change when the solution file does, and
+    ///     safe because membership can only change when the solution file does, and
     ///     the solution file is a structural input of the paired session's reconcile sweep — so the change
     ///     arrives as a new generation, which flushes this store before any of it is read again.
     /// </remarks>
@@ -213,7 +213,7 @@ internal sealed class SessionFragmentStore : IDisposable
     /// </summary>
     /// <remarks>
     ///     The memo is keyed by the fragment-set version <em>and</em> the exclusion set, so it can never
-    ///     serve a model built from other inputs; a version change simply empties it. Two overlapping calls
+    ///     serve a model built from other inputs; a version change empties it. Two overlapping calls
     ///     can therefore both merge (the loser's entry is re-made), which costs a merge and never a wrong
     ///     model.
     /// </remarks>

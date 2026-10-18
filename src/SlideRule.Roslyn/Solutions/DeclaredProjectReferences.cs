@@ -4,16 +4,19 @@ namespace SlideRule.Roslyn.Solutions;
 
 /// <summary>
 ///     Turns the project files a project's evaluation declared references to into the names of the loaded
-///     projects they are, and names the workspace references those declarations do not account for. Split into
-///     a map over the loaded projects and a lookup through it, both taking the canonicalizer as a delegate, plus
-///     a difference taking a declared project's reach as one, so all of it is unit-testable over synthetic input
-///     with no workspace and no disk.
+///     projects they are, and names the workspace references those declarations do not account for.
 /// </summary>
 /// <remarks>
-///     Both sides of the lookup are canonicalized, because the two spellings of one project file come from
-///     different readers: the workspace reports a project's path as the solution named it, while an
-///     evaluated reference is its include resolved against the referencing project's directory. A link on
-///     either route would otherwise leave a declared reference unnamed.
+///     <para>
+///         The canonicalizer and a declared project's reach arrive as delegates, so all of it is unit-testable
+///         over synthetic input with no workspace and no disk.
+///     </para>
+///     <para>
+///         Both sides of the lookup are canonicalized, because the two spellings of one project file come from
+///         different readers: the workspace reports a project's path as the solution named it, while an
+///         evaluated reference is its include resolved against the referencing project's directory. A link on
+///         either route would otherwise leave a declared reference unnamed.
+///     </para>
 /// </remarks>
 internal static class DeclaredProjectReferences
 {

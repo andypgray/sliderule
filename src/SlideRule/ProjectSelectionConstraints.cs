@@ -13,7 +13,7 @@ namespace SlideRule;
 ///     defaults and every import, not
 ///     what the project file's own text says, so a setting a shared props file above the project
 ///     supplies is a fact these verbs see. A violation is sited at the declaration that won the
-///     evaluation, regularly that props file rather than the project itself. Every verb passes a
+///     evaluation, often that props file rather than the project itself. Every verb passes a
 ///     project whose fact nothing evaluated.
 /// </summary>
 // Negation lives in the verb name, never in a Not() combinator (GRAMMAR §2), and every verb here
