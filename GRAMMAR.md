@@ -1196,6 +1196,13 @@ properties it sets.
   project's frameworks, is private only where every declaration is: a non-private declaration
   decides and brings its site, and between declarations that agree the ordinally-first site
   stays.
+- **Facts are what evaluation answers on the machine that runs it.** A condition on
+  `$([MSBuild]::IsOSPlatform(...))`, on `$(OS)` or on an environment variable resolves on the
+  host running SlideRule, and a binlog replay is no exception: it takes the compilations from
+  the log and evaluates the project files again, on the current host, reading none of the
+  evaluations the log recorded. So a framework, package or property a project declares behind
+  such a condition can give one verdict on Windows and another on Linux. A law about one
+  platform's build is checked on that platform, in CI on that platform's runner.
 - **A property is set when a declaration in the solution sets it.** An evaluation records each
   property whose winning definition sits in the project's cone (its own directory and those
   above it, where MSBuild discovers `Directory.Build.props`) or anywhere under the solution's

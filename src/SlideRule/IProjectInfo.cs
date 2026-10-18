@@ -5,7 +5,9 @@ namespace SlideRule;
 ///     lambda in <c>.Where(project =&gt; ..., description)</c> and
 ///     <c>.Must(project =&gt; ..., description)</c> on a project selection. The facts are what a build
 ///     evaluation answers, not what the project file spells, so a setting supplied by a shared props
-///     file above the project, or defaulted by the SDK, is a fact here and absent from the file. Where
+///     file above the project, or defaulted by the SDK, is a fact here and absent from the file. The
+///     evaluation runs on the machine running the check, so a condition on the operating system or an
+///     environment variable resolves there, and a fact behind one can differ between Windows and Linux. Where
 ///     nothing evaluated a project the fact is missing rather than defaulted (the lists come back
 ///     empty and the tri-state facts null), so a predicate that reads unknown as false asserts
 ///     something nothing measured; treat unknown as passing, as the project verbs do. The lambda runs
