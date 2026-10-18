@@ -51,8 +51,8 @@
         <!-- The DI/Hosting abstractions the registration-recognition tests (CompilationFactory's DiReferences)
              bind against — promoted from transitive (via the MCP/Hosting stack) to explicit, so the versions
              the recognizer resolves are pinned here rather than floating on another package's closure. -->
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.12" />
-        <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.12" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.13" />
+        <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.13" />
         <!-- The completion surface the spec-completion tests drive the provider through, at the version
              this test host resolves rather than the 4.0.1 floor the provider is built against: a provider
              has to answer the editor of the day, and running it against the floor would be testing the
