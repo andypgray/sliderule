@@ -122,10 +122,11 @@ public class SpecValidationTests
     [InlineData(typeof(BlankExemplarWhereSpec), nameof(Code.BlankProse), "area/rule")]
     [InlineData(typeof(UndefinedLifetimeExemplarSpec), nameof(Code.UndefinedLifetime), "area/rule")]
     // A member Except payload is a member selection with a type selection of its own, and every walk the
-    // subject takes reaches it: its source's Arch, a family standing there, its blank names and its blank
-    // member Where descriptions (GRAMMAR §8 items 5, 10, 15, 27).
+    // subject takes reaches it: its source's Arch, a family standing there, its source's Where descriptions,
+    // its blank names and its blank member Where descriptions (GRAMMAR §8 items 5, 10, 15, 27).
     [InlineData(typeof(ForeignMemberExceptPayloadSpec), nameof(Code.ForeignSelection), "area/rule")]
     [InlineData(typeof(FamilyInMemberExceptPayloadSpec), nameof(Code.FamilyMisplaced), "area/rule")]
+    [InlineData(typeof(BlankSourceWhereInMemberExceptPayloadSpec), nameof(Code.BlankProse), "area/rule")]
     [InlineData(typeof(BlankNameInMemberExceptPayloadSpec), nameof(Code.BlankPattern), "area/rule")]
     [InlineData(typeof(BlankWhereInMemberExceptPayloadSpec), nameof(Code.BlankProse), "area/rule")]
     public void Validate_FailingSpec_ReportsItsCodeAndRuleId(Type specType, string codeName, string ruleId)

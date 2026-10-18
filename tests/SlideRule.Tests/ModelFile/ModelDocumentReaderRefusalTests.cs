@@ -1,7 +1,7 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Internal;
 using SlideRule.ModelFile;
+using Xunit;
 
 namespace SlideRule.Tests.ModelFile;
 
@@ -177,6 +177,19 @@ public sealed class ModelDocumentReaderRefusalTests
         refusal.Kind.ShouldBe(ModelRefusalKind.Malformed);
         refusal.Describe()
             .ShouldBe("line 19, column 241: type-name pattern \"\" is blank.");
+    }
+
+    [Fact]
+    public void Read_AMalformedPathGlob_RefusesInTheMatchersOwnWords()
+    {
+        ModelRefusal refusal = ShouldRefuseAfterEdit(
+            ModelFileSpecs.SampleText(),
+            "{ \"node\": \"withSuffix\", \"suffix\": \"Dto\" }", "{ \"node\": \"under\", \"globs\": [\"src/../Widgets\"] }");
+
+        refusal.Kind.ShouldBe(ModelRefusalKind.Malformed);
+        refusal.Describe()
+            .ShouldBe("line 19, column 232: path glob \"src/../Widgets\" has a `.` or `..` segment; name the "
+                      + "directories from the solution directory down.");
     }
 
     [Fact]

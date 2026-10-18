@@ -1614,3 +1614,13 @@ internal sealed class MalformedPathGlobSpec : IArchitectureSpec
         arch.Rule("area/doubled").Enforce(arch.Types.Under("src/**Widgets").MustBeSealed()).Because("Reason.");
     }
 }
+
+internal sealed class BlankSourceWhereInMemberExceptPayloadSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        arch.Rule("area/rule")
+            .Enforce(arch.Types.Methods.Except(arch.Types.Where(t => true, " ").Methods).MustBeStatic())
+            .Because("Reason.");
+    }
+}
