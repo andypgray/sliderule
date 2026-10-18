@@ -1114,8 +1114,10 @@ internal static class FragmentExtractor
                 MemberKindOf(member),
                 AccessibilityMapper.Map(member),
                 member.IsStatic,
-                member.IsAbstract, // C# declaration semantics: an abstract member and every interface member report true
+                member.IsAbstract, // C# declaration semantics: an abstract member and a bodiless interface member report true
                 member.IsVirtual, // false for an override or abstract member — an override is not itself "virtual"
+                member.IsOverride, // the `override` keyword, sealed or not
+                member.IsSealed, // a `sealed override` only; `sealed` makes an interface member non-virtual instead
                 member is IMethodSymbol { IsAsync: true },
                 returnTypeFullName,
                 memberTypeFullName,

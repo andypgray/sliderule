@@ -15,9 +15,11 @@ namespace SlideRule.Codebase;
 ///     </para>
 ///     <para>
 ///         The flags describe the declaration as C# spells it rather than the IL behind it. An
-///         <c>override</c> member is not <see cref="IsVirtual" />, every interface member is
-///         <see cref="IsAbstract" />, and a <c>const</c> field is not <see cref="IsReadOnly" /> — those two
-///         are separate declarations, where <see cref="HasInitOnlySetter" /> instead narrows
+///         <c>override</c> member is not <see cref="IsVirtual" /> but is <see cref="IsOverride" />, only a
+///         <c>sealed override</c> is <see cref="IsSealed" /> (a member of a sealed class does not inherit
+///         it), an interface member without a body is <see cref="IsAbstract" />, and a <c>const</c> field is not
+///         <see cref="IsReadOnly" /> — those two are separate declarations, where
+///         <see cref="HasInitOnlySetter" /> instead narrows
 ///         <see cref="HasSetter" />. Exactly one of <see cref="ReturnTypeFullName" /> (methods, with
 ///         <c>System.Void</c> for a void one) and <see cref="MemberTypeFullName" /> (properties, fields and
 ///         events) is non-null.
@@ -44,7 +46,9 @@ internal sealed class MemberNode : IMemberInfo
         bool hasSetter = false,
         bool hasInitOnlySetter = false,
         bool isReadOnly = false,
-        bool isConst = false)
+        bool isConst = false,
+        bool isOverride = false,
+        bool isSealed = false)
     {
         DeclaringType = declaringType;
         SymbolId = symbolId;
@@ -65,6 +69,8 @@ internal sealed class MemberNode : IMemberInfo
         HasInitOnlySetter = hasInitOnlySetter;
         IsReadOnly = isReadOnly;
         IsConst = isConst;
+        IsOverride = isOverride;
+        IsSealed = isSealed;
     }
 
     /// <summary>
@@ -102,6 +108,12 @@ internal sealed class MemberNode : IMemberInfo
 
     /// <inheritdoc />
     public bool IsVirtual { get; }
+
+    /// <inheritdoc />
+    public bool IsOverride { get; }
+
+    /// <inheritdoc />
+    public bool IsSealed { get; }
 
     /// <inheritdoc />
     public bool IsAsync { get; }

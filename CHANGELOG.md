@@ -32,8 +32,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   file and line that set it, for `.Must` predicates. A blank name or
   value is reported as `SR1033`. `baseline add --target` takes the property item, such as
   `Nullable@net8.0`.
+- Member selections narrow by declared accessibility at all six levels: `ThatArePublic()`,
+  `ThatAreInternal()`, `ThatAreProtected()`, `ThatArePrivate()`, `ThatAreProtectedInternal()` and
+  `ThatArePrivateProtected()`, each matching its level exactly and reading as a prefix ("protected fields
+  of types"). `MustBeProtected()` states that every selected member is declared `protected`, so
+  `.Fields.ThatArePrivate().MustBeProtected()` over a base class's namespace reds each field an inheritor
+  cannot reach.
+- `IMemberInfo.IsOverride` reports a member declared `override`, and `IMemberInfo.IsSealed` a
+  `sealed override`, for `.Where` and `.Must` predicates.
 - The extraction cache starts over once after this upgrade, because each project's evaluation now records
-  the properties the solution sets.
+  the properties the solution sets, and each member whether it overrides.
 - `check --json` and `arch_check` carry a `framework` key on each `MustOnlyTarget` violation, naming
   the framework it reports.
 - `baseline add --source <project> --target <package-or-framework>` adds the entry for a project's

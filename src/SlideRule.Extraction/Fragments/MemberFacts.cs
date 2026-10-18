@@ -16,7 +16,10 @@ namespace SlideRule.Extraction.Fragments;
 ///     <para>
 ///         The flags carry C# declaration semantics, not IL: <see cref="IsVirtual" /> is true for a
 ///         <c>virtual</c> member and false for an <c>override</c> or <c>abstract</c> one;
-///         <see cref="IsAbstract" /> is true for an <c>abstract</c> member and for every interface member;
+///         <see cref="IsAbstract" /> is true for an <c>abstract</c> member and for every interface member
+///         without a body (a default implementation is virtual instead);
+///         <see cref="IsOverride" /> reads the member's own <c>override</c> keyword and <see cref="IsSealed" />
+///         is true for a <c>sealed override</c> alone, so a member of a sealed class is not sealed;
 ///         <see cref="IsAsync" /> reflects the <c>async</c> keyword. Exactly one of
 ///         <see cref="ReturnTypeFullName" /> (methods; <c>System.Void</c> for a void method) and
 ///         <see cref="MemberTypeFullName" /> (properties/fields/events) is non-null; both are the
@@ -54,6 +57,8 @@ internal sealed record MemberFacts(
     bool IsStatic,
     bool IsAbstract,
     bool IsVirtual,
+    bool IsOverride,
+    bool IsSealed,
     bool IsAsync,
     string? ReturnTypeFullName,
     string? MemberTypeFullName,

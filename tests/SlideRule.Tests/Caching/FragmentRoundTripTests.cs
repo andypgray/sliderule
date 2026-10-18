@@ -73,6 +73,16 @@ public sealed class FragmentRoundTripTests
         fromCache.Member("N.Budget", "P:N.Budget.Frozen")
             .HasSetter.ShouldBeFalse();
 
+        // And for the two inheritance facts, which read false on every member that does not say the keyword.
+        direct.Member("N.Dog", "M:N.Dog.Speak")
+            .IsOverride.ShouldBeTrue();
+        direct.Member("N.Puppy", "M:N.Puppy.Speak")
+            .IsSealed.ShouldBeTrue();
+        fromCache.Member("N.Dog", "M:N.Dog.Speak")
+            .IsOverride.ShouldBeTrue();
+        fromCache.Member("N.Puppy", "M:N.Puppy.Speak")
+            .IsSealed.ShouldBeTrue();
+
         // Total-fact equality: the round-trip is invisible to the merged model.
         fromCache.ShouldModelTheSameAs(direct);
     }
@@ -824,9 +834,9 @@ public sealed class FragmentRoundTripTests
                              public interface IBase {}
                              public interface IHandler<T> {}
                              public interface IDerived<T> : IBase {}
-                             public abstract class Animal {}
-                             public class Dog : Animal {}
-                             public sealed class Puppy : Dog {}
+                             public abstract class Animal { public virtual void Speak() {} }
+                             public class Dog : Animal { public override void Speak() {} }
+                             public sealed class Puppy : Dog { public sealed override void Speak() {} }
                              public static class Helpers {}
                              public record Money(decimal Amount);
                              public struct Point {}

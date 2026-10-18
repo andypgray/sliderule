@@ -100,6 +100,9 @@ public sealed class ExtractionCacheStoreTests
     // slot, so every project replays as one nothing evaluated, and MustSetProperty would pass a property nobody
     // set where a fresh extraction reds it.
     [InlineData(35)]
+    // A v36 cache predates the override and sealed member facts (schema bumped 36→37): every member replays
+    // as neither, so MustBeOverridable would red every unsealed override a fresh extraction passes.
+    [InlineData(36)]
     public void ReadAndValidate_SchemaVersionOtherThanTheCurrentOne_ReturnsMiss(int schemaVersion)
     {
         // Arrange
@@ -129,7 +132,7 @@ public sealed class ExtractionCacheStoreTests
 
         version.ShouldNotBeNull("the extraction cache still declares a schema version");
         version.GetRawConstantValue()
-            .ShouldBe(36);
+            .ShouldBe(37);
     }
 
     [Fact]

@@ -196,6 +196,10 @@ internal static class ModelDump
             .Append(member.IsAbstract)
             .Append(" virtual=")
             .Append(member.IsVirtual)
+            .Append(" override=")
+            .Append(member.IsOverride)
+            .Append(" sealed=")
+            .Append(member.IsSealed)
             .Append(" async=")
             .Append(member.IsAsync)
             .AppendLine();

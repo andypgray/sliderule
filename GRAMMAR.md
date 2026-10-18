@@ -929,8 +929,12 @@ Quarantine desugaring (§7) — is the underlying **type** selection.
   declaration has one.
 - **Declaration-semantics flags are pinned to C#, not IL.** `IsVirtual` is true for a member
   declared `virtual` and false for an `override` or `abstract` one (an override is not itself
-  "virtual" in the authored sense); `IsAbstract` is true for an `abstract` member and for every
-  interface member (interface members are abstract); `IsAsync` reflects the `async` keyword; and
+  "virtual" in the authored sense); `IsOverride` is true for a member declared `override`, sealed or
+  not, and `IsSealed` for a `sealed override` alone — the keywords the member itself writes, so a
+  member of a sealed class reports neither by inheritance, and `sealed` on an interface member makes
+  it non-virtual rather than sealed; `IsAbstract` is true for an `abstract` member and for every interface
+  member without a body (interface members are abstract; a default implementation is virtual
+  instead); `IsAsync` reflects the `async` keyword; and
   the four mutability flags read the declaration the same way — an expression-bodied property has
   no setter, a manually written `set` accessor is one, and an `abstract` or interface property's
   `set` counts because the declaration writes it. These
@@ -1690,7 +1694,7 @@ can combine it with anything else the contract carries.
 Member-predicate input contract (`IMemberInfo`, the input to a member `.Where`/`.Must`, §4.6):
 `Name`, `Kind` (`MemberKind`: Method / Property / Field / Event), `DeclaringType` (an
 `ITypeInfo` — the type-side contract, reused so a member predicate can reach its declaring
-type's facts), `Accessibility`, `IsStatic`, `IsAbstract`, `IsVirtual`, `IsAsync`,
+type's facts), `Accessibility`, `IsStatic`, `IsAbstract`, `IsVirtual`, `IsOverride`, `IsSealed`, `IsAsync`,
 `ReturnTypeFullName` (methods; `System.Void` for a void method; null otherwise),
 `MemberTypeFullName` (the property/field/event type; null for methods), `Parameters` (the
 declared parameters in declaration order — each an `IParameterInfo` of `Name` and
@@ -1702,7 +1706,8 @@ and `[return:]` attributes are outside it), `HasSetter` and `HasInitOnlySetter` 
 setter shape — any setter at all, `private set` and `init` included, then the init-only
 refinement of it; both false for every non-property), `IsReadOnly` and `IsConst` (field
 writability; both false for every non-field, and disjoint from each other), and `FilePaths` (declaration file paths). The flags carry the same C# declaration semantics as the member axis
-(§4.6): an `override` member is not `IsVirtual`, an interface member is `IsAbstract`, a property
+(§4.6): an `override` member is not `IsVirtual` but is `IsOverride`, only a `sealed override` is
+`IsSealed`, an interface member without a body is `IsAbstract`, a property
 with an `init`-only setter has a setter. The
 contract grows additively, exactly like `ITypeInfo`.
 

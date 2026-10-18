@@ -4,7 +4,7 @@ namespace SlideRule;
 ///     What a member predicate sees: the facts of one declared member, handed to the lambda in
 ///     <c>.Where(member =&gt; ..., description)</c> and <c>.Must(member =&gt; ..., description)</c> on a
 ///     member selection. Every fact is the member's declaration as C# writes it rather than what the
-///     compiler emits, so an <c>override</c> member is not virtual, an interface member is abstract,
+///     compiler emits, so an <c>override</c> member is not virtual, an interface member without a body is abstract,
 ///     and a property with an <c>init</c> setter has a setter. Facts that belong to one kind of member
 ///     are false or null on the others, so a predicate may read any of them without testing
 ///     <see cref="Kind" /> first. The lambda runs when the check runs, not when the spec is loaded; the
@@ -45,7 +45,8 @@ public interface IMemberInfo
 
     /// <summary>
     ///     Whether the member is abstract as C# declares it: an <c>abstract</c> member reports
-    ///     <c>true</c>, and so does every interface member.
+    ///     <c>true</c>, and so does every interface member declared without a body. An interface member
+    ///     with a default body reports <see cref="IsVirtual" /> instead.
     /// </summary>
     bool IsAbstract { get; }
 
@@ -54,6 +55,21 @@ public interface IMemberInfo
     ///     reports <c>false</c>: neither is itself virtual in the sense the author wrote.
     /// </summary>
     bool IsVirtual { get; }
+
+    /// <summary>
+    ///     Whether the declaration says <c>override</c>, sealed or not. An override is not
+    ///     <see cref="IsVirtual" />, so a predicate asking whether a member can still be overridden reads
+    ///     this beside <see cref="IsSealed" />. A field is never an override.
+    /// </summary>
+    bool IsOverride { get; }
+
+    /// <summary>
+    ///     Whether the member is a <c>sealed override</c>, the one declaration that ends an override chain.
+    ///     A member of a sealed class reports <c>false</c> unless it says <c>sealed override</c> itself: the
+    ///     keyword on the class is not written on the member. An interface member declared <c>sealed</c>
+    ///     reports <c>false</c> as well, since there the keyword makes the member non-virtual.
+    /// </summary>
+    bool IsSealed { get; }
 
     /// <summary>
     ///     Whether a method's declaration says <c>async</c>, and <c>false</c> for a property, field or

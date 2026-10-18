@@ -114,7 +114,8 @@ public static class MemberSelectionConstraints
 
     /// <summary>
     ///     States that every selected member must be declared <c>abstract</c>. This reads the C# declaration:
-    ///     every member of an interface counts as abstract, while a <c>virtual</c> member and a plain
+    ///     every interface member declared without a body counts as abstract, while a <c>virtual</c> member, an
+    ///     interface member with a default body and a plain
     ///     <c>override</c> do not and fail the check.
     /// </summary>
     public static Constraint MustBeAbstract(this MemberSelection subject)

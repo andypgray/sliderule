@@ -275,6 +275,99 @@ public sealed class CodebaseExtractorMemberInventoryTests
     }
 
     [Fact]
+    public void Inventory_InheritanceFlags_ReadEachMembersOwnKeywords()
+    {
+        // The matrix MustBeOverridable reads (GRAMMAR §4.6): each flag is a keyword the member itself writes.
+        // An override is neither virtual nor sealed until it says so, `new` hides without overriding, nothing
+        // a sealed class writes reaches its members, and an interface member is abstract unless a body makes
+        // it virtual. IsSealed is the sealed override's alone: an interface member declared `sealed` reports
+        // none of the four, because the keyword there only stops its body being virtual.
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public abstract class Base
+                                                         {
+                                                             public virtual void Virtual() {}
+                                                             public virtual void Overridden() {}
+                                                             public virtual void Closing() {}
+                                                             public abstract void Abstract();
+                                                             public void Hidden() {}
+                                                         }
+                                                         public class Derived : Base
+                                                         {
+                                                             public override void Overridden() {}
+                                                             public sealed override void Closing() {}
+                                                             public override void Abstract() {}
+                                                             public new void Hidden() {}
+                                                         }
+                                                         public sealed class Closed : Base
+                                                         {
+                                                             public override void Overridden() {}
+                                                             public override void Abstract() {}
+                                                         }
+                                                         public interface IContract
+                                                         {
+                                                             void Member();
+                                                             static abstract void Factory();
+                                                             void Defaulted() {}
+                                                             sealed void Fixed() {}
+                                                         }
+                                                         """);
+
+        Flags(model, "N.Base", "M:N.Base.Virtual").ShouldBe((true, false, false, false));
+        Flags(model, "N.Base", "M:N.Base.Abstract").ShouldBe((false, false, false, true));
+        Flags(model, "N.Derived", "M:N.Derived.Overridden").ShouldBe((false, true, false, false));
+        Flags(model, "N.Derived", "M:N.Derived.Closing").ShouldBe((false, true, true, false));
+        Flags(model, "N.Derived", "M:N.Derived.Abstract").ShouldBe((false, true, false, false));
+        Flags(model, "N.Derived", "M:N.Derived.Hidden").ShouldBe((false, false, false, false));
+        Flags(model, "N.Closed", "M:N.Closed.Overridden").ShouldBe((false, true, false, false));
+        Flags(model, "N.IContract", "M:N.IContract.Member").ShouldBe((false, false, false, true));
+        Flags(model, "N.IContract", "M:N.IContract.Factory").ShouldBe((false, false, false, true));
+        Flags(model, "N.IContract", "M:N.IContract.Defaulted").ShouldBe((true, false, false, false));
+        Flags(model, "N.IContract", "M:N.IContract.Fixed").ShouldBe((false, false, false, false));
+
+        static (bool Virtual, bool Override, bool Sealed, bool Abstract) Flags(
+            CodebaseModel codebase, string type, string symbolId)
+        {
+            MemberNode member = codebase.Type(type)
+                .Member(symbolId);
+            return (member.IsVirtual, member.IsOverride, member.IsSealed, member.IsAbstract);
+        }
+    }
+
+    [Fact]
+    public void Inventory_InheritanceFlags_OnPropertiesAndEvents_AndNeverOnAField()
+    {
+        // The keywords reach properties and events the same way they reach methods; a field can carry neither.
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public abstract class Base
+                                                         {
+                                                             public virtual int Size => 0;
+                                                             public virtual event System.Action Changed;
+                                                             protected int Count;
+                                                         }
+                                                         public class Derived : Base
+                                                         {
+                                                             public sealed override int Size => 1;
+                                                             public override event System.Action Changed;
+                                                         }
+                                                         """);
+
+        TypeNode derived = model.Type("N.Derived");
+        derived.Member("P:N.Derived.Size")
+            .IsOverride.ShouldBeTrue();
+        derived.Member("P:N.Derived.Size")
+            .IsSealed.ShouldBeTrue();
+        derived.Member("E:N.Derived.Changed")
+            .IsOverride.ShouldBeTrue();
+        derived.Member("E:N.Derived.Changed")
+            .IsSealed.ShouldBeFalse();
+        model.Type("N.Base")
+            .Member("F:N.Base.Count")
+            .IsOverride.ShouldBeFalse();
+    }
+
+    [Fact]
     public void Inventory_AsyncMethod_IsAsyncTrueWithTaskReturn()
     {
         CodebaseModel model = CompilationFactory.Extract("""

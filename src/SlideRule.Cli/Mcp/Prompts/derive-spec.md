@@ -596,9 +596,9 @@ descriptions are bare-infinitive phrases completing "must …" ("keep type names
 characters"). The predicate sees `ITypeInfo`: `Name`, `Namespace`, `Kind`, `ProjectName`,
 `Accessibility`, `IsSealed`, `IsStatic`, `IsAbstract`, `IsRecord` (how record rules are
 written), `FilePaths`, attributes, base type, interfaces. On a member subject it sees `IMemberInfo`:
-`Name`, `Kind`, `DeclaringType`, `Accessibility`, `IsStatic`, `IsVirtual`, `IsAsync`, `IsConst`,
-`IsReadOnly`, `ReturnTypeFullName`, `Parameters`, attributes, so a constants law is a
-`.Where(m => m.IsConst, "that are constants")` away.
+`Name`, `Kind`, `DeclaringType`, `Accessibility`, `IsStatic`, `IsVirtual`, `IsOverride`, `IsSealed`,
+`IsAsync`, `IsConst`, `IsReadOnly`, `ReturnTypeFullName`, `Parameters`, attributes, so a constants law
+is a `.Where(m => m.IsConst, "that are constants")` away.
 
 **Namespace patterns** (dot-segment aware, case-sensitive) — trailing `.*` = the subtree
 *including the namespace itself*; interior `*` = exactly one segment; partial `Legacy*` =
