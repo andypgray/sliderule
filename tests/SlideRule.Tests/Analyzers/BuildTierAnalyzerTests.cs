@@ -1,11 +1,11 @@
 using System.Globalization;
 using Microsoft.CodeAnalysis;
 using Shouldly;
-using Xunit;
 using SlideRule.Analyzers;
 using SlideRule.Hosting;
 using SlideRule.ModelFile;
 using SlideRule.Tests.Checking;
+using Xunit;
 
 namespace SlideRule.Tests.Analyzers;
 
@@ -542,7 +542,7 @@ public sealed class BuildTierAnalyzerTests
     }
 
     [Fact]
-    public async Task AFaultUnderTheBuildTier_IsOneLB2093WithTheSameWording()
+    public async Task AFaultUnderTheBuildTier_IsOneSR2093WithTheSameWording()
     {
         // The build tier faults inside its own guarded region rather than inside a document's, and the two
         // regions end at one place: what a reader is told must not depend on which tier built the project.
@@ -644,7 +644,7 @@ public sealed class BuildTierAnalyzerTests
     }
 
     [Fact]
-    public async Task AFaultInEveryDocument_IsOneLB2093InBatchAndNonePerDocument()
+    public async Task AFaultInEveryDocument_IsOneSR2093InBatchAndNonePerDocument()
     {
         // A fault is about the analyzer rather than about any one document, so it is named once for the
         // compilation — and a diagnostic with no location reaches no per-document result at all.
@@ -758,7 +758,7 @@ public sealed class BuildTierAnalyzerTests
     }
 
     [Fact]
-    public async Task LB2090_IsReportedInBatchAndNeverPerDocument()
+    public async Task SR2090_IsReportedInBatchAndNeverPerDocument()
     {
         IReadOnlyList<Diagnostic> reported = await BuildTier.DiagnoseAsync(
             BuildTier.OwnCompilation(), [], cancellationToken: Ct);

@@ -1,7 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Shouldly;
-using Xunit;
 using SlideRule.Analyzers;
+using Xunit;
 
 namespace SlideRule.Tests.Analyzers;
 
@@ -91,7 +91,7 @@ public sealed class BuildTierGuardTests
 
     [Theory]
     [MemberData(nameof(PointsOnBothTiers))]
-    public async Task AFaultAtAGuardedPoint_IsOneLB2093CarryingIt(GuardedPoint point, string tier)
+    public async Task AFaultAtAGuardedPoint_IsOneSR2093CarryingIt(GuardedPoint point, string tier)
     {
         IReadOnlyList<Diagnostic> reported = await BuildTier.DiagnoseAsync(
             ArmedAt(point, Boom), BuildTier.OwnCompilation(), FilesReaching(point), tier, Ct);
@@ -103,7 +103,7 @@ public sealed class BuildTierGuardTests
     [Theory]
     [InlineData("live")]
     [InlineData("build")]
-    public async Task FaultsAtTwoPoints_AreStillOneLB2093(string tier)
+    public async Task FaultsAtTwoPoints_AreStillOneSR2093(string tier)
     {
         var analyzer = new BuildTierAnalyzer(
             beforeCheck: Boom,

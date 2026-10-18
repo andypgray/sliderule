@@ -1,7 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Shouldly;
-using Xunit;
 using SlideRule.Analyzers;
+using Xunit;
 
 namespace SlideRule.Tests.Analyzers;
 
@@ -27,7 +27,7 @@ public sealed class BuildTierVersionCheckTests
 
     [Theory]
     [MemberData(nameof(Arrangements))]
-    public async Task TwoVersions_AreOneLB2093NamingBothAndNothingElse(string arrangement)
+    public async Task TwoVersions_AreOneSR2093NamingBothAndNothingElse(string arrangement)
     {
         IReadOnlyList<Diagnostic> reported = await DiagnoseAsync(("0.9.0+abc123", "0.8.0+def456"), arrangement);
 
@@ -36,7 +36,7 @@ public sealed class BuildTierVersionCheckTests
     }
 
     [Fact]
-    public async Task TwoVersions_UnderTheBuildTier_AreTheSameOneLB2093()
+    public async Task TwoVersions_UnderTheBuildTier_AreTheSameOneSR2093()
     {
         IReadOnlyList<Diagnostic> reported = await DiagnoseAsync(("0.9.0", "0.8.0"), "findings", "build");
 
