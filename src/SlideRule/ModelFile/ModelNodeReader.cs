@@ -181,7 +181,7 @@ internal sealed class ModelNodeReader
 
         List<StrictJsonValue> elements = globs.EnumerateArray().ToList();
         for (var i = 0; i < patterns.Count; i++)
-            if (!CheckNamespaceGlob(elements[i], patterns[i]))
+            if (!CheckGlob(elements[i], patterns[i], "namespace pattern", NamespacePattern.Validate))
                 return null;
 
         string[] more = patterns.Skip(1).ToArray();
@@ -398,14 +398,9 @@ internal sealed class ModelNodeReader
         StrictJsonValue? array = AsArray(union, Field("union"));
         if (array is null) return null;
 
-        List<Selection>? parts = Each(array, element => ReadSelection(element, EntryOf("union")));
+        List<Selection>? read = Each(array, element => ReadSelection(element, EntryOf("union")));
+        IReadOnlyList<Selection>? parts = NonEmpty(read, obj, "union");
         if (parts is null) return null;
-
-        if (parts.Count == 0)
-        {
-            RefuseEmpty(array, "union");
-            return null;
-        }
 
         IReadOnlyList<SelectionAdjective>? adjectives =
             ReadAdjectives(obj, NodeReaders.AdjectiveWhere, NodeReaders.AdjectiveArms);
@@ -584,7 +579,7 @@ internal sealed class ModelNodeReader
         string? glob = AsText(value, Field(key));
         if (glob is null) return null;
 
-        return CheckNamespaceGlob(value, glob) ? glob : null;
+        return CheckGlob(value, glob, "namespace pattern", NamespacePattern.Validate) ? glob : null;
     }
 
     /// <summary>
@@ -599,12 +594,7 @@ internal sealed class ModelNodeReader
         return Each(array, element =>
         {
             string? glob = AsText(element, EntryOf(key));
-            if (glob is null) return null;
-
-            if (PathGlob.Validate(glob) is not { } reason) return glob;
-
-            RefuseAt(element, "path glob " + JsonText.Quote(glob) + " " + reason + ".");
-            return null;
+            return glob is not null && CheckGlob(element, glob, "path glob", PathGlob.Validate) ? glob : null;
         });
     }
 
@@ -644,7 +634,7 @@ internal sealed class ModelNodeReader
     {
         if (list is not { Count: 0 }) return list;
 
-        RefuseEmpty(Optional(obj, key)!, key);
+        RefuseAt(Optional(obj, key)!, Field(key) + " must not be empty.");
         return null;
     }
 
@@ -765,12 +755,12 @@ internal sealed class ModelNodeReader
         return null;
     }
 
-    private bool CheckNamespaceGlob(StrictJsonValue at, string glob)
+    private bool CheckGlob(StrictJsonValue at, string glob, string noun, Func<string, string?> validate)
     {
-        string? reason = NamespacePattern.Validate(glob);
+        string? reason = validate(glob);
         if (reason is null) return true;
 
-        RefuseAt(at, "namespace pattern " + JsonText.Quote(glob) + " " + reason + ".");
+        RefuseAt(at, noun + " " + JsonText.Quote(glob) + " " + reason + ".");
         return false;
     }
 
@@ -862,11 +852,6 @@ internal sealed class ModelNodeReader
     {
         obj.TryGetProperty(key, out StrictJsonValue? value);
         return value;
-    }
-
-    private void RefuseEmpty(StrictJsonValue array, string key)
-    {
-        RefuseAt(array, Field(key) + " must not be empty.");
     }
 
     internal void RefuseAt(StrictJsonValue at, string message)

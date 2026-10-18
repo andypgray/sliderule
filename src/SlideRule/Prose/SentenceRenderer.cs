@@ -60,7 +60,7 @@ internal static class SentenceRenderer
     internal static string MemberReferenceList(IReadOnlyList<MemberSelection> selections)
     {
         List<string> parts = selections.Select(MemberReference).ToList();
-        bool closesBeforeOr = selections.Count >= 2 && EndsOpen(selections[selections.Count - 2]);
+        bool closesBeforeOr = ClosesBeforeOr(selections);
         return ProseFormat.JoinReferences(parts, closesBeforeOr);
     }
 
@@ -503,6 +503,11 @@ internal static class SentenceRenderer
     // The or-joiner's closing decision for a list: only the PENULTIMATE item can end open and still be
     // followed by text, because every item before it is already followed by a comma (GRAMMAR §6).
     private static bool ClosesBeforeOr(IReadOnlyList<Selection> parts)
+    {
+        return parts.Count >= 2 && EndsOpen(parts[parts.Count - 2]);
+    }
+
+    private static bool ClosesBeforeOr(IReadOnlyList<MemberSelection> parts)
     {
         return parts.Count >= 2 && EndsOpen(parts[parts.Count - 2]);
     }

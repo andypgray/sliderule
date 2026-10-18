@@ -173,14 +173,7 @@ internal sealed class NodeWriter
         if (selection is UnionSelection union)
         {
             Key("union");
-            BeginArray();
-            foreach (Selection part in union.Parts)
-            {
-                Element();
-                WriteSelection(part);
-            }
-
-            EndArray();
+            Elements(union.Parts, WriteSelection);
         }
         else
         {
@@ -252,14 +245,7 @@ internal sealed class NodeWriter
         if (Refused) return;
 
         Key(key);
-        BeginArray();
-        foreach (MemberSelection selection in selections)
-        {
-            Element();
-            WriteMemberSelection(selection);
-        }
-
-        EndArray();
+        Elements(selections, WriteMemberSelection);
     }
 
     internal void Operands(IReadOnlyList<Selection> operands)
@@ -267,14 +253,7 @@ internal sealed class NodeWriter
         if (Refused) return;
 
         Key("operands");
-        BeginArray();
-        foreach (Selection operand in operands)
-        {
-            Element();
-            WriteSelection(operand);
-        }
-
-        EndArray();
+        Elements(operands, WriteSelection);
     }
 
     internal void Members(IReadOnlyList<Member> members)
@@ -282,14 +261,7 @@ internal sealed class NodeWriter
         if (Refused) return;
 
         Key("members");
-        BeginArray();
-        foreach (Member member in members)
-        {
-            Element();
-            WriteMember(member);
-        }
-
-        EndArray();
+        Elements(members, WriteMember);
     }
 
     /// <summary>An anchor in a position that matches on the definition, which refuses a construction.</summary>
@@ -333,14 +305,7 @@ internal sealed class NodeWriter
         if (Refused) return;
 
         Key("layers");
-        BeginArray();
-        foreach (Layer cell in cells)
-        {
-            Element();
-            LayerReference(cell.Name);
-        }
-
-        EndArray();
+        Elements(cells, cell => LayerReference(cell.Name));
     }
 
     internal void ProjectCells(ProjectSelection projects)
@@ -400,14 +365,7 @@ internal sealed class NodeWriter
     {
         if (Refused) return;
 
-        BeginArray();
-        foreach (string value in values)
-        {
-            Element();
-            Str(value);
-        }
-
-        EndArray();
+        Elements(values, Str);
     }
 
     /// <summary>A key and its string value.</summary>
@@ -443,19 +401,24 @@ internal sealed class NodeWriter
 
     // ---- inner walks ---------------------------------------------------------------------------
 
+    private void Elements<T>(IReadOnlyList<T> items, Action<T> write)
+    {
+        BeginArray();
+        foreach (T item in items)
+        {
+            Element();
+            write(item);
+        }
+
+        EndArray();
+    }
+
     private void WriteAdjectives(IReadOnlyList<object> adjectives)
     {
         if (Refused || adjectives.Count == 0) return;
 
         Key("adjectives");
-        BeginArray();
-        foreach (object adjective in adjectives)
-        {
-            Element();
-            NodeWriters.Write(this, adjective);
-        }
-
-        EndArray();
+        Elements(adjectives, adjective => NodeWriters.Write(this, adjective));
     }
 
     // The subject of a predicate verb, walked but not written: whatever the subject holds is met before
@@ -514,14 +477,7 @@ internal sealed class NodeWriter
         if (Refused) return;
 
         Key(key);
-        BeginArray();
-        foreach (TypeAnchor anchor in anchors)
-        {
-            Element();
-            Anchor(anchor, definitionPosition);
-        }
-
-        EndArray();
+        Elements(anchors, anchor => Anchor(anchor, definitionPosition));
     }
 
     private void Anchor(TypeAnchor anchor, bool definitionPosition)

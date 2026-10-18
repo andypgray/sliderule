@@ -343,21 +343,17 @@ internal static class SpecValidator
                     break;
             }
 
-        if (constraint is MemberConstraint member)
-        {
-            MemberSelection subject = member.MemberSubject;
-            foreach (MemberSelection selection in SelectionWalk.MemberExceptPayloads(subject).Prepend(subject))
-            foreach (MemberAdjective adjective in selection.Adjectives)
-                switch (adjective)
-                {
-                    case MemberNamedAdjective { Names.Count: 0 }:
-                        yield return EmptyMemberNamed;
-                        break;
-                    case MemberExceptAdjective { Payloads.Count: 0 }:
-                        yield return EmptyMemberExcept;
-                        break;
-                }
-        }
+        foreach (MemberSelection selection in SelectionWalk.ConstraintMemberSelections(constraint))
+        foreach (MemberAdjective adjective in selection.Adjectives)
+            switch (adjective)
+            {
+                case MemberNamedAdjective { Names.Count: 0 }:
+                    yield return EmptyMemberNamed;
+                    break;
+                case MemberExceptAdjective { Payloads.Count: 0 }:
+                    yield return EmptyMemberExcept;
+                    break;
+            }
 
         if (constraint is MustNotUseConstraint { MemberOperands.Count: 0 }) yield return EmptyMustNotUse;
     }
@@ -592,11 +588,9 @@ internal static class SpecValidator
     // is a legal name that simply matches nothing.
     private static void CheckMemberReturning(RuleRegistration rule, List<SpecValidationError> errors)
     {
-        if (rule.Constraint is not MemberConstraint memberConstraint) return;
+        if (rule.Constraint is null) return;
 
-        MemberSelection subject = memberConstraint.MemberSubject;
-        IEnumerable<MemberSelection> selections = SelectionWalk.MemberExceptPayloads(subject).Prepend(subject);
-        foreach (MemberSelection selection in selections)
+        foreach (MemberSelection selection in SelectionWalk.ConstraintMemberSelections(rule.Constraint))
         foreach (MemberAdjective adjective in selection.Adjectives)
             if (adjective is ReturningAdjective returning)
                 CheckClosedGenericAnchors(rule, errors, returning.Anchors, Code.MemberReturningClosedGeneric, ".Returning");
@@ -608,11 +602,9 @@ internal static class SpecValidator
     // every kind and clashes with none.
     private static void CheckMemberExceptKinds(RuleRegistration rule, List<SpecValidationError> errors)
     {
-        if (rule.Constraint is not MemberConstraint memberConstraint) return;
+        if (rule.Constraint is null) return;
 
-        MemberSelection subject = memberConstraint.MemberSubject;
-        IEnumerable<MemberSelection> hosts = SelectionWalk.MemberExceptPayloads(subject).Prepend(subject);
-        foreach (MemberSelection host in hosts)
+        foreach (MemberSelection host in SelectionWalk.ConstraintMemberSelections(rule.Constraint))
         foreach (MemberAdjective adjective in host.Adjectives)
         {
             if (adjective is not MemberExceptAdjective except) continue;
@@ -903,22 +895,21 @@ internal static class SpecValidator
         if (constraint is MemberMustConstraint memberMust) yield return (SpecSlot.Description, memberMust.Description);
 
         if (constraint is MemberConstraint memberConstraint)
-            foreach (MemberAdjective adjective in memberConstraint.MemberSubject.Adjectives)
-                if (adjective is MemberWhereAdjective memberWhere)
-                    yield return (SpecSlot.Description, memberWhere.Description);
+        {
+            foreach ((SpecSlot, string?) prose in MemberWhereProse(memberConstraint.MemberSubject))
+                yield return prose;
 
-        // Each member Except payload is a member selection in its own right: its source's prose and its own
-        // member Where descriptions are walked as the subject's are.
-        if (constraint is MemberConstraint withPayloads)
-            foreach (MemberSelection payload in SelectionWalk.MemberExceptPayloads(withPayloads.MemberSubject))
+            // Each member Except payload is a member selection in its own right: its source's prose and its own
+            // member Where descriptions are walked as the subject's are.
+            foreach (MemberSelection payload in SelectionWalk.MemberExceptPayloads(memberConstraint.MemberSubject))
             {
                 foreach ((SpecSlot, string?) prose in SelectionProse(payload.Source))
                     yield return prose;
 
-                foreach (MemberAdjective adjective in payload.Adjectives)
-                    if (adjective is MemberWhereAdjective payloadWhere)
-                        yield return (SpecSlot.Description, payloadWhere.Description);
+                foreach ((SpecSlot, string?) prose in MemberWhereProse(payload))
+                    yield return prose;
             }
+        }
 
         // The project escape hatches (GRAMMAR §4.10, §8 item 5 via the same extended walk): the project Must
         // description and any project Where descriptions on the project subject, including those nested under
@@ -940,6 +931,15 @@ internal static class SpecValidator
         foreach (Selection operand in constraint.Operands)
         foreach ((SpecSlot, string?) prose in SelectionProse(operand))
             yield return prose;
+    }
+
+    // A member selection's own Where descriptions, in authoring order: what the subject and each Except payload
+    // contribute beyond their sources.
+    private static IEnumerable<(SpecSlot Slot, string? Value)> MemberWhereProse(MemberSelection selection)
+    {
+        foreach (MemberAdjective adjective in selection.Adjectives)
+            if (adjective is MemberWhereAdjective where)
+                yield return (SpecSlot.Description, where.Description);
     }
 
     private static IEnumerable<(SpecSlot Slot, string? Value)> SelectionProse(Selection selection)
@@ -1111,8 +1111,7 @@ internal static class SpecValidator
         // like CheckMemberReturning reaches the member .Returning anchor.
         if (constraint is not MemberConstraint memberConstraint) yield break;
 
-        foreach (MemberAdjective adjective in memberConstraint.MemberSubject.Adjectives)
-        foreach ((string, SpecSlot) pattern in MemberAdjectivePatterns(adjective))
+        foreach ((string, SpecSlot) pattern in MemberSelectionPatterns(memberConstraint.MemberSubject))
             yield return pattern;
 
         // Then each member Except payload, its source's patterns before its own, as the subject reads.
@@ -1121,8 +1120,7 @@ internal static class SpecValidator
             foreach ((string, SpecSlot) pattern in SelectionPatterns(payload.Source))
                 yield return pattern;
 
-            foreach (MemberAdjective adjective in payload.Adjectives)
-            foreach ((string, SpecSlot) pattern in MemberAdjectivePatterns(adjective))
+            foreach ((string, SpecSlot) pattern in MemberSelectionPatterns(payload))
                 yield return pattern;
         }
     }
@@ -1193,6 +1191,11 @@ internal static class SpecValidator
                     foreach ((string, SpecSlot) pattern in SelectionPatterns(a.Payload)) yield return pattern;
                     break;
             }
+    }
+
+    private static IEnumerable<(string Value, SpecSlot Slot)> MemberSelectionPatterns(MemberSelection selection)
+    {
+        return selection.Adjectives.SelectMany(MemberAdjectivePatterns);
     }
 
     private static IEnumerable<(string Value, SpecSlot Slot)> MemberAdjectivePatterns(MemberAdjective adjective)

@@ -57,8 +57,8 @@ internal static class SelectionWalk
     /// <summary>
     ///     The project selections a constraint reaches — its project subject and the payloads nested under
     ///     that subject's <c>Except</c> adjectives — or nothing at all for every type- and member-subject
-    ///     constraint. The project-stratum twin of <see cref="ConstraintSelections" />, kept beside it so
-    ///     the two walks a validation pass needs are read in one place.
+    ///     constraint. The project-stratum twin of <see cref="ConstraintSelections" />, kept beside it and
+    ///     <see cref="ConstraintMemberSelections" /> so the walks a validation pass needs are read in one place.
     /// </summary>
     internal static IEnumerable<ProjectSelection> ConstraintProjectSelections(Constraint constraint)
     {
@@ -77,6 +77,20 @@ internal static class SelectionWalk
         if (FamilyProjects(constraint.Subject) is { } projects)
             foreach (ProjectSelection selection in ExpandProjectSelection(projects))
                 yield return selection;
+    }
+
+    /// <summary>
+    ///     The member selections a constraint reaches: its member subject, then every payload nested under that
+    ///     subject's <c>Except</c> adjectives in <see cref="MemberExceptPayloads" /> order, or nothing at all for a
+    ///     type- or project-subject constraint. The member-stratum twin of <see cref="ConstraintProjectSelections" />.
+    /// </summary>
+    internal static IEnumerable<MemberSelection> ConstraintMemberSelections(Constraint constraint)
+    {
+        if (constraint is not MemberConstraint member) yield break;
+
+        yield return member.MemberSubject;
+
+        foreach (MemberSelection payload in MemberExceptPayloads(member.MemberSubject)) yield return payload;
     }
 
     /// <summary>

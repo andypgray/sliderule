@@ -422,9 +422,7 @@ internal static class NodeReaders
 
         map.Add(Key<MustResideInNamespaceConstraint>(), (r, v) =>
         {
-            if (!r.OnlyKeys(v, ConstraintWhere, "node", "subject", "glob")) return null;
-
-            Selection? subject = r.RequiredSelection(v, ConstraintWhere, "subject");
+            Selection? subject = SubjectWith(r, v, "glob");
             if (subject is null) return null;
 
             string? glob = r.RequiredNamespaceGlob(v, ConstraintWhere, "glob");
@@ -433,9 +431,7 @@ internal static class NodeReaders
 
         map.Add(Key<MustResideInProjectConstraint>(), (r, v) =>
         {
-            if (!r.OnlyKeys(v, ConstraintWhere, "node", "subject", "projectName")) return null;
-
-            Selection? subject = r.RequiredSelection(v, ConstraintWhere, "subject");
+            Selection? subject = SubjectWith(r, v, "projectName");
             if (subject is null) return null;
 
             string? name = r.RequiredText(v, ConstraintWhere, "projectName");
@@ -471,9 +467,7 @@ internal static class NodeReaders
 
         map.Add(Key<MustHaveExactlyOneCounterpartConstraint>(), (r, v) =>
         {
-            if (!r.OnlyKeys(v, ConstraintWhere, "node", "subject", "operands", "template")) return null;
-
-            Selection? subject = r.RequiredSelection(v, ConstraintWhere, "subject");
+            Selection? subject = SubjectWith(r, v, "operands", "template");
             if (subject is null) return null;
 
             IReadOnlyList<Selection>? among = r.RequiredOperands(v, ConstraintWhere);
@@ -485,9 +479,7 @@ internal static class NodeReaders
 
         map.Add(Key<MustNotUseConstraint>(), (r, v) =>
         {
-            if (!r.OnlyKeys(v, ConstraintWhere, "node", "subject", "members")) return null;
-
-            Selection? subject = r.RequiredSelection(v, ConstraintWhere, "subject");
+            Selection? subject = SubjectWith(r, v, "members");
             if (subject is null) return null;
 
             IReadOnlyList<Member>? members = r.NonEmpty(r.RequiredMembers(v, ConstraintWhere), v, "members");
@@ -569,33 +561,20 @@ internal static class NodeReaders
         ProjectSubject<MustLockPackagesConstraint>(map, s => new MustLockPackagesConstraint(s));
         ProjectSubject<MustNotBePackableConstraint>(map, s => new MustNotBePackableConstraint(s));
 
-        map.Add(Key<MustOnlyTargetConstraint>(), (r, v) =>
-        {
-            if (!r.OnlyKeys(v, ConstraintWhere, "node", "projectSubject", "frameworks")) return null;
-
-            ProjectSelection? subject = r.RequiredProjectSelection(v, ConstraintWhere, "projectSubject");
-            if (subject is null) return null;
-
-            IReadOnlyList<string>? frameworks = r.RequiredTexts(v, ConstraintWhere, "frameworks");
-            return frameworks is null ? null : new MustOnlyTargetConstraint(subject, frameworks);
-        });
+        ProjectTexts<MustOnlyTargetConstraint>(map, "frameworks", (s, frameworks) => new MustOnlyTargetConstraint(s, frameworks));
         map.Add(Key<MustTargetConstraint>(), (r, v) =>
         {
-            if (!r.OnlyKeys(v, ConstraintWhere, "node", "projectSubject", "framework")) return null;
-
-            ProjectSelection? subject = r.RequiredProjectSelection(v, ConstraintWhere, "projectSubject");
+            ProjectSelection? subject = ProjectSubjectWith(r, v, "framework");
             if (subject is null) return null;
 
             string? framework = r.RequiredText(v, ConstraintWhere, "framework");
             return framework is null ? null : new MustTargetConstraint(subject, framework);
         });
-        ProjectPatterns<MustOnlyReferencePackagesConstraint>(map, (s, patterns) => new MustOnlyReferencePackagesConstraint(s, patterns));
-        ProjectPatterns<MustNotReferencePackagesConstraint>(map, (s, patterns) => new MustNotReferencePackagesConstraint(s, patterns));
+        ProjectTexts<MustOnlyReferencePackagesConstraint>(map, "patterns", (s, patterns) => new MustOnlyReferencePackagesConstraint(s, patterns));
+        ProjectTexts<MustNotReferencePackagesConstraint>(map, "patterns", (s, patterns) => new MustNotReferencePackagesConstraint(s, patterns));
         map.Add(Key<MustSetPropertyConstraint>(), (r, v) =>
         {
-            if (!r.OnlyKeys(v, ConstraintWhere, "node", "projectSubject", "property", "value")) return null;
-
-            ProjectSelection? subject = r.RequiredProjectSelection(v, ConstraintWhere, "projectSubject");
+            ProjectSelection? subject = ProjectSubjectWith(r, v, "property", "value");
             if (subject is null) return null;
 
             string? name = r.RequiredText(v, ConstraintWhere, "property");
@@ -694,27 +673,28 @@ internal static class NodeReaders
         });
     }
 
-    // The package verbs' shape: a project subject and the list of identifier globs it is judged against.
-    private static void ProjectPatterns<TConstraint>(
+    // A project subject and one list of strings under one key: MustOnlyTarget's frameworks and the package
+    // verbs' identifier globs.
+    private static void ProjectTexts<TConstraint>(
         Dictionary<string, Func<ModelNodeReader, StrictJsonValue, Constraint?>> map,
+        string key,
         Func<ProjectSelection, IReadOnlyList<string>, TConstraint> build)
         where TConstraint : ProjectConstraint
     {
         map.Add(Key<TConstraint>(), (r, v) =>
         {
-            if (!r.OnlyKeys(v, ConstraintWhere, "node", "projectSubject", "patterns")) return null;
-
-            ProjectSelection? subject = r.RequiredProjectSelection(v, ConstraintWhere, "projectSubject");
+            ProjectSelection? subject = ProjectSubjectWith(r, v, key);
             if (subject is null) return null;
 
-            IReadOnlyList<string>? patterns = r.RequiredTexts(v, ConstraintWhere, "patterns");
-            return patterns is null ? null : build(subject, patterns);
+            IReadOnlyList<string>? texts = r.RequiredTexts(v, ConstraintWhere, key);
+            return texts is null ? null : build(subject, texts);
         });
     }
 
-    private static Selection? SubjectWith(ModelNodeReader reader, StrictJsonValue value, string field)
+    private static Selection? SubjectWith(ModelNodeReader reader, StrictJsonValue value, params string[] fields)
     {
-        if (!reader.OnlyKeys(value, ConstraintWhere, "node", "subject", field)) return null;
+        string[] allowed = ["node", "subject", .. fields];
+        if (!reader.OnlyKeys(value, ConstraintWhere, allowed)) return null;
 
         return reader.RequiredSelection(value, ConstraintWhere, "subject");
     }
@@ -724,6 +704,14 @@ internal static class NodeReaders
         if (!reader.OnlyKeys(value, ConstraintWhere, "node", "memberSubject", field)) return null;
 
         return reader.RequiredMemberSelection(value, ConstraintWhere, "memberSubject");
+    }
+
+    private static ProjectSelection? ProjectSubjectWith(ModelNodeReader reader, StrictJsonValue value, params string[] fields)
+    {
+        string[] allowed = ["node", "projectSubject", .. fields];
+        if (!reader.OnlyKeys(value, ConstraintWhere, allowed)) return null;
+
+        return reader.RequiredProjectSelection(value, ConstraintWhere, "projectSubject");
     }
 
     private static TypeAnchor? OneAnchor(ModelNodeReader reader, StrictJsonValue value, string where)

@@ -244,8 +244,8 @@ internal sealed class SpecSlot
         return _check switch
         {
             SlotCheck.Pattern => Blank(literal, Code.BlankPattern),
-            SlotCheck.NamespaceStructure => Blank(literal, Code.BlankPattern) ?? Unanchored(literal),
-            SlotCheck.PathGlob => Blank(literal, Code.BlankPattern) ?? MalformedGlob(literal),
+            SlotCheck.NamespaceStructure => Blank(literal, Code.BlankPattern) ?? MatcherRefusal(literal, NamespaceGlob.Validate, Code.UnanchoredSubtreePattern),
+            SlotCheck.PathGlob => Blank(literal, Code.BlankPattern) ?? MatcherRefusal(literal, PathGlobMatcher.Validate, Code.MalformedPathGlob),
             SlotCheck.CounterpartTemplate => Blank(literal, Code.BlankPattern) ?? PlaceholderFree(literal),
             SlotCheck.ProjectOperand => Blank(literal, Code.BlankProjectPattern),
             SlotCheck.Prose => Blank(literal, Code.BlankProse) ?? MultiLine(literal),
@@ -276,24 +276,15 @@ internal sealed class SpecSlot
             : null;
     }
 
-    // GRAMMAR §8 item 16: a glob whose trailing `.*` sits behind a literal prefix carrying a `*` can never
-    // match. The clause comes back from the matcher; the frame is this catalog's.
-    private LiteralVerdict? Unanchored(string literal)
+    // GRAMMAR §8 items 16 and 35: a namespace glob whose trailing `.*` sits behind a literal prefix carrying a `*`,
+    // and a path glob in a shape the matcher refuses rather than normalizes. The clause comes back from the
+    // matcher and the frame is this catalog's, so what a matcher refuses and what the catalog reports cannot drift.
+    private LiteralVerdict? MatcherRefusal(string literal, Func<string, string?> validate, Code code)
     {
-        string? reason = NamespaceGlob.Validate(literal);
+        string? reason = validate(literal);
         if (reason is null) return null;
 
-        return LiteralVerdict.About(Code.UnanchoredSubtreePattern, $"The {Label} '{literal}'", $" {reason}.");
-    }
-
-    // GRAMMAR §8 item 35: a path glob in a shape the matcher refuses rather than normalizes. The clause comes back
-    // from the matcher, as the namespace glob's does, so what it refuses and what the catalog reports cannot drift.
-    private LiteralVerdict? MalformedGlob(string literal)
-    {
-        string? reason = PathGlobMatcher.Validate(literal);
-        if (reason is null) return null;
-
-        return LiteralVerdict.About(Code.MalformedPathGlob, $"The {Label} '{literal}'", $" {reason}.");
+        return LiteralVerdict.About(code, $"The {Label} '{literal}'", $" {reason}.");
     }
 
     // GRAMMAR §8 item 26: a template with no {Name} in it is a constant predicate — every subject derives
