@@ -553,6 +553,8 @@ internal static class NodeReaders
             string? framework = r.RequiredText(v, ConstraintWhere, "framework");
             return framework is null ? null : new MustTargetConstraint(subject, framework);
         });
+        ProjectPatterns<MustOnlyReferencePackagesConstraint>(map, (s, patterns) => new MustOnlyReferencePackagesConstraint(s, patterns));
+        ProjectPatterns<MustNotReferencePackagesConstraint>(map, (s, patterns) => new MustNotReferencePackagesConstraint(s, patterns));
     }
 
     // ---- the shapes several verbs share --------------------------------------------------------
@@ -640,6 +642,24 @@ internal static class NodeReaders
 
             ProjectSelection? subject = r.RequiredProjectSelection(v, ConstraintWhere, "projectSubject");
             return subject is null ? null : build(subject);
+        });
+    }
+
+    // The package verbs' shape: a project subject and the list of identifier globs it is judged against.
+    private static void ProjectPatterns<TConstraint>(
+        Dictionary<string, Func<ModelNodeReader, StrictJsonValue, Constraint?>> map,
+        Func<ProjectSelection, IReadOnlyList<string>, TConstraint> build)
+        where TConstraint : ProjectConstraint
+    {
+        map.Add(Key<TConstraint>(), (r, v) =>
+        {
+            if (!r.OnlyKeys(v, ConstraintWhere, "node", "projectSubject", "patterns")) return null;
+
+            ProjectSelection? subject = r.RequiredProjectSelection(v, ConstraintWhere, "projectSubject");
+            if (subject is null) return null;
+
+            IReadOnlyList<string>? patterns = r.RequiredTexts(v, ConstraintWhere, "patterns");
+            return patterns is null ? null : build(subject, patterns);
         });
     }
 

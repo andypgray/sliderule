@@ -941,6 +941,14 @@ internal static class SpecValidator
             case MustTargetConstraint c:
                 yield return (c.Framework, SpecSlot.TargetFramework);
                 break;
+
+            // The package verbs' globs: a blank one matches no package, which narrows an allow-list and empties a ban.
+            case MustOnlyReferencePackagesConstraint c:
+                foreach (string pattern in c.Patterns) yield return (pattern, SpecSlot.PackagePattern);
+                break;
+            case MustNotReferencePackagesConstraint c:
+                foreach (string pattern in c.Patterns) yield return (pattern, SpecSlot.PackagePattern);
+                break;
         }
 
         // The subject selection tree (for a member constraint this is the underlying type selection,

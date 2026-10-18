@@ -7,8 +7,8 @@ namespace SlideRule.Fluent;
 ///     contain: the subject of a project rule. Start one from <c>arch.Projects</c>; narrow it with
 ///     <c>Named</c>, <c>Matching</c>, <c>Packable</c>, <c>Except</c> or <c>Where</c>, each of which
 ///     returns a new selection; finish it with a project verb (<c>MustOnlyTarget</c>, <c>MustTarget</c>,
-///     <c>MustReferenceNoPackages</c>, <c>MustLockPackages</c>, <c>MustNotBePackable</c> or
-///     <c>Must</c>), which yields the <see cref="Constraint" /> a rule takes. The facts these verbs
+///     <c>MustReferenceNoPackages</c>, <c>MustOnlyReferencePackages</c>, <c>MustNotReferencePackages</c>,
+///     <c>MustLockPackages</c>, <c>MustNotBePackable</c> or <c>Must</c>), which yields the <see cref="Constraint" /> a rule takes. The facts these verbs
 ///     read are what a build evaluation answers, so a setting a shared props file supplies counts and a
 ///     project nothing evaluated passes rather than fails. For the types a project declares, use
 ///     <c>arch.Project(name)</c> instead. Immutable and reusable: assign one to a variable and use it

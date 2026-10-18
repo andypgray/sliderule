@@ -102,6 +102,35 @@ public sealed class WildcardPropertyTests
     }
 
     /// <summary>
+    ///     The case-insensitive mode the package globs use, stated against the ordinal mode rather than derived
+    ///     again: ignoring case is matching both sides upper-cased, so the two modes part only on a pair that
+    ///     differs in case, and the backtracking the first property holds is shared.
+    /// </summary>
+    [Property(MaxTest = 1000)]
+    public Property Match_IgnoringCase_IsTheOrdinalMatchOfBothSidesUpperCased()
+    {
+        Gen<(string Pattern, string Text)> cases = StringOf(PatternAlphabet, 0, 8)
+            .SelectMany(_ => StringOf(TextAlphabet, 0, 8), (pattern, text) => (Pattern: pattern, Text: text));
+
+        return Prop.ForAll(
+            cases.ToArbitrary(),
+            testCase =>
+            {
+                // Arrange
+                bool expected = Wildcard.Match(testCase.Pattern.ToUpperInvariant(), testCase.Text.ToUpperInvariant());
+
+                // Act
+                bool matched = Wildcard.Match(testCase.Pattern, testCase.Text, ignoreCase: true);
+
+                // Assert
+                matched.ShouldBe(
+                    expected,
+                    $"`{testCase.Pattern}` against \"{testCase.Text}\", ignoring case, must answer what the ordinal "
+                    + "match of the two upper-cased answers.");
+            });
+    }
+
+    /// <summary>
     ///     The safety-critical shape, stated at the level the call sites use it: a trailing <c>*</c> reaches every
     ///     text carrying the literal prefix and no other. <c>MyApp.Legacy*</c> must reach
     ///     <c>MyApp.LegacyBilling</c> and must not reach <c>MyApp.Ledger</c>, and a <c>--rules</c> glob that

@@ -71,12 +71,60 @@ public static class ProjectSelectionConstraints
     ///     is grandfathered on its own, so a package the project adds after the baseline was captured fails
     ///     the check. Only what a project declares itself is seen: a package arriving through a project
     ///     reference is not, and the rule's sentence in the generated agent context says so. To forbid
-    ///     private references as well, state the strict form with <c>Must</c>:
-    ///     <c>arch.Projects.Must(p =&gt; p.PackageReferences.Count == 0, description: "declare no packages")</c>.
+    ///     private references as well, write <c>MustNotReferencePackages("*")</c>, which counts every
+    ///     declared reference.
     /// </summary>
     public static Constraint MustReferenceNoPackages(this ProjectSelection subject)
     {
         return new MustReferenceNoPackagesConstraint(Subject(subject));
+    }
+
+    /// <summary>
+    ///     States that every selected project may declare a <c>PackageReference</c> only to a package whose
+    ///     identifier matches one of these patterns, private references aside, such as
+    ///     <c>arch.Projects.Named("MyApp.Core").MustOnlyReferencePackages("Microsoft.Bcl.*", "System.Memory")</c>.
+    ///     A pattern is a glob in which <c>*</c> matches any run of characters, dots included, and it is
+    ///     compared with the identifier ignoring case, as NuGet compares identifiers. A private reference, one
+    ///     whose <c>PrivateAssets</c> is <c>all</c>, passes whatever its name, as it does under
+    ///     <c>MustReferenceNoPackages</c>. Every other package a project declares that no pattern matches is one
+    ///     violation, sited at its own declaration, and under <c>Migrate</c> each is grandfathered on its own. A
+    ///     pattern that matches no declared package is not reported. Only what a project declares itself is
+    ///     seen, and a project whose packages nothing evaluated passes. At least one pattern is required, and a
+    ///     blank one is reported when the spec is loaded.
+    /// </summary>
+    public static Constraint MustOnlyReferencePackages(
+        this ProjectSelection subject,
+        [SpecSlot(nameof(SpecSlot.PackagePattern))]
+        string first,
+        [SpecSlot(nameof(SpecSlot.PackagePattern))]
+        params string[] more)
+    {
+        IReadOnlyList<string> patterns = OperandList.OneOrMore(first, more, pattern => pattern);
+        return new MustOnlyReferencePackagesConstraint(Subject(subject), patterns);
+    }
+
+    /// <summary>
+    ///     States that no selected project may declare a <c>PackageReference</c> to a package whose identifier
+    ///     matches one of these patterns, such as
+    ///     <c>arch.Projects.Matching("MyApp.*").MustNotReferencePackages("Newtonsoft.Json")</c>. A pattern is a
+    ///     glob in which <c>*</c> matches any run of characters, dots included, and it is compared with the
+    ///     identifier ignoring case. Private references count: a banned package is banned however it is
+    ///     declared, so <c>MustNotReferencePackages("*")</c> forbids every package reference, private ones
+    ///     included. Each declared package a pattern matches is one violation, sited at its own declaration, and
+    ///     under <c>Migrate</c> each is grandfathered on its own. A pattern that matches no declared package is
+    ///     not reported, because no reference to a banned package is the state the rule asks for. Only what a
+    ///     project declares itself is seen. At least one pattern is required, and a blank one is reported when the
+    ///     spec is loaded.
+    /// </summary>
+    public static Constraint MustNotReferencePackages(
+        this ProjectSelection subject,
+        [SpecSlot(nameof(SpecSlot.PackagePattern))]
+        string first,
+        [SpecSlot(nameof(SpecSlot.PackagePattern))]
+        params string[] more)
+    {
+        IReadOnlyList<string> patterns = OperandList.OneOrMore(first, more, pattern => pattern);
+        return new MustNotReferencePackagesConstraint(Subject(subject), patterns);
     }
 
     /// <summary>

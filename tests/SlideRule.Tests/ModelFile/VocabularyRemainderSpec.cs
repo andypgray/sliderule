@@ -41,6 +41,16 @@ internal static class VocabularyRemainderSpec
             .Enforce(arch.Projects.Matching("Remainder.Contracts*")
                 .MustTarget("netstandard2.0"))
             .Because("The contracts are what the net48 callers compile against, so netstandard2.0 stays among their frameworks.");
+
+        arch.Rule("remainder/contracts-take-only-the-backports")
+            .Enforce(arch.Projects.Matching("Remainder.Contracts*")
+                .MustOnlyReferencePackages("Microsoft.Bcl.*", "System.Memory"))
+            .Because("A contract's package dependencies become every caller's, so it takes the runtime backports and nothing else.");
+
+        arch.Rule("remainder/no-retired-serializer")
+            .Enforce(arch.Projects.Matching("Remainder.*")
+                .MustNotReferencePackages("Newtonsoft.Json"))
+            .Because("The wire format moved to System.Text.Json, and a second serializer reintroduces the casing bugs the move fixed.");
     }
 
     // The five type-shape modals. Each takes a subject narrow enough that the law reads as one a codebase

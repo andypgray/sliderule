@@ -332,6 +332,16 @@ internal static class NodeWriters
             w.ProjectSubject(c.ProjectSubject);
             w.Field("framework", c.Framework);
         });
+        Add<MustOnlyReferencePackagesConstraint>(arms, (w, c) =>
+        {
+            w.ProjectSubject(c.ProjectSubject);
+            w.StringsField("patterns", c.Patterns);
+        });
+        Add<MustNotReferencePackagesConstraint>(arms, (w, c) =>
+        {
+            w.ProjectSubject(c.ProjectSubject);
+            w.StringsField("patterns", c.Patterns);
+        });
     }
 
     private static void Subject<TConstraint>(Dictionary<Type, Action<NodeWriter, object>> arms)

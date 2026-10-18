@@ -487,7 +487,9 @@ internal static class OneProjectDecidability
             typeof(MustLockPackagesConstraint),
             typeof(MustNotBePackableConstraint),
             typeof(MustOnlyTargetConstraint),
-            typeof(MustTargetConstraint));
+            typeof(MustTargetConstraint),
+            typeof(MustOnlyReferencePackagesConstraint),
+            typeof(MustNotReferencePackagesConstraint));
     }
 
     private static void AddSelections(Dictionary<Type, Func<OneProjectPosition, string?>> rows)

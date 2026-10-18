@@ -481,6 +481,18 @@ public class SpecValidationTests
     }
 
     [Fact]
+    public void BlankPackagePattern_OnEitherPackageVerb_IsReported()
+    {
+        // A blank glob matches no package: it narrows an allow-list and empties a ban, so both verbs report it.
+        SpecValidationException ex = BuildExpectingFailure(new BlankPackagePatternSpec());
+
+        ex.ShouldHaveError(Code.BlankPackagePattern, "area/allow")
+            .Message.ShouldBe("SpecValidationSpecs.cs:1529: Blank package pattern on 'area/allow'.");
+        ex.ShouldHaveError(Code.BlankPackagePattern, "area/ban")
+            .Message.ShouldBe("SpecValidationSpecs.cs:1530: Blank package pattern on 'area/ban'.");
+    }
+
+    [Fact]
     public void ValidMemberUse_MustNotUseSpec_BuildsWithoutError()
     {
         Should.NotThrow(() => ArchModelBuilder.Build(new ValidMemberUseSpec()));

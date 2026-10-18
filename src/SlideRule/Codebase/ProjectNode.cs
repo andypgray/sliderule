@@ -4,7 +4,7 @@ namespace SlideRule.Codebase;
 ///     One project in the extracted codebase: its name, whether the solution file declares it, the
 ///     projects it references, the frameworks it targets, the packages it declares, and whether it packs
 ///     and locks its restore. These are the facts a rule about a project is judged on, so they are what
-///     <c>MustOnlyTarget</c>, <c>MustTarget</c>, <c>MustReferenceNoPackages</c>, <c>MustLockPackages</c> and
+///     <c>MustOnlyTarget</c>, <c>MustTarget</c>, the three package verbs, <c>MustLockPackages</c> and
 ///     <c>MustNotBePackable</c> read. Only forward project references are stored; build the reverse graph
 ///     yourself if you need it.
 /// </summary>

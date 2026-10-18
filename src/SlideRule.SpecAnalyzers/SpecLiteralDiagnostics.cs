@@ -5,14 +5,14 @@ using Microsoft.CodeAnalysis;
 namespace SlideRule.SpecAnalyzers;
 
 /// <summary>
-///     The fifteen warnings the spec-literal analyzer reports: fourteen verdicts a string literal draws
+///     The sixteen warnings the spec-literal analyzer reports: fifteen verdicts a string literal draws
 ///     where it is written, and the analyzer's own fault, which comes in two forms.
 /// </summary>
 /// <remarks>
 ///     <para>
 ///         Every string a developer reads is here rather than at the place that reports it, so the wording
 ///         can be reviewed in one sitting and the analyzer stays a description of when each warning is due.
-///         The fourteen carry <c>{0}</c> as their whole message: the sentence is decided in the contract,
+///         The fifteen carry <c>{0}</c> as their whole message: the sentence is decided in the contract,
 ///         by the same types the spec loader decides with, so the warning at the literal and the error at
 ///         load cannot drift into different English.
 ///     </para>
@@ -58,8 +58,8 @@ internal static class SpecLiteralDiagnostics
     private const int CodeOffset = 1000;
 
     /// <summary>
-    ///     The closing sentence every verdict description ends with, written once so that fourteen
-    ///     descriptions cannot come to say it fourteen ways.
+    ///     The closing sentence every verdict description ends with, written once so that fifteen
+    ///     descriptions cannot come to say it fifteen ways.
     /// </summary>
     private const string SameVerdictAtLoad =
         "Loading the spec reports the same mistake as a validation error, from 'sliderule check', "
@@ -261,6 +261,20 @@ internal static class SpecLiteralDiagnostics
         + "the layer in the first argument. " + SameVerdictAtLoad,
         HelpLink);
 
+    /// <summary>A package pattern was left empty.</summary>
+    internal static readonly DiagnosticDescriptor BlankPackagePattern = new(
+        "SR1032",
+        "A package pattern is blank",
+        "{0}",
+        Category,
+        DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        "A MustOnlyReferencePackages or MustNotReferencePackages was given an empty package pattern. No package "
+        + "has an empty identifier, so a blank pattern matches nothing. On MustOnlyReferencePackages it permits "
+        + "nothing, so the rule fails on the package that was meant to be allowed; on MustNotReferencePackages it "
+        + "forbids nothing, so the rule stays green whatever the projects reference. " + SameVerdictAtLoad,
+        HelpLink);
+
     /// <summary>The analyzer itself failed, which says nothing about the spec it was reading.</summary>
     internal static readonly DiagnosticDescriptor AnalyzerFault = new(
         "SR1093",
@@ -297,18 +311,18 @@ internal static class SpecLiteralDiagnostics
         HelpLink,
         WellKnownDiagnosticTags.CompilationEnd);
 
-    // The fourteen a verdict can be reported under, which are all the lookup below holds: the fault's two
+    // The fifteen a verdict can be reported under, which are all the lookup below holds: the fault's two
     // share one ID, and neither is a verdict.
     private static readonly ImmutableArray<DiagnosticDescriptor> Verdicts = ImmutableArray.Create(
         DuplicateId, IdExtendsScope, BlankProse, MultiLineProse, MalformedId, DuplicateLayerName,
         BlankMemberName, BlankPattern, UnanchoredSubtreePattern, BlankProjectPattern, BlankTargetFramework,
-        CounterpartTemplateWithoutPlaceholder, MalformedCitation, BlankLayerName);
+        CounterpartTemplateWithoutPlaceholder, MalformedCitation, BlankLayerName, BlankPackagePattern);
 
     /// <summary>Every descriptor this analyzer can report, which is what it declares it supports.</summary>
     internal static ImmutableArray<DiagnosticDescriptor> All { get; } = Verdicts.Add(AnalyzerFault)
         .Add(VersionMismatch);
 
-    // Built from the fourteen verdicts rather than from the code enum, which is the whole point of writing
+    // Built from the fifteen verdicts rather than from the code enum, which is the whole point of writing
     // them out: a code with no entry here has no descriptor, and no descriptor means no report.
     private static readonly ImmutableDictionary<string, DiagnosticDescriptor> ById =
         Verdicts.ToImmutableDictionary(descriptor => descriptor.Id, StringComparer.Ordinal);

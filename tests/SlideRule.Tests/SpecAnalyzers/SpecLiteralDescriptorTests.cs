@@ -10,9 +10,9 @@ using SlideRule.Validation;
 namespace SlideRule.Tests.SpecAnalyzers;
 
 /// <summary>
-///     The fifteen warnings the spec analyzer declares: their IDs, the title, message and description each
-///     one ships with, the numbering that ties fourteen of them to a validation code, and the claim that
-///     those fourteen are exactly the verdicts the contract can hand back.
+///     The sixteen warnings the spec analyzer declares: their IDs, the title, message and description each
+///     one ships with, the numbering that ties fifteen of them to a validation code, and the claim that
+///     those fifteen are exactly the verdicts the contract can hand back.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -43,7 +43,7 @@ public sealed class SpecLiteralDescriptorTests
     private static readonly string[] Ids =
     [
         "SR1000", "SR1001", "SR1005", "SR1006", "SR1008", "SR1010", "SR1012", "SR1016", "SR1017", "SR1024",
-        "SR1025", "SR1026", "SR1030", "SR1031", ToolFault, ToolFault
+        "SR1025", "SR1026", "SR1030", "SR1031", "SR1032", ToolFault, ToolFault
     ];
 
     /// <summary>The closing sentence every verdict description carries, restated here to pin it.</summary>
@@ -213,6 +213,17 @@ public sealed class SpecLiteralDescriptorTests
                 + "from it. Name the layer in the first argument." + Closing
             },
             {
+                nameof(SpecLiteralDiagnostics.BlankPackagePattern),
+                "SR1032",
+                "A package pattern is blank",
+                "{0}",
+                "A MustOnlyReferencePackages or MustNotReferencePackages was given an empty package pattern. "
+                + "No package has an empty identifier, so a blank pattern matches nothing. On "
+                + "MustOnlyReferencePackages it permits nothing, so the rule fails on the package that was "
+                + "meant to be allowed; on MustNotReferencePackages it forbids nothing, so the rule stays "
+                + "green whatever the projects reference." + Closing
+            },
+            {
                 nameof(SpecLiteralDiagnostics.AnalyzerFault),
                 ToolFault,
                 "The SlideRule spec analyzer failed",
@@ -320,7 +331,7 @@ public sealed class SpecLiteralDescriptorTests
     }
 
     [Fact]
-    public void TheAnalyzer_DeclaresTheFifteenIdsInSixteenDescriptorsAsWhatItCanReport()
+    public void TheAnalyzer_DeclaresTheSixteenIdsInSeventeenDescriptorsAsWhatItCanReport()
     {
         List<string> supported = new SpecLiteralAnalyzer().SupportedDiagnostics
             .Select(descriptor => descriptor.Id)

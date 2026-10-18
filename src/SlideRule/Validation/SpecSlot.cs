@@ -115,6 +115,9 @@ internal sealed class SpecSlot
     /// <summary>One framework moniker on <c>MustOnlyTarget</c> or <c>MustTarget</c>.</summary>
     internal static readonly SpecSlot TargetFramework = new(nameof(TargetFramework), "target framework", SlotCheck.TargetFramework);
 
+    /// <summary>A package identifier glob on <c>MustOnlyReferencePackages</c> or <c>MustNotReferencePackages</c>.</summary>
+    internal static readonly SpecSlot PackagePattern = new(nameof(PackagePattern), "package pattern", SlotCheck.PackagePattern);
+
     /// <summary>The name of <c>arch.Member(type, name)</c>.</summary>
     internal static readonly SpecSlot MemberName = new(nameof(MemberName), "member name", SlotCheck.MemberName);
 
@@ -157,6 +160,7 @@ internal sealed class SpecSlot
         Description,
         Purpose,
         TargetFramework,
+        PackagePattern,
         MemberName,
         RuleId,
         ScopeId,
@@ -219,6 +223,7 @@ internal sealed class SpecSlot
             SlotCheck.Prose => Blank(literal, Code.BlankProse) ?? MultiLine(literal),
             SlotCheck.Citation => Blank(literal, Code.BlankProse) ?? MultiLine(literal) ?? NotAnHttpUrl(literal),
             SlotCheck.TargetFramework => Blank(literal, Code.BlankTargetFramework),
+            SlotCheck.PackagePattern => Blank(literal, Code.BlankPackagePattern),
             SlotCheck.MemberName => Blank(literal, Code.BlankMemberName),
             SlotCheck.Id => MalformedId(literal),
             SlotCheck.LayerName => BlankLayerName(literal),
@@ -309,6 +314,7 @@ internal sealed class SpecSlot
         Prose,
         Citation,
         TargetFramework,
+        PackagePattern,
         MemberName,
         Id,
         LayerName

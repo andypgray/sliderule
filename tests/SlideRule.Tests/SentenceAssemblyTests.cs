@@ -1609,6 +1609,27 @@ public class SentenceAssemblyTests
     }
 
     [Fact]
+    public void MustOnlyReferencePackages_TwoPatterns_OrJoinsThemBeforeThePrivacyClause()
+    {
+        SentenceRenderer.Sentence(Arch.Projects.Named("SlideRule")
+                .MustOnlyReferencePackages("Microsoft.Bcl.*", "System.Memory"))
+            .ShouldBe(
+                "Project `SlideRule` must reference only NuGet packages matching `Microsoft.Bcl.*` or `System.Memory`, "
+                + "other than private ones, whose `PrivateAssets` is `all` (declared references only; transitive "
+                + "dependencies are not seen).");
+    }
+
+    [Fact]
+    public void MustNotReferencePackages_ThreePatterns_OrJoinsThem()
+    {
+        SentenceRenderer.Sentence(Arch.Projects.Named("SlideRule")
+                .MustNotReferencePackages("GreenPipes", "MassTransit.Host", "Newtonsoft.*"))
+            .ShouldBe(
+                "Project `SlideRule` must not reference NuGet packages matching `GreenPipes`, `MassTransit.Host` or "
+                + "`Newtonsoft.*` (declared references only; transitive dependencies are not seen).");
+    }
+
+    [Fact]
     public void BareProjectsInReferencePosition_IsTheUncapitalizedPhrase()
     {
         // Reference position differs from subject position by capitalization alone: a project selection has

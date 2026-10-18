@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `MustTarget(framework)` states a framework floor: every selected project must target the framework,
   among any others it targets. A project that does not is one violation, sited at the declaration of its
   framework list and keyed by the framework, and a project nothing evaluated passes.
+- `MustOnlyReferencePackages(pattern, ...)` states a package allow-list: every package a project
+  declares must match one of the patterns, private references aside. `MustNotReferencePackages(pattern,
+  ...)` bans the packages its patterns match, private references included, so
+  `MustNotReferencePackages("*")` forbids every package reference. Patterns are globs matched ignoring
+  case, as NuGet compares package identifiers, and each package a rule objects to is one violation at
+  its own declaration, keyed by the package. A blank pattern is reported as `SR1032`.
 - `check --json` and `arch_check` carry a `framework` key on each `MustOnlyTarget` violation, naming
   the framework it reports.
 - `baseline add --source <project> --target <package-or-framework>` adds the entry for a project's

@@ -62,9 +62,10 @@ internal sealed class Violation
 
     /// <summary>
     ///     Gets the declared package reference that counts against the rule. Populated only by the
-    ///     per-package violations of <c>MustReferenceNoPackages</c>, one for each package the project
-    ///     declares that is not private, and null on every other project violation and every other kind:
-    ///     its presence is what parts "this project is wrong" from "this project declares this package".
+    ///     per-package violations of <c>MustReferenceNoPackages</c>, <c>MustOnlyReferencePackages</c> and
+    ///     <c>MustNotReferencePackages</c>, one for each package the project declares that the rule objects to,
+    ///     and null on every other project violation and every other kind: its presence is what parts "this
+    ///     project is wrong" from "this project declares this package".
     /// </summary>
     public PackageReference? Package { get; private set; }
 
@@ -296,10 +297,9 @@ internal sealed class Violation
     }
 
     /// <summary>
-    ///     One declared package reference counting against <c>MustReferenceNoPackages</c>, sited at the
-    ///     reference's own declaration — which may be a props file above the project. Shares
-    ///     <see cref="ProjectShape" />'s kind; <see cref="Package" /> is what tells the two apart, and what
-    ///     keys its identity per package.
+    ///     One declared package reference counting against a package verb, sited at the reference's own
+    ///     declaration — which may be a props file above the project. Shares <see cref="ProjectShape" />'s
+    ///     kind; <see cref="Package" /> is what tells the two apart, and what keys its identity per package.
     /// </summary>
     internal static Violation ProjectPackage(ProjectNode subject, PackageReference package)
     {

@@ -12,8 +12,8 @@ namespace SlideRule.Tests.Checking;
 ///     blessed stays red.
 /// </summary>
 /// <remarks>
-///     The rows that matter most are the per-item ones. <c>MustReferenceNoPackages</c> mints one violation
-///     per declared package, <c>MustOnlyTarget</c> one per framework it does not permit and <c>MustTarget</c>
+///     The rows that matter most are the per-item ones. The package verbs mint one violation per declared
+///     package they object to, <c>MustOnlyTarget</c> one per framework it does not permit and <c>MustTarget</c>
 ///     one per project lacking the framework it requires, and each keys an edge from the project to its item,
 ///     so a package or framework the project takes after the capture is red, and so is a project that drops
 ///     the required framework. A project-wide entry written before the items were keyed apart still grandfathers every item of
@@ -167,6 +167,36 @@ public sealed class ProjectRatchetTests
     }
 
     [Fact]
+    public void Migrate_PackageOutsideTheAllowListAddedAfterCapture_IsRed()
+    {
+        // The allow-list keys what MustReferenceNoPackages keys, so the package a project takes after the capture
+        // is a new identity and red, while the one captured stays grandfathered.
+        CodebaseModel captured = ProjectFacts.Solution(
+            ProjectFacts.Project(
+                "Zphil.Domain", packageReferences: [ProjectFacts.Package("Newtonsoft.Json", "src/Domain/Domain.csproj", 9)]));
+        BaselineIndex index = Capture(captured, AllowListRule);
+
+        RuleResult result = Checker.Run(PackageScene, index, AllowListRule).Single();
+
+        result.ShouldHaveFailedWithProjectSubjects(["Zphil.Domain -> Serilog", "Zphil.Web -> Serilog"]);
+        result.ShouldHaveGrandfathered(1);
+    }
+
+    [Fact]
+    public void Migrate_BannedPackageAddedAfterCapture_IsRed()
+    {
+        CodebaseModel captured = ProjectFacts.Solution(
+            ProjectFacts.Project(
+                "Zphil.Domain", packageReferences: [ProjectFacts.Package("Serilog", "src/Domain/Domain.csproj", 10)]));
+        BaselineIndex index = Capture(captured, BanRule);
+
+        RuleResult result = Checker.Run(PackageScene, index, BanRule).Single();
+
+        result.ShouldHaveFailedWithProjectSubjects(["Zphil.Web -> Serilog"]);
+        result.ShouldHaveGrandfathered(1);
+    }
+
+    [Fact]
     public void Migrate_FrameworkAddedAfterCapture_IsRed()
     {
         CodebaseModel captured = ProjectFacts.Solution(
@@ -277,6 +307,20 @@ public sealed class ProjectRatchetTests
     {
         return ProjectFacts.Project(
             name, targetFrameworks: frameworks, targetFrameworksSite: ProjectFacts.Site($"src/{name}/{name}.csproj", 3));
+    }
+
+    private static void AllowListRule(Arch arch)
+    {
+        arch.Rule("packaging/no-new-packages")
+            .Migrate("Projects take packages nobody reviewed.", arch.Projects.Matching("Zphil.*").MustOnlyReferencePackages("Microsoft.*"))
+            .Because("b");
+    }
+
+    private static void BanRule(Arch arch)
+    {
+        arch.Rule("packaging/one-logger")
+            .Migrate("Serilog lingers beside Microsoft.Extensions.Logging.", arch.Projects.Matching("Zphil.*").MustNotReferencePackages("Serilog*"))
+            .Because("b");
     }
 
     private static void FrameworkRule(Arch arch)

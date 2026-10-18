@@ -691,6 +691,29 @@ public class VocabularyFragmentTests
     }
 
     [Fact]
+    public void MustOnlyReferencePackages_BackticksThePatternsAndCarriesBothBoundaries()
+    {
+        // The allow-list keeps both of MustReferenceNoPackages' boundaries. The privacy clause is set off by
+        // commas so it reads as the exemption it is, not as a narrowing of the list.
+        SentenceRenderer.Sentence(Arch.Projects.Named("Spectre.Console").MustOnlyReferencePackages("Microsoft.Bcl.*"))
+            .ShouldBe(
+                "Project `Spectre.Console` must reference only NuGet packages matching `Microsoft.Bcl.*`, other than "
+                + "private ones, whose `PrivateAssets` is `all` (declared references only; transitive dependencies "
+                + "are not seen).");
+    }
+
+    [Fact]
+    public void MustNotReferencePackages_CarriesTheHonestyBoundaryAndNoPrivacyClause()
+    {
+        // Privacy exempts nothing from a ban, so the sentence names no privacy clause; the declared-only boundary
+        // still rides, as on every package verb.
+        SentenceRenderer.Sentence(Arch.Projects.Matching("MassTransit*").MustNotReferencePackages("GreenPipes"))
+            .ShouldBe(
+                "Projects matching `MassTransit*` must not reference NuGet packages matching `GreenPipes` (declared "
+                + "references only; transitive dependencies are not seen).");
+    }
+
+    [Fact]
     public void MustLockPackages_PremodifiedSubjectHead_RendersFragment()
     {
         // `.Packable()` premodifies the bare plural head, exactly as `.Authored()` does on the type side.

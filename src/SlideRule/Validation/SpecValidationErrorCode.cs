@@ -245,5 +245,14 @@ internal enum SpecValidationErrorCode
     ///     and generated context refers to the layer, and how a second layer is told from it, so it cannot be
     ///     left out. Name it in the first argument.
     /// </summary>
-    BlankLayerName
+    BlankLayerName,
+
+    /// <summary>
+    ///     An empty package pattern on <c>MustOnlyReferencePackages</c> or <c>MustNotReferencePackages</c>. No
+    ///     package has an empty identifier, so a blank pattern matches nothing. On <c>MustOnlyReferencePackages</c>
+    ///     it permits nothing, so the rule fails on the package that was meant to be allowed; on
+    ///     <c>MustNotReferencePackages</c> it forbids nothing, so the rule stays green whatever the projects
+    ///     reference.
+    /// </summary>
+    BlankPackagePattern
 }

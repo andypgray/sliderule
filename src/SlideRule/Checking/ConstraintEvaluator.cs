@@ -1,5 +1,6 @@
 using SlideRule.Codebase;
 using SlideRule.Fluent;
+using SlideRule.Internal;
 using SlideRule.Model;
 using SlideRule.Prose;
 
@@ -1536,6 +1537,10 @@ internal sealed class ConstraintEvaluator
                 return MissingFramework(subjects, c.Framework);
             case MustReferenceNoPackagesConstraint:
                 return ForbiddenPackages(subjects);
+            case MustOnlyReferencePackagesConstraint c:
+                return UnlistedPackages(subjects, c.Patterns);
+            case MustNotReferencePackagesConstraint c:
+                return BannedPackages(subjects, c.Patterns);
             case MustLockPackagesConstraint:
                 // Null passes and false reds: `!= false` is the tri-state, written as the one comparison
                 // that says so rather than as a two-arm test that reads like a bug.
@@ -1584,6 +1589,37 @@ internal sealed class ConstraintEvaluator
         foreach (ProjectNode subject in subjects)
         foreach (PackageReference package in subject.PackageReferences)
             if (!package.IsPrivate)
+                violations.Add(Violation.ProjectPackage(subject, package));
+
+        return violations;
+    }
+
+    // MustOnlyReferencePackages (GRAMMAR §4.10): MustReferenceNoPackages with an allow-list. One violation per declared
+    // package that is not private and that no pattern matches, sited at its own declaration, the identifiers compared
+    // ignoring case as NuGet compares them. A pattern that matches nothing is silence rather than a warning: a project
+    // taking none of the permitted packages is obeying the rule.
+    private static IReadOnlyList<Violation> UnlistedPackages(
+        IReadOnlyList<ProjectNode> subjects, IReadOnlyList<string> patterns)
+    {
+        var violations = new List<Violation>();
+        foreach (ProjectNode subject in subjects)
+        foreach (PackageReference package in subject.PackageReferences)
+            if (!package.IsPrivate && !Wildcard.MatchesAny(patterns, package.Name, ignoreCase: true))
+                violations.Add(Violation.ProjectPackage(subject, package));
+
+        return violations;
+    }
+
+    // MustNotReferencePackages (GRAMMAR §4.10): one violation per declared package a pattern matches, private or not,
+    // since a banned package is banned however it is declared. As on the allow-list, a pattern that matches nothing
+    // is silence: no reference to a banned package is the state the rule asks for.
+    private static IReadOnlyList<Violation> BannedPackages(
+        IReadOnlyList<ProjectNode> subjects, IReadOnlyList<string> patterns)
+    {
+        var violations = new List<Violation>();
+        foreach (ProjectNode subject in subjects)
+        foreach (PackageReference package in subject.PackageReferences)
+            if (Wildcard.MatchesAny(patterns, package.Name, ignoreCase: true))
                 violations.Add(Violation.ProjectPackage(subject, package));
 
         return violations;

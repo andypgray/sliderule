@@ -279,8 +279,8 @@ internal sealed record BaselineJson(string Path, int Grandfathered, int Stale, i
 /// </param>
 /// <param name="Package">
 ///     The offending package's name, for the per-package <c>projectShape</c> violations a
-///     <c>MustReferenceNoPackages</c> rule mints; null (omitted) on every other violation, that rule's
-///     siblings included.
+///     <c>MustReferenceNoPackages</c>, <c>MustOnlyReferencePackages</c> or <c>MustNotReferencePackages</c> rule
+///     mints; null (omitted) on every other violation.
 /// </param>
 /// <param name="Framework">
 ///     The target framework's short moniker, for the per-framework <c>projectShape</c> violations: one a

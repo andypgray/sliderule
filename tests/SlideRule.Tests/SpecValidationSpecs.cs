@@ -1521,3 +1521,12 @@ internal sealed class BlankRequiredTargetFrameworkSpec : IArchitectureSpec
         arch.Rule("area/rule").Enforce(arch.Projects.Named("A").MustTarget(" ")).Because("Reason.");
     }
 }
+
+internal sealed class BlankPackagePatternSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        arch.Rule("area/allow").Enforce(arch.Projects.Named("A").MustOnlyReferencePackages("Microsoft.*", " ")).Because("Reason.");
+        arch.Rule("area/ban").Enforce(arch.Projects.Named("A").MustNotReferencePackages("")).Because("Reason.");
+    }
+}

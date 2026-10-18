@@ -67,6 +67,8 @@ internal static class VerbLedger
             [nameof(SelectionConstraints.MustHaveExactlyOneCounterpart)] =
                 "This suite organizes tests by behavior rather than per type, so a rule demanding a " +
                 "{Name}Tests class each would record a convention the tree does not follow as unpaid debt.",
-            [nameof(ProjectSelectionConstraints.MustTarget)] = AwaitsTheAnalyzerRelease
+            [nameof(ProjectSelectionConstraints.MustTarget)] = AwaitsTheAnalyzerRelease,
+            [nameof(ProjectSelectionConstraints.MustOnlyReferencePackages)] = AwaitsTheAnalyzerRelease,
+            [nameof(ProjectSelectionConstraints.MustNotReferencePackages)] = AwaitsTheAnalyzerRelease
         };
 }

@@ -31,6 +31,11 @@ public sealed class ProjectViolationRenderTests
         ProjectFacts.Project(
             "Zphil.Domain", packageReferences: [ProjectFacts.Package("Serilog", "Domain.csproj", 9)]));
 
+    private static readonly CodebaseModel Analyzed = ProjectFacts.Solution(
+        ProjectFacts.Project(
+            "Zphil.Domain",
+            packageReferences: [ProjectFacts.Package("StyleCop.Analyzers", "Directory.Build.props", 6, isPrivate: true)]));
+
     private static readonly CodebaseModel Targeted = ProjectFacts.Solution(
         ProjectFacts.Project("Zphil.Host", ["net48", "net8.0"], ProjectFacts.Site("Directory.Build.props", 3)));
 
@@ -59,6 +64,17 @@ public sealed class ProjectViolationRenderTests
             .Single()
             .HumanBlock()
             .ShouldContain("Directory.Build.props:3 — Zphil.Host targets net48");
+    }
+
+    [Fact]
+    public void HumanBlock_BannedPrivatePackage_ReadsAsAnyOtherPackage()
+    {
+        // The ban counts private references, and a private one is named the way every package is: privacy is a
+        // fact about the declaration, not part of what the line says.
+        BannedReport()
+            .Single()
+            .HumanBlock()
+            .ShouldContain("Directory.Build.props:6 — Zphil.Domain references package StyleCop.Analyzers");
     }
 
     [Fact]
@@ -108,6 +124,13 @@ public sealed class ProjectViolationRenderTests
     {
         TargetedReport()
             .ShouldRenderProjectShapeViolation("projectShape", "Zphil.Host", framework: "net48");
+    }
+
+    [Fact]
+    public void Json_BannedPrivatePackage_CarriesThePackage()
+    {
+        BannedReport()
+            .ShouldRenderProjectShapeViolation("projectShape", "Zphil.Domain", "StyleCop.Analyzers");
     }
 
     [Fact]
@@ -167,6 +190,14 @@ public sealed class ProjectViolationRenderTests
     }
 
     [Fact]
+    public void Sarif_BannedPrivatePackage_MessageNamesTheProjectAndThePackage()
+    {
+        BannedReport()
+            .ToSarif()
+            .ShouldBeOneErrorSaying("Zphil.Domain references package StyleCop.Analyzers");
+    }
+
+    [Fact]
     public void Sarif_MissingFrameworkViolation_MessageSaysTheProjectDoesNotTargetIt()
     {
         FlooredReport()
@@ -186,6 +217,13 @@ public sealed class ProjectViolationRenderTests
         return Checker.Run(Targeted, arch => arch.Rule("packaging/supported-frameworks")
             .Enforce(arch.Projects.Matching("*").MustOnlyTarget("net8.0"))
             .Because("A framework nobody supports is a build nobody can reproduce."));
+    }
+
+    private static CheckReport BannedReport()
+    {
+        return Checker.Run(Analyzed, arch => arch.Rule("packaging/no-stylecop")
+            .Enforce(arch.Projects.Matching("*").MustNotReferencePackages("StyleCop.*"))
+            .Because("The house analyzers replaced StyleCop, and two rule sets disagree on every file."));
     }
 
     private static CheckReport FlooredReport()

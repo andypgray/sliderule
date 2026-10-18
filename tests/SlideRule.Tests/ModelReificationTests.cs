@@ -573,6 +573,26 @@ public class ModelReificationTests
         floor.Framework.ShouldBe("netstandard2.0");
         floor.Operands.ShouldBeEmpty();
 
+        var allowed = Checker.Model(arch => arch.Rule("packaging/backports-only")
+                .Enforce(arch.Projects.Named("SlideRule").MustOnlyReferencePackages("Microsoft.Bcl.*", "System.Memory"))
+                .Because("The contract's dependencies become every caller's."))
+            .Rules.Single()
+            .Constraint
+            .ShouldBeOfType<MustOnlyReferencePackagesConstraint>();
+
+        allowed.Patterns.ShouldBe(["Microsoft.Bcl.*", "System.Memory"]);
+        allowed.Operands.ShouldBeEmpty();
+
+        var banned = Checker.Model(arch => arch.Rule("packaging/no-v7-packages")
+                .Enforce(arch.Projects.Named("SlideRule").MustNotReferencePackages("GreenPipes"))
+                .Because("The v7 packages are retired."))
+            .Rules.Single()
+            .Constraint
+            .ShouldBeOfType<MustNotReferencePackagesConstraint>();
+
+        banned.Patterns.ShouldBe(["GreenPipes"]);
+        banned.Operands.ShouldBeEmpty();
+
         var must = Checker.Model(arch => arch.Rule("packaging/described")
                 .Enforce(arch.Projects.Named("SlideRule")
                     .Must(project => project.IsPackable == true, description: "produce a package"))
