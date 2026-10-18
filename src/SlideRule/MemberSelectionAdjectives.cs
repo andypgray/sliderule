@@ -25,7 +25,8 @@ public static class MemberSelectionAdjectives
     ///     <c>arch.Types.Methods.WithSuffix("Async")</c>. The comparison is case-sensitive and literal
     ///     over the member's own name. Literal means the suffix is not a glob: a <c>*</c> in it matches
     ///     a <c>*</c>, so over a type declaring <c>LoadAsync</c>, <c>WithSuffix("*Async")</c> selects
-    ///     nothing while <c>WithNameMatching("*Async")</c> selects it. A blank suffix is reported when
+    ///     nothing while <c>WithNameMatching("*Async")</c> selects it. It reads as a premodifier in the
+    ///     rendered sentence: "`*Async` methods of types in <c>MyApp.*</c>". A blank suffix is reported when
     ///     the spec is loaded. <see cref="WithNameMatching{TSelf}" /> is the glob form beside this one.
     /// </summary>
     public static TSelf WithSuffix<TSelf>(this TSelf selection, [SpecSlot(nameof(SpecSlot.MemberSuffix))] string suffix)
@@ -39,8 +40,9 @@ public static class MemberSelectionAdjectives
     ///     <c>arch.Types.Methods.WithPrefix("Get")</c>. The comparison is case-sensitive and literal
     ///     over the member's own name. Literal means the prefix is not a glob: a <c>*</c> in it matches
     ///     a <c>*</c>, so over a type declaring <c>GetOrder</c>, <c>WithPrefix("Get*")</c> selects
-    ///     nothing while <c>WithNameMatching("Get*")</c> selects it. A blank prefix is reported when the
-    ///     spec is loaded. <see cref="WithNameMatching{TSelf}" /> is the glob form beside this one.
+    ///     nothing while <c>WithNameMatching("Get*")</c> selects it. It reads as a premodifier in the
+    ///     rendered sentence: "`Get*` methods of types in <c>MyApp.*</c>". A blank prefix is reported when
+    ///     the spec is loaded. <see cref="WithNameMatching{TSelf}" /> is the glob form beside this one.
     /// </summary>
     public static TSelf WithPrefix<TSelf>(this TSelf selection, [SpecSlot(nameof(SpecSlot.MemberPrefix))] string prefix)
         where TSelf : MemberSelection
@@ -52,8 +54,9 @@ public static class MemberSelectionAdjectives
     ///     Narrows the selection to the members whose name matches a glob, such as
     ///     <c>arch.Types.Members.WithNameMatching("*Handler*")</c>. Matching is case-sensitive: <c>*</c>
     ///     matches any run of characters including none, every other character matches itself, a pattern
-    ///     with no <c>*</c> is an exact name match, and a lone <c>*</c> matches every name. A blank glob is
-    ///     reported when the spec is loaded.
+    ///     with no <c>*</c> is an exact name match, and a lone <c>*</c> matches every name. It reads as a
+    ///     premodifier in the rendered sentence: "`*Handler*` members of types in <c>MyApp.*</c>". A blank
+    ///     glob is reported when the spec is loaded.
     /// </summary>
     public static TSelf WithNameMatching<TSelf>(
         this TSelf selection, [SpecSlot(nameof(SpecSlot.MemberNamePattern))] string glob)

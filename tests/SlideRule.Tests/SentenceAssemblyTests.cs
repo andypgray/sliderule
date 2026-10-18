@@ -911,7 +911,8 @@ public class SentenceAssemblyTests
     [Fact]
     public void MemberWhere_CanonicalizesToSentenceFinal_RegardlessOfChainPosition()
     {
-        // The member Where renders sentence-final after the inline adjective, whatever the chain order.
+        // The member Where renders sentence-final, after the head prefix and the type reference, whatever the
+        // chain order.
         string whereFirst = SentenceRenderer.MemberSubject(
             Arch.Types.Methods.Where(m => m.IsAsync, "that are async")
                 .WithSuffix("Handler"));
@@ -919,30 +920,71 @@ public class SentenceAssemblyTests
             Arch.Types.Methods.WithSuffix("Handler")
                 .Where(m => m.IsAsync, "that are async"));
 
-        whereFirst.ShouldBe("Methods of types named `*Handler` that are async");
+        whereFirst.ShouldBe("`*Handler` methods of types that are async");
         whereLast.ShouldBe(whereFirst);
     }
 
     [Fact]
-    public void MemberAdjectives_RenderInAuthoringOrder()
+    public void MemberNamePrefix_AndReturning_RenderTheSameSentenceInEitherOrder()
     {
-        // Two inline adjectives render in the order written — order is preserved, not canonicalized.
-        SentenceRenderer.MemberSubject(Arch.Types.Methods.Returning(typeof(Task))
-                .WithSuffix("Async"))
-            .ShouldBe("Methods of types returning `Task` named `*Async`");
-        SentenceRenderer.MemberSubject(Arch.Types.Methods.WithSuffix("Async")
-                .Returning(typeof(Task)))
-            .ShouldBe("Methods of types named `*Async` returning `Task`");
+        // The name adjective premodifies the head and Returning stays inline after the type reference, so the
+        // chain order cannot change the sentence.
+        string suffixFirst = SentenceRenderer.MemberSubject(Arch.Types.Methods.WithSuffix("Async")
+            .Returning(typeof(Task)));
+        string returningFirst = SentenceRenderer.MemberSubject(Arch.Types.Methods.Returning(typeof(Task))
+            .WithSuffix("Async"));
+
+        suffixFirst.ShouldBe("`*Async` methods of types returning `Task`");
+        returningFirst.ShouldBe(suffixFirst);
     }
 
     [Fact]
-    public void MemberWithNameMatching_RendersMatchesClauseAfterKindHead()
+    public void MemberNamePrefixes_ConcatenateInAuthoringOrder()
     {
-        // The member .WithNameMatching adjective renders " whose name matches `glob`" inline after the
-        // projection head (GRAMMAR §5.7): MemberWithNameMatchingAdjective.Fragment at an Inline placement,
-        // cloned onto the selection through KindMemberSelection.Rebuild.
+        // Stacked head prefixes are an intersection rendered in the order written, not canonicalized.
+        SentenceRenderer.MemberSubject(Arch.Types.Methods.WithPrefix("Get")
+                .WithSuffix("Async"))
+            .ShouldBe("`Get*` `*Async` methods of types");
+        SentenceRenderer.MemberSubject(Arch.Types.Methods.WithSuffix("Async")
+                .WithPrefix("Get"))
+            .ShouldBe("`*Async` `Get*` methods of types");
+    }
+
+    [Fact]
+    public void MemberWithNameMatching_PremodifiesTheKindPlural()
+    {
+        // The glob premodifies the projection head (GRAMMAR §5.7), cloned onto the selection through
+        // KindMemberSelection.Rebuild.
         SentenceRenderer.MemberSubject(Arch.Types.Members.WithNameMatching("*Handler*"))
-            .ShouldBe("Members of types whose name matches `*Handler*`");
+            .ShouldBe("`*Handler*` members of types");
+    }
+
+    // Each row renders a member name adjective and its type-side twin before the projection, which select
+    // different members.
+    public static TheoryData<string, string, string> MemberNameAdjectiveTwins =>
+        new()
+        {
+            {
+                "WithSuffix", SentenceRenderer.MemberSubject(Arch.Types.Methods.WithSuffix("Speak")),
+                SentenceRenderer.MemberSubject(Arch.Types.WithSuffix("Speak").Methods)
+            },
+            {
+                "WithPrefix", SentenceRenderer.MemberSubject(Arch.Types.Methods.WithPrefix("Get")),
+                SentenceRenderer.MemberSubject(Arch.Types.WithPrefix("Get").Methods)
+            },
+            {
+                "WithNameMatching", SentenceRenderer.MemberSubject(Arch.Types.Methods.WithNameMatching("*Handler*")),
+                SentenceRenderer.MemberSubject(Arch.Types.WithNameMatching("*Handler*").Methods)
+            }
+        };
+
+    [Theory]
+    [MemberData(nameof(MemberNameAdjectiveTwins))]
+    public void MemberNameAdjective_AndTheTypeSideTwin_RenderDifferentSubjects(
+        string adjective, string memberForm, string typeForm)
+    {
+        // The two select different members, so they must not hand an agent the same sentence.
+        memberForm.ShouldNotBe(typeForm, customMessage: adjective);
     }
 
     // ---- Registered noun + MustNotInject (GRAMMAR §4.7, §5.1, §5.3): head truth under adjectives ----

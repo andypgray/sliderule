@@ -452,6 +452,21 @@ public class VocabularyFragmentTests
     }
 
     [Fact]
+    public void Member_NameAffixesAndGlob_PremodifyTheKindPlural()
+    {
+        // Member Named's reason: after the type reference, " named `*Async`" would read as naming the types.
+        SentenceRenderer.Sentence(Arch.Types.Methods.WithSuffix("Async")
+                .MustBePublic())
+            .ShouldBe("`*Async` methods of types must be public.");
+        SentenceRenderer.Sentence(Arch.Types.Methods.WithPrefix("Get")
+                .MustBePublic())
+            .ShouldBe("`Get*` methods of types must be public.");
+        SentenceRenderer.Sentence(Arch.Types.Members.WithNameMatching("*Handler*")
+                .MustBePublic())
+            .ShouldBe("`*Handler*` members of types must be public.");
+    }
+
+    [Fact]
     public void Member_Except_RendersEachPayloadInReferencePosition()
     {
         // An open parenthetical the composer closes; several payloads or-join, each a member phrase of its own.

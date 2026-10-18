@@ -80,6 +80,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `baseline accept-reductions` splits it into one entry per package or framework, each keeping its
   reason. A consumer keyed on SARIF `partialFingerprints` sees each of these rules' alerts re-keyed once;
   GitHub code scanning matches on its own line hash and is unaffected.
+- `.WithSuffix`, `.WithPrefix` and `.WithNameMatching` on a member selection now read as a prefix on the
+  members: `arch.Types.Methods.WithSuffix("Async")` renders "`*Async` methods of types", where it rendered
+  "Methods of types named `*Async`". The old sentence was also what `arch.Types.WithSuffix("Async").Methods`
+  renders, which selects every method of the types named `*Async`, so two rules with different verdicts
+  read alike. What each selects is unchanged.
 - The `derive_spec` recipe's first step now has the agent search where a project records its
   decisions: its issues, pull requests and discussions, release notes and upgrade guides,
   first-party templates and sibling repositories, and API-approval tests. It reads the README,

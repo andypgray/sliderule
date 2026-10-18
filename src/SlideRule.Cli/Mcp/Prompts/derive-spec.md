@@ -427,9 +427,9 @@ line.
 
 | Adjective | Overloads | Fragment |
 |---|---|---|
-| `.WithSuffix` | `(string)` | Methods of types named `*Async` |
-| `.WithPrefix` | `(string)` | Methods of types named `Get*` |
-| `.WithNameMatching` | `(string)` | Methods of types whose name matches `*Handler*` |
+| `.WithSuffix` | `(string)` | `*Async` methods of types |
+| `.WithPrefix` | `(string)` | `Get*` methods of types |
+| `.WithNameMatching` | `(string)` | `*Handler*` methods of types |
 | `.Named` | `(string, …)` | `Main` methods of types |
 | `.Returning` | `(Type, …)` · `(string, …)` on `.Methods` | Methods of types returning `Task` |
 | `.AttributedWith` | `(Type)` · `(string)` · `<T>()` | `[ApiController]`-attributed methods of types |

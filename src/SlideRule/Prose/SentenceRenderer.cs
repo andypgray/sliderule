@@ -511,9 +511,11 @@ internal static class SentenceRenderer
         return parts.Count >= 2 && EndsOpen(parts[parts.Count - 2]);
     }
 
-    // Member-subject assembly (GRAMMAR §4.6, §6): head-prefix member adjectives + "{kind-plural} of
-    // {selection-reference}" + inline member adjectives in authoring order + the sentence-final member Where
-    // and Except clauses, every Where before every Except. The kind-plural is the projection head; the
+    // Member-subject assembly (GRAMMAR §4.6, §6): head-prefix member adjectives in authoring order +
+    // "{kind-plural} of {selection-reference}" + the inline Returning clauses in authoring order + the
+    // sentence-final member Where and Except clauses, every Where before every Except. Every member adjective
+    // that names the member is a head prefix, because an inline one after the reference reads as naming the
+    // types. The kind-plural is the projection head; the
     // reference is the underlying type selection in reference position. There is no head-SUBSTITUTION arm:
     // the projection fixes the head.
     private static string MemberPhrase(MemberSelection selection)

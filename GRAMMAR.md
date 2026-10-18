@@ -155,7 +155,8 @@ Selection    — adjectives → Selection; modal verbs → Constraint (terminal)
                projections (.Members / .Methods / .Properties / .Fields / .Events)
                → MemberSelection (§4.6)
 MemberSelection — member adjectives (.WithSuffix / .WithPrefix / .WithNameMatching /
-               .AttributedWith / .ThatAreStatic / .Where) → the SAME concrete
+               .Named / .AttributedWith / .ThatAreStatic / .ThatArePublic and the
+               other accessibility adjectives / .Except / .Where) → the SAME concrete
                member-selection type; member modal verbs → Constraint (terminal)
 MethodSelection — a MemberSelection minted by .Methods that additionally offers
                .Returning(Type first, params Type[] more) /
@@ -1388,9 +1389,9 @@ posture verbs, trailers and escape hatches of §5.4–§5.6 are written by hand.
 
 | Adjective | Overloads | Fragment |
 |---|---|---|
-| `.WithSuffix` | `(string)` | Methods of types named `*Async` |
-| `.WithPrefix` | `(string)` | Methods of types named `Get*` |
-| `.WithNameMatching` | `(string)` | Methods of types whose name matches `*Handler*` |
+| `.WithSuffix` | `(string)` | `*Async` methods of types |
+| `.WithPrefix` | `(string)` | `Get*` methods of types |
+| `.WithNameMatching` | `(string)` | `*Handler*` methods of types |
 | `.Named` | `(string, …)` | `Main` methods of types |
 | `.Returning` | `(Type, …)` · `(string, …)` on `.Methods` | Methods of types returning `Task` |
 | `.AttributedWith` | `(Type)` · `(string)` · `<T>()` | `[ApiController]`-attributed methods of types |
@@ -1818,9 +1819,9 @@ form cannot reach, because a string anchor still names one definition rather tha
 - `.Properties` — the selection is a `PropertySelection`, so `MustBeGetOnly` is available
 - `.Fields` — the selection is a `FieldSelection`, so `MustBeReadonly` is available
 
-**Member adjectives** (reduced relative clauses on the member set):
+**Member adjectives** (narrow the member set; each one's placement in the sentence is given beside it, §6):
 
-- `.WithSuffix("Async")` — the same fragment as the type-side adjective (§5.2)
+- `.WithSuffix("Async")` / `.WithPrefix("Get")` / `.WithNameMatching("*Handler*")` — head prefix naming the members: "`*Async` methods of types in `MyApp.*`", "`Get*` methods of types", "`*Handler*` members of types". The affixes are literal and the glob is a §4.2 pattern, both over the member's own name. A head prefix where the type-side twins are inline clauses, for member `Named`'s reason: an inline " named `*Async`" after the type reference would read as naming the types, and `arch.Types.Methods.WithSuffix("Speak")` and `arch.Types.WithSuffix("Speak").Methods` would render one sentence for two different subjects
 - `.Named("Main")` — head prefix naming the members: "`Main` methods of types named `Program`", "`Main` or `Run` methods of types". The exact name, ordinal, reaching every overload of a method, with a `*` read as a literal character, as on the type side (§5.2). A head prefix where the type-side twin is an inline clause, because an inline " named `Main`" after the type reference would read as naming the types. Each name of a subject's list that no member carries fails on its own (§4.6)
 - `.Returning(typeof(Task))` / `.Returning("System.Threading.Tasks.Task")` — declaration-level (§4.6); an open generic renders declared type-parameter names ("returning `Task<TResult>`"); multiple anchors join "returning `Task` or `Task<TResult>`", colliding simple names widening as in §6; the string form is §5.2's escape hatch, rendering byte-identically. Methods-only.
 - `.AttributedWith(typeof(McpServerToolAttribute))` / `.AttributedWith("ModelContextProtocol.Server.McpServerToolAttribute")` — head prefix: "`[McpServerTool]`-attributed" — premodifies the kind-plural (§6), so the subject reads "`[McpServerTool]`-attributed methods of types in `SlideRule.*`". Declared member attributes only (§4.6); the string form is §5.2's escape hatch, rendering byte-identically
@@ -1866,7 +1867,8 @@ short name, so `Billing.AuditAttribute` and `Sales.AuditAttribute` both read
 "`[Audit]`-attributed", and dropping the second would widen the subject. The shape
 adjective `.ThatAreStatic()` head-prefixes for the same reason and stacks the same way, so
 prefixes concatenate across both families ("static `[Audit]`-attributed fields of
-types"), and so do the six accessibility adjectives ("static private fields of types"). The generic twin is receiver-typed rather than `TSelf`-generic (§10): C# has no
+types"), and so do the six accessibility adjectives ("static private fields of types") and the
+name prefixes: `Named`, the two affixes and the glob ("`Get*` `*Async` methods of types"). The generic twin is receiver-typed rather than `TSelf`-generic (§10): C# has no
 partial type inference, so the sugar ships as one overload per concrete member selection —
 `MemberSelection` for `.Members`/`.Events`, and `MethodSelection`, `PropertySelection` and
 `FieldSelection`, each keeping its own kind-only vocabulary reachable after it.
@@ -2032,20 +2034,20 @@ carries its sugar overload too, or the verb silently stops compiling after the s
   including when the member names differ ("`Billing.Order.Total` or `Sales.Order.Refresh()`"),
   because the reader must see they are different `Order`s.
 - **Member subjects** (§4.6) assemble as the member head prefixes + `{kind-plural} of
-  {selection-reference}` + the inline adjectives in authoring order + the sentence-final
+  {selection-reference}` + the inline `Returning` clauses in authoring order + the sentence-final
   `Where` and `Except` clauses, every `Where` before every `Except` as on the type side, the member
   `Except` rendering each payload in reference position. The kind-plural is the
   projection head ("methods", "properties", …); the `{selection-reference}` is the underlying
   type selection rendered in *reference* position (the same "types in `MyApp.Web.*`" / "the Web
   layer" form a target list uses), so a member subject reads "methods of types in `MyApp.Web.*`".
-  Inline member adjectives (`WithSuffix`/`WithPrefix`/`WithNameMatching`/`Returning`) append in
-  the order written; the member `Where` canonicalizes sentence-final exactly like the type-side
-  `Where`. The flagship: `web.Methods.Returning(typeof(Task)).MustHaveSuffix("Async")` (where
+  `Returning` is the one inline member adjective, and its clauses append in the order written; the
+  member `Where` canonicalizes sentence-final exactly like the type-side `Where`. The flagship: `web.Methods.Returning(typeof(Task)).MustHaveSuffix("Async")` (where
   `web` is `MyApp.Web.*`) → *"Methods of types in `MyApp.Web.*` returning `Task` must be named
   `*Async`."* The member attribute adjective premodifies the kind-plural
   ("`[McpServerTool]`-attributed methods of types in `SlideRule.*`"), as do `.ThatAreStatic()`,
-  the accessibility adjectives ("private fields of types") and member `Named` ("`Main` methods of
-  types named `Program`"), and stacked
+  the accessibility adjectives ("private fields of types"), member `Named` ("`Main` methods of
+  types named `Program`") and the name adjectives `WithSuffix`, `WithPrefix` and `WithNameMatching`
+  ("`*Async` methods of types"), and stacked
   member prefixes concatenate in authoring order (§5.7), so every
   narrowing fact reaches the sentence — the member-side twin of the `.Authored()` head
   premodification above, on the same grounds: a trailing clause would read as narrowing the
