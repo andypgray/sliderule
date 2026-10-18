@@ -342,6 +342,12 @@ internal static class NodeWriters
             w.ProjectSubject(c.ProjectSubject);
             w.StringsField("patterns", c.Patterns);
         });
+        Add<MustSetPropertyConstraint>(arms, (w, c) =>
+        {
+            w.ProjectSubject(c.ProjectSubject);
+            w.Field("property", c.Name);
+            w.Field("value", c.Value);
+        });
     }
 
     private static void Subject<TConstraint>(Dictionary<Type, Action<NodeWriter, object>> arms)

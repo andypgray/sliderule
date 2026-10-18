@@ -7,7 +7,7 @@ using SlideRule.Internal;
 namespace SlideRule.Tests.Internal;
 
 /// <summary>
-///     <see cref="Wildcard.Match" /> stated over generated patterns rather than a table of them. It is a
+///     <see cref="Wildcard.Match(string, string)" /> stated over generated patterns rather than a table of them. It is a
 ///     hand-written iterative matcher that backtracks by letting the last <c>*</c> swallow one more character,
 ///     and it decides which rules a run evaluates, which projects are surveyed, and which namespaces and type
 ///     names a rule reaches — but nothing downstream can tell that it answered wrongly. The dangerous direction

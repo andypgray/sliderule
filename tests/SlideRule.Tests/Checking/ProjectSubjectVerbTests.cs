@@ -1,7 +1,7 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Checking;
 using SlideRule.Codebase;
+using Xunit;
 
 namespace SlideRule.Tests.Checking;
 
@@ -137,6 +137,38 @@ public sealed class ProjectSubjectVerbTests
                 .Because("b"))
             .Single()
             .ShouldHaveFailedWithProjectSubjects(["Console"]);
+    }
+
+    [Fact]
+    public void Must_OverProperties_ReadsWhereEachIsSet()
+    {
+        // No verb says where a property must be set; a predicate over IProjectInfo.Properties can. Here Nullable
+        // belongs in the shared props file, and the project that sets it in its own file reds.
+        CodebaseModel scene = ProjectFacts.Solution(
+            ProjectFacts.Project(
+                "Bus",
+                evaluations:
+                [
+                    ProjectFacts.Evaluation("net8.0", "src/Bus/Bus.csproj", ("Nullable", "enable", "src/Bus/Bus.csproj", 5))
+                ]),
+            ProjectFacts.Project(
+                "Core",
+                evaluations:
+                [
+                    ProjectFacts.Evaluation("net8.0", "src/Core/Core.csproj", ("Nullable", "enable", "Directory.Build.props", 3))
+                ]));
+
+        Checker.Run(scene, arch => arch.Rule("build/nullable-set-centrally")
+                .Enforce(arch.Projects.Matching("*")
+                    .Must(
+                        project => project.Properties
+                            .Where(property => property.Name == "Nullable")
+                            .All(property => property.FilePath.EndsWith("Directory.Build.props", StringComparison.Ordinal)
+                                             && property.Line > 0),
+                        description: "take Nullable from Directory.Build.props"))
+                .Because("b"))
+            .Single()
+            .ShouldHaveFailedWithProjectSubjects(["Bus"]);
     }
 
     [Fact]

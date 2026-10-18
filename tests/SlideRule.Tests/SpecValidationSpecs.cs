@@ -1530,3 +1530,12 @@ internal sealed class BlankPackagePatternSpec : IArchitectureSpec
         arch.Rule("area/ban").Enforce(arch.Projects.Named("A").MustNotReferencePackages("")).Because("Reason.");
     }
 }
+
+internal sealed class BlankPropertySpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        arch.Rule("area/name").Enforce(arch.Projects.Named("A").MustSetProperty(" ", "enable")).Because("Reason.");
+        arch.Rule("area/value").Enforce(arch.Projects.Named("A").MustSetProperty("Nullable", "")).Because("Reason.");
+    }
+}

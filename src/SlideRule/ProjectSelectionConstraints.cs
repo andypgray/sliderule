@@ -8,9 +8,10 @@ namespace SlideRule;
 
 /// <summary>
 ///     The verbs that finish a <see cref="ProjectSelection" /> — the packaging rules: what a project
-///     targets, what it takes from the package feed, whether its restore is pinned, and whether it
-///     ships. Each returns the <see cref="Constraint" /> to hand to <c>Enforce</c> or <c>Migrate</c>.
-///     What they read is what MSBuild evaluation answered after SDK defaults and every import, not
+///     targets, what it takes from the package feed, whether its restore is pinned, whether it ships,
+///     and which MSBuild properties it sets. Each returns the <see cref="Constraint" /> to hand to
+///     <c>Enforce</c> or <c>Migrate</c>. What they read is what MSBuild evaluation answered after SDK
+///     defaults and every import, not
 ///     what the project file's own text says, so a setting a shared props file above the project
 ///     supplies is a fact these verbs see. A violation is sited at the declaration that won the
 ///     evaluation, regularly that props file rather than the project itself. Every verb passes a
@@ -147,6 +148,29 @@ public static class ProjectSelectionConstraints
     public static Constraint MustNotBePackable(this ProjectSelection subject)
     {
         return new MustNotBePackableConstraint(Subject(subject));
+    }
+
+    /// <summary>
+    ///     States that every selected project must set an MSBuild property to a value, such as
+    ///     <c>arch.Projects.Packable().MustSetProperty("GenerateDocumentationFile", "true")</c>. Set means declared
+    ///     in the solution: in the project file, a <c>Directory.Build.props</c> above it, or a props file it imports
+    ///     from inside the solution. A value only the SDK defaults does not count, and neither does one passed on
+    ///     the command line or read from the environment. Each target framework's build is judged on its own,
+    ///     because a property can be set under a <c>$(TargetFramework)</c> condition: a build where the property is
+    ///     unset or holds another value is one violation, sited at the definition that won or, where nothing set
+    ///     it, at the project file, and under <c>Migrate</c> each framework is grandfathered on its own. The name
+    ///     is matched ignoring case, as MSBuild matches property names, and the value is compared ignoring case and
+    ///     the whitespace around it. A project nothing evaluated passes. A blank name or value is reported when the
+    ///     spec is loaded, since MSBuild treats an empty property as unset.
+    /// </summary>
+    public static Constraint MustSetProperty(
+        this ProjectSelection subject,
+        [SpecSlot(nameof(SpecSlot.PropertyName))]
+        string name,
+        [SpecSlot(nameof(SpecSlot.PropertyValue))]
+        string value)
+    {
+        return new MustSetPropertyConstraint(Subject(subject), NotNull(name, nameof(name)), NotNull(value, nameof(value)));
     }
 
     /// <summary>

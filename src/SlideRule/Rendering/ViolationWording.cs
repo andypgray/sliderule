@@ -49,13 +49,26 @@ internal static class ViolationWording
         };
     }
 
-    // The project arm on its own, which the SARIF renderer's twin switch mirrors line for line.
+    // The project arm on its own, which the SARIF renderer's twin switch mirrors line for line. A property violation
+    // says what the judged build holds, and names the framework only where the build told one apart.
     private static string ProjectText(Violation violation)
     {
         string project = violation.SubjectProject!.Name;
         if (violation.Package is { } package) return $"{project} references package {package.Name}";
+        if (violation.Property is { } property) return project + PropertyText(property, violation);
         if (violation.Framework is not { } framework) return project;
 
         return violation.FrameworkMissing ? $"{project} does not target {framework}" : $"{project} targets {framework}";
+    }
+
+    private static string PropertyText(string property, Violation violation)
+    {
+        string build = violation.Framework is { } framework ? $" for {framework}" : "";
+        return violation.PropertyValue switch
+        {
+            null => $" does not set {property}{build}",
+            { } value when value.Trim().Length == 0 => $" sets {property} to an empty value{build}",
+            { } value => $" sets {property} to {value}{build}"
+        };
     }
 }

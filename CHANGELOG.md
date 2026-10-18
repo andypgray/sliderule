@@ -23,6 +23,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `netstandard2.0` alone. `graph` marks a package only some of a project's frameworks declare, as
   `(netstandard2.0 only)`, and `graph --json` and `arch_graph` list those packages in a
   `packageFrameworks` key.
+- `MustSetProperty(name, value)` states that every selected project sets an MSBuild property to a value.
+  Set means declared in the solution, in the project file, a `Directory.Build.props` above it or a props
+  file imported from inside the solution; a value only the SDK defaults does not count. Each target
+  framework's build is judged on its own, and each one where the property is unset or holds another value
+  is a violation keyed `property:{name}@{framework}`. `IProjectInfo.Properties` lists the properties the
+  solution sets for a project, each an `IProjectPropertyInfo` carrying its value, its framework and the
+  file and line that set it, for `.Must` predicates. A blank name or
+  value is reported as `SR1033`. `baseline add --target` takes the property item, such as
+  `Nullable@net8.0`.
+- The extraction cache starts over once after this upgrade, because each project's evaluation now records
+  the properties the solution sets.
 - `check --json` and `arch_check` carry a `framework` key on each `MustOnlyTarget` violation, naming
   the framework it reports.
 - `baseline add --source <project> --target <package-or-framework>` adds the entry for a project's

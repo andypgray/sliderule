@@ -96,6 +96,10 @@ public sealed class ExtractionCacheStoreTests
     // reference missing from its declared list, where a fresh extraction resolves it against the solution the
     // workspace loaded, and no fragment says which compiled-against projects its declarations do not reach.
     [InlineData(34)]
+    // A v35 cache predates the evaluated properties (schema bumped 35→36): its fragments carry no properties
+    // slot, so every project replays as one nothing evaluated, and MustSetProperty would pass a property nobody
+    // set where a fresh extraction reds it.
+    [InlineData(35)]
     public void ReadAndValidate_SchemaVersionOtherThanTheCurrentOne_ReturnsMiss(int schemaVersion)
     {
         // Arrange
@@ -125,7 +129,7 @@ public sealed class ExtractionCacheStoreTests
 
         version.ShouldNotBeNull("the extraction cache still declares a schema version");
         version.GetRawConstantValue()
-            .ShouldBe(35);
+            .ShouldBe(36);
     }
 
     [Fact]

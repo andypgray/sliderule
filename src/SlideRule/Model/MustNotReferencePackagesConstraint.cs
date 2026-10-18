@@ -16,6 +16,7 @@ internal sealed class MustNotReferencePackagesConstraint(ProjectSelection subjec
     internal IReadOnlyList<string> Patterns { get; } = patterns;
 
     internal override string VerbPhrase =>
-        "must not reference NuGet packages matching " + ProseFormat.BacktickedList(Patterns)
+        "must not reference NuGet packages matching "
+        + ProseFormat.BacktickedList(Patterns)
         + " (declared references only; transitive dependencies are not seen)";
 }

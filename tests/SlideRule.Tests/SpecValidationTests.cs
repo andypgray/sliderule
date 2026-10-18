@@ -1,7 +1,7 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Hosting;
 using SlideRule.Validation;
+using Xunit;
 using Code = SlideRule.Validation.SpecValidationErrorCode;
 
 namespace SlideRule.Tests;
@@ -490,6 +490,19 @@ public class SpecValidationTests
             .Message.ShouldBe("SpecValidationSpecs.cs:1529: Blank package pattern on 'area/allow'.");
         ex.ShouldHaveError(Code.BlankPackagePattern, "area/ban")
             .Message.ShouldBe("SpecValidationSpecs.cs:1530: Blank package pattern on 'area/ban'.");
+    }
+
+    [Fact]
+    public void BlankProperty_NameOrValue_IsReportedUnderItsOwnLabel()
+    {
+        // One code for both strings, since either blank asks for a property no project can declare, and the
+        // label says which was left out.
+        SpecValidationException ex = BuildExpectingFailure(new BlankPropertySpec());
+
+        ex.ShouldHaveError(Code.BlankProperty, "area/name")
+            .Message.ShouldBe("SpecValidationSpecs.cs:1538: Blank property name on 'area/name'.");
+        ex.ShouldHaveError(Code.BlankProperty, "area/value")
+            .Message.ShouldBe("SpecValidationSpecs.cs:1539: Blank property value on 'area/value'.");
     }
 
     [Fact]

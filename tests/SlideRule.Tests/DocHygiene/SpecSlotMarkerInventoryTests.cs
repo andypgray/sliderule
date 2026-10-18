@@ -1,8 +1,8 @@
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using Shouldly;
-using Xunit;
 using SlideRule.Validation;
+using Xunit;
 
 namespace SlideRule.Tests.DocHygiene;
 
@@ -42,7 +42,7 @@ public sealed class SpecSlotMarkerInventoryTests
 {
     // The number of string literals a spec can write, counted once so that adding a verb is a deliberate
     // edit here rather than a table that grew while nobody was counting.
-    private const int SlotCount = 79;
+    private const int SlotCount = 81;
 
     private const string RootNamespace = "SlideRule";
 
@@ -162,6 +162,8 @@ public sealed class SpecSlotMarkerInventoryTests
             ["ProjectSelectionConstraints.MustOnlyReferencePackages(ProjectSelection, string, string[])/more"] = nameof(SpecSlot.PackagePattern),
             ["ProjectSelectionConstraints.MustNotReferencePackages(ProjectSelection, string, string[])/first"] = nameof(SpecSlot.PackagePattern),
             ["ProjectSelectionConstraints.MustNotReferencePackages(ProjectSelection, string, string[])/more"] = nameof(SpecSlot.PackagePattern),
+            ["ProjectSelectionConstraints.MustSetProperty(ProjectSelection, string, string)/name"] = nameof(SpecSlot.PropertyName),
+            ["ProjectSelectionConstraints.MustSetProperty(ProjectSelection, string, string)/value"] = nameof(SpecSlot.PropertyValue),
             ["ProjectSelectionConstraints.Must(ProjectSelection, Func<IProjectInfo, bool>, string)/description"] = nameof(SpecSlot.Description),
 
             ["IRuleBuilder.Migrate(string, Constraint)/from"] = nameof(SpecSlot.MigrateFrom),

@@ -443,13 +443,26 @@ internal static class SarifReportRenderer
     }
 
     // A project violation names its project, and a per-item one the package or framework beside it; a
-    // framework the project lacks (MustTarget) reads as one it does not target.
+    // framework the project lacks (MustTarget) reads as one it does not target, and a property violation
+    // (MustSetProperty) says what the judged build holds.
     private static string ProjectMessageText(Violation violation)
     {
         string project = violation.SubjectProject!.Name;
         if (violation.Package is { } package) return $"{project} references package {package.Name}";
+        if (violation.Property is { } property) return project + PropertyMessageText(property, violation);
         if (violation.Framework is not { } framework) return project;
 
         return violation.FrameworkMissing ? $"{project} does not target {framework}" : $"{project} targets {framework}";
+    }
+
+    private static string PropertyMessageText(string property, Violation violation)
+    {
+        string build = violation.Framework is { } framework ? $" for {framework}" : "";
+        return violation.PropertyValue switch
+        {
+            null => $" does not set {property}{build}",
+            { } value when value.Trim().Length == 0 => $" sets {property} to an empty value{build}",
+            { } value => $" sets {property} to {value}{build}"
+        };
     }
 }

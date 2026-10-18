@@ -473,6 +473,7 @@ line.
 | `.MustReferenceNoPackages` | `()` | must reference no NuGet packages other than private ones, whose `PrivateAssets` is `all` (declared references only; transitive dependencies are not seen) |
 | `.MustOnlyReferencePackages` | `(string, …)` | must reference only NuGet packages matching `Microsoft.Bcl.*`, other than private ones, whose `PrivateAssets` is `all` (declared references only; transitive dependencies are not seen) |
 | `.MustNotReferencePackages` | `(string, …)` | must not reference NuGet packages matching `Newtonsoft.Json` (declared references only; transitive dependencies are not seen) |
+| `.MustSetProperty` | `(string, string)` | must set `GenerateDocumentationFile` to `true` |
 | `.MustLockPackages` | `()` | must lock package restore |
 | `.MustNotBePackable` | `()` | must not be packable |
 | `.Must` | `(Func<IProjectInfo, bool>, string)` | must produce a package |
@@ -537,10 +538,11 @@ a closed set, and `MustTarget(tfm)` states the floor; `MustLockPackages()` reads
 `RestorePackagesWithLockFile`; `MustReferenceNoPackages()` passes only private references, whose
 `PrivateAssets` is `all` (analyzers and build tooling), `MustOnlyReferencePackages(glob, ...)` adds an
 allow-list to it, and `MustNotReferencePackages(glob, ...)` bans packages, private ones included, both
-matching identifiers ignoring case; `MustNotBePackable()` makes an internal project's opt-out
-checkable, since the SDK defaults `IsPackable` on. Every project fact is evaluated rather than parsed,
-so a violation points at the declaration that won, often a `Directory.Build.props` above the
-project, and a fact nothing evaluated passes. The flagship:
+matching identifiers ignoring case; `MustSetProperty(name, value)` asks that a declaration in the
+solution set an MSBuild property, per framework, an SDK default not counting; `MustNotBePackable()`
+makes an internal project's opt-out checkable, since the SDK defaults `IsPackable` on. Every project
+fact is evaluated rather than parsed, so a violation points at the declaration that won, often a
+`Directory.Build.props` above the project, and a fact nothing evaluated passes. The flagship:
 `arch.Projects.Matching("MyApp.*").Except(arch.Projects.Named("MyApp.Cli")).MustNotBePackable()` —
 *"Projects matching `MyApp.*`, except project `MyApp.Cli`, must not be packable."*
 

@@ -2,11 +2,12 @@ namespace SlideRule.Codebase;
 
 /// <summary>
 ///     One project in the extracted codebase: its name, whether the solution file declares it, the
-///     projects it references, the frameworks it targets, the packages it declares, and whether it packs
-///     and locks its restore. These are the facts a rule about a project is judged on, so they are what
-///     <c>MustOnlyTarget</c>, <c>MustTarget</c>, the three package verbs, <c>MustLockPackages</c> and
-///     <c>MustNotBePackable</c> read. Only forward project references are stored; build the reverse graph
-///     yourself if you need it.
+///     projects it references, the frameworks it targets, the packages it declares, whether it packs
+///     and locks its restore, and the MSBuild properties the solution sets for it. These are the facts
+///     a rule about a project is judged on, so they are what <c>MustOnlyTarget</c>, <c>MustTarget</c>,
+///     the three package verbs, <c>MustSetProperty</c>, <c>MustLockPackages</c> and
+///     <c>MustNotBePackable</c> read. Only forward project references are stored; build the reverse
+///     graph yourself if you need it.
 /// </summary>
 /// <remarks>
 ///     The framework, package, packable and lock facts are evaluated rather than read out of the project
@@ -33,7 +34,8 @@ internal sealed class ProjectNode : IProjectInfo
         bool? locksPackages = null,
         SourceLocation? locksPackagesSite = null,
         IReadOnlyList<string>? assemblyNames = null,
-        IReadOnlyList<string>? undeclaredProjectReferences = null)
+        IReadOnlyList<string>? undeclaredProjectReferences = null,
+        IReadOnlyList<ProjectEvaluation>? evaluations = null)
     {
         Name = name;
         ProjectReferences = projectReferences;
@@ -48,6 +50,12 @@ internal sealed class ProjectNode : IProjectInfo
         LocksPackagesSite = locksPackagesSite;
         AssemblyNames = assemblyNames ?? [];
         UndeclaredProjectReferences = undeclaredProjectReferences ?? [];
+        Evaluations = evaluations ?? [];
+        Properties = Evaluations
+            .SelectMany(evaluation => evaluation.Properties)
+            .OrderBy(property => property.Name, StringComparer.Ordinal)
+            .ThenBy(property => property.TargetFramework, StringComparer.Ordinal)
+            .ToList();
     }
 
     /// <summary>
@@ -188,6 +196,24 @@ internal sealed class ProjectNode : IProjectInfo
     ///     site is regularly a file the project itself never mentions.
     /// </summary>
     public SourceLocation? LocksPackagesSite { get; }
+
+    /// <summary>
+    ///     Gets the MSBuild properties a declaration in the solution set for this project, one per property and
+    ///     evaluation, ordinal by name and then by framework (<see cref="IProjectInfo.Properties" />). Empty where
+    ///     nothing evaluated the project.
+    /// </summary>
+    public IReadOnlyList<EvaluatedProperty> Properties { get; }
+
+    IReadOnlyList<IProjectPropertyInfo> IProjectInfo.Properties => Properties;
+
+    /// <summary>
+    ///     Gets the evaluations this project's facts were read from, one per framework told apart, ordinal by
+    ///     framework with an evaluation no framework was told apart in first. Empty where nothing evaluated the
+    ///     project.
+    /// </summary>
+    // Not on IProjectInfo: the flat Properties list is what a predicate reads, and this is the shape a rule about a
+    // missing property needs, since an unset property leaves no entry of its own in that list.
+    internal IReadOnlyList<ProjectEvaluation> Evaluations { get; }
 
     /// <summary>
     ///     Gets the assembly names this project's compilations produce, ordinal-ordered and distinct, or

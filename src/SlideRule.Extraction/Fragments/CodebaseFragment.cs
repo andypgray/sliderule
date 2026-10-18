@@ -53,9 +53,13 @@ namespace SlideRule.Extraction.Fragments;
 ///         multi-targeted project.
 ///     </para>
 ///     <para>
-///         <see cref="UndeclaredProjectReferences" /> trails them all: the projects this compilation references
-///         that <see cref="ProjectReferences" /> does not account for, read beside the declarations, and
-///         <see langword="null" /> or empty wherever there is nothing to report.
+///         <see cref="UndeclaredProjectReferences" /> trails them all but one: the projects this compilation
+///         references that <see cref="ProjectReferences" /> does not account for, read beside the declarations,
+///         and <see langword="null" /> or empty wherever there is nothing to report.
+///     </para>
+///     <para>
+///         <see cref="Properties" /> is last: the properties this compilation's evaluation found the repository
+///         setting, with the project file it read, and <see langword="null" /> wherever nothing evaluated it.
 ///     </para>
 /// </remarks>
 internal sealed record CodebaseFragment(
@@ -81,4 +85,5 @@ internal sealed record CodebaseFragment(
     FragmentSite? IsPackableSite = null,
     bool? LocksPackages = null,
     FragmentSite? LocksPackagesSite = null,
-    IReadOnlyList<string>? UndeclaredProjectReferences = null);
+    IReadOnlyList<string>? UndeclaredProjectReferences = null,
+    FragmentProperties? Properties = null);

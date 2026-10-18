@@ -247,7 +247,8 @@ internal static class FragmentExtractor
             IsPackable = facts.IsPackable,
             IsPackableSite = facts.IsPackableSite,
             LocksPackages = facts.LocksPackages,
-            LocksPackagesSite = facts.LocksPackagesSite
+            LocksPackagesSite = facts.LocksPackagesSite,
+            Properties = facts.Properties
         };
     }
 

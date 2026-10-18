@@ -1541,6 +1541,8 @@ internal sealed class ConstraintEvaluator
                 return UnlistedPackages(subjects, c.Patterns);
             case MustNotReferencePackagesConstraint c:
                 return BannedPackages(subjects, c.Patterns);
+            case MustSetPropertyConstraint c:
+                return UnsetProperties(subjects, c.Name, c.Value);
             case MustLockPackagesConstraint:
                 // Null passes and false reds: `!= false` is the tri-state, written as the one comparison
                 // that says so rather than as a two-arm test that reads like a bug.
@@ -1654,6 +1656,33 @@ internal sealed class ConstraintEvaluator
                 violations.Add(Violation.ProjectMissingFramework(subject, framework, AtSite(subject.TargetFrameworksSite)));
 
         return violations;
+    }
+
+    // MustSetProperty (GRAMMAR §4.10): one violation per evaluation of a project in which nothing in the solution set
+    // the property, or set it to another value. Each evaluation is judged apart, because a $(TargetFramework)
+    // condition can set a property for one framework only, and a project nothing evaluated has no evaluation to
+    // judge, so it passes.
+    private static IReadOnlyList<Violation> UnsetProperties(
+        IReadOnlyList<ProjectNode> subjects, string name, string value)
+    {
+        var violations = new List<Violation>();
+        foreach (ProjectNode subject in subjects)
+        foreach (ProjectEvaluation evaluation in subject.Evaluations)
+        {
+            EvaluatedProperty? found = evaluation.Find(name);
+            if (found is not null && SameValue(found.Value, value)) continue;
+
+            violations.Add(Violation.ProjectProperty(subject, name, evaluation, found));
+        }
+
+        return violations;
+    }
+
+    // As an MSBuild condition compares two strings: ignoring case, and here the whitespace around either too, which
+    // a value written across lines in a project file carries.
+    private static bool SameValue(string actual, string expected)
+    {
+        return string.Equals(actual.Trim(), expected.Trim(), StringComparison.OrdinalIgnoreCase);
     }
 
     // A nullable fact site as a violation's evidence list: the one site it has, or nothing to point at.

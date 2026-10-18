@@ -246,6 +246,32 @@ public sealed class FragmentSiteRemapperTests
     }
 
     [Fact]
+    public void TryRemap_PropertiesInAMappedFile_MoveWithTheirFile()
+    {
+        // Arrange — no C# document's map claims a props file, but the remapper treats every site alike, so a map
+        // that did would move the property declared there and leave the one in the unmapped project file, and the
+        // project file's own site beside them, where they were.
+        const string props = "/repo/Directory.Build.props";
+        var projectFile = new FragmentSite("/repo/Lib.csproj", 1);
+        var nullable = new FragmentProperty("Nullable", "enable", new FragmentSite("/repo/Lib.csproj", 4));
+        CodebaseFragment fragment = EdgeFragmentAt(3, 4) with
+        {
+            Properties = new FragmentProperties(
+                projectFile, [new FragmentProperty("LangVersion", "latest", new FragmentSite(props, 3)), nullable])
+        };
+        var maps = new Dictionary<string, LineMap>(PathComparison.Comparer) { [props] = new([1, 2, 5]) };
+
+        // Act
+        CodebaseFragment remapped = FragmentSiteRemapper.TryRemap(fragment, maps)
+            .ShouldNotBeNull();
+
+        // Assert
+        FragmentProperties properties = remapped.Properties.ShouldNotBeNull();
+        properties.Declared.ShouldBe([new FragmentProperty("LangVersion", "latest", new FragmentSite(props, 5)), nullable]);
+        properties.ProjectFile.ShouldBe(projectFile);
+    }
+
+    [Fact]
     public void TryRemap_MapForAnotherFileOnly_ReturnsTheSameFragment()
     {
         // Arrange

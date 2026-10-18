@@ -986,7 +986,8 @@ internal static class FragmentMerger
                 isPackableSite: FragmentSiteSets.Location(artifacts.IsPackableSite),
                 locksPackages: artifacts.LocksPackages,
                 locksPackagesSite: FragmentSiteSets.Location(artifacts.LocksPackagesSite),
-                assemblyNames: artifacts.AssemblyNames());
+                assemblyNames: artifacts.AssemblyNames(),
+                evaluations: artifacts.Evaluations());
         }
 
         // What the project declares, whatever it compiled to — so a single-framework project states its one
@@ -1076,6 +1077,13 @@ internal static class FragmentMerger
             private readonly SortedSet<string> _frameworks = new(StringComparer.Ordinal);
             private readonly List<FragmentPackageReference> _packages = [];
             private readonly Dictionary<string, SortedSet<string>> _packageFrameworks = new(StringComparer.Ordinal);
+
+            // One evaluation per framework told apart, keyed by the moniker and by the empty string for an evaluation
+            // no framework was told apart in. Every compilation of one framework read one project file under the
+            // same conditions, so the first to report stands for the rest.
+            private readonly Dictionary<string, (string? Framework, FragmentProperties Properties)> _evaluations =
+                new(StringComparer.Ordinal);
+
             private ArtifactVerdict _packable;
             private ArtifactVerdict _locks;
             private ArtifactVerdict _member;
@@ -1104,8 +1112,9 @@ internal static class FragmentMerger
                 // contributes nothing rather than an empty name.
                 if (!string.IsNullOrWhiteSpace(fragment.AssemblyName)) _assemblyNames.Add(fragment.AssemblyName!);
 
+                string? evaluated = EvaluatedFramework(fragment);
                 _packages.AddRange(fragment.PackageReferences ?? []);
-                if (EvaluatedFramework(fragment) is { } evaluated)
+                if (evaluated is not null)
                     foreach (FragmentPackageReference package in fragment.PackageReferences ?? [])
                         FragmentSiteSets.OrdinalNamesFor(_packageFrameworks, package.Name).Add(evaluated);
 
@@ -1114,6 +1123,9 @@ internal static class FragmentMerger
 
                 // Membership has no site of its own — nothing reads one — so it folds against a null site.
                 _member = _member.Fold(fragment.SolutionMember, null, decisive: true);
+
+                if (fragment.Properties is { } properties && !_evaluations.ContainsKey(evaluated ?? string.Empty))
+                    _evaluations[evaluated ?? string.Empty] = (evaluated, properties);
             }
 
             internal IReadOnlyList<string> TargetFrameworks()
@@ -1137,6 +1149,24 @@ internal static class FragmentMerger
                             ? frameworks.ToList()
                             : null))
                     .ToList();
+            }
+
+            internal IReadOnlyList<ProjectEvaluation> Evaluations()
+            {
+                return _evaluations
+                    .OrderBy(entry => entry.Key, StringComparer.Ordinal)
+                    .Select(entry => Evaluation(entry.Value.Framework, entry.Value.Properties))
+                    .ToList();
+            }
+
+            private static ProjectEvaluation Evaluation(string? framework, FragmentProperties properties)
+            {
+                List<EvaluatedProperty> declared = properties.Declared
+                    .Select(property => new EvaluatedProperty(
+                        property.Name, property.Value, framework, FragmentSiteSets.Location(property.Site)))
+                    .ToList();
+
+                return new ProjectEvaluation(framework, FragmentSiteSets.Location(properties.ProjectFile), declared);
             }
 
             // The framework one fragment's evaluation answered for: the one it was asked for, or, for an

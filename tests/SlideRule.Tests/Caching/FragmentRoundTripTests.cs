@@ -1,12 +1,12 @@
 using System.Text.Json;
 using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
-using Xunit;
 using SlideRule.Codebase;
 using SlideRule.Extraction;
 using SlideRule.Extraction.Fragments;
 using SlideRule.Roslyn.Caching;
 using SlideRule.Tests.Extraction;
+using Xunit;
 
 namespace SlideRule.Tests.Caching;
 
@@ -721,6 +721,71 @@ public sealed class FragmentRoundTripTests
             .Projects.Single()
             .PackageReferences.Select(DescribeFrameworks)
             .ShouldBe(["Shared: net10.0, netstandard2.0", "System.Memory: netstandard2.0"]);
+    }
+
+    [Fact]
+    public void Merge_PropertiesPerFramework_BecomeOneEvaluationEach()
+    {
+        // Arrange — a property a `$(TargetFramework)` condition sets for net10.0 alone. The netstandard2.0
+        // evaluation set nothing, and it is still an evaluation: that is what lets a rule say the property is
+        // unset there.
+        CodebaseFragment modern = WidgetFragment("net10.0") with { Properties = Evaluated(("Nullable", "enable", 6)) };
+        CodebaseFragment legacy = WidgetFragment("netstandard2.0") with { Properties = Evaluated() };
+
+        // Act
+        ProjectNode project = FragmentMerger.Merge([modern, legacy])
+            .Projects.Single();
+
+        // Assert
+        project.Evaluations.Select(DescribeEvaluation)
+            .ShouldBe(["net10.0 @ /repo/Widget.csproj:1: Nullable=enable", "netstandard2.0 @ /repo/Widget.csproj:1: "]);
+        project.Properties.Select(property => $"{property.Name}@{property.TargetFramework} {property.Site}")
+            .ShouldBe(["Nullable@net10.0 /repo/Widget.csproj:6"]);
+    }
+
+    [Fact]
+    public void Merge_FragmentNothingEvaluated_HasNoEvaluation()
+    {
+        // No properties slot at all means no evaluation ran, which is a different fact from one that found
+        // nothing set, and only the second can red a rule about a missing property.
+        ProjectNode project = FragmentMerger.Merge([WidgetFragment("net10.0") with { Properties = null }])
+            .Projects.Single();
+
+        project.Evaluations.ShouldBeEmpty();
+        project.Properties.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void RoundTrip_Properties_ReplayAsTheyWereRecorded()
+    {
+        // Arrange
+        CodebaseFragment modern = WidgetFragment("net10.0") with { Properties = Evaluated(("Nullable", "enable", 6)) };
+        CodebaseFragment legacy = WidgetFragment("netstandard2.0") with { Properties = Evaluated() };
+
+        // Act
+        string json = JsonSerializer.Serialize<IReadOnlyList<CodebaseFragment>>([modern, legacy], ManifestJson.Options);
+        var roundTripped = JsonSerializer.Deserialize<IReadOnlyList<CodebaseFragment>>(json, ManifestJson.Options)!;
+
+        // Assert
+        FragmentMerger.Merge(roundTripped)
+            .Projects.Single()
+            .Evaluations.Select(DescribeEvaluation)
+            .ShouldBe(["net10.0 @ /repo/Widget.csproj:1: Nullable=enable", "netstandard2.0 @ /repo/Widget.csproj:1: "]);
+    }
+
+    private static FragmentProperties Evaluated(params (string Name, string Value, int Line)[] properties)
+    {
+        return new FragmentProperties(
+            new FragmentSite("/repo/Widget.csproj", 1),
+            properties.Select(property => new FragmentProperty(
+                    property.Name, property.Value, new FragmentSite("/repo/Widget.csproj", property.Line)))
+                .ToList());
+    }
+
+    private static string DescribeEvaluation(ProjectEvaluation evaluation)
+    {
+        string properties = string.Join(", ", evaluation.Properties.Select(property => $"{property.Name}={property.Value}"));
+        return $"{evaluation.TargetFramework} @ {evaluation.ProjectFile}: {properties}";
     }
 
     private static CodebaseFragment WidgetFragment(string framework, params FragmentPackageReference[] packages)

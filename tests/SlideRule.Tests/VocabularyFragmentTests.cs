@@ -1,7 +1,7 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Prose;
 using SlideRule.Tests.Stubs;
+using Xunit;
 
 namespace SlideRule.Tests;
 
@@ -711,6 +711,14 @@ public class VocabularyFragmentTests
             .ShouldBe(
                 "Projects matching `MassTransit*` must not reference NuGet packages matching `GreenPipes` (declared "
                 + "references only; transitive dependencies are not seen).");
+    }
+
+    [Fact]
+    public void MustSetProperty_BackticksTheNameAndTheValue()
+    {
+        // "Set" carries the boundary on its own: a value only the SDK defaults is one nobody set.
+        SentenceRenderer.Sentence(Arch.Projects.Packable().MustSetProperty("GenerateDocumentationFile", "true"))
+            .ShouldBe("Packable projects must set `GenerateDocumentationFile` to `true`.");
     }
 
     [Fact]

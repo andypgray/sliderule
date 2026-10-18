@@ -62,6 +62,7 @@ internal static class FragmentSiteRemapper
         IReadOnlyList<FragmentPackageReference>? packageReferences = pass.RemapPackages(fragment.PackageReferences);
         FragmentSite? isPackableSite = pass.RemapOptional(fragment.IsPackableSite);
         FragmentSite? locksPackagesSite = pass.RemapOptional(fragment.LocksPackagesSite);
+        FragmentProperties? properties = pass.RemapProperties(fragment.Properties);
 
         if (pass.Unmappable) return null;
         if (!pass.Changed) return fragment;
@@ -80,7 +81,8 @@ internal static class FragmentSiteRemapper
             TargetFrameworksSite = targetFrameworksSite,
             PackageReferences = packageReferences,
             IsPackableSite = isPackableSite,
-            LocksPackagesSite = locksPackagesSite
+            LocksPackagesSite = locksPackagesSite,
+            Properties = properties
         };
     }
 
@@ -199,6 +201,32 @@ internal static class FragmentSiteRemapper
             }
 
             return rebuilt ?? packages;
+        }
+
+        /// <summary>
+        ///     One evaluation's properties, each keeping its name and its position as
+        ///     <see cref="RemapPackages" /> keeps a package's, and the project file beside them.
+        /// </summary>
+        internal FragmentProperties? RemapProperties(FragmentProperties? properties)
+        {
+            if (properties is null) return null;
+
+            FragmentSite projectFile = Remap(properties.ProjectFile);
+            IReadOnlyList<FragmentProperty> declared = properties.Declared;
+            List<FragmentProperty>? rebuilt = null;
+            for (var index = 0; index < declared.Count; index++)
+            {
+                FragmentProperty property = declared[index];
+                FragmentSite remapped = Remap(property.Site);
+                if (IsUnchanged(remapped, property.Site) && rebuilt is null) continue;
+
+                rebuilt ??= Carry(declared, index);
+                rebuilt.Add(property with { Site = remapped });
+            }
+
+            if (rebuilt is null && IsUnchanged(projectFile, properties.ProjectFile)) return properties;
+
+            return new FragmentProperties(projectFile, rebuilt ?? declared);
         }
 
         private FragmentMember RemapMember(FragmentMember member)

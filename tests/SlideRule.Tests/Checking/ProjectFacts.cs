@@ -36,7 +36,8 @@ internal static class ProjectFacts
         bool? isPackable = null,
         SourceLocation? isPackableSite = null,
         bool? locksPackages = null,
-        SourceLocation? locksPackagesSite = null)
+        SourceLocation? locksPackagesSite = null,
+        IReadOnlyList<ProjectEvaluation>? evaluations = null)
     {
         return new ProjectNode(
             name,
@@ -49,7 +50,23 @@ internal static class ProjectFacts
             isPackable: isPackable,
             isPackableSite: isPackableSite,
             locksPackages: locksPackages,
-            locksPackagesSite: locksPackagesSite);
+            locksPackagesSite: locksPackagesSite,
+            evaluations: evaluations);
+    }
+
+    /// <summary>
+    ///     One evaluation of <paramref name="projectFile" />, for <paramref name="framework" /> or for no framework
+    ///     told apart, in which the solution set <paramref name="properties" />, each declared at its own
+    ///     <c>file:line</c>.
+    /// </summary>
+    internal static ProjectEvaluation Evaluation(
+        string? framework, string projectFile, params (string Name, string Value, string File, int Line)[] properties)
+    {
+        List<EvaluatedProperty> set = properties
+            .Select(property => new EvaluatedProperty(property.Name, property.Value, framework, Site(property.File, property.Line)))
+            .ToList();
+
+        return new ProjectEvaluation(framework, Site(projectFile, 1), set);
     }
 
     /// <summary>

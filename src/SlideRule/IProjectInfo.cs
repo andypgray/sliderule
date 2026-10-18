@@ -55,4 +55,15 @@ public interface IProjectInfo
     ///     Whether restoring the project writes a package lock file, or null where nothing evaluated it.
     /// </summary>
     bool? LocksPackages { get; }
+
+    /// <summary>
+    ///     The MSBuild properties a declaration in the solution sets for the project, ordered by name, one entry
+    ///     for each property in each target framework's build: its evaluated value, the framework
+    ///     (<see cref="IProjectPropertyInfo.TargetFramework" />), and the file and line of the definition that
+    ///     won, which may be a props file above the project. A value only the SDK or a package supplies is not
+    ///     here, and neither is one passed on the command line or read from the environment, so
+    ///     <c>p.Properties.Any(x =&gt; x.Name == "IsPackable")</c> asks whether anybody in the solution set it.
+    ///     Empty where nothing evaluated the project.
+    /// </summary>
+    IReadOnlyList<IProjectPropertyInfo> Properties { get; }
 }

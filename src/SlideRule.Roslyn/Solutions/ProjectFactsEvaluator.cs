@@ -259,9 +259,19 @@ internal static class ProjectFactsEvaluator
             IReadOnlyList<FragmentPackageReference> packages =
                 ReadPackageReferences(project, projectCone, projectSite);
             IReadOnlyList<string> projectReferences = ReadProjectReferences(project);
+            collection.GlobalProperties.TryGetValue("SolutionDir", out string? solutionDirectory);
+            FragmentProperties properties = ReadProperties(project, projectCone, projectSite, solutionDirectory);
 
             return new ProjectArtifactFacts(
-                frameworks, frameworksSite, packages, packable, packableSite, locks, locksSite, projectReferences);
+                frameworks,
+                frameworksSite,
+                packages,
+                packable,
+                packableSite,
+                locks,
+                locksSite,
+                projectReferences,
+                properties);
         }
         finally
         {
@@ -383,6 +393,72 @@ internal static class ProjectFactsEvaluator
         }
 
         return paths;
+    }
+
+    // Every property a declaration in the repository set: the definition that won sits in the project's cone, or
+    // anywhere under the solution's directory, which reaches a props file a project imports from a sibling
+    // directory the ancestor-only cone misses. Global, reserved and environment properties have no definition and
+    // are never listed, and neither is one an SDK or a package import set, which is what makes "set" mean declared
+    // by somebody who can change it. Under the solution's directory, the restore output a project imports and a
+    // package folder restored into the tree hold packages' declarations rather than the repository's, so they are
+    // left out the same way. Each file is decided once, because an evaluation holds hundreds of properties from a
+    // handful of files.
+    private static FragmentProperties ReadProperties(
+        Project project, IReadOnlySet<string> projectCone, FragmentSite projectSite, string? solutionDirectory)
+    {
+        IReadOnlyList<string> foreignRoots = ForeignRoots(project, solutionDirectory);
+        var admittedFiles = new Dictionary<string, bool>(StringComparer.Ordinal);
+        var declared = new List<FragmentProperty>();
+        foreach (ProjectProperty property in project.Properties)
+        {
+            if (property.Xml?.Location is not { File.Length: > 0 } location) continue;
+
+            if (!admittedFiles.TryGetValue(location.File, out bool admitted))
+            {
+                admitted = IsUnderProjectCone(location.File, projectCone)
+                           || IsInsideSolution(location.File, solutionDirectory, foreignRoots);
+                admittedFiles[location.File] = admitted;
+            }
+
+            if (!admitted) continue;
+
+            var site = new FragmentSite(location.File, Math.Max(location.Line, ProjectFileLine));
+            declared.Add(new FragmentProperty(property.Name, property.EvaluatedValue, site));
+        }
+
+        declared.Sort((left, right) => StringComparer.Ordinal.Compare(left.Name, right.Name));
+        return new FragmentProperties(projectSite, declared);
+    }
+
+    // The directories under the solution that hold packages' files rather than the repository's own: the restore
+    // output the project imports its packages' props through, the global package folder where a repository has
+    // put it inside the tree, and the packages folder packages.config restores into beside the solution. Each is
+    // folded and closed with a separator, so a prefix test cannot match a sibling that merely shares the name.
+    private static IReadOnlyList<string> ForeignRoots(Project project, string? solutionDirectory)
+    {
+        var roots = new List<string>();
+        foreach (string name in (string[])["MSBuildProjectExtensionsPath", "NuGetPackageRoot"])
+        {
+            string value = project.GetPropertyValue(name);
+            if (value.Length > 0) roots.Add(Path.GetFullPath(Path.Combine(project.DirectoryPath, value)));
+        }
+
+        if (solutionDirectory is { Length: > 0 }) roots.Add(Path.Combine(solutionDirectory, "packages"));
+
+        return roots
+            .Select(root => PathComparison.Fold(Normalize(root)) + Path.DirectorySeparatorChar)
+            .ToList();
+    }
+
+    private static bool IsInsideSolution(string file, string? solutionDirectory, IReadOnlyList<string> foreignRoots)
+    {
+        if (solutionDirectory is not { Length: > 0 }) return false;
+
+        string folded = PathComparison.Fold(Path.GetFullPath(file));
+        string solution = PathComparison.Fold(Normalize(solutionDirectory)) + Path.DirectorySeparatorChar;
+        if (!folded.StartsWith(solution, StringComparison.Ordinal)) return false;
+
+        return !foreignRoots.Any(root => folded.StartsWith(root, StringComparison.Ordinal));
     }
 
     private static FragmentSite SiteOf(

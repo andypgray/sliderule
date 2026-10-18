@@ -51,6 +51,11 @@ internal static class VocabularyRemainderSpec
             .Enforce(arch.Projects.Matching("Remainder.*")
                 .MustNotReferencePackages("Newtonsoft.Json"))
             .Because("The wire format moved to System.Text.Json, and a second serializer reintroduces the casing bugs the move fixed.");
+
+        arch.Rule("remainder/contracts-are-null-annotated")
+            .Enforce(arch.Projects.Matching("Remainder.Contracts*")
+                .MustSetProperty("Nullable", "enable"))
+            .Because("A caller reads the contract's nullability from its annotations, and an unannotated contract promises nothing.");
     }
 
     // The five type-shape modals. Each takes a subject narrow enough that the law reads as one a codebase

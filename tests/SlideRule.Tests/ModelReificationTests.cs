@@ -1,10 +1,10 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Fluent;
 using SlideRule.Hosting;
 using SlideRule.Model;
 using SlideRule.Tests.Checking;
 using SlideRule.Tests.Stubs;
+using Xunit;
 
 namespace SlideRule.Tests;
 
@@ -592,6 +592,17 @@ public class ModelReificationTests
 
         banned.Patterns.ShouldBe(["GreenPipes"]);
         banned.Operands.ShouldBeEmpty();
+
+        var property = Checker.Model(arch => arch.Rule("build/nullable")
+                .Enforce(arch.Projects.Named("SlideRule").MustSetProperty("Nullable", "enable"))
+                .Because("Callers read the contract's nullability from its annotations."))
+            .Rules.Single()
+            .Constraint
+            .ShouldBeOfType<MustSetPropertyConstraint>();
+
+        property.Name.ShouldBe("Nullable");
+        property.Value.ShouldBe("enable");
+        property.Operands.ShouldBeEmpty();
 
         var must = Checker.Model(arch => arch.Rule("packaging/described")
                 .Enforce(arch.Projects.Named("SlideRule")

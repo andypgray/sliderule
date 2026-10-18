@@ -25,6 +25,7 @@ SlideRule.IMemberInfo
 SlideRule.IPackageReferenceInfo
 SlideRule.IParameterInfo
 SlideRule.IProjectInfo
+SlideRule.IProjectPropertyInfo
 SlideRule.IRuleBuilder
 SlideRule.IScopeBuilder
 SlideRule.ITypeInfo

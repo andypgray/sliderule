@@ -3,6 +3,7 @@ using SlideRule.Checking;
 using SlideRule.Cli.Verbs;
 using SlideRule.Codebase;
 using SlideRule.Roslyn;
+using SlideRule.Tests.Checking;
 using SlideRule.Tests.TestSupport;
 using Xunit;
 
@@ -146,6 +147,23 @@ public sealed class BaselineAddMatcherTests
 
         BaselineAddMatcher.ResolveEdge("r", violations, "Zphil.Host", "net48").ShouldBeSameAs(net48);
         BaselineAddMatcher.ResolveEdge("r", violations, "Zphil.Host", "framework:net6.0").ShouldBeSameAs(net6);
+    }
+
+    [Fact]
+    public void ResolveEdge_ProjectAndProperty_ByItemNameAndIdentityForm_ReturnsThatFrameworksViolation()
+    {
+        // The property item carries its framework, so `Nullable@net8.0` picks one build's violation where the
+        // property alone would name two.
+        ProjectNode project = Project("Zphil.Host");
+        Violation modern = Violation.ProjectProperty(
+            project, "Nullable", ProjectFacts.Evaluation("net8.0", "Host.csproj"), found: null);
+        Violation legacy = Violation.ProjectProperty(
+            project, "Nullable", ProjectFacts.Evaluation("net48", "Host.csproj"), found: null);
+        Violation[] violations = [legacy, modern];
+
+        BaselineAddMatcher.ResolveEdge("r", violations, "Zphil.Host", "Nullable@net8.0").ShouldBeSameAs(modern);
+        BaselineAddMatcher.ResolveEdge("r", violations, "project:Zphil.Host", "property:Nullable@net48")
+            .ShouldBeSameAs(legacy);
     }
 
     [Fact]

@@ -190,6 +190,8 @@ internal static class JsonReportRenderer
             violation.SubjectProject?.Name,
             violation.Package?.Name,
             violation.Framework,
+            violation.Property,
+            violation.PropertyValue,
             violation.Detail,
             violation.Hint,
             grandfatheredSiteCount,

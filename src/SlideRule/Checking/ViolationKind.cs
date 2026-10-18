@@ -79,7 +79,8 @@ internal enum ViolationKind
     ///     rule objects to, with <c>Package</c> naming it and the package's own declaration as the site, and
     ///     <c>MustOnlyTarget</c> one per framework outside its list and <c>MustTarget</c> one for the framework a
     ///     project lacks, each with <c>Framework</c> naming it and the declaration of the project's framework
-    ///     list as the site.
+    ///     list as the site. <c>MustSetProperty</c> reports one per framework build where the property is unset
+    ///     or holds another value, with <c>Property</c> naming it, at the definition that won or the project file.
     /// </summary>
     ProjectShape,
 

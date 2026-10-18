@@ -106,7 +106,7 @@ arch.Rule("mcp/tools-accept-cancellation")
     .Fix("Add a trailing CancellationToken parameter (default it) and flow it into the runner.");
 ```
 
-`arch.Projects` selects projects, for rules about project files: target frameworks, package references, lock files.
+`arch.Projects` selects projects, for rules about project files: target frameworks, package references, lock files, MSBuild properties.
 
 ```csharp
 arch.Rule("packaging/core-netstandard-only")
@@ -153,7 +153,7 @@ The verbs count facts in source code, as the glossary at the top of a rendered `
 | `MustBeRegistered` | a type named in a container registration |
 | `MustNotExpose` | a type in a public member's signature |
 
-Other verbs test the shape and name of a type or a member (`MustBeSealed`, `MustHaveSuffix`, `MustAcceptParameter`) or a project's properties (`MustOnlyTarget`, `MustLockPackages`). The vocabulary table lists every one, with its overloads.
+Other verbs test the shape and name of a type or a member (`MustBeSealed`, `MustHaveSuffix`, `MustAcceptParameter`) or a project's build facts (`MustTarget`, `MustOnlyReferencePackages`, `MustSetProperty`). The vocabulary table lists every one, with its overloads.
 
 ## Scopes
 

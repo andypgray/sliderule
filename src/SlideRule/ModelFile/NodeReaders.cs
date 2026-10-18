@@ -555,6 +555,19 @@ internal static class NodeReaders
         });
         ProjectPatterns<MustOnlyReferencePackagesConstraint>(map, (s, patterns) => new MustOnlyReferencePackagesConstraint(s, patterns));
         ProjectPatterns<MustNotReferencePackagesConstraint>(map, (s, patterns) => new MustNotReferencePackagesConstraint(s, patterns));
+        map.Add(Key<MustSetPropertyConstraint>(), (r, v) =>
+        {
+            if (!r.OnlyKeys(v, ConstraintWhere, "node", "projectSubject", "property", "value")) return null;
+
+            ProjectSelection? subject = r.RequiredProjectSelection(v, ConstraintWhere, "projectSubject");
+            if (subject is null) return null;
+
+            string? name = r.RequiredText(v, ConstraintWhere, "property");
+            if (name is null) return null;
+
+            string? value = r.RequiredText(v, ConstraintWhere, "value");
+            return value is null ? null : new MustSetPropertyConstraint(subject, name, value);
+        });
     }
 
     // ---- the shapes several verbs share --------------------------------------------------------

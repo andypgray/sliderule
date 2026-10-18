@@ -307,6 +307,70 @@ public sealed class ProjectArtifactFactsTests
     }
 
     [Fact]
+    public void EvaluateAll_Properties_AreWhatTheSolutionSetsForEachFramework()
+    {
+        // A props file above the project sets a property for every framework, the project sets one for
+        // netstandard2.0 alone, and a props file in a sibling build/ directory, which the solution's directory
+        // reaches and the ancestor cone does not, sets a third. The restore output beside the project is a
+        // package's declaration, and the SDK's own defaults are nobody's here: neither is listed.
+        using TempDirectory temp = TestTempRoot.Fresh("artifact-facts-properties");
+        temp.WriteFile(["Directory.Build.props"], """
+                                                  <Project>
+                                                      <PropertyGroup>
+                                                          <LangVersion>latest</LangVersion>
+                                                      </PropertyGroup>
+                                                  </Project>
+                                                  """);
+        string shared = temp.WriteFile(["build", "Shared.props"], """
+                                                                  <Project>
+                                                                      <PropertyGroup>
+                                                                          <Deterministic>true</Deterministic>
+                                                                      </PropertyGroup>
+                                                                  </Project>
+                                                                  """);
+        temp.WriteFile(["src", "Console", "obj", "Console.csproj.nuget.g.props"], """
+                                                                                  <Project>
+                                                                                      <PropertyGroup>
+                                                                                          <RestoreTool>NuGet</RestoreTool>
+                                                                                      </PropertyGroup>
+                                                                                  </Project>
+                                                                                  """);
+        string projectFile = temp.WriteFile(["src", "Console", "Console.csproj"], """
+                                                                                  <Project Sdk="Microsoft.NET.Sdk">
+                                                                                      <Import Project="..\..\build\Shared.props" />
+                                                                                      <PropertyGroup>
+                                                                                          <TargetFrameworks>netstandard2.0;net10.0</TargetFrameworks>
+                                                                                      </PropertyGroup>
+                                                                                      <PropertyGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
+                                                                                          <IsAotCompatible>false</IsAotCompatible>
+                                                                                      </PropertyGroup>
+                                                                                  </Project>
+                                                                                  """);
+
+        // Act
+        IReadOnlyList<ProjectArtifactFacts?> facts = ProjectFactsEvaluator.EvaluateAll(
+            [new ProjectEvaluationRequest(projectFile, "netstandard2.0"), new ProjectEvaluationRequest(projectFile, "net10.0")],
+            temp.PathOf("Console.sln"),
+            Ct);
+
+        // Assert
+        FragmentProperties legacy = facts[0].ShouldNotBeNull().Properties;
+        FragmentProperties modern = facts[1].ShouldNotBeNull().Properties;
+        legacy.ProjectFile.ShouldBe(new FragmentSite(projectFile, 1));
+        Set(legacy, "LangVersion").ShouldBe(new FragmentProperty("LangVersion", "latest", new FragmentSite(temp.PathOf("Directory.Build.props"), 3)));
+        Set(legacy, "Deterministic").ShouldBe(new FragmentProperty("Deterministic", "true", new FragmentSite(shared, 3)));
+        Set(legacy, "IsAotCompatible").ShouldBe(new FragmentProperty("IsAotCompatible", "false", new FragmentSite(projectFile, 7)));
+        Set(modern, "IsAotCompatible").ShouldBeNull();
+        Set(modern, "LangVersion").ShouldNotBeNull();
+        legacy.Declared.Select(property => property.Name)
+            .ShouldNotContain("RestoreTool", customMessage: "the restore output beside the project is a package's declaration");
+        legacy.Declared.Select(property => property.Name)
+            .ShouldNotContain("OutputType", customMessage: "an SDK default is nobody's declaration");
+        legacy.Declared.Select(property => property.Name)
+            .ShouldBe(legacy.Declared.Select(property => property.Name).OrderBy(name => name, StringComparer.Ordinal));
+    }
+
+    [Fact]
     public void EvaluateAll_ProjectReferences_AreTheDeclaredOnesThatReferenceTheirOutput()
     {
         // One plain reference and one that only orders the build. Neither target file exists: evaluation
@@ -580,6 +644,15 @@ public sealed class ProjectArtifactFactsTests
 
     // One project evaluated on its own, the Act every evaluation row here takes. Non-asserting, so the row
     // keeps its own ShouldNotBeNull and reds on the null with its own name.
+    // The one property of this name an evaluation found set, or null where nothing in the solution set it.
+    private static FragmentProperty? Set(FragmentProperties properties, string name)
+    {
+        return properties.Declared
+            .Where(property => property.Name == name)
+            .Select(property => (FragmentProperty?)property)
+            .SingleOrDefault();
+    }
+
     private static ProjectArtifactFacts? EvaluatedFacts(string projectFile, string? solutionFile = null)
     {
         return ProjectFactsEvaluator.EvaluateAll([new ProjectEvaluationRequest(projectFile, null)], solutionFile, Ct)

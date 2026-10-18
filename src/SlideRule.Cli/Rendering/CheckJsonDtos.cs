@@ -285,8 +285,17 @@ internal sealed record BaselineJson(string Path, int Grandfathered, int Stale, i
 /// <param name="Framework">
 ///     The target framework's short moniker, for the per-framework <c>projectShape</c> violations: one a
 ///     <c>MustOnlyTarget</c> rule does not permit and the project targets, or the one a <c>MustTarget</c> rule
-///     requires and the project does not target, which the rule's sentence tells apart; null (omitted) on every
-///     other violation.
+///     requires and the project does not target, which the rule's sentence tells apart; on a <c>MustSetProperty</c>
+///     violation, the framework whose build was judged. Null (omitted) on every other violation, and on a property
+///     violation whose build told no framework apart.
+/// </param>
+/// <param name="Property">
+///     The MSBuild property a <c>MustSetProperty</c> violation is about, as the rule names it; null (omitted) on
+///     every other violation.
+/// </param>
+/// <param name="PropertyValue">
+///     The value the judged build holds for <see cref="Property" />; null (omitted) where nothing in the solution
+///     set it there, and on every other violation.
 /// </param>
 /// <param name="Detail">Kind-specific context, or null (omitted) when the kind carries none.</param>
 /// <param name="Hint">
@@ -324,6 +333,8 @@ internal sealed record ViolationJson(
     string? SubjectProject,
     string? Package,
     string? Framework,
+    string? Property,
+    string? PropertyValue,
     string? Detail,
     string? Hint,
     int? GrandfatheredSiteCount,

@@ -169,7 +169,8 @@ FieldSelection — a MemberSelection minted by .Fields that additionally offers
 ProjectSelection — project adjectives (.Named / .Matching / .Packable / .Except / .Where)
                → ProjectSelection; project modal verbs (MustOnlyTarget / MustTarget /
                MustReferenceNoPackages / MustOnlyReferencePackages / MustNotReferencePackages /
-               MustLockPackages / MustNotBePackable / .Must) → Constraint (terminal; §4.10, §5.8)
+               MustSetProperty / MustLockPackages / MustNotBePackable / .Must) → Constraint
+               (terminal; §4.10, §5.8)
 IRuleBuilder — ONLY .Enforce(Constraint) → IEnforceRule | .Migrate(from:, to:) → IMigrateRule
 IEnforceRule — .Because / .Fix / .Citation / .Exemplar(Selection)
 IMigrateRule — .Because / .Fix / .Citation / .Exemplar(Selection) / .Baseline(path)
@@ -632,19 +633,24 @@ Per verb class — this is grammar-level semantics, not baseline file format:
   source rides together and is counted, and a grandfathered exposure plus a *different*
   forbidden exposed type from the same source is NEW and red.
 - **Project item verbs** (the package verbs `MustReferenceNoPackages`,
-  `MustOnlyReferencePackages` and `MustNotReferencePackages`, and `MustOnlyTarget` and
-  `MustTarget`, §4.10/§5.8): `(ruleId, project:{name}, package:{id})` and
-  `(ruleId, project:{name}, framework:{moniker})`. This is the edge-key shape, the project in
-  the source slot and the item it names in the target slot. A grandfathered package plus a
+  `MustOnlyReferencePackages` and `MustNotReferencePackages`, `MustOnlyTarget` and `MustTarget`,
+  and `MustSetProperty`, §4.10/§5.8): `(ruleId, project:{name}, package:{id})`,
+  `(ruleId, project:{name}, framework:{moniker})` and
+  `(ruleId, project:{name}, property:{name}@{moniker})`. This is the edge-key shape, the project
+  in the source slot and the item it names in the target slot. A grandfathered package plus a
   *different* package the same project declares later is NEW and red, and so is a framework the
   project starts targeting. `MustTarget` keys the framework a project lacks the same way, so a
-  second project that drops it is NEW and red. The package identifier is spelled as the project
-  declares it and compared ordinally, though a package pattern matches it ignoring case (§4.10);
-  the moniker is the normalized short form. A baseline file written before items had identities
-  of their own holds one subject entry, `project:{name}`, for the project. That entry still
-  grandfathers every item of its project, and `status` counts it as uncounted until
-  `baseline accept-reductions` splits it into one counted entry per item it still covers, each
-  keeping its reason.
+  second project that drops it is NEW and red. `MustSetProperty` keys the property with the
+  framework of the build it judged, the property spelled as the rule names it, and `@{moniker}`
+  dropped for a build no framework was told apart in. The framework is identity rather than
+  evidence because two frameworks that both lack a property share one site, the project file, so
+  a key without it would bless the next framework that loses the property under the site count.
+  The package identifier is spelled as the project declares it and compared ordinally, though a
+  package pattern matches it ignoring case (§4.10); the moniker is the normalized short form. A
+  baseline file written before items had identities of their own holds one subject entry,
+  `project:{name}`, for the project. That entry still grandfathers every item of its project,
+  and `status` counts it as uncounted until `baseline accept-reductions` splits it into one
+  counted entry per item it still covers, each keeping its reason.
 - **Shape/naming/inheritance/attribute/membership verbs and escape hatches**:
   `(ruleId, subject symbol ID)`. A membership verb's operands (`MustBelongTo`'s memberships,
   §5.3) are part of the rule, never of the identity: widening or narrowing the membership list
@@ -1154,7 +1160,8 @@ consumes it.
 `arch.Projects` selects the solution's projects as build artifacts — the third subject
 stratum (§3.2). `arch.Project(name)` keeps meaning the types the project declares; the
 artifact stratum is where a rule speaks about the project itself: what it targets, what it
-declares as package references, whether it locks restore and whether it packs.
+declares as package references, whether it locks restore, whether it packs, and which MSBuild
+properties it sets.
 
 - **Facts are evaluated, never parsed from the csproj XML.** What a verb reads is what
   MSBuild evaluation answers after SDK defaults and every import: the lock policy a
@@ -1163,7 +1170,8 @@ declares as package references, whether it locks restore and whether it packs.
   the declared target frameworks (the list is total, and a classic project's framework
   normalizes to the short moniker, `net48`), the declared `PackageReference`s, each marked
   private where its `PrivateAssets` is `all` and carrying the frameworks whose evaluation
-  declared it, `RestorePackagesWithLockFile`, and `IsPackable`.
+  declared it, `RestorePackagesWithLockFile`, `IsPackable`, and the properties a declaration in
+  the solution sets, recorded once per evaluation with their evaluated values.
   `MustOnlyTarget` and `MustTarget` compare monikers ordinally against the normalized short
   forms. A package pattern is a glob, `*` matching any run of characters, dots included, and it
   is compared with the package identifier ignoring case, as NuGet compares identifiers.
@@ -1188,6 +1196,17 @@ declares as package references, whether it locks restore and whether it packs.
   project's frameworks, is private only where every declaration is: a non-private declaration
   decides and brings its site, and between declarations that agree the ordinally-first site
   stays.
+- **A property is set when a declaration in the solution sets it.** An evaluation records each
+  property whose winning definition sits in the project's cone (its own directory and those
+  above it, where MSBuild discovers `Directory.Build.props`) or anywhere under the solution's
+  directory, which reaches a props file a project imports from a sibling `build/` directory. A
+  global, reserved or environment property has no definition and is never recorded, and neither
+  is a value an SDK or a package import supplies, nor one from the restore output or a package
+  folder inside the tree. So `MustSetProperty` asks whether somebody who can change the value
+  declared it: the `IsPackable` the SDK defaults on is not set. The property name is matched
+  ignoring case, as MSBuild matches it, and the value is compared ignoring case and surrounding
+  whitespace. Each evaluation is judged apart, since a `$(TargetFramework)` condition can set a
+  property for one framework, and a project with no recorded evaluation passes.
 - **A package carries the frameworks that declare it.** A multi-targeted project is evaluated
   once per framework, so a `PackageReference` conditioned on `$(TargetFramework)` is declared by
   the evaluations whose condition holds, and `IPackageReferenceInfo.Frameworks` lists those,
@@ -1214,11 +1233,13 @@ declares as package references, whether it locks restore and whether it packs.
   burndown, one framework at a time. `MustTarget` keys the framework it requires the same way.
 - **The site is the declaration that won the evaluation** — regularly a props file above the
   project, not the csproj — and where the defect is an absence, the site falls back to the
-  project file itself. `MustReferenceNoPackages` mints one violation per declared package
-  that is not private, each sited at its own declaration; `MustOnlyReferencePackages` mints one
-  per non-private package no pattern matches, and `MustNotReferencePackages` one per package a
-  pattern matches, private or not, each sited the same way. `MustOnlyTarget` mints one violation
-  per target framework the rule does not permit, each sited at the declaration of the project's
+  project file itself. `MustReferenceNoPackages` mints one violation per declared package that
+  is not private, each sited at its own declaration; `MustOnlyReferencePackages` mints one per
+  non-private package no pattern matches, and `MustNotReferencePackages` one per package a
+  pattern matches, private or not, each sited the same way. `MustSetProperty` mints one per
+  evaluation where the property is unset or holds another value, sited at the definition that
+  won, or at the project file where nothing set it. `MustOnlyTarget` mints one violation per
+  target framework the rule does not permit, each sited at the declaration of the project's
   framework list. `MustTarget` mints one per project whose list lacks the required framework,
   sited at the same declaration, and its message says the project does not target it.
 - **A narrowed run skips a project rule that selects nothing**, exactly as it skips a type
@@ -1364,6 +1385,7 @@ posture verbs, trailers and escape hatches of §5.4–§5.6 are written by hand.
 | `.MustReferenceNoPackages` | `()` | must reference no NuGet packages other than private ones, whose `PrivateAssets` is `all` (declared references only; transitive dependencies are not seen) |
 | `.MustOnlyReferencePackages` | `(string, …)` | must reference only NuGet packages matching `Microsoft.Bcl.*`, other than private ones, whose `PrivateAssets` is `all` (declared references only; transitive dependencies are not seen) |
 | `.MustNotReferencePackages` | `(string, …)` | must not reference NuGet packages matching `Newtonsoft.Json` (declared references only; transitive dependencies are not seen) |
+| `.MustSetProperty` | `(string, string)` | must set `GenerateDocumentationFile` to `true` |
 | `.MustLockPackages` | `()` | must lock package restore |
 | `.MustNotBePackable` | `()` | must not be packable |
 | `.Must` | `(Func<IProjectInfo, bool>, string)` | must produce a package |
@@ -1678,7 +1700,11 @@ declaration site, which may be a props file above the project), `IsPrivate`, and
 (the target frameworks whose evaluation declared it, ordinal; empty where the evaluation could
 not tell them apart) — declared references only, §4.10),
 `ProjectReferences` (the names of the projects it declares a reference to, ordinal-ordered;
-declared references only, as for the packages), and the tri-state
+declared references only, as for the packages), `Properties` (every property a declaration in the
+solution sets, one entry per property and evaluation, ordinal by name, each an
+`IProjectPropertyInfo` of `Name`, `Value` (evaluated), `TargetFramework` (`null` where the
+evaluation told no framework apart), `FilePath` and `Line` (the definition that won); empty where
+nothing evaluated the project, §4.10), and the tri-state
 `IsPackable` and `LocksPackages` — `bool?`, `null` meaning the evaluation never happened
 rather than that the property is off. A predicate that treats unknown as false asserts
 something the model never measured; treat unknown as passing, exactly as the project verbs do
@@ -1810,6 +1836,7 @@ carries its sugar overload too, or the verb silently stops compiling after the s
 - `.MustReferenceNoPackages()` — zero-arity (§10); both boundaries ride in the sentence, "other than" so the first cannot read as a second `, except` clause
 - `.MustOnlyReferencePackages("Microsoft.Bcl.*")` — "must reference only NuGet packages matching `Microsoft.Bcl.*`, other than private ones, whose `PrivateAssets` is `all` (declared references only; transitive dependencies are not seen)" ("matching `A` or `B`" for several) — `MustReferenceNoPackages` with an allow-list, keeping both its boundaries; the privacy clause is set off by commas so it reads as an exemption rather than as a narrowing of the list
 - `.MustNotReferencePackages("GreenPipes")` — "must not reference NuGet packages matching `GreenPipes` (declared references only; transitive dependencies are not seen)" — no privacy clause, because privacy exempts nothing from a ban
+- `.MustSetProperty("Nullable", "enable")` — "must set `Nullable` to `enable`" — no caveat, because "set" already reads as declared by somebody, the boundary §4.10 keeps; judged per evaluation
 - `.MustLockPackages()` — "must lock package restore" — zero-arity (§10), over the evaluated `RestorePackagesWithLockFile`
 - `.MustNotBePackable()` — "must not be packable" — zero-arity (§10), over the evaluated `IsPackable`, which the SDK defaults on
 - `.Must(pred, description:)` — `pred` is `Func<IProjectInfo, bool>` (§5.6)
@@ -2207,6 +2234,11 @@ carries its sugar overload too, or the verb silently stops compiling after the s
     (`Blank package pattern on '{id}'.`). No package has an empty identifier, so a blank pattern
     matches nothing: it narrows an allow-list, which then reds on the package the author meant to
     permit, and it empties a ban, which then stays green whatever the projects reference.
+33. Blank/whitespace property name or value on `MustSetProperty` (`Blank property name on
+    '{id}'.`, `Blank property value on '{id}'.`). No property has an empty name, and MSBuild
+    treats a property set to nothing as unset, so either way the rule asks for something no
+    project can declare and reds every evaluated project. One code for both, since both fail in
+    that one direction; the label says which was left out.
 
 Item 5 also reaches the member escape-hatch descriptions: a blank or multi-line member `Where`
 (`Func<IMemberInfo,bool>`) or member `Must` description is caught by the same prose walk,
@@ -2395,7 +2427,8 @@ this catalog.
   hierarchy verbs' argument: `("net8.0", "net48")` reads as both and as either, and a second
   required framework is a second rule. `MustOnlyReferencePackages` and `MustNotReferencePackages`
   keep `(first, more)`: the allow-list is a bound whose reading "only" fixes, and a ban is none-of
-  under either join. `Except` carries the pair on the type stratum (several
+  under either join. `MustSetProperty` takes exactly its pair, a name and a value: a property holds
+  one value in a build, so neither operand admits a list. `Except` carries the pair on the type stratum (several
   exclusions are the union `AnyOf` mints, and the `Type` sugar rides beside it exactly as on the
   dependency verbs, §3.3) and stays single-operand on the project stratum, where `.Named(a, b)` and `.Matching(a, b)` already
   say "either of these" and no `AnyOf` exists to desugar a list to.
@@ -2503,8 +2536,7 @@ would be a new, explicitly named semantic, never a widening of the exact match; 
 exposure data (exposure edges stay out of the graph).
 
 On the project stratum (§4.10), each waiting on a consumer: `.Under(pathGlob…)`;
-`MustSetProperty` / `MustSetPackageAsset` (the `ExcludeAssets=runtime` shape); a
-framework-scoped package verb, an allow-list or ban over one framework's references, which
+`MustSetPackageAsset` (the `ExcludeAssets=runtime` shape); a framework-scoped package verb, an allow-list or ban over one framework's references, which
 `.Must` over `IPackageReferenceInfo.Frameworks` spells today; `AnyOf` over project selections;
 and card placement for artifact selections — a project rule renders into the root block only.
 

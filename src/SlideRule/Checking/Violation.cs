@@ -73,8 +73,9 @@ internal sealed class Violation
     ///     Gets the target framework, as a short moniker, that counts against the rule. Populated only by the
     ///     per-framework violations of <c>MustOnlyTarget</c>, one for each framework the project targets that the
     ///     rule does not permit, and by those of <c>MustTarget</c>, naming the framework the rule requires and the
-    ///     project does not target (<see cref="FrameworkMissing" />); null on every other project violation and
-    ///     every other kind.
+    ///     project does not target (<see cref="FrameworkMissing" />). A <c>MustSetProperty</c> violation fills it
+    ///     too, with the framework whose build was judged. Null on every other project violation and every other
+    ///     kind.
     /// </summary>
     public string? Framework { get; private set; }
 
@@ -87,21 +88,48 @@ internal sealed class Violation
     public bool FrameworkMissing { get; private set; }
 
     /// <summary>
-    ///     Gets the package or framework a per-item project violation names, in the form its baseline identity
-    ///     keys it by: <c>package:</c> or <c>framework:</c> followed by the package identifier as declared or the
-    ///     short moniker. Null on every violation that names no item.
+    ///     Gets the MSBuild property a <c>MustSetProperty</c> violation is about, named as the rule names it, and
+    ///     null on every other violation. <see cref="Framework" /> names the framework whose build was judged, or
+    ///     is null where that build told no framework apart, and <see cref="PropertyValue" /> what it holds.
     /// </summary>
+    public string? Property { get; private set; }
+
+    /// <summary>
+    ///     Gets the value the judged build evaluated for <see cref="Property" />, or null where nothing in the
+    ///     solution set it there; null on every other violation.
+    /// </summary>
+    public string? PropertyValue { get; private set; }
+
+    /// <summary>
+    ///     Gets the package, framework or property a per-item project violation names, in the form its baseline
+    ///     identity keys it by: <c>package:</c>, <c>framework:</c> or <c>property:</c> followed by the package
+    ///     identifier as declared, the short moniker, or the property as the rule names it with <c>@</c> and the
+    ///     framework of the build judged. Null on every violation that names no item.
+    /// </summary>
+    // The property arm comes before the framework one because a property violation fills Framework too: there it
+    // names the build judged, not the item.
     internal string? ProjectItem => Package is { } package
         ? PackageItemPrefix + package.Name
-        : Framework is { } framework
-            ? FrameworkItemPrefix + framework
-            : null;
+        : Property is not null
+            ? PropertyItemPrefix + PropertyItemName
+            : Framework is { } framework
+                ? FrameworkItemPrefix + framework
+                : null;
 
-    /// <summary>The bare name of <see cref="ProjectItem" />: the package identifier or the moniker, untagged.</summary>
-    internal string? ProjectItemName => Package?.Name ?? Framework;
+    /// <summary>
+    ///     The bare name of <see cref="ProjectItem" />: the package identifier, the property with its framework, or
+    ///     the moniker, untagged.
+    /// </summary>
+    internal string? ProjectItemName => Package?.Name ?? (Property is not null ? PropertyItemName : Framework);
+
+    // "Nullable@net8.0", or the property alone for a build no framework was told apart in. The framework is part of
+    // the item, not evidence: two frameworks that both lack a property share the project-file site, so an identity
+    // that left the framework out would let a migrated rule pass the next framework that loses the property.
+    private string PropertyItemName => Framework is { } framework ? $"{Property}@{framework}" : Property!;
 
     private const string PackageItemPrefix = "package:";
     private const string FrameworkItemPrefix = "framework:";
+    private const string PropertyItemPrefix = "property:";
 
     /// <summary>
     ///     Gets the source positions that evidence the violation: the sites of the offending edge, or the
@@ -328,6 +356,25 @@ internal sealed class Violation
         return new Violation(ViolationKind.ProjectShape, sites)
         {
             SubjectProject = subject, Framework = framework, FrameworkMissing = true
+        };
+    }
+
+    /// <summary>
+    ///     One evaluation of a project in which <paramref name="property" /> is unset or holds another value than a
+    ///     <c>MustSetProperty</c> rule asks, sited at the definition that won, or at the project file where nothing
+    ///     set it. Shares <see cref="ProjectShape" />'s kind; <see cref="Property" /> with the evaluation's
+    ///     framework keys its identity.
+    /// </summary>
+    internal static Violation ProjectProperty(
+        ProjectNode subject, string property, ProjectEvaluation evaluation, EvaluatedProperty? found)
+    {
+        SourceLocation site = found?.Site ?? evaluation.ProjectFile;
+        return new Violation(ViolationKind.ProjectShape, [site])
+        {
+            SubjectProject = subject,
+            Property = property,
+            Framework = evaluation.TargetFramework,
+            PropertyValue = found?.Value
         };
     }
 

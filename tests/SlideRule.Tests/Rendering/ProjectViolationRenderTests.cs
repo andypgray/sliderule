@@ -36,6 +36,16 @@ public sealed class ProjectViolationRenderTests
             "Zphil.Domain",
             packageReferences: [ProjectFacts.Package("StyleCop.Analyzers", "Directory.Build.props", 6, isPrivate: true)]));
 
+    private static readonly CodebaseModel Configured = ProjectFacts.Solution(
+        ProjectFacts.Project(
+            "Zphil.Bus",
+            ["net472", "net8.0"],
+            evaluations:
+            [
+                ProjectFacts.Evaluation("net472", "Bus.csproj"),
+                ProjectFacts.Evaluation("net8.0", "Bus.csproj", ("Nullable", "disable", "Directory.Build.props", 7))
+            ]));
+
     private static readonly CodebaseModel Targeted = ProjectFacts.Solution(
         ProjectFacts.Project("Zphil.Host", ["net48", "net8.0"], ProjectFacts.Site("Directory.Build.props", 3)));
 
@@ -75,6 +85,19 @@ public sealed class ProjectViolationRenderTests
             .Single()
             .HumanBlock()
             .ShouldContain("Directory.Build.props:6 — Zphil.Domain references package StyleCop.Analyzers");
+    }
+
+    [Fact]
+    public void HumanBlock_PropertyViolations_SayWhatEachFrameworksBuildHolds()
+    {
+        // One build sets nothing and one sets another value: the first points at the project file, where the
+        // declaration would go, and the second at the definition that won.
+        string block = PropertyReport()
+            .Single()
+            .HumanBlock();
+
+        block.ShouldContain("Bus.csproj:1 — Zphil.Bus does not set Nullable for net472");
+        block.ShouldContain("Directory.Build.props:7 — Zphil.Bus sets Nullable to disable for net8.0");
     }
 
     [Fact]
@@ -134,6 +157,21 @@ public sealed class ProjectViolationRenderTests
     }
 
     [Fact]
+    public void Json_PropertyViolation_CarriesThePropertyTheFrameworkAndTheValueHeld()
+    {
+        using JsonDocument document = JsonDocument.Parse(PropertyReport().JsonReport());
+        JsonElement[] violations = document.RootElement.GetProperty("rules")[0]
+            .GetProperty("violations")
+            .EnumerateArray()
+            .ToArray();
+
+        violations.Select(violation => $"{violation.GetProperty("property").GetString()}@"
+                                       + $"{violation.GetProperty("framework").GetString()}="
+                                       + (violation.TryGetProperty("propertyValue", out JsonElement value) ? value.GetString() : "(unset)"))
+            .ShouldBe(["Nullable@net472=(unset)", "Nullable@net8.0=disable"]);
+    }
+
+    [Fact]
     public void Json_MissingFrameworkViolation_CarriesTheFramework()
     {
         // The same key as the ceiling's: the rule's sentence, beside it in the document, says which reading
@@ -162,6 +200,10 @@ public sealed class ProjectViolationRenderTests
         violation.TryGetProperty("package", out _)
             .ShouldBeFalse();
         violation.TryGetProperty("framework", out _)
+            .ShouldBeFalse();
+        violation.TryGetProperty("property", out _)
+            .ShouldBeFalse();
+        violation.TryGetProperty("propertyValue", out _)
             .ShouldBeFalse();
     }
 
@@ -198,6 +240,53 @@ public sealed class ProjectViolationRenderTests
     }
 
     [Fact]
+    public void Sarif_PropertyViolation_MessageSaysWhatTheBuildHolds()
+    {
+        CodebaseModel unset = ProjectFacts.Solution(
+            ProjectFacts.Project("Zphil.Bus", ["net472"], evaluations: [ProjectFacts.Evaluation("net472", "Bus.csproj")]));
+
+        Checker.Run(unset, PropertyRule)
+            .ToSarif()
+            .ShouldBeOneErrorSaying("Zphil.Bus does not set Nullable for net472");
+    }
+
+    [Fact]
+    public void Sarif_PropertySetToAnotherValue_MessageSaysWhatTheBuildHolds()
+    {
+        CodebaseModel disabled = ProjectFacts.Solution(
+            ProjectFacts.Project(
+                "Zphil.Bus",
+                ["net8.0"],
+                evaluations:
+                [
+                    ProjectFacts.Evaluation("net8.0", "Bus.csproj", ("Nullable", "disable", "Directory.Build.props", 7))
+                ]));
+
+        Checker.Run(disabled, PropertyRule)
+            .ToSarif()
+            .ShouldBeOneErrorSaying("Zphil.Bus sets Nullable to disable for net8.0");
+    }
+
+    [Fact]
+    public void PropertySetToNothing_ReadsAsAnEmptyValue_WithNoFrameworkWhereNoneWasToldApart()
+    {
+        // A definition that sets the property to whitespace is a value the build holds, not an absence, and it
+        // is named so rather than printed as a blank; an evaluation that told no framework apart names none.
+        CodebaseModel emptied = ProjectFacts.Solution(
+            ProjectFacts.Project(
+                "Zphil.Bus", evaluations: [ProjectFacts.Evaluation(null, "Bus.csproj", ("Nullable", " ", "Bus.csproj", 6))]));
+
+        CheckReport report = Checker.Run(emptied, PropertyRule);
+
+        string block = report.Single()
+            .HumanBlock();
+        block.ShouldContain("Bus.csproj:6 — Zphil.Bus sets Nullable to an empty value");
+        block.ShouldNotContain("empty value for");
+        report.ToSarif()
+            .ShouldBeOneErrorSaying("Zphil.Bus sets Nullable to an empty value");
+    }
+
+    [Fact]
     public void Sarif_MissingFrameworkViolation_MessageSaysTheProjectDoesNotTargetIt()
     {
         FlooredReport()
@@ -224,6 +313,18 @@ public sealed class ProjectViolationRenderTests
         return Checker.Run(Analyzed, arch => arch.Rule("packaging/no-stylecop")
             .Enforce(arch.Projects.Matching("*").MustNotReferencePackages("StyleCop.*"))
             .Because("The house analyzers replaced StyleCop, and two rule sets disagree on every file."));
+    }
+
+    private static CheckReport PropertyReport()
+    {
+        return Checker.Run(Configured, PropertyRule);
+    }
+
+    private static void PropertyRule(Arch arch)
+    {
+        arch.Rule("build/nullable")
+            .Enforce(arch.Projects.Matching("*").MustSetProperty("Nullable", "enable"))
+            .Because("Callers read a library's nullability from its annotations.");
     }
 
     private static CheckReport FlooredReport()

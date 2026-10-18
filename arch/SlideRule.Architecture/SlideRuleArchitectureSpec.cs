@@ -229,6 +229,7 @@ public sealed class SlideRuleArchitectureSpec : IArchitectureSpec
                     typeof(IPackageReferenceInfo),
                     typeof(IParameterInfo),
                     typeof(IProjectInfo),
+                    typeof(IProjectPropertyInfo),
                     typeof(IRuleBuilder),
                     typeof(IScopeBuilder),
                     typeof(ITypeInfo),

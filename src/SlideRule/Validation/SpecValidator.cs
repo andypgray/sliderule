@@ -949,6 +949,12 @@ internal static class SpecValidator
             case MustNotReferencePackagesConstraint c:
                 foreach (string pattern in c.Patterns) yield return (pattern, SpecSlot.PackagePattern);
                 break;
+
+            // The property verb's two strings, either of which blank asks for a property no project can declare.
+            case MustSetPropertyConstraint c:
+                yield return (c.Name, SpecSlot.PropertyName);
+                yield return (c.Value, SpecSlot.PropertyValue);
+                break;
         }
 
         // The subject selection tree (for a member constraint this is the underlying type selection,

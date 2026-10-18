@@ -1,7 +1,7 @@
 using System.Reflection;
 using Shouldly;
-using Xunit;
 using SlideRule.Validation;
+using Xunit;
 using Code = SlideRule.Validation.SpecValidationErrorCode;
 
 namespace SlideRule.Tests;
@@ -16,9 +16,9 @@ public sealed class SpecVerdictOwnerTests
     [Fact]
     public void All_HoldsEverySlotOfTheAuthoringSurface()
     {
-        // Seventeen pattern slots, nine prose slots, and five that are neither.
+        // Eighteen pattern slots, nine prose slots, and seven that are neither.
         SpecSlot.All.Count
-            .ShouldBe(31);
+            .ShouldBe(34);
     }
 
     [Fact]
@@ -82,6 +82,9 @@ public sealed class SpecVerdictOwnerTests
             "Description: description",
             "Purpose: purpose",
             "TargetFramework: target framework",
+            "PackagePattern: package pattern",
+            "PropertyName: property name",
+            "PropertyValue: property value",
             "MemberName: member name",
             "RuleId: rule ID",
             "ScopeId: scope ID",

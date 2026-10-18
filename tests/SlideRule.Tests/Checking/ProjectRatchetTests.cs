@@ -13,11 +13,12 @@ namespace SlideRule.Tests.Checking;
 /// </summary>
 /// <remarks>
 ///     The rows that matter most are the per-item ones. The package verbs mint one violation per declared
-///     package they object to, <c>MustOnlyTarget</c> one per framework it does not permit and <c>MustTarget</c>
-///     one per project lacking the framework it requires, and each keys an edge from the project to its item,
-///     so a package or framework the project takes after the capture is red, and so is a project that drops
-///     the required framework. A project-wide entry written before the items were keyed apart still grandfathers every item of
-///     its project, as an uncounted entry, until accept-reductions splits it.
+///     package they object to, <c>MustOnlyTarget</c> one per framework it does not permit, <c>MustTarget</c>
+///     one per project lacking the framework it requires and <c>MustSetProperty</c> one per framework build
+///     the property is missing from. Each keys an edge from the project to its item, so a package or framework
+///     the project takes after the capture is red, and so is a project that drops the required framework or a
+///     build that loses the property. A project-wide entry written before the items were keyed apart still
+///     grandfathers every item of its project, as an uncounted entry, until accept-reductions splits it.
 /// </remarks>
 public sealed class ProjectRatchetTests
 {
@@ -197,6 +198,35 @@ public sealed class ProjectRatchetTests
     }
 
     [Fact]
+    public void Migrate_FrameworkLosingThePropertyAfterCapture_IsRed()
+    {
+        // The capture blesses the one framework that lacked the property; the second framework losing it later
+        // shares that framework's project-file site and is still a new identity, so it reds.
+        CodebaseModel captured = ProjectFacts.Solution(
+            ProjectFacts.Project(
+                "Zphil.Domain",
+                evaluations:
+                [
+                    ProjectFacts.Evaluation("net48", "src/Domain/Domain.csproj"),
+                    ProjectFacts.Evaluation("net8.0", "src/Domain/Domain.csproj", ("Nullable", "enable", "src/Domain/Domain.csproj", 5))
+                ]));
+        CodebaseModel later = ProjectFacts.Solution(
+            ProjectFacts.Project(
+                "Zphil.Domain",
+                evaluations:
+                [
+                    ProjectFacts.Evaluation("net48", "src/Domain/Domain.csproj"),
+                    ProjectFacts.Evaluation("net8.0", "src/Domain/Domain.csproj")
+                ]));
+        BaselineIndex index = Capture(captured, PropertyRule);
+
+        RuleResult result = Checker.Run(later, index, PropertyRule).Single();
+
+        result.ShouldHaveFailedWithProjectSubjects(["Zphil.Domain -> Nullable@net8.0"]);
+        result.ShouldHaveGrandfathered(1);
+    }
+
+    [Fact]
     public void Migrate_FrameworkAddedAfterCapture_IsRed()
     {
         CodebaseModel captured = ProjectFacts.Solution(
@@ -320,6 +350,13 @@ public sealed class ProjectRatchetTests
     {
         arch.Rule("packaging/one-logger")
             .Migrate("Serilog lingers beside Microsoft.Extensions.Logging.", arch.Projects.Matching("Zphil.*").MustNotReferencePackages("Serilog*"))
+            .Because("b");
+    }
+
+    private static void PropertyRule(Arch arch)
+    {
+        arch.Rule("build/nullable")
+            .Migrate("Older frameworks build without nullable analysis.", arch.Projects.Matching("Zphil.*").MustSetProperty("Nullable", "enable"))
             .Because("b");
     }
 

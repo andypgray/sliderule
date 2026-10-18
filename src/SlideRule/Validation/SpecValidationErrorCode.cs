@@ -254,5 +254,12 @@ internal enum SpecValidationErrorCode
     ///     <c>MustNotReferencePackages</c> it forbids nothing, so the rule stays green whatever the projects
     ///     reference.
     /// </summary>
-    BlankPackagePattern
+    BlankPackagePattern,
+
+    /// <summary>
+    ///     An empty property name or value on <c>MustSetProperty</c>. No property has an empty name, and MSBuild
+    ///     treats a property set to nothing as unset, so either way the rule asks for something no project can
+    ///     declare and fails every project it reads.
+    /// </summary>
+    BlankProperty
 }

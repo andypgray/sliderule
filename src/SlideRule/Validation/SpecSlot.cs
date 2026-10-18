@@ -118,6 +118,12 @@ internal sealed class SpecSlot
     /// <summary>A package identifier glob on <c>MustOnlyReferencePackages</c> or <c>MustNotReferencePackages</c>.</summary>
     internal static readonly SpecSlot PackagePattern = new(nameof(PackagePattern), "package pattern", SlotCheck.PackagePattern);
 
+    /// <summary>The MSBuild property name on <c>MustSetProperty</c>.</summary>
+    internal static readonly SpecSlot PropertyName = new(nameof(PropertyName), "property name", SlotCheck.Property);
+
+    /// <summary>The value <c>MustSetProperty</c> requires.</summary>
+    internal static readonly SpecSlot PropertyValue = new(nameof(PropertyValue), "property value", SlotCheck.Property);
+
     /// <summary>The name of <c>arch.Member(type, name)</c>.</summary>
     internal static readonly SpecSlot MemberName = new(nameof(MemberName), "member name", SlotCheck.MemberName);
 
@@ -161,6 +167,8 @@ internal sealed class SpecSlot
         Purpose,
         TargetFramework,
         PackagePattern,
+        PropertyName,
+        PropertyValue,
         MemberName,
         RuleId,
         ScopeId,
@@ -224,6 +232,7 @@ internal sealed class SpecSlot
             SlotCheck.Citation => Blank(literal, Code.BlankProse) ?? MultiLine(literal) ?? NotAnHttpUrl(literal),
             SlotCheck.TargetFramework => Blank(literal, Code.BlankTargetFramework),
             SlotCheck.PackagePattern => Blank(literal, Code.BlankPackagePattern),
+            SlotCheck.Property => Blank(literal, Code.BlankProperty),
             SlotCheck.MemberName => Blank(literal, Code.BlankMemberName),
             SlotCheck.Id => MalformedId(literal),
             SlotCheck.LayerName => BlankLayerName(literal),
@@ -315,6 +324,7 @@ internal sealed class SpecSlot
         Citation,
         TargetFramework,
         PackagePattern,
+        Property,
         MemberName,
         Id,
         LayerName

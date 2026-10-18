@@ -69,6 +69,7 @@ internal static class VerbLedger
                 "{Name}Tests class each would record a convention the tree does not follow as unpaid debt.",
             [nameof(ProjectSelectionConstraints.MustTarget)] = AwaitsTheAnalyzerRelease,
             [nameof(ProjectSelectionConstraints.MustOnlyReferencePackages)] = AwaitsTheAnalyzerRelease,
-            [nameof(ProjectSelectionConstraints.MustNotReferencePackages)] = AwaitsTheAnalyzerRelease
+            [nameof(ProjectSelectionConstraints.MustNotReferencePackages)] = AwaitsTheAnalyzerRelease,
+            [nameof(ProjectSelectionConstraints.MustSetProperty)] = AwaitsTheAnalyzerRelease
         };
 }

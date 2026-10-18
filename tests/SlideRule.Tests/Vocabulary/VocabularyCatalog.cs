@@ -241,6 +241,8 @@ internal static class VocabularyCatalog
                 arch => arch.Projects.Named("MyApp.Domain").MustOnlyReferencePackages("Microsoft.Bcl.*")),
             ProjectVerb(nameof(ProjectSelectionConstraints.MustNotReferencePackages),
                 arch => arch.Projects.Matching("MyApp.*").MustNotReferencePackages("Newtonsoft.Json")),
+            ProjectVerb(nameof(ProjectSelectionConstraints.MustSetProperty),
+                arch => arch.Projects.Packable().MustSetProperty("GenerateDocumentationFile", "true")),
             ProjectVerb(nameof(ProjectSelectionConstraints.MustLockPackages), arch => arch.Projects.Packable().MustLockPackages()),
             ProjectVerb(nameof(ProjectSelectionConstraints.MustNotBePackable), arch => arch.Projects.Matching("MyApp.*").MustNotBePackable()),
             ProjectVerb(nameof(ProjectSelectionConstraints.Must),

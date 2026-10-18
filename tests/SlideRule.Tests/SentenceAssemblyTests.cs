@@ -1,8 +1,8 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Prose;
 using SlideRule.Tests.Stubs;
 using SlideRule.Tests.Stubs.Billing;
+using Xunit;
 
 namespace SlideRule.Tests;
 

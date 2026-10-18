@@ -4,7 +4,7 @@ using Xunit;
 namespace SlideRule.Tests.SpecAnalyzers;
 
 /// <summary>
-///     The sentence each of the fifteen verdicts reads as at the literal: one spec statement, one warning,
+///     The sentence each of the sixteen verdicts reads as at the literal: one spec statement, one warning,
 ///     one expected message written out whole.
 /// </summary>
 /// <remarks>
@@ -15,7 +15,7 @@ namespace SlideRule.Tests.SpecAnalyzers;
 ///         it: a golden derived from its subject agrees with whatever that subject says today.
 ///     </para>
 ///     <para>
-///         One statement per row, so the table can be read straight through. Three of the fifteen need two
+///         One statement per row, so the table can be read straight through. Three of the sixteen need two
 ///         declarations rather than one, because a collision is what two literals decide between them.
 ///     </para>
 /// </remarks>
@@ -103,6 +103,11 @@ public sealed class SpecLiteralSentenceTests
                 "SR1032",
                 """arch.Projects.Named("A").MustNotReferencePackages("");""",
                 "Blank package pattern."
+            },
+            {
+                "SR1033",
+                """arch.Projects.Named("A").MustSetProperty("Nullable", " ");""",
+                "Blank property value."
             }
         };
 

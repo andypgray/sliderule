@@ -50,8 +50,10 @@ public sealed class SpecCompletionParityTests(SpecCompletionFixture fixture)
         };
 
     // The catalog's own size, stated here so that a slot added to the contract reds on this side too and
-    // someone decides whether it is one an editor can offer names in.
-    private const int CatalogSize = 31;
+    // someone decides whether it is one an editor can offer names in. The package pattern and the property
+    // name and value complete nothing: the compilation a spec is written in holds no package identifiers and
+    // no MSBuild properties to offer.
+    private const int CatalogSize = 34;
 
     [Fact]
     public async Task EveryProductType_IsOfferedUnderTheNameTheExtractorRendersForIt()

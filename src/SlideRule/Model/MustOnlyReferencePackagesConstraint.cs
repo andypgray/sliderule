@@ -17,7 +17,8 @@ internal sealed class MustOnlyReferencePackagesConstraint(ProjectSelection subje
     internal IReadOnlyList<string> Patterns { get; } = patterns;
 
     internal override string VerbPhrase =>
-        "must reference only NuGet packages matching " + ProseFormat.BacktickedList(Patterns)
+        "must reference only NuGet packages matching "
+        + ProseFormat.BacktickedList(Patterns)
         + ", other than private ones, whose `PrivateAssets` is `all` "
         + "(declared references only; transitive dependencies are not seen)";
 }

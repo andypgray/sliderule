@@ -2,17 +2,17 @@ using System.Globalization;
 using System.Reflection;
 using Microsoft.CodeAnalysis;
 using Shouldly;
-using Xunit;
 using SlideRule.SpecAnalyzers;
 using SlideRule.Tests.DocHygiene;
 using SlideRule.Validation;
+using Xunit;
 
 namespace SlideRule.Tests.SpecAnalyzers;
 
 /// <summary>
-///     The sixteen warnings the spec analyzer declares: their IDs, the title, message and description each
-///     one ships with, the numbering that ties fifteen of them to a validation code, and the claim that
-///     those fifteen are exactly the verdicts the contract can hand back.
+///     The seventeen warnings the spec analyzer declares: their IDs, the title, message and description each
+///     one ships with, the numbering that ties sixteen of them to a validation code, and the claim that
+///     those sixteen are exactly the verdicts the contract can hand back.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -43,7 +43,7 @@ public sealed class SpecLiteralDescriptorTests
     private static readonly string[] Ids =
     [
         "SR1000", "SR1001", "SR1005", "SR1006", "SR1008", "SR1010", "SR1012", "SR1016", "SR1017", "SR1024",
-        "SR1025", "SR1026", "SR1030", "SR1031", "SR1032", ToolFault, ToolFault
+        "SR1025", "SR1026", "SR1030", "SR1031", "SR1032", "SR1033", ToolFault, ToolFault
     ];
 
     /// <summary>The closing sentence every verdict description carries, restated here to pin it.</summary>
@@ -224,6 +224,15 @@ public sealed class SpecLiteralDescriptorTests
                 + "green whatever the projects reference." + Closing
             },
             {
+                nameof(SpecLiteralDiagnostics.BlankProperty),
+                "SR1033",
+                "A property name or value is blank",
+                "{0}",
+                "A MustSetProperty was given an empty property name or value. No property has an empty name, and "
+                + "MSBuild treats a property set to nothing as unset, so either way the rule asks for something no "
+                + "project can declare and fails every project it reads." + Closing
+            },
+            {
                 nameof(SpecLiteralDiagnostics.AnalyzerFault),
                 ToolFault,
                 "The SlideRule spec analyzer failed",
@@ -331,7 +340,7 @@ public sealed class SpecLiteralDescriptorTests
     }
 
     [Fact]
-    public void TheAnalyzer_DeclaresTheSixteenIdsInSeventeenDescriptorsAsWhatItCanReport()
+    public void TheAnalyzer_DeclaresTheSeventeenIdsInEighteenDescriptorsAsWhatItCanReport()
     {
         List<string> supported = new SpecLiteralAnalyzer().SupportedDiagnostics
             .Select(descriptor => descriptor.Id)

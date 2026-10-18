@@ -4,9 +4,9 @@ namespace SlideRule.Extraction;
 
 /// <summary>
 ///     What one evaluation of one project file said about the artifact it builds: the frameworks it
-///     declares, the packages it declares, whether it packs, and whether its restore locks — each paired
-///     with the <c>file:line</c> that decided it. It also names the project files the project declares a
-///     reference to.
+///     declares, the packages it declares, whether it packs, whether its restore locks, and the properties
+///     the repository sets for it — each paired with the <c>file:line</c> that decided it. It also names the
+///     project files the project declares a reference to.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -48,6 +48,10 @@ namespace SlideRule.Extraction;
 ///     (<c>ReferenceOutputAssembly="false"</c>). Paths rather than names, because which loaded project a
 ///     path is belongs to the loader to say.
 /// </param>
+/// <param name="Properties">
+///     Every property a declaration in the repository set, with the project file this evaluation read: never a
+///     global, environment or reserved property, and never one only an SDK or a package import set.
+/// </param>
 internal sealed record ProjectArtifactFacts(
     IReadOnlyList<string> TargetFrameworks,
     FragmentSite TargetFrameworksSite,
@@ -56,7 +60,8 @@ internal sealed record ProjectArtifactFacts(
     FragmentSite IsPackableSite,
     bool LocksPackages,
     FragmentSite LocksPackagesSite,
-    IReadOnlyList<string> ProjectReferencePaths);
+    IReadOnlyList<string> ProjectReferencePaths,
+    FragmentProperties Properties);
 
 /// <summary>
 ///     What one enumeration of a solution produced: the compilations to extract from, and what MSBuild said
