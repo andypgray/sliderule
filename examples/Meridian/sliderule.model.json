@@ -49,12 +49,12 @@
     {
       "id": "naming/async-suffix",
       "posture": "migrate",
-      "sentence": "Methods of authored types in the Domain or Web layers returning `Task`, `Task<TResult>`, `ValueTask` or `ValueTask<TResult>` must be named `*Async`.",
+      "sentence": "Methods returning `Task`, `Task<TResult>`, `ValueTask` or `ValueTask<TResult>` declared in authored types in the Domain or Web layers must be named `*Async`.",
       "because": "Task- and ValueTask-returning methods carry the Async suffix so callers see at the call site that a method must be awaited.",
       "fix": "Rename the method to end in Async and update its callers; see the interface and its implementation together.",
       "citation": "https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap",
       "constraint": { "node": "memberMustHaveSuffix", "memberSubject": { "source": { "union": [{ "noun": { "node": "layer", "name": "Domain" } }, { "noun": { "node": "layer", "name": "Web" } }], "adjectives": [{ "node": "authored" }] }, "kind": "method", "adjectives": [{ "node": "returning", "anchors": [{ "name": "System.Threading.Tasks.Task" }, { "name": "System.Threading.Tasks.Task<TResult>", "onDefinition": true }, { "name": "System.Threading.Tasks.ValueTask" }, { "name": "System.Threading.Tasks.ValueTask<TResult>", "onDefinition": true }] }] }, "suffix": "Async" },
-      "migrate": { "from": "Repository and controller methods return Task without the Async suffix.", "toSentence": "Methods of authored types in the Domain or Web layers returning `Task`, `Task<TResult>`, `ValueTask` or `ValueTask<TResult>` must be named `*Async`.", "baselinePath": "arch/baselines/naming/async-suffix.json", "policy": "migrateIfSmall" }
+      "migrate": { "from": "Repository and controller methods return Task without the Async suffix.", "toSentence": "Methods returning `Task`, `Task<TResult>`, `ValueTask` or `ValueTask<TResult>` declared in authored types in the Domain or Web layers must be named `*Async`.", "baselinePath": "arch/baselines/naming/async-suffix.json", "policy": "migrateIfSmall" }
     },
     {
       "id": "di/no-buildserviceprovider",

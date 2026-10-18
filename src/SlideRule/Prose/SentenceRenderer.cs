@@ -370,8 +370,8 @@ internal static class SentenceRenderer
     // opens-parenthetical) triples rather than an adjective list because the strata's adjective hierarchies
     // are deliberately disjoint and share no base: the triples are the whole of what placement needs from
     // any of them. MemberPhrase keeps its own variant, and that one is a real divergence rather than a copy —
-    // its HeadPrefix arm keeps a repeat because attribute prefixes can collide — while its sentence-final
-    // group orders through the same SentenceFinalOrder, so a member Except renders after a member Where.
+    // its HeadPrefix arm keeps a repeat because attribute prefixes can collide, and its Where clauses render
+    // ahead of the reference while its Excepts follow it, so a member Except still renders after a member Where.
     private static (string? Head, IReadOnlyList<string>? HeadPrefixes, string Inline, string SubjectFinal) Placements(
         IEnumerable<(AdjectivePlacement Placement, string Fragment, bool OpensParenthetical)> adjectives,
         string? head, IReadOnlyList<string>? headPrefixes)
@@ -414,8 +414,9 @@ internal static class SentenceRenderer
     // The sentence-final group in rendered order (GRAMMAR §6): every Where in authoring order, then every
     // Except in authoring order, so the parenthetical is the last thing before the junction that closes it.
     // OrderBy is stable, which is what keeps authoring order inside each half. Placements assembles the group
-    // by this and the EndsOpen twins read its last clause by this, so a phrase and its openness cannot
-    // disagree. Generic over the clause type because the strata's adjective hierarchies share no base.
+    // by this and the type and project EndsOpen twins read its last clause by this, so a phrase and its
+    // openness cannot disagree. Generic over the clause type because the strata's adjective hierarchies share
+    // no base.
     private static IEnumerable<TClause> SentenceFinalOrder<TClause>(
         IEnumerable<TClause> clauses, Func<TClause, bool> opensParenthetical)
     {
@@ -477,23 +478,19 @@ internal static class SentenceRenderer
         return lastClause is { OpensParenthetical: true };
     }
 
-    // A member subject renders its own inline and sentence-final clauses AFTER the reference, so those
-    // clauses close an Except the source left open, and its last sentence-final clause, read in rendered
-    // order, says whether it opened one of its own. Only head prefixes leave the reference at the end.
+    // A member subject's Returning and Where clauses render BEFORE the reference and only its Excepts after
+    // it, so the phrase ends open when it carries a member Except and otherwise exactly when the reference
+    // does.
     private static bool EndsOpen(MemberSelection selection)
     {
-        IEnumerable<MemberAdjective> clauses = selection.Adjectives
-            .Where(adjective => adjective.Placement == AdjectivePlacement.SubjectFinal);
-        MemberAdjective? lastClause = SentenceFinalOrder(clauses, adjective => adjective.OpensParenthetical)
-            .LastOrDefault();
-        if (lastClause is not null) return lastClause.OpensParenthetical;
+        bool hasExcept = selection.Adjectives
+            .Any(adjective => adjective is { Placement: AdjectivePlacement.SubjectFinal, OpensParenthetical: true });
 
-        return EndsOpen(selection.Source)
-               && selection.Adjectives.All(adjective => adjective.Placement == AdjectivePlacement.HeadPrefix);
+        return hasExcept || EndsOpen(selection.Source);
     }
 
     // Comma-closes a following fragment when the phrase before it ended open. Every following fragment opens
-    // with a space, so this yields ", returning `Task`", ", whose name …", ", without a `when` filter". An
+    // with a space, so this yields ", whose name …", ", without a `when` filter". An
     // empty following is closed by whatever comes after it — the sentence-final period, the verb — and an
     // Except following an Except already carries the comma.
     private static string CloseBefore(bool endsOpen, string following)
@@ -510,13 +507,15 @@ internal static class SentenceRenderer
         return parts.Count >= 2 && EndsOpen(parts[parts.Count - 2]);
     }
 
-    // Member-subject assembly (GRAMMAR §4.6, §6): head-prefix member adjectives in authoring order +
-    // "{kind-plural} of {selection-reference}" + the inline Returning clauses in authoring order + the
-    // sentence-final member Where and Except clauses, every Where before every Except. Every member adjective
-    // that names the member is a head prefix, because an inline one after the reference reads as naming the
-    // types. The kind-plural is the projection head; the
-    // reference is the underlying type selection in reference position. There is no head-SUBSTITUTION arm:
-    // the projection fixes the head.
+    // Member-subject assembly (GRAMMAR §4.6, §6): head-prefix member adjectives in authoring order + the
+    // kind-plural + the trailing member clauses + the reference + the member Excepts. With no Returning or
+    // Where the trailing clauses are empty and the reference joins with " of ": "methods of types in X".
+    // With either, the clauses follow the kind-plural directly and the reference joins with " declared in ":
+    // "methods returning `Task` declared in types in X". A clause after the reference would read as
+    // narrowing the types, and a type-side Where before the projection would then render the same sentence
+    // as a member Where after it. Every Where precedes every Except, as on the type side. The kind-plural is
+    // the projection head; the reference is the underlying type selection in reference position. There is
+    // no head-SUBSTITUTION arm: the projection fixes the head.
     private static string MemberPhrase(MemberSelection selection)
     {
         string head = ProseFormat.MemberKindPlural(selection.Kind);
@@ -524,7 +523,8 @@ internal static class SentenceRenderer
 
         var headPrefix = string.Empty;
         var inline = string.Empty;
-        var clauses = new List<MemberAdjective>();
+        var wheres = string.Empty;
+        var excepts = string.Empty;
         foreach (MemberAdjective adjective in selection.Adjectives)
             switch (adjective.Placement)
             {
@@ -536,17 +536,20 @@ internal static class SentenceRenderer
                     // checker uses.
                     headPrefix += adjective.Fragment;
                     break;
+                case AdjectivePlacement.SubjectFinal when adjective.OpensParenthetical:
+                    excepts += adjective.Fragment;
+                    break;
                 case AdjectivePlacement.SubjectFinal:
-                    clauses.Add(adjective);
+                    wheres += adjective.Fragment;
                     break;
                 default:
                     inline += adjective.Fragment;
                     break;
             }
 
-        string subjectFinal = string.Concat(
-            SentenceFinalOrder(clauses, adjective => adjective.OpensParenthetical).Select(adjective => adjective.Fragment));
-        return headPrefix + head + " of " + reference + CloseBefore(EndsOpen(selection.Source), inline + subjectFinal);
+        string trailing = inline + wheres;
+        string join = trailing.Length == 0 ? " of " : " declared in ";
+        return headPrefix + head + trailing + join + reference + CloseBefore(EndsOpen(selection.Source), excepts);
     }
 
     // Project-subject assembly (GRAMMAR §4.10, §6): the bare plural "projects" as the head, then the shared

@@ -302,7 +302,7 @@
       "id": "naming/async-suffix",
       "posture": "migrate",
       "status": "failed",
-      "sentence": "Methods of the Web layer returning `Task` or `Task<TResult>` must be named `*Async`.",
+      "sentence": "Methods returning `Task` or `Task<TResult>` declared in the Web layer must be named `*Async`.",
       "because": "Async methods are discovered by their Async suffix.",
       "fix": "Rename the method to end in Async and update its callers.",
       "baseline": {
@@ -566,7 +566,7 @@
       "id": "async/accept-cancellation",
       "posture": "enforce",
       "status": "failed",
-      "sentence": "Methods of the Web layer returning `Task` or `Task<TResult>` must accept a parameter of type `CancellationToken`.",
+      "sentence": "Methods returning `Task` or `Task<TResult>` declared in the Web layer must accept a parameter of type `CancellationToken`.",
       "because": "A Task-returning method that ignores cancellation cannot be stopped once its caller has moved on.",
       "fix": "Add a CancellationToken parameter and flow it to the calls you await.",
       "violationCount": 3,

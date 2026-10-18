@@ -135,7 +135,7 @@
             {
               "id": "naming/async-suffix",
               "shortDescription": {
-                "text": "Methods of the Web layer returning `Task` or `Task<TResult>` must be named `*Async`."
+                "text": "Methods returning `Task` or `Task<TResult>` declared in the Web layer must be named `*Async`."
               },
               "fullDescription": {
                 "text": "Async methods are discovered by their Async suffix."
@@ -285,7 +285,7 @@
             {
               "id": "async/accept-cancellation",
               "shortDescription": {
-                "text": "Methods of the Web layer returning `Task` or `Task<TResult>` must accept a parameter of type `CancellationToken`."
+                "text": "Methods returning `Task` or `Task<TResult>` declared in the Web layer must accept a parameter of type `CancellationToken`."
               },
               "fullDescription": {
                 "text": "A Task-returning method that ignores cancellation cannot be stopped once its caller has moved on."

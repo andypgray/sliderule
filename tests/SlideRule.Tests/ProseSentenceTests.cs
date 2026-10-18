@@ -1,6 +1,6 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Tests.Checking;
+using Xunit;
 
 namespace SlideRule.Tests;
 
@@ -92,7 +92,7 @@ public class ProseSentenceTests
     public void Enforce_AsyncSuffix_RendersMemberSubjectFlagship()
     {
         // The flagship member-subject rule (GRAMMAR §4.6, §6). The member
-        // subject is "{kind-plural} of {selection-reference}" + the Returning adjective; single anchor.
+        // subject is "{kind-plural} {Returning} declared in {selection-reference}"; single anchor.
         Checker.Model(arch =>
             {
                 Selection web = arch.Namespace("MyApp.Web.*");
@@ -102,7 +102,7 @@ public class ProseSentenceTests
             })
             .Rule("naming/async-suffix")
             .Sentence
-            .ShouldBe("Methods of types in `MyApp.Web.*` returning `Task` must be named `*Async`.");
+            .ShouldBe("Methods returning `Task` declared in types in `MyApp.Web.*` must be named `*Async`.");
     }
 
     [Fact]
@@ -121,7 +121,7 @@ public class ProseSentenceTests
             })
             .Rule("async/accept-cancellation")
             .Sentence
-            .ShouldBe("Methods of the Web layer returning `Task` or `Task<TResult>` must accept a parameter of type `CancellationToken`.");
+            .ShouldBe("Methods returning `Task` or `Task<TResult>` declared in the Web layer must accept a parameter of type `CancellationToken`.");
     }
 
     [Fact]

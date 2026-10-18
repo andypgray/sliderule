@@ -9,7 +9,9 @@ namespace SlideRule.Model;
 ///     declared type-parameter names, so <c>typeof(Task&lt;&gt;)</c> renders <c>Task&lt;TResult&gt;</c>),
 ///     widens colliding simple names outward (GRAMMAR §6) and joins with the no-Oxford-comma reference
 ///     join. Matching is definition-level and happens at check time; on the <c>typeof</c> arm a
-///     closed-generic anchor is refused at spec build (GRAMMAR §8 item 14).
+///     closed-generic anchor is refused at spec build (GRAMMAR §8 item 14). The fragment follows the
+///     kind-plural and switches the member subject's join to " declared in", so it never reads as
+///     narrowing the types (GRAMMAR §6).
 /// </summary>
 internal sealed class ReturningAdjective(IReadOnlyList<TypeAnchor> anchors) : MemberAdjective
 {

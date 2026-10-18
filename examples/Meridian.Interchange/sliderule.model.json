@@ -76,7 +76,7 @@
     {
       "id": "naming/async-suffix",
       "posture": "enforce",
-      "sentence": "Methods of authored types in `Meridian.Interchange.*` returning `Task`, `Task<TResult>`, `ValueTask` or `ValueTask<TResult>` must be named `*Async`.",
+      "sentence": "Methods returning `Task`, `Task<TResult>`, `ValueTask` or `ValueTask<TResult>` declared in authored types in `Meridian.Interchange.*` must be named `*Async`.",
       "because": "Task- and ValueTask-returning methods carry the Async suffix so callers see at the call site that a method must be awaited.",
       "fix": "Rename the method to end in Async.",
       "citation": "https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap",
@@ -94,7 +94,7 @@
     {
       "id": "async/accept-cancellation",
       "posture": "enforce",
-      "sentence": "Methods of authored types in `Meridian.Interchange.*` returning `Task`, `Task<TResult>`, `ValueTask` or `ValueTask<TResult>` must accept a parameter of type `CancellationToken`.",
+      "sentence": "Methods returning `Task`, `Task<TResult>`, `ValueTask` or `ValueTask<TResult>` declared in authored types in `Meridian.Interchange.*` must accept a parameter of type `CancellationToken`.",
       "because": "Accepting a CancellationToken lets a caller stop in-flight async work and flow that request on to the calls it makes, so a Task- or ValueTask-returning method without one cannot take part in cooperative cancellation.",
       "fix": "Add a CancellationToken parameter and flow OutboxDispatcher's stoppingToken through the call chain.",
       "citation": "https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap",

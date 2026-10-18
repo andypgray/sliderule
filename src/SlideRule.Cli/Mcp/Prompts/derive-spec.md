@@ -431,7 +431,7 @@ line.
 | `.WithPrefix` | `(string)` | `Get*` methods of types |
 | `.WithNameMatching` | `(string)` | `*Handler*` methods of types |
 | `.Named` | `(IEnumerable<string>)` · `(string, …)` | `Main` methods of types |
-| `.Returning` | `(Type, …)` · `(string, …)` on `.Methods` | Methods of types returning `Task` |
+| `.Returning` | `(Type, …)` · `(string, …)` on `.Methods` | Methods returning `Task` declared in types |
 | `.AttributedWith` | `(Type)` · `(string)` · `<T>()` | `[ApiController]`-attributed methods of types |
 | `.ThatAreStatic` | `()` | Static fields of types |
 | `.ThatArePublic` | `()` | Public methods of types |
@@ -441,7 +441,7 @@ line.
 | `.ThatAreProtectedInternal` | `()` | Protected internal methods of types |
 | `.ThatArePrivateProtected` | `()` | Private protected methods of types |
 | `.Except` | `(IEnumerable<MemberSelection>)` · `(MemberSelection, …)` | Methods of types, except `Main` methods of types named `Program` |
-| `.Where` | `(Func<IMemberInfo, bool>, string)` | Methods of types that are async |
+| `.Where` | `(Func<IMemberInfo, bool>, string)` | Methods that are async declared in types |
 
 | Verb | Overloads | Fragment |
 |---|---|---|
@@ -543,9 +543,9 @@ accessibility adjective, which on members also has `.ThatAreProtected()`, `.That
 and `.ThatArePrivateProtected()`, each matching its level exactly; `.Named(name, ...)` picks
 members by exact name ("`Main` methods of ..."), and `.Except(memberSelection, ...)` exempts members a
 name alone cannot: `.Methods.Except(arch.Types.Named("Program").Methods.Named("Main"))`. The flagship:
-`web.Methods.Returning(typeof(Task)).MustHaveSuffix("Async")` — *"Methods of types in `MyApp.Web.*`
-returning `Task` must be named `*Async`."* `arch.Projects` names the solution's projects as build
-artifacts, not sets of types (`arch.Project(name)` is the unrelated type noun).
+`web.Methods.Returning(typeof(Task)).MustHaveSuffix("Async")` — *"Methods returning `Task` declared in
+types in `MyApp.Web.*` must be named `*Async`."* `arch.Projects` names the solution's projects as build
+artifacts (`arch.Project(name)` is the unrelated type noun).
 `.Matching(glob, ...)` reads `*` over one token, because a project name carries no dot-segment
 structure, and `.Packable()` is the projects an evaluation reported packable.
 `MustOnlyTarget(tfm, ...)` is strict, with no external exemption, because a project's frameworks are

@@ -198,14 +198,29 @@ public class SentenceAssemblyTests
     }
 
     [Fact]
-    public void Except_OnAMemberSubjectsSource_ClosesBeforeTheMemberClauses()
+    public void Except_OnAMemberSubjectsSourceWithMemberClauses_TheVerbClosesIt()
     {
-        // The junction: the member subject's own clauses, which render after the source reference.
+        // The junction: the verb. The member clauses render ahead of "declared in", so the source reference
+        // still ends the subject.
         SentenceRenderer.Sentence(Arch.Types.InNamespace("MyApp.*")
                 .Except(Arch.Type(typeof(SqlConnection)))
                 .Methods.Returning(typeof(Task))
                 .MustHaveSuffix("Async"))
-            .ShouldBe("Methods of types in `MyApp.*`, except `SqlConnection`, returning `Task` must be named `*Async`.");
+            .ShouldBe("Methods returning `Task` declared in types in `MyApp.*`, except `SqlConnection`, must be named `*Async`.");
+    }
+
+    [Fact]
+    public void Except_OnAMemberSubjectsSourceWithAMemberExcept_EachParentheticalIsClosed()
+    {
+        // The junction: the member Except. Its fragment opens with a comma, so the source's parenthetical is
+        // closed by it and the verb closes the member's own.
+        SentenceRenderer.Sentence(Arch.Types.InNamespace("MyApp.*")
+                .Except(Arch.Type(typeof(SqlConnection)))
+                .Methods.Returning(typeof(Task))
+                .Except(Arch.Types.Named("Program").Methods.Named("Main"))
+                .MustHaveSuffix("Async"))
+            .ShouldBe("Methods returning `Task` declared in types in `MyApp.*`, except `SqlConnection`, except `Main` "
+                      + "methods of types named `Program`, must be named `*Async`.");
     }
 
     [Fact]
@@ -298,18 +313,18 @@ public class SentenceAssemblyTests
     }
 
     [Fact]
-    public void ExceptAndWhere_OnAMemberSubjectsSource_TheMemberClausesCloseIt()
+    public void ExceptAndWhere_OnAMemberSubjectsSourceWithMemberClauses_TheVerbClosesIt()
     {
-        // The junction: the member subject's own clauses. The source ends on the open Except parenthetical,
-        // so the member clauses close it with a comma.
+        // The junction: the verb. The source ends on the open Except parenthetical, and the member clauses
+        // render ahead of "declared in", so nothing comes between the parenthetical and the verb.
         SentenceRenderer.Sentence(Arch.Types.InNamespace("MyApp.*")
                 .Except(Arch.Type(typeof(SqlConnection)))
                 .Where(t => t.Name.Any(char.IsDigit), "whose name contains a digit")
                 .Methods.Returning(typeof(Task))
                 .MustHaveSuffix("Async"))
             .ShouldBe(
-                "Methods of types in `MyApp.*` whose name contains a digit, except `SqlConnection`, "
-                + "returning `Task` must be named `*Async`.");
+                "Methods returning `Task` declared in types in `MyApp.*` whose name contains a digit, "
+                + "except `SqlConnection`, must be named `*Async`.");
     }
 
     [Fact]
@@ -868,7 +883,7 @@ public class SentenceAssemblyTests
     {
         SentenceRenderer.MemberSubject(Arch.Namespace("MyApp.Web.*")
                 .Methods.Returning(typeof(Task)))
-            .ShouldBe("Methods of types in `MyApp.Web.*` returning `Task`");
+            .ShouldBe("Methods returning `Task` declared in types in `MyApp.Web.*`");
     }
 
     [Fact]
@@ -876,14 +891,14 @@ public class SentenceAssemblyTests
     {
         // An open-generic anchor renders declared type-parameter names, like Implementing (§4.6, §5.2).
         SentenceRenderer.MemberSubject(Arch.Types.Methods.Returning(typeof(Task<>)))
-            .ShouldBe("Methods of types returning `Task<TResult>`");
+            .ShouldBe("Methods returning `Task<TResult>` declared in types");
     }
 
     [Fact]
     public void Returning_MultipleAnchors_JoinWithOr()
     {
         SentenceRenderer.MemberSubject(Arch.Types.Methods.Returning(typeof(Task), typeof(Task<>)))
-            .ShouldBe("Methods of types returning `Task` or `Task<TResult>`");
+            .ShouldBe("Methods returning `Task` or `Task<TResult>` declared in types");
     }
 
     [Fact]
@@ -896,7 +911,7 @@ public class SentenceAssemblyTests
             .Returning("System.Threading.Tasks.Task", "System.Threading.Tasks.Task<TResult>"));
 
         named.ShouldBe(typed);
-        typed.ShouldBe("Methods of types returning `Task` or `Task<TResult>`");
+        typed.ShouldBe("Methods returning `Task` or `Task<TResult>` declared in types");
     }
 
     [Fact]
@@ -905,14 +920,14 @@ public class SentenceAssemblyTests
         // The anchor list widens colliding simple names outward by the minimal distinguishing trailing
         // segments (§6), exactly as every other anchor list does.
         SentenceRenderer.MemberSubject(Arch.Types.Methods.Returning("A.Result", "B.Result"))
-            .ShouldBe("Methods of types returning `A.Result` or `B.Result`");
+            .ShouldBe("Methods returning `A.Result` or `B.Result` declared in types");
     }
 
     [Fact]
-    public void MemberWhere_CanonicalizesToSentenceFinal_RegardlessOfChainPosition()
+    public void MemberWhere_FollowsTheKindPlural_RegardlessOfChainPosition()
     {
-        // The member Where renders sentence-final, after the head prefix and the type reference, whatever the
-        // chain order.
+        // The member Where renders right after the kind plural and ahead of "declared in" and the type
+        // reference, whatever the chain order.
         string whereFirst = SentenceRenderer.MemberSubject(
             Arch.Types.Methods.Where(m => m.IsAsync, "that are async")
                 .WithSuffix("Handler"));
@@ -920,21 +935,21 @@ public class SentenceAssemblyTests
             Arch.Types.Methods.WithSuffix("Handler")
                 .Where(m => m.IsAsync, "that are async"));
 
-        whereFirst.ShouldBe("`*Handler` methods of types that are async");
+        whereFirst.ShouldBe("`*Handler` methods that are async declared in types");
         whereLast.ShouldBe(whereFirst);
     }
 
     [Fact]
     public void MemberNamePrefix_AndReturning_RenderTheSameSentenceInEitherOrder()
     {
-        // The name adjective premodifies the head and Returning stays inline after the type reference, so the
+        // The name adjective premodifies the head and Returning follows it ahead of the type reference, so the
         // chain order cannot change the sentence.
         string suffixFirst = SentenceRenderer.MemberSubject(Arch.Types.Methods.WithSuffix("Async")
             .Returning(typeof(Task)));
         string returningFirst = SentenceRenderer.MemberSubject(Arch.Types.Methods.Returning(typeof(Task))
             .WithSuffix("Async"));
 
-        suffixFirst.ShouldBe("`*Async` methods of types returning `Task`");
+        suffixFirst.ShouldBe("`*Async` methods returning `Task` declared in types");
         returningFirst.ShouldBe(suffixFirst);
     }
 
@@ -1397,16 +1412,16 @@ public class SentenceAssemblyTests
     }
 
     [Fact]
-    public void MemberAttributedWith_ComposesWithInlineAndSentenceFinalAdjectives()
+    public void MemberAttributedWith_ComposesWithReturningAndWhere()
     {
-        // The prefix leads, the inline adjective follows the type reference, the Where canonicalizes
-        // sentence-final — three placements in one subject. (That `.Returning` is still reachable after the
-        // adjective is the TSelf-generic shape holding: this line would not compile otherwise.)
+        // The prefix leads, Returning and then the Where follow the kind plural, and the type reference comes
+        // last — three placements in one subject. (That `.Returning` is still reachable after the adjective is
+        // the TSelf-generic shape holding: this line would not compile otherwise.)
         SentenceRenderer.MemberSubject(Arch.Types.Methods
                 .AttributedWith(typeof(ApiControllerAttribute))
                 .Returning(typeof(Task))
                 .Where(m => m.IsAsync, "that are async"))
-            .ShouldBe("`[ApiController]`-attributed methods of types returning `Task` that are async");
+            .ShouldBe("`[ApiController]`-attributed methods returning `Task` that are async declared in types");
     }
 
     [Fact]
@@ -1476,14 +1491,28 @@ public class SentenceAssemblyTests
     }
 
     [Fact]
-    public void ThatAreStatic_WithMemberWhere_KeepsTheWhereSentenceFinal()
+    public void ThatAreStatic_WithMemberWhere_KeepsTheWhereOnTheKindPlural()
     {
-        // Three placements in one member subject: the prefix leads, the type reference follows the kind
-        // plural, and the Where canonicalizes sentence-final whatever the chain order.
+        // Three placements in one member subject: the prefix leads, the Where follows the kind plural whatever
+        // the chain order, and the type reference comes last.
         SentenceRenderer.MemberSubject(Arch.Types.Fields
                 .Where(m => !m.IsConst, "that are not constants")
                 .ThatAreStatic())
-            .ShouldBe("Static fields of types that are not constants");
+            .ShouldBe("Static fields that are not constants declared in types");
+    }
+
+    [Fact]
+    public void MemberWhere_AndTypeWhereThenProjected_RenderDifferentSentences()
+    {
+        // The disambiguation pin for the member Where: with one description, the fields of the types it
+        // describes and the fields it describes of any type are two subjects, and a Where after the type
+        // reference would give them one sentence.
+        string typeWhere = SentenceRenderer.MemberSubject(Arch.Types.Where(_ => true, "that are obsolete")
+            .Fields);
+        string memberWhere = SentenceRenderer.MemberSubject(Arch.Types.Fields.Where(_ => true, "that are obsolete"));
+
+        typeWhere.ShouldBe("Fields of types that are obsolete");
+        memberWhere.ShouldBe("Fields that are obsolete declared in types");
     }
 
     [Fact]
@@ -1520,12 +1549,22 @@ public class SentenceAssemblyTests
     [Fact]
     public void MemberExcept_RendersAfterAMemberWhere_WhateverTheChainOrder()
     {
-        // The member stratum's sentence-final group orders as the type side's does: a Where written after the
-        // Except still describes the subject, never the exception.
+        // The member stratum keeps the type side's order: a Where written after the Except still describes the
+        // subject, never the exception, because the Where renders ahead of the reference and the Except after it.
         SentenceRenderer.MemberSubject(Arch.Types.Methods
                 .Except(Arch.Types.Named("Program").Methods.Named("Main"))
                 .Where(m => m.IsAsync, "that are async"))
-            .ShouldBe("Methods of types that are async, except `Main` methods of types named `Program`");
+            .ShouldBe("Methods that are async declared in types, except `Main` methods of types named `Program`");
+    }
+
+    [Fact]
+    public void MemberExcept_APayloadWithMemberClauses_ReadsTheSameInReferencePosition()
+    {
+        // A payload renders its own subject phrase, so its clauses precede "declared in" there too.
+        SentenceRenderer.Sentence(Arch.Types.Methods
+                .Except(Arch.Types.Named("Worker").Methods.Returning(typeof(Task)))
+                .MustBeStatic())
+            .ShouldBe("Methods of types, except methods returning `Task` declared in types named `Worker`, must be static.");
     }
 
     [Fact]

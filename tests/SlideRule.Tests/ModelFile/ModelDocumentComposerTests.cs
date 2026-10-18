@@ -49,7 +49,7 @@ public sealed class ModelDocumentComposerTests
             "    {",
             "      \"id\": \"api/handlers-are-public\",",
             "      \"posture\": \"enforce\",",
-            "      \"sentence\": \"Methods of the Handlers layer returning `String` must be public.\",",
+            "      \"sentence\": \"Methods returning `String` declared in the Handlers layer must be public.\",",
             "      \"because\": \"A handler nobody can call is dead code.\",",
             "      \"constraint\": { \"node\": \"memberMustBePublic\", \"memberSubject\": { \"source\": { \"noun\": { \"node\": \"layer\", \"name\": \"Handlers\" } }, \"kind\": \"method\", \"adjectives\": [{ \"node\": \"returning\", \"anchors\": [{ \"name\": \"System.String\" }] }] } }",
             "    },",

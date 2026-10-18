@@ -863,8 +863,8 @@ express them: members as constraint **targets**. Member *subjects* are §4.6.
 Where §4.5 admits members as constraint *targets* (`arch.Member` + `MustNotUse`), this section
 admits them as *subjects*: a projection turns a type selection into a **member selection** over
 the declared members of the selected types, refinable with member adjectives and asserted on
-with member modal verbs. The flagship is `naming/async-suffix` — *"Methods of types in
-`MyApp.Web.*` returning `Task` must be named `*Async`."* A member constraint's subject, as
+with member modal verbs. The flagship is `naming/async-suffix` — *"Methods returning `Task`
+declared in types in `MyApp.Web.*` must be named `*Async`."* A member constraint's subject, as
 every walk through `Constraint.Subject` sees it — foreign-`Arch` detection (§8 item 10) and
 Quarantine desugaring (§7) — is the underlying **type** selection.
 
@@ -1419,7 +1419,7 @@ posture verbs, trailers and escape hatches of §5.4–§5.6 are written by hand.
 | `.WithPrefix` | `(string)` | `Get*` methods of types |
 | `.WithNameMatching` | `(string)` | `*Handler*` methods of types |
 | `.Named` | `(IEnumerable<string>)` · `(string, …)` | `Main` methods of types |
-| `.Returning` | `(Type, …)` · `(string, …)` on `.Methods` | Methods of types returning `Task` |
+| `.Returning` | `(Type, …)` · `(string, …)` on `.Methods` | Methods returning `Task` declared in types |
 | `.AttributedWith` | `(Type)` · `(string)` · `<T>()` | `[ApiController]`-attributed methods of types |
 | `.ThatAreStatic` | `()` | Static fields of types |
 | `.ThatArePublic` | `()` | Public methods of types |
@@ -1429,7 +1429,7 @@ posture verbs, trailers and escape hatches of §5.4–§5.6 are written by hand.
 | `.ThatAreProtectedInternal` | `()` | Protected internal methods of types |
 | `.ThatArePrivateProtected` | `()` | Private protected methods of types |
 | `.Except` | `(IEnumerable<MemberSelection>)` · `(MemberSelection, …)` | Methods of types, except `Main` methods of types named `Program` |
-| `.Where` | `(Func<IMemberInfo, bool>, string)` | Methods of types that are async |
+| `.Where` | `(Func<IMemberInfo, bool>, string)` | Methods that are async declared in types |
 
 | Verb | Overloads | Fragment |
 |---|---|---|
@@ -1851,12 +1851,12 @@ form cannot reach, because a string anchor still names one definition rather tha
 
 - `.WithSuffix("Async")` / `.WithPrefix("Get")` / `.WithNameMatching("*Handler*")` — head prefix naming the members: "`*Async` methods of types in `MyApp.*`", "`Get*` methods of types", "`*Handler*` members of types". The affixes are literal and the glob is a §4.2 pattern, both over the member's own name. A head prefix where the type-side twins are inline clauses, for member `Named`'s reason: an inline " named `*Async`" after the type reference would read as naming the types, and `arch.Types.Methods.WithSuffix("Speak")` and `arch.Types.WithSuffix("Speak").Methods` would render one sentence for two different subjects
 - `.Named("Main")` — head prefix naming the members: "`Main` methods of types named `Program`", "`Main` or `Run` methods of types". The exact name, ordinal, reaching every overload of a method, with a `*` read as a literal character, as on the type side (§5.2). A head prefix where the type-side twin is an inline clause, because an inline " named `Main`" after the type reference would read as naming the types. Each name of a subject's list that no member carries fails on its own (§4.6)
-- `.Returning(typeof(Task))` / `.Returning("System.Threading.Tasks.Task")` — declaration-level (§4.6); an open generic renders declared type-parameter names ("returning `Task<TResult>`"); multiple anchors join "returning `Task` or `Task<TResult>`", colliding simple names widening as in §6; the string form is §5.2's escape hatch, rendering byte-identically. Methods-only.
+- `.Returning(typeof(Task))` / `.Returning("System.Threading.Tasks.Task")` — declaration-level (§4.6); an open generic renders declared type-parameter names ("returning `Task<TResult>`"); multiple anchors join "returning `Task` or `Task<TResult>`", colliding simple names widening as in §6; the string form is §5.2's escape hatch, rendering byte-identically. Methods-only. A trailing clause on the kind-plural: the subject joins its types with "declared in" rather than "of", so the clause sits between the two nouns and cannot be read as narrowing the types: "methods returning `Task` declared in types in `MyApp.Web.*`" (§6)
 - `.AttributedWith(typeof(McpServerToolAttribute))` / `.AttributedWith("ModelContextProtocol.Server.McpServerToolAttribute")` — head prefix: "`[McpServerTool]`-attributed" — premodifies the kind-plural (§6), so the subject reads "`[McpServerTool]`-attributed methods of types in `SlideRule.*`". Declared member attributes only (§4.6); the string form is §5.2's escape hatch, rendering byte-identically
 - `.ThatAreStatic()` — head prefix: "static" — premodifies the kind-plural (§6), so the subject reads "static fields of the Core layer". A member **shape** adjective (§11); head prefixes stack across families and concatenate in authoring order
 - `.ThatArePublic()` / `.ThatAreInternal()` / `.ThatAreProtected()` / `.ThatArePrivate()` / `.ThatAreProtectedInternal()` / `.ThatArePrivateProtected()` — head prefix naming the declared accessibility: "protected fields of types in `MyApp.Services.*`", "private protected methods of types". Each matches its level exactly, so `.ThatAreProtected()` leaves out the `protected internal` and `private protected` members, which have adjectives of their own, and a class member written with no modifier is private. All six levels ship where the type side ships three (§5.2), because the laws that need the protected levels are laws about members: a base class's fields and hooks are what an inheritor reaches. The adjective half of the family `MustBePublic`, `MustBeInternal`, `MustBeProtected` and `MustBePrivate` constrain; the prefixes stack with `.ThatAreStatic()` and the attribute prefix in authoring order
-- `.Except(memberSelection, …)` — ", except `Main` methods of types named `Program`" — a parenthetical canonicalized to sentence-final after any member `Where` and closed by the composer, as on the type side (§5.2, §6). Each operand is a member selection over types of its own (`arch.Types.Named("Program").Methods.Named("Main")`), several or-joined, and is resolved and subtracted on §4.6's terms. It is the exemption form for a member a law must not reach when no name or kind picks it out of the subject alone
-- `.Where(pred, description:)` — description verbatim — canonicalized to sentence-final (§6)
+- `.Except(memberSelection, …)` — ", except `Main` methods of types named `Program`" — a parenthetical rendered last, after the type reference and so after any member `Where`, and closed by the composer, as on the type side (§5.2, §6). Each operand is a member selection over types of its own (`arch.Types.Named("Program").Methods.Named("Main")`), several or-joined, and is resolved and subtracted on §4.6's terms. It is the exemption form for a member a law must not reach when no name or kind picks it out of the subject alone
+- `.Where(pred, description:)` — description verbatim — a trailing clause on the kind-plural like `Returning`, after any `Returning` clauses whatever the chain order: "fields that are not constants declared in types". The description completes the subject as a relative clause, so it cannot premodify the head as the other member adjectives do; after the type reference, `arch.Types.Fields.Where(p, "that are X")` would render the sentence `arch.Types.Where(q, "that are X").Fields` renders, "Fields of types that are X", for a different subject (§6)
 
 **Member modal verbs** (turn a `MemberSelection` into a terminal `Constraint`):
 
@@ -1984,9 +1984,8 @@ carries its sugar overload too, or the verb silently stops compiling after the s
   a comma (", except `Foo`") and never closes itself: one phrase serves subject and reference
   position alike, so only the junction that follows knows whether text follows. Wherever running
   text does, a comma closes the clause — before the verb (*"Types in the Host layer, except
-  `McpServerCommand`, must not use …"*), before a member subject's own clauses (*"Methods of
-  types in `MyApp.*`, except `SqlConnection`, returning `Task` must be named `*Async`."*),
-  before the final joiner of a list whose penultimate item ends open (*"must not reference types
+  `McpServerCommand`, must not use …"*, *"Methods returning `Task` declared in types in
+  `MyApp.*`, except `SqlConnection`, must be named `*Async`."*), before the final joiner of a list whose penultimate item ends open (*"must not reference types
   in `MyApp.Legacy.*`, except `SqlConnection`, or `SqlCommand`"*), before a union's own clauses
   when its last operand ends open, and before a verb phrase's tail (*"…, except
   `TimeoutException`, without a `when` filter"*). A sentence-final period closes it by itself
@@ -2007,10 +2006,11 @@ carries its sugar overload too, or the verb silently stops compiling after the s
   `arch.AnyOf(arch.Namespace("A.*").ThatArePublic(), arch.Project("B")).Authored()` reads
   "authored public types in `A.*` or authored types in project `B`". Prefixing is what keeps the
   fact attached to the noun it narrows. A member subject renders its type selection in
-  *reference* position (below), so a trailing clause would land between the types and the
-  member's own adjectives — "…layers, excluding source-generated types returning `Task`" reads
-  as narrowing the generated `Task`-returning types, which is not the set the checker uses. The
-  member side's own accessibility adjectives (§5.7) prefix the kind-plural on these grounds —
+  *reference* position (below), so a trailing type clause would land beside the member's own
+  clauses and read as one of them — "methods returning `Task` declared in types in `A.*`,
+  excluding source-generated types" can be heard as excluding methods, which is not the set the
+  checker uses. The member side's own accessibility adjectives (§5.7) prefix the kind-plural on
+  these grounds —
   "protected fields of types in `MyApp.*`" — and, as member prefixes, concatenate rather than
   collapse.
 - **Union collapse** (§5.1): a union of two or more operands, each adjective-free and all of the
@@ -2061,17 +2061,22 @@ carries its sugar overload too, or the verb silently stops compiling after the s
   Colliding declaring-type simple names widen by the same minimal-trailing-segments rule —
   including when the member names differ ("`Billing.Order.Total` or `Sales.Order.Refresh()`"),
   because the reader must see they are different `Order`s.
-- **Member subjects** (§4.6) assemble as the member head prefixes + `{kind-plural} of
-  {selection-reference}` + the inline `Returning` clauses in authoring order + the sentence-final
-  `Where` and `Except` clauses, every `Where` before every `Except` as on the type side, the member
-  `Except` rendering each payload in reference position. The kind-plural is the
-  projection head ("methods", "properties", …); the `{selection-reference}` is the underlying
-  type selection rendered in *reference* position (the same "types in `MyApp.Web.*`" / "the Web
-  layer" form a target list uses), so a member subject reads "methods of types in `MyApp.Web.*`".
-  `Returning` is the one inline member adjective, and its clauses append in the order written; the
-  member `Where` canonicalizes sentence-final exactly like the type-side `Where`. The flagship: `web.Methods.Returning(typeof(Task)).MustHaveSuffix("Async")` (where
-  `web` is `MyApp.Web.*`) → *"Methods of types in `MyApp.Web.*` returning `Task` must be named
-  `*Async`."* The member attribute adjective premodifies the kind-plural
+- **Member subjects** (§4.6) assemble as the member head prefixes + the kind-plural + the
+  trailing member clauses + the joiner + `{selection-reference}` + the member `Except` clauses.
+  The trailing clauses are the `Returning` clauses in the order written, then the member `Where`
+  descriptions in the order written, whatever the chain order. The joiner is " of " when there
+  are none and " declared in " when there are: "methods of types in `MyApp.Web.*`", "methods
+  returning `Task` declared in types in `MyApp.Web.*`". A clause after the reference would read
+  as narrowing the types, and a member `Where` there would render the sentence a type-side
+  `Where` before the projection renders. Every `Where` still precedes every `Except`, as on the
+  type side, and the member `Except` renders each payload in reference position, where a payload
+  with clauses of its own reads the same way ("except methods returning `Task` declared in types
+  named `Worker`"). The kind-plural is the projection head ("methods", "properties", …); the
+  `{selection-reference}` is the underlying type selection rendered in *reference* position (the
+  same "types in `MyApp.Web.*`" / "the Web layer" form a target list uses). The flagship:
+  `web.Methods.Returning(typeof(Task)).MustHaveSuffix("Async")` (where `web` is `MyApp.Web.*`) →
+  *"Methods returning `Task` declared in types in `MyApp.Web.*` must be named `*Async`."* The
+  member attribute adjective premodifies the kind-plural
   ("`[McpServerTool]`-attributed methods of types in `SlideRule.*`"), as do `.ThatAreStatic()`,
   the accessibility adjectives ("private fields of types"), member `Named` ("`Main` methods of
   types named `Program`") and the name adjectives `WithSuffix`, `WithPrefix` and `WithNameMatching`

@@ -8,11 +8,10 @@ namespace SlideRule.Model;
 ///     anchor is a <see cref="TypeAnchor" />, so the string form renders the identical prefix.
 /// </summary>
 /// <remarks>
-///     A head prefix, never the type side's inline clause: a member subject renders its type selection in
-///     reference position, so an inline member fragment would land after that reference and
-///     <c>arch.Types.AttributedWith(X).Methods</c> would render byte-identically to
-///     <c>arch.Types.Methods.AttributedWith(X)</c> while naming a different subject. Prefixing keeps the
-///     fact attached to the noun it narrows, as <see cref="AuthoredAdjective" /> does for the same ambiguity.
+///     A head prefix, never the type side's inline clause: <c>arch.Types.AttributedWith(X).Methods</c>
+///     renders "methods of types attributed with `[X]`", and the member fact must not read like that for
+///     <c>arch.Types.Methods.AttributedWith(X)</c>, a different subject. Prefixing keeps the fact attached
+///     to the noun it narrows, as <see cref="AuthoredAdjective" /> does for the same ambiguity.
 /// </remarks>
 internal sealed class MemberAttributedWithAdjective(TypeAnchor anchor) : MemberAdjective
 {

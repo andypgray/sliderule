@@ -211,7 +211,7 @@ await runner.RunPendingAsync();
 The build warns `SR2001` at the method and exits 0, and `check` exits 1:
 
 ```text
-FAIL async/accept-cancellation — Methods of authored types in `Meridian.Interchange.*` returning `Task`, `Task<TResult>`, `ValueTask` or `ValueTask<TResult>` must accept a parameter of type `CancellationToken`.
+FAIL async/accept-cancellation — Methods returning `Task`, `Task<TResult>`, `ValueTask` or `ValueTask<TResult>` declared in authored types in `Meridian.Interchange.*` must accept a parameter of type `CancellationToken`.
   because: Accepting a CancellationToken lets a caller stop in-flight async work and flow that request on to the calls it makes, so a Task- or ValueTask-returning method without one cannot take part in cooperative cancellation.
   citation: https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap
   fix: Add a CancellationToken parameter and flow OutboxDispatcher's stoppingToken through the call chain.
@@ -348,7 +348,7 @@ FAIL di/hosted-services-scope-their-work — Types derived from `BackgroundServi
 Rename `IOutboxProcessor.ProcessPendingAsync` to `ProcessPending`, with its implementation and the one call site in `ScopedDispatchRunner`, so it compiles. Both the interface and the class now declare a `Task`-returning method without the suffix. The build warns `SR2001` twice, and the rule fires on both:
 
 ```text
-FAIL naming/async-suffix — Methods of authored types in `Meridian.Interchange.*` returning `Task`, `Task<TResult>`, `ValueTask` or `ValueTask<TResult>` must be named `*Async`.
+FAIL naming/async-suffix — Methods returning `Task`, `Task<TResult>`, `ValueTask` or `ValueTask<TResult>` declared in authored types in `Meridian.Interchange.*` must be named `*Async`.
   because: Task- and ValueTask-returning methods carry the Async suffix so callers see at the call site that a method must be awaited.
   citation: https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap
   fix: Rename the method to end in Async.

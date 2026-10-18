@@ -92,6 +92,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "Methods of types named `*Async`". The old sentence was also what `arch.Types.WithSuffix("Async").Methods`
   renders, which selects every method of the types named `*Async`, so two rules with different verdicts
   read alike. What each selects is unchanged.
+- A member subject with `.Returning` or a member `.Where` now puts those clauses on the members and names
+  the types after "declared in": `web.Methods.Returning(typeof(Task))` renders "Methods returning `Task`
+  declared in types in `MyApp.Web.*`", where it rendered "Methods of types in `MyApp.Web.*` returning
+  `Task`". `arch.Types.Fields.Where(p, "that are X")` rendered "Fields of types that are X", the sentence
+  `arch.Types.Where(q, "that are X").Fields` also renders for the fields of different types; it now
+  renders "Fields that are X declared in types". A member subject without either clause still reads
+  "methods of types …", and what each selects is unchanged.
 - `MemberSelection`, `MethodSelection`, `FieldSelection`, `PropertySelection` and `ProjectSelection` moved
   from `SlideRule.Fluent` to the `SlideRule` namespace, so a helper method that takes or returns one
   compiles under `using SlideRule;` alone. Every member whose signature names one of them changed with

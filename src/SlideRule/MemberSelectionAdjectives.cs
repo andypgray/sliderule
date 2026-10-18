@@ -344,9 +344,9 @@ public static class MemberSelectionAdjectives
     ///     declaring type's included, and runs against each candidate member when the check runs, never
     ///     when the spec is loaded. <paramref name="description" /> is required and completes the subject
     ///     as a relative clause; it is rendered verbatim in the generated agent context in place of the
-    ///     wording an adjective would produce, last in the clause list, and nothing checks that it
-    ///     describes what the predicate does. A blank or multi-line description is reported when the spec
-    ///     is loaded.
+    ///     wording an adjective would produce, right after the member kind and ahead of the types:
+    ///     "methods with over 5 parameters declared in types". Nothing checks that it describes what the
+    ///     predicate does. A blank or multi-line description is reported when the spec is loaded.
     /// </summary>
     public static TSelf Where<TSelf>(
         this TSelf selection,

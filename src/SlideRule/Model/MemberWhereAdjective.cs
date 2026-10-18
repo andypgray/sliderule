@@ -3,8 +3,11 @@ namespace SlideRule.Model;
 /// <summary>
 ///     The member selector-position escape hatch (<c>.Where(pred, description:)</c> on a member
 ///     selection, GRAMMAR §5.6, §5.7). The predicate is stored but never evaluated at spec build; the
-///     description renders verbatim as a sentence-final relative clause on the member subject, exactly
-///     like the type-side <see cref="WhereAdjective" />.
+///     description renders verbatim as a relative clause on the member kind-plural, after any
+///     <see cref="ReturningAdjective" /> and ahead of " declared in" and the type reference, so it never
+///     reads as the type-side <see cref="WhereAdjective" /> (GRAMMAR §6). Its placement stays
+///     <see cref="AdjectivePlacement.SubjectFinal" /> because that is what orders it ahead of every member
+///     Except.
 /// </summary>
 internal sealed class MemberWhereAdjective(Func<IMemberInfo, bool> predicate, string description) : MemberAdjective
 {
