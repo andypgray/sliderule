@@ -1,12 +1,12 @@
 using System.Text.Json;
 using ModelContextProtocol.Protocol;
 using Shouldly;
-using Xunit;
 using SlideRule.Cli.Mcp.Infrastructure;
 using SlideRule.Roslyn.Hosting;
 using SlideRule.Tests.Cli;
 using SlideRule.Tests.Mcp.TestDoubles;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.Mcp;
 

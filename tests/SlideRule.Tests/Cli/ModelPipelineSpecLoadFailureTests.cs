@@ -1,10 +1,10 @@
 using System.Reflection;
 using Shouldly;
-using Xunit;
 using SlideRule.Cli.Pipeline;
 using SlideRule.Discovery;
 using SlideRule.Roslyn;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.Cli;
 

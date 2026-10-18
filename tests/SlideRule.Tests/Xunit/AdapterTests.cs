@@ -1,12 +1,12 @@
 using Shouldly;
-using Xunit;
-using Xunit.Sdk;
 using SlideRule.Architecture;
 using SlideRule.Checking;
 using SlideRule.Roslyn.Diagnostics;
 using SlideRule.Tests.Cli;
 using SlideRule.Tests.TestSupport;
 using SlideRule.Xunit;
+using Xunit;
+using Xunit.Sdk;
 
 namespace SlideRule.Tests.Xunit;
 

@@ -1,10 +1,10 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Codebase;
 using SlideRule.Extraction;
 using SlideRule.Rendering;
 using SlideRule.Roslyn;
 using SlideRule.Tests.Extraction;
+using Xunit;
 
 namespace SlideRule.Tests.Rendering;
 

@@ -1,11 +1,11 @@
 using System.Text.Json;
 using ModelContextProtocol.Protocol;
 using Shouldly;
-using Xunit;
 using SlideRule.Cli.Mcp;
 using SlideRule.Cli.Verbs;
 using SlideRule.Tests.Mcp;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.Cli;
 

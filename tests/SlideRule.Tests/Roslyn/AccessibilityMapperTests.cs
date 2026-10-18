@@ -1,9 +1,9 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
-using Xunit;
 using SlideRule.Extraction.Passes;
 using SlideRule.Tests.Extraction;
+using Xunit;
 using CoreAccessibility = SlideRule.Accessibility;
 using RoslynAccessibility = Microsoft.CodeAnalysis.Accessibility;
 using RoslynTypeKind = Microsoft.CodeAnalysis.TypeKind;

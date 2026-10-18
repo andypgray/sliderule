@@ -1,9 +1,9 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Hosting;
 using SlideRule.Tests.Cli;
 using SlideRule.Tests.ModelFile;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.Analyzers.Parity;
 

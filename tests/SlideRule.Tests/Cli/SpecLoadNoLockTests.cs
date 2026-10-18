@@ -1,8 +1,8 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Cli.Pipeline;
 using SlideRule.Hosting;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.Cli;
 

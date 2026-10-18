@@ -1,8 +1,8 @@
 using System.Diagnostics;
 using Shouldly;
-using Xunit;
 using SlideRule.Tests.Cli;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.Mcp;
 

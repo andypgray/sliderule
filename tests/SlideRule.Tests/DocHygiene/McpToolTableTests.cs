@@ -1,9 +1,9 @@
 using System.Reflection;
 using System.Text.RegularExpressions;
 using ModelContextProtocol.Server;
-using Xunit;
 using SlideRule.Cli.Mcp.Pipeline;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.DocHygiene;
 

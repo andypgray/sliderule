@@ -1,5 +1,4 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Codebase;
 using SlideRule.Hosting;
 using SlideRule.Rendering;
@@ -7,6 +6,7 @@ using SlideRule.Roslyn;
 using SlideRule.Tests.Checking;
 using SlideRule.Tests.Extraction;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.Rendering;
 

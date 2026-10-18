@@ -1,10 +1,10 @@
 using System.Diagnostics;
 using System.Text;
 using Shouldly;
-using Xunit;
 using SlideRule.Roslyn.Hosting;
 using SlideRule.Tests.Cli;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.Replay;
 

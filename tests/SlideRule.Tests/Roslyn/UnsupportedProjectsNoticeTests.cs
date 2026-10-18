@@ -1,6 +1,6 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Roslyn.Diagnostics;
+using Xunit;
 
 namespace SlideRule.Tests.Roslyn;
 

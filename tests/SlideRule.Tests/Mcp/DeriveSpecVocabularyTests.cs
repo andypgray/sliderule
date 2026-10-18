@@ -1,10 +1,10 @@
 using System.Text.RegularExpressions;
 using Shouldly;
-using Xunit;
 using SlideRule.Cli.Mcp.Prompts;
 using SlideRule.Rendering;
 using SlideRule.Tests.DocHygiene;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.Mcp;
 

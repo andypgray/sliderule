@@ -6,8 +6,8 @@ using System.Text.Json.Nodes;
 using Microsoft.Extensions.AI;
 using ModelContextProtocol.Server;
 using Shouldly;
-using Xunit;
 using SlideRule.Cli.Mcp.Pipeline;
+using Xunit;
 
 namespace SlideRule.Tests.Mcp;
 

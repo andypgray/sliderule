@@ -1,9 +1,9 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Codebase;
 using SlideRule.Extraction;
 using SlideRule.Roslyn;
 using SlideRule.Roslyn.Diagnostics;
+using Xunit;
 
 namespace SlideRule.Tests.Extraction;
 

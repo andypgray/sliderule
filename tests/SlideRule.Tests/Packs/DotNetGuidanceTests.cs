@@ -1,13 +1,13 @@
 using System.Reflection;
 using Microsoft.Extensions.Hosting;
 using Shouldly;
-using Xunit;
 using SlideRule.Hosting;
 using SlideRule.Model;
 using SlideRule.Packs.DotNet;
 using SlideRule.Tests.Checking;
 using SlideRule.Tests.DocHygiene;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.Packs;
 

@@ -1,12 +1,12 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Shouldly;
-using Xunit;
 using SlideRule.Cli.Rendering;
 using SlideRule.Tests.Cli;
 using SlideRule.Tests.DocHygiene.Walkthroughs;
 using SlideRule.Tests.ModelFile;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.DocHygiene;
 

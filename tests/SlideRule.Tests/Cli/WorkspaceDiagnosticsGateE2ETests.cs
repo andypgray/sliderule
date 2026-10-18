@@ -1,11 +1,11 @@
 using System.Text.Json;
 using Shouldly;
-using Xunit;
 using SlideRule.Cli.Verbs;
 using SlideRule.Roslyn.Diagnostics;
 using SlideRule.Roslyn.MsBuild;
 using SlideRule.Tests.Mcp.TestDoubles;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 // The suite's reader over a check document, not the CLI renderer of the same name that this file also imports.
 using CheckJson = SlideRule.Tests.TestSupport.CheckJson;
 

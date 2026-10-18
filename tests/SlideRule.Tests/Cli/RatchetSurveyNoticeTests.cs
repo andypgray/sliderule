@@ -1,10 +1,10 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Checking;
 using SlideRule.Cli.Rendering;
 using SlideRule.Hosting;
 using SlideRule.Tests.Checking;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.Cli;
 
