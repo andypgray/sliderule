@@ -134,7 +134,8 @@ internal static class SarifReportRenderer
     }
 
     // Each resolved type by its simple name and first declaration site, the same pointer the human report
-    // prints, composed here per this file's convention that each renderer formats its own text.
+    // prints, composed here per this file's convention that each renderer composes its own pointers, stamps
+    // and notifications; a violation's wording is the exception, with ViolationWording as the one owner.
     private static string ExemplarText(RuleResult result, PathFormat.Relativizer relativizer)
     {
         IEnumerable<string> pointers = result.Exemplar.Select(type => ExemplarPointer(type, relativizer));
@@ -240,7 +241,8 @@ internal static class SarifReportRenderer
     // that from — a clean SARIF over a filter would close every alert the unchecked projects would have
     // raised. Warning rather than error: the results are true, they are simply not the whole solution's.
     // Composed here rather than shared with the human stamp, per this file's convention that each renderer
-    // formats independently; the paths arrive already solution-relative, like every other path in the log.
+    // composes its own stamps and notifications; the paths arrive already solution-relative, like every other
+    // path in the log.
     // The sentence is this file's; its noun and copula are the one inflection owner's, so the two numbers of
     // it cannot be written by hand into disagreement.
     private static SarifNotification NarrowingNotification(IReadOnlyList<string> uncheckedProjects)
@@ -258,9 +260,9 @@ internal static class SarifReportRenderer
     // project written in a language this product cannot read is never in the model, so no alert can ever be
     // raised in it and a clean scan over a polyglot solution silently reads as clean over all of it. Warning
     // rather than error, beside the narrowing one and for its reason: the results are true, they are simply
-    // not the whole solution's. Composed here per this file's convention that each renderer formats its own
-    // messages; the reason each entry carries is the shared stamp's, so the prose and the JSON key cannot
-    // disagree about what the run could read.
+    // not the whole solution's. Composed here per this file's convention that each renderer composes its own
+    // stamps and notifications; the reason each entry carries is the shared stamp's, so the prose and the JSON
+    // key cannot disagree about what the run could read.
     private static SarifNotification UnsupportedNotification(IReadOnlyList<UnsupportedProjectStamp> unsupportedProjects)
     {
         string subject = DeclaredSubject(unsupportedProjects.Count, "surveyed");
@@ -420,49 +422,17 @@ internal static class SarifReportRenderer
         }
     }
 
-    // The per-kind result body, a twin of ViolationWording's wording, kept per the house convention that each
-    // renderer formats independently. What is not duplicated is how a member is spelled: that form is also what
-    // 'baseline add' resolves names against, so it lives in MemberDisplay rather than in each surface.
+    // The result body is the violation's wording, from the one owner every surface takes it from, split the
+    // way the human report's site loop and the build finding split it: the seven edge kinds read as a source
+    // doing something to a far end, the three subject kinds as one thing being the wrong shape.
     // EmptySubject/RuleError are site-less, so this is never reached for them.
     private static string MessageText(Violation violation)
     {
         return violation.Kind switch
         {
-            ViolationKind.Reference => $"{violation.Source!.FullName} references {violation.Target!.FullName}",
-            ViolationKind.MemberUse => $"{violation.Source!.FullName} uses {MemberDisplay.Of(violation.Member!)}",
-            ViolationKind.Construction => $"{violation.Source!.FullName} constructs {violation.Target!.FullName}",
-            ViolationKind.Injection => $"{violation.Source!.FullName} injects {violation.Target!.FullName}",
-            ViolationKind.Catch => $"{violation.Source!.FullName} catches {violation.Target!.FullName}",
-            ViolationKind.Throw => $"{violation.Source!.FullName} throws {violation.Target!.FullName}",
-            ViolationKind.Expose => $"{violation.Source!.FullName} exposes {violation.Target!.FullName}",
-            ViolationKind.Shape => violation.Subject!.FullName,
-            ViolationKind.MemberShape => MemberDisplay.Of(violation.SubjectMember!),
-            ViolationKind.ProjectShape => ProjectMessageText(violation),
-            _ => string.Empty
-        };
-    }
-
-    // A project violation names its project, and a per-item one the package or framework beside it; a
-    // framework the project lacks (MustTarget) reads as one it does not target, and a property violation
-    // (MustSetProperty) says what the judged build holds.
-    private static string ProjectMessageText(Violation violation)
-    {
-        string project = violation.SubjectProject!.Name;
-        if (violation.Package is { } package) return $"{project} references package {package.Name}";
-        if (violation.Property is { } property) return project + PropertyMessageText(property, violation);
-        if (violation.Framework is not { } framework) return project;
-
-        return violation.FrameworkMissing ? $"{project} does not target {framework}" : $"{project} targets {framework}";
-    }
-
-    private static string PropertyMessageText(string property, Violation violation)
-    {
-        string build = violation.Framework is { } framework ? $" for {framework}" : "";
-        return violation.PropertyValue switch
-        {
-            null => $" does not set {property}{build}",
-            { } value when value.Trim().Length == 0 => $" sets {property} to an empty value{build}",
-            { } value => $" sets {property} to {value}{build}"
+            ViolationKind.Shape or ViolationKind.MemberShape or ViolationKind.ProjectShape =>
+                ViolationWording.SubjectText(violation),
+            _ => ViolationWording.EdgeText(violation)
         };
     }
 }

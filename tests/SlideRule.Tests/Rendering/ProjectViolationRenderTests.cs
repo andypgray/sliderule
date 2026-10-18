@@ -16,8 +16,9 @@ namespace SlideRule.Tests.Rendering;
 ///     does not target.
 /// </summary>
 /// <remarks>
-///     The renderers format independently by house convention, so the same sentences are asserted three
-///     times rather than shared through a helper. What is asserted about JSON is also the slot discipline:
+///     The three surfaces take a violation's wording from <c>ViolationWording</c>, and each is still asserted
+///     on its own: the pin is that every surface reaches the owner, so a surface that grows a twin of its own
+///     reds here rather than in a consumer's scanner. What is asserted about JSON is also the slot discipline:
 ///     <c>subjectProject</c>, <c>package</c> and <c>framework</c> are additive and null-omitted, so a report
 ///     from a spec with no project rule carries none of them.
 /// </remarks>

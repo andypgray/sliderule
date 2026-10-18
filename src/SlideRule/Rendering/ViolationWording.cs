@@ -4,15 +4,16 @@ namespace SlideRule.Rendering;
 
 /// <summary>
 ///     What a violation says in English, one owner for every surface that words one: the phrase the human
-///     check report prints after a site's <c>path:line</c>, and the same phrase inside a build finding's
-///     one-line message.
+///     check report prints after a site's <c>path:line</c>, the same phrase inside a build finding's
+///     one-line message, and the text of a SARIF result.
 /// </summary>
 /// <remarks>
-///     Wording only: which site a violation lands at, and how many lines it yields, stays with each caller,
-///     because that is where the two surfaces genuinely differ. <c>SarifReportRenderer</c> keeps a twin
-///     switch of its own and is not a caller here — each renderer formatting independently is a house
-///     convention. Both spell a member through <c>MemberDisplay</c>, because that form is also what
-///     <c>baseline add</c> resolves names against.
+///     Wording only: which site a violation lands at, how many lines or results it yields, and the stamps
+///     and notifications a surface composes for itself stay with each caller, because that is where the
+///     three surfaces differ. A wording change therefore lands on the human report, the build finding and
+///     the SARIF result at once, and the render tests pin each surface against this class, so a surface that
+///     grows a twin of its own reds there. Members are spelled through <c>MemberDisplay</c>, because that
+///     form is also what <c>baseline add</c> resolves names against.
 /// </remarks>
 internal static class ViolationWording
 {
@@ -49,8 +50,8 @@ internal static class ViolationWording
         };
     }
 
-    // The project arm on its own, which the SARIF renderer's twin switch mirrors line for line. A property violation
-    // says what the judged build holds, and names the framework only where the build told one apart.
+    // The project arm on its own. A property violation says what the judged build holds, and names the
+    // framework only where the build told one apart.
     private static string ProjectText(Violation violation)
     {
         string project = violation.SubjectProject!.Name;
