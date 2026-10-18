@@ -142,6 +142,20 @@ public sealed class DeriveSpecPromptTests
         text.ShouldContain("MustNotHaveCircularReferences()");
         text.ShouldContain("but never in a circle");
         text.ShouldContain("over the family, not one per unit");
+        // Step 3's questions decide what a derivation drafts, and an example is what fires: the member ban and
+        // the attribute law each carry one, inheritance is asked about before a seal rule, the captive template
+        // bans scoped captures alone, a direction a project cycle already forbids is stated as an allow-list,
+        // a family excuses types rather than dropping cells, unreferenced code takes the scope posture that
+        // never fires containment, and the member predicate's properties are listed where a law needs them.
+        text.ShouldContain("domain.MustNotUse(() => DateTime.Now, () => DateTime.UtcNow)");
+        text.ShouldContain("MustBeAttributedWith(\"MyApp.Web.AuthorizeAdminAttribute\")");
+        text.ShouldContain("after asking which way inheritance runs");
+        text.ShouldContain("arch.Registered(Lifetime.Singleton).MustNotInject(arch.Registered(Lifetime.Scoped))`.");
+        text.ShouldContain("only where the transients are disposable or hold state");
+        text.ShouldContain("MSBuild forbids the pair as a cycle");
+        text.ShouldContain("`.Except` them from the family rather than dropping their cell");
+        text.ShouldContain("Code nothing references by type");
+        text.ShouldContain("On a member subject it sees `IMemberInfo`");
         text.ShouldContain("arch_graph"); // the survey tool
         text.ShouldContain("arch_check"); // the evidence tool
     }
