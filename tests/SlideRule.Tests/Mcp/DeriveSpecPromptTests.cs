@@ -80,6 +80,13 @@ public sealed class DeriveSpecPromptTests
         @"^postures: enforce (?<enforce>\d+) / migrate (?<migrate>\d+) / quarantine (?<quarantine>\d+) / caution (?<caution>\d+)$",
         RegexOptions.CultureInvariant);
 
+    // A step-3 question bullet opens with its label, which the receipt's candidate line repeats.
+    private static readonly Regex QuestionLabel = new(
+        @"^- \*\*`(?<label>[a-z]+)`: ", RegexOptions.CultureInvariant | RegexOptions.Multiline);
+
+    private static readonly Regex CandidateLine = new(
+        @"^candidate: (?<label>[a-z]+) -> \S", RegexOptions.CultureInvariant);
+
     // A prompt call never resolves the binding (prompts read no solution/spec), so any working directory
     // serves; a real one keeps StartAsync's host build honest.
     private static McpServerBinding Binding => new(null, null, Directory.GetCurrentDirectory());
@@ -255,6 +262,7 @@ public sealed class DeriveSpecPromptTests
         string[] receiptKeys =
         [
             "statedIntent:",
+            "candidate:",
             "specBuild: ok",
             "evidencePass: complete",
             "check: exit 1, rules 23, passed 12, failed 9, skipped 2, violations 70",
@@ -294,8 +302,8 @@ public sealed class DeriveSpecPromptTests
 
         // Assert
         keys.ShouldBe([
-            "statedIntent", "specBuild", "evidencePass", "check", "postures", "leftRed", "dropped", "undecided",
-            "curation", "baseline", "render"
+            "statedIntent", "candidate", "specBuild", "evidencePass", "check", "postures", "leftRed", "dropped",
+            "undecided", "curation", "baseline", "render"
         ]);
     }
 
@@ -320,6 +328,30 @@ public sealed class DeriveSpecPromptTests
         accountedFor.ShouldBe(rules, "a check's passed, failed and skipped rules account for every rule it checked");
         postured.ShouldBe(rules, "the postures line counts each entry of the same document once");
         exitCode.ShouldBe(failed > 0 ? 1 : 0, "a check with a failed rule exits 1");
+    }
+
+    [Fact]
+    public async Task DeriveSpec_ReceiptExample_AnswersEveryStepThreeQuestionOnce()
+    {
+        // Arrange: the candidate lines are the floor under step 3. A derivation that stops at layering rules has
+        // left the other questions unanswered, and the example is what it copies, so the example answers every
+        // question the step asks, each under the label the step gives it.
+        string text = await ServedRecipeAsync();
+        QuotedFence fence = ShouldFindReceiptFence();
+
+        // Act
+        List<string> questionLabels = QuestionLabel.Matches(text)
+            .Select(static match => match.Groups["label"].Value)
+            .ToList();
+        List<string> answeredLabels = fence.Lines
+            .Select(static line => CandidateLine.Match(line))
+            .Where(static match => match.Success)
+            .Select(static match => match.Groups["label"].Value)
+            .ToList();
+
+        // Assert
+        questionLabels.ShouldNotBeEmpty("step 3 should label its questions");
+        answeredLabels.ShouldBe(questionLabels, "the receipt example should answer step 3's questions in order, each once");
     }
 
     [Fact]
