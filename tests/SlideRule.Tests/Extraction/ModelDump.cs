@@ -136,6 +136,9 @@ internal static class ModelDump
             .Append(" -> [")
             .Append(string.Join(", ", project.ProjectReferences))
             .AppendLine("]");
+        builder.Append("  undeclared=[")
+            .Append(string.Join(", ", project.UndeclaredProjectReferences))
+            .AppendLine("]");
         builder.Append("  assemblies=[")
             .Append(string.Join(", ", project.AssemblyNames))
             .AppendLine("]");
@@ -160,12 +163,25 @@ internal static class ModelDump
         builder.Append("  packages=[")
             .Append(string.Join(", ", project.PackageReferences.Select(Package)))
             .AppendLine("]");
+        foreach (ProjectEvaluation evaluation in project.Evaluations)
+            builder.Append("  evaluation ")
+                .Append(evaluation.TargetFramework ?? "<null>")
+                .Append(" @ ")
+                .Append(Site(evaluation.ProjectFile))
+                .Append(" set=[")
+                .Append(string.Join(", ", evaluation.Properties.Select(Property)))
+                .AppendLine("]");
     }
 
     private static string Package(PackageReference package)
     {
         string privacy = package.IsPrivate ? " (private)" : "";
-        return $"{package.Name} @ {package.Site}{privacy}";
+        return $"{package.Name} @ {package.Site}{privacy} for=[{string.Join(", ", package.Frameworks)}]";
+    }
+
+    private static string Property(EvaluatedProperty property)
+    {
+        return $"{property.Name}={property.Value}@{property.TargetFramework ?? "<null>"} @ {property.Site}";
     }
 
     private static string Tristate(bool? value)

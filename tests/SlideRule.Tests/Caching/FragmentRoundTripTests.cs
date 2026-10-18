@@ -672,14 +672,11 @@ public sealed class FragmentRoundTripTests
     [Fact]
     public void Merge_PackageDeclaredForOneFrameworkOnly_ListsThatFramework()
     {
-        // Arrange — the shape a `$(TargetFramework)` condition produces: both frameworks declare the shared
-        // package, and only netstandard2.0 declares the backport.
-        CodebaseFragment modern = WidgetFragment("net10.0", Declaration("Shared", 9, isPrivate: false));
-        CodebaseFragment legacy = WidgetFragment(
-            "netstandard2.0", Declaration("Shared", 9, isPrivate: false), Declaration("System.Memory", 13, isPrivate: false));
+        // Arrange
+        IReadOnlyList<CodebaseFragment> fragments = PackageForOneFrameworkOnly();
 
         // Act
-        ProjectNode project = FragmentMerger.Merge([modern, legacy])
+        ProjectNode project = FragmentMerger.Merge(fragments)
             .Projects.Single();
 
         // Assert — the frameworks union beside the name-keyed privacy fold, ordinally.
@@ -718,32 +715,26 @@ public sealed class FragmentRoundTripTests
     {
         // Arrange — the frameworks are computed at merge from facts every fragment already carries, so a cache
         // hit must replay them exactly as a fresh extraction would.
-        CodebaseFragment modern = WidgetFragment("net10.0", Declaration("Shared", 9, isPrivate: false));
-        CodebaseFragment legacy = WidgetFragment(
-            "netstandard2.0", Declaration("Shared", 9, isPrivate: false), Declaration("System.Memory", 13, isPrivate: false));
+        IReadOnlyList<CodebaseFragment> fragments = PackageForOneFrameworkOnly();
 
         // Act
-        string json = JsonSerializer.Serialize<IReadOnlyList<CodebaseFragment>>([modern, legacy], ManifestJson.Options);
+        string json = JsonSerializer.Serialize(fragments, ManifestJson.Options);
         var roundTripped = JsonSerializer.Deserialize<IReadOnlyList<CodebaseFragment>>(json, ManifestJson.Options)!;
 
         // Assert
-        FragmentMerger.Merge(roundTripped)
-            .Projects.Single()
-            .PackageReferences.Select(DescribeFrameworks)
-            .ShouldBe(["Shared: net10.0, netstandard2.0", "System.Memory: netstandard2.0"]);
+        CodebaseModel direct = FragmentMerger.Merge(fragments);
+        CodebaseModel fromCache = FragmentMerger.Merge(roundTripped);
+        fromCache.ShouldModelTheSameAs(direct);
     }
 
     [Fact]
     public void Merge_PropertiesPerFramework_BecomeOneEvaluationEach()
     {
-        // Arrange — a property a `$(TargetFramework)` condition sets for net10.0 alone. The netstandard2.0
-        // evaluation set nothing, and it is still an evaluation: that is what lets a rule say the property is
-        // unset there.
-        CodebaseFragment modern = WidgetFragment("net10.0") with { Properties = Evaluated(("Nullable", "enable", 6)) };
-        CodebaseFragment legacy = WidgetFragment("netstandard2.0") with { Properties = Evaluated() };
+        // Arrange
+        IReadOnlyList<CodebaseFragment> fragments = PropertyForOneFrameworkOnly();
 
         // Act
-        ProjectNode project = FragmentMerger.Merge([modern, legacy])
+        ProjectNode project = FragmentMerger.Merge(fragments)
             .Projects.Single();
 
         // Assert
@@ -769,18 +760,35 @@ public sealed class FragmentRoundTripTests
     public void RoundTrip_Properties_ReplayAsTheyWereRecorded()
     {
         // Arrange
-        CodebaseFragment modern = WidgetFragment("net10.0") with { Properties = Evaluated(("Nullable", "enable", 6)) };
-        CodebaseFragment legacy = WidgetFragment("netstandard2.0") with { Properties = Evaluated() };
+        IReadOnlyList<CodebaseFragment> fragments = PropertyForOneFrameworkOnly();
 
         // Act
-        string json = JsonSerializer.Serialize<IReadOnlyList<CodebaseFragment>>([modern, legacy], ManifestJson.Options);
+        string json = JsonSerializer.Serialize(fragments, ManifestJson.Options);
         var roundTripped = JsonSerializer.Deserialize<IReadOnlyList<CodebaseFragment>>(json, ManifestJson.Options)!;
 
         // Assert
-        FragmentMerger.Merge(roundTripped)
-            .Projects.Single()
-            .Evaluations.Select(DescribeEvaluation)
-            .ShouldBe(["net10.0 @ /repo/Widget.csproj:1: Nullable=enable", "netstandard2.0 @ /repo/Widget.csproj:1: "]);
+        CodebaseModel direct = FragmentMerger.Merge(fragments);
+        CodebaseModel fromCache = FragmentMerger.Merge(roundTripped);
+        fromCache.ShouldModelTheSameAs(direct);
+    }
+
+    // The shape a `$(TargetFramework)` condition produces: both frameworks declare the shared package, and only
+    // netstandard2.0 declares the backport.
+    private static IReadOnlyList<CodebaseFragment> PackageForOneFrameworkOnly()
+    {
+        CodebaseFragment modern = WidgetFragment("net10.0", Declaration("Shared", 9, isPrivate: false));
+        CodebaseFragment legacy = WidgetFragment(
+            "netstandard2.0", Declaration("Shared", 9, isPrivate: false), Declaration("System.Memory", 13, isPrivate: false));
+        return [modern, legacy];
+    }
+
+    // A property a `$(TargetFramework)` condition sets for net10.0 alone. The netstandard2.0 evaluation set nothing,
+    // and it is still an evaluation: that is what lets a rule say the property is unset there.
+    private static IReadOnlyList<CodebaseFragment> PropertyForOneFrameworkOnly()
+    {
+        CodebaseFragment modern = WidgetFragment("net10.0") with { Properties = Evaluated(("Nullable", "enable", 6)) };
+        CodebaseFragment legacy = WidgetFragment("netstandard2.0") with { Properties = Evaluated() };
+        return [modern, legacy];
     }
 
     private static FragmentProperties Evaluated(params (string Name, string Value, int Line)[] properties)
