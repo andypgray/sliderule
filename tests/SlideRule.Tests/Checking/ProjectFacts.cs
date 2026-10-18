@@ -54,11 +54,13 @@ internal static class ProjectFacts
 
     /// <summary>
     ///     One declared package reference at <paramref name="filePath" />:<paramref name="line" />, private
-    ///     where <paramref name="isPrivate" /> says so.
+    ///     where <paramref name="isPrivate" /> says so, declared for <paramref name="frameworks" /> where the
+    ///     row names them and for no known framework otherwise.
     /// </summary>
-    internal static PackageReference Package(string name, string filePath, int line, bool isPrivate = false)
+    internal static PackageReference Package(
+        string name, string filePath, int line, bool isPrivate = false, IReadOnlyList<string>? frameworks = null)
     {
-        return new PackageReference(name, Site(filePath, line), isPrivate);
+        return new PackageReference(name, Site(filePath, line), isPrivate, frameworks);
     }
 
     /// <summary>A declaration site — the <c>file:line</c> a violation cites.</summary>

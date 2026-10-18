@@ -138,7 +138,9 @@ internal static class GraphFormatter
     // rather than with the solution. It reads "(none)" like the references beside it, because a project that
     // declares no packages is the fact a rule about declared packages is written against. A private reference
     // is marked where it is named rather than listed again, on the passenger's rule: the mark lands only on the
-    // names MustReferenceNoPackages passes, and leaves with them at skeleton.
+    // names MustReferenceNoPackages passes, and leaves with them at skeleton. A package declared for only some of
+    // the project's frameworks is marked the same way, "(netstandard2.0 only)", and both marks share one
+    // parenthesis where both apply.
     private static string PackagesClause(ProjectSummary project, DocumentGrain grain)
     {
         if (grain >= DocumentGrain.Skeleton) return "";
@@ -146,10 +148,18 @@ internal static class GraphFormatter
         IReadOnlyList<PackageReference> packages = project.PackageReferences;
         if (packages.Count == 0) return "; packages: (none)";
 
-        IEnumerable<string> named = packages.Select(package =>
-            package.IsPrivate ? $"{package.Name} (private)" : package.Name);
+        IEnumerable<string> named = packages.Select(package => package.Name + PackageMarks(package, project.TargetFrameworks));
 
         return $"; packages: {string.Join(", ", named)}";
+    }
+
+    private static string PackageMarks(PackageReference package, IReadOnlyList<string> projectFrameworks)
+    {
+        var marks = new List<string>(2);
+        if (package.IsPrivate) marks.Add("private");
+        if (package.DeclaredForOnlySomeOf(projectFrameworks)) marks.Add(string.Join(", ", package.Frameworks) + " only");
+
+        return marks.Count == 0 ? "" : $" ({string.Join("; ", marks)})";
     }
 
     // Only the deliberate half of each fact is annotated, on the passenger's rule: the SDK makes every

@@ -159,6 +159,56 @@ public sealed class GraphJsonGrainTests
     }
 
     [Fact]
+    public void Document_PackageFrameworks_NameThePackagesOnlySomeFrameworksDeclare_AboveSkeletonOnly()
+    {
+        // The backport is declared for one of the project's two frameworks and is the one entry; the package both
+        // frameworks declare, and the one no evaluation told the frameworks apart for, say nothing a rule could
+        // use and stay out. The key qualifies the declared list, so it leaves with it at skeleton.
+        IReadOnlyList<PackageReference> packageReferences =
+        [
+            ProjectFacts.Package("Microsoft.Bcl.HashCode", "Acme.App.csproj", 9, frameworks: ["netstandard2.0"]),
+            ProjectFacts.Package("Serilog", "Acme.App.csproj", 10, frameworks: ["net10.0", "netstandard2.0"]),
+            ProjectFacts.Package("Unattributed", "Acme.App.csproj", 11)
+        ];
+        string[] frameworks = ["net10.0", "netstandard2.0"];
+
+        foreach (DocumentGrain grain in new[] { DocumentGrain.Full, DocumentGrain.Overview })
+        {
+            using JsonDocument json = JsonDocument.Parse(
+                Render(grain, [], packageReferences: packageReferences, targetFrameworks: frameworks));
+            JsonElement entry = GraphSurveyJson.Project(json, "Acme.App")
+                .GetProperty("packageFrameworks")
+                .EnumerateArray()
+                .ShouldHaveSingleItem($"at {grain} grain");
+
+            entry.GetProperty("package")
+                .GetString()
+                .ShouldBe("Microsoft.Bcl.HashCode", $"at {grain} grain");
+            GraphSurveyJson.Strings(entry, "frameworks")
+                .ShouldBe(["netstandard2.0"], $"at {grain} grain");
+        }
+
+        foreach (DocumentGrain grain in new[] { DocumentGrain.Skeleton, DocumentGrain.Index })
+            Render(grain, [], packageReferences: packageReferences, targetFrameworks: frameworks)
+                .ShouldNotContain("\"packageFrameworks\"", customMessage: $"at {grain} grain");
+    }
+
+    [Fact]
+    public void Document_PackagesEveryFrameworkDeclares_WriteNoPackageFrameworksKey()
+    {
+        // Absent rather than an empty array, so the survey of a solution with no framework-conditioned package is
+        // the document it was before the key existed; the graph goldens hold that over MyApp.
+        string full = Render(
+            DocumentGrain.Full,
+            [],
+            packageReferences: [ProjectFacts.Package("Serilog", "Acme.App.csproj", 10, frameworks: ["net10.0"])],
+            targetFrameworks: ["net10.0"]);
+
+        full.ShouldContain("\"packageReferences\"");
+        full.ShouldNotContain("\"packageFrameworks\"");
+    }
+
+    [Fact]
     public void Document_UndeclaredProjectReferences_RideEveryRungAboveIndex()
     {
         // They qualify the declared list, so they ride every rung it does and leave with it at index.
@@ -194,11 +244,14 @@ public sealed class GraphJsonGrainTests
         IReadOnlyList<string> workspaceDiagnostics,
         IReadOnlyList<string>? loadFailures = null,
         IReadOnlyList<PackageReference>? packageReferences = null,
-        IReadOnlyList<string>? undeclaredProjectReferences = null)
+        IReadOnlyList<string>? undeclaredProjectReferences = null,
+        IReadOnlyList<string>? targetFrameworks = null)
     {
         ProjectSummary project = new(
             "Acme.App", ["Acme.Core"], 3, 0, [new NamespaceCount("Acme.App", 3, 0)],
-            packageReferences: packageReferences, undeclaredProjectReferences: undeclaredProjectReferences);
+            targetFrameworks: targetFrameworks,
+            packageReferences: packageReferences,
+            undeclaredProjectReferences: undeclaredProjectReferences);
         GraphSummary summary = new([project], [], [], [], []);
 
         // Named, because five of the seven slots are IReadOnlyList<string> and this test's whole subject

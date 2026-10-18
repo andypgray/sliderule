@@ -106,7 +106,9 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         "than read off the project file, so a value an SDK defaults or a props file above the solution sets " +
         "is the one reported; packageReferences is what the project declares, never the transitive closure, " +
         "and privatePackageReferences (absent when empty) names the ones whose PrivateAssets is all — " +
-        "analyzers and build tools that ship to no consumer, which MustReferenceNoPackages passes. " +
+        "analyzers and build tools that ship to no consumer, which MustReferenceNoPackages passes — and " +
+        "packageFrameworks (absent when empty) the ones declared for only some of the project's frameworks, " +
+        "with those frameworks. " +
         "Needs no spec — call it before one exists to plan layers and rules. Needs the solution restored, " +
         "not built (the code is read from source): if projects fail to load, or their NuGet packages did " +
         "not resolve, it returns an error naming them rather than a survey missing them or missing their " +
@@ -247,7 +249,8 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         [Description(
             "One grain as one string, not an array: full (the default), overview, skeleton or index, each coarser "
             + "than the one before and never a narrower subject. overview elides every project's namespace "
-            + "inventory; skeleton also elides each project's packageReferences and privatePackageReferences, "
+            + "inventory; skeleton also elides each project's packageReferences, privatePackageReferences and "
+            + "packageFrameworks, "
             + "and reports the external-reference rows, the multiply-declared types and the shadowed types as "
             + "counts (externalEdgeCount, multiplyDeclaredTypeCount, shadowedTypeCount), keeping every project "
             + "with its targetFrameworks, factsFollow, isPackable, locksPackages, projectReferences, "

@@ -1045,7 +1045,8 @@ internal static class FragmentMerger
         ///     <para>
         ///         <b>Each fact folds in the direction that cannot invent a clean answer.</b> A package any
         ///         framework declares is a package the project declares, so the references union, and the package
-        ///         is private only where every framework's declaration of it is. Packability
+        ///         is private only where every framework's declaration of it is. Which frameworks declared it
+        ///         unions beside that fold, keyed by the same name, from each evaluation whose framework is known. Packability
         ///         unions for the same reason read the other way round: if one framework produces a package,
         ///         the project ships one. The lock policy <em>intersects</em> — a framework whose restore
         ///         writes no lock file leaves that restore unlocked however the others are configured — and
@@ -1074,6 +1075,7 @@ internal static class FragmentMerger
             private readonly SortedSet<string> _assemblyNames = new(StringComparer.Ordinal);
             private readonly SortedSet<string> _frameworks = new(StringComparer.Ordinal);
             private readonly List<FragmentPackageReference> _packages = [];
+            private readonly Dictionary<string, SortedSet<string>> _packageFrameworks = new(StringComparer.Ordinal);
             private ArtifactVerdict _packable;
             private ArtifactVerdict _locks;
             private ArtifactVerdict _member;
@@ -1103,6 +1105,9 @@ internal static class FragmentMerger
                 if (!string.IsNullOrWhiteSpace(fragment.AssemblyName)) _assemblyNames.Add(fragment.AssemblyName!);
 
                 _packages.AddRange(fragment.PackageReferences ?? []);
+                if (EvaluatedFramework(fragment) is { } evaluated)
+                    foreach (FragmentPackageReference package in fragment.PackageReferences ?? [])
+                        FragmentSiteSets.OrdinalNamesFor(_packageFrameworks, package.Name).Add(evaluated);
 
                 _packable = _packable.Fold(fragment.IsPackable, fragment.IsPackableSite, decisive: true);
                 _locks = _locks.Fold(fragment.LocksPackages, fragment.LocksPackagesSite, decisive: false);
@@ -1125,8 +1130,25 @@ internal static class FragmentMerger
             {
                 return FragmentSiteSets.OrderedPackages(_packages)
                     .Select(package => new PackageReference(
-                        package.Name, FragmentSiteSets.Location(package.Site), package.IsPrivate))
+                        package.Name,
+                        FragmentSiteSets.Location(package.Site),
+                        package.IsPrivate,
+                        _packageFrameworks.TryGetValue(package.Name, out SortedSet<string>? frameworks)
+                            ? frameworks.ToList()
+                            : null))
                     .ToList();
+            }
+
+            // The framework one fragment's evaluation answered for: the one it was asked for, or, for an
+            // evaluation run with none chosen, the project's own framework where it declares exactly one. A
+            // single-targeted project is evaluated that way, and so is every compilation of a multi-targeted one
+            // whose frameworks a replay could not tell apart; in that second case the evaluation saw no framework's
+            // conditions at all, so its declarations belong to no framework in particular and stay unattributed.
+            private static string? EvaluatedFramework(CodebaseFragment fragment)
+            {
+                if (fragment.TargetFramework is { } requested) return requested;
+
+                return fragment.DeclaredTargetFrameworks is { Count: 1 } single ? single[0] : null;
             }
         }
 

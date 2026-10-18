@@ -31,7 +31,7 @@ Call `arch_graph` (CLI: `sliderule graph MyApp.sln --json`). It needs no spec, a
 The document's keys, exactly (camelCase; an optional field is absent, never null):
 
 ```text
-projects[]              { name, solutionMember?, targetFrameworks?, factsFollow?, isPackable?, locksPackages?, projectReferences[], undeclaredProjectReferences?, packageReferences[], privatePackageReferences?, types, generated?, namespaces[]{ namespace, types, generated? } }
+projects[]              { name, solutionMember?, targetFrameworks?, factsFollow?, isPackable?, locksPackages?, projectReferences[], undeclaredProjectReferences?, packageReferences[], privatePackageReferences?, packageFrameworks?[]{ package, frameworks[] }, types, generated?, namespaces[]{ namespace, types, generated? } }
 projectEdges[]          { source, target, references }
 externalEdges[]         { source, targetNamespaceRoot, references }
 multiplyDeclaredTypes[] { type, declaredBy[], factsFollow }

@@ -112,6 +112,7 @@ internal static class GraphJsonRenderer
             index ? null : SlideRuleJson.OmitEmpty(project.UndeclaredProjectReferences),
             skeleton ? null : PackageNames(project.PackageReferences, privateOnly: false),
             skeleton ? null : SlideRuleJson.OmitEmpty(PackageNames(project.PackageReferences, privateOnly: true)),
+            skeleton ? null : PackageFrameworks(project),
             project.Types,
             SlideRuleJson.OmitZero(project.Generated),
             grain >= DocumentGrain.Overview
@@ -127,6 +128,19 @@ internal static class GraphJsonRenderer
             .Where(package => !privateOnly || package.IsPrivate)
             .Select(package => package.Name)
             .ToList();
+    }
+
+    // The packages the project declares for only some of its frameworks, each with the frameworks that declare it,
+    // in package order. Null where there are none, for the private subset's reason: a solution with no
+    // framework-conditioned package surveys exactly as it did before the key existed.
+    private static IReadOnlyList<GraphPackageFrameworksJson>? PackageFrameworks(ProjectSummary project)
+    {
+        List<GraphPackageFrameworksJson> scoped = project.PackageReferences
+            .Where(package => package.DeclaredForOnlySomeOf(project.TargetFrameworks))
+            .Select(package => new GraphPackageFrameworksJson(package.Name, package.Frameworks))
+            .ToList();
+
+        return scoped.Count == 0 ? null : scoped;
     }
 
     // Omitted at zero on both keys, which is what keeps the survey of a solution with no generators exactly

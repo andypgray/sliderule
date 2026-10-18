@@ -1162,7 +1162,8 @@ declares as package references, whether it locks restore and whether it packs.
   declares anywhere, are both facts the raw project file does not carry. The verb facts are
   the declared target frameworks (the list is total, and a classic project's framework
   normalizes to the short moniker, `net48`), the declared `PackageReference`s, each marked
-  private where its `PrivateAssets` is `all`, `RestorePackagesWithLockFile`, and `IsPackable`.
+  private where its `PrivateAssets` is `all` and carrying the frameworks whose evaluation
+  declared it, `RestorePackagesWithLockFile`, and `IsPackable`.
   `MustOnlyTarget` and `MustTarget` compare monikers ordinally against the normalized short
   forms. A package pattern is a glob, `*` matching any run of characters, dots included, and it
   is compared with the package identifier ignoring case, as NuGet compares identifiers.
@@ -1187,6 +1188,15 @@ declares as package references, whether it locks restore and whether it packs.
   project's frameworks, is private only where every declaration is: a non-private declaration
   decides and brings its site, and between declarations that agree the ordinally-first site
   stays.
+- **A package carries the frameworks that declare it.** A multi-targeted project is evaluated
+  once per framework, so a `PackageReference` conditioned on `$(TargetFramework)` is declared by
+  the evaluations whose condition holds, and `IPackageReferenceInfo.Frameworks` lists those,
+  ordinally. An evaluation run with no framework chosen answers for the project's one framework
+  where it declares exactly one; where it declares several, which is what a replay that cannot
+  tell a project's compilations apart runs, it saw no framework's conditions, so its packages
+  carry no framework and the list is empty, meaning unknown. No verb reads the list: a
+  per-framework law is a `.Must` over it (§5.6), and the survey marks a package only some
+  frameworks declare.
 - **Unknown passes.** A load path that cannot carry a fact records absence, never a default,
   and every project verb passes on absence: a rule that reds on a project nothing evaluated
   is reporting the load's own gaps as architecture violations, which is `modelIncomplete`'s
@@ -1664,8 +1674,9 @@ Project-predicate input contract (`IProjectInfo`, the input to a project `.Where
 §4.10): `Name`, `TargetFrameworks` (ordinal-ordered, normalized to the short moniker; empty
 where nothing evaluated the project), `PackageReferences` (every declared package, private ones
 included, ordinal by name, each an `IPackageReferenceInfo` of `Name`, `FilePath` and `Line` (its
-declaration site, which may be a props file above the project) and `IsPrivate` — declared
-references only, §4.10),
+declaration site, which may be a props file above the project), `IsPrivate`, and `Frameworks`
+(the target frameworks whose evaluation declared it, ordinal; empty where the evaluation could
+not tell them apart) — declared references only, §4.10),
 `ProjectReferences` (the names of the projects it declares a reference to, ordinal-ordered;
 declared references only, as for the packages), and the tri-state
 `IsPackable` and `LocksPackages` — `bool?`, `null` meaning the evaluation never happened
@@ -2492,9 +2503,10 @@ would be a new, explicitly named semantic, never a widening of the exact match; 
 exposure data (exposure edges stay out of the graph).
 
 On the project stratum (§4.10), each waiting on a consumer: `.Under(pathGlob…)`;
-`MustSetProperty` / `MustSetPackageAsset` (the `ExcludeAssets=runtime` shape); `AnyOf` over
-project selections; and card placement for artifact selections — a project rule renders into
-the root block only.
+`MustSetProperty` / `MustSetPackageAsset` (the `ExcludeAssets=runtime` shape); a
+framework-scoped package verb, an allow-list or ban over one framework's references, which
+`.Must` over `IPackageReferenceInfo.Frameworks` spells today; `AnyOf` over project selections;
+and card placement for artifact selections — a project rule renders into the root block only.
 
 On the string anchors (§5.2): **constructed-generic** anchoring — a string naming a
 construction rather than a definition (`"MyApp.Web.IHandler<MyApp.Web.InvoiceCreated>"`)

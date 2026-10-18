@@ -659,6 +659,70 @@ public sealed class FragmentRoundTripTests
             .ShouldBe(["Polyfill @ /repo/Widget.csproj:13 private=False"]);
     }
 
+    [Fact]
+    public void Merge_PackageDeclaredForOneFrameworkOnly_ListsThatFramework()
+    {
+        // Arrange — the shape a `$(TargetFramework)` condition produces: both frameworks declare the shared
+        // package, and only netstandard2.0 declares the backport.
+        CodebaseFragment modern = WidgetFragment("net10.0", Declaration("Shared", 9, isPrivate: false));
+        CodebaseFragment legacy = WidgetFragment(
+            "netstandard2.0", Declaration("Shared", 9, isPrivate: false), Declaration("System.Memory", 13, isPrivate: false));
+
+        // Act
+        ProjectNode project = FragmentMerger.Merge([modern, legacy])
+            .Projects.Single();
+
+        // Assert — the frameworks union beside the name-keyed privacy fold, ordinally.
+        project.PackageReferences.Select(DescribeFrameworks)
+            .ShouldBe(["Shared: net10.0, netstandard2.0", "System.Memory: netstandard2.0"]);
+    }
+
+    [Fact]
+    public void Merge_EvaluationWithNoFrameworkChosen_AttributesOnlyAProjectsOneFramework()
+    {
+        // Arrange — a single-targeted project is evaluated with no framework chosen, and its one declared
+        // framework answers for it. A multi-targeted project evaluated that way, which is what a replay that
+        // could not tell its compilations apart does, saw no framework's conditions, so it attributes nothing.
+        CodebaseFragment single = WidgetFragment("net10.0", Declaration("Serilog", 9, isPrivate: false)) with
+        {
+            TargetFramework = null,
+            DeclaredTargetFrameworks = ["net10.0"]
+        };
+        CodebaseFragment undiscriminated = single with { DeclaredTargetFrameworks = ["net10.0", "netstandard2.0"] };
+
+        // Act
+        ProjectNode attributed = FragmentMerger.Merge([single])
+            .Projects.Single();
+        ProjectNode unknown = FragmentMerger.Merge([undiscriminated])
+            .Projects.Single();
+
+        // Assert
+        attributed.PackageReferences.Select(DescribeFrameworks)
+            .ShouldBe(["Serilog: net10.0"]);
+        unknown.PackageReferences.Select(DescribeFrameworks)
+            .ShouldBe(["Serilog: "]);
+    }
+
+    [Fact]
+    public void RoundTrip_PerFrameworkPackages_ReplayTheSameFrameworks()
+    {
+        // Arrange — the frameworks are computed at merge from facts every fragment already carries, so a cache
+        // hit must replay them exactly as a fresh extraction would.
+        CodebaseFragment modern = WidgetFragment("net10.0", Declaration("Shared", 9, isPrivate: false));
+        CodebaseFragment legacy = WidgetFragment(
+            "netstandard2.0", Declaration("Shared", 9, isPrivate: false), Declaration("System.Memory", 13, isPrivate: false));
+
+        // Act
+        string json = JsonSerializer.Serialize<IReadOnlyList<CodebaseFragment>>([modern, legacy], ManifestJson.Options);
+        var roundTripped = JsonSerializer.Deserialize<IReadOnlyList<CodebaseFragment>>(json, ManifestJson.Options)!;
+
+        // Assert
+        FragmentMerger.Merge(roundTripped)
+            .Projects.Single()
+            .PackageReferences.Select(DescribeFrameworks)
+            .ShouldBe(["Shared: net10.0, netstandard2.0", "System.Memory: netstandard2.0"]);
+    }
+
     private static CodebaseFragment WidgetFragment(string framework, params FragmentPackageReference[] packages)
     {
         return FragmentExtractor.Extract(CompilationFactory.Compile("Widget", ("Widget.cs", """
@@ -680,6 +744,11 @@ public sealed class FragmentRoundTripTests
     private static string Describe(PackageReference package)
     {
         return $"{package.Name} @ {package.Site} private={package.IsPrivate}";
+    }
+
+    private static string DescribeFrameworks(PackageReference package)
+    {
+        return $"{package.Name}: {string.Join(", ", package.Frameworks)}";
     }
 
     private static IReadOnlyList<CodebaseFragment> ExtractRichSolution()

@@ -273,6 +273,40 @@ public sealed class ProjectArtifactFactsTests
     }
 
     [Fact]
+    public void EvaluateAll_PackageConditionedOnTheFramework_IsDeclaredOnlyWhereTheConditionHolds()
+    {
+        // The input the merge attributes frameworks from: each framework's evaluation sees only the references
+        // whose `$(TargetFramework)` condition holds for it, so the backport is netstandard2.0's alone.
+        using TempDirectory temp = TestTempRoot.Fresh("artifact-facts-framework-conditioned-package");
+        string projectFile = temp.WriteFile(["Console", "Console.csproj"], """
+                                                                           <Project Sdk="Microsoft.NET.Sdk">
+                                                                               <PropertyGroup>
+                                                                                   <TargetFrameworks>netstandard2.0;net10.0</TargetFrameworks>
+                                                                               </PropertyGroup>
+                                                                               <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
+                                                                                   <PackageReference Include="System.Memory" Version="4.5.5" />
+                                                                               </ItemGroup>
+                                                                           </Project>
+                                                                           """);
+
+        // Act
+        IReadOnlyList<ProjectArtifactFacts?> facts = ProjectFactsEvaluator.EvaluateAll(
+            [new ProjectEvaluationRequest(projectFile, "netstandard2.0"), new ProjectEvaluationRequest(projectFile, "net10.0")],
+            solutionFile: null,
+            Ct);
+
+        // Assert
+        facts[0]
+            .ShouldNotBeNull()
+            .PackageReferences.ShouldBe([
+                new FragmentPackageReference("System.Memory", new FragmentSite(projectFile, 6), IsPrivate: false)
+            ]);
+        facts[1]
+            .ShouldNotBeNull()
+            .PackageReferences.ShouldBeEmpty();
+    }
+
+    [Fact]
     public void EvaluateAll_ProjectReferences_AreTheDeclaredOnesThatReferenceTheirOutput()
     {
         // One plain reference and one that only orders the build. Neither target file exists: evaluation

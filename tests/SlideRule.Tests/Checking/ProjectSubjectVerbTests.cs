@@ -111,6 +111,35 @@ public sealed class ProjectSubjectVerbTests
     }
 
     [Fact]
+    public void Must_OverPackageFrameworks_StatesThatTheBackportsAreForOneFrameworkOnly()
+    {
+        // The per-framework law has no verb of its own: a predicate over IPackageReferenceInfo.Frameworks states
+        // it, and reds the project whose backport reaches a framework that has the API built in.
+        CodebaseModel scene = ProjectFacts.Solution(
+            ProjectFacts.Project(
+                "Console",
+                ["net8.0", "netstandard2.0"],
+                ProjectFacts.Site("src/Console/Console.csproj", 4),
+                packageReferences:
+                [
+                    ProjectFacts.Package("Microsoft.Bcl.HashCode", "src/Console/Console.csproj", 9, frameworks: ["netstandard2.0"]),
+                    ProjectFacts.Package("System.Memory", "src/Console/Console.csproj", 10, frameworks: ["net8.0", "netstandard2.0"])
+                ]));
+
+        Checker.Run(scene, arch => arch.Rule("packaging/backports-stay-on-netstandard")
+                .Enforce(arch.Projects.Named("Console")
+                    .Must(
+                        project => project.PackageReferences
+                            .Where(package => package.Name.StartsWith("Microsoft.Bcl.", StringComparison.Ordinal)
+                                              || package.Name == "System.Memory")
+                            .All(package => package.Frameworks.SequenceEqual(["netstandard2.0"])),
+                        description: "take the BCL backports for netstandard2.0 alone"))
+                .Because("b"))
+            .Single()
+            .ShouldHaveFailedWithProjectSubjects(["Console"]);
+    }
+
+    [Fact]
     public void Must_ThrowingPredicate_BecomesARuleErrorNamingTheProject()
     {
         // The guarded invoke: a throwing hatch is a rule error naming the project it threw on, never an

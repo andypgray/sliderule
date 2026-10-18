@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `MustNotReferencePackages("*")` forbids every package reference. Patterns are globs matched ignoring
   case, as NuGet compares package identifiers, and each package a rule objects to is one violation at
   its own declaration, keyed by the package. A blank pattern is reported as `SR1032`.
+- `IPackageReferenceInfo.Frameworks` names the target frameworks whose build declares a package, so a
+  `.Must` predicate can state a law about one framework's packages, such as backports taken for
+  `netstandard2.0` alone. `graph` marks a package only some of a project's frameworks declare, as
+  `(netstandard2.0 only)`, and `graph --json` and `arch_graph` list those packages in a
+  `packageFrameworks` key.
 - `check --json` and `arch_check` carry a `framework` key on each `MustOnlyTarget` violation, naming
   the framework it reports.
 - `baseline add --source <project> --target <package-or-framework>` adds the entry for a project's

@@ -3,7 +3,8 @@ namespace SlideRule;
 /// <summary>
 ///     One package a project declares, as a project predicate reads it from
 ///     <see cref="IProjectInfo.PackageReferences" />: the package's identifier, where the reference is declared,
-///     and whether it is private. The version is not recorded.
+///     whether it is private, and which of the project's target frameworks declare it. The version is not
+///     recorded.
 /// </summary>
 // Read by the predicate authors this contract exists for rather than through the interface in-solution, so
 // solution-wide search finds only the implementation and calls the members unused.
@@ -38,4 +39,14 @@ public interface IPackageReferenceInfo
     ///     declaration is.
     /// </summary>
     bool IsPrivate { get; }
+
+    /// <summary>
+    ///     The target frameworks whose build declares the reference, as short monikers ordered ordinally: a
+    ///     package a multi-targeted project declares under a <c>$(TargetFramework)</c> condition lists only the
+    ///     frameworks whose condition held, so <c>r.Frameworks.SequenceEqual(new[] { "netstandard2.0" })</c> reads
+    ///     "declared for netstandard2.0 alone". A single-targeted project lists its one framework. Empty where the
+    ///     frameworks were not told apart: a project evaluated once with no framework chosen while it declares
+    ///     several, or one whose framework list nothing evaluated. Treat empty as unknown, never as "none".
+    /// </summary>
+    IReadOnlyList<string> Frameworks { get; }
 }

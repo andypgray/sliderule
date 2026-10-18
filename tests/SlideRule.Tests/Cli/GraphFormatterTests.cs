@@ -197,6 +197,34 @@ public sealed class GraphFormatterTests
     }
 
     [Fact]
+    public void Lines_PackageDeclaredForSomeFrameworksOnly_IsMarkedWithThoseFrameworks()
+    {
+        // Arrange — a backport one framework takes, a private analyzer one framework takes, and a package both
+        // take, which reads as it always did.
+        List<ProjectSummary> projects =
+        [
+            new(
+                "Acme.Console", [], 0, 0, [], true, ["net10.0", "netstandard2.0"], null,
+                [
+                    ProjectFacts.Package("Microsoft.Bcl.HashCode", "Acme.csproj", 1, frameworks: ["netstandard2.0"]),
+                    ProjectFacts.Package("PolySharp", "Acme.csproj", 2, isPrivate: true, frameworks: ["netstandard2.0"]),
+                    ProjectFacts.Package("Wcwidth", "Acme.csproj", 3, frameworks: ["net10.0", "netstandard2.0"])
+                ])
+        ];
+
+        // Act
+        IReadOnlyList<string> lines = GraphFormatter.Lines(
+            new GraphSummary(projects, [], [], [], []), "Acme.slnx", DocumentGrain.Full, []);
+
+        // Assert — the framework mark shares the private mark's parenthesis where both apply.
+        Roster(lines)
+            .ShouldBe([
+                "  Acme.Console — 0 types; targets net10.0, netstandard2.0; references: (none); packages: "
+                + "Microsoft.Bcl.HashCode (netstandard2.0 only), PolySharp (private; netstandard2.0 only), Wcwidth"
+            ]);
+    }
+
+    [Fact]
     public void Lines_UndeclaredReferences_FollowTheDeclaredOnesOnlyWhereThereAreAny()
     {
         // Arrange — a plugin whose declaration was lost, beside a project whose declarations explain everything.

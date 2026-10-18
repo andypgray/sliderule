@@ -204,6 +204,15 @@ internal sealed record GraphJson(
 ///         byte-identical to the one before the key existed.
 ///     </para>
 ///     <para>
+///         <c>packageFrameworks</c> names the packages the project declares for only some of its target
+///         frameworks, each with the frameworks that declare it: a <c>PackageReference</c> conditioned on
+///         <c>$(TargetFramework)</c>, which a rule reads through <c>IPackageReferenceInfo.Frameworks</c>. It
+///         qualifies <c>packageReferences</c> the way the private subset does, so it leaves at skeleton with it,
+///         and it is absent where every package is declared for every framework or the frameworks were not told
+///         apart, which keeps the survey of a solution with no such package byte-identical to the one before the
+///         key existed.
+///     </para>
+///     <para>
 ///         <c>undeclaredProjectReferences</c> names the projects this project compiles against that its
 ///         <c>projectReferences</c> do not account for, directly or through what a declared project references in
 ///         turn. A non-empty list says the declared list is short: the project file declares a reference this
@@ -229,9 +238,16 @@ internal sealed record GraphProjectJson(
     IReadOnlyList<string>? UndeclaredProjectReferences,
     IReadOnlyList<string>? PackageReferences,
     IReadOnlyList<string>? PrivatePackageReferences,
+    IReadOnlyList<GraphPackageFrameworksJson>? PackageFrameworks,
     int Types,
     int? Generated,
     IReadOnlyList<GraphNamespaceJson>? Namespaces);
+
+/// <summary>
+///     A package the project declares for only some of its target frameworks, and those frameworks, ordered
+///     ordinally.
+/// </summary>
+internal sealed record GraphPackageFrameworksJson(string Package, IReadOnlyList<string> Frameworks);
 
 /// <summary>
 ///     A namespace and the count of the project's declared types in it, with how many of those a generator

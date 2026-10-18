@@ -30,8 +30,9 @@ public interface IProjectInfo
 
     /// <summary>
     ///     The packages the project declares itself, ordered by name, each carrying the file and line of
-    ///     its declaration (which may be a props file above the project) and whether it is private
-    ///     (<see cref="IPackageReferenceInfo.IsPrivate" />). Every declared reference is here, private ones
+    ///     its declaration (which may be a props file above the project), whether it is private
+    ///     (<see cref="IPackageReferenceInfo.IsPrivate" />) and the frameworks that declare it
+    ///     (<see cref="IPackageReferenceInfo.Frameworks" />). Every declared reference is here, private ones
     ///     included, so <c>p.PackageReferences.Count == 0</c> is stricter than
     ///     <c>MustReferenceNoPackages</c>, which does not count private references. Declared references
     ///     only: the packages those packages pull in are a different fact and are not here.

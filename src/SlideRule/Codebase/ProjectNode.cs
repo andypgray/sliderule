@@ -147,8 +147,9 @@ internal sealed class ProjectNode : IProjectInfo
 
     /// <summary>
     ///     Gets the packages this project declares, ordinal by name, each with the <c>file:line</c> that declares it,
-    ///     which may sit in a props file above the project, and whether it is private
-    ///     (<see cref="PackageReference.IsPrivate" />). Private references are listed too. Declared references only:
+    ///     which may sit in a props file above the project, whether it is private
+    ///     (<see cref="PackageReference.IsPrivate" />), and the frameworks that declare it
+    ///     (<see cref="PackageReference.Frameworks" />). Private references are listed too. Declared references only:
     ///     the transitive package graph is a different fact and is not in the model, and the references the SDK adds
     ///     implicitly, which nobody wrote and nobody can remove, are left out. Empty where nothing was evaluated, and
     ///     empty for a project that declares none.
@@ -203,16 +204,19 @@ internal sealed class ProjectNode : IProjectInfo
 }
 
 /// <summary>
-///     One package a project declares: the package's identifier, the <c>file:line</c> of the declaration, and
-///     whether the reference is private. What a project predicate reads of it is <see cref="IPackageReferenceInfo" />.
+///     One package a project declares: the package's identifier, the <c>file:line</c> of the declaration,
+///     whether the reference is private, and the frameworks whose evaluation declared it. What a project
+///     predicate reads of it is <see cref="IPackageReferenceInfo" />.
 /// </summary>
 internal sealed class PackageReference : IPackageReferenceInfo
 {
-    internal PackageReference(string name, SourceLocation site, bool isPrivate)
+    internal PackageReference(
+        string name, SourceLocation site, bool isPrivate, IReadOnlyList<string>? frameworks = null)
     {
         Name = name;
         Site = site;
         IsPrivate = isPrivate;
+        Frameworks = frameworks ?? [];
     }
 
     /// <summary>
@@ -232,4 +236,16 @@ internal sealed class PackageReference : IPackageReferenceInfo
 
     /// <inheritdoc />
     public bool IsPrivate { get; }
+
+    /// <inheritdoc />
+    public IReadOnlyList<string> Frameworks { get; }
+
+    /// <summary>
+    ///     Whether the frameworks that declare the reference are known and leave out at least one of
+    ///     <paramref name="projectFrameworks" />: a package the project takes for some of its frameworks only.
+    /// </summary>
+    internal bool DeclaredForOnlySomeOf(IReadOnlyList<string> projectFrameworks)
+    {
+        return Frameworks.Count > 0 && projectFrameworks.Any(framework => !Frameworks.Contains(framework, StringComparer.Ordinal));
+    }
 }
