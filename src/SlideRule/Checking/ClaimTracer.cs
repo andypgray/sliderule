@@ -202,14 +202,19 @@ internal sealed class ClaimTracer(CodebaseModel model, SolutionRoot? root = null
     // kept the type, so one pair exists.
     private ClaimStep UnderStep(UnderAdjective under, TypeNode type)
     {
+        List<PathGlob> globs = under.Globs.Select(glob => new PathGlob(glob)).ToList();
         foreach (string path in type.FilePaths)
         {
             if (_evaluator.RelativeSegments(path) is not { } segments) continue;
 
-            foreach (string glob in under.Globs)
-                if (SelectionEvaluator.UnderAny([glob])(segments))
-                    return new ClaimStep(
-                        $"it is declared in {ProseFormat.Backtick(string.Join("/", segments))}, under {ProseFormat.Backtick(glob)}");
+            for (var i = 0; i < globs.Count; i++)
+            {
+                if (!globs[i].Matches(segments)) continue;
+
+                string file = ProseFormat.Backtick(string.Join("/", segments));
+                string glob = ProseFormat.Backtick(under.Globs[i]);
+                return new ClaimStep($"it is declared in {file}, under {glob}");
+            }
         }
 
         return new ClaimStep($"it passes \"{under.Fragment.Trim()}\"");

@@ -148,13 +148,24 @@ internal sealed class SelectionEvaluator
     }
 
     /// <summary>
-    ///     Whether a file's segments below the root are under any of <paramref name="globs" /> — each glob parsed
-    ///     once, here, for every type and file it is then asked about.
+    ///     The test of whether a type is declared under any of <paramref name="globs" />: any of its declaring files
+    ///     below the run's root that a glob matches, each glob parsed once, here. Throws
+    ///     <see cref="RuleEvaluationException" /> where the run was given no root.
     /// </summary>
-    internal static Func<IReadOnlyList<string>, bool> UnderAny(IReadOnlyList<string> globs)
+    internal Func<TypeNode, bool> DeclaredUnder(IReadOnlyList<string> globs)
     {
+        if (_root is null) throw NoRoot();
+
         List<PathGlob> parsed = globs.Select(glob => new PathGlob(glob)).ToList();
-        return segments => parsed.Exists(glob => glob.Matches(segments));
+        return type =>
+        {
+            IReadOnlyList<string> paths = type.FilePaths;
+            for (var i = 0; i < paths.Count; i++)
+                if (RelativeSegments(paths[i]) is { } segments && MatchesAnyGlob(parsed, segments))
+                    return true;
+
+            return false;
+        };
     }
 
     private static RuleEvaluationException NoRoot()
@@ -366,12 +377,21 @@ internal sealed class SelectionEvaluator
         return scanned;
     }
 
-    // A layer's glob scan: an index walk rather than a LINQ Any, because it runs once per type in the
-    // universe over a list that is usually a single glob.
+    // A layer's glob scan, and an Under list's per declaring file: an index walk rather than a LINQ Any, because it
+    // runs once per type in the universe over a list that is usually a single glob.
     private static bool MatchesAnyGlob(IReadOnlyList<NamespacePattern> globs, string ns)
     {
         for (var i = 0; i < globs.Count; i++)
             if (globs[i].Matches(ns))
+                return true;
+
+        return false;
+    }
+
+    private static bool MatchesAnyGlob(IReadOnlyList<PathGlob> globs, IReadOnlyList<string> relativeSegments)
+    {
+        for (var i = 0; i < globs.Count; i++)
+            if (globs[i].Matches(relativeSegments))
                 return true;
 
         return false;
@@ -497,10 +517,7 @@ internal sealed class SelectionEvaluator
                 // Any declaring file under any glob (GRAMMAR §5.2): a partial type is where any of its files
                 // is, and an external type, declared in no file of the solution, is under nothing. The root is
                 // asked for here, at the call, so a run given none refuses before any type is tested.
-                if (_root is null) throw NoRoot();
-
-                Func<IReadOnlyList<string>, bool> underAny = UnderAny(under.Globs);
-                return t => t.FilePaths.Any(path => RelativeSegments(path) is { } segments && underAny(segments));
+                return DeclaredUnder(under.Globs);
             default:
                 // Fail closed: an unknown adjective would silently widen the selection — and in a
                 // MustOnly* target position a silently-widened allow-set is fail-open enforcement. A missing

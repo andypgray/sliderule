@@ -117,9 +117,8 @@ internal static class DeadNames
 
     private static bool AnyUnder(HashSet<TypeNode> members, string glob, SelectionEvaluator selections)
     {
-        Func<IReadOnlyList<string>, bool> under = SelectionEvaluator.UnderAny([glob]);
-        return members.Any(type =>
-            type.FilePaths.Any(path => selections.RelativeSegments(path) is { } segments && under(segments)));
+        Func<TypeNode, bool> declaredUnder = selections.DeclaredUnder([glob]);
+        return members.Any(declaredUnder);
     }
 
     private static HashSet<string> Carried(HashSet<TypeNode> members)

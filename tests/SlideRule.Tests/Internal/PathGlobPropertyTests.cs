@@ -9,8 +9,8 @@ namespace SlideRule.Tests.Internal;
 /// <summary>
 ///     <see cref="PathGlob.Matches" /> stated over generated globs and paths rather than a table of them, beside
 ///     <see cref="WildcardPropertyTests" />, whose matcher it calls once per segment. Its own algorithm is the
-///     <c>**</c> table and the prefix reading, and both fail quietly: a glob that matches too little leaves a
-///     type out of a rule's subject and the report still says passed.
+///     <c>**</c> segment walk and the prefix reading, and both fail silently: a glob that matches too little leaves
+///     a type out of a rule's subject and the report still says passed.
 /// </summary>
 public sealed class PathGlobPropertyTests
 {
@@ -20,7 +20,7 @@ public sealed class PathGlobPropertyTests
 
     private static readonly string[] GlobWords = ["a", "b", "A", "ab", "*", "a*", "**"];
 
-    /// <summary>The table against the recursive definition of a segment glob with a trailing <c>**</c>.</summary>
+    /// <summary>The segment walk against the recursive definition of a segment glob with a trailing <c>**</c>.</summary>
     [Property(MaxTest = 1000)]
     public Property Matches_AnyGlobAndPath_AgreesWithTheRecursiveDefinition()
     {
@@ -41,7 +41,7 @@ public sealed class PathGlobPropertyTests
                 // Assert
                 matched.ShouldBe(
                     expected,
-                    $"`{glob}` against \"{string.Join("/", testCase.Path)}\": the table and the recursive "
+                    $"`{glob}` against \"{string.Join("/", testCase.Path)}\": the segment walk and the recursive "
                     + "definition of `**` and the prefix reading must agree.");
             });
     }

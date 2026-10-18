@@ -66,20 +66,38 @@ internal sealed class PathGlob
     {
         Guard.NotNull(relativeSegments, nameof(relativeSegments));
 
-        // under[i, j]: the glob's segments from i on match the path's from j on. Filled from the end, so each
-        // cell reads only cells already filled; a `**` either matches nothing more or takes one segment and
-        // stays.
-        int globCount = _segments.Length;
-        int pathCount = relativeSegments.Count;
-        var under = new bool[globCount + 1, pathCount + 1];
-        under[globCount, pathCount] = true;
-        for (int i = globCount - 1; i >= 0; i--)
-        for (int j = pathCount; j >= 0; j--)
-            under[i, j] = _segments[i] == AnySegments
-                ? under[i + 1, j] || (j < pathCount && under[i, j + 1])
-                : j < pathCount && Wildcard.Match(_segments[i], relativeSegments[j], ignoreCase: true) && under[i + 1, j + 1];
+        // g/s walk the glob and the path; star/mark remember the last `**` taken and how far the path had advanced
+        // then, so a dead end backtracks by letting that `**` take one more segment. Exact because every other glob
+        // segment consumes exactly one path segment, as Wildcard's characters do.
+        var g = 0;
+        var s = 0;
+        int star = -1;
+        var mark = 0;
 
-        return under[0, 0];
+        while (s < relativeSegments.Count)
+            if (g < _segments.Length && _segments[g] == AnySegments)
+            {
+                star = g++;
+                mark = s;
+            }
+            else if (g < _segments.Length && Wildcard.Match(_segments[g], relativeSegments[s], ignoreCase: true))
+            {
+                g++;
+                s++;
+            }
+            else if (star >= 0)
+            {
+                g = star + 1;
+                s = ++mark;
+            }
+            else
+            {
+                return false;
+            }
+
+        while (g < _segments.Length && _segments[g] == AnySegments) g++;
+
+        return g == _segments.Length;
     }
 
     private static bool IsDriveRooted(string glob)
