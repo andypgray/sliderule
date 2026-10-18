@@ -36,9 +36,6 @@ public sealed class DeadSubjectMemberNameTests
         "A name in a member `Named` list is the member's own name, matched exactly, without its declaring type "
         + "or signature; check the selection against what the solution declares.";
 
-    // A stand-in for the sentence a partial model composes; its wording is pinned where it is minted.
-    private const string PartialModelCure = "THE-PARTIAL-MODEL-CURE";
-
     private static readonly CodebaseModel Model = CompilationFactory.Extract(Source);
 
     [Fact]
@@ -116,7 +113,7 @@ public sealed class DeadSubjectMemberNameTests
     [Fact]
     public void ADeadNameUnderAPartialModel_CarriesThePartialModelCure()
     {
-        var partial = new IncompleteModel(PartialModelCure);
+        IncompleteModel partial = Checker.PartialModel;
 
         RuleResult result = Checker.Run(Model, partial, arch =>
                 arch.Rule("members/named")
@@ -126,7 +123,7 @@ public sealed class DeadSubjectMemberNameTests
 
         result.ShouldHaveFailedWithDetail(
                 ViolationKind.EmptySubject, ConstraintEvaluator.EmptyMemberOperandMessage(GhostOperand))
-            .Hint.ShouldBe(PartialModelCure);
+            .Hint.ShouldBe(Checker.PartialModelCure);
     }
 
     [Fact]

@@ -72,12 +72,11 @@ public sealed class MustReferenceNoPackagesVerbTests
                 .Because("b"))
             .Single();
 
-        result.Violations.Select(violation => violation.BaselineIdentity())
-            .ShouldBe(
-            [
-                BaselineEntry.ForEdge("project:Domain", "package:Newtonsoft.Json"),
-                BaselineEntry.ForEdge("project:Domain", "package:Serilog")
-            ]);
+        result.ShouldHaveBaselineIdentities(
+        [
+            BaselineEntry.ForEdge("project:Domain", "package:Newtonsoft.Json"),
+            BaselineEntry.ForEdge("project:Domain", "package:Serilog")
+        ]);
     }
 
     [Fact]
@@ -114,7 +113,7 @@ public sealed class MustReferenceNoPackagesVerbTests
                 .Because("b"))
             .Single();
 
-        result.ShouldHaveFailedWithProjectItemAtSites("Domain -> Newtonsoft.Json", ["src/Domain/Domain.csproj:9"]);
+        result.ShouldHaveFailedWithProjectAtSites("Domain -> Newtonsoft.Json", ["src/Domain/Domain.csproj:9"]);
     }
 
     [Fact]

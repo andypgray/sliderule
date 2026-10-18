@@ -57,7 +57,7 @@ internal static class ParityRemainderSpec
     ///     A second file of the own project, under the directory the model file sits in, so a path glob can reach
     ///     what it declares; the other file's path is relative and under no glob.
     /// </summary>
-    internal const string FolderedPath = "/repo/src/Own/Internal/Foldered.cs";
+    internal const string FolderedPath = SiblingWorld.ModelDirectory + "/src/Own/Internal/Foldered.cs";
 
     /// <summary>The type the foldered file declares, public where its folder says it should not be.</summary>
     internal const string FolderedSource = "namespace Own; public class Foldered { }";

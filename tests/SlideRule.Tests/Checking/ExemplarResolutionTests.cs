@@ -1,7 +1,7 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Baselines;
 using SlideRule.Checking;
+using Xunit;
 
 namespace SlideRule.Tests.Checking;
 
@@ -20,9 +20,6 @@ public sealed class ExemplarResolutionTests
     private const string NamespaceCure =
         "A trailing `.*` covers the namespace itself and everything under it, and `Legacy*` never crosses a "
         + "dot; the verdict never depends on it, so point it at a type the solution declares or remove it.";
-
-    // A stand-in for the sentence a partial model composes; its wording is pinned where it is minted.
-    private const string PartialModelCure = "THE-PARTIAL-MODEL-CURE";
 
     private const string FaultPrefix = "This rule's exemplar could not be resolved: ";
 
@@ -316,14 +313,14 @@ public sealed class ExemplarResolutionTests
     {
         Action<Arch> define = WebRuleWithExemplar(arch => arch.Types.Named("Ghost"));
 
-        RuleResult result = Checker.Run(Sources.LayeredModel, new IncompleteModel(PartialModelCure), define)
+        RuleResult result = Checker.Run(Sources.LayeredModel, Checker.PartialModel, define)
             .Single();
 
         result.ShouldHaveWarnedDeadExemplars("types named `Ghost`");
         result.Warnings
             .Single()
             .Hint
-            .ShouldBe(PartialModelCure);
+            .ShouldBe(Checker.PartialModelCure);
     }
 
     [Fact]

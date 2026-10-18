@@ -1,9 +1,9 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Baselines;
 using SlideRule.Checking;
 using SlideRule.Codebase;
 using SlideRule.Tests.Extraction;
+using Xunit;
 
 namespace SlideRule.Tests.Checking;
 
@@ -325,12 +325,8 @@ public sealed class MustHaveExactlyOneCounterpartVerbTests
         ambiguous.ShouldHaveGrandfathered(1);
 
         // The pinned identity form on each arm: the type-tagged DocId, with the counterparts nowhere in it.
-        Run(SceneModel, BaselineIndex.Empty)
-            .Violations.Select(violation => violation.BaselineIdentity())
-            .ShouldBe([blessed]);
-        Run(AmbiguousModel, BaselineIndex.Empty)
-            .Violations.Select(violation => violation.BaselineIdentity())
-            .ShouldBe([blessed]);
+        Run(SceneModel, BaselineIndex.Empty).ShouldHaveBaselineIdentities([blessed]);
+        Run(AmbiguousModel, BaselineIndex.Empty).ShouldHaveBaselineIdentities([blessed]);
     }
 
     [Fact]

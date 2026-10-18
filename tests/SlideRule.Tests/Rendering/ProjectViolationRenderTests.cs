@@ -159,11 +159,8 @@ public sealed class ProjectViolationRenderTests
     [Fact]
     public void Json_PropertyViolation_CarriesThePropertyTheFrameworkAndTheValueHeld()
     {
-        using JsonDocument document = JsonDocument.Parse(PropertyReport().JsonReport());
-        JsonElement[] violations = document.RootElement.GetProperty("rules")[0]
-            .GetProperty("violations")
-            .EnumerateArray()
-            .ToArray();
+        string json = PropertyReport().JsonReport();
+        IReadOnlyList<JsonElement> violations = CheckJson.Violations(json, "build/nullable");
 
         violations.Select(violation => $"{violation.GetProperty("property").GetString()}@"
                                        + $"{violation.GetProperty("framework").GetString()}="
@@ -191,9 +188,8 @@ public sealed class ProjectViolationRenderTests
                 .Enforce(arch.Namespace("App.*").MustHaveSuffix("Service"))
                 .Because("b"));
 
-        using JsonDocument document = JsonDocument.Parse(report.JsonReport());
-        JsonElement violation = document.RootElement.GetProperty("rules")[0]
-            .GetProperty("violations")[0];
+        string json = report.JsonReport();
+        JsonElement violation = CheckJson.Violations(json, "naming/things")[0];
 
         violation.TryGetProperty("subjectProject", out _)
             .ShouldBeFalse();
@@ -240,31 +236,18 @@ public sealed class ProjectViolationRenderTests
     }
 
     [Fact]
-    public void Sarif_PropertyViolation_MessageSaysWhatTheBuildHolds()
+    public void Sarif_PropertyViolations_SayWhatEachFrameworksBuildHolds()
     {
-        CodebaseModel unset = ProjectFacts.Solution(
-            ProjectFacts.Project("Zphil.Bus", ["net472"], evaluations: [ProjectFacts.Evaluation("net472", "Bus.csproj")]));
-
-        Checker.Run(unset, PropertyRule)
+        IReadOnlyList<JsonElement> results = PropertyReport()
             .ToSarif()
-            .ShouldBeOneErrorSaying("Zphil.Bus does not set Nullable for net472");
-    }
+            .SarifResults();
 
-    [Fact]
-    public void Sarif_PropertySetToAnotherValue_MessageSaysWhatTheBuildHolds()
-    {
-        CodebaseModel disabled = ProjectFacts.Solution(
-            ProjectFacts.Project(
-                "Zphil.Bus",
-                ["net8.0"],
-                evaluations:
-                [
-                    ProjectFacts.Evaluation("net8.0", "Bus.csproj", ("Nullable", "disable", "Directory.Build.props", 7))
-                ]));
-
-        Checker.Run(disabled, PropertyRule)
-            .ToSarif()
-            .ShouldBeOneErrorSaying("Zphil.Bus sets Nullable to disable for net8.0");
+        results.Select(result => $"{result.GetProperty("level").GetString()}: "
+                                 + $"{result.GetProperty("message").GetProperty("text").GetString()}")
+            .ShouldBe([
+                "error: Zphil.Bus does not set Nullable for net472",
+                "error: Zphil.Bus sets Nullable to disable for net8.0"
+            ]);
     }
 
     [Fact]

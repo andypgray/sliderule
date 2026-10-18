@@ -57,7 +57,7 @@ public sealed class MustSetPropertyVerbTests
                 .Enforce(arch.Projects.Named("Abstractions").MustSetProperty("Nullable", "enable"))
                 .Because("b"))
             .Single()
-            .ShouldHaveFailedWithProjectItemAtSites(
+            .ShouldHaveFailedWithProjectAtSites(
                 "Abstractions -> Nullable@netstandard2.0", ["src/Abstractions/Abstractions.csproj:1"]);
 
         violation.PropertyValue.ShouldBeNull();
@@ -70,7 +70,7 @@ public sealed class MustSetPropertyVerbTests
                 .Enforce(arch.Projects.Named("Legacy").MustSetProperty("Nullable", "enable"))
                 .Because("b"))
             .Single()
-            .ShouldHaveFailedWithProjectItemAtSites("Legacy -> Nullable@net48", ["Directory.Build.props:4"]);
+            .ShouldHaveFailedWithProjectAtSites("Legacy -> Nullable@net48", ["Directory.Build.props:4"]);
 
         violation.PropertyValue.ShouldBe("disable");
     }
@@ -119,12 +119,11 @@ public sealed class MustSetPropertyVerbTests
                 .Because("b"))
             .Single();
 
-        result.Violations.Select(violation => violation.BaselineIdentity())
-            .ShouldBe(
-            [
-                BaselineEntry.ForEdge("project:Bus", "property:Nullable@net472"),
-                BaselineEntry.ForEdge("project:Bus", "property:Nullable@net8.0"),
-                BaselineEntry.ForEdge("project:Tool", "property:Nullable")
-            ]);
+        result.ShouldHaveBaselineIdentities(
+        [
+            BaselineEntry.ForEdge("project:Bus", "property:Nullable@net472"),
+            BaselineEntry.ForEdge("project:Bus", "property:Nullable@net8.0"),
+            BaselineEntry.ForEdge("project:Tool", "property:Nullable")
+        ]);
     }
 }

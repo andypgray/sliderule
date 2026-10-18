@@ -1,4 +1,3 @@
-using Shouldly;
 using SlideRule.Baselines;
 using SlideRule.Checking;
 using SlideRule.Codebase;
@@ -45,7 +44,7 @@ public sealed class MustOnlyReferencePackagesVerbTests
                 .Enforce(arch.Projects.Named("Console").MustOnlyReferencePackages("Microsoft.Bcl.*", "System.Memory"))
                 .Because("b"))
             .Single()
-            .ShouldHaveFailedWithProjectItemAtSites("Console -> Wcwidth", ["src/Console/Console.csproj:11"]);
+            .ShouldHaveFailedWithProjectAtSites("Console -> Wcwidth", ["src/Console/Console.csproj:11"]);
     }
 
     [Fact]
@@ -91,12 +90,11 @@ public sealed class MustOnlyReferencePackagesVerbTests
                 .Because("b"))
             .Single();
 
-        result.Violations.Select(violation => violation.BaselineIdentity())
-            .ShouldBe(
-            [
-                BaselineEntry.ForEdge("project:Console", "package:Wcwidth"),
-                BaselineEntry.ForEdge("project:Console", "package:microsoft.bcl.asyncinterfaces")
-            ]);
+        result.ShouldHaveBaselineIdentities(
+        [
+            BaselineEntry.ForEdge("project:Console", "package:Wcwidth"),
+            BaselineEntry.ForEdge("project:Console", "package:microsoft.bcl.asyncinterfaces")
+        ]);
     }
 
     [Fact]
@@ -107,6 +105,6 @@ public sealed class MustOnlyReferencePackagesVerbTests
                 .Enforce(arch.Projects.Named("Console").MustOnlyReferencePackages("System", "Microsoft.Bcl.*", "Wcwidth"))
                 .Because("b"))
             .Single()
-            .ShouldHaveFailedWithProjectItemAtSites("Console -> System.Memory", ["src/Console/Console.csproj:10"]);
+            .ShouldHaveFailedWithProjectAtSites("Console -> System.Memory", ["src/Console/Console.csproj:10"]);
     }
 }

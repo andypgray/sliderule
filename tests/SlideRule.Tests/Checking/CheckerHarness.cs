@@ -73,6 +73,17 @@ internal static class Checker
         new(FilterSkipReason, "'Leaf.slnf' narrowed this run; check the whole solution.");
 
     /// <summary>
+    ///     The cure a rule reports when <see cref="PartialModel" /> stood behind a selection that matched nothing.
+    /// </summary>
+    /// <remarks>
+    ///     A stand-in for the sentence a partial model composes, for <see cref="FilterSkipReason" />'s reason.
+    /// </remarks>
+    internal const string PartialModelCure = "THE-PARTIAL-MODEL-CURE";
+
+    /// <summary>The partial-model fact handed to the checker by a run part of whose model never loaded.</summary>
+    internal static IncompleteModel PartialModel { get; } = new(PartialModelCure);
+
+    /// <summary>
     ///     Checks over a run a solution filter narrowed — the same internal overload a narrowed production
     ///     run takes — so a test can put a rule's empty subject in front of a universe that is smaller than
     ///     the solution.
@@ -226,11 +237,29 @@ internal static class Checker
     /// </remarks>
     public static IReadOnlyList<string> Selects(CodebaseModel codebase, Func<Arch, Selection> select)
     {
-        return Run(codebase, arch => arch.Rule("probe/selection")
-                .Enforce(select(arch).MustHavePrefix("ZZZ"))
-                .Because("b"))
+        Action<Arch> probe = Probe(select);
+        return Run(codebase, probe)
             .Single()
             .ShapeSubjects();
+    }
+
+    /// <summary>
+    ///     The same reading over a run given the directory path globs are read against, for <c>Under</c>.
+    /// </summary>
+    public static IReadOnlyList<string> Selects(CodebaseModel codebase, SolutionRoot root, Func<Arch, Selection> select)
+    {
+        Action<Arch> probe = Probe(select);
+        return Run(codebase, root, probe)
+            .Single()
+            .ShapeSubjects();
+    }
+
+    // The probe rule both readings run, explained on Selects.
+    private static Action<Arch> Probe(Func<Arch, Selection> select)
+    {
+        return arch => arch.Rule("probe/selection")
+            .Enforce(select(arch).MustHavePrefix("ZZZ"))
+            .Because("b");
     }
 
     /// <summary>A baseline index carrying <paramref name="entries" /> under one rule — the ratchet's input.</summary>
@@ -288,9 +317,10 @@ internal static class Checker
     ///         Every other claim about a result is an outcome verb of <see cref="RuleResultAssertions" />.
     ///     </para>
     ///     <para>
-    ///         The readers stay in the harness because <see cref="Selects" /> reads
-    ///         <see cref="ShapeSubjects" />: beside the assertions they would make the harness depend on the
-    ///         assertions rather than the other way round.
+    ///         The readers stay in the harness because
+    ///         <see cref="Selects(CodebaseModel, Func{Arch, Selection})" /> reads <see cref="ShapeSubjects" />:
+    ///         beside the assertions they would make the harness depend on the assertions rather than the other
+    ///         way round.
     ///     </para>
     /// </remarks>
     public static IReadOnlyList<string> Violators(
@@ -357,8 +387,8 @@ internal static class Checker
 
     /// <summary>
     ///     The projects <paramref name="select" /> matches over <paramref name="codebase" />, in report
-    ///     order — the project-stratum twin of <see cref="Selects" /> and read back the same way, through a
-    ///     probe rule nothing can satisfy.
+    ///     order — the project-stratum twin of <see cref="Selects(CodebaseModel, Func{Arch, Selection})" /> and
+    ///     read back the same way, through a probe rule nothing can satisfy.
     /// </summary>
     /// <remarks>
     ///     The probe is the escape hatch with a constant-false predicate rather than a naming verb, because
@@ -497,8 +527,8 @@ internal static class Checker
     ///     Asserts the first violation of the first rule renders as a project subject:
     ///     <paramref name="kind" /> over <paramref name="subjectProject" />, with <c>package</c> and
     ///     <c>framework</c> each present only when <paramref name="package" /> or <paramref name="framework" />
-    ///     is given, and every type- and member-level slot omitted.
-    ///     The fourth distinct slot combination the wire format carries.
+    ///     is given, <c>property</c> and <c>propertyValue</c> omitted, and every type- and member-level slot
+    ///     omitted. The fourth distinct slot combination the wire format carries.
     /// </summary>
     public static void ShouldRenderProjectShapeViolation(
         this CheckReport report, string kind, string subjectProject, string? package = null, string? framework = null)
@@ -515,21 +545,10 @@ internal static class Checker
             .GetString()
             .ShouldBe(subjectProject);
 
-        if (package is null)
-            violation.TryGetProperty("package", out _)
-                .ShouldBeFalse();
-        else
-            violation.GetProperty("package")
-                .GetString()
-                .ShouldBe(package);
-
-        if (framework is null)
-            violation.TryGetProperty("framework", out _)
-                .ShouldBeFalse();
-        else
-            violation.GetProperty("framework")
-                .GetString()
-                .ShouldBe(framework);
+        ShouldCarrySlot(violation, "package", package);
+        ShouldCarrySlot(violation, "framework", framework);
+        ShouldCarrySlot(violation, "property", null);
+        ShouldCarrySlot(violation, "propertyValue", null);
 
         violation.TryGetProperty("source", out _)
             .ShouldBeFalse();
@@ -539,6 +558,23 @@ internal static class Checker
             .ShouldBeFalse();
         violation.TryGetProperty("subjectMember", out _)
             .ShouldBeFalse();
+    }
+
+    // One optional slot of a violation's wire form: omitted when expected is null, otherwise present and holding it.
+    // The slot rides as the message because inside a helper Shouldly prints the expression, not the literal.
+    private static void ShouldCarrySlot(JsonElement violation, string slot, string? expected)
+    {
+        var reason = $"the {slot} slot";
+        if (expected is null)
+        {
+            violation.TryGetProperty(slot, out _)
+                .ShouldBeFalse(reason);
+            return;
+        }
+
+        violation.GetProperty(slot)
+            .GetString()
+            .ShouldBe(expected, customMessage: reason);
     }
 
     private static string Pair(Violation v)

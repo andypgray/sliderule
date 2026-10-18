@@ -27,27 +27,17 @@ public sealed class MustTargetVerbTests
         ProjectFacts.Project("Unevaluated"));
 
     [Fact]
-    public void MustTarget_FrameworkMissing_FailsAtTheDeclaringPropsFile()
+    public void MustTarget_FrameworkMissing_FailsAtTheDeclaringPropsFile_AndIsFlaggedAsMissing()
     {
         // The site is where the framework list is declared, here a props file above the project: that is the
         // line a fix adds the missing moniker to.
-        Checker.Run(Scene, arch => arch.Rule("packaging/standard-floor")
-                .Enforce(arch.Projects.Named("Host").MustTarget("netstandard2.0"))
-                .Because("b"))
-            .Single()
-            .ShouldHaveFailedWithProjectItemAtSites("Host -> netstandard2.0", ["Directory.Build.props:3"]);
-    }
-
-    [Fact]
-    public void MustTarget_FrameworkMissing_IsFlaggedAsMissing()
-    {
         // The flag is what the wording reads to say "does not target" rather than "targets", over the same
         // framework slot MustOnlyTarget fills with a framework the project does target.
         Violation violation = Checker.Run(Scene, arch => arch.Rule("packaging/standard-floor")
                 .Enforce(arch.Projects.Named("Host").MustTarget("netstandard2.0"))
                 .Because("b"))
             .Single()
-            .ShouldHaveFailedWithProjectItemAtSites("Host -> netstandard2.0", ["Directory.Build.props:3"]);
+            .ShouldHaveFailedWithProjectAtSites("Host -> netstandard2.0", ["Directory.Build.props:3"]);
 
         violation.FrameworkMissing.ShouldBeTrue();
     }
@@ -86,7 +76,7 @@ public sealed class MustTargetVerbTests
                 .Enforce(arch.Projects.Named("Legacy").MustTarget("net8.0"))
                 .Because("b"))
             .Single()
-            .ShouldHaveFailedWithProjectItemAtSites("Legacy -> net8.0", []);
+            .ShouldHaveFailedWithProjectAtSites("Legacy -> net8.0", []);
     }
 
     [Fact]
@@ -98,7 +88,7 @@ public sealed class MustTargetVerbTests
                 .Enforce(arch.Projects.Named("Contract").MustTarget("NetStandard2.0"))
                 .Because("b"))
             .Single()
-            .ShouldHaveFailedWithProjectItemAtSites("Contract -> NetStandard2.0", ["src/Contract/Contract.csproj:5"]);
+            .ShouldHaveFailedWithProjectAtSites("Contract -> NetStandard2.0", ["src/Contract/Contract.csproj:5"]);
     }
 
     [Fact]

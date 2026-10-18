@@ -32,19 +32,10 @@ public sealed class ParamsArrayGuardInventoryTests
         foreach (MethodInfo verb in verbs)
         {
             ParameterInfo[] parameters = verb.GetParameters();
-            object?[] arguments = parameters
-                .Select((parameter, index) =>
-                    index == parameters.Length - 1 ? null : SurfaceSamples.Sample(parameter.ParameterType))
-                .ToArray();
-
-            Exception? thrown = SurfaceSamples.Invoke(verb, SurfaceSamples.Receiver(verb), arguments);
-            string expected = parameters[parameters.Length - 1].Name!;
-            if (thrown is ArgumentNullException guarded && guarded.ParamName == expected) continue;
-
-            string actual = thrown is null
-                ? "no exception"
-                : $"{thrown.GetType().Name} naming '{(thrown as ArgumentException)?.ParamName}'";
-            unguarded.Add($"{verb.DeclaringType!.Name}.{verb.Name}({SurfaceSamples.Signature(parameters)}) -> {actual}");
+            string array = parameters[parameters.Length - 1].Name!;
+            Exception? thrown = SurfaceSamples.CallWithLast(verb, null);
+            string? miss = SurfaceSamples.NullGuardMiss(thrown, array);
+            if (miss is not null) unguarded.Add($"{SurfaceSamples.Describe(verb)} -> {miss}");
         }
 
         unguarded.ShouldBeEmpty();

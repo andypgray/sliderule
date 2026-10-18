@@ -1,6 +1,6 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Checking;
+using Xunit;
 
 namespace SlideRule.Tests.Checking;
 
@@ -17,9 +17,6 @@ public sealed class DeadSubjectNameTests
     private const string NameCure =
         "A name in a `Named` list is the whole simple name, matched exactly, without its namespace, generic "
         + "arity or containing type; check the selection against what the solution declares.";
-
-    // A stand-in for the sentence a partial model composes; its wording is pinned where it is minted.
-    private const string PartialModelCure = "THE-PARTIAL-MODEL-CURE";
 
     [Fact]
     public void ADeadNameBesideALiveOne_FailsTheRuleNamingIt()
@@ -165,7 +162,7 @@ public sealed class DeadSubjectNameTests
     [Fact]
     public void ADeadNameUnderAPartialModel_CarriesThePartialModelCure()
     {
-        var partial = new IncompleteModel(PartialModelCure);
+        IncompleteModel partial = Checker.PartialModel;
 
         RuleResult result = Checker.Run(Sources.LayeredModel, partial, arch =>
                 arch.Rule("naming/named")
@@ -175,6 +172,6 @@ public sealed class DeadSubjectNameTests
 
         result.ShouldHaveFailedWithDetail(
                 ViolationKind.EmptySubject, ConstraintEvaluator.EmptyOperandMessage(GhostOperand))
-            .Hint.ShouldBe(PartialModelCure);
+            .Hint.ShouldBe(Checker.PartialModelCure);
     }
 }

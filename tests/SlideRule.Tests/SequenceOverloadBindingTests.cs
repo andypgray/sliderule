@@ -129,29 +129,15 @@ public sealed class SequenceOverloadBindingTests
 
     private static (CSharpCompilation Compilation, SyntaxTree Tree) Compile(LanguageVersion version, params string[] statements)
     {
-        IEnumerable<string> body = statements.Select(statement => "        " + statement);
-        string source = string.Join(
-            "\n",
-            [
-                "using System;",
-                "using System.Collections.Generic;",
-                "using SlideRule;",
-                "",
-                "public sealed class Spec",
-                "{",
-                "    public void Define(Arch arch)",
-                "    {",
-                .. body,
-                "    }",
-                "}"
-            ]);
+        string spec = SpecSnippet.Around(statements);
+        string source = string.Join(Environment.NewLine, "using System;", "using System.Collections.Generic;", spec);
 
-        SyntaxTree tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(version), cancellationToken: Ct);
+        CSharpParseOptions parseOptions = SpecSnippet.Language.WithLanguageVersion(version);
+        SyntaxTree tree = CSharpSyntaxTree.ParseText(source, parseOptions, cancellationToken: Ct);
         NullableContextOptions nullable = version == LanguageVersion.CSharp7_3
             ? NullableContextOptions.Disable
             : NullableContextOptions.Enable;
-        CSharpCompilationOptions options = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
-            .WithNullableContextOptions(nullable);
+        CSharpCompilationOptions options = SpecSnippet.Options.WithNullableContextOptions(nullable);
         var compilation = CSharpCompilation.Create("Binding", [tree], SpecSnippet.WithTheContract, options);
 
         return (compilation, tree);

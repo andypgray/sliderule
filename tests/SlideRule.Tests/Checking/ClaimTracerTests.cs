@@ -3,7 +3,6 @@ using SlideRule.Checking;
 using SlideRule.Cli.Rendering;
 using SlideRule.Codebase;
 using SlideRule.Hosting;
-using SlideRule.Internal;
 using SlideRule.Tests.Extraction;
 using SlideRule.Tests.TestSupport;
 using Xunit;
@@ -340,7 +339,7 @@ public sealed class ClaimTracerTests
     {
         // The first declaring file under a glob, relative to the solution directory: a partial type answers
         // from whichever of its files the glob reaches.
-        var tracer = new ClaimTracer(Sources.FolderModel, new SolutionRoot(Sources.FolderRoot));
+        var tracer = new ClaimTracer(Sources.FolderModel, Sources.FolderRoot);
         var arch = new Arch();
 
         ClaimTrace kept = tracer.Trace(arch.Types.Under("src/Widgets", "vendor"), Sources.FolderModel.Type("App.Split"));
@@ -352,14 +351,14 @@ public sealed class ClaimTracerTests
     [Fact]
     public void AnUnderAdjective_SaysWhyNoFilePutTheTypeUnderTheGlobs()
     {
-        var tracer = new ClaimTracer(Sources.FolderModel, new SolutionRoot(Sources.FolderRoot));
+        var tracer = new ClaimTracer(Sources.FolderModel, Sources.FolderRoot);
         var arch = new Arch();
 
         ClaimTrace outside = tracer.Trace(arch.Types.Under("src/Widgets", "src/Console"), Sources.FolderModel.Type("App.Shared"));
 
         // A declared type the model records no file for, which no glob can reach either.
         TypeNode bare = SyntheticNodes.Type("App.Bare");
-        ClaimTrace fileless = new ClaimTracer(SyntheticNodes.Referencing([bare]), new SolutionRoot(Sources.FolderRoot))
+        ClaimTrace fileless = new ClaimTracer(SyntheticNodes.Referencing([bare]), Sources.FolderRoot)
             .Trace(arch.Types.Under("src"), bare);
 
         outside.Verdict.ShouldBe(ClaimVerdict.Narrowed);

@@ -1,4 +1,3 @@
-using Shouldly;
 using SlideRule.Baselines;
 using SlideRule.Checking;
 using SlideRule.Codebase;
@@ -40,7 +39,7 @@ public sealed class MustNotReferencePackagesVerbTests
                 .Enforce(arch.Projects.Matching("*").MustNotReferencePackages("GreenPipes", "MassTransit.Host"))
                 .Because("b"))
             .Single()
-            .ShouldHaveFailedWithProjectItemAtSites("Bus -> greenpipes", ["src/Bus/Bus.csproj:9"]);
+            .ShouldHaveFailedWithProjectAtSites("Bus -> greenpipes", ["src/Bus/Bus.csproj:9"]);
     }
 
     [Fact]
@@ -51,7 +50,7 @@ public sealed class MustNotReferencePackagesVerbTests
                 .Enforce(arch.Projects.Named("Bus").MustNotReferencePackages("StyleCop.*"))
                 .Because("b"))
             .Single()
-            .ShouldHaveFailedWithProjectItemAtSites("Bus -> StyleCop.Analyzers", ["Directory.Build.props:6"]);
+            .ShouldHaveFailedWithProjectAtSites("Bus -> StyleCop.Analyzers", ["Directory.Build.props:6"]);
     }
 
     [Fact]
@@ -98,12 +97,11 @@ public sealed class MustNotReferencePackagesVerbTests
                 .Because("b"))
             .Single();
 
-        result.Violations.Select(violation => violation.BaselineIdentity())
-            .ShouldBe(
-            [
-                BaselineEntry.ForEdge("project:Bus", "package:Microsoft.Extensions.Logging"),
-                BaselineEntry.ForEdge("project:Bus", "package:StyleCop.Analyzers"),
-                BaselineEntry.ForEdge("project:Bus", "package:greenpipes")
-            ]);
+        result.ShouldHaveBaselineIdentities(
+        [
+            BaselineEntry.ForEdge("project:Bus", "package:Microsoft.Extensions.Logging"),
+            BaselineEntry.ForEdge("project:Bus", "package:StyleCop.Analyzers"),
+            BaselineEntry.ForEdge("project:Bus", "package:greenpipes")
+        ]);
     }
 }

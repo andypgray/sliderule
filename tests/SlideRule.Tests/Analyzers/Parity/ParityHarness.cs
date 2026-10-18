@@ -351,8 +351,7 @@ internal static class ParityHarness
         List<ArchRule> inRules = document.Rules
             .Where(rule => OneProjectDecidability.Classify(rule).Decidable)
             .ToList();
-        CheckReport report = ArchChecker.Check(
-            inRules, codebase, baselines, null, null, null, new SolutionRoot(modelDirectory));
+        CheckReport report = WholeSolution(inRules, codebase, baselines, modelDirectory);
 
         List<string> unmeasured = report.Results
             .Where(result => result.Violations.Any(violation =>
@@ -590,7 +589,7 @@ internal static class ParityHarness
     {
         ArchRule rule = subject.Document.Rules.Single(candidate =>
             string.Equals(candidate.Id, ruleId, StringComparison.Ordinal));
-        CheckReport report = ArchChecker.Check([rule], subject.Codebase, subject.Baselines, null);
+        CheckReport report = WholeSolution([rule], subject.Codebase, subject.Baselines, subject.ModelDirectory);
 
         return BuildFindings.From(report, _ => true)
             .Select(KeyOf)
@@ -644,6 +643,15 @@ internal static class ParityHarness
 
         return new ParitySubject(
             name, codebase, document, text, files, baselines, modelDirectory, expectation, compilations);
+    }
+
+    // The whole-solution check over `rules`, with path globs read against `modelDirectory` as the build tier
+    // reads them.
+    private static CheckReport WholeSolution(
+        IReadOnlyList<ArchRule> rules, CodebaseModel codebase, BaselineIndex baselines, string modelDirectory)
+    {
+        var root = new SolutionRoot(modelDirectory);
+        return ArchChecker.Check(rules, codebase, baselines, null, null, null, root);
     }
 
     // The file the tool would have read, at the path the tool resolves it to. A declared path with nothing

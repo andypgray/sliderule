@@ -51,7 +51,7 @@ public sealed class ClaimTraceParityTests(WorkspaceFixture fixture)
                 .Because("b");
         });
 
-        ShouldTraceWhatItEvaluates(model, Sources.FolderModel, new SolutionRoot(Sources.FolderRoot));
+        ShouldTraceWhatItEvaluates(model, Sources.FolderModel, Sources.FolderRoot);
     }
 
     private static void ShouldTraceWhatItEvaluates(

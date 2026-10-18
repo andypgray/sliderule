@@ -206,9 +206,9 @@ public sealed class GraphFormatterTests
             new(
                 "Acme.Console", [], 0, 0, [], true, ["net10.0", "netstandard2.0"], null,
                 [
-                    ProjectFacts.Package("Microsoft.Bcl.HashCode", "Acme.csproj", 1, frameworks: ["netstandard2.0"]),
-                    ProjectFacts.Package("PolySharp", "Acme.csproj", 2, isPrivate: true, frameworks: ["netstandard2.0"]),
-                    ProjectFacts.Package("Wcwidth", "Acme.csproj", 3, frameworks: ["net10.0", "netstandard2.0"])
+                    Package("Microsoft.Bcl.HashCode", frameworks: ["netstandard2.0"]),
+                    Package("PolySharp", isPrivate: true, frameworks: ["netstandard2.0"]),
+                    Package("Wcwidth", frameworks: ["net10.0", "netstandard2.0"])
                 ])
         ];
 
@@ -401,9 +401,9 @@ public sealed class GraphFormatterTests
     }
 
     // The survey renders names alone, so where a reference was declared is no part of any line under test.
-    private static PackageReference Package(string name, bool isPrivate = false)
+    private static PackageReference Package(string name, bool isPrivate = false, IReadOnlyList<string>? frameworks = null)
     {
-        return ProjectFacts.Package(name, "Acme.csproj", 1, isPrivate);
+        return ProjectFacts.Package(name, "Acme.csproj", 1, isPrivate, frameworks);
     }
 
     // App (declared) references Passenger (undeclared); Unread was extracted with no membership at all.

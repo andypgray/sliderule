@@ -43,14 +43,49 @@ internal static class SurfaceSamples
         return method.MakeGenericMethod(typeArguments);
     }
 
+    /// <summary>
+    ///     Calls the method with a sample for every parameter but the last, which is <paramref name="last" />,
+    ///     returning what it threw with the reflection layer unwrapped, or null.
+    /// </summary>
+    internal static Exception? CallWithLast(MethodInfo method, object? last)
+    {
+        ParameterInfo[] parameters = method.GetParameters();
+        object?[] arguments = parameters
+            .Select((parameter, index) =>
+                index == parameters.Length - 1 ? last : Sample(parameter.ParameterType))
+            .ToArray();
+        object? receiver = Receiver(method);
+
+        return Invoke(method, receiver, arguments);
+    }
+
+    /// <summary>
+    ///     Null when the call threw ArgumentNullException naming the parameter, otherwise what it did instead.
+    /// </summary>
+    internal static string? NullGuardMiss(Exception? thrown, string parameter)
+    {
+        if (thrown is ArgumentNullException guarded && guarded.ParamName == parameter) return null;
+
+        return thrown is null
+            ? "no exception"
+            : $"{thrown.GetType().Name} naming '{(thrown as ArgumentException)?.ParamName}'";
+    }
+
+    /// <summary>The method as a report line names it: its declaring type, its name and its parameter list.</summary>
+    internal static string Describe(MethodInfo method)
+    {
+        string signature = Signature(method.GetParameters());
+        return $"{method.DeclaringType!.Name}.{method.Name}({signature})";
+    }
+
     /// <summary>The receiver of an instance method, or null for a static one.</summary>
-    internal static object? Receiver(MethodInfo method)
+    private static object? Receiver(MethodInfo method)
     {
         return method.IsStatic ? null : Sample(method.DeclaringType!);
     }
 
     /// <summary>Calls the method, returning what it threw with the reflection layer unwrapped, or null.</summary>
-    internal static Exception? Invoke(MethodInfo method, object? receiver, object?[] arguments)
+    private static Exception? Invoke(MethodInfo method, object? receiver, object?[] arguments)
     {
         try
         {
@@ -95,7 +130,7 @@ internal static class SurfaceSamples
     }
 
     /// <summary>The parameter list as the report line spells it.</summary>
-    internal static string Signature(ParameterInfo[] parameters)
+    private static string Signature(ParameterInfo[] parameters)
     {
         return string.Join(", ", parameters.Select(parameter => parameter.ParameterType.Name + " " + parameter.Name));
     }

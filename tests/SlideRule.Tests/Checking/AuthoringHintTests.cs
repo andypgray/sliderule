@@ -50,11 +50,8 @@ public sealed class AuthoringHintTests
 
     private const string NameCure = NamedClause + "; a name that matches nothing bans nothing, so decide before keeping it.";
 
-    // A stand-in for the sentence a partial model composes; its wording is pinned where it is minted, and
-    // these rows are about the replacement rather than about the words.
-    private const string PartialModelCure = "THE-PARTIAL-MODEL-CURE";
-
-    // The same kind of stand-in, for the inert-target cure a solution filter's narrowing composes.
+    // The same kind of stand-in as Checker.PartialModelCure, for the inert-target cure a solution filter's
+    // narrowing composes.
     private const string NarrowedInertCure = "THE-NARROWED-INERT-CURE";
 
     [Fact]
@@ -433,7 +430,7 @@ public sealed class AuthoringHintTests
     {
         // The name cure takes the same two replacements as the other inert cures, and the evaluator is what hands
         // it the run's facts: a call that passed neither would keep every row above green.
-        var partial = new IncompleteModel(PartialModelCure);
+        IncompleteModel partial = Checker.PartialModel;
 
         RuleResult broken = Checker.Run(Sources.LayeredModel, partial, arch =>
                 arch.Rule("inert/name")
@@ -447,7 +444,7 @@ public sealed class AuthoringHintTests
             .Single();
 
         broken.Warnings.Single()
-            .Hint.ShouldBe(PartialModelCure);
+            .Hint.ShouldBe(Checker.PartialModelCure);
         filtered.Warnings.Single()
             .Hint.ShouldBe(NarrowedInertCure);
     }
@@ -482,14 +479,14 @@ public sealed class AuthoringHintTests
         // and a cure narrowed to namespace nouns would go on reading green against a glob row while a
         // project- or typeof-shaped empty subject advised a spec fix for a load failure. That is the
         // half-fix the member and project row below exists to prevent, one stratum over.
-        var partial = new IncompleteModel(PartialModelCure);
+        IncompleteModel partial = Checker.PartialModel;
 
         foreach ((string shape, Selection pattern, string shapeFragment) in EveryShape())
         {
             string subject = AuthoringHints.ForSubject(pattern, partial);
 
             subject.ShouldSatisfyAllConditions(
-                () => subject.ShouldBe(PartialModelCure, shape),
+                () => subject.ShouldBe(Checker.PartialModelCure, shape),
                 () => subject.ShouldNotContain(shapeFragment, shape),
                 () => subject.ShouldNotContain(SubjectAction, shape));
 
@@ -499,7 +496,7 @@ public sealed class AuthoringHintTests
                 var context = $"{cure} on {shape}";
 
                 hint.ShouldSatisfyAllConditions(
-                    () => hint.ShouldBe(PartialModelCure, context),
+                    () => hint.ShouldBe(Checker.PartialModelCure, context),
                     () => hint.ShouldNotContain(action, context));
             }
 
@@ -509,7 +506,7 @@ public sealed class AuthoringHintTests
                 var context = $"{cure} on {shape}";
 
                 hint.ShouldSatisfyAllConditions(
-                    () => hint.ShouldBe(PartialModelCure, context),
+                    () => hint.ShouldBe(Checker.PartialModelCure, context),
                     () => hint.ShouldNotContain(action, context));
             }
         }
@@ -521,12 +518,12 @@ public sealed class AuthoringHintTests
         // The two fixed clauses read off no selection shape, so nothing about them would have made anyone
         // route them through the fact — and a failed project empties a member or a project subject exactly
         // as it empties a type one. Leaving these two alone was the half-fix this row exists to prevent.
-        var partial = new IncompleteModel(PartialModelCure);
+        IncompleteModel partial = Checker.PartialModel;
 
         AuthoringHints.ForMemberSubject(partial)
-            .ShouldBe(PartialModelCure);
+            .ShouldBe(Checker.PartialModelCure);
         AuthoringHints.ForProjectSubject(partial)
-            .ShouldBe(PartialModelCure);
+            .ShouldBe(Checker.PartialModelCure);
     }
 
     [Fact]
@@ -535,7 +532,7 @@ public sealed class AuthoringHintTests
         // The wiring, end to end on one model: a subject that matched nothing fails carrying the fact, and a
         // target that matched nothing warns carrying the same fact. Before this, a rule reported itself inert
         // because the edge it rests on was never extracted and the cure it printed was about globs.
-        var partial = new IncompleteModel(PartialModelCure);
+        IncompleteModel partial = Checker.PartialModel;
 
         RuleResult empty = Checker.Run(Sources.LayeredModel, partial, arch =>
                 arch.Rule("empty/x")
@@ -549,9 +546,9 @@ public sealed class AuthoringHintTests
             .Single();
 
         empty.Violations.Single()
-            .Hint.ShouldBe(PartialModelCure);
+            .Hint.ShouldBe(Checker.PartialModelCure);
         inert.Warnings.Single()
-            .Hint.ShouldBe(PartialModelCure);
+            .Hint.ShouldBe(Checker.PartialModelCure);
     }
 
     [Fact]
@@ -599,12 +596,12 @@ public sealed class AuthoringHintTests
         // A filtered run can also be a broken one. The narrowing's cure sends the reader to re-check against
         // the whole solution, which loads the same broken model, so the load's repair has to come first —
         // for every cure a narrowing replaces, whatever the shape of what came up empty.
-        var partial = new IncompleteModel(PartialModelCure);
+        IncompleteModel partial = Checker.PartialModel;
 
         foreach ((string shape, Selection pattern, _) in EveryShape())
         foreach ((string cure, InertCure hintFor, _) in EveryInertCure())
             hintFor(pattern, partial, Narrowed())
-                .ShouldBe(PartialModelCure, $"{cure} on {shape}");
+                .ShouldBe(Checker.PartialModelCure, $"{cure} on {shape}");
     }
 
     // Every shape the cure chooser reads, so a row over this table makes its claim of every shape rather than

@@ -3,7 +3,6 @@ using Shouldly;
 using SlideRule.Baselines;
 using SlideRule.Checking;
 using SlideRule.Codebase;
-using SlideRule.Internal;
 using SlideRule.Tests.Extraction;
 using Xunit;
 
@@ -17,8 +16,6 @@ namespace SlideRule.Tests.Checking;
 /// </summary>
 public sealed class UnderAdjectiveTests
 {
-    private static readonly SolutionRoot Root = new(Sources.FolderRoot);
-
     [Fact]
     public void Under_AFolder_KeepsEveryTypeDeclaredBelowIt()
     {
@@ -83,7 +80,7 @@ public sealed class UnderAdjectiveTests
     public void Under_OnATarget_ReachesTheTypesDeclaredThere()
     {
         // The target side reads the same way: Writer reaches into Internal, and nothing else does.
-        RuleResult result = Checker.Run(Sources.FolderModel, Root, arch =>
+        RuleResult result = Checker.Run(Sources.FolderModel, Sources.FolderRoot, arch =>
                 arch.Rule("console/internal")
                     .Enforce(arch.Types.Under("src").MustNotReference(arch.Types.Under("src/Console/Internal")))
                     .Because("b"))
@@ -97,7 +94,7 @@ public sealed class UnderAdjectiveTests
     {
         // Writer reaches Ansi and the framework's StringBuilder; a ban over every path reds the first alone,
         // because a type the solution does not declare has no file in it.
-        RuleResult result = Checker.Run(Sources.FolderModel, Root, arch =>
+        RuleResult result = Checker.Run(Sources.FolderModel, Sources.FolderRoot, arch =>
                 arch.Rule("console/self-contained")
                     .Enforce(arch.Types.Named("Writer").MustNotReference(arch.Types.Under("**")))
                     .Because("b"))
@@ -124,7 +121,7 @@ public sealed class UnderAdjectiveTests
     [Fact]
     public void Under_ARunOverOneProject_ReadsTheGlobAgainstTheRootItWasGiven()
     {
-        Checker.Run(Sources.FolderModel, BaselineIndex.Empty, NarrowedUniverse.OneProject, Root, arch =>
+        Checker.Run(Sources.FolderModel, BaselineIndex.Empty, NarrowedUniverse.OneProject, Sources.FolderRoot, arch =>
                 arch.Rule("widgets/sealed")
                     .Enforce(arch.Types.Under("src/Widgets").MustBeSealed())
                     .Because("b"))
@@ -151,11 +148,8 @@ public sealed class UnderAdjectiveTests
                                              }
                                          }
                                          """));
-        var evaluator = new SelectionEvaluator(codebase, Root);
-
-        List<string> underEverything = evaluator.Evaluate(new Arch().Types.Under("**"), SelectionPosition.Subject)
-            .Select(type => type.FullName)
-            .ToList();
+        IReadOnlyList<string> underEverything = Checker.Selects(
+            codebase, Sources.FolderRoot, arch => arch.Types.Under("**"));
 
         underEverything.ShouldContain("App.Gizmo");
         underEverything.ShouldNotContain("Gen.Emitted");
@@ -163,14 +157,7 @@ public sealed class UnderAdjectiveTests
 
     private static IReadOnlyList<string> Selected(string first, params string[] more)
     {
-        return Checker.Run(Sources.FolderModel, Root, arch =>
-                arch.Rule("selected/sealed")
-                    .Enforce(arch.Types.Under(first, more).MustBeSealed())
-                    .Because("b"))
-            .Single()
-            .ShapeSubjects()
-            .OrderBy(name => name, StringComparer.Ordinal)
-            .ToList();
+        return Checker.Selects(Sources.FolderModel, Sources.FolderRoot, arch => arch.Types.Under(first, more));
     }
 
     private sealed class EmittingGenerator : IIncrementalGenerator

@@ -1,6 +1,7 @@
 using Shouldly;
 using SlideRule.Baselines;
 using SlideRule.Checking;
+using SlideRule.Cli.Verbs;
 using SlideRule.Codebase;
 using Xunit;
 
@@ -71,52 +72,39 @@ public sealed class ProjectRatchetTests
                 .Because("b"))
             .Single();
 
-        result.Violations.Select(violation => violation.BaselineIdentity())
-            .ShouldBe(
-            [
-                BaselineEntry.ForSubject("project:Zphil.Cli"),
-                BaselineEntry.ForSubject("project:Zphil.Contract")
-            ]);
+        result.ShouldHaveBaselineIdentities(
+        [
+            BaselineEntry.ForSubject("project:Zphil.Cli"),
+            BaselineEntry.ForSubject("project:Zphil.Contract")
+        ]);
     }
 
     [Fact]
     public void Migrate_PackageIdentity_IsAnEdgeFromTheProjectToThePackage()
     {
         // The pinned per-item form: the project's identity, then the package tagged the way the project is.
-        RuleResult result = Checker.Run(PackageScene, BaselineIndex.Empty, arch => arch.Rule("packaging/domain-pure")
-                .Migrate("Packages everywhere.", arch.Projects.Matching("Zphil.*").MustReferenceNoPackages())
-                .Because("b"))
-            .Single();
+        RuleResult result = Checker.Run(PackageScene, BaselineIndex.Empty, PackageRule).Single();
 
-        result.Violations.Select(violation => violation.BaselineIdentity())
-            .ShouldBe(
-            [
-                BaselineEntry.ForEdge("project:Zphil.Domain", "package:Newtonsoft.Json"),
-                BaselineEntry.ForEdge("project:Zphil.Domain", "package:Serilog"),
-                BaselineEntry.ForEdge("project:Zphil.Web", "package:Serilog")
-            ]);
+        result.ShouldHaveBaselineIdentities(
+        [
+            BaselineEntry.ForEdge("project:Zphil.Domain", "package:Newtonsoft.Json"),
+            BaselineEntry.ForEdge("project:Zphil.Domain", "package:Serilog"),
+            BaselineEntry.ForEdge("project:Zphil.Web", "package:Serilog")
+        ]);
     }
 
     [Fact]
     public void Migrate_FrameworkIdentity_IsAnEdgeFromTheProjectToTheFramework()
     {
-        CodebaseModel scene = ProjectFacts.Solution(
-            ProjectFacts.Project(
-                "Zphil.Domain",
-                targetFrameworks: ["net48", "net6.0", "net8.0"],
-                targetFrameworksSite: ProjectFacts.Site("src/Domain/Domain.csproj", 3)));
+        CodebaseModel scene = ProjectFacts.Solution(Targeting("Zphil.Domain", "net48", "net6.0", "net8.0"));
 
-        RuleResult result = Checker.Run(scene, BaselineIndex.Empty, arch => arch.Rule("packaging/supported")
-                .Migrate("Old frameworks linger.", arch.Projects.Matching("Zphil.*").MustOnlyTarget("net8.0"))
-                .Because("b"))
-            .Single();
+        RuleResult result = Checker.Run(scene, BaselineIndex.Empty, FrameworkRule).Single();
 
-        result.Violations.Select(violation => violation.BaselineIdentity())
-            .ShouldBe(
-            [
-                BaselineEntry.ForEdge("project:Zphil.Domain", "framework:net48"),
-                BaselineEntry.ForEdge("project:Zphil.Domain", "framework:net6.0")
-            ]);
+        result.ShouldHaveBaselineIdentities(
+        [
+            BaselineEntry.ForEdge("project:Zphil.Domain", "framework:net48"),
+            BaselineEntry.ForEdge("project:Zphil.Domain", "framework:net6.0")
+        ]);
     }
 
     [Fact]
@@ -126,12 +114,11 @@ public sealed class ProjectRatchetTests
         // project lacks rather than one it targets.
         RuleResult result = Checker.Run(FloorScene, BaselineIndex.Empty, FloorRule).Single();
 
-        result.Violations.Select(violation => violation.BaselineIdentity())
-            .ShouldBe(
-            [
-                BaselineEntry.ForEdge("project:Zphil.Domain", "framework:net8.0"),
-                BaselineEntry.ForEdge("project:Zphil.Web", "framework:net8.0")
-            ]);
+        result.ShouldHaveBaselineIdentities(
+        [
+            BaselineEntry.ForEdge("project:Zphil.Domain", "framework:net8.0"),
+            BaselineEntry.ForEdge("project:Zphil.Web", "framework:net8.0")
+        ]);
     }
 
     [Fact]
@@ -229,16 +216,8 @@ public sealed class ProjectRatchetTests
     [Fact]
     public void Migrate_FrameworkAddedAfterCapture_IsRed()
     {
-        CodebaseModel captured = ProjectFacts.Solution(
-            ProjectFacts.Project(
-                "Zphil.Domain",
-                targetFrameworks: ["net48", "net8.0"],
-                targetFrameworksSite: ProjectFacts.Site("src/Domain/Domain.csproj", 3)));
-        CodebaseModel later = ProjectFacts.Solution(
-            ProjectFacts.Project(
-                "Zphil.Domain",
-                targetFrameworks: ["net472", "net48", "net8.0"],
-                targetFrameworksSite: ProjectFacts.Site("src/Domain/Domain.csproj", 3)));
+        CodebaseModel captured = ProjectFacts.Solution(Targeting("Zphil.Domain", "net48", "net8.0"));
+        CodebaseModel later = ProjectFacts.Solution(Targeting("Zphil.Domain", "net472", "net48", "net8.0"));
         BaselineIndex index = Capture(captured, FrameworkRule);
 
         RuleResult result = Checker.Run(later, index, FrameworkRule).Single();
@@ -276,7 +255,7 @@ public sealed class ProjectRatchetTests
 
         RuleResult result = Checker.Run(PackageScene, index, PackageRule).Single();
 
-        result.GrandfatheredEntries.ShouldBe(
+        result.ShouldHaveGrandfatheredEntries(
         [
             BaselineEntry.ForSubject("project:Zphil.Domain"),
             BaselineEntry.ForEdge("project:Zphil.Domain", "package:Serilog")
@@ -290,10 +269,7 @@ public sealed class ProjectRatchetTests
     {
         // Deterministic report order across the project and package slots: the project name is the primary
         // key and the package name stands where a Target would, so one project's packages sort among themselves.
-        RuleResult result = Checker.Run(PackageScene, BaselineIndex.Empty, arch => arch.Rule("packaging/domain-pure")
-                .Migrate("Packages everywhere.", arch.Projects.Matching("Zphil.*").MustReferenceNoPackages())
-                .Because("b"))
-            .Single();
+        RuleResult result = Checker.Run(PackageScene, BaselineIndex.Empty, PackageRule).Single();
 
         result.Violations.Select(violation => $"{violation.SubjectProject!.Name} -> {violation.Package!.Name}")
             .ShouldBe(["Zphil.Domain -> Newtonsoft.Json", "Zphil.Domain -> Serilog", "Zphil.Web -> Serilog"]);
@@ -372,10 +348,8 @@ public sealed class ProjectRatchetTests
     private static BaselineIndex Capture(CodebaseModel scene, Action<Arch> spec)
     {
         RuleResult first = Checker.Run(scene, BaselineIndex.Empty, spec).Single();
-        BaselineEntry[] entries = first.Violations
-            .Select(violation => violation.BaselineIdentity()!.WithSiteCount(violation.Sites.Count))
-            .ToArray();
+        IReadOnlyList<BaselineEntry> entries = BaselineRunner.CapturedEntries(first).ShouldNotBeNull();
 
-        return Checker.Baselines(first.Rule.Id, entries);
+        return Checker.Baselines(first.Rule.Id, [.. entries]);
     }
 }

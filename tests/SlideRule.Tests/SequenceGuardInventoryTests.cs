@@ -33,20 +33,21 @@ public sealed class SequenceGuardInventoryTests
             ParameterInfo[] parameters = method.GetParameters();
             ParameterInfo sequence = parameters[parameters.Length - 1];
             Type element = sequence.ParameterType.GetGenericArguments()[0];
-            var where = $"{method.DeclaringType!.Name}.{method.Name}({SurfaceSamples.Signature(parameters)})";
+            string where = SurfaceSamples.Describe(method);
 
-            string? nullList = NamesTheParameter(Call(method, null), sequence.Name!);
+            string? nullList = SurfaceSamples.NullGuardMiss(SurfaceSamples.CallWithLast(method, null), sequence.Name!);
             if (nullList is not null) broken.Add($"{where} given a null list -> {nullList}");
 
-            string? nullEntry = NamesTheParameter(Call(method, ListOf(element, [null])), sequence.Name!);
+            string? nullEntry = SurfaceSamples.NullGuardMiss(
+                SurfaceSamples.CallWithLast(method, ListOf(element, [null])), sequence.Name!);
             if (nullEntry is not null) broken.Add($"{where} given a null entry -> {nullEntry}");
 
-            if (Call(method, ListOf(element, [])) is { } thrownOnEmpty)
+            if (SurfaceSamples.CallWithLast(method, ListOf(element, [])) is { } thrownOnEmpty)
                 broken.Add($"{where} given an empty list -> {thrownOnEmpty.GetType().Name}, where validation reports it");
 
             var counting = (ICountedSequence)Activator.CreateInstance(
                 typeof(CountingSequence<>).MakeGenericType(element), SurfaceSamples.Sample(element))!;
-            Exception? thrownOnOne = Call(method, counting);
+            Exception? thrownOnOne = SurfaceSamples.CallWithLast(method, counting);
             if (thrownOnOne is not null) broken.Add($"{where} given one entry -> {thrownOnOne.GetType().Name}");
             else if (counting.Enumerations != 1) broken.Add($"{where} enumerated its list {counting.Enumerations} times");
         }
@@ -68,27 +69,6 @@ public sealed class SequenceGuardInventoryTests
 
         Type last = parameters[parameters.Length - 1].ParameterType;
         return last.IsGenericType && last.GetGenericTypeDefinition() == typeof(IEnumerable<>);
-    }
-
-    private static Exception? Call(MethodInfo method, object? sequence)
-    {
-        ParameterInfo[] parameters = method.GetParameters();
-        object?[] arguments = parameters
-            .Select((parameter, index) =>
-                index == parameters.Length - 1 ? sequence : SurfaceSamples.Sample(parameter.ParameterType))
-            .ToArray();
-
-        return SurfaceSamples.Invoke(method, SurfaceSamples.Receiver(method), arguments);
-    }
-
-    // Null when the call threw ArgumentNullException naming the parameter, otherwise what it did instead.
-    private static string? NamesTheParameter(Exception? thrown, string parameter)
-    {
-        if (thrown is ArgumentNullException guarded && guarded.ParamName == parameter) return null;
-
-        return thrown is null
-            ? "no exception"
-            : $"{thrown.GetType().Name} naming '{(thrown as ArgumentException)?.ParamName}'";
     }
 
     private static IList ListOf(Type element, object?[] entries)

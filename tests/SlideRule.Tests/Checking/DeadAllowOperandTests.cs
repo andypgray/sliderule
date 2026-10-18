@@ -1,7 +1,6 @@
 using Shouldly;
 using SlideRule.Baselines;
 using SlideRule.Checking;
-using SlideRule.Internal;
 using Xunit;
 
 namespace SlideRule.Tests.Checking;
@@ -74,7 +73,7 @@ public sealed class DeadAllowOperandTests
     [Fact]
     public void MustOnlyReference_DeadGlobInAnUnderList_WarnsNamingTheOneGlobSpelling()
     {
-        RuleResult result = Checker.Run(Sources.FolderModel, new SolutionRoot(Sources.FolderRoot), arch =>
+        RuleResult result = Checker.Run(Sources.FolderModel, Sources.FolderRoot, arch =>
                 arch.Rule("only/glob")
                     .Enforce(arch.Types.Named("Writer").MustOnlyReference(arch.Types.Under("src/Console", "src/Gone")))
                     .Because("b"))

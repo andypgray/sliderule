@@ -362,12 +362,13 @@ public sealed class ProjectArtifactFactsTests
         Set(legacy, "IsAotCompatible").ShouldBe(new FragmentProperty("IsAotCompatible", "false", new FragmentSite(projectFile, 7)));
         Set(modern, "IsAotCompatible").ShouldBeNull();
         Set(modern, "LangVersion").ShouldNotBeNull();
-        legacy.Declared.Select(property => property.Name)
-            .ShouldNotContain("RestoreTool", customMessage: "the restore output beside the project is a package's declaration");
-        legacy.Declared.Select(property => property.Name)
-            .ShouldNotContain("OutputType", customMessage: "an SDK default is nobody's declaration");
-        legacy.Declared.Select(property => property.Name)
-            .ShouldBe(legacy.Declared.Select(property => property.Name).OrderBy(name => name, StringComparer.Ordinal));
+        Set(legacy, "RestoreTool").ShouldBeNull(customMessage: "the restore output beside the project is a package's declaration");
+        Set(legacy, "OutputType").ShouldBeNull(customMessage: "an SDK default is nobody's declaration");
+        List<string> names = legacy.Declared.Select(property => property.Name)
+            .ToList();
+        List<string> ordinal = names.OrderBy(name => name, StringComparer.Ordinal)
+            .ToList();
+        names.ShouldBe(ordinal);
     }
 
     [Fact]
@@ -642,8 +643,6 @@ public sealed class ProjectArtifactFactsTests
         ProjectFactsEvaluator.SolutionProperties(solutionFile).ShouldBeEmpty();
     }
 
-    // One project evaluated on its own, the Act every evaluation row here takes. Non-asserting, so the row
-    // keeps its own ShouldNotBeNull and reds on the null with its own name.
     // The one property of this name an evaluation found set, or null where nothing in the solution set it.
     private static FragmentProperty? Set(FragmentProperties properties, string name)
     {
@@ -653,6 +652,8 @@ public sealed class ProjectArtifactFactsTests
             .SingleOrDefault();
     }
 
+    // One project evaluated on its own, the Act every evaluation row here takes. Non-asserting, so the row
+    // keeps its own ShouldNotBeNull and reds on the null with its own name.
     private static ProjectArtifactFacts? EvaluatedFacts(string projectFile, string? solutionFile = null)
     {
         return ProjectFactsEvaluator.EvaluateAll([new ProjectEvaluationRequest(projectFile, null)], solutionFile, Ct)

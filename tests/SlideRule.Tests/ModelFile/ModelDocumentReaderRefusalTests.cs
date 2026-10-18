@@ -284,9 +284,6 @@ public sealed class ModelDocumentReaderRefusalTests
             .ParamName.ShouldBe("text");
     }
 
-    // One surgical edit of a text that read clean, with the three guards a refusal row needs: that the
-    // text read before the edit, that the edit changed it, and that what comes back is the reader's
-    // refusal rather than the JSON parser's.
     // Each list the spec refuses empty when it loads, by the node that holds it and the key the list sits under.
     public static TheoryData<string, string> EmptiableLists =>
         new()
@@ -306,13 +303,10 @@ public sealed class ModelDocumentReaderRefusalTests
         // A file holding one was not written from a spec that loaded, so reading it would mint a model no spec
         // could have built.
         string valid = ModelFileSpecs.TextOf(DefineEveryEmptiableList);
-        valid.ShouldReadBack();
         (string edited, int at) = WithEmptiedArray(valid, node, key);
 
-        ModelReadResult result = ModelDocumentReader.Read(edited);
+        ModelRefusal refusal = ShouldRefuseEdited(valid, edited);
 
-        result.Document.ShouldBeNull();
-        ModelRefusal refusal = result.Refusal.ShouldNotBeNull();
         refusal.Kind.ShouldBe(ModelRefusalKind.Malformed);
         refusal.Describe()
             .ShouldBe($"{PositionOf(edited, at)}: \"{key}\" must not be empty.");
@@ -344,10 +338,7 @@ public sealed class ModelDocumentReaderRefusalTests
     // array's opening bracket. The bracket is matched to its close, so the edit holds whatever the entries spell.
     private static (string Edited, int At) WithEmptiedArray(string text, string node, string key)
     {
-        int start = text.IndexOf(node, StringComparison.Ordinal);
-        start.ShouldBeGreaterThanOrEqualTo(0, $"the text should carry '{node}'");
-        text.IndexOf(node, start + node.Length, StringComparison.Ordinal)
-            .ShouldBe(-1, $"the text should carry '{node}' exactly once");
+        int start = ShouldFindOnce(text, node);
 
         var keyText = $"\"{key}\": [";
         int open = text.IndexOf(keyText, start, StringComparison.Ordinal) + keyText.Length - 1;
@@ -368,11 +359,19 @@ public sealed class ModelDocumentReaderRefusalTests
         return $"line {line}, column {offset - lineStart + 1}";
     }
 
+    // One surgical edit of a text that read clean, with the three guards a refusal row needs: that the
+    // text read before the edit, that the edit changed it, and that what comes back is the reader's
+    // refusal rather than the JSON parser's.
     private static ModelRefusal ShouldRefuseAfterEdit(string valid, string find, string replace)
+    {
+        string edited = Edited(valid, find, replace);
+        return ShouldRefuseEdited(valid, edited);
+    }
+
+    private static ModelRefusal ShouldRefuseEdited(string valid, string edited)
     {
         valid.ShouldReadBack();
 
-        string edited = Edited(valid, find, replace);
         edited.ShouldNotBe(valid);
         StrictJson.TryParse(edited, out _, out StrictJsonError? parserError)
             .ShouldBeTrue($"a model-level refusal is meant, but the text stopped being JSON: {parserError?.Describe()}");
@@ -386,11 +385,17 @@ public sealed class ModelDocumentReaderRefusalTests
     // somewhere else would move the position every row above asserts.
     private static string Edited(string text, string find, string replace)
     {
+        int at = ShouldFindOnce(text, find);
+        return text.Substring(0, at) + replace + text.Substring(at + find.Length);
+    }
+
+    private static int ShouldFindOnce(string text, string find)
+    {
         int at = text.IndexOf(find, StringComparison.Ordinal);
         at.ShouldBeGreaterThanOrEqualTo(0, $"the text should carry '{find}'");
         text.IndexOf(find, at + find.Length, StringComparison.Ordinal)
             .ShouldBe(-1, $"the text should carry '{find}' exactly once");
 
-        return text.Substring(0, at) + replace + text.Substring(at + find.Length);
+        return at;
     }
 }

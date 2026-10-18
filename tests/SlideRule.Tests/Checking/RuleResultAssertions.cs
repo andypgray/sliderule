@@ -1,4 +1,5 @@
 using Shouldly;
+using SlideRule.Baselines;
 using SlideRule.Checking;
 
 namespace SlideRule.Tests.Checking;
@@ -356,6 +357,43 @@ internal static class RuleResultAssertions
     }
 
     /// <summary>
+    ///     Asserts the violations key exactly <paramref name="identities" /> as baseline entries, in report order,
+    ///     compared on identity as baseline matching compares them.
+    /// </summary>
+    internal static RuleResult ShouldHaveBaselineIdentities(this RuleResult result, BaselineEntry[] identities)
+    {
+        string report = Describe(result);
+        string[] expected = identities.Select(IdentityOf).ToArray();
+        RequireExpectation(expected, report);
+        string[] actual = result.Violations
+            .Select(violation => IdentityOf(violation.BaselineIdentity()))
+            .ToArray();
+
+        actual.ShouldBe(expected, customMessage: report);
+        return result;
+    }
+
+    /// <summary>Asserts the ratchet grandfathered exactly <paramref name="entries" />, in report order.</summary>
+    internal static RuleResult ShouldHaveGrandfatheredEntries(this RuleResult result, BaselineEntry[] entries)
+    {
+        string report = Describe(result);
+        string[] expected = entries.Select(IdentityOf).ToArray();
+        RequireExpectation(expected, report);
+        string[] actual = result.GrandfatheredEntries
+            .Select(IdentityOf)
+            .ToArray();
+
+        actual.ShouldBe(expected, customMessage: report);
+        return result;
+    }
+
+    // An entry's identity as one line, or the placeholder for a violation no baseline can hold.
+    private static string IdentityOf(BaselineEntry? entry)
+    {
+        return entry?.SymbolForm ?? NothingPopulated;
+    }
+
+    /// <summary>
     ///     Asserts the rule failed. Says nothing about which violations did it — for the rows whose subject is
     ///     the violation list itself, which then read it in its own right.
     /// </summary>
@@ -610,7 +648,9 @@ internal static class RuleResultAssertions
     ///     The project twin of <see cref="ShouldHaveFailedWithSubjectAtSites" />: exactly one project
     ///     violation, naming <paramref name="project" /> and evidenced by <paramref name="sites" /> — the
     ///     <c>file:line</c> that declared the fact the verb read, which is regularly a props file above the
-    ///     project and is empty where nothing declared it (GRAMMAR §4.10).
+    ///     project and is empty where nothing declared it (GRAMMAR §4.10). <paramref name="project" /> is the
+    ///     offending project's name, or <c>{project} -&gt; {item}</c> for a per-item violation, as
+    ///     <see cref="ShouldHaveFailedWithProjectSubjects" /> reads it.
     /// </summary>
     internal static Violation ShouldHaveFailedWithProjectAtSites(
         this RuleResult result, string project, string[] sites)
@@ -621,32 +661,7 @@ internal static class RuleResultAssertions
 
         violation.ShouldSatisfyAllConditions(
             () => violation.Kind.ShouldBe(ViolationKind.ProjectShape, report),
-            () => violation.SubjectProject!.Name.ShouldBe(project, report),
-            () => RenderedSites(violation).ShouldBe(sites, report));
-
-        return violation;
-    }
-
-    /// <summary>
-    ///     The per-item twin of <see cref="ShouldHaveFailedWithProjectAtSites" />: exactly one project
-    ///     violation, rendered <c>{project} -&gt; {package}</c> or <c>{project} -&gt; {framework}</c> as
-    ///     <paramref name="edge" /> spells it (GRAMMAR §4.10) and evidenced by <paramref name="sites" /> — the
-    ///     <c>file:line</c> that declared the reference or the framework list.
-    /// </summary>
-    /// <remarks>
-    ///     An addition rather than an argument on its twin: that one compares the subject project's name
-    ///     alone, which cannot carry the item the verb names beside it.
-    /// </remarks>
-    internal static Violation ShouldHaveFailedWithProjectItemAtSites(
-        this RuleResult result, string edge, string[] sites)
-    {
-        string report = Describe(result);
-        result.Status.ShouldBe(RuleStatus.Failed, report);
-        Violation violation = result.Violations.ShouldHaveSingleItem(report);
-
-        violation.ShouldSatisfyAllConditions(
-            () => violation.Kind.ShouldBe(ViolationKind.ProjectShape, report),
-            () => Edge(violation).ShouldBe(edge, report),
+            () => Edge(violation).ShouldBe(project, report),
             () => RenderedSites(violation).ShouldBe(sites, report));
 
         return violation;

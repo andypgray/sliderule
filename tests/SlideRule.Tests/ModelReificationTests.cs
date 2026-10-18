@@ -459,12 +459,8 @@ public class ModelReificationTests
     {
         // The .Properties projection mints a PropertySelection, which is what carries the kind-only verb —
         // the reified node is the same walkable MemberConstraint shape every other member verb reifies to.
-        var constraint = Checker.Model(arch => arch.Rule("domain/values-immutable")
-                .Enforce(arch.Namespace("MyApp.Domain.*").Properties.MustBeGetOnly())
-                .Because("A value another thread can write is not a value."))
-            .Rules.Single()
-            .Constraint
-            .ShouldBeOfType<MemberMustBeGetOnlyConstraint>();
+        var constraint = ShouldReifyTo<MemberMustBeGetOnlyConstraint>(arch => arch.Namespace("MyApp.Domain.*").Properties
+            .MustBeGetOnly());
 
         constraint.MemberSubject.Kind.ShouldBe(MemberKindFilter.Property);
         constraint.MemberSubject.ShouldBeOfType<PropertySelection>();
@@ -475,12 +471,8 @@ public class ModelReificationTests
     [Fact]
     public void FieldSubjectRule_ReifiesToWalkableMemberConstraint()
     {
-        var constraint = Checker.Model(arch => arch.Rule("state/no-static-mutable")
-                .Enforce(arch.Namespace("MyApp.Web.*").Fields.MustBeReadonly())
-                .Because("A writable static is process-wide state nothing declares."))
-            .Rules.Single()
-            .Constraint
-            .ShouldBeOfType<MemberMustBeReadonlyConstraint>();
+        var constraint = ShouldReifyTo<MemberMustBeReadonlyConstraint>(arch => arch.Namespace("MyApp.Web.*").Fields
+            .MustBeReadonly());
 
         constraint.MemberSubject.Kind.ShouldBe(MemberKindFilter.Field);
         constraint.MemberSubject.ShouldBeOfType<FieldSelection>();
@@ -493,12 +485,8 @@ public class ModelReificationTests
     {
         // The adjective lands in the member selection's adjective list, and Rebuild returns the concrete
         // type — which is what keeps the kind-only verb reachable after it, in any order.
-        var constraint = Checker.Model(arch => arch.Rule("state/no-static-mutable")
-                .Enforce(arch.Namespace("MyApp.Web.*").Fields.ThatAreStatic().MustBeReadonly())
-                .Because("A writable static is process-wide state nothing declares."))
-            .Rules.Single()
-            .Constraint
-            .ShouldBeOfType<MemberMustBeReadonlyConstraint>();
+        var constraint = ShouldReifyTo<MemberMustBeReadonlyConstraint>(arch => arch.Namespace("MyApp.Web.*").Fields.ThatAreStatic()
+            .MustBeReadonly());
 
         constraint.MemberSubject.Adjectives.OfType<MemberThatAreStaticAdjective>()
             .ShouldHaveSingleItem();
@@ -509,12 +497,8 @@ public class ModelReificationTests
     public void Under_ReifiesItsGlobsAsWritten()
     {
         // No normalization: the model carries what the author wrote, case and all, for every reader to match.
-        var constraint = Checker.Model(arch => arch.Rule("console/internal")
-                .Enforce(arch.Types.Under("src/Console/Internal", "src/*/Generated").MustBeInternal())
-                .Because("The folder is the boundary; nothing outside the assembly names what is in it."))
-            .Rules.Single()
-            .Constraint
-            .ShouldBeOfType<MustBeInternalConstraint>();
+        var constraint = ShouldReifyTo<MustBeInternalConstraint>(arch => arch.Types.Under("src/Console/Internal", "src/*/Generated")
+            .MustBeInternal());
 
         constraint.Subject!.Adjectives.OfType<UnderAdjective>()
             .ShouldHaveSingleItem()
@@ -526,14 +510,9 @@ public class ModelReificationTests
     {
         // No union node on the member stratum: the adjective holds the payload list itself, each payload a
         // member selection over its own source, so a payload's kind survives for the kind-clash check.
-        var constraint = Checker.Model(arch => arch.Rule("naming/entry-points")
-                .Enforce(arch.Namespace("MyApp.*").Methods
-                    .Except(arch.Types.Named("Program").Methods.Named("Main"), arch.Types.Named("Startup").Members)
-                    .MustHaveSuffix("Async"))
-                .Because("Every method but the framework-fixed ones is awaited."))
-            .Rules.Single()
-            .Constraint
-            .ShouldBeOfType<MemberMustHaveSuffixConstraint>();
+        var constraint = ShouldReifyTo<MemberMustHaveSuffixConstraint>(arch => arch.Namespace("MyApp.*").Methods
+            .Except(arch.Types.Named("Program").Methods.Named("Main"), arch.Types.Named("Startup").Members)
+            .MustHaveSuffix("Async"));
 
         MemberExceptAdjective except = constraint.MemberSubject.Adjectives.OfType<MemberExceptAdjective>()
             .ShouldHaveSingleItem();
@@ -546,12 +525,8 @@ public class ModelReificationTests
     public void AccessibilityAdjective_ReifiesOntoTheMemberSelection_CarryingItsLevel()
     {
         // One node carries all six levels, the member twin of the type-side accessibility node.
-        var constraint = Checker.Model(arch => arch.Rule("state/fields-are-protected")
-                .Enforce(arch.Namespace("MyApp.Web.*").Fields.ThatArePrivate().MustBeProtected())
-                .Because("An inheritor reaches the base's state through protected fields."))
-            .Rules.Single()
-            .Constraint
-            .ShouldBeOfType<MemberMustBeProtectedConstraint>();
+        var constraint = ShouldReifyTo<MemberMustBeProtectedConstraint>(arch => arch.Namespace("MyApp.Web.*").Fields.ThatArePrivate()
+            .MustBeProtected());
 
         constraint.MemberSubject.Adjectives.OfType<MemberAccessibilityAdjective>()
             .ShouldHaveSingleItem()
@@ -566,12 +541,8 @@ public class ModelReificationTests
         // inherited type Subject is NULL — there is no underlying type selection to hand up, which is the
         // whole point of departure from a member constraint. Every type-side walk therefore reaches nothing
         // here, and the nullable-flow analysis is what audits that each of them dispatched first.
-        var constraint = Checker.Model(arch => arch.Rule("packaging/internal-not-shipped")
-                .Enforce(arch.Projects.Matching("Zphil.*").MustNotBePackable())
-                .Because("An internal project on the feed is an API nobody meant to promise."))
-            .Rules.Single()
-            .Constraint
-            .ShouldBeOfType<MustNotBePackableConstraint>();
+        var constraint = ShouldReifyTo<MustNotBePackableConstraint>(arch => arch.Projects.Matching("Zphil.*")
+            .MustNotBePackable());
 
         constraint.Subject.ShouldBeNull();
         constraint.Operands.ShouldBeEmpty();
@@ -586,15 +557,10 @@ public class ModelReificationTests
     {
         // Each adjective appends and clones, so the list is the chain in authoring order — the same
         // immutable-value shape the type and member selections take.
-        var constraint = Checker.Model(arch => arch.Rule("packaging/locked-restore")
-                .Enforce(arch.Projects.Packable()
-                    .Named("SlideRule", "SlideRule.Cli")
-                    .Except(arch.Projects.Matching("*.Tests"))
-                    .MustLockPackages())
-                .Because("A drifting package graph is a build nobody can reproduce."))
-            .Rules.Single()
-            .Constraint
-            .ShouldBeOfType<MustLockPackagesConstraint>();
+        var constraint = ShouldReifyTo<MustLockPackagesConstraint>(arch => arch.Projects.Packable()
+            .Named("SlideRule", "SlideRule.Cli")
+            .Except(arch.Projects.Matching("*.Tests"))
+            .MustLockPackages());
 
         constraint.ProjectSubject.Adjectives.Select(adjective => adjective.GetType()
                 .Name)
@@ -607,64 +573,38 @@ public class ModelReificationTests
         // The two operand-carrying project verbs publish their operands as their own domain-named lists —
         // never through the type-side Operands hook, which stays empty because a project verb names no
         // type selection at all.
-        var target = Checker.Model(arch => arch.Rule("packaging/contract-tfm")
-                .Enforce(arch.Projects.Named("SlideRule").MustOnlyTarget("netstandard2.0", "net8.0"))
-                .Because("The contract package has to load on every host the estate runs."))
-            .Rules.Single()
-            .Constraint
-            .ShouldBeOfType<MustOnlyTargetConstraint>();
+        var target = ShouldReifyTo<MustOnlyTargetConstraint>(arch => arch.Projects.Named("SlideRule")
+            .MustOnlyTarget("netstandard2.0", "net8.0"));
 
         target.Frameworks.ShouldBe(["netstandard2.0", "net8.0"]);
         target.Operands.ShouldBeEmpty();
 
-        var floor = Checker.Model(arch => arch.Rule("packaging/standard-floor")
-                .Enforce(arch.Projects.Packable().MustTarget("netstandard2.0"))
-                .Because("Every package has to load on the net48 hosts the estate still runs."))
-            .Rules.Single()
-            .Constraint
-            .ShouldBeOfType<MustTargetConstraint>();
+        var floor = ShouldReifyTo<MustTargetConstraint>(arch => arch.Projects.Packable().MustTarget("netstandard2.0"));
 
         floor.Framework.ShouldBe("netstandard2.0");
         floor.Operands.ShouldBeEmpty();
 
-        var allowed = Checker.Model(arch => arch.Rule("packaging/backports-only")
-                .Enforce(arch.Projects.Named("SlideRule").MustOnlyReferencePackages("Microsoft.Bcl.*", "System.Memory"))
-                .Because("The contract's dependencies become every caller's."))
-            .Rules.Single()
-            .Constraint
-            .ShouldBeOfType<MustOnlyReferencePackagesConstraint>();
+        var allowed = ShouldReifyTo<MustOnlyReferencePackagesConstraint>(arch => arch.Projects.Named("SlideRule")
+            .MustOnlyReferencePackages("Microsoft.Bcl.*", "System.Memory"));
 
         allowed.Patterns.ShouldBe(["Microsoft.Bcl.*", "System.Memory"]);
         allowed.Operands.ShouldBeEmpty();
 
-        var banned = Checker.Model(arch => arch.Rule("packaging/no-v7-packages")
-                .Enforce(arch.Projects.Named("SlideRule").MustNotReferencePackages("GreenPipes"))
-                .Because("The v7 packages are retired."))
-            .Rules.Single()
-            .Constraint
-            .ShouldBeOfType<MustNotReferencePackagesConstraint>();
+        var banned = ShouldReifyTo<MustNotReferencePackagesConstraint>(arch => arch.Projects.Named("SlideRule")
+            .MustNotReferencePackages("GreenPipes"));
 
         banned.Patterns.ShouldBe(["GreenPipes"]);
         banned.Operands.ShouldBeEmpty();
 
-        var property = Checker.Model(arch => arch.Rule("build/nullable")
-                .Enforce(arch.Projects.Named("SlideRule").MustSetProperty("Nullable", "enable"))
-                .Because("Callers read the contract's nullability from its annotations."))
-            .Rules.Single()
-            .Constraint
-            .ShouldBeOfType<MustSetPropertyConstraint>();
+        var property = ShouldReifyTo<MustSetPropertyConstraint>(arch => arch.Projects.Named("SlideRule")
+            .MustSetProperty("Nullable", "enable"));
 
         property.Name.ShouldBe("Nullable");
         property.Value.ShouldBe("enable");
         property.Operands.ShouldBeEmpty();
 
-        var must = Checker.Model(arch => arch.Rule("packaging/described")
-                .Enforce(arch.Projects.Named("SlideRule")
-                    .Must(project => project.IsPackable == true, description: "produce a package"))
-                .Because("A contract nobody ships is a contract nobody has."))
-            .Rules.Single()
-            .Constraint
-            .ShouldBeOfType<ProjectMustConstraint>();
+        var must = ShouldReifyTo<ProjectMustConstraint>(arch => arch.Projects.Named("SlideRule")
+            .Must(project => project.IsPackable == true, description: "produce a package"));
 
         must.Description.ShouldBe("produce a package");
         must.Subject.ShouldBeNull();
@@ -676,13 +616,8 @@ public class ModelReificationTests
         // arch.Registered(Lifetime.X) reifies to a RegisteredNoun carrying that lifetime; MustNotInject
         // reifies to a MustNotInjectConstraint whose Operands mirror its Targets (GRAMMAR §4.7).
         // The captive-dependency flagship: singleton-registered types must not inject scoped/transient ones.
-        var constraint = Checker.Model(arch => arch.Rule("di/no-captive-dependencies")
-                .Enforce(arch.Registered(Lifetime.Singleton)
-                    .MustNotInject(arch.Registered(Lifetime.Scoped), arch.Registered(Lifetime.Transient)))
-                .Because("Singletons capturing scoped/transient services leak state across scopes."))
-            .Rules.Single()
-            .Constraint
-            .ShouldBeOfType<MustNotInjectConstraint>();
+        var constraint = ShouldReifyTo<MustNotInjectConstraint>(arch => arch.Registered(Lifetime.Singleton)
+            .MustNotInject(arch.Registered(Lifetime.Scoped), arch.Registered(Lifetime.Transient)));
 
         constraint.Subject!.Noun.ShouldBeOfType<RegisteredNoun>()
             .Lifetime.ShouldBe(Lifetime.Singleton);
@@ -697,12 +632,8 @@ public class ModelReificationTests
     public void RegisteredNoun_NoArg_ReifiesWithNullLifetime()
     {
         // arch.Registered() reifies to a RegisteredNoun with a null lifetime (any lifetime).
-        var constraint = Checker.Model(arch => arch.Rule("di/registered-inject")
-                .Enforce(arch.Registered().MustNotInject(arch.Registered(Lifetime.Scoped)))
-                .Because("Any registration must not inject a scoped service."))
-            .Rules.Single()
-            .Constraint
-            .ShouldBeOfType<MustNotInjectConstraint>();
+        var constraint = ShouldReifyTo<MustNotInjectConstraint>(arch => arch.Registered()
+            .MustNotInject(arch.Registered(Lifetime.Scoped)));
         constraint.Subject!.Noun.ShouldBeOfType<RegisteredNoun>()
             .Lifetime.ShouldBeNull();
     }
@@ -711,7 +642,6 @@ public class ModelReificationTests
     public void MustNotInject_TypeSugar_ReifiesIdenticallyToWrappedSelection()
     {
         ShouldReifyTypeSugarLikeWrappedSelection<MustNotInjectConstraint>(
-            "di/no-inject-sql",
             arch => arch.Types.MustNotInject(typeof(SqlConnection)),
             arch => arch.Types.MustNotInject(arch.Type(typeof(SqlConnection))),
             constraint => constraint.Targets,
@@ -786,7 +716,6 @@ public class ModelReificationTests
     public void MustNotCatch_TypeSugar_ReifiesIdenticallyToWrappedSelection()
     {
         ShouldReifyTypeSugarLikeWrappedSelection<MustNotCatchConstraint>(
-            "errors/no-catch",
             arch => arch.Types.MustNotCatch(typeof(InvalidOperationException)),
             arch => arch.Types.MustNotCatch(arch.Type(typeof(InvalidOperationException))),
             constraint => constraint.Targets,
@@ -797,7 +726,6 @@ public class ModelReificationTests
     public void MustNotCatchUnfiltered_TypeSugar_ReifiesIdenticallyToWrappedSelection()
     {
         ShouldReifyTypeSugarLikeWrappedSelection<MustNotCatchUnfilteredConstraint>(
-            "errors/no-unfiltered-catch",
             arch => arch.Types.MustNotCatchUnfiltered(typeof(Exception)),
             arch => arch.Types.MustNotCatchUnfiltered(arch.Type(typeof(Exception))),
             constraint => constraint.Targets,
@@ -808,7 +736,6 @@ public class ModelReificationTests
     public void MustNotSwallow_TypeSugar_ReifiesIdenticallyToWrappedSelection()
     {
         ShouldReifyTypeSugarLikeWrappedSelection<MustNotSwallowConstraint>(
-            "errors/no-swallow",
             arch => arch.Types.MustNotSwallow(typeof(Exception)),
             arch => arch.Types.MustNotSwallow(arch.Type(typeof(Exception))),
             constraint => constraint.Targets,
@@ -819,7 +746,6 @@ public class ModelReificationTests
     public void MustNotThrow_TypeSugar_ReifiesIdenticallyToWrappedSelection()
     {
         ShouldReifyTypeSugarLikeWrappedSelection<MustNotThrowConstraint>(
-            "errors/no-throw",
             arch => arch.Types.MustNotThrow(typeof(Exception)),
             arch => arch.Types.MustNotThrow(arch.Type(typeof(Exception))),
             constraint => constraint.Targets,
@@ -830,7 +756,6 @@ public class ModelReificationTests
     public void MustOnlyThrow_TypeSugar_ReifiesIdenticallyToWrappedSelection()
     {
         ShouldReifyTypeSugarLikeWrappedSelection<MustOnlyThrowConstraint>(
-            "errors/throw-only",
             arch => arch.Types.MustOnlyThrow(typeof(InvalidOperationException)),
             arch => arch.Types.MustOnlyThrow(arch.Type(typeof(InvalidOperationException))),
             constraint => constraint.Targets,
@@ -853,7 +778,6 @@ public class ModelReificationTests
     public void MustNotExpose_TypeSugar_ReifiesIdenticallyToWrappedSelection()
     {
         ShouldReifyTypeSugarLikeWrappedSelection<MustNotExposeConstraint>(
-            "api/no-expose",
             arch => arch.Types.MustNotExpose(typeof(SqlConnection)),
             arch => arch.Types.MustNotExpose(arch.Type(typeof(SqlConnection))),
             constraint => constraint.Targets,
@@ -883,13 +807,8 @@ public class ModelReificationTests
         // The verb has no bare-Type sugar twin (GRAMMAR §5.3: a bare typeof membership would read as "must
         // be that type"), so a type membership is written out as a selection. That spelling is legal and
         // reifies like any other membership, which is what this row pins.
-        var constraint = Checker.Model(arch => arch.Rule("legacy/billing/facade-only")
-                .Enforce(arch.Types.MustBelongTo(
-                    arch.Type(typeof(IBillingFacade)), arch.Namespace("MyApp.Domain.*")))
-                .Because("Reason."))
-            .Rules.Single()
-            .Constraint
-            .ShouldBeOfType<MustBelongToConstraint>();
+        var constraint = ShouldReifyTo<MustBelongToConstraint>(arch => arch.Types
+            .MustBelongTo(arch.Type(typeof(IBillingFacade)), arch.Namespace("MyApp.Domain.*")));
 
         // Memberships in authoring order, each carrying its own noun.
         constraint.Memberships.Count.ShouldBe(2);
@@ -923,13 +842,8 @@ public class ModelReificationTests
         // One among selection, never a params list (GRAMMAR §5.3): candidate homes are unioned with
         // arch.AnyOf, which reifies as one operand, so Among is asserted against Operands rather than beside
         // them. The template is stored verbatim: substitution happens at check time, never at mint.
-        var constraint = Checker.Model(arch => arch.Rule("naming/one-interface-per-service")
-                .Enforce(arch.Types.MustHaveExactlyOneCounterpart(
-                    among: arch.Namespace("MyApp.Contracts.*"), named: "I{Name}"))
-                .Because("Reason."))
-            .Rules.Single()
-            .Constraint
-            .ShouldBeOfType<MustHaveExactlyOneCounterpartConstraint>();
+        var constraint = ShouldReifyTo<MustHaveExactlyOneCounterpartConstraint>(arch => arch.Types
+            .MustHaveExactlyOneCounterpart(among: arch.Namespace("MyApp.Contracts.*"), named: "I{Name}"));
 
         constraint.Among.ShouldHaveSingleItem()
             .Noun.ShouldBeOfType<NamespaceNoun>()
@@ -1130,25 +1044,14 @@ public class ModelReificationTests
     ///     carries no adjectives.
     /// </summary>
     private static void ShouldReifyTypeSugarLikeWrappedSelection<TConstraint>(
-        string ruleId,
         Func<Arch, Constraint> sugar,
         Func<Arch, Constraint> wrapped,
         Func<TConstraint, IReadOnlyList<Selection>> targets,
         Type expected)
         where TConstraint : OperandConstraint
     {
-        var sugared = Checker.Model(arch => arch.Rule(ruleId)
-                .Enforce(sugar(arch))
-                .Because("Reason."))
-            .Rules.Single()
-            .Constraint
-            .ShouldBeOfType<TConstraint>();
-        var handWritten = Checker.Model(arch => arch.Rule(ruleId)
-                .Enforce(wrapped(arch))
-                .Because("Reason."))
-            .Rules.Single()
-            .Constraint
-            .ShouldBeOfType<TConstraint>();
+        var sugared = ShouldReifyTo<TConstraint>(sugar);
+        var handWritten = ShouldReifyTo<TConstraint>(wrapped);
         IReadOnlyList<Selection> sugaredTargets = targets(sugared);
         IReadOnlyList<Selection> handWrittenTargets = targets(handWritten);
 
@@ -1162,6 +1065,19 @@ public class ModelReificationTests
         wrappedType.ShouldBe(sugarType);
         sugaredTargets[0]
             .Adjectives.ShouldBeEmpty();
+    }
+
+    // The constraint a one-rule spec enforcing `constraint` reifies to, held to being a TConstraint. The rule's ID
+    // and reason are placeholders: no row reads either.
+    private static TConstraint ShouldReifyTo<TConstraint>(Func<Arch, Constraint> constraint)
+        where TConstraint : Constraint
+    {
+        return Checker.Model(arch => arch.Rule("area/rule")
+                .Enforce(constraint(arch))
+                .Because("Reason."))
+            .Rules.Single()
+            .Constraint
+            .ShouldBeOfType<TConstraint>();
     }
 }
 

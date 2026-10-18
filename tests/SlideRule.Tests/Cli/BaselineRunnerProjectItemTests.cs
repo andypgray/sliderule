@@ -25,6 +25,11 @@ public sealed class BaselineRunnerProjectItemTests : IDisposable
     private static readonly BaselineEntry Json = BaselineEntry.ForEdge("project:Zphil.Core", "package:Newtonsoft.Json");
     private static readonly BaselineEntry Serilog = BaselineEntry.ForEdge("project:Zphil.Core", "package:Serilog");
 
+    private static readonly ArchitectureModel Model = Checker.Model(arch => arch.Rule(RuleId)
+        .Migrate("The core still takes packages.", arch.Projects.Named("Zphil.Core").MustReferenceNoPackages())
+        .Baseline(BaselineFile)
+        .Because("b"));
+
     private readonly TempDirectory _temp = TestTempRoot.Fresh("baseline-runner-project-item");
 
     public void Dispose()
@@ -41,7 +46,8 @@ public sealed class BaselineRunnerProjectItemTests : IDisposable
         Apply(BaselineRequests.Init(_temp.Path), Check(Core("Newtonsoft.Json"), BaselineIndex.Empty).Results);
         Read(path).ShouldBe(BaselineComposer.Compose(RuleId, Json.WithSiteCount(1)));
 
-        RuleResult result = Check(Core("Newtonsoft.Json", "Serilog"), IndexFrom(path)).Single();
+        BaselineIndex captured = BaselineStore.LoadForModel(Model, _temp.Path);
+        RuleResult result = Check(Core("Newtonsoft.Json", "Serilog"), captured).Single();
 
         result.ShouldHaveFailedWithProjectSubjects(["Zphil.Core -> Serilog"]);
         result.ShouldHaveGrandfathered(1);
@@ -107,22 +113,7 @@ public sealed class BaselineRunnerProjectItemTests : IDisposable
 
     private static CheckReport Check(CodebaseModel codebase, BaselineIndex baselines)
     {
-        ArchitectureModel model = Checker.Model(arch => arch.Rule(RuleId)
-            .Migrate("The core still takes packages.", arch.Projects.Named("Zphil.Core").MustReferenceNoPackages())
-            .Baseline(BaselineFile)
-            .Because("b"));
-
-        return ArchChecker.Check(model, codebase, baselines);
-    }
-
-    // The captured file as check reads it: the verified document's sections, each a rule's baseline.
-    private static BaselineIndex IndexFrom(string path)
-    {
-        BaselineDocument document = BaselineStore.TryReadDocument(path)!;
-        Dictionary<string, RuleBaseline> sections = document.Sections
-            .ToDictionary(section => section.Key, section => new RuleBaseline(section.Value.ToList()), StringComparer.Ordinal);
-
-        return new BaselineIndex(sections);
+        return ArchChecker.Check(Model, codebase, baselines);
     }
 
     private string Apply(BaselineRequest request, IEnumerable<RuleResult> results)

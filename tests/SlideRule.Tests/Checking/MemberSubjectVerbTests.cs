@@ -237,13 +237,8 @@ public sealed class MemberSubjectVerbTests
     public void MemberWithSuffixAdjective_ReadsStarAsLiteral_WhereWithNameMatchingGlobs()
     {
         // The literal reading selects no member at all, which is the empty-member-subject failure.
-        RuleResult result = Checker.Run(MembersModel, arch =>
-                arch.Rule("member/x")
-                    .Enforce(arch.Namespace("App.Members.*").Methods.WithSuffix("*Async").MustBePublic())
-                    .Because("b"))
-            .Single();
-
-        result.ShouldHaveFailedWithDetail(ViolationKind.EmptySubject, ConstraintEvaluator.EmptyMemberSubjectMessage);
+        ShouldFailOnTheEmptyMemberSubject(
+            MembersModel, arch => arch.Namespace("App.Members.*").Methods.WithSuffix("*Async").MustBePublic());
 
         Pass(MembersModel, arch => arch.Namespace("App.Members.*").Methods.WithNameMatching("*Async")
             .MustBePublic());
@@ -320,24 +315,16 @@ public sealed class MemberSubjectVerbTests
         FailedMemberIds(MembersModel, arch => arch.Namespace("App.Members.*").Methods.Named("Walk", "Idle").MustBeStatic())
             .ShouldBe(["M:App.Members.Machine.Idle", "M:App.Members.Widget.Walk"]);
 
-        RuleResult result = Checker.Run(MembersModel, arch =>
-                arch.Rule("member/x")
-                    .Enforce(arch.Namespace("App.Members.*").Methods.Named("walk").MustBeStatic())
-                    .Because("b"))
-            .Single();
-        result.ShouldHaveFailedWithDetail(ViolationKind.EmptySubject, ConstraintEvaluator.EmptyMemberSubjectMessage);
+        ShouldFailOnTheEmptyMemberSubject(
+            MembersModel, arch => arch.Namespace("App.Members.*").Methods.Named("walk").MustBeStatic());
     }
 
     [Fact]
     public void Named_ReadsStarAsLiteral_WhereWithNameMatchingGlobs()
     {
         // A `*` in an exact name is a character, so it selects nothing here and the glob form selects RunAsync.
-        RuleResult result = Checker.Run(MembersModel, arch =>
-                arch.Rule("member/x")
-                    .Enforce(arch.Namespace("App.Members.*").Methods.Named("*Async").MustBePublic())
-                    .Because("b"))
-            .Single();
-        result.ShouldHaveFailedWithDetail(ViolationKind.EmptySubject, ConstraintEvaluator.EmptyMemberSubjectMessage);
+        ShouldFailOnTheEmptyMemberSubject(
+            MembersModel, arch => arch.Namespace("App.Members.*").Methods.Named("*Async").MustBePublic());
 
         Pass(MembersModel, arch => arch.Namespace("App.Members.*").Methods.WithNameMatching("*Async").MustBePublic());
     }
@@ -378,13 +365,9 @@ public sealed class MemberSubjectVerbTests
     [Fact]
     public void Except_RemovingEveryMember_FailsOnTheEmptyMemberSubject()
     {
-        RuleResult result = Checker.Run(MembersModel, arch =>
-                arch.Rule("member/x")
-                    .Enforce(arch.Types.Named("Widget").Methods.Except(arch.Types.Named("Widget").Members).MustBeStatic())
-                    .Because("b"))
-            .Single();
-
-        result.ShouldHaveFailedWithDetail(ViolationKind.EmptySubject, ConstraintEvaluator.EmptyMemberSubjectMessage);
+        ShouldFailOnTheEmptyMemberSubject(
+            MembersModel, arch => arch.Types.Named("Widget").Methods.Except(arch.Types.Named("Widget").Members)
+                .MustBeStatic());
     }
 
     // ── accessibility adjectives ──────────────────────────────────────────────────────────────────────
@@ -415,13 +398,9 @@ public sealed class MemberSubjectVerbTests
     {
         // Two levels are disjoint, so the subject empties and the rule reds on the empty-member gate rather
         // than passing over nothing.
-        RuleResult result = Checker.Run(AccessModel, arch =>
-                arch.Rule("member/x")
-                    .Enforce(arch.Namespace("App.Access.*").Fields.ThatArePrivate().ThatAreProtected().MustBeStatic())
-                    .Because("b"))
-            .Single();
-
-        result.ShouldHaveFailedWithDetail(ViolationKind.EmptySubject, ConstraintEvaluator.EmptyMemberSubjectMessage);
+        ShouldFailOnTheEmptyMemberSubject(
+            AccessModel, arch => arch.Namespace("App.Access.*").Fields.ThatArePrivate().ThatAreProtected()
+                .MustBeStatic());
     }
 
     // ── static / abstract / virtual verbs ─────────────────────────────────────────────────────────────
@@ -592,15 +571,10 @@ public sealed class MemberSubjectVerbTests
         // arm carries cannot port here: a constructed spelling builds, names no definition, and as the SOLE
         // anchor empties the member subject — which the fail-on-empty gate reds in member terms rather than
         // passing vacuously. Loud, and pinned because it is the honesty boundary of the hatch.
-        RuleResult result = Checker.Run(AsyncModel, arch => arch.Rule("member/x")
-                .Enforce(
-                    arch.Namespace("App.Async.*").Methods
-                        .Returning("System.Threading.Tasks.Task<System.Int32>")
-                        .MustHaveSuffix("Async"))
-                .Because("b"))
-            .Single();
-
-        result.ShouldHaveFailedWithDetail(ViolationKind.EmptySubject, ConstraintEvaluator.EmptyMemberSubjectMessage);
+        ShouldFailOnTheEmptyMemberSubject(
+            AsyncModel, arch => arch.Namespace("App.Async.*").Methods
+                .Returning("System.Threading.Tasks.Task<System.Int32>")
+                .MustHaveSuffix("Async"));
     }
 
     [Fact]
@@ -801,12 +775,8 @@ public sealed class MemberSubjectVerbTests
         // Why the ADJECTIVE needs no spec-build category check while the MustNot verb does: a misspelled or
         // wrong-category anchor as the sole adjective matches nothing, and the fail-on-empty gate reds the
         // rule in member terms rather than letting it pass vacuously. Pinned, because it is the argument.
-        RuleResult result = Checker.Run(AttributedModel, arch => arch.Rule("member/x")
-                .Enforce(arch.Types.Methods.AttributedWith($"{T}MrakAttribute").MustBePublic())
-                .Because("b"))
-            .Single();
-
-        result.ShouldHaveFailedWithDetail(ViolationKind.EmptySubject, ConstraintEvaluator.EmptyMemberSubjectMessage);
+        ShouldFailOnTheEmptyMemberSubject(
+            AttributedModel, arch => arch.Types.Methods.AttributedWith($"{T}MrakAttribute").MustBePublic());
     }
 
     [Fact]
@@ -972,13 +942,7 @@ public sealed class MemberSubjectVerbTests
     {
         // A member rule whose underlying type selection matches no types still speaks in member terms —
         // member dispatch runs before the type-subject empty gate.
-        RuleResult result = Checker.Run(AsyncModel, arch =>
-                arch.Rule("member/x")
-                    .Enforce(arch.Namespace("Nowhere.*").Methods.MustBePublic())
-                    .Because("b"))
-            .Single();
-
-        result.ShouldHaveFailedWithDetail(ViolationKind.EmptySubject, ConstraintEvaluator.EmptyMemberSubjectMessage);
+        ShouldFailOnTheEmptyMemberSubject(AsyncModel, arch => arch.Namespace("Nowhere.*").Methods.MustBePublic());
     }
 
     // ── ratchet round-trip ────────────────────────────────────────────────────────────────────────────
@@ -1200,21 +1164,29 @@ public sealed class MemberSubjectVerbTests
 
     // ── helpers ───────────────────────────────────────────────────────────────────────────────────────
 
-    private static void Pass(CodebaseModel codebase, Func<Arch, Constraint> constraint)
+    private static RuleResult Checked(CodebaseModel codebase, Func<Arch, Constraint> constraint)
     {
-        Checker.Run(codebase, arch => arch.Rule("member/x")
+        return Checker.Run(codebase, arch => arch.Rule("member/x")
                 .Enforce(constraint(arch))
                 .Because("b"))
-            .Single()
+            .Single();
+    }
+
+    private static void Pass(CodebaseModel codebase, Func<Arch, Constraint> constraint)
+    {
+        Checked(codebase, constraint)
             .ShouldHavePassed();
     }
 
     private static IReadOnlyList<string> FailedMemberIds(CodebaseModel codebase, Func<Arch, Constraint> constraint)
     {
-        return Checker.Run(codebase, arch => arch.Rule("member/x")
-                .Enforce(constraint(arch))
-                .Because("b"))
-            .Single()
+        return Checked(codebase, constraint)
             .MemberShapeSubjects();
+    }
+
+    private static void ShouldFailOnTheEmptyMemberSubject(CodebaseModel codebase, Func<Arch, Constraint> constraint)
+    {
+        Checked(codebase, constraint)
+            .ShouldHaveFailedWithDetail(ViolationKind.EmptySubject, ConstraintEvaluator.EmptyMemberSubjectMessage);
     }
 }

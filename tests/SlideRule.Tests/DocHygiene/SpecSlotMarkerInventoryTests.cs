@@ -355,9 +355,8 @@ public sealed class SpecSlotMarkerInventoryTests
 
     private static bool IsSlotCandidate(ParameterInfo parameter)
     {
-        bool takesText = parameter.ParameterType == typeof(string)
-                         || parameter.ParameterType == typeof(string[])
-                         || parameter.ParameterType == typeof(IEnumerable<string>);
+        Type type = parameter.ParameterType;
+        bool takesText = type == typeof(string) || typeof(IEnumerable<string>).IsAssignableFrom(type);
         if (!takesText) return false;
 
         bool fromCaller = parameter.IsDefined(typeof(CallerFilePathAttribute), inherit: false)

@@ -132,9 +132,12 @@ public sealed class SpecContractBindTests
         Assembly spec = SpecReferencing(HostContractVersion);
         var missing = new MissingMethodException("Method not found: 'Void SlideRule.Arch.FutureVerb()'.");
 
-        SpecContractMismatch.MapSkew(spec, "Sync.Architecture.dll", missing)
-            .Message
-            .ShouldContain("That is a spec built against a newer SlideRule package than the tool running it.");
+        string message = SpecContractMismatch.MapSkew(spec, "Sync.Architecture.dll", missing)
+            .Message;
+
+        message.ShouldStartWith(
+            "The spec assembly 'Sync.Architecture' uses SlideRule API this tool's contract does not have");
+        message.ShouldContain("That is a spec built against a newer SlideRule package than the tool running it.");
     }
 
     [Fact]
@@ -209,17 +212,6 @@ public sealed class SpecContractBindTests
         SpecContractMismatch.MapSkew(spec, "Sync.Architecture.dll", denied)
             .Message
             .ShouldStartWith("The spec assembly 'Sync.Architecture' uses SlideRule API that is no longer public");
-    }
-
-    [Fact]
-    public void MapSkew_AMissingMember_IsTheNewerContractRefusal()
-    {
-        Assembly spec = SpecReferencing(HostContractVersion);
-        var missing = new MissingMethodException("Method not found: 'Void SlideRule.Arch.FutureVerb()'.");
-
-        SpecContractMismatch.MapSkew(spec, "Sync.Architecture.dll", missing)
-            .Message
-            .ShouldStartWith("The spec assembly 'Sync.Architecture' uses SlideRule API this tool's contract does not have");
     }
 
     // The runtime's own messages, recorded on .NET 10 from a spec compiled against a contract with these members and

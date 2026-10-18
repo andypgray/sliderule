@@ -35,7 +35,7 @@ public sealed class CoreCarriesNothingTests
 
         // Assert — the dependency every consumer would inherit, at the line to delete, and nothing for the
         // analyzer, which ships to no one.
-        result.ShouldHaveFailedWithProjectItemAtSites(
+        result.ShouldHaveFailedWithProjectAtSites(
             "SlideRule -> System.Text.Json", [$"{CoreProjectFile}:32"]);
     }
 

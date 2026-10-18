@@ -1,5 +1,6 @@
 using SlideRule.Baselines;
 using SlideRule.Codebase;
+using SlideRule.Internal;
 using SlideRule.Tests.Extraction;
 
 namespace SlideRule.Tests.Checking;
@@ -317,7 +318,7 @@ internal static class Sources
     public static readonly CodebaseModel LayeredModel = CompilationFactory.Extract(Layered);
 
     /// <summary>The solution directory <see cref="FolderModel" />'s files sit under.</summary>
-    public const string FolderRoot = "/repo";
+    public static readonly SolutionRoot FolderRoot = new("/repo");
 
     /// <summary>
     ///     One namespace laid out in folders, the way a codebase whose folders are its only structure is: widgets

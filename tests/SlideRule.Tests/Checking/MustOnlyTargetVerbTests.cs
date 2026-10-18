@@ -35,7 +35,7 @@ public sealed class MustOnlyTargetVerbTests
                 .Enforce(arch.Projects.Named("Host").MustOnlyTarget("net8.0"))
                 .Because("b"))
             .Single()
-            .ShouldHaveFailedWithProjectItemAtSites("Host -> net48", ["Directory.Build.props:3"]);
+            .ShouldHaveFailedWithProjectAtSites("Host -> net48", ["Directory.Build.props:3"]);
     }
 
     [Fact]
@@ -84,7 +84,7 @@ public sealed class MustOnlyTargetVerbTests
                 .Enforce(arch.Projects.Named("Legacy").MustOnlyTarget("net8.0"))
                 .Because("b"))
             .Single()
-            .ShouldHaveFailedWithProjectItemAtSites("Legacy -> net48", []);
+            .ShouldHaveFailedWithProjectAtSites("Legacy -> net48", []);
     }
 
     [Fact]
