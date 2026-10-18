@@ -4,7 +4,9 @@ using Meridian.Quoting.Domain;
 
 namespace Meridian.Quoting.Application.Handlers;
 
-/// <summary>Reads a quote by reference and projects it to a <see cref="QuoteView" />, or null if there is none.</summary>
+/// <summary>
+///     Reads a quote by reference and projects it to a <see cref="QuoteView" />, or null if there is none.
+/// </summary>
 public sealed class GetQuoteHandler(IQuoteRepository quotes) : IQueryHandler<GetQuoteQuery, QuoteView?>
 {
     /// <inheritdoc />

@@ -6,6 +6,8 @@ namespace Meridian.Quoting.Application.Abstractions;
 /// </summary>
 public interface ICommandBus
 {
-    /// <summary>Routes the command to its handler, running it under a unit of work when the handler is transactional.</summary>
+    /// <summary>
+    ///     Routes the command to its handler, running it under a unit of work when the handler is transactional.
+    /// </summary>
     Task SendAsync(ICommand command);
 }

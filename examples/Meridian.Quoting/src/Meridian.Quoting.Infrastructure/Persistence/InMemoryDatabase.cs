@@ -62,14 +62,18 @@ public sealed class InMemoryDatabase
         return quotes.GetValueOrDefault(reference);
     }
 
-    /// <summary>Returns the seeded rate card effective for the lane at the given instant, or null if none applies.</summary>
+    /// <summary>
+    ///     Returns the seeded rate card effective for the lane at the given instant, or null if none applies.
+    /// </summary>
     public RateCard? FindRateCard(string lane, DateTime asOfUtc)
     {
         return rateCards.FirstOrDefault(card =>
             card.Lane == lane && card.EffectiveFromUtc <= asOfUtc && asOfUtc < card.EffectiveToUtc);
     }
 
-    /// <summary>Captures the current state so a later <see cref="Restore" /> can return the store to this point.</summary>
+    /// <summary>
+    ///     Captures the current state so a later <see cref="Restore" /> can return the store to this point.
+    /// </summary>
     public Snapshot Capture()
     {
         return new Snapshot(new Dictionary<string, Quote>(quotes, StringComparer.Ordinal), lastQuoteNumber);

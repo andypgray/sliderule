@@ -61,7 +61,7 @@ public sealed class OperationsArchitectureSpec : IArchitectureSpec
             .Because("The `*Event` values are what tracking projects across the module boundary and, later, onto a bus; declaring them as records makes them immutable and compared by value, so an event cannot be mutated after it is published or matched by reference identity.")
             .Fix("Declare the `*Event` type as a `record`.");
 
-        // demurrage is listed here as the whole layer, not just its Contracts/facade surface: the
+        // demurrage is listed here as the whole layer, not just its calculator facade: the
         // reconciler's grandfathered reach into FreeTimeCalendar is owned by the demurrage/engine
         // quarantine below, which baselines that one legacy edge. An Enforce rule cannot carry a
         // baseline, so naming only the facade here would turn the same edge into an

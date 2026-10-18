@@ -7,7 +7,9 @@ internal sealed class InvoiceAssembler
 {
     private const decimal OceanTransportCharge = 1850m;
 
-    /// <summary>Builds the invoice's money lines and total from the shipment's milestones and demurrage charge.</summary>
+    /// <summary>
+    ///     Builds the invoice's money lines and total from the shipment's milestones and demurrage charge.
+    /// </summary>
     public Invoice Assemble(
         string shipmentId,
         IReadOnlyList<ShipmentMilestone> milestones,

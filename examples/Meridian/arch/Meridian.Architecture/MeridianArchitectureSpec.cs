@@ -10,8 +10,8 @@ namespace Meridian.Architecture;
 ///     three postures on one codebase: Enforce for the law it already keeps, Migrate for the three
 ///     ratchets being worked off (inline SQL in controllers; ambient-clock reads; Task-returning
 ///     methods without the Async suffix), and Quarantine for the ISO 6346 clearance engine, contained
-///     behind its gateway. Five rules are Meridian's own; two come from the shared
-///     <c>DotNetGuidance</c> pack, taken a la carte at the postures this codebase warrants.
+///     behind its gateway. Four rules and the quarantine are Meridian's own; two rules come from
+///     the shared <c>DotNetGuidance</c> pack, taken a la carte at the postures this codebase warrants.
 /// </summary>
 // This example's README quotes rules from the class below as they are written here, continuation
 // columns included, and the compiled spec is the same whichever way they are laid out. The marker
@@ -37,7 +37,7 @@ public sealed class MeridianArchitectureSpec : IArchitectureSpec
 
         // The subject is the hierarchy, not the folder: a request handler is a ControllerBase deriver
         // wherever it lives. This spec is a plain class library with no <FrameworkReference>, so it cannot
-        // write typeof(ControllerBase) at all — the string overload names the anchor by fully-qualified
+        // write typeof(ControllerBase) at all — the string overload names the base type by its fully-qualified
         // name and needs no reference to it, which is the adopter's position on any MVC codebase.
         arch.Rule("naming/controllers")
             .Enforce(arch.Types.DerivedFrom("Microsoft.AspNetCore.Mvc.ControllerBase").MustHaveSuffix("Controller"))
@@ -64,11 +64,11 @@ public sealed class MeridianArchitectureSpec : IArchitectureSpec
             .Exemplar(arch.Types.Named("BookingsController"));
 
         // Two rules taken from the shared DotNetGuidance pack rather than written again. The posture is
-        // Meridian's to choose, and the two differ: the naming convention is genuinely behind here, so it
+        // Meridian's to choose, and the two differ: the naming convention is behind here, so it
         // ratchets against a baseline, while nothing builds a second container, so that one is law from
         // the start. The subject for the naming rule is the two layers rather than a project, so the rule
-        // anchors on no single project and stays in the root context rather than churning the per-project
-        // cards; it also keeps Program.cs's top-level statements out of the subject.
+        // lands on no single project's card and stays in the root AGENTS.md block rather than churning the
+        // per-project cards; it also keeps Program.cs's top-level statements out of the subject.
         DotNetGuidance.AsyncSuffix(arch, arch.AnyOf(domain, web),
             PackPosture.Migrate("Repository and controller methods return Task without the Async suffix."),
             "Rename the method to end in Async and update its callers; see the interface and its implementation together.");

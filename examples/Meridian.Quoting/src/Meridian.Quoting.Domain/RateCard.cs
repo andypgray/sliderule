@@ -6,7 +6,9 @@ namespace Meridian.Quoting.Domain;
 /// </summary>
 public sealed record RateCard
 {
-    /// <summary>The lane the rate applies to, as origin/destination UN/LOCODEs (for example, "CNSHA-&gt;USLGB").</summary>
+    /// <summary>
+    ///     The lane the rate applies to, as origin/destination UN/LOCODEs (for example, "CNSHA-&gt;USLGB").
+    /// </summary>
     public required string Lane { get; init; }
 
     /// <summary>The price for one TEU on this lane.</summary>

@@ -5,6 +5,8 @@ namespace Meridian.Quoting.Domain;
 /// </summary>
 public interface IRateCardRepository
 {
-    /// <summary>Returns the rate card effective for the lane at the given UTC instant, or null if none applies.</summary>
+    /// <summary>
+    ///     Returns the rate card effective for the lane at the given UTC instant, or null if none applies.
+    /// </summary>
     Task<RateCard?> GetForLane(string lane, DateTime asOfUtc);
 }
