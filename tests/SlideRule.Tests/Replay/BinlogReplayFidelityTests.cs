@@ -137,10 +137,9 @@ public sealed class BinlogReplayFidelityTests(BinlogFixtureWorkspace fixture) : 
         // Arrange — append a new type to a source file already covered by the binlog's csc file list, AFTER
         // the binlog was built. Mutate the shared copy in place; a held ScopedFile reverts it for the others.
         string moneySource = Fixture.PathOf("MyApp.Domain", "Money.cs");
-        string original = File.ReadAllText(moneySource);
         using (ScopedFile.Hold(moneySource))
         {
-            File.WriteAllText(moneySource, $"{original}{Environment.NewLine}public sealed class ReplayFreshnessProbe {{ }}{Environment.NewLine}");
+            File.AppendAllText(moneySource, $"{Environment.NewLine}public sealed class ReplayFreshnessProbe {{ }}{Environment.NewLine}");
 
             // Act — replay the UNCHANGED binlog; text is read from current disk at materialisation time.
             using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath, Fixture.SolutionPath, ct: Ct);
@@ -161,21 +160,13 @@ public sealed class BinlogReplayFidelityTests(BinlogFixtureWorkspace fixture) : 
     [Fact]
     public async Task Replay_DisposedWrapper_LeavesSolutionUsable()
     {
-        // Arrange
-        ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath, Fixture.SolutionPath, ct: Ct);
-        CodebaseModel before;
-        try
-        {
-            before = await CodebaseExtractor.ExtractFromSolutionAsync(replayed.Solution, ct: Ct);
-        }
-        catch
-        {
-            // The dispose below is the act, so the wrapper is released here only when the arrange fails.
-            replayed.Dispose();
-            throw;
-        }
+        // Arrange — the scope's own dispose is a second call, and a no-op once the act below has run; it is what
+        // releases the wrapper when the arrange step throws.
+        using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath, Fixture.SolutionPath, ct: Ct);
+        CodebaseModel before = await CodebaseExtractor.ExtractFromSolutionAsync(replayed.Solution, ct: Ct);
 
-        // Act — dispose the wrapper (workspace + reader), then keep using the Solution.
+        // Act — dispose the wrapper (workspace + reader) explicitly, then keep using the Solution.
+        // ReSharper disable once DisposeOnUsingVariable
         replayed.Dispose();
         CodebaseModel after = await CodebaseExtractor.ExtractFromSolutionAsync(replayed.Solution, ct: Ct);
 

@@ -23,7 +23,9 @@ namespace SlideRule.Roslyn.Replay;
 /// </remarks>
 internal sealed class ReplayedSolution : IDisposable
 {
+    private readonly AdhocWorkspace _workspace;
     private readonly SolutionReader _reader;
+    private bool _disposed;
 
     internal ReplayedSolution(
         AdhocWorkspace workspace, SolutionReader reader, Solution solution,
@@ -32,7 +34,7 @@ internal sealed class ReplayedSolution : IDisposable
         IReadOnlyList<string>? uncheckedProjects = null,
         IReadOnlyList<UnsupportedProject>? unsupportedProjects = null)
     {
-        Workspace = workspace;
+        _workspace = workspace;
         _reader = reader;
         Solution = solution;
         TargetFrameworks = targetFrameworks ?? TargetFrameworkMaps.None;
@@ -40,9 +42,6 @@ internal sealed class ReplayedSolution : IDisposable
         UncheckedProjects = uncheckedProjects ?? [];
         UnsupportedProjects = unsupportedProjects ?? [];
     }
-
-    /// <summary>The in-memory workspace the replayed solution was added to.</summary>
-    private AdhocWorkspace Workspace { get; }
 
     /// <summary>The replayed, unresolved-reference-stripped solution.</summary>
     public Solution Solution { get; }
@@ -90,11 +89,7 @@ internal sealed class ReplayedSolution : IDisposable
     /// </remarks>
     private IReadOnlyList<string> RestoreFailedProjects { get; } = [];
 
-    /// <summary>
-    ///     The projects this capture built in a language the replay cannot read, ordinal-sorted by path —
-    ///     the same fact <see cref="LoadedSolution.UnsupportedProjects" /> carries, so a document says what
-    ///     it covers on both paths, and internal for that property's reason.
-    /// </summary>
+    /// <summary>The projects this capture built in a language the replay cannot read.</summary>
     /// <remarks>
     ///     Read from the capture rather than from a solution file, which is the only difference between the
     ///     two paths here: a binlog records what was built, so the compiler invocations the C#-only predicate
@@ -118,12 +113,18 @@ internal sealed class ReplayedSolution : IDisposable
             loadFailures, [], FailedProjects, UncheckedProjects, RestoreFailedProjects, UnsupportedProjects, []);
     }
 
-    /// <summary>Disposes the workspace and the binlog reader (releasing its stream and analyzer host).</summary>
+    /// <summary>
+    ///     Disposes the workspace and the binlog reader (releasing its stream and analyzer host). A second call is
+    ///     a no-op.
+    /// </summary>
     public void Dispose()
     {
+        if (_disposed) return;
+
+        _disposed = true;
         try
         {
-            Workspace.Dispose();
+            _workspace.Dispose();
         }
         finally
         {

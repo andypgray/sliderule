@@ -251,10 +251,12 @@ public sealed class WorkspaceSessionTests(SharedWorkspaceSession shared) : IClas
         await using var session = new WorkspaceSession();
         await session.GetCurrentAsync(fixture.SolutionPath, Ct);
 
-        // Act
+        // Act — dispose explicitly: this call and the one below are what the row tests.
+        // ReSharper disable once DisposeOnUsingVariable
         await session.DisposeAsync();
 
         // Assert — a second dispose is a no-op, and post-dispose access is a clean ObjectDisposedException.
+        // ReSharper disable once DisposeOnUsingVariable
         await Should.NotThrowAsync(async () => await session.DisposeAsync());
         await Should.ThrowAsync<ObjectDisposedException>(async () => await session.GetCurrentAsync(fixture.SolutionPath, Ct));
     }

@@ -1,4 +1,3 @@
-using System.Runtime.CompilerServices;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
 using SlideRule.Internal;
@@ -534,8 +533,7 @@ internal sealed class WorkspaceSession : IAsyncDisposable
     {
         // Read via a stream so SourceText detects the encoding (BOM-aware, UTF-8 default), matching how
         // the workspace decoded the file on load. FileShare.ReadWrite tolerates a concurrent writer.
-        FileStream stream = new(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-        await using ConfiguredAsyncDisposable streamLifetime = stream.ConfigureAwait(false);
+        using FileStream stream = new(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
         using MemoryStream buffer = new();
         await stream.CopyToAsync(buffer, ct).ConfigureAwait(false);
         buffer.Position = 0;
