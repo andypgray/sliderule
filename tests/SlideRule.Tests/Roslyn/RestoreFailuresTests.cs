@@ -229,8 +229,8 @@ public sealed class RestoreFailuresTests
         using TempDirectory temp = TestTempRoot.Fresh("restore-absent-multi-tfm");
         string csproj = WriteProject(temp, "Core", SdkStyleProjectXml);
         using var workspace = new AdhocWorkspace();
-        Solution solution = AdhocSolution.Of(
-            workspace, AdhocSolution.Loaded("Core(net10.0)", csproj), AdhocSolution.Loaded("Core(netstandard2.0)", csproj));
+        Solution solution = workspace.WithProjects(
+            AdhocSolution.Loaded("Core(net10.0)", csproj), AdhocSolution.Loaded("Core(netstandard2.0)", csproj));
 
         RestoreFailures.Detect(solution, [])
             .ShouldBe([csproj]);
@@ -352,8 +352,8 @@ public sealed class RestoreFailuresTests
         using TempDirectory temp = TestTempRoot.Fresh("restore-multi-tfm");
         string csproj = WriteAssets(temp, "Core", FailedRestoreAssets);
         using var workspace = new AdhocWorkspace();
-        Solution solution = AdhocSolution.Of(
-            workspace, AdhocSolution.Loaded("Core(net10.0)", csproj), AdhocSolution.Loaded("Core(netstandard2.0)", csproj));
+        Solution solution = workspace.WithProjects(
+            AdhocSolution.Loaded("Core(net10.0)", csproj), AdhocSolution.Loaded("Core(netstandard2.0)", csproj));
 
         RestoreFailures.Detect(solution, [])
             .ShouldBe([csproj]);
@@ -432,8 +432,7 @@ public sealed class RestoreFailuresTests
     // carrying its evaluated output path, so ProjectLoadFailures sees nothing wrong with it.
     private static Solution SolutionOf(AdhocWorkspace workspace, params string[] csprojPaths)
     {
-        return AdhocSolution.Of(
-            workspace,
+        return workspace.WithProjects(
             [.. csprojPaths.Select(path => AdhocSolution.Loaded(Path.GetFileNameWithoutExtension(path), path))]);
     }
 }

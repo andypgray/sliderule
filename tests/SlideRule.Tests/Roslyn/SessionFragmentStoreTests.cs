@@ -110,7 +110,7 @@ public sealed class SessionFragmentStoreTests(SessionFragmentStoreTests.Sessions
         // The merged model carries the new type and equals a fresh cold extraction of the edited tree.
         CodebaseModel storeModel = FragmentMerger.Merge(edited.Fragments);
         CodebaseModel coldModel = await CodebaseExtractor.ExtractFromSolutionAsync(snap2.Solution, ct: Ct);
-        ModelDump.Render(storeModel)
+        storeModel.Dump()
             .ShouldContain("MyApp.Web.WebIncrementalProbe");
         storeModel.ShouldModelTheSameAs(coldModel);
     }
@@ -193,7 +193,8 @@ public sealed class SessionFragmentStoreTests(SessionFragmentStoreTests.Sessions
         reExtracted.Fragments.Where(fragment => fragment.ProjectName == MultiTfmCore)
             .Select(fragment => fragment.TargetFramework)
             .ShouldBe(["net10.0", "netstandard2.0"]);
-        ModelDump.Render(FragmentMerger.Merge(reExtracted.Fragments))
+        FragmentMerger.Merge(reExtracted.Fragments)
+            .Dump()
             .ShouldContain("MultiTfm.Core.WidgetProbe");
     }
 
@@ -221,7 +222,7 @@ public sealed class SessionFragmentStoreTests(SessionFragmentStoreTests.Sessions
         store.LastRemappedProjects.ShouldBe([Web]);
         store.FullWalkCount.ShouldBe(1);
 
-        await ShouldMergeToTheColdModelAsync(edited, snap2);
+        await edited.ShouldMergeToTheColdModelAsync(snap2);
 
         // …and the moved sites themselves, which the model comparison establishes but does not show: the same
         // files, and every line inside the edited file two lower than it was.
@@ -296,7 +297,7 @@ public sealed class SessionFragmentStoreTests(SessionFragmentStoreTests.Sessions
         SessionFragmentSet first = await store.GetFragmentsAsync(snap2, null, Ct);
         first.ReExtractedProjects.ShouldBeEmpty();
         store.LastRemappedProjects.ShouldBe([Web]);
-        await ShouldMergeToTheColdModelAsync(first, snap2);
+        await first.ShouldMergeToTheColdModelAsync(snap2);
 
         // Act/Assert 2 — a second comment edit remaps again, against the sites the first one left behind.
         EditOnDisk(homeController, content => "// probe two\n" + content);
@@ -304,7 +305,7 @@ public sealed class SessionFragmentStoreTests(SessionFragmentStoreTests.Sessions
         SessionFragmentSet second = await store.GetFragmentsAsync(snap3, null, Ct);
         second.ReExtractedProjects.ShouldBeEmpty();
         store.LastRemappedProjects.ShouldBe([Web]);
-        await ShouldMergeToTheColdModelAsync(second, snap3);
+        await second.ShouldMergeToTheColdModelAsync(snap3);
 
         // Act/Assert 3 — a real edit re-walks Web, and remaps nothing; it is inside a method body, so Web's
         // dependent stays.
@@ -314,7 +315,7 @@ public sealed class SessionFragmentStoreTests(SessionFragmentStoreTests.Sessions
         SessionFragmentSet third = await store.GetFragmentsAsync(snap4, null, Ct);
         third.ReExtractedProjects.ShouldBe([Web]);
         store.LastRemappedProjects.ShouldBeEmpty();
-        await ShouldMergeToTheColdModelAsync(third, snap4);
+        await third.ShouldMergeToTheColdModelAsync(snap4);
 
         // Act/Assert 4 — and a comment edit after the re-walk remaps once more.
         EditOnDisk(homeController, content => "// probe three\n" + content);
@@ -323,7 +324,7 @@ public sealed class SessionFragmentStoreTests(SessionFragmentStoreTests.Sessions
         fourth.ReExtractedProjects.ShouldBeEmpty();
         store.LastRemappedProjects.ShouldBe([Web]);
         store.FullWalkCount.ShouldBe(1);
-        await ShouldMergeToTheColdModelAsync(fourth, snap5);
+        await fourth.ShouldMergeToTheColdModelAsync(snap5);
     }
 
     [Fact]
@@ -346,7 +347,7 @@ public sealed class SessionFragmentStoreTests(SessionFragmentStoreTests.Sessions
         // own frameworks: a remap that dropped or reordered one would strand a framework's facts.
         ShouldHaveRemappedCoreAlone(store, remapped);
 
-        await ShouldMergeToTheColdModelAsync(remapped, edited);
+        await remapped.ShouldMergeToTheColdModelAsync(edited);
     }
 
     [Fact]
@@ -379,7 +380,7 @@ public sealed class SessionFragmentStoreTests(SessionFragmentStoreTests.Sessions
         LegacyEdgeLines(remapped, "net10.0", widgetLegacy)
             .ShouldBeEmpty();
 
-        await ShouldMergeToTheColdModelAsync(remapped, edited);
+        await remapped.ShouldMergeToTheColdModelAsync(edited);
     }
 
     [Fact]
@@ -406,7 +407,7 @@ public sealed class SessionFragmentStoreTests(SessionFragmentStoreTests.Sessions
         store.LastRemappedProjects.ShouldBeEmpty();
         store.FullWalkCount.ShouldBe(1);
 
-        await ShouldMergeToTheColdModelAsync(reWalked, edited);
+        await reWalked.ShouldMergeToTheColdModelAsync(edited);
     }
 
     [Fact]
@@ -448,7 +449,7 @@ public sealed class SessionFragmentStoreTests(SessionFragmentStoreTests.Sessions
         // refusal, and its fragment is still there beside the one that went through the map.
         ShouldHaveRemappedCoreAlone(store, remapped);
 
-        await ShouldMergeToTheColdModelAsync(remapped, edited);
+        await remapped.ShouldMergeToTheColdModelAsync(edited);
     }
 
     // The scene three of the rows above share, differing only in the edit they make: populate the store from
@@ -475,7 +476,7 @@ public sealed class SessionFragmentStoreTests(SessionFragmentStoreTests.Sessions
         store.LastRemappedProjects.ShouldBeEmpty();
         store.FullWalkCount.ShouldBe(1);
 
-        await ShouldMergeToTheColdModelAsync(edited, snap2);
+        await edited.ShouldMergeToTheColdModelAsync(snap2);
     }
 
     // The same scene for an edit that changes the file's shape but not its declaration surface: Web re-walks
@@ -498,7 +499,7 @@ public sealed class SessionFragmentStoreTests(SessionFragmentStoreTests.Sessions
         store.LastRemappedProjects.ShouldBeEmpty();
         store.FullWalkCount.ShouldBe(1);
 
-        await ShouldMergeToTheColdModelAsync(edited, snap2);
+        await edited.ShouldMergeToTheColdModelAsync(snap2);
     }
 
     // The scene the two unrecorded-framework rows share, differing only in the Core file they edit. The snapshots
@@ -529,17 +530,7 @@ public sealed class SessionFragmentStoreTests(SessionFragmentStoreTests.Sessions
         reWalked.ReExtractedProjects.ShouldBe([MultiTfmCore]);
         store.LastRemappedProjects.ShouldBeEmpty();
         store.FullWalkCount.ShouldBe(1);
-        await ShouldMergeToTheColdModelAsync(reWalked, unattributed);
-    }
-
-    // The model oracle: the store's fragments merge to exactly the model a cold extraction produces from the
-    // snapshot the store was handed, under that snapshot's own framework map.
-    private static async Task ShouldMergeToTheColdModelAsync(SessionFragmentSet set, WorkspaceSnapshot snapshot)
-    {
-        CodebaseModel coldModel = await CodebaseExtractor.ExtractFromSolutionAsync(
-            snapshot.Solution, null, snapshot.TargetFrameworks, null, Ct);
-        FragmentMerger.Merge(set.Fragments)
-            .ShouldModelTheSameAs(coldModel);
+        await reWalked.ShouldMergeToTheColdModelAsync(unattributed);
     }
 
     // The verdict of a remap confined to Core: nothing re-walked, Core alone remapped, no new full walk, and both of
@@ -666,5 +657,18 @@ public sealed class SessionFragmentStoreTests(SessionFragmentStoreTests.Sessions
                 FileSnapshot.Restore(changed.Key, changed.Value);
             _changed.Clear();
         }
+    }
+}
+
+file static class SessionFragmentStoreAssertions
+{
+    // The model oracle: the store's fragments merge to exactly the model a cold extraction produces from the
+    // snapshot the store was handed, under that snapshot's own framework map.
+    internal static async Task ShouldMergeToTheColdModelAsync(this SessionFragmentSet set, WorkspaceSnapshot snapshot)
+    {
+        CodebaseModel coldModel = await CodebaseExtractor.ExtractFromSolutionAsync(
+            snapshot.Solution, null, snapshot.TargetFrameworks, null, Ct);
+        FragmentMerger.Merge(set.Fragments)
+            .ShouldModelTheSameAs(coldModel);
     }
 }

@@ -140,7 +140,7 @@ public sealed class PolyglotSurveyE2ETests
         // Assert — one line per project, naming the reason, so the terminal reader gets the same fact the
         // document carries rather than having to reach for --json.
         result.ShouldSucceed();
-        Section(result.Out, UnsupportedHeading)
+        result.ShouldHaveOutSection(UnsupportedHeading)
             .ShouldBe(["  PolyglotApp.Fs/PolyglotApp.Fs.fsproj — not a C# project"]);
     }
 
@@ -297,19 +297,5 @@ public sealed class PolyglotSurveyE2ETests
         notification.GetProperty("level")
             .GetString()
             .ShouldBe("warning");
-    }
-
-    // ── harness ───────────────────────────────────────────────────────────────────────────────────────────
-
-    // One section of the human survey: the lines between its heading and the blank line closing it.
-    private static IReadOnlyList<string> Section(string output, string heading)
-    {
-        return output
-            .NormalizedTrimmed()
-            .Split('\n')
-            .SkipWhile(line => !line.Equals(heading, StringComparison.Ordinal))
-            .Skip(1)
-            .TakeWhile(line => line.Length > 0)
-            .ToList();
     }
 }

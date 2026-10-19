@@ -7,7 +7,6 @@ using SlideRule.Tests.Mcp.TestDoubles;
 using SlideRule.Tests.TestSupport;
 using Xunit;
 // The suite's reader over a check document, not the CLI renderer of the same name that this file also imports.
-using CheckJson = SlideRule.Tests.TestSupport.CheckJson;
 
 namespace SlideRule.Tests.Cli;
 
@@ -200,7 +199,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
 
         result.ShouldRefuseWith();
         using JsonDocument document = result.ShouldHaveJsonStdout();
-        CheckJson.Strings(document, "workspaceDiagnostics")
+        document.RootElement.Strings("workspaceDiagnostics")
             .ShouldBe([LoadDiagnostic, MsBuildBootstrap.SelectionNote()]);
         result.Err.ShouldContain("MSBuild for this run:"); // and it is still on stderr, unchanged
     }
@@ -215,7 +214,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
 
         result.ShouldSucceed();
         using JsonDocument document = result.ShouldHaveJsonStdout();
-        CheckJson.Strings(document, "workspaceDiagnostics")
+        document.RootElement.Strings("workspaceDiagnostics")
             .ShouldBeEmpty();
         document.ShouldCarryPackageAudit(AuditMessage, [AuditProject]);
         document.RootElement.TryGetProperty("modelIncomplete", out _)
@@ -236,7 +235,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
 
         result.ShouldSucceed();
         using JsonDocument document = result.ShouldHaveJsonStdout();
-        CheckJson.Strings(document, "workspaceDiagnostics")
+        document.RootElement.Strings("workspaceDiagnostics")
             .ShouldBe([PruningAdvisory, MsBuildBootstrap.SelectionNote()]);
         document.ShouldCarryPackageAudit(AuditMessage, [AuditProject]);
         document.RootElement.TryGetProperty("modelIncomplete", out _)
@@ -376,7 +375,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
 
         result.ShouldSucceed();
         using JsonDocument document = result.ShouldHaveJsonStdout();
-        CheckJson.Strings(document, "workspaceDiagnostics")
+        document.RootElement.Strings("workspaceDiagnostics")
             .ShouldBe([GermanAuditFetchFailure, MsBuildBootstrap.SelectionNote()]);
         document.ShouldCarryNoPackageAudit();
     }
@@ -394,7 +393,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
 
         result.ShouldReportViolations();
         string grouped = "warning: " + new PackageAuditEntry(AuditMessage, ["App", "App.Tests"]).Describe();
-        TextNormalization.Occurrences(result.Out, grouped)
+        result.Out.Occurrences(grouped)
             .ShouldBe(1, result.Out);
         result.Out.ShouldNotContain(AuditDiagnostic);
     }
@@ -474,7 +473,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
             .ShouldBeTrue();
         // Solution-relative and forward-slashed, like every other path in the document, so no machine path
         // ever lands in one a golden pins.
-        CheckJson.Strings(document, "failedProjects")
+        document.RootElement.Strings("failedProjects")
             .ShouldHaveSingleItem()
             .ShouldEndWith("MyApp.Broken/MyApp.Broken.csproj");
     }
@@ -498,7 +497,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         document.RootElement.TryGetProperty("failedProjects", out _)
             .ShouldBeFalse();
         // Solution-relative and forward-slashed, like failedProjects beside it and every other path here.
-        CheckJson.Strings(document, "uncheckedProjects")
+        document.RootElement.Strings("uncheckedProjects")
             .ShouldHaveSingleItem()
             .ShouldEndWith("MyApp.Skipped/MyApp.Skipped.csproj");
     }
@@ -587,7 +586,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
             .ShouldBeTrue();
         document.RootElement.TryGetProperty("failedProjects", out _)
             .ShouldBeFalse();
-        CheckJson.Strings(document, "restoreFailedProjects")
+        document.RootElement.Strings("restoreFailedProjects")
             .ShouldHaveSingleItem()
             .ShouldEndWith("MyApp.Unrestored/MyApp.Unrestored.csproj");
     }
@@ -604,7 +603,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         document.RootElement.GetProperty("modelIncomplete")
             .GetBoolean()
             .ShouldBeTrue();
-        CheckJson.Strings(document, "restoreFailedProjects")
+        document.RootElement.Strings("restoreFailedProjects")
             .ShouldHaveSingleItem();
     }
 

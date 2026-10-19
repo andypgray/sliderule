@@ -190,7 +190,7 @@ public sealed class RestoreFailureSilentEdgeE2ETests
             .ShouldBeTrue();
         document.RootElement.TryGetProperty("failedProjects", out _)
             .ShouldBeFalse(never.Transcript());
-        CheckJson.Strings(document, "restoreFailedProjects")
+        document.RootElement.Strings("restoreFailedProjects")
             .ShouldBe(["FieldMini.Core/FieldMini.Core.csproj"]);
     }
 
@@ -222,7 +222,7 @@ public sealed class RestoreFailureSilentEdgeE2ETests
             .ShouldBeTrue();
         document.RootElement.TryGetProperty("failedProjects", out _)
             .ShouldBeFalse(broken.Transcript());
-        CheckJson.Strings(document, "restoreFailedProjects")
+        document.RootElement.Strings("restoreFailedProjects")
             .ShouldBe(["FieldMini.Core/FieldMini.Core.csproj"]);
         // The same fact the stamp above carries, reaching the rule that reported itself inert: the warning's
         // own cure names the partial model rather than the selection's shape, so a client reading one rule's

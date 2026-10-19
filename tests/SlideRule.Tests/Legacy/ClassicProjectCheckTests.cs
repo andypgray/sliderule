@@ -33,7 +33,7 @@ public sealed class ClassicProjectCheckTests
         // stderr, so a bare `Exit.ShouldBe(1)` on a machine where the project did not load reports the exit
         // code and discards the runner's own explanation of why — which is exactly the failure that reached
         // CI as an unexplained 2.
-        string context = LegacyRunContext.Describe(result);
+        string context = result.DescribeLegacyRun();
 
         // Assert
         result.Exit.ShouldBe(1, context);

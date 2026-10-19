@@ -16,6 +16,7 @@ using SlideRule.Roslyn.Files;
 using SlideRule.Tests.Checking;
 using SlideRule.Tests.Cli;
 using SlideRule.Tests.DocHygiene;
+using SlideRule.Tests.Extraction;
 using SlideRule.Tests.TestSupport;
 using Xunit;
 
@@ -270,7 +271,7 @@ public sealed class SelfSpecTests
         string? body = ManagedBlock.ExtractBody(File.ReadAllText(RepoRoot.ArchitectureMd));
         body.ShouldNotBeNull("ARCHITECTURE.md carries no managed block.");
 
-        TextNormalization.Occurrences(body, "```mermaid")
+        body.Occurrences("```mermaid")
             .ShouldBe(2, "the managed block must carry both drawings.");
         body.ShouldContain("accTitle: Codebase survey:");
         body.ShouldContain("accTitle: Architecture law:");
@@ -434,8 +435,9 @@ public sealed class SelfSpecTests
         ArchitectureModel packed = Checker.Model(arch =>
             DotNetGuidance.NoSyncOverAsync(arch, arch.Types, PackPosture.Enforce));
 
-        Anchors(SelfModel.Rule("mcp/no-blocking-waits"))
-            .ShouldBe(Anchors(packed.Rule("async/no-sync-over-async")));
+        SelfModel.Rule("mcp/no-blocking-waits")
+            .MemberAnchors()
+            .ShouldBe(packed.Rule("async/no-sync-over-async").MemberAnchors());
     }
 
     /// <summary>
@@ -527,8 +529,10 @@ public sealed class SelfSpecTests
         Selection cliProject = arch.Project("SlideRule.Cli");
 
         var evaluator = new SelectionEvaluator(codebase);
-        IReadOnlyList<string> declared = Names(evaluator.Evaluate(cliProject, SelectionPosition.Subject));
-        IReadOnlyList<string> authored = Names(evaluator.Evaluate(cliProject.Authored(), SelectionPosition.Subject));
+        IReadOnlyList<string> declared = evaluator.Evaluate(cliProject, SelectionPosition.Subject)
+            .SortedFullNames();
+        IReadOnlyList<string> authored = evaluator.Evaluate(cliProject.Authored(), SelectionPosition.Subject)
+            .SortedFullNames();
 
         declared.Except(authored)
             .ShouldBe(["SlideRule.Cli.Rendering.SlideRuleJsonContext"]);
@@ -566,8 +570,10 @@ public sealed class SelfSpecTests
         Selection roslynProject = arch.Project("SlideRule.Roslyn");
 
         var evaluator = new SelectionEvaluator(codebase);
-        IReadOnlyList<string> declared = Names(evaluator.Evaluate(roslynProject, SelectionPosition.Subject));
-        IReadOnlyList<string> authored = Names(evaluator.Evaluate(roslynProject.Authored(), SelectionPosition.Subject));
+        IReadOnlyList<string> declared = evaluator.Evaluate(roslynProject, SelectionPosition.Subject)
+            .SortedFullNames();
+        IReadOnlyList<string> authored = evaluator.Evaluate(roslynProject.Authored(), SelectionPosition.Subject)
+            .SortedFullNames();
 
         declared.Except(authored)
             .ShouldBe(
@@ -629,25 +635,6 @@ public sealed class SelfSpecTests
         return !string.IsNullOrWhiteSpace(assemblyPath)
                && Path.IsPathRooted(assemblyPath)
                && !string.Equals(assemblyPath, project.OutputFilePath, PathComparison.Comparison);
-    }
-
-    // A rule's banned members as comparable text, the projection PackParityTests measures pack-and-inline
-    // agreement with: the resolved leaf, which is what has to match. Location is not read: it is
-    // diagnostics only, and both rules capture it inside the pack's own file.
-    private static IReadOnlyList<string> Anchors(ArchRule rule)
-    {
-        if (rule.Constraint is not { } constraint) return [];
-
-        return constraint.MemberOperands
-            .Select(member => $"{member.DeclaringType.FullName}.{member.Name} (method: {member.IsMethod})")
-            .ToList();
-    }
-
-    private static IReadOnlyList<string> Names(IEnumerable<TypeNode> types)
-    {
-        return types.Select(type => type.FullName)
-            .OrderBy(name => name, StringComparer.Ordinal)
-            .ToList();
     }
 
     // Every way the quoted roster lines differ from the printed ones, project by project: a project on one

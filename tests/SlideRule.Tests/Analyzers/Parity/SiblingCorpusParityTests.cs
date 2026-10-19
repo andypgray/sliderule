@@ -25,7 +25,7 @@ public sealed class SiblingCorpusParityTests
 
         // Three rules, and between them a violation written in each of the three projects that has one:
         // no single compilation sees all of it and the union over them does.
-        ParityHarness.Describe(subject.Expectation.Keys)
+        subject.Expectation.Keys.Describe()
             .Count.ShouldBe(4, "the two contract crossings and the store held from the web layer twice over");
 
         await subject.ShouldHoldOnBothLegsAsync(Ct);
@@ -36,7 +36,7 @@ public sealed class SiblingCorpusParityTests
     {
         ParitySubject subject = SiblingCorpus.CapturedContainment();
 
-        ParityHarness.Describe(subject.Expectation.Keys)
+        subject.Expectation.Keys.Describe()
             .ShouldBe(
                 ["legacy/data/containment [Reference] T:Web.Fresh -> T:Data.Ledger at Web.Site.cs:10"],
                 "the blessed crossing is grandfathered and the new one is a broken law");
@@ -49,7 +49,7 @@ public sealed class SiblingCorpusParityTests
     {
         ParitySubject subject = SiblingCorpus.RenamedAssembly();
 
-        ParityHarness.Describe(subject.Expectation.Keys)
+        subject.Expectation.Keys.Describe()
             .ShouldBe(
                 ["projects/web-not-through-data [Reference] T:Web.OrderController -> T:Data.Store at Web.Site.cs:5"],
                 "a project noun answers from the model file's table, not from the assembly name");
@@ -62,7 +62,7 @@ public sealed class SiblingCorpusParityTests
     {
         ParitySubject subject = SiblingCorpus.GrownPair();
 
-        ParityHarness.Describe(subject.Expectation.Keys)
+        subject.Expectation.Keys.Describe()
             .Count.ShouldBe(2, "a pair that has grown is red at every site, the blessed one included");
 
         await subject.ShouldHoldOnBothLegsAsync(Ct);
@@ -79,7 +79,7 @@ public sealed class SiblingCorpusParityTests
             "the sibling's base type lives in Base.Lib, which the web project does not reference",
             key => key.Rule == "hierarchy/web-holds-no-root");
 
-        ParityHarness.Describe(subject.Expectation.Keys)
+        subject.Expectation.Keys.Describe()
             .Count.ShouldBe(1, "the whole-solution check sees the sibling's whole hierarchy");
 
         await subject.ShouldHoldOnBothLegsAsync(Ct, gap);
@@ -92,7 +92,7 @@ public sealed class SiblingCorpusParityTests
         // sets are equal. That is what shows the difference came from the missing reference.
         ParitySubject subject = SiblingCorpus.ErrorHierarchy(vouched: true);
 
-        ParityHarness.Describe(subject.Expectation.Keys)
+        subject.Expectation.Keys.Describe()
             .Count.ShouldBe(1, "the whole-solution check sees the sibling's whole hierarchy");
 
         await subject.ShouldHoldOnBothLegsAsync(Ct);
@@ -130,11 +130,12 @@ public sealed class SiblingCorpusParityTests
             "markers/web-holds-nothing-marked [Reference] T:Web.Client -> T:Data.Store at Web.Site.cs:5";
 
         // Act
-        IReadOnlyList<string> solution = ParityHarness.Describe(ParityHarness.SolutionKeys(subject, ruleId));
-        IReadOnlyList<string> asCompilations = ParityHarness.Describe(
-            ParityHarness.ForcedKeys(subject, ruleId, subject.Compilations, Ct));
-        IReadOnlyList<string> asImages = ParityHarness.Describe(
-            ParityHarness.ForcedKeys(subject, ruleId, subject.Imaged, Ct));
+        IReadOnlyList<string> solution = subject.SolutionKeys(ruleId)
+            .Describe();
+        IReadOnlyList<string> asCompilations = subject.ForcedKeys(ruleId, subject.Compilations, Ct)
+            .Describe();
+        IReadOnlyList<string> asImages = subject.ForcedKeys(ruleId, subject.Imaged, Ct)
+            .Describe();
 
         // Assert — the row's own verdict first: the classifier holds the rule out, so the build never reaches it.
         subject.Expectation.Checked.ShouldBeEmpty("rules the classifier lets a one-project build decide");
@@ -167,11 +168,12 @@ public sealed class SiblingCorpusParityTests
             "markers/web-holds-nothing-defaulted [Reference] T:Web.Client -> T:Data.Catalogue at Web.Site.cs:6";
 
         // Act
-        IReadOnlyList<string> solution = ParityHarness.Describe(ParityHarness.SolutionKeys(subject, ruleId));
-        IReadOnlyList<string> asCompilations = ParityHarness.Describe(
-            ParityHarness.ForcedKeys(subject, ruleId, subject.Compilations, Ct));
-        IReadOnlyList<string> asImages = ParityHarness.Describe(
-            ParityHarness.ForcedKeys(subject, ruleId, subject.Imaged, Ct));
+        IReadOnlyList<string> solution = subject.SolutionKeys(ruleId)
+            .Describe();
+        IReadOnlyList<string> asCompilations = subject.ForcedKeys(ruleId, subject.Compilations, Ct)
+            .Describe();
+        IReadOnlyList<string> asImages = subject.ForcedKeys(ruleId, subject.Imaged, Ct)
+            .Describe();
 
         // Assert — the row's own verdict first: the classifier holds the rule out, so the build never reaches it.
         subject.Expectation.Checked.ShouldBeEmpty("rules the classifier lets a one-project build decide");
@@ -217,7 +219,7 @@ public sealed class SiblingCorpusParityTests
 
         // The difference guard: the rule has to be live for its silence about the widget to mean anything,
         // so the reference it does refuse is pinned here.
-        ParityHarness.Describe(subject.Expectation.Keys)
+        subject.Expectation.Keys.Describe()
             .ShouldBe(
                 ["copies/host-reaches-only-supply [Reference] T:Host.Consumer -> T:Ink.Pen at Host.App.cs:6"],
                 "the pen is outside the allow-list and the widget, whose reached copy Supply declares, is in it");
@@ -230,7 +232,7 @@ public sealed class SiblingCorpusParityTests
     {
         ParitySubject subject = SiblingCorpus.AllowListOverASharedName(namingTheReachedCopy: false);
 
-        ParityHarness.Describe(subject.Expectation.Keys)
+        subject.Expectation.Keys.Describe()
             .ShouldBe(
                 [
                     "copies/host-reaches-only-bureau [Reference] T:Host.Consumer -> T:Common.Widget at Host.App.cs:5",
@@ -252,7 +254,7 @@ public sealed class SiblingCorpusParityTests
 
         // The difference guard: the snag is outside the allow-list either way, so a leg that reported
         // nothing would be a rule that never ran rather than a fault it spared.
-        ParityHarness.Describe(subject.Expectation.Keys)
+        subject.Expectation.Keys.Describe()
             .ShouldBe(
                 ["copies/host-throws-only-supply [Throw] T:Host.Scribe -> T:Ink.Snag at Host.App.cs:6"],
                 "the fault is Supply's copy, which the law names, and the snag is nobody's");
@@ -269,7 +271,7 @@ public sealed class SiblingCorpusParityTests
     {
         ParitySubject subject = SiblingCorpus.ThrowAllowListOverASharedName(namingTheReachedCopy: false);
 
-        ParityHarness.Describe(subject.Expectation.Keys)
+        subject.Expectation.Keys.Describe()
             .ShouldBe(
                 [
                     "copies/host-throws-only-bureau [Throw] T:Host.Scribe -> T:Common.Fault at Host.App.cs:5",
@@ -285,7 +287,7 @@ public sealed class SiblingCorpusParityTests
     {
         ParitySubject subject = SiblingCorpus.InboundAllowListOverDriftedCopies();
 
-        ParityHarness.Describe(subject.Expectation.Keys)
+        subject.Expectation.Keys.Describe()
             .ShouldBe(
                 ["copies/pen-only-from-the-writer [Reference] T:Common.Scribe -> T:Ink.Pen at Mirror.Asm.cs:5"],
                 "one of two identical references, the writer's being the copy the law names");
@@ -298,7 +300,7 @@ public sealed class SiblingCorpusParityTests
     {
         ParitySubject subject = SiblingCorpus.SelfAllowanceOverDriftedCopies();
 
-        ParityHarness.Describe(subject.Expectation.Keys)
+        subject.Expectation.Keys.Describe()
             .ShouldBe(
                 ["copies/writer-reaches-only-itself [Reference] T:Common.Scribe -> T:Ink.Pen at Writer.Asm.cs:5"],
                 "the writer's own copy reaches outside the writer, and the mirror's copy is not the subject's");
@@ -311,7 +313,7 @@ public sealed class SiblingCorpusParityTests
     {
         ParitySubject subject = SiblingCorpus.PartialAcrossTwoDocuments();
 
-        ParityHarness.Describe(subject.Expectation.Keys)
+        subject.Expectation.Keys.Describe()
             .ShouldBe(
                 [
                     "partial/web-not-through-data [Reference] T:Web.OrderController -> T:Data.Ledger at Web.Audit.cs:5",
@@ -324,12 +326,12 @@ public sealed class SiblingCorpusParityTests
         IReadOnlyList<ParityKey> inAudit = perDocument.KeysIn("Web.Audit.cs");
 
         inWeb.Count.ShouldBe(1, "the part in Web.cs reaches the store once and the other part's site is not its");
-        ParityHarness.Describe(inWeb)
+        inWeb.Describe()
             .ShouldBe(
                 ["partial/web-not-through-data [Reference] T:Web.OrderController -> T:Data.Store at Web.cs:5"],
                 "the store is held by the part Web.cs writes");
         inAudit.Count.ShouldBe(1, "the part in Web.Audit.cs reaches the ledger once");
-        ParityHarness.Describe(inAudit)
+        inAudit.Describe()
             .ShouldBe(
                 [
                     "partial/web-not-through-data [Reference] T:Web.OrderController -> T:Data.Ledger at Web.Audit.cs:5"
@@ -344,7 +346,7 @@ public sealed class SiblingCorpusParityTests
     {
         ParitySubject subject = SiblingCorpus.ShapeOnAPartialType();
 
-        ParityHarness.Describe(subject.Expectation.Keys)
+        subject.Expectation.Keys.Describe()
             .ShouldBe(
                 ["shapes/controllers-are-sealed [Shape] T:Web.OrderController at A.cs:3"],
                 "the declaration that sorts first is where a shape violation is placed");
@@ -353,7 +355,7 @@ public sealed class SiblingCorpusParityTests
         IReadOnlyList<ParityKey> inA = perDocument.KeysIn("A.cs");
 
         inA.Count.ShouldBe(1, "the document holding the placed site reports it once");
-        ParityHarness.Describe(inA)
+        inA.Describe()
             .ShouldBe(
                 ["shapes/controllers-are-sealed [Shape] T:Web.OrderController at A.cs:3"],
                 "the document holding the placed site is the one that reports the violation");
@@ -378,7 +380,7 @@ public sealed class SiblingCorpusParityTests
         // Arrange
         ParitySubject subject = SiblingCorpus.GrownPairAcrossTwoDocuments();
 
-        ParityHarness.Describe(subject.Expectation.Keys)
+        subject.Expectation.Keys.Describe()
             .ShouldBe(
                 [
                     "legacy/web-through-the-store [Reference] T:Web.OrderController -> T:Data.Store at Web.More.cs:5",
@@ -410,7 +412,7 @@ public sealed class SiblingCorpusParityTests
     {
         ParitySubject subject = SiblingCorpus.NestedTypeInASecondFile();
 
-        ParityHarness.Describe(subject.Expectation.Keys)
+        subject.Expectation.Keys.Describe()
             .ShouldBe(
                 [
                     "nested/web-not-through-data [Reference] T:Web.OrderController -> T:Data.Store at Web.cs:5",
@@ -420,14 +422,16 @@ public sealed class SiblingCorpusParityTests
                 "the container reaches the store and the type nested in its second part reaches the ledger");
 
         ParityReport perDocument = await PerDocumentAsync(subject);
-        ParityHarness.Describe(perDocument.KeysIn("Web.Nested.cs"))
+        perDocument.KeysIn("Web.Nested.cs")
+            .Describe()
             .ShouldBe(
                 [
                     "nested/web-not-through-data [Reference] T:Web.OrderController.Audit -> T:Data.Ledger "
                     + "at Web.Nested.cs:7"
                 ],
                 "the nested type's crossing is the file that declares the nested type's");
-        ParityHarness.Describe(perDocument.KeysIn("Web.cs"))
+        perDocument.KeysIn("Web.cs")
+            .Describe()
             .ShouldBe(
                 ["nested/web-not-through-data [Reference] T:Web.OrderController -> T:Data.Store at Web.cs:5"],
                 "the container's own crossing stays in the file that writes it");
@@ -440,7 +444,7 @@ public sealed class SiblingCorpusParityTests
     {
         ParitySubject subject = SiblingCorpus.ADocumentWithNoTypes();
 
-        ParityHarness.Describe(subject.Expectation.Keys)
+        subject.Expectation.Keys.Describe()
             .ShouldBe(
                 ["inbound/data-not-from-web [Reference] T:Web.OrderController -> T:Data.Store at Web.cs:5"],
                 "the one crossing, so the empty document's silence is beside a document that speaks");
@@ -459,13 +463,14 @@ public sealed class SiblingCorpusParityTests
     {
         ParitySubject subject = SiblingCorpus.AnInboundRuleWhoseSubjectIsInAnotherDocument();
 
-        ParityHarness.Describe(subject.Expectation.Keys)
+        subject.Expectation.Keys.Describe()
             .ShouldBe(
                 ["inbound/core-not-from-the-ui [Reference] T:Web.Ui.Page -> T:Web.Core.Store at Ui.cs:5"],
                 "the page's reference to the store, which is the one crossing");
 
         ParityReport perDocument = await PerDocumentAsync(subject);
-        ParityHarness.Describe(perDocument.KeysIn("Ui.cs"))
+        perDocument.KeysIn("Ui.cs")
+            .Describe()
             .ShouldBe(
                 ["inbound/core-not-from-the-ui [Reference] T:Web.Ui.Page -> T:Web.Core.Store at Ui.cs:5"],
                 "the document that makes the reference is the one that answers for it");
@@ -480,13 +485,14 @@ public sealed class SiblingCorpusParityTests
     {
         ParitySubject subject = SiblingCorpus.TopLevelStatementsProgram();
 
-        ParityHarness.Describe(subject.Expectation.Keys)
+        subject.Expectation.Keys.Describe()
             .ShouldBe(
                 ["entry/web-not-through-data [Reference] T:Program -> T:Data.Store at Program.cs:1"],
                 "the statement that makes the store is attributed to the type the compiler synthesized");
 
         ParityReport perDocument = await PerDocumentAsync(subject);
-        ParityHarness.Describe(perDocument.KeysIn("Program.cs"))
+        perDocument.KeysIn("Program.cs")
+            .Describe()
             .ShouldBe(
                 ["entry/web-not-through-data [Reference] T:Program -> T:Data.Store at Program.cs:1"],
                 "the document the statements sit in reports the synthesized type's crossing");
@@ -499,13 +505,14 @@ public sealed class SiblingCorpusParityTests
     {
         ParitySubject subject = SiblingCorpus.AnErrorBaseInAnotherDocument();
 
-        ParityHarness.Describe(subject.Expectation.Keys)
+        subject.Expectation.Keys.Describe()
             .ShouldBe(
                 ["inbound/legacy-not-from-the-ui [Reference] T:Web.Ui.Consumer -> T:Web.Legacy.Broken at Ui.cs:5"],
                 "the consumer's reference into the legacy corner, whose own base does not resolve");
 
         ParityReport perDocument = await PerDocumentAsync(subject);
-        ParityHarness.Describe(perDocument.KeysIn("Ui.cs"))
+        perDocument.KeysIn("Ui.cs")
+            .Describe()
             .ShouldBe(
                 ["inbound/legacy-not-from-the-ui [Reference] T:Web.Ui.Consumer -> T:Web.Legacy.Broken at Ui.cs:5"],
                 "the screen an unresolved base trips is about a sibling's closure, not about own code");
@@ -521,7 +528,7 @@ public sealed class SiblingCorpusParityTests
         // Arrange
         ParitySubject subject = SiblingCorpus.TwoTreesUnderOnePath();
 
-        ParityHarness.Describe(subject.Expectation.Keys)
+        subject.Expectation.Keys.Describe()
             .ShouldBe(
                 ["paths/web-not-through-data [Reference] T:Web.OrderController -> T:Data.Store at Web.cs:5"],
                 "the crossing the first tree under the path makes, which is the only one there is");

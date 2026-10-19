@@ -36,7 +36,7 @@ public sealed class McpNameMarkerTests
         string serverName = ShouldHaveManifestServerName();
 
         // Act
-        int markers = TextNormalization.Occurrences(readme, MarkerKey);
+        int markers = readme.Occurrences(MarkerKey);
         Match comment = MarkerComment.Match(readme);
 
         // Assert

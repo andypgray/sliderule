@@ -51,8 +51,7 @@ public sealed class ClaimTracerTests
                 .Because("b");
         });
 
-        ShouldReadClaims(
-            claims,
+        claims.ShouldReadClaims(
             """
             layers:
               Domain
@@ -75,8 +74,7 @@ public sealed class ClaimTracerTests
                 .Because("b");
         });
 
-        ShouldReadClaims(
-            claims,
+        claims.ShouldReadClaims(
             """
             layers:
               App
@@ -96,8 +94,7 @@ public sealed class ClaimTracerTests
                 .Enforce(arch.Types.MustBePublic())
                 .Because("b"));
 
-        ShouldReadClaims(
-            claims,
+        claims.ShouldReadClaims(
             """
             rules:
               all/public: Types
@@ -116,8 +113,7 @@ public sealed class ClaimTracerTests
                 .Because("b");
         });
 
-        ShouldReadClaims(
-            claims,
+        claims.ShouldReadClaims(
             """
             layers:
               Domain
@@ -139,7 +135,7 @@ public sealed class ClaimTracerTests
                 .Enforce(arch.Types.OfKind(TypeKind.Interface).MustHavePrefix("I"))
                 .Because("b"));
 
-        ShouldReadClaims(claims, "claimed by: no layer, rule or scope");
+        claims.ShouldReadClaims("claimed by: no layer, rule or scope");
     }
 
     [Fact]
@@ -150,8 +146,7 @@ public sealed class ClaimTracerTests
                 .Enforce(arch.AnyOf(arch.Namespace("Shop.Web"), arch.Types.WithSuffix("Repository")).MustBePublic())
                 .Because("b"));
 
-        ShouldReadClaims(
-            claims,
+        claims.ShouldReadClaims(
             """
             rules:
               mixed/public: Types in `Shop.Web` or types named `*Repository`
@@ -172,8 +167,7 @@ public sealed class ClaimTracerTests
                 .Because("b");
         });
 
-        ShouldReadClaims(
-            claims,
+        claims.ShouldReadClaims(
             """
             layers:
               Web
@@ -195,8 +189,7 @@ public sealed class ClaimTracerTests
                 .Enforce(arch.Registered(Lifetime.Scoped).MustBePublic())
                 .Because("b"));
 
-        ShouldReadClaims(
-            claims,
+        claims.ShouldReadClaims(
             $"""
              rules:
                di/scoped-public: Scoped-registered types
@@ -212,8 +205,7 @@ public sealed class ClaimTracerTests
                 .Enforce(arch.Namespace("Shop.Domain").Methods.MustBePublic())
                 .Because("b"));
 
-        ShouldReadClaims(
-            claims,
+        claims.ShouldReadClaims(
             """
             rules:
               domain/methods-public: Methods of types in `Shop.Domain`
@@ -231,8 +223,7 @@ public sealed class ClaimTracerTests
                 .Dragons("d")
                 .Because("b"));
 
-        ShouldReadClaims(
-            claims,
+        claims.ShouldReadClaims(
             """
             scopes:
               domain/legacy (quarantine): Types in `Shop.Domain`
@@ -256,8 +247,7 @@ public sealed class ClaimTracerTests
                 .Because("b");
         });
 
-        ShouldReadClaims(
-            claims,
+        claims.ShouldReadClaims(
             """
             layers:
               Domain
@@ -372,10 +362,13 @@ public sealed class ClaimTracerTests
         TypeNode type = ShopModel.Type(fullName);
         return TypeClaims.Of(model, new ClaimTracer(ShopModel), type);
     }
+}
 
+file static class ClaimTracerAssertions
+{
     // The header (the type line and its project and file lines) is the formatter's own subject, pinned end to end
     // by the CLI tests, so this compares from the first group on, one indent shallower.
-    private static void ShouldReadClaims(TypeClaims claims, string expected)
+    internal static void ShouldReadClaims(this TypeClaims claims, string expected)
     {
         IReadOnlyList<string> lines = ClaimsFormatter.Lines(claims, Directory.GetCurrentDirectory());
         string actual = string.Join(

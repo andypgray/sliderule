@@ -279,11 +279,11 @@ public sealed class SpecLiteralDescriptorTests
             .ShouldHaveSingleItem($"SpecLiteralDiagnostics should declare {field}");
 
         descriptor.Id.ShouldBe(id);
-        Text(descriptor.Title)
+        descriptor.Title.Invariant()
             .ShouldBe(title);
-        Text(descriptor.MessageFormat)
+        descriptor.MessageFormat.Invariant()
             .ShouldBe(messageFormat);
-        Text(descriptor.Description)
+        descriptor.Description.Invariant()
             .ShouldBe(description);
     }
 
@@ -340,7 +340,7 @@ public sealed class SpecLiteralDescriptorTests
 
         string Shape(DiagnosticDescriptor descriptor)
         {
-            return $"{descriptor.Id} | {Text(descriptor.Title)} | {descriptor.Category} | "
+            return $"{descriptor.Id} | {descriptor.Title.Invariant()} | {descriptor.Category} | "
                    + $"{descriptor.DefaultSeverity} | {descriptor.IsEnabledByDefault} | {descriptor.HelpLinkUri}";
         }
 
@@ -440,10 +440,5 @@ public sealed class SpecLiteralDescriptorTests
             .Where(field => field.FieldType == typeof(DiagnosticDescriptor))
             .Select(field => (field.Name, (DiagnosticDescriptor)field.GetValue(null)!))
             .ToList();
-    }
-
-    private static string Text(LocalizableString localizable)
-    {
-        return localizable.ToString(CultureInfo.InvariantCulture);
     }
 }

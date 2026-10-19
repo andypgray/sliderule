@@ -181,7 +181,7 @@ public sealed class SolutionDiscoveryTests : IDisposable
     public void DiscoverSolution_NoSolutionAnywhere_ThrowsNamingBothFixes()
     {
         string cwdDir = CreateDir("empty", "deep", "nested");
-        SolutionPaths.ShouldHaveNoSolutionInAnyAncestor(cwdDir, StrayMakesItMeaningless);
+        cwdDir.ShouldHaveNoSolutionInAnyAncestor(StrayMakesItMeaningless);
 
         var ex = Should.Throw<InvalidOperationException>(() => Discover(null, cwdDir));
 
@@ -198,7 +198,7 @@ public sealed class SolutionDiscoveryTests : IDisposable
         // walk-up climbs past the repository entirely. Discovery still refuses — it never widens the
         // search into a guess — but naming the file turns a dead end into one copy-paste.
         string root = CreateDir("repo");
-        SolutionPaths.ShouldHaveNoSolutionInAnyAncestor(root, StrayMakesItMeaningless);
+        root.ShouldHaveNoSolutionInAnyAncestor(StrayMakesItMeaningless);
         SolutionPaths.CreateSln(CreateDir("repo", "src"), "Storefront.sln");
         SolutionPaths.CreateSln(CreateDir("repo", "bin"), "StaleBuildOutput.sln");
 

@@ -14,8 +14,8 @@ internal static class ManagedBlocks
     /// </summary>
     internal static int MarkerPairCount(string text)
     {
-        int begins = TextNormalization.Occurrences(text, ManagedBlock.BeginMarker);
-        int ends = TextNormalization.Occurrences(text, ManagedBlock.EndMarker);
+        int begins = text.Occurrences(ManagedBlock.BeginMarker);
+        int ends = text.Occurrences(ManagedBlock.EndMarker);
         return begins == ends ? begins : -1;
     }
 }

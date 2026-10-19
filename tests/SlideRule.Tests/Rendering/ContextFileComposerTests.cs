@@ -134,7 +134,7 @@ public class ContextFileComposerTests
             .ShouldBeLessThan(body.IndexOf("## Quarantined scope `legacy/billing`", StringComparison.Ordinal));
 
         // And exactly one provenance line for the merged file, not one per card.
-        TextNormalization.Occurrences(body, AgentContextRenderer.ProvenanceLine(SpecName))
+        body.Occurrences(AgentContextRenderer.ProvenanceLine(SpecName))
             .ShouldBe(1);
     }
 
@@ -196,7 +196,7 @@ public class ContextFileComposerTests
             .ShouldBeLessThan(body.IndexOf("## Cautioned scope `legacy/billing`", StringComparison.Ordinal));
 
         // And exactly one provenance line for the merged file, not one per card.
-        TextNormalization.Occurrences(body, AgentContextRenderer.ProvenanceLine(SpecName))
+        body.Occurrences(AgentContextRenderer.ProvenanceLine(SpecName))
             .ShouldBe(1);
     }
 

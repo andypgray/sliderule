@@ -23,7 +23,7 @@ internal static class DiagnosticAssertions
         List<Diagnostic> matching = reported.Where(diagnostic => diagnostic.Id == id)
             .ToList();
 
-        return matching.ShouldHaveSingleItem(Describe(reported, $"Looking for exactly one {id}"));
+        return matching.ShouldHaveSingleItem(reported.Describe($"Looking for exactly one {id}"));
     }
 
     /// <summary>
@@ -40,7 +40,7 @@ internal static class DiagnosticAssertions
     /// <summary>Asserts the analyzer reported nothing at all.</summary>
     internal static void ShouldBeSilent(this IReadOnlyList<Diagnostic> reported)
     {
-        reported.ShouldBeEmpty(Describe(reported, "Expected the analyzer to report nothing"));
+        reported.ShouldBeEmpty(reported.Describe("Expected the analyzer to report nothing"));
     }
 
     /// <summary>Asserts the warnings are exactly <paramref name="ids" />, in the order they were reported.</summary>
@@ -49,7 +49,7 @@ internal static class DiagnosticAssertions
         List<string> declared = reported.Select(diagnostic => diagnostic.Id)
             .ToList();
 
-        declared.ShouldBe(ids, Case.Sensitive, Describe(reported, $"Expected {string.Join(", ", ids)}"));
+        declared.ShouldBe(ids, Case.Sensitive, reported.Describe($"Expected {string.Join(", ", ids)}"));
     }
 
     /// <summary>
@@ -63,7 +63,7 @@ internal static class DiagnosticAssertions
             .ToList();
         string header = customMessage ?? $"Expected no {id}";
 
-        matching.ShouldBeEmpty(Describe(reported, header));
+        matching.ShouldBeEmpty(reported.Describe(header));
     }
 
     /// <summary>Asserts the whole message, composed in the invariant culture.</summary>
@@ -108,17 +108,24 @@ internal static class DiagnosticAssertions
         return diagnostic.Properties.TryGetValue(key, out string? value) ? value : null;
     }
 
+    /// <summary>A descriptor's title, message format or description, read in the invariant culture.</summary>
+    internal static string Invariant(this LocalizableString localizable)
+    {
+        return localizable.ToString(CultureInfo.InvariantCulture);
+    }
+
     /// <summary>A failure message: <paramref name="header" />, then every warning reported, one per line.</summary>
-    internal static string Describe(IReadOnlyList<Diagnostic> reported, string header)
+    internal static string Describe(this IReadOnlyList<Diagnostic> reported, string header)
     {
         if (reported.Count == 0) return $"{header}; the analyzer reported nothing.";
 
-        IEnumerable<string> lines = reported.Select(Describe);
+        IEnumerable<string> lines = reported.Select(diagnostic => $"  {diagnostic.Describe()}");
 
         return $"{header}; the analyzer reported:\n{string.Join("\n", lines)}";
     }
 
-    private static string Describe(Diagnostic diagnostic)
+    /// <summary>One warning as a failure message names it: its ID, its line and column, and its message.</summary>
+    internal static string Describe(this Diagnostic diagnostic)
     {
         // A warning with no location has a line span whose path is null rather than empty, which is worth
         // knowing here: composing this message is the first thing every red does.
@@ -127,6 +134,6 @@ internal static class DiagnosticAssertions
             ? "(no location)"
             : $"{span.Path}:{span.StartLinePosition.Line + 1},{span.StartLinePosition.Character + 1}";
 
-        return $"  {diagnostic.Id} at {place}: {diagnostic.GetMessage(CultureInfo.InvariantCulture)}";
+        return $"{diagnostic.Id} at {place}: {diagnostic.GetMessage(CultureInfo.InvariantCulture)}";
     }
 }

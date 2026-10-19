@@ -273,7 +273,7 @@ public sealed class ArchToolsWorkspaceDiagnosticsTests
             : null;
         stampedGrain.ShouldBe(grain, document);
         parsed.ShouldCarryPackageAudit(CapturedAuditLines.BuildTasksGitAdvisory, projects);
-        CheckJson.Strings(parsed, "workspaceDiagnostics")
+        parsed.RootElement.Strings("workspaceDiagnostics")
             .ShouldBeEmpty();
     }
 

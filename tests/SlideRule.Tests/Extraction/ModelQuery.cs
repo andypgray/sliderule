@@ -187,4 +187,19 @@ internal static class ModelQuery
         return member.Attributes.Select(a => (a.DefinitionFullName, a.FullName))
             .ToList();
     }
+
+    /// <summary>The full names of <paramref name="types" />, in the order given.</summary>
+    public static IReadOnlyList<string> FullNames(this IEnumerable<TypeNode> types)
+    {
+        return types.Select(type => type.FullName)
+            .ToList();
+    }
+
+    /// <summary>The full names of <paramref name="types" />, ordinally sorted.</summary>
+    public static IReadOnlyList<string> SortedFullNames(this IEnumerable<TypeNode> types)
+    {
+        return types.Select(type => type.FullName)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToList();
+    }
 }

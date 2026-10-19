@@ -3,7 +3,6 @@ using SlideRule.Cli.Pipeline;
 using SlideRule.Cli.Verbs;
 using SlideRule.Roslyn;
 using SlideRule.Roslyn.Diagnostics;
-using SlideRule.Tests.Mcp.TestDoubles;
 using SlideRule.Tests.TestSupport;
 using Xunit;
 
@@ -37,14 +36,14 @@ public sealed class CheckCacheClosureE2ETests
         partial.ReExtracted.ShouldBe([Web]);
         partial.Source.ClosureRequests.Single()
             .ShouldBe([workspace.PathOf(Web, $"{Web}.csproj")]);
-        ShouldHaveLoadedOnly(partial, true, Web, Billing);
-        ShouldMatch(partial, noCache);
+        partial.ShouldHaveLoadedOnly(true, Web, Billing);
+        partial.ShouldMatch(noCache);
 
         // And what the closure run wrote back validates whole: the next run is a hit with the same answer.
         CacheRun hit = await RunCheckAsync(workspace.SolutionPath, cache.Root);
         hit.Outcome.ShouldBe(CodebaseSourceOutcome.Hit);
         hit.Source.AcquireCount.ShouldBe(0);
-        ShouldMatch(hit, noCache);
+        hit.ShouldMatch(noCache);
     }
 
     [Fact]
@@ -52,15 +51,15 @@ public sealed class CheckCacheClosureE2ETests
     {
         using var workspace = new TempFixtureWorkspace();
         using var cache = new TempCacheRoot("check-closure");
-        await RunGraphAsync(workspace.SolutionPath, cache.Root);
+        await CacheRuns.GraphAsync(workspace.SolutionPath, cache.Root);
         EditWebBody(workspace);
 
-        CacheRun partial = await RunGraphAsync(workspace.SolutionPath, cache.Root);
-        CacheRun noCache = await RunGraphAsync(workspace.SolutionPath, cache.Root, true);
+        CacheRun partial = await CacheRuns.GraphAsync(workspace.SolutionPath, cache.Root);
+        CacheRun noCache = await CacheRuns.GraphAsync(workspace.SolutionPath, cache.Root, true);
 
         partial.Outcome.ShouldBe(CodebaseSourceOutcome.Partial);
-        ShouldHaveLoadedOnly(partial, true, Web, Billing);
-        ShouldMatch(partial, noCache);
+        partial.ShouldHaveLoadedOnly(true, Web, Billing);
+        partial.ShouldMatch(noCache);
     }
 
     /// <summary>
@@ -84,10 +83,10 @@ public sealed class CheckCacheClosureE2ETests
             workspace.SolutionPath, cache.Root, true, new CountingSolutionSource(BrokenDomain(workspace, verdict)));
 
         partial.Outcome.ShouldBe(CodebaseSourceOutcome.Partial);
-        ShouldHaveLoadedOnly(partial, true, Web, Billing);
+        partial.ShouldHaveLoadedOnly(true, Web, Billing);
         (partial.Out + partial.Err).ShouldContain(Domain);
         partial.Exit.ShouldBe(ExitCodes.Error);
-        ShouldMatch(partial, noCache);
+        partial.ShouldMatch(noCache);
     }
 
     [Fact]
@@ -107,7 +106,7 @@ public sealed class CheckCacheClosureE2ETests
         partial.Source.Loads.Select(load => load.IsClosure)
             .ShouldBe([true, false]);
         partial.Source.Loads[1].Projects.ShouldBe([Billing, Domain, Web], true);
-        ShouldMatch(partial, noCache);
+        partial.ShouldMatch(noCache);
     }
 
     [Fact]
@@ -118,7 +117,7 @@ public sealed class CheckCacheClosureE2ETests
         // refuses, the same way it refuses with no cache at all.
         using var workspace = new TempFixtureWorkspace();
         using var cache = new TempCacheRoot("check-closure");
-        await RunGraphAsync(workspace.SolutionPath, cache.Root);
+        await CacheRuns.GraphAsync(workspace.SolutionPath, cache.Root);
         EditWebBody(workspace);
         var partialSource = new CountingSolutionSource();
         var noCacheSource = new CountingSolutionSource();
@@ -157,8 +156,8 @@ public sealed class CheckCacheClosureE2ETests
 
         partial.Outcome.ShouldBe(CodebaseSourceOutcome.Partial);
         partial.ReExtracted.ShouldBe([Billing]);
-        ShouldHaveLoadedOnly(partial, true, Billing);
-        ShouldMatch(partial, noCache);
+        partial.ShouldHaveLoadedOnly(true, Billing);
+        partial.ShouldMatch(noCache);
     }
 
     // ── harness ───────────────────────────────────────────────────────────────────────────────────────────
@@ -188,69 +187,14 @@ public sealed class CheckCacheClosureE2ETests
                 inner: new ColdSolutionSource());
     }
 
-    // The run made one acquisition, of the kind given, and it loaded exactly these projects.
-    private static void ShouldHaveLoadedOnly(CacheRun run, bool isClosure, params string[] projects)
-    {
-        (bool IsClosure, IReadOnlySet<string> Projects) load = run.Source.Loads.ShouldHaveSingleItem();
-        load.IsClosure.ShouldBe(isClosure);
-        load.Projects.ShouldBe(projects, true);
-    }
-
-    private static void ShouldMatch(CacheRun actual, CacheRun expected)
-    {
-        actual.Out.ShouldBe(expected.Out);
-        actual.Err.ShouldBe(expected.Err);
-        actual.Exit.ShouldBe(expected.Exit);
-    }
-
-    private static async Task<CacheRun> RunCheckAsync(
+    private static Task<CacheRun> RunCheckAsync(
         string solution, string cacheRoot, bool noCache = false, CountingSolutionSource? source = null,
         bool conventionSpec = false)
     {
-        var output = new StringWriter();
-        var error = new StringWriter();
-        CountingSolutionSource counting = source ?? new CountingSolutionSource();
-        var runner = new CheckRunner(output, error, counting, FakeEnvironment.WithCacheRoot(cacheRoot));
+        string? spec = conventionSpec ? null : CliRunner.ViolatedSpecDll;
 
-        CheckRequest request = CheckRequests.For(
-                solution, conventionSpec ? null : CliRunner.ViolatedSpecDll, SolutionPaths.SolutionDirectoryOf(solution))
-            with
-            {
-                Json = true, NoCache = noCache
-            };
-
-        int exit = await runner.RunAsync(request, Ct);
-
-        return new CacheRun(
-            exit, output.ToString(), error.ToString(), runner.LastOutcome, runner.LastReExtractedProjects, counting);
+        return CacheRuns.CheckAsync(solution, spec, cacheRoot, noCache, source: source);
     }
-
-    private static async Task<CacheRun> RunGraphAsync(string solution, string cacheRoot, bool noCache = false)
-    {
-        var output = new StringWriter();
-        var error = new StringWriter();
-        var counting = new CountingSolutionSource();
-        var runner = new GraphRunner(output, error, counting, FakeEnvironment.WithCacheRoot(cacheRoot));
-
-        GraphRequest request = GraphRequests.For(solution, SolutionPaths.SolutionDirectoryOf(solution))
-            with
-            {
-                Json = true, NoCache = noCache
-            };
-
-        int exit = await runner.RunAsync(request, Ct);
-
-        return new CacheRun(
-            exit, output.ToString(), error.ToString(), runner.LastOutcome, runner.LastReExtractedProjects, counting);
-    }
-
-    private sealed record CacheRun(
-        int Exit,
-        string Out,
-        string Err,
-        CodebaseSourceOutcome? Outcome,
-        IReadOnlySet<string> ReExtracted,
-        CountingSolutionSource Source);
 
     // A cold source whose closure loads report a project that failed to load, which no recorded verdict holds.
     private sealed class ClosureFailingSolutionSource : ISolutionSource
@@ -274,5 +218,23 @@ public sealed class CheckCacheClosureE2ETests
                 real.Solution, real.SolutionPath, failed, real, targetFrameworks: real.TargetFrameworks,
                 isClosure: real.IsClosure);
         }
+    }
+}
+
+file static class CheckCacheClosureAssertions
+{
+    // The run made one acquisition, of the kind given, and it loaded exactly these projects.
+    internal static void ShouldHaveLoadedOnly(this CacheRun run, bool isClosure, params string[] projects)
+    {
+        (bool IsClosure, IReadOnlySet<string> Projects) load = run.Source.Loads.ShouldHaveSingleItem();
+        load.IsClosure.ShouldBe(isClosure);
+        load.Projects.ShouldBe(projects, true);
+    }
+
+    internal static void ShouldMatch(this CacheRun actual, CacheRun expected)
+    {
+        actual.Out.ShouldBe(expected.Out);
+        actual.Err.ShouldBe(expected.Err);
+        actual.Exit.ShouldBe(expected.Exit);
     }
 }

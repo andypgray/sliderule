@@ -183,7 +183,7 @@ public sealed class DeriveSpecVocabularyTests
 
         missingVerbs.ShouldBe(["MustNotReferenceEachOther"]);
         missingAdjectives.ShouldBe(["Packable"]);
-        TextNormalization.Occurrences(Prose(), block)
+        Prose().Occurrences(block)
             .ShouldBe(0, "Prose() must cut the table from the served recipe, or every gate here passes vacuously");
     }
 
@@ -205,7 +205,7 @@ public sealed class DeriveSpecVocabularyTests
     {
         if (block.Length == 0) return served;
 
-        int occurrences = TextNormalization.Occurrences(served, block);
+        int occurrences = served.Occurrences(block);
         if (occurrences != 1)
             throw new InvalidOperationException(
                 $"The served recipe carries the committed vocabulary table {occurrences} times; expected exactly once.");

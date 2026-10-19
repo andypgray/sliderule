@@ -935,7 +935,7 @@ public sealed class HookRunnerTests
         // refreshes and writes back when it is allowed to.
         HookSandbox sandbox = ArrangeRepository();
         string probe = CommitProbe(sandbox);
-        Backdate(probe);
+        FixtureEdits.Backdate(probe);
         string index = Path.Combine(sandbox.ProjectDirectory, ".git", "index");
         byte[] before = File.ReadAllBytes(index);
 
@@ -1602,16 +1602,6 @@ public sealed class HookRunnerTests
         GitCommand.Commit(sandbox.ProjectDirectory, "-m", "probe");
 
         return probe;
-    }
-
-    /// <summary>
-    ///     Pushes <paramref name="path" />'s write time ten seconds into the past, so the index's cached stat no longer
-    ///     matches the file whatever the filesystem's timestamp granularity, while its content still does.
-    /// </summary>
-    private static void Backdate(string path)
-    {
-        File.SetLastWriteTimeUtc(path, File.GetLastWriteTimeUtc(path)
-            .AddSeconds(-10));
     }
 
     private readonly record struct HookSandbox(string Root, string ProjectDirectory, string StateDirectory);

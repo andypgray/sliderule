@@ -47,8 +47,7 @@ public sealed class SolutionExtensionsTests
         using TempDirectory temp = TestTempRoot.Fresh("normalize-own-directories");
         string projectFile = WriteProjectFile(temp);
         using var workspace = new AdhocWorkspace();
-        Solution solution = AdhocSolution.Of(
-            workspace,
+        Solution solution = workspace.WithProjects(
             Replayed(projectFile, temp.PathOf("obj", "Debug", "net10.0", "Core.dll")),
             Replayed(projectFile, temp.PathOf("obj", "Debug", "netstandard2.0", "Core.dll")));
 
@@ -70,8 +69,8 @@ public sealed class SolutionExtensionsTests
         string projectFile = WriteProjectFile(temp);
         string sharedOutput = temp.PathOf("obj", "Debug", "Core.dll");
         using var workspace = new AdhocWorkspace();
-        Solution solution = AdhocSolution.Of(
-            workspace, Replayed(projectFile, sharedOutput), Replayed(projectFile, sharedOutput));
+        Solution solution = workspace.WithProjects(
+            Replayed(projectFile, sharedOutput), Replayed(projectFile, sharedOutput));
 
         // Act
         (_, IReadOnlyDictionary<ProjectId, string> frameworks) = solution.NormalizeProjectNames();

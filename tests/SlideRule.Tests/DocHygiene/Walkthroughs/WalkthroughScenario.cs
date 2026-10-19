@@ -36,7 +36,7 @@ internal sealed record SourceEdit(string Path, string Anchor, EditKind Kind, str
     /// </summary>
     internal string ApplyTo(string text, string scenario)
     {
-        int occurrences = TextNormalization.Occurrences(text, Anchor);
+        int occurrences = text.Occurrences(Anchor);
         if (occurrences != 1)
             throw new InvalidOperationException(
                 $"Scenario '{scenario}' anchors an edit to {Path} on text that occurs {occurrences} times there, "

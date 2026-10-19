@@ -49,9 +49,9 @@ public sealed class ShadowedTypeGraphE2ETests
             () => entry.GetProperty("declaredBy")
                 .GetString()
                 .ShouldBe("ShadowedApp.Product.Tests"),
-            () => GraphSurveyJson.Strings(entry, "suppliedBy")
+            () => entry.Strings("suppliedBy")
                 .ShouldBe([Package]),
-            () => GraphSurveyJson.Strings(entry, "boundFromAssemblyBy")
+            () => entry.Strings("boundFromAssemblyBy")
                 .ShouldBe(["ShadowedApp.Product"]));
     }
 
@@ -88,7 +88,7 @@ public sealed class ShadowedTypeGraphE2ETests
         // Assert — one line per name, carrying the same fact the document does, so a terminal reader is not
         // sent to --json for it.
         result.ShouldSucceed();
-        Section(result.Out, ShadowedHeading)
+        result.ShouldHaveOutSection(ShadowedHeading)
             .ShouldBe([
                 $"  {Shadowed} — declared by ShadowedApp.Product.Tests; "
                 + $"also supplied by {Package}, which ShadowedApp.Product binds"
@@ -109,33 +109,18 @@ public sealed class ShadowedTypeGraphE2ETests
         // empty one.
         result.ShouldSucceed();
         using JsonDocument document = result.ShouldHaveJsonStdout();
-        JsonElement product = GraphSurveyJson.Project(document, "ShadowedApp.Product");
-        JsonElement tests = GraphSurveyJson.Project(document, "ShadowedApp.Product.Tests");
+        JsonElement product = document.SurveyProject("ShadowedApp.Product");
+        JsonElement tests = document.SurveyProject("ShadowedApp.Product.Tests");
 
         product.ShouldSatisfyAllConditions(
-            () => GraphSurveyJson.Strings(product, "packageReferences")
+            () => product.Strings("packageReferences")
                 .ShouldBe([Package]),
-            () => GraphSurveyJson.Strings(product, "privatePackageReferences")
+            () => product.Strings("privatePackageReferences")
                 .ShouldBe([Package]));
         tests.ShouldSatisfyAllConditions(
-            () => GraphSurveyJson.Strings(tests, "packageReferences")
+            () => tests.Strings("packageReferences")
                 .ShouldBeEmpty(),
             () => tests.TryGetProperty("privatePackageReferences", out _)
                 .ShouldBeFalse());
-    }
-
-    // The lines under one heading, up to the blank line closing the section.
-    private static IReadOnlyList<string> Section(string output, string heading)
-    {
-        List<string> lines = output.NormalizedLines()
-            .Split('\n')
-            .ToList();
-        int start = lines.FindIndex(line => line.Trim() == heading);
-        start.ShouldBeGreaterThanOrEqualTo(0, $"no '{heading}' section in:\n{output}");
-
-        return lines.Skip(start + 1)
-            .TakeWhile(line => line.Trim()
-                .Length > 0)
-            .ToList();
     }
 }

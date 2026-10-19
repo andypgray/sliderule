@@ -65,7 +65,7 @@ public sealed class ExampleArchitectureDocTests
         ManagedBlocks.MarkerPairCount(committed)
             .ShouldBe(1, $"{relativePath} must carry exactly one managed block.");
         body.ShouldNotBeNull($"{relativePath} carries no managed block.");
-        TextNormalization.Occurrences(body, "```mermaid")
+        body.Occurrences("```mermaid")
             .ShouldBe(2, $"{relativePath} must carry both drawings.");
         body.ShouldContain(
             $"accTitle: Codebase survey: {solutionFileName}",

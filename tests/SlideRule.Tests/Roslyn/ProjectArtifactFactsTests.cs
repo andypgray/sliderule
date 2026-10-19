@@ -574,7 +574,7 @@ public sealed class ProjectArtifactFactsTests
             ProjectId.CreateNewId(), VersionStamp.Default, "Library", "Library", LanguageNames.CSharp);
         ProjectInfo app = ProjectInfo.Create(ProjectId.CreateNewId(), VersionStamp.Default, "App", "App", LanguageNames.CSharp)
             .WithProjectReferences([new ProjectReference(library.Id)]);
-        Solution solution = AdhocSolution.Of(workspace, library, app);
+        Solution solution = workspace.WithProjects(library, app);
 
         // Act
         CodebaseModel model = await CodebaseExtractor.ExtractFromSolutionAsync(solution, ct: Ct);
@@ -598,7 +598,7 @@ public sealed class ProjectArtifactFactsTests
         ProjectInfo library = AdhocSolution.Loaded("Library", libraryFile);
         ProjectInfo app = AdhocSolution.Loaded("App", appFile)
             .WithProjectReferences([new ProjectReference(library.Id)]);
-        Solution solution = AdhocSolution.InSolutionFile(workspace, solutionFile, library, app);
+        Solution solution = workspace.WithSolutionFile(solutionFile, library, app);
 
         // Act
         CodebaseModel model = await CodebaseExtractor.ExtractFromSolutionAsync(solution, ct: Ct);
@@ -634,7 +634,7 @@ public sealed class ProjectArtifactFactsTests
                 new ProjectReference(middle.Id),
                 new ProjectReference(bottom.Id)
             ]);
-        Solution solution = AdhocSolution.InSolutionFile(workspace, solutionFile, bottom, middle, legacy, app);
+        Solution solution = workspace.WithSolutionFile(solutionFile, bottom, middle, legacy, app);
 
         // Act
         CodebaseModel model = await CodebaseExtractor.ExtractFromSolutionAsync(solution, ct: Ct);
@@ -657,8 +657,8 @@ public sealed class ProjectArtifactFactsTests
         string libraryFile = temp.WriteFile(["Libraries", "Library", "Library.csproj"], ReferencelessProject);
         string appFile = temp.WriteFile(["Presentation", "App", "App.csproj"], SolutionDirReferencingProject);
         using var workspace = new AdhocWorkspace();
-        Solution solution = AdhocSolution.InSolutionFile(
-            workspace, solutionFile, AdhocSolution.Loaded("Library", libraryFile), AdhocSolution.Loaded("App", appFile));
+        Solution solution = workspace.WithSolutionFile(
+            solutionFile, AdhocSolution.Loaded("Library", libraryFile), AdhocSolution.Loaded("App", appFile));
 
         // Act
         CodebaseModel model = await CodebaseExtractor.ExtractFromSolutionAsync(solution, ct: Ct);

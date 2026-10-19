@@ -33,13 +33,16 @@ public sealed class SolutionDirSurveyE2ETests
         result.ShouldSucceed();
         using JsonDocument document = result.ShouldHaveJsonStdout();
 
-        GraphSurveyJson.Strings(GraphSurveyJson.Project(document, Plugin), "projectReferences")
+        document.SurveyProject(Plugin)
+            .Strings("projectReferences")
             .ShouldBe([Web]);
-        GraphSurveyJson.Strings(GraphSurveyJson.Project(document, Web), "projectReferences")
+        document.SurveyProject(Web)
+            .Strings("projectReferences")
             .ShouldBe([Core]);
-        GraphSurveyJson.Strings(GraphSurveyJson.Project(document, Core), "projectReferences")
+        document.SurveyProject(Core)
+            .Strings("projectReferences")
             .ShouldBeEmpty();
-        GraphSurveyJson.ProjectEdges(document)
+        document.ProjectEdges()
             .Select(edge => (edge.Source, edge.Target))
             .ShouldBe([(Plugin, Core), (Plugin, Web), (Web, Core)], ignoreOrder: true);
     }

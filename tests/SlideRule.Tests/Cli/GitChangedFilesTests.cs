@@ -92,7 +92,7 @@ public sealed class GitChangedFilesTests
         using TempDirectory temp = TestTempRoot.Fresh("git-changed-files");
         string dir = temp.Path;
         string file = CommitFile(dir, "Probe.cs");
-        Backdate(file);
+        FixtureEdits.Backdate(file);
         string index = Path.Combine(dir, ".git", "index");
         byte[] before = File.ReadAllBytes(index);
 
@@ -114,7 +114,7 @@ public sealed class GitChangedFilesTests
         using TempDirectory temp = TestTempRoot.Fresh("git-changed-files");
         string dir = temp.Path;
         string file = CommitFile(dir, "Probe.cs");
-        Backdate(file);
+        FixtureEdits.Backdate(file);
 
         // Act
         DiffContext context = await GitChangedFiles.ResolveAsync("HEAD", dir, Ct);
@@ -199,13 +199,5 @@ public sealed class GitChangedFilesTests
         GitCommand.Commit(dir, "-m", name);
 
         return file;
-    }
-
-    // Ten seconds into the past, so the index's cached stat no longer matches the file whatever the timestamp
-    // granularity, while its content still does.
-    private static void Backdate(string path)
-    {
-        File.SetLastWriteTimeUtc(path, File.GetLastWriteTimeUtc(path)
-            .AddSeconds(-10));
     }
 }

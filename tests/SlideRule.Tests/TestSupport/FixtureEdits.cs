@@ -103,6 +103,16 @@ internal static class FixtureEdits
         }
     }
 
+    /// <summary>
+    ///     Pushes <paramref name="path" />'s write time ten seconds into the past, so git's cached stat for it no
+    ///     longer matches whatever the filesystem's timestamp granularity, while its content still does.
+    /// </summary>
+    internal static void Backdate(string path)
+    {
+        DateTime written = File.GetLastWriteTimeUtc(path);
+        File.SetLastWriteTimeUtc(path, written.AddSeconds(-10));
+    }
+
     private static void Backdate(string path, DateTime wellPast)
     {
         try

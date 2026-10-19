@@ -11,7 +11,7 @@ namespace SlideRule.Tests.Extraction;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         A bare <c>ModelDump.Render(a).ShouldBe(ModelDump.Render(b))</c> reds with two multi-kilobyte
+///         A bare <c>a.Dump().ShouldBe(b.Dump())</c> reds with two multi-kilobyte
 ///         strings and names no differing fact, leaving the reader to diff them by eye. This finds the first
 ///         differing line instead, hands Shouldly that one line as the actual/expected pair, and puts the
 ///         <c>== SECTION ==</c> it falls under plus a few lines of context from each dump in the message —
@@ -36,8 +36,8 @@ internal static class CodebaseModelAssertions
     /// </summary>
     internal static CodebaseModel ShouldModelTheSameAs(this CodebaseModel actual, CodebaseModel expected)
     {
-        string actualDump = ModelDump.Render(actual);
-        string expectedDump = ModelDump.Render(expected);
+        string actualDump = actual.Dump();
+        string expectedDump = expected.Dump();
         if (string.Equals(actualDump, expectedDump, StringComparison.Ordinal)) return actual;
 
         string[] actualLines = Lines(actualDump);

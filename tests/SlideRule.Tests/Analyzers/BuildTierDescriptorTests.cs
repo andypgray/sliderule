@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Reflection;
 using Microsoft.CodeAnalysis;
 using Shouldly;
@@ -118,11 +117,11 @@ public sealed class BuildTierDescriptorTests
         DiagnosticDescriptor descriptor = Declared(field);
 
         descriptor.Id.ShouldBe(id);
-        Text(descriptor.Title)
+        descriptor.Title.Invariant()
             .ShouldBe(title);
-        Text(descriptor.MessageFormat)
+        descriptor.MessageFormat.Invariant()
             .ShouldBe(messageFormat);
-        Text(descriptor.Description)
+        descriptor.Description.Invariant()
             .ShouldBe(description);
     }
 
@@ -183,8 +182,8 @@ public sealed class BuildTierDescriptorTests
 
         Shape(mismatch)
             .ShouldBe(Shape(fault));
-        Text(mismatch.MessageFormat)
-            .ShouldNotBe(Text(fault.MessageFormat));
+        mismatch.MessageFormat.Invariant()
+            .ShouldNotBe(fault.MessageFormat.Invariant());
     }
 
     [Fact]
@@ -200,7 +199,9 @@ public sealed class BuildTierDescriptorTests
     // Everything a descriptor declares but its message and description.
     private static string Shape(DiagnosticDescriptor descriptor)
     {
-        return $"{descriptor.Id} | {Text(descriptor.Title)} | {descriptor.Category} | {descriptor.DefaultSeverity} | "
+        string title = descriptor.Title.Invariant();
+
+        return $"{descriptor.Id} | {title} | {descriptor.Category} | {descriptor.DefaultSeverity} | "
                + $"{descriptor.IsEnabledByDefault} | {descriptor.HelpLinkUri} | {string.Join(",", descriptor.CustomTags)}";
     }
 
@@ -212,10 +213,5 @@ public sealed class BuildTierDescriptorTests
             .ShouldNotBeNull($"BuildTierDiagnostics should declare {field}");
 
         return (DiagnosticDescriptor)declared.GetValue(null)!;
-    }
-
-    private static string Text(LocalizableString localizable)
-    {
-        return localizable.ToString(CultureInfo.InvariantCulture);
     }
 }

@@ -112,7 +112,7 @@ public sealed class HumanReportRendererTests
         block.ShouldSatisfyAllConditions(
             () => block.ShouldContain("the first part matched nothing"),
             () => block.ShouldContain("the second part matched nothing"),
-            () => TextNormalization.Occurrences(block, "hint: SHARED-CURE").ShouldBe(1, block));
+            () => block.Occurrences("hint: SHARED-CURE").ShouldBe(1, block));
     }
 
     [Fact]
@@ -158,7 +158,7 @@ public sealed class HumanReportRendererTests
             () => block.ShouldContain(
                 "warning: This rule is partly inert: its target selection operand \"types in `App.Phantom.*`\" "
                 + "matched no types."),
-            () => TextNormalization.Occurrences(block, "  hint: ").ShouldBe(1, block));
+            () => block.Occurrences("  hint: ").ShouldBe(1, block));
     }
 
     [Fact]
@@ -625,7 +625,7 @@ public sealed class HumanReportRendererTests
             .HumanBlock();
 
         block.ShouldEndWith("\n  dragons: Banker's rounding happens at line-item level.");
-        TextNormalization.Occurrences(block, "  dragons: ")
+        block.Occurrences("  dragons: ")
             .ShouldBe(1);
         block.ShouldNotContain("dragons-doc:");
     }

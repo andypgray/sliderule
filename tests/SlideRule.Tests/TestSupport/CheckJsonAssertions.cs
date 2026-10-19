@@ -95,7 +95,7 @@ internal static class CheckJsonAssertions
         rule.GetProperty("status")
             .GetString()
             .ShouldBe("skipped", report);
-        Slot(rule, "skipReason")
+        rule.StringOrDefault("skipReason")
             .ShouldBe(reason, report);
 
         return checkJson;
@@ -207,7 +207,7 @@ internal static class CheckJsonAssertions
         violations.ShouldNotBeEmpty(report);
 
         Action[] checks = violations
-            .Select<JsonElement, Action>(violation => () => Slot(violation, "detail")
+            .Select<JsonElement, Action>(violation => () => violation.StringOrDefault("detail")
                 .ShouldBe(detail, report))
             .ToArray();
         red.ShouldSatisfyAllConditions(checks);
@@ -252,11 +252,11 @@ internal static class CheckJsonAssertions
         JsonElement violation = SoleViolationOrFail(red, report);
 
         violation.ShouldSatisfyAllConditions(
-            () => Slot(violation, "kind")
+            () => violation.StringOrDefault("kind")
                 .ShouldBe(kind, report),
-            () => Slot(violation, "source")
+            () => violation.StringOrDefault("source")
                 .ShouldBe(source, report),
-            () => Slot(violation, "target")
+            () => violation.StringOrDefault("target")
                 .ShouldBe(target, report));
 
         return checkJson;
@@ -281,9 +281,9 @@ internal static class CheckJsonAssertions
         JsonElement violation = SoleViolationOrFail(red, report);
 
         violation.ShouldSatisfyAllConditions(
-            () => Slot(violation, "kind")
+            () => violation.StringOrDefault("kind")
                 .ShouldBe(kind, report),
-            () => Slot(violation, slot)
+            () => violation.StringOrDefault(slot)
                 .ShouldBe(member, report));
 
         return checkJson;
@@ -306,7 +306,7 @@ internal static class CheckJsonAssertions
 
         JsonElement violation = red.GetProperty("violations")
             .EnumerateArray()
-            .Where(candidate => Slot(candidate, identity.Slot) == identity.Value)
+            .Where(candidate => candidate.StringOrDefault(identity.Slot) == identity.Value)
             .ToList()
             .ShouldHaveSingleItem(report);
         violation.GetProperty("sites")
@@ -382,17 +382,6 @@ internal static class CheckJsonAssertions
                 $"the report should have been one JSON document but did not parse: {exception.Message}"
                 + Environment.NewLine + report);
         }
-    }
-
-    /// <summary>One optional string slot, or null when the document does not carry it.</summary>
-    /// <remarks>
-    ///     Every null slot is omitted from the wire document rather than written as null, so a slot the
-    ///     violation's kind does not fill has to read as "does not match" — a
-    ///     <see cref="KeyNotFoundException" /> would abandon the batch instead of failing one condition in it.
-    /// </remarks>
-    private static string? Slot(JsonElement element, string name)
-    {
-        return element.TryGetProperty(name, out JsonElement slot) ? slot.GetString() : null;
     }
 
     /// <summary>The rule's whole JSON object — its status, every violation and its baseline counts.</summary>

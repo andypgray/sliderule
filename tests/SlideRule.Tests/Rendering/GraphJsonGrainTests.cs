@@ -176,7 +176,7 @@ public sealed class GraphJsonGrainTests
         {
             using JsonDocument json = JsonDocument.Parse(
                 Render(grain, [], packageReferences: packageReferences, targetFrameworks: frameworks));
-            JsonElement entry = GraphSurveyJson.Project(json, "Acme.App")
+            JsonElement entry = json.SurveyProject("Acme.App")
                 .GetProperty("packageFrameworks")
                 .EnumerateArray()
                 .ShouldHaveSingleItem($"at {grain} grain");
@@ -184,7 +184,7 @@ public sealed class GraphJsonGrainTests
             entry.GetProperty("package")
                 .GetString()
                 .ShouldBe("Microsoft.Bcl.HashCode", $"at {grain} grain");
-            GraphSurveyJson.Strings(entry, "frameworks")
+            entry.Strings("frameworks")
                 .ShouldBe(["netstandard2.0"], $"at {grain} grain");
         }
 
@@ -234,9 +234,9 @@ public sealed class GraphJsonGrainTests
     private static IReadOnlyList<string> ProjectStrings(string document, string property)
     {
         using JsonDocument json = JsonDocument.Parse(document);
-        JsonElement project = GraphSurveyJson.Project(json, "Acme.App");
+        JsonElement project = json.SurveyProject("Acme.App");
 
-        return GraphSurveyJson.Strings(project, property);
+        return project.Strings(property);
     }
 
     private static string Render(

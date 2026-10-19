@@ -40,7 +40,7 @@ public sealed class SpecContractSkewE2ETests
 
     private const string Because = "A service's name is the first thing a reader has to go on.";
 
-    private const string SpecAssemblyName = "SlideRule.ContractSkewSpec";
+    internal const string SpecAssemblyName = "SlideRule.ContractSkewSpec";
 
     private const string AbsentMemberCall = "arch.FutureVerb(\"a verb only the newer contract declares\");";
 
@@ -62,9 +62,9 @@ public sealed class SpecContractSkewE2ETests
                                                 }
                                                 """;
 
-    private static readonly Version NewerContract = new(2, 0, 0, 0);
+    internal static readonly Version NewerContract = new(2, 0, 0, 0);
 
-    private static Version HostContractVersion => typeof(IArchitectureSpec).Assembly.GetName()
+    internal static Version HostContractVersion => typeof(IArchitectureSpec).Assembly.GetName()
         .Version!;
 
     [Theory]
@@ -93,7 +93,7 @@ public sealed class SpecContractSkewE2ETests
         CliResult result = await ExplainSpecBuiltAgainstNewerContractAsync(AbsentMemberCall);
 
         // Assert
-        ShouldRefuseAsContractSkew(result, "SlideRule.Arch.FutureVerb(System.String)");
+        result.ShouldRefuseAsContractSkew("SlideRule.Arch.FutureVerb(System.String)");
     }
 
     [Fact]
@@ -105,7 +105,7 @@ public sealed class SpecContractSkewE2ETests
 
         // Assert: and not the remedy for a type that exists only on .NET Framework, which the runtime raises
         // the same exception type for.
-        ShouldRefuseAsContractSkew(result, "SlideRule.FutureConstraints");
+        result.ShouldRefuseAsContractSkew("SlideRule.FutureConstraints");
         result.Err.ShouldNotContain("does not exist on .NET");
     }
 
@@ -117,7 +117,7 @@ public sealed class SpecContractSkewE2ETests
         CliResult result = await ExplainSpecBuiltAgainstNewerContractAsync("", AbsentInterfaceImplementation);
 
         // Assert: and not the remedy for a dependency the spec's build did not stage.
-        ShouldRefuseAsContractSkew(result, "SlideRule.IFutureShape");
+        result.ShouldRefuseAsContractSkew("SlideRule.IFutureShape");
         result.Err.ShouldNotContain("CopyLocalLockFileAssemblies");
     }
 
@@ -130,27 +130,8 @@ public sealed class SpecContractSkewE2ETests
         CliResult result = await ExplainSpecBuiltAgainstNewerContractAsync("", EagerSpecDeclaration);
 
         // Assert: and not the stack trace an unexpected failure prints.
-        ShouldRefuseAsContractSkew(result, "SlideRule.FutureConstraints");
+        result.ShouldRefuseAsContractSkew("SlideRule.FutureConstraints");
         result.Err.ShouldNotContain("TargetInvocationException");
-    }
-
-    /// <summary>
-    ///     Asserts the run was refused as a spec built against a newer contract: the frame, both versions,
-    ///     <paramref name="missing" /> named, and both remedies.
-    /// </summary>
-    /// <remarks>
-    ///     The frame is pinned, and the runtime's own wording around the name ("Method not found:", "Could not
-    ///     load type") is quoted only as far as the name itself. The part the reader acts on is ours; the
-    ///     sentence around it is not.
-    /// </remarks>
-    private static void ShouldRefuseAsContractSkew(CliResult result, string missing)
-    {
-        result.ShouldRefuseWith(
-            $"The spec assembly '{SpecAssemblyName}' uses SlideRule API this tool's contract does not have",
-            $"(the spec was built against contract {NewerContract}, this tool carries {HostContractVersion})",
-            missing,
-            "dotnet tool update -g SlideRule.Cli",
-            "reference the SlideRule package that matches this tool");
     }
 
     private static async Task<CliResult> ExplainSpecBuiltAgainstNewerContractAsync(
@@ -214,5 +195,31 @@ public sealed class SpecContractSkewE2ETests
             [expected],
             $"'{Path.GetFileName(specDllPath)}' must reference exactly one {SpecLoadContext.ContractAssemblyName}, "
             + "at the skewed identity it was built against.");
+    }
+}
+
+file static class SpecContractSkewAssertions
+{
+    /// <summary>
+    ///     Asserts the run was refused as a spec built against a newer contract: the frame, both versions,
+    ///     <paramref name="missing" /> named, and both remedies.
+    /// </summary>
+    /// <remarks>
+    ///     The frame is pinned, and the runtime's own wording around the name ("Method not found:", "Could not
+    ///     load type") is quoted only as far as the name itself. The part the reader acts on is ours; the
+    ///     sentence around it is not.
+    /// </remarks>
+    internal static void ShouldRefuseAsContractSkew(this CliResult result, string missing)
+    {
+        string specName = SpecContractSkewE2ETests.SpecAssemblyName;
+        Version newer = SpecContractSkewE2ETests.NewerContract;
+        Version host = SpecContractSkewE2ETests.HostContractVersion;
+
+        result.ShouldRefuseWith(
+            $"The spec assembly '{specName}' uses SlideRule API this tool's contract does not have",
+            $"(the spec was built against contract {newer}, this tool carries {host})",
+            missing,
+            "dotnet tool update -g SlideRule.Cli",
+            "reference the SlideRule package that matches this tool");
     }
 }

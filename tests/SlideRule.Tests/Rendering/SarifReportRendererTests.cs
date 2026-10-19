@@ -94,7 +94,7 @@ public sealed class SarifReportRendererTests
         IReadOnlyList<JsonElement> results = json.SarifResults();
         results.Count.ShouldBeGreaterThan(1); // multi-site
         // All sites belong to the one Page -> Db violation, so the fingerprints share every slot but the ordinal.
-        IReadOnlyList<string> fingerprints = results.Select(Fingerprint)
+        IReadOnlyList<string> fingerprints = results.Select(result => result.SarifFingerprint())
             .ToList();
         fingerprints.ShouldAllBe(f => f.StartsWith("v1|T:App.Web.Page|T:App.Data.Db|", StringComparison.Ordinal));
         List<int> ordinals = fingerprints.Select(f => int.Parse(f.Split('|')[^1]))
@@ -126,7 +126,7 @@ public sealed class SarifReportRendererTests
             .SarifResults();
 
         results.Count.ShouldBe(2);
-        IReadOnlyList<string> fingerprints = results.Select(Fingerprint)
+        IReadOnlyList<string> fingerprints = results.Select(result => result.SarifFingerprint())
             .ToList();
         fingerprints.ShouldBeUnique();
         // Not the whole string: the path slot depends on relativizing a bare relative site against the
@@ -230,7 +230,7 @@ public sealed class SarifReportRendererTests
         string json = report.ToSarif();
 
         JsonElement result = json.ShouldBeOneErrorSaying("App.Handler catches Errors.DbError");
-        StartLine(result)
+        result.SarifStartLine()
             .ShouldBe(11);
 
         // The filter law is not in the message, so it has to be somewhere a standalone viewer looks: the rule
@@ -496,7 +496,7 @@ public sealed class SarifReportRendererTests
 
         IReadOnlyList<string> fingerprints = report.ToSarif()
             .SarifResults()
-            .Select(Fingerprint)
+            .Select(result => result.SarifFingerprint())
             .ToList();
 
         fingerprints.ShouldBe(["v1||types named `Ghost`|||0", "v1|exemplar|types named `Ghost`|||0"]);
@@ -548,7 +548,7 @@ public sealed class SarifReportRendererTests
         result.GetProperty("level")
             .GetString()
             .ShouldBe("warning");
-        MessageText(result)
+        result.SarifMessageText()
             .ShouldContain("App.Legacy/Alpha.cs");
         JsonElement location = result.GetProperty("locations")
             .EnumerateArray()
@@ -649,7 +649,7 @@ public sealed class SarifReportRendererTests
         JsonElement warning = json.SarifResults()
             .ShouldHaveSingleItem();
 
-        MessageText(warning)
+        warning.SarifMessageText()
             .ShouldBe("This rule is inert: its target selection matched no types.");
     }
 
@@ -667,7 +667,7 @@ public sealed class SarifReportRendererTests
 
         IReadOnlyList<string> fingerprints = report.ToSarif()
             .SarifResults()
-            .Select(Fingerprint)
+            .Select(result => result.SarifFingerprint())
             .ToList();
 
         fingerprints.ShouldBe(["v1||types in `Ghost.*`|||0", "v1||types in `Phantom.*`|||0"]);
@@ -687,7 +687,7 @@ public sealed class SarifReportRendererTests
                 .GetString() == "warning")
             .ToList();
 
-        warnings.Select(Fingerprint)
+        warnings.Select(result => result.SarifFingerprint())
             .ShouldBe(["v1||data/old-x||arch/baselines/data/old-x.json|0", "v1||legacy/old||arch/shared.json|0"]);
         warnings.Select(result => result.GetProperty("locations")[0]
                 .GetProperty("physicalLocation")
@@ -756,7 +756,7 @@ public sealed class SarifReportRendererTests
                 .ShouldBe("updated");
             result.TryGetProperty("suppressions", out _)
                 .ShouldBeFalse();
-            MessageText(result)
+            result.SarifMessageText()
                 .ShouldBe("App.Web.OldController references App.Data.Db");
         }
     }
@@ -776,7 +776,7 @@ public sealed class SarifReportRendererTests
         string sarif = InertTargetReport.ToSarif(diagnostics);
 
         IReadOnlyList<JsonElement> notifications = sarif.SarifNotifications();
-        notifications.Select(MessageText)
+        notifications.Select(notification => notification.SarifMessageText())
             .ShouldBe([
                 $"{CapturedAuditLines.BuildTasksGitAdvisory} (2 projects: 'App' and 'App.Tests')",
                 "a load failure",
@@ -854,7 +854,7 @@ public sealed class SarifReportRendererTests
             suppression.GetProperty("justification")
                 .GetString()
                 .ShouldBe(attribution);
-            MessageText(note)
+            note.SarifMessageText()
                 .ShouldEndWith($" ({attribution})");
         }
     }
@@ -866,30 +866,5 @@ public sealed class SarifReportRendererTests
             .Where(r => r.GetProperty("level")
                 .GetString() == "note")
             .ToList();
-    }
-
-    // The alert's title, which is the one field every code-scanning UI shows.
-    private static string MessageText(JsonElement result)
-    {
-        return result.GetProperty("message")
-            .GetProperty("text")
-            .GetString()!;
-    }
-
-    private static string Fingerprint(JsonElement result)
-    {
-        return result.GetProperty("partialFingerprints")
-            .GetProperty("slideRuleViolationIdentity/v1")
-            .GetString()!;
-    }
-
-    // The 1-based source line of a single-location result — the site the reader is sent to.
-    private static int StartLine(JsonElement result)
-    {
-        return result.GetProperty("locations")[0]
-            .GetProperty("physicalLocation")
-            .GetProperty("region")
-            .GetProperty("startLine")
-            .GetInt32();
     }
 }

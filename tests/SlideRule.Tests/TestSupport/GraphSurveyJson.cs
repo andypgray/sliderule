@@ -13,7 +13,7 @@ namespace SlideRule.Tests.TestSupport;
 internal static class GraphSurveyJson
 {
     /// <summary>One project's row, found by the name the survey lists it under.</summary>
-    internal static JsonElement Project(JsonDocument document, string name)
+    internal static JsonElement SurveyProject(this JsonDocument document, string name)
     {
         return document.RootElement.GetProperty("projects")
             .EnumerateArray()
@@ -21,20 +21,9 @@ internal static class GraphSurveyJson
                 .GetString() == name);
     }
 
-    /// <summary>
-    ///     The string array at <paramref name="property" /> of one row — <c>packageReferences</c>,
-    ///     <c>privatePackageReferences</c>, <c>suppliedBy</c> — in document order.
-    /// </summary>
-    internal static IReadOnlyList<string> Strings(JsonElement element, string property)
-    {
-        return element.GetProperty(property)
-            .EnumerateArray()
-            .Select(value => value.GetString()!)
-            .ToList();
-    }
-
     /// <summary>Every project reference edge, as the pair it joins and how many references cross it.</summary>
-    internal static IReadOnlyList<(string Source, string Target, int References)> ProjectEdges(JsonDocument document)
+    internal static IReadOnlyList<(string Source, string Target, int References)> ProjectEdges(
+        this JsonDocument document)
     {
         return document.RootElement.GetProperty("projectEdges")
             .EnumerateArray()

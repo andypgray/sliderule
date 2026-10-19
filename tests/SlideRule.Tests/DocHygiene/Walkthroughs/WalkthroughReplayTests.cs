@@ -88,9 +88,8 @@ public sealed class WalkthroughReplayTests
         CliResult check = await CliRunner.InvokeAsync("check", solution, "--no-cache");
         CliResult status = await CliRunner.InvokeAsync("status", solution, "--no-cache");
 
-        // Assert
-        ModelDump.Render(run.Committed)
-            .ShouldBe(ModelDump.Render(run.Governed), "the replay extracts the committed tree as the verbs do");
+        // Assert — the replay extracts the committed tree as the verbs do.
+        run.Committed.ShouldModelTheSameAs(run.Governed);
         check.ShouldSucceed();
         check.Out.NormalizedLines()
             .ShouldBe($"{run.Tree.Report}\n");

@@ -540,9 +540,9 @@ internal static class ParityHarness
     /// <param name="ruleId">The rule to check, which need not be one the table decides.</param>
     /// <param name="cancellationToken">The token extraction and checking run under.</param>
     internal static IReadOnlyList<ParityKey> ForcedKeys(
-        ParitySubject subject, string ruleId, CancellationToken cancellationToken)
+        this ParitySubject subject, string ruleId, CancellationToken cancellationToken)
     {
-        return ForcedKeys(subject, ruleId, subject.Compilations, cancellationToken);
+        return subject.ForcedKeys(ruleId, subject.Compilations, cancellationToken);
     }
 
     /// <summary>The same, over the compilations of one chosen leg.</summary>
@@ -551,7 +551,7 @@ internal static class ParityHarness
     /// <param name="compilations">The compilations to read, which are one leg's.</param>
     /// <param name="cancellationToken">The token extraction and checking run under.</param>
     internal static IReadOnlyList<ParityKey> ForcedKeys(
-        ParitySubject subject, string ruleId, IReadOnlyList<ParityCompilation> compilations,
+        this ParitySubject subject, string ruleId, IReadOnlyList<ParityCompilation> compilations,
         CancellationToken cancellationToken)
     {
         ArchRule rule = subject.Document.Rules.Single(candidate =>
@@ -585,7 +585,7 @@ internal static class ParityHarness
     /// </summary>
     /// <param name="subject">The solution and spec under test.</param>
     /// <param name="ruleId">The rule to check.</param>
-    internal static IReadOnlyList<ParityKey> SolutionKeys(ParitySubject subject, string ruleId)
+    internal static IReadOnlyList<ParityKey> SolutionKeys(this ParitySubject subject, string ruleId)
     {
         ArchRule rule = subject.Document.Rules.Single(candidate =>
             string.Equals(candidate.Id, ruleId, StringComparison.Ordinal));
@@ -597,7 +597,7 @@ internal static class ParityHarness
     }
 
     /// <summary>The one line a failure prints for each of <paramref name="keys" />, ordinally sorted.</summary>
-    internal static IReadOnlyList<string> Describe(IEnumerable<ParityKey> keys)
+    internal static IReadOnlyList<string> Describe(this IEnumerable<ParityKey> keys)
     {
         return keys.Select(key => key.Describe())
             .Distinct(StringComparer.Ordinal)

@@ -16,7 +16,7 @@ namespace SlideRule.Tests.TestSupport;
 internal static class AdhocSolution
 {
     /// <summary>The workspace's solution with <paramref name="projects" /> added, in order.</summary>
-    internal static Solution Of(AdhocWorkspace workspace, params ProjectInfo[] projects)
+    internal static Solution WithProjects(this AdhocWorkspace workspace, params ProjectInfo[] projects)
     {
         foreach (ProjectInfo project in projects) workspace.AddProject(project);
         return workspace.CurrentSolution;
@@ -27,8 +27,8 @@ internal static class AdhocSolution
     ///     the path a workspace load stamps on the solution it opened, and the one the artifact-facts evaluation
     ///     derives <c>$(SolutionDir)</c> from.
     /// </summary>
-    internal static Solution InSolutionFile(
-        AdhocWorkspace workspace, string solutionFilePath, params ProjectInfo[] projects)
+    internal static Solution WithSolutionFile(
+        this AdhocWorkspace workspace, string solutionFilePath, params ProjectInfo[] projects)
     {
         var solution = SolutionInfo.Create(
             SolutionId.CreateNewId(), VersionStamp.Default, solutionFilePath, projects);

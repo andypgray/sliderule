@@ -85,16 +85,8 @@ public class PackParityTests
         // to their definition), so Task<object>.Result and typeof(Task<>) + "Result" are the same leaf.
         // This is the assertion that catches the conversion, since Location is diagnostics-only and does
         // not reach the model.
-        Anchors(Packed.Rule(id))
-            .ShouldBe(Anchors(Inline.Rule(id)));
-    }
-
-    private static IReadOnlyList<string> Anchors(ArchRule rule)
-    {
-        if (rule.Constraint is not { } constraint) return [];
-
-        return constraint.MemberOperands
-            .Select(member => $"{member.DeclaringType.FullName}.{member.Name} (method: {member.IsMethod})")
-            .ToList();
+        Packed.Rule(id)
+            .MemberAnchors()
+            .ShouldBe(Inline.Rule(id).MemberAnchors());
     }
 }

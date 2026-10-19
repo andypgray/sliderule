@@ -465,7 +465,7 @@ public sealed class ExtractionCacheStoreTests
             .Documents.ShouldBe(partial.Validated.ShouldNotBeNull().Projects.Single(project => project.Entry.ProjectName == "B").Entry.Documents);
         store.Write(fingerprint, TrivialExtraction(solution))
             .ShouldBeTrue();
-        ShouldValidateAsAPureStatHit(store);
+        store.ShouldValidateAsAPureStatHit();
     }
 
     [Fact]
@@ -491,7 +491,7 @@ public sealed class ExtractionCacheStoreTests
         (store.CaptureStampCount - beforeCapture).ShouldBe(1);
         store.Write(fingerprint, TrivialExtraction(solution))
             .ShouldBeTrue();
-        ShouldValidateAsAPureStatHit(store);
+        store.ShouldValidateAsAPureStatHit();
     }
 
     [Fact]
@@ -522,7 +522,7 @@ public sealed class ExtractionCacheStoreTests
             .ShouldBe([Path.GetFullPath(solution.PathOf("A", "A1.cs")), Path.GetFullPath(added)]);
         store.Write(fingerprint, TrivialExtraction(solution))
             .ShouldBeTrue();
-        ShouldValidateAsAPureStatHit(store);
+        store.ShouldValidateAsAPureStatHit();
     }
 
     [Fact]
@@ -551,7 +551,7 @@ public sealed class ExtractionCacheStoreTests
             .ShouldBe([Path.GetFullPath(solution.PathOf("A", "A1.cs"))]);
         store.Write(fingerprint, TrivialExtraction(solution))
             .ShouldBeTrue();
-        ShouldValidateAsAPureStatHit(store);
+        store.ShouldValidateAsAPureStatHit();
     }
 
     [Fact]
@@ -1001,16 +1001,6 @@ public sealed class ExtractionCacheStoreTests
 
     // ── helpers ─────────────────────────────────────────────────────────────────────────────────────────
 
-    // The written cache is a hit that reads no content at all: every key the capture wrote is the one the next
-    // validation recomputes, and every stamp is promoted.
-    private static void ShouldValidateAsAPureStatHit(ExtractionCacheStore store)
-    {
-        long before = store.ContentHashCount;
-        store.ReadAndValidate()
-            .Outcome.ShouldBe(CacheOutcome.Hit);
-        (store.ContentHashCount - before).ShouldBe(0);
-    }
-
     // The solution's inputs as a load would list them after one project's documents changed on disk.
     private static IReadOnlyList<ProjectInputs> WithDocuments(SyntheticSolution solution, string projectName, params string[] documentPaths)
     {
@@ -1361,5 +1351,18 @@ public sealed class ExtractionCacheStoreTests
             mutate(root);
             File.WriteAllText(CacheFilePath, root.ToJsonString());
         }
+    }
+}
+
+file static class ExtractionCacheStoreAssertions
+{
+    // The written cache is a hit that reads no content at all: every key the capture wrote is the one the next
+    // validation recomputes, and every stamp is promoted.
+    internal static void ShouldValidateAsAPureStatHit(this ExtractionCacheStore store)
+    {
+        long before = store.ContentHashCount;
+        store.ReadAndValidate()
+            .Outcome.ShouldBe(CacheOutcome.Hit);
+        (store.ContentHashCount - before).ShouldBe(0);
     }
 }

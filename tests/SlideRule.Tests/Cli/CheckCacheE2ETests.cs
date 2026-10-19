@@ -1,8 +1,6 @@
-using System.Text.Json;
 using Shouldly;
 using SlideRule.Cli.Pipeline;
 using SlideRule.Cli.SpecLoading;
-using SlideRule.Cli.Verbs;
 using SlideRule.Roslyn;
 using SlideRule.Roslyn.Caching;
 using SlideRule.Tests.Mcp.TestDoubles;
@@ -31,8 +29,8 @@ public sealed class CheckCacheE2ETests
     {
         using var cache = new TempCacheRoot("check-cache");
 
-        CacheRun cold = await RunCheckAsync(CliRunner.MyAppSolution, CliRunner.ViolatedSpecDll, cache.Root);
-        CacheRun warm = await RunCheckAsync(CliRunner.MyAppSolution, CliRunner.ViolatedSpecDll, cache.Root);
+        CacheRun cold = await CacheRuns.CheckAsync(CliRunner.MyAppSolution, CliRunner.ViolatedSpecDll, cache.Root);
+        CacheRun warm = await CacheRuns.CheckAsync(CliRunner.MyAppSolution, CliRunner.ViolatedSpecDll, cache.Root);
 
         // The first run had to open the workspace and extract; the second reused the cache with none of that.
         cold.Outcome.ShouldBe(CodebaseSourceOutcome.Miss);
@@ -51,8 +49,8 @@ public sealed class CheckCacheE2ETests
     {
         using var cache = new TempCacheRoot("check-cache");
 
-        CacheRun first = await RunCheckAsync(CliRunner.MyAppSolution, CliRunner.CleanSpecDll, cache.Root, true);
-        CacheRun second = await RunCheckAsync(CliRunner.MyAppSolution, CliRunner.CleanSpecDll, cache.Root, true);
+        CacheRun first = await CacheRuns.CheckAsync(CliRunner.MyAppSolution, CliRunner.CleanSpecDll, cache.Root, true);
+        CacheRun second = await CacheRuns.CheckAsync(CliRunner.MyAppSolution, CliRunner.CleanSpecDll, cache.Root, true);
 
         first.Outcome.ShouldBe(CodebaseSourceOutcome.Disabled);
         second.Outcome.ShouldBe(CodebaseSourceOutcome.Disabled);
@@ -75,7 +73,7 @@ public sealed class CheckCacheE2ETests
         using var cache = new TempCacheRoot("check-cache");
 
         // Populate the cache from the clean tree.
-        CacheRun cold = await RunGraphAsync(workspace.SolutionPath, cache.Root);
+        CacheRun cold = await CacheRuns.GraphAsync(workspace.SolutionPath, cache.Root);
         cold.Outcome.ShouldBe(CodebaseSourceOutcome.Miss);
 
         // Add a new type to the Web project (an SDK-glob add the cone scan catches). Web is content-dirty;
@@ -83,8 +81,8 @@ public sealed class CheckCacheE2ETests
         // references nothing) stays clean and is reused.
         await AddSourceFileAsync(workspace.PathOf(Web, "CacheProbe.cs"), "namespace MyApp.Web;\n\npublic class CacheProbeType;\n");
 
-        CacheRun partial = await RunGraphAsync(workspace.SolutionPath, cache.Root);
-        CacheRun freshCold = await RunGraphAsync(workspace.SolutionPath, cache.Root, true);
+        CacheRun partial = await CacheRuns.GraphAsync(workspace.SolutionPath, cache.Root);
+        CacheRun freshCold = await CacheRuns.GraphAsync(workspace.SolutionPath, cache.Root, true);
 
         // Re-extraction covers exactly the content-dirty project and its Merkle dependents — nothing else.
         partial.Outcome.ShouldBe(CodebaseSourceOutcome.Partial);
@@ -104,7 +102,7 @@ public sealed class CheckCacheE2ETests
         using var cache = new TempCacheRoot("check-cache");
 
         // Populate the cache from the clean tree.
-        CacheRun cold = await RunCheckAsync(workspace.SolutionPath, CliRunner.ViolatedSpecDll, cache.Root);
+        CacheRun cold = await CacheRuns.CheckAsync(workspace.SolutionPath, CliRunner.ViolatedSpecDll, cache.Root);
         cold.Outcome.ShouldBe(CodebaseSourceOutcome.Miss);
 
         // One more ambient-clock read, inside an existing method body. Web's own facts change — a new red site —
@@ -114,8 +112,9 @@ public sealed class CheckCacheE2ETests
             content => content.Replace(
                 "        log.Append(description);", "        log.Append(System.DateTime.Now);\n        log.Append(description);"));
 
-        CacheRun partial = await RunCheckAsync(workspace.SolutionPath, CliRunner.ViolatedSpecDll, cache.Root);
-        CacheRun freshCold = await RunCheckAsync(workspace.SolutionPath, CliRunner.ViolatedSpecDll, cache.Root, true);
+        CacheRun partial = await CacheRuns.CheckAsync(workspace.SolutionPath, CliRunner.ViolatedSpecDll, cache.Root);
+        CacheRun freshCold = await CacheRuns.CheckAsync(
+            workspace.SolutionPath, CliRunner.ViolatedSpecDll, cache.Root, true);
 
         // Web alone re-walks, and the verdict still equals a full cold check of the edited tree.
         partial.Outcome.ShouldBe(CodebaseSourceOutcome.Partial);
@@ -137,7 +136,7 @@ public sealed class CheckCacheE2ETests
         string freshSarif = logs.PathOf("fresh.sarif");
 
         // Populate the cache from the clean tree.
-        CacheRun cold = await RunCheckAsync(
+        CacheRun cold = await CacheRuns.CheckAsync(
             workspace.SolutionPath, CliRunner.ViolatedSpecDll, cache.Root, sarif: coldSarif);
         cold.Outcome.ShouldBe(CodebaseSourceOutcome.Miss);
 
@@ -146,9 +145,9 @@ public sealed class CheckCacheE2ETests
         FixtureEdits.EditOnDisk(workspace.PathOf(Web, "HomeController.cs"), Prepended);
         FixtureEdits.EditOnDisk(workspace.PathOf(Web, "InvoiceController.cs"), Prepended);
 
-        CacheRun warm = await RunCheckAsync(
+        CacheRun warm = await CacheRuns.CheckAsync(
             workspace.SolutionPath, CliRunner.ViolatedSpecDll, cache.Root, sarif: warmSarif);
-        CacheRun fresh = await RunCheckAsync(
+        CacheRun fresh = await CacheRuns.CheckAsync(
             workspace.SolutionPath, CliRunner.ViolatedSpecDll, cache.Root, true, freshSarif);
 
         // Nothing was re-extracted and no workspace was opened: a comment edit is a hit, not a partial.
@@ -182,11 +181,11 @@ public sealed class CheckCacheE2ETests
         using var cache = new TempCacheRoot("check-cache");
 
         // graph extracts every project (no spec, no exclusion) and writes them all.
-        CacheRun graph = await RunGraphAsync(CliRunner.MyAppSolution, cache.Root);
+        CacheRun graph = await CacheRuns.GraphAsync(CliRunner.MyAppSolution, cache.Root);
         graph.Outcome.ShouldBe(CodebaseSourceOutcome.Miss);
 
         // check reuses those very fragments: the external DLL spec resolves with no workspace, so it is a hit.
-        CacheRun check = await RunCheckAsync(CliRunner.MyAppSolution, CliRunner.CleanSpecDll, cache.Root);
+        CacheRun check = await CacheRuns.CheckAsync(CliRunner.MyAppSolution, CliRunner.CleanSpecDll, cache.Root);
         check.Outcome.ShouldBe(CodebaseSourceOutcome.Hit);
         check.AcquireCount.ShouldBe(0);
         check.Exit.ShouldBe(0);
@@ -321,45 +320,6 @@ public sealed class CheckCacheE2ETests
 
     // ── harness ───────────────────────────────────────────────────────────────────────────────────────────
 
-    private static async Task<CacheRun> RunCheckAsync(
-        string solution, string spec, string cacheRoot, bool noCache = false, string? sarif = null)
-    {
-        var output = new StringWriter();
-        var error = new StringWriter();
-        var counting = new CountingSolutionSource();
-        var runner = new CheckRunner(output, error, counting, FakeEnvironment.WithCacheRoot(cacheRoot));
-
-        CheckRequest request = CheckRequests.For(solution, spec, SolutionPaths.SolutionDirectoryOf(solution))
-            with
-            {
-                Json = true, NoCache = noCache, Sarif = sarif
-            };
-
-        int exit = await runner.RunAsync(request, Ct);
-
-        return new CacheRun(
-            exit, output.ToString(), error.ToString(), runner.LastOutcome, runner.LastReExtractedProjects, counting.AcquireCount);
-    }
-
-    private static async Task<CacheRun> RunGraphAsync(string solution, string cacheRoot, bool noCache = false)
-    {
-        var output = new StringWriter();
-        var error = new StringWriter();
-        var counting = new CountingSolutionSource();
-        var runner = new GraphRunner(output, error, counting, FakeEnvironment.WithCacheRoot(cacheRoot));
-
-        GraphRequest request = GraphRequests.For(solution, SolutionPaths.SolutionDirectoryOf(solution))
-            with
-            {
-                Json = true, NoCache = noCache
-            };
-
-        int exit = await runner.RunAsync(request, Ct);
-
-        return new CacheRun(
-            exit, output.ToString(), error.ToString(), runner.LastOutcome, runner.LastReExtractedProjects, counting.AcquireCount);
-    }
-
     // Writes a brand-new source file the SDK glob will compile in — an add only the cone scan can see.
     private static async Task AddSourceFileAsync(string filePath, string content)
     {
@@ -387,20 +347,10 @@ public sealed class CheckCacheE2ETests
                 .GetString() == "data-access/no-inline-sql")
             .Where(result => result.GetProperty("level")
                 .GetString() == level)
-            .Select(StartLine)
+            .Select(result => result.SarifStartLine())
             .ToList();
         lines.ShouldNotBeEmpty();
         return lines;
-    }
-
-    // The 1-based source line of a single-location result — the site the reader is sent to.
-    private static int StartLine(JsonElement result)
-    {
-        return result.GetProperty("locations")[0]
-            .GetProperty("physicalLocation")
-            .GetProperty("region")
-            .GetProperty("startLine")
-            .GetInt32();
     }
 
     // A zero-byte assembly for the spec-replay trees: the built-output check resolves a path, it never reads
@@ -409,12 +359,4 @@ public sealed class CheckCacheE2ETests
     {
         return temp.WriteFile(segments, "");
     }
-
-    private sealed record CacheRun(
-        int Exit,
-        string Out,
-        string Err,
-        CodebaseSourceOutcome? Outcome,
-        IReadOnlySet<string> ReExtracted,
-        int AcquireCount);
 }

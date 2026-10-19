@@ -222,7 +222,7 @@ public sealed class SdkStyleProjectTests
         string classicBilling = Path.Combine(
             FixturesRoot, "LegacySolutions", "ClassicApp", "Classic.Billing", "Classic.Billing.csproj");
         using var workspace = new AdhocWorkspace();
-        Solution solution = AdhocSolution.Of(workspace, AdhocSolution.Loaded("Classic.Billing", classicBilling));
+        Solution solution = workspace.WithProjects(AdhocSolution.Loaded("Classic.Billing", classicBilling));
 
         RestoreFailures.Detect(solution, [])
             .ShouldBeEmpty();

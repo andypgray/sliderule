@@ -36,21 +36,13 @@ internal static class CheckJson
     }
 
     /// <summary>
-    ///     The string array at a top-level <paramref name="slot" /> — <c>workspaceDiagnostics</c>,
-    ///     <c>failedProjects</c>, <c>uncheckedProjects</c>, <c>restoreFailedProjects</c> — in document order.
+    ///     The string array at a top-level <paramref name="slot" /> of a check document still in its wire form:
+    ///     <c>workspaceDiagnostics</c>, <c>failedProjects</c>, <c>uncheckedProjects</c>,
+    ///     <c>restoreFailedProjects</c>, in document order.
     /// </summary>
     internal static IReadOnlyList<string> Strings(string checkJson, string slot)
     {
         using JsonDocument document = JsonDocument.Parse(checkJson);
-        return Strings(document, slot);
-    }
-
-    /// <summary>The same, over a document a caller already holds for its other reads.</summary>
-    internal static IReadOnlyList<string> Strings(JsonDocument document, string slot)
-    {
-        return document.RootElement.GetProperty(slot)
-            .EnumerateArray()
-            .Select(element => element.GetString() ?? string.Empty)
-            .ToArray();
+        return document.RootElement.Strings(slot);
     }
 }

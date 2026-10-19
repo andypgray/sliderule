@@ -195,7 +195,7 @@ public sealed class SpecCompletionFixture : IDisposable
         ProjectInfo plain = Library(plainId, PlainAssembly, WithoutTheContract)
             .WithProjectReferences([new ProjectReference(productId)]);
 
-        Solution solution = AdhocSolution.Of(_workspace, product, spec, plain);
+        Solution solution = _workspace.WithProjects(product, spec, plain);
         _spec = solution.GetProject(specId)!;
         _plain = solution.GetProject(plainId)!;
     }

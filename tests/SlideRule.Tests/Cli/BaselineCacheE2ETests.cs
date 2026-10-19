@@ -43,7 +43,7 @@ public sealed class BaselineCacheE2ETests
 
         // Populate the slot: graph has no spec and no exclusion, so it writes every project's fragments —
         // exactly the set a spec-ful hit merges from.
-        CacheRun populate = await RunGraphAsync(workspace.SolutionPath, cache.Root);
+        CacheRun populate = await CacheRuns.GraphAsync(workspace.SolutionPath, cache.Root);
         populate.Outcome.ShouldBe(CodebaseSourceOutcome.Miss);
 
         // add first, so the hit below cannot be an artefact of what the two write-happy modes leave on disk.
@@ -69,7 +69,7 @@ public sealed class BaselineCacheE2ETests
         using var workspace = new TempFixtureWorkspace();
         using var cache = new TempCacheRoot("baseline-cache");
 
-        CacheRun populate = await RunGraphAsync(workspace.SolutionPath, cache.Root);
+        CacheRun populate = await CacheRuns.GraphAsync(workspace.SolutionPath, cache.Root);
         populate.Outcome.ShouldBe(CodebaseSourceOutcome.Miss);
 
         // The mode gate only ever forces the cache OFF, so on add the flag is the whole policy: the same
@@ -110,26 +110,7 @@ public sealed class BaselineCacheE2ETests
 
         int exit = await runner.RunAsync(request, Ct);
 
-        return new CacheRun(exit, runner.LastOutcome, counting.AcquireCount);
+        return new CacheRun(
+            exit, output.ToString(), error.ToString(), runner.LastOutcome, runner.LastReExtractedProjects, counting);
     }
-
-    private static async Task<CacheRun> RunGraphAsync(string solution, string cacheRoot)
-    {
-        var output = new StringWriter();
-        var error = new StringWriter();
-        var counting = new CountingSolutionSource();
-        var runner = new GraphRunner(output, error, counting, FakeEnvironment.WithCacheRoot(cacheRoot));
-
-        GraphRequest request = GraphRequests.For(solution, SolutionPaths.SolutionDirectoryOf(solution))
-            with
-            {
-                Json = true
-            };
-
-        int exit = await runner.RunAsync(request, Ct);
-
-        return new CacheRun(exit, runner.LastOutcome, counting.AcquireCount);
-    }
-
-    private sealed record CacheRun(int Exit, CodebaseSourceOutcome? Outcome, int AcquireCount);
 }

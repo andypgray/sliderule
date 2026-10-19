@@ -37,7 +37,7 @@ public sealed class GeneratedTypeSurveyE2ETests
         // beside it, which is why it qualifies that number rather than sitting in a list of its own.
         result.ShouldSucceed();
         using JsonDocument document = result.ShouldHaveJsonStdout();
-        JsonElement web = GraphSurveyJson.Project(document, Web);
+        JsonElement web = document.SurveyProject(Web);
 
         web.GetProperty("types")
             .GetInt32()
@@ -61,7 +61,7 @@ public sealed class GeneratedTypeSurveyE2ETests
         // shapes cannot drift apart.
         result.ShouldSucceed();
         using JsonDocument document = result.ShouldHaveJsonStdout();
-        JsonElement core = GraphSurveyJson.Project(document, Core);
+        JsonElement core = document.SurveyProject(Core);
 
         core.GetProperty("types")
             .GetInt32()
@@ -84,7 +84,7 @@ public sealed class GeneratedTypeSurveyE2ETests
         // generator output before they reach for it.
         result.ShouldSucceed();
         using JsonDocument document = result.ShouldHaveJsonStdout();
-        JsonElement views = Namespace(GraphSurveyJson.Project(document, Web), GeneratedNamespace);
+        JsonElement views = Namespace(document.SurveyProject(Web), GeneratedNamespace);
 
         views.GetProperty("types")
             .GetInt32()
@@ -95,7 +95,7 @@ public sealed class GeneratedTypeSurveyE2ETests
 
         // The authored namespace beside it in the same project, so this is a distinction the document draws
         // rather than a blanket mark on everything the Web SDK compiles.
-        Namespace(GraphSurveyJson.Project(document, Web), Web)
+        Namespace(document.SurveyProject(Web), Web)
             .TryGetProperty("generated", out _)
             .ShouldBeFalse();
     }

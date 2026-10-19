@@ -37,7 +37,7 @@ internal static class SolutionPaths
     ///     keeps climbing for a single one. <paramref name="consequence" /> completes the sentence
     ///     <c>Stray solution file under ancestor '&lt;dir&gt;' …</c>, so each caller says what one would cost it.
     /// </remarks>
-    internal static void ShouldHaveNoSolutionInAnyAncestor(string directory, string consequence)
+    internal static void ShouldHaveNoSolutionInAnyAncestor(this string directory, string consequence)
     {
         for (DirectoryInfo? dir = new(directory); dir is not null; dir = dir.Parent)
         {

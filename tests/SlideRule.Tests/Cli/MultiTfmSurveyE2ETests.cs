@@ -37,9 +37,9 @@ public sealed class MultiTfmSurveyE2ETests
         // first so this pin means something.
         result.ShouldSucceed();
         using JsonDocument document = result.ShouldHaveJsonStdout();
-        JsonElement core = GraphSurveyJson.Project(document, Core);
+        JsonElement core = document.SurveyProject(Core);
 
-        Frameworks(core)
+        core.Strings("targetFrameworks")
             .ShouldBe(["net10.0", "netstandard2.0"]);
         core.GetProperty("factsFollow")
             .GetString()
@@ -62,7 +62,7 @@ public sealed class MultiTfmSurveyE2ETests
         result.ShouldSucceed();
         using JsonDocument document = result.ShouldHaveJsonStdout();
 
-        GraphSurveyJson.Project(document, Core)
+        document.SurveyProject(Core)
             .GetProperty("types")
             .GetInt32()
             .ShouldBe(3);
@@ -82,9 +82,9 @@ public sealed class MultiTfmSurveyE2ETests
         // disclosure about a collapse, and this project had none.
         result.ShouldSucceed();
         using JsonDocument document = result.ShouldHaveJsonStdout();
-        JsonElement web = GraphSurveyJson.Project(document, Web);
+        JsonElement web = document.SurveyProject(Web);
 
-        Frameworks(web)
+        web.Strings("targetFrameworks")
             .ShouldBe(["net10.0"]);
         web.TryGetProperty("factsFollow", out _)
             .ShouldBeFalse();
@@ -106,9 +106,9 @@ public sealed class MultiTfmSurveyE2ETests
         // and "this noun is one compilation of two" is exactly what that noun does not say by itself.
         result.ShouldSucceed();
         using JsonDocument document = result.ShouldHaveJsonStdout();
-        JsonElement core = GraphSurveyJson.Project(document, Core);
+        JsonElement core = document.SurveyProject(Core);
 
-        Frameworks(core)
+        core.Strings("targetFrameworks")
             .ShouldBe(["net10.0", "netstandard2.0"]);
         core.GetProperty("factsFollow")
             .GetString()
@@ -133,13 +133,5 @@ public sealed class MultiTfmSurveyE2ETests
             $"  {Core} — 3 types; targets net10.0, netstandard2.0 (shared types from net10.0); "
             + "references: (none); packages: (none)");
         output.ShouldContain($"  {Web} — 1 type; targets net10.0; references: {Core}; packages: (none)");
-    }
-
-    private static IReadOnlyList<string?> Frameworks(JsonElement project)
-    {
-        return project.GetProperty("targetFrameworks")
-            .EnumerateArray()
-            .Select(framework => framework.GetString())
-            .ToList();
     }
 }

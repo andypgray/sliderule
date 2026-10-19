@@ -85,7 +85,7 @@ public sealed class BuildTierGuardTests
             new BuildTierAnalyzer(), BuildTier.OwnCompilation(), FilesReaching(point), cancellationToken: Ct);
 
         reported.ShouldNotReport("SR2093");
-        reported.ShouldNotBeEmpty(DiagnosticAssertions.Describe(reported, $"{point} unarmed should report"));
+        reported.ShouldNotBeEmpty(reported.Describe($"{point} unarmed should report"));
     }
 
     [Theory]

@@ -134,7 +134,7 @@ public sealed class SpecLiteralParityTests(SpecFixtureCorpus corpus) : IClassFix
     {
         // Act
         List<string> stray = corpus.Stray()
-            .Select(Describe)
+            .Select(warning => warning.Describe())
             .ToList();
 
         // Assert: an unattributable warning takes no part in the pairing, so a difference it stands for
@@ -150,7 +150,7 @@ public sealed class SpecLiteralParityTests(SpecFixtureCorpus corpus) : IClassFix
         // Act
         List<string> faults = corpus.Reported
             .Where(diagnostic => diagnostic.Id == SpecLiteralDiagnostics.AnalyzerFault.Id)
-            .Select(Describe)
+            .Select(warning => warning.Describe())
             .ToList();
 
         // Assert: a fault means the analyzer stopped somewhere, so every silence after it is silence about
@@ -286,16 +286,6 @@ public sealed class SpecLiteralParityTests(SpecFixtureCorpus corpus) : IClassFix
     private static string Sentence(Diagnostic warning)
     {
         return warning.GetMessage(CultureInfo.InvariantCulture);
-    }
-
-    private static string Describe(Diagnostic warning)
-    {
-        FileLinePositionSpan span = warning.Location.GetLineSpan();
-        string place = string.IsNullOrEmpty(span.Path)
-            ? "(no location)"
-            : $"{span.Path}:{span.StartLinePosition.Line + 1}";
-
-        return $"{warning.Id} at {place}: {Sentence(warning)}";
     }
 
     // What loading one spec on its own reports: nothing at all when it builds. Anything thrown that is not a

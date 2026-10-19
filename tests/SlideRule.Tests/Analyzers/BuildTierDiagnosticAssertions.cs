@@ -25,7 +25,7 @@ internal static class BuildTierDiagnosticAssertions
         List<string> strangers = reported.Where(diagnostic => diagnostic.Id != id)
             .Select(diagnostic => diagnostic.Id)
             .ToList();
-        strangers.ShouldBeEmpty(DiagnosticAssertions.Describe(reported, $"Expected every warning to be {id}"));
+        strangers.ShouldBeEmpty(reported.Describe($"Expected every warning to be {id}"));
 
         return reported;
     }

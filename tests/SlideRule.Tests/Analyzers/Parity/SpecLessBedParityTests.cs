@@ -83,8 +83,10 @@ public sealed class SpecLessBedParityTests
         ParitySubject subject = await ResidencyAsync("LinkedApp/residency forced");
 
         // Act
-        IReadOnlyList<string> forced = ParityHarness.Describe(ParityHarness.ForcedKeys(subject, ruleId, Ct));
-        IReadOnlyList<string> solution = ParityHarness.Describe(ParityHarness.SolutionKeys(subject, ruleId));
+        IReadOnlyList<string> forced = subject.ForcedKeys(ruleId, Ct)
+            .Describe();
+        IReadOnlyList<string> solution = subject.SolutionKeys(ruleId)
+            .Describe();
 
         // Assert — the row's own verdict first: the classifier holds the rule out, so the build never reaches it.
         subject.Expectation.Checked.ShouldBeEmpty("rules the classifier lets a one-project build decide");
@@ -126,8 +128,10 @@ public sealed class SpecLessBedParityTests
         ParitySubject subject = await ExclusionAsync("LinkedApp/exclusion forced");
 
         // Act
-        IReadOnlyList<string> forced = ParityHarness.Describe(ParityHarness.ForcedKeys(subject, ruleId, Ct));
-        IReadOnlyList<string> solution = ParityHarness.Describe(ParityHarness.SolutionKeys(subject, ruleId));
+        IReadOnlyList<string> forced = subject.ForcedKeys(ruleId, Ct)
+            .Describe();
+        IReadOnlyList<string> solution = subject.SolutionKeys(ruleId)
+            .Describe();
 
         // Assert — the row's own verdict first: the classifier holds the rule out, so the build never reaches it.
         subject.Expectation.Checked.ShouldBeEmpty("rules the classifier lets a one-project build decide");
@@ -162,8 +166,10 @@ public sealed class SpecLessBedParityTests
                 .Because("Every shared type is one of Core's, whoever else compiles it."));
 
         // Act
-        IReadOnlyList<string> forced = ParityHarness.Describe(ParityHarness.ForcedKeys(subject, ruleId, Ct));
-        IReadOnlyList<string> solution = ParityHarness.Describe(ParityHarness.SolutionKeys(subject, ruleId));
+        IReadOnlyList<string> forced = subject.ForcedKeys(ruleId, Ct)
+            .Describe();
+        IReadOnlyList<string> solution = subject.SolutionKeys(ruleId)
+            .Describe();
 
         // Assert — the row's own verdict first: the classifier holds the rule out, so the build never reaches it.
         subject.Expectation.Checked.ShouldBeEmpty("rules the classifier lets a one-project build decide");
@@ -193,7 +199,7 @@ public sealed class SpecLessBedParityTests
 
         // The difference guard: legs that agree because nothing was ever selected prove nothing, so the
         // whole-solution check is held to the crossing the linked file makes before the two are compared.
-        ParityHarness.Describe(subject.Expectation.Keys)
+        subject.Expectation.Keys.Describe()
             .ShouldBe(
                 [
                     "linked/tool-compiled-types-hold-nothing-shared [Reference] T:LinkedApp.Tool.Command -> "
@@ -224,7 +230,7 @@ public sealed class SpecLessBedParityTests
 
         // The difference guard: legs that agree because nothing was ever selected prove nothing, so the
         // whole-solution check is held to the crossing the linked file makes before the two are compared.
-        ParityHarness.Describe(subject.Expectation.Keys)
+        subject.Expectation.Keys.Describe()
             .ShouldBe(
                 [
                     "linked/tool-code-holds-no-compiled-in-copy [Reference] T:LinkedApp.Tool.Command -> "
@@ -261,7 +267,7 @@ public sealed class SpecLessBedParityTests
 
         // The difference guard: legs that agree because nothing was ever selected prove nothing, so the
         // whole-solution check is held to the crossing the linked file makes before the two are compared.
-        ParityHarness.Describe(subject.Expectation.Keys)
+        subject.Expectation.Keys.Describe()
             .ShouldBe(
                 ["linked/tool-reaches-only-core" + ReachedTheWidget],
                 "the allow entry is asked at the project the instance reached, which is the tool's own copy");
@@ -292,7 +298,8 @@ public sealed class SpecLessBedParityTests
                 .Because("A shared type Core does not own is one the tool compiled in for itself."));
 
         // Act
-        IReadOnlyList<string> solution = ParityHarness.Describe(ParityHarness.SolutionKeys(subject, ruleId));
+        IReadOnlyList<string> solution = subject.SolutionKeys(ruleId)
+            .Describe();
 
         // Assert — the row's own verdict first: the classifier holds the rule out, so the build never reaches it.
         subject.Expectation.Checked.ShouldBeEmpty("rules the classifier lets a one-project build decide");
@@ -312,7 +319,7 @@ public sealed class SpecLessBedParityTests
 
         subject.Compilations.Count.ShouldBe(3, "two frameworks of the core project and the web project");
         subject.Expectation.Unmeasured.ShouldBeEmpty("rules the whole-solution check never measured");
-        ParityHarness.Describe(subject.Expectation.Keys)
+        subject.Expectation.Keys.Describe()
             .ShouldBe([
                 $"multi/core-types-are-sealed [Shape] T:MultiTfm.Core.ModernOnly at {BedSource("MultiTfm", "MultiTfm.Core", "ModernOnly.cs")}:7",
                 $"multi/core-types-are-sealed [Shape] T:MultiTfm.Core.Widget at {BedSource("MultiTfm", "MultiTfm.Core", "Widget.Legacy.cs")}:6",
@@ -364,7 +371,7 @@ public sealed class SpecLessBedParityTests
         subject.Codebase.Types
             .Where(type => type.Namespace.StartsWith("AspNetCoreGeneratedDocument", StringComparison.Ordinal))
             .ShouldNotBeEmpty("generated view types for .Authored() to filter out");
-        ParityHarness.Describe(subject.Expectation.Keys)
+        subject.Expectation.Keys.Describe()
             .ShouldBe([
                 $"razor/handwritten-web-types-are-sealed [Shape] T:RazorApp.Web.HomeController at {WebSource("HomeController.cs")}:3",
                 $"razor/handwritten-web-types-are-sealed [Shape] T:RazorApp.Web.Program at {WebSource("Program.cs")}:3"
@@ -402,7 +409,8 @@ public sealed class SpecLessBedParityTests
         ParitySubject subject, string ruleId, IReadOnlyList<string> keys)
     {
         foreach (ParityLeg leg in ParityAssertions.Legs)
-            ParityHarness.Describe(ParityHarness.ForcedKeys(subject, ruleId, subject.On(leg), Ct))
+            subject.ForcedKeys(ruleId, subject.On(leg), Ct)
+                .Describe()
                 .ShouldBe(
                     keys,
                     $"what a forced-in project-defined layer reports from one project's view with {ParityAssertions.Name(leg)}");

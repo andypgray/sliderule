@@ -493,7 +493,7 @@ public sealed class DeriveSpecPromptTests
         string served = ArchPrompts.DeriveSpec();
 
         // Assert
-        TextNormalization.Occurrences(served, block)
+        served.Occurrences(block)
             .ShouldBe(1, "the served recipe must carry the committed vocabulary table exactly once");
         served.ShouldNotContain(ManagedBlock.BeginMarker);
         served.ShouldNotContain(ManagedBlock.EndMarker);

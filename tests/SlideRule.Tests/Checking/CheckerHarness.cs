@@ -205,6 +205,23 @@ internal static class Checker
     }
 
     /// <summary>
+    ///     The members <paramref name="rule" />'s constraint names as operands, each as its declaring type, name
+    ///     and whether it is a method, in authoring order; empty for a rule with no constraint.
+    /// </summary>
+    /// <remarks>
+    ///     The resolved member is what two rules must agree on. Its location is left out: it is diagnostic only,
+    ///     so the same member captured from two different files still compares equal.
+    /// </remarks>
+    public static IReadOnlyList<string> MemberAnchors(this ArchRule rule)
+    {
+        if (rule.Constraint is not { } constraint) return [];
+
+        return constraint.MemberOperands
+            .Select(member => $"{member.DeclaringType.FullName}.{member.Name} (method: {member.IsMethod})")
+            .ToList();
+    }
+
+    /// <summary>
     ///     The rendered sentence of a one-rule spec carrying <paramref name="constraint" /> — the model is
     ///     the sole source of prose, so two spellings that render one sentence reified to one thing.
     /// </summary>

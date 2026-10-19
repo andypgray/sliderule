@@ -35,7 +35,7 @@ public sealed class ProjectLoadFailuresTests
         // analyzer counts, which is why those counts are not the predicate.
         using var workspace = new AdhocWorkspace();
         string csproj = ProjectPath("P", "P.csproj");
-        Solution solution = AdhocSolution.Of(workspace, AdhocSolution.Loaded("P", csproj));
+        Solution solution = workspace.WithProjects(AdhocSolution.Loaded("P", csproj));
 
         ProjectLoadFailures.Detect(solution, null)
             .ShouldHaveLoadedEverything();
@@ -49,7 +49,7 @@ public sealed class ProjectLoadFailuresTests
         // null, so the model is missing that project entirely while the load still "succeeded".
         using var workspace = new AdhocWorkspace();
         string csproj = ProjectPath("P", "P.csproj");
-        Solution solution = AdhocSolution.Of(workspace, AdhocSolution.Empty("P", csproj));
+        Solution solution = workspace.WithProjects(AdhocSolution.Empty("P", csproj));
 
         ProjectLoadFailures.Detect(solution, null)
             .ShouldHaveFailed(csproj);
@@ -64,8 +64,7 @@ public sealed class ProjectLoadFailuresTests
         using var workspace = new AdhocWorkspace();
         string csproj = ProjectPath("A", "A.csproj");
         string outputPath = ProjectPath("A", "bin", "A.dll");
-        Solution solution = AdhocSolution.Of(
-            workspace,
+        Solution solution = workspace.WithProjects(
             AdhocSolution.Empty("HasOutput", csproj).WithOutputFilePath(outputPath));
 
         ProjectLoadFailures.Detect(solution, null)
@@ -79,8 +78,7 @@ public sealed class ProjectLoadFailuresTests
         // once rather than once per framework.
         using var workspace = new AdhocWorkspace();
         string csproj = ProjectPath("P", "P.csproj");
-        Solution solution = AdhocSolution.Of(
-            workspace,
+        Solution solution = workspace.WithProjects(
             AdhocSolution.Empty("P(net10.0)", csproj),
             AdhocSolution.Empty("P(netstandard2.0)", csproj));
 
@@ -96,7 +94,7 @@ public sealed class ProjectLoadFailuresTests
         using TempDirectory temp = TestTempRoot.Fresh("declared-absent");
         string solutionPath = WriteSolution(temp, "Present", "Absent");
         using var workspace = new AdhocWorkspace();
-        Solution solution = AdhocSolution.Of(workspace, AdhocSolution.Loaded("Present", temp.PathOf("Present", "Present.csproj")));
+        Solution solution = workspace.WithProjects(AdhocSolution.Loaded("Present", temp.PathOf("Present", "Present.csproj")));
 
         ProjectLoadFailures.Detect(solution, solutionPath)
             .ShouldHaveFailed(temp.PathOf("Absent", "Absent.csproj"));
@@ -108,8 +106,7 @@ public sealed class ProjectLoadFailuresTests
         using TempDirectory temp = TestTempRoot.Fresh("declared-present");
         string solutionPath = WriteSolution(temp, "One", "Two");
         using var workspace = new AdhocWorkspace();
-        Solution solution = AdhocSolution.Of(
-            workspace,
+        Solution solution = workspace.WithProjects(
             AdhocSolution.Loaded("One", temp.PathOf("One", "One.csproj")),
             AdhocSolution.Loaded("Two", temp.PathOf("Two", "Two.csproj")));
 
@@ -125,7 +122,7 @@ public sealed class ProjectLoadFailuresTests
         using TempDirectory temp = TestTempRoot.Fresh("declared-filtered");
         string filterPath = WriteFilter(temp, ["Kept", "Dropped"], "Kept");
         using var workspace = new AdhocWorkspace();
-        Solution solution = AdhocSolution.Of(workspace, AdhocSolution.Loaded("Kept", temp.PathOf("Kept", "Kept.csproj")));
+        Solution solution = workspace.WithProjects(AdhocSolution.Loaded("Kept", temp.PathOf("Kept", "Kept.csproj")));
 
         ProjectLoadFailures.Detect(solution, filterPath)
             .ShouldHaveLeftUnchecked(temp.PathOf("Dropped", "Dropped.csproj"));
@@ -140,7 +137,7 @@ public sealed class ProjectLoadFailuresTests
         using TempDirectory temp = TestTempRoot.Fresh("filtered-absent");
         string filterPath = WriteFilter(temp, ["Kept", "Dropped"], "Kept");
         using var workspace = new AdhocWorkspace();
-        Solution solution = AdhocSolution.Of(workspace);
+        Solution solution = workspace.WithProjects();
 
         ProjectLoadReport report = ProjectLoadFailures.Detect(solution, filterPath);
 
@@ -157,8 +154,7 @@ public sealed class ProjectLoadFailuresTests
         using TempDirectory temp = TestTempRoot.Fresh("filtered-empty");
         string filterPath = WriteFilter(temp, ["One", "Two"]);
         using var workspace = new AdhocWorkspace();
-        Solution solution = AdhocSolution.Of(
-            workspace,
+        Solution solution = workspace.WithProjects(
             AdhocSolution.Loaded("One", temp.PathOf("One", "One.csproj")),
             AdhocSolution.Loaded("Two", temp.PathOf("Two", "Two.csproj")));
 
@@ -176,8 +172,7 @@ public sealed class ProjectLoadFailuresTests
         using TempDirectory temp = TestTempRoot.Fresh("filtered-transitive");
         string filterPath = WriteFilter(temp, ["Kept", "Pulled"], "Kept");
         using var workspace = new AdhocWorkspace();
-        Solution solution = AdhocSolution.Of(
-            workspace,
+        Solution solution = workspace.WithProjects(
             AdhocSolution.Loaded("Kept", temp.PathOf("Kept", "Kept.csproj")),
             AdhocSolution.Loaded("Pulled", temp.PathOf("Pulled", "Pulled.csproj")));
 
@@ -193,7 +188,7 @@ public sealed class ProjectLoadFailuresTests
         using TempDirectory temp = TestTempRoot.Fresh("both-arms");
         string solutionPath = WriteSolution(temp, "Zed", "Absent");
         using var workspace = new AdhocWorkspace();
-        Solution solution = AdhocSolution.Of(workspace, AdhocSolution.Empty("Zed", temp.PathOf("Zed", "Zed.csproj")));
+        Solution solution = workspace.WithProjects(AdhocSolution.Empty("Zed", temp.PathOf("Zed", "Zed.csproj")));
 
         ProjectLoadFailures.Detect(solution, solutionPath)
             .ShouldHaveFailed(temp.PathOf("Absent", "Absent.csproj"), temp.PathOf("Zed", "Zed.csproj"));
@@ -212,7 +207,7 @@ public sealed class ProjectLoadFailuresTests
         string via = links.PathOf("via");
         SymlinkSupport.CreateDirectorySymlink(via, real.Path);
         using var workspace = new AdhocWorkspace();
-        Solution solution = AdhocSolution.Of(workspace, AdhocSolution.Loaded("Present", real.PathOf("Present", "Present.csproj")));
+        Solution solution = workspace.WithProjects(AdhocSolution.Loaded("Present", real.PathOf("Present", "Present.csproj")));
 
         ProjectLoadFailures.Detect(solution, Path.Combine(via, "Solution.sln"))
             .ShouldHaveFailed(Path.Combine(via, "Absent", "Absent.csproj"));

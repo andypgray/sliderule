@@ -52,7 +52,7 @@ public sealed class LinkedSourceGraphE2ETests
         // reaches nothing outside itself, so any Tool→Core row here is the phantom.
         result.ShouldSucceed();
         using JsonDocument document = result.ShouldHaveJsonStdout();
-        GraphSurveyJson.ProjectEdges(document)
+        document.ProjectEdges()
             .ShouldBe([("LinkedApp.Client", "LinkedApp.Core", 1)]);
     }
 
@@ -146,7 +146,7 @@ public sealed class LinkedSourceGraphE2ETests
         // Assert — one line per type, naming every declarer and the winner, so the terminal reader gets the
         // same fact the document carries rather than having to reach for --json.
         result.ShouldSucceed();
-        Section(result.Out, MultiplyDeclaredHeading)
+        result.ShouldHaveOutSection(MultiplyDeclaredHeading)
             .ShouldBe([
                 "  LinkedApp.Shared.Widget — declared by LinkedApp.Core, LinkedApp.Tool; "
                 + "facts follow LinkedApp.Core"
@@ -165,23 +165,9 @@ public sealed class LinkedSourceGraphE2ETests
         // Assert — the formatter's standing rule: no section ever disappears, and a coarser grain says what
         // it left out and how to get it back.
         result.ShouldSucceed();
-        Section(result.Out, MultiplyDeclaredHeading)
+        result.ShouldHaveOutSection(MultiplyDeclaredHeading)
             .ShouldBe([
                 "  (elided at skeleton grain — rerun at --grain full for the multiply-declared types)"
             ]);
-    }
-
-    // ── harness ───────────────────────────────────────────────────────────────────────────────────────────
-
-    // One section of the human survey: the lines between its heading and the blank line closing it.
-    private static IReadOnlyList<string> Section(string output, string heading)
-    {
-        return output
-            .NormalizedTrimmed()
-            .Split('\n')
-            .SkipWhile(line => !line.Equals(heading, StringComparison.Ordinal))
-            .Skip(1)
-            .TakeWhile(line => line.Length > 0)
-            .ToList();
     }
 }

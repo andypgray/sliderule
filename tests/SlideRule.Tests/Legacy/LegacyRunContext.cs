@@ -20,7 +20,7 @@ internal static class LegacyRunContext
     internal static string MsBuildSelection => MsBuildBootstrap.LastSelection ?? "(none registered)";
 
     /// <summary>Formats one run. <paramref name="label" /> names it when a message carries more than one.</summary>
-    internal static string Describe(CliResult result, string? label = null)
+    internal static string DescribeLegacyRun(this CliResult result, string? label = null)
     {
         string heading = label is null ? string.Empty : $"[{label}] ";
         return $"""

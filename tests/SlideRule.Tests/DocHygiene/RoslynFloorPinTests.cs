@@ -309,17 +309,14 @@ public sealed class RoslynFloorPinTests
         JsonProperty framework = dependencies.EnumerateObject()
             .Single();
 
+        // A project entry carries no resolved version, so a missing key is an empty string rather than a throw.
         return framework.Value.EnumerateObject()
             .ToDictionary(
                 static entry => entry.Name,
-                static entry => new LockedPackage(TextOf(entry.Value, "type"), TextOf(entry.Value, "resolved")),
+                static entry => new LockedPackage(
+                    entry.Value.StringOrDefault("type") ?? "",
+                    entry.Value.StringOrDefault("resolved") ?? ""),
                 StringComparer.Ordinal);
-    }
-
-    // A project entry carries no resolved version, so a missing key is an empty string rather than a throw.
-    private static string TextOf(JsonElement entry, string property)
-    {
-        return entry.TryGetProperty(property, out JsonElement value) ? value.GetString() ?? "" : "";
     }
 
     /// <summary>

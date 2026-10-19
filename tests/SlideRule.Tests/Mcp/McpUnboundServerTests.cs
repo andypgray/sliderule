@@ -57,7 +57,7 @@ public sealed class McpUnboundServerTests : IDisposable
     public async Task SeveralSolutionsAtTheRoot_StartsUnboundAndSaysWhyOnBothChannels()
     {
         // The ILSpy / MathNet shape: enough .sln* at the repository root that the walk-up cannot choose.
-        SolutionPaths.ShouldHaveNoSolutionInAnyAncestor(_temp.Path, StrayWouldBind);
+        _temp.Path.ShouldHaveNoSolutionInAnyAncestor(StrayWouldBind);
         SolutionPaths.CreateSln(_temp.Path, "Alpha.sln");
         SolutionPaths.CreateSln(_temp.Path, "Beta.slnf");
         SolutionPaths.CreateSln(_temp.Path, "Gamma.slnx");
@@ -90,7 +90,7 @@ public sealed class McpUnboundServerTests : IDisposable
     {
         // The nopCommerce shape: nothing at the repository root, the solution under src\ — so the walk-up
         // climbs past the repository to the drive root and finds nothing at all.
-        SolutionPaths.ShouldHaveNoSolutionInAnyAncestor(_temp.Path, StrayWouldBind);
+        _temp.Path.ShouldHaveNoSolutionInAnyAncestor(StrayWouldBind);
         Directory.CreateDirectory(_temp.PathOf("src"));
         SolutionPaths.CreateSln(_temp.PathOf("src"), "Storefront.sln");
 

@@ -238,7 +238,7 @@ public sealed class FilteredSolutionE2ETests
         // a skip reason or an inert target's hint. The lede's full stop does — both continue past it with a
         // comma.
         result.Out.ShouldNotContain(NarrowingLede);
-        CheckJson.Strings(document, "uncheckedProjects")
+        document.RootElement.Strings("uncheckedProjects")
             .ShouldBe(TheTwoUncheckedProjects);
         // It scopes the verdict rather than overturning it: nothing failed to load.
         document.RootElement.TryGetProperty("modelIncomplete", out _)
@@ -254,7 +254,7 @@ public sealed class FilteredSolutionE2ETests
         result.ShouldSucceed();
         using JsonDocument document = result.ShouldHaveJsonStdout();
         result.Out.ShouldNotContain(AnyNarrowing);
-        CheckJson.Strings(document, "uncheckedProjects")
+        document.RootElement.Strings("uncheckedProjects")
             .ShouldBe(TheTwoUncheckedProjects);
     }
 
@@ -267,7 +267,7 @@ public sealed class FilteredSolutionE2ETests
         result.ShouldSucceed();
         using JsonDocument document = result.ShouldHaveJsonStdout();
         result.Out.ShouldNotContain(AnyNarrowing);
-        CheckJson.Strings(document, "uncheckedProjects")
+        document.RootElement.Strings("uncheckedProjects")
             .ShouldBe(TheTwoUncheckedProjects);
     }
 

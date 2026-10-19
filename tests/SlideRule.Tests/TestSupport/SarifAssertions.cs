@@ -120,6 +120,32 @@ internal static class SarifAssertions
             .ToList();
     }
 
+    /// <summary>A result's or notification's message text: the alert title every code-scanning UI shows.</summary>
+    internal static string SarifMessageText(this JsonElement result)
+    {
+        return result.GetProperty("message")
+            .GetProperty("text")
+            .GetString()!;
+    }
+
+    /// <summary>The violation-identity fingerprint a result carries.</summary>
+    internal static string SarifFingerprint(this JsonElement result)
+    {
+        return result.GetProperty("partialFingerprints")
+            .GetProperty("slideRuleViolationIdentity/v1")
+            .GetString()!;
+    }
+
+    /// <summary>The 1-based source line of a single-location result: the site the reader is sent to.</summary>
+    internal static int SarifStartLine(this JsonElement result)
+    {
+        return result.GetProperty("locations")[0]
+            .GetProperty("physicalLocation")
+            .GetProperty("region")
+            .GetProperty("startLine")
+            .GetInt32();
+    }
+
     // The single run a SlideRule SARIF log always carries.
     private static JsonElement Run(string sarif)
     {

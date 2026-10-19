@@ -49,7 +49,7 @@ public sealed class DriftedCopiesGraphE2ETests
         // either direction, and the markup project's reference at the copy it bound.
         result.ShouldSucceed();
         using JsonDocument document = result.ShouldHaveJsonStdout();
-        GraphSurveyJson.ProjectEdges(document)
+        document.ProjectEdges()
             .ShouldBe([
                 ("DriftedApp.Client", "DriftedApp.Core", 1),
                 ("DriftedApp.Markup", "DriftedApp.Core.Ansi", 1)
@@ -84,7 +84,7 @@ public sealed class DriftedCopiesGraphE2ETests
             .Select(entry => (
                 entry.GetProperty("type")
                     .GetString()!,
-                string.Join(", ", GraphSurveyJson.Strings(entry, "declaredBy"))))
+                string.Join(", ", entry.Strings("declaredBy"))))
             .ToList();
     }
 }

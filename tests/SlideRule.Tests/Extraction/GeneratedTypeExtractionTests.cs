@@ -80,8 +80,11 @@ public sealed class GeneratedTypeExtractionTests
         var evaluator = new SelectionEvaluator(Model);
 
         // Act
-        IReadOnlyList<string> inAuthoredNamespace = Names(evaluator.Evaluate(arch.Namespace("App.*"), SelectionPosition.Subject));
-        IReadOnlyList<string> inProject = Names(evaluator.Evaluate(arch.Project("TestProject"), SelectionPosition.Subject));
+        IReadOnlyList<string> inAuthoredNamespace = evaluator
+            .Evaluate(arch.Namespace("App.*"), SelectionPosition.Subject)
+            .FullNames();
+        IReadOnlyList<string> inProject = evaluator.Evaluate(arch.Project("TestProject"), SelectionPosition.Subject)
+            .FullNames();
 
         // Assert
         inAuthoredNamespace.ShouldNotContain("Gen.Emitted");
@@ -185,12 +188,6 @@ public sealed class GeneratedTypeExtractionTests
         // of every file declaring the type and lifts to the type; nobody can act on a violation here.
         split.FilePaths.Count.ShouldBe(2);
         split.IsGenerated.ShouldBeTrue();
-    }
-
-    private static IReadOnlyList<string> Names(IEnumerable<TypeNode> types)
-    {
-        return types.Select(type => type.FullName)
-            .ToList();
     }
 
     // Emits both halves of the fixture in one post-initialization output: an attributed container with an

@@ -60,8 +60,8 @@ public sealed class FrameworkBinlogReplayTests
         // Assert: byte parity across the two paths, and the replay leg never opened a workspace. Both runs
         // ride every assertion message — a parity break or a wrong exit code is a question about what the
         // two legs actually printed, and on a machine with a different MSBuild that is the only evidence.
-        string context = $"{LegacyRunContext.Describe(replay, "replay")}{Environment.NewLine}"
-                         + LegacyRunContext.Describe(cold, "cold");
+        string context = $"{replay.DescribeLegacyRun("replay")}{Environment.NewLine}"
+                         + cold.DescribeLegacyRun("cold");
         replay.Out.ShouldBe(cold.Out, context);
         replay.Err.ShouldBe(cold.Err, context);
         replay.Exit.ShouldBe(cold.Exit, context);

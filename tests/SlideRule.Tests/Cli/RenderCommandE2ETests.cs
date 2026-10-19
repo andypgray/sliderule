@@ -751,7 +751,7 @@ public sealed class RenderCommandE2ETests : IDisposable
     [Fact]
     public async Task Render_WithNoClaudeFileInOrAboveTheSolution_SaysNothingAboutClaudeCode()
     {
-        ClaudeFiles.ShouldHaveNoClaudeFileInAnyAncestor(SolutionDirectory, "would make this render warn about it.");
+        SolutionDirectory.ShouldHaveNoClaudeFileInAnyAncestor("would make this render warn about it.");
 
         CliResult result = await CliRunner.InvokeAsync("render", _workspace.SolutionPath, "--spec", CliRunner.RenderSpecDll);
 

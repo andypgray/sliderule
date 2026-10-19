@@ -94,8 +94,10 @@ public sealed class RazorGeneratedTypeTests
         var evaluator = new SelectionEvaluator(model);
         Selection webProject = arch.Project(Web);
 
-        IReadOnlyList<string> declared = Names(evaluator.Evaluate(webProject, SelectionPosition.Subject));
-        IReadOnlyList<string> authored = Names(evaluator.Evaluate(webProject.Authored(), SelectionPosition.Subject));
+        IReadOnlyList<string> declared = evaluator.Evaluate(webProject, SelectionPosition.Subject)
+            .FullNames();
+        IReadOnlyList<string> authored = evaluator.Evaluate(webProject.Authored(), SelectionPosition.Subject)
+            .FullNames();
 
         // The cure, end to end: the project noun sweeps the views, `.Authored()` takes exactly them, and the
         // hand-written types survive. Asserted as a set difference rather than a containment, because a
@@ -137,12 +139,6 @@ public sealed class RazorGeneratedTypeTests
     {
         return model.Types
             .Where(type => type.Namespace == GeneratedNamespace)
-            .ToList();
-    }
-
-    private static IReadOnlyList<string> Names(IEnumerable<TypeNode> types)
-    {
-        return types.Select(type => type.FullName)
             .ToList();
     }
 

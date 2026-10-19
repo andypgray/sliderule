@@ -14,7 +14,7 @@ namespace SlideRule.Tests.Extraction;
 /// </remarks>
 internal static class ModelDump
 {
-    public static string Render(CodebaseModel model)
+    internal static string Dump(this CodebaseModel model)
     {
         var builder = new StringBuilder();
 

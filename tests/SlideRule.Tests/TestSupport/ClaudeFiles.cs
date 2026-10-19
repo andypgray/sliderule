@@ -22,7 +22,7 @@ internal static class ClaudeFiles
     ///     <paramref name="consequence" /> completes the sentence <c>Stray CLAUDE file '&lt;path&gt;' …</c>, so
     ///     each caller says what one would cost it.
     /// </remarks>
-    internal static void ShouldHaveNoClaudeFileInAnyAncestor(string directory, string consequence)
+    internal static void ShouldHaveNoClaudeFileInAnyAncestor(this string directory, string consequence)
     {
         IReadOnlySet<string> userMemory = ClaudeInstructionFiles.UserMemoryFiles(new SystemEnvironment());
         for (DirectoryInfo? dir = new(directory); dir is not null; dir = dir.Parent)

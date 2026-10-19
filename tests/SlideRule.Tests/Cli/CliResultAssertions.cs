@@ -138,6 +138,29 @@ internal static class CliResultAssertions
     }
 
     /// <summary>
+    ///     Asserts stdout carries a section under <paramref name="heading" />, and returns its lines as written,
+    ///     indentation included, up to the first blank line.
+    /// </summary>
+    /// <remarks>
+    ///     A missing heading reds rather than reading as an empty section, so a row pinning a section's lines
+    ///     cannot pass on output that never printed the section at all.
+    /// </remarks>
+    internal static IReadOnlyList<string> ShouldHaveOutSection(this CliResult result, string heading)
+    {
+        List<string> lines = result.Out.NormalizedLines()
+            .Split('\n')
+            .ToList();
+        int start = lines.FindIndex(line => string.Equals(line.Trim(), heading, StringComparison.Ordinal));
+        start.ShouldBeGreaterThanOrEqualTo(
+            0, $"stdout has no '{heading}' section" + Environment.NewLine + result.Transcript());
+
+        return lines.Skip(start + 1)
+            .TakeWhile(line => line.Trim()
+                .Length > 0)
+            .ToList();
+    }
+
+    /// <summary>
     ///     Asserts stderr carries exactly one <c>warning:</c> line, and that it reports the NuGet audit advisory
     ///     <paramref name="message" /> for <paramref name="projects" /> — the grouped line, once, with no load
     ///     line and no MSBuild note beside it.
