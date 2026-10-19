@@ -99,9 +99,9 @@
       },
       "SlideRule.Analyzers": {
         "type": "Direct",
-        "requested": "[0.1.2, )",
-        "resolved": "0.1.2",
-        "contentHash": "xqd5XdO9keJ1BeTdZq9vPpDxVZSkwxtW0L6mjIcIIQmAhMLWyXpbF/hVAGVybgSRz6BfbWY5UPQRpyeX1PJnhw=="
+        "requested": "[0.2.0, )",
+        "resolved": "0.2.0",
+        "contentHash": "rBYeHtl1br1j0JK1GShcDtGhUW9EJhcikMAFH99LZprS0m193+L2CPB/9PBio/aF0iZzX0utslgnxWIY78iBag=="
       },
       "xunit.v3.assert": {
         "type": "Direct",
