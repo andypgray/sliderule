@@ -27,6 +27,12 @@
         <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
     </ItemGroup>
 
+    <!-- Severities for this project alone, beside the repo-wide file src/Directory.Build.props names. The
+         file explains what it promotes and why the CLI is held to less. -->
+    <ItemGroup>
+        <GlobalAnalyzerConfigFiles Include="$(MSBuildThisFileDirectory)library.globalconfig" />
+    </ItemGroup>
+
     <ItemGroup>
         <PackageReference Include="Microsoft.Build.Locator" Version="1.11.2" />
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.9.0" />

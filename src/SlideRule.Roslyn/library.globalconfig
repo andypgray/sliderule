@@ -1,0 +1,13 @@
+# Analyzer severities for this project alone, named from SlideRule.Roslyn.csproj. Not called `.globalconfig`
+# for the reason the head of the repo-root analyzers.globalconfig gives: under that name Roslyn would
+# discover it on its own and set every key here twice. A key must also never appear in both files, because
+# a key two global configs set is unset.
+
+is_global = true
+
+# This assembly is library code: the xUnit adapter carries it into a consumer's test process, where the
+# awaits in it run under whatever synchronization context that test framework installs, and an await
+# that resumes on a captured context can deadlock a caller that blocks on it. Every await here therefore
+# says ConfigureAwait(false). The CLI is an application that owns its process and has no such context, so
+# the rule stays off there, which is why it is promoted from this file and not from analyzers.globalconfig.
+dotnet_diagnostic.CA2007.severity = warning

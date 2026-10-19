@@ -70,7 +70,7 @@ internal static class CodebaseExtractor
     {
         ExtractionInputs collected = await CollectInputsAsync(
             solution, p => excludeProjects is null || !excludeProjects.Contains(p.Name), targetFrameworks,
-            declaredMembers, ct);
+            declaredMembers, ct).ConfigureAwait(false);
         return CodebaseModelBuilder.Build(collected.Inputs, collected.ArtifactFacts, ct);
     }
 
@@ -96,7 +96,7 @@ internal static class CodebaseExtractor
     {
         ExtractionInputs collected = await CollectInputsAsync(
             solution, p => includeProjects is null || includeProjects.Contains(p.Name), targetFrameworks,
-            declaredMembers, ct);
+            declaredMembers, ct).ConfigureAwait(false);
         return FragmentExtractor.ExtractAll(collected.Inputs, collected.ArtifactFacts, ct);
     }
 
@@ -144,7 +144,7 @@ internal static class CodebaseExtractor
         // one after another. The ordered list above decides input order — the results are read back by
         // index, never in completion order — so the merge's first-declarer-wins rule sees that order.
         IEnumerable<Task<Compilation?>> compilationTasks = projects.Select(project => project.GetCompilationAsync(ct));
-        Compilation?[] compilations = await Task.WhenAll(compilationTasks);
+        Compilation?[] compilations = await Task.WhenAll(compilationTasks).ConfigureAwait(false);
 
         // The provenance half of the generated-code signal (GRAMMAR §5.2), read once per project. It runs
         // AFTER the compilation batch rather than beside it because binding is what executes the generators:
@@ -152,13 +152,13 @@ internal static class CodebaseExtractor
         // round of generator work.
         IEnumerable<Task<IReadOnlySet<SyntaxTree>>> generatedTreeTasks =
             projects.Select(project => GeneratedTreesOfAsync(project, ct));
-        IReadOnlySet<SyntaxTree>[] generatedTrees = await Task.WhenAll(generatedTreeTasks);
+        IReadOnlySet<SyntaxTree>[] generatedTrees = await Task.WhenAll(generatedTreeTasks).ConfigureAwait(false);
 
         // One canonicalizer for the whole enumeration: every project's membership is tested against a
         // canonicalized path, and the projects of one solution share nearly all of their ancestors.
         var canonicalProjectFiles = new ProjectFileCanonicalizer();
 
-        IReadOnlyList<ProjectArtifactFacts?> evaluated = await artifactFactsTask;
+        IReadOnlyList<ProjectArtifactFacts?> evaluated = await artifactFactsTask.ConfigureAwait(false);
 
         // Every loaded project, whatever its language and whether or not this call extracts it, because a
         // declared reference may name any project of the workspace, and the filter above can hold as few as
@@ -229,11 +229,11 @@ internal static class CodebaseExtractor
     // that sets EmitCompilerGeneratedFiles, which moves every generated document off its pseudo-path.
     private static async Task<IReadOnlySet<SyntaxTree>> GeneratedTreesOfAsync(Project project, CancellationToken ct)
     {
-        IEnumerable<SourceGeneratedDocument> documents = await project.GetSourceGeneratedDocumentsAsync(ct);
+        IEnumerable<SourceGeneratedDocument> documents = await project.GetSourceGeneratedDocumentsAsync(ct).ConfigureAwait(false);
 
         var trees = new HashSet<SyntaxTree>();
         foreach (SourceGeneratedDocument document in documents)
-            if (await document.GetSyntaxTreeAsync(ct) is { } tree)
+            if (await document.GetSyntaxTreeAsync(ct).ConfigureAwait(false) is { } tree)
                 trees.Add(tree);
 
         return trees;

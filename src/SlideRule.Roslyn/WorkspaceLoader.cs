@@ -97,7 +97,7 @@ internal static class WorkspaceLoader
         // it (a cancel, an unreadable filter) disposes it here rather than orphaning it.
         try
         {
-            Solution solution = await OpenAsync(workspace, solutionPath, ct);
+            Solution solution = await OpenAsync(workspace, solutionPath, ct).ConfigureAwait(false);
             (Solution stripped, int _, int _) = solution.StripUnresolvedReferences();
             (Solution normalized, IReadOnlyDictionary<ProjectId, string> targetFrameworks) =
                 stripped.NormalizeProjectNames();
@@ -147,8 +147,8 @@ internal static class WorkspaceLoader
             if (ClosureFilterText(solutionPath, projectFiles) is not { } filterText) return null;
 
             Directory.CreateDirectory(filterDirectory);
-            await File.WriteAllTextAsync(filterPath, filterText, ct);
-            return await LoadAsync(filterPath, diagnosticLog, ct);
+            await File.WriteAllTextAsync(filterPath, filterText, ct).ConfigureAwait(false);
+            return await LoadAsync(filterPath, diagnosticLog, ct).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is UserErrorException or IOException or UnauthorizedAccessException
                                        or FormatException or XmlException)
@@ -228,11 +228,11 @@ internal static class WorkspaceLoader
         MSBuildWorkspace workspace, string solutionPath, CancellationToken ct)
     {
         if (!SolutionProjectFileParser.IsFilterFormat(solutionPath))
-            return await workspace.OpenSolutionAsync(solutionPath, cancellationToken: ct);
+            return await workspace.OpenSolutionAsync(solutionPath, cancellationToken: ct).ConfigureAwait(false);
 
         try
         {
-            return await workspace.OpenSolutionAsync(solutionPath, cancellationToken: ct);
+            return await workspace.OpenSolutionAsync(solutionPath, cancellationToken: ct).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

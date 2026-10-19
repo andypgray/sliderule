@@ -70,7 +70,7 @@ internal static class ChildProcess
         TimeSpan bound = timeout ?? DefaultTimeout;
 
         using Process process = Start(startInfo);
-        await WriteAndCloseInputAsync(process, standardInput);
+        await WriteAndCloseInputAsync(process, standardInput).ConfigureAwait(false);
 
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
         deadline.CancelAfter(bound);
@@ -79,13 +79,15 @@ internal static class ChildProcess
         Task<string> error = process.StandardError.ReadToEndAsync(deadline.Token);
         try
         {
-            await process.WaitForExitAsync(deadline.Token);
-            return new ProcessResult(process.ExitCode, await output, await error);
+            await process.WaitForExitAsync(deadline.Token).ConfigureAwait(false);
+            string standardOutput = await output.ConfigureAwait(false);
+            string standardError = await error.ConfigureAwait(false);
+            return new ProcessResult(process.ExitCode, standardOutput, standardError);
         }
         catch (OperationCanceledException)
         {
             TryKillTree(process);
-            await ObserveKilledReadsAsync(output, error);
+            await ObserveKilledReadsAsync(output, error).ConfigureAwait(false);
 
             // A caller cancel is a cancel, not a timeout: only the ceiling produces a TimeoutException.
             ct.ThrowIfCancellationRequested();
@@ -149,7 +151,7 @@ internal static class ChildProcess
 
     private static async Task WriteAndCloseInputAsync(Process process, string? standardInput)
     {
-        if (!string.IsNullOrEmpty(standardInput)) await process.StandardInput.WriteAsync(standardInput);
+        if (!string.IsNullOrEmpty(standardInput)) await process.StandardInput.WriteAsync(standardInput).ConfigureAwait(false);
         process.StandardInput.Close();
     }
 
@@ -180,7 +182,7 @@ internal static class ChildProcess
                 TaskContinuationOptions.ExecuteSynchronously,
                 TaskScheduler.Default);
 
-        await Task.WhenAny(observed, Task.Delay(KilledReadGrace, CancellationToken.None));
+        await Task.WhenAny(observed, Task.Delay(KilledReadGrace, CancellationToken.None)).ConfigureAwait(false);
     }
 
     // '\n' rather than Environment.NewLine, so the sync arm's capture reads the same on every OS.
