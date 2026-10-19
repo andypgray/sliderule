@@ -115,6 +115,54 @@ public sealed class CliBehaviorTests
     }
 
     [Fact]
+    public async Task MistypedCommand_IsRefusedWithTheNearestCommandSuggestedOnStderr()
+    {
+        CliResult result = await CliRunner.InvokeAsync("chek");
+
+        // The suggestion's wording is the library's and localized, so the row asserts the token and the line
+        // naming the command, which no culture changes.
+        result.ShouldRefuseWith("'chek'");
+        result.Out.ShouldBeEmpty(result.Transcript());
+        result.Err.Split(Environment.NewLine).ShouldContain("check", result.Transcript());
+    }
+
+    [Fact]
+    public async Task MistypedOptionAfterTheSolution_IsRefusedWithTheOptionSuggestedOnStderr()
+    {
+        CliResult result = await CliRunner.InvokeAsync("check", "App.slnx", "--jsno");
+
+        result.ShouldRefuseWith("'--jsno'");
+        result.Out.ShouldBeEmpty(result.Transcript());
+        result.Err.Split(Environment.NewLine).ShouldContain("--json", result.Transcript());
+    }
+
+    [Fact]
+    public async Task FailureOutsideEveryCommandsHandler_ExitsTwoThroughTheErrorMapper()
+    {
+        var root = new RootCommand();
+        root.SetAction(int (_) => throw new InvalidOperationException("outside every handler"));
+
+        CliResult result = await InvokeEntryAsync(root);
+
+        // System.CommandLine's own handler would print its "Unhandled exception" header and exit 1, the CLI's code
+        // for a red rule. An unexpected exception keeps its stack trace: it is a bug.
+        result.ShouldRefuseWith("System.InvalidOperationException: outside every handler");
+        result.Err.ShouldNotContain("Unhandled exception", result.Transcript());
+    }
+
+    [Fact]
+    public async Task FailureOutsideTheHookVerbsHandler_IsReportedWithoutBlocking()
+    {
+        Command hook = new(CommandFactory.HookCommandName);
+        hook.SetAction(int (_) => throw new InvalidOperationException("outside the hook's handler"));
+        var root = new RootCommand { hook };
+
+        CliResult result = await InvokeEntryAsync(root, CommandFactory.HookCommandName);
+
+        result.ShouldReportConfigError("System.InvalidOperationException: outside the hook's handler");
+    }
+
+    [Fact]
     public void SolutionPathBeginningWithADash_ParsesWhenWrittenFromTheCurrentDirectory()
     {
         ParseResult parsed = CommandTree.Root()
@@ -178,5 +226,13 @@ public sealed class CliBehaviorTests
 
         return CliResult.CapturedAsync((output, error) => root.Parse([])
             .InvokeAsync(new InvocationConfiguration { Output = output, Error = error }, Ct));
+    }
+
+    // The entry point over a hand-built tree. Every real command's action runs under its own handler, so a failure
+    // that escapes one is reachable only this way.
+    private static Task<CliResult> InvokeEntryAsync(RootCommand root, params string[] args)
+    {
+        return CliResult.CapturedAsync((output, error) =>
+            CliEntry.InvokeAsync(root, args, new InvocationConfiguration { Output = output, Error = error }));
     }
 }

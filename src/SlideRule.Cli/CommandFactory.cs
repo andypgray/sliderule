@@ -482,7 +482,7 @@ internal static class CommandFactory
                 Directory.GetCurrentDirectory(),
                 NoCache: false,
                 AllowWorkspaceDiagnostics: false,
-                Rename: new BaselineRename(parseResult.GetValue(from)!, parseResult.GetValue(to)!))),
+                Rename: new BaselineRename(parseResult.GetRequiredValue(from), parseResult.GetRequiredValue(to)))),
             (request, output, error, ct) =>
                 MsBuildGate.RunBaselineAsync(request, output, error, hostSource, environment, ct));
 
@@ -675,7 +675,7 @@ internal static class CommandFactory
             parseResult => new HookRequest(
                 parseResult.GetValue(solution),
                 parseResult.GetValue(spec),
-                parseResult.GetValue(diffBase)!,
+                parseResult.GetRequiredValue(diffBase),
                 parseResult.GetValue(maxRounds),
                 Directory.GetCurrentDirectory()),
             (request, output, error, ct) => new HookRunner(
@@ -709,10 +709,9 @@ internal static class CommandFactory
 
     // The action shape every command shares: build the request off the parse and run it, both under the
     // top-level error handler and with the SAME error writer the run itself writes to. The request is built
-    // inside the handler because a binding failure outside it reaches System.CommandLine's own handler,
-    // which prints a trace and exits 1, the code a hook reads as a red rule. One place, so a verb added
-    // later cannot wire the two apart, and CliErrorMapper cannot end up writing somewhere the verb's own
-    // diagnostics did not.
+    // inside the handler so a binding failure is reported as a failure of the run: a user error's message alone,
+    // and exit 2. One place, so a verb added later cannot wire the two apart, and CliErrorMapper cannot end up
+    // writing somewhere the verb's own diagnostics did not.
     internal static void SetRequestAction<TRequest>(
         Command command,
         Func<ParseResult, TRequest> requestFrom,
