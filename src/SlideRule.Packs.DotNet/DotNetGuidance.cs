@@ -63,8 +63,10 @@ public static class DotNetGuidance
         Arch arch, Selection subject, Selection compositionRoot, PackPosture posture, string? fix = null,
         Selection? exemplar = null)
     {
-        IRuleBuilder rule = arch.Rule("http/reuse-httpclient");
+        ArgumentNullException.ThrowIfNull(arch);
+        ArgumentNullException.ThrowIfNull(posture);
         Constraint constraint = subject.Except(compositionRoot).MustNotConstruct(typeof(HttpClient));
+        IRuleBuilder rule = arch.Rule("http/reuse-httpclient");
 
         Declare(rule, constraint, posture,
             "A new HttpClient per call exhausts sockets under load; IHttpClientFactory pools handlers.",
@@ -96,11 +98,13 @@ public static class DotNetGuidance
         Arch arch, Selection subject, Selection resolveSeam, PackPosture posture, string? fix = null,
         Selection? exemplar = null)
     {
-        IRuleBuilder rule = arch.Rule("di/no-service-locator");
+        ArgumentNullException.ThrowIfNull(arch);
+        ArgumentNullException.ThrowIfNull(posture);
         Constraint constraint = subject.Except(resolveSeam).MustNotUse(
             arch.Member(typeof(IServiceProvider), nameof(IServiceProvider.GetService)),
             arch.Member(typeof(ServiceProviderServiceExtensions), nameof(ServiceProviderServiceExtensions.GetService)),
             arch.Member(typeof(ServiceProviderServiceExtensions), nameof(ServiceProviderServiceExtensions.GetRequiredService)));
+        IRuleBuilder rule = arch.Rule("di/no-service-locator");
 
         Declare(rule, constraint, posture,
             "Resolving services from IServiceProvider at call sites hides a type's real dependencies; declare them as constructor parameters.",
@@ -130,9 +134,11 @@ public static class DotNetGuidance
         Arch arch, Selection subject, PackPosture posture, string? fix = null,
         Selection? exemplar = null)
     {
-        IRuleBuilder rule = arch.Rule("di/no-buildserviceprovider");
+        ArgumentNullException.ThrowIfNull(arch);
+        ArgumentNullException.ThrowIfNull(posture);
         Constraint constraint = subject.MustNotUse(
             arch.Member(typeof(ServiceCollectionContainerBuilderExtensions), nameof(ServiceCollectionContainerBuilderExtensions.BuildServiceProvider)));
+        IRuleBuilder rule = arch.Rule("di/no-buildserviceprovider");
 
         Declare(rule, constraint, posture,
             "Calling BuildServiceProvider while configuring services builds a second container with its own singletons, a duplicate-instance trap.",
@@ -163,9 +169,11 @@ public static class DotNetGuidance
         Arch arch, Selection subject, PackPosture posture, string? fix = null,
         Selection? exemplar = null)
     {
-        IRuleBuilder rule = arch.Rule("async/no-sync-over-async");
+        ArgumentNullException.ThrowIfNull(arch);
+        ArgumentNullException.ThrowIfNull(posture);
         IReadOnlyList<Member> blockingWaits = BlockingWaitAnchors(arch);
         Constraint constraint = subject.MustNotUse(blockingWaits);
+        IRuleBuilder rule = arch.Rule("async/no-sync-over-async");
 
         Declare(rule, constraint, posture,
             "Blocking on a Task or ValueTask (.Result/.Wait/.GetResult) ties up a thread and can deadlock in a captured context; await instead.",
@@ -191,6 +199,7 @@ public static class DotNetGuidance
     /// <returns>The banned members.</returns>
     public static IReadOnlyList<Member> BlockingWaitAnchors(Arch arch)
     {
+        ArgumentNullException.ThrowIfNull(arch);
         return
         [
             arch.Member(typeof(Task), nameof(Task.Wait)),
@@ -225,10 +234,12 @@ public static class DotNetGuidance
         Arch arch, Selection subject, PackPosture posture, string? fix = null,
         Selection? exemplar = null)
     {
-        IRuleBuilder rule = arch.Rule("di/no-captive-dependencies");
+        ArgumentNullException.ThrowIfNull(arch);
+        ArgumentNullException.ThrowIfNull(posture);
         Constraint constraint = subject.MustNotInject(
             arch.Registered(Lifetime.Scoped),
             arch.Registered(Lifetime.Transient));
+        IRuleBuilder rule = arch.Rule("di/no-captive-dependencies");
 
         Declare(rule, constraint, posture,
             "A singleton is created once and holds every dependency it injects for the whole process, so a scoped or transient service injected into it is captured past its lifetime and shared across all callers.",
@@ -261,10 +272,12 @@ public static class DotNetGuidance
         Arch arch, Selection subject, PackPosture posture, string? fix = null,
         Selection? exemplar = null)
     {
-        IRuleBuilder rule = arch.Rule("naming/async-suffix");
+        ArgumentNullException.ThrowIfNull(arch);
+        ArgumentNullException.ThrowIfNull(posture);
         Constraint constraint = subject.Authored().Methods
             .Returning(typeof(Task), typeof(Task<>), typeof(ValueTask), typeof(ValueTask<>))
             .MustHaveSuffix("Async");
+        IRuleBuilder rule = arch.Rule("naming/async-suffix");
 
         Declare(rule, constraint, posture,
             "Task- and ValueTask-returning methods carry the Async suffix so callers see at the call site that a method must be awaited.",
@@ -295,8 +308,10 @@ public static class DotNetGuidance
         Arch arch, Selection subject, Selection topLevelHandler, PackPosture posture, string? fix = null,
         Selection? exemplar = null)
     {
-        IRuleBuilder rule = arch.Rule("exceptions/no-general-catch");
+        ArgumentNullException.ThrowIfNull(arch);
+        ArgumentNullException.ThrowIfNull(posture);
         Constraint constraint = subject.Except(topLevelHandler).MustNotSwallow(typeof(Exception));
+        IRuleBuilder rule = arch.Rule("exceptions/no-general-catch");
 
         Declare(rule, constraint, posture,
             "Catching base Exception outside a top-level handler swallows the faults you meant to see; scope the catch-all to that handler and let other code catch only the specific types it can handle.",
@@ -330,10 +345,12 @@ public static class DotNetGuidance
         Arch arch, Selection subject, PackPosture posture, string? fix = null,
         Selection? exemplar = null)
     {
-        IRuleBuilder rule = arch.Rule("async/accept-cancellation");
+        ArgumentNullException.ThrowIfNull(arch);
+        ArgumentNullException.ThrowIfNull(posture);
         Constraint constraint = subject.Authored().Methods
             .Returning(typeof(Task), typeof(Task<>), typeof(ValueTask), typeof(ValueTask<>))
             .MustAcceptParameter<CancellationToken>();
+        IRuleBuilder rule = arch.Rule("async/accept-cancellation");
 
         Declare(rule, constraint, posture,
             "Accepting a CancellationToken lets a caller stop in-flight async work and flow that request on to the calls it makes, so a Task- or ValueTask-returning method without one cannot take part in cooperative cancellation.",
@@ -363,8 +380,10 @@ public static class DotNetGuidance
         Arch arch, Selection subject, PackPosture posture, string? fix = null,
         Selection? exemplar = null)
     {
-        IRuleBuilder rule = arch.Rule("persistence/no-mapping-attributes");
+        ArgumentNullException.ThrowIfNull(arch);
+        ArgumentNullException.ThrowIfNull(posture);
         Constraint constraint = subject.MustNotBeAttributedWith(typeof(TableAttribute), typeof(ComplexTypeAttribute));
+        IRuleBuilder rule = arch.Rule("persistence/no-mapping-attributes");
 
         Declare(rule, constraint, posture,
             "A persistence-specific attribute such as [Table] or [ComplexType] couples a persisted type to one data-access technology, so the same model can no longer be stored another way or moved to a new store; keep it ignorant of how it is persisted.",
@@ -408,9 +427,10 @@ public static class DotNetGuidance
     }
 
     // The one place a posture becomes a chain. IEnforceRule and IMigrateRule are unrelated interfaces,
-    // so each arm completes its own; exactly one Because, one Citation and one Fix reach the rule either
-    // way, and at most one Exemplar. Note arch.Rule(id) is deliberately NOT called here — it captures
-    // caller info, and one call site would give all nine rules the same file:line.
+    // so each arm completes its own. arch.Rule(id) is deliberately not called here: it captures caller
+    // info, and one call site would give every pack rule the same file:line. Each caller refuses its
+    // arguments and builds its constraint before calling arch.Rule, so a refused argument leaves no rule
+    // half-declared.
     private static void Declare(
         IRuleBuilder rule,
         Constraint constraint,
