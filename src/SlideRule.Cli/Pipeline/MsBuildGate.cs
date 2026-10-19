@@ -196,23 +196,16 @@ internal static class MsBuildGate
         string solutionPath = ModelPipeline.DiscoverSolution(request.Solution, request.WorkingDirectory, environment);
 
         var diagnostics = new List<string>();
-        ReplayedSolution replayed = ReplayOrThrow(binlogFullPath, solutionPath, binlog, diagnostics, ct);
-        try
+        using ReplayedSolution replayed = ReplayOrThrow(binlogFullPath, solutionPath, binlog, diagnostics, ct);
+        if (!request.NoCache)
         {
-            if (!request.NoCache)
-            {
-                string? cacheRoot = environment.CacheRootOverride();
-                new BinlogCaptureStore(solutionPath, cacheRoot).Ingest(replayed.Solution, binlogFullPath, binlog, ct);
-            }
+            string? cacheRoot = environment.CacheRootOverride();
+            new BinlogCaptureStore(solutionPath, cacheRoot).Ingest(replayed.Solution, binlogFullPath, binlog, ct);
+        }
 
-            var source = new ReplayedSolutionSource(
-                replayed.Solution, replayed.LoadDiagnosticsWith(diagnostics), replayed.TargetFrameworks);
-            return await invokeRunner(solutionPath, source);
-        }
-        finally
-        {
-            replayed.Dispose();
-        }
+        var source = new ReplayedSolutionSource(
+            replayed.Solution, replayed.LoadDiagnosticsWith(diagnostics), replayed.TargetFrameworks);
+        return await invokeRunner(solutionPath, source);
     }
 
     // A structurally-valid capture: replay it lazily, so a fragment-cache hit stays replay-free and

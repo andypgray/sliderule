@@ -16,7 +16,7 @@ namespace SlideRule.Cli.SpecLoading;
 ///     the spec's <c>Type</c> references, so it is never actually collected while that model lives;
 ///     a path load would therefore hold an OS file lock for the whole host lifetime.
 /// </remarks>
-internal sealed class SpecLoadContext : AssemblyLoadContext
+internal sealed class SpecLoadContext : AssemblyLoadContext, IDisposable
 {
     /// <summary>The spec contract's simple name — the one assembly identity shared across the boundary.</summary>
     internal const string ContractAssemblyName = "SlideRule";
@@ -30,6 +30,12 @@ internal sealed class SpecLoadContext : AssemblyLoadContext
         : base(true)
     {
         _resolver = new AssemblyDependencyResolver(mainAssemblyPath);
+    }
+
+    /// <summary>Starts unloading the context.</summary>
+    public void Dispose()
+    {
+        Unload();
     }
 
     /// <summary>

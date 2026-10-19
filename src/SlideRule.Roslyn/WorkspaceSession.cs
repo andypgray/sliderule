@@ -4,6 +4,7 @@ using SlideRule.Internal;
 using SlideRule.Roslyn.Caching;
 using SlideRule.Roslyn.Diagnostics;
 using SlideRule.Roslyn.Solutions;
+using SlideRule.Roslyn.Threading;
 
 namespace SlideRule.Roslyn;
 
@@ -185,22 +186,15 @@ internal sealed class WorkspaceSession : IAsyncDisposable
         ObjectDisposedException.ThrowIf(Volatile.Read(ref disposed) != 0, this);
         string normalizedPath = Path.GetFullPath(solutionPath);
 
-        await gate.WaitAsync(ct).ConfigureAwait(false);
-        try
-        {
-            ObjectDisposedException.ThrowIf(disposed != 0, this);
+        using SemaphoreRelease held = await gate.LockAsync(ct).ConfigureAwait(false);
+        ObjectDisposedException.ThrowIf(disposed != 0, this);
 
-            if (loaded is null || !PathEquals(loadedSolutionPath, normalizedPath))
-                await LoadFreshAsync(normalizedPath, ct).ConfigureAwait(false);
-            else
-                await ReconcileAsync(ct).ConfigureAwait(false);
+        if (loaded is null || !PathEquals(loadedSolutionPath, normalizedPath))
+            await LoadFreshAsync(normalizedPath, ct).ConfigureAwait(false);
+        else
+            await ReconcileAsync(ct).ConfigureAwait(false);
 
-            return snapshot!;
-        }
-        finally
-        {
-            gate.Release();
-        }
+        return snapshot!;
     }
 
     /// <summary>
@@ -229,7 +223,18 @@ internal sealed class WorkspaceSession : IAsyncDisposable
         var collectedLock = new object();
 
         LoadedSolution freshlyLoaded = await WorkspaceLoader.LoadAsync(solutionPath, CollectDiagnostic, ct).ConfigureAwait(false);
-        Solution materialized = await MaterializeDocumentTextsAsync(freshlyLoaded.Solution, ct).ConfigureAwait(false);
+
+        // Until it is stored in loaded, nothing else will dispose the fresh workspace and its build host.
+        Solution materialized;
+        try
+        {
+            materialized = await MaterializeDocumentTextsAsync(freshlyLoaded.Solution, ct).ConfigureAwait(false);
+        }
+        catch
+        {
+            freshlyLoaded.Dispose();
+            throw;
+        }
 
         loaded = freshlyLoaded;
         current = materialized;

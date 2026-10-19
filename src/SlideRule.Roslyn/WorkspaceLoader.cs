@@ -93,19 +93,27 @@ internal static class WorkspaceLoader
             if (e.Diagnostic.Kind == WorkspaceDiagnosticKind.Failure) diagnosticLog?.Invoke(e.Diagnostic.Message);
         });
 
-        Solution solution = await OpenAsync(workspace, solutionPath, ct);
-        (Solution stripped, int _, int _) = solution.StripUnresolvedReferences();
-        (Solution normalized, IReadOnlyDictionary<ProjectId, string> targetFrameworks) =
-            stripped.NormalizeProjectNames();
+        // The workspace owns an out-of-process build host, so a throw before the result takes ownership of
+        // it (a cancel, an unreadable filter) disposes it here rather than orphaning it.
+        try
+        {
+            Solution solution = await OpenAsync(workspace, solutionPath, ct);
+            (Solution stripped, int _, int _) = solution.StripUnresolvedReferences();
+            (Solution normalized, IReadOnlyDictionary<ProjectId, string> targetFrameworks) =
+                stripped.NormalizeProjectNames();
 
-        // What the load did and did not produce is read off the loaded structure here, at the boundary, so
-        // every consumer downstream is handed the same answer rather than re-deriving one from the
-        // diagnostic text. The restore verdict is the same idea one file further out: a project whose restore
-        // failed loads completely, so nothing in the loaded structure says so and only its assets file can.
-        ProjectLoadReport report = ProjectLoadFailures.Detect(normalized, solutionPath);
-        IReadOnlyList<string> restoreFailed = RestoreFailures.Detect(normalized, report.Failed);
+            // A project whose restore failed loads completely, so nothing in the loaded structure says so and
+            // only its assets file can.
+            ProjectLoadReport report = ProjectLoadFailures.Detect(normalized, solutionPath);
+            IReadOnlyList<string> restoreFailed = RestoreFailures.Detect(normalized, report.Failed);
 
-        return new LoadedSolution(workspace, normalized, targetFrameworks, report, restoreFailed);
+            return new LoadedSolution(workspace, normalized, targetFrameworks, report, restoreFailed);
+        }
+        catch
+        {
+            workspace.Dispose();
+            throw;
+        }
     }
 
     /// <summary>

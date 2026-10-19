@@ -121,7 +121,13 @@ internal sealed class ReplayedSolution : IDisposable
     /// <summary>Disposes the workspace and the binlog reader (releasing its stream and analyzer host).</summary>
     public void Dispose()
     {
-        Workspace.Dispose();
-        _reader.Dispose();
+        try
+        {
+            Workspace.Dispose();
+        }
+        finally
+        {
+            _reader.Dispose();
+        }
     }
 }

@@ -34,6 +34,11 @@ internal sealed class LazyCaptureReplaySource(string binlogCopyPath) : ISolution
     /// <inheritdoc />
     public Task<SolutionHandle> AcquireAsync(string solutionPath, CancellationToken ct)
     {
+        // The handle handed out does not own the replay, so a second replay could neither replace the first
+        // (whose handle may still be reading through its reader) nor be released alongside it.
+        if (_replayed is not null)
+            throw new InvalidOperationException("A capture replay source serves one acquire per run.");
+
         var diagnostics = new List<string>();
         ReplayedSolution replayed;
         try

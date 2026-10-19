@@ -4,6 +4,7 @@ using SlideRule.Extraction;
 using SlideRule.Extraction.Fragments;
 using SlideRule.Internal;
 using SlideRule.Roslyn.Caching;
+using SlideRule.Roslyn.Threading;
 
 namespace SlideRule.Roslyn.Sessions;
 
@@ -191,17 +192,10 @@ internal sealed class SessionFragmentStore : IDisposable
     internal async Task<SessionFragmentSet> GetFragmentsAsync(
         WorkspaceSnapshot snapshot, IReadOnlySet<string>? declaredMembers, CancellationToken ct)
     {
-        await gate.WaitAsync(ct).ConfigureAwait(false);
-        try
-        {
-            return snapshot.Generation != extractedGeneration
-                ? await FullWalkAsync(snapshot, declaredMembers, ct).ConfigureAwait(false)
-                : await IncrementalWalkAsync(snapshot, declaredMembers, ct).ConfigureAwait(false);
-        }
-        finally
-        {
-            gate.Release();
-        }
+        using SemaphoreRelease held = await gate.LockAsync(ct).ConfigureAwait(false);
+        return snapshot.Generation != extractedGeneration
+            ? await FullWalkAsync(snapshot, declaredMembers, ct).ConfigureAwait(false)
+            : await IncrementalWalkAsync(snapshot, declaredMembers, ct).ConfigureAwait(false);
     }
 
     /// <summary>

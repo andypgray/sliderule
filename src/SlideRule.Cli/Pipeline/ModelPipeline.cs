@@ -57,57 +57,50 @@ internal static class ModelPipeline
     /// </summary>
     public static ArchitectureModel LoadModel(string specDllPath)
     {
-        var context = new SpecLoadContext(specDllPath);
+        using var context = new SpecLoadContext(specDllPath);
+        Assembly assembly = context.LoadWithoutLocking(specDllPath);
+        IReadOnlyList<IArchitectureSpec> specs;
         try
         {
-            Assembly assembly = context.LoadWithoutLocking(specDllPath);
-            IReadOnlyList<IArchitectureSpec> specs;
-            try
-            {
-                specs = SpecDiscovery.FindSpecs(assembly);
-            }
-            catch (SpecDiscoveryException ex)
-            {
-                throw new UserErrorException(ex.Message, ex);
-            }
-            catch (Exception ex) when (SpecContractMismatch.SkewCause(ex) is { } cause)
-            {
-                // A contract member or type this host's copy lacks or keeps internal, met while the spec's types
-                // load or a spec class is created.
-                throw SpecContractMismatch.MapSkew(assembly, specDllPath, cause);
-            }
-            catch (ReflectionTypeLoadException ex)
-            {
-                // GetTypes() couldn't load every type — a missing or version-mismatched dependency of the
-                // spec assembly. Surface the distinct loader messages as one user error, not a reflection crash.
-                throw new UserErrorException(LoaderFailureMessage(ex, specDllPath), ex);
-            }
-
-            try
-            {
-                return ArchModelBuilder.Build(specs); // SpecValidationException propagates to the top handler
-            }
-            catch (FileNotFoundException ex) when (SpecDependencyLoadFailure.IsAssemblyLoadFailure(ex))
-            {
-                throw SpecDependencyLoadFailure.Map(ex, specDllPath);
-            }
-            catch (Exception ex) when (SpecContractMismatch.SkewCause(ex) is { } cause)
-            {
-                // A contract member or type this host's copy lacks or keeps internal, met while Define() runs. The
-                // bind is version-agnostic by design, so it got this far; what the spec reached for is the one
-                // thing that cannot work.
-                throw SpecContractMismatch.MapSkew(assembly, specDllPath, cause);
-            }
-            catch (TypeLoadException ex)
-            {
-                // A typeof() anchor whose base type or implemented interface lives in a .NET Framework-only
-                // assembly: the dependency resolved, the type did not. Without this arm it surfaces raw.
-                throw SpecDependencyLoadFailure.Map(ex, specDllPath);
-            }
+            specs = SpecDiscovery.FindSpecs(assembly);
         }
-        finally
+        catch (SpecDiscoveryException ex)
         {
-            context.Unload();
+            throw new UserErrorException(ex.Message, ex);
+        }
+        catch (Exception ex) when (SpecContractMismatch.SkewCause(ex) is { } cause)
+        {
+            // A contract member or type this host's copy lacks or keeps internal, met while the spec's types
+            // load or a spec class is created.
+            throw SpecContractMismatch.MapSkew(assembly, specDllPath, cause);
+        }
+        catch (ReflectionTypeLoadException ex)
+        {
+            // GetTypes() couldn't load every type — a missing or version-mismatched dependency of the
+            // spec assembly. Surface the distinct loader messages as one user error, not a reflection crash.
+            throw new UserErrorException(LoaderFailureMessage(ex, specDllPath), ex);
+        }
+
+        try
+        {
+            return ArchModelBuilder.Build(specs); // SpecValidationException propagates to the top handler
+        }
+        catch (FileNotFoundException ex) when (SpecDependencyLoadFailure.IsAssemblyLoadFailure(ex))
+        {
+            throw SpecDependencyLoadFailure.Map(ex, specDllPath);
+        }
+        catch (Exception ex) when (SpecContractMismatch.SkewCause(ex) is { } cause)
+        {
+            // A contract member or type this host's copy lacks or keeps internal, met while Define() runs. The
+            // bind is version-agnostic by design, so it got this far; what the spec reached for is the one
+            // thing that cannot work.
+            throw SpecContractMismatch.MapSkew(assembly, specDllPath, cause);
+        }
+        catch (TypeLoadException ex)
+        {
+            // A typeof() anchor whose base type or implemented interface lives in a .NET Framework-only
+            // assembly: the dependency resolved, the type did not. Without this arm it surfaces raw.
+            throw SpecDependencyLoadFailure.Map(ex, specDllPath);
         }
     }
 
