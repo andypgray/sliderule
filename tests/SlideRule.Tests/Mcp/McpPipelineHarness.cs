@@ -64,24 +64,40 @@ internal sealed class McpPipelineHarness : IAsyncDisposable
     {
         // Dispose order matters: closing the client sends EOF, which ends the single-session server's
         // RunAsync and triggers host shutdown; then stop the host (bounded so a stuck stop can't hang the
-        // suite).
-        await Client.DisposeAsync();
-
-        using CancellationTokenSource stopTimeout = new(TimeSpan.FromSeconds(30));
-        await _host.StopAsync(stopTimeout.Token);
-
-        // DisposeAsync, not Dispose: the warm WorkspaceSession singleton is IAsyncDisposable-only, and a
-        // synchronous container dispose throws when it meets one. This also awaits the session's own
-        // MSBuildWorkspace/BuildHost teardown before the test that used the harness ends.
-        if (_host is IAsyncDisposable asyncHost)
-            await asyncHost.DisposeAsync();
-        else
-            _host.Dispose();
-
-        // The warm ISolutionSource factory registers the session's disposer on the static ServerShutdown
-        // list; clear it so registrations don't accumulate (or dangle onto a disposed session) across the
-        // suite — the same reset idiom ServerShutdownTests uses.
-        ServerShutdown.ResetForTests();
+        // suite). Each step runs in the finally of the one before, so a throw early in the chain still
+        // tears down the rest.
+        try
+        {
+            await Client.DisposeAsync();
+        }
+        finally
+        {
+            try
+            {
+                using CancellationTokenSource stopTimeout = new(TimeSpan.FromSeconds(30));
+                await _host.StopAsync(stopTimeout.Token);
+            }
+            finally
+            {
+                try
+                {
+                    // DisposeAsync, not Dispose: the warm WorkspaceSession singleton is IAsyncDisposable-only, and
+                    // a synchronous container dispose throws when it meets one. This also awaits the session's own
+                    // MSBuildWorkspace/BuildHost teardown before the test that used the harness ends.
+                    if (_host is IAsyncDisposable asyncHost)
+                        await asyncHost.DisposeAsync();
+                    else
+                        _host.Dispose();
+                }
+                finally
+                {
+                    // The warm ISolutionSource factory registers the session's disposer on the static
+                    // ServerShutdown list; clear it so registrations don't accumulate (or dangle onto a disposed
+                    // session) across the suite.
+                    ServerShutdown.ResetForTests();
+                }
+            }
+        }
     }
 
     /// <summary>

@@ -15,8 +15,8 @@ namespace SlideRule.Tests.TestSupport;
 ///     </para>
 ///     <para>
 ///         One tree per class is what lets the replay classes run in parallel: a class's tests run one at a
-///         time, so a test that edits the tree and restores it in a <c>finally</c> is never observed by
-///         another reader mid-edit.
+///         time, so a test that edits the tree and restores it through a <see cref="ScopedFile" /> is never
+///         observed by another reader mid-edit.
 ///     </para>
 /// </remarks>
 public sealed class BinlogFixtureWorkspace : IDisposable
@@ -59,11 +59,11 @@ public sealed class BinlogFixtureWorkspace : IDisposable
     /// <summary>
     ///     Writes a second solution file beside <see cref="SolutionPath" /> declaring its members plus
     ///     <c>{projectName}\{projectName}.csproj</c>, a project with no file on disk that the binlog therefore
-    ///     never built, and returns its path. It carries the original's write time, so a capture's ingest reads
-    ///     it as no newer than the build rather than refusing the binlog as stale. The caller deletes it in a
-    ///     <c>finally</c>.
+    ///     never built, and returns it as a scope that deletes it on dispose. It carries the original's write
+    ///     time, so a capture's ingest reads it as no newer than the build rather than refusing the binlog as
+    ///     stale.
     /// </summary>
-    internal string WriteSolutionWithUnbuiltMember(string projectName)
+    internal ScopedFile WriteSolutionWithUnbuiltMember(string projectName)
     {
         string declared = File.ReadAllText(SolutionPath);
         int global = declared.IndexOf("Global", StringComparison.Ordinal);
@@ -75,6 +75,6 @@ public sealed class BinlogFixtureWorkspace : IDisposable
         string widerPath = PathOf("MyApp.Wider.sln");
         File.WriteAllText(widerPath, declared.Insert(global, member));
         File.SetLastWriteTimeUtc(widerPath, File.GetLastWriteTimeUtc(SolutionPath));
-        return widerPath;
+        return ScopedFile.Planted(widerPath);
     }
 }

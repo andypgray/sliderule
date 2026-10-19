@@ -27,56 +27,49 @@ public sealed class LegacySpecLoadingTests
     {
         // Arrange
         string specPath = CliRunner.LegacySpecDll;
-        var context = new SpecLoadContext(specPath);
-        try
-        {
-            // Act
-            Assembly spec = context.LoadFromAssemblyPath(specPath);
-            IReadOnlyList<IArchitectureSpec> specs = SpecDiscovery.FindSpecs(spec);
-            ArchitectureModel model = ArchModelBuilder.Build(specs);
+        using var context = new SpecLoadContext(specPath);
 
-            // Assert: the fixture really is .NET Framework, not silently retargeted by the build.
-            spec.GetCustomAttribute<TargetFrameworkAttribute>()!.FrameworkName
-                .ShouldBe(".NETFramework,Version=v4.8");
+        // Act
+        Assembly spec = context.LoadFromAssemblyPath(specPath);
+        IReadOnlyList<IArchitectureSpec> specs = SpecDiscovery.FindSpecs(spec);
+        ArchitectureModel model = ArchModelBuilder.Build(specs);
 
-            // Type identity holds across the ALC boundary — the shared-contract-to-Default delegation.
-            specs.ShouldHaveSingleItem()
-                .ShouldBeAssignableTo<IArchitectureSpec>();
+        // Assert: the fixture really is .NET Framework, not silently retargeted by the build.
+        spec.GetCustomAttribute<TargetFrameworkAttribute>()!.FrameworkName
+            .ShouldBe(".NETFramework,Version=v4.8");
 
-            // The model builds, and the second sentence comes from a typeof() anchor on a net48 product type.
-            model.Rule("legacy/interfaces")
-                .Sentence
-                .ShouldBe("Interfaces in `Legacy.*` must be named `I*`.");
-            model.Rule("legacy/gateway-through-interface")
-                .Sentence
-                .ShouldBe("Types in `Legacy.*` must not construct `BillingGateway`.");
+        // Type identity holds across the ALC boundary — the shared-contract-to-Default delegation.
+        specs.ShouldHaveSingleItem()
+            .ShouldBeAssignableTo<IArchitectureSpec>();
 
-            // The key finding: a net48 build writes no .deps.json, so the AssemblyDependencyResolver
-            // has nothing to consult and falls back to the spec's own output directory — where
-            // CopyLocalLockFileAssemblies staged the product DLL. It lands in the spec ALC, not Default.
-            File.Exists(Path.ChangeExtension(specPath, ".deps.json"))
-                .ShouldBeFalse();
-            File.Exists(Path.Combine(Path.GetDirectoryName(specPath)!, $"{ProductAssemblyName}.dll"))
-                .ShouldBeTrue();
-            Assembly product = context.Assemblies.Single(loaded => loaded.GetName()
-                .Name == ProductAssemblyName);
-            AssemblyLoadContext.Default.Assemblies
-                .Select(loaded => loaded.GetName()
-                    .Name)
-                .ShouldNotContain(ProductAssemblyName);
+        // The model builds, and the second sentence comes from a typeof() anchor on a net48 product type.
+        model.Rule("legacy/interfaces")
+            .Sentence
+            .ShouldBe("Interfaces in `Legacy.*` must be named `I*`.");
+        model.Rule("legacy/gateway-through-interface")
+            .Sentence
+            .ShouldBe("Types in `Legacy.*` must not construct `BillingGateway`.");
 
-            // The context loads dependencies from their bytes so a warm host leaves the spec's build output
-            // replaceable (SpecLoadNoLockTests), and a stream-loaded assembly reports no location — so
-            // app-local resolution cannot be pinned through product.Location. The two facts above carry the
-            // claim instead: the file exists only beside the spec, and the resolver is the context's one
-            // route to it.
-            product.Location.ShouldBeEmpty();
-        }
-        finally
-        {
-            // Best-effort unload; nothing gates on GC timing.
-            context.Unload();
-        }
+        // A net48 build writes no .deps.json, so the AssemblyDependencyResolver
+        // has nothing to consult and falls back to the spec's own output directory — where
+        // CopyLocalLockFileAssemblies staged the product DLL. It lands in the spec ALC, not Default.
+        File.Exists(Path.ChangeExtension(specPath, ".deps.json"))
+            .ShouldBeFalse();
+        File.Exists(Path.Combine(Path.GetDirectoryName(specPath)!, $"{ProductAssemblyName}.dll"))
+            .ShouldBeTrue();
+        Assembly product = context.Assemblies.Single(loaded => loaded.GetName()
+            .Name == ProductAssemblyName);
+        AssemblyLoadContext.Default.Assemblies
+            .Select(loaded => loaded.GetName()
+                .Name)
+            .ShouldNotContain(ProductAssemblyName);
+
+        // The context loads dependencies from their bytes so a warm host leaves the spec's build output
+        // replaceable (SpecLoadNoLockTests), and a stream-loaded assembly reports no location — so
+        // app-local resolution cannot be pinned through product.Location. The two facts above carry the
+        // claim instead: the file exists only beside the spec, and the resolver is the context's one
+        // route to it.
+        product.Location.ShouldBeEmpty();
     }
 
     [Fact]
@@ -86,28 +79,21 @@ public sealed class LegacySpecLoadingTests
         // implements System.Web.IHttpHandler, which has no counterpart on .NET, so a typeof() anchor on it
         // cannot resolve however the spec project is built.
         string specPath = CliRunner.LegacySpecDll;
-        var context = new SpecLoadContext(specPath);
-        try
-        {
-            string productBesideSpec = Path.Combine(
-                Path.GetDirectoryName(specPath)!, $"{ProductAssemblyName}.dll");
-            Assembly product = context.LoadFromAssemblyPath(productBesideSpec);
+        using var context = new SpecLoadContext(specPath);
+        string productBesideSpec = Path.Combine(
+            Path.GetDirectoryName(specPath)!, $"{ProductAssemblyName}.dll");
+        Assembly product = context.LoadFromAssemblyPath(productBesideSpec);
 
-            // Act
-            var thrown = Should.Throw<TypeLoadException>(() => product.GetType("Legacy.Product.LegacyHandler", true));
+        // Act
+        var thrown = Should.Throw<TypeLoadException>(() => product.GetType("Legacy.Product.LegacyHandler", true));
 
-            // Assert: the runtime names the unloadable interface, and the CLI's mapping carries that name
-            // into a user error rather than letting the raw crash out. This is the companion to the
-            // fabricated-exception unit test, which can only reach the unnamed degraded form.
-            thrown.TypeName.ShouldBe("System.Web.IHttpHandler");
-            UserErrorException mapped = SpecDependencyLoadFailure.Map(thrown, specPath);
-            mapped.Message.ShouldStartWith(
-                "The spec assembly 'SlideRule.LegacySpec' could not load the type "
-                + "'System.Web.IHttpHandler' while running Define().");
-        }
-        finally
-        {
-            context.Unload();
-        }
+        // Assert: the runtime names the unloadable interface, and the CLI's mapping carries that name
+        // into a user error rather than letting the raw crash out. This is the companion to the
+        // fabricated-exception unit test, which can only reach the unnamed degraded form.
+        thrown.TypeName.ShouldBe("System.Web.IHttpHandler");
+        UserErrorException mapped = SpecDependencyLoadFailure.Map(thrown, specPath);
+        mapped.Message.ShouldStartWith(
+            "The spec assembly 'SlideRule.LegacySpec' could not load the type "
+            + "'System.Web.IHttpHandler' while running Define().");
     }
 }

@@ -47,8 +47,8 @@ internal static class ProcessFileFootprintAssertions
 
         while (true)
         {
-            IReadOnlyList<RetainedPath> retained = ProcessFileFootprint.AcquiredPathsUnder(
-                process, root, inheritedHandles, injectedProfilerDirectory);
+            IReadOnlyList<RetainedPath> retained = process.AcquiredPathsUnder(
+                root, inheritedHandles, injectedProfilerDirectory);
 
             if (retained.Count == 0) return;
 

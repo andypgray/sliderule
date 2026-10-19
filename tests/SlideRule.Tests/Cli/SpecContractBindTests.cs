@@ -25,24 +25,17 @@ public sealed class SpecContractBindTests
     [InlineData("9.9.9.9")] // and a version no host will ever carry
     public void LoadFromAssemblyName_ContractAtAnyVersion_ResolvesToTheHostsOwnCopy(string version)
     {
-        var context = new SpecLoadContext(CliRunner.CleanSpecDll);
+        using var context = new SpecLoadContext(CliRunner.CleanSpecDll);
         var requested = new AssemblyName(SpecLoadContext.ContractAssemblyName) { Version = Version.Parse(version) };
 
-        try
-        {
-            Assembly resolved = context.LoadFromAssemblyName(requested);
+        Assembly resolved = context.LoadFromAssemblyName(requested);
 
-            // Same instance, not merely the same name: this is what makes `spec is IArchitectureSpec` hold
-            // across the load-context boundary, and it is the whole reason the contract is short-circuited.
-            resolved.ShouldBeSameAs(
-                typeof(IArchitectureSpec).Assembly,
-                $"a spec compiled against contract {version} must bind to the contract this host carries; "
-                + "binding on the version instead is what failed specs that would have run perfectly.");
-        }
-        finally
-        {
-            context.Unload();
-        }
+        // Same instance, not the same name alone: this is what makes `spec is IArchitectureSpec` hold
+        // across the load-context boundary, and it is the whole reason the contract is short-circuited.
+        resolved.ShouldBeSameAs(
+            typeof(IArchitectureSpec).Assembly,
+            $"a spec compiled against contract {version} must bind to the contract this host carries; "
+            + "binding on the version instead is what failed specs that would have run perfectly.");
     }
 
     [Fact]

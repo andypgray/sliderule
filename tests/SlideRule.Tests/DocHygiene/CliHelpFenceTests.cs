@@ -69,21 +69,18 @@ public sealed class CliHelpFenceTests
     public void Render_IgnoresTheUICulture()
     {
         // Arrange: System.CommandLine translates its headings, and German is one of its satellites.
-        CultureInfo culture = CultureInfo.CurrentUICulture;
         string german;
         string english;
 
         // Act
-        try
+        using (new ScopedUICulture(CultureInfo.GetCultureInfo("de-DE")))
         {
-            CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("de-DE");
             german = CliHelpFences.Render("sliderule check");
-            CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("en-US");
-            english = CliHelpFences.Render("sliderule check");
         }
-        finally
+
+        using (new ScopedUICulture(CultureInfo.GetCultureInfo("en-US")))
         {
-            CultureInfo.CurrentUICulture = culture;
+            english = CliHelpFences.Render("sliderule check");
         }
 
         // Assert

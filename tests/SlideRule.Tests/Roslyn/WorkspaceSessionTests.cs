@@ -209,22 +209,17 @@ public sealed class WorkspaceSessionTests(SharedWorkspaceSession shared) : IClas
         long reloadsBefore = session.FullReloadCount;
         string propsFile = Path.Combine(Path.GetDirectoryName(shared.SolutionPath)!, "Directory.Build.props");
 
-        try
-        {
-            // Act — a props file that did not exist at load appears in the solution directory (a probe-chain
-            // ancestor recorded as absent).
-            await File.WriteAllTextAsync(propsFile, "<Project />\n", Ct);
-            await session.GetCurrentAsync(shared.SolutionPath, Ct);
+        // The write lands in an ancestor of the whole fixture copy, so it outlives this test's tree
+        // unless it is taken back: every later case would build against a props file it never asked for.
+        using ScopedFile held = ScopedFile.Hold(propsFile);
 
-            // Assert
-            (session.FullReloadCount - reloadsBefore).ShouldBe(1);
-        }
-        finally
-        {
-            // The write lands in an ancestor of the whole fixture copy, so it outlives this test's tree
-            // unless it is taken back: every later case would build against a props file it never asked for.
-            File.Delete(propsFile);
-        }
+        // Act — a props file that did not exist at load appears in the solution directory (a probe-chain
+        // ancestor recorded as absent).
+        await File.WriteAllTextAsync(propsFile, "<Project />\n", Ct);
+        await session.GetCurrentAsync(shared.SolutionPath, Ct);
+
+        // Assert
+        (session.FullReloadCount - reloadsBefore).ShouldBe(1);
     }
 
     [Fact]
@@ -250,7 +245,10 @@ public sealed class WorkspaceSessionTests(SharedWorkspaceSession shared) : IClas
     {
         // Arrange
         using var fixture = new TempFixtureWorkspace();
-        var session = new WorkspaceSession();
+
+        // The scope's own dispose is a third call, and a no-op once the two below have run; it is what
+        // releases the session when the arrange step throws.
+        await using var session = new WorkspaceSession();
         await session.GetCurrentAsync(fixture.SolutionPath, Ct);
 
         // Act

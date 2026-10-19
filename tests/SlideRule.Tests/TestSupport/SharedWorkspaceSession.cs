@@ -51,8 +51,14 @@ public sealed class SharedWorkspaceSession : IAsyncDisposable
     /// <summary>Disposes the session first, so the copy is unheld when it is deleted.</summary>
     public async ValueTask DisposeAsync()
     {
-        await Session.DisposeAsync();
-        _fixture.Dispose();
+        try
+        {
+            await Session.DisposeAsync();
+        }
+        finally
+        {
+            _fixture.Dispose();
+        }
     }
 
     /// <summary>Absolute path to a file inside the copy, from solution-relative segments.</summary>

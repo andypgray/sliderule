@@ -99,21 +99,14 @@ public sealed class BinlogReplayFidelityTests(BinlogFixtureWorkspace fixture) : 
     {
         // A binlog of less than the solution. A capture's ingest refuses one, but a run that ingests nothing
         // replays it as given, and only this answer stops it checking a model missing that project.
-        string widerSolution = Fixture.WriteSolutionWithUnbuiltMember("MyApp.Unbuilt");
-        try
-        {
-            string unbuilt = Fixture.PathOf("MyApp.Unbuilt", "MyApp.Unbuilt.csproj");
-            var diagnostics = new List<string>();
+        using ScopedFile widerSolution = Fixture.WriteSolutionWithUnbuiltMember("MyApp.Unbuilt");
+        string unbuilt = Fixture.PathOf("MyApp.Unbuilt", "MyApp.Unbuilt.csproj");
+        var diagnostics = new List<string>();
 
-            using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath, widerSolution, diagnostics.Add);
+        using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath, widerSolution.Path, diagnostics.Add);
 
-            replayed.FailedProjects.ShouldBe([unbuilt]);
-            diagnostics.ShouldBe([BinlogReplayer.UnbuiltMemberMessage(unbuilt)]);
-        }
-        finally
-        {
-            File.Delete(widerSolution);
-        }
+        replayed.FailedProjects.ShouldBe([unbuilt]);
+        diagnostics.ShouldBe([BinlogReplayer.UnbuiltMemberMessage(unbuilt)]);
     }
 
     [Fact]
@@ -142,10 +135,10 @@ public sealed class BinlogReplayFidelityTests(BinlogFixtureWorkspace fixture) : 
     public async Task Replay_AfterAppendingTypePostBuild_ReflectsCurrentDiskNotCapturedText()
     {
         // Arrange — append a new type to a source file already covered by the binlog's csc file list, AFTER
-        // the binlog was built. Mutate the shared copy in place; a try/finally reverts it for the others.
+        // the binlog was built. Mutate the shared copy in place; a held ScopedFile reverts it for the others.
         string moneySource = Fixture.PathOf("MyApp.Domain", "Money.cs");
         string original = File.ReadAllText(moneySource);
-        try
+        using (ScopedFile.Hold(moneySource))
         {
             File.WriteAllText(moneySource, $"{original}{Environment.NewLine}public sealed class ReplayFreshnessProbe {{ }}{Environment.NewLine}");
 
@@ -156,10 +149,6 @@ public sealed class BinlogReplayFidelityTests(BinlogFixtureWorkspace fixture) : 
             // Assert — the post-capture type is in the model, proving text is not embedded in the binlog.
             model.Types.Select(t => t.FullName)
                 .ShouldContain("MyApp.Domain.ReplayFreshnessProbe");
-        }
-        finally
-        {
-            File.WriteAllText(moneySource, original);
         }
 
         // And the revert is visible to a fresh replay — the freshness contract cuts both ways.
@@ -174,7 +163,17 @@ public sealed class BinlogReplayFidelityTests(BinlogFixtureWorkspace fixture) : 
     {
         // Arrange
         ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath, Fixture.SolutionPath);
-        CodebaseModel before = await CodebaseExtractor.ExtractFromSolutionAsync(replayed.Solution);
+        CodebaseModel before;
+        try
+        {
+            before = await CodebaseExtractor.ExtractFromSolutionAsync(replayed.Solution);
+        }
+        catch
+        {
+            // The dispose below is the act, so the wrapper is released here only when the arrange fails.
+            replayed.Dispose();
+            throw;
+        }
 
         // Act — dispose the wrapper (workspace + reader), then keep using the Solution.
         replayed.Dispose();

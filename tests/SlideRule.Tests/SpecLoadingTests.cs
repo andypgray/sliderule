@@ -21,25 +21,17 @@ public class SpecLoadingTests
     public void LoadFixtureSpec_ViaAssemblyLoadContext_DiscoversBuildsAndEnumerates()
     {
         string fixturePath = CliRunner.SpecFixtureDll;
-        var context = new SpecLoadContext(fixturePath);
-        try
-        {
-            Assembly fixture = context.LoadFromAssemblyPath(fixturePath);
-            IReadOnlyList<IArchitectureSpec> specs = SpecDiscovery.FindSpecs(fixture);
+        using var context = new SpecLoadContext(fixturePath);
+        Assembly fixture = context.LoadFromAssemblyPath(fixturePath);
+        IReadOnlyList<IArchitectureSpec> specs = SpecDiscovery.FindSpecs(fixture);
 
-            specs.ShouldNotBeEmpty();
-            // Type identity across the ALC boundary — the shared-contract-to-Default delegation.
-            specs[0]
-                .ShouldBeAssignableTo<IArchitectureSpec>();
+        specs.ShouldNotBeEmpty();
+        // Type identity across the ALC boundary — the shared-contract-to-Default delegation.
+        specs[0]
+            .ShouldBeAssignableTo<IArchitectureSpec>();
 
-            ArchitectureModel model = ArchModelBuilder.Build(specs);
-            ArchRule rule = model.Rule("fixture/interfaces");
-            rule.Sentence.ShouldBe("Interfaces in `Fixture.*` must be named `I*`.");
-        }
-        finally
-        {
-            // Best-effort unload; nothing gates on GC timing.
-            context.Unload();
-        }
+        ArchitectureModel model = ArchModelBuilder.Build(specs);
+        ArchRule rule = model.Rule("fixture/interfaces");
+        rule.Sentence.ShouldBe("Interfaces in `Fixture.*` must be named `I*`.");
     }
 }

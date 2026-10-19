@@ -1,6 +1,7 @@
 using Shouldly;
 using SlideRule.Cli.Verbs;
 using SlideRule.Tests.Cli;
+using SlideRule.Tests.TestSupport;
 
 namespace SlideRule.Tests.Hooks;
 
@@ -141,14 +142,8 @@ internal static class HookRunAssertions
         var probe = $".same-directory-{Guid.NewGuid():N}";
         string planted = Path.Combine(directory, probe);
         File.WriteAllText(planted, "");
-        try
-        {
-            return File.Exists(Path.Combine(candidate, probe));
-        }
-        finally
-        {
-            File.Delete(planted);
-        }
+        using ScopedFile held = ScopedFile.Planted(planted);
+        return File.Exists(Path.Combine(candidate, probe));
     }
 
     /// <summary>The row's own reason with the run appended, so a red carries both rather than either.</summary>

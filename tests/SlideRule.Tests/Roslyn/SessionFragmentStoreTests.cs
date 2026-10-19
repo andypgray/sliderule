@@ -643,8 +643,14 @@ public sealed class SessionFragmentStoreTests(SessionFragmentStoreTests.Sessions
         /// <summary>Disposes both sessions and deletes their copies.</summary>
         public async ValueTask DisposeAsync()
         {
-            await MyApp.DisposeAsync();
-            await MultiTfm.DisposeAsync();
+            try
+            {
+                await MyApp.DisposeAsync();
+            }
+            finally
+            {
+                await MultiTfm.DisposeAsync();
+            }
         }
 
         /// <summary>Records a file's bytes and mtime before the running test first changes it.</summary>

@@ -98,35 +98,29 @@ public sealed class BinlogCliE2ETests(BinlogFixtureWorkspace fixture)
         await RunAsync(cache, "check", Sln, "--binlog", Binlog, "--spec", CleanSpec); // seed the capture (replay)
 
         string csproj = Fixture.PathOf("MyApp.Domain", "MyApp.Domain.csproj");
-        (byte[] bytes, DateTime mtime) original = FileSnapshot.Capture(csproj);
-        try
-        {
-            // A harmless XML comment: a structural content change that invalidates the capture (stale) and the
-            // fragment cache (a structural miss), without changing the extracted model — so stdout is unmoved.
-            string edited = File.ReadAllText(csproj)
-                .Replace("</Project>", "  <!-- capture stale probe -->\n</Project>");
-            File.WriteAllText(csproj, edited);
+        using ScopedFile held = ScopedFile.Hold(csproj);
 
-            // Baseline: a plain cold run over the edited tree with no capture (fresh cache) — one build, silent.
-            CliResult cold = await RunAsync(FreshCache(), "check", Sln, "--spec", CleanSpec);
-            cold.Loads.ShouldBe(1);
+        // A harmless XML comment: a structural content change that invalidates the capture (stale) and the
+        // fragment cache (a structural miss), without changing the extracted model — so stdout is unmoved.
+        string edited = File.ReadAllText(csproj)
+            .Replace("</Project>", "  <!-- capture stale probe -->\n</Project>");
+        File.WriteAllText(csproj, edited);
 
-            // The seeded cache now holds a stale capture: the gate notices once at acquisition, then builds.
-            CliResult invalid = await RunAsync(cache, "check", Sln, "--spec", CleanSpec);
-            var notice = $"warning: {BinlogCaptureStore.StaleNotice(Path.GetFullPath(csproj))}";
+        // Baseline: a plain cold run over the edited tree with no capture (fresh cache) — one build, silent.
+        CliResult cold = await RunAsync(FreshCache(), "check", Sln, "--spec", CleanSpec);
+        cold.Loads.ShouldBe(1);
 
-            // Not ShouldMatchTheOutputOf: two channels match the cold run and the third is composed from it.
-            invalid.Out.ShouldBe(cold.Out); // stdout byte-identical to the cold run
-            invalid.Exit.ShouldBe(cold.Exit);
-            invalid.Loads.ShouldBe(1); // the design-time build ran
-            invalid.Gate.ShouldBe(GateAcquisition.NoticeCold);
-            // stderr is exactly the one notice line (printed first, at acquisition) followed by the cold stderr.
-            invalid.Err.ShouldBe($"{notice}{Environment.NewLine}{cold.Err}");
-        }
-        finally
-        {
-            FileSnapshot.Restore(csproj, original);
-        }
+        // The seeded cache now holds a stale capture: the gate notices once at acquisition, then builds.
+        CliResult invalid = await RunAsync(cache, "check", Sln, "--spec", CleanSpec);
+        var notice = $"warning: {BinlogCaptureStore.StaleNotice(Path.GetFullPath(csproj))}";
+
+        // Not ShouldMatchTheOutputOf: two channels match the cold run and the third is composed from it.
+        invalid.Out.ShouldBe(cold.Out); // stdout byte-identical to the cold run
+        invalid.Exit.ShouldBe(cold.Exit);
+        invalid.Loads.ShouldBe(1); // the design-time build ran
+        invalid.Gate.ShouldBe(GateAcquisition.NoticeCold);
+        // stderr is exactly the one notice line (printed first, at acquisition) followed by the cold stderr.
+        invalid.Err.ShouldBe($"{notice}{Environment.NewLine}{cold.Err}");
     }
 
     // ── loud refusals: stale-at-ingest, missing, junk ────────────────────────────────────────────────────
@@ -136,30 +130,24 @@ public sealed class BinlogCliE2ETests(BinlogFixtureWorkspace fixture)
     {
         string cache = FreshCache();
         string csproj = Fixture.PathOf("MyApp.Domain", "MyApp.Domain.csproj");
-        DateTime originalMtime = File.GetLastWriteTimeUtc(csproj);
-        try
-        {
-            // Bump a csproj past the binlog with no content change: ingest must refuse the now-stale build.
-            File.SetLastWriteTimeUtc(csproj, File.GetLastWriteTimeUtc(Binlog)
-                .AddHours(1));
+        using ScopedFile held = ScopedFile.Hold(csproj);
 
-            CliResult run = await RunAsync(cache, "check", Sln, "--binlog", Binlog, "--spec", CleanSpec);
+        // Bump a csproj past the binlog with no content change: ingest must refuse the now-stale build.
+        File.SetLastWriteTimeUtc(csproj, File.GetLastWriteTimeUtc(Binlog)
+            .AddHours(1));
 
-            // Not ShouldRefuseWith: that is a ShouldContain over fragments, and the refusal is claimed here
-            // in full — the whole of stderr, and nothing else on it.
-            run.Exit.ShouldBe(2);
-            run.Err.Trim()
-                .ShouldBe(BinlogCaptureStore.StaleAtIngestMessage(Binlog, Path.GetFullPath(csproj)));
-            // The refusal fired before persistence: nothing was written.
-            File.Exists(CacheLocations.CaptureManifestPath(Sln, cache))
-                .ShouldBeFalse();
-            File.Exists(CacheLocations.CaptureBinlogPath(Sln, cache))
-                .ShouldBeFalse();
-        }
-        finally
-        {
-            File.SetLastWriteTimeUtc(csproj, originalMtime);
-        }
+        CliResult run = await RunAsync(cache, "check", Sln, "--binlog", Binlog, "--spec", CleanSpec);
+
+        // Not ShouldRefuseWith: that is a ShouldContain over fragments, and the refusal is claimed here
+        // in full — the whole of stderr, and nothing else on it.
+        run.Exit.ShouldBe(2);
+        run.Err.Trim()
+            .ShouldBe(BinlogCaptureStore.StaleAtIngestMessage(Binlog, Path.GetFullPath(csproj)));
+        // The refusal fired before persistence: nothing was written.
+        File.Exists(CacheLocations.CaptureManifestPath(Sln, cache))
+            .ShouldBeFalse();
+        File.Exists(CacheLocations.CaptureBinlogPath(Sln, cache))
+            .ShouldBeFalse();
     }
 
     [Fact]
@@ -224,25 +212,18 @@ public sealed class BinlogCliE2ETests(BinlogFixtureWorkspace fixture)
     {
         // No capture is ingested under --no-cache, so the coverage refusal never runs; the replay's own
         // declared-membership answer is what keeps a binlog of less than the solution from checking green.
-        string widerSolution = Fixture.WriteSolutionWithUnbuiltMember("MyApp.Unbuilt");
-        try
-        {
-            string unbuilt = Fixture.PathOf("MyApp.Unbuilt", "MyApp.Unbuilt.csproj");
+        using ScopedFile widerSolution = Fixture.WriteSolutionWithUnbuiltMember("MyApp.Unbuilt");
+        string unbuilt = Fixture.PathOf("MyApp.Unbuilt", "MyApp.Unbuilt.csproj");
 
-            CliResult run = await RunAsync(
-                FreshCache(), "check", widerSolution, "--binlog", Binlog, "--spec", CleanSpec, "--no-cache");
+        CliResult run = await RunAsync(
+            FreshCache(), "check", widerSolution.Path, "--binlog", Binlog, "--spec", CleanSpec, "--no-cache");
 
-            run.ShouldRefuseWith(
-                BinlogReplayer.UnbuiltMemberMessage(unbuilt),
-                "error: the model is incomplete — 1 project failed to load, so check cannot pass:",
-                unbuilt);
-            run.Gate.ShouldBe(GateAcquisition.ExplicitReplay);
-            run.Loads.ShouldBe(0);
-        }
-        finally
-        {
-            File.Delete(widerSolution);
-        }
+        run.ShouldRefuseWith(
+            BinlogReplayer.UnbuiltMemberMessage(unbuilt),
+            "error: the model is incomplete — 1 project failed to load, so check cannot pass:",
+            unbuilt);
+        run.Gate.ShouldBe(GateAcquisition.ExplicitReplay);
+        run.Loads.ShouldBe(0);
     }
 
     [Fact]
@@ -250,26 +231,19 @@ public sealed class BinlogCliE2ETests(BinlogFixtureWorkspace fixture)
     {
         // The same binlog with a capture to ingest: the coverage refusal fires first and alone, so the replay's
         // failed-project answer changes nothing a user sees on this path.
-        string widerSolution = Fixture.WriteSolutionWithUnbuiltMember("MyApp.Unbuilt");
-        try
-        {
-            string unbuilt = Fixture.PathOf("MyApp.Unbuilt", "MyApp.Unbuilt.csproj");
+        using ScopedFile widerSolution = Fixture.WriteSolutionWithUnbuiltMember("MyApp.Unbuilt");
+        string unbuilt = Fixture.PathOf("MyApp.Unbuilt", "MyApp.Unbuilt.csproj");
 
-            CliResult run = await RunAsync(FreshCache(), "check", widerSolution, "--binlog", Binlog, "--spec", CleanSpec);
+        CliResult run = await RunAsync(FreshCache(), "check", widerSolution.Path, "--binlog", Binlog, "--spec", CleanSpec);
 
-            // Exact, for the reason given on the stale-at-ingest row: the whole of stderr is the coverage
-            // refusal, so no model-incomplete block follows it. The refusal is several lines, and the console
-            // ends them its own way.
-            run.Exit.ShouldBe(2);
-            run.Err.Trim()
-                .ReplaceLineEndings("\n")
-                .ShouldBe(BinlogCaptureStore.MissingCoverageMessage(Binlog, [unbuilt])
-                    .ReplaceLineEndings("\n"));
-        }
-        finally
-        {
-            File.Delete(widerSolution);
-        }
+        // Exact, for the reason given on the stale-at-ingest row: the whole of stderr is the coverage
+        // refusal, so no model-incomplete block follows it. The refusal is several lines, and the console
+        // ends them its own way.
+        run.Exit.ShouldBe(2);
+        run.Err.Trim()
+            .ReplaceLineEndings("\n")
+            .ShouldBe(BinlogCaptureStore.MissingCoverageMessage(Binlog, [unbuilt])
+                .ReplaceLineEndings("\n"));
     }
 
     // ── graph parity ─────────────────────────────────────────────────────────────────────────────────────

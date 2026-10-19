@@ -18,8 +18,7 @@ public sealed class ProcessFileFootprintTests
 
         using var self = Process.GetCurrentProcess();
 
-        IReadOnlyList<RetainedPath> retained =
-            ProcessFileFootprint.PathsUnder(self, AppContext.BaseDirectory);
+        IReadOnlyList<RetainedPath> retained = self.PathsUnder(AppContext.BaseDirectory);
 
         // This assembly is running: its image is mapped from the directory it was loaded out of, and no file
         // handle on it exists to find — which is exactly why the mapped-view scan has to exist.
@@ -43,7 +42,7 @@ public sealed class ProcessFileFootprintTests
 
         using (new FileStream(probeFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
         {
-            IReadOnlyList<RetainedPath> held = ProcessFileFootprint.PathsUnder(self, probeRoot);
+            IReadOnlyList<RetainedPath> held = self.PathsUnder(probeRoot);
 
             held.ShouldContain(
                 path => path.Scan == FootprintScan.Handle
@@ -53,7 +52,7 @@ public sealed class ProcessFileFootprintTests
 
         // The other direction, so a scan that reported everything under the sun would fail here: once the
         // stream is closed the same root must come back empty.
-        IReadOnlyList<RetainedPath> released = ProcessFileFootprint.PathsUnder(self, probeRoot);
+        IReadOnlyList<RetainedPath> released = self.PathsUnder(probeRoot);
         released.ShouldBeEmpty($"nothing should be held under '{probeRoot}' once the stream is disposed.");
     }
 

@@ -2,6 +2,7 @@ using SlideRule.Cli;
 using SlideRule.Cli.Pipeline;
 using SlideRule.Internal;
 using SlideRule.Roslyn;
+using SlideRule.Roslyn.Threading;
 
 namespace SlideRule.Tests.TestSupport;
 
@@ -77,16 +78,9 @@ internal static class WarmWorkspacePool
     {
         string key = Path.GetFullPath(solutionPath);
 
-        await Gate.WaitAsync(ct);
-        try
-        {
-            WorkspaceSession session = await RentAsync(key);
-            return await session.GetCurrentAsync(key, ct);
-        }
-        finally
-        {
-            Gate.Release();
-        }
+        using SemaphoreRelease held = await Gate.LockAsync(ct);
+        WorkspaceSession session = await RentAsync(key);
+        return await session.GetCurrentAsync(key, ct);
     }
 
     /// <summary>
@@ -101,36 +95,22 @@ internal static class WarmWorkspacePool
     {
         string prefix = Path.TrimEndingDirectorySeparator(Path.GetFullPath(directory)) + Path.DirectorySeparatorChar;
 
-        Gate.Wait();
-        try
+        using SemaphoreRelease held = Gate.Lock();
+        List<Entry> doomed = Live.Where(entry => entry.Key.StartsWith(prefix, PathComparison.Comparison))
+            .ToList();
+        foreach (Entry entry in doomed)
         {
-            List<Entry> doomed = Live.Where(entry => entry.Key.StartsWith(prefix, PathComparison.Comparison))
-                .ToList();
-            foreach (Entry entry in doomed)
-            {
-                Live.Remove(entry);
-                Dispose(entry);
-            }
-        }
-        finally
-        {
-            Gate.Release();
+            Live.Remove(entry);
+            Dispose(entry);
         }
     }
 
     /// <summary>Disposes every live session.</summary>
     internal static void DropAll()
     {
-        Gate.Wait();
-        try
-        {
-            foreach (Entry entry in Live) Dispose(entry);
-            Live.Clear();
-        }
-        finally
-        {
-            Gate.Release();
-        }
+        using SemaphoreRelease held = Gate.Lock();
+        foreach (Entry entry in Live) Dispose(entry);
+        Live.Clear();
     }
 
     // Caller holds the gate. Deliberately uncancellable: an eviction half-done would leave a workspace

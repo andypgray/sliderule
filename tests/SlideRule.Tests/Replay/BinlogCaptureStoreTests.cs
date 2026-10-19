@@ -63,23 +63,14 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
         // invalidates a structure-only capture.
         BinlogCaptureStore store = IngestFullCapture();
         string source = Fixture.PathOf("MyApp.Domain", "Money.cs");
-        byte[] original = File.ReadAllBytes(source);
-        DateTime originalMtime = File.GetLastWriteTimeUtc(source);
-        try
-        {
-            File.AppendAllText(source, $"{Environment.NewLine}public sealed class CaptureContentEditProbe {{ }}{Environment.NewLine}");
+        using ScopedFile held = ScopedFile.Hold(source);
+        File.AppendAllText(source, $"{Environment.NewLine}public sealed class CaptureContentEditProbe {{ }}{Environment.NewLine}");
 
-            // Act
-            CaptureValidation validation = store.Validate();
+        // Act
+        CaptureValidation validation = store.Validate();
 
-            // Assert
-            validation.State.ShouldBe(CaptureState.Usable);
-        }
-        finally
-        {
-            File.WriteAllBytes(source, original);
-            File.SetLastWriteTimeUtc(source, originalMtime);
-        }
+        // Assert
+        validation.State.ShouldBe(CaptureState.Usable);
     }
 
     [Fact]
@@ -88,36 +79,31 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
         // Arrange
         BinlogCaptureStore store = IngestFullCapture();
         string csproj = Fixture.PathOf("MyApp.Domain", "MyApp.Domain.csproj");
-        (byte[] bytes, DateTime mtime) original = FileSnapshot.Capture(csproj);
-        try
-        {
-            // A warm-up validation promotes any structural stamp that was still racy at ingest, so the only
-            // re-hash the post-touch validation can incur is the touched csproj itself.
-            store.Validate()
-                .State.ShouldBe(CaptureState.Usable);
+        using ScopedFile held = ScopedFile.Hold(csproj);
+        byte[] unchanged = File.ReadAllBytes(csproj);
 
-            // Act 1 — rewrite identical bytes and set a different, comfortably-past mtime (a bare touch).
-            File.WriteAllBytes(csproj, original.bytes);
-            File.SetLastWriteTimeUtc(csproj, DateTime.UtcNow.AddHours(-1));
-            long beforeTouch = store.ContentHashCount;
-            CaptureValidation afterTouch = store.Validate();
+        // A warm-up validation promotes any structural stamp that was still racy at ingest, so the only
+        // re-hash the post-touch validation can incur is the touched csproj itself.
+        store.Validate()
+            .State.ShouldBe(CaptureState.Usable);
 
-            // Assert 1 — exactly one re-hash (the touched csproj), still usable (bytes unchanged).
-            afterTouch.State.ShouldBe(CaptureState.Usable);
-            (store.ContentHashCount - beforeTouch).ShouldBe(1);
+        // Act 1 — rewrite identical bytes and set a different, comfortably-past mtime (a bare touch).
+        File.WriteAllBytes(csproj, unchanged);
+        File.SetLastWriteTimeUtc(csproj, DateTime.UtcNow.AddHours(-1));
+        long beforeTouch = store.ContentHashCount;
+        CaptureValidation afterTouch = store.Validate();
 
-            // Act 2 — validate again with nothing touched.
-            long beforeSecond = store.ContentHashCount;
-            CaptureValidation second = store.Validate();
+        // Assert 1 — exactly one re-hash (the touched csproj), still usable (bytes unchanged).
+        afterTouch.State.ShouldBe(CaptureState.Usable);
+        (store.ContentHashCount - beforeTouch).ShouldBe(1);
 
-            // Assert 2 — the promoted stamp means the steady state hashes nothing.
-            second.State.ShouldBe(CaptureState.Usable);
-            (store.ContentHashCount - beforeSecond).ShouldBe(0);
-        }
-        finally
-        {
-            FileSnapshot.Restore(csproj, original);
-        }
+        // Act 2 — validate again with nothing touched.
+        long beforeSecond = store.ContentHashCount;
+        CaptureValidation second = store.Validate();
+
+        // Assert 2 — the promoted stamp means the steady state hashes nothing.
+        second.State.ShouldBe(CaptureState.Usable);
+        (store.ContentHashCount - beforeSecond).ShouldBe(0);
     }
 
     // ── structural / membership invalidation ─────────────────────────────────────────────────────────────
@@ -132,24 +118,17 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
             .ShouldBeTrue();
 
         string csproj = CsprojPathOf(replayed.Solution, "MyApp.Domain");
-        (byte[] bytes, DateTime mtime) original = FileSnapshot.Capture(csproj);
-        try
-        {
-            string edited = File.ReadAllText(csproj)
-                .Replace("</Project>", "  <!-- capture stale probe -->\n</Project>");
-            File.WriteAllText(csproj, edited);
+        using ScopedFile held = ScopedFile.Hold(csproj);
+        string edited = File.ReadAllText(csproj)
+            .Replace("</Project>", "  <!-- capture stale probe -->\n</Project>");
+        File.WriteAllText(csproj, edited);
 
-            // Act
-            CaptureValidation validation = store.Validate();
+        // Act
+        CaptureValidation validation = store.Validate();
 
-            // Assert — a structural content change is the stale variant naming that csproj.
-            validation.State.ShouldBe(CaptureState.Invalid);
-            validation.Notice.ShouldBe(BinlogCaptureStore.StaleNotice(csproj));
-        }
-        finally
-        {
-            FileSnapshot.Restore(csproj, original);
-        }
+        // Assert — a structural content change is the stale variant naming that csproj.
+        validation.State.ShouldBe(CaptureState.Invalid);
+        validation.Notice.ShouldBe(BinlogCaptureStore.StaleNotice(csproj));
     }
 
     [Fact]
@@ -158,21 +137,15 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
         // Arrange
         BinlogCaptureStore store = IngestFullCapture();
         string added = Fixture.PathOf("MyApp.Domain", "CaptureConeAddProbe.cs");
-        try
-        {
-            File.WriteAllText(added, "namespace MyApp.Domain; public sealed class CaptureConeAddProbe { }\n");
+        using ScopedFile held = ScopedFile.Hold(added);
+        File.WriteAllText(added, "namespace MyApp.Domain; public sealed class CaptureConeAddProbe { }\n");
 
-            // Act
-            CaptureValidation validation = store.Validate();
+        // Act
+        CaptureValidation validation = store.Validate();
 
-            // Assert — an unrecorded *.cs in a project cone is a membership change, naming the file.
-            validation.State.ShouldBe(CaptureState.Invalid);
-            validation.Notice.ShouldBe(BinlogCaptureStore.StaleNotice(Path.GetFullPath(added)));
-        }
-        finally
-        {
-            File.Delete(added);
-        }
+        // Assert — an unrecorded *.cs in a project cone is a membership change, naming the file.
+        validation.State.ShouldBe(CaptureState.Invalid);
+        validation.Notice.ShouldBe(BinlogCaptureStore.StaleNotice(Path.GetFullPath(added)));
     }
 
     [Fact]
@@ -181,18 +154,12 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
         // Arrange
         BinlogCaptureStore store = IngestFullCapture();
         string objProbe = Fixture.PathOf("MyApp.Domain", "obj", "CaptureObjProbe.cs");
-        try
-        {
-            File.WriteAllText(objProbe, "namespace MyApp.Domain; public sealed class CaptureObjProbe { }\n");
+        using ScopedFile held = ScopedFile.Hold(objProbe);
+        File.WriteAllText(objProbe, "namespace MyApp.Domain; public sealed class CaptureObjProbe { }\n");
 
-            // Act + Assert — the cone scan skips bin/obj, so a generated-output add never invalidates.
-            store.Validate()
-                .State.ShouldBe(CaptureState.Usable);
-        }
-        finally
-        {
-            File.Delete(objProbe);
-        }
+        // Act + Assert — the cone scan skips bin/obj, so a generated-output add never invalidates.
+        store.Validate()
+            .State.ShouldBe(CaptureState.Usable);
     }
 
     [Fact]
@@ -224,24 +191,15 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
             .ShouldBeTrue();
 
         string document = DocumentPathOf(replayed.Solution, "MyApp.Legacy.Billing", "RoundingMode.cs");
-        byte[] original = File.ReadAllBytes(document);
-        DateTime originalMtime = File.GetLastWriteTimeUtc(document);
-        try
-        {
-            File.Delete(document);
+        using ScopedFile held = ScopedFile.Hold(document);
+        File.Delete(document);
 
-            // Act
-            CaptureValidation validation = store.Validate();
+        // Act
+        CaptureValidation validation = store.Validate();
 
-            // Assert — a recorded document that has vanished (a delete or a clean) is stale, naming it.
-            validation.State.ShouldBe(CaptureState.Invalid);
-            validation.Notice.ShouldBe(BinlogCaptureStore.StaleNotice(document));
-        }
-        finally
-        {
-            File.WriteAllBytes(document, original);
-            File.SetLastWriteTimeUtc(document, originalMtime);
-        }
+        // Assert — a recorded document that has vanished (a delete or a clean) is stale, naming it.
+        validation.State.ShouldBe(CaptureState.Invalid);
+        validation.Notice.ShouldBe(BinlogCaptureStore.StaleNotice(document));
     }
 
     // ── unreadable / version / absent ────────────────────────────────────────────────────────────────────
@@ -325,24 +283,17 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
         // Arrange — make one csproj newer than the binlog (a rebuild the binlog no longer reflects).
         using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath, Fixture.SolutionPath);
         string csproj = CsprojPathOf(replayed.Solution, "MyApp.Domain");
-        (byte[] bytes, DateTime mtime) original = FileSnapshot.Capture(csproj);
-        try
-        {
-            DateTime newer = File.GetLastWriteTimeUtc(Fixture.BinlogPath)
-                .AddHours(1);
-            File.SetLastWriteTimeUtc(csproj, newer);
-            var store = new BinlogCaptureStore(Fixture.SolutionPath, _cacheRoot.Path);
+        using ScopedFile held = ScopedFile.Hold(csproj);
+        DateTime newer = File.GetLastWriteTimeUtc(Fixture.BinlogPath)
+            .AddHours(1);
+        File.SetLastWriteTimeUtc(csproj, newer);
+        var store = new BinlogCaptureStore(Fixture.SolutionPath, _cacheRoot.Path);
 
-            // Act
-            var ex = Should.Throw<UserErrorException>(() => store.Ingest(replayed.Solution, Fixture.BinlogPath, Fixture.BinlogPath));
+        // Act
+        var ex = Should.Throw<UserErrorException>(() => store.Ingest(replayed.Solution, Fixture.BinlogPath, Fixture.BinlogPath));
 
-            // Assert — the exact dictated refusal naming the newest offending structural file.
-            ex.Message.ShouldBe(BinlogCaptureStore.StaleAtIngestMessage(Fixture.BinlogPath, csproj));
-        }
-        finally
-        {
-            FileSnapshot.Restore(csproj, original);
-        }
+        // Assert — the exact dictated refusal naming the newest offending structural file.
+        ex.Message.ShouldBe(BinlogCaptureStore.StaleAtIngestMessage(Fixture.BinlogPath, csproj));
     }
 
     [Fact]
@@ -379,7 +330,8 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
         // solution proves it never reaches CollectProjects/coverage, which would answer a filter with a
         // misleading zero-members "coverage" message).
         var store = new BinlogCaptureStore(_cacheRoot.PathOf("App.slnf"), _cacheRoot.Path);
-        Solution empty = new AdhocWorkspace().CurrentSolution;
+        using var workspace = new AdhocWorkspace();
+        Solution empty = workspace.CurrentSolution;
 
         var ex = Should.Throw<UserErrorException>(() => store.Ingest(empty, "build.binlog", "build.binlog"));
         ex.Message.ShouldBe(BinlogCaptureStore.SolutionFilterNotSupportedMessage("App.slnf"));
@@ -389,23 +341,16 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
     public void Ingest_BinlogHasProjectNotInSolution_ThrowsExtraCoverageRefusal()
     {
         // Arrange — a reduced solution missing the MyApp.Web member; the full binlog builds it anyway.
-        string reducedSln = WriteReducedSolutionWithoutWeb();
-        try
-        {
-            using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath, Fixture.SolutionPath);
-            var store = new BinlogCaptureStore(reducedSln, _cacheRoot.Path);
-            string webCsproj = CsprojPathOf(replayed.Solution, "MyApp.Web");
+        using ScopedFile reducedSln = WriteReducedSolutionWithoutWeb();
+        using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath, Fixture.SolutionPath);
+        var store = new BinlogCaptureStore(reducedSln.Path, _cacheRoot.Path);
+        string webCsproj = CsprojPathOf(replayed.Solution, "MyApp.Web");
 
-            // Act
-            var ex = Should.Throw<UserErrorException>(() => store.Ingest(replayed.Solution, Fixture.BinlogPath, Fixture.BinlogPath));
+        // Act
+        var ex = Should.Throw<UserErrorException>(() => store.Ingest(replayed.Solution, Fixture.BinlogPath, Fixture.BinlogPath));
 
-            // Assert — the refusal names the extra project and the reduced solution's file name.
-            ex.Message.ShouldBe(BinlogCaptureStore.ExtraCoverageMessage(Fixture.BinlogPath, "MyApp.Reduced.sln", [webCsproj]));
-        }
-        finally
-        {
-            File.Delete(reducedSln);
-        }
+        // Assert — the refusal names the extra project and the reduced solution's file name.
+        ex.Message.ShouldBe(BinlogCaptureStore.ExtraCoverageMessage(Fixture.BinlogPath, "MyApp.Reduced.sln", [webCsproj]));
     }
 
     // ── fully-literal message pins (pin the dictated constants themselves) ────────────────────────────────
@@ -487,8 +432,9 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
     }
 
     // Copies MyApp.sln to MyApp.Reduced.sln minus the MyApp.Web project block, backdated below the binlog so
-    // the ingest staleness check passes and the coverage check is what fires. Returns the reduced-sln path.
-    private string WriteReducedSolutionWithoutWeb()
+    // the ingest staleness check passes and the coverage check is what fires. Returns it as a scope that
+    // deletes it on dispose.
+    private ScopedFile WriteReducedSolutionWithoutWeb()
     {
         List<string> lines = File.ReadAllLines(Fixture.SolutionPath)
             .ToList();
@@ -501,7 +447,7 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
         File.WriteAllLines(reducedSln, lines);
         File.SetLastWriteTimeUtc(reducedSln, File.GetLastWriteTimeUtc(Fixture.BinlogPath)
             .AddMinutes(-5));
-        return reducedSln;
+        return ScopedFile.Planted(reducedSln);
     }
 
     private void MutateManifest(Action<JsonObject> mutate)

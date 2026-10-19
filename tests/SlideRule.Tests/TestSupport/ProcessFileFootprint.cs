@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
+using Microsoft.Win32.SafeHandles;
 
 // Every P/Invoke in this assembly is one of the imports below, and each names a Windows system DLL that
 // can resolve nowhere but System32 — so the search path is stated once for the assembly rather than
@@ -95,8 +96,6 @@ internal static class ProcessFileFootprint
     /// <summary>A backstop on the address-space walk; a real process has a few thousand regions.</summary>
     private const int MaxRegions = 200_000;
 
-    private static readonly IntPtr InvalidHandleValue = new(-1);
-
     /// <summary>
     ///     Whether this host can run a scan at all. Off-Windows and under WOW64 the calls below either do not
     ///     exist or would read the wrong address space; callers skip rather than pretend.
@@ -108,7 +107,7 @@ internal static class ProcessFileFootprint
     ///     mapped views first, then open disk handles. An empty result is a real "holds nothing": anything
     ///     that could have blinded the scan throws instead.
     /// </summary>
-    internal static IReadOnlyList<RetainedPath> PathsUnder(Process process, string root)
+    internal static IReadOnlyList<RetainedPath> PathsUnder(this Process process, string root)
     {
         return Scan(process, root, true);
     }
@@ -124,7 +123,7 @@ internal static class ProcessFileFootprint
     ///     before the child starts, this is the set that was handed over rather than acquired; see
     ///     <see cref="ExceptInherited" />.
     /// </remarks>
-    internal static IReadOnlyList<RetainedPath> HandlePathsUnder(Process process, string root)
+    internal static IReadOnlyList<RetainedPath> HandlePathsUnder(this Process process, string root)
     {
         return Scan(process, root, false);
     }
@@ -206,12 +205,12 @@ internal static class ProcessFileFootprint
     ///     cannot drift over which exclusions ran. A new exclusion lands here and both have it.
     /// </remarks>
     internal static IReadOnlyList<RetainedPath> AcquiredPathsUnder(
-        Process process,
+        this Process process,
         string root,
         IReadOnlyCollection<RetainedPath>? inheritedHandles,
         string? injectedProfilerDirectory)
     {
-        IReadOnlyList<RetainedPath> retained = PathsUnder(process, root);
+        IReadOnlyList<RetainedPath> retained = process.PathsUnder(root);
         if (inheritedHandles is not null)
             retained = ExceptInherited(retained, inheritedHandles);
 
@@ -232,25 +231,18 @@ internal static class ProcessFileFootprint
         string canonicalRoot = Canonicalize(root);
         Dictionary<string, string> deviceMap = BuildDeviceMap();
 
-        IntPtr handle = OpenProcess(ProcessQueryInformation | ProcessDupHandle, false, process.Id);
-        if (handle == IntPtr.Zero)
+        using SafeProcessHandle handle = OpenProcess(ProcessQueryInformation | ProcessDupHandle, false, process.Id);
+        if (handle.IsInvalid)
             throw new Win32Exception(
                 Marshal.GetLastWin32Error(),
                 $"OpenProcess failed for PID {process.Id}: the footprint scan cannot see the process at all.");
 
-        try
-        {
-            RequireNativeBitness(handle, process.Id);
+        RequireNativeBitness(handle, process.Id);
 
-            var found = new List<RetainedPath>();
-            if (includeMappedViews) ScanMappedViews(handle, deviceMap, canonicalRoot, found);
-            ScanHandleTable(handle, deviceMap, canonicalRoot, found);
-            return found;
-        }
-        finally
-        {
-            CloseHandle(handle);
-        }
+        var found = new List<RetainedPath>();
+        if (includeMappedViews) ScanMappedViews(handle, deviceMap, canonicalRoot, found);
+        ScanHandleTable(handle, deviceMap, canonicalRoot, found);
+        return found;
     }
 
     /// <summary>
@@ -260,31 +252,24 @@ internal static class ProcessFileFootprint
     /// </summary>
     private static string Canonicalize(string path)
     {
-        IntPtr file = CreateFile(
+        using SafeFileHandle file = CreateFile(
             path, 0, FileShareAll, IntPtr.Zero, OpenExisting, FileFlagBackupSemantics, IntPtr.Zero);
-        if (file == InvalidHandleValue)
+        if (file.IsInvalid)
             throw new Win32Exception(
                 Marshal.GetLastWin32Error(), $"Could not open '{path}' to resolve its canonical spelling.");
 
-        try
-        {
-            string resolved = FinalPath(file, VolumeNameDos)
-                              ?? throw new Win32Exception(
-                                  Marshal.GetLastWin32Error(),
-                                  $"GetFinalPathNameByHandle failed for '{path}'.");
-            return Path.TrimEndingDirectorySeparator(StripExtendedPrefix(resolved));
-        }
-        finally
-        {
-            CloseHandle(file);
-        }
+        string resolved = FinalPath(file, VolumeNameDos)
+                          ?? throw new Win32Exception(
+                              Marshal.GetLastWin32Error(),
+                              $"GetFinalPathNameByHandle failed for '{path}'.");
+        return Path.TrimEndingDirectorySeparator(StripExtendedPrefix(resolved));
     }
 
     // Walks the target's committed address space region by region, asking the memory manager for the name of
     // the section behind each file-backed one. Regions with no name (pagefile-backed) are skipped: the
     // absence of a name is the absence of a retained path, not a failed read.
     private static void ScanMappedViews(
-        IntPtr process, Dictionary<string, string> deviceMap, string canonicalRoot, List<RetainedPath> found)
+        SafeProcessHandle process, Dictionary<string, string> deviceMap, string canonicalRoot, List<RetainedPath> found)
     {
         var infoSize = (IntPtr)Marshal.SizeOf<MemoryBasicInformation>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -327,7 +312,7 @@ internal static class ProcessFileFootprint
     // is the gate: it is documented safe on any handle type, where an object-name query on a synchronous
     // pipe can block forever — and a pipe is exactly what a stdio server's own handles are.
     private static void ScanHandleTable(
-        IntPtr process, Dictionary<string, string> deviceMap, string canonicalRoot, List<RetainedPath> found)
+        SafeProcessHandle process, Dictionary<string, string> deviceMap, string canonicalRoot, List<RetainedPath> found)
     {
         int size = 64 * 1024;
         while (true)
@@ -365,7 +350,7 @@ internal static class ProcessFileFootprint
     }
 
     private static void CollectDiskHandles(
-        IntPtr process,
+        SafeProcessHandle process,
         IntPtr snapshot,
         Dictionary<string, string> deviceMap,
         string canonicalRoot,
@@ -389,16 +374,16 @@ internal static class ProcessFileFootprint
     }
 
     private static RetainedPath? DiskHandlePath(
-        IntPtr process, IntPtr handleValue, Dictionary<string, string> deviceMap)
+        SafeProcessHandle process, IntPtr handleValue, Dictionary<string, string> deviceMap)
     {
-        if (!DuplicateHandle(
-                process, handleValue, GetCurrentProcess(), out IntPtr duplicate, 0, false, DuplicateSameAccess))
+        bool duplicated = DuplicateHandle(
+            process, handleValue, GetCurrentProcess(), out SafeFileHandle duplicate, 0, false, DuplicateSameAccess);
+        using (duplicate)
+        {
             // The handle closed between the snapshot and now, or it is not duplicable: either way it is not a
             // handle this process is holding onto, which is the only thing being counted.
-            return null;
+            if (!duplicated) return null;
 
-        try
-        {
             if (GetFileType(duplicate) != FileTypeDisk) return null;
 
             if (FinalPath(duplicate, VolumeNameDos) is { } dos)
@@ -412,13 +397,9 @@ internal static class ProcessFileFootprint
 
             return null;
         }
-        finally
-        {
-            CloseHandle(duplicate);
-        }
     }
 
-    private static string? SectionName(IntPtr process, IntPtr baseAddress)
+    private static string? SectionName(SafeProcessHandle process, IntPtr baseAddress)
     {
         for (var size = 1024; size <= MaxSectionNameBytes; size *= 2)
         {
@@ -445,7 +426,7 @@ internal static class ProcessFileFootprint
             + "region it failed to name.");
     }
 
-    private static string? FinalPath(IntPtr file, int volumeNameFlag)
+    private static string? FinalPath(SafeFileHandle file, int volumeNameFlag)
     {
         var buffer = new StringBuilder(1024);
         int length = GetFinalPathNameByHandle(
@@ -521,7 +502,7 @@ internal static class ProcessFileFootprint
         return next is '\\' or '/';
     }
 
-    private static void RequireNativeBitness(IntPtr process, int processId)
+    private static void RequireNativeBitness(SafeProcessHandle process, int processId)
     {
         if (!IsWow64Process(process, out bool isWow64))
             throw new Win32Exception(
@@ -534,42 +515,40 @@ internal static class ProcessFileFootprint
     }
 
     [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern IntPtr OpenProcess(int desiredAccess, bool inheritHandle, int processId);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool CloseHandle(IntPtr handle);
+    private static extern SafeProcessHandle OpenProcess(int desiredAccess, bool inheritHandle, int processId);
 
     [DllImport("kernel32.dll")]
     private static extern IntPtr GetCurrentProcess();
 
     [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool IsWow64Process(IntPtr process, out bool isWow64);
+    private static extern bool IsWow64Process(SafeProcessHandle process, out bool isWow64);
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern IntPtr VirtualQueryEx(
-        IntPtr process, IntPtr address, out MemoryBasicInformation buffer, IntPtr length);
+        SafeProcessHandle process, IntPtr address, out MemoryBasicInformation buffer, IntPtr length);
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool DuplicateHandle(
-        IntPtr sourceProcess,
+        SafeProcessHandle sourceProcess,
         IntPtr sourceHandle,
         IntPtr targetProcess,
-        out IntPtr targetHandle,
+        out SafeFileHandle targetHandle,
         int desiredAccess,
         bool inheritHandle,
         int options);
 
     [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern int GetFileType(IntPtr file);
+    private static extern int GetFileType(SafeFileHandle file);
 
     [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-    private static extern int GetFinalPathNameByHandle(IntPtr file, StringBuilder path, int pathLength, int flags);
+    private static extern int GetFinalPathNameByHandle(
+        SafeFileHandle file, StringBuilder path, int pathLength, int flags);
 
     [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
     private static extern int QueryDosDevice(string deviceName, StringBuilder targetPath, int maxCharacters);
 
     [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-    private static extern IntPtr CreateFile(
+    private static extern SafeFileHandle CreateFile(
         string fileName,
         int desiredAccess,
         int shareMode,
@@ -580,7 +559,7 @@ internal static class ProcessFileFootprint
 
     [DllImport("ntdll.dll")]
     private static extern int NtQueryVirtualMemory(
-        IntPtr process,
+        SafeProcessHandle process,
         IntPtr baseAddress,
         int memoryInformationClass,
         IntPtr buffer,
@@ -589,7 +568,7 @@ internal static class ProcessFileFootprint
 
     [DllImport("ntdll.dll")]
     private static extern int NtQueryInformationProcess(
-        IntPtr process,
+        SafeProcessHandle process,
         int processInformationClass,
         IntPtr processInformation,
         int processInformationLength,

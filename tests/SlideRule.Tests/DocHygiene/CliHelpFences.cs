@@ -86,16 +86,10 @@ internal static class CliHelpFences
 
         string[] words = commandLine.Split(' ')[1..];
         StringWriter writer = new();
-        CultureInfo culture = CultureInfo.CurrentUICulture;
-        CultureInfo.CurrentUICulture = CultureInfo.InvariantCulture;
-        try
+        using (new ScopedUICulture(CultureInfo.InvariantCulture))
         {
             root.Parse([.. words, "--help"])
                 .Invoke(new InvocationConfiguration { Output = writer, Error = writer });
-        }
-        finally
-        {
-            CultureInfo.CurrentUICulture = culture;
         }
 
         // Nothing else is normalised: the line endings are the platform's, trailing padding is invisible on the

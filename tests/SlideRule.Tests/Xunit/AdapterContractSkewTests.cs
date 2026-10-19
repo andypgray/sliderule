@@ -67,81 +67,59 @@ public sealed class AdapterContractSkewTests
     public void RuleRows_OnASkewedPair_ReturnsOneSkippedRowNamingBothVersions()
     {
         // Arrange
-        var context = new SkewedPairContext();
-        try
-        {
-            Type probeTests = ShouldLoadProbeTestsOverTheStandIn(context);
-            MethodInfo ruleRows = probeTests.GetMethod(
-                "RuleRows", BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy)!;
+        using var context = new SkewedPairContext();
+        Type probeTests = ShouldLoadProbeTestsOverTheStandIn(context);
+        MethodInfo ruleRows = probeTests.GetMethod(
+            "RuleRows", BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy)!;
 
-            // Act
-            object? rows = ruleRows.Invoke(null, BindingFlags.DoNotWrapExceptions, null, null, null);
+        // Act
+        object? rows = ruleRows.Invoke(null, BindingFlags.DoNotWrapExceptions, null, null, null);
 
-            // Assert
-            ITheoryDataRow row = ((IEnumerable<ITheoryDataRow>)rows!).ToList()
-                .ShouldHaveSingleItem();
-            row.TestDisplayName.ShouldBe("ProbeSpec: not checked");
-            row.Skip.ShouldBe(ExpectedRefusal);
-            row.Skip!.ShouldContain("loaded version 2.0.0.0 of SlideRule");
-        }
-        finally
-        {
-            // Best-effort unload; nothing gates on GC timing.
-            context.Unload();
-        }
+        // Assert
+        ITheoryDataRow row = ((IEnumerable<ITheoryDataRow>)rows!).ToList()
+            .ShouldHaveSingleItem();
+        row.TestDisplayName.ShouldBe("ProbeSpec: not checked");
+        row.Skip.ShouldBe(ExpectedRefusal);
+        row.Skip!.ShouldContain("loaded version 2.0.0.0 of SlideRule");
     }
 
     [Fact]
     public async Task RuleHolds_OnASkewedPair_SkipsWithBothVersions()
     {
         // Arrange
-        var context = new SkewedPairContext();
-        try
-        {
-            Type probeTests = ShouldLoadProbeTestsOverTheStandIn(context);
-            object instance = Activator.CreateInstance(probeTests)!;
-            var ruleHolds = probeTests.GetMethod("Rule_Holds")!
-                .CreateDelegate<Func<string, Task>>(instance);
+        using var context = new SkewedPairContext();
+        Type probeTests = ShouldLoadProbeTestsOverTheStandIn(context);
+        object instance = Activator.CreateInstance(probeTests)!;
+        var ruleHolds = probeTests.GetMethod("Rule_Holds")!
+            .CreateDelegate<Func<string, Task>>(instance);
 
-            // Act
-            Exception? exception = await AdapterOutcome.CaughtAsync(() => ruleHolds(string.Empty));
+        // Act
+        Exception? exception = await AdapterOutcome.CaughtAsync(() => ruleHolds(string.Empty));
 
-            // Assert: a wrong exception is printed whole, since a load error is the likeliest one.
-            // SkipException.ForSkip prefixes the reason with a marker, so the reason is the suffix.
-            var skip = exception.ShouldBeOfType<SkipException>(exception?.ToString());
-            skip.Message.ShouldEndWith(ExpectedRefusal);
-            skip.Message.ShouldContain("loaded version 2.0.0.0 of SlideRule");
-        }
-        finally
-        {
-            context.Unload();
-        }
+        // Assert: a wrong exception is printed whole, since a load error is the likeliest one.
+        // SkipException.ForSkip prefixes the reason with a marker, so the reason is the suffix.
+        var skip = exception.ShouldBeOfType<SkipException>(exception?.ToString());
+        skip.Message.ShouldEndWith(ExpectedRefusal);
+        skip.Message.ShouldContain("loaded version 2.0.0.0 of SlideRule");
     }
 
     [Fact]
     public async Task WorkspaceLoadedCompletely_OnASkewedPair_FailsWithBothVersions()
     {
         // Arrange
-        var context = new SkewedPairContext();
-        try
-        {
-            Type probeTests = ShouldLoadProbeTestsOverTheStandIn(context);
-            object instance = Activator.CreateInstance(probeTests)!;
-            var workspaceLoadedCompletely = probeTests.GetMethod("Workspace_LoadedCompletely")!
-                .CreateDelegate<Func<Task>>(instance);
+        using var context = new SkewedPairContext();
+        Type probeTests = ShouldLoadProbeTestsOverTheStandIn(context);
+        object instance = Activator.CreateInstance(probeTests)!;
+        var workspaceLoadedCompletely = probeTests.GetMethod("Workspace_LoadedCompletely")!
+            .CreateDelegate<Func<Task>>(instance);
 
-            // Act
-            Exception? exception = await AdapterOutcome.CaughtAsync(workspaceLoadedCompletely);
+        // Act
+        Exception? exception = await AdapterOutcome.CaughtAsync(workspaceLoadedCompletely);
 
-            // Assert
-            var failure = exception.ShouldBeOfType<FailException>(exception?.ToString());
-            failure.Message.ShouldBe(ExpectedRefusal);
-            failure.Message.ShouldContain("loaded version 2.0.0.0 of SlideRule");
-        }
-        finally
-        {
-            context.Unload();
-        }
+        // Assert
+        var failure = exception.ShouldBeOfType<FailException>(exception?.ToString());
+        failure.Message.ShouldBe(ExpectedRefusal);
+        failure.Message.ShouldContain("loaded version 2.0.0.0 of SlideRule");
     }
 
     // Held by attribute rather than by the probe above, which runs under the host's default JIT: a JIT that inlines
@@ -194,7 +172,7 @@ public sealed class AdapterContractSkewTests
     // The consumer's process in miniature: the contract is the stand-in, the adapter and its two carried
     // assemblies are the real build read as bytes, and every other name falls through to the default
     // context.
-    private sealed class SkewedPairContext() : AssemblyLoadContext("adapter-contract-skew", true)
+    private sealed class SkewedPairContext() : AssemblyLoadContext("adapter-contract-skew", true), IDisposable
     {
         private static readonly Dictionary<string, string> CarriedPaths = new[]
             {
@@ -204,6 +182,12 @@ public sealed class AdapterContractSkewTests
             }
             .ToDictionary(assembly => assembly.GetName()
                 .Name!, assembly => assembly.Location, StringComparer.Ordinal);
+
+        // Starts the unload; nothing here gates on GC timing.
+        public void Dispose()
+        {
+            Unload();
+        }
 
         protected override Assembly? Load(AssemblyName assemblyName)
         {
