@@ -392,6 +392,53 @@ public sealed class SlideRuleArchitectureSpec : IArchitectureSpec
             .Fix("Use what the netstandard2.0 surface already supplies, or put the dependency behind " +
                  "SlideRule.Roslyn or the CLI, where a package reference costs only the tool.");
 
+        // Core is compiler-hosted too, and core-netstandard-only and core-carries-nothing already hold it to
+        // netstandard2.0 alone and to no packages at all.
+        ProjectSelection compilerHosted = arch.Projects.Named(
+            "SlideRule.Extraction",
+            "SlideRule.Analyzers",
+            "SlideRule.SpecAnalyzers",
+            "SlideRule.SpecCompletion");
+
+        arch.Rule("packaging/compiler-hosted-netstandard")
+            .Enforce(compilerHosted.MustTarget("netstandard2.0"))
+            .Because("A compiler loads these four projects: the analyzer package carries Extraction beside the " +
+                     "build analyzer, and the contract package carries the spec analyzer and the completion " +
+                     "provider. Visual Studio runs its compiler on .NET Framework and the dotnet CLI runs it on " +
+                     ".NET, and netstandard2.0 is the one target both of them can load.")
+            .Fix("Keep netstandard2.0 among the project's target frameworks. An API it lacks belongs in " +
+                 "SlideRule.Roslyn or the CLI, which no compiler loads.");
+
+        arch.Rule("packaging/compiler-hosted-take-only-the-compiler")
+            .Enforce(compilerHosted.MustOnlyReferencePackages("Microsoft.CodeAnalysis*"))
+            .Because("A compiler resolves an analyzer's dependencies from the directory it loaded the analyzer " +
+                     "from, and the packages put nothing there but these assemblies and Core. A reference to " +
+                     "any other package compiles and passes every test, because the test process can load it, " +
+                     "and then fails to load inside the compiler of everyone who installs the package. The " +
+                     "compiler's own packages are the exception, because the compiler supplies them itself.")
+            .Fix("Take what the package supplies from the compiler API or from Core. A dependency that cannot " +
+                 "be avoided belongs in SlideRule.Roslyn or the CLI.");
+
+        arch.Rule("packaging/mcp-sdk-in-cli-only")
+            .Enforce(arch.Projects.Matching("SlideRule*")
+                .Except(arch.Projects.Named("SlideRule.Cli"))
+                .MustNotReferencePackages("ModelContextProtocol*"))
+            .Because("The package-level form of mcp/tool-types-in-cli: that rule keeps the tool classes in the " +
+                     "CLI, and this one keeps their SDK there. A reference from any other project carries the " +
+                     "SDK into what that project ships: from Core into every spec project, and from the adapter " +
+                     "into every consumer's test project.")
+            .Fix("Keep MCP code in SlideRule.Cli.Mcp beside the tool classes; only the CLI references the MCP SDK.");
+
+        arch.Rule("packaging/xunit-in-adapter-only")
+            .Enforce(arch.Projects.Matching("SlideRule*")
+                .Except(arch.Projects.Named("SlideRule.Xunit", "SlideRule.Tests"))
+                .MustNotReferencePackages("xunit*"))
+            .Because("The package-level form of layering/adapter-is-a-leaf: the adapter and this repository's " +
+                     "tests are the only projects here that run inside a test process. An xunit reference " +
+                     "anywhere else ships a test framework in the tool, the contract or the build analyzer, to " +
+                     "consumers who never run a test with it.")
+            .Fix("Put code that needs the test framework in SlideRule.Xunit, or in the tests if it is a test.");
+
         // The lock rule's subject stays `.Packable()`: it is the law for what ships, and a project that
         // commits a lock file without shipping is already held from both sides — the Dependabot coverage
         // gate pairs every committed lock file with its update entry, and src/Directory.Build.props makes
@@ -403,6 +450,16 @@ public sealed class SlideRuleArchitectureSpec : IArchitectureSpec
             .Citation("https://learn.microsoft.com/nuget/consume-packages/package-references-in-project-files#locking-dependencies")
             .Fix("Set `RestorePackagesWithLockFile` to true and commit the packages.lock.json the next " +
                  "restore writes; src/Directory.Build.props already carries the policy for everything under it.");
+
+        arch.Rule("packaging/shipping-carries-docs")
+            .Enforce(arch.Projects.Matching("SlideRule*").Packable()
+                .MustSetProperty("GenerateDocumentationFile", "true"))
+            .Because("A consumer's editor shows a package's doc comments only from the XML file packed beside " +
+                     "its assembly, and the compiler checks the doc comments only while it writes that file. A " +
+                     "shipping project that stops generating it ships an API with no documentation, and a doc " +
+                     "comment that names a type which no longer exists then builds green.")
+            .Fix("Set `GenerateDocumentationFile` to true. src/Directory.Build.props already sets it for every " +
+                 "project under src/.");
 
         arch.Rule("packaging/only-the-named-ship")
             .Enforce(arch.Projects.Matching("SlideRule*")
@@ -584,6 +641,26 @@ public sealed class SlideRuleArchitectureSpec : IArchitectureSpec
                      "rule results.")
             .Fix("Route new failure modes through FileNotFoundException (missing solution) or " +
                  "InvalidOperationException (bad configuration).");
+
+        // A consumer configures a run by overriding the base class's properties, so its properties are the
+        // adapter's whole configuration surface.
+        Selection testBase = adapter.Named("ArchRuleTests");
+
+        arch.Rule("xunit/hooks-overridable")
+            .Enforce(testBase.Properties.MustBeOverridable())
+            .Because("Every property of ArchRuleTests is a hook a consumer's test class overrides: SolutionPath " +
+                     "always, ExcludeProjectName and AllowWorkspaceDiagnostics when their defaults do not fit. A " +
+                     "property that cannot be overridden is a setting no consumer can change.")
+            .Fix("Declare the property abstract or virtual. A value the adapter computes for itself belongs in a " +
+                 "private member.");
+
+        arch.Rule("xunit/hooks-protected")
+            .Enforce(testBase.Properties.MustBeProtected())
+            .Because("A consumer overrides each hook as `protected override`, the shape the adapter's README " +
+                     "shows, and an override keeps the access of the member it overrides. A hook declared public " +
+                     "breaks that override with CS0507, and a private protected one cannot be overridden outside " +
+                     "the adapter's assembly.")
+            .Fix("Declare the hook protected.");
     }
 
     // The banned list is RS1035's, which the compiler enforces on the three projects that declare
@@ -687,42 +764,35 @@ public sealed class SlideRuleArchitectureSpec : IArchitectureSpec
         // The subject is fields only, so the static `{ get; private set; }` diagnostics property
         // (MsBuildBootstrap.LastSelection) is outside it. Leaving it out is a choice:
         // `.Properties.ThatAreStatic().MustBeGetOnly()` would reach it (GRAMMAR §11).
+        //
+        // The seven exempted fields are named by declaring type and field name rather than by type alone,
+        // because a second mutable static in one of these classes is what the law should still catch. By family:
+        //   Interlocked and volatile locations, since a compare-and-swap needs a writable field:
+        //     IdleTimeoutWatchdog.s_inFlightCount and s_lastActivityTicks, ServerShutdown.s_hasExited,
+        //     WorkspaceLoader._loadCount
+        //   one-shot state written under a lock: ArchRuleTests.s_run, IdleTimeoutWatchdog.s_drainWaiter
+        //   the clock seam, the only way to test an idle timeout without sleeping for it:
+        //     IdleTimeoutWatchdog.s_timestampProvider
         arch.Rule("state/no-static-mutable")
             .Enforce(shipping
                 .Authored()
                 .Fields.ThatAreStatic()
-                .Where(m => !SanctionedMutableStatics.Contains(m.DeclaringType.Name + "." + m.Name),
-                    description: "that are not one of the sanctioned mutable statics (the Interlocked " +
-                                 "locations, the lock-guarded one-shot state, and the clock seam)")
+                .Except(
+                    arch.Types.Named("IdleTimeoutWatchdog")
+                        .Fields.Named("s_inFlightCount", "s_lastActivityTicks", "s_drainWaiter", "s_timestampProvider"),
+                    arch.Types.Named("ServerShutdown").Fields.Named("s_hasExited"),
+                    arch.Types.Named("WorkspaceLoader").Fields.Named("_loadCount"),
+                    arch.Types.Named("ArchRuleTests").Fields.Named("s_run"))
                 .MustBeReadonly())
             .Because("A writable static is process-wide state in a library a long-lived MCP server calls " +
                      "concurrently and every spec project links: whoever wrote to it last decides what the " +
                      "next caller reads, and nothing in the type system says so. A const counts as readonly " +
                      "here — it is readonly's superset — so the law asks for the weakest thing that closes " +
                      "the hole.")
-            .Fix("Make it `readonly` or `const`. If it genuinely has to be written — an Interlocked location, " +
-                 "a lock-guarded one-shot, or a test seam — add it to SanctionedMutableStatics in this spec " +
-                 "with the family it belongs to, and say in review which one.");
+            .Fix("Make it `readonly` or `const`. If it has to be written (an Interlocked location, a " +
+                 "lock-guarded one-shot or a test seam), add it to this rule's `Except` in the spec, with its " +
+                 "family in the comment on the rule, and say in review which one.");
     }
-
-    /// <summary>
-    ///     The static fields whose mutability is intended, exempted from <c>state/no-static-mutable</c>.
-    ///     Keyed by declaring type and name rather than by type alone, because a second mutable static in the
-    ///     same class is exactly what the law should still catch.
-    /// </summary>
-    private static readonly HashSet<string> SanctionedMutableStatics =
-    [
-        // Interlocked and volatile locations: a compare-and-swap needs a writable field.
-        "IdleTimeoutWatchdog.s_inFlightCount",
-        "IdleTimeoutWatchdog.s_lastActivityTicks",
-        "ServerShutdown.s_hasExited",
-        "WorkspaceLoader._loadCount",
-        // One-shot state written under a lock.
-        "ArchRuleTests.s_run",
-        "IdleTimeoutWatchdog.s_drainWaiter",
-        // The clock seam: the only way to test an idle timeout without sleeping for it.
-        "IdleTimeoutWatchdog.s_timestampProvider"
-    ];
 
     private static void Naming(Arch arch, Selection shipping, Selection repo)
     {
@@ -730,13 +800,14 @@ public sealed class SlideRuleArchitectureSpec : IArchitectureSpec
             .Enforce(shipping
                 .Authored()
                 .Methods.Returning(typeof(Task), typeof(Task<>), typeof(ValueTask), typeof(ValueTask<>))
-                .Where(m => m.Name != "Rule_Holds" && m.Name != "Workspace_LoadedCompletely"
-                                                   && m.Name != "WhenAllCallsComplete",
-                    description: "whose name is not Rule_Holds or Workspace_LoadedCompletely (consumer-facing " +
-                                 "test display names) or WhenAllCallsComplete (a Task.WhenAll-style combinator)")
+                .Except(
+                    arch.Types.Named("ArchRuleTests").Methods.Named("Rule_Holds", "Workspace_LoadedCompletely"),
+                    arch.Types.Named("IdleTimeoutWatchdog").Methods.Named("WhenAllCallsComplete"))
                 .MustHaveSuffix("Async"))
-            .Because("House convention held repo-wide: an agent grepping *Async sees every await point; " +
-                     "the three named exceptions are deliberate, not drift.")
+            .Because("House convention held repo-wide: an agent grepping *Async sees every await point. The " +
+                     "three exceptions are deliberate, not drift: Rule_Holds and Workspace_LoadedCompletely are " +
+                     "the adapter's test methods, whose names a consumer reads in every test run, and " +
+                     "WhenAllCallsComplete takes its name from Task.WhenAll, the combinator it mirrors.")
             .Citation("https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap")
             .Fix("Name Task-returning methods with the Async suffix.");
 

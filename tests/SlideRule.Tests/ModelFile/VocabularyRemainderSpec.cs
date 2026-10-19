@@ -30,32 +30,6 @@ internal static class VocabularyRemainderSpec
         DefineNames(arch);
         DefineReach(arch);
         DefineMemberShapes(arch);
-        DefineProjects(arch);
-    }
-
-    // The project verbs no real spec in the corpus takes up, over projects named the way the subjects above
-    // name namespaces.
-    private static void DefineProjects(Arch arch)
-    {
-        arch.Rule("remainder/contracts-keep-the-standard-floor")
-            .Enforce(arch.Projects.Matching("Remainder.Contracts*")
-                .MustTarget("netstandard2.0"))
-            .Because("The contracts are what the net48 callers compile against, so netstandard2.0 stays among their frameworks.");
-
-        arch.Rule("remainder/contracts-take-only-the-backports")
-            .Enforce(arch.Projects.Matching("Remainder.Contracts*")
-                .MustOnlyReferencePackages("Microsoft.Bcl.*", "System.Memory"))
-            .Because("A contract's package dependencies become every caller's, so it takes the runtime backports and nothing else.");
-
-        arch.Rule("remainder/no-retired-serializer")
-            .Enforce(arch.Projects.Matching("Remainder.*")
-                .MustNotReferencePackages("Newtonsoft.Json"))
-            .Because("The wire format moved to System.Text.Json, and a second serializer reintroduces the casing bugs the move fixed.");
-
-        arch.Rule("remainder/contracts-are-null-annotated")
-            .Enforce(arch.Projects.Matching("Remainder.Contracts*")
-                .MustSetProperty("Nullable", "enable"))
-            .Because("A caller reads the contract's nullability from its annotations, and an unannotated contract promises nothing.");
     }
 
     // The five type-shape modals. Each takes a subject narrow enough that the law reads as one a codebase
@@ -133,8 +107,8 @@ internal static class VocabularyRemainderSpec
             .Because("Each leaf ships on its own cadence, which stops being true the moment one of them reaches outside itself.");
     }
 
-    // The member axis: every member modal no corpus spec states, and the three name-shaped member
-    // adjectives none of them narrows by.
+    // The member axis: every member modal no corpus spec states, and the member adjectives none of them
+    // narrows by.
     private static void DefineMemberShapes(Arch arch)
     {
         arch.Rule("remainder/api-members-are-public")
@@ -159,12 +133,6 @@ internal static class VocabularyRemainderSpec
                 .MustBeProtected())
             .Because("A policy case reads the base's state directly, which a private field puts out of its reach.");
 
-        arch.Rule("remainder/entry-points-are-static")
-            .Enforce(arch.Types.Named("Program")
-                .Methods.Named("Main", "Run")
-                .MustBeStatic())
-            .Because("The host calls the entry points before any instance exists, so an instance one is never reached.");
-
         arch.Rule("remainder/factories-are-static")
             .Enforce(arch.Types.InNamespace("Remainder.Api.*")
                 .Methods.WithNameMatching("Create*")
@@ -182,13 +150,6 @@ internal static class VocabularyRemainderSpec
                 .Methods.WithSuffix("Hook")
                 .MustBeVirtual())
             .Because("A hook is the point a renderer is extended at; sealed, the extension has to fork the renderer instead.");
-
-        arch.Rule("remainder/service-methods-stay-overridable")
-            .Enforce(arch.Types.InNamespace("Remainder.Services.*")
-                .Methods.ThatArePublic()
-                .Except(arch.Types.InNamespace("Remainder.Services.Hosting.*").Members.Named("Configure"))
-                .MustBeOverridable())
-            .Because("A host extends a service by deriving from it, which a sealed override or a plain method rules out.");
 
         arch.Rule("remainder/ambient-properties-are-named-for-it")
             .Enforce(arch.Types.InNamespace("Remainder.Api.*")

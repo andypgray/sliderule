@@ -190,6 +190,38 @@
       "constraint": { "node": "mustReferenceNoPackages", "projectSubject": { "adjectives": [{ "node": "projectNamed", "names": ["SlideRule"] }] } }
     },
     {
+      "id": "packaging/compiler-hosted-netstandard",
+      "posture": "enforce",
+      "sentence": "Projects `SlideRule.Extraction`, `SlideRule.Analyzers`, `SlideRule.SpecAnalyzers` or `SlideRule.SpecCompletion` must target `netstandard2.0`.",
+      "because": "A compiler loads these four projects: the analyzer package carries Extraction beside the build analyzer, and the contract package carries the spec analyzer and the completion provider. Visual Studio runs its compiler on .NET Framework and the dotnet CLI runs it on .NET, and netstandard2.0 is the one target both of them can load.",
+      "fix": "Keep netstandard2.0 among the project's target frameworks. An API it lacks belongs in SlideRule.Roslyn or the CLI, which no compiler loads.",
+      "constraint": { "node": "mustTarget", "projectSubject": { "adjectives": [{ "node": "projectNamed", "names": ["SlideRule.Extraction", "SlideRule.Analyzers", "SlideRule.SpecAnalyzers", "SlideRule.SpecCompletion"] }] }, "framework": "netstandard2.0" }
+    },
+    {
+      "id": "packaging/compiler-hosted-take-only-the-compiler",
+      "posture": "enforce",
+      "sentence": "Projects `SlideRule.Extraction`, `SlideRule.Analyzers`, `SlideRule.SpecAnalyzers` or `SlideRule.SpecCompletion` must reference only NuGet packages matching `Microsoft.CodeAnalysis*`, other than private ones, whose `PrivateAssets` is `all` (declared references only; transitive dependencies are not seen).",
+      "because": "A compiler resolves an analyzer's dependencies from the directory it loaded the analyzer from, and the packages put nothing there but these assemblies and Core. A reference to any other package compiles and passes every test, because the test process can load it, and then fails to load inside the compiler of everyone who installs the package. The compiler's own packages are the exception, because the compiler supplies them itself.",
+      "fix": "Take what the package supplies from the compiler API or from Core. A dependency that cannot be avoided belongs in SlideRule.Roslyn or the CLI.",
+      "constraint": { "node": "mustOnlyReferencePackages", "projectSubject": { "adjectives": [{ "node": "projectNamed", "names": ["SlideRule.Extraction", "SlideRule.Analyzers", "SlideRule.SpecAnalyzers", "SlideRule.SpecCompletion"] }] }, "patterns": ["Microsoft.CodeAnalysis*"] }
+    },
+    {
+      "id": "packaging/mcp-sdk-in-cli-only",
+      "posture": "enforce",
+      "sentence": "Projects matching `SlideRule*`, except project `SlideRule.Cli`, must not reference NuGet packages matching `ModelContextProtocol*` (declared references only; transitive dependencies are not seen).",
+      "because": "The package-level form of mcp/tool-types-in-cli: that rule keeps the tool classes in the CLI, and this one keeps their SDK there. A reference from any other project carries the SDK into what that project ships: from Core into every spec project, and from the adapter into every consumer's test project.",
+      "fix": "Keep MCP code in SlideRule.Cli.Mcp beside the tool classes; only the CLI references the MCP SDK.",
+      "constraint": { "node": "mustNotReferencePackages", "projectSubject": { "adjectives": [{ "node": "projectMatching", "globs": ["SlideRule*"] }, { "node": "projectExcept", "payload": { "adjectives": [{ "node": "projectNamed", "names": ["SlideRule.Cli"] }] } }] }, "patterns": ["ModelContextProtocol*"] }
+    },
+    {
+      "id": "packaging/xunit-in-adapter-only",
+      "posture": "enforce",
+      "sentence": "Projects matching `SlideRule*`, except projects `SlideRule.Xunit` or `SlideRule.Tests`, must not reference NuGet packages matching `xunit*` (declared references only; transitive dependencies are not seen).",
+      "because": "The package-level form of layering/adapter-is-a-leaf: the adapter and this repository's tests are the only projects here that run inside a test process. An xunit reference anywhere else ships a test framework in the tool, the contract or the build analyzer, to consumers who never run a test with it.",
+      "fix": "Put code that needs the test framework in SlideRule.Xunit, or in the tests if it is a test.",
+      "constraint": { "node": "mustNotReferencePackages", "projectSubject": { "adjectives": [{ "node": "projectMatching", "globs": ["SlideRule*"] }, { "node": "projectExcept", "payload": { "adjectives": [{ "node": "projectNamed", "names": ["SlideRule.Xunit", "SlideRule.Tests"] }] } }] }, "patterns": ["xunit*"] }
+    },
+    {
       "id": "packaging/shipping-locks-restore",
       "posture": "enforce",
       "sentence": "Packable projects matching `SlideRule*` must lock package restore.",
@@ -197,6 +229,14 @@
       "fix": "Set `RestorePackagesWithLockFile` to true and commit the packages.lock.json the next restore writes; src/Directory.Build.props already carries the policy for everything under it.",
       "citation": "https://learn.microsoft.com/nuget/consume-packages/package-references-in-project-files#locking-dependencies",
       "constraint": { "node": "mustLockPackages", "projectSubject": { "adjectives": [{ "node": "projectMatching", "globs": ["SlideRule*"] }, { "node": "projectPackable" }] } }
+    },
+    {
+      "id": "packaging/shipping-carries-docs",
+      "posture": "enforce",
+      "sentence": "Packable projects matching `SlideRule*` must set `GenerateDocumentationFile` to `true`.",
+      "because": "A consumer's editor shows a package's doc comments only from the XML file packed beside its assembly, and the compiler checks the doc comments only while it writes that file. A shipping project that stops generating it ships an API with no documentation, and a doc comment that names a type which no longer exists then builds green.",
+      "fix": "Set `GenerateDocumentationFile` to true. src/Directory.Build.props already sets it for every project under src/.",
+      "constraint": { "node": "mustSetProperty", "projectSubject": { "adjectives": [{ "node": "projectMatching", "globs": ["SlideRule*"] }, { "node": "projectPackable" }] }, "property": "GenerateDocumentationFile", "value": "true" }
     },
     {
       "id": "packaging/only-the-named-ship",
@@ -320,6 +360,22 @@
       "constraint": { "node": "mustOnlyThrow", "subject": { "noun": { "node": "layer", "name": "Adapter" } }, "operands": [{ "noun": { "node": "type", "anchor": { "name": "System.IO.FileNotFoundException" } } }, { "noun": { "node": "type", "anchor": { "name": "System.InvalidOperationException" } } }] }
     },
     {
+      "id": "xunit/hooks-overridable",
+      "posture": "enforce",
+      "sentence": "Properties of types in the Adapter layer named `ArchRuleTests` must be overridable.",
+      "because": "Every property of ArchRuleTests is a hook a consumer's test class overrides: SolutionPath always, ExcludeProjectName and AllowWorkspaceDiagnostics when their defaults do not fit. A property that cannot be overridden is a setting no consumer can change.",
+      "fix": "Declare the property abstract or virtual. A value the adapter computes for itself belongs in a private member.",
+      "constraint": { "node": "memberMustBeOverridable", "memberSubject": { "source": { "noun": { "node": "layer", "name": "Adapter" }, "adjectives": [{ "node": "named", "names": ["ArchRuleTests"] }] }, "kind": "property" } }
+    },
+    {
+      "id": "xunit/hooks-protected",
+      "posture": "enforce",
+      "sentence": "Properties of types in the Adapter layer named `ArchRuleTests` must be protected.",
+      "because": "A consumer overrides each hook as `protected override`, the shape the adapter's README shows, and an override keeps the access of the member it overrides. A hook declared public breaks that override with CS0507, and a private protected one cannot be overridden outside the adapter's assembly.",
+      "fix": "Declare the hook protected.",
+      "constraint": { "node": "memberMustBeProtected", "memberSubject": { "source": { "noun": { "node": "layer", "name": "Adapter" }, "adjectives": [{ "node": "named", "names": ["ArchRuleTests"] }] }, "kind": "property" } }
+    },
+    {
       "id": "analyzer/no-ambient-types",
       "posture": "enforce",
       "sentence": "The Core or Extraction layers must not reference `File`, `Directory`, `Environment`, `Console`, `Process`, `ProcessStartInfo` or `Random`.",
@@ -355,6 +411,23 @@
       "constraint": { "node": "mustNotThrow", "subject": { "union": [{ "noun": { "node": "layer", "name": "Core" } }, { "noun": { "node": "layer", "name": "Extraction" } }, { "noun": { "node": "layer", "name": "Analyzers" } }, { "noun": { "node": "layer", "name": "SpecAnalyzers" } }, { "noun": { "node": "layer", "name": "SpecCompletion" } }, { "noun": { "node": "layer", "name": "Workspace" } }, { "noun": { "node": "layer", "name": "Host" } }, { "noun": { "node": "layer", "name": "Adapter" } }, { "noun": { "node": "layer", "name": "Pack" } }] }, "operands": [{ "noun": { "node": "type", "anchor": { "name": "System.Exception" } } }, { "noun": { "node": "type", "anchor": { "name": "System.SystemException" } } }, { "noun": { "node": "type", "anchor": { "name": "System.ApplicationException" } } }] }
     },
     {
+      "id": "state/no-static-mutable",
+      "posture": "enforce",
+      "sentence": "Static fields of authored types in the Core, Extraction, Analyzers, SpecAnalyzers, SpecCompletion, Workspace, Host, Adapter or Pack layers, except `s_inFlightCount`, `s_lastActivityTicks`, `s_drainWaiter` or `s_timestampProvider` fields of types named `IdleTimeoutWatchdog`, `s_hasExited` fields of types named `ServerShutdown`, `_loadCount` fields of types named `WorkspaceLoader` or `s_run` fields of types named `ArchRuleTests`, must be readonly.",
+      "because": "A writable static is process-wide state in a library a long-lived MCP server calls concurrently and every spec project links: whoever wrote to it last decides what the next caller reads, and nothing in the type system says so. A const counts as readonly here — it is readonly's superset — so the law asks for the weakest thing that closes the hole.",
+      "fix": "Make it `readonly` or `const`. If it has to be written (an Interlocked location, a lock-guarded one-shot or a test seam), add it to this rule's `Except` in the spec, with its family in the comment on the rule, and say in review which one.",
+      "constraint": { "node": "memberMustBeReadonly", "memberSubject": { "source": { "union": [{ "noun": { "node": "layer", "name": "Core" } }, { "noun": { "node": "layer", "name": "Extraction" } }, { "noun": { "node": "layer", "name": "Analyzers" } }, { "noun": { "node": "layer", "name": "SpecAnalyzers" } }, { "noun": { "node": "layer", "name": "SpecCompletion" } }, { "noun": { "node": "layer", "name": "Workspace" } }, { "noun": { "node": "layer", "name": "Host" } }, { "noun": { "node": "layer", "name": "Adapter" } }, { "noun": { "node": "layer", "name": "Pack" } }], "adjectives": [{ "node": "authored" }] }, "kind": "field", "adjectives": [{ "node": "memberThatAreStatic" }, { "node": "memberExcept", "payloads": [{ "source": { "noun": { "node": "types" }, "adjectives": [{ "node": "named", "names": ["IdleTimeoutWatchdog"] }] }, "kind": "field", "adjectives": [{ "node": "memberNamed", "names": ["s_inFlightCount", "s_lastActivityTicks", "s_drainWaiter", "s_timestampProvider"] }] }, { "source": { "noun": { "node": "types" }, "adjectives": [{ "node": "named", "names": ["ServerShutdown"] }] }, "kind": "field", "adjectives": [{ "node": "memberNamed", "names": ["s_hasExited"] }] }, { "source": { "noun": { "node": "types" }, "adjectives": [{ "node": "named", "names": ["WorkspaceLoader"] }] }, "kind": "field", "adjectives": [{ "node": "memberNamed", "names": ["_loadCount"] }] }, { "source": { "noun": { "node": "types" }, "adjectives": [{ "node": "named", "names": ["ArchRuleTests"] }] }, "kind": "field", "adjectives": [{ "node": "memberNamed", "names": ["s_run"] }] }] }] } }
+    },
+    {
+      "id": "naming/async-suffix",
+      "posture": "enforce",
+      "sentence": "Methods returning `Task`, `Task<TResult>`, `ValueTask` or `ValueTask<TResult>` declared in authored types in the Core, Extraction, Analyzers, SpecAnalyzers, SpecCompletion, Workspace, Host, Adapter or Pack layers, except `Rule_Holds` or `Workspace_LoadedCompletely` methods of types named `ArchRuleTests` or `WhenAllCallsComplete` methods of types named `IdleTimeoutWatchdog`, must be named `*Async`.",
+      "because": "House convention held repo-wide: an agent grepping *Async sees every await point. The three exceptions are deliberate, not drift: Rule_Holds and Workspace_LoadedCompletely are the adapter's test methods, whose names a consumer reads in every test run, and WhenAllCallsComplete takes its name from Task.WhenAll, the combinator it mirrors.",
+      "fix": "Name Task-returning methods with the Async suffix.",
+      "citation": "https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap",
+      "constraint": { "node": "memberMustHaveSuffix", "memberSubject": { "source": { "union": [{ "noun": { "node": "layer", "name": "Core" } }, { "noun": { "node": "layer", "name": "Extraction" } }, { "noun": { "node": "layer", "name": "Analyzers" } }, { "noun": { "node": "layer", "name": "SpecAnalyzers" } }, { "noun": { "node": "layer", "name": "SpecCompletion" } }, { "noun": { "node": "layer", "name": "Workspace" } }, { "noun": { "node": "layer", "name": "Host" } }, { "noun": { "node": "layer", "name": "Adapter" } }, { "noun": { "node": "layer", "name": "Pack" } }], "adjectives": [{ "node": "authored" }] }, "kind": "method", "adjectives": [{ "node": "returning", "anchors": [{ "name": "System.Threading.Tasks.Task" }, { "name": "System.Threading.Tasks.Task<TResult>", "onDefinition": true }, { "name": "System.Threading.Tasks.ValueTask" }, { "name": "System.Threading.Tasks.ValueTask<TResult>", "onDefinition": true }] }, { "node": "memberExcept", "payloads": [{ "source": { "noun": { "node": "types" }, "adjectives": [{ "node": "named", "names": ["ArchRuleTests"] }] }, "kind": "method", "adjectives": [{ "node": "memberNamed", "names": ["Rule_Holds", "Workspace_LoadedCompletely"] }] }, { "source": { "noun": { "node": "types" }, "adjectives": [{ "node": "named", "names": ["IdleTimeoutWatchdog"] }] }, "kind": "method", "adjectives": [{ "node": "memberNamed", "names": ["WhenAllCallsComplete"] }] }] }] }, "suffix": "Async" }
+    },
+    {
       "id": "naming/interfaces",
       "posture": "enforce",
       "sentence": "Interfaces in `SlideRule.*` must be named `I*`.",
@@ -387,8 +460,5 @@
       "scope": { "role": "tripwire", "scopeId": "model/prose-fragments", "scoped": { "noun": { "node": "layer", "name": "Model" } }, "surface": [], "dragons": "Every node here declares the prose fragment the renderers assemble into its sentence, and the fragments are position-blind: one phrase serves subject and reference position, so a fragment never closes its own parenthetical — the closing comma belongs to the junction (SentenceRenderer.EndsOpen and CloseBefore). A strict verb renders its strictness by the absence of the external-packages caveat; do not add one. A changed fragment moves its pin in the same commit." }
     }
   ],
-  "omitted": [
-    { "id": "state/no-static-mutable", "reason": "A Where predicate is code, and this file carries data only." },
-    { "id": "naming/async-suffix", "reason": "A Where predicate is code, and this file carries data only." }
-  ]
+  "omitted": []
 }

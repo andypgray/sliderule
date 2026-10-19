@@ -1,5 +1,4 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Hosting;
 using SlideRule.Model;
 using SlideRule.ModelFile;
@@ -7,6 +6,7 @@ using SlideRule.Tests.Checking;
 using SlideRule.Tests.DocHygiene;
 using SlideRule.Tests.Dogfood;
 using SlideRule.Tests.Stubs;
+using Xunit;
 
 namespace SlideRule.Tests.ModelFile;
 
@@ -138,25 +138,18 @@ public sealed class ModelDocumentOmittedExactnessTests
     }
 
     [Fact]
-    public void From_ThisRepositorysOwnSpec_OmitsExactlyTheTwoWheres()
+    public void From_ThisRepositorysOwnSpec_OmitsNothing()
     {
-        // Arrange
-        const string predicateAdjective = "A Where predicate is code, and this file carries data only.";
-
         // Act
         ModelDocument document = ModelDocument.From(
             SelfSpecTests.SelfModel, "SlideRule.Architecture", ModelFileCorpus.Projects);
 
-        // Assert: in the order the spec declares them, each with the whole sentence a reader of the file
-        // gets. Each narrows its subject by a Where before the verb, so that is what the file reports.
-        // All four front doors name their lists as data and are carried: api/extraction-front-door
-        // subtracts the private nested types it has to leave out with ThatArePrivate, not a predicate.
-        document.Omitted.Select(entry => (entry.Id, entry.Reason))
-            .ShouldBe(
-            [
-                ("state/no-static-mutable", predicateAdjective),
-                ("naming/async-suffix", predicateAdjective)
-            ]);
+        // Assert: every rule is data. All four front doors name their lists as data, and
+        // api/extraction-front-door subtracts the private nested types it has to leave out with
+        // ThatArePrivate; the two exemption lists are member Except payloads. None of them is a predicate.
+        document.Omitted.Select(entry => $"{entry.Id}: {entry.Reason}")
+            .ToList()
+            .ShouldBeEmpty("a rule the model file leaves out is one the build analyzer never checks");
     }
 
     // Where the writer's partition and the walk's disagree, as one line per rule.

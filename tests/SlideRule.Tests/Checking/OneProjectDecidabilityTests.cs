@@ -4,7 +4,6 @@ using SlideRule.Hosting;
 using SlideRule.Model;
 using SlideRule.ModelFile;
 using SlideRule.Tests.DocHygiene;
-using SlideRule.Tests.Dogfood;
 using SlideRule.Tests.ModelFile;
 using Xunit;
 
@@ -466,27 +465,6 @@ public sealed class OneProjectDecidabilityTests
 
         fromAnAllowList.Reason.ShouldBeNull();
         fromABan.Reason.ShouldBe(Declarer);
-    }
-
-    [Fact]
-    public void Classify_TheSelfSpecsTwoPredicateRulesOverProjectDefinedLayers_ReportThePredicate()
-    {
-        // Arrange — the walk passes the project noun defining these two rules' subject layers, and they go
-        // out one node further along, at the Where their member subject carries. Nothing else reds on a
-        // reason that moves — the split pins assert rule IDs — so the reason is pinned here.
-        ArchitectureModel self = SelfSpecTests.SelfModel;
-        string[] moved = ["naming/async-suffix", "state/no-static-mutable"];
-
-        // Act
-        List<(string Id, string? Reason)> read = moved
-            .Select(id => (id, OneProjectDecidability.Classify(self.Rule(id)).Reason))
-            .ToList();
-
-        // Assert
-        read.Where(rule => rule.Reason != Code)
-            .Select(rule => $"{rule.Id}: {Describe(rule.Reason)}")
-            .ToList()
-            .ShouldReportNothing("Rule(s) that should report the predicate they hold rather than a declarer");
     }
 
     private static Layer Data(Arch arch)

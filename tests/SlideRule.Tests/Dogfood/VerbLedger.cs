@@ -24,11 +24,6 @@ internal static class VerbLedger
         "The seams here are consumed by injection rather than inheritance, and the one true hierarchy " +
         "statement, that every *Constraint derives from Constraint, is already model/constraint-nodes.";
 
-    private const string AwaitsTheAnalyzerRelease =
-        "Newer than the build analyzer this repository runs, which is the last released package: its " +
-        "model-file reader refuses a node it does not know, and CI's self-check build fails on that " +
-        "refusal, so the self-spec takes the verb up when a release that reads it moves the analyzer here.";
-
     /// <summary>The unused verbs, each keyed to the sentence saying why the self-spec does not use it.</summary>
     public static IReadOnlyDictionary<string, string> Unused { get; } =
         new Dictionary<string, string>(StringComparer.Ordinal)
@@ -66,12 +61,6 @@ internal static class VerbLedger
                 "narrow a subject, which is Where's work and not this verb's.",
             [nameof(SelectionConstraints.MustHaveExactlyOneCounterpart)] =
                 "This suite organizes tests by behavior rather than per type, so a rule demanding a " +
-                "{Name}Tests class each would record a convention the tree does not follow as unpaid debt.",
-            [nameof(ProjectSelectionConstraints.MustTarget)] = AwaitsTheAnalyzerRelease,
-            [nameof(ProjectSelectionConstraints.MustOnlyReferencePackages)] = AwaitsTheAnalyzerRelease,
-            [nameof(ProjectSelectionConstraints.MustNotReferencePackages)] = AwaitsTheAnalyzerRelease,
-            [nameof(ProjectSelectionConstraints.MustSetProperty)] = AwaitsTheAnalyzerRelease,
-            [nameof(MemberSelectionConstraints.MustBeProtected)] = AwaitsTheAnalyzerRelease,
-            [nameof(MemberSelectionConstraints.MustBeOverridable)] = AwaitsTheAnalyzerRelease
+                "{Name}Tests class each would record a convention the tree does not follow as unpaid debt."
         };
 }

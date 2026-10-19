@@ -1,4 +1,3 @@
-using System.Reflection;
 using System.Text.Json;
 using Microsoft.CodeAnalysis;
 using Shouldly;
@@ -465,48 +464,28 @@ public sealed class SelfSpecTests
 
     /// <summary>
     ///     The sanctioned-mutable-static pin, the broad-catcher pin's twin over the other exemption list.
-    ///     <c>state/no-static-mutable</c> carves seven fields out of its own subject, and the key here is
-    ///     <c>{DeclaringType}.{Name}</c> rather than a type name, so the list can only grow one field at a
-    ///     time — which is exactly the growth that turns an exemption list into a null law. Pinning the
-    ///     exact seven makes every addition a deliberate act: the list can only grow by moving this
-    ///     assertion in the same commit, where a reviewer sees the field and its family together.
+    ///     <c>state/no-static-mutable</c> carves seven fields out of its own subject, each named by its
+    ///     declaring type and its own name rather than by type alone, so the list grows one field at a time,
+    ///     which is the growth that turns an exemption list into a null law. The fields live in the rule's own
+    ///     <c>Except</c> operand, so the rendered law is the list, and pinning that sentence to the exact seven
+    ///     makes every addition a deliberate act: the list can only grow by moving this assertion in the same
+    ///     commit, where a reviewer sees the field and its family (the comment on the rule) together.
     /// </summary>
     [Fact]
     public void SanctionedMutableStatics_AreExactlyTheSevenIntendedWrites()
     {
-        ShouldCarrySanctionedSet("SanctionedMutableStatics")
+        SelfModel.Rule("state/no-static-mutable")
+            .Sentence
             .ShouldBe(
-                [
-                    "ArchRuleTests.s_run",
-                    "IdleTimeoutWatchdog.s_drainWaiter",
-                    "IdleTimeoutWatchdog.s_inFlightCount",
-                    "IdleTimeoutWatchdog.s_lastActivityTicks",
-                    "IdleTimeoutWatchdog.s_timestampProvider",
-                    "ServerShutdown.s_hasExited",
-                    "WorkspaceLoader._loadCount"
-                ], customMessage: "a name added here leaves the static-mutability law; add it with its family in the " +
-                                  "set's xmldoc — an Interlocked location, lock-guarded one-shot state, or the clock " +
-                                  "seam — or make the field readonly or const.");
-    }
-
-    /// <summary>
-    ///     The contents of one of the self-spec's private exemption sets, ordinally sorted, kept as the one
-    ///     place the reflection and the guard beside it are written.
-    /// </summary>
-    /// <remarks>
-    ///     Asserting, hence the name: the set is <c>private static</c> and reached by reflection, so a
-    ///     rename or a deletion would otherwise surface as a <see cref="NullReferenceException" /> in the
-    ///     caller rather than as the instruction to move the pin with it.
-    /// </remarks>
-    private static IReadOnlyList<string> ShouldCarrySanctionedSet(string fieldName)
-    {
-        FieldInfo? field = typeof(SlideRuleArchitectureSpec).GetField(
-            fieldName, BindingFlags.NonPublic | BindingFlags.Static);
-        field.ShouldNotBeNull($"the self-spec no longer carries a {fieldName} set; move this pin with it.");
-
-        var sanctioned = (HashSet<string>)field.GetValue(null)!;
-        return sanctioned.OrderBy(name => name, StringComparer.Ordinal)
-            .ToList();
+                "Static fields of authored types in the Core, Extraction, Analyzers, SpecAnalyzers, SpecCompletion, " +
+                "Workspace, Host, Adapter or Pack layers, " +
+                "except `s_inFlightCount`, `s_lastActivityTicks`, `s_drainWaiter` or `s_timestampProvider` fields of " +
+                "types named `IdleTimeoutWatchdog`, `s_hasExited` fields of types named `ServerShutdown`, " +
+                "`_loadCount` fields of types named `WorkspaceLoader` or `s_run` fields of types named " +
+                "`ArchRuleTests`, must be readonly.",
+                customMessage: "a field added here leaves the static-mutability law; add it under its family in the " +
+                               "comment on the rule (an Interlocked location, lock-guarded one-shot state, or the " +
+                               "clock seam), or make the field readonly or const.");
     }
 
     // A constraint node's type name is its verb plus the `Constraint` suffix, with the member- and
