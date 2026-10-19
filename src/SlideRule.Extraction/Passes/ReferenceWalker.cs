@@ -224,7 +224,7 @@ internal static class ReferenceWalker
         if (symbol is null) return null;
 
         INamedTypeSymbol definition = symbol.OriginalDefinition;
-        if (!TypeKindMapper.IsModelledType(definition)) return null;
+        if (!definition.IsModelledType()) return null;
 
         return definition;
     }

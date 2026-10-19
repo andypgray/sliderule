@@ -39,7 +39,7 @@ internal static class ScopeDesugarer
         // The Fix names the first sanctioned operand as the sentence would refer to it (GRAMMAR §5.5):
         // "use `IBillingFacade`" for a type, "use types named `CodeFormatHelper`" for a no-load anchor.
         string? fix = boundary.Count > 0
-            ? "use " + SentenceRenderer.Reference(boundary[0])
+            ? "use " + boundary[0].ReferenceProse()
             : null;
 
         return new ArchRule(

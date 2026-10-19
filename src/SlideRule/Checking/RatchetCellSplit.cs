@@ -34,7 +34,7 @@ internal sealed class RatchetCellSplit
     internal static RatchetCellSplit? Of(ArchRule rule, IReadOnlyList<Violation> grandfathered)
     {
         if (!rule.IsRatcheted) return null;
-        if (SelectionWalk.FamilyNoun(rule.Constraint?.Subject) is not { } family) return null;
+        if (rule.Constraint?.Subject.FamilyNounOrNull() is not { } family) return null;
 
         Dictionary<string, (int Remaining, int Sites)> held = Held(grandfathered);
         if (held.Count == 0) return null;

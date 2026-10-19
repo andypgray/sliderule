@@ -27,5 +27,5 @@ internal sealed class MemberExceptAdjective(IReadOnlyList<MemberSelection> paylo
 
     internal override bool OpensParenthetical => true;
 
-    internal override string Fragment => ", except " + SentenceRenderer.MemberReferenceList(Payloads);
+    internal override string Fragment => ", except " + Payloads.ReferenceListProse();
 }

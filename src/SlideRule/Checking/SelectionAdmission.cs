@@ -63,16 +63,6 @@ internal sealed class SelectionAdmission
     }
 
     /// <summary>
-    ///     Whether the selection names <paramref name="node" /> at <paramref name="project" />: the GRAMMAR §4.1
-    ///     test an edge end asks of one instance, asked here of one declarer. A card's placement counts a
-    ///     declarer's own files only where this holds, so a project-defined layer places by its own copy.
-    /// </summary>
-    private bool NamesAt(TypeNode node, string project)
-    {
-        return NamingOf(node).Names(project);
-    }
-
-    /// <summary>
     ///     The sites this selection counts for <paramref name="node" />: every site where one project declares
     ///     it, and otherwise the sites of the declarers the selection names it at (GRAMMAR §4.1). The
     ///     node-level twin of the edge test — a card's placement collapses these, so a project-defined layer
@@ -84,8 +74,9 @@ internal sealed class SelectionAdmission
         // only where the model conflates something — which on an ordinary codebase is nowhere.
         if (node.AlsoDeclaredBy.Count == 0) return node.DeclarationSites;
 
+        Naming naming = NamingOf(node);
         return node.Declarers
-            .Where(declarer => NamesAt(node, declarer))
+            .Where(declarer => naming.Names(declarer))
             .SelectMany(node.DeclarationSitesOf);
     }
 

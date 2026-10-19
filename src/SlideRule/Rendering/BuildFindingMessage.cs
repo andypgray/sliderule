@@ -43,7 +43,7 @@ internal static class BuildFindingMessage
     internal static string Compose(RuleResult result, Violation violation)
     {
         ArchRule rule = result.Rule;
-        var segments = new List<string> { $"{rule.Id}: {Wording(violation)}." };
+        var segments = new List<string> { $"{rule.Id}: {violation.Text()}." };
 
         if (result.GrownEntries.TryGetValue(violation, out BaselineEntry entry)) segments.Add(GrownText(entry, violation));
         if (rule.Sentence.Length > 0) segments.Add(Terminated(rule.Sentence));
@@ -52,20 +52,6 @@ internal static class BuildFindingMessage
         if (rule.Exemplar is { } exemplar) segments.Add($"Exemplar: {exemplar}.");
 
         return string.Join(" ", segments);
-    }
-
-    // The same split the human report's site loop makes, for the same reason: the seven edge kinds read as a
-    // source doing something to a far end, the three subject kinds as one thing being the wrong shape. The
-    // site-less kinds never arrive — a finding needs a place — and EdgeText answers the empty string for
-    // them rather than reaching through a slot they leave null.
-    private static string Wording(Violation violation)
-    {
-        return violation.Kind switch
-        {
-            ViolationKind.Shape or ViolationKind.MemberShape or ViolationKind.ProjectShape =>
-                ViolationWording.SubjectText(violation),
-            _ => ViolationWording.EdgeText(violation)
-        };
     }
 
     // Why a site the baseline names is red anyway: the allowance beside what this run measured. The noun

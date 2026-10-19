@@ -866,7 +866,7 @@ internal sealed class ExtractionCacheStore
             return new DocumentCheck(null, null, refreshed, null);
         }
 
-        if (FileStamping.ToFreshness(document).MatchesStat(current) && document.Promoted)
+        if (document.ToFreshness().MatchesStat(current) && document.Promoted)
             // provably unchanged: trust the recorded hash
             return new DocumentCheck(document.Sha256, document.Sha256, document, null);
 
@@ -1049,7 +1049,7 @@ internal sealed class ExtractionCacheStore
         FileFreshness current = FileFreshness.Capture(stamp.Path);
         if (stamp.Exists != current.Exists) return true;
         if (!stamp.Exists) return false;
-        return !FileStamping.ToFreshness(stamp).MatchesStat(current);
+        return !stamp.ToFreshness().MatchesStat(current);
     }
 
     private string? HashDuringValidation(string path)

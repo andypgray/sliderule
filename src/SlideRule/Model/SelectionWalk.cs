@@ -13,11 +13,10 @@ internal static class SelectionWalk
 {
     /// <summary>The constraint's subject tree followed by each operand's tree, in operand order.</summary>
     /// <remarks>
-    ///     A project constraint contributes no type selection at all — its subject is a project selection
-    ///     and its <see cref="Constraint.Subject" /> is null (GRAMMAR §4.10) — so it walks out empty here
-    ///     and through <see cref="ConstraintProjectSelections" /> instead.
+    ///     A project constraint, whose subject is null, walks out empty here and through
+    ///     <see cref="ProjectSelections" /> instead.
     /// </remarks>
-    internal static IEnumerable<Selection> ConstraintSelections(Constraint constraint)
+    internal static IEnumerable<Selection> Selections(this Constraint constraint)
     {
         if (constraint.Subject is { } subject)
             foreach (Selection selection in ExpandSelection(subject))
@@ -30,7 +29,7 @@ internal static class SelectionWalk
         // A member subject's own source is Constraint.Subject, walked above; each of its Except payloads draws
         // its members from a type selection of its own, which every walk over this one must reach too.
         if (constraint is MemberConstraint member)
-            foreach (MemberSelection payload in MemberExceptPayloads(member.MemberSubject))
+            foreach (MemberSelection payload in member.MemberSubject.ExceptPayloads())
             foreach (Selection selection in ExpandSelection(payload.Source))
                 yield return selection;
     }
@@ -39,7 +38,7 @@ internal static class SelectionWalk
     ///     Every member selection nested under <paramref name="selection" />'s <c>Except</c> adjectives, in
     ///     authoring order, each followed by the payloads it nests in turn — the selection itself excluded.
     /// </summary>
-    internal static IEnumerable<MemberSelection> MemberExceptPayloads(MemberSelection selection)
+    internal static IEnumerable<MemberSelection> ExceptPayloads(this MemberSelection selection)
     {
         foreach (MemberAdjective adjective in selection.Adjectives)
         {
@@ -49,18 +48,17 @@ internal static class SelectionWalk
             {
                 yield return payload;
 
-                foreach (MemberSelection nested in MemberExceptPayloads(payload)) yield return nested;
+                foreach (MemberSelection nested in payload.ExceptPayloads()) yield return nested;
             }
         }
     }
 
     /// <summary>
-    ///     The project selections a constraint reaches — its project subject and the payloads nested under
-    ///     that subject's <c>Except</c> adjectives — or nothing at all for every type- and member-subject
-    ///     constraint. The project-stratum twin of <see cref="ConstraintSelections" />, kept beside it and
-    ///     <see cref="ConstraintMemberSelections" /> so the walks a validation pass needs are read in one place.
+    ///     The project selections a constraint reaches: its project subject and the payloads nested under that
+    ///     subject's <c>Except</c> adjectives, the project form of a family subject, or nothing. The
+    ///     project-stratum twin of <see cref="Selections" />.
     /// </summary>
-    internal static IEnumerable<ProjectSelection> ConstraintProjectSelections(Constraint constraint)
+    internal static IEnumerable<ProjectSelection> ProjectSelections(this Constraint constraint)
     {
         if (constraint is ProjectConstraint project)
         {
@@ -74,49 +72,41 @@ internal static class SelectionWalk
         // checks — the foreign-Arch walk and the blank name/glob check (§8 items 22–23) — reach it
         // without a walk of their own. A reader here is therefore not entitled to assume a project
         // constraint; each one reads the anchor it was given rather than the constraint.
-        if (FamilyProjects(constraint.Subject) is { } projects)
+        if (constraint.Subject.FamilyNounOrNull()?.Projects is { } projects)
             foreach (ProjectSelection selection in ExpandProjectSelection(projects))
                 yield return selection;
     }
 
     /// <summary>
     ///     The member selections a constraint reaches: its member subject, then every payload nested under that
-    ///     subject's <c>Except</c> adjectives in <see cref="MemberExceptPayloads" /> order, or nothing at all for a
-    ///     type- or project-subject constraint. The member-stratum twin of <see cref="ConstraintProjectSelections" />.
+    ///     subject's <c>Except</c> adjectives in <see cref="ExceptPayloads" /> order, or nothing at all for a
+    ///     type- or project-subject constraint. The member-stratum twin of <see cref="ProjectSelections" />.
     /// </summary>
-    internal static IEnumerable<MemberSelection> ConstraintMemberSelections(Constraint constraint)
+    internal static IEnumerable<MemberSelection> MemberSelections(this Constraint constraint)
     {
         if (constraint is not MemberConstraint member) yield break;
 
         yield return member.MemberSubject;
 
-        foreach (MemberSelection payload in MemberExceptPayloads(member.MemberSubject)) yield return payload;
+        foreach (MemberSelection payload in member.MemberSubject.ExceptPayloads()) yield return payload;
     }
 
     /// <summary>
-    ///     The noun head of a selection, or null for a <see cref="UnionSelection" /> and for null — the
-    ///     one place the union guard is stated, because reading <see cref="Selection.Noun" /> on a union
-    ///     throws by design (GRAMMAR §5.1). Every question about a selection's noun goes through it, so a
-    ///     union answers "not that noun" rather than throwing, at every asker.
+    ///     The noun head of a selection, or null for a <see cref="UnionSelection" />, whose
+    ///     <see cref="Selection.Noun" /> throws (GRAMMAR §5.1), and for a null receiver.
     /// </summary>
-    internal static SelectionNoun? NounOf(Selection? selection)
+    internal static SelectionNoun? NounOrNull(this Selection? selection)
     {
         return selection is null or UnionSelection ? null : selection.Noun;
     }
 
-    /// <summary>The family noun of a family subject, or null for every other selection (GRAMMAR §5.1).</summary>
-    internal static EachNoun? FamilyNoun(Selection? selection)
-    {
-        return NounOf(selection) as EachNoun;
-    }
-
     /// <summary>
-    ///     The project selection inside a family-of-projects subject, or null for every other selection —
-    ///     the one place the type stratum reaches the artifact stratum (GRAMMAR §5.1).
+    ///     The family noun of a family subject, or null for every other selection and for a null receiver
+    ///     (GRAMMAR §5.1).
     /// </summary>
-    private static ProjectSelection? FamilyProjects(Selection? selection)
+    internal static EachNoun? FamilyNounOrNull(this Selection? selection)
     {
-        return FamilyNoun(selection)?.Projects;
+        return selection.NounOrNull() as EachNoun;
     }
 
     /// <summary>The project selection itself, then the payloads of its own <c>Except</c> adjectives.</summary>

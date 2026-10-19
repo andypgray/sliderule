@@ -83,13 +83,13 @@ internal static class StatusFormatter
     // meet next is the capture the verb refuses, so the line says why and what clears it.
     private static string PartlyMeasuredLine(RuleResult result)
     {
-        string named = DeadOperandWording.Named(result.UntestedRole, result.UntestedOperands);
+        string named = result.UntestedRole.NamedOperands(result.UntestedOperands);
 
         return result.BaselineCaptured
             ? $"  not measured: {named} matched no types, so this rule's unmatched entries may be untested rather "
               + "than fixed."
             : $"  not measured: {named} matched no types, so 'sliderule baseline init' skips this rule until "
-              + $"each dead operand {DeadOperandWording.Until(result.UntestedRole)}.";
+              + $"each dead operand {result.UntestedRole.UntilClause()}.";
     }
 
     // A rule with a dead allowed pattern or membership only gained violations, so its row's counts already say
@@ -97,12 +97,12 @@ internal static class StatusFormatter
     // verb refuses because it would record them as debt.
     private static string StricterLine(RuleResult result)
     {
-        string named = DeadOperandWording.Named(result.StricterRole, result.StricterOperands);
+        string named = result.StricterRole.NamedOperands(result.StricterOperands);
 
         return result.BaselineCaptured
             ? $"  stricter than written: {named} matched no types."
             : $"  stricter than written: {named} matched no types, so 'sliderule baseline init' skips this rule "
-              + $"until each dead operand {DeadOperandWording.Until(result.StricterRole)}.";
+              + $"until each dead operand {result.StricterRole.UntilClause()}.";
     }
 
     // The cure the signal already carries — the empty subject's first, since that shape fails the rule and a

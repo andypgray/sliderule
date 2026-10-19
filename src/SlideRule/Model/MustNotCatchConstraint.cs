@@ -12,5 +12,5 @@ internal sealed class MustNotCatchConstraint(Selection subject, IReadOnlyList<Se
     /// <summary>The forbidden catch targets.</summary>
     internal IReadOnlyList<Selection> Targets => Operands;
 
-    internal override string VerbPhrase => "must not catch " + SentenceRenderer.TargetList(Targets);
+    internal override string VerbPhrase => "must not catch " + Targets.TargetListProse();
 }

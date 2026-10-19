@@ -61,6 +61,6 @@ internal sealed class EachNoun : SelectionNoun
     // "projects `A` or `B`"), so the family prefixes the quantifier and nothing else.
     private string ProjectFragment()
     {
-        return "each of the " + SentenceRenderer.ProjectReference(Projects!);
+        return "each of the " + Projects!.ReferenceProse();
     }
 }

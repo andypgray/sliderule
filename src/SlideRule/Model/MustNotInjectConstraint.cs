@@ -12,5 +12,5 @@ internal sealed class MustNotInjectConstraint(Selection subject, IReadOnlyList<S
     /// <summary>The forbidden injection targets.</summary>
     internal IReadOnlyList<Selection> Targets => Operands;
 
-    internal override string VerbPhrase => "must not inject " + SentenceRenderer.TargetList(Targets);
+    internal override string VerbPhrase => "must not inject " + Targets.TargetListProse();
 }

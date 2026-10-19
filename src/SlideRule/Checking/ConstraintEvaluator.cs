@@ -469,7 +469,7 @@ internal sealed class ConstraintEvaluator
     // thing carry the same cure whichever comes first.
     private void AddOnce(ref List<CheckWarning>? warnings, Selection piece, DeadOperandRole role)
     {
-        string reference = SentenceRenderer.Reference(piece);
+        string reference = piece.ReferenceProse();
         warnings ??= [];
         bool raised = warnings.Exists(warning =>
             warning.Kind == CheckWarningKind.DeadOperand && warning.Key == reference);
@@ -1161,7 +1161,7 @@ internal sealed class ConstraintEvaluator
     {
         return dead
             .Select(part => Violation.EmptySubject(
-                EmptyOperandMessage(SentenceRenderer.Reference(part)),
+                EmptyOperandMessage(part.ReferenceProse()),
                 AuthoringHints.ForSubject(part, _incompleteModel)))
             .ToList();
     }
@@ -1205,7 +1205,7 @@ internal sealed class ConstraintEvaluator
         // One warning per distinct reference: the reference is the warning's key, so two parts that render
         // alike warn once.
         List<CheckWarning> warnings = dead
-            .Select(part => (Part: part, Reference: SentenceRenderer.Reference(part)))
+            .Select(part => (Part: part, Reference: part.ReferenceProse()))
             .GroupBy(entry => entry.Reference, StringComparer.Ordinal)
             .Select(group => group.First())
             .Select(entry => CheckWarning.DeadExemplar(
@@ -1429,7 +1429,7 @@ internal sealed class ConstraintEvaluator
         {
             List<Violation> deadNames = MemberDeadNames.In(constraint.MemberSubject, members)
                 .Select(dead => Violation.EmptySubject(
-                    EmptyMemberOperandMessage(SentenceRenderer.MemberReference(dead)),
+                    EmptyMemberOperandMessage(dead.ReferenceProse()),
                     AuthoringHints.ForMemberName(_incompleteModel)))
                 .ToList();
             if (deadNames.Count > 0) return (deadNames, NoWarnings, default);
@@ -1765,7 +1765,7 @@ internal sealed class ConstraintEvaluator
         /// </remarks>
         internal string CellName(int index)
         {
-            return SelectionWalk.NounOf(Cells[index]) switch
+            return Cells[index].NounOrNull() switch
             {
                 LayerNoun layer => layer.Name,
                 ProjectNoun project => project.Name,

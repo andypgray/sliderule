@@ -91,14 +91,13 @@ internal static class ProseFormat
     }
 
     /// <summary>
-    ///     The bracketed attribute form with a trailing <c>Attribute</c> stripped:
-    ///     <c>ApiControllerAttribute</c> → <c>[ApiController]</c> (GRAMMAR §5.2). Reads the anchor's
-    ///     simple display, so a <c>typeof</c> anchor and a string anchor naming the same attribute
-    ///     render the same bracketed form.
+    ///     The backticked, bracketed attribute form with a trailing <c>Attribute</c> stripped:
+    ///     <c>ApiControllerAttribute</c> → <c>`[ApiController]`</c> (GRAMMAR §5.2).
     /// </summary>
-    internal static string AttributeName(TypeAnchor anchor)
+    internal static string BacktickedAttributeName(this TypeAnchor anchor)
     {
-        return BracketAttribute(anchor.SimpleDisplay);
+        string bracketed = BracketAttribute(anchor.SimpleDisplay);
+        return Backtick(bracketed);
     }
 
     /// <summary>
@@ -114,20 +113,9 @@ internal static class ProseFormat
         return "[" + name + "]";
     }
 
-    /// <summary>
-    ///     A single type anchor's unbracketed display name — the hierarchy analog of
-    ///     <see cref="AttributeName" />, for the positions that name one type and never bracket it:
-    ///     the <c>Implementing</c> / <c>DerivedFrom</c> adjectives and the <c>MustImplement</c> /
-    ///     <c>MustDeriveFrom</c> verbs (GRAMMAR §5.2, §5.3).
-    /// </summary>
-    /// <remarks>
-    ///     Reads the anchor's simple display, which for a <c>typeof</c> anchor is
-    ///     <see cref="TypeName.Simple" /> — so a string anchor naming the same type renders the same
-    ///     fragment, generic type-parameter names included.
-    /// </remarks>
-    internal static string AnchorName(TypeAnchor anchor)
+    internal static string BacktickedName(this TypeAnchor anchor)
     {
-        return anchor.SimpleDisplay;
+        return Backtick(anchor.SimpleDisplay);
     }
 
     /// <summary>

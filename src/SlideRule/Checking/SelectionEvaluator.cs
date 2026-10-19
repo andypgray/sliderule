@@ -2,6 +2,7 @@ using SlideRule.Codebase;
 using SlideRule.Fluent;
 using SlideRule.Internal;
 using SlideRule.Model;
+using SlideRule.Prose;
 
 namespace SlideRule.Checking;
 
@@ -93,7 +94,7 @@ internal sealed class SelectionEvaluator
     /// <summary>Whether the operand is a pattern/glob selection (anything but a bare <c>typeof</c>) — the inert-warning gate.</summary>
     internal static bool IsPatternSelection(Selection selection)
     {
-        return selection.Adjectives.Count > 0 || SelectionWalk.NounOf(selection) is not TypeNoun;
+        return selection.Adjectives.Count > 0 || selection.NounOrNull() is not TypeNoun;
     }
 
     /// <summary>
@@ -465,7 +466,7 @@ internal sealed class SelectionEvaluator
     {
         if (refusal == AnchorRefusal.ClosedGeneric)
             return new RuleEvaluationException(
-                $"`{anchor.SimpleDisplay}` is a closed generic construction; {closedGenericGuidance}");
+                $"{anchor.BacktickedName()} is a closed generic construction; {closedGenericGuidance}");
 
         return new RuleEvaluationException(anchor.Unrepresentable!);
     }

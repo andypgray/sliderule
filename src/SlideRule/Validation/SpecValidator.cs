@@ -301,7 +301,7 @@ internal static class SpecValidator
     {
         foreach ((Selection selection, string position) in candidates)
         {
-            if (SelectionWalk.FamilyNoun(selection) is null) continue;
+            if (selection.FamilyNounOrNull() is null) continue;
 
             errors.Add(new SpecValidationError(Code.FamilyMisplaced, target.Id,
                 $"A family (`arch.Each`) used as {position} by {target.Subject}; "
@@ -331,7 +331,7 @@ internal static class SpecValidator
 
         if (rule.Constraint is not { } constraint) yield break;
 
-        foreach (ProjectSelection selection in SelectionWalk.ConstraintProjectSelections(constraint))
+        foreach (ProjectSelection selection in constraint.ProjectSelections())
         foreach (ProjectAdjective adjective in selection.Adjectives)
             switch (adjective)
             {
@@ -343,7 +343,7 @@ internal static class SpecValidator
                     break;
             }
 
-        foreach (MemberSelection selection in SelectionWalk.ConstraintMemberSelections(constraint))
+        foreach (MemberSelection selection in constraint.MemberSelections())
         foreach (MemberAdjective adjective in selection.Adjectives)
             switch (adjective)
             {
@@ -375,7 +375,7 @@ internal static class SpecValidator
     {
         if (rule.Constraint is not MustNotReferenceEachOtherConstraint constraint) return;
 
-        if (SelectionWalk.FamilyNoun(constraint.Subject) is not null) return;
+        if (constraint.Subject.FamilyNounOrNull() is not null) return;
 
         errors.Add(new SpecValidationError(Code.EachOtherWithoutFamily, rule.Id,
             $"`MustNotReferenceEachOther` on '{rule.Id}' needs a family subject (`arch.Each`); "
@@ -390,7 +390,7 @@ internal static class SpecValidator
     {
         if (rule.Constraint is not MustNotHaveCircularReferencesConstraint constraint) return;
 
-        if (SelectionWalk.FamilyNoun(constraint.Subject) is not { } family)
+        if (constraint.Subject.FamilyNounOrNull() is not { } family)
         {
             errors.Add(new SpecValidationError(Code.CircularReferencesNeedLayerFamily, rule.Id,
                 $"`MustNotHaveCircularReferences` on '{rule.Id}' needs a family of layers (`arch.Each`); "
@@ -430,7 +430,7 @@ internal static class SpecValidator
         // as one; only the subject's own source is a subject.
         if (constraint is not MemberConstraint member) yield break;
 
-        foreach (MemberSelection payload in SelectionWalk.MemberExceptPayloads(member.MemberSubject))
+        foreach (MemberSelection payload in member.MemberSubject.ExceptPayloads())
         foreach ((Selection, string) position in FamilyPositions(payload.Source, FamilyPosition.ExceptPayload))
             yield return position;
     }
@@ -527,7 +527,7 @@ internal static class SpecValidator
     {
         if (rule.Constraint is null) return;
 
-        IEnumerable<ProjectSelection> selections = SelectionWalk.ConstraintProjectSelections(rule.Constraint);
+        IEnumerable<ProjectSelection> selections = rule.Constraint.ProjectSelections();
         IEnumerable<(Arch Owner, SpecSourceLocation? Location)> candidates =
             selections.Select(selection => (selection.Owner, rule.Location));
 
@@ -546,7 +546,7 @@ internal static class SpecValidator
     {
         if (rule.Constraint is null) return;
 
-        foreach (ProjectSelection selection in SelectionWalk.ConstraintProjectSelections(rule.Constraint))
+        foreach (ProjectSelection selection in rule.Constraint.ProjectSelections())
         foreach (ProjectAdjective adjective in selection.Adjectives)
             switch (adjective)
             {
@@ -590,7 +590,7 @@ internal static class SpecValidator
     {
         if (rule.Constraint is null) return;
 
-        foreach (MemberSelection selection in SelectionWalk.ConstraintMemberSelections(rule.Constraint))
+        foreach (MemberSelection selection in rule.Constraint.MemberSelections())
         foreach (MemberAdjective adjective in selection.Adjectives)
             if (adjective is ReturningAdjective returning)
                 CheckClosedGenericAnchors(rule, errors, returning.Anchors, Code.MemberReturningClosedGeneric, ".Returning");
@@ -604,7 +604,7 @@ internal static class SpecValidator
     {
         if (rule.Constraint is null) return;
 
-        foreach (MemberSelection host in SelectionWalk.ConstraintMemberSelections(rule.Constraint))
+        foreach (MemberSelection host in rule.Constraint.MemberSelections())
         foreach (MemberAdjective adjective in host.Adjectives)
         {
             if (adjective is not MemberExceptAdjective except) continue;
@@ -741,7 +741,7 @@ internal static class SpecValidator
         IEnumerable<Selection> selections, ErrorTarget target, List<SpecValidationError> errors)
     {
         foreach (Selection selection in selections)
-            if (SelectionWalk.NounOf(selection) is RegisteredNoun { Lifetime: { } lifetime }
+            if (selection.NounOrNull() is RegisteredNoun { Lifetime: { } lifetime }
                 && !Enum.IsDefined(typeof(Lifetime), lifetime))
                 errors.Add(new SpecValidationError(Code.UndefinedLifetime, target.Id,
                     $"'(Lifetime){(int)lifetime}' is not a defined Lifetime — " +
@@ -901,7 +901,7 @@ internal static class SpecValidator
 
             // Each member Except payload is a member selection in its own right: its source's prose and its own
             // member Where descriptions are walked as the subject's are.
-            foreach (MemberSelection payload in SelectionWalk.MemberExceptPayloads(memberConstraint.MemberSubject))
+            foreach (MemberSelection payload in memberConstraint.MemberSubject.ExceptPayloads())
             {
                 foreach ((SpecSlot, string?) prose in SelectionProse(payload.Source))
                     yield return prose;
@@ -916,7 +916,7 @@ internal static class SpecValidator
         // its Except payloads.
         if (constraint is ProjectMustConstraint projectMust) yield return (SpecSlot.Description, projectMust.Description);
 
-        foreach (ProjectSelection selection in SelectionWalk.ConstraintProjectSelections(constraint))
+        foreach (ProjectSelection selection in constraint.ProjectSelections())
         foreach (ProjectAdjective adjective in selection.Adjectives)
             if (adjective is ProjectWhereAdjective projectWhere)
                 yield return (SpecSlot.Description, projectWhere.Description);
@@ -965,7 +965,7 @@ internal static class SpecValidator
     {
         IEnumerable<Selection> constraintSelections = rule.Constraint is null
             ? Enumerable.Empty<Selection>()
-            : SelectionWalk.ConstraintSelections(rule.Constraint);
+            : rule.Constraint.Selections();
         IEnumerable<Selection> exemplarSelections = rule.Exemplars.SelectMany(SelectionWalk.ExpandSelection);
         return constraintSelections.Concat(exemplarSelections);
     }
@@ -1115,7 +1115,7 @@ internal static class SpecValidator
             yield return pattern;
 
         // Then each member Except payload, its source's patterns before its own, as the subject reads.
-        foreach (MemberSelection payload in SelectionWalk.MemberExceptPayloads(memberConstraint.MemberSubject))
+        foreach (MemberSelection payload in memberConstraint.MemberSubject.ExceptPayloads())
         {
             foreach ((string, SpecSlot) pattern in SelectionPatterns(payload.Source))
                 yield return pattern;

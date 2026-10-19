@@ -15,5 +15,5 @@ internal sealed class ImplementingAdjective(TypeAnchor anchor) : SelectionAdject
 
     internal override AdjectivePlacement Placement => AdjectivePlacement.Inline;
 
-    internal override string Fragment => $" implementing {ProseFormat.Backtick(ProseFormat.AnchorName(Anchor))}";
+    internal override string Fragment => $" implementing {Anchor.BacktickedName()}";
 }

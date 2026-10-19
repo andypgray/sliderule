@@ -143,8 +143,8 @@ public sealed class SarifReportRendererTests
     [Fact]
     public void Serialize_CatchViolation_EmitsCatchesMessageText()
     {
-        // A red MustNotCatch violation drives the SARIF MessageText catch arm (a missing arm renders empty text
-        // and reads green): message `Source catches Target`, level error (GRAMMAR §4.8).
+        // A red MustNotCatch violation drives the catch arm of a SARIF result's message text (a missing arm renders
+        // empty text and reads green): message `Source catches Target`, level error (GRAMMAR §4.8).
         const string source = """
                               namespace Errors { public class DbError : System.Exception {} }
                               namespace App { public class Handler { public void Run() { try { } catch (Errors.DbError) { } } } }
@@ -162,8 +162,8 @@ public sealed class SarifReportRendererTests
     [Fact]
     public void Serialize_ExposeViolation_EmitsExposesMessageText()
     {
-        // A red MustNotExpose violation drives the SARIF MessageText expose arm (a missing arm renders empty text
-        // and reads green): message `Source exposes Target`, level error (GRAMMAR §4.9).
+        // A red MustNotExpose violation drives the expose arm of a SARIF result's message text (a missing arm renders
+        // empty text and reads green): message `Source exposes Target`, level error (GRAMMAR §4.9).
         const string source = """
                               namespace Secrets { public class Data {} }
                               namespace App { public class Facade { public void Take(Secrets.Data d) {} } }
@@ -181,9 +181,10 @@ public sealed class SarifReportRendererTests
     [Fact]
     public void Serialize_ThrowViolation_EmitsThrowsMessageText()
     {
-        // A red MustOnlyThrow violation drives the SARIF MessageText throw arm: an external, unlisted throw is
-        // red (no external exemption), message `Source throws Target`, level error (GRAMMAR §4.8). The allow-set
-        // is a typeof the code never throws, which allows nothing and warns nothing, so the one result is the throw.
+        // A red MustOnlyThrow violation drives the throw arm of a SARIF result's message text: an external,
+        // unlisted throw is red (no external exemption), message `Source throws Target`, level error (GRAMMAR §4.8).
+        // The allow-set is a typeof the code never throws, which allows nothing and warns nothing, so the one result
+        // is the throw.
         const string source = """
                               namespace App { public class Service { public void Run() => throw new System.InvalidOperationException(); } }
                               """;
@@ -248,8 +249,8 @@ public sealed class SarifReportRendererTests
     [Fact]
     public void Serialize_ForbiddenThrowViolation_EmitsThrowsMessageText()
     {
-        // A red MustNotThrow violation drives the same SARIF MessageText throw arm the allow-list drives —
-        // the ban polarity adds no arm, so there is no new way for a red to render as nothing.
+        // A red MustNotThrow violation drives the same throw arm of a SARIF result's message text that the
+        // allow-list drives — the ban polarity adds no arm, so there is no new way for a red to render as nothing.
         const string source = """
                               namespace App { public class Service { public void Run() => throw new System.Exception(); } }
                               """;

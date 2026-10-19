@@ -60,7 +60,7 @@ public sealed class FragmentSiteTests
     {
         var site = new FragmentSite("a.cs", 3);
 
-        SourceLocation location = FragmentSiteSets.Location(site);
+        SourceLocation location = site.ToLocation();
 
         site.Length.ShouldBe(0, "a site nothing minted from syntax records no span");
         location.Span.ShouldBeNull("and the location it projects to carries none either");
@@ -71,7 +71,7 @@ public sealed class FragmentSiteTests
     {
         TextSpan span = SpanOf("Second");
 
-        SourceLocation location = FragmentSiteSets.Location(FragmentSite.Of(Tree(), span));
+        SourceLocation location = FragmentSite.Of(Tree(), span).ToLocation();
 
         location.Span.ShouldBe(
             new SourceSpan(span.Start, span.Length), "the span the site was minted from reaches the model unchanged");

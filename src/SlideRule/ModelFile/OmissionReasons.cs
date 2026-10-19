@@ -27,7 +27,7 @@ internal static class OmissionReasons
     /// </summary>
     private static string ClosedGeneric(TypeAnchor anchor)
     {
-        return ProseFormat.Backtick(anchor.SimpleDisplay)
+        return anchor.BacktickedName()
                + " is a closed generic construction where the rule matches on a "
                + "definition, so `check` reports this rule as an error.";
     }
@@ -35,7 +35,7 @@ internal static class OmissionReasons
     /// <summary>An anchor on a type with no source-level name — a pointer, a by-ref, a partial construction.</summary>
     private static string Unrepresentable(TypeAnchor anchor)
     {
-        return ProseFormat.Backtick(anchor.SimpleDisplay)
+        return anchor.BacktickedName()
                + " has no source-level name to match on, so `check` reports this rule as an error.";
     }
 

@@ -12,5 +12,5 @@ internal sealed class MustBelongToConstraint(Selection subject, IReadOnlyList<Se
     /// <summary>The memberships the subject must belong to at least one of.</summary>
     internal IReadOnlyList<Selection> Memberships => Operands;
 
-    internal override string VerbPhrase => "must belong to " + SentenceRenderer.TargetList(Memberships);
+    internal override string VerbPhrase => "must belong to " + Memberships.TargetListProse();
 }

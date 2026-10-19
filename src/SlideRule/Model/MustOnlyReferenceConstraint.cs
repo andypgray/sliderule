@@ -19,8 +19,8 @@ internal sealed class MustOnlyReferenceConstraint(Selection subject, IReadOnlyLi
     /// </summary>
     internal const string ExternalCaveat = " (external packages are not constrained by this rule)";
 
-    // Plain concatenation, not the closing TargetList overload: the tail is a bracketed parenthetical, which
+    // Plain concatenation, not the closing TargetListProse overload: the tail is a bracketed parenthetical, which
     // closes an Except the last target left open without a comma of its own (GRAMMAR §6).
     internal override string VerbPhrase
-        => "must reference only " + SentenceRenderer.TargetList(Targets) + ExternalCaveat;
+        => "must reference only " + Targets.TargetListProse() + ExternalCaveat;
 }

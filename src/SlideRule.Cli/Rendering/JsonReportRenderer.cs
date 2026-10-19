@@ -70,7 +70,7 @@ internal static class JsonReportRenderer
             SchemaVersion: SchemaVersion,
             Solution: solutionName,
             SpecAssembly: specAssembly,
-            Grain: DocumentGrains.Wire(grain),
+            Grain: grain.Wire(),
             DiffBase: diffBase,
             RulesFilter: SlideRuleJson.OmitEmpty(rulesFilter),
             ModelIncomplete: trust.ModelIncomplete,

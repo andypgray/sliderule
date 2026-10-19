@@ -221,7 +221,7 @@ internal sealed class CheckRunner(
         IReadOnlyList<string> renderedDiagnostics, WorkspaceTrustStamp trust, IReadOnlyList<string> ruleGlobs)
     {
         string specAssembly = Path.GetFileName(source.Resolution.DllPath);
-        IEnumerable<string> ladder = DocumentGrains.Ladder(request.Grain, Compose);
+        IEnumerable<string> ladder = request.Grain.Ladder(Compose);
         string document = Fitter.Fit(ladder);
         stdout.WriteLine(document);
         return;

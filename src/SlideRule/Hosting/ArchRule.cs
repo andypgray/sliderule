@@ -33,7 +33,7 @@ internal sealed class ArchRule
         Scope = scope;
         Citation = citation;
         ExemplarSelection = exemplar;
-        Exemplar = exemplar is null ? null : SentenceRenderer.Reference(exemplar);
+        Exemplar = exemplar?.ReferenceProse();
     }
 
     /// <summary>

@@ -8,5 +8,5 @@ internal sealed class MustNotBeReferencedByConstraint(Selection subject, IReadOn
     /// <summary>The forbidden referencing sources.</summary>
     internal IReadOnlyList<Selection> Sources => Operands;
 
-    internal override string VerbPhrase => "must not be referenced by " + SentenceRenderer.TargetList(Sources);
+    internal override string VerbPhrase => "must not be referenced by " + Sources.TargetListProse();
 }

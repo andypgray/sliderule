@@ -12,5 +12,5 @@ internal sealed class MustBeAttributedWithConstraint(Selection subject, TypeAnch
     /// <summary>The attribute the subject must carry, by <c>typeof</c> or by definition name.</summary>
     internal TypeAnchor Anchor { get; } = anchor;
 
-    internal override string VerbPhrase => "must be attributed with " + ProseFormat.Backtick(ProseFormat.AttributeName(Anchor));
+    internal override string VerbPhrase => "must be attributed with " + Anchor.BacktickedAttributeName();
 }

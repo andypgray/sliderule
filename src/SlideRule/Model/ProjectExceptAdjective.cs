@@ -20,5 +20,5 @@ internal sealed class ProjectExceptAdjective(ProjectSelection payload) : Project
 
     internal override bool OpensParenthetical => true;
 
-    internal override string Fragment => ", except " + SentenceRenderer.ProjectReference(Payload);
+    internal override string Fragment => ", except " + Payload.ReferenceProse();
 }

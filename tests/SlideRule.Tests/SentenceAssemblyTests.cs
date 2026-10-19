@@ -42,7 +42,7 @@ public class SentenceAssemblyTests
 
         SentenceRenderer.Subject(family)
             .ShouldBe("Each of the Dispatch, Tracking and Invoicing layers");
-        SentenceRenderer.Reference(family)
+        family.ReferenceProse()
             .ShouldBe("each of the Dispatch, Tracking and Invoicing layers");
     }
 
@@ -50,7 +50,7 @@ public class SentenceAssemblyTests
     public void TwoCellFamily_AndJoinsWithoutACommaAtAll()
     {
         // The two-item join has no comma; three or more take one before every item but the last.
-        SentenceRenderer.Reference(Arch.Each(Arch.Layer("Reporting", "MyApp.Report.*"), Arch.Layer("Billing", "MyApp.Billing.*")))
+        Arch.Each(Arch.Layer("Reporting", "MyApp.Report.*"), Arch.Layer("Billing", "MyApp.Billing.*")).ReferenceProse()
             .ShouldBe("each of the Reporting and Billing layers");
     }
 
@@ -63,7 +63,7 @@ public class SentenceAssemblyTests
 
         SentenceRenderer.Subject(family)
             .ShouldBe("The Reporting layer");
-        SentenceRenderer.Reference(family)
+        family.ReferenceProse()
             .ShouldBe("the Reporting layer");
     }
 
@@ -74,7 +74,7 @@ public class SentenceAssemblyTests
         // quantifies over is the artifact-stratum phrase, unchanged (GRAMMAR §4.10, §5.1).
         SentenceRenderer.Subject(Arch.Each(Arch.Projects.Matching("Nop.Plugin.*")))
             .ShouldBe("Each of the projects matching `Nop.Plugin.*`");
-        SentenceRenderer.Reference(Arch.Each(Arch.Projects.Named("A", "B")))
+        Arch.Each(Arch.Projects.Named("A", "B")).ReferenceProse()
             .ShouldBe("each of the projects `A` or `B`");
     }
 
@@ -610,7 +610,7 @@ public class SentenceAssemblyTests
     [Fact]
     public void MustNotConstruct_CollidingSimpleNames_QualifyWithMinimalTrailingSegments()
     {
-        // Shares TargetList with the reference verbs, so colliding simple names widen identically.
+        // Shares TargetListProse with the reference verbs, so colliding simple names widen identically.
         Constraint constraint = Arch.Types.MustNotConstruct(typeof(Order), typeof(Stubs.Sales.Order));
         SentenceRenderer.Sentence(constraint)
             .ShouldBe("Types must not construct `Billing.Order` or `Sales.Order`.");
@@ -677,7 +677,7 @@ public class SentenceAssemblyTests
     [Fact]
     public void MustNotCatch_CollidingTargets_QualifyWithMinimalTrailingSegments()
     {
-        // Catch targets share TargetList, so colliding exception names widen like the reference verbs.
+        // Catch targets share TargetListProse, so colliding exception names widen like the reference verbs.
         Constraint constraint = Arch.Types.MustNotCatch(typeof(DataException), typeof(Stubs.Sales.DataException));
         SentenceRenderer.Sentence(constraint)
             .ShouldBe("Types must not catch `Billing.DataException` or `Sales.DataException`.");
@@ -714,7 +714,7 @@ public class SentenceAssemblyTests
     [Fact]
     public void MustNotCatchUnfiltered_CollidingTargets_QualifyWithMinimalTrailingSegments()
     {
-        // Shares TargetList with the other catch verb, so colliding exception names widen the same way.
+        // Shares TargetListProse with the other catch verb, so colliding exception names widen the same way.
         Constraint constraint = Arch.Types.MustNotCatchUnfiltered(typeof(DataException), typeof(Stubs.Sales.DataException));
         SentenceRenderer.Sentence(constraint)
             .ShouldBe("Types must not catch `Billing.DataException` or `Sales.DataException` without a `when` filter.");
@@ -750,7 +750,7 @@ public class SentenceAssemblyTests
     [Fact]
     public void MustNotSwallow_CollidingTargets_QualifyWithMinimalTrailingSegments()
     {
-        // Shares TargetList with the other catch verbs, so colliding exception names widen the same way.
+        // Shares TargetListProse with the other catch verbs, so colliding exception names widen the same way.
         Constraint constraint = Arch.Types.MustNotSwallow(typeof(DataException), typeof(Stubs.Sales.DataException));
         SentenceRenderer.Sentence(constraint)
             .ShouldBe("Types must not swallow `Billing.DataException` or `Sales.DataException`.");
@@ -778,7 +778,7 @@ public class SentenceAssemblyTests
     [Fact]
     public void MustNotThrow_ThreeTargets_JoinWithCommasAndOr_NoOxfordComma()
     {
-        // Shares TargetList with the reference verbs: three targets join "`A`, `B` or `C`" with no Oxford comma.
+        // Shares TargetListProse with the reference verbs: three targets join "`A`, `B` or `C`" with no Oxford comma.
         Constraint constraint = Arch.Types.MustNotThrow(
             typeof(Exception), typeof(SystemException), typeof(ApplicationException));
         SentenceRenderer.Sentence(constraint)
@@ -807,7 +807,7 @@ public class SentenceAssemblyTests
     [Fact]
     public void MustOnlyThrow_ThreeTargets_JoinWithCommasAndOr_NoOxfordComma()
     {
-        // Shares TargetList with the reference verbs: three targets join "`A`, `B` or `C`" with no Oxford comma.
+        // Shares TargetListProse with the reference verbs: three targets join "`A`, `B` or `C`" with no Oxford comma.
         Constraint constraint = Arch.Types.MustOnlyThrow(
             typeof(InvalidOperationException), typeof(ArgumentException), typeof(TimeoutException));
         SentenceRenderer.Sentence(constraint)
@@ -836,7 +836,7 @@ public class SentenceAssemblyTests
     [Fact]
     public void MustNotExpose_MultipleTargets_JoinWithOr()
     {
-        // Shares TargetList with the other dependency verbs, so multiple targets join "`A` or `B`".
+        // Shares TargetListProse with the other dependency verbs, so multiple targets join "`A` or `B`".
         Constraint constraint = Arch.Types.MustNotExpose(typeof(SqlConnection), typeof(ControllerBase));
         SentenceRenderer.Sentence(constraint)
             .ShouldBe("Types must not expose `SqlConnection` or `ControllerBase`.");
@@ -845,7 +845,7 @@ public class SentenceAssemblyTests
     [Fact]
     public void MustNotExpose_CollidingTargets_QualifyWithMinimalTrailingSegments()
     {
-        // Reuses the Order collision pair; expose shares TargetList so its targets widen identically.
+        // Reuses the Order collision pair; expose shares TargetListProse so its targets widen identically.
         Constraint constraint = Arch.Types.MustNotExpose(typeof(Order), typeof(Stubs.Sales.Order));
         SentenceRenderer.Sentence(constraint)
             .ShouldBe("Types must not expose `Billing.Order` or `Sales.Order`.");
@@ -1068,7 +1068,7 @@ public class SentenceAssemblyTests
     public void UnionOfTypes_InReferencePosition_IsTheBareBacktickedList()
     {
         Selection union = Arch.AnyOf(Arch.Type(typeof(SqlConnection)), Arch.Type(typeof(ControllerBase)));
-        SentenceRenderer.Reference(union)
+        union.ReferenceProse()
             .ShouldBe("`SqlConnection` or `ControllerBase`");
     }
 
@@ -1077,7 +1077,7 @@ public class SentenceAssemblyTests
     {
         // The collapsed type list reuses ProseFormat.AnchorList, so a union disambiguates by exactly the rule
         // every other multi-operand list uses (§6).
-        SentenceRenderer.Reference(Arch.AnyOf(typeof(Order), typeof(Stubs.Sales.Order)))
+        Arch.AnyOf(typeof(Order), typeof(Stubs.Sales.Order)).ReferenceProse()
             .ShouldBe("`Billing.Order` or `Sales.Order`");
     }
 
@@ -1223,7 +1223,7 @@ public class SentenceAssemblyTests
             .Authored();
         SentenceRenderer.Subject(union)
             .ShouldBe("Authored types in projects `A` or `B`");
-        SentenceRenderer.Reference(union)
+        union.ReferenceProse()
             .ShouldBe("authored types in projects `A` or `B`");
     }
 
@@ -1293,7 +1293,7 @@ public class SentenceAssemblyTests
         // identity in both positions, not a degenerate "or" list.
         SentenceRenderer.Subject(Arch.AnyOf(Arch.Project("A")))
             .ShouldBe("Types in project `A`");
-        SentenceRenderer.Reference(Arch.AnyOf(Arch.Project("A")))
+        Arch.AnyOf(Arch.Project("A")).ReferenceProse()
             .ShouldBe("types in project `A`");
     }
 
@@ -1652,7 +1652,7 @@ public class SentenceAssemblyTests
     [Fact]
     public void MustBelongTo_ThreeMemberships_JoinWithCommasAndOr_NoOxfordComma()
     {
-        // Shares TargetList with the dependency verbs, so three memberships join "`A`, `B` or `C`" with no
+        // Shares TargetListProse with the dependency verbs, so three memberships join "`A`, `B` or `C`" with no
         // Oxford comma — and the or-join is what says the rule is satisfied by ANY one of them.
         Constraint constraint = Arch.Types.MustBelongTo(
             Arch.Layer("Core", "MyApp.Core.*"),
@@ -1841,7 +1841,7 @@ public class SentenceAssemblyTests
     {
         // Reference position differs from subject position by capitalization alone: a project selection has
         // one head and no noun that reads differently as a reference.
-        SentenceRenderer.ProjectReference(Arch.Projects.Named("A"))
+        Arch.Projects.Named("A").ReferenceProse()
             .ShouldBe("project `A`");
     }
 }

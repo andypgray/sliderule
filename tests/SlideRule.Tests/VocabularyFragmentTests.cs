@@ -505,7 +505,7 @@ public class VocabularyFragmentTests
     public void Registered_WithLifetime_RendersLifetimePrefixedFragment(Lifetime lifetime, string expected)
     {
         // The per-lifetime noun fragment in reference position (GRAMMAR §5.1).
-        SentenceRenderer.Reference(Arch.Registered(lifetime))
+        Arch.Registered(lifetime).ReferenceProse()
             .ShouldBe(expected);
     }
 
@@ -513,7 +513,7 @@ public class VocabularyFragmentTests
     public void Registered_NoArg_RendersBareRegisteredFragment()
     {
         // The any-lifetime noun fragment (GRAMMAR §5.1).
-        SentenceRenderer.Reference(Arch.Registered())
+        Arch.Registered().ReferenceProse()
             .ShouldBe("registered types");
     }
 

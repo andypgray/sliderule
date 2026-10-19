@@ -19,7 +19,7 @@ internal static class ViolationWording
 {
     /// <summary>The phrase an edge violation reads as: the source, the verb its kind names, and the far end.</summary>
     // What each of the seven edge kinds says, with placement left to the caller.
-    internal static string EdgeText(Violation violation)
+    internal static string EdgeText(this Violation violation)
     {
         return violation.Kind switch
         {
@@ -40,13 +40,25 @@ internal static class ViolationWording
     // read — which may be a props file above the project, and may be nothing at all. A per-package or
     // per-framework violation names the item too, in EdgeText's register (no backticks: these lines are jump
     // targets, not prose), and a framework the project lacks reads as one it does not target.
-    internal static string SubjectText(Violation violation)
+    internal static string SubjectText(this Violation violation)
     {
         return violation.Kind switch
         {
             ViolationKind.MemberShape => MemberDisplay.Of(violation.SubjectMember!),
             ViolationKind.ProjectShape => ProjectText(violation),
             _ => violation.Subject!.FullName
+        };
+    }
+
+    // A site-less kind (EmptySubject, RuleError) answers the empty string, through EdgeText's default arm,
+    // rather than reaching through a slot it leaves null.
+    internal static string Text(this Violation violation)
+    {
+        return violation.Kind switch
+        {
+            ViolationKind.Shape or ViolationKind.MemberShape or ViolationKind.ProjectShape =>
+                violation.SubjectText(),
+            _ => violation.EdgeText()
         };
     }
 

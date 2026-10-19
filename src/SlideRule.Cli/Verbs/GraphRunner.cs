@@ -112,7 +112,7 @@ internal sealed class GraphRunner(
         IReadOnlyList<string> renderedDiagnostics, WorkspaceTrustStamp trust,
         IReadOnlyList<string> projectGlobs)
     {
-        IEnumerable<string> ladder = DocumentGrains.Ladder(request.Grain, Compose);
+        IEnumerable<string> ladder = request.Grain.Ladder(Compose);
         string document = Fitter.Fit(ladder);
         output.WriteLine(document);
         return;

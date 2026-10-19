@@ -14,5 +14,5 @@ internal sealed class MustNotCatchUnfilteredConstraint(Selection subject, IReadO
     internal IReadOnlyList<Selection> Targets => Operands;
 
     internal override string VerbPhrase =>
-        "must not catch " + SentenceRenderer.TargetList(Targets, " without a `when` filter");
+        "must not catch " + Targets.TargetListProse(" without a `when` filter");
 }

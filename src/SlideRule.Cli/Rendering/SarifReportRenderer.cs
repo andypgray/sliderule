@@ -398,7 +398,7 @@ internal static class SarifReportRenderer
         string source = identity?.Source ?? string.Empty;
         string target = identity?.Target ?? string.Empty;
         string subject = identity?.Subject ?? string.Empty;
-        string body = MessageText(violation);
+        string body = violation.Text();
         var message = new SarifMessage(attribution is null ? body : $"{body} ({attribution})");
         IReadOnlyList<SarifSuppression>? suppressions = attribution is null
             ? null
@@ -420,19 +420,5 @@ internal static class SarifReportRenderer
             yield return new SarifResult(
                 ruleId, level, message, [location], fingerprints, baselineState, suppressions);
         }
-    }
-
-    // The result body is the violation's wording, from the one owner every surface takes it from, split the
-    // way the human report's site loop and the build finding split it: the seven edge kinds read as a source
-    // doing something to a far end, the three subject kinds as one thing being the wrong shape.
-    // EmptySubject/RuleError are site-less, so this is never reached for them.
-    private static string MessageText(Violation violation)
-    {
-        return violation.Kind switch
-        {
-            ViolationKind.Shape or ViolationKind.MemberShape or ViolationKind.ProjectShape =>
-                ViolationWording.SubjectText(violation),
-            _ => ViolationWording.EdgeText(violation)
-        };
     }
 }

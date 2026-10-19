@@ -12,5 +12,5 @@ internal sealed class MustDeriveFromConstraint(Selection subject, TypeAnchor anc
     /// <summary>The base type the subject must derive from, by <c>typeof</c> or by definition name.</summary>
     internal TypeAnchor Anchor { get; } = anchor;
 
-    internal override string VerbPhrase => "must derive from " + ProseFormat.Backtick(ProseFormat.AnchorName(Anchor));
+    internal override string VerbPhrase => "must derive from " + Anchor.BacktickedName();
 }

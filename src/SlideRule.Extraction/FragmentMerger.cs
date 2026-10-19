@@ -319,7 +319,7 @@ internal static class FragmentMerger
         {
             if (fragment.TargetFramework is not { } targetFramework) return;
 
-            FragmentSiteSets.OrdinalNamesFor(_frameworksByProject, fragment.ProjectName)
+            _frameworksByProject.OrdinalNamesFor(fragment.ProjectName)
                 .Add(targetFramework);
         }
 
@@ -388,7 +388,7 @@ internal static class FragmentMerger
             // Every winner is kept, not only the first collapse's: which collapse the merge meets first depends
             // on the order a fragment lists its types, and a project whose frameworks share different sets of
             // types has a winner per set.
-            FragmentSiteSets.OrdinalNamesFor(_multiFrameworkWinners, roster.Winner)
+            _multiFrameworkWinners.OrdinalNamesFor(roster.Winner)
                 .Add(winningFramework);
         }
 
@@ -449,7 +449,7 @@ internal static class FragmentMerger
                 if (roster.Losers is not { } losers) continue;
 
                 var set = new DeclarerSet(roster.Winner, string.Join("\n", losers));
-                FragmentSiteSets.OrdinalNamesFor(bySet, set)
+                bySet.OrdinalNamesFor(set)
                     .Add(fqn);
             }
 
@@ -531,7 +531,7 @@ internal static class FragmentMerger
             HashSet<string> declaring = roster.Assemblies;
             if (declaring.Count == 0 || declaring.Contains(supplying)) return;
 
-            FragmentSiteSets.OrdinalNamesFor(_shadowingAssemblies, fqn)
+            _shadowingAssemblies.OrdinalNamesFor(fqn)
                 .Add(supplying);
             var shadowKey = new NodeKey(fqn, supplying);
             if (!_externalFacts.ContainsKey(shadowKey)) _externalFacts[shadowKey] = external;
@@ -567,7 +567,7 @@ internal static class FragmentMerger
 
         private void RecordBinder(string fqn, string projectName)
         {
-            FragmentSiteSets.OrdinalNamesFor(_shadowBinders, fqn)
+            _shadowBinders.OrdinalNamesFor(fqn)
                 .Add(projectName);
         }
 
@@ -760,8 +760,8 @@ internal static class FragmentMerger
         // the identical registration collapse to one fact with unioned sites.
         private void MergeRegistration(FragmentServiceRegistration registration)
         {
-            SortedSet<FragmentSite> sites = FragmentSiteSets.For(
-                _registrationSites, (registration.Lifetime, registration.ServiceFullName, registration.ImplementationFullName));
+            SortedSet<FragmentSite> sites = _registrationSites.SitesFor(
+                (registration.Lifetime, registration.ServiceFullName, registration.ImplementationFullName));
             foreach (FragmentSite site in registration.Sites) sites.Add(site);
         }
 
@@ -787,8 +787,8 @@ internal static class FragmentMerger
             foreach (DeclarerRoster roster in _rosters.Values)
             {
                 TypeNode node = roster.Node;
-                node.DeclarationSites = FragmentSiteSets.Locations(roster.Sites);
-                node.FilePaths = FragmentSiteSets.FilePaths(roster.Sites);
+                node.DeclarationSites = roster.Sites.ToLocations();
+                node.FilePaths = roster.Sites.FilePaths();
 
                 // The conflation kept as a fact rather than only as the sentence ConflationNote composes from the
                 // same roster. A consumer that has to ACT on it — the survey, which must not render a project's
@@ -829,8 +829,8 @@ internal static class FragmentMerger
                 _injectionEdges,
                 (src, injected, evidence) => new InjectionEdge(src, injected, evidence));
 
-            List<CatchEdge> catchEdges = FragmentSiteSets.OrderedPairs(
-                _catchEdges.Sites, NodeKey.Ordinal, NodeKey.Ordinal, BuildCatchEdge);
+            List<CatchEdge> catchEdges = _catchEdges.Sites.OrderedPairs(
+                NodeKey.Ordinal, NodeKey.Ordinal, BuildCatchEdge);
 
             List<ThrowEdge> throwEdges = BuildEdges(
                 _throwEdges, (src, thrown, evidence) => new ThrowEdge(src, thrown, evidence));
@@ -838,10 +838,9 @@ internal static class FragmentMerger
             List<ExposureEdge> exposureEdges = BuildEdges(
                 _exposureEdges, (src, exposed, evidence) => new ExposureEdge(src, exposed, evidence));
 
-            List<ServiceRegistration> serviceRegistrations = FragmentSiteSets.OrderedRegistrations(
-                _registrationSites,
-                (lifetime, service, impl, sites) => new ServiceRegistration(
-                    lifetime, service, impl, FragmentSiteSets.Locations(sites)));
+            List<ServiceRegistration> serviceRegistrations =
+                _registrationSites.OrderedRegistrations((lifetime, service, impl, sites) =>
+                    new ServiceRegistration(lifetime, service, impl, sites.ToLocations()));
 
             // The advisory notes: the two project-level kinds first, each ordinal by project, then the
             // conflation kind, one note per declarer set, ordinal by winner and then by its losers — coarse
@@ -872,8 +871,8 @@ internal static class FragmentMerger
         private List<TEdge> BuildEdges<TEdge>(
             EdgeTable<NodeKey> table, Func<TypeNode, TypeNode, EdgeEvidence, TEdge> make)
         {
-            return FragmentSiteSets.OrderedPairs(
-                table.Sites, NodeKey.Ordinal, NodeKey.Ordinal,
+            return table.Sites.OrderedPairs(
+                NodeKey.Ordinal, NodeKey.Ordinal,
                 (src, tgt, sites) => make(_nodes[src], _nodes[tgt], table.EvidenceOf((src, tgt), sites)));
         }
 
@@ -930,8 +929,8 @@ internal static class FragmentMerger
                 return reference;
             }
 
-            return FragmentSiteSets.OrderedPairs(
-                _memberEdges.Sites, NodeKey.Ordinal, StringComparer.Ordinal,
+            return _memberEdges.Sites.OrderedPairs(
+                NodeKey.Ordinal, StringComparer.Ordinal,
                 (src, symbolId, sites) => new MemberEdge(
                     _nodes[src], MemberReferenceFor(symbolId), _memberEdges.EvidenceOf((src, symbolId), sites)));
         }
@@ -945,10 +944,10 @@ internal static class FragmentMerger
             Dictionary<string, ProjectArtifacts> artifactsByProject = new(StringComparer.Ordinal);
             foreach (CodebaseFragment fragment in _fragments)
             {
-                SortedSet<string> refs = FragmentSiteSets.OrdinalNamesFor(refsByProject, fragment.ProjectName);
+                SortedSet<string> refs = refsByProject.OrdinalNamesFor(fragment.ProjectName);
                 foreach (string reference in fragment.ProjectReferences) refs.Add(reference);
 
-                SortedSet<string> undeclared = FragmentSiteSets.OrdinalNamesFor(undeclaredByProject, fragment.ProjectName);
+                SortedSet<string> undeclared = undeclaredByProject.OrdinalNamesFor(fragment.ProjectName);
                 foreach (string reference in fragment.UndeclaredProjectReferences ?? []) undeclared.Add(reference);
 
                 if (!artifactsByProject.TryGetValue(fragment.ProjectName, out ProjectArtifacts? artifacts))
@@ -980,13 +979,13 @@ internal static class FragmentMerger
                 undeclaredProjectReferences: undeclaredReferences.ToList(),
                 solutionMember: artifacts.SolutionMember,
                 targetFrameworks: TargetFrameworksOf(projectName, artifacts),
-                targetFrameworksSite: FragmentSiteSets.Location(artifacts.TargetFrameworksSite),
+                targetFrameworksSite: artifacts.TargetFrameworksSite.ToLocation(),
                 factsFollow: winners?.Min,
                 packageReferences: artifacts.PackageReferences(),
                 isPackable: artifacts.IsPackable,
-                isPackableSite: FragmentSiteSets.Location(artifacts.IsPackableSite),
+                isPackableSite: artifacts.IsPackableSite.ToLocation(),
                 locksPackages: artifacts.LocksPackages,
-                locksPackagesSite: FragmentSiteSets.Location(artifacts.LocksPackagesSite),
+                locksPackagesSite: artifacts.LocksPackagesSite.ToLocation(),
                 assemblyNames: artifacts.AssemblyNames(),
                 evaluations: artifacts.Evaluations());
         }
@@ -1117,7 +1116,7 @@ internal static class FragmentMerger
                 _packages.AddRange(fragment.PackageReferences ?? []);
                 if (evaluated is not null)
                     foreach (FragmentPackageReference package in fragment.PackageReferences ?? [])
-                        FragmentSiteSets.OrdinalNamesFor(_packageFrameworks, package.Name).Add(evaluated);
+                        _packageFrameworks.OrdinalNamesFor(package.Name).Add(evaluated);
 
                 _packable = _packable.Fold(fragment.IsPackable, fragment.IsPackableSite, decisive: true);
                 _locks = _locks.Fold(fragment.LocksPackages, fragment.LocksPackagesSite, decisive: false);
@@ -1144,7 +1143,7 @@ internal static class FragmentMerger
                 return FragmentSiteSets.OrderedPackages(_packages)
                     .Select(package => new PackageReference(
                         package.Name,
-                        FragmentSiteSets.Location(package.Site),
+                        package.Site.ToLocation(),
                         package.IsPrivate,
                         _packageFrameworks.TryGetValue(package.Name, out SortedSet<string>? frameworks)
                             ? frameworks.ToList()
@@ -1164,10 +1163,10 @@ internal static class FragmentMerger
             {
                 List<EvaluatedProperty> declared = properties.Declared
                     .Select(property => new EvaluatedProperty(
-                        property.Name, property.Value, framework, FragmentSiteSets.Location(property.Site)))
+                        property.Name, property.Value, framework, property.Site.ToLocation()))
                     .ToList();
 
-                return new ProjectEvaluation(framework, FragmentSiteSets.Location(properties.ProjectFile), declared);
+                return new ProjectEvaluation(framework, properties.ProjectFile.ToLocation(), declared);
             }
 
             // The framework one fragment's evaluation answered for: the one it was asked for, or, for an
@@ -1282,7 +1281,7 @@ internal static class FragmentMerger
             {
                 if (SitesByDeclarer is null) return;
 
-                SortedSet<FragmentSite> share = FragmentSiteSets.For(SitesByDeclarer, project);
+                SortedSet<FragmentSite> share = SitesByDeclarer.SitesFor(project);
                 foreach (FragmentSite site in sites) share.Add(site);
             }
         }
@@ -1326,7 +1325,7 @@ internal static class FragmentMerger
             internal void Merge(
                 (NodeKey Source, TTarget Target) key, InstanceKey? instance, IReadOnlyList<FragmentSite> sites)
             {
-                SortedSet<FragmentSite> merged = FragmentSiteSets.For(Sites, key);
+                SortedSet<FragmentSite> merged = Sites.SitesFor(key);
                 foreach (FragmentSite site in sites) merged.Add(site);
 
                 if (instance is not { } made) return;
@@ -1335,7 +1334,7 @@ internal static class FragmentMerger
                 if (!_instances.TryGetValue(key, out Dictionary<InstanceKey, SortedSet<FragmentSite>>? byInstance))
                     _instances[key] = byInstance = new Dictionary<InstanceKey, SortedSet<FragmentSite>>();
 
-                SortedSet<FragmentSite> instanceSites = FragmentSiteSets.For(byInstance, made);
+                SortedSet<FragmentSite> instanceSites = byInstance.SitesFor(made);
                 foreach (FragmentSite site in sites) instanceSites.Add(site);
             }
 
@@ -1352,7 +1351,7 @@ internal static class FragmentMerger
             /// </remarks>
             internal EdgeEvidence EvidenceOf((NodeKey Source, TTarget Target) key, SortedSet<FragmentSite> sites)
             {
-                IReadOnlyList<SourceLocation> locations = FragmentSiteSets.Locations(sites);
+                IReadOnlyList<SourceLocation> locations = sites.ToLocations();
                 return new EdgeEvidence(locations, InstancesOf(key, sites, locations));
             }
 

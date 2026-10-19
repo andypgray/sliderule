@@ -34,5 +34,5 @@ internal sealed class MustHaveExactlyOneCounterpartConstraint(Selection subject,
     }
 
     internal override string VerbPhrase =>
-        "must have exactly one counterpart named " + ProseFormat.Backtick(Template) + " among " + SentenceRenderer.TargetList(Among);
+        "must have exactly one counterpart named " + ProseFormat.Backtick(Template) + " among " + Among.TargetListProse();
 }

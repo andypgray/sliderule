@@ -14,5 +14,5 @@ internal sealed class DerivedFromAdjective(TypeAnchor anchor) : SelectionAdjecti
 
     internal override AdjectivePlacement Placement => AdjectivePlacement.Inline;
 
-    internal override string Fragment => $" derived from {ProseFormat.Backtick(ProseFormat.AnchorName(Anchor))}";
+    internal override string Fragment => $" derived from {Anchor.BacktickedName()}";
 }

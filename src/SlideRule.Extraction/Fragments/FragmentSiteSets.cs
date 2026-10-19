@@ -9,16 +9,10 @@ namespace SlideRule.Extraction.Fragments;
 ///     whole table in canonical order, and project a materialized site list the two ways the model reads it.
 /// </summary>
 /// <remarks>
-///     Each operation carries a determinism contract that would otherwise be restated once per edge axis, in
-///     both files. <see cref="For{TKey}" /> holds the single <c>new SortedSet&lt;FragmentSite&gt;()</c>, so the
-///     default comparer — which <em>is</em> the pinned (file, line) site ordering, see
-///     <see cref="FragmentSite.CompareTo" /> — cannot be spelled differently on one axis and silently reorder
-///     that family's sites. <see cref="OrderedPairs{TFirst,TSecond,TValue,TOut}" /> and
-///     <see cref="OrderedRegistrations{TOut}" /> hold the sorts that make a serialized fragment and a merged
-///     model byte-stable however a dictionary happened to lay its entries out — one sort for both ends of the
-///     pipeline, with each end naming the comparer its own key element is ordered by.
-///     <see cref="FilePaths" /> holds the GRAMMAR §5.6 first-occurrence-order contract. Adding an edge axis
-///     costs a table and a call, not a copy of any of those rules.
+///     The edge and registration tables of both ends are materialized through the sorts here, each end naming
+///     the comparer its own key element is ordered by, which keeps a serialized fragment and a merged model
+///     byte-stable however a dictionary happened to lay its entries out. A new edge axis calls these rather
+///     than spelling its own set or sort, which could order that family's sites differently.
 /// </remarks>
 internal static class FragmentSiteSets
 {
@@ -26,7 +20,7 @@ internal static class FragmentSiteSets
     ///     The site set <paramref name="key" /> unions into, adding an empty one on first mention. One hash
     ///     lookup where the key is already there, a second only where it is new.
     /// </summary>
-    internal static SortedSet<FragmentSite> For<TKey>(Dictionary<TKey, SortedSet<FragmentSite>> map, TKey key)
+    internal static SortedSet<FragmentSite> SitesFor<TKey>(this Dictionary<TKey, SortedSet<FragmentSite>> map, TKey key)
         where TKey : notnull
     {
         if (map.TryGetValue(key, out SortedSet<FragmentSite>? sites)) return sites;
@@ -37,11 +31,10 @@ internal static class FragmentSiteSets
     }
 
     /// <summary>
-    ///     The ordinal name set <paramref name="key" /> unions into, adding an empty one on first mention — the
-    ///     name-axis twin of <see cref="For{TKey}" />, so the comparer is spelled once here rather than at every
-    ///     table that keys names by project or by declarer set.
+    ///     The ordinal name set <paramref name="key" /> unions into, adding an empty one on first mention. The
+    ///     set is ordinal, so a keyed name table that makes its sets here cannot spell another comparer.
     /// </summary>
-    internal static SortedSet<string> OrdinalNamesFor<TKey>(Dictionary<TKey, SortedSet<string>> map, TKey key)
+    internal static SortedSet<string> OrdinalNamesFor<TKey>(this Dictionary<TKey, SortedSet<string>> map, TKey key)
         where TKey : notnull
     {
         if (map.TryGetValue(key, out SortedSet<string>? names)) return names;
@@ -60,7 +53,7 @@ internal static class FragmentSiteSets
     ///     one name can denote two).
     /// </summary>
     internal static List<TOut> OrderedPairs<TFirst, TSecond, TValue, TOut>(
-        Dictionary<(TFirst, TSecond), TValue> map,
+        this Dictionary<(TFirst, TSecond), TValue> map,
         IComparer<TFirst> firstComparer,
         IComparer<TSecond> secondComparer,
         Func<TFirst, TSecond, TValue, TOut> make)
@@ -77,9 +70,9 @@ internal static class FragmentSiteSets
     ///     so an axis there names no comparer and the sort is still spelled exactly once.
     /// </summary>
     internal static List<TOut> OrderedPairs<TValue, TOut>(
-        Dictionary<(string, string), TValue> map, Func<string, string, TValue, TOut> make)
+        this Dictionary<(string, string), TValue> map, Func<string, string, TValue, TOut> make)
     {
-        return OrderedPairs(map, StringComparer.Ordinal, StringComparer.Ordinal, make);
+        return map.OrderedPairs(StringComparer.Ordinal, StringComparer.Ordinal, make);
     }
 
     /// <summary>
@@ -93,7 +86,7 @@ internal static class FragmentSiteSets
     ///     come to be spelled two ways.
     /// </remarks>
     internal static List<TOut> OrderedRegistrations<TOut>(
-        Dictionary<(Lifetime, string, string?), SortedSet<FragmentSite>> map,
+        this Dictionary<(Lifetime, string, string?), SortedSet<FragmentSite>> map,
         Func<Lifetime, string, string?, SortedSet<FragmentSite>, TOut> make)
     {
         return map
@@ -151,13 +144,13 @@ internal static class FragmentSiteSets
     ///     A site collection as the model's <see cref="SourceLocation" /> list — the projection every axis
     ///     applies on the way out of extraction, order preserved exactly as the collection holds it.
     /// </summary>
-    internal static IReadOnlyList<SourceLocation> Locations(IReadOnlyCollection<FragmentSite> sites)
+    internal static IReadOnlyList<SourceLocation> ToLocations(this IReadOnlyCollection<FragmentSite> sites)
     {
         if (sites.Count == 0) return [];
 
         var locations = new SourceLocation[sites.Count];
         var index = 0;
-        foreach (FragmentSite site in sites) locations[index++] = Location(site);
+        foreach (FragmentSite site in sites) locations[index++] = site.ToLocation();
 
         return locations;
     }
@@ -168,17 +161,11 @@ internal static class FragmentSiteSets
     ///     sites of <paramref name="all" /> that <paramref name="subset" /> also contains.
     /// </summary>
     /// <remarks>
-    ///     <para>
-    ///         <paramref name="allLocations" /> must be <see cref="Locations" /> of <paramref name="all" />, and
-    ///         <paramref name="subset" /> a subset of it — both hold by construction, since a site recorded
-    ///         under one instance (or under one of a catch edge's narrowings) was unioned into the edge in the
-    ///         same call. Both sets carry the default (file, line) comparer, so one index walks them together.
-    ///     </para>
-    ///     <para>
-    ///         A subset holding every site gets <paramref name="allLocations" /> itself, which is what lets a
-    ///         reader compare the two by reference and lets an edge only one copy makes print the list the
-    ///         model already built. That reference identity is the contract, not an optimization.
-    ///     </para>
+    ///     <paramref name="allLocations" /> must be <see cref="ToLocations" /> of <paramref name="all" />, and
+    ///     <paramref name="subset" /> a subset of it; both sets carry the default (file, line) comparer, so one
+    ///     index walks them together. A subset holding every site gets <paramref name="allLocations" /> itself,
+    ///     which is what lets a reader compare the two by reference: that identity is the contract, not an
+    ///     optimization.
     /// </remarks>
     internal static IReadOnlyList<SourceLocation> Subsequence(
         SortedSet<FragmentSite> all, IReadOnlyList<SourceLocation> allLocations, SortedSet<FragmentSite> subset)
@@ -202,21 +189,16 @@ internal static class FragmentSiteSets
     ///     shapes, which every projection here goes through. A site that carries a span hands it over; one
     ///     that carries none gives a location that is a line and nothing more.
     /// </summary>
-    internal static SourceLocation Location(FragmentSite site)
+    internal static SourceLocation ToLocation(this FragmentSite site)
     {
         SourceSpan? span = site.Length > 0 ? new SourceSpan(site.Start, site.Length) : null;
 
         return new SourceLocation(site.File, site.Line, span);
     }
 
-    /// <summary>
-    ///     One site as the model's <see cref="SourceLocation" />, or <see langword="null" /> for a site that
-    ///     was never recorded — the singular twin of <see cref="Locations" />, for the facts that have one
-    ///     declaration rather than a set of mentions.
-    /// </summary>
-    internal static SourceLocation? Location(FragmentSite? site)
+    internal static SourceLocation? ToLocation(this FragmentSite? site)
     {
-        return site is { } known ? Location(known) : null;
+        return site is { } known ? known.ToLocation() : null;
     }
 
     /// <summary>
@@ -229,7 +211,7 @@ internal static class FragmentSiteSets
     ///     <em>is</em> ordinal file order, and <c>Distinct</c> is what preserves it. The one-site case is the
     ///     overwhelming majority (a type or member declared in a single file) and skips the set entirely.
     /// </remarks>
-    internal static IReadOnlyList<string> FilePaths(IReadOnlyCollection<FragmentSite> sites)
+    internal static IReadOnlyList<string> FilePaths(this IReadOnlyCollection<FragmentSite> sites)
     {
         if (sites.Count == 0) return [];
         if (sites.Count == 1) return [sites.First().File];

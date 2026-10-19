@@ -48,7 +48,7 @@ internal static class SentenceRenderer
     ///     How a member selection reads in reference position (GRAMMAR §6): its subject phrase, uncapitalized,
     ///     as a message quotes it or an <c>Except</c> payload renders it.
     /// </summary>
-    internal static string MemberReference(MemberSelection selection)
+    internal static string ReferenceProse(this MemberSelection selection)
     {
         return MemberPhrase(selection);
     }
@@ -57,9 +57,9 @@ internal static class SentenceRenderer
     ///     A member <c>Except</c>'s payload list (GRAMMAR §6): each payload in reference position, or-joined with
     ///     no Oxford comma, the final joiner closing a penultimate payload that ended open.
     /// </summary>
-    internal static string MemberReferenceList(IReadOnlyList<MemberSelection> selections)
+    internal static string ReferenceListProse(this IReadOnlyList<MemberSelection> selections)
     {
-        List<string> parts = selections.Select(MemberReference).ToList();
+        List<string> parts = selections.Select(ReferenceProse).ToList();
         bool closesBeforeOr = ClosesBeforeOr(selections);
         return ProseFormat.JoinReferences(parts, closesBeforeOr);
     }
@@ -79,7 +79,7 @@ internal static class SentenceRenderer
     ///     head and no noun that reads differently as a reference, so subject and reference position differ
     ///     by capitalization alone.
     /// </remarks>
-    internal static string ProjectReference(ProjectSelection selection)
+    internal static string ReferenceProse(this ProjectSelection selection)
     {
         return ProjectPhrase(selection);
     }
@@ -97,7 +97,7 @@ internal static class SentenceRenderer
     private static bool ReadsAsItsNoun(Selection selection)
     {
         return selection.Adjectives.Count == 0
-               && SelectionWalk.NounOf(selection) is LayerNoun or EachNoun or TypeNoun;
+               && selection.NounOrNull() is LayerNoun or EachNoun or TypeNoun;
     }
 
     /// <summary>
@@ -108,7 +108,7 @@ internal static class SentenceRenderer
     /// </summary>
     private static string? FamilyCellWord(Selection selection)
     {
-        if (SelectionWalk.FamilyNoun(selection) is not { } family) return null;
+        if (selection.FamilyNounOrNull() is not { } family) return null;
 
         return ReadsAsItsNoun(selection) ? null : family.CellWord;
     }
@@ -143,7 +143,7 @@ internal static class SentenceRenderer
     }
 
     /// <summary>How a selection reads in reference position (lowercase; joins union members).</summary>
-    internal static string Reference(Selection selection)
+    internal static string ReferenceProse(this Selection selection)
     {
         if (selection is UnionSelection union) return UnionReference(union);
 
@@ -158,7 +158,7 @@ internal static class SentenceRenderer
     ///     the minimal distinguishing trailing namespace segments (GRAMMAR §6), then joins with no
     ///     Oxford comma.
     /// </summary>
-    internal static string TargetList(IReadOnlyList<Selection> targets)
+    internal static string TargetListProse(this IReadOnlyList<Selection> targets)
     {
         return ProseFormat.JoinReferences(ReferenceFragments(targets), ClosesBeforeOr(targets));
     }
@@ -184,7 +184,7 @@ internal static class SentenceRenderer
         {
             if (!TryBareTypeAnchor(selection, out _))
             {
-                parts.Add(Reference(selection));
+                parts.Add(selection.ReferenceProse());
                 continue;
             }
 
@@ -201,9 +201,9 @@ internal static class SentenceRenderer
     ///     (GRAMMAR §6). A tail that is a bracketed parenthetical closes the clause on its own and
     ///     concatenates instead.
     /// </summary>
-    internal static string TargetList(IReadOnlyList<Selection> targets, string tail)
+    internal static string TargetListProse(this IReadOnlyList<Selection> targets, string tail)
     {
-        return TargetList(targets) + CloseBefore(EndsOpen(targets[targets.Count - 1]), tail);
+        return targets.TargetListProse() + CloseBefore(EndsOpen(targets[targets.Count - 1]), tail);
     }
 
     /// <summary>
@@ -251,7 +251,7 @@ internal static class SentenceRenderer
     {
         if (noun.Definition is not { } definition) return string.Join(", ", noun.Globs.Select(ProseFormat.Backtick));
 
-        return BareLocative(definition) ?? Reference(definition);
+        return BareLocative(definition) ?? definition.ReferenceProse();
     }
 
     // A bare noun's locative with the "types" head dropped, or null for a definition that has no such
@@ -323,7 +323,7 @@ internal static class SentenceRenderer
 
         IReadOnlyList<SelectionNoun>? nouns = CollapsibleNouns(union);
         return nouns is null
-            ? ProseFormat.JoinReferences(union.Parts.Select(Reference).ToList(), ClosesBeforeOr(union.Parts))
+            ? ProseFormat.JoinReferences(union.Parts.Select(ReferenceProse).ToList(), ClosesBeforeOr(union.Parts))
             : nouns[0].CollapsedReference(nouns);
     }
 
@@ -524,7 +524,7 @@ internal static class SentenceRenderer
     private static string MemberPhrase(MemberSelection selection)
     {
         string head = ProseFormat.MemberKindPlural(selection.Kind);
-        string reference = Reference(selection.Source);
+        string reference = selection.Source.ReferenceProse();
 
         var headPrefix = string.Empty;
         var inline = string.Empty;
@@ -575,7 +575,7 @@ internal static class SentenceRenderer
 
     private static bool TryBareTypeAnchor(Selection selection, out TypeAnchor anchor)
     {
-        if (selection.Adjectives.Count == 0 && SelectionWalk.NounOf(selection) is TypeNoun typeNoun)
+        if (selection.Adjectives.Count == 0 && selection.NounOrNull() is TypeNoun typeNoun)
         {
             anchor = typeNoun.Anchor;
             return true;

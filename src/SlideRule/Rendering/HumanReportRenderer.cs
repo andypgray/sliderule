@@ -277,14 +277,14 @@ internal static class HumanReportRenderer
                 // loop and differ only in the verb EdgeText picks.
                 case ViolationKind.Reference or ViolationKind.MemberUse or ViolationKind.Construction
                     or ViolationKind.Injection or ViolationKind.Catch or ViolationKind.Throw or ViolationKind.Expose:
-                    string edgeText = ViolationWording.EdgeText(violation);
+                    string edgeText = violation.EdgeText();
                     foreach (SourceLocation site in violation.Sites)
                         located.Add((relativizer.Relative(site.FilePath), site.Line, edgeText));
                     break;
                 // The three subject kinds place identically — one line at the first site the verb carried,
                 // or the unlocated block — so they share the arm and differ only in the text SubjectText picks.
                 case ViolationKind.Shape or ViolationKind.MemberShape or ViolationKind.ProjectShape:
-                    Place(violation.Sites.FirstOrDefault(), ViolationWording.SubjectText(violation));
+                    Place(violation.Sites.FirstOrDefault(), violation.SubjectText());
                     break;
                 case ViolationKind.EmptySubject:
                     unlocated.Add(violation.Detail ?? "the subject selection matched no types");

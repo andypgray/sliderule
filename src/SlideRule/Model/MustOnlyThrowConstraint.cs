@@ -13,5 +13,5 @@ internal sealed class MustOnlyThrowConstraint(Selection subject, IReadOnlyList<S
     /// <summary>The permitted throw targets.</summary>
     internal IReadOnlyList<Selection> Targets => Operands;
 
-    internal override string VerbPhrase => "must throw only " + SentenceRenderer.TargetList(Targets);
+    internal override string VerbPhrase => "must throw only " + Targets.TargetListProse();
 }

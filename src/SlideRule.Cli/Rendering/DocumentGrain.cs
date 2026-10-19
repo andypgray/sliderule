@@ -145,7 +145,7 @@ internal static class DocumentGrains
     /// </remarks>
     /// <param name="floor">The grain the caller asked for: the finest rung offered, and always yielded.</param>
     /// <param name="compose">Composes the whole document at one grain.</param>
-    public static IEnumerable<string> Ladder(DocumentGrain floor, Func<DocumentGrain, string> compose)
+    public static IEnumerable<string> Ladder(this DocumentGrain floor, Func<DocumentGrain, string> compose)
     {
         for (DocumentGrain at = floor; at <= DocumentGrain.Index; at++) yield return compose(at);
     }
@@ -155,7 +155,7 @@ internal static class DocumentGrains
     ///     <see cref="DocumentGrain.Full" /> — which omits the key, so a document that says nothing about
     ///     grain is the complete one.
     /// </summary>
-    public static string? Wire(DocumentGrain grain)
+    public static string? Wire(this DocumentGrain grain)
     {
         return grain == DocumentGrain.Full ? null : Names[(int)grain];
     }

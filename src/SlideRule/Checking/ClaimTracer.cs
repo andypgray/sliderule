@@ -94,7 +94,7 @@ internal sealed class ClaimTracer(CodebaseModel model, SolutionRoot? root = null
     private List<ClaimStep>? PartSteps(
         Selection selection, IReadOnlyList<Selection> parts, SelectionPosition position, TypeNode type)
     {
-        if (SelectionWalk.NounOf(selection) is LayerNoun layer)
+        if (selection.NounOrNull() is LayerNoun layer)
         {
             ClaimTrace definition = Trace(parts[0], position, type);
             return definition.Verdict == ClaimVerdict.Claimed ? [new ClaimStep(LayerStep(layer.Name), definition.Steps)] : null;
@@ -107,7 +107,7 @@ internal sealed class ClaimTracer(CodebaseModel model, SolutionRoot? root = null
             if (trace.Verdict != ClaimVerdict.Claimed) continue;
 
             if (parts.Count > 1 && (part is UnionSelection || part.Adjectives.Count > 0))
-                steps.Add(new ClaimStep($"through {SentenceRenderer.Reference(part)}", trace.Steps));
+                steps.Add(new ClaimStep($"through {part.ReferenceProse()}", trace.Steps));
             else
                 steps.AddRange(trace.Steps);
         }
@@ -184,12 +184,12 @@ internal sealed class ClaimTracer(CodebaseModel model, SolutionRoot? root = null
                 new ClaimStep($"its name {ProseFormat.Backtick(type.Name)} matches {ProseFormat.Backtick(matching.Glob)}"),
             NamedAdjective => new ClaimStep($"it is named {ProseFormat.Backtick(type.Name)}"),
             ImplementingAdjective implementing =>
-                new ClaimStep($"it implements {ProseFormat.Backtick(ProseFormat.AnchorName(implementing.Anchor))}"),
+                new ClaimStep($"it implements {implementing.Anchor.BacktickedName()}"),
             DerivedFromAdjective derivedFrom =>
-                new ClaimStep($"it derives from {ProseFormat.Backtick(ProseFormat.AnchorName(derivedFrom.Anchor))}"),
+                new ClaimStep($"it derives from {derivedFrom.Anchor.BacktickedName()}"),
             AttributedWithAdjective attributedWith =>
-                new ClaimStep($"it is attributed with {ProseFormat.Backtick(ProseFormat.AttributeName(attributedWith.Anchor))}"),
-            ExceptAdjective except => new ClaimStep($"outside the except: {SentenceRenderer.Reference(except.Payload)}"),
+                new ClaimStep($"it is attributed with {attributedWith.Anchor.BacktickedAttributeName()}"),
+            ExceptAdjective except => new ClaimStep($"outside the except: {except.Payload.ReferenceProse()}"),
             WhereAdjective where => new ClaimStep($"it passes the predicate \"{where.Description}\""),
             AuthoredAdjective => new ClaimStep("it is authored, not generated"),
             AccessibilityAdjective => new ClaimStep($"it is declared {AccessibilityWord(type.Accessibility)}"),
@@ -244,16 +244,16 @@ internal sealed class ClaimTracer(CodebaseModel model, SolutionRoot? root = null
             NamedAdjective named =>
                 new ClaimStep($"its name {ProseFormat.Backtick(type.Name)} is not {ProseFormat.BacktickedList(named.Names)}"),
             ImplementingAdjective implementing =>
-                new ClaimStep($"it does not implement {ProseFormat.Backtick(ProseFormat.AnchorName(implementing.Anchor))}"),
+                new ClaimStep($"it does not implement {implementing.Anchor.BacktickedName()}"),
             DerivedFromAdjective derivedFrom =>
-                new ClaimStep($"it does not derive from {ProseFormat.Backtick(ProseFormat.AnchorName(derivedFrom.Anchor))}"),
+                new ClaimStep($"it does not derive from {derivedFrom.Anchor.BacktickedName()}"),
             AttributedWithAdjective attributedWith =>
                 new ClaimStep(
-                    $"it is not attributed with {ProseFormat.Backtick(ProseFormat.AttributeName(attributedWith.Anchor))}"),
+                    $"it is not attributed with {attributedWith.Anchor.BacktickedAttributeName()}"),
             // The removal is the surprise this trace exists to explain, so the payload's own trace says why
             // the type is in it — read in target position, where an Except payload is always resolved.
             ExceptAdjective except => new ClaimStep(
-                $"removed by the except: {SentenceRenderer.Reference(except.Payload)}",
+                $"removed by the except: {except.Payload.ReferenceProse()}",
                 Trace(except.Payload, SelectionPosition.Target, type).Steps),
             WhereAdjective where => new ClaimStep($"it fails the predicate \"{where.Description}\""),
             AuthoredAdjective => new ClaimStep("it is generated, not authored"),

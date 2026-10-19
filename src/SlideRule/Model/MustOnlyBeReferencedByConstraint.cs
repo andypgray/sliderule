@@ -12,5 +12,5 @@ internal sealed class MustOnlyBeReferencedByConstraint(Selection subject, IReadO
     /// <summary>The permitted referencing sources.</summary>
     internal IReadOnlyList<Selection> Sources => Operands;
 
-    internal override string VerbPhrase => "must be referenced only by " + SentenceRenderer.TargetList(Sources);
+    internal override string VerbPhrase => "must be referenced only by " + Sources.TargetListProse();
 }

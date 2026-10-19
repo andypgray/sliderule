@@ -21,5 +21,5 @@ internal sealed class MemberAttributedWithAdjective(TypeAnchor anchor) : MemberA
 
     internal override AdjectivePlacement Placement => AdjectivePlacement.HeadPrefix;
 
-    internal override string Fragment => ProseFormat.Backtick(ProseFormat.AttributeName(Anchor)) + "-attributed ";
+    internal override string Fragment => Anchor.BacktickedAttributeName() + "-attributed ";
 }

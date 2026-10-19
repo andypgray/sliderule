@@ -8,5 +8,5 @@ internal sealed class MustNotConstructConstraint(Selection subject, IReadOnlyLis
     /// <summary>The forbidden construction targets.</summary>
     internal IReadOnlyList<Selection> Targets => Operands;
 
-    internal override string VerbPhrase => "must not construct " + SentenceRenderer.TargetList(Targets);
+    internal override string VerbPhrase => "must not construct " + Targets.TargetListProse();
 }

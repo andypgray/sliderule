@@ -20,7 +20,7 @@ internal static class DeadOperandWording
     /// <summary>The dead patterns as one noun phrase, inflected for how many there are.</summary>
     /// <param name="role">The position the patterns held; never <see cref="DeadOperandRole.None" />.</param>
     /// <param name="references">The patterns, each as its warning quotes it, in operand order.</param>
-    internal static string Named(DeadOperandRole role, IReadOnlyList<string> references)
+    internal static string NamedOperands(this DeadOperandRole role, IReadOnlyList<string> references)
     {
         List<string> quoted = references.Select(reference => $"\"{reference}\"")
             .ToList();
@@ -33,7 +33,7 @@ internal static class DeadOperandWording
     ///     What clears dead patterns in <paramref name="role" />, as the end of "until each dead operand …":
     ///     <c>matches or moves to a rule of its own</c> for a target, <c>matches or is removed</c> otherwise.
     /// </summary>
-    internal static string Until(DeadOperandRole role)
+    internal static string UntilClause(this DeadOperandRole role)
     {
         return IsTarget(role) ? "matches or moves to a rule of its own" : "matches or is removed";
     }
@@ -43,7 +43,7 @@ internal static class DeadOperandWording
     ///     <c>Fix each dead operand or move it to a rule of its own</c> for a target, and
     ///     <c>Fix or remove each dead operand</c> otherwise.
     /// </summary>
-    internal static string Instruction(DeadOperandRole role)
+    internal static string ClearingInstruction(this DeadOperandRole role)
     {
         return IsTarget(role) ? "Fix each dead operand or move it to a rule of its own" : "Fix or remove each dead operand";
     }

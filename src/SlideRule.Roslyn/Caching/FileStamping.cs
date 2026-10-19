@@ -157,7 +157,7 @@ internal static class FileStamping
     ///     Reconstitutes a <see cref="FileFreshness" /> from a stamp for a pure stat comparison; the racy verdict is the
     ///     persisted <see cref="FileStamp.Promoted" /> flag, not a re-derived instant.
     /// </summary>
-    internal static FileFreshness ToFreshness(FileStamp stamp)
+    internal static FileFreshness ToFreshness(this FileStamp stamp)
     {
         return new FileFreshness(stamp.Exists, new DateTime(stamp.LastWriteTimeUtcTicks, DateTimeKind.Utc), stamp.Length, default);
     }
@@ -196,7 +196,7 @@ internal static class FileStamping
         FileFreshness current = FileFreshness.Capture(stamp.Path);
         if (stamp.Exists != current.Exists) return (true, stamp);
         if (!stamp.Exists) return (false, stamp);
-        if (ToFreshness(stamp).MatchesStat(current) && stamp.Promoted) return (false, stamp);
+        if (stamp.ToFreshness().MatchesStat(current) && stamp.Promoted) return (false, stamp);
 
         onHash();
         string? sha = TryHashFile(stamp.Path);

@@ -57,7 +57,7 @@ internal static class GraphJsonRenderer
         var document = new GraphJson(
             SchemaVersion,
             solutionName,
-            DocumentGrains.Wire(grain),
+            grain.Wire(),
             SlideRuleJson.OmitEmpty(projectsScope),
             summary.Projects.Select(project => ToProject(project, grain)).ToList(),
             index

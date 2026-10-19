@@ -186,8 +186,8 @@ internal static class AgentContextRenderer
     {
         if (constraint is MustBeRegisteredConstraint) return true;
 
-        IEnumerable<Selection> selections = SelectionWalk.ConstraintSelections(constraint);
-        return selections.Any(selection => SelectionWalk.NounOf(selection) is RegisteredNoun);
+        IEnumerable<Selection> selections = constraint.Selections();
+        return selections.Any(selection => selection.NounOrNull() is RegisteredNoun);
     }
 
     /// <summary>
@@ -274,7 +274,7 @@ internal static class AgentContextRenderer
 
         var heading = $"## {ProseFormat.Capitalize(posture)} scope {ProseFormat.Backtick(scope.ScopeId)}";
         string lede = $"This directory contains the {posture} {ProseFormat.Backtick(scope.ScopeId)} scope: " +
-                      $"{SentenceRenderer.Reference(scope.Scoped)}. Here be dragons: {warning}";
+                      $"{scope.Scoped.ReferenceProse()}. Here be dragons: {warning}";
 
         var sections = new List<string> { heading, lede };
         if (scope.Dragons is { } dragons) sections.Add($"Dragons: {dragons}");

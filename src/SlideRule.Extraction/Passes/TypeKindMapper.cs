@@ -45,7 +45,7 @@ internal static class TypeKindMapper
     ///     Whether a type is one the model records: not implicitly declared, nameable from source, and of a
     ///     kind <see cref="TryMap" /> maps.
     /// </summary>
-    internal static bool IsModelledType(INamedTypeSymbol type)
+    internal static bool IsModelledType(this INamedTypeSymbol type)
     {
         return !type.IsImplicitlyDeclared && type.CanBeReferencedByName && TryMap(type, out _);
     }

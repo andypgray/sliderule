@@ -53,7 +53,7 @@ public class SpecValidationTests
     [InlineData(typeof(BlankMemberNameMatchingVerbSpec), nameof(Code.BlankPattern), "area/rule")]
     [InlineData(typeof(BlankMemberPrefixVerbSpec), nameof(Code.BlankPattern), "area/rule")]
     // MustNotConstruct's foreign-target reach. The verb overrides Operands (the dependency-verb walk hook,
-    // like the reference verbs), so the §8 item 10 foreign-selection walk (ConstraintSelections →
+    // like the reference verbs), so the §8 item 10 foreign-selection walk (Selections →
     // CheckForeign) reaches a construct target minted on another Arch without an arm of its own.
     [InlineData(typeof(ForeignConstructTargetSpec), nameof(Code.ForeignSelection), "area/rule")]
     // Surface union: a union carries adjectives of its own (GRAMMAR §5.1), so every §8 walk must reach them

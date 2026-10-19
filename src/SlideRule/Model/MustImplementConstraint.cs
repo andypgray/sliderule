@@ -11,5 +11,5 @@ internal sealed class MustImplementConstraint(Selection subject, TypeAnchor anch
     /// <summary>The interface the subject must implement, by <c>typeof</c> or by definition name.</summary>
     internal TypeAnchor Anchor { get; } = anchor;
 
-    internal override string VerbPhrase => "must implement " + ProseFormat.Backtick(ProseFormat.AnchorName(Anchor));
+    internal override string VerbPhrase => "must implement " + Anchor.BacktickedName();
 }

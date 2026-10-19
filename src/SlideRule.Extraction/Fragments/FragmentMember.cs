@@ -31,8 +31,8 @@ internal sealed record FragmentMember(
     /// </remarks>
     public MemberNode ToMemberNode(TypeNode declaringType)
     {
-        IReadOnlyList<SourceLocation> declarationSites = FragmentSiteSets.Locations(DeclarationSites);
-        IReadOnlyList<string> filePaths = FragmentSiteSets.FilePaths(DeclarationSites);
+        IReadOnlyList<SourceLocation> declarationSites = DeclarationSites.ToLocations();
+        IReadOnlyList<string> filePaths = DeclarationSites.FilePaths();
         List<ParameterNode> parameters = Facts.Parameters.Select(p => new ParameterNode(p.Name, p.TypeFullName)).ToList();
         List<AttributeNode> attributes = Facts.Attributes.Select(a => new AttributeNode(a.DefinitionFullName, a.ConstructedName)).ToList();
 

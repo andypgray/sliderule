@@ -12,5 +12,5 @@ internal sealed class MustNotExposeConstraint(Selection subject, IReadOnlyList<S
     /// <summary>The forbidden exposure targets.</summary>
     internal IReadOnlyList<Selection> Targets => Operands;
 
-    internal override string VerbPhrase => "must not expose " + SentenceRenderer.TargetList(Targets);
+    internal override string VerbPhrase => "must not expose " + Targets.TargetListProse();
 }

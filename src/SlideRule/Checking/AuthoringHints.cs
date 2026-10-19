@@ -284,7 +284,7 @@ internal static class AuthoringHints
         // on a path the same way: a glob relative to the wrong directory, or one naming a folder renamed since.
         if (selection.Adjectives.Any(adjective => adjective is UnderAdjective)) return PathGlobClause;
 
-        return SelectionWalk.NounOf(selection) switch
+        return selection.NounOrNull() switch
         {
             // A layer is transparent to what defines it, so its cure is its definition's. The glob form has
             // no definition to reach and is namespaces by construction.

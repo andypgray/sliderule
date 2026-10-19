@@ -485,9 +485,9 @@ internal sealed class BaselineRunner(
             string refusal = result.SelectionMatchedNothing
                 ? $"{ruleId}: cannot capture — the rule's selection matched nothing, so this run measured no "
                   + "debt for it; skipped. Fix the rule's selection, then re-run."
-                : $"{ruleId}: cannot capture — {DeadOperandWording.Named(result.UntestedRole, result.UntestedOperands)} "
+                : $"{ruleId}: cannot capture — {result.UntestedRole.NamedOperands(result.UntestedOperands)} "
                   + "matched no types, so this run measured only part of the rule; skipped. "
-                  + $"{DeadOperandWording.Instruction(result.UntestedRole)}, then re-run.";
+                  + $"{result.UntestedRole.ClearingInstruction()}, then re-run.";
             output.WriteLine(refusal);
             return false;
         }
@@ -519,7 +519,7 @@ internal sealed class BaselineRunner(
     private static string StricterRefusal(string ruleId, RuleResult result)
     {
         DeadOperandRole role = result.StricterRole;
-        string named = DeadOperandWording.Named(role, result.StricterOperands);
+        string named = role.NamedOperands(result.StricterOperands);
         string itWas = result.StricterOperands.Count == 1 ? "it was" : "they were";
         string reported = role switch
         {
@@ -529,7 +529,7 @@ internal sealed class BaselineRunner(
         };
 
         return $"{ruleId}: cannot capture — {named} matched no types, so {reported} and would be recorded as "
-               + $"debt; skipped. {DeadOperandWording.Instruction(role)}, then re-run.";
+               + $"debt; skipped. {role.ClearingInstruction()}, then re-run.";
     }
 
     // init: grandfather an uncaptured rule's current state (empty = zero debt); leave captured rules be.

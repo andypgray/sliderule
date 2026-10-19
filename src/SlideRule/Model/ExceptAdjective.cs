@@ -24,5 +24,5 @@ internal sealed class ExceptAdjective(Selection payload) : SelectionAdjective
 
     internal override bool OpensParenthetical => true;
 
-    internal override string Fragment => ", except " + SentenceRenderer.Reference(Payload);
+    internal override string Fragment => ", except " + Payload.ReferenceProse();
 }

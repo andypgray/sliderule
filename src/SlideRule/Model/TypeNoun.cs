@@ -16,7 +16,7 @@ internal sealed class TypeNoun(TypeAnchor anchor) : SelectionNoun
     // Read only under adjectives: a bare type reads as its reference fragment in both positions.
     internal override string Locative => " named " + ReferenceFragment;
 
-    internal override string ReferenceFragment => ProseFormat.Backtick(Anchor.SimpleDisplay);
+    internal override string ReferenceFragment => Anchor.BacktickedName();
 
     // The operand names after the one hoisted head, through the shared anchor-list composer, so an
     // adjective on a union of types names every type it narrows: "authored types named `A` or `B`".

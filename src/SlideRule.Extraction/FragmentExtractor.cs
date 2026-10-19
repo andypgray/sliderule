@@ -412,7 +412,7 @@ internal static class FragmentExtractor
 
             case INamedTypeSymbol named:
                 INamedTypeSymbol definition = named.OriginalDefinition;
-                if (TypeKindMapper.IsModelledType(definition)) yield return definition;
+                if (definition.IsModelledType()) yield return definition;
                 foreach (ITypeSymbol argument in named.TypeArguments)
                 foreach (INamedTypeSymbol endpoint in DecomposeType(argument))
                     yield return endpoint;
@@ -710,7 +710,7 @@ internal static class FragmentExtractor
 
         private void Declare(INamedTypeSymbol symbol)
         {
-            if (!TypeKindMapper.IsModelledType(symbol)) return;
+            if (!symbol.IsModelledType()) return;
 
             INamedTypeSymbol definition = symbol.OriginalDefinition;
             string fqn = FullNameOf(definition);
@@ -785,7 +785,7 @@ internal static class FragmentExtractor
                 if (fqn == srcFqn) return null;
 
                 ResolveName(endpoint);
-                FragmentSiteSets.For(map, (srcFqn, fqn)).Add(site);
+                map.SitesFor((srcFqn, fqn)).Add(site);
                 return fqn;
             }
 
@@ -815,9 +815,9 @@ internal static class FragmentExtractor
                     // subset-of-a-subset holds by construction too.
                     if (Record(channels.Caught, _catchEdgeSites, site) is { } caughtFqn)
                     {
-                        if (!channels.CaughtHasFilter) FragmentSiteSets.For(_catchEdgeUnfilteredSites, (srcFqn, caughtFqn)).Add(site);
+                        if (!channels.CaughtHasFilter) _catchEdgeUnfilteredSites.SitesFor((srcFqn, caughtFqn)).Add(site);
                         if (channels is { CaughtHasFilter: false, CaughtEndsInThrow: false })
-                            FragmentSiteSets.For(_catchEdgeSwallowingSites, (srcFqn, caughtFqn)).Add(site);
+                            _catchEdgeSwallowingSites.SitesFor((srcFqn, caughtFqn)).Add(site);
                     }
 
                     // The throw channel (§4.8): mint the throw edge, self-throw dropped like the type-edge self-drop.
@@ -863,7 +863,7 @@ internal static class FragmentExtractor
                     {
                         string injectedFqn = ResolveName(endpoint);
                         if (injectedFqn == srcFqn) continue; // self-injection dropped
-                        FragmentSiteSets.For(_injectionEdgeSites, (srcFqn, injectedFqn)).Add(site);
+                        _injectionEdgeSites.SitesFor((srcFqn, injectedFqn)).Add(site);
                     }
                 }
             }
@@ -890,7 +890,7 @@ internal static class FragmentExtractor
                 {
                     string exposedFqn = ResolveName(endpoint);
                     if (exposedFqn == srcFqn) continue; // self-exposure dropped
-                    SortedSet<FragmentSite> sites = FragmentSiteSets.For(_exposureEdgeSites, (srcFqn, exposedFqn));
+                    SortedSet<FragmentSite> sites = _exposureEdgeSites.SitesFor((srcFqn, exposedFqn));
                     foreach (FragmentSite site in member.DeclarationSites) sites.Add(site);
                 }
             }
@@ -921,7 +921,7 @@ internal static class FragmentExtractor
         {
             string serviceFqn = FullNameOf(registration.Service);
             string? implFqn = registration.Implementation is { } impl ? FullNameOf(impl) : null;
-            FragmentSiteSets.For(_registrationSites, (registration.Lifetime, serviceFqn, implFqn)).Add(site);
+            _registrationSites.SitesFor((registration.Lifetime, serviceFqn, implFqn)).Add(site);
         }
 
         /// <summary>
@@ -1227,7 +1227,7 @@ internal static class FragmentExtractor
                 return;
             }
 
-            if (!TypeKindMapper.IsModelledType(definition)) return;
+            if (!definition.IsModelledType()) return;
 
             // The own-project arm, reachable on a document run alone: a type of this compilation that some
             // OTHER document declares. The sibling map answers the own project as absent — it is nobody's
@@ -1455,52 +1455,43 @@ internal static class FragmentExtractor
                 .ToList();
 
             List<FragmentEdge> edges = Vouched(
-                FragmentSiteSets.OrderedPairs(
-                    _edgeSites, (src, tgt, sites) => new FragmentEdge(src, tgt, sites.ToList())),
+                _edgeSites.OrderedPairs((src, tgt, sites) => new FragmentEdge(src, tgt, sites.ToList())),
                 edge => edge.TargetFullName);
 
             List<FragmentMemberEdge> memberEdges = Vouched(
-                FragmentSiteSets.OrderedPairs(
-                    _memberEdges,
-                    (src, symbolId, builder) => new FragmentMemberEdge(
-                        src, builder.ContainingFullName, builder.MemberName, symbolId, builder.Kind, builder.Sites.ToList())),
+                _memberEdges.OrderedPairs((src, symbolId, builder) => new FragmentMemberEdge(
+                    src, builder.ContainingFullName, builder.MemberName, symbolId, builder.Kind, builder.Sites.ToList())),
                 edge => edge.TargetContainingTypeFullName);
 
             List<FragmentConstructorEdge> constructorEdges = Vouched(
-                FragmentSiteSets.OrderedPairs(
-                    _constructorEdgeSites, (src, ctor, sites) => new FragmentConstructorEdge(src, ctor, sites.ToList())),
+                _constructorEdgeSites.OrderedPairs((src, ctor, sites) => new FragmentConstructorEdge(src, ctor, sites.ToList())),
                 edge => edge.ConstructedFullName);
 
             List<FragmentInjectionEdge> injectionEdges = Vouched(
-                FragmentSiteSets.OrderedPairs(
-                    _injectionEdgeSites, (src, injected, sites) => new FragmentInjectionEdge(src, injected, sites.ToList())),
+                _injectionEdgeSites.OrderedPairs((src, injected, sites) => new FragmentInjectionEdge(src, injected, sites.ToList())),
                 edge => edge.InjectedFullName);
 
             // An edge whose every site is filtered has no entry in either parallel table, which materializes as
             // the empty list — the honest reading, since nothing about that edge is unfiltered. An edge whose
             // every unfiltered site ends in a throw materializes the third list empty for the same reason.
             List<FragmentCatchEdge> catchEdges = Vouched(
-                FragmentSiteSets.OrderedPairs(
-                    _catchEdgeSites,
-                    (src, caught, sites) => new FragmentCatchEdge(
-                        src, caught, sites.ToList(),
-                        _catchEdgeUnfilteredSites.TryGetValue((src, caught), out SortedSet<FragmentSite>? unfiltered) ? unfiltered.ToList() : [],
-                        _catchEdgeSwallowingSites.TryGetValue((src, caught), out SortedSet<FragmentSite>? swallowing) ? swallowing.ToList() : [])),
+                _catchEdgeSites.OrderedPairs((src, caught, sites) => new FragmentCatchEdge(
+                    src, caught, sites.ToList(),
+                    _catchEdgeUnfilteredSites.TryGetValue((src, caught), out SortedSet<FragmentSite>? unfiltered) ? unfiltered.ToList() : [],
+                    _catchEdgeSwallowingSites.TryGetValue((src, caught), out SortedSet<FragmentSite>? swallowing) ? swallowing.ToList() : [])),
                 edge => edge.CaughtFullName);
 
             List<FragmentThrowEdge> throwEdges = Vouched(
-                FragmentSiteSets.OrderedPairs(
-                    _throwEdgeSites, (src, thrown, sites) => new FragmentThrowEdge(src, thrown, sites.ToList())),
+                _throwEdgeSites.OrderedPairs((src, thrown, sites) => new FragmentThrowEdge(src, thrown, sites.ToList())),
                 edge => edge.ThrownFullName);
 
             List<FragmentExposureEdge> exposureEdges = Vouched(
-                FragmentSiteSets.OrderedPairs(
-                    _exposureEdgeSites, (src, exposed, sites) => new FragmentExposureEdge(src, exposed, sites.ToList())),
+                _exposureEdgeSites.OrderedPairs((src, exposed, sites) => new FragmentExposureEdge(src, exposed, sites.ToList())),
                 edge => edge.ExposedFullName);
 
-            List<FragmentServiceRegistration> serviceRegistrations = FragmentSiteSets.OrderedRegistrations(
-                _registrationSites,
-                (lifetime, service, impl, sites) => new FragmentServiceRegistration(lifetime, service, impl, sites.ToList()));
+            List<FragmentServiceRegistration> serviceRegistrations =
+                _registrationSites.OrderedRegistrations((lifetime, service, impl, sites) =>
+                    new FragmentServiceRegistration(lifetime, service, impl, sites.ToList()));
 
             // The assembly name is read off the IAssemblySymbol rather than the compilation's own option
             // string, because the merge compares it against a FragmentExternal's — which ResolveName

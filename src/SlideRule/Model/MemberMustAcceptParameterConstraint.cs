@@ -16,5 +16,5 @@ internal sealed class MemberMustAcceptParameterConstraint(MemberSelection subjec
     internal TypeAnchor Anchor { get; } = anchor;
 
     internal override string VerbPhrase =>
-        "must accept a parameter of type " + ProseFormat.Backtick(ProseFormat.AnchorName(Anchor));
+        "must accept a parameter of type " + Anchor.BacktickedName();
 }
