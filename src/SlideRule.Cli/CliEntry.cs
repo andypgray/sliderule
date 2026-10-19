@@ -61,14 +61,14 @@ internal static class CliEntry
         // action included, which System.CommandLine's own handler would report with exit 1: a red rule to a script,
         // and a non-blocking error under the hook only by accident.
         configuration.EnableDefaultExceptionHandler = false;
-        StringWriter? hookFailure = hookVerb ? new StringWriter() : null;
-        (bool finished, int code) = await CommandEntryPoint.TryRunAsync(
-            () => parseResult.InvokeAsync(configuration), hookFailure ?? configuration.Error, CancellationToken.None);
-        if (finished) return code;
+        return hookVerb
+            ? await HookRunner.RunReportingConfigErrorAsync(InvokeParsed, configuration.Error, CancellationToken.None)
+            : await CommandEntryPoint.RunAsync(InvokeParsed, configuration.Error, CancellationToken.None);
 
-        return hookFailure is null
-            ? ExitCodes.Error
-            : await HookRunner.ReportConfigErrorAsync(configuration.Error, hookFailure.ToString());
+        Task<int> InvokeParsed()
+        {
+            return parseResult.InvokeAsync(configuration);
+        }
     }
 
     // The stock parse-error action, with its typo suggestions, writes both of its channels to stderr, which keeps

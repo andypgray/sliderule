@@ -79,13 +79,18 @@ internal sealed class HookRunner(
     private const string NoPrompt = "noprompt";
 
     /// <summary>Runs the hook for the payload on stdin and returns the code Claude Code reads.</summary>
-    public async Task<int> RunAsync(HookRequest request, CancellationToken ct)
+    public Task<int> RunAsync(HookRequest request, CancellationToken ct)
+    {
+        return RunReportingConfigErrorAsync(() => DecideAsync(request, ct), error, ct);
+    }
+
+    // The top-level handler every command runs under, so a failure nothing below anticipated is reported rather
+    // than thrown. Here a failure is the hook's non-blocking error under ConfigErrorLine, not the CLI's exit 2.
+    internal static async Task<int> RunReportingConfigErrorAsync(
+        Func<Task<int>> action, TextWriter error, CancellationToken ct)
     {
         var failure = new StringWriter();
-
-        // The top-level handler every command runs under, so a failure nothing below anticipated is reported rather
-        // than thrown. Here a failure is the hook's non-blocking error, not the CLI's exit 2.
-        (bool decided, int code) = await CommandEntryPoint.TryRunAsync(() => DecideAsync(request, ct), failure, ct);
+        (bool decided, int code) = await CommandEntryPoint.TryRunAsync(action, failure, ct);
         if (decided) return code;
 
         return await ReportConfigErrorAsync(error, failure.ToString());
@@ -506,7 +511,7 @@ internal sealed class HookRunner(
     }
 
     // SlideRule's own failure, the way the hook reports every one: the config-error line, the report under it,
-    // and the non-blocking code. CliEntry reports a hook command line that does not parse through it too.
+    // and the non-blocking code.
     internal static async Task<int> ReportConfigErrorAsync(TextWriter error, string report)
     {
         await error.WriteLineAsync(ConfigErrorLine);
