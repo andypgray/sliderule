@@ -220,9 +220,7 @@ public sealed class GraphCommandTests
         root.GetProperty("grain")
             .GetString()
             .ShouldBe("overview");
-        root.GetProperty("projectsScope")
-            .EnumerateArray()
-            .Select(glob => glob.GetString())
+        root.Strings("projectsScope")
             .ShouldBe(["MyApp.We*"]);
         root.GetProperty("projects")
             .EnumerateArray()

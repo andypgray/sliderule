@@ -197,9 +197,8 @@ public sealed class HookReadmeTests
             using JsonDocument document = JsonDocument.Parse(RepoRoot.ReadText(snippet));
             (string Tool, Regex Rule)[] rules = document.RootElement
                 .GetProperty("permissions")
-                .GetProperty("deny")
-                .EnumerateArray()
-                .Select(static entry => ShellRule.Match(entry.GetString() ?? ""))
+                .Strings("deny")
+                .Select(static entry => ShellRule.Match(entry))
                 .Where(static match => match.Success)
                 .Select(static match => (
                     Tool: match.Groups[1].Value,

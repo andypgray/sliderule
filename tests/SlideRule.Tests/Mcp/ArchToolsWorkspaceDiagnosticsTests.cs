@@ -68,11 +68,7 @@ public sealed class ArchToolsWorkspaceDiagnosticsTests
     [Fact]
     public async Task ArchCheck_WorkspaceLoadDiagnostic_CarriesTheMsBuildNoteLastInTheDocument()
     {
-        var tools = new ArchTools(
-            McpServerBindings.MyAppWithCleanSpec(),
-            new DiagnosticInjectingSolutionSource([LoadDiagnostic]),
-            new SystemEnvironment(),
-            ResponseFitter.FirstRung);
+        ArchTools tools = ToolsWith([LoadDiagnostic]);
 
         string document = await tools.CheckAsync(cancellationToken: Ct);
 
@@ -85,11 +81,7 @@ public sealed class ArchToolsWorkspaceDiagnosticsTests
     {
         // The negative control that keeps the note diagnostic context rather than a banner: an empty
         // composition stays empty, so a clean call's document says nothing about MSBuild at all.
-        var tools = new ArchTools(
-            McpServerBindings.MyAppWithCleanSpec(),
-            new DiagnosticInjectingSolutionSource([]),
-            new SystemEnvironment(),
-            ResponseFitter.FirstRung);
+        ArchTools tools = ToolsWith([]);
 
         string document = await tools.CheckAsync(cancellationToken: Ct);
 
@@ -102,11 +94,7 @@ public sealed class ArchToolsWorkspaceDiagnosticsTests
     {
         // The MCP surface has no exit code, so modelIncomplete is the whole refusal a client can read. It
         // follows the gate rather than either cause, so a further cause needs no change to any tool.
-        var tools = new ArchTools(
-            McpServerBindings.MyAppWithCleanSpec(),
-            new DiagnosticInjectingSolutionSource([], restoreFailedProjects: [UnrestoredProject]),
-            new SystemEnvironment(),
-            ResponseFitter.FirstRung);
+        ArchTools tools = ToolsWith([], restoreFailedProjects: [UnrestoredProject]);
 
         string document = await tools.CheckAsync(cancellationToken: Ct);
 
@@ -122,11 +110,7 @@ public sealed class ArchToolsWorkspaceDiagnosticsTests
         // graph carries its evidence inline because there is nothing above it here — this tool discards its
         // error writer — and it is the entry point a stranger reaches for first, so the refusal names the
         // remedy and the opt-out in both dialects rather than assuming which surface asked.
-        var tools = new ArchTools(
-            McpServerBindings.MyAppWithCleanSpec(),
-            new DiagnosticInjectingSolutionSource([], restoreFailedProjects: [UnrestoredProject]),
-            new SystemEnvironment(),
-            ResponseFitter.FirstRung);
+        ArchTools tools = ToolsWith([], restoreFailedProjects: [UnrestoredProject]);
 
         var error = await Should.ThrowAsync<UserErrorException>(() => tools.GraphAsync(cancellationToken: Ct));
 
@@ -144,11 +128,7 @@ public sealed class ArchToolsWorkspaceDiagnosticsTests
     {
         // The opt-out the refusal names, taken: one flag for one question, whichever way the model came up
         // short.
-        var tools = new ArchTools(
-            McpServerBindings.MyAppWithCleanSpec(),
-            new DiagnosticInjectingSolutionSource([], restoreFailedProjects: [UnrestoredProject]),
-            new SystemEnvironment(),
-            ResponseFitter.FirstRung);
+        ArchTools tools = ToolsWith([], restoreFailedProjects: [UnrestoredProject]);
 
         string document = await tools.GraphAsync(true, cancellationToken: Ct);
 
@@ -274,21 +254,21 @@ public sealed class ArchToolsWorkspaceDiagnosticsTests
         string document = await tools.CheckAsync(rules: rules, grain: grain, cancellationToken: Ct);
 
         using JsonDocument parsed = JsonDocument.Parse(document);
-        string? stampedGrain = parsed.RootElement.TryGetProperty("grain", out JsonElement stamped)
-            ? stamped.GetString()
-            : null;
+        string? stampedGrain = parsed.RootElement.StringOrDefault("grain");
         stampedGrain.ShouldBe(grain, document);
         parsed.ShouldCarryPackageAudit(CapturedAuditLines.BuildTasksGitAdvisory, projects);
         parsed.RootElement.Strings("workspaceDiagnostics")
             .ShouldBeEmpty();
     }
 
-    // The tools over the clean spec, with diagnostics injected into an otherwise healthy load.
-    private static ArchTools ToolsWith(IReadOnlyList<string> diagnostics)
+    // The tools over the clean spec, with diagnostics and any restore-failed projects injected into an otherwise
+    // healthy load.
+    private static ArchTools ToolsWith(
+        IReadOnlyList<string> diagnostics, IReadOnlyList<string>? restoreFailedProjects = null)
     {
         return new ArchTools(
             McpServerBindings.MyAppWithCleanSpec(),
-            new DiagnosticInjectingSolutionSource(diagnostics),
+            new DiagnosticInjectingSolutionSource(diagnostics, restoreFailedProjects: restoreFailedProjects),
             new SystemEnvironment(),
             ResponseFitter.FirstRung);
     }

@@ -92,9 +92,7 @@ public sealed class MultiTfmCheckE2ETests
         stamped.GetProperty("project")
             .GetString()
             .ShouldBe(Core);
-        stamped.GetProperty("targetFrameworks")
-            .EnumerateArray()
-            .Select(framework => framework.GetString())
+        stamped.Strings("targetFrameworks")
             .ShouldBe(["net10.0", "netstandard2.0"]);
         stamped.GetProperty("factsFollow")
             .GetString()

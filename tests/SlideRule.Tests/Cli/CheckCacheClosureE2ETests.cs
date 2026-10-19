@@ -37,13 +37,13 @@ public sealed class CheckCacheClosureE2ETests
         partial.Source.ClosureRequests.Single()
             .ShouldBe([workspace.PathOf(Web, $"{Web}.csproj")]);
         partial.ShouldHaveLoadedOnly(true, Web, Billing);
-        partial.ShouldMatch(noCache);
+        partial.Result.ShouldMatchTheOutputOf(noCache.Result);
 
         // And what the closure run wrote back validates whole: the next run is a hit with the same answer.
         CacheRun hit = await RunCheckAsync(workspace.SolutionPath, cache.Root);
         hit.Outcome.ShouldBe(CodebaseSourceOutcome.Hit);
         hit.Source.AcquireCount.ShouldBe(0);
-        hit.ShouldMatch(noCache);
+        hit.Result.ShouldMatchTheOutputOf(noCache.Result);
     }
 
     [Fact]
@@ -59,7 +59,7 @@ public sealed class CheckCacheClosureE2ETests
 
         partial.Outcome.ShouldBe(CodebaseSourceOutcome.Partial);
         partial.ShouldHaveLoadedOnly(true, Web, Billing);
-        partial.ShouldMatch(noCache);
+        partial.Result.ShouldMatchTheOutputOf(noCache.Result);
     }
 
     /// <summary>
@@ -84,9 +84,9 @@ public sealed class CheckCacheClosureE2ETests
 
         partial.Outcome.ShouldBe(CodebaseSourceOutcome.Partial);
         partial.ShouldHaveLoadedOnly(true, Web, Billing);
-        (partial.Out + partial.Err).ShouldContain(Domain);
-        partial.Exit.ShouldBe(ExitCodes.Error);
-        partial.ShouldMatch(noCache);
+        (partial.Result.Out + partial.Result.Err).ShouldContain(Domain);
+        partial.Result.Exit.ShouldBe(ExitCodes.Error);
+        partial.Result.ShouldMatchTheOutputOf(noCache.Result);
     }
 
     [Fact]
@@ -106,7 +106,7 @@ public sealed class CheckCacheClosureE2ETests
         partial.Source.Loads.Select(load => load.IsClosure)
             .ShouldBe([true, false]);
         partial.Source.Loads[1].Projects.ShouldBe([Billing, Domain, Web], true);
-        partial.ShouldMatch(noCache);
+        partial.Result.ShouldMatchTheOutputOf(noCache.Result);
     }
 
     [Fact]
@@ -157,7 +157,7 @@ public sealed class CheckCacheClosureE2ETests
         partial.Outcome.ShouldBe(CodebaseSourceOutcome.Partial);
         partial.ReExtracted.ShouldBe([Billing]);
         partial.ShouldHaveLoadedOnly(true, Billing);
-        partial.ShouldMatch(noCache);
+        partial.Result.ShouldMatchTheOutputOf(noCache.Result);
     }
 
     // ── harness ───────────────────────────────────────────────────────────────────────────────────────────
@@ -229,12 +229,5 @@ file static class CheckCacheClosureAssertions
         (bool IsClosure, IReadOnlySet<string> Projects) load = run.Source.Loads.ShouldHaveSingleItem();
         load.IsClosure.ShouldBe(isClosure);
         load.Projects.ShouldBe(projects, true);
-    }
-
-    internal static void ShouldMatch(this CacheRun actual, CacheRun expected)
-    {
-        actual.Out.ShouldBe(expected.Out);
-        actual.Err.ShouldBe(expected.Err);
-        actual.Exit.ShouldBe(expected.Exit);
     }
 }

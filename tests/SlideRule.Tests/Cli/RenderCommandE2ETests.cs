@@ -451,9 +451,7 @@ public sealed class RenderCommandE2ETests : IDisposable
         cachedLoads.ShouldBe(0);
 
         // Byte-identical on every channel: a cached render is not a cheaper answer, it is the same answer.
-        cached.Out.ShouldBe(cold.Out);
-        cached.Err.ShouldBe(cold.Err);
-        cached.Exit.ShouldBe(cold.Exit);
+        cached.ShouldMatchTheOutputOf(cold);
         cold.ShouldSucceed();
     }
 
@@ -480,15 +478,15 @@ public sealed class RenderCommandE2ETests : IDisposable
     {
         using var cache = new TempCacheRoot("render-cache");
 
-        RenderRun cold = await RenderRunAsync(cache.Root, noCache: true, Architecture);
+        CacheRun cold = await RenderRunAsync(cache.Root, noCache: true, Architecture);
 
         // This run asks its source for two models — the cards respect the spec's exclusions, the survey fence
         // draws every declared project — and one walk of the solution serves both: the second model is a merge
         // over fragments already in hand.
         cold.ExtractionCount.ShouldBe(1);
         cold.AcquireCount.ShouldBe(1);
-        cold.Exit.ShouldBe(0);
-        cold.Out.NormalizedTrimmed()
+        cold.Result.ShouldSucceed();
+        cold.Result.Out.NormalizedTrimmed()
             .ShouldBe(RenderSpecCardsWritten + "\nwrote ARCHITECTURE.md");
     }
 
@@ -497,8 +495,8 @@ public sealed class RenderCommandE2ETests : IDisposable
     {
         using var cache = new TempCacheRoot("render-cache");
 
-        RenderRun cold = await RenderRunAsync(cache.Root, false, Architecture);
-        RenderRun cached = await RenderRunAsync(cache.Root, false, Architecture);
+        CacheRun cold = await RenderRunAsync(cache.Root, false, Architecture);
+        CacheRun cached = await RenderRunAsync(cache.Root, false, Architecture);
 
         // The fingerprint and the write-back live on the one-walk path, so the walk count is what says the
         // slot was filled once: a second walk would have re-fingerprinted and re-written it.
@@ -510,7 +508,7 @@ public sealed class RenderCommandE2ETests : IDisposable
         cached.Outcome.ShouldBe(CodebaseSourceOutcome.Hit);
         cached.ExtractionCount.ShouldBe(0); // a hit takes the stored fragments whole and walks nothing
         cached.AcquireCount.ShouldBe(0);
-        cached.Out.NormalizedTrimmed()
+        cached.Result.Out.NormalizedTrimmed()
             .ShouldBe(
                 "unchanged AGENTS.md\nunchanged MyApp.Legacy.Billing/AGENTS.md\n" +
                 "unchanged MyApp.Domain/AGENTS.md\nunchanged ARCHITECTURE.md");
@@ -531,29 +529,16 @@ public sealed class RenderCommandE2ETests : IDisposable
     // The runner directly rather than the command tree, because the walk count is a runner observable the
     // command line has no way to surface — output is byte-identical whichever path a run takes, which is the
     // whole claim.
-    private async Task<RenderRun> RenderRunAsync(string cacheRoot, bool noCache, string? diagram = null)
+    private Task<CacheRun> RenderRunAsync(string cacheRoot, bool noCache, string? diagram = null)
     {
-        var output = new StringWriter();
-        var error = new StringWriter();
-        var counting = new CountingSolutionSource();
-        FakeEnvironment environment = FakeEnvironment.WithCacheRoot(cacheRoot);
-        var runner = new RenderRunner(output, error, counting, environment);
+        var request = new RenderRequest(
+            _workspace.SolutionPath, CliRunner.RenderSpecDll, SolutionDirectory, noCache, false, diagram);
 
-        int exit = await runner.RunAsync(
-            new RenderRequest(
-                _workspace.SolutionPath, CliRunner.RenderSpecDll, SolutionDirectory, noCache, false, diagram),
-            Ct);
-
-        return new RenderRun(
-            exit, output.ToString(), runner.LastOutcome, runner.LastExtractionCount, counting.AcquireCount);
+        return CacheRuns.RunAsync(
+            cacheRoot,
+            static (output, error, counting, environment) => new RenderRunner(output, error, counting, environment),
+            runner => runner.RunAsync(request, Ct));
     }
-
-    private sealed record RenderRun(
-        int Exit,
-        string Out,
-        CodebaseSourceOutcome? Outcome,
-        int ExtractionCount,
-        int AcquireCount);
 
     // ── the model file ───────────────────────────────────────────────────────────────────────────────────
 

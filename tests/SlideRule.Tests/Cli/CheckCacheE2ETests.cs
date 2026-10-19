@@ -39,9 +39,7 @@ public sealed class CheckCacheE2ETests
         warm.AcquireCount.ShouldBe(0);
 
         // Byte-identical: stdout, stderr, and exit code all match — the cache never leaks into observable output.
-        warm.Out.ShouldBe(cold.Out);
-        warm.Err.ShouldBe(cold.Err);
-        warm.Exit.ShouldBe(cold.Exit);
+        warm.Result.ShouldMatchTheOutputOf(cold.Result);
     }
 
     [Fact]
@@ -61,9 +59,7 @@ public sealed class CheckCacheE2ETests
         cache.HasCacheFile()
             .ShouldBeFalse();
 
-        second.Out.ShouldBe(first.Out);
-        second.Err.ShouldBe(first.Err);
-        second.Exit.ShouldBe(first.Exit);
+        second.Result.ShouldMatchTheOutputOf(first.Result);
     }
 
     [Fact]
@@ -89,10 +85,8 @@ public sealed class CheckCacheE2ETests
         partial.ReExtracted.ShouldBe([Web, Domain], true);
 
         // The partial model equals a full cold extraction on the edited tree, and the edit really was seen.
-        partial.Out.ShouldBe(freshCold.Out);
-        partial.Err.ShouldBe(freshCold.Err);
-        partial.Exit.ShouldBe(freshCold.Exit);
-        partial.Out.ShouldNotBe(cold.Out);
+        partial.Result.ShouldMatchTheOutputOf(freshCold.Result);
+        partial.Result.Out.ShouldNotBe(cold.Result.Out);
     }
 
     [Fact]
@@ -119,10 +113,8 @@ public sealed class CheckCacheE2ETests
         // Web alone re-walks, and the verdict still equals a full cold check of the edited tree.
         partial.Outcome.ShouldBe(CodebaseSourceOutcome.Partial);
         partial.ReExtracted.ShouldBe([Web]);
-        partial.Out.ShouldBe(freshCold.Out);
-        partial.Err.ShouldBe(freshCold.Err);
-        partial.Exit.ShouldBe(freshCold.Exit);
-        partial.Out.ShouldNotBe(cold.Out);
+        partial.Result.ShouldMatchTheOutputOf(freshCold.Result);
+        partial.Result.Out.ShouldNotBe(cold.Result.Out);
     }
 
     [Fact]
@@ -156,14 +148,12 @@ public sealed class CheckCacheE2ETests
         warm.ReExtracted.ShouldBeEmpty();
 
         // And the hit answers what a full cold extraction of the edited tree answers, on every channel.
-        warm.Out.ShouldBe(fresh.Out);
-        warm.Err.ShouldBe(fresh.Err);
-        warm.Exit.ShouldBe(fresh.Exit);
+        warm.Result.ShouldMatchTheOutputOf(fresh.Result);
         File.ReadAllBytes(warmSarif)
             .ShouldBe(File.ReadAllBytes(freshSarif));
 
         // The edit really was seen — a hit that replayed the stored lines would match the cold run instead.
-        warm.Out.ShouldNotBe(cold.Out);
+        warm.Result.Out.ShouldNotBe(cold.Result.Out);
 
         // Site by site: the grandfathered notes and the red error each moved down by the two lines inserted
         // above them, and no site was gained or lost on the way.
@@ -188,7 +178,7 @@ public sealed class CheckCacheE2ETests
         CacheRun check = await CacheRuns.CheckAsync(CliRunner.MyAppSolution, CliRunner.CleanSpecDll, cache.Root);
         check.Outcome.ShouldBe(CodebaseSourceOutcome.Hit);
         check.AcquireCount.ShouldBe(0);
-        check.Exit.ShouldBe(0);
+        check.Result.ShouldSucceed();
     }
 
     // ── spec replay on a hit: convention / csproj / explicit-DLL / sibling-config fallback ─────────────────

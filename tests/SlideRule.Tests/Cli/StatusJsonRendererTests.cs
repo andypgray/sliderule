@@ -5,6 +5,7 @@ using SlideRule.Checking;
 using SlideRule.Cli.Rendering;
 using SlideRule.Roslyn.Diagnostics;
 using SlideRule.Tests.Checking;
+using SlideRule.Tests.TestSupport;
 using Xunit;
 
 namespace SlideRule.Tests.Cli;
@@ -33,9 +34,7 @@ public sealed class StatusJsonRendererTests
         JsonElement ratchet = Ratchet(document);
         JsonElement summary = document.RootElement.GetProperty("summary");
 
-        ratchet.GetProperty("untestedOperands")
-            .EnumerateArray()
-            .Select(operand => operand.GetString())
+        ratchet.Strings("untestedOperands")
             .ShouldBe(["types in `App.Ghost.*`"]);
         ratchet.ShouldSatisfyAllConditions(
             () => ratchet.GetProperty("stale")
@@ -86,9 +85,7 @@ public sealed class StatusJsonRendererTests
         JsonElement ratchet = Ratchet(document);
         JsonElement summary = document.RootElement.GetProperty("summary");
 
-        ratchet.GetProperty("stricterOperands")
-            .EnumerateArray()
-            .Select(operand => operand.GetString())
+        ratchet.Strings("stricterOperands")
             .ShouldBe(["types in `App.Ghost.*`"]);
         ratchet.ShouldSatisfyAllConditions(
             () => ratchet.TryGetProperty("untestedOperands", out _)

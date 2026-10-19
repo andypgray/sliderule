@@ -29,9 +29,8 @@ namespace SlideRule.Tests.Replay;
 ///         headline guarantee.
 ///     </para>
 ///     <para>
-///         The class has its own binlog fixture; any mutation of it is reverted byte- and mtime-safely in a
-///         <c>finally</c> (a structural file left newer than the binlog would trip a later test's ingest
-///         staleness check).
+///         The class has its own binlog fixture; every mutation of it happens inside a <see cref="ScopedFile" />
+///         (a structural file left newer than the binlog would trip a later test's ingest staleness check).
 ///     </para>
 /// </remarks>
 public sealed class BinlogCliE2ETests(BinlogFixtureWorkspace fixture)

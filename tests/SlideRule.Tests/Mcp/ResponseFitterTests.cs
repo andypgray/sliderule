@@ -116,13 +116,12 @@ public sealed class ResponseFitterTests
         List<DocumentGrain> composed = [];
 
         // Act
-        List<string> rungs = DocumentGrains.Ladder(
-                DocumentGrain.Full,
-                at =>
-                {
-                    composed.Add(at);
-                    return DocumentGrains.Wire(at) ?? "full";
-                })
+        List<string> rungs = DocumentGrain.Full
+            .Ladder(at =>
+            {
+                composed.Add(at);
+                return at.Wire() ?? "full";
+            })
             .ToList();
 
         // Assert
@@ -137,13 +136,12 @@ public sealed class ResponseFitterTests
         List<DocumentGrain> composed = [];
 
         // Act
-        List<string> rungs = DocumentGrains.Ladder(
-                DocumentGrain.Index,
-                at =>
-                {
-                    composed.Add(at);
-                    return DocumentGrains.Wire(at) ?? "full";
-                })
+        List<string> rungs = DocumentGrain.Index
+            .Ladder(at =>
+            {
+                composed.Add(at);
+                return at.Wire() ?? "full";
+            })
             .ToList();
 
         // Assert

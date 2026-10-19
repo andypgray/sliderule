@@ -92,7 +92,7 @@ public sealed class GitChangedFilesTests
         using TempDirectory temp = TestTempRoot.Fresh("git-changed-files");
         string dir = temp.Path;
         string file = CommitFile(dir, "Probe.cs");
-        FixtureEdits.Backdate(file);
+        FixtureEdits.MakeGitIndexStatStale(file);
         string index = Path.Combine(dir, ".git", "index");
         byte[] before = File.ReadAllBytes(index);
 
@@ -114,7 +114,7 @@ public sealed class GitChangedFilesTests
         using TempDirectory temp = TestTempRoot.Fresh("git-changed-files");
         string dir = temp.Path;
         string file = CommitFile(dir, "Probe.cs");
-        FixtureEdits.Backdate(file);
+        FixtureEdits.MakeGitIndexStatStale(file);
 
         // Act
         DiffContext context = await GitChangedFiles.ResolveAsync("HEAD", dir, Ct);

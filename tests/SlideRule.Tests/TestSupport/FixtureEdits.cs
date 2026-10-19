@@ -4,12 +4,13 @@ using SlideRule.Roslyn;
 namespace SlideRule.Tests.TestSupport;
 
 /// <summary>
-///     Mutates a fixture tree the way the suites that exercise reconciliation and caching need it mutated:
-///     an edit the freshness machinery is guaranteed to notice, or a tree stamped old enough to be trusted.
+///     Mutates a fixture tree the way the suites that exercise reconciliation, caching and git's index need it
+///     mutated: an edit the freshness machinery is guaranteed to notice, a tree stamped old enough to be trusted,
+///     or a file whose stat git's index no longer matches.
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>The freshness contract every method here is written against.</b> Both the workspace sweep and
+///         <b>The freshness contract the sweep and cache stamps are written against.</b> Both the workspace sweep and
 ///         the persisted extraction cache decide what to re-read by comparing a file's mtime against the one
 ///         recorded when it was last seen, and a file stamped close to now is treated as racy — re-read
 ///         rather than trusted. So the two directions are stamped deliberately, and neither number is
@@ -22,9 +23,14 @@ namespace SlideRule.Tests.TestSupport;
 ///     </para>
 ///     <para>
 ///         <b>Backward, -1d.</b> Backdating puts every input comfortably outside the racy window, so the
-///         next capture stamps it promoted — the precondition for the stat fast path. It is best-effort
-///         throughout: a file that cannot be re-stamped stays racy and simply re-reads, which costs a read
-///         and no correctness.
+///         next capture stamps it promoted — the precondition for the stat fast path. Backdating is
+///         best-effort: a file that cannot be re-stamped stays racy and re-reads, which costs a read and no
+///         correctness.
+///     </para>
+///     <para>
+///         <b>Git's index, -10s.</b> <see cref="MakeGitIndexStatStale" /> serves git's stat cache rather than the
+///         sweep's or the cache's, and is not best-effort: a file it cannot re-stamp throws, because one still
+///         matching its cached stat would leave the row that uses it asserting nothing.
 ///     </para>
 /// </remarks>
 internal static class FixtureEdits
@@ -107,7 +113,7 @@ internal static class FixtureEdits
     ///     Pushes <paramref name="path" />'s write time ten seconds into the past, so git's cached stat for it no
     ///     longer matches whatever the filesystem's timestamp granularity, while its content still does.
     /// </summary>
-    internal static void Backdate(string path)
+    internal static void MakeGitIndexStatStale(string path)
     {
         DateTime written = File.GetLastWriteTimeUtc(path);
         File.SetLastWriteTimeUtc(path, written.AddSeconds(-10));

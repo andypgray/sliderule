@@ -512,6 +512,17 @@ public sealed class OneProjectDecidabilityTests
     }
 
     [Fact]
+    public void Classify_AMemberWhereOverALayerAProjectDefines_ReportsTheCodeReason()
+    {
+        // The walk passes the project noun that defines the subject's layer, which is decidable where it stands,
+        // and goes out one node further along, at the Where the member subject carries.
+        OneProjectVerdict verdict = Enforcing(arch => Data(arch).Methods.Where(_ => true, description: "that qualify")
+            .MustHaveSuffix("Async"));
+
+        verdict.Reason.ShouldBe(Code);
+    }
+
+    [Fact]
     public void Classify_ARepresentativeRuleOfEachDecidableFamily_IsDecidable()
     {
         // Arrange — one rule per shape the classifier is meant to let through, so a row that quietly went

@@ -1,7 +1,6 @@
 using Shouldly;
 using SlideRule.Cli.Pipeline;
 using SlideRule.Cli.Verbs;
-using SlideRule.Tests.Mcp.TestDoubles;
 using SlideRule.Tests.TestSupport;
 using Xunit;
 
@@ -54,7 +53,7 @@ public sealed class BaselineCacheE2ETests
         // add records one violation this run saw, so it rides the cache: no workspace, no design-time build.
         add.Outcome.ShouldBe(CodebaseSourceOutcome.Hit);
         add.AcquireCount.ShouldBe(0);
-        add.Exit.ShouldBe(0);
+        add.Result.ShouldSucceed();
 
         // The other two asked for the cache and were refused it by their mode — the gate this class exists for.
         init.Outcome.ShouldBe(CodebaseSourceOutcome.Disabled);
@@ -81,7 +80,7 @@ public sealed class BaselineCacheE2ETests
 
         add.Outcome.ShouldBe(CodebaseSourceOutcome.Disabled);
         add.AcquireCount.ShouldBe(1);
-        add.Exit.ShouldBe(0);
+        add.Result.ShouldSucceed();
     }
 
     // ── harness ───────────────────────────────────────────────────────────────────────────────────────────
@@ -91,14 +90,9 @@ public sealed class BaselineCacheE2ETests
         return BaselineRequests.Add(InlineSqlRule, "INC-1234", CapturedSource, CapturedTarget, workingDirectory);
     }
 
-    private static async Task<CacheRun> RunBaselineAsync(
+    private static Task<CacheRun> RunBaselineAsync(
         string solution, string cacheRoot, Func<string, BaselineRequest> mode)
     {
-        var output = new StringWriter();
-        var error = new StringWriter();
-        var counting = new CountingSolutionSource();
-        var runner = new BaselineRunner(output, error, counting, FakeEnvironment.WithCacheRoot(cacheRoot));
-
         // NoCache false on every mode deliberately (the factories leave the cache on): what each run reports
         // is then the mode's own answer.
         BaselineRequest request = mode(SolutionPaths.SolutionDirectoryOf(solution))
@@ -108,9 +102,9 @@ public sealed class BaselineCacheE2ETests
                 Spec = CliRunner.ViolatedSpecDll
             };
 
-        int exit = await runner.RunAsync(request, Ct);
-
-        return new CacheRun(
-            exit, output.ToString(), error.ToString(), runner.LastOutcome, runner.LastReExtractedProjects, counting);
+        return CacheRuns.RunAsync(
+            cacheRoot,
+            static (output, error, counting, environment) => new BaselineRunner(output, error, counting, environment),
+            runner => runner.RunAsync(request, Ct));
     }
 }

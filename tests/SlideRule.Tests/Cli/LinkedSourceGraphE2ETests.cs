@@ -77,9 +77,7 @@ public sealed class LinkedSourceGraphE2ETests
         entry.GetProperty("type")
             .GetString()
             .ShouldBe("LinkedApp.Shared.Widget");
-        entry.GetProperty("declaredBy")
-            .EnumerateArray()
-            .Select(project => project.GetString())
+        entry.Strings("declaredBy")
             .ShouldBe(["LinkedApp.Core", "LinkedApp.Tool"]);
         entry.GetProperty("factsFollow")
             .GetString()

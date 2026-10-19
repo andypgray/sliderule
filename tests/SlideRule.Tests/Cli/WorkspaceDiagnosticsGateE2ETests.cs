@@ -6,7 +6,6 @@ using SlideRule.Roslyn.MsBuild;
 using SlideRule.Tests.Mcp.TestDoubles;
 using SlideRule.Tests.TestSupport;
 using Xunit;
-// The suite's reader over a check document, not the CLI renderer of the same name that this file also imports.
 
 namespace SlideRule.Tests.Cli;
 

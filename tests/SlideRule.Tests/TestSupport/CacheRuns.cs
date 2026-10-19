@@ -1,19 +1,21 @@
+using SlideRule.Cli.Mcp.Infrastructure;
 using SlideRule.Cli.Pipeline;
 using SlideRule.Cli.Verbs;
+using SlideRule.Tests.Cli;
 using SlideRule.Tests.Mcp.TestDoubles;
 
 namespace SlideRule.Tests.TestSupport;
 
 /// <summary>
-///     What one cache-wired verb run produced: its exit code and both output channels, how the run obtained
-///     its codebase, which projects it re-extracted, and the counting source every acquisition went through.
+///     What one cache-wired verb run produced: the CLI result (exit code, both output channels and the
+///     workspace loads), how the run obtained its codebase, which projects it re-extracted, how many times it
+///     walked the workspace for fragments, and the counting source every acquisition went through.
 /// </summary>
 internal sealed record CacheRun(
-    int Exit,
-    string Out,
-    string Err,
+    CliResult Result,
     CodebaseSourceOutcome? Outcome,
     IReadOnlySet<string> ReExtracted,
+    int ExtractionCount,
     CountingSolutionSource Source)
 {
     /// <summary>How many times the run asked for a loaded solution, closures included.</summary>
@@ -21,8 +23,10 @@ internal sealed record CacheRun(
 }
 
 /// <summary>
-///     Runs <c>check</c> and <c>graph</c> in process over a persisted cache rooted at a caller-supplied
-///     directory, in JSON mode, through a <see cref="CountingSolutionSource" /> the result hands back.
+///     Runs a cache-wired verb in process over a persisted cache rooted at a caller-supplied directory, through a
+///     <see cref="CountingSolutionSource" /> the result hands back. <see cref="CheckAsync" /> and
+///     <see cref="GraphAsync" /> build the JSON-mode request for their verb; any other verb passes its runner and
+///     its request to <see cref="RunAsync{TRunner}" />.
 /// </summary>
 internal static class CacheRuns
 {
@@ -31,44 +35,62 @@ internal static class CacheRuns
     ///     <paramref name="spec" /> leaves the spec to discovery; a null <paramref name="source" /> counts over a
     ///     cold source.
     /// </summary>
-    internal static async Task<CacheRun> CheckAsync(
+    internal static Task<CacheRun> CheckAsync(
         string solution, string? spec, string cacheRoot, bool noCache = false, string? sarif = null,
         CountingSolutionSource? source = null)
     {
-        var output = new StringWriter();
-        var error = new StringWriter();
-        CountingSolutionSource counting = source ?? new CountingSolutionSource();
-        var runner = new CheckRunner(output, error, counting, FakeEnvironment.WithCacheRoot(cacheRoot));
-
         CheckRequest request = CheckRequests.For(solution, spec, SolutionPaths.SolutionDirectoryOf(solution))
             with
             {
                 Json = true, NoCache = noCache, Sarif = sarif
             };
 
-        int exit = await runner.RunAsync(request, Ct);
-
-        return new CacheRun(
-            exit, output.ToString(), error.ToString(), runner.LastOutcome, runner.LastReExtractedProjects, counting);
+        return RunAsync(
+            cacheRoot,
+            static (output, error, counting, environment) => new CheckRunner(output, error, counting, environment),
+            runner => runner.RunAsync(request, Ct),
+            source);
     }
 
     /// <summary>One <c>graph --json</c> run over <paramref name="solution" />.</summary>
-    internal static async Task<CacheRun> GraphAsync(string solution, string cacheRoot, bool noCache = false)
+    internal static Task<CacheRun> GraphAsync(string solution, string cacheRoot, bool noCache = false)
     {
-        var output = new StringWriter();
-        var error = new StringWriter();
-        var counting = new CountingSolutionSource();
-        var runner = new GraphRunner(output, error, counting, FakeEnvironment.WithCacheRoot(cacheRoot));
-
         GraphRequest request = GraphRequests.For(solution, SolutionPaths.SolutionDirectoryOf(solution))
             with
             {
                 Json = true, NoCache = noCache
             };
 
-        int exit = await runner.RunAsync(request, Ct);
+        return RunAsync(
+            cacheRoot,
+            static (output, error, counting, environment) => new GraphRunner(output, error, counting, environment),
+            runner => runner.RunAsync(request, Ct));
+    }
+
+    /// <summary>
+    ///     One run of the runner <paramref name="create" /> builds over a fresh writer pair, the counting source
+    ///     (<paramref name="source" />, or a cold one when null) and an environment whose cache root is
+    ///     <paramref name="cacheRoot" />, started by <paramref name="run" />. The runner's cache observables are
+    ///     read once the run has finished.
+    /// </summary>
+    internal static async Task<CacheRun> RunAsync<TRunner>(
+        string cacheRoot,
+        Func<TextWriter, TextWriter, ISolutionSource, IEnvironment, TRunner> create,
+        Func<TRunner, Task<int>> run,
+        CountingSolutionSource? source = null)
+        where TRunner : CacheWiredRunner
+    {
+        CountingSolutionSource counting = source ?? new CountingSolutionSource();
+        FakeEnvironment environment = FakeEnvironment.WithCacheRoot(cacheRoot);
+        TRunner? runner = null;
+
+        CliResult result = await CliResult.CapturedAsync((output, error) =>
+        {
+            runner = create(output, error, counting, environment);
+            return run(runner);
+        });
 
         return new CacheRun(
-            exit, output.ToString(), error.ToString(), runner.LastOutcome, runner.LastReExtractedProjects, counting);
+            result, runner!.LastOutcome, runner.LastReExtractedProjects, runner.LastExtractionCount, counting);
     }
 }

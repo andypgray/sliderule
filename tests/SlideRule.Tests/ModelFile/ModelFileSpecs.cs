@@ -1,4 +1,3 @@
-using SlideRule.Hosting;
 using SlideRule.ModelFile;
 using SlideRule.Tests.Checking;
 using SlideRule.Tests.Stubs;
@@ -25,14 +24,9 @@ internal static class ModelFileSpecs
         new("MyApp.Domain", ["MyApp.Domain"])
     ];
 
-    private static ArchitectureModel Model()
-    {
-        return Checker.Model(Define);
-    }
-
     internal static ModelDocument Document()
     {
-        return ModelDocument.From(Model(), SpecName, Projects);
+        return DocumentOf(Define);
     }
 
     internal static ModelDocument DocumentOf(Action<Arch> define)

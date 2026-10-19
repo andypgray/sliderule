@@ -288,9 +288,7 @@ public sealed class PolyglotSurveyE2ETests
             .SarifNotifications()
             .ShouldHaveSingleItem();
 
-        notification.GetProperty("message")
-            .GetProperty("text")
-            .GetString()
+        notification.SarifMessageText()
             .ShouldBe(
                 "1 project the solution declares was not surveyed, so these results cover part of the "
                 + "solution: PolyglotApp.Fs/PolyglotApp.Fs.fsproj (not a C# project)");

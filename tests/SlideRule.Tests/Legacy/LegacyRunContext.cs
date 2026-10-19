@@ -4,8 +4,8 @@ using SlideRule.Tests.Cli;
 namespace SlideRule.Tests.Legacy;
 
 /// <summary>
-///     The whole of a legacy CLI run, formatted for a Shouldly <c>customMessage</c>: the exit code, both
-///     streams, and the MSBuild this process registered.
+///     The whole of a legacy CLI run, formatted for a Shouldly <c>customMessage</c>: the MSBuild this
+///     process registered, then the run's <see cref="CliResultAssertions.Transcript" />.
 /// </summary>
 /// <remarks>
 ///     The legacy tests are the ones that fail on somebody else's machine — a CI runner with a different
@@ -23,13 +23,8 @@ internal static class LegacyRunContext
     internal static string DescribeLegacyRun(this CliResult result, string? label = null)
     {
         string heading = label is null ? string.Empty : $"[{label}] ";
-        return $"""
-                {heading}exit: {result.Exit}
-                MSBuild: {MsBuildSelection}
-                --- stdout ---
-                {result.Out}
-                --- stderr ---
-                {result.Err}
-                """;
+        string transcript = result.Transcript();
+
+        return $"{heading}MSBuild: {MsBuildSelection}{Environment.NewLine}{transcript}";
     }
 }

@@ -106,9 +106,7 @@ public sealed class AuthoredAdjectiveTests
     {
         var evaluator = new SelectionEvaluator(Codebase);
         return evaluator.Evaluate(selection, SelectionPosition.Subject)
-            .Select(type => type.FullName)
-            .OrderBy(name => name, StringComparer.Ordinal)
-            .ToList();
+            .SortedFullNames();
     }
 
     // Two trees, one per detection arm. The first is an attributed container with an attribute-free nested

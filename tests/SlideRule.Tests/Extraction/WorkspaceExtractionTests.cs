@@ -46,18 +46,15 @@ public sealed class WorkspaceExtractionTests(WorkspaceFixture fixture)
             fixture.Model, new SolutionRoot(Path.GetDirectoryName(fixture.SolutionPath)!));
         var arch = new Arch();
 
-        List<string> underFolder = Names(evaluator.Evaluate(arch.Types.Under("MyApp.Domain"), SelectionPosition.Subject));
-        List<string> declared = Names(evaluator.Evaluate(arch.Project("MyApp.Domain"), SelectionPosition.Subject));
+        IReadOnlyList<string> underFolder = evaluator
+            .Evaluate(arch.Types.Under("MyApp.Domain"), SelectionPosition.Subject)
+            .SortedFullNames();
+        IReadOnlyList<string> declared = evaluator
+            .Evaluate(arch.Project("MyApp.Domain"), SelectionPosition.Subject)
+            .SortedFullNames();
 
         underFolder.ShouldNotBeEmpty();
         underFolder.ShouldBe(declared);
-
-        static List<string> Names(IEnumerable<TypeNode> types)
-        {
-            return types.Select(type => type.FullName)
-                .OrderBy(name => name, StringComparer.Ordinal)
-                .ToList();
-        }
     }
 
     [Fact]

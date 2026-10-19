@@ -13,9 +13,9 @@ namespace SlideRule.Tests.Replay;
 /// <summary>
 ///     Tests for <see cref="BinlogCaptureStore" /> over this class's own MyApp binlog fixture. Every test
 ///     points the store at its own throwaway cache root, so the persisted <c>capture.json</c>/<c>capture.binlog</c>
-///     are per-test; the only shared mutable state is the fixture tree, so any test that mutates it reverts
-///     byte- and mtime-safely in a <c>finally</c> (a structural file left newer than the binlog would trip a
-///     later test's ingest staleness check).
+///     are per-test; the only shared mutable state is the fixture tree, so every test that mutates it does so
+///     inside a <see cref="ScopedFile" /> (a structural file left newer than the binlog would trip a later test's
+///     ingest staleness check).
 /// </summary>
 /// <remarks>
 ///     The headline pin is the structure-only contract: a content edit to a tracked source file leaves the
@@ -80,15 +80,13 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
         BinlogCaptureStore store = IngestFullCapture();
         string csproj = Fixture.PathOf("MyApp.Domain", "MyApp.Domain.csproj");
         using ScopedFile held = ScopedFile.Hold(csproj);
-        byte[] unchanged = File.ReadAllBytes(csproj);
 
         // A warm-up validation promotes any structural stamp that was still racy at ingest, so the only
         // re-hash the post-touch validation can incur is the touched csproj itself.
         store.Validate(Ct)
             .State.ShouldBe(CaptureState.Usable);
 
-        // Act 1 — rewrite identical bytes and set a different, comfortably-past mtime (a bare touch).
-        File.WriteAllBytes(csproj, unchanged);
+        // Act 1 — set a different, comfortably-past mtime with the bytes untouched (a bare touch).
         File.SetLastWriteTimeUtc(csproj, DateTime.UtcNow.AddHours(-1));
         long beforeTouch = store.ContentHashCount;
         CaptureValidation afterTouch = store.Validate(Ct);

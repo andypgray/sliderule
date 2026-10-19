@@ -53,9 +53,7 @@ public sealed class ExplainCacheE2ETests
         (CliResult cached, long cachedLoads) = await ExplainAsync(workspace, cache.Root);
 
         cachedLoads.ShouldBe(0); // the whole of what a convention --spec costs, skipped
-        cached.Out.ShouldBe(cold.Out);
-        cached.Err.ShouldBe(cold.Err);
-        cached.Exit.ShouldBe(cold.Exit);
+        cached.ShouldMatchTheOutputOf(cold);
     }
 
     [Fact]

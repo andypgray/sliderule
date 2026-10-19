@@ -164,7 +164,7 @@ public sealed class ProjectViolationRenderTests
 
         violations.Select(violation => $"{violation.GetProperty("property").GetString()}@"
                                        + $"{violation.GetProperty("framework").GetString()}="
-                                       + (violation.TryGetProperty("propertyValue", out JsonElement value) ? value.GetString() : "(unset)"))
+                                       + (violation.StringOrDefault("propertyValue") ?? "(unset)"))
             .ShouldBe(["Nullable@net472=(unset)", "Nullable@net8.0=disable"]);
     }
 
@@ -242,8 +242,7 @@ public sealed class ProjectViolationRenderTests
             .ToSarif()
             .SarifResults();
 
-        results.Select(result => $"{result.GetProperty("level").GetString()}: "
-                                 + $"{result.GetProperty("message").GetProperty("text").GetString()}")
+        results.Select(result => $"{result.GetProperty("level").GetString()}: {result.SarifMessageText()}")
             .ShouldBe([
                 "error: Zphil.Bus does not set Nullable for net472",
                 "error: Zphil.Bus sets Nullable to disable for net8.0"

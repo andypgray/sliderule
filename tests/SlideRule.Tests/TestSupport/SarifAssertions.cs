@@ -56,9 +56,7 @@ internal static class SarifAssertions
         result.GetProperty("level")
             .GetString()
             .ShouldBe("error");
-        result.GetProperty("message")
-            .GetProperty("text")
-            .GetString()
+        result.SarifMessageText()
             .ShouldBe(message);
 
         return result;
@@ -78,9 +76,7 @@ internal static class SarifAssertions
         notification.GetProperty("level")
             .GetString()
             .ShouldBe("warning", sarif);
-        notification.GetProperty("message")
-            .GetProperty("text")
-            .GetString()
+        notification.SarifMessageText()
             .ShouldBe(new PackageAuditEntry(message, projects).Describe(), sarif);
     }
 

@@ -42,12 +42,14 @@ public sealed class ArchToolsEnvironmentSeamTests : IDisposable
     [Fact]
     public async Task ArchCheck_UnboundServer_WithoutTheVariable_RefusesDiscovery()
     {
+        _empty.Path.ShouldHaveNoSolutionInAnyAncestor("would bind this server — clean it.");
+
         await Should.ThrowAsync<UserErrorException>(() => Tools(new FakeEnvironment()).CheckAsync(cancellationToken: Ct));
     }
 
     private ArchTools Tools(FakeEnvironment environment)
     {
         McpServerBinding unbound = new(null, CliRunner.CleanSpecDll, _empty.Path);
-        return new ArchTools(unbound, new DiagnosticInjectingSolutionSource([]), environment, ResponseFitter.FirstRung);
+        return new ArchTools(unbound, WarmWorkspacePool.Source, environment, ResponseFitter.FirstRung);
     }
 }

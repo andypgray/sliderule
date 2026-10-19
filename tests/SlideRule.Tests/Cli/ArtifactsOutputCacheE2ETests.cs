@@ -1,8 +1,6 @@
 using Shouldly;
 using SlideRule.Cli.Pipeline;
-using SlideRule.Cli.Verbs;
 using SlideRule.Roslyn.Solutions;
-using SlideRule.Tests.Mcp.TestDoubles;
 using SlideRule.Tests.TestSupport;
 using Xunit;
 
@@ -93,21 +91,9 @@ public sealed class ArtifactsOutputCacheE2ETests
 
     private static async Task<CodebaseSourceOutcome?> RunGraphAsync(TempFixtureWorkspace workspace, string cacheRoot)
     {
-        var output = new StringWriter();
-        var error = new StringWriter();
-        FakeEnvironment environment = FakeEnvironment.WithCacheRoot(cacheRoot);
-        var runner = new GraphRunner(output, error, new ColdSolutionSource(), environment);
-        string workingDirectory = SolutionPaths.SolutionDirectoryOf(workspace.SolutionPath);
+        CacheRun run = await CacheRuns.GraphAsync(workspace.SolutionPath, cacheRoot);
 
-        GraphRequest request = GraphRequests.For(workspace.SolutionPath, workingDirectory)
-            with
-            {
-                Json = true
-            };
-
-        int exit = await runner.RunAsync(request, Ct);
-
-        exit.ShouldBe(0, error.ToString());
-        return runner.LastOutcome;
+        run.Result.ShouldSucceed();
+        return run.Outcome;
     }
 }

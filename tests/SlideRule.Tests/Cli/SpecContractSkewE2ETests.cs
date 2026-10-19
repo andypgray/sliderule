@@ -40,8 +40,6 @@ public sealed class SpecContractSkewE2ETests
 
     private const string Because = "A service's name is the first thing a reader has to go on.";
 
-    internal const string SpecAssemblyName = "SlideRule.ContractSkewSpec";
-
     private const string AbsentMemberCall = "arch.FutureVerb(\"a verb only the newer contract declares\");";
 
     private const string AbsentTypeCall = "arch.Rule(\"future/absent-type\").Enforce(arch.Types.MustBeFuture());";
@@ -61,11 +59,6 @@ public sealed class SpecContractSkewE2ETests
                                                     }
                                                 }
                                                 """;
-
-    internal static readonly Version NewerContract = new(2, 0, 0, 0);
-
-    internal static Version HostContractVersion => typeof(IArchitectureSpec).Assembly.GetName()
-        .Version!;
 
     [Theory]
     [InlineData("0.2.0.0")] // older than the host's pinned identity…
@@ -138,16 +131,18 @@ public sealed class SpecContractSkewE2ETests
         string extraStatement, string extraDeclaration = "")
     {
         using TempDirectory temp = TestTempRoot.Fresh("spec-contract-skew");
-        string specDll = EmitSkewedSpec(temp, NewerContract, extraStatement, extraDeclaration);
+        string specDll = EmitSkewedSpec(
+            temp, SpecContractSkewAssertions.NewerContract, extraStatement, extraDeclaration);
         return await CliRunner.InvokeAsync("explain", RuleId, "--spec", specDll);
     }
 
     private static string EmitSkewedSpec(
         TempDirectory temp, Version contractVersion, string extraStatement, string extraDeclaration = "")
     {
-        string specDll = temp.PathOf(SpecAssemblyName + ".dll");
+        string specDll = temp.PathOf(SpecContractSkewAssertions.SpecAssemblyName + ".dll");
         string source = SpecSource(extraStatement, extraDeclaration);
-        SpecAssemblyCompiler.EmitSpecDll(source, specDll, SpecAssemblyName, SkewedContract.Reference(contractVersion));
+        SpecAssemblyCompiler.EmitSpecDll(
+            source, specDll, SpecContractSkewAssertions.SpecAssemblyName, SkewedContract.Reference(contractVersion));
         return specDll;
     }
 
@@ -200,6 +195,13 @@ public sealed class SpecContractSkewE2ETests
 
 file static class SpecContractSkewAssertions
 {
+    internal const string SpecAssemblyName = "SlideRule.ContractSkewSpec";
+
+    internal static readonly Version NewerContract = new(2, 0, 0, 0);
+
+    private static Version HostContractVersion => typeof(IArchitectureSpec).Assembly.GetName()
+        .Version!;
+
     /// <summary>
     ///     Asserts the run was refused as a spec built against a newer contract: the frame, both versions,
     ///     <paramref name="missing" /> named, and both remedies.
@@ -211,13 +213,9 @@ file static class SpecContractSkewAssertions
     /// </remarks>
     internal static void ShouldRefuseAsContractSkew(this CliResult result, string missing)
     {
-        string specName = SpecContractSkewE2ETests.SpecAssemblyName;
-        Version newer = SpecContractSkewE2ETests.NewerContract;
-        Version host = SpecContractSkewE2ETests.HostContractVersion;
-
         result.ShouldRefuseWith(
-            $"The spec assembly '{specName}' uses SlideRule API this tool's contract does not have",
-            $"(the spec was built against contract {newer}, this tool carries {host})",
+            $"The spec assembly '{SpecAssemblyName}' uses SlideRule API this tool's contract does not have",
+            $"(the spec was built against contract {NewerContract}, this tool carries {HostContractVersion})",
             missing,
             "dotnet tool update -g SlideRule.Cli",
             "reference the SlideRule package that matches this tool");

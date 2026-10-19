@@ -49,10 +49,7 @@ internal static class PackageAuditAssertions
         entry.GetProperty("message")
             .GetString()
             .ShouldBe(message, report);
-        entry.GetProperty("projects")
-            .EnumerateArray()
-            .Select(project => project.GetString() ?? string.Empty)
-            .ToArray()
+        entry.Strings("projects")
             .ShouldBe(projects, customMessage: report);
     }
 

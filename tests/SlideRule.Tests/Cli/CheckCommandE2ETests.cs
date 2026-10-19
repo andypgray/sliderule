@@ -641,9 +641,7 @@ public sealed class CheckCommandE2ETests
         using JsonDocument document = result.ShouldHaveJsonStdout();
         JsonElement root = document.RootElement;
 
-        root.GetProperty("rulesFilter")
-            .EnumerateArray()
-            .Select(glob => glob.GetString())
+        root.Strings("rulesFilter")
             .ShouldBe(["exceptions/*"]);
         root.GetProperty("rules")
             .GetArrayLength()

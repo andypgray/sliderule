@@ -118,9 +118,7 @@ public sealed class SelfSpecTests
         result.ShouldSucceed();
 
         using JsonDocument report = result.ShouldHaveJsonStdout();
-        report.RootElement.GetProperty("workspaceDiagnostics")
-            .EnumerateArray()
-            .Select(note => note.GetString())
+        report.RootElement.Strings("workspaceDiagnostics")
             .ShouldBeEmpty(
                 "this repo's own check must carry no advisory note at all — a duplicate declaration here is " +
                 "a layout mistake, not background noise, and this channel is the product's own front door.");
@@ -465,13 +463,9 @@ public sealed class SelfSpecTests
     }
 
     /// <summary>
-    ///     The sanctioned-mutable-static pin, the broad-catcher pin's twin over the other exemption list.
+    ///     The sanctioned-mutable-static pin, the broad-catcher pin's twin over the other exemption list:
     ///     <c>state/no-static-mutable</c> carves seven fields out of its own subject, each named by its
-    ///     declaring type and its own name rather than by type alone, so the list grows one field at a time,
-    ///     which is the growth that turns an exemption list into a null law. The fields live in the rule's own
-    ///     <c>Except</c> operand, so the rendered law is the list, and pinning that sentence to the exact seven
-    ///     makes every addition a deliberate act: the list can only grow by moving this assertion in the same
-    ///     commit, where a reviewer sees the field and its family (the comment on the rule) together.
+    ///     declaring type and its own name rather than by type alone, so its list grows one field at a time.
     /// </summary>
     [Fact]
     public void SanctionedMutableStatics_AreExactlyTheSevenIntendedWrites()
@@ -493,7 +487,7 @@ public sealed class SelfSpecTests
     // A constraint node's type name is its verb plus the `Constraint` suffix, with the member- and
     // project-level twins carrying a `Member` or `Project` prefix where a bare name would collide with the
     // type side's (MemberMustHaveSuffixConstraint is MustHaveSuffix on a member subject;
-    // ProjectMustConstraint is Must on a project one). The four packaging verbs need no prefix and carry
+    // ProjectMustConstraint is Must on a project one). The packaging verbs need no prefix and carry
     // none — their names are theirs alone.
     private static string VerbName(Type constraintType)
     {

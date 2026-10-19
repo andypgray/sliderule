@@ -935,7 +935,7 @@ public sealed class HookRunnerTests
         // refreshes and writes back when it is allowed to.
         HookSandbox sandbox = ArrangeRepository();
         string probe = CommitProbe(sandbox);
-        FixtureEdits.Backdate(probe);
+        FixtureEdits.MakeGitIndexStatStale(probe);
         string index = Path.Combine(sandbox.ProjectDirectory, ".git", "index");
         byte[] before = File.ReadAllBytes(index);
 

@@ -137,7 +137,7 @@ public sealed class ProjectLoadFailuresTests
         using TempDirectory temp = TestTempRoot.Fresh("filtered-absent");
         string filterPath = WriteFilter(temp, ["Kept", "Dropped"], "Kept");
         using var workspace = new AdhocWorkspace();
-        Solution solution = workspace.WithProjects();
+        Solution solution = workspace.CurrentSolution;
 
         ProjectLoadReport report = ProjectLoadFailures.Detect(solution, filterPath);
 

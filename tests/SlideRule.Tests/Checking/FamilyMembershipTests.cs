@@ -1,6 +1,7 @@
 using Shouldly;
 using SlideRule.Checking;
 using SlideRule.Codebase;
+using SlideRule.Tests.Extraction;
 using Xunit;
 
 namespace SlideRule.Tests.Checking;
@@ -76,9 +77,6 @@ public sealed class FamilyMembershipTests
     {
         var evaluator = new SelectionEvaluator(TwoProjectsCodebase.Model);
         HashSet<TypeNode> members = evaluator.Evaluate(selection, position);
-        return members
-            .Select(type => type.FullName)
-            .Order(StringComparer.Ordinal)
-            .ToList();
+        return members.SortedFullNames();
     }
 }

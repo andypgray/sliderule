@@ -149,7 +149,7 @@ public sealed class ModelDocumentOmittedExactnessTests
         // ThatArePrivate; the two exemption lists are member Except payloads. None of them is a predicate.
         document.Omitted.Select(entry => $"{entry.Id}: {entry.Reason}")
             .ToList()
-            .ShouldBeEmpty("a rule the model file leaves out is one the build analyzer never checks");
+            .ShouldReportNothing("Rule(s) the model file leaves out, which the build analyzer never checks");
     }
 
     // Where the writer's partition and the walk's disagree, as one line per rule.
