@@ -215,8 +215,11 @@ public sealed class BuildTierBaselineTests
     private static Task<IReadOnlyList<Diagnostic>> Diagnose(
         ArchitectureModel model, params (string Path, string? Text)[] baselines)
     {
-        List<AdditionalText> files = [BuildTier.ModelFile(BuildTier.ModelTextFor(model))];
-        files.AddRange(baselines.Select(baseline => BuildTier.File(baseline.Path, baseline.Text)));
+        List<AdditionalText> files =
+        [
+            BuildTier.ModelFile(BuildTier.ModelTextFor(model)),
+            .. baselines.Select(baseline => BuildTier.File(baseline.Path, baseline.Text))
+        ];
 
         return BuildTier.DiagnoseAsync(BuildTier.OwnCompilation(), files, cancellationToken: Ct);
     }

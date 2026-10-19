@@ -136,7 +136,7 @@ internal static class SpecValidator
 
     private static void ValidateRule(RuleRegistration rule, Arch arch, List<SpecValidationError> errors)
     {
-        if (rule.Posture == null)
+        if (rule.Posture is null)
         {
             errors.Add(new SpecValidationError(Code.MissingPosture, rule.Id,
                 $"Rule '{rule.Id}' has no posture; call .Enforce(...) or .Migrate(...).", rule.Location));
@@ -181,7 +181,7 @@ internal static class SpecValidator
     {
         // The posture field, not the selection: both verbs set the two together, so either would answer, but
         // "which posture is this scope" is the question the rest of this method asks and the one item 2 reports.
-        if (scope.Posture == null)
+        if (scope.Posture is null)
         {
             errors.Add(new SpecValidationError(Code.MissingPosture, scope.Id,
                 $"Scope '{scope.Id}' has no posture; call .Quarantine(...) or .Caution(...).", scope.Location));
@@ -777,7 +777,7 @@ internal static class SpecValidator
         if (Declares(anchor, member.Name)) return;
 
         Type? declaringBase = FindDeclaringBase(anchor, member.Name);
-        if (declaringBase != null)
+        if (declaringBase is not null)
         {
             errors.Add(new SpecValidationError(Code.MemberNotDeclared, target.Id,
                 $"'{display}' does not declare '{member.Name}'; it is declared on base type '{SafeFullDisplay(declaringBase)}' — " +
@@ -804,7 +804,7 @@ internal static class SpecValidator
             return null;
         }
 
-        for (Type? baseType = anchor.BaseType; baseType != null; baseType = baseType.BaseType)
+        for (Type? baseType = anchor.BaseType; baseType is not null; baseType = baseType.BaseType)
         {
             Type normalized = Generics.Definition(baseType);
             if (Declares(normalized, name)) return normalized;
@@ -858,7 +858,7 @@ internal static class SpecValidator
         // said about why, and `baseline init` tries to write the directory itself.
         foreach (string baseline in rule.Baselines) yield return (SpecSlot.Baseline, baseline);
 
-        if (rule.Constraint != null)
+        if (rule.Constraint is not null)
             foreach ((SpecSlot, string?) prose in ConstraintProse(rule.Constraint))
                 yield return prose;
 
@@ -963,7 +963,7 @@ internal static class SpecValidator
     // other, so the foreign-Arch and lifetime walks reach it, though the verdict never reads it.
     private static IEnumerable<Selection> RuleSelections(RuleRegistration rule)
     {
-        IEnumerable<Selection> constraintSelections = rule.Constraint == null
+        IEnumerable<Selection> constraintSelections = rule.Constraint is null
             ? Enumerable.Empty<Selection>()
             : SelectionWalk.ConstraintSelections(rule.Constraint);
         IEnumerable<Selection> exemplarSelections = rule.Exemplars.SelectMany(SelectionWalk.ExpandSelection);
@@ -977,7 +977,7 @@ internal static class SpecValidator
     // well-formedness a definition FQN has, so it joins the plain kinds under its own label.
     private static IEnumerable<(string Value, SpecSlot Slot)> RulePatterns(RuleRegistration rule)
     {
-        IEnumerable<(string, SpecSlot)> constraintPatterns = rule.Constraint == null
+        IEnumerable<(string, SpecSlot)> constraintPatterns = rule.Constraint is null
             ? Enumerable.Empty<(string, SpecSlot)>()
             : ConstraintPatterns(rule.Constraint);
         IEnumerable<(string, SpecSlot)> exemplarPatterns = rule.Exemplars.SelectMany(SelectionPatterns);

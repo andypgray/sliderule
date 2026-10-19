@@ -54,7 +54,7 @@ internal sealed class ToolNamedHelpAction(HelpAction inner, string toolName) : S
 
     // The Usage line is the one place the root's own name is printed: the line under the heading, indented, opening
     // with that name and a space. A root that is already the tool's name is left as it is.
-    internal static string WithToolName(string page, string rootName, string toolName)
+    private static string WithToolName(string page, string rootName, string toolName)
     {
         string[] lines = page.Split('\n');
         for (var index = 1; index < lines.Length; index++)

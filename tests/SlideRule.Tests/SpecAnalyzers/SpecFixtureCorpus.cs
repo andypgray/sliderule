@@ -38,10 +38,10 @@ namespace SlideRule.Tests.SpecAnalyzers;
 public sealed class SpecFixtureCorpus : IAsyncLifetime
 {
     /// <summary>The fixture file, by the repo-relative path the suite reads committed files under.</summary>
-    public const string FixtureFile = "tests/SlideRule.Tests/SpecValidationSpecs.cs";
+    private const string FixtureFile = "tests/SlideRule.Tests/SpecValidationSpecs.cs";
 
     /// <summary>The anchor helper types the fixture file's member anchors name.</summary>
-    public const string HelperFile = "tests/SlideRule.Tests/MemberExpressionAnchorFixtures.cs";
+    private const string HelperFile = "tests/SlideRule.Tests/MemberExpressionAnchorFixtures.cs";
 
     private const string FixtureNamespace = "SlideRule.Tests";
 

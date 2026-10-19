@@ -262,7 +262,7 @@ internal static partial class SolutionProjectFileParser
     ///     <c>.csproj</c> members and everything else. Dispatches on the file extension (<c>.slnx</c> ⇒ XML,
     ///     else classic).
     /// </summary>
-    internal static DeclaredProjects ReadDeclaredProjects(string solutionPath)
+    private static DeclaredProjects ReadDeclaredProjects(string solutionPath)
     {
         string fullPath = Path.GetFullPath(solutionPath);
         string text = File.ReadAllText(fullPath);

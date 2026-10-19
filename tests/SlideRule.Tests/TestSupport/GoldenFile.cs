@@ -9,7 +9,7 @@ namespace SlideRule.Tests.TestSupport;
 internal static class GoldenFile
 {
     /// <summary>The golden's text, as committed.</summary>
-    internal static string Read(string fileName)
+    private static string Read(string fileName)
     {
         return File.ReadAllText(GoldenPath(fileName));
     }

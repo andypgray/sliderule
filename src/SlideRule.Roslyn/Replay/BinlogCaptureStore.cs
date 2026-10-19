@@ -223,7 +223,7 @@ internal sealed class BinlogCaptureStore
         return TryPersist(projects, structuralPaths, binlogFullPath, ct);
     }
 
-    private void RefuseIfStale(
+    private static void RefuseIfStale(
         IReadOnlyList<string> structuralPaths, string binlogFullPath, string binlogArgument, CancellationToken ct)
     {
         DateTime binlogTime = File.GetLastWriteTimeUtc(binlogFullPath);

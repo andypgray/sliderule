@@ -16,7 +16,7 @@ namespace SlideRule.Cli.Rendering;
 /// </remarks>
 internal static class ClaimsFormatter
 {
-    internal const string NothingClaims = "  claimed by: no layer, rule or scope";
+    private const string NothingClaims = "  claimed by: no layer, rule or scope";
 
     internal const string ExternalLine =
         "  claimed by: nothing; it is declared outside the solution, and every selection ranges over the types "

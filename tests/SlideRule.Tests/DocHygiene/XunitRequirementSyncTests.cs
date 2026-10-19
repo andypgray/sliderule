@@ -79,7 +79,7 @@ public sealed class XunitRequirementSyncTests
         string pair = PairVersion();
         string description = SolutionInventory.Properties(DocPaths.AdapterProject)
             .GetValueOrDefault("Description") ?? string.Empty;
-        List<string> findings = new();
+        List<string> findings = [];
 
         // Act
         findings.AddRange(RequirementFindings($"{DocPaths.AdapterProject}'s <Description>", description, pair));

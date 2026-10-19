@@ -25,7 +25,7 @@ internal static class OmissionReasons
     ///     same anchor already makes the rule an error at check time, so the file leaving it out loses
     ///     nothing that was being enforced.
     /// </summary>
-    internal static string ClosedGeneric(TypeAnchor anchor)
+    private static string ClosedGeneric(TypeAnchor anchor)
     {
         return ProseFormat.Backtick(anchor.SimpleDisplay)
                + " is a closed generic construction where the rule matches on a "
@@ -33,7 +33,7 @@ internal static class OmissionReasons
     }
 
     /// <summary>An anchor on a type with no source-level name — a pointer, a by-ref, a partial construction.</summary>
-    internal static string Unrepresentable(TypeAnchor anchor)
+    private static string Unrepresentable(TypeAnchor anchor)
     {
         return ProseFormat.Backtick(anchor.SimpleDisplay)
                + " has no source-level name to match on, so `check` reports this rule as an error.";

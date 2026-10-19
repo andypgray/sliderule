@@ -31,7 +31,7 @@ public sealed class SequenceGuardInventoryTests
         foreach (MethodInfo method in methods)
         {
             ParameterInfo[] parameters = method.GetParameters();
-            ParameterInfo sequence = parameters[parameters.Length - 1];
+            ParameterInfo sequence = parameters[^1];
             Type element = sequence.ParameterType.GetGenericArguments()[0];
             string where = SurfaceSamples.Describe(method);
 
@@ -67,7 +67,7 @@ public sealed class SequenceGuardInventoryTests
         ParameterInfo[] parameters = method.GetParameters();
         if (parameters.Length == 0) return false;
 
-        Type last = parameters[parameters.Length - 1].ParameterType;
+        Type last = parameters[^1].ParameterType;
         return last.IsGenericType && last.GetGenericTypeDefinition() == typeof(IEnumerable<>);
     }
 

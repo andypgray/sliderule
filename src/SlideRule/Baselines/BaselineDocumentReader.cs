@@ -411,7 +411,7 @@ internal static class BaselineDocumentReader
         private void Refuse(
             BaselineRefusalKind kind, string detail, string? ruleId, string? entryIdentity, JsonPosition at)
         {
-            if (Refusal is null) Refusal = new BaselineRefusal(kind, detail, ruleId, entryIdentity, at);
+            Refusal ??= new BaselineRefusal(kind, detail, ruleId, entryIdentity, at);
         }
     }
 }

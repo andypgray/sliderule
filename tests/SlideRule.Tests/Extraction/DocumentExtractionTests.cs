@@ -559,7 +559,7 @@ public sealed class DocumentExtractionTests
             IReadOnlyList<string> declared = Names(whole[0].DeclaredTypes);
             IReadOnlyList<string> homed = whole
                 .SelectMany(fragment => fragment.Externals.Select(external => external.Facts.FullName))
-                .Where(name => declared.Contains(name))
+                .Where(declared.Contains)
                 .ToList();
             homed.ShouldBeEmpty("a name the own compilation declares must stay out of every fragment's externals");
 

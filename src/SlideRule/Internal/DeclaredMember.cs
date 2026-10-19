@@ -17,8 +17,8 @@ namespace SlideRule.Internal;
 internal static class DeclaredMember
 {
     /// <summary>The binding flags that define declared membership: declared-only, both visibilities, both scopes.</summary>
-    internal const BindingFlags Flags = BindingFlags.DeclaredOnly | BindingFlags.Public | BindingFlags.NonPublic |
-                                        BindingFlags.Instance | BindingFlags.Static;
+    private const BindingFlags Flags = BindingFlags.DeclaredOnly | BindingFlags.Public | BindingFlags.NonPublic |
+                                       BindingFlags.Instance | BindingFlags.Static;
 
     /// <summary>
     ///     The members <paramref name="type" />'s generic definition declares under

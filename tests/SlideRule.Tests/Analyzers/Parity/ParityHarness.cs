@@ -119,7 +119,7 @@ internal sealed class ParityExpectation
     internal IReadOnlyList<string> Uncaptured { get; }
 
     /// <summary>Where each uncaptured rule would have reported, evaluated against an empty baseline.</summary>
-    internal IReadOnlyDictionary<string, IReadOnlyList<string>> UncapturedFiles { get; }
+    private IReadOnlyDictionary<string, IReadOnlyList<string>> UncapturedFiles { get; }
 
     /// <summary>
     ///     The (compilation, rule) pairs the build is entitled to name as unchecked: an uncaptured rule with
@@ -334,7 +334,7 @@ internal static class ParityHarness
 
         return Prepare(
             name, model, codebase, baselines, modelDirectory,
-            path => byResolvedPath.GetValueOrDefault(path), compilations);
+            byResolvedPath.GetValueOrDefault, compilations);
     }
 
     /// <summary>
@@ -345,7 +345,7 @@ internal static class ParityHarness
     /// <param name="codebase">The merged model.</param>
     /// <param name="baselines">The baselines as the tool loads them.</param>
     /// <param name="modelDirectory">The directory path globs read against, as the build tier reads them.</param>
-    internal static ParityExpectation ExpectedFor(
+    private static ParityExpectation ExpectedFor(
         ModelDocument document, CodebaseModel codebase, BaselineIndex baselines, string modelDirectory)
     {
         List<ArchRule> inRules = document.Rules
@@ -499,7 +499,7 @@ internal static class ParityHarness
     /// </summary>
     /// <param name="solutionPath">The solution to open, through the shared warm pool.</param>
     /// <param name="cancellationToken">The token the load and the binding run under.</param>
-    internal static async Task<IReadOnlyList<ParityCompilation>> CompilationsOfAsync(
+    private static async Task<IReadOnlyList<ParityCompilation>> CompilationsOfAsync(
         string solutionPath, CancellationToken cancellationToken)
     {
         WorkspaceSnapshot snapshot = await WarmWorkspacePool.GetCurrentAsync(solutionPath, cancellationToken);

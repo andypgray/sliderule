@@ -122,7 +122,7 @@ internal static class BuildTier
     internal const string LedgerId = "T:Data.Ledger";
 
     /// <summary>The sibling's source: the types the own project reaches.</summary>
-    internal const string SiblingSource =
+    private const string SiblingSource =
         """
         namespace Data;
 
@@ -460,7 +460,7 @@ internal static class BuildTier
             [.. additionalFiles],
             new InMemoryConfigOptionsProvider(global));
 
-        return compilation.WithAnalyzers(ImmutableArray.Create<DiagnosticAnalyzer>(analyzer), analyzerOptions);
+        return compilation.WithAnalyzers([analyzer], analyzerOptions);
     }
 
     // One order for both calls, so a fact written against the batch result reads the same way round when it

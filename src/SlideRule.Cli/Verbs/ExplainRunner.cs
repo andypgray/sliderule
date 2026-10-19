@@ -180,7 +180,7 @@ internal sealed class ExplainRunner(
             : $"Unknown type '{name}'";
 
         List<string> closest = codebase.Types
-            .Where(type => !type.IsExternal && type.FullName.IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0)
+            .Where(type => !type.IsExternal && type.FullName.Contains(name, StringComparison.OrdinalIgnoreCase))
             .Select(type => type.FullName)
             .Distinct(StringComparer.Ordinal)
             .OrderBy(fullName => fullName, StringComparer.Ordinal)

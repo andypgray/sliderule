@@ -69,7 +69,7 @@ internal static class SpecSnippet
     ///     the whole of what a real spec file needs beside its own text, which is why a corpus of them can
     ///     be compiled from the repository as it is written.
     /// </remarks>
-    internal static (string Path, string Source) ImplicitUsings { get; } =
+    private static (string Path, string Source) ImplicitUsings { get; } =
         ("ImplicitUsings.cs",
             """
             global using global::System;
@@ -157,7 +157,7 @@ internal static class SpecSnippet
 
         var analyzer = new SpecLiteralAnalyzer(beforeDecide, versions);
         CompilationWithAnalyzers withAnalyzers =
-            compilation.WithAnalyzers(ImmutableArray.Create<DiagnosticAnalyzer>(analyzer));
+            compilation.WithAnalyzers([analyzer]);
 
         // One bind serves both halves, and the compiler's is held to zero errors before the analyzer's is read.
         ImmutableArray<Diagnostic> diagnostics = await withAnalyzers.GetAllDiagnosticsAsync(cancellationToken);

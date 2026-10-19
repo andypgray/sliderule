@@ -198,7 +198,7 @@ internal static class SolutionDiscovery
     ///     solution stands beside them, the filters are the candidates: one resolves, and several make the
     ///     directory ambiguous, so the walk climbs past it.
     /// </summary>
-    internal static string[] FindSlnFiles(string directory)
+    private static string[] FindSlnFiles(string directory)
     {
         string[] candidates = Directory.EnumerateFiles(directory)
             .Where(SolutionProjectFileParser.OwnsFormat)

@@ -218,7 +218,7 @@ internal static class BaselineFormat
     // The one place that says what an entry's content is, so a seal and the frozen legacy digest cannot
     // disagree about it. All that separates the two renderings is the preamble, whether the rule ID leads
     // one entry or a whole section, and whether the measure is part of the grammar at all.
-    internal static void AppendEntryLines(StringBuilder builder, BaselineEntry entry, bool counted)
+    private static void AppendEntryLines(StringBuilder builder, BaselineEntry entry, bool counted)
     {
         if (entry.Subject is { } subject)
             builder.Append("subject ").Append(subject).Append('\n');

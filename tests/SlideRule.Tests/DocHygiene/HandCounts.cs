@@ -29,7 +29,7 @@ namespace SlideRule.Tests.DocHygiene;
 internal static class HandCounts
 {
     /// <summary>Where a registered fragment marks the number it claims.</summary>
-    internal const string CountPlaceholder = "{count}";
+    private const string CountPlaceholder = "{count}";
 
     // One collapse per doc rather than one per claim: several docs carry more than one registered
     // sentence, and collapsing walks the whole file.

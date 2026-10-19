@@ -39,7 +39,7 @@ internal static class SlotBinding
     ///     compiler old enough not to name it is also old enough never to produce one, so the number reaches
     ///     nothing on those.
     /// </summary>
-    internal const int CollectionExpressionOperationKind = 0x7F;
+    private const int CollectionExpressionOperationKind = 0x7F;
 
     /// <summary>
     ///     The slot the literal fills, or <see cref="SlotKind.None" /> where nothing here can say.

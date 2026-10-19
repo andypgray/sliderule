@@ -26,7 +26,7 @@ namespace SlideRule.Tests.TestSupport;
 internal sealed class WorkspaceLoadProbeAttribute : BeforeAfterTestAttribute
 {
     /// <summary>Names the TSV the probe writes at shutdown. Unset (the default) disables the probe.</summary>
-    internal const string ProbeFileVariable = "SLIDERULE_LOAD_PROBE";
+    private const string ProbeFileVariable = "SLIDERULE_LOAD_PROBE";
 
     private static readonly ConcurrentQueue<string> Rows = new();
 

@@ -67,7 +67,7 @@ internal sealed class SelectionAdmission
     ///     test an edge end asks of one instance, asked here of one declarer. A card's placement counts a
     ///     declarer's own files only where this holds, so a project-defined layer places by its own copy.
     /// </summary>
-    internal bool NamesAt(TypeNode node, string project)
+    private bool NamesAt(TypeNode node, string project)
     {
         return NamingOf(node).Names(project);
     }
@@ -86,7 +86,7 @@ internal sealed class SelectionAdmission
 
         return node.Declarers
             .Where(declarer => NamesAt(node, declarer))
-            .SelectMany(declarer => node.DeclarationSitesOf(declarer));
+            .SelectMany(node.DeclarationSitesOf);
     }
 
     /// <summary>

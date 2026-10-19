@@ -68,7 +68,7 @@ internal static class FragmentExtractor
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        return new ExtractState(input.Compilation, input.GeneratedTrees, cancellationToken, siblingProjects: null)
+        return new ExtractState(input.Compilation, input.GeneratedTrees, siblingProjects: null, cancellationToken)
             .Run(input);
     }
 
@@ -118,7 +118,7 @@ internal static class FragmentExtractor
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        return new ExtractState(input.Compilation, input.GeneratedTrees, cancellationToken, siblingProjects)
+        return new ExtractState(input.Compilation, input.GeneratedTrees, siblingProjects, cancellationToken)
             .RunOneProject(input);
     }
 
@@ -181,7 +181,7 @@ internal static class FragmentExtractor
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        return new ExtractState(input.Compilation, input.GeneratedTrees, cancellationToken, siblingProjects)
+        return new ExtractState(input.Compilation, input.GeneratedTrees, siblingProjects, cancellationToken)
             .RunDocument(input, tree, semanticModel, declaringTrees);
     }
 
@@ -587,7 +587,7 @@ internal static class FragmentExtractor
 
         public ExtractState(
             Compilation compilation, IReadOnlyCollection<SyntaxTree>? generatorOutputTrees,
-            CancellationToken cancellationToken, SiblingProjects? siblingProjects)
+            SiblingProjects? siblingProjects, CancellationToken cancellationToken)
         {
             _compilation = compilation;
             _bareCatchType = ReferenceWalker.BareCatchTypeOf(compilation);

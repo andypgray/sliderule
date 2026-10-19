@@ -70,7 +70,7 @@ internal static class HeadingAnchors
     ///     The anchor github-slugger derives from a heading's rendered text, before any suffix that tells
     ///     repeated headings apart.
     /// </summary>
-    public static string Slug(string headingText)
+    private static string Slug(string headingText)
     {
         string lowered = headingText.ToLowerInvariant();
         StringBuilder slug = new(lowered.Length);

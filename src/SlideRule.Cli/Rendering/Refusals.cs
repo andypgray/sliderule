@@ -21,7 +21,7 @@ namespace SlideRule.Cli.Rendering;
 internal static class Refusals
 {
     /// <summary>Every rule ID in <paramref name="model" />, ordinal-sorted — the post-desugar spec as a reader can name it.</summary>
-    internal static IEnumerable<string> AvailableRuleIds(ArchitectureModel model)
+    private static IEnumerable<string> AvailableRuleIds(ArchitectureModel model)
     {
         return model.Rules.Select(rule => rule.Id).OrderBy(id => id, StringComparer.Ordinal);
     }

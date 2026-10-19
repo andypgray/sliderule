@@ -106,7 +106,7 @@ internal static class SentenceRenderer
     ///     cells, or a family in the collective voice, which reads as one noun phrase and names no cell
     ///     (GRAMMAR §5.3, §6).
     /// </summary>
-    internal static string? FamilyCellWord(Selection selection)
+    private static string? FamilyCellWord(Selection selection)
     {
         if (SelectionWalk.FamilyNoun(selection) is not { } family) return null;
 

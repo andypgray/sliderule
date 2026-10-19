@@ -114,7 +114,7 @@ internal static class SelectionWalk
     ///     The project selection inside a family-of-projects subject, or null for every other selection —
     ///     the one place the type stratum reaches the artifact stratum (GRAMMAR §5.1).
     /// </summary>
-    internal static ProjectSelection? FamilyProjects(Selection? selection)
+    private static ProjectSelection? FamilyProjects(Selection? selection)
     {
         return FamilyNoun(selection)?.Projects;
     }
@@ -125,7 +125,7 @@ internal static class SelectionWalk
     ///     <c>.Matching(a, b)</c> already say "either of these" without one. <c>Except</c> is the only way a
     ///     project selection nests.
     /// </remarks>
-    internal static IEnumerable<ProjectSelection> ExpandProjectSelection(ProjectSelection selection)
+    private static IEnumerable<ProjectSelection> ExpandProjectSelection(ProjectSelection selection)
     {
         yield return selection;
 

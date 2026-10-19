@@ -28,7 +28,7 @@ namespace SlideRule.Tests.DocHygiene;
 public sealed class CitationLinkTests
 {
     /// <summary>Set to a non-blank value to run the network probe. Unset (the default) skips it.</summary>
-    internal const string LinkCheckVariable = "SLIDERULE_LINK_CHECK";
+    private const string LinkCheckVariable = "SLIDERULE_LINK_CHECK";
 
     private const string AgentsFileName = "AGENTS.md";
 

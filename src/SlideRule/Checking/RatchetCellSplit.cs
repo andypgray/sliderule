@@ -10,7 +10,7 @@ namespace SlideRule.Checking;
 /// </summary>
 internal sealed class RatchetCellSplit
 {
-    internal RatchetCellSplit(string cellWord, IReadOnlyList<RatchetCell> cells)
+    private RatchetCellSplit(string cellWord, IReadOnlyList<RatchetCell> cells)
     {
         CellWord = cellWord;
         Cells = cells;

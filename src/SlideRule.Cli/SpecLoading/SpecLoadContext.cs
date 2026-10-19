@@ -78,6 +78,6 @@ internal sealed class SpecLoadContext : AssemblyLoadContext
         if (assemblyName.Name == ContractAssemblyName) return Contract;
 
         string? path = _resolver.ResolveAssemblyToPath(assemblyName);
-        return path != null ? LoadWithoutLocking(path) : null;
+        return path is not null ? LoadWithoutLocking(path) : null;
     }
 }

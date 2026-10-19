@@ -13,7 +13,7 @@ namespace SlideRule.Validation;
 // directories).
 internal sealed class SpecSourceLocation
 {
-    internal SpecSourceLocation(string file, int line)
+    private SpecSourceLocation(string file, int line)
     {
         File = file;
         Line = line;

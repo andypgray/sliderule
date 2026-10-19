@@ -364,7 +364,7 @@ internal static class SpecLiteralDiagnostics
     ///     own <c>AD0001</c> and fails any build treating warnings as errors.
     /// </remarks>
     /// <param name="code">The number of the code the contract decided the literal under.</param>
-    internal static DiagnosticDescriptor? For(int code)
+    private static DiagnosticDescriptor? For(int code)
     {
         int number = CodeOffset + code;
         string id = IdPrefix + number.ToString(CultureInfo.InvariantCulture);

@@ -37,7 +37,7 @@ internal static class IdleTimeoutWatchdog
     ///     <see cref="ExitCall" />). Calls parked on an outer filter have not yet reached
     ///     <see cref="EnterCall" />, so they are correctly uncounted.
     /// </summary>
-    internal static int InFlightCount => Volatile.Read(ref s_inFlightCount);
+    private static int InFlightCount => Volatile.Read(ref s_inFlightCount);
 
     /// <summary>Records the start of a tool call: re-stamps the idle clock and increments the in-flight count.</summary>
     /// <remarks>

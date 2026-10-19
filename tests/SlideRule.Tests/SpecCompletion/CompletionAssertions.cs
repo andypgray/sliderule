@@ -254,7 +254,7 @@ internal static class CompletionAssertions
         int opening = text.Length > 0 && text[0] == '@' ? 2 : 1;
         if (text.Length < opening) return text;
 
-        bool closed = text.Length > opening && text[text.Length - 1] == '"';
+        bool closed = text.Length > opening && text[^1] == '"';
 
         return text.Substring(opening, (closed ? text.Length - 1 : text.Length) - opening);
     }

@@ -318,7 +318,7 @@ public static class SelectionAdjectives
     {
         NotNull(selection, nameof(selection));
         Arch owner = selection.Owner;
-        return AppendExcept(selection, OperandList.OneOrMore(first, more, type => owner.Type(type)));
+        return AppendExcept(selection, OperandList.OneOrMore(first, more, owner.Type));
     }
 
     /// <summary>

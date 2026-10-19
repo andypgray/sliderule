@@ -34,12 +34,12 @@ internal sealed class DiagramScope
     /// <summary>
     ///     Gets the allow-list globs; empty means every project is in scope.
     /// </summary>
-    public IReadOnlyList<string> Only { get; }
+    private IReadOnlyList<string> Only { get; }
 
     /// <summary>
     ///     Gets the deny-list globs; a match here drops the project whatever <see cref="Only" /> says.
     /// </summary>
-    public IReadOnlyList<string> Exclude { get; }
+    private IReadOnlyList<string> Exclude { get; }
 
     /// <summary>
     ///     Reports whether <paramref name="projectName" /> survives both lists.

@@ -42,7 +42,7 @@ internal sealed class ModelNodeReader
     internal ModelRefusal? Refusal { get; private set; }
 
     /// <summary>Whether a refusal has been recorded, so callers stop.</summary>
-    internal bool Failed => Refusal is not null;
+    private bool Failed => Refusal is not null;
 
     // ---- the document --------------------------------------------------------------------------
 
@@ -362,7 +362,7 @@ internal sealed class ModelNodeReader
 
     // ---- the model graph -----------------------------------------------------------------------
 
-    internal Selection? ReadSelection(StrictJsonValue value, string what)
+    private Selection? ReadSelection(StrictJsonValue value, string what)
     {
         StrictJsonValue? obj = AsObject(value, what);
         if (obj is null) return null;
@@ -410,7 +410,7 @@ internal sealed class ModelNodeReader
         return adjectives.Count == 0 ? built : built.WithAdjectives(adjectives);
     }
 
-    internal MemberSelection? ReadMemberSelection(StrictJsonValue value, string what)
+    private MemberSelection? ReadMemberSelection(StrictJsonValue value, string what)
     {
         StrictJsonValue? obj = AsObject(value, what);
         if (obj is null) return null;
@@ -428,7 +428,7 @@ internal sealed class ModelNodeReader
         return MemberSelections.Of(source, kind, adjectives);
     }
 
-    internal ProjectSelection? ReadProjectSelection(StrictJsonValue value, string what)
+    private ProjectSelection? ReadProjectSelection(StrictJsonValue value, string what)
     {
         StrictJsonValue? obj = AsObject(value, what);
         if (obj is null) return null;
@@ -441,7 +441,7 @@ internal sealed class ModelNodeReader
         return new RefinedProjectSelection(_arch, adjectives);
     }
 
-    internal Constraint? ReadConstraint(StrictJsonValue value, string what)
+    private Constraint? ReadConstraint(StrictJsonValue value, string what)
     {
         return ReadNode(value, what, NodeReaders.ConstraintWhere, NodeReaders.ConstraintArms);
     }
@@ -654,7 +654,7 @@ internal sealed class ModelNodeReader
         return false;
     }
 
-    internal bool RequiredFlag(StrictJsonValue obj, string where, string key, out bool flag)
+    private bool RequiredFlag(StrictJsonValue obj, string where, string key, out bool flag)
     {
         flag = false;
         StrictJsonValue? value = Required(obj, where, key);
@@ -684,7 +684,7 @@ internal sealed class ModelNodeReader
         return false;
     }
 
-    internal bool OptionalFlag(StrictJsonValue obj, string key, out bool flag)
+    private bool OptionalFlag(StrictJsonValue obj, string key, out bool flag)
     {
         flag = false;
         StrictJsonValue? value = Optional(obj, key);
@@ -861,7 +861,7 @@ internal sealed class ModelNodeReader
 
     private void Refuse(ModelRefusalKind kind, string message, JsonPosition at)
     {
-        if (Refusal is null) Refusal = new ModelRefusal(kind, message, at);
+        Refusal ??= new ModelRefusal(kind, message, at);
     }
 
     private static string Field(string key)

@@ -33,7 +33,7 @@ namespace SlideRule.Roslyn.Solutions;
 internal static class IntermediateOutputTree
 {
     /// <summary>The NuGet restore assets file's name — the structural input this tree is probed for.</summary>
-    internal const string AssetsFileName = "project.assets.json";
+    private const string AssetsFileName = "project.assets.json";
 
     /// <summary>
     ///     The project's restore assets file in the <em>default</em> output layout

@@ -15,7 +15,7 @@ internal static class MermaidText
     ///     <see cref="char.IsLetterOrDigit(char)" />, which is Unicode-aware and would leave accented
     ///     letters in an identifier position where Mermaid's tolerance is unknown.
     /// </summary>
-    internal static string Slug(string name)
+    private static string Slug(string name)
     {
         var builder = new StringBuilder(name.Length);
         foreach (char character in name)
@@ -56,7 +56,7 @@ internal static class MermaidText
     ///     than a node, and what keeps an ID from starting with the <c>o</c> or <c>x</c> Mermaid's link
     ///     rules read as an arrowhead.
     /// </remarks>
-    internal static IReadOnlyList<string> UniqueIds(string prefix, IReadOnlyList<string> names)
+    private static IReadOnlyList<string> UniqueIds(string prefix, IReadOnlyList<string> names)
     {
         var taken = new HashSet<string>(StringComparer.Ordinal);
         var ids = new List<string>(names.Count);

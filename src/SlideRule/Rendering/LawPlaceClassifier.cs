@@ -105,7 +105,7 @@ internal static class LawPlaceClassifier
     }
 
     /// <summary>A place standing for one namespace glob, carrying a declared layer's name when one owns that glob.</summary>
-    internal static LawPlace FromGlob(string glob, IReadOnlyList<LayerDefinition> layers)
+    private static LawPlace FromGlob(string glob, IReadOnlyList<LayerDefinition> layers)
     {
         // Identity collapse: a layer defined by exactly one glob IS that glob, so a rule naming the glob
         // and a rule naming the layer draw one node under the layer's name. A multi-glob layer is a set
@@ -309,7 +309,7 @@ internal static class LawPlaceClassifier
     // owns it, so a second spelling of it could never leave the slug reading the old one.
     private static string IdSourceOf(string glob)
     {
-        NamespacePattern.TryParseSubtree(glob, out string prefix);
+        _ = NamespacePattern.TryParseSubtree(glob, out string prefix);
         return prefix;
     }
 

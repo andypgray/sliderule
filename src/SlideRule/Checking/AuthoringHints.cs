@@ -42,7 +42,7 @@ internal static class AuthoringHints
     ///     type selection matched nothing reports the member message, not the type one. Reached through
     ///     <see cref="ForMemberSubject" />, which is what a partial model replaces.
     /// </summary>
-    internal const string EmptyMemberSubject =
+    private const string EmptyMemberSubject =
         "Either the type selection matched nothing or none of the members it reached survived; check the "
         + "types first, then .Methods, .Properties or .Fields and the filters after them.";
 
@@ -51,7 +51,7 @@ internal static class AuthoringHints
     ///     rule rather than on the emptiness: the message it sits under has just said that. Reached through
     ///     <see cref="ForProjectSubject" />, which is what a partial model replaces.
     /// </summary>
-    internal const string EmptyProjectSubject =
+    private const string EmptyProjectSubject =
         "A project is named by its csproj file name, and .Matching(...) globs that name with a `*` that has "
         + "no dot structure; check the names against the solution.";
 
@@ -141,7 +141,7 @@ internal static class AuthoringHints
     ///     The action clause on a dead exemplar part. It says what the warning does not cost, since a reader's
     ///     first question about a warning on a rule is whether the verdict can be trusted.
     /// </summary>
-    internal const string ExemplarTail =
+    private const string ExemplarTail =
         "; the verdict never depends on it, so point it at a type the solution declares or remove it";
 
     /// <summary>

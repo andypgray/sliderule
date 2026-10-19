@@ -14,13 +14,13 @@ namespace SlideRule.Tests.Cli;
 internal sealed record CliResult(int Exit, string Out, string Err)
 {
     /// <summary>The workspace loads of this one invocation, exact whatever runs beside it.</summary>
-    internal long Loads { get; init; }
+    internal long Loads { get; private init; }
 
     /// <summary>
     ///     The MSBuild-gate branch of this one invocation, exact whatever runs beside it; <c>null</c> when the
     ///     invocation never reaches the gate (explain, render, baseline, or a runner driven directly).
     /// </summary>
-    internal GateAcquisition? Gate { get; init; }
+    internal GateAcquisition? Gate { get; private init; }
 
     /// <summary>
     ///     Runs <paramref name="invoke" /> against a fresh writer pair and captures both channels, the workspace
@@ -102,7 +102,7 @@ internal static class CliRunner
         Path.Combine(AppContext.BaseDirectory, "Fixtures", "LegacySolutions", "ClassicApp", "ClassicApp.sln");
 
     /// <summary>The polyglot bed's solution, copied to the test output as content.</summary>
-    public static string PolyglotSolution =>
+    private static string PolyglotSolution =>
         Path.Combine(AppContext.BaseDirectory, "Fixtures", "TestSolutions", "PolyglotApp", "PolyglotApp.slnx");
 
     /// <summary>

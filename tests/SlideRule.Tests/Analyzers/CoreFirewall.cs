@@ -71,19 +71,19 @@ internal sealed record FirewallBreach(string Site, string Rule, string Detail)
 internal static class CoreFirewall
 {
     /// <summary>Rule 1 as a breach reads.</summary>
-    internal const string NamesCore = "rule 1, names Core outside a boundary";
+    private const string NamesCore = "rule 1, names Core outside a boundary";
 
     /// <summary>Rule 2 as a breach reads.</summary>
-    internal const string CallsUnguarded = "rule 2, calls a boundary outside a guard";
+    private const string CallsUnguarded = "rule 2, calls a boundary outside a guard";
 
     /// <summary>Rule 3 as a breach reads.</summary>
-    internal const string HandsRoslyn = "rule 3, hands Roslyn a boundary";
+    private const string HandsRoslyn = "rule 3, hands Roslyn a boundary";
 
     /// <summary>Rule 4 as a breach reads.</summary>
-    internal const string FaultPathNamesCore = "rule 4, the fault path names Core";
+    private const string FaultPathNamesCore = "rule 4, the fault path names Core";
 
     /// <summary>Rule 5 as a breach reads.</summary>
-    internal const string LoadBindsCore = "rule 5, loading the type binds Core";
+    private const string LoadBindsCore = "rule 5, loading the type binds Core";
 
     /// <summary>The assemblies on the far side of the firewall.</summary>
     private static readonly ImmutableHashSet<string> Guarded =

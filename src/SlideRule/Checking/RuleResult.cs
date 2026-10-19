@@ -306,7 +306,7 @@ internal sealed class RuleResult
     // that silently does nothing, beside the authoring hint that says what actually went wrong. An empty subject
     // and a rule error are both identity-less (GRAMMAR §4.3), and keying on the identity is what covers the
     // second without anyone having to remember it.
-    internal bool HoldsBaselinableViolations =>
+    private bool HoldsBaselinableViolations =>
         Violations.Any(violation => violation.BaselineIdentity() is not null);
 
     /// <summary>

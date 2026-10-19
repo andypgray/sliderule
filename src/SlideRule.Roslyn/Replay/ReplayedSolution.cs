@@ -42,7 +42,7 @@ internal sealed class ReplayedSolution : IDisposable
     }
 
     /// <summary>The in-memory workspace the replayed solution was added to.</summary>
-    public AdhocWorkspace Workspace { get; }
+    private AdhocWorkspace Workspace { get; }
 
     /// <summary>The replayed, unresolved-reference-stripped solution.</summary>
     public Solution Solution { get; }
@@ -88,7 +88,7 @@ internal sealed class ReplayedSolution : IDisposable
     ///     yesterday's model — and a capture that was replayed because it was structurally valid is, by
     ///     construction, a capture of a build that compiled.
     /// </remarks>
-    public IReadOnlyList<string> RestoreFailedProjects { get; } = [];
+    private IReadOnlyList<string> RestoreFailedProjects { get; } = [];
 
     /// <summary>
     ///     The projects this capture built in a language the replay cannot read, ordinal-sorted by path —
@@ -104,7 +104,7 @@ internal sealed class ReplayedSolution : IDisposable
     ///     one. A project the build skipped entirely is invisible here — the replay analog of the MSBuild
     ///     path's undeclared-passenger limit.
     /// </remarks>
-    internal IReadOnlyList<UnsupportedProject> UnsupportedProjects { get; }
+    private IReadOnlyList<UnsupportedProject> UnsupportedProjects { get; }
 
     /// <summary>
     ///     This replay's verdict as the one value every surface reads — the four project lists above beside

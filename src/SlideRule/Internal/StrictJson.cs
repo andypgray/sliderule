@@ -600,9 +600,9 @@ internal static class StrictJson
 
         private static int HexValue(char c)
         {
-            if (c >= '0' && c <= '9') return c - '0';
-            if (c >= 'a' && c <= 'f') return c - 'a' + 10;
-            if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+            if (c is >= '0' and <= '9') return c - '0';
+            if (c is >= 'a' and <= 'f') return c - 'a' + 10;
+            if (c is >= 'A' and <= 'F') return c - 'A' + 10;
 
             return -1;
         }
@@ -614,17 +614,17 @@ internal static class StrictJson
 
         private static bool IsDigit(char c)
         {
-            return c >= '0' && c <= '9';
+            return c is >= '0' and <= '9';
         }
 
         private static bool IsAsciiLetter(char c)
         {
-            return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+            return c is >= 'a' and <= 'z' or >= 'A' and <= 'Z';
         }
 
         private static bool IsPrintableAscii(char c)
         {
-            return c >= ' ' && c <= '~';
+            return c is >= ' ' and <= '~';
         }
 
         // What a string carries as itself: anything but the quote that closes it, the backslash that opens an

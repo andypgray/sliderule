@@ -60,7 +60,7 @@ internal sealed class NodeWriter
     /// <summary>Records the first reason met; a later one cannot displace it.</summary>
     internal void Refuse(string reason)
     {
-        if (Refusal is null) Refusal = reason;
+        Refusal ??= reason;
     }
 
     // ---- entries -------------------------------------------------------------------------------
@@ -185,7 +185,7 @@ internal sealed class NodeWriter
         EndObject();
     }
 
-    internal void WriteMemberSelection(MemberSelection selection)
+    private void WriteMemberSelection(MemberSelection selection)
     {
         if (Refused) return;
 
@@ -341,27 +341,27 @@ internal sealed class NodeWriter
             .Append(": ");
     }
 
-    internal void Str(string value)
+    private void Str(string value)
     {
         if (Refused) return;
 
         _builder.AppendQuoted(value);
     }
 
-    internal void Bool(bool value)
+    private void Bool(bool value)
     {
         if (Refused) return;
 
         _builder.Append(value ? "true" : "false");
     }
 
-    internal void EnumValue<TEnum>(TEnum value)
+    private void EnumValue<TEnum>(TEnum value)
         where TEnum : struct, Enum
     {
         Str(NodeWriters.Camel(value.ToString()));
     }
 
-    internal void Strings(IReadOnlyList<string> values)
+    private void Strings(IReadOnlyList<string> values)
     {
         if (Refused) return;
 
@@ -376,7 +376,7 @@ internal sealed class NodeWriter
     }
 
     /// <summary>A key and its string value, or nothing at all when the value is null.</summary>
-    internal void OptionalField(string key, string? value)
+    private void OptionalField(string key, string? value)
     {
         if (value is null) return;
 

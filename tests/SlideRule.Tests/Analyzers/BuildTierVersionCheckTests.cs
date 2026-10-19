@@ -23,7 +23,7 @@ public sealed class BuildTierVersionCheckTests
         + "and 'sliderule check' is unaffected. Report it at https://github.com/andypgray/sliderule/issues.";
 
     /// <summary>Each arrangement's files, and what it reports when the two versions agree.</summary>
-    public static TheoryData<string> Arrangements => new() { "findings", "no model file", "unchecked rule", "refused model" };
+    public static TheoryData<string> Arrangements => ["findings", "no model file", "unchecked rule", "refused model"];
 
     [Theory]
     [MemberData(nameof(Arrangements))]

@@ -34,7 +34,7 @@ namespace SlideRule.Tests.SpecCompletion;
 public sealed class SpecCompletionFixture : IDisposable
 {
     /// <summary>Where the caret is, written into the source and taken out before it is parsed.</summary>
-    internal const string Caret = "$$";
+    private const string Caret = "$$";
 
     private const string ProductAssembly = "MyApp";
 
@@ -149,7 +149,7 @@ public sealed class SpecCompletionFixture : IDisposable
         .ToArray();
 
     /// <summary>What a spec project compiles against: the test host's own set, plus the contract.</summary>
-    internal static readonly ImmutableArray<MetadataReference> References = SpecSnippet.Less(BuiltHere);
+    private static readonly ImmutableArray<MetadataReference> References = SpecSnippet.Less(BuiltHere);
 
     /// <summary>
     ///     The same set with the contract taken out, which is every project in an estate that has no spec in
@@ -273,7 +273,7 @@ public sealed class SpecCompletionFixture : IDisposable
 
     /// <summary>The source with its caret marker taken out, and where the caret was.</summary>
     /// <param name="composed">A source with <c>$$</c> where the caret is.</param>
-    internal static (string Source, int Caret) WithoutCaret(string composed)
+    private static (string Source, int Caret) WithoutCaret(string composed)
     {
         int caret = composed.IndexOf(Caret, StringComparison.Ordinal);
         caret.ShouldBeGreaterThanOrEqualTo(0, $"The source carries no {Caret} caret marker:\n{composed}");
@@ -374,7 +374,7 @@ internal sealed class OfferedList(
     CompletionList list)
 {
     /// <summary>The spec source with the caret marker still in place.</summary>
-    internal string Source { get; } = source;
+    private string Source { get; } = source;
 
     /// <summary>The document the request was made over.</summary>
     internal Document Document { get; } = document;
@@ -407,7 +407,7 @@ internal sealed class OfferedList(
         .ToList();
 
     /// <summary>Everything else the host offered at the same caret, which a failure prints as context.</summary>
-    internal IReadOnlyList<string> Others { get; } = list.ItemsList
+    private IReadOnlyList<string> Others { get; } = list.ItemsList
         .Where(item => !item.Properties.ContainsKey(Marker))
         .Select(TextOf)
         .ToList();

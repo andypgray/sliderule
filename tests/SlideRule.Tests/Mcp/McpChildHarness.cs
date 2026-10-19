@@ -26,21 +26,21 @@ namespace SlideRule.Tests.Mcp;
 internal static class McpChildHarness
 {
     /// <summary>The client half of the MCP handshake.</summary>
-    internal const string InitializeRequest =
+    private const string InitializeRequest =
         """{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"sliderule-stdio-regression","version":"1.0.0"}}}""";
 
     /// <summary>The notification that completes it, after which tool calls are legal.</summary>
-    internal const string InitializedNotification =
+    private const string InitializedNotification =
         """{"jsonrpc":"2.0","method":"notifications/initialized"}""";
 
     /// <summary>Budget for the handshake: a cold child, MSBuild registration, and the vswhere probe.</summary>
-    internal static readonly TimeSpan HandshakeBudget = TimeSpan.FromMinutes(2);
+    private static readonly TimeSpan HandshakeBudget = TimeSpan.FromMinutes(2);
 
     /// <summary>
     ///     Budget for one tool call: a cold workspace load plus extraction plus whatever the tool shells out
     ///     to. A caller whose tool refuses before any workspace opens may pass a shorter one and say so.
     /// </summary>
-    internal static readonly TimeSpan CallBudget = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan CallBudget = TimeSpan.FromMinutes(5);
 
     private static readonly TimeSpan DrainBudget = TimeSpan.FromSeconds(30);
 
@@ -190,7 +190,7 @@ internal static class McpChildHarness
     }
 
     /// <summary>Writes one newline-delimited frame to the child's stdin and flushes, leaving the pipe open.</summary>
-    internal static async Task SendAsync(Process server, string frame)
+    private static async Task SendAsync(Process server, string frame)
     {
         await server.StandardInput.WriteAsync(frame + "\n");
         await server.StandardInput.FlushAsync(Ct);
@@ -201,7 +201,7 @@ internal static class McpChildHarness
     ///     budget runs out. Null means "never arrived" — a wedge, an EOF, or a crash — which is what the
     ///     caller's assertions turn into a named failure.
     /// </summary>
-    internal static async Task<string?> ReadResponseAsync(StreamReader stdout, int id, TimeSpan budget)
+    private static async Task<string?> ReadResponseAsync(StreamReader stdout, int id, TimeSpan budget)
     {
         long start = Stopwatch.GetTimestamp();
         while (true)
@@ -216,7 +216,7 @@ internal static class McpChildHarness
     }
 
     /// <summary>The numeric <c>id</c> of a JSON-RPC frame, or null for a notification or a stray line.</summary>
-    internal static int? ResponseId(string line)
+    private static int? ResponseId(string line)
     {
         try
         {
@@ -237,7 +237,7 @@ internal static class McpChildHarness
     ///     Awaits a stderr drain started at launch, within its own budget. Diagnostics only: a drain that
     ///     fails or overruns must not replace the caller's assertion failure with its own.
     /// </summary>
-    internal static async Task<string> DrainAsync(Task<string> drain)
+    private static async Task<string> DrainAsync(Task<string> drain)
     {
         try
         {
@@ -255,7 +255,7 @@ internal static class McpChildHarness
     ///     are synchronous underneath, so a token cannot interrupt a read already in flight — the caller's
     ///     kill is what ends it. Null means the budget won.
     /// </summary>
-    internal static async Task<string?> ReadLineWithinAsync(StreamReader stdout, TimeSpan budget)
+    private static async Task<string?> ReadLineWithinAsync(StreamReader stdout, TimeSpan budget)
     {
         Task<string?> pending = stdout.ReadLineAsync();
         Task first = await Task.WhenAny(pending, Task.Delay(budget, Ct));
@@ -263,7 +263,7 @@ internal static class McpChildHarness
     }
 
     /// <summary>Kills the child and everything it started, tolerating a process that has already gone.</summary>
-    internal static void TryKillTree(Process process)
+    private static void TryKillTree(Process process)
     {
         try
         {

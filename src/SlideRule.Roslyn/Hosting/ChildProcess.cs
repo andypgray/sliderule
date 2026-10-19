@@ -44,7 +44,7 @@ namespace SlideRule.Roslyn.Hosting;
 internal static class ChildProcess
 {
     /// <summary>The ceiling for any single child — generous, so it only trips on a genuine wedge.</summary>
-    internal static readonly TimeSpan DefaultTimeout = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan DefaultTimeout = TimeSpan.FromMinutes(5);
 
     // How long the expiry path waits for the two reads to finish once the tree is dead. A grace period,
     // not a second unbounded wait: a kill that somehow failed must not turn a bounded call into an

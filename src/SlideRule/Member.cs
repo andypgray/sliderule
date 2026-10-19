@@ -114,7 +114,7 @@ public sealed class Member
 
     // A poisoned member anchor never populated its resolved fields; reading one is a caller bug. Fail closed
     // rather than hand back a default that could masquerade as a resolved anchor.
-    private InvalidOperationException PoisonRead()
+    private static InvalidOperationException PoisonRead()
     {
         return new InvalidOperationException(
             "A poisoned member anchor's DeclaringType/DeclaringAnchor/Name/IsMethod must not be read; " +

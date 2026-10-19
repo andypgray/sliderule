@@ -10,7 +10,7 @@ namespace SlideRule.Cli.Mcp.Infrastructure;
 internal static class ServerVersion
 {
     /// <summary>The full informational version, e.g. <c>1.0.0+abc123</c>, or <c>"unknown"</c> if unattributed.</summary>
-    internal static readonly string Informational =
+    private static readonly string Informational =
         typeof(ServerVersion).Assembly
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
         ?? "unknown";

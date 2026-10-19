@@ -50,7 +50,7 @@ public sealed class OracleArchitecture
     // Qualified because the self-spec's namespace, SlideRule.Architecture, encloses this file's and so
     // binds the simple name before any using directive is consulted.
     /// <summary>The architecture built from the three MyApp DLLs' IL.</summary>
-    public ArchUnitNET.Domain.Architecture Architecture { get; }
+    private ArchUnitNET.Domain.Architecture Architecture { get; }
 
     /// <summary>The loaded MyApp.Domain assembly (for <c>ResideInAssembly</c> universe scoping).</summary>
     public Assembly Domain { get; }
@@ -62,7 +62,7 @@ public sealed class OracleArchitecture
     public Assembly Billing { get; }
 
     /// <summary>The MyApp-declared types (the <c>!IsExternal</c> reference universe).</summary>
-    public IReadOnlyList<IType> MyAppTypes { get; }
+    private IReadOnlyList<IType> MyAppTypes { get; }
 
     /// <summary>
     ///     A fresh MyApp-declared-types universe filter (an <see cref="IObjectProvider{T}" /> ranging over

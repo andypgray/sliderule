@@ -17,7 +17,7 @@ namespace SlideRule.Tests.ModelFile;
 /// </remarks>
 internal static class ModelFileSpecs
 {
-    internal const string SpecName = "MyApp architecture";
+    private const string SpecName = "MyApp architecture";
 
     internal static readonly IReadOnlyList<ModelDocumentProject> Projects =
     [
@@ -25,7 +25,7 @@ internal static class ModelFileSpecs
         new("MyApp.Domain", ["MyApp.Domain"])
     ];
 
-    internal static ArchitectureModel Model()
+    private static ArchitectureModel Model()
     {
         return Checker.Model(Define);
     }
@@ -116,7 +116,7 @@ internal static class ModelFileSpecs
             .Because("Leaves are independent.");
     }
 
-    internal static void Define(Arch arch)
+    private static void Define(Arch arch)
     {
         Layer domain = arch.Layer("Domain", "MyApp.Domain.*")
             .Purpose("What the business knows.");

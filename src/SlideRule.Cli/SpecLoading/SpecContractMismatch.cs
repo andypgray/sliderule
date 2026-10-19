@@ -96,7 +96,7 @@ internal static class SpecContractMismatch
     ///     whose missing name is one of those types under its old namespace. Keeps <paramref name="inner" /> as
     ///     the inner exception.
     /// </summary>
-    internal static UserErrorException MapMoved(Assembly spec, string specDllPath, Exception inner)
+    private static UserErrorException MapMoved(Assembly spec, string specDllPath, Exception inner)
     {
         string name = Path.GetFileNameWithoutExtension(specDllPath);
         string message =

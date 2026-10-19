@@ -140,7 +140,7 @@ internal static class ProcessFileFootprint
     ///     so an image under the repository is not always one the process chose; that is the other half of
     ///     given-rather-than-acquired, and it belongs to <see cref="ExceptInjected" />.
     /// </remarks>
-    internal static IReadOnlyList<RetainedPath> ExceptInherited(
+    private static IReadOnlyList<RetainedPath> ExceptInherited(
         IReadOnlyList<RetainedPath> retained, IReadOnlyCollection<RetainedPath> inheritedHandles)
     {
         if (inheritedHandles.Count == 0) return retained;
@@ -258,7 +258,7 @@ internal static class ProcessFileFootprint
     ///     junctions and symlinks followed, the volume named by its drive letter — so a comparison against
     ///     it cannot be dodged by an alternative spelling of the same directory.
     /// </summary>
-    internal static string Canonicalize(string path)
+    private static string Canonicalize(string path)
     {
         IntPtr file = CreateFile(
             path, 0, FileShareAll, IntPtr.Zero, OpenExisting, FileFlagBackupSemantics, IntPtr.Zero);

@@ -29,7 +29,7 @@ internal static class CommandFactory
     ///     The command a user types, as the CLI project's <c>ToolCommandName</c> declares it; help prints it on every
     ///     Usage line in place of the running assembly's name.
     /// </summary>
-    internal const string ToolCommandName = "sliderule";
+    private const string ToolCommandName = "sliderule";
 
     /// <param name="hostSource">
     ///     The solution source for any run that would otherwise open a fresh one-shot workspace, or
@@ -78,7 +78,7 @@ internal static class CommandFactory
     }
 
     /// <summary>Every command below <paramref name="command" />, parents before their subcommands.</summary>
-    internal static IEnumerable<Command> Descendants(Command command)
+    private static IEnumerable<Command> Descendants(Command command)
     {
         return command.Subcommands.SelectMany(static subcommand => Descendants(subcommand).Prepend(subcommand));
     }

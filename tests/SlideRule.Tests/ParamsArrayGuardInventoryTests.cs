@@ -32,7 +32,7 @@ public sealed class ParamsArrayGuardInventoryTests
         foreach (MethodInfo verb in verbs)
         {
             ParameterInfo[] parameters = verb.GetParameters();
-            string array = parameters[parameters.Length - 1].Name!;
+            string array = parameters[^1].Name!;
             Exception? thrown = SurfaceSamples.CallWithLast(verb, null);
             string? miss = SurfaceSamples.NullGuardMiss(thrown, array);
             if (miss is not null) unguarded.Add($"{SurfaceSamples.Describe(verb)} -> {miss}");
@@ -51,6 +51,6 @@ public sealed class ParamsArrayGuardInventoryTests
     private static bool HasParamsArray(MethodInfo method)
     {
         ParameterInfo[] parameters = method.GetParameters();
-        return parameters.Length > 0 && parameters[parameters.Length - 1].IsDefined(typeof(ParamArrayAttribute), false);
+        return parameters.Length > 0 && parameters[^1].IsDefined(typeof(ParamArrayAttribute), false);
     }
 }

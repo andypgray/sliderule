@@ -44,7 +44,7 @@ internal static class ModelFileCorpus
     internal static IReadOnlyList<CorpusSpec> All => LazyAll.Value;
 
     /// <summary>The model of one fixture spec assembly, loaded the way the CLI loads it.</summary>
-    internal static ArchitectureModel FixtureModel(string specDllPath)
+    private static ArchitectureModel FixtureModel(string specDllPath)
     {
         return ModelPipeline.LoadModel(specDllPath);
     }

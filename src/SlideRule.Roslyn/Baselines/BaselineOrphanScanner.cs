@@ -20,7 +20,7 @@ internal static class BaselineOrphanScanner
 {
     // Fixed rather than the exception's message, which names the machine's absolute path: the reason reaches
     // status and status --json, which are otherwise the same on every machine.
-    internal const string CouldNotOpen = "the file could not be opened.";
+    private const string CouldNotOpen = "the file could not be opened.";
 
     // An inaccessible subdirectory is skipped rather than thrown on: the scan runs inside every check, status,
     // hook and adapter run, and it is a nudge, never a reason for one of them to stop.
@@ -104,7 +104,7 @@ internal static class BaselineOrphanScanner
 
         return conventional
             .Concat(declared)
-            .Select(path => Path.GetFullPath(path))
+            .Select(Path.GetFullPath)
             .Distinct(PathComparison.Comparer)
             .Select(path => (Path: path, Relative: PathFormat.Relative(solutionDirectory, path)))
             .OrderBy(file => file.Relative, StringComparer.Ordinal)

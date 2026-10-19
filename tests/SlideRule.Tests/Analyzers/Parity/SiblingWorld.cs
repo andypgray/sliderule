@@ -132,7 +132,7 @@ internal sealed class SiblingWorld
         }
 
         BaselineIndex index = BaselineIndexBuilder.ForRules(
-            model.Rules, path => documents.GetValueOrDefault(path));
+            model.Rules, documents.GetValueOrDefault);
         List<ParityCompilation> compilations = projects
             .Select(unit => new ParityCompilation(unit.ProjectName!, unit.Compilation))
             .ToList();

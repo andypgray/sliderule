@@ -15,7 +15,7 @@ internal static class RuleIdSyntax
     /// <summary>Whether an ID is well-formed.</summary>
     internal static bool IsValid(string? id)
     {
-        return id != null && Matcher.IsMatch(id);
+        return id is not null && Matcher.IsMatch(id);
     }
 
     /// <summary>

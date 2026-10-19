@@ -1307,7 +1307,7 @@ internal sealed class ConstraintEvaluator
             + "a family's cells must not overlap. Leave the type out of one of the two layer definitions.");
     }
 
-    private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) Shape(HashSet<TypeNode> subjects, Func<TypeNode, bool> holds)
+    private static (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) Shape(HashSet<TypeNode> subjects, Func<TypeNode, bool> holds)
     {
         return Shape(subjects, subject => holds(subject) ? null : subject.DeclarationSites);
     }
@@ -1315,7 +1315,7 @@ internal sealed class ConstraintEvaluator
     // The one minter for every type-subject shape violation: the verdict answers with the sites a red
     // points at, null for a pass. Most shape verbs point at the failing subject's own declaration (the
     // predicate form above); a verb whose evidence lives elsewhere answers with those sites instead.
-    private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) Shape(
+    private static (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) Shape(
         HashSet<TypeNode> subjects, Func<TypeNode, IReadOnlyList<SourceLocation>?> verdict)
     {
         var violations = new List<Violation>();
@@ -1440,7 +1440,7 @@ internal sealed class ConstraintEvaluator
     }
 
     // The member-verb dispatch, kept apart from EvaluateMember for the same reason Dispatch is.
-    private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) DispatchMember(
+    private static (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) DispatchMember(
         MemberConstraint constraint, IReadOnlyList<MemberNode> members)
     {
         switch (constraint)
@@ -1518,7 +1518,7 @@ internal sealed class ConstraintEvaluator
         return false;
     }
 
-    private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) MemberShape(
+    private static (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) MemberShape(
         IReadOnlyList<MemberNode> members, Func<IMemberInfo, bool> holds)
     {
         var violations = new List<Violation>();

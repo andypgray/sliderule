@@ -13,7 +13,7 @@ namespace SlideRule.Tests.DocHygiene.Walkthroughs;
 internal static class WalkthroughScenarios
 {
     internal const string Meridian = "Meridian";
-    internal const string Quoting = "Meridian.Quoting";
+    private const string Quoting = "Meridian.Quoting";
     internal const string Operations = "Meridian.Operations";
     internal const string Interchange = "Meridian.Interchange";
 

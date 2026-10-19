@@ -67,14 +67,13 @@ public sealed class BuildTierGuardTests
 
     /// <summary>Every guarded point once.</summary>
     public static TheoryData<GuardedPoint> Points =>
-        new()
-        {
-            GuardedPoint.Start,
-            GuardedPoint.ModelRead,
-            GuardedPoint.BaselineRead,
-            GuardedPoint.ModelRefusal,
-            GuardedPoint.BaselineRefusal
-        };
+    [
+        GuardedPoint.Start,
+        GuardedPoint.ModelRead,
+        GuardedPoint.BaselineRead,
+        GuardedPoint.ModelRefusal,
+        GuardedPoint.BaselineRefusal
+    ];
 
     [Theory]
     [MemberData(nameof(Points))]
