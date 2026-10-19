@@ -44,8 +44,8 @@ namespace SlideRule.Cli.Verbs;
 internal sealed class GraphRunner(
     TextWriter output,
     TextWriter error,
-    ISolutionSource? source = null,
-    IEnvironment? environment = null,
+    ISolutionSource source,
+    IEnvironment environment,
     IResponseFitter? fitter = null) : CacheWiredRunner(source, environment, fitter)
 {
     public async Task<int> RunAsync(GraphRequest request, CancellationToken ct)

@@ -29,8 +29,8 @@ namespace SlideRule.Cli.Verbs;
 internal sealed class StatusRunner(
     TextWriter output,
     TextWriter error,
-    ISolutionSource? source = null,
-    IEnvironment? environment = null) : CacheWiredRunner(source, environment)
+    ISolutionSource source,
+    IEnvironment environment) : CacheWiredRunner(source, environment)
 {
     public async Task<int> RunAsync(StatusRequest request, CancellationToken ct)
     {

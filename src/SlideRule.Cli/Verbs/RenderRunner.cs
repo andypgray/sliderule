@@ -61,8 +61,8 @@ namespace SlideRule.Cli.Verbs;
 internal sealed class RenderRunner(
     TextWriter output,
     TextWriter error,
-    ISolutionSource? source = null,
-    IEnvironment? environment = null)
+    ISolutionSource source,
+    IEnvironment environment)
     : CacheWiredRunner(source, environment)
 {
     public async Task<int> RunAsync(RenderRequest request, CancellationToken ct)

@@ -31,25 +31,14 @@ internal static class CommandFactory
     /// </summary>
     private const string ToolCommandName = "sliderule";
 
-    /// <param name="hostSource">
-    ///     The solution source for any run that would otherwise open a fresh one-shot workspace, or
-    ///     <c>null</c> (the real entry point) for <see cref="ColdSolutionSource" />. Carried into every
-    ///     workspace command's action; see <see cref="MsBuildGate" /> for what a host source does and does
-    ///     not displace.
-    /// </param>
-    /// <param name="environment">
-    ///     The environment seam process variables are read through (<c>SLIDERULE_SOLUTION_PATH</c>, the
-    ///     cache-root override, and the hook's own), or <c>null</c> (the real entry point) for real process state.
-    ///     Carried into every command, since each resolves its solution through it, and each that consumes a model
-    ///     fronts the persisted extraction cache and so resolves a cache root.
-    /// </param>
-    /// <param name="input">
-    ///     The stdin the <c>hook</c> verb reads its payload from, or <c>null</c> when nothing was piped in, which the
-    ///     verb reads as no payload. Threaded here because <see cref="InvocationConfiguration" /> carries an output
-    ///     and an error writer and no input.
-    /// </param>
+    /// <summary>
+    ///     The command tree. <paramref name="hostSource" /> serves any run that would otherwise open a fresh one-shot
+    ///     workspace (<see cref="MsBuildGate" /> says what it displaces); <paramref name="input" /> is the stdin the
+    ///     <c>hook</c> verb reads its payload from, or null when nothing was piped in, and is passed here because
+    ///     <see cref="InvocationConfiguration" /> carries an output and an error writer and no input.
+    /// </summary>
     public static RootCommand BuildRootCommand(
-        ISolutionSource? hostSource = null, IEnvironment? environment = null, TextReader? input = null)
+        ISolutionSource hostSource, IEnvironment environment, TextReader? input = null)
     {
         RootCommand root = new(
             "SlideRule is a .NET architecture checker that enforces one C# spec and renders the same rules for "
@@ -83,7 +72,7 @@ internal static class CommandFactory
         return command.Subcommands.SelectMany(static subcommand => Descendants(subcommand).Prepend(subcommand));
     }
 
-    private static Command BuildCheckCommand(ISolutionSource? hostSource, IEnvironment? environment)
+    private static Command BuildCheckCommand(ISolutionSource hostSource, IEnvironment environment)
     {
         Argument<string?> solution = SolutionArgument();
         Option<string?> spec = SpecOption();
@@ -160,7 +149,7 @@ internal static class CommandFactory
         return check;
     }
 
-    private static Command BuildExplainCommand(ISolutionSource? hostSource, IEnvironment? environment)
+    private static Command BuildExplainCommand(ISolutionSource hostSource, IEnvironment environment)
     {
         Argument<string?> ruleId = new("rule-id")
         {
@@ -234,7 +223,7 @@ internal static class CommandFactory
 
     internal const string ExplainFormsRefusal = "Pass exactly one of a rule ID, --type and --path.";
 
-    private static Command BuildRenderCommand(ISolutionSource? hostSource, IEnvironment? environment)
+    private static Command BuildRenderCommand(ISolutionSource hostSource, IEnvironment environment)
     {
         Argument<string?> solution = SolutionArgument();
         Option<string?> spec = SpecOption();
@@ -324,7 +313,7 @@ internal static class CommandFactory
 
     // A command group: the four modes of the ratchet are subcommands, so choosing exactly one is the shape of
     // the command line rather than a check, and the add and rename companions exist only where they mean something.
-    private static Command BuildBaselineCommand(ISolutionSource? hostSource, IEnvironment? environment)
+    private static Command BuildBaselineCommand(ISolutionSource hostSource, IEnvironment environment)
     {
         return new Command(
             "baseline",
@@ -351,7 +340,7 @@ internal static class CommandFactory
     // init and accept-reductions take the same arguments: neither has companions, and both extract cache-free
     // whatever an operator asks, so neither offers --no-cache.
     private static Command BuildBaselineModeCommand(
-        string name, string description, BaselineMode mode, ISolutionSource? hostSource, IEnvironment? environment)
+        string name, string description, BaselineMode mode, ISolutionSource hostSource, IEnvironment environment)
     {
         Argument<string?> solution = SolutionArgument();
         Option<string?> spec = SpecOption();
@@ -379,7 +368,7 @@ internal static class CommandFactory
         return command;
     }
 
-    private static Command BuildBaselineAddCommand(ISolutionSource? hostSource, IEnvironment? environment)
+    private static Command BuildBaselineAddCommand(ISolutionSource hostSource, IEnvironment environment)
     {
         Argument<string?> solution = SolutionArgument();
         Option<string?> spec = SpecOption();
@@ -457,7 +446,7 @@ internal static class CommandFactory
 
     // rename measures nothing, so it offers neither --allow-workspace-diagnostics (there is no gate to opt out
     // of) nor --no-cache (there is no extraction to take fresh). Both companions are required by the parser.
-    private static Command BuildBaselineRenameCommand(ISolutionSource? hostSource, IEnvironment? environment)
+    private static Command BuildBaselineRenameCommand(ISolutionSource hostSource, IEnvironment environment)
     {
         Argument<string?> solution = SolutionArgument();
         Option<string?> spec = SpecOption();
@@ -507,7 +496,7 @@ internal static class CommandFactory
             + "refusing the command with exit 2.");
     }
 
-    private static Command BuildStatusCommand(ISolutionSource? hostSource, IEnvironment? environment)
+    private static Command BuildStatusCommand(ISolutionSource hostSource, IEnvironment environment)
     {
         Argument<string?> solution = SolutionArgument();
         Option<string?> spec = SpecOption();
@@ -550,7 +539,7 @@ internal static class CommandFactory
         return status;
     }
 
-    private static Command BuildGraphCommand(ISolutionSource? hostSource, IEnvironment? environment)
+    private static Command BuildGraphCommand(ISolutionSource hostSource, IEnvironment environment)
     {
         Argument<string?> solution = SolutionArgument();
         Option<bool> json = new("--json")
@@ -613,7 +602,7 @@ internal static class CommandFactory
         return graph;
     }
 
-    private static Command BuildMcpCommand(IEnvironment? environment)
+    private static Command BuildMcpCommand(IEnvironment environment)
     {
         Argument<string?> solution = SolutionArgument();
         Option<string?> spec = SpecOption();
@@ -632,7 +621,7 @@ internal static class CommandFactory
                 targets.Solution,
                 targets.Spec,
                 Directory.GetCurrentDirectory())),
-            (binding, _, error, ct) => McpServerCommand.RunAsync(binding, error, ct));
+            (binding, _, error, ct) => McpServerCommand.RunAsync(binding, environment, error, ct));
 
         return mcp;
     }
@@ -640,7 +629,7 @@ internal static class CommandFactory
     // The hook resolves nothing in its request builder: its paths are relative to the working tree the hook fires
     // for, which only the payload names, and a refusal there would reach the handler below as exit 2, the one code
     // that tells an agent to keep working. The runner resolves inside its own handling instead.
-    private static Command BuildHookCommand(ISolutionSource? hostSource, IEnvironment? environment, TextReader? input)
+    private static Command BuildHookCommand(ISolutionSource hostSource, IEnvironment environment, TextReader? input)
     {
         Argument<string?> solution = SolutionArgument(
             "Solution file, or a directory to search, relative to the working tree the hook fires for. Omit it "
@@ -690,7 +679,7 @@ internal static class CommandFactory
                 parseResult.GetValue(maxRounds),
                 Directory.GetCurrentDirectory()),
             (request, output, error, ct) => new HookRunner(
-                    output, error, input, environment ?? new SystemEnvironment(), new InProcessHookCheck(hostSource, environment))
+                    output, error, input, environment, new InProcessHookCheck(hostSource, environment))
                 .RunAsync(request, ct));
 
         return hook;
@@ -700,7 +689,7 @@ internal static class CommandFactory
     // hook does it inside the request builder, so a malformed or misdirected settings file is refused like a bad
     // argument: exit 2, before any load.
     private static TRequest Resolved<TRequest>(
-        ParseResult parseResult, Argument<string?> solution, Option<string?>? spec, IEnvironment? environment,
+        ParseResult parseResult, Argument<string?> solution, Option<string?>? spec, IEnvironment environment,
         Func<InvocationTargets, TRequest> build)
     {
         string? solutionValue = parseResult.GetValue(solution);
@@ -711,10 +700,10 @@ internal static class CommandFactory
     // The same resolution over values a builder settled itself, which explain needs: its positional is the
     // solution only once the rule ID turns out to be absent.
     private static TRequest Resolved<TRequest>(
-        string? solution, string? spec, IEnvironment? environment, Func<InvocationTargets, TRequest> build)
+        string? solution, string? spec, IEnvironment environment, Func<InvocationTargets, TRequest> build)
     {
         InvocationTargets targets = InvocationTargets.Resolve(
-            solution, spec, Directory.GetCurrentDirectory(), environment ?? new SystemEnvironment());
+            solution, spec, Directory.GetCurrentDirectory(), environment);
         return build(targets);
     }
 

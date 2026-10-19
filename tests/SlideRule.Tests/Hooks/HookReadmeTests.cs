@@ -267,7 +267,7 @@ public sealed class HookReadmeTests
 
     private static Command RootSubcommand(string name)
     {
-        return CommandFactory.BuildRootCommand()
+        return CommandTree.Root()
             .Subcommands
             .Single(command => command.Name == name);
     }

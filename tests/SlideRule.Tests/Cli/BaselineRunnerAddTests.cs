@@ -1,6 +1,8 @@
 using Shouldly;
 using SlideRule.Baselines;
 using SlideRule.Checking;
+using SlideRule.Cli.Mcp.Infrastructure;
+using SlideRule.Cli.Pipeline;
 using SlideRule.Cli.Verbs;
 using SlideRule.Codebase;
 using SlideRule.Hosting;
@@ -78,7 +80,7 @@ public sealed class BaselineRunnerAddTests : IDisposable
         File.WriteAllText(path, BaselineComposer.Compose(RuleId));
 
         var output = new StringWriter();
-        var runner = new BaselineRunner(output, TextWriter.Null);
+        var runner = new BaselineRunner(output, TextWriter.Null, new ColdSolutionSource(), new SystemEnvironment());
         BaselineRequest request = BaselineRequests.Add(
             RuleId, "INC-1234", "MyApp.Web.HomeController", "System.DateTime.Now", _temp.Path);
 
@@ -119,7 +121,7 @@ public sealed class BaselineRunnerAddTests : IDisposable
         File.WriteAllText(path, BaselineComposer.Compose(CtorRuleId));
 
         var output = new StringWriter();
-        var runner = new BaselineRunner(output, TextWriter.Null);
+        var runner = new BaselineRunner(output, TextWriter.Null, new ColdSolutionSource(), new SystemEnvironment());
         BaselineRequest request = BaselineRequests.Add(
             CtorRuleId, "INC-9", "MyApp.Web.OrderController", "MyApp.Data.Db", _temp.Path);
 
@@ -166,7 +168,7 @@ public sealed class BaselineRunnerAddTests : IDisposable
         File.WriteAllText(path, BaselineComposer.Compose(UnfilteredCatchRuleId));
 
         var output = new StringWriter();
-        var runner = new BaselineRunner(output, TextWriter.Null);
+        var runner = new BaselineRunner(output, TextWriter.Null, new ColdSolutionSource(), new SystemEnvironment());
         BaselineRequest request = BaselineRequests.Add(
             UnfilteredCatchRuleId, "INC-77", "App.LegacyHandler", "Errors.DbError", _temp.Path);
 

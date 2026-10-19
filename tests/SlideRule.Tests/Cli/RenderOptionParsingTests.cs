@@ -1,6 +1,6 @@
 using System.CommandLine;
 using Shouldly;
-using SlideRule.Cli;
+using SlideRule.Tests.TestSupport;
 using Xunit;
 
 namespace SlideRule.Tests.Cli;
@@ -25,7 +25,7 @@ public sealed class RenderOptionParsingTests
     [Fact]
     public void Parse_RenderWithModel_ReadsTheFlagAsTrue()
     {
-        RootCommand root = CommandFactory.BuildRootCommand();
+        RootCommand root = CommandTree.Root();
         Option<bool> model = ModelOption(root);
 
         ParseResult parsed = root.Parse(["render", "MyApp.sln", "--model"]);
@@ -38,7 +38,7 @@ public sealed class RenderOptionParsingTests
     [Fact]
     public void Parse_RenderWithoutModel_ReadsTheFlagAsFalse()
     {
-        RootCommand root = CommandFactory.BuildRootCommand();
+        RootCommand root = CommandTree.Root();
         Option<bool> model = ModelOption(root);
 
         ParseResult parsed = root.Parse(["render", "MyApp.sln"]);
@@ -51,7 +51,7 @@ public sealed class RenderOptionParsingTests
     [Fact]
     public void RenderCommand_ModelOption_CarriesItsPinnedHelp()
     {
-        ModelOption(CommandFactory.BuildRootCommand())
+        ModelOption(CommandTree.Root())
             .Description.ShouldBe(ModelHelp);
     }
 

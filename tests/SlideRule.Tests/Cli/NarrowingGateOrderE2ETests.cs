@@ -1,4 +1,5 @@
 using Shouldly;
+using SlideRule.Cli.Mcp.Infrastructure;
 using SlideRule.Cli.Verbs;
 using SlideRule.Tests.TestSupport;
 using Xunit;
@@ -136,7 +137,7 @@ public sealed class NarrowingGateOrderE2ETests
         string solutionDirectory = Path.GetDirectoryName(Path.GetFullPath(workspace.SolutionPath))!;
         var source = new DiagnosticInjectingSolutionSource([], [BrokenProject], [SkippedProject(workspace)]);
 
-        int exit = await new ContextRunner(output, source).RunAsync(
+        int exit = await new ContextRunner(output, source, new SystemEnvironment()).RunAsync(
             new ContextRequest(
                 "MyApp.Legacy.Billing", workspace.SolutionPath, CliRunner.CleanSpecDll, solutionDirectory),
             Ct);
@@ -160,7 +161,7 @@ public sealed class NarrowingGateOrderE2ETests
             workspace.SolutionPath, CliRunner.CleanSpecDll,
             SolutionPaths.SolutionDirectoryOf(workspace.SolutionPath), true, false);
 
-        CliResult render = await CliResult.CapturedAsync((output, error) => new RenderRunner(output, error, source).RunAsync(request, Ct));
+        CliResult render = await CliResult.CapturedAsync((output, error) => new RenderRunner(output, error, source, new SystemEnvironment()).RunAsync(request, Ct));
 
         render.ShouldRefuseWith(RenderGateLede, BrokenProject, RenderRestoreGateLede, UnrestoredProject);
         render.Err.IndexOf(RenderRestoreGateLede, StringComparison.Ordinal)
@@ -195,7 +196,7 @@ public sealed class NarrowingGateOrderE2ETests
                 AllowWorkspaceDiagnostics = allowWorkspaceDiagnostics
             };
 
-        return CliResult.CapturedAsync((output, error) => new BaselineRunner(output, error, source).RunAsync(request, Ct));
+        return CliResult.CapturedAsync((output, error) => new BaselineRunner(output, error, source, new SystemEnvironment()).RunAsync(request, Ct));
     }
 
     private static Task<CliResult> RunRenderAsync(
@@ -206,6 +207,6 @@ public sealed class NarrowingGateOrderE2ETests
             workspace.SolutionPath, CliRunner.CleanSpecDll,
             SolutionPaths.SolutionDirectoryOf(workspace.SolutionPath), true, allowWorkspaceDiagnostics);
 
-        return CliResult.CapturedAsync((output, error) => new RenderRunner(output, error, source).RunAsync(request, Ct));
+        return CliResult.CapturedAsync((output, error) => new RenderRunner(output, error, source, new SystemEnvironment()).RunAsync(request, Ct));
     }
 }

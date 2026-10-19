@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using Shouldly;
+using SlideRule.Cli.Mcp.Infrastructure;
 using SlideRule.Cli.Pipeline;
 using SlideRule.Cli.Settings;
 using SlideRule.Cli.Verbs;
@@ -697,7 +698,7 @@ public sealed class RenderCommandE2ETests : IDisposable
         var request = new RenderRequest(
             _workspace.SolutionPath, CliRunner.RenderSpecDll, SolutionDirectory, true, true, Model: model);
 
-        return CliResult.CapturedAsync((output, error) => new RenderRunner(output, error, source).RunAsync(request, Ct));
+        return CliResult.CapturedAsync((output, error) => new RenderRunner(output, error, source, new SystemEnvironment()).RunAsync(request, Ct));
     }
 
     // ── the Claude Code instruction files ────────────────────────────────────────────────────────────────

@@ -1,6 +1,8 @@
 using Shouldly;
 using SlideRule.Baselines;
 using SlideRule.Checking;
+using SlideRule.Cli.Mcp.Infrastructure;
+using SlideRule.Cli.Pipeline;
 using SlideRule.Cli.Verbs;
 using SlideRule.Hosting;
 using SlideRule.Tests.Checking;
@@ -580,7 +582,7 @@ public sealed class BaselineRunnerCountTests : IDisposable
 
     private BaselineRunner Runner(TextWriter output)
     {
-        return new BaselineRunner(output, TextWriter.Null);
+        return new BaselineRunner(output, TextWriter.Null, new ColdSolutionSource(), new SystemEnvironment());
     }
 
     private BaselineRequest AddRequest(string because)

@@ -1,4 +1,6 @@
 using Shouldly;
+using SlideRule.Cli.Mcp.Infrastructure;
+using SlideRule.Cli.Pipeline;
 using SlideRule.Cli.Verbs;
 using SlideRule.Roslyn;
 using SlideRule.Tests.TestSupport;
@@ -26,7 +28,7 @@ public sealed class CheckRunnerTests
         // — so the shape half is exactly the half that can be judged this early, and this is the pin that
         // keeps it there.
         var output = new StringWriter();
-        var runner = new CheckRunner(output, TextWriter.Null);
+        var runner = new CheckRunner(output, TextWriter.Null, new ColdSolutionSource(), new SystemEnvironment());
         string absentSolution = Path.Combine(Path.GetTempPath(), "no-such-solution.slnx");
         CheckRequest request = CheckRequests.For(absentSolution, null, Path.GetTempPath())
             with

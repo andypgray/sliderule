@@ -1,4 +1,5 @@
 using Shouldly;
+using SlideRule.Cli.Mcp.Infrastructure;
 using SlideRule.Cli.Verbs;
 using SlideRule.Roslyn.Diagnostics;
 using SlideRule.Tests.Mcp.TestDoubles;
@@ -246,7 +247,7 @@ public sealed class BaselineWorkspaceDiagnosticsGateE2ETests
                 AllowWorkspaceDiagnostics = allowWorkspaceDiagnostics
             };
 
-        return CliResult.CapturedAsync((output, error) => new BaselineRunner(output, error, source)
+        return CliResult.CapturedAsync((output, error) => new BaselineRunner(output, error, source, new SystemEnvironment())
             .RunAsync(request, Ct));
     }
 

@@ -3,9 +3,9 @@ using SlideRule.Roslyn.Hosting;
 namespace SlideRule.Cli.Mcp.Infrastructure;
 
 /// <summary>
-///     The single seam through which the MCP server reads process environment variables. Everything
-///     else is a pure function of these values, which is what lets the xUnit suite drive the pipeline
-///     without ever mutating real process state.
+///     The single seam through which the CLI and the MCP server read process environment variables.
+///     Everything else is a pure function of these values, which is what lets a test drive the
+///     pipeline without ever mutating real process state.
 /// </summary>
 internal interface IEnvironment
 {

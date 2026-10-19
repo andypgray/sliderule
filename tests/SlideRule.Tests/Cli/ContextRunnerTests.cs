@@ -1,4 +1,6 @@
 using Shouldly;
+using SlideRule.Cli.Mcp.Infrastructure;
+using SlideRule.Cli.Pipeline;
 using SlideRule.Cli.Verbs;
 using SlideRule.Roslyn;
 using Xunit;
@@ -47,7 +49,7 @@ public sealed class ContextRunnerTests
         // caveat block is written to the body before any answer, and a caveat above a refusal qualifies
         // nothing.
         var output = new StringWriter();
-        var runner = new ContextRunner(output);
+        var runner = new ContextRunner(output, new ColdSolutionSource(), new SystemEnvironment());
         string absentSolution = Path.Combine(Path.GetTempPath(), "no-such-solution.slnx");
         var request = new ContextRequest("""["src/Foo"]""", absentSolution, null, Path.GetTempPath());
 
@@ -75,7 +77,7 @@ public sealed class ContextRunnerTests
     // own, being the one test that asserts on the output channel.
     private static async Task<UserErrorException> ShouldRefuse(string path)
     {
-        var runner = new ContextRunner(new StringWriter());
+        var runner = new ContextRunner(new StringWriter(), new ColdSolutionSource(), new SystemEnvironment());
         return await Should.ThrowAsync<UserErrorException>(() => runner.RunAsync(Request(path), Ct));
     }
 

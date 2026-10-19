@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using ModelContextProtocol.Server;
+using SlideRule.Cli.Mcp.Infrastructure;
 using SlideRule.Cli.Mcp.Pipeline;
 using SlideRule.Cli.Pipeline;
 using SlideRule.Cli.Rendering;
@@ -18,15 +19,14 @@ namespace SlideRule.Cli.Mcp.Tools;
 ///     <see cref="GlobalCallToolFilter" /> shapes any <see cref="Roslyn.UserErrorException" /> or
 ///     spec-validation failure into an error result.
 ///     Reaching a Roslyn workspace type only through the runners keeps the MSBuildLocator JIT quarantine
-///     intact — these methods are first JITted at the first tool call, after registration has run. Every
-///     runner is handed the injected <see cref="ISolutionSource" />, so every tool call acquires the solution
-///     through the one source the server registered. The injected <see cref="IResponseFitter" /> is how a
-///     document-shaped tool answers a client whose channel is smaller than the answer: the runner offers its
-///     coarsening ladder and the fitter takes the first rung that fits, rather than a tool reading process
-///     state to decide.
+///     intact — these methods are first JITted at the first tool call, after registration has run.
 /// </remarks>
 [McpServerToolType]
-internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source, IResponseFitter fitter)
+internal sealed class ArchTools(
+    McpServerBinding binding,
+    ISolutionSource source,
+    IEnvironment environment,
+    IResponseFitter fitter)
 {
     private const string CheckDescription =
         "Run the architecture spec against the bound solution and return the JSON check report " +
@@ -161,7 +161,7 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         // (TextWriter.Null would otherwise swallow that one line, and "which MSBuild opened it" is the next
         // question after any load failure). The gate verdict the exit code would have expressed rides in
         // modelIncomplete, and an unmatched --rules filter surfaces as an error result rather than exit 2.
-        return await CaptureAsync(output => new CheckRunner(output, TextWriter.Null, source, fitter: fitter)
+        return await CaptureAsync(output => new CheckRunner(output, TextWriter.Null, source, environment, fitter)
             .RunAsync(
                 binding.CheckRequest(diffBase, rules, DocumentGrains.Parse(grain)),
                 cancellationToken));
@@ -177,7 +177,7 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
     [Description(StatusDescription)]
     public async Task<string> StatusAsync(CancellationToken cancellationToken = default)
     {
-        return await CaptureAsync(output => new StatusRunner(output, TextWriter.Null, source)
+        return await CaptureAsync(output => new StatusRunner(output, TextWriter.Null, source, environment)
             .RunAsync(binding.StatusRequest(), cancellationToken));
     }
 
@@ -207,7 +207,7 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
     {
         // Error writer deliberately discarded. A rule answer is spec-derived and cannot be made wrong by a load
         // failure; a type or path answer carries its partial-model caveat in the body, as arch_context does.
-        return await CaptureAsync(output => new ExplainRunner(output, TextWriter.Null, source)
+        return await CaptureAsync(output => new ExplainRunner(output, TextWriter.Null, source, environment)
             .RunAsync(binding.ExplainRequest(ruleId, type, path), cancellationToken));
     }
 
@@ -229,7 +229,7 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         CancellationToken cancellationToken = default)
     {
         // No error writer to discard: context's body is its only channel, so its runner takes stdout alone.
-        return await CaptureAsync(output => new ContextRunner(output, source)
+        return await CaptureAsync(output => new ContextRunner(output, source, environment)
             .RunAsync(binding.ContextRequest(path), cancellationToken));
     }
 
@@ -271,7 +271,7 @@ internal sealed class ArchTools(McpServerBinding binding, ISolutionSource source
         // Unlike arch_check and arch_status, the incomplete-model verdict cannot ride this document by
         // default — graph refuses before there is one — so the refusal throws and GlobalCallToolFilter
         // returns it as a clean un-logged error result.
-        return await CaptureAsync(output => new GraphRunner(output, TextWriter.Null, source, fitter: fitter)
+        return await CaptureAsync(output => new GraphRunner(output, TextWriter.Null, source, environment, fitter)
             .RunAsync(
                 binding.GraphRequest(
                     allowWorkspaceDiagnostics, DocumentGrains.Parse(grain), projects),

@@ -1,5 +1,4 @@
 using System.Text.Json;
-using SlideRule.Cli;
 using SlideRule.Tests.TestSupport;
 using Xunit;
 
@@ -35,7 +34,7 @@ public sealed class LedeSyncTests
         List<string> findings = new();
 
         // Act
-        string rootDescription = CommandFactory.BuildRootCommand()
+        string rootDescription = CommandTree.Root()
             .Description ?? string.Empty;
         if (rootDescription != lede)
             findings.Add("The root command's description, the first line of sliderule --help, reads "

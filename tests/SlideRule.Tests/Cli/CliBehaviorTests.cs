@@ -43,7 +43,7 @@ public sealed class CliBehaviorTests
     public static TheoryData<string> Groups =>
     [
         "",
-        .. CommandTree.Below(CommandFactory.BuildRootCommand())
+        .. CommandTree.Below(CommandTree.Root())
             .Where(static entry => entry.Command is { Subcommands.Count: > 0, Action: null })
             .Select(static entry => entry.Path)
     ];
@@ -55,7 +55,7 @@ public sealed class CliBehaviorTests
         // Both halves come from the tool itself, so the comparison holds under any UI culture and any
         // console width.
         string[] words = group.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        string parseError = CommandFactory.BuildRootCommand()
+        string parseError = CommandTree.Root()
             .Parse(words)
             .Errors
             .ShouldHaveSingleItem()
@@ -76,7 +76,7 @@ public sealed class CliBehaviorTests
     /// </summary>
     public static TheoryData<string> Commands =>
     [
-        .. CommandTree.Below(CommandFactory.BuildRootCommand())
+        .. CommandTree.Below(CommandTree.Root())
             .Where(static entry => entry.Command.Action is not null && entry.Path != CommandFactory.HookCommandName)
             .Select(static entry => entry.Path)
     ];
@@ -117,7 +117,7 @@ public sealed class CliBehaviorTests
     [Fact]
     public void SolutionPathBeginningWithADash_ParsesWhenWrittenFromTheCurrentDirectory()
     {
-        ParseResult parsed = CommandFactory.BuildRootCommand()
+        ParseResult parsed = CommandTree.Root()
             .Parse(["check", "./-odd.sln"]);
 
         parsed.Errors.ShouldBeEmpty();

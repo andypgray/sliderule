@@ -124,7 +124,7 @@ internal static class CliRunner
     /// <summary>Runs the CLI over the shared warm workspace pool — the default; see the type's remarks.</summary>
     public static Task<CliResult> InvokeAsync(params string[] args)
     {
-        return RunAsync(WarmWorkspacePool.Source, null, args);
+        return RunAsync(WarmWorkspacePool.Source, new SystemEnvironment(), args);
     }
 
     /// <summary>
@@ -138,13 +138,14 @@ internal static class CliRunner
     }
 
     /// <summary>
-    ///     Runs the CLI with no host source, so every workspace command opens (and disposes) its own
+    ///     Runs the CLI over a fresh <see cref="ColdSolutionSource" />, so every workspace command opens (and disposes) its
+    ///     own
     ///     <c>MSBuildWorkspace</c>. For tests that read <see cref="CliResult.Loads" /> or otherwise measure
     ///     whether a design-time build ran: the warm pool would answer from a session it already loaded.
     /// </summary>
     public static Task<CliResult> InvokeColdAsync(params string[] args)
     {
-        return RunAsync(null, null, args);
+        return RunAsync(new ColdSolutionSource(), new SystemEnvironment(), args);
     }
 
     /// <summary>
@@ -159,7 +160,7 @@ internal static class CliRunner
     /// </remarks>
     public static Task<CliResult> InvokeColdAsync(IEnvironment environment, params string[] args)
     {
-        return RunAsync(null, environment, args);
+        return RunAsync(new ColdSolutionSource(), environment, args);
     }
 
     /// <summary>
@@ -178,7 +179,7 @@ internal static class CliRunner
     }
 
     private static Task<CliResult> RunAsync(
-        ISolutionSource? hostSource, IEnvironment? environment, string[] args, TextReader? input = null)
+        ISolutionSource hostSource, IEnvironment environment, string[] args, TextReader? input = null)
     {
         return CliResult.CapturedAsync((output, error) => CliEntry.InvokeAsync(
             args, new InvocationConfiguration { Output = output, Error = error }, hostSource, environment, input));

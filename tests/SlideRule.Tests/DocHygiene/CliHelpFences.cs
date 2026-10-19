@@ -1,7 +1,6 @@
 using System.CommandLine;
 using System.CommandLine.Help;
 using System.Globalization;
-using SlideRule.Cli;
 using SlideRule.Cli.Rendering;
 using SlideRule.Tests.TestSupport;
 
@@ -79,7 +78,7 @@ internal static class CliHelpFences
     /// </summary>
     internal static string Render(string commandLine)
     {
-        RootCommand root = CommandFactory.BuildRootCommand();
+        RootCommand root = CommandTree.Root();
         HelpOption help = root.Options.OfType<HelpOption>()
             .Single();
         ((ToolNamedHelpAction)help.Action!).MaxWidth = Width;

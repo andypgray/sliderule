@@ -2,6 +2,8 @@ using System.Text.Json;
 using ModelContextProtocol.Protocol;
 using Shouldly;
 using SlideRule.Cli.Mcp;
+using SlideRule.Cli.Mcp.Infrastructure;
+using SlideRule.Cli.Pipeline;
 using SlideRule.Cli.Verbs;
 using SlideRule.Tests.Mcp;
 using SlideRule.Tests.TestSupport;
@@ -287,7 +289,7 @@ public sealed class PartialLoadWorkspaceE2ETests
             null, workspace.SolutionPath, CliRunner.CleanSpecDll, solutionDirectory, NoCache: true,
             Path: Path.Combine("BrokenApp.Web", "WidgetController.cs"));
 
-        CliResult result = await CliResult.CapturedAsync((output, error) => new ExplainRunner(output, error).RunAsync(request, Ct));
+        CliResult result = await CliResult.CapturedAsync((output, error) => new ExplainRunner(output, error, new ColdSolutionSource(), new SystemEnvironment()).RunAsync(request, Ct));
 
         result.ShouldSucceed();
         string answer = result.Out;
@@ -312,7 +314,7 @@ public sealed class PartialLoadWorkspaceE2ETests
         string solutionDirectory = Path.GetDirectoryName(workspace.SolutionPath)!;
         var output = new StringWriter();
 
-        int exit = await new ContextRunner(output).RunAsync(
+        int exit = await new ContextRunner(output, new ColdSolutionSource(), new SystemEnvironment()).RunAsync(
             new ContextRequest(
                 Path.Combine("BrokenApp.Web", "WidgetController.cs"), workspace.SolutionPath,
                 CliRunner.CleanSpecDll, solutionDirectory),

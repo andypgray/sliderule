@@ -1,6 +1,5 @@
 using System.CommandLine;
 using Shouldly;
-using SlideRule.Cli;
 using SlideRule.Cli.Mcp.Infrastructure;
 using SlideRule.Cli.Replay;
 using SlideRule.Roslyn.Caching;
@@ -297,7 +296,7 @@ public sealed class BinlogCliE2ETests(BinlogFixtureWorkspace fixture)
             "Bypass the persisted caches (extraction fragments and the build capture): always load and extract "
             + "fresh, and write nothing back.";
 
-        RootCommand root = CommandFactory.BuildRootCommand();
+        RootCommand root = CommandTree.Root();
         foreach (string commandName in new[] { "check", "status", "graph" })
         {
             Command command = root.Subcommands.First(c => c.Name == commandName);

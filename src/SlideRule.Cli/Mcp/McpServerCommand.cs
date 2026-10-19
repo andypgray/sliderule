@@ -26,10 +26,14 @@ internal static class McpServerCommand
     ///     Runs the stdio server until <paramref name="ct" /> is cancelled or the transport closes,
     ///     returning the process exit code.
     /// </summary>
-    /// <param name="binding">The solution + spec this server answers for, and the run policy its tools apply.</param>
-    /// <param name="error">Where the interactive-launch refusal is written; never stdout, which carries JSON-RPC.</param>
-    /// <param name="ct">Cancels the host run.</param>
-    public static async Task<int> RunAsync(McpServerBinding binding, TextWriter error, CancellationToken ct)
+    /// <remarks>
+    ///     <paramref name="environment" /> is the process's one environment seam. The logger and the watchdogs start
+    ///     before the host exists, so their settings are read off it here and handed in, and the container then
+    ///     serves the same instance to every tool. <paramref name="error" /> takes the interactive-launch refusal,
+    ///     never stdout, which carries JSON-RPC.
+    /// </remarks>
+    public static async Task<int> RunAsync(
+        McpServerBinding binding, IEnvironment environment, TextWriter error, CancellationToken ct)
     {
         if (!Console.IsInputRedirected)
         {
@@ -38,12 +42,6 @@ internal static class McpServerCommand
             await error.WriteLineAsync("Configure it in your MCP client (command \"sliderule mcp <solution> --spec <spec>\").");
             return ExitCodes.Error;
         }
-
-        // The one env seam, built here because the bind check, the logger and both watchdogs are configured from
-        // process state before there is a host to inject it from. The bind check takes the seam and the others
-        // take their values as arguments rather than reading at the leaf, so the reads that shape a server's
-        // lifetime all happen on this stretch of the startup path.
-        var environment = new SystemEnvironment();
 
         // Fail fast on an argument that cannot be discovered; keep the reason and start anyway when there was
         // no argument to be wrong about. See ResolveBoundSolution for why the two halves differ.
@@ -65,6 +63,9 @@ internal static class McpServerCommand
         HostApplicationBuilder builder = Host.CreateApplicationBuilder();
         builder.AddSerilogLogging();
 
+        // Registered under the seam interface by name, as every interface-typed service here is, rather than
+        // under whatever type the argument happens to be declared as.
+        // ReSharper disable once RedundantTypeArgumentsOfMethod
         builder.Services.AddSingleton<IEnvironment>(environment);
         builder.Services.AddSingleton(binding);
         AddToolServices(builder.Services);

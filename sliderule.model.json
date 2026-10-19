@@ -256,6 +256,14 @@
       "constraint": { "node": "mustNotInject", "subject": { "noun": { "node": "registered", "lifetime": "singleton" }, "adjectives": [{ "node": "inNamespace", "glob": "SlideRule.*" }] }, "operands": [{ "noun": { "node": "registered", "lifetime": "scoped" } }, { "noun": { "node": "registered", "lifetime": "transient" } }] }
     },
     {
+      "id": "di/seams-constructed-at-root",
+      "posture": "enforce",
+      "sentence": "Types in the Host layer, except types named `Program` or `McpServerCommand`, must not construct types named `SystemEnvironment` or `ColdSolutionSource`.",
+      "because": "The environment seam and the cold solution source are built once per process, at its composition root, and handed down. A type below the root that builds its own default reads real process state behind the fake a caller passed, so a test that isolates its caches or its solution variable silently reads the process's own values instead, and two consumers of one invocation can disagree about which environment they are reading.",
+      "fix": "Take the seam as a constructor or method parameter. Program builds the CLI's pair; the MCP server receives the CLI's environment, and McpServerCommand's DI factory alone chooses the cold source.",
+      "constraint": { "node": "mustNotConstruct", "subject": { "noun": { "node": "layer", "name": "Host" }, "adjectives": [{ "node": "except", "payload": { "noun": { "node": "types" }, "adjectives": [{ "node": "named", "names": ["Program", "McpServerCommand"] }] } }] }, "operands": [{ "noun": { "node": "types" }, "adjectives": [{ "node": "named", "names": ["SystemEnvironment", "ColdSolutionSource"] }] }] }
+    },
+    {
       "id": "di/no-service-locator",
       "posture": "enforce",
       "sentence": "Types in the Host layer, except types named `McpServerCommand` or `GlobalCallToolFilter`, must not use `IServiceProvider.GetService()`, `ServiceProviderServiceExtensions.GetService()` or `ServiceProviderServiceExtensions.GetRequiredService()`.",
@@ -337,11 +345,11 @@
     {
       "id": "mcp/env-through-seam",
       "posture": "enforce",
-      "sentence": "Types in `SlideRule.Cli.Mcp.Infrastructure.*`, except types named `SystemEnvironment`, must not use `Environment.GetEnvironmentVariable()`, `Environment.GetEnvironmentVariables()`, `Environment.ExpandEnvironmentVariables()` or `Environment.SetEnvironmentVariable()`.",
-      "because": "A single IEnvironment seam keeps the MCP pipeline testable without mutating real process state: a test sets a variable on the fake, never on the process.",
+      "sentence": "Types in the Host layer, except types named `SystemEnvironment`, must not use `Environment.GetEnvironmentVariable()`, `Environment.GetEnvironmentVariables()`, `Environment.ExpandEnvironmentVariables()` or `Environment.SetEnvironmentVariable()`.",
+      "because": "A single IEnvironment seam keeps the CLI and the MCP server testable without mutating real process state: a test sets a variable on the fake, never on the process.",
       "fix": "Inject IEnvironment and read through GetVariable; SystemEnvironment alone reads the real process environment.",
       "exemplar": { "noun": { "node": "types" }, "adjectives": [{ "node": "named", "names": ["ResponseBudget"] }] },
-      "constraint": { "node": "mustNotUse", "subject": { "noun": { "node": "types" }, "adjectives": [{ "node": "inNamespace", "glob": "SlideRule.Cli.Mcp.Infrastructure.*" }, { "node": "except", "payload": { "noun": { "node": "types" }, "adjectives": [{ "node": "named", "names": ["SystemEnvironment"] }] } }] }, "members": [{ "declaring": { "name": "System.Environment" }, "name": "GetEnvironmentVariable", "isMethod": true }, { "declaring": { "name": "System.Environment" }, "name": "GetEnvironmentVariables", "isMethod": true }, { "declaring": { "name": "System.Environment" }, "name": "ExpandEnvironmentVariables", "isMethod": true }, { "declaring": { "name": "System.Environment" }, "name": "SetEnvironmentVariable", "isMethod": true }] }
+      "constraint": { "node": "mustNotUse", "subject": { "noun": { "node": "layer", "name": "Host" }, "adjectives": [{ "node": "except", "payload": { "noun": { "node": "types" }, "adjectives": [{ "node": "named", "names": ["SystemEnvironment"] }] } }] }, "members": [{ "declaring": { "name": "System.Environment" }, "name": "GetEnvironmentVariable", "isMethod": true }, { "declaring": { "name": "System.Environment" }, "name": "GetEnvironmentVariables", "isMethod": true }, { "declaring": { "name": "System.Environment" }, "name": "ExpandEnvironmentVariables", "isMethod": true }, { "declaring": { "name": "System.Environment" }, "name": "SetEnvironmentVariable", "isMethod": true }] }
     },
     {
       "id": "roslyn/no-msbuildlocator-query",

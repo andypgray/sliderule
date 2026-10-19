@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Shouldly;
+using SlideRule.Cli.Mcp.Infrastructure;
 using SlideRule.Cli.Mcp.Pipeline;
 using SlideRule.Cli.Pipeline;
 using SlideRule.Cli.Rendering;
@@ -601,7 +602,7 @@ public sealed class GraphCommandTests
     // never degraded — which is what makes the un-budgeted rows below the control for the budgeted ones.
     private static GraphRunner Runner(TextWriter output, IResponseFitter? fitter = null)
     {
-        return new GraphRunner(output, TextWriter.Null, WarmWorkspacePool.Source, fitter: fitter);
+        return new GraphRunner(output, TextWriter.Null, WarmWorkspacePool.Source, new SystemEnvironment(), fitter);
     }
 
     // The composed document's length, not the writer's: the runner measures the document against the budget

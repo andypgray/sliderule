@@ -1,7 +1,7 @@
 using System.CommandLine;
 using System.CommandLine.Parsing;
 using System.Text.RegularExpressions;
-using SlideRule.Cli;
+using SlideRule.Tests.TestSupport;
 
 namespace SlideRule.Tests.DocHygiene;
 
@@ -92,7 +92,7 @@ internal static class FencedCommands
     /// </summary>
     public static ParseResult Parse(IReadOnlyList<string> arguments)
     {
-        RootCommand root = CommandFactory.BuildRootCommand();
+        RootCommand root = CommandTree.Root();
 
         return root.Parse(arguments);
     }

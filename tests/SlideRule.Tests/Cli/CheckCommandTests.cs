@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Shouldly;
+using SlideRule.Cli.Mcp.Infrastructure;
 using SlideRule.Cli.Mcp.Pipeline;
 using SlideRule.Cli.Pipeline;
 using SlideRule.Cli.Rendering;
@@ -313,7 +314,7 @@ public sealed class CheckCommandTests
     // default — the requested grain, never degraded — which is what makes the un-budgeted rows the control.
     private static CheckRunner Runner(TextWriter output, IResponseFitter? fitter = null)
     {
-        return new CheckRunner(output, TextWriter.Null, WarmWorkspacePool.Source, fitter: fitter);
+        return new CheckRunner(output, TextWriter.Null, WarmWorkspacePool.Source, new SystemEnvironment(), fitter);
     }
 
     // The composed document's length, not the writer's: the runner measures the document against the budget

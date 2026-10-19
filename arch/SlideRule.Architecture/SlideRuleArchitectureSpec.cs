@@ -379,6 +379,9 @@ public sealed class SlideRuleArchitectureSpec : IArchitectureSpec
         // broad subjects are bounded to `SlideRule*`: the MyApp fixture solutions ride into this universe as
         // passengers of the spec fixtures' project references, packable and unlocked, and a bare artifact
         // subject would red on code this repository does not ship.
+        ProjectSelection repoProjects = arch.Projects.Matching("SlideRule*");
+        ProjectSelection packableProjects = repoProjects.Packable();
+
         arch.Rule("packaging/core-netstandard-only")
             .Enforce(arch.Projects.Named("SlideRule").MustOnlyTarget("netstandard2.0"))
             .Because("netstandard2.0 is the one TFM a net48 spec project and the net10 host can both load; " +
@@ -420,7 +423,7 @@ public sealed class SlideRuleArchitectureSpec : IArchitectureSpec
                  "be avoided belongs in SlideRule.Roslyn or the CLI.");
 
         arch.Rule("packaging/mcp-sdk-in-cli-only")
-            .Enforce(arch.Projects.Matching("SlideRule*")
+            .Enforce(repoProjects
                 .Except(arch.Projects.Named("SlideRule.Cli"))
                 .MustNotReferencePackages("ModelContextProtocol*"))
             .Because("The package-level form of mcp/tool-types-in-cli: that rule keeps the tool classes in the " +
@@ -430,7 +433,7 @@ public sealed class SlideRuleArchitectureSpec : IArchitectureSpec
             .Fix("Keep MCP code in SlideRule.Cli.Mcp beside the tool classes; only the CLI references the MCP SDK.");
 
         arch.Rule("packaging/xunit-in-adapter-only")
-            .Enforce(arch.Projects.Matching("SlideRule*")
+            .Enforce(repoProjects
                 .Except(arch.Projects.Named("SlideRule.Xunit", "SlideRule.Tests"))
                 .MustNotReferencePackages("xunit*"))
             .Because("The package-level form of layering/adapter-is-a-leaf: the adapter and this repository's " +
@@ -444,7 +447,7 @@ public sealed class SlideRuleArchitectureSpec : IArchitectureSpec
         // gate pairs every committed lock file with its update entry, and src/Directory.Build.props makes
         // locking the default for everything beneath it.
         arch.Rule("packaging/shipping-locks-restore")
-            .Enforce(arch.Projects.Matching("SlideRule*").Packable().MustLockPackages())
+            .Enforce(packableProjects.MustLockPackages())
             .Because("CI restores locked; a shipping project without a lock file floats its dependency graph " +
                      "under audit.")
             .Citation("https://learn.microsoft.com/nuget/consume-packages/package-references-in-project-files#locking-dependencies")
@@ -452,8 +455,7 @@ public sealed class SlideRuleArchitectureSpec : IArchitectureSpec
                  "restore writes; src/Directory.Build.props already carries the policy for everything under it.");
 
         arch.Rule("packaging/shipping-carries-docs")
-            .Enforce(arch.Projects.Matching("SlideRule*").Packable()
-                .MustSetProperty("GenerateDocumentationFile", "true"))
+            .Enforce(packableProjects.MustSetProperty("GenerateDocumentationFile", "true"))
             .Because("A consumer's editor shows a package's doc comments only from the XML file packed beside " +
                      "its assembly, and the compiler checks the doc comments only while it writes that file. A " +
                      "shipping project that stops generating it ships an API with no documentation, and a doc " +
@@ -462,7 +464,7 @@ public sealed class SlideRuleArchitectureSpec : IArchitectureSpec
                  "project under src/.");
 
         arch.Rule("packaging/only-the-named-ship")
-            .Enforce(arch.Projects.Matching("SlideRule*")
+            .Enforce(repoProjects
                 .Except(arch.Projects.Named(
                     "SlideRule",
                     "SlideRule.Analyzers",
@@ -488,6 +490,19 @@ public sealed class SlideRuleArchitectureSpec : IArchitectureSpec
             .Citation("https://learn.microsoft.com/dotnet/core/extensions/dependency-injection/guidelines")
             .Fix("Keep singletons depending only on singletons; resolve any scoped or transient work per call " +
                  "inside an IServiceScopeFactory scope instead of injecting it into the singleton.");
+
+        arch.Rule("di/seams-constructed-at-root")
+            .Enforce(host
+                .Except(arch.Types.Named("Program", "McpServerCommand"))
+                .MustNotConstruct(arch.Types.Named("SystemEnvironment", "ColdSolutionSource")))
+            .Because("The environment seam and the cold solution source are built once per process, at its " +
+                     "composition root, and handed down. A type below the root that builds its own default " +
+                     "reads real process state behind the fake a caller passed, so a test that isolates its " +
+                     "caches or its solution variable silently reads the process's own values instead, and two " +
+                     "consumers of one invocation can disagree about which environment they are reading.")
+            .Fix("Take the seam as a constructor or method parameter. Program builds the CLI's pair; the MCP " +
+                 "server receives the CLI's environment, and McpServerCommand's DI factory alone chooses the cold " +
+                 "source.");
 
         // Two rules come from the shared pack; the rest of it is declined, since a pack is a menu and not
         // calling a method is the whole opt-out.
@@ -597,15 +612,15 @@ public sealed class SlideRuleArchitectureSpec : IArchitectureSpec
             .Fix("Resolve them from DI; only McpServerCommand's composition root constructs them.");
 
         arch.Rule("mcp/env-through-seam")
-            .Enforce(arch.Types.InNamespace("SlideRule.Cli.Mcp.Infrastructure.*")
+            .Enforce(host
                 .Except(arch.Types.Named("SystemEnvironment"))
                 .MustNotUse(
                     arch.Member(typeof(Environment), nameof(Environment.GetEnvironmentVariable)),
                     arch.Member(typeof(Environment), nameof(Environment.GetEnvironmentVariables)),
                     arch.Member(typeof(Environment), nameof(Environment.ExpandEnvironmentVariables)),
                     arch.Member(typeof(Environment), nameof(Environment.SetEnvironmentVariable))))
-            .Because("A single IEnvironment seam keeps the MCP pipeline testable without mutating real " +
-                     "process state: a test sets a variable on the fake, never on the process.")
+            .Because("A single IEnvironment seam keeps the CLI and the MCP server testable without mutating " +
+                     "real process state: a test sets a variable on the fake, never on the process.")
             .Fix("Inject IEnvironment and read through GetVariable; SystemEnvironment alone reads the real process " +
                  "environment.")
             .Exemplar(arch.Types.Named("ResponseBudget"));

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Shouldly;
 using SlideRule.Cli.Mcp;
+using SlideRule.Cli.Mcp.Infrastructure;
 using SlideRule.Cli.Mcp.Pipeline;
 using SlideRule.Cli.Mcp.Tools;
 using SlideRule.Cli.Pipeline;
@@ -70,6 +71,7 @@ public sealed class ArchToolsWorkspaceDiagnosticsTests
         var tools = new ArchTools(
             McpServerBindings.MyAppWithCleanSpec(),
             new DiagnosticInjectingSolutionSource([LoadDiagnostic]),
+            new SystemEnvironment(),
             ResponseFitter.FirstRung);
 
         string document = await tools.CheckAsync(cancellationToken: Ct);
@@ -86,6 +88,7 @@ public sealed class ArchToolsWorkspaceDiagnosticsTests
         var tools = new ArchTools(
             McpServerBindings.MyAppWithCleanSpec(),
             new DiagnosticInjectingSolutionSource([]),
+            new SystemEnvironment(),
             ResponseFitter.FirstRung);
 
         string document = await tools.CheckAsync(cancellationToken: Ct);
@@ -102,6 +105,7 @@ public sealed class ArchToolsWorkspaceDiagnosticsTests
         var tools = new ArchTools(
             McpServerBindings.MyAppWithCleanSpec(),
             new DiagnosticInjectingSolutionSource([], restoreFailedProjects: [UnrestoredProject]),
+            new SystemEnvironment(),
             ResponseFitter.FirstRung);
 
         string document = await tools.CheckAsync(cancellationToken: Ct);
@@ -121,6 +125,7 @@ public sealed class ArchToolsWorkspaceDiagnosticsTests
         var tools = new ArchTools(
             McpServerBindings.MyAppWithCleanSpec(),
             new DiagnosticInjectingSolutionSource([], restoreFailedProjects: [UnrestoredProject]),
+            new SystemEnvironment(),
             ResponseFitter.FirstRung);
 
         var error = await Should.ThrowAsync<UserErrorException>(() => tools.GraphAsync(cancellationToken: Ct));
@@ -142,6 +147,7 @@ public sealed class ArchToolsWorkspaceDiagnosticsTests
         var tools = new ArchTools(
             McpServerBindings.MyAppWithCleanSpec(),
             new DiagnosticInjectingSolutionSource([], restoreFailedProjects: [UnrestoredProject]),
+            new SystemEnvironment(),
             ResponseFitter.FirstRung);
 
         string document = await tools.GraphAsync(true, cancellationToken: Ct);
@@ -264,7 +270,7 @@ public sealed class ArchToolsWorkspaceDiagnosticsTests
         lines.Sum(line => line.Length)
             .ShouldBeGreaterThan(maxChars, "the raw lines must overrun the budget on their own, or this pins nothing");
 
-        var tools = new ArchTools(binding, new DiagnosticInjectingSolutionSource(lines), new BudgetedResponseFitter(budget));
+        var tools = new ArchTools(binding, new DiagnosticInjectingSolutionSource(lines), new SystemEnvironment(), new BudgetedResponseFitter(budget));
         string document = await tools.CheckAsync(rules: rules, grain: grain, cancellationToken: Ct);
 
         using JsonDocument parsed = JsonDocument.Parse(document);
@@ -283,6 +289,7 @@ public sealed class ArchToolsWorkspaceDiagnosticsTests
         return new ArchTools(
             McpServerBindings.MyAppWithCleanSpec(),
             new DiagnosticInjectingSolutionSource(diagnostics),
+            new SystemEnvironment(),
             ResponseFitter.FirstRung);
     }
 

@@ -62,6 +62,7 @@ public sealed class AdapterTests
                 "packaging/shipping-carries-docs",
                 "packaging/only-the-named-ship",
                 "di/no-captive-dependencies",
+                "di/seams-constructed-at-root",
                 "di/no-service-locator",
                 "di/no-buildserviceprovider",
                 "cli/no-stdout",

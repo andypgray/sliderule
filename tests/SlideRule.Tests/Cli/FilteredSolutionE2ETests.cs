@@ -1,5 +1,7 @@
 using System.Text.Json;
 using Shouldly;
+using SlideRule.Cli.Mcp.Infrastructure;
+using SlideRule.Cli.Pipeline;
 using SlideRule.Cli.Verbs;
 using SlideRule.Tests.TestSupport;
 using Xunit;
@@ -370,7 +372,7 @@ public sealed class FilteredSolutionE2ETests
         // through the runner directly, because there is no CLI verb to invoke.
         var output = new StringWriter();
 
-        int exit = await new ContextRunner(output).RunAsync(
+        int exit = await new ContextRunner(output, new ColdSolutionSource(), new SystemEnvironment()).RunAsync(
             new ContextRequest("MyApp.Legacy.Billing", BillingOnlyFilter(), CliRunner.CleanSpecDll, FilterDirectory),
             Ct);
 
@@ -386,7 +388,7 @@ public sealed class FilteredSolutionE2ETests
     {
         var output = new StringWriter();
 
-        int exit = await new ContextRunner(output).RunAsync(
+        int exit = await new ContextRunner(output, new ColdSolutionSource(), new SystemEnvironment()).RunAsync(
             new ContextRequest(
                 "MyApp.Legacy.Billing", Path.Combine(FilterDirectory, "DomainAndWeb.slnf"),
                 CliRunner.CleanSpecDll, FilterDirectory),

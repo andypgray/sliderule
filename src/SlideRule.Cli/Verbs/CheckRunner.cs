@@ -39,8 +39,8 @@ namespace SlideRule.Cli.Verbs;
 internal sealed class CheckRunner(
     TextWriter output,
     TextWriter error,
-    ISolutionSource? source = null,
-    IEnvironment? environment = null,
+    ISolutionSource source,
+    IEnvironment environment,
     IResponseFitter? fitter = null) : CacheWiredRunner(source, environment, fitter)
 {
     /// <summary>

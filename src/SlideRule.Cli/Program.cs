@@ -1,6 +1,8 @@
 using System.CommandLine;
 using System.Text;
 using SlideRule.Cli;
+using SlideRule.Cli.Mcp.Infrastructure;
+using SlideRule.Cli.Pipeline;
 
 // Prose fragments carry em-dashes and backticks; force UTF-8 so a real console renders them (the
 // in-process tests bypass Console entirely). Guarded: the setter can throw when stdout is redirected.
@@ -20,4 +22,8 @@ TextReader? input = Console.IsInputRedirected
     ? new StreamReader(Console.OpenStandardInput(), Encoding.UTF8)
     : null;
 
-return await CliEntry.InvokeAsync(args, new InvocationConfiguration(), input: input);
+// The process's composition root: the production seams are built here and handed down (di/seams-constructed-at-root).
+ColdSolutionSource source = new();
+SystemEnvironment environment = new();
+
+return await CliEntry.InvokeAsync(args, new InvocationConfiguration(), source, environment, input);

@@ -13,28 +13,15 @@ namespace SlideRule.Cli;
 /// </summary>
 internal static class CliEntry
 {
-    /// <param name="args">The command line, exactly as the shell handed it over.</param>
-    /// <param name="configuration">Where the run's stdout/stderr go.</param>
-    /// <param name="hostSource">
-    ///     The solution source for any run that would otherwise open a fresh one-shot workspace, or
-    ///     <c>null</c> — what <c>Program</c> passes — for <see cref="ColdSolutionSource" />. The e2e harness
-    ///     supplies a warm one so a test class's many invocations share one loaded workspace.
-    /// </param>
-    /// <param name="environment">
-    ///     The environment seam every verb reads <c>SLIDERULE_SOLUTION_PATH</c> through, and the cache-fronted
-    ///     verbs their cache-root override, or <c>null</c> — what <c>Program</c> passes — for real process state.
-    ///     The e2e harness supplies a fake one so a test can isolate its caches without mutating the process
-    ///     environment its neighbours share.
-    /// </param>
-    /// <param name="input">
-    ///     The stdin the <c>hook</c> verb reads its payload from, or <c>null</c> — what <c>Program</c> passes when
-    ///     nothing was piped in — for no payload. The e2e harness supplies the payload text.
-    /// </param>
+    /// <summary>
+    ///     Runs <paramref name="args" /> against the command tree <see cref="CommandFactory.BuildRootCommand" /> builds
+    ///     over the given seams.
+    /// </summary>
     public static async Task<int> InvokeAsync(
         string[] args,
         InvocationConfiguration configuration,
-        ISolutionSource? hostSource = null,
-        IEnvironment? environment = null,
+        ISolutionSource hostSource,
+        IEnvironment environment,
         TextReader? input = null)
     {
         RootCommand root = CommandFactory.BuildRootCommand(hostSource, environment, input);

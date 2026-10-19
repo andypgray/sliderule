@@ -1,4 +1,5 @@
 using Shouldly;
+using SlideRule.Cli.Mcp.Infrastructure;
 using SlideRule.Cli.Verbs;
 using SlideRule.Tests.TestSupport;
 using Xunit;
@@ -57,6 +58,6 @@ public sealed class ExplainWorkspaceDiagnosticsE2ETests
     {
         var source = new DiagnosticInjectingSolutionSource([LoadDiagnostic]);
 
-        return CliResult.CapturedAsync((output, error) => new ExplainRunner(output, error, source).RunAsync(request, Ct));
+        return CliResult.CapturedAsync((output, error) => new ExplainRunner(output, error, source, new SystemEnvironment()).RunAsync(request, Ct));
     }
 }

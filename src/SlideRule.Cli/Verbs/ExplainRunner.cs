@@ -53,8 +53,8 @@ namespace SlideRule.Cli.Verbs;
 internal sealed class ExplainRunner(
     TextWriter output,
     TextWriter error,
-    ISolutionSource? source = null,
-    IEnvironment? environment = null)
+    ISolutionSource source,
+    IEnvironment environment)
     : CacheWiredRunner(source, environment)
 {
     // Enough to recognise a near miss by, few enough that a short fragment does not roster the solution.

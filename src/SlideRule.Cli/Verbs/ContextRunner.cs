@@ -30,8 +30,8 @@ namespace SlideRule.Cli.Verbs;
 /// </remarks>
 internal sealed class ContextRunner(
     TextWriter output,
-    ISolutionSource? source = null,
-    IEnvironment? environment = null)
+    ISolutionSource source,
+    IEnvironment environment)
     : WorkspaceRunner(source)
 {
     public async Task<int> RunAsync(ContextRequest request, CancellationToken ct)
@@ -49,9 +49,8 @@ internal sealed class ContextRunner(
         // the file and the warm WorkspaceSession keep independent lifetimes and never race on it. The
         // environment seam still goes down, for discovery alone: under noCache the cache root is never read
         // from it.
-        IEnvironment seam = environment ?? new SystemEnvironment();
         using var source = await CodebaseSource.CreateWithSpecAsync(
-            SolutionSource, environment: seam, request.Solution, request.Spec, request.WorkingDirectory,
+            SolutionSource, environment, request.Solution, request.Spec, request.WorkingDirectory,
             noCache: true, ct);
 
         // Ahead of every exit below, because each of them can be the false all-clear: the body is context's

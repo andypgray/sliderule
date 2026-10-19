@@ -1,7 +1,6 @@
 using System.CommandLine;
 using System.Globalization;
 using Shouldly;
-using SlideRule.Cli;
 using SlideRule.Tests.TestSupport;
 using Xunit;
 
@@ -50,7 +49,7 @@ public sealed class CliHelpFenceTests
     public void HelpFences_NameEveryCommandTheToolHas()
     {
         // Arrange
-        RootCommand root = CommandFactory.BuildRootCommand();
+        RootCommand root = CommandTree.Root();
         List<string> commands = ["sliderule", .. CommandTree.Below(root).Select(static entry => $"sliderule {entry.Path}")];
 
         // Act
