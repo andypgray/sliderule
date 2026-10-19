@@ -371,8 +371,8 @@ public sealed class OneProjectExtractionTests
         CodebaseModel oneProject = FragmentMerger.Merge(FragmentExtractor.ExtractOneProject(own, SiblingMap(), Ct));
         CodebaseModel wholeSolution = FragmentMerger.Merge(
         [
-            FragmentExtractor.Extract(own),
-            FragmentExtractor.Extract(new CompilationInput(GeneratedDomainCompilation(), SiblingProjectName, []))
+            FragmentExtractor.Extract(own, Ct),
+            FragmentExtractor.Extract(new CompilationInput(GeneratedDomainCompilation(), SiblingProjectName, []), Ct)
         ]);
 
         // Assert: the banner is a signal at all — the whole-solution merge reads it from the file — and is
@@ -396,7 +396,7 @@ public sealed class OneProjectExtractionTests
         CompilationInput own = GeneratedDomainConsumer(asImage);
 
         // Act
-        CodebaseModel ownAlone = FragmentMerger.Merge([FragmentExtractor.Extract(own)]);
+        CodebaseModel ownAlone = FragmentMerger.Merge([FragmentExtractor.Extract(own, Ct)]);
 
         // Assert
         TypeNode emitted = ownAlone.Type("Domain.Emitted");
@@ -555,7 +555,7 @@ public sealed class OneProjectExtractionTests
         view[0].Serialized()
             .ShouldContain("N.Widget");
         view[0].Serialized()
-            .ShouldBe(FragmentExtractor.Extract(input)
+            .ShouldBe(FragmentExtractor.Extract(input, Ct)
                 .Serialized());
     }
 
@@ -587,7 +587,7 @@ public sealed class OneProjectExtractionTests
         IReadOnlyList<CodebaseFragment> view = FragmentExtractor.ExtractOneProject(input, SiblingMap(), Ct);
 
         // Assert: the ordinary extraction of the same input does record it, so the emptiness is the skip.
-        FragmentExtractor.Extract(input)
+        FragmentExtractor.Extract(input, Ct)
             .ServiceRegistrations.ShouldNotBeEmpty();
         view[0]
             .ServiceRegistrations.ShouldBeEmpty();
@@ -709,7 +709,7 @@ public sealed class OneProjectExtractionTests
         // Act
         IReadOnlyList<CodebaseFragment> view = FragmentExtractor.ExtractOneProject(own, SiblingMap(), Ct);
         FragmentType side = view[1].DeclaredType("Domain.Sorted");
-        FragmentType ownFragment = FragmentExtractor.Extract(new CompilationInput(domain, SiblingProjectName, []))
+        FragmentType ownFragment = FragmentExtractor.Extract(new CompilationInput(domain, SiblingProjectName, []), Ct)
             .DeclaredType("Domain.Sorted");
 
         // Assert: the ordinal order, spelled out so a slot that stopped sorting reds here rather than
@@ -830,8 +830,8 @@ public sealed class OneProjectExtractionTests
     {
         return
         [
-            FragmentExtractor.Extract(OwnInput(asImage)),
-            FragmentExtractor.Extract(new CompilationInput(DomainCompilation(), SiblingProjectName, []))
+            FragmentExtractor.Extract(OwnInput(asImage), Ct),
+            FragmentExtractor.Extract(new CompilationInput(DomainCompilation(), SiblingProjectName, []), Ct)
         ];
     }
 

@@ -13,7 +13,7 @@
              them is ever compiled against. Suppressed at project level because per-item NoWarn does not
              reach this warning and SkipGetTargetFrameworkProperties, which does, also stops the resolved
              output paths reaching the baked metadata attributes the tests read. -->
-        <NoWarn>$(NoWarn);xUnit1051;NU1702</NoWarn>
+        <NoWarn>$(NoWarn);NU1702</NoWarn>
         <!-- RestorePackagesWithLockFile inline here (rather than a tests/Directory.Build.props) so it
              applies to this project alone. A directory-level policy would also catch the
              deliberately-unlocked fixtures below it: the spec-fixture projects under tests/Fixtures/

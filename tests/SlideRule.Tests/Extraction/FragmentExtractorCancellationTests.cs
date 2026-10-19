@@ -26,8 +26,11 @@ public sealed class FragmentExtractorCancellationTests
     {
         CompilationInput input = CompilationFactory.Compile("TestProject", FragmentQuery.EveryPassSource);
 
+        // The tokenless overload is the subject here, so this call takes no token.
+#pragma warning disable xUnit1051
         string tokenless = FragmentExtractor.Extract(input)
             .Serialized();
+#pragma warning restore xUnit1051
         string withNone = FragmentExtractor.Extract(input, CancellationToken.None)
             .Serialized();
 

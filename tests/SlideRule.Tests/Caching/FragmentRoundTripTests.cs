@@ -500,7 +500,7 @@ public sealed class FragmentRoundTripTests
         CodebaseFragment fragment = FragmentExtractor.Extract(CompilationFactory.Compile("Widget", ("Widget.cs", """
                                                                                                                  namespace Widget;
                                                                                                                  public class W {}
-                                                                                                                 """))) with
+                                                                                                                 """)), Ct) with
         {
             DeclaredTargetFrameworks = ["net10.0", "netstandard2.0"],
             TargetFrameworksSite = new FragmentSite("/repo/src/Widget/Widget.csproj", 3),
@@ -551,7 +551,7 @@ public sealed class FragmentRoundTripTests
         CodebaseFragment fragment = FragmentExtractor.Extract(CompilationFactory.Compile("Bare", ("Bare.cs", """
                                                                                                              namespace Bare;
                                                                                                              public class B {}
-                                                                                                             """)));
+                                                                                                             """)), Ct);
 
         // Act
         string json = JsonSerializer.Serialize<IReadOnlyList<CodebaseFragment>>([fragment], ManifestJson.Options);
@@ -811,7 +811,7 @@ public sealed class FragmentRoundTripTests
         return FragmentExtractor.Extract(CompilationFactory.Compile("Widget", ("Widget.cs", """
                                                                                             namespace Widget;
                                                                                             public class W {}
-                                                                                            """))) with
+                                                                                            """)), Ct) with
         {
             TargetFramework = framework,
             DeclaredTargetFrameworks = ["net10.0", "netstandard2.0"],

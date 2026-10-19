@@ -565,10 +565,10 @@ public sealed class DocumentExtractionTests
 
             // And the ordinary extraction is untouched by the lookup, which reads the compilation and writes
             // nothing back to it.
-            string before = FragmentExtractor.Extract(own)
+            string before = FragmentExtractor.Extract(own, Ct)
                 .Serialized();
             DeclaringTrees.Of(own.Compilation);
-            string after = FragmentExtractor.Extract(own)
+            string after = FragmentExtractor.Extract(own, Ct)
                 .Serialized();
             after.ShouldBe(before, "building the lookup must have no effect on the compilation it read");
         }

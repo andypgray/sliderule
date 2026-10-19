@@ -213,16 +213,16 @@ public sealed class ServerShutdownTests : IDisposable
         // assertion below to fail first, the Set would fault the unobserved task and nothing else.
         // ReSharper disable once AccessToDisposedClosure
         Task shutdown = Task.Run(() => ServerShutdown.ExitWith(
-            "test", exited.Set, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(5)));
+            "test", exited.Set, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(5)), Ct);
 
         // While the call is in flight, the drain blocks: no disposer has run and exit hasn't fired.
-        exited.Wait(TimeSpan.FromMilliseconds(300))
+        exited.Wait(TimeSpan.FromMilliseconds(300), Ct)
             .ShouldBeFalse();
         disposerRan.ShouldBeFalse();
 
         // Completing the call releases the drain; shutdown proceeds to disposers + exit.
         IdleTimeoutWatchdog.ExitCall(); // in-flight count = 0
-        exited.Wait(TimeSpan.FromSeconds(5))
+        exited.Wait(TimeSpan.FromSeconds(5), Ct)
             .ShouldBeTrue();
         disposerRan.ShouldBeTrue();
         await shutdown.WaitAsync(TimeSpan.FromSeconds(5), Ct);

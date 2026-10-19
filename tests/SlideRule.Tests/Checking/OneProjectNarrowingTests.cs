@@ -266,7 +266,7 @@ public sealed class OneProjectNarrowingTests
             .Parts;
 
         RuleResult result = ArchChecker
-            .Check(model.Rules, WebAndDataModel, BaselineIndex.Empty, null, NarrowedUniverse.OneProject, null)
+            .Check(model.Rules, WebAndDataModel, BaselineIndex.Empty, null, NarrowedUniverse.OneProject, null, null, Ct)
             .Single();
 
         result.ShouldHaveFailedWithSingleEdge(ViolationKind.Reference, "App.Web.HomeController", "App.Data.Db");

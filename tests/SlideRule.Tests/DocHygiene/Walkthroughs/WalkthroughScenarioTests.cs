@@ -85,8 +85,8 @@ public sealed class WalkthroughScenarioTests
         QuotedFence draft = WalkthroughFences.AdoptingDraft.ShouldFindFence();
 
         // Act
-        List<string> errors = CSharpSyntaxTree.ParseText(string.Join("\n", draft.Lines))
-            .GetDiagnostics()
+        List<string> errors = CSharpSyntaxTree.ParseText(string.Join("\n", draft.Lines), cancellationToken: Ct)
+            .GetDiagnostics(Ct)
             .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
             .Select(static diagnostic => diagnostic.ToString())
             .ToList();

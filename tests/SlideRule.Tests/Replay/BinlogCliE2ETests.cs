@@ -164,7 +164,7 @@ public sealed class BinlogCliE2ETests(BinlogFixtureWorkspace fixture)
     public async Task Check_JunkBinlog_ExitsTwoWithCouldNotBeReplayed()
     {
         string junk = _cacheRootBase.PathOf("junk.binlog");
-        await File.WriteAllTextAsync(junk, "this is not a binlog");
+        await File.WriteAllTextAsync(junk, "this is not a binlog", Ct);
 
         CliResult run = await RunAsync(FreshCache(), "check", Sln, "--binlog", junk, "--spec", CleanSpec);
 
@@ -181,13 +181,13 @@ public sealed class BinlogCliE2ETests(BinlogFixtureWorkspace fixture)
         // With a persisted capture present, `--no-cache` runs cold and never reads it — no notice, capture untouched.
         string seededCache = FreshCache();
         await RunAsync(seededCache, "check", Sln, "--binlog", Binlog, "--spec", CleanSpec); // seed (replay)
-        byte[] captureBefore = await File.ReadAllBytesAsync(CacheLocations.CaptureBinlogPath(Sln, seededCache));
+        byte[] captureBefore = await File.ReadAllBytesAsync(CacheLocations.CaptureBinlogPath(Sln, seededCache), Ct);
 
         CliResult cold = await RunAsync(seededCache, "check", Sln, "--spec", CleanSpec, "--no-cache");
         cold.Loads.ShouldBe(1); // cold: the design-time build ran
         cold.Gate.ShouldBe(GateAcquisition.Cold);
         cold.Err.ShouldNotContain("build capture"); // no capture notice on the --no-cache path
-        (await File.ReadAllBytesAsync(CacheLocations.CaptureBinlogPath(Sln, seededCache))).ShouldBe(captureBefore);
+        (await File.ReadAllBytesAsync(CacheLocations.CaptureBinlogPath(Sln, seededCache), Ct)).ShouldBe(captureBefore);
         File.Exists(CacheLocations.CaptureManifestPath(Sln, seededCache))
             .ShouldBeTrue();
 
@@ -269,7 +269,7 @@ public sealed class BinlogCliE2ETests(BinlogFixtureWorkspace fixture)
 
         // Corrupt the binlog copy but leave the manifest valid: Validate never re-reads the copy's bytes, so it
         // still reports Usable — the failure only surfaces when the lazy source tries to replay it at runtime.
-        await File.WriteAllTextAsync(CacheLocations.CaptureBinlogPath(Sln, cache), "corrupt");
+        await File.WriteAllTextAsync(CacheLocations.CaptureBinlogPath(Sln, cache), "corrupt", Ct);
         // Delete the fragment cache so the runner must actually acquire (and thus replay) rather than hit.
         File.Delete(CacheLocations.CacheFilePath(Sln, cache));
 

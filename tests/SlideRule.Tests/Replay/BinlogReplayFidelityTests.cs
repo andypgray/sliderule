@@ -26,11 +26,11 @@ public sealed class BinlogReplayFidelityTests(BinlogFixtureWorkspace fixture) : 
     public async Task Replay_SameTreeAsMsBuildWorkspace_ProducesIdenticalModel()
     {
         // Arrange — extract the SAME temp copy both ways, through the one shared extractor path.
-        using LoadedSolution loaded = await WorkspaceLoader.LoadAsync(Fixture.SolutionPath);
-        CodebaseModel viaMsBuild = await CodebaseExtractor.ExtractFromSolutionAsync(loaded.Solution);
+        using LoadedSolution loaded = await WorkspaceLoader.LoadAsync(Fixture.SolutionPath, ct: Ct);
+        CodebaseModel viaMsBuild = await CodebaseExtractor.ExtractFromSolutionAsync(loaded.Solution, ct: Ct);
 
-        using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath, Fixture.SolutionPath);
-        CodebaseModel viaReplay = await CodebaseExtractor.ExtractFromSolutionAsync(replayed.Solution);
+        using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath, Fixture.SolutionPath, ct: Ct);
+        CodebaseModel viaReplay = await CodebaseExtractor.ExtractFromSolutionAsync(replayed.Solution, ct: Ct);
 
         // Act + Assert — fact for fact, raw paths included so a slash/spelling drift fails here (never
         // papered over).
@@ -56,9 +56,9 @@ public sealed class BinlogReplayFidelityTests(BinlogFixtureWorkspace fixture) : 
         // SolutionReader gives each replayed project its csproj FilePath to be matched on. Worth pinning
         // rather than assuming: if that path were ever absent the label would silently degrade to null on
         // every replayed run, which fails open and therefore reds nothing else.
-        using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath, Fixture.SolutionPath);
+        using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath, Fixture.SolutionPath, ct: Ct);
         CodebaseModel model = await CodebaseExtractor.ExtractFromSolutionAsync(
-            replayed.Solution, declaredMembers: SpecExclusion.TryReadDeclaredMembers(Fixture.SolutionPath));
+            replayed.Solution, declaredMembers: SpecExclusion.TryReadDeclaredMembers(Fixture.SolutionPath), ct: Ct);
 
         model.Projects.Select(project => (project.Name, project.SolutionMember))
             .ShouldBe([("MyApp.Domain", true), ("MyApp.Legacy.Billing", true), ("MyApp.Web", true)]);
@@ -71,9 +71,9 @@ public sealed class BinlogReplayFidelityTests(BinlogFixtureWorkspace fixture) : 
         // solution never resolves (or resolves to a format the parser does not own) must leave the label
         // absent rather than call every project a passenger — which, once `render` filters on it, would
         // empty the drawing.
-        using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath, Fixture.SolutionPath);
+        using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath, Fixture.SolutionPath, ct: Ct);
         CodebaseModel model = await CodebaseExtractor.ExtractFromSolutionAsync(
-            replayed.Solution, declaredMembers: SpecExclusion.TryReadDeclaredMembers(Fixture.BinlogPath));
+            replayed.Solution, declaredMembers: SpecExclusion.TryReadDeclaredMembers(Fixture.BinlogPath), ct: Ct);
 
         model.Projects.Select(project => project.SolutionMember)
             .ShouldAllBe(member => member == null);
@@ -87,7 +87,7 @@ public sealed class BinlogReplayFidelityTests(BinlogFixtureWorkspace fixture) : 
         // and this binlog builds every member the solution declares, so the declared-but-absent arm finds
         // nothing either.
         var diagnostics = new List<string>();
-        using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath, Fixture.SolutionPath, diagnostics.Add);
+        using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath, Fixture.SolutionPath, diagnostics.Add, ct: Ct);
 
         replayed.FailedProjects.ShouldBeEmpty();
         replayed.UncheckedProjects.ShouldBeEmpty();
@@ -103,7 +103,7 @@ public sealed class BinlogReplayFidelityTests(BinlogFixtureWorkspace fixture) : 
         string unbuilt = Fixture.PathOf("MyApp.Unbuilt", "MyApp.Unbuilt.csproj");
         var diagnostics = new List<string>();
 
-        using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath, widerSolution.Path, diagnostics.Add);
+        using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath, widerSolution.Path, diagnostics.Add, ct: Ct);
 
         replayed.FailedProjects.ShouldBe([unbuilt]);
         diagnostics.ShouldBe([BinlogReplayer.UnbuiltMemberMessage(unbuilt)]);
@@ -112,7 +112,7 @@ public sealed class BinlogReplayFidelityTests(BinlogFixtureWorkspace fixture) : 
     [Fact]
     public void Replay_NoSolutionFile_SkipsTheDeclaredMembershipArm()
     {
-        using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath, null);
+        using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath, null, ct: Ct);
 
         replayed.FailedProjects.ShouldBeEmpty();
     }
@@ -122,8 +122,8 @@ public sealed class BinlogReplayFidelityTests(BinlogFixtureWorkspace fixture) : 
     {
         // The construction channel (GRAMMAR §4.5) survives the binlog-replay path — an explicit assertion
         // beside the whole-model dump equality above, so a dropped ctor channel is a named failure not a diff.
-        using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath, Fixture.SolutionPath);
-        CodebaseModel model = await CodebaseExtractor.ExtractFromSolutionAsync(replayed.Solution);
+        using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath, Fixture.SolutionPath, ct: Ct);
+        CodebaseModel model = await CodebaseExtractor.ExtractFromSolutionAsync(replayed.Solution, ct: Ct);
 
         model.HasConstructorEdge("MyApp.Domain.OrderService", "MyApp.Web.HomeController")
             .ShouldBeTrue();
@@ -143,8 +143,8 @@ public sealed class BinlogReplayFidelityTests(BinlogFixtureWorkspace fixture) : 
             File.WriteAllText(moneySource, $"{original}{Environment.NewLine}public sealed class ReplayFreshnessProbe {{ }}{Environment.NewLine}");
 
             // Act — replay the UNCHANGED binlog; text is read from current disk at materialisation time.
-            using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath, Fixture.SolutionPath);
-            CodebaseModel model = await CodebaseExtractor.ExtractFromSolutionAsync(replayed.Solution);
+            using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath, Fixture.SolutionPath, ct: Ct);
+            CodebaseModel model = await CodebaseExtractor.ExtractFromSolutionAsync(replayed.Solution, ct: Ct);
 
             // Assert — the post-capture type is in the model, proving text is not embedded in the binlog.
             model.Types.Select(t => t.FullName)
@@ -152,8 +152,8 @@ public sealed class BinlogReplayFidelityTests(BinlogFixtureWorkspace fixture) : 
         }
 
         // And the revert is visible to a fresh replay — the freshness contract cuts both ways.
-        using ReplayedSolution reverted = BinlogReplayer.Replay(Fixture.BinlogPath, Fixture.SolutionPath);
-        CodebaseModel afterRevert = await CodebaseExtractor.ExtractFromSolutionAsync(reverted.Solution);
+        using ReplayedSolution reverted = BinlogReplayer.Replay(Fixture.BinlogPath, Fixture.SolutionPath, ct: Ct);
+        CodebaseModel afterRevert = await CodebaseExtractor.ExtractFromSolutionAsync(reverted.Solution, ct: Ct);
         afterRevert.Types.Select(t => t.FullName)
             .ShouldNotContain("MyApp.Domain.ReplayFreshnessProbe");
     }
@@ -162,11 +162,11 @@ public sealed class BinlogReplayFidelityTests(BinlogFixtureWorkspace fixture) : 
     public async Task Replay_DisposedWrapper_LeavesSolutionUsable()
     {
         // Arrange
-        ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath, Fixture.SolutionPath);
+        ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath, Fixture.SolutionPath, ct: Ct);
         CodebaseModel before;
         try
         {
-            before = await CodebaseExtractor.ExtractFromSolutionAsync(replayed.Solution);
+            before = await CodebaseExtractor.ExtractFromSolutionAsync(replayed.Solution, ct: Ct);
         }
         catch
         {
@@ -177,7 +177,7 @@ public sealed class BinlogReplayFidelityTests(BinlogFixtureWorkspace fixture) : 
 
         // Act — dispose the wrapper (workspace + reader), then keep using the Solution.
         replayed.Dispose();
-        CodebaseModel after = await CodebaseExtractor.ExtractFromSolutionAsync(replayed.Solution);
+        CodebaseModel after = await CodebaseExtractor.ExtractFromSolutionAsync(replayed.Solution, ct: Ct);
 
         // Assert — a Roslyn Solution outlives its workspace (the repo-wide LoadedSolution contract).
         after.Types.Count.ShouldBe(before.Types.Count);
@@ -187,7 +187,7 @@ public sealed class BinlogReplayFidelityTests(BinlogFixtureWorkspace fixture) : 
     public void Replay_EveryProject_HasCsprojFilePathAndBuiltOutputAssembly()
     {
         // Arrange
-        using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath, Fixture.SolutionPath);
+        using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath, Fixture.SolutionPath, ct: Ct);
 
         // Assert — SolutionReader populates FilePath (csproj) and OutputFilePath (the obj-path intermediate
         // assembly) with no backfill needed; both must be real files on disk. Only the three C# projects
