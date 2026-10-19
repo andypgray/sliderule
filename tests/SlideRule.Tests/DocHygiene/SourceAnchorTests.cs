@@ -357,10 +357,14 @@ public sealed class SourceAnchorTests
     {
         // Arrange
         SourceAnchor anchor = new("d.md", 5, "src/Gone.cs", 3, "Ns.T references Ns.Pkg.Foo");
-        Func<string, IReadOnlyList<string>?> reader = _ => null;
+
+        static IReadOnlyList<string>? NoFile(string _)
+        {
+            return null;
+        }
 
         // Act
-        SourceAnchors.AnchorResult result = SourceAnchors.Classify(anchor, "ex", NoLandmarks, reader);
+        SourceAnchors.AnchorResult result = SourceAnchors.Classify(anchor, "ex", NoLandmarks, NoFile);
 
         // Assert
         result.Bucket.ShouldBe(SourceAnchors.AnchorBucket.Unresolved);

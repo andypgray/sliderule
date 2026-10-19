@@ -241,9 +241,12 @@ public sealed class CardContainmentTests
     public void Placements_BlankSolutionDirectory_Throws(string? solutionDirectory)
     {
         // The one entry point every card placement goes through, so a blank directory is refused here or nowhere.
-        Action placing = () => ContextFileComposer.Placements(JsonLayerModel, JsonWithShim, solutionDirectory!);
+        void Placing()
+        {
+            ContextFileComposer.Placements(JsonLayerModel, JsonWithShim, solutionDirectory!);
+        }
 
-        Should.Throw<ArgumentException>(placing)
+        Should.Throw<ArgumentException>(Placing)
             .ParamName.ShouldBe("solutionDirectory");
     }
 

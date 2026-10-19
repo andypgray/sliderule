@@ -49,11 +49,11 @@ internal static class CheckPipeline
         IReadOnlyList<ArchRule> rules,
         CancellationToken ct)
     {
-        Func<CancellationToken, Task<ExtractedCodebase>> extract = async token =>
+        async Task<ExtractedCodebase> Extract(CancellationToken token)
         {
             CodebaseModel codebase = await source.ExtractAsync(source.Resolution.ExcludeProjectNames, token);
             return new ExtractedCodebase(codebase, source.Diagnostics);
-        };
+        }
 
         // Changed files a caller already listed are taken as given; otherwise git lists them since the diff base, and
         // with neither the tripwires are skipped.
@@ -65,7 +65,7 @@ internal static class CheckPipeline
         };
 
         return ArchCheckSequence.ExecuteAsync(
-            source.Model, rules, source.SolutionPath, source.SolutionDirectory, extract, resolveDiff, ct);
+            source.Model, rules, source.SolutionPath, source.SolutionDirectory, Extract, resolveDiff, ct);
     }
 
     // The unmatched-filter refusal, in the shared shape explain's unknown-rule refusal and graph's

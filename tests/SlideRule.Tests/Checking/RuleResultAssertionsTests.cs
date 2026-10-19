@@ -54,9 +54,12 @@ public sealed class RuleResultAssertionsTests
         // than swallow it, which is what makes the helper safe to use at a hundred sites.
         RuleResult result = Caught(OneCatchModel);
 
-        Action assertion = () => result.ShouldHaveFailedWithSingleEdge(ViolationKind.Reference, "App.Handler", "Errors.DbError");
+        void Assertion()
+        {
+            result.ShouldHaveFailedWithSingleEdge(ViolationKind.Reference, "App.Handler", "Errors.DbError");
+        }
 
-        Should.Throw<ShouldAssertException>(assertion);
+        Should.Throw<ShouldAssertException>(Assertion);
     }
 
     [Fact]
@@ -66,9 +69,12 @@ public sealed class RuleResultAssertionsTests
         // set comparison has to red on it rather than reading the edge off some other kind's violation.
         RuleResult result = Caught(OneCatchModel);
 
-        Action assertion = () => result.ShouldHaveFailedWithEdges(ViolationKind.Reference, ["App.Handler -> Errors.DbError"]);
+        void Assertion()
+        {
+            result.ShouldHaveFailedWithEdges(ViolationKind.Reference, ["App.Handler -> Errors.DbError"]);
+        }
 
-        Should.Throw<ShouldAssertException>(assertion);
+        Should.Throw<ShouldAssertException>(Assertion);
     }
 
     [Fact]
@@ -78,10 +84,13 @@ public sealed class RuleResultAssertionsTests
         // the failure mode ShouldSatisfyAllConditions exists to prevent and nothing else here covers.
         RuleResult result = Caught(TwoCatchesModel);
 
-        Action assertion = () => result.ShouldHaveFailedWithEdgesIncluding(
-            ViolationKind.Catch, "App.Alpha -> Errors.DbError", "App.Zeta -> Errors.DbError");
+        void Assertion()
+        {
+            result.ShouldHaveFailedWithEdgesIncluding(
+                ViolationKind.Catch, "App.Alpha -> Errors.DbError", "App.Zeta -> Errors.DbError");
+        }
 
-        Should.Throw<ShouldAssertException>(assertion);
+        Should.Throw<ShouldAssertException>(Assertion);
     }
 
     [Fact]
@@ -124,9 +133,12 @@ public sealed class RuleResultAssertionsTests
         // every violation, not two bare collections. Nothing else asserts that Describe reaches the message.
         RuleResult result = Caught(OneCatchModel);
 
-        Action assertion = () => result.ShouldHaveFailedWithEdges(ViolationKind.Catch, ["App.Handler -> Errors.Missing"]);
+        void Assertion()
+        {
+            result.ShouldHaveFailedWithEdges(ViolationKind.Catch, ["App.Handler -> Errors.Missing"]);
+        }
 
-        var red = Should.Throw<ShouldAssertException>(assertion);
+        var red = Should.Throw<ShouldAssertException>(Assertion);
 
         red.Message.ShouldContain("violations (");
         red.Message.ShouldContain("Catch App.Handler -> Errors.DbError");
@@ -149,10 +161,13 @@ public sealed class RuleResultAssertionsTests
         // line from somewhere else, which is what a violation charged with another copy's sites looks like.
         RuleResult result = Caught(OneCatchModel);
 
-        Action assertion = () => result.ShouldHaveFailedWithEdgeAtSites(
-            ViolationKind.Catch, "App.Handler", "Errors.DbError", ["Test.cs:6", "Other.cs:6"]);
+        void Assertion()
+        {
+            result.ShouldHaveFailedWithEdgeAtSites(
+                ViolationKind.Catch, "App.Handler", "Errors.DbError", ["Test.cs:6", "Other.cs:6"]);
+        }
 
-        Should.Throw<ShouldAssertException>(assertion);
+        Should.Throw<ShouldAssertException>(Assertion);
     }
 
     [Fact]
@@ -176,13 +191,16 @@ public sealed class RuleResultAssertionsTests
         // rather than a green over two matching edge names.
         RuleResult result = Caught(TwoCatchesModel);
 
-        Action assertion = () => result.ShouldHaveFailedWithEdgesAtSites(ViolationKind.Catch,
-        [
-            ("App.Alpha -> Errors.DbError", ["Test.cs:10"]),
-            ("App.Beta -> Errors.DbError", ["Test.cs:6"])
-        ]);
+        void Assertion()
+        {
+            result.ShouldHaveFailedWithEdgesAtSites(ViolationKind.Catch,
+            [
+                ("App.Alpha -> Errors.DbError", ["Test.cs:10"]),
+                ("App.Beta -> Errors.DbError", ["Test.cs:6"])
+            ]);
+        }
 
-        Should.Throw<ShouldAssertException>(assertion);
+        Should.Throw<ShouldAssertException>(Assertion);
     }
 
     private static RuleResult Caught(CodebaseModel codebase)

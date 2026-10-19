@@ -345,10 +345,14 @@ public sealed class GrandfatheredCountsTests
     {
         // Arrange
         GrandfatheredCount count = new("d.md", 12, "time/inject-clock", 7, null);
-        Func<string, string?> read = _ => null;
+
+        static string? Read(string _)
+        {
+            return null;
+        }
 
         // Act
-        GrandfatheredCounts.CountResult result = GrandfatheredCounts.Classify(count, "examples/Meridian", [], read);
+        GrandfatheredCounts.CountResult result = GrandfatheredCounts.Classify(count, "examples/Meridian", [], Read);
 
         // Assert
         result.Bucket.ShouldBe(GrandfatheredCounts.CountBucket.NoBaseline);
@@ -360,10 +364,14 @@ public sealed class GrandfatheredCountsTests
     {
         // Arrange: an unattributable count is reported, never silently skipped.
         GrandfatheredCount count = new("d.md", 12, string.Empty, 5, null);
-        Func<string, string?> read = _ => null;
+
+        static string? Read(string _)
+        {
+            return null;
+        }
 
         // Act
-        GrandfatheredCounts.CountResult result = GrandfatheredCounts.Classify(count, "examples/Meridian", [], read);
+        GrandfatheredCounts.CountResult result = GrandfatheredCounts.Classify(count, "examples/Meridian", [], Read);
 
         // Assert
         result.Bucket.ShouldBe(GrandfatheredCounts.CountBucket.NoBaseline);

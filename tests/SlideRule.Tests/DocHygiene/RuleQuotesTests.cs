@@ -279,10 +279,14 @@ public sealed class RuleQuotesTests
         // reports a named drift instead of dying on the first absent file.
         string[] tracked = ["examples/Ex/AGENTS.md", "examples/Ex/src/Gone/AGENTS.md"];
         string card = Card($"- `a/rule` {EmDash} the only rendered sentence.");
-        Func<string, string?> reader = path => path == "examples/Ex/AGENTS.md" ? card : null;
+
+        string? Reader(string path)
+        {
+            return path == "examples/Ex/AGENTS.md" ? card : null;
+        }
 
         // Act
-        IReadOnlyDictionary<string, IReadOnlyList<string>> bullets = RuleQuotes.RenderedBullets("examples/Ex", tracked, reader);
+        IReadOnlyDictionary<string, IReadOnlyList<string>> bullets = RuleQuotes.RenderedBullets("examples/Ex", tracked, Reader);
 
         // Assert
         bullets.ShouldHaveSingleItem()
