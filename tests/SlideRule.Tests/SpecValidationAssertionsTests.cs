@@ -1,7 +1,7 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Hosting;
 using SlideRule.Validation;
+using Xunit;
 using Code = SlideRule.Validation.SpecValidationErrorCode;
 
 namespace SlideRule.Tests;

@@ -1,9 +1,9 @@
 using Microsoft.Extensions.Logging;
 using Serilog.Events;
 using Shouldly;
-using Xunit;
 using SlideRule.Cli.Mcp.Infrastructure;
 using SlideRule.Roslyn.Hosting;
+using Xunit;
 
 namespace SlideRule.Tests.Mcp.Infrastructure;
 

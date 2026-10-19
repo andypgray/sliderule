@@ -1,7 +1,7 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Checking;
 using SlideRule.Hosting;
+using Xunit;
 
 namespace SlideRule.Tests.Analyzers.Parity;
 

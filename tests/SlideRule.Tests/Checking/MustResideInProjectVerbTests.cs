@@ -1,7 +1,7 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Baselines;
 using SlideRule.Checking;
+using Xunit;
 
 namespace SlideRule.Tests.Checking;
 

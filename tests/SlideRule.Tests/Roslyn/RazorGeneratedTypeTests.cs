@@ -1,11 +1,11 @@
 using Microsoft.CodeAnalysis;
 using Shouldly;
-using Xunit;
 using SlideRule.Checking;
 using SlideRule.Codebase;
 using SlideRule.Roslyn;
 using SlideRule.Tests.Extraction;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.Roslyn;
 

@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using Shouldly;
-using Xunit;
 using SlideRule.Cli.Mcp.Infrastructure;
+using Xunit;
 
 namespace SlideRule.Tests.Mcp.Infrastructure;
 

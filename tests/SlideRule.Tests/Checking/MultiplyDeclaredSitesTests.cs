@@ -1,10 +1,10 @@
 using Base;
 using Shared;
 using Shouldly;
-using Xunit;
 using SlideRule.Checking;
 using SlideRule.Codebase;
 using SlideRule.Tests.Extraction;
+using Xunit;
 
 namespace SlideRule.Tests.Checking;
 

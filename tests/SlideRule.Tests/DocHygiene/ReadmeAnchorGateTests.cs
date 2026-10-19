@@ -1,7 +1,7 @@
-using Xunit;
 using SlideRule.Tests.DocHygiene.Walkthroughs;
 using SlideRule.Tests.Dogfood;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.DocHygiene;
 

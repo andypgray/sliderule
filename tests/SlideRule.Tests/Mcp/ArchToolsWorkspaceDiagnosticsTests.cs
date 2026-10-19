@@ -1,6 +1,5 @@
 using System.Text.Json;
 using Shouldly;
-using Xunit;
 using SlideRule.Cli.Mcp;
 using SlideRule.Cli.Mcp.Pipeline;
 using SlideRule.Cli.Mcp.Tools;
@@ -9,6 +8,7 @@ using SlideRule.Roslyn;
 using SlideRule.Roslyn.MsBuild;
 using SlideRule.Tests.Mcp.TestDoubles;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.Mcp;
 

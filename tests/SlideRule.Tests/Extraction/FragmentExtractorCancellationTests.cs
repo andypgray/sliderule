@@ -1,6 +1,6 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Extraction;
+using Xunit;
 
 namespace SlideRule.Tests.Extraction;
 

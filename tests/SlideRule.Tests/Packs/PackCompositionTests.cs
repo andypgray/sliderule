@@ -1,7 +1,7 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Hosting;
 using SlideRule.Validation;
+using Xunit;
 
 namespace SlideRule.Tests.Packs;
 

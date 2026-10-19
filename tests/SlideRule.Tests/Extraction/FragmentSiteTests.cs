@@ -2,9 +2,9 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Text;
 using Shouldly;
-using Xunit;
 using SlideRule.Codebase;
 using SlideRule.Extraction.Fragments;
+using Xunit;
 
 namespace SlideRule.Tests.Extraction;
 

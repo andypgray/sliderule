@@ -1,7 +1,7 @@
-using Xunit;
 using SlideRule.Cli.Verbs;
 using SlideRule.Tests.Mcp.TestDoubles;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.Cli;
 

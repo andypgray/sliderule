@@ -1,5 +1,5 @@
-using Xunit;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.Checking;
 

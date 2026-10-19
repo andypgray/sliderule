@@ -1,9 +1,9 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Checking;
 using SlideRule.Tests.Cli;
 using SlideRule.Tests.Extraction;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.DocHygiene.Walkthroughs;
 

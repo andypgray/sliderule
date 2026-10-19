@@ -1,8 +1,8 @@
 using System.CommandLine;
 using System.Text.Json;
 using Shouldly;
-using Xunit;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.DocHygiene;
 

@@ -1,9 +1,9 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Tests.Checking;
 using SlideRule.Tests.DocHygiene;
 using SlideRule.Tests.TestSupport;
 using SlideRule.Validation;
+using Xunit;
 
 namespace SlideRule.Tests.Vocabulary;
 

@@ -1,9 +1,9 @@
 using System.Runtime.CompilerServices;
 using Microsoft.Build.Locator;
-using Xunit;
 using SlideRule.Roslyn.Hosting;
 using SlideRule.Roslyn.MsBuild;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 [assembly: AssemblyFixture(typeof(WorkspaceFixture))]
 

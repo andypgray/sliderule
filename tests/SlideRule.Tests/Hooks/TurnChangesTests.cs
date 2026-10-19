@@ -1,6 +1,6 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Cli.Hooks;
+using Xunit;
 
 namespace SlideRule.Tests.Hooks;
 

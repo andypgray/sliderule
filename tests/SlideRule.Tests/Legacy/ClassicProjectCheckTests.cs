@@ -1,7 +1,7 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Tests.Cli;
 using SlideRule.Tests.DocHygiene;
+using Xunit;
 
 namespace SlideRule.Tests.Legacy;
 

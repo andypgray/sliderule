@@ -1,5 +1,4 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Baselines;
 using SlideRule.Hosting;
 using SlideRule.ModelFile;
@@ -7,6 +6,7 @@ using SlideRule.Roslyn.Baselines;
 using SlideRule.Roslyn.Files;
 using SlideRule.Tests.DocHygiene;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.ModelFile;
 

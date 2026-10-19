@@ -1,6 +1,6 @@
+using SlideRule.Tests.TestSupport;
 using Xunit.Sdk;
 using Xunit.v3;
-using SlideRule.Tests.TestSupport;
 
 [assembly: TestPipelineStartup(typeof(FixtureRestoreStartup))]
 

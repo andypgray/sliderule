@@ -1,7 +1,6 @@
 using System.Globalization;
 using System.Reflection;
 using Shouldly;
-using Xunit;
 using SlideRule.Baselines;
 using SlideRule.Cli;
 using SlideRule.Cli.Mcp.Infrastructure;
@@ -10,6 +9,7 @@ using SlideRule.Cli.Verbs;
 using SlideRule.ModelFile;
 using SlideRule.Roslyn.Hosting;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.DocHygiene;
 

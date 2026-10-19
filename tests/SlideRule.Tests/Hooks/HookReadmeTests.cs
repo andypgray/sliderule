@@ -2,13 +2,13 @@ using System.CommandLine;
 using System.Globalization;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using Xunit;
 using SlideRule.Cli;
 using SlideRule.Cli.Mcp.Infrastructure;
 using SlideRule.Cli.Verbs;
 using SlideRule.Roslyn.Hosting;
 using SlideRule.Tests.DocHygiene;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.Hooks;
 

@@ -1,8 +1,8 @@
 using Serilog;
 using Serilog.Core;
 using Shouldly;
-using Xunit;
 using SlideRule.Cli.Mcp.Infrastructure;
+using Xunit;
 
 namespace SlideRule.Tests.Mcp.Infrastructure;
 

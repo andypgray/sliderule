@@ -1,11 +1,11 @@
 using System.Text.Json;
 using Shouldly;
-using Xunit;
 using SlideRule.Baselines;
 using SlideRule.Checking;
 using SlideRule.Cli.Rendering;
 using SlideRule.Roslyn.Diagnostics;
 using SlideRule.Tests.Checking;
+using Xunit;
 
 namespace SlideRule.Tests.Cli;
 

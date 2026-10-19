@@ -1,7 +1,7 @@
 using Microsoft.CodeAnalysis.Completion;
 using Shouldly;
-using Xunit;
 using SlideRule.SpecCompletion;
+using Xunit;
 
 namespace SlideRule.Tests.SpecCompletion;
 

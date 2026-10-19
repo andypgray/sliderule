@@ -4,8 +4,8 @@ using Microsoft.Extensions.DependencyInjection;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 using Shouldly;
-using Xunit;
 using SlideRule.Cli.Mcp.Pipeline;
+using Xunit;
 
 namespace SlideRule.Tests.Mcp;
 

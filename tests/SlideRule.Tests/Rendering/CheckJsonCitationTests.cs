@@ -1,11 +1,11 @@
 using System.Text.Json;
 using Shouldly;
-using Xunit;
 using SlideRule.Checking;
 using SlideRule.Cli.Rendering;
 using SlideRule.Codebase;
 using SlideRule.Tests.Checking;
 using SlideRule.Tests.Extraction;
+using Xunit;
 // The suite's reader over a check document, not the CLI renderer of the same name that this file also imports.
 using CheckJson = SlideRule.Tests.TestSupport.CheckJson;
 

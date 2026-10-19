@@ -2,10 +2,10 @@ using System.ComponentModel;
 using System.Reflection;
 using ModelContextProtocol.Protocol;
 using Shouldly;
-using Xunit;
 using SlideRule.Cli.Mcp.Pipeline;
 using SlideRule.Tests.Cli;
 using SlideRule.Tests.DocHygiene;
+using Xunit;
 
 namespace SlideRule.Tests.Mcp;
 

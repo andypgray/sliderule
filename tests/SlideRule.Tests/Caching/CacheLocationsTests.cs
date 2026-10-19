@@ -1,8 +1,8 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Cli.Mcp.Infrastructure;
 using SlideRule.Roslyn.Caching;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.Caching;
 

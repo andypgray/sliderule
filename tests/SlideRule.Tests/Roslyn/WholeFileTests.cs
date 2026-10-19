@@ -1,9 +1,9 @@
 using System.Text;
 using Shouldly;
-using Xunit;
 using SlideRule.Rendering;
 using SlideRule.Roslyn.Files;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.Roslyn;
 

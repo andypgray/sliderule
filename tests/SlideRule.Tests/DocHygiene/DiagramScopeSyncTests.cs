@@ -1,9 +1,9 @@
 using System.Text.RegularExpressions;
 using Shouldly;
-using Xunit;
 using SlideRule.Cli.Settings;
 using SlideRule.Internal;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.DocHygiene;
 

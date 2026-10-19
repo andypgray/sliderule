@@ -2,12 +2,12 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Text.RegularExpressions;
 using Shouldly;
-using Xunit;
 using SlideRule.ModelFile;
 using SlideRule.Roslyn.Hosting;
 using SlideRule.Tests.Analyzers.Parity;
 using SlideRule.Tests.Cli;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.Analyzers;
 

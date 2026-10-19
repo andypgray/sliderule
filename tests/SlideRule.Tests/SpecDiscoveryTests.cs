@@ -1,9 +1,9 @@
 using System.Reflection;
 using Shouldly;
-using Xunit;
 using SlideRule.Architecture;
 using SlideRule.Discovery;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests;
 

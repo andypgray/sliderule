@@ -1,8 +1,8 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Rendering;
 using SlideRule.Tests.TestSupport;
 using SlideRule.Tests.Vocabulary;
+using Xunit;
 
 namespace SlideRule.Tests.DocHygiene;
 

@@ -1,9 +1,9 @@
-using Xunit;
 using SlideRule.Checking;
 using SlideRule.Cli.Rendering;
 using SlideRule.Codebase;
 using SlideRule.Tests.DocHygiene;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.Dogfood;
 

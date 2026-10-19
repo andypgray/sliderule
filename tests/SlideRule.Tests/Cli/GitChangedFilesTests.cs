@@ -1,9 +1,9 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Checking;
 using SlideRule.Cli.Diff;
 using SlideRule.Roslyn;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.Cli;
 

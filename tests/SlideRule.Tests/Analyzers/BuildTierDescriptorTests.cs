@@ -2,8 +2,8 @@ using System.Globalization;
 using System.Reflection;
 using Microsoft.CodeAnalysis;
 using Shouldly;
-using Xunit;
 using SlideRule.Analyzers;
+using Xunit;
 
 namespace SlideRule.Tests.Analyzers;
 

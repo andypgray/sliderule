@@ -1,8 +1,8 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Cli.Verbs;
 using SlideRule.ModelFile;
 using SlideRule.Tests.ModelFile;
+using Xunit;
 
 namespace SlideRule.Tests.Cli;
 

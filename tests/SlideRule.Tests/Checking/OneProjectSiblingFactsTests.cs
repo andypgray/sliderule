@@ -1,8 +1,8 @@
 using System.Text.RegularExpressions;
 using Shouldly;
-using Xunit;
 using SlideRule.Tests.DocHygiene;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.Checking;
 

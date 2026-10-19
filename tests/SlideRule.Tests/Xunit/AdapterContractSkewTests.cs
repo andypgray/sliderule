@@ -1,12 +1,12 @@
 using System.Reflection;
 using System.Runtime.Loader;
 using Shouldly;
-using Xunit;
-using Xunit.Sdk;
 using SlideRule.Extraction;
 using SlideRule.Roslyn;
 using SlideRule.Tests.TestSupport;
 using SlideRule.Xunit;
+using Xunit;
+using Xunit.Sdk;
 
 namespace SlideRule.Tests.Xunit;
 

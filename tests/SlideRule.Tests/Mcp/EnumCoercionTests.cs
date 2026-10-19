@@ -1,8 +1,8 @@
 using System.Text.Json;
 using Shouldly;
-using Xunit;
 using SlideRule.Cli.Mcp.Pipeline;
 using SlideRule.Roslyn;
+using Xunit;
 
 namespace SlideRule.Tests.Mcp;
 

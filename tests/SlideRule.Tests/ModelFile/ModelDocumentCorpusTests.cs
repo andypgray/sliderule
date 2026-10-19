@@ -1,5 +1,4 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Baselines;
 using SlideRule.Cli.Pipeline;
 using SlideRule.Codebase;
@@ -12,6 +11,7 @@ using SlideRule.Tests.DocHygiene;
 using SlideRule.Tests.Dogfood;
 using SlideRule.Tests.Extraction;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.ModelFile;
 

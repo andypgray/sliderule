@@ -1,5 +1,4 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Baselines;
 using SlideRule.Codebase;
 using SlideRule.Hosting;
@@ -10,6 +9,7 @@ using SlideRule.Tests.Checking;
 using SlideRule.Tests.Extraction;
 using SlideRule.Tests.ModelFile.Nesting;
 using SlideRule.Tests.ModelFile.Nesting.Archive;
+using Xunit;
 
 namespace SlideRule.Tests.ModelFile;
 

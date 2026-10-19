@@ -1,7 +1,7 @@
 using System.Text;
 using Shouldly;
-using Xunit;
 using SlideRule.Internal;
+using Xunit;
 
 namespace SlideRule.Tests.Internal;
 

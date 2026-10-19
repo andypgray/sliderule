@@ -1,8 +1,8 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
-using Xunit;
 using SlideRule.Roslyn.Caching;
+using Xunit;
 
 namespace SlideRule.Tests.Caching;
 

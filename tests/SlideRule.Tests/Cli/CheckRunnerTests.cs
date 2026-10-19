@@ -1,8 +1,8 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Cli.Verbs;
 using SlideRule.Roslyn;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.Cli;
 

@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
-using Xunit;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.DocHygiene;
 

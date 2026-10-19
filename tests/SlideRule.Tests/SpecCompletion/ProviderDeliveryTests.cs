@@ -4,8 +4,8 @@ using Microsoft.CodeAnalysis.Completion;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Host.Mef;
 using Shouldly;
-using Xunit;
 using SlideRule.SpecCompletion;
+using Xunit;
 
 namespace SlideRule.Tests.SpecCompletion;
 

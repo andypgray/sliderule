@@ -1,11 +1,11 @@
 using System.Reflection;
 using Shouldly;
-using Xunit;
 using SlideRule.Cli.SpecLoading;
 using SlideRule.Discovery;
 using SlideRule.Hosting;
 using SlideRule.Tests.Checking;
 using SlideRule.Tests.Cli;
+using Xunit;
 
 namespace SlideRule.Tests;
 

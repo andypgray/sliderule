@@ -1,9 +1,9 @@
 using System.Reflection;
 using System.Runtime.Loader;
 using Shouldly;
-using Xunit;
 using SlideRule.Cli.SpecLoading;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.Cli;
 

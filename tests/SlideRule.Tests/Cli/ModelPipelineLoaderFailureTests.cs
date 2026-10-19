@@ -1,7 +1,7 @@
 using System.Reflection;
 using Shouldly;
-using Xunit;
 using SlideRule.Cli.Pipeline;
+using Xunit;
 
 namespace SlideRule.Tests.Cli;
 

@@ -1,7 +1,7 @@
 using System.Text.Json;
-using Xunit;
 using SlideRule.Cli;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.DocHygiene;
 

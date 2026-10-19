@@ -1,9 +1,9 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Cli.Rendering;
 using SlideRule.Hosting;
 using SlideRule.ModelFile;
 using SlideRule.Tests.Checking;
+using Xunit;
 
 namespace SlideRule.Tests.Cli;
 

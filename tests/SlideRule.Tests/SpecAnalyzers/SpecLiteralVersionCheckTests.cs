@@ -1,7 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Shouldly;
-using Xunit;
 using SlideRule.SpecAnalyzers;
+using Xunit;
 
 namespace SlideRule.Tests.SpecAnalyzers;
 

@@ -3,11 +3,11 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Emit;
 using Shouldly;
-using Xunit;
 using SlideRule.Analyzers;
 using SlideRule.SpecAnalyzers;
 using SlideRule.SpecCompletion;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.Analyzers;
 

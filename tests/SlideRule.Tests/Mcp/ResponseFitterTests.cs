@@ -1,10 +1,10 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Cli.Mcp.Pipeline;
 using SlideRule.Cli.Pipeline;
 using SlideRule.Cli.Rendering;
 using SlideRule.Roslyn.Hosting;
 using SlideRule.Tests.Mcp.TestDoubles;
+using Xunit;
 
 namespace SlideRule.Tests.Mcp;
 

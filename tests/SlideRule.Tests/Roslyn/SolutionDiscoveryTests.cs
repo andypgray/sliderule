@@ -1,8 +1,8 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Roslyn;
 using SlideRule.Roslyn.Hosting;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.Roslyn;
 

@@ -1,7 +1,7 @@
 using System.Text.Json;
 using Shouldly;
-using Xunit;
 using SlideRule.Cli.Rendering;
+using Xunit;
 
 namespace SlideRule.Tests.Rendering;
 

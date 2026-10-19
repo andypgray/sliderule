@@ -1,8 +1,8 @@
 using Shouldly;
-using Xunit;
 using SlideRule.Codebase;
 using SlideRule.Prose;
 using SlideRule.Tests.Extraction;
+using Xunit;
 
 namespace SlideRule.Tests.Checking;
 

@@ -3,9 +3,9 @@ using System.Globalization;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using Shouldly;
-using Xunit;
 using SlideRule.Cli.Mcp.Pipeline;
 using SlideRule.Cli.Rendering;
+using Xunit;
 
 namespace SlideRule.Tests.Mcp;
 
