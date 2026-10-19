@@ -61,14 +61,14 @@ internal static class ArchCheckSequence
     {
         BaselineIndex baselines = BaselineStore.LoadForModel(model, solutionDirectory);
 
-        DiffContext? diff = resolveDiff is null ? null : await resolveDiff(ct);
+        DiffContext? diff = resolveDiff is null ? null : await resolveDiff(ct).ConfigureAwait(false);
 
-        ExtractedCodebase extracted = await extract(ct);
+        ExtractedCodebase extracted = await extract(ct).ConfigureAwait(false);
         NarrowedUniverse? narrowing = Narrowing(solutionPath, extracted.Diagnostics.UncheckedProjects);
         IncompleteModel? incomplete = Incomplete(extracted.Diagnostics);
 
         return ArchChecker.Check(
-            rules, extracted.Codebase, baselines, diff, narrowing, incomplete, new SolutionRoot(solutionDirectory));
+            rules, extracted.Codebase, baselines, diff, narrowing, incomplete, new SolutionRoot(solutionDirectory), ct);
     }
 
     // Null unless this run actually checked less than the solution declares — measured from the load, never

@@ -39,3 +39,10 @@ dotnet_diagnostic.CA5392.severity = warning
 # rather than prose, and Ordinal is what says so. CA1307, the same argument about calls that are already
 # ordinal, stays off — that one is ceremony, and this file promotes correctness.
 dotnet_diagnostic.CA1310.severity = warning
+
+# A method that holds a CancellationToken and calls an overload that takes one, without passing it, loses
+# the caller's cancel at that call. The CLI and the layers under it serve as a long-lived MCP server, where a
+# client cancel must reach the work the tool call started; an unforwarded token leaves that work running
+# to its end with nobody waiting for it. Passing CancellationToken.None states that a call is not
+# abandonable, and the rule accepts that.
+dotnet_diagnostic.CA2016.severity = warning

@@ -153,7 +153,7 @@ public sealed class PackageShadowedNameTests
         // make the merge conclude that one name denotes two types. Unreachable through CompilationFactory,
         // which always names the assembly, so the blanking is done here rather than built in.
         List<CodebaseFragment> unnamed = Inputs()
-            .Select(FragmentExtractor.Extract)
+            .Select(input => FragmentExtractor.Extract(input, Ct))
             .Select(fragment => fragment with { AssemblyName = null })
             .ToList();
 

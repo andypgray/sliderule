@@ -6,8 +6,7 @@ namespace SlideRule.Tests.Extraction;
 
 /// <summary>
 ///     Cancellation on the extraction path: a run that has been abandoned stops rather than finishing its
-///     compilation, and taking a token changes nothing about the fragment a run that was not abandoned
-///     produces.
+///     compilation, whether it extracts one input or every input of a solution.
 /// </summary>
 public sealed class FragmentExtractorCancellationTests
 {
@@ -22,21 +21,12 @@ public sealed class FragmentExtractorCancellationTests
     }
 
     [Fact]
-    public void Extract_WithAnUncancellableTokenAndWithout_ProduceTheSameFragment()
+    public void ExtractAll_TokenAlreadyCancelled_ThrowsRatherThanReturningFragments()
     {
         CompilationInput input = CompilationFactory.Compile("TestProject", FragmentQuery.EveryPassSource);
+        using var cancelled = new CancellationTokenSource();
+        cancelled.Cancel();
 
-        // The tokenless overload is the subject here, so this call takes no token.
-#pragma warning disable xUnit1051
-        string tokenless = FragmentExtractor.Extract(input)
-            .Serialized();
-#pragma warning restore xUnit1051
-        string withNone = FragmentExtractor.Extract(input, CancellationToken.None)
-            .Serialized();
-
-        // Non-vacuity: both sides have to carry the bed, or an extraction that produced nothing at all
-        // would satisfy the comparison below.
-        tokenless.ShouldContain("N.Widget");
-        withNone.ShouldBe(tokenless);
+        Should.Throw<OperationCanceledException>(() => FragmentExtractor.ExtractAll([input], null, cancelled.Token));
     }
 }

@@ -165,7 +165,7 @@ public sealed class FragmentSiteRemapperTests
 
     private static readonly IReadOnlyDictionary<string, LineMap> InsertionMaps = MapsBetween(Before, AfterInsertions);
 
-    private static readonly IReadOnlyList<CodebaseFragment> BeforeFragments = Before.Select(FragmentExtractor.Extract)
+    private static readonly IReadOnlyList<CodebaseFragment> BeforeFragments = Before.Select(static input => FragmentExtractor.Extract(input, CancellationToken.None))
         .ToList();
 
     // One selector per site family, read twice by ShouldHaveMovedEverySiteFamily — once for the stored
@@ -192,7 +192,7 @@ public sealed class FragmentSiteRemapperTests
     public void TryRemap_LinesInsertedInEveryFile_SerializesLikeAColdWalk()
     {
         // Arrange
-        List<CodebaseFragment> afterEdit = AfterInsertions.Select(FragmentExtractor.Extract)
+        List<CodebaseFragment> afterEdit = AfterInsertions.Select(input => FragmentExtractor.Extract(input, Ct))
             .ToList();
 
         // Act

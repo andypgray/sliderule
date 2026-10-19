@@ -47,15 +47,11 @@ internal static class FragmentExtractor
         SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces,
         SymbolDisplayGenericsOptions.IncludeTypeParameters);
 
-    public static CodebaseFragment Extract(CompilationInput input)
-    {
-        return Extract(input, CancellationToken.None);
-    }
-
     /// <summary>
-    ///     The same extraction, abandonable: <paramref name="cancellationToken" /> is observed on entry,
-    ///     once per syntax tree the registration walk visits, and once per declared type each pass
-    ///     processes, so a cancelled caller waits at worst for one type's worth of work.
+    ///     Extracts <paramref name="input" /> into one self-contained fragment, polling
+    ///     <paramref name="cancellationToken" /> on entry, once per syntax tree the registration walk visits and
+    ///     once per declared type each pass processes, and nowhere below that: a cancelled caller waits at worst
+    ///     for one type's worth of work.
     /// </summary>
     /// <remarks>
     ///     Those three grains are the whole of the polling: one type's worth of work is short enough to
@@ -100,19 +96,6 @@ internal static class FragmentExtractor
     ///         side fragment's externals.
     ///     </para>
     /// </remarks>
-    /// <param name="input">
-    ///     The compilation to extract, whose <see cref="CompilationInput.ProjectName" /> names the project
-    ///     that produced it — never the assembly name, which is what a project selection would then miss.
-    /// </param>
-    /// <param name="siblingProjects">
-    ///     Which project of the solution produces each assembly, or null where nothing said: with no map
-    ///     the own fragment is the one <see cref="Extract(CompilationInput)" /> produces and no side
-    ///     fragment is built.
-    /// </param>
-    /// <param name="cancellationToken">
-    ///     Observed at the grains <see cref="Extract(CompilationInput,CancellationToken)" /> names, plus
-    ///     once per sibling type.
-    /// </param>
     internal static IReadOnlyList<CodebaseFragment> ExtractOneProject(
         CompilationInput input, SiblingProjects? siblingProjects, CancellationToken cancellationToken)
     {
@@ -200,22 +183,20 @@ internal static class FragmentExtractor
     ///     <para>
     ///         The first inner exception is rethrown with its stack intact, so an extraction failure reaches
     ///         a caller as the exception it threw rather than wrapped in an
-    ///         <see cref="AggregateException" /> the error-rendering path has never had to know about.
+    ///         <see cref="AggregateException" />, which the error-rendering path does not unwrap. A cancelled
+    ///         run therefore reaches the caller as the <see cref="OperationCanceledException" /> an input's
+    ///         extraction threw.
     ///     </para>
     /// </remarks>
-    /// <param name="inputs">The compilations to extract, in extraction order.</param>
-    /// <param name="artifactFacts">
-    ///     What MSBuild said about each input's project, at the same index — null, or a null entry, wherever
-    ///     nothing evaluated it, which is every path that hands compilations over directly.
-    /// </param>
     public static CodebaseFragment[] ExtractAll(
-        IReadOnlyList<CompilationInput> inputs, IReadOnlyList<ProjectArtifactFacts?>? artifactFacts = null)
+        IReadOnlyList<CompilationInput> inputs, IReadOnlyList<ProjectArtifactFacts?>? artifactFacts,
+        CancellationToken cancellationToken)
     {
         var fragments = new CodebaseFragment[inputs.Count];
 
         try
         {
-            Parallel.For(0, inputs.Count, i => fragments[i] = WithArtifactFacts(Extract(inputs[i]), ArtifactFactsAt(artifactFacts, i)));
+            Parallel.For(0, inputs.Count, i => fragments[i] = WithArtifactFacts(Extract(inputs[i], cancellationToken), ArtifactFactsAt(artifactFacts, i)));
         }
         catch (AggregateException aggregate) when (aggregate.InnerExceptions.Count > 0)
         {

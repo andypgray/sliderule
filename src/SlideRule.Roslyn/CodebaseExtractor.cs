@@ -26,7 +26,7 @@ internal static class CodebaseExtractor
     /// <returns>The model built from every compilation in <paramref name="inputs" />.</returns>
     public static CodebaseModel ExtractFromCompilations(IReadOnlyList<CompilationInput> inputs)
     {
-        return CodebaseModelBuilder.Build(inputs);
+        return CodebaseModelBuilder.Build(inputs, null, CancellationToken.None);
     }
 
     /// <summary>
@@ -71,7 +71,7 @@ internal static class CodebaseExtractor
         ExtractionInputs collected = await CollectInputsAsync(
             solution, p => excludeProjects is null || !excludeProjects.Contains(p.Name), targetFrameworks,
             declaredMembers, ct);
-        return CodebaseModelBuilder.Build(collected.Inputs, collected.ArtifactFacts);
+        return CodebaseModelBuilder.Build(collected.Inputs, collected.ArtifactFacts, ct);
     }
 
     /// <summary>
@@ -97,7 +97,7 @@ internal static class CodebaseExtractor
         ExtractionInputs collected = await CollectInputsAsync(
             solution, p => includeProjects is null || includeProjects.Contains(p.Name), targetFrameworks,
             declaredMembers, ct);
-        return FragmentExtractor.ExtractAll(collected.Inputs, collected.ArtifactFacts);
+        return FragmentExtractor.ExtractAll(collected.Inputs, collected.ArtifactFacts, ct);
     }
 
     // The shared project enumeration behind both entry points: C# projects passing the filter, ordered by

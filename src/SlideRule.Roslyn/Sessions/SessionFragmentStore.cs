@@ -261,9 +261,8 @@ internal sealed class SessionFragmentStore : IDisposable
         return new SessionFragmentSet(OrderedFragments(), LastReExtractedProjects, fragmentSetVersion);
     }
 
-    // Classify, seed, expand, commit the remaps the expansion left standing, then extract what is left —
-    // in that order, because whether a remap survives is decided by the expansion rather than by the
-    // classification that proposed it.
+    // A remap lands only once the extraction has returned, so a cancelled extraction leaves every stored fragment
+    // describing extractedSolution, the text the next call classifies its edits against.
     private async Task<SessionFragmentSet> IncrementalWalkAsync(
         WorkspaceSnapshot snapshot, IReadOnlySet<string>? declaredMembers, CancellationToken ct)
     {
@@ -295,6 +294,7 @@ internal sealed class SessionFragmentStore : IDisposable
         HashSet<string> dirty = ExpandToDependents(seed, snapshot.Solution);
         dirty.UnionWith(walkAlone);
         var remapped = new HashSet<string>(StringComparer.Ordinal);
+        var staged = new List<(string Name, List<CodebaseFragment> Moved)>();
 
         // A candidate the expansion pulled in through a dependent edge is re-walked instead and its remap
         // discarded: the walk answers for both reasons it is dirty, the remap for only one of them.
@@ -302,7 +302,7 @@ internal sealed class SessionFragmentStore : IDisposable
         {
             if (dirty.Contains(name)) continue;
 
-            fragmentsByProject[name] = moved;
+            staged.Add((name, moved));
             remapped.Add(name);
         }
 
@@ -316,6 +316,8 @@ internal sealed class SessionFragmentStore : IDisposable
             foreach (string name in dirty) fragmentsByProject.Remove(name);
             Index(reExtracted);
         }
+
+        foreach ((string name, List<CodebaseFragment> moved) in staged) fragmentsByProject[name] = moved;
 
         if (dirty.Count > 0 || remapped.Count > 0) fragmentSetVersion++;
 

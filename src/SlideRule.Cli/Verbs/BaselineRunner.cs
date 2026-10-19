@@ -112,7 +112,7 @@ internal sealed class BaselineRunner(
         // No narrowing goes down: this report is a capture survey rather than a verdict, the two modes that
         // read absence as evidence have already refused above, and add branches out before the survey.
         CheckReport report = ArchChecker.Check(
-            source.Model.Rules, codebase, BaselineIndex.Empty, null, null, null, new SolutionRoot(source.SolutionDirectory));
+            source.Model.Rules, codebase, BaselineIndex.Empty, null, null, null, new SolutionRoot(source.SolutionDirectory), ct);
 
         // Branch to the single-rule add path before the ratchet survey below, so a bad --rule refuses instead of exiting 0.
         if (request.Mode == BaselineMode.Add)

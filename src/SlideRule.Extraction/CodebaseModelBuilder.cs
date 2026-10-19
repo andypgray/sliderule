@@ -13,15 +13,11 @@ namespace SlideRule.Extraction;
 /// </summary>
 internal static class CodebaseModelBuilder
 {
-    /// <param name="inputs">The compilations to extract, in extraction order.</param>
-    /// <param name="artifactFacts">
-    ///     What MSBuild said about each input's project, at the same index. Null on the paths that hand
-    ///     compilations over directly, where there is no project file to evaluate.
-    /// </param>
     public static CodebaseModel Build(
-        IReadOnlyList<CompilationInput> inputs, IReadOnlyList<ProjectArtifactFacts?>? artifactFacts = null)
+        IReadOnlyList<CompilationInput> inputs, IReadOnlyList<ProjectArtifactFacts?>? artifactFacts,
+        CancellationToken cancellationToken)
     {
-        CodebaseFragment[] fragments = FragmentExtractor.ExtractAll(inputs, artifactFacts);
+        CodebaseFragment[] fragments = FragmentExtractor.ExtractAll(inputs, artifactFacts, cancellationToken);
 
         return FragmentMerger.Merge(fragments);
     }

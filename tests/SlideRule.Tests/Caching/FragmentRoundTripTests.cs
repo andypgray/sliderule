@@ -147,7 +147,7 @@ public sealed class FragmentRoundTripTests
                            private void OnEvt() {}
                        }
                        """));
-        IReadOnlyList<CodebaseFragment> fragments = new[] { lib, app }.Select(FragmentExtractor.Extract)
+        IReadOnlyList<CodebaseFragment> fragments = new[] { lib, app }.Select(input => FragmentExtractor.Extract(input, Ct))
             .ToList();
 
         // Act
@@ -188,7 +188,7 @@ public sealed class FragmentRoundTripTests
                            private static void H() {}
                        }
                        """));
-        IReadOnlyList<CodebaseFragment> fragments = new[] { lib, app }.Select(FragmentExtractor.Extract)
+        IReadOnlyList<CodebaseFragment> fragments = new[] { lib, app }.Select(input => FragmentExtractor.Extract(input, Ct))
             .ToList();
 
         // Act
@@ -226,7 +226,7 @@ public sealed class FragmentRoundTripTests
                                                                                        }
                                                                                    }
                                                                                    """));
-        IReadOnlyList<CodebaseFragment> fragments = new[] { app }.Select(FragmentExtractor.Extract)
+        IReadOnlyList<CodebaseFragment> fragments = new[] { app }.Select(input => FragmentExtractor.Extract(input, Ct))
             .ToList();
 
         // Act
@@ -282,7 +282,7 @@ public sealed class FragmentRoundTripTests
                            }
                        }
                        """));
-        IReadOnlyList<CodebaseFragment> fragments = new[] { lib, app }.Select(FragmentExtractor.Extract)
+        IReadOnlyList<CodebaseFragment> fragments = new[] { lib, app }.Select(input => FragmentExtractor.Extract(input, Ct))
             .ToList();
 
         // Act
@@ -349,7 +349,7 @@ public sealed class FragmentRoundTripTests
                            public event N.Notify Ev;
                        }
                        """));
-        IReadOnlyList<CodebaseFragment> fragments = new[] { lib, app }.Select(FragmentExtractor.Extract)
+        IReadOnlyList<CodebaseFragment> fragments = new[] { lib, app }.Select(input => FragmentExtractor.Extract(input, Ct))
             .ToList();
 
         // Act
@@ -387,7 +387,7 @@ public sealed class FragmentRoundTripTests
         var legacy = new CompilationInput(CompilationFactory.Compile("P", shared)
             .Compilation, "P", [], "netstandard2.0");
         IReadOnlyList<CodebaseFragment> fragments = new[] { modern, legacy }
-            .Select(FragmentExtractor.Extract)
+            .Select(input => FragmentExtractor.Extract(input, Ct))
             .ToList();
 
         // Act
@@ -430,7 +430,7 @@ public sealed class FragmentRoundTripTests
                                                                                           public class Widget {}
                                                                                           """));
         IReadOnlyList<CodebaseFragment> fragments = new[] { product, tests }
-            .Select(FragmentExtractor.Extract)
+            .Select(input => FragmentExtractor.Extract(input, Ct))
             .ToList();
 
         // Act
@@ -475,7 +475,7 @@ public sealed class FragmentRoundTripTests
                                                                                      public class C {}
                                                                                      """));
         IReadOnlyList<CodebaseFragment> fragments = new[] { member, passenger, unread }
-            .Select(FragmentExtractor.Extract)
+            .Select(input => FragmentExtractor.Extract(input, Ct))
             .ToList();
 
         // Act
@@ -895,7 +895,7 @@ public sealed class FragmentRoundTripTests
             .Compilation, "P", ["Modern"]);
 
         return new[] { lib, app, legacy, modern }
-            .Select(FragmentExtractor.Extract)
+            .Select(input => FragmentExtractor.Extract(input, Ct))
             .ToList();
     }
 }
