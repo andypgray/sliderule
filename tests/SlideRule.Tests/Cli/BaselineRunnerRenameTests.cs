@@ -1,7 +1,5 @@
 using Shouldly;
 using SlideRule.Baselines;
-using SlideRule.Cli.Mcp.Infrastructure;
-using SlideRule.Cli.Pipeline;
 using SlideRule.Cli.Verbs;
 using SlideRule.Hosting;
 using SlideRule.Roslyn;
@@ -342,16 +340,14 @@ public sealed class BaselineRunnerRenameTests : IDisposable
     private (int Exit, string Output) Run(ArchitectureModel model)
     {
         var output = new StringWriter();
-        var runner = new BaselineRunner(output, TextWriter.Null, new ColdSolutionSource(), new SystemEnvironment());
-        int exit = runner.Rename(BaselineRequests.Rename(From, To, _temp.Path), model, _temp.Path);
+        int exit = BaselineRunner.Rename(output, BaselineRequests.Rename(From, To, _temp.Path), model, _temp.Path);
         return (exit, output.ToString().NormalizedLines());
     }
 
     private string ShouldRefuse(ArchitectureModel model, string from = From)
     {
-        var runner = new BaselineRunner(TextWriter.Null, TextWriter.Null, new ColdSolutionSource(), new SystemEnvironment());
         BaselineRequest request = BaselineRequests.Rename(from, To, _temp.Path);
-        return Should.Throw<UserErrorException>(() => runner.Rename(request, model, _temp.Path)).Message;
+        return Should.Throw<UserErrorException>(() => BaselineRunner.Rename(TextWriter.Null, request, model, _temp.Path)).Message;
     }
 
     private string WriteBaseline(string relativePath, string text)

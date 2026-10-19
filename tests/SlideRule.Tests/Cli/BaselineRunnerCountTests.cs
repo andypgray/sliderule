@@ -1,8 +1,6 @@
 using Shouldly;
 using SlideRule.Baselines;
 using SlideRule.Checking;
-using SlideRule.Cli.Mcp.Infrastructure;
-using SlideRule.Cli.Pipeline;
 using SlideRule.Cli.Verbs;
 using SlideRule.Hosting;
 using SlideRule.Tests.Checking;
@@ -136,8 +134,7 @@ public sealed class BaselineRunnerCountTests : IDisposable
         string path = WriteBaseline(BaselineComposer.Compose(RuleId));
 
         var output = new StringWriter();
-        int exit = Runner(output)
-            .AddEntry(AddRequest("INC-1"), report, _temp.Path);
+        int exit = BaselineRunner.AddEntry(output, AddRequest("INC-1"), report, _temp.Path);
 
         exit.ShouldBe(0);
         // The valve grandfathers a pair AND says how much of it: both of the controller's mentions ride the
@@ -580,11 +577,6 @@ public sealed class BaselineRunnerCountTests : IDisposable
         return new RuleResult(Model().Rule(RuleId), RuleStatus.Failed, violations);
     }
 
-    private BaselineRunner Runner(TextWriter output)
-    {
-        return new BaselineRunner(output, TextWriter.Null, new ColdSolutionSource(), new SystemEnvironment());
-    }
-
     private BaselineRequest AddRequest(string because)
     {
         return BaselineRequests.Add(RuleId, because, "App.Web.ReportController", "App.Data.Ledger", _temp.Path);
@@ -604,8 +596,7 @@ public sealed class BaselineRunnerCountTests : IDisposable
     private string Apply(BaselineRequest request, IEnumerable<RuleResult> results)
     {
         var output = new StringWriter();
-        Runner(output)
-            .ApplyFiles(request, results, _temp.Path);
+        BaselineRunner.ApplyFiles(output, request, results, _temp.Path);
         return output.ToString();
     }
 
@@ -614,8 +605,7 @@ public sealed class BaselineRunnerCountTests : IDisposable
     private string AddEntry(string because, CheckReport report)
     {
         var output = new StringWriter();
-        Runner(output)
-            .AddEntry(AddRequest(because), report, _temp.Path);
+        BaselineRunner.AddEntry(output, AddRequest(because), report, _temp.Path);
         return output.ToString();
     }
 

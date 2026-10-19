@@ -5,7 +5,6 @@ using Microsoft.CodeAnalysis.Text;
 using Shouldly;
 using SlideRule.Baselines;
 using SlideRule.Checking;
-using SlideRule.Cli.Mcp.Infrastructure;
 using SlideRule.Cli.Pipeline;
 using SlideRule.Cli.Rendering;
 using SlideRule.Cli.Verbs;
@@ -220,7 +219,7 @@ internal static class ExampleReplay
 
         using TempDirectory capture = TestTempRoot.Fresh("walkthrough-baseline-init");
         var output = new StringWriter { NewLine = "\n" };
-        new BaselineRunner(output, TextWriter.Null, new ColdSolutionSource(), new SystemEnvironment()).ApplyFiles(BaselineRequests.Init(capture.Path), ratcheted, capture.Path);
+        BaselineRunner.ApplyFiles(output, BaselineRequests.Init(capture.Path), ratcheted, capture.Path);
         foreach (string line in RatchetSurveyNotice.Lines(survey, anyRatchetedRule: true)) output.WriteLine(line);
 
         Dictionary<string, byte[]> files = Directory.EnumerateFiles(capture.Path, "*", SearchOption.AllDirectories)

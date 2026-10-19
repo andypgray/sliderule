@@ -1,8 +1,6 @@
 using Shouldly;
 using SlideRule.Baselines;
 using SlideRule.Checking;
-using SlideRule.Cli.Mcp.Infrastructure;
-using SlideRule.Cli.Pipeline;
 using SlideRule.Cli.Verbs;
 using SlideRule.Codebase;
 using SlideRule.Hosting;
@@ -121,7 +119,7 @@ public sealed class BaselineRunnerProjectItemTests : IDisposable
     private string Apply(BaselineRequest request, IEnumerable<RuleResult> results)
     {
         var output = new StringWriter();
-        new BaselineRunner(output, TextWriter.Null, new ColdSolutionSource(), new SystemEnvironment()).ApplyFiles(request, results, _temp.Path);
+        BaselineRunner.ApplyFiles(output, request, results, _temp.Path);
         return output.ToString();
     }
 

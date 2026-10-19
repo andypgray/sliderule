@@ -116,7 +116,7 @@ internal sealed class BaselineRunner(
 
         // Branch to the single-rule add path before the ratchet survey below, so a bad --rule refuses instead of exiting 0.
         if (request.Mode == BaselineMode.Add)
-            return AddEntry(request, report, source.SolutionDirectory);
+            return AddEntry(output, request, report, source.SolutionDirectory);
 
         List<RuleResult> ratchetResults = report.Results.Where(r => r.Rule.IsRatcheted).ToList();
         if (ratchetResults.Count == 0)
@@ -129,7 +129,7 @@ internal sealed class BaselineRunner(
         // The directory is read out before the apply below, because the grouping in there is lazy: a lambda
         // closing over `source` would outlive the using block if the sequence were ever enumerated later.
         string solutionDirectory = source.SolutionDirectory;
-        ApplyFiles(request, ratchetResults, solutionDirectory);
+        ApplyFiles(output, request, ratchetResults, solutionDirectory);
 
         // The survey's last word: name the failing rules no baseline can capture, after the per-file lines.
         foreach (string line in RatchetSurveyNotice.Lines(report, anyRatchetedRule: true))
@@ -180,7 +180,8 @@ internal sealed class BaselineRunner(
 
     // add: append one attributed entry to a captured rule's section (or update attribution on a present
     // entry). Internal so the fast-tier runner tests drive it over an in-memory report (no workspace).
-    internal int AddEntry(BaselineRequest request, CheckReport report, string solutionDirectory)
+    internal static int AddEntry(
+        TextWriter output, BaselineRequest request, CheckReport report, string solutionDirectory)
     {
         if (request.Addition is not { Rule: { } ruleId, Because: { } because } addition)
             throw MisassembledAddRequest();
@@ -254,7 +255,7 @@ internal sealed class BaselineRunner(
             string solutionPath = ModelPipeline.DiscoverSolution(request.Solution, request.WorkingDirectory, Environment);
             string anchor = SolutionProjectFileParser.AnchorDirectory(solutionPath);
             ArchitectureModel model = SolutionSource.LoadSpecModel(withoutSolution.DllPath);
-            return Rename(request, model, anchor);
+            return Rename(output, request, model, anchor);
         }
 
         using var source = await CodebaseSource.CreateWithSpecAsync(
@@ -262,7 +263,7 @@ internal sealed class BaselineRunner(
         WorkspaceDiagnosticsRenderer.Render(error, source.Diagnostics);
         RecordCacheOutcome(source);
 
-        return Rename(request, source.Model, source.SolutionDirectory);
+        return Rename(output, request, source.Model, source.SolutionDirectory);
     }
 
     // The old ID can become a conventional path that Rename may delete. BaselineConventions refuses an ID outside
@@ -286,7 +287,8 @@ internal sealed class BaselineRunner(
     // run leaves the entries under both IDs rather than under neither. The entries list moves verbatim —
     // identity, site count and attribution — and the write re-seals each under its new ID. Internal so the
     // fast-tier runner tests drive it over a hand-built model, as they drive add.
-    internal int Rename(BaselineRequest request, ArchitectureModel model, string solutionDirectory)
+    internal static int Rename(
+        TextWriter output, BaselineRequest request, ArchitectureModel model, string solutionDirectory)
     {
         if (request.Rename is not { From: var from, To: var to }) throw MisassembledRenameRequest();
         RefuseMalformedFrom(from);
@@ -429,23 +431,25 @@ internal sealed class BaselineRunner(
     // init and accept-reductions, one baseline file at a time: ordinal grouping in first-appearance order,
     // so two rules sharing a file are read, spliced and written once between them. Internal so the fast-tier
     // runner tests can drive both modes over an in-memory report the way they drive add — no workspace.
-    internal void ApplyFiles(BaselineRequest request, IEnumerable<RuleResult> ratchetResults, string solutionDirectory)
+    internal static void ApplyFiles(
+        TextWriter output, BaselineRequest request, IEnumerable<RuleResult> ratchetResults, string solutionDirectory)
     {
         IEnumerable<IGrouping<string, RuleResult>> fileGroups = ratchetResults
             .GroupBy(r => BaselineStore.ResolvePath(r.Rule.BaselinePath!, solutionDirectory), StringComparer.Ordinal);
 
         foreach (IGrouping<string, RuleResult> group in fileGroups)
-            ApplyFile(request, group, solutionDirectory);
+            ApplyFile(output, request, group, solutionDirectory);
     }
 
-    private void ApplyFile(BaselineRequest request, IGrouping<string, RuleResult> group, string solutionDirectory)
+    private static void ApplyFile(
+        TextWriter output, BaselineRequest request, IGrouping<string, RuleResult> group, string solutionDirectory)
     {
         // Read + verify once (tamper throws here — init cannot distinguish tamper from corruption).
         BaselineDocument? existing = BaselineStore.TryReadDocument(group.Key);
         Dictionary<string, IReadOnlyList<BaselineEntry>> sections = MutableSections(existing);
 
         var rewrote = false;
-        foreach (RuleResult result in group) rewrote |= ApplyRule(request, result, sections);
+        foreach (RuleResult result in group) rewrote |= ApplyRule(output, request, result, sections);
 
         // init writes nothing to a file whose every visited section was already captured. Without that arm
         // the write still lands, and since a composed file always carries the current schema version an
@@ -469,7 +473,9 @@ internal sealed class BaselineRunner(
     }
 
     // Whether this rule rewrote its section — what tells the caller above whether the file has anything new to say.
-    private bool ApplyRule(BaselineRequest request, RuleResult result, Dictionary<string, IReadOnlyList<BaselineEntry>> sections)
+    private static bool ApplyRule(
+        TextWriter output, BaselineRequest request, RuleResult result,
+        Dictionary<string, IReadOnlyList<BaselineEntry>> sections)
     {
         string ruleId = result.Rule.Id;
         // The rotted rule, refused ahead of the unbaselinable one because it is the dangerous half and the
@@ -509,8 +515,8 @@ internal sealed class BaselineRunner(
 
         sections.TryGetValue(ruleId, out IReadOnlyList<BaselineEntry>? existingEntries);
         return request.Mode == BaselineMode.Init
-            ? InitRule(ruleId, current, existingEntries, sections)
-            : AcceptReductions(ruleId, current, existingEntries, sections);
+            ? InitRule(output, ruleId, current, existingEntries, sections)
+            : AcceptReductions(output, ruleId, current, existingEntries, sections);
     }
 
     // Why init will not capture a rule stricter than written: what the dead pattern was meant to allow, or the
@@ -533,8 +539,8 @@ internal sealed class BaselineRunner(
     }
 
     // init: grandfather an uncaptured rule's current state (empty = zero debt); leave captured rules be.
-    private bool InitRule(
-        string ruleId, IReadOnlyList<(BaselineEntry Identity, int Sites)> current,
+    private static bool InitRule(
+        TextWriter output, string ruleId, IReadOnlyList<(BaselineEntry Identity, int Sites)> current,
         IReadOnlyList<BaselineEntry>? existingEntries, Dictionary<string, IReadOnlyList<BaselineEntry>> sections)
     {
         if (existingEntries is { } captured)
@@ -554,8 +560,8 @@ internal sealed class BaselineRunner(
     // before this runs, since a project that stopped loading looks exactly like a violation that stopped.
     // Recording a count on an entry that had none is a tightening too, and it is the route by which a file
     // written before the measure existed becomes a counted one.
-    private bool AcceptReductions(
-        string ruleId, IReadOnlyList<(BaselineEntry Identity, int Sites)> current,
+    private static bool AcceptReductions(
+        TextWriter output, string ruleId, IReadOnlyList<(BaselineEntry Identity, int Sites)> current,
         IReadOnlyList<BaselineEntry>? existingEntries, Dictionary<string, IReadOnlyList<BaselineEntry>> sections)
     {
         if (existingEntries is not { } captured)

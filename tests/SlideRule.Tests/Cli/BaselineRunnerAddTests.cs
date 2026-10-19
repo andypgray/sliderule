@@ -1,8 +1,6 @@
 using Shouldly;
 using SlideRule.Baselines;
 using SlideRule.Checking;
-using SlideRule.Cli.Mcp.Infrastructure;
-using SlideRule.Cli.Pipeline;
 using SlideRule.Cli.Verbs;
 using SlideRule.Codebase;
 using SlideRule.Hosting;
@@ -80,12 +78,11 @@ public sealed class BaselineRunnerAddTests : IDisposable
         File.WriteAllText(path, BaselineComposer.Compose(RuleId));
 
         var output = new StringWriter();
-        var runner = new BaselineRunner(output, TextWriter.Null, new ColdSolutionSource(), new SystemEnvironment());
         BaselineRequest request = BaselineRequests.Add(
             RuleId, "INC-1234", "MyApp.Web.HomeController", "System.DateTime.Now", _temp.Path);
 
         // Act — the MemberUse violation reaches the added-entry echo with a null Target slot.
-        int exit = runner.AddEntry(request, report, _temp.Path);
+        int exit = BaselineRunner.AddEntry(output, request, report, _temp.Path);
 
         // Assert — the pinned echo renders the member display, and the entry keys the P: member ID.
         exit.ShouldBe(0);
@@ -121,12 +118,11 @@ public sealed class BaselineRunnerAddTests : IDisposable
         File.WriteAllText(path, BaselineComposer.Compose(CtorRuleId));
 
         var output = new StringWriter();
-        var runner = new BaselineRunner(output, TextWriter.Null, new ColdSolutionSource(), new SystemEnvironment());
         BaselineRequest request = BaselineRequests.Add(
             CtorRuleId, "INC-9", "MyApp.Web.OrderController", "MyApp.Data.Db", _temp.Path);
 
         // Act — the Construction violation reaches the added-entry echo; the constructed type rides the Target slot.
-        int exit = runner.AddEntry(request, report, _temp.Path);
+        int exit = BaselineRunner.AddEntry(output, request, report, _temp.Path);
 
         // Assert — the echo renders Source -> Constructed via the shared full-name form, and the entry keys a
         // plain T:->T: ForEdge (identical to a reference edge, GRAMMAR §4.3).
@@ -168,12 +164,11 @@ public sealed class BaselineRunnerAddTests : IDisposable
         File.WriteAllText(path, BaselineComposer.Compose(UnfilteredCatchRuleId));
 
         var output = new StringWriter();
-        var runner = new BaselineRunner(output, TextWriter.Null, new ColdSolutionSource(), new SystemEnvironment());
         BaselineRequest request = BaselineRequests.Add(
             UnfilteredCatchRuleId, "INC-77", "App.LegacyHandler", "Errors.DbError", _temp.Path);
 
         // Act — the valve resolves the unfiltered-catch violation by its (source, caught) type pair.
-        int exit = runner.AddEntry(request, report, _temp.Path);
+        int exit = BaselineRunner.AddEntry(output, request, report, _temp.Path);
 
         // Assert — the echo and the appended entry are a plain T:->T: ForEdge, indistinguishable from the
         // sibling catch verb's: this verb reads a different fact but keys the same identity.
