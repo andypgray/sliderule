@@ -33,12 +33,15 @@ namespace SlideRule.Tests.Hooks;
 /// </remarks>
 public sealed class McpLaunchScriptTests
 {
-    /// <summary>The entry assembly the launcher execs, and one of the files whose modification time and size key the copy.</summary>
+    /// <summary>
+    ///     The entry assembly the launcher execs, and one of the files whose modification time and size key the
+    ///     copy.
+    /// </summary>
     private const string ServerDll = "sliderule-cli.dll";
 
     /// <summary>
-    ///     A dependency beside the entry assembly: proof the whole directory is staged, and a file whose rebuild the key
-    ///     has to notice on its own.
+    ///     A dependency beside the entry assembly: proof the whole directory is staged, and a file whose rebuild
+    ///     the key has to notice on its own.
     /// </summary>
     private const string SiblingDll = "SlideRule.dll";
 
@@ -396,7 +399,9 @@ public sealed class McpLaunchScriptTests
 
         private string ProjectDirectory { get; }
 
-        /// <summary>Where the copies live. Absolute, as a client would set it: the launcher never resolves it.</summary>
+        /// <summary>
+        ///     Where the copies live. Absolute, as a client would set it: the launcher never resolves it.
+        /// </summary>
         internal string RunRoot { get; set; }
 
         /// <summary>Kept relative, so a launcher that did not anchor itself to the project finds nothing.</summary>
@@ -433,7 +438,9 @@ public sealed class McpLaunchScriptTests
             WriteSiblingDll("a dependency of the server");
         }
 
-        /// <summary>Rewrites the dependency alone, leaving the entry assembly's bytes and timestamp as they were.</summary>
+        /// <summary>
+        ///     Rewrites the dependency alone, leaving the entry assembly's bytes and timestamp as they were.
+        /// </summary>
         internal void WriteSiblingDll(string content)
         {
             File.WriteAllText(SiblingPath, content);
@@ -658,7 +665,9 @@ public sealed class McpLaunchScriptTests
                 + "exit \"${status:-127}\"\n");
         }
 
-        /// <summary>Writes an executable <c>sh</c> script named <paramref name="command" /> into the stub directory.</summary>
+        /// <summary>
+        ///     Writes an executable <c>sh</c> script named <paramref name="command" /> into the stub directory.
+        /// </summary>
         private void Stub(string command, string body)
         {
             ShellInterpreter.WriteExecutableStub(_stubDirectory, command, "#!/bin/sh\n" + body);

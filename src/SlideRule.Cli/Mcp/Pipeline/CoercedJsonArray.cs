@@ -4,11 +4,9 @@ using SlideRule.Roslyn;
 namespace SlideRule.Cli.Mcp.Pipeline;
 
 /// <summary>
-///     The JSON-array reading both array coercers do, written once. <c>string[]</c> and <c>TEnum[]</c>
-///     face the same two shapes — a real array token, and a string whose contents are an array — and
-///     differ only in what each element becomes, so the projection arrives as a delegate and the token
-///     walk, the <c>[</c>-prefix fast path, and the "every element must be a string" rule have a single
-///     spelling instead of a hand-maintained parity.
+///     The JSON-array reading the array coercers share. <c>string[]</c> and <c>TEnum[]</c> face the same two
+///     shapes, a real array token and a string whose contents are an array, and differ only in what each element
+///     becomes, which arrives as a delegate.
 /// </summary>
 /// <remarks>
 ///     What a malformed input <em>says</em> stays with the caller: the refusal names the parameter's own

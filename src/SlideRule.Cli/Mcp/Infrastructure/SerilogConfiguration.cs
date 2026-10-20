@@ -8,9 +8,8 @@ using SlideRule.Roslyn.Caching;
 namespace SlideRule.Cli.Mcp.Infrastructure;
 
 /// <summary>
-///     Configures Serilog file logging for post-mortem debugging of catastrophic crashes that can't
-///     reach the MCP client. Logs to <c>%LOCALAPPDATA%/SlideRule/logs/</c>. Nothing is written
-///     to stdout — that channel is reserved for MCP JSON-RPC.
+///     Configures Serilog file logging for post-mortem debugging of catastrophic crashes that can't reach the MCP
+///     client.
 /// </summary>
 internal static class SerilogConfiguration
 {
@@ -21,18 +20,14 @@ internal static class SerilogConfiguration
     internal static string LogDirectory => Path.Combine(CacheLocations.ProductDataRoot(), "logs");
 
     /// <summary>
-    ///     Creates the static <see cref="Log.Logger" /> with a daily rolling file sink. Call before any
-    ///     host building so crash handlers can use it immediately.
+    ///     Creates the static <see cref="Log.Logger" /> with a daily rolling file sink. Call before any host
+    ///     building so crash handlers can use it immediately.
     /// </summary>
-    /// <param name="rawLogLevel">
-    ///     The unparsed <c>SLIDERULE_LOG_LEVEL</c> value — read by the caller, which owns the one env
-    ///     seam, because this runs before the host that would inject it exists.
-    /// </param>
-    /// <param name="sessionId">
-    ///     The launching agent session's id, or null for a generated one. It tags every log line so
-    ///     concurrent server processes sharing the daily-rolling file can be told apart and, when the
-    ///     launcher supplied one, correlated with the session that started them.
-    /// </param>
+    /// <remarks>
+    ///     <paramref name="rawLogLevel" /> is the unparsed <c>SLIDERULE_LOG_LEVEL</c> value, and
+    ///     <paramref name="sessionId" /> the launching agent session's id, or null for a generated one; a
+    ///     launcher-supplied id correlates the lines with the session that started the server.
+    /// </remarks>
     public static void InitializeFileLogger(string? rawLogLevel, string? sessionId)
     {
         LogEventLevel minimumLevel = ParseLogLevel(rawLogLevel);
@@ -85,8 +80,7 @@ internal static class SerilogConfiguration
     {
         if (string.IsNullOrWhiteSpace(envValue)) return LogEventLevel.Warning;
 
-        // Accept Microsoft.Extensions.Logging.LogLevel names. Enum.TryParse also binds numeric strings
-        // ("99") to an undefined enum value, so guard with Enum.IsDefined to keep them on the fallback.
+        // Enum.TryParse binds a numeric string ("99") to an undefined value; Enum.IsDefined keeps it on the fallback.
         if (Enum.TryParse(envValue, true, out LogLevel msLevel) && Enum.IsDefined(msLevel)) return LevelConvert.ToSerilogLevel(msLevel);
 
         if (Enum.TryParse(envValue, true, out LogEventLevel serilogLevel) && Enum.IsDefined(serilogLevel)) return serilogLevel;

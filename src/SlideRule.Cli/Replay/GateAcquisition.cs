@@ -4,10 +4,8 @@ namespace SlideRule.Cli.Replay;
 
 /// <summary>
 ///     Which source-selection branch <see cref="MsBuildGate" /> took for a <c>check</c>/<c>status</c>/<c>graph</c>
-///     run, as recorded for one call through <see cref="MsBuildGate.RecordAcquisitionOnThisFlow" />. Internal test
-///     observable — the enforcement path's output is byte-identical whichever branch runs, so this only ever tells
-///     a test which path was chosen, paired with the same call's
-///     <see cref="Roslyn.WorkspaceLoader.CountLoadsOnThisFlow" /> for the "no design-time build" pin. Never printed.
+///     run, as recorded for one call through <see cref="MsBuildGate.RecordAcquisitionOnThisFlow" />. A test
+///     observable, never printed: output is byte-identical whichever branch runs.
 /// </summary>
 internal enum GateAcquisition
 {

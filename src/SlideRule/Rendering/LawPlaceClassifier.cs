@@ -6,52 +6,37 @@ namespace SlideRule.Rendering;
 
 /// <summary>
 ///     The triage behind the law diagram: which verbs draw as an edge, and which selections land on a
-///     place a node can stand for. Everything it declines goes to the compact list under the fence, so a
-///     rule this classifier cannot place is still visible — the drawing narrows, the law never does.
+///     place a node can stand for.
 /// </summary>
 /// <remarks>
-///     The approximation is noun-level, with one exception. A noun names a region of the codebase,
-///     and a subtractive adjective — <c>Except</c>, <c>Named</c>, <c>Where</c>, <c>Authored</c> — narrows
-///     which types inside it the rule governs without moving the node, because a diagram has no room to
-///     say "except these four types" and <c>sliderule explain</c> carries the exact subject. The
-///     exception is the locative one: a place-shaped noun narrowed by exactly one <c>InNamespace</c> says
-///     where a region sits, not which types it holds, so it draws as that region inside the head's own
-///     place. That is the only adjective that moves a node, and it is what lets a region nest inside a
-///     layer anchored on a project, which carries no globs for containment to be inferred from. A
-///     union has no single noun (and <see cref="Selection.Noun" /> throws on one), a registration is a
-///     lifetime rather than a location, bare <c>arch.Types</c> is the whole solution, and a family
-///     (<c>arch.Each</c>) is several places at once — none of the four is a place, so all four go to the
-///     list.
+///     The approximation is noun-level, with one exception. A noun names a region of the codebase, and a
+///     subtractive adjective (<c>Except</c>, <c>Named</c>, <c>Where</c>, <c>Authored</c>) narrows which
+///     types inside it the rule governs without moving the node, because a diagram has no room to say
+///     "except these four types" and <c>sliderule explain</c> carries the exact subject. The exception is
+///     the locative <c>InNamespace</c> (<see cref="FromLocative" />). A union has no single noun, a
+///     registration is a lifetime rather than a location, bare <c>arch.Types</c> is the whole solution, and
+///     a family (<c>arch.Each</c>) is several places at once, so none of them is a place.
 /// </remarks>
 internal static class LawPlaceClassifier
 {
     /// <summary>
-    ///     The word an exposure edge's label carries. Shared because the legend row that explains that
-    ///     label is gated on the verb rather than on the composed arrow text; the allow-list word needs no
-    ///     such constant, because <see cref="DrawableVerb.Only" /> already names that fact.
+    ///     The word an exposure edge's label carries, shared because the legend row that explains that label
+    ///     is gated on the verb rather than on the composed arrow text.
     /// </summary>
     internal const string ExposeVerb = "expose";
 
     private const string OnlyVerb = "only";
 
     /// <summary>
-    ///     What the fence draws for a verb, or null when the verb draws nothing. The drawable verbs are
-    ///     the four dependency-direction verbs, the two leaf forms of the allow-lists, and the exposure
-    ///     verb; every other verb constrains a shape, a name, or a member rather than a relation between
-    ///     two places, and an arrow would misrepresent it. The cross-cell ban
-    ///     (<c>MustNotReferenceEachOther</c>) is not among them: its far end is a different place for every
-    ///     cell, so one arrow could not say it and its subject is not a place either. Neither is the cycle
-    ///     gate (<c>MustNotHaveCircularReferences</c>), and for a further reason: no arrow can say "no
-    ///     circle" — the law forbids a property of a path, not an edge. Both fall to the compact list under
-    ///     the fence with their subject.
+    ///     What the fence draws for a verb, or null for a verb that constrains a shape, a name, or a member
+    ///     rather than a relation between two places, where an arrow would misrepresent it. One arrow cannot
+    ///     say the cross-cell ban or the cycle gate either.
     /// </summary>
     /// <remarks>
-    ///     One reading answers the whole drawing — the arrow's direction, the self-edge an allow-list makes
-    ///     redundant, the word the label carries, and the legend rows those imply — so a verb can never be
-    ///     one thing to the arrow and another to the legend. The leaf form is drawable and draws nothing:
-    ///     it names no operand, so it registers its subject's place and then falls to the compact list
-    ///     under the fence. Declining it here instead would drop the place with it, and a leaf is a node of
-    ///     the graph whether or not an arrow leaves it.
+    ///     One reading answers the whole drawing, so a verb can never be one thing to the arrow and another to
+    ///     the legend. The leaf form is drawable and draws nothing: it names no operand, so it registers its
+    ///     subject's place and then falls to the compact list under the fence. Declining it here instead would
+    ///     drop the place with it, and a leaf is a node of the graph whether or not an arrow leaves it.
     /// </remarks>
     internal static DrawableVerb? Classify(Constraint? constraint)
     {
@@ -78,7 +63,6 @@ internal static class LawPlaceClassifier
         return new DrawableVerb(inbound, only, verbWord);
     }
 
-    /// <summary>Whether the fence can draw an edge for this verb at all.</summary>
     internal static bool IsDrawableVerb(Constraint? constraint)
     {
         return Classify(constraint) is not null;
@@ -95,16 +79,15 @@ internal static class LawPlaceClassifier
     }
 
     /// <summary>
-    ///     The place an operand stands on, or null when it is not place-shaped. A single type
-    ///     <em>is</em> a place here: <c>MustNotReference(typeof(Environment))</c> names exactly one thing
-    ///     to point the arrow at, and that is the whole of what the rule forbids.
+    ///     The place an operand stands on, or null when it is not place-shaped. A single type is a place
+    ///     here: <c>MustNotReference(typeof(Environment))</c> names exactly one thing to point the arrow at,
+    ///     and that is the whole of what the rule forbids.
     /// </summary>
     internal static LawPlace? OperandPlace(Selection? selection, IReadOnlyList<LayerDefinition> layers)
     {
         return PlaceOf(selection, layers, PlacePosition.Operand);
     }
 
-    /// <summary>A place standing for one namespace glob, carrying a declared layer's name when one owns that glob.</summary>
     private static LawPlace FromGlob(string glob, IReadOnlyList<LayerDefinition> layers)
     {
         // Identity collapse: a layer defined by exactly one glob IS that glob, so a rule naming the glob
@@ -117,17 +100,12 @@ internal static class LawPlaceClassifier
             : new LawPlace(glob, owner.Name, owner.Name, owner.Globs, true);
     }
 
-    /// <summary>
-    ///     The place one sanctioned-surface operand stands on, or null when it is not place-shaped. A
-    ///     boundary the drawing cannot place is not a boundary the law loses: its containment rule joins
-    ///     the compact list under the fence, which is the drawing's totality rule.
-    /// </summary>
+    /// <summary>The place one sanctioned-surface operand stands on, or null when it is not place-shaped.</summary>
     internal static LawPlace? FacadePlace(Selection? selection, IReadOnlyList<LayerDefinition> layers)
     {
         return PlaceOf(selection, layers, PlacePosition.Facade);
     }
 
-    /// <summary>A place standing for one sanctioned-surface type inside a quarantined scope.</summary>
     private static LawPlace FromFacade(TypeAnchor anchor)
     {
         // The facade's box sits inside the scope's box, which already names the scope, so the simple name
@@ -166,7 +144,6 @@ internal static class LawPlaceClassifier
         }
     }
 
-    // The place a bare noun stands on, or null for a noun that is not a region of the codebase.
     private static LawPlace? NounPlace(SelectionNoun noun, IReadOnlyList<LayerDefinition> layers)
     {
         return noun switch
@@ -178,12 +155,11 @@ internal static class LawPlaceClassifier
         };
     }
 
-    // The one adjective that moves a node. A place-shaped noun narrowed by exactly one InNamespace names a
-    // region and says where it sits, so it draws as that region inside the head's own place — the declared
-    // containment a refinement-defined layer earns in FromLayer, without minting a layer to declare it.
-    // Every other adjective is subtractive and leaves the node on the head, which is the noun-level rule
-    // holding. The region takes FromGlob's key, so a rule naming the glob and a rule naming it locatively
-    // stay one node.
+    // The one adjective that moves a node. A place-shaped noun narrowed by exactly one InNamespace says where
+    // a region sits, not which types it holds, so it draws as that region inside the head's own place: the
+    // declared containment a refinement-defined layer earns in FromLayer, without minting a layer to declare
+    // it. The region takes FromGlob's key, so a rule naming the glob and a rule naming it locatively stay one
+    // node.
     private static LawPlace? FromLocative(Selection selection, IReadOnlyList<LayerDefinition> layers)
     {
         LawPlace? head = NounPlace(selection.Noun, layers);
@@ -313,17 +289,13 @@ internal static class LawPlaceClassifier
         return prefix;
     }
 
-    /// <summary>
-    ///     What one drawable verb means to the drawing: which end of the relation the arrow leaves from,
-    ///     whether it states an allow-list rather than a ban, and the word its label carries when it has
-    ///     one.
-    /// </summary>
+    /// <summary>What one drawable verb means to the drawing.</summary>
     internal sealed class DrawableVerb(bool inbound, bool only, string? verbWord)
     {
-        /// <summary>Whether the operand is the source of the arrow — the passive voice of a direction verb.</summary>
+        /// <summary>Whether the operand is the source of the arrow: the passive voice of a direction verb.</summary>
         internal bool Inbound { get; } = inbound;
 
-        /// <summary>Whether the verb names an allow-list, which is what makes it naming its own subject a no-op.</summary>
+        /// <summary>Whether the verb names an allow-list rather than a ban.</summary>
         internal bool Only { get; } = only;
 
         /// <summary>The word the edge label carries, or null for the plain ban that needs none.</summary>

@@ -14,15 +14,12 @@ namespace SlideRule.Cli.Mcp.Pipeline;
 ///         every other key, so a hallucinated key (the model guessing <c>file</c>/<c>ruleId</c> variants
 ///         instead of the real parameter) is dropped before the tool runs. The model never learns it sent a
 ///         typo: a required parameter fails downstream as missing, and an optional one silently takes its
-///         default. This guard inspects the raw argument keys ahead of binding and names both the bad keys
-///         and the real parameter list so the next call self-corrects, mirroring the forgiving-input policy
-///         of <see cref="EnumValidationConverterFactory" /> and <see cref="StringArrayCoercerFactory" />.
+///         default.
 ///     </para>
 ///     <para>
 ///         It must accept exactly the keys the binder binds. Names are therefore read from
 ///         <see cref="ParameterInfo.Name" /> with no naming policy applied, as the binder reads them for a
-///         parameter no experimental <c>[AIParameterName]</c> renames (no tool here uses one), and compared
-///         ordinally, as the SDK's argument dictionary compares them. The Web defaults' case-insensitivity
+///         parameter no experimental <c>[AIParameterName]</c> renames; the Web defaults' case-insensitivity
 ///         applies only inside a value being deserialized, never to the keys. Parameters the SDK binds from
 ///         the request or from services are left out (<see cref="ToolAttributeDiscovery.IsJsonBoundParameter" />).
 ///         The SDK's own unmapped-key check stays off because these options keep
@@ -35,10 +32,9 @@ internal static class UnknownParameterGuard
     private static readonly FrozenDictionary<string, string[]> ToolParameters = BuildMap();
 
     /// <summary>
-    ///     Returns an error message if <paramref name="arguments" /> contains a key that
-    ///     matches no declared parameter of <paramref name="toolName" /> exactly (ordinally, as the SDK
-    ///     binds them), otherwise <see langword="null" />. Only key identity is inspected — values are
-    ///     never read, so a present-but-null valid argument is fine.
+    ///     Returns an error message if <paramref name="arguments" /> holds a key that matches no declared parameter
+    ///     of <paramref name="toolName" />, otherwise <see langword="null" />. Only key identity is inspected, so a
+    ///     present-but-null valid argument is fine.
     /// </summary>
     internal static string? Validate(string toolName, IDictionary<string, JsonElement>? arguments)
     {

@@ -8,9 +8,7 @@ namespace SlideRule.Codebase;
 /// <remarks>
 ///     The two lists are one value because neither means anything without the other: an instance's share is a
 ///     subsequence of <see cref="Sites" /> BY REFERENCE, and a rule that read one list's instances beside
-///     another list's sites would cite lines that no instance it owns ever made. The merge mints the pair in
-///     one place per edge table, and a catch edge carries one per narrowing, so a verb deciding on a narrowing
-///     cannot reach a share of the edge's whole list.
+///     another list's sites would cite lines that no instance it owns ever made.
 /// </remarks>
 internal readonly struct EdgeEvidence
 {
@@ -20,7 +18,10 @@ internal readonly struct EdgeEvidence
         Instances = instances;
     }
 
-    /// <summary>Each distinct place the fact occurs, ordered by file then line.</summary>
+    /// <summary>
+    ///     Each distinct place the fact occurs, ordered by file then line; two occurrences on one line are one
+    ///     site.
+    /// </summary>
     internal IReadOnlyList<SourceLocation> Sites { get; }
 
     /// <summary>

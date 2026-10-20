@@ -67,11 +67,9 @@ internal static class SelectionWalk
             yield break;
         }
 
-        // The one project selection a TYPE-subject constraint can carry: the project form of a family
-        // (GRAMMAR §5.1), whose cells the artifact stratum names. It rides this walk so the project-side
-        // checks — the foreign-Arch walk and the blank name/glob check (§8 items 22–23) — reach it
-        // without a walk of their own. A reader here is therefore not entitled to assume a project
-        // constraint; each one reads the anchor it was given rather than the constraint.
+        // The one project selection a type-subject constraint can carry: a project family's (GRAMMAR §5.1). It
+        // rides this walk so the project-side checks (§8 items 22–23) reach it without a walk of their own, so a
+        // reader here may not assume a project constraint and reads the anchor it was given.
         if (constraint.Subject.FamilyNounOrNull()?.Projects is { } projects)
             foreach (ProjectSelection selection in ExpandProjectSelection(projects))
                 yield return selection;
@@ -110,11 +108,7 @@ internal static class SelectionWalk
     }
 
     /// <summary>The project selection itself, then the payloads of its own <c>Except</c> adjectives.</summary>
-    /// <remarks>
-    ///     There is no union arm: the project stratum has no <c>AnyOf</c>, because <c>.Named(a, b)</c> and
-    ///     <c>.Matching(a, b)</c> already say "either of these" without one. <c>Except</c> is the only way a
-    ///     project selection nests.
-    /// </remarks>
+    /// <remarks>No union arm: the project stratum has no <c>AnyOf</c>, and <c>Except</c> is its only nesting.</remarks>
     private static IEnumerable<ProjectSelection> ExpandProjectSelection(ProjectSelection selection)
     {
         yield return selection;
@@ -133,11 +127,10 @@ internal static class SelectionWalk
     {
         yield return selection;
 
-        // As in SelectionProse: the operands, then this selection's own Except payloads — a union carries
-        // adjectives of its own, so AnyOf(a, b).Except(bad) must reach the payload walk. A family's layer
-        // cells are walked on the same terms and for the same reason, so the foreign-Arch, lifetime and
-        // blank walks reach a cell minted on another Arch (GRAMMAR §5.1, §8). The arms are exclusive
-        // because reading .Noun on a union throws by design.
+        // As in SpecValidator.SelectionProse: a union carries adjectives of its own, so AnyOf(a, b).Except(bad)
+        // must reach the payload walk too, and a family's layer cells are walked on the same terms, so a cell
+        // minted on another Arch is reached (GRAMMAR §5.1, §8). The arms are exclusive because reading .Noun on a
+        // union throws.
         if (selection is UnionSelection union)
             foreach (Selection member in union.Parts)
             foreach (Selection nested in ExpandSelection(member))

@@ -11,12 +11,8 @@ namespace SlideRule.Codebase;
 ///     referencing compilation actually bound: a project that references the package reaches the package's
 ///     type and never the declaring project's. A rule naming the type by name reaches both, and a rule
 ///     naming a project tells them apart, because the supplied type carries the supplying assembly's name in
-///     place of a project's. This is the same split <see cref="CodebaseModel.MergeNotes" /> states in prose,
-///     in a form a caller can act on without parsing a sentence or grouping
-///     <see cref="CodebaseModel.Types" /> by name.
+///     place of a project's.
 /// </remarks>
-// Sealed class, internal constructor, get-only properties: the Codebase style, positional records being
-// unavailable on Core's netstandard2.0 target.
 internal sealed class ShadowedName
 {
     internal ShadowedName(

@@ -33,8 +33,8 @@ namespace SlideRule.Packs.DotNet;
 // so the doctrine costs nothing.
 public static class DotNetGuidance
 {
-    // The two pages more than one rule rests on, written once so a moved page cannot be corrected on some
-    // rules and missed on the others. The four pages a single rule cites stay at their own call site.
+    // The pages more than one rule rests on, written once so a moved page cannot be corrected on some rules
+    // and missed on the others. A page a single rule cites stays at its own call site.
     private const string DependencyInjectionGuidelines =
         "https://learn.microsoft.com/dotnet/core/extensions/dependency-injection/guidelines";
 

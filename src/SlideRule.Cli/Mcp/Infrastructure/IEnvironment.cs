@@ -29,9 +29,8 @@ internal static class EnvironmentReadings
     ///     <c>null</c> when it is unset or blank.
     /// </summary>
     /// <remarks>
-    ///     One owner because a run's binlog capture store and its extraction-fragment cache have to agree on
-    ///     where the cache is: they read the same variable through the same seam, and two normalizations of
-    ///     "blank means unset" are two chances for them to disagree.
+    ///     One owner because a run's binlog capture store and its extraction-fragment cache must agree on where the
+    ///     cache is, and two normalizations of "blank means unset" are two chances for them to disagree.
     /// </remarks>
     internal static string? CacheRootOverride(this IEnvironment environment)
     {

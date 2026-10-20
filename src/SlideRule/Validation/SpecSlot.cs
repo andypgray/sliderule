@@ -13,23 +13,8 @@ namespace SlideRule.Validation;
 /// <remarks>
 ///     One instance per slot, so each label literal is written once and the noun a value is named by
 ///     cannot fork between the walks that reach it. <see cref="Decide" /> owns the whole precedence for
-///     its slot — blank first, then the slot's own structural check — which is what lets a slot be held
-///     by more than one caller and still be reported once.
-///     <para>
-///         Two slots carry the label "project name" under different codes. <c>arch.Project(...)</c> and
-///         <c>MustResideInProject(...)</c> report a blank as
-///         <see cref="SpecValidationErrorCode.BlankPattern" />, while <c>arch.Projects.Named(...)</c>
-///         reports it as <see cref="SpecValidationErrorCode.BlankProjectPattern" />, because a blank
-///         project name and a blank project glob fail in opposite directions and the catalog entries have
-///         to be able to say so. A verdict carries the code, so those need an instance each.
-///     </para>
-///     <para>
-///         "member name" is shared the same way. <c>arch.Member(type, name)</c> reports a blank as
-///         <see cref="SpecValidationErrorCode.BlankMemberName" />, because a blank anchor name never resolves
-///         to a member, while a member selection's <c>Named(...)</c> reports it as
-///         <see cref="SpecValidationErrorCode.BlankPattern" /> beside the type side's exact names, because a
-///         blank exact name is the same authoring slip on either stratum.
-///     </para>
+///     its slot, which is what lets a slot be held by more than one caller and still be reported once. A
+///     label two slots share sits under a different code on each, since a verdict carries the code.
 /// </remarks>
 internal sealed class SpecSlot
 {
@@ -62,7 +47,7 @@ internal sealed class SpecSlot
 
     /// <summary>
     ///     One exact member name on a member selection's <c>Named</c>, which reports a blank as
-    ///     <see cref="Code.BlankPattern" />.
+    ///     <see cref="Code.BlankPattern" />, the slip the type side's exact names make.
     /// </summary>
     internal static readonly SpecSlot ExactMemberName = new(nameof(ExactMemberName), "member name", SlotCheck.Pattern);
 
@@ -94,8 +79,9 @@ internal sealed class SpecSlot
     internal static readonly SpecSlot ProjectNamePattern = new(nameof(ProjectNamePattern), "project name pattern", SlotCheck.ProjectOperand);
 
     /// <summary>
-    ///     A name on <c>arch.Projects.Named</c>: the same noun as <see cref="ProjectName" /> under the project stratum's
-    ///     own code.
+    ///     A name on <c>arch.Projects.Named</c>: the same noun as <see cref="ProjectName" /> under the project
+    ///     stratum's own code, <see cref="Code.BlankProjectPattern" />, a blank project name and a blank project
+    ///     glob failing in opposite directions.
     /// </summary>
     internal static readonly SpecSlot ProjectNameOperand = new(nameof(ProjectNameOperand), "project name", SlotCheck.ProjectOperand);
 
@@ -141,7 +127,10 @@ internal sealed class SpecSlot
     /// <summary>The value <c>MustSetProperty</c> requires.</summary>
     internal static readonly SpecSlot PropertyValue = new(nameof(PropertyValue), "property value", SlotCheck.Property);
 
-    /// <summary>The name of <c>arch.Member(type, name)</c>.</summary>
+    /// <summary>
+    ///     The name of <c>arch.Member(type, name)</c>, which reports a blank as <see cref="Code.BlankMemberName" />:
+    ///     a blank anchor name never resolves to a member.
+    /// </summary>
     internal static readonly SpecSlot MemberName = new(nameof(MemberName), "member name", SlotCheck.MemberName);
 
     /// <summary>The ID of <c>arch.Rule</c>.</summary>
@@ -205,10 +194,7 @@ internal sealed class SpecSlot
         _check = check;
     }
 
-    /// <summary>
-    ///     The slot's own identifier, which is the name of the field holding it. It is what a caller with
-    ///     no reference to the instance names the slot by.
-    /// </summary>
+    /// <summary>The name of the field holding the slot, by which a caller with no reference to it names it.</summary>
     internal string Name { get; }
 
     /// <summary>The noun this slot's messages name the value by ("Blank interface name on 'rule/id'.").</summary>
@@ -225,17 +211,10 @@ internal sealed class SpecSlot
     ///     reach on its own.
     /// </summary>
     /// <remarks>
-    ///     The whole precedence for the slot, in the order the catalog reports it: blank first, so every
-    ///     kind shares one blank code and one blank sentence, then whatever structure the slot carries of
-    ///     its own. A namespace glob's second verdict is asked of <c>NamespacePattern.Validate</c> rather
-    ///     than reproduced here, so what the matcher treats as literal and what the catalog refuses to
-    ///     strand a <c>*</c> in cannot drift; that method keeps its own blank branch for the readers that
-    ///     call it with no blank check in front.
-    ///     <para>
-    ///         A null is read as the empty string. The model holds a value that was never written as null
-    ///         (a <c>Migrate</c> with no <c>from</c>), every arm below opens on a blank check, and a blank
-    ///         and an absent value draw the same sentence.
-    ///     </para>
+    ///     The whole precedence for the slot, in the order the catalog reports it: blank first, then whatever
+    ///     structure the slot carries of its own. A null is read as the empty string: the model holds a value
+    ///     never written as null (a <c>Migrate</c> with no <c>from</c>), and a blank and an absent value draw
+    ///     the same sentence.
     /// </remarks>
     internal LiteralVerdict? Decide(string? value)
     {
@@ -279,6 +258,7 @@ internal sealed class SpecSlot
     // GRAMMAR §8 items 16 and 35: a namespace glob whose trailing `.*` sits behind a literal prefix carrying a `*`,
     // and a path glob in a shape the matcher refuses rather than normalizes. The clause comes back from the
     // matcher and the frame is this catalog's, so what a matcher refuses and what the catalog reports cannot drift.
+    // Fluent.NamespacePattern.Validate keeps its own blank branch for callers that make no blank check first.
     private LiteralVerdict? MatcherRefusal(string literal, Func<string, string?> validate, Code code)
     {
         string? reason = validate(literal);
@@ -287,10 +267,8 @@ internal sealed class SpecSlot
         return LiteralVerdict.About(code, $"The {Label} '{literal}'", $" {reason}.");
     }
 
-    // GRAMMAR §8 item 26: a template with no {Name} in it is a constant predicate — every subject derives
-    // the same fixed name, so the rule is a cardinality law wearing a correspondence law's clothes, and it
-    // reds or greens the whole subject set together. The match is ordinal, which is what makes the
-    // '{name}' typo fail here rather than at check time.
+    // GRAMMAR §8 item 26. The match is ordinal, as Derive's is, so a '{name}' typo fails here rather than at
+    // check time.
     private LiteralVerdict? PlaceholderFree(string literal)
     {
         int placeholder = literal.IndexOf(MustHaveExactlyOneCounterpartConstraint.NamePlaceholder, StringComparison.Ordinal);
@@ -301,10 +279,8 @@ internal sealed class SpecSlot
             + "claim, not a correspondence; use a template such as 'I{Name}' (substitution is case-sensitive).");
     }
 
-    // GRAMMAR §8 item 30: every consuming surface treats a citation as a link — the agent block autolinks
-    // it, SARIF hands it to a scanning service as helpUri — and none of them can report a value that is not
-    // one. The scheme allow-list is what makes a pasted page title or a repo-relative path fail at spec
-    // build rather than downstream.
+    // GRAMMAR §8 item 30: no surface downstream can report a citation that is not a link, so the scheme
+    // allow-list fails it at spec build.
     private static LiteralVerdict? NotAnHttpUrl(string literal)
     {
         bool absolute = Uri.TryCreate(literal, UriKind.Absolute, out Uri parsed);
@@ -314,8 +290,7 @@ internal sealed class SpecSlot
             $": '{literal}' is not an absolute http(s) URL.");
     }
 
-    // GRAMMAR §8 item 7. The sentence names no subject because the ID is the subject: quoting it twice
-    // would say the same thing in two places.
+    // GRAMMAR §8 item 7. A whole verdict: the ID is its own subject.
     private static LiteralVerdict? MalformedId(string literal)
     {
         if (RuleIdSyntax.IsValid(literal)) return null;
@@ -324,8 +299,8 @@ internal sealed class SpecSlot
             $"Malformed ID '{literal}'; expected `area/rule-name` matching {RuleIdSyntax.Pattern}.");
     }
 
-    // A blank layer name is the one blank the shared sentence cannot render: the name is what is missing,
-    // so there is nothing to name it by. The steer points at the argument to write instead.
+    // The one blank the shared sentence cannot render: the name is what is missing, so there is nothing to
+    // name it by.
     private static LiteralVerdict? BlankLayerName(string literal)
     {
         if (!string.IsNullOrWhiteSpace(literal)) return null;

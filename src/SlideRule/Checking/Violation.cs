@@ -4,21 +4,12 @@ using SlideRule.Codebase;
 namespace SlideRule.Checking;
 
 /// <summary>
-///     One concrete way a rule was broken: a reference between two types, a use of a banned member, a
-///     type, member or project of the wrong shape, a subject that matched nothing, or an error that
-///     stopped the rule being evaluated. <see cref="Kind" /> says which, and therefore which of the
-///     properties below carry a value and which are null; <see cref="Sites" /> carries the source
-///     positions that evidence it. A rule's failing violations are in
-///     <see cref="RuleResult.Violations" /> and its tolerated ones in
-///     <see cref="RuleResult.Grandfathered" />.
+///     One concrete way a rule was broken. <see cref="Kind" /> says which, and therefore which of the properties
+///     below carry a value and which are null; <see cref="Sites" /> carries the source positions that evidence it.
 /// </summary>
-// The constructor takes only what every violation has — its kind and its evidence — and each factory
-// below names the slots its own kind populates, through an object initializer. That is why the slots
-// carry a private setter rather than being get-only: init is unavailable on this target framework (no
-// IsExternalInit), and every factory is a member of this class, so the setters reach exactly as far
-// as they must and a violation is read-only to every consumer. A new slot therefore touches no
-// existing factory, and no factory threads a run of nulls past slots of the same type where a
-// transposition would compile.
+// Each factory below names the slots its own kind populates through an object initializer, so the slots carry a
+// private setter rather than being get-only: init is unavailable on this target framework (no IsExternalInit),
+// and every factory is a member of this class, so a violation stays read-only to every consumer.
 internal sealed class Violation
 {
     private Violation(ViolationKind kind, IReadOnlyList<SourceLocation> sites)
@@ -31,24 +22,21 @@ internal sealed class Violation
     public ViolationKind Kind { get; }
 
     /// <summary>
-    ///     Gets the type at the near end of the offending edge: the one that references, constructs,
-    ///     injects, catches, throws or exposes, depending on <see cref="Kind" />. This is where the edit
-    ///     goes, for the inbound verbs as much as the outbound ones. Null for every kind that is not an
-    ///     edge.
+    ///     Gets the type at the near end of the offending edge: the one that references, uses, constructs,
+    ///     injects, catches, throws or exposes, depending on <see cref="Kind" />. This is where the edit goes, for
+    ///     the inbound verbs as much as the outbound ones. Null for every kind that is not an edge.
     /// </summary>
     public TypeNode? Source { get; private set; }
 
     /// <summary>
     ///     Gets the type at the far end of the offending edge: the referenced type, the constructed type,
     ///     the injected parameter type, the caught or the thrown exception type, or the exposed type,
-    ///     depending on <see cref="Kind" />. Null for every kind that is not an edge.
+    ///     depending on <see cref="Kind" />. Null on a member use, whose far end is <see cref="Member" />, and on
+    ///     every kind that is not an edge.
     /// </summary>
     public TypeNode? Target { get; private set; }
 
-    /// <summary>
-    ///     Gets the type that failed a verb about the type itself (its shape, its name, what it inherits
-    ///     or is attributed with, where it lives, or a <c>Must</c> predicate); null for every other kind.
-    /// </summary>
+    /// <summary>Gets the type that failed a verb about the type itself; null for every other kind.</summary>
     public TypeNode? Subject { get; private set; }
 
     /// <summary>Gets the banned member the source used; null for every kind but a member use.</summary>
@@ -123,7 +111,8 @@ internal sealed class Violation
     ///     declarations of the offending type, member or project fact. For a project fact that is the
     ///     declaration that won the build's evaluation, regularly a props file above the project file, and
     ///     the project file itself where nothing declared the property. Empty when the subject matched
-    ///     nothing and when the rule errored, neither of which has anywhere to point.
+    ///     nothing, when the rule errored, and on any other project fact nothing declared, none of which has
+    ///     anywhere to point.
     /// </summary>
     public IReadOnlyList<SourceLocation> Sites { get; }
 
@@ -139,8 +128,7 @@ internal sealed class Violation
     ///     Gets what to change so the rule's subject matches something, on a violation that is about the
     ///     rule rather than about the code: the selection's own semantics, and what to check first. Present
     ///     on every violation raised because the subject selected nothing, and null on every other kind,
-    ///     whose fix is a change to the code the violation names. The check report prints it on a line
-    ///     under the violation, and <c>--json</c> output carries it as <c>hint</c>.
+    ///     whose fix is a change to the code the violation names.
     /// </summary>
     public string? Hint { get; private set; }
 
@@ -149,20 +137,15 @@ internal sealed class Violation
     ///     was speaking about when the violation was found. Populated only by the verbs of a rule whose
     ///     subject is a family (<c>arch.Each</c>), and null on every violation of every other rule. Where a
     ///     verb constrains what may reference the subject, the cell is the one the referenced type sits in,
-    ///     not the referencing type's, because that is the cell the rule was judging. The burndown printed
-    ///     by <c>sliderule status</c> groups a family rule's grandfathered violations by it, and it is no
-    ///     part of what a baseline file records.
+    ///     not the referencing type's, because that is the cell the rule was judging. It is no part of what a
+    ///     baseline file records.
     /// </summary>
     public string? Cell { get; private set; }
 
     /// <summary>
-    ///     This violation's deterministic within-rule report order key: (Source|Subject FullName, Target
-    ///     FullName, Member SymbolId, Target|Subject ProjectName), compared ordinal by the checker. A
-    ///     MemberUse mirrors Reference's (source, target) as (source FullName, member SymbolId); a
-    ///     MemberShape mirrors Shape's subject as (declaring-type FullName, member SymbolId); a
-    ///     ProjectShape mirrors it as (project Name, the bare name of the package, framework or property it
-    ///     names), the item standing where a Target would, so one project's per-item violations sort by the
-    ///     item they name.
+    ///     This violation's deterministic within-rule report order key, compared ordinal by the checker. A
+    ///     per-item project violation puts the bare name of its item where a Target would stand, so one project's
+    ///     per-item violations sort by the item they name.
     /// </summary>
     /// <remarks>
     ///     The fourth slot exists because the first three do not separate every pair of violations: a full
@@ -191,21 +174,12 @@ internal sealed class Violation
     }
 
     /// <summary>
-    ///     Returns the entry that identifies this violation in a baseline file — what decides whether a
-    ///     captured baseline grandfathers it — or null for a violation no baseline can ever hold.
+    ///     Returns the entry that identifies this violation in a baseline file, which decides whether a captured
+    ///     baseline grandfathers it, or null for an empty subject or a rule error, which have no stable identity.
     /// </summary>
     /// <remarks>
-    ///     An edge key for the edge kinds, pairing <see cref="Source" />'s symbol ID with
-    ///     <see cref="Target" />'s, or with <see cref="Member" />'s for a banned member use. A subject key
-    ///     otherwise: <see cref="Subject" />'s symbol ID for a type, <see cref="SubjectMember" />'s for a
-    ///     member, and <see cref="SubjectProject" />'s for a project. A per-item project violation keys an
-    ///     edge instead, from the project's identity to <see cref="ProjectItem" />, so a package or framework
-    ///     added after the baseline was captured is a new identity and fails, as a different forbidden target
-    ///     from a grandfathered source does. Every overload, parameter, catch clause, throw and signature
-    ///     position of one pair rides under one identity, its sites being evidence rather than identity; an edge entry also
-    ///     records how many sites it covered when it was captured, and a pair that has since grown past that
-    ///     count fails the rule instead of being grandfathered. Null for a subject that matched nothing and
-    ///     for a rule that errored: those have no stable identity.
+    ///     Every overload, parameter, catch clause, throw and signature position of one pair rides under one
+    ///     identity, its sites being evidence rather than identity.
     /// </remarks>
     public BaselineEntry? BaselineIdentity()
     {
@@ -232,11 +206,10 @@ internal sealed class Violation
     }
 
     /// <summary>
-    ///     A reference violation carrying the circle its pair lies on — what
-    ///     <c>MustNotHaveCircularReferences</c> mints (GRAMMAR §5.3). Identical to
+    ///     A reference violation carrying the circle its pair lies on, which <c>MustNotHaveCircularReferences</c>
+    ///     mints (GRAMMAR §5.3): identical to
     ///     <see cref="Reference(TypeNode, TypeNode, IReadOnlyList{SourceLocation})" /> in kind, identity and
-    ///     order key, so the baseline, the human report and SARIF are untouched; <see cref="Detail" /> is
-    ///     the JSON channel's addition alone.
+    ///     order key, and set apart by <see cref="Detail" /> alone.
     /// </summary>
     internal static Violation Reference(
         TypeNode source, TypeNode target, IReadOnlyList<SourceLocation> sites, string detail)
@@ -246,15 +219,11 @@ internal sealed class Violation
 
     /// <summary>
     ///     Labels a just-minted violation with the family cell whose law it breaks, and hands it back so a
-    ///     per-cell walk can annotate at the mint site. A null <paramref name="cell" /> labels nothing, which
-    ///     is what the same walks passing through for a plain subject want.
+    ///     per-cell walk can annotate at the mint site. A null <paramref name="cell" /> labels nothing.
     /// </summary>
     /// <remarks>
-    ///     A step of its own rather than a parameter on each factory, because the cell is orthogonal to the
-    ///     kind and would arrive beside a string the mint already takes — the cycle gate's circle detail — and
-    ///     two strings in a row is the transposition the factories above are shaped to prevent. Mutating here
-    ///     is safe for the same reason the private setters are: only this class can reach them, and a walk
-    ///     labels the instance it has just made, before any consumer has seen it.
+    ///     Mutating here is safe for the same reason the private setters are: only this class can reach them,
+    ///     and a walk labels the instance it has just made, before any consumer has seen it.
     /// </remarks>
     internal Violation InCell(string? cell)
     {
@@ -305,7 +274,7 @@ internal sealed class Violation
     /// <summary>
     ///     A subject project failing a packaging or escape verb (GRAMMAR §4.10), evidenced by the offending
     ///     fact's declaration sites — which may be empty, because a fact nothing declared has nowhere to
-    ///     point and an unlocated finding is more honest than a made-up one.
+    ///     point, and an unlocated finding is better than one pointing at a made-up site.
     /// </summary>
     internal static Violation ProjectShape(ProjectNode subject, IReadOnlyList<SourceLocation> sites)
     {
@@ -314,8 +283,7 @@ internal sealed class Violation
 
     /// <summary>
     ///     One declared package reference counting against a package verb, sited at the reference's own
-    ///     declaration — which may be a props file above the project. Shares <see cref="ProjectShape" />'s
-    ///     kind; <see cref="Package" /> is what tells the two apart, and what keys its identity per package.
+    ///     declaration, which may be a props file above the project.
     /// </summary>
     internal static Violation ProjectPackage(ProjectNode subject, PackageReference package)
     {
@@ -330,8 +298,7 @@ internal sealed class Violation
 
     /// <summary>
     ///     One target framework counting against <c>MustOnlyTarget</c>, as its short moniker, sited at the
-    ///     declaration of the project's framework list. Shares <see cref="ProjectShape" />'s kind;
-    ///     <see cref="Framework" /> keys its identity per framework.
+    ///     declaration of the project's framework list.
     /// </summary>
     internal static Violation ProjectFramework(ProjectNode subject, string framework, IReadOnlyList<SourceLocation> sites)
     {
@@ -346,9 +313,7 @@ internal sealed class Violation
 
     /// <summary>
     ///     The target framework a <c>MustTarget</c> rule requires and the project does not target, as its short
-    ///     moniker, sited at the declaration of the project's framework list. Keyed per framework as
-    ///     <see cref="ProjectFramework" /> is; <see cref="FrameworkMissing" /> is what the wording reads to say the
-    ///     project lacks it.
+    ///     moniker, sited at the declaration of the project's framework list.
     /// </summary>
     internal static Violation ProjectMissingFramework(
         ProjectNode subject, string framework, IReadOnlyList<SourceLocation> sites)
@@ -366,8 +331,7 @@ internal sealed class Violation
     /// <summary>
     ///     One evaluation of a project in which <paramref name="property" /> is unset or holds another value than a
     ///     <c>MustSetProperty</c> rule asks, sited at the definition that won, or at the project file where nothing
-    ///     set it. Shares <see cref="ProjectShape" />'s kind; <see cref="Property" /> with the evaluation's
-    ///     framework keys its identity.
+    ///     set it.
     /// </summary>
     internal static Violation ProjectProperty(
         ProjectNode subject, string property, ProjectEvaluation evaluation, EvaluatedProperty? found)
@@ -402,8 +366,6 @@ internal sealed class Violation
         return new Violation(ViolationKind.RuleError, Array.Empty<SourceLocation>()) { Detail = detail };
     }
 
-    // The one mint the six edge factories share: an edge violation is a (source, target) pair with its
-    // sites, and every other slot empty.
     private static Violation Edge(
         ViolationKind kind, TypeNode source, TypeNode target, IReadOnlyList<SourceLocation> sites)
     {

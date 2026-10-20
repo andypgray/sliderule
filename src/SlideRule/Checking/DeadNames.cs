@@ -5,9 +5,7 @@ namespace SlideRule.Checking;
 
 /// <summary>
 ///     The names of a selection's own multi-name <c>Named</c> lists that none of its members carries, and the globs
-///     of its own multi-glob <c>Under</c> lists that none of its members is declared under (GRAMMAR §4.1): read on an
-///     operand or an exemplar part as a dead one, on a subject as an empty one, and dropped from a subject before a
-///     run over one project's compilation evaluates it.
+///     of its own multi-glob <c>Under</c> lists that none of its members is declared under (GRAMMAR §4.1).
 /// </summary>
 /// <remarks>
 ///     <para>

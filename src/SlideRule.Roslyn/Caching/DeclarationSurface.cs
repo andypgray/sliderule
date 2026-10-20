@@ -11,9 +11,7 @@ namespace SlideRule.Roslyn.Caching;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         Opaque: method, constructor, destructor, operator, conversion and accessor bodies in both block and
-///         arrow form, property and indexer expression bodies, the initializers of non-constant fields, of
-///         field-like events and of auto-properties, and top-level statements. A dependent binds to a
+///         Member bodies, non-constant initializers and top-level statements are opaque: a dependent binds to a
 ///         member's signature, never to its body, and a non-constant initializer is evaluated where it is
 ///         declared. Everything else stays in the surface, including the parts that feel like implementation
 ///         but are not: a constant's value and an enum member's value (constant folding and overload
@@ -63,8 +61,7 @@ internal static class DeclarationSurface
     }
 
     // An initializer evaluated where it is declared: a non-const field's, a field-like event's or an
-    // auto-property's. A const field's value, an enum member's value and a parameter's default are read by
-    // the dependents that use them, so they are surface.
+    // auto-property's.
     private static bool IsNonConstantInitializer(SyntaxNode clause)
     {
         return clause.Parent switch

@@ -75,12 +75,8 @@ internal enum ViolationKind
     ///     A project failing a verb about projects: <c>SubjectProject</c> is the project, and <c>Sites</c>
     ///     points at where the offending fact is declared — which may be a shared props file above the
     ///     project, and may be empty where the fact has nowhere to point. One violation per rule and project,
-    ///     except where the verb names an item. The package verbs report one per declared package reference the
-    ///     rule objects to, with <c>Package</c> naming it and the package's own declaration as the site, and
-    ///     <c>MustOnlyTarget</c> one per framework outside its list and <c>MustTarget</c> one for the framework a
-    ///     project lacks, each with <c>Framework</c> naming it and the declaration of the project's framework
-    ///     list as the site. <c>MustSetProperty</c> reports one per framework build where the property is unset
-    ///     or holds another value, with <c>Property</c> naming it, at the definition that won or the project file.
+    ///     except where the verb names an item: then one per item, with <c>Package</c>, <c>Framework</c> or
+    ///     <c>Property</c> naming it.
     /// </summary>
     ProjectShape,
 
@@ -92,8 +88,7 @@ internal enum ViolationKind
     EmptySubject,
 
     /// <summary>
-    ///     The rule could not be evaluated: a type that cannot be represented, a closed generic where a
-    ///     definition was required, a predicate that threw, or a family of layers whose cells overlap.
+    ///     The rule could not be evaluated: a <see cref="RuleEvaluationException" />, or an unexpected fault.
     ///     <c>Detail</c> carries the explanation, and <c>Sites</c> is empty.
     /// </summary>
     RuleError

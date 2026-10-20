@@ -5,10 +5,7 @@ namespace SlideRule.Checking;
 /// <summary>
 ///     A note about something the check noticed without failing anything: a warning never changes its
 ///     rule's <see cref="RuleResult.Status" /> or the check's exit code, so it can sit on a rule that passed
-///     or on one that failed. Read one rule's warnings from <see cref="RuleResult.Warnings" /> and the run's
-///     total from <see cref="CheckReport.WarningCount" />. Each is printed by the check report, carried in
-///     <c>--json</c> output, and published as a warning-level result in SARIF output, and one that carries
-///     a <see cref="Hint" /> prints it beside the message on the first two.
+///     or on one that failed.
 /// </summary>
 internal sealed class CheckWarning
 {
@@ -31,10 +28,7 @@ internal sealed class CheckWarning
     /// <summary>Gets what raised the warning.</summary>
     public CheckWarningKind Kind { get; }
 
-    /// <summary>
-    ///     Gets the line saying what was noticed. The check report, <c>--json</c> output and SARIF output all
-    ///     carry it; the first two also carry <see cref="Hint" /> beside it where there is one.
-    /// </summary>
+    /// <summary>Gets the line saying what was noticed.</summary>
     public string Message { get; }
 
     /// <summary>
@@ -43,24 +37,19 @@ internal sealed class CheckWarning
     ///     whose message already carries the fault. On a warning about a selection, a pattern or an exemplar
     ///     part that matched nothing it carries that selection's own semantics and the choice left to make; on
     ///     a warning about a baseline section no rule names it gives the <c>sliderule baseline rename</c> that
-    ///     would move the section to the rule. The check report prints it on a line under the warning, once
-    ///     however many warnings of a rule share it, and <c>--json</c> output carries it as <c>hint</c>; SARIF
-    ///     output does not.
+    ///     would move the section to the rule.
     /// </summary>
     public string? Hint { get; }
 
     /// <summary>
     ///     Gets the file the warning is about, relative to the solution directory and with forward slashes:
-    ///     the same path <see cref="Message" /> names, held apart for in-process readers, and the location
-    ///     SARIF output reports the warning at. <c>check --json</c> does not carry it, since the warning's
-    ///     message there names the path. On an <see cref="CheckWarningKind.OrphanedBaseline" /> warning it is
-    ///     the baseline file holding the section. Null when the warning is about the spec rather than about the
-    ///     code or a baseline, which is every <see cref="CheckWarningKind.InertTarget" />,
-    ///     <see cref="CheckWarningKind.DeadOperand" /> and <see cref="CheckWarningKind.DeadExemplar" /> warning.
+    ///     the same path <see cref="Message" /> names, held apart for in-process readers.
+    ///     <c>check --json</c> does not carry it, since the warning's message there names the path. On an
+    ///     <see cref="CheckWarningKind.OrphanedBaseline" /> warning it is the baseline file holding the section.
+    ///     Null when the warning is about the spec rather than about the code or a baseline, which is every
+    ///     <see cref="CheckWarningKind.InertTarget" />, <see cref="CheckWarningKind.DeadOperand" /> and
+    ///     <see cref="CheckWarningKind.DeadExemplar" /> warning.
     /// </summary>
-    // Solution-relative because that is the one spelling every surface can use: an absolute path would
-    // have to be relativized again by each of them, and against the same solution directory the tripwire
-    // already resolved it against.
     public string? File { get; }
 
     /// <summary>
@@ -70,10 +59,7 @@ internal sealed class CheckWarning
     ///     list that matched nothing); the rule ID the section an <see cref="CheckWarningKind.OrphanedBaseline" />
     ///     warning names is filed under; or the exemplar part a <see cref="CheckWarningKind.DeadExemplar" />
     ///     warning is about, spelled as <see cref="Message" /> quotes it, or the whole exemplar's reference on a
-    ///     warning that it could not be resolved. Null on every other kind. <c>status</c> and <c>baseline</c> name
-    ///     dead patterns by it, through <see cref="RuleResult.UntestedOperands" /> and
-    ///     <see cref="RuleResult.StricterOperands" />, which <c>status --json</c> lists under <c>ratchet</c>; SARIF
-    ///     output puts it in the target slot of the warning's fingerprint. <c>check --json</c> does not carry it,
+    ///     warning that it could not be resolved. Null on every other kind. <c>check --json</c> does not carry it,
     ///     since the message quotes the same string, except on a warning that the exemplar could not be resolved,
     ///     whose message carries the fault instead.
     /// </summary>
@@ -94,9 +80,7 @@ internal sealed class CheckWarning
 
     /// <summary>
     ///     A warning that the target pattern <paramref name="operand" /> matched no types while the rule's other
-    ///     targets matched some. The message is composed from the operand so that the two cannot disagree: the
-    ///     operand is what keeps two such warnings on one rule apart in the SARIF fingerprint and in what status
-    ///     and baseline name.
+    ///     targets matched some.
     /// </summary>
     internal static CheckWarning InertTargetOperand(string operand, string? hint)
     {
@@ -107,9 +91,7 @@ internal sealed class CheckWarning
 
     /// <summary>
     ///     A warning that the allow-list pattern <paramref name="operand" /> matched no types, so the rule is
-    ///     stricter than written. The same kind as <see cref="InertTargetOperand" />, keyed the same way, because
-    ///     a rule carrying either was not measured as written and must not be captured into a baseline; its
-    ///     <see cref="Role" /> is what tells the two directions apart.
+    ///     stricter than written.
     /// </summary>
     internal static CheckWarning DeadAllowedOperand(string operand, string? hint)
     {
@@ -121,7 +103,7 @@ internal sealed class CheckWarning
     /// <summary>
     ///     A warning that the membership <paramref name="operand" /> — a selection a subject must belong to, or
     ///     the reside pair's namespace glob or project name — matched no types, so the rule is stricter than
-    ///     written. The same kind and key as <see cref="DeadAllowedOperand" />, and the same direction.
+    ///     written.
     /// </summary>
     internal static CheckWarning DeadMembership(string operand, string? hint)
     {
@@ -132,9 +114,7 @@ internal sealed class CheckWarning
 
     /// <summary>
     ///     A warning that the part <paramref name="operand" /> of a counterpart verb's <c>among:</c> matched no
-    ///     types. It errs both ways — a subject it held the one counterpart of reds, a subject it would have made
-    ///     ambiguous passes — so the rule is not measured as written, in the direction of
-    ///     <see cref="InertTargetOperand" />.
+    ///     types.
     /// </summary>
     internal static CheckWarning DeadAmongOperand(string operand, string? hint)
     {
@@ -173,9 +153,7 @@ internal sealed class CheckWarning
     }
 
     /// <summary>
-    ///     A warning that the exemplar part <paramref name="reference" /> matched no solution-declared types. The
-    ///     message is composed from the reference, as <see cref="InertTargetOperand" />'s is and for the same
-    ///     reason: the reference is what keeps two such warnings on one rule apart.
+    ///     A warning that the exemplar part <paramref name="reference" /> matched no solution-declared types.
     /// </summary>
     internal static CheckWarning DeadExemplar(string reference, string? hint)
     {

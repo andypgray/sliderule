@@ -1,9 +1,8 @@
 namespace SlideRule.Codebase;
 
 /// <summary>
-///     One evaluation of a project: the framework it was evaluated for, the project file it read, and the
-///     properties a declaration in the solution set in it. A multi-targeted project carries one per framework,
-///     because a condition on <c>$(TargetFramework)</c> can set a property for one framework and not another.
+///     One evaluation of a project. A multi-targeted project carries one per framework, because a condition on
+///     <c>$(TargetFramework)</c> can set a property for one framework and not another.
 /// </summary>
 /// <remarks>
 ///     The evaluation is recorded whole, not only through the properties it found, because a property nothing

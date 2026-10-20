@@ -3,24 +3,7 @@ using SlideRule.Roslyn.Diagnostics;
 namespace SlideRule.Cli.Verbs;
 
 /// <summary>The parsed inputs for <c>sliderule status</c> — the burndown report (human or <c>--json</c>).</summary>
-/// <param name="Solution">
-///     The solution to load: the settings file's where one applies, otherwise the positional argument (a file, a
-///     directory, or null for discovery).
-/// </param>
-/// <param name="Spec">
-///     The <c>--spec</c> value (a built DLL or a solution-member csproj), else the settings file's spec, else null
-///     for the convention.
-/// </param>
-/// <param name="Json">Whether to emit the machine-readable JSON burndown document instead of human output.</param>
-/// <param name="WorkingDirectory">The directory solution discovery walks up from.</param>
-/// <param name="NoCache">Whether to bypass the persisted extraction cache entirely (no read, no write).</param>
-/// <param name="Binlog">The explicit <c>--binlog</c> to replay instead of a design-time build, or null to auto-select.</param>
-/// <param name="AllowWorkspaceDiagnostics">
-///     Whether to report the burndown from the partial model when a project fails to load. Default
-///     (<c>false</c>): the burndown still renders, then the run exits 2 — unloaded projects declare no types,
-///     so every count reads low and a ratchet read against them looks like progress. Keys on exactly what
-///     <c>check</c> keys on (<see cref="IncompleteModelGate" />).
-/// </param>
+/// <remarks><paramref name="AllowWorkspaceDiagnostics" /> opts out of <see cref="IncompleteModelGate" />.</remarks>
 internal sealed record StatusRequest(
     string? Solution,
     string? Spec,

@@ -16,18 +16,16 @@ internal static class ServerInstructions
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         Deliberately silent about <c>args</c> and the environment variable, which the banner names in
-    ///         the paragraph after this one. Those bind the next session: an agent inside this one cannot
-    ///         edit the client config that launched it, and a remedy the reader cannot take reads as no remedy
-    ///         at all.
+    ///         It is silent about <c>args</c> and the environment variable, which the banner names after it:
+    ///         those bind the next session, and an agent inside this one cannot edit the client config that
+    ///         launched it.
     ///     </para>
     ///     <para>
     ///         Both spellings are named because this process cannot know which one resolves for whoever is
     ///         reading. A config generated from the registry manifest passes no solution, so that session binds
-    ///         only through <c>SLIDERULE_SOLUTION_PATH</c> or the walk-up, and starts unbound when neither
-    ///         resolves one. The <c>dnx</c> launch the manifest prescribes runs the package without installing
-    ///         the tool, so <c>sliderule</c> is absent there. The installed spelling still leads, because it
-    ///         is right for every other unbound shape.
+    ///         only through <c>SLIDERULE_SOLUTION_PATH</c> or the walk-up, and the <c>dnx</c> launch the manifest
+    ///         prescribes runs the package without installing the tool, so <c>sliderule</c> is absent there. The
+    ///         installed spelling still leads, because it is right for every other unbound shape.
     ///     </para>
     ///     <para>
     ///         Four things here are required and easy to undo by accident. <c>dotnet dnx</c>, never bare
@@ -57,15 +55,9 @@ internal static class ServerInstructions
     ///     normally, and otherwise a banner carrying <paramref name="bindingFailure" /> verbatim above it.
     /// </summary>
     /// <remarks>
-    ///     A server launched with no solution argument whose walk-up finds nothing still starts, so the reason
-    ///     takes the two channels a client does read: this banner, delivered once at the handshake, and every
-    ///     tool call's error result, which carries the identical discovery message because the tools re-run
-    ///     discovery per call and gets <see cref="UnboundCallCoda" /> appended by <c>GlobalCallToolFilter</c>.
-    ///     Both channels lead with the recovery this session can perform and name the client-config edits it
-    ///     cannot only after it. The banner is only ever prepended — the embedded resource is never edited, so
-    ///     a bound server and an unbound one describe the same tools in the same words.
+    ///     The banner is only ever prepended and the embedded resource never edited, so a bound server and an
+    ///     unbound one describe the same tools in the same words.
     /// </remarks>
-    /// <param name="bindingFailure">The discovery refusal, or <see langword="null" /> when the bind succeeded.</param>
     internal static string For(string? bindingFailure)
     {
         if (bindingFailure is null) return Text;

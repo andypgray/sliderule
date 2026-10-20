@@ -17,10 +17,8 @@ internal sealed class StrictJsonError
     /// </summary>
     internal string Reason { get; }
 
-    /// <summary>Where the refusal sits in the text that was parsed.</summary>
     internal JsonPosition Position { get; }
 
-    /// <summary>The refusal with its position in front: <c>line 2, column 8: ...</c>.</summary>
     internal string Describe()
     {
         return Position.Describe(Reason);

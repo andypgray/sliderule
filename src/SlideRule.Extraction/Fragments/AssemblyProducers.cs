@@ -6,15 +6,13 @@ namespace SlideRule.Extraction.Fragments;
 /// </summary>
 /// <remarks>
 ///     Several frameworks of one project produce one assembly name and agree; two projects producing one name
-///     disagree, and the entry goes null rather than naming either of them, because a name that does not say
-///     which project it came from concludes nothing. Names compare ordinally, and the answers do not depend on
-///     the order the pairs were recorded in. <see cref="FragmentMerger" /> and <see cref="SiblingProjects" />
-///     both fold through this one index, so the merge and the one-project view attribute an assembly by the
-///     same rule.
+///     disagree, and the entry goes null for good rather than naming either of them, because a name that does
+///     not say which project it came from concludes nothing. So no answer depends on the order the pairs were
+///     recorded in. <see cref="FragmentMerger" /> and <see cref="SiblingProjects" /> both fold through this one
+///     index, so the merge and the one-project view attribute an assembly by the same rule.
 /// </remarks>
 internal sealed class AssemblyProducers
 {
-    // Assembly name → the one project producing it, or null where several do.
     private readonly Dictionary<string, string?> _projectsByAssembly = new(StringComparer.Ordinal);
 
     /// <summary>

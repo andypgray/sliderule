@@ -1,10 +1,6 @@
 namespace SlideRule.Checking;
 
-/// <summary>
-///     What a <see cref="CheckWarning" /> is about. A warning is something the check noticed without
-///     failing anything: it never changes the status of the rule it sits on or the exit code, so it can
-///     sit on a rule that passed or on one that failed.
-/// </summary>
+/// <summary>What a <see cref="CheckWarning" /> is about.</summary>
 internal enum CheckWarningKind
 {
     /// <summary>
@@ -20,16 +16,14 @@ internal enum CheckWarningKind
 
     /// <summary>
     ///     A file changed since the diff base (<c>check --diff-base</c>) declares a type inside a quarantined
-    ///     scope. The warning asks whether the task requires editing inside that scope at all; the rule
-    ///     itself still passes.
+    ///     scope. The warning asks whether the task requires editing inside that scope at all.
     /// </summary>
     QuarantinedScopeTouched,
 
     /// <summary>
     ///     A file changed since the diff base (<c>check --diff-base</c>) declares a type inside a cautioned
     ///     scope. The warning asks that the scope's <c>Dragons</c> prose or <c>DragonsDoc</c> document be read
-    ///     before editing; the rule itself still passes, and nothing about a cautioned scope ever fails the
-    ///     check.
+    ///     before editing; nothing about a cautioned scope ever fails the check.
     /// </summary>
     CautionedScopeTouched,
 
@@ -41,25 +35,19 @@ internal enum CheckWarningKind
     ///     <c>MustHaveExactlyOneCounterpart</c>'s <c>among:</c>.
     /// </summary>
     /// <remarks>
-    ///     Each distinct pattern gets one warning, named in the message and in <see cref="CheckWarning.Key" />.
-    ///     A pattern can be one piece of an operand: a part of a union, a layer's definition, or one name of a
-    ///     <c>Named</c> list, quoted as the operand would read with that name alone. A <c>typeof</c> operand
-    ///     absent from the codebase warns about nothing, and the memberships, the reside pair's glob or project
-    ///     name and the <c>among:</c> parts raise none on a run over only part of the solution.
-    ///     <see cref="CheckWarning.Role" /> says which list the pattern sat in, and so which way the rule errs
-    ///     (<see cref="DeadOperandRole" />) and whether its unmatched baseline entries count as fixed
-    ///     (<see cref="RuleResult.UnmatchedEntriesTested" />). A rule carrying any of these is never suggested for
-    ///     promotion, and <c>sliderule baseline init</c> skips it (<see cref="RuleResult.MeasuredInFull" />).
+    ///     Each distinct pattern gets one warning. A pattern can be one piece of an operand: a part of a union, a
+    ///     layer's definition, or one name of a <c>Named</c> list, quoted as the operand would read with that name
+    ///     alone. A <c>typeof</c> operand absent from the codebase warns about nothing, and the memberships, the
+    ///     reside pair's glob or project name and the <c>among:</c> parts raise none on a run over only part of
+    ///     the solution. Whichever list the pattern sat in, a rule carrying one of these was not measured as
+    ///     written (<see cref="RuleResult.MeasuredInFull" />).
     /// </remarks>
     DeadOperand,
 
     /// <summary>
     ///     A ratcheted rule failed with no baseline captured while a baseline section filed under a rule ID the spec
-    ///     does not declare sits in the solution: the section a rename leaves behind under the rule's old ID. It
-    ///     fails nothing, and replaces the hint to run <c>sliderule baseline init</c> on that rule. Each such
-    ///     section gets one warning, naming it in <see cref="CheckWarning.Key" /> and its file in
-    ///     <see cref="CheckWarning.File" />, and its hint gives the <c>sliderule baseline rename</c> that would
-    ///     move it to this rule.
+    ///     does not declare sits in the solution: the section a rename leaves behind under the rule's old ID. Each
+    ///     such section gets one warning.
     /// </summary>
     OrphanedBaseline,
 
@@ -67,10 +55,10 @@ internal enum CheckWarningKind
     ///     A part of the rule's exemplar, the type a fix is pointed at, matched no type the solution declares, or
     ///     the exemplar could not be resolved at all. The exemplar never decides the verdict, so the rule's status
     ///     is unaffected and its counts were measured in full: nothing here stops a promotion or a baseline
-    ///     capture. Each dead part gets one warning, naming it in <see cref="CheckWarning.Key" />: a union
-    ///     operand, a name of a <c>Named</c> list quoted as the selection would read with that name alone, or the
-    ///     whole exemplar where the whole is dead. A run over a solution filter resolves the exemplar but raises
-    ///     none of these, since a project the filter left out may declare the type.
+    ///     capture. Each dead part gets one warning: a union operand, a name of a <c>Named</c> list quoted as the
+    ///     selection would read with that name alone, or the whole exemplar where the whole is dead. A run over a
+    ///     solution filter resolves the exemplar but raises none of these, since a project the filter left out may
+    ///     declare the type.
     /// </summary>
     DeadExemplar
 }

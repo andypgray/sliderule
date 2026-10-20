@@ -9,17 +9,11 @@ namespace SlideRule.Cli.Mcp.Pipeline;
 internal static class EnumStringHelper
 {
     /// <summary>
-    ///     The one enum-name rule both coercers apply: refuse anything
-    ///     <see cref="ResolvesByArithmetic" /> would let through by ordinal arithmetic, then match a
-    ///     member name case-insensitively and require that member to be defined. A name the caller may not
-    ///     reach returns <c>false</c> with <paramref name="parsed" /> left at its default, never at the
-    ///     undefined value <see cref="Enum.TryParse{T}(string,bool,out T)" /> would have bound it to.
+    ///     The one enum-name rule both coercers apply, so the array path and the scalar path admit the same
+    ///     spellings: one defined member, named case-insensitively. A name the caller may not reach returns
+    ///     <c>false</c> with <paramref name="parsed" /> left at its default, never at the undefined value
+    ///     <see cref="Enum.TryParse{T}(string,bool,out T)" /> would have bound it to.
     /// </summary>
-    /// <remarks>
-    ///     Here rather than in either factory because the array path and the scalar path must admit the
-    ///     same spellings: a name a tool parameter refuses cannot be one the same tool's array parameter
-    ///     accepts.
-    /// </remarks>
     internal static bool TryParseName<T>(string name, out T parsed) where T : struct, Enum
     {
         parsed = default;
@@ -60,17 +54,13 @@ internal static class EnumStringHelper
     }
 
     /// <summary>
-    ///     Returns <c>true</c> when <paramref name="value" /> is an integer in disguise — a string
-    ///     <see cref="Enum.TryParse{T}(string,bool,out T)" /> would bind to a numeric ordinal rather
-    ///     than a name (e.g. <c>"2"</c> → the member whose value is 2), violating the documented
-    ///     "integers are not admitted as enum values" contract.
+    ///     Returns <c>true</c> when <paramref name="value" /> is an integer in disguise, a string
+    ///     <see cref="Enum.TryParse{T}(string,bool,out T)" /> would bind to a numeric ordinal rather than a name
+    ///     (<c>"2"</c> to the member whose value is 2).
     /// </summary>
     /// <remarks>
-    ///     Trims surrounding whitespace first, then tests
-    ///     <see cref="long.TryParse(ReadOnlySpan{char}, out long)" /> and
-    ///     <see cref="BigInteger.TryParse(ReadOnlySpan{char}, out BigInteger)" />. A leading-digit
-    ///     check is insufficient: <c>"5"</c>, <c>"+5"</c>, <c>" 5 "</c>, <c>"5 "</c>, and ordinals
-    ///     wider than <see cref="long" /> must all be rejected.
+    ///     <c>"5"</c>, <c>"+5"</c>, <c>" 5 "</c>, <c>"5 "</c> and ordinals wider than <see cref="long" /> must all be
+    ///     rejected, which a leading-digit check would miss.
     /// </remarks>
     internal static bool LooksNumeric(string value)
     {

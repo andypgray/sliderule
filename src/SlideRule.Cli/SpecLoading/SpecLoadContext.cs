@@ -4,11 +4,9 @@ using System.Runtime.Loader;
 namespace SlideRule.Cli.SpecLoading;
 
 /// <summary>
-///     A collectible <see cref="AssemblyLoadContext" /> that isolates a prebuilt spec DLL — the
-///     host-side half of loading a spec in isolation. The type-identity fix is the shared-contract
-///     short-circuit: <c>SlideRule</c> resolves to the copy this host already carries so
-///     <c>spec is IArchitectureSpec</c> holds across the boundary; everything else resolves through
-///     the dependency resolver.
+///     A collectible <see cref="AssemblyLoadContext" /> that isolates a prebuilt spec DLL. <c>SlideRule</c>
+///     resolves to the copy this host already carries, so <c>spec is IArchitectureSpec</c> holds across the
+///     boundary.
 /// </summary>
 /// <remarks>
 ///     Every assembly this context loads is loaded from its <em>bytes</em>, never its path — see

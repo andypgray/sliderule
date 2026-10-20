@@ -8,12 +8,8 @@ namespace SlideRule.Codebase;
 /// <remarks>
 ///     <para>
 ///         A <c>catch</c> that immediately rethrows still counts — these are facts about the source, not
-///         judgements about it — and a type catching itself gives nothing. Exception types are recorded at
-///         their definition, and a <c>catch</c> on a type parameter, or on a type the compilation cannot
-///         resolve, records nothing at all. Both ends are the very type instances
-///         <see cref="CodebaseModel.Types" /> lists, so compare them by reference rather than by name.
-///         Because no source names the type, a bare <c>catch</c> adds no ordinary reference, where a typed
-///         <c>catch (IOException)</c> does and the catch edge sits beside it.
+///         judgements about it — and a <c>catch</c> on a type parameter, or on a type the compilation cannot
+///         resolve, records nothing at all.
 ///     </para>
 ///     <para>
 ///         Three site lists narrow one another: <see cref="Sites" />, then
@@ -53,26 +49,18 @@ internal sealed class CatchEdge : IEdgeEnds
 
     TypeNode IEdgeEnds.Target => Caught;
 
-    /// <summary>
-    ///     Gets each distinct <c>catch</c> position, ordered by file then line. Two <c>catch</c> clauses for the
-    ///     same type on one line count as one site.
-    /// </summary>
     public IReadOnlyList<SourceLocation> Sites => Evidence.Sites;
 
     /// <summary>
-    ///     Gets the sites of <see cref="Sites" /> whose <c>catch</c> clause carries no <c>when</c> filter, in
-    ///     the same order. Empty when every site is filtered. Whether a filter is present is read from what the
-    ///     source spells, never from what the filter tests, so <c>when (true)</c> counts as filtered. A bare
-    ///     <c>catch</c> is unfiltered; a bare <c>catch when (...)</c> is not.
+    ///     Gets the sites of <see cref="Sites" /> whose <c>catch</c> clause spells no <c>when</c> filter, in the
+    ///     same order. A bare <c>catch</c> is unfiltered; a bare <c>catch when (...)</c> is not.
     /// </summary>
     public IReadOnlyList<SourceLocation> UnfilteredSites => UnfilteredEvidence.Sites;
 
     /// <summary>
     ///     Gets the sites of <see cref="UnfilteredSites" /> whose <c>catch</c> block does not end in a
-    ///     <c>throw</c> statement — the ones that hold a failure and carry on. Empty when every unfiltered site
-    ///     rethrows or throws something else. Only the block's last statement is read, and never whether every
-    ///     path reaches it: <c>catch { if (x) return; throw; }</c> is absent from this list, and
-    ///     <c>catch { if (x) throw; Cleanup(); }</c> is in it.
+    ///     <c>throw</c> statement, the ones that hold a failure and carry on: <c>catch { if (x) return; throw; }</c>
+    ///     is absent from this list, and <c>catch { if (x) throw; Cleanup(); }</c> is in it.
     /// </summary>
     public IReadOnlyList<SourceLocation> SwallowingSites => SwallowingEvidence.Sites;
 
@@ -82,11 +70,9 @@ internal sealed class CatchEdge : IEdgeEnds
     // instead — the narrowing has to carry its own, because which of a copy's catch clauses spell a filter is a
     // fact about that copy. Its instances are null exactly when Evidence's are, and index-aligned with them on the
     // same instance keys, so a rule that owns Evidence.Instances[i] cites UnfilteredEvidence.Instances[i]. An
-    // instance none of whose sites survive the narrowing carries an empty list, which the filter-aware ban reads
-    // as green rather than as a violation with no lines.
+    // instance none of whose sites survive the narrowing carries an empty list.
     internal EdgeEvidence UnfilteredEvidence { get; }
 
-    // SwallowingSites with its shares, aligned to Evidence's instances exactly as UnfilteredEvidence's are: null
-    // exactly when they are, and an empty list for an instance none of whose sites swallow, which reads green.
+    // SwallowingSites with its shares, aligned to Evidence's instances exactly as UnfilteredEvidence's are.
     internal EdgeEvidence SwallowingEvidence { get; }
 }

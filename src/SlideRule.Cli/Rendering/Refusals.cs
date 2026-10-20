@@ -6,21 +6,20 @@ namespace SlideRule.Cli.Rendering;
 ///     The CLI's "you named something that is not there" refusals — an unmatched filter, an unknown ID. A
 ///     reader who meets two of them should meet one format: name what did not match, then list what was
 ///     available, so the next command is one edit away. Each caller keeps its own lead; the shape they share
-///     lives here, as does the label-plus-roster pairing the two rule-ID refusals share and the ordinal sort
-///     that makes a rule-ID list read the same on every machine.
+///     lives here.
 /// </summary>
 /// <remarks>
-///     One value never earns the roster: a JSON array a client serialized into the string parameter it was
-///     binding. Every name the reader wants is already inside their own brackets, so answering with the whole
-///     spec's is a menu to a question nobody asked — the defect is the shape, not the spelling.
-///     <see cref="StringifiedArrayRefusal" /> owns that decision, so a caller states only its lead, its
-///     advice, and the roster it falls back to. The refusals are shared by the CLI and the MCP tools by
-///     construction, so no wording here may name a flag or a tool parameter: it names the shape both
-///     surfaces pass.
+///     A JSON array a client serialized into a string parameter is refused on its shape, never answered with
+///     the roster: <see cref="StringifiedArrayRefusal" /> owns that decision, so a caller states only its lead,
+///     its advice, and the roster it falls back to. The refusals are shared by the CLI and the MCP tools, so no
+///     wording here may name a flag or a tool parameter: it names the shape both surfaces pass.
 /// </remarks>
 internal static class Refusals
 {
-    /// <summary>Every rule ID in <paramref name="model" />, ordinal-sorted — the post-desugar spec as a reader can name it.</summary>
+    /// <summary>
+    ///     Every rule ID in <paramref name="model" />, ordinal-sorted: the post-desugar spec as a reader can
+    ///     name it.
+    /// </summary>
     private static IEnumerable<string> AvailableRuleIds(ArchitectureModel model)
     {
         return model.Rules.Select(rule => rule.Id).OrderBy(id => id, StringComparer.Ordinal);
@@ -38,8 +37,8 @@ internal static class Refusals
 
     /// <summary>
     ///     A named rule that is not in <paramref name="model" />: <paramref name="lead" /> over the spec's
-    ///     whole rule roster. The label and the roster travel together, so <c>check</c>'s unmatched
-    ///     <c>--rules</c> filter and <c>explain</c>'s unknown ID differ only in what they lead with.
+    ///     whole rule roster. The label and the roster travel together, so every rule-ID refusal differs only
+    ///     in what it leads with.
     /// </summary>
     internal static string RuleNotFound(string lead, ArchitectureModel model)
     {
@@ -75,11 +74,7 @@ internal static class Refusals
     ///     The refusal text for a stringified array: <paramref name="lead" /> (what did not match), then the
     ///     shape, then <paramref name="advice" /> — the caller's own sentence for what to pass instead.
     /// </summary>
-    /// <remarks>
-    ///     Lead and advice, and no roster. A caller whose brackets hold an ID that does not exist pays one
-    ///     extra round trip for that — shape first, roster on the retry — which is the trade: the shape is
-    ///     always the defect worth naming first, and the message stays one sentence.
-    /// </remarks>
+    /// <remarks>No roster: the shape is the defect named first, and the roster comes on the retry.</remarks>
     internal static string StringifiedArrayMessage(string lead, string advice)
     {
         return $"{lead}. That is a JSON array written as text; {advice}.";
@@ -102,7 +97,7 @@ internal static class Refusals
     }
 
     /// <summary>
-    ///     The advice both glob-list filters give — one semicolon-separated string, echoing
+    ///     The advice a glob-list filter gives — one semicolon-separated string, echoing
     ///     <paramref name="elements" /> as that string, which is the value the caller can paste back.
     /// </summary>
     internal static string GlobListAdvice(IReadOnlyList<string> elements)
@@ -117,8 +112,7 @@ internal static class Refusals
     /// </summary>
     /// <remarks>
     ///     The echo is withheld for an array of several deliberately: it holds no single value the verb could
-    ///     have taken, so naming one would be picking for the caller. The glob twin above can always echo,
-    ///     because its parameter accepts the whole list as one string.
+    ///     have taken, so naming one would be picking for the caller.
     /// </remarks>
     internal static string SingleValueAdvice(string advice, IReadOnlyList<string> elements)
     {
@@ -133,9 +127,8 @@ internal static class Refusals
     /// <remarks>
     ///     The pairing is spelled here because <see cref="SingleValueAdvice" /> takes the noun first and so
     ///     cannot be passed as a method group; without it every scalar caller writes the same closure out, and
-    ///     a copied one is how a path parameter comes to advise "pass one git ref". The glob twin needs no
-    ///     such pairing — <see cref="GlobListAdvice" /> is already the shape the refusal takes. Text only,
-    ///     with no throw: a caller that has its own fallback reads this through <c>??</c>.
+    ///     a copied one is how a path parameter comes to advise "pass one git ref". Text only, with no throw: a
+    ///     caller that has its own fallback reads this through <c>??</c>.
     /// </remarks>
     internal static string? SingleValueRefusal(string value, string lead, string advice)
     {

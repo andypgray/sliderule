@@ -1,23 +1,24 @@
 namespace SlideRule.Model;
 
 /// <summary>
-///     A refinement on a <see cref="MemberSelection" /> — a closed hierarchy so each member adjective
-///     owns its own prose fragment (GRAMMAR §2 admission rule, §4.6). Reuses
-///     <see cref="AdjectivePlacement" /> minus <see cref="AdjectivePlacement.Head" />: the projection
-///     fixes the head, so no member adjective substitutes it (§6).
+///     A refinement on a <see cref="MemberSelection" />, the member twin of <see cref="SelectionAdjective" />
+///     (GRAMMAR §4.6). It takes every <see cref="AdjectivePlacement" /> but
+///     <see cref="AdjectivePlacement.Head" />: the projection fixes the head, so no member adjective
+///     substitutes it (§6).
 /// </summary>
+/// <remarks>
+///     A head prefix keeps the member subject's " of " join, which a trailing clause switches to " declared in "
+///     (<c>SentenceRenderer.MemberPhrase</c>), and reads as the members' own fact ("`Main` methods of types")
+///     rather than like the type side's clause on a different subject. Head prefixes concatenate in authoring
+///     order, an intersection the sentence states whole.
+/// </remarks>
 internal abstract class MemberAdjective
 {
-    /// <summary>Where this adjective's fragment lands during member-subject assembly (GRAMMAR §6).</summary>
     internal abstract AdjectivePlacement Placement { get; }
 
-    /// <summary>The rendered fragment, including its leading separator (e.g. <c> returning `Task`</c>).</summary>
+    /// <summary>As <see cref="SelectionAdjective.Fragment" />.</summary>
     internal abstract string Fragment { get; }
 
-    /// <summary>
-    ///     Whether the fragment opens an <c>Except</c> parenthetical it leaves for the composer to close
-    ///     (GRAMMAR §6) — the member twin of <see cref="SelectionAdjective.OpensParenthetical" />, true for
-    ///     <see cref="MemberExceptAdjective" /> alone.
-    /// </summary>
+    /// <summary>The member twin of <see cref="SelectionAdjective.OpensParenthetical" />.</summary>
     internal virtual bool OpensParenthetical => false;
 }

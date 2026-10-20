@@ -15,39 +15,21 @@ namespace SlideRule.Cli.Mcp.Pipeline;
 ///     those coercers erase.
 /// </summary>
 /// <remarks>
-///     <para>
-///         Registering a custom <see cref="System.Text.Json.Serialization.JsonConverter" /> for a
-///         type makes STJ's schema exporter erase that parameter — it can no longer infer the shape.
-///         Every converter-bound parameter is affected: a <c>string[]</c> parameter would collapse
-///         from an array-of-strings to nothing at all, and (verified empirically) every scalar
-///         <c>string?</c> and <c>bool</c> parameter erases too. <see cref="ReinjectErasedSchema" /> is
-///         the <c>SchemaCreateOptions.TransformSchemaNode</c> hook that restores the erased shape from
-///         the underlying CLR type.
-///     </para>
-///     <para>
-///         This is deliberately narrow: it wires only the coercers and re-injects the schema they
-///         erase, and does NOT touch tool metadata — <c>Title</c>, <c>Execution</c>, or the
-///         <c>_meta</c> the options object below can carry — or shrink the payload. Those would
-///         change this server's advertised <c>tools/list</c> output and are out of scope by
-///         decision rather than by oversight.
-///     </para>
+///     Registering a custom <see cref="System.Text.Json.Serialization.JsonConverter" /> for a type makes STJ's
+///     schema exporter erase that parameter — it can no longer infer the shape. Every converter-bound parameter is
+///     affected: a <c>string[]</c> parameter would collapse from an array-of-strings to nothing at all, and
+///     every scalar <c>string</c> and <c>bool</c> parameter erases too.
 /// </remarks>
 internal static class CoercingToolRegistration
 {
-    /// <summary>
-    ///     The schema hook every tool registered here is created with. Internal rather than private so a
-    ///     test can create a probe tool through it: every parameter the real <c>arch_*</c> tools declare is a
-    ///     scalar string or a bool, so only a probe reaches the array and enum repairs below.
-    /// </summary>
+    /// <summary>The schema hook every tool registered here is created with.</summary>
     internal static readonly AIJsonSchemaCreateOptions SchemaOptions = new()
     {
         TransformSchemaNode = ReinjectErasedSchema
     };
 
     /// <summary>
-    ///     Registers each <see cref="McpServerToolAttribute" />-annotated method as an
-    ///     <see cref="McpServerTool" /> whose argument binder uses <see cref="ToolInputSerializerOptions" />
-    ///     and whose input schema is repaired by <see cref="ReinjectErasedSchema" />.
+    ///     Registers each <see cref="McpServerToolAttribute" />-annotated method with the coercing options.
     /// </summary>
     public static IMcpServerBuilder WithCoercingTools(this IMcpServerBuilder builder)
     {
@@ -84,13 +66,10 @@ internal static class CoercingToolRegistration
     }
 
     /// <summary>
-    ///     Re-injects the shape the custom converters erased, reading it back from the underlying CLR
-    ///     type: array + <c>items</c> for string/enum arrays, <c>string</c> or <c>boolean</c> for scalars,
-    ///     and — for enum parameters — the <c>enum</c> value list. The value list is otherwise lost (the
-    ///     converter hides the enum from the exporter), so restoring it here is what lets the allowed
-    ///     values travel in the schema rather than being duplicated into the description prose. Every
-    ///     branch is guarded on <c>!ContainsKey</c>, so it is a no-op whenever the exporter already
-    ///     emitted the shape, and a node no branch claims is handed back exactly as it arrived.
+    ///     Re-injects the shape the custom converters erased, reading it back from the underlying CLR type, and is
+    ///     a no-op wherever the exporter already emitted it. The <c>enum</c> value list is otherwise lost, because
+    ///     the converter hides the enum from the exporter, and restoring it lets the allowed values travel in the
+    ///     schema rather than in the description prose.
     /// </summary>
     private static JsonNode ReinjectErasedSchema(AIJsonSchemaCreateContext context, JsonNode node)
     {
@@ -116,18 +95,15 @@ internal static class CoercingToolRegistration
         }
         else if (t == typeof(string) && !obj.ContainsKey("type"))
         {
-            // Required here: verified empirically that this project's exporter erases every
-            // scalar string?/string parameter under StringCoercerFactory. Without this repair they
-            // would advertise no type at all. (The advertised shape is a plain "string"; no
-            // ["string","null"] union appears.)
+            // Without this repair a scalar string?/string parameter advertises no type at all. The advertised
+            // shape is a plain "string"; no ["string","null"] union appears.
             obj["type"] = "string";
         }
         else if (t == typeof(bool) && !obj.ContainsKey("type"))
         {
-            // Under BoolCoercerFactory the tools' bool flags erase exactly as the
-            // scalar strings do. Their description and `default: false` survive the erasure, so this puts
-            // back the one keyword that did not — all that changes in the advertised schema is where
-            // `type` sits in the object, which no client reads as meaning.
+            // The flags' description and `default: false` survive the erasure, so this puts back the one keyword
+            // that did not; all that changes in the advertised schema is where `type` sits in the object, which no
+            // client reads as meaning.
             obj["type"] = "boolean";
         }
         else
@@ -150,8 +126,7 @@ internal static class CoercingToolRegistration
     ///     schema — "any value" — when it has neither. Both are the same loss, so <c>true</c> gets a fresh
     ///     object to be rebuilt into. <c>false</c> is the opposite claim, "nothing valid", and is left
     ///     alone: repairing it would widen a schema that admits no value into one that admits every value.
-    ///     Internal rather than private so a test can pin that, because no exporter path reaches this hook
-    ///     with <c>false</c>.
+    ///     No exporter path reaches this hook with <c>false</c>.
     /// </remarks>
     internal static JsonObject? ErasureTarget(JsonNode node)
     {

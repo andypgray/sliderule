@@ -14,15 +14,8 @@ namespace SlideRule.Rendering;
 ///     them.
 /// </summary>
 /// <remarks>
-///     A card lands in the deepest directory holding every file inside the solution directory that declares
-///     one of the layer's types, so it covers the layer and as little else as it can; a layer whose types are
-///     spread across the solution therefore lands high up. Where several projects compile a type of one name,
-///     a layer defined by a project counts only that project's copy, and a layer defined by namespace globs
-///     counts every copy. A file outside the solution directory never moves a card, so a file a project
-///     compiles from a package folder leaves the card where the project's own files put it. A layer that
-///     matches no type in the solution, or only types declared outside the solution directory, comes back
-///     with a null directory and the reason, for the caller to report or ignore. A purpose alone gets no
-///     card: a card exists to carry rules.
+///     <see cref="DirectoryPlacement" /> decides where a card lands. A purpose alone gets no card: a card exists
+///     to carry rules.
 /// </remarks>
 // Scope children are excluded by their payload rather than their posture: a quarantined layer's
 // containment subject is layer-anchored, but its story belongs to the scope card and the two
@@ -33,15 +26,8 @@ internal static class LayerContextResolver
 {
     /// <summary>
     ///     Resolves a placement for every layer that has rules of its own, in the order the spec declares the
-    ///     layers. Ask <see cref="HasAnchoredLayers" /> first to learn whether extracting a codebase is worth the
-    ///     cost at all.
+    ///     layers.
     /// </summary>
-    /// <remarks>
-    ///     The evaluator and the boundary are taken rather than built: an evaluator materializes the
-    ///     solution-declared type list and its noun indexes once, and a boundary splits the solution directory and
-    ///     memoizes each site's verdict once, so a caller resolving both emission keys for one codebase builds one
-    ///     of each and hands them to both resolvers rather than paying for either twice.
-    /// </remarks>
     internal static IReadOnlyList<LayerPlacement> Resolve(
         ArchitectureModel model, SelectionEvaluator evaluator, DirectoryPlacement.Boundary boundary)
     {
@@ -50,7 +36,7 @@ internal static class LayerContextResolver
         foreach (LayerDefinition layer in model.Layers)
         {
             List<ArchRule> anchored = AnchoredRules(model, layer).ToList();
-            if (anchored.Count == 0) continue; // A layer no rule anchors on gets no placement at all.
+            if (anchored.Count == 0) continue;
 
             CardDestination destination = DirectoryPlacement.Place(
                 evaluator, BareLayer(anchored[0], layer), boundary, "layer", layer.Name);
@@ -61,13 +47,7 @@ internal static class LayerContextResolver
         return placements;
     }
 
-    /// <summary>
-    ///     Reports whether any layer has at least one Enforce or Migrate rule of its own. Answered from the
-    ///     model alone, so it is the question to ask before extracting a codebase to resolve placements
-    ///     against.
-    /// </summary>
-    /// <param name="model">The model to inspect.</param>
-    /// <returns><see langword="true" /> when at least one layer would get a placement.</returns>
+    /// <summary>Reports whether any layer has at least one Enforce or Migrate rule of its own.</summary>
     public static bool HasAnchoredLayers(ArchitectureModel model)
     {
         Guard.NotNull(model, nameof(model));
@@ -75,21 +55,16 @@ internal static class LayerContextResolver
         return model.Layers.Any(layer => AnchoredRules(model, layer).Any());
     }
 
-    // The rules no scope desugared into whose subject noun head is this layer, in model order. A scope's
-    // children carry a payload and are excluded on it — a scoped layer's story is the scope card's.
+    // The rules no scope desugared into whose subject noun head is this layer, in model order.
     private static IEnumerable<ArchRule> AnchoredRules(ArchitectureModel model, LayerDefinition layer)
     {
         return model.Rules.Where(rule => rule.Scope is null && IsAnchoredOn(rule, layer));
     }
 
-    // Anchored: the subject selection's noun head names this layer — a LayerNoun that is it, or a family
-    // of layers holding it as a cell (GRAMMAR §5.1, §6: a family rule places its bullet on every cell's
-    // card, because the sentence names every cell and so reads correctly on each). A refinement
-    // (adjective / Except) produces a RefinedSelection that keeps the same noun, so a refined subject —
-    // family or plain — still anchors. A union subject anchors nothing: it has no single home directory
-    // even when a Layer is one of its operands, so its rule renders into the root block only, and the
-    // guard also keeps this off UnionSelection.Noun, which throws. The project form of a family anchors
-    // nothing either, as a bare project noun does not.
+    // A family rule places its bullet on every cell's card, because the sentence names every cell and so
+    // reads correctly on each (GRAMMAR §5.1, §6). A refinement keeps the same noun, so a refined subject,
+    // family or plain, still anchors. The project form of a family anchors nothing, as a bare project noun
+    // does not.
     private static bool IsAnchoredOn(ArchRule rule, LayerDefinition layer)
     {
         // Kept as separate conjuncts because the order is the guard: the UnionSelection test has to be
@@ -104,10 +79,8 @@ internal static class LayerContextResolver
     // type in the layer rather than an anchored rule's possibly-refined subject. For a family it is the
     // MATCHING cell rather than the subject's own head, which is what places one family rule's card at
     // each cell's own directory. Its owning Arch is borrowed from the same subject (every selection in
-    // one build shares the single Arch, and the evaluator never reads the owner).
-    // A plain refined selection rather than a Layer: the evaluator reads a noun and its adjectives, which
-    // is all of what this is, while a Layer is the AUTHOR's handle on a declared layer and carries that
-    // layer's registration. Nothing declares this one, so there is no registration for it to carry.
+    // one build shares the single Arch, and the evaluator never reads the owner). A plain refined
+    // selection rather than a Layer, which would carry a registration nothing declares.
     private static Selection BareLayer(ArchRule anchoredRule, LayerDefinition layer)
     {
         // Both bangs and the third are IsAnchoredOn's: it already read this constraint's subject and
@@ -118,7 +91,6 @@ internal static class LayerContextResolver
             subject.Owner, MatchingCell(subject.Noun, layer.Name)!, Array.Empty<SelectionAdjective>());
     }
 
-    // The noun head naming this layer: the head itself, the family cell carrying the name, or null.
     private static LayerNoun? MatchingCell(SelectionNoun noun, string layerName)
     {
         if (noun is LayerNoun head)

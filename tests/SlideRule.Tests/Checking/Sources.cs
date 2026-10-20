@@ -6,8 +6,9 @@ using SlideRule.Tests.Extraction;
 namespace SlideRule.Tests.Checking;
 
 /// <summary>
-///     Shared source strings for the fast-path checker tests, most beside the one
-///     <see cref="CodebaseModel" /> extracted from it.
+///     Shared inputs for the fast-path checker tests: source strings, most beside the one
+///     <see cref="CodebaseModel" /> extracted from it, the specs several classes run over them, and the
+///     baseline orphan scans the rename-hint rows read.
 /// </summary>
 /// <remarks>
 ///     Two jobs, and the second is why the catch scenes live here. A scene many rows check is compiled

@@ -18,18 +18,16 @@ namespace SlideRule.Checking;
 ///     <para>
 ///         The rows are per node class, and a rule's verdict is the first "out" the walk meets — one node
 ///         that needs the solution is enough, so the rule verdict is the minimum over what it reads.
-///         Keeping each row honest about its own node rather than about the rules it can appear in is why
-///         the project adjectives are in while no project rule is decidable: every verb that can take a
-///         project subject is itself out.
+///         Each row answers for its own node rather than for the rules it can appear in, which is why the
+///         project adjectives are in while no project rule is decidable: every verb that can take a project
+///         subject is itself out.
 ///     </para>
 ///     <para>
-///         Where a node stands is three facts, not one, and each row keys on the ones its own argument
-///         rests on. <see cref="OneProjectPosition" /> holds the three and says what each asks, and a row
-///         that reads an axis says why beside the row. Three out answers were
-///         each settled by comparing a one-project verdict with the whole solution's over the same code:
-///         the project noun where it exempts by plain membership (an <c>Except</c> payload subtracting
-///         from a ban), <see cref="MustResideInProjectConstraint" /> and
-///         <see cref="MustBelongToConstraint" />. The family noun is held out by its shape alone, since no
+///         Where a node stands is three facts (<see cref="OneProjectPosition" />), and a row that reads an
+///         axis says why beside the row. Three out answers were each settled by comparing a one-project
+///         verdict with the whole solution's over the same code: the project noun where it exempts by plain
+///         membership (an <c>Except</c> payload subtracting from a ban), <see cref="MustResideInProjectConstraint" />
+///         and <see cref="MustBelongToConstraint" />. The family noun is held out by its shape alone, since no
 ///         comparison has been run over it.
 ///     </para>
 ///     <para>
@@ -42,11 +40,9 @@ internal static class OneProjectDecidability
     /// <summary>A predicate the spec wrote in code, which only a run of that code answers.</summary>
     private const string CodeReason = "Holds a predicate written in code.";
 
-    /// <summary>Container registrations, which are gathered from wherever in the solution they are written.</summary>
     private const string RegisteredReason =
         "Reads dependency-injection registrations, which are collected across the whole solution.";
 
-    /// <summary>Generated-code filtering applied to types other projects declare.</summary>
     private const string AuthoredReason =
         "Filters generated code out of a selection of other types, and one project cannot tell whether a "
         + "type another project declares is generated.";
@@ -61,10 +57,6 @@ internal static class OneProjectDecidability
         "Selects other types by attribute, and a project compiled against another's assembly does not see "
         + "every attribute its source declares.";
 
-    /// <summary>
-    ///     A path glob applied to types another project declares: a project compiled against another's assembly
-    ///     sees those types without the source files they were declared in, so it has no path to read.
-    /// </summary>
     private const string UnderReason =
         "Selects other types by the files declaring them, and a project compiled against another's assembly does "
         + "not see its source files.";
@@ -77,18 +69,14 @@ internal static class OneProjectDecidability
         "Spares a type by any project that declares it, and one project's compilation cannot tell when "
         + "another project compiles the same type, so it would report what the whole solution exempts.";
 
-    /// <summary>A family noun, whose cells are partitioned and compared across the solution.</summary>
     private const string FamilyReason = "Ranges over a family, which is judged across the whole solution.";
 
-    /// <summary>A verb that judges the cells of a family against one another.</summary>
     private const string AmongReason =
         "Judges references among a family of layers, which takes the whole solution.";
 
-    /// <summary>A verb whose subject is a cycle, which no single project can see the whole of.</summary>
     private const string CircleReason =
         "A circle of references can pass through any project, so finding one takes the whole solution.";
 
-    /// <summary>A verb that counts types carrying a derived name, wherever they are declared.</summary>
     private const string CounterpartReason =
         "A counterpart may be declared in any project, so the rule takes the whole solution.";
 
@@ -100,7 +88,6 @@ internal static class OneProjectDecidability
     /// </remarks>
     private const string ProjectReason = "Reads project-file facts, and one project's compilation carries none.";
 
-    /// <summary>The residency verb, whose answer is the list of projects that declare a type.</summary>
     private const string ResidencyReason =
         "A type compiled into several projects resides in each of them, so where a type resides takes the "
         + "whole solution.";
@@ -113,7 +100,6 @@ internal static class OneProjectDecidability
         "Which layer a type belongs to can depend on every project that compiles it, so coverage is left to "
         + "the whole solution.";
 
-    /// <summary>A rule with no constraint, which judges a diff rather than the code.</summary>
     private const string TripwireReason =
         "A tripwire compares against a diff, which one project's compilation does not carry.";
 
@@ -123,11 +109,9 @@ internal static class OneProjectDecidability
     internal static IReadOnlyCollection<Type> ClassifiedTypes => Rows.Keys;
 
     /// <summary>
-    ///     Whether the row for <paramref name="node" /> is decidable — the registry's values, for the
-    ///     inventory sweep that holds every decidable verb to a diagnostic a build really reported. Read at
-    ///     <see cref="OneProjectPosition.Verb" />, which is the only reading a constraint class has: every
-    ///     constraint row is position-blind, and the sweep asks about constraint classes alone. False for a
-    ///     node class with no row at all.
+    ///     Whether the row for <paramref name="node" /> is decidable, read at <see cref="OneProjectPosition.Verb" />:
+    ///     the only reading a constraint class has, since every constraint row is position-blind. False for a node
+    ///     class with no row at all.
     /// </summary>
     internal static bool Decides(Type node)
     {
@@ -141,9 +125,8 @@ internal static class OneProjectDecidability
         return new OneProjectVerdict(ReasonAgainst(rule));
     }
 
-    // The fixed order: a rule with no constraint, then the verb, then the subject, then the operands, then
-    // whichever second subject the verb carries. The order is what makes the reason reproducible — several
-    // nodes of one rule can each be out, and the reader is told about the one nearest the verb.
+    // The walk's fixed order is what makes the reason reproducible: several nodes of one rule can each be out,
+    // and the reader is told about the one nearest the verb.
     private static string? ReasonAgainst(ArchRule rule)
     {
         if (rule.Constraint is not { } constraint) return TripwireReason;
@@ -285,9 +268,7 @@ internal static class OneProjectDecidability
         {
             if (Row(adjective, position) is { } reason) return reason;
 
-            // An exclusion stands at its own position rather than at the one it was written inside: it is
-            // read over the whole solution even within a subject, since a type this project cannot see can
-            // still be one of the types that are NOT the subject, and it spares where its host bans.
+            // An exclusion stands at its own position (AsExceptPayload) rather than at the one it was written inside.
             if (adjective is ExceptAdjective except
                 && WalkSelection(except.Payload, position.AsExceptPayload()) is { } payloadReason)
                 return payloadReason;

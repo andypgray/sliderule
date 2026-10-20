@@ -220,7 +220,6 @@ internal sealed class ClaimTracer(CodebaseModel model, SolutionRoot? root = null
         return new ClaimStep($"it passes \"{under.Fragment.Trim()}\"");
     }
 
-    // Why no file put the type under the globs: it has none in the solution, or none of them is under any.
     private static ClaimStep NotUnderStep(UnderAdjective under, TypeNode type)
     {
         return type.FilePaths.Count == 0

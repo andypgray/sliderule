@@ -11,8 +11,6 @@ namespace SlideRule.Cli.Mcp.Prompts;
 ///     validating every claim with <c>arch_graph</c> and <c>arch_check</c>.
 /// </summary>
 /// <remarks>
-///     The server does not infer the spec: the recipe has the executing agent derive a proposal from
-///     evidence, and the human curate and baseline it.
 ///     The class is deliberately non-static: <c>WithPrompts&lt;ArchPrompts&gt;()</c> takes it as a type
 ///     argument, and static classes cannot be type arguments. The prompt method is <c>static</c>, so no
 ///     instance is ever constructed. A <c>string</c>-returning method maps to a single <c>Role.User</c>

@@ -4,11 +4,12 @@ using SlideRule.Tests.TestSupport;
 namespace SlideRule.Tests.DocHygiene;
 
 /// <summary>
-///     The source-anchor checker the walkthrough gate runs on. It lifts every <c>file:line — message</c>
-///     anchor out of a doc's fenced code blocks, derives the content token the committed source line
-///     must carry, and decides whether each anchor still matches its source — by content, or by a
-///     landmark pin that keys a documented walkthrough edit to the committed line it lands on. All of
-///     the logic lives here so the gate and the unit tests exercise the same code path.
+///     The fenced-block scanner the doc gates share, and the source-anchor checker built on it. It reads a
+///     doc's fenced code blocks, lifts every <c>file:line — message</c> anchor out of them, derives the
+///     content token the committed source line must carry, and decides whether each anchor still matches
+///     its source — by content, or by a landmark pin that keys a documented walkthrough edit to the
+///     committed line it lands on. A change to how it reads a fence changes what every gate built on it
+///     sees, so the gates and the unit tests exercise this one code path.
 /// </summary>
 internal static class SourceAnchors
 {

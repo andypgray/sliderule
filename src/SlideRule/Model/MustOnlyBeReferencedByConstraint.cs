@@ -9,7 +9,6 @@ namespace SlideRule.Model;
 /// </summary>
 internal sealed class MustOnlyBeReferencedByConstraint(Selection subject, IReadOnlyList<Selection> sources) : OperandConstraint(subject, sources)
 {
-    /// <summary>The permitted referencing sources.</summary>
     internal IReadOnlyList<Selection> Sources => Operands;
 
     internal override string VerbPhrase => "must be referenced only by " + Sources.TargetListProse();

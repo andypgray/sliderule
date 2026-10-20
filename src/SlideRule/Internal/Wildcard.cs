@@ -1,12 +1,11 @@
 namespace SlideRule.Internal;
 
 /// <summary>
-///     The shared iterative <c>*</c>-glob matcher behind both simple-name and namespace-segment
-///     matching (GRAMMAR §4.2, §5.2), and behind the package globs (§4.10). <c>*</c> matches any run of
-///     characters including the empty run; every other character is an ordinal (case-sensitive) match,
-///     or an ordinal case-insensitive one for a caller that asks, as the package verbs do because NuGet
-///     compares package identifiers that way. It has no notion of a dot separator — dot-crossing is
-///     decided by whoever tokenizes the input before calling in.
+///     The shared iterative <c>*</c>-glob matcher of simple names, namespace segments and package globs
+///     (GRAMMAR §4.2, §5.2, §4.10). <c>*</c> matches any run of characters including the empty run; every
+///     other character is an ordinal (case-sensitive) match, or an ordinal case-insensitive one for a caller
+///     that asks. It has no notion of a dot separator; dot-crossing is decided by whoever tokenizes the input
+///     before calling in.
 /// </summary>
 internal static class Wildcard
 {
@@ -51,16 +50,11 @@ internal static class Wildcard
         return p == pattern.Length;
     }
 
-    /// <summary>Whether any of <paramref name="patterns" /> matches <paramref name="text" />.</summary>
     internal static bool MatchesAny(IReadOnlyList<string> patterns, string text)
     {
         return MatchesAny(patterns, text, ignoreCase: false);
     }
 
-    /// <summary>
-    ///     Whether any of <paramref name="patterns" /> matches <paramref name="text" />, ignoring case where
-    ///     <paramref name="ignoreCase" /> says so.
-    /// </summary>
     internal static bool MatchesAny(IReadOnlyList<string> patterns, string text, bool ignoreCase)
     {
         // An index walk rather than a LINQ Any, because it runs once per candidate name — a project, an edge end,

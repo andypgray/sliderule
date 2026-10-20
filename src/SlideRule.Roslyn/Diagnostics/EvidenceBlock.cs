@@ -7,45 +7,26 @@ namespace SlideRule.Roslyn.Diagnostics;
 ///     two-space-indented beneath it, then what to do about it.
 /// </summary>
 /// <remarks>
-///     <para>
-///         <b>A colon promises a block, so composing one over nothing is refused here.</b> A lede ending in
-///         a colon and answered by the remedy line reads as truncated output. A caller whose list can be
-///         empty therefore either guards the whole block on that list — as
-///         <see cref="IncompleteModelGate" /> does, once per cause — or ends its lede in a full stop, as
-///         <see cref="SolutionDiscovery.NotFoundMessage" /> does.
-///     </para>
-///     <para>
-///         <b>The block is LF-joined, never platform-joined.</b> A composed block is one comparable value
-///         whatever machine built it; <see cref="LineBlocks" /> is what turns it back into console lines.
-///     </para>
+///     The block is LF-joined whatever the platform, so it is one comparable value wherever it was built;
+///     <see cref="LineBlocks" /> writes it back as console lines.
 /// </remarks>
 internal static class EvidenceBlock
 {
     /// <summary>
-    ///     The composed block: <paramref name="lede" />, then <paramref name="evidence" /> indented two
-    ///     spaces (with the elision count when <paramref name="quoteCap" /> bites), then — inside that
-    ///     indented run, never after the tail — the MSBuild selection note, then <paramref name="tail" />.
+    ///     The composed block: <paramref name="lede" />, then <paramref name="evidence" /> indented two spaces, then
+    ///     the MSBuild selection note inside that indented run, then <paramref name="tail" />, the remedy or the
+    ///     reading being denied.
     /// </summary>
-    /// <param name="lede">
-    ///     The sentence the evidence hangs from, ending in a colon — or in a full stop where
-    ///     <paramref name="evidence" /> can be empty, which is what the guard below holds callers to.
-    /// </param>
-    /// <param name="evidence">The paths or diagnostics being named, one per line.</param>
-    /// <param name="tail">
-    ///     The closing sentence — the remedy, or the reading being denied. Omitted where the lede already
-    ///     said everything (an opted-in run has nothing to ask for).
-    /// </param>
-    /// <param name="withSelectionNote">
-    ///     Whether to name the MSBuild instance this run selected. On for a refusal carrying its own
-    ///     evidence — an MCP surface has no stderr echo above to read it from.
-    /// </param>
-    /// <param name="quoteCap">
-    ///     How many entries to quote before counting the rest. A refusal nobody reads to the end names
-    ///     nothing; omitted where the evidence is a project list the reader has to act on entry by entry.
-    /// </param>
+    /// <remarks>
+    ///     <paramref name="quoteCap" /> quotes that many entries and counts the rest: a refusal nobody reads to the
+    ///     end names nothing, and a project list the reader acts on entry by entry goes uncapped.
+    ///     <paramref name="withSelectionNote" /> is for a refusal carrying its own evidence, since an MCP surface has
+    ///     no stderr echo above it to read the selection from.
+    /// </remarks>
     /// <exception cref="ArgumentException">
-    ///     <paramref name="lede" /> ends in a colon and <paramref name="evidence" /> is empty — the dangling
-    ///     colon this guard exists to make unreachable.
+    ///     <paramref name="lede" /> ends in a colon and <paramref name="evidence" /> is empty: a colon answered by
+    ///     the remedy line reads as truncated output, so a caller whose list can be empty guards the whole block on
+    ///     it or ends the lede in a full stop.
     /// </exception>
     internal static string Compose(
         string lede,

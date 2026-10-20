@@ -7,10 +7,9 @@ using SlideRule.Roslyn;
 namespace SlideRule.Cli.Mcp.Pipeline;
 
 /// <summary>
-///     The single point where tool-call exceptions become error results and successful responses are
-///     truncated. Tool methods never <c>try/catch</c>: they throw, and this filter shapes the outcome.
-///     It also brackets every call with the idle watchdog's in-flight count so a long cold-solution load
-///     can never self-trip the timeout.
+///     The single point where tool-call exceptions become error results and successful responses are truncated.
+///     It also brackets every call with the idle watchdog's in-flight count so a long cold-solution load can never
+///     self-trip the timeout.
 /// </summary>
 internal static class GlobalCallToolFilter
 {
@@ -23,18 +22,12 @@ internal static class GlobalCallToolFilter
     ///     anything unexpected is logged exactly once, and successful text is truncated to the client's budget.
     /// </summary>
     /// <remarks>
-    ///     On an unbound server every error also carries <see cref="ServerInstructions.UnboundCallCoda" />,
-    ///     because the banner that named a recovery was delivered once, at the handshake, and a reader arriving
-    ///     at a failed tool call may never have seen it.
+    ///     Only the nullness of <paramref name="bindingFailure" /> is read. On an unbound server every error also
+    ///     carries <see cref="ServerInstructions.UnboundCallCoda" />, because the banner that named a recovery was
+    ///     delivered once, at the handshake, and a reader arriving at a failed tool call may never have seen it. The
+    ///     parameter is required so a forgotten coda cannot leave a silent hole in the only channel an unbound
+    ///     session still reads.
     /// </remarks>
-    /// <param name="builder">The server builder being composed.</param>
-    /// <param name="bindingFailure">
-    ///     The discovery refusal, or <see langword="null" /> when the server bound. Only its nullness is
-    ///     read; it takes the same shape as <see cref="ServerInstructions.For" />'s parameter so one call
-    ///     site passes one value to both and the handshake and the per-call replies cannot disagree about
-    ///     whether this server is bound. Required rather than optional: a forgotten coda would be a silent
-    ///     hole in the only channel an unbound session still reads.
-    /// </param>
     public static IMcpServerBuilder WithGlobalCallToolFilter(this IMcpServerBuilder builder, string? bindingFailure)
     {
         return builder.WithRequestFilters(filters =>
@@ -56,10 +49,8 @@ internal static class GlobalCallToolFilter
                     }
                     catch (Exception ex) when (ex is not OperationCanceledException)
                     {
-                        // Expected user-facing error (bad input, missing solution, spec validation, a
-                        // tampered baseline) — possibly wrapped in JsonException(s) by the SDK's argument
-                        // binder. Walk the chain: the first UserFacingMessage surfaces silently, exactly as
-                        // a directly-thrown one would. Anything else is a bug: log one warning, then surface.
+                        // The first user-facing message in the chain surfaces silently, exactly as a directly
+                        // thrown one would. Anything else is a bug: log one warning, then surface.
                         if (FindUserFacingMessage(ex) is { } message) return ErrorResult(message, bindingFailure);
 
                         context.Server.Services?.GetService<ILoggerFactory>()
@@ -71,13 +62,11 @@ internal static class GlobalCallToolFilter
 
                     if (result.IsError is not true)
                     {
-                        // The same budget the tools degrade against, resolved from the request context — one
-                        // service, so a response can never be composed against one cap and cut against
-                        // another. Required, not optional: a GetService fallback would quietly use the
-                        // default cap whenever the service was missing, turning a composition bug into a
-                        // silently-wrong number. The provider cannot be absent by the time a result exists —
-                        // the tool that produced it was itself constructed from it — unlike the logger above,
-                        // which is best-effort by design.
+                        // The budget the tools degrade against, resolved from the request context. Required, not
+                        // optional: a GetService fallback would use the default cap whenever the service was
+                        // missing, turning a composition bug into a silently-wrong number. The provider cannot be
+                        // absent by the time a result exists — the tool that produced it was itself constructed from
+                        // it — unlike the logger above, which is best-effort by design.
                         int maxChars = context.Server.Services!.GetRequiredService<IResponseBudget>()
                             .MaxChars();
                         string toolName = context.Params.Name;
@@ -101,12 +90,10 @@ internal static class GlobalCallToolFilter
     ///     server never bound to a solution.
     /// </summary>
     /// <remarks>
-    ///     The coda rides every error while unbound, not just the discovery refusal. While unbound every
-    ///     dispatched call ends in that refusal anyway, and the calls that fail earlier — the unknown-key
-    ///     guard, a coercer — would only reach it once the argument was fixed, so the advice is true of all
-    ///     of them. Scoping it to the refusal's own text would instead couple this filter to prose that is
-    ///     pinned verbatim elsewhere. Errors bypass the truncator, so the coda can never be the part that
-    ///     gets cut.
+    ///     The coda rides every error while unbound, whatever failed: every dispatched call ends in the discovery
+    ///     refusal anyway, and the calls that fail earlier (the unknown-key guard, a coercer) would only reach it once
+    ///     the argument was fixed, so the advice is true of all of them. Errors bypass the truncator, so the coda can
+    ///     never be the part that gets cut.
     /// </remarks>
     private static CallToolResult ErrorResult(string message, string? bindingFailure)
     {
@@ -123,9 +110,8 @@ internal static class GlobalCallToolFilter
 
     /// <summary>
     ///     Walks up to <see cref="MaxExceptionChainDepth" /> inner exceptions for the first one
-    ///     <see cref="CliErrorMapper.UserFacingMessage" /> recognizes (the SDK's argument binder can bury a
-    ///     coercer-thrown <see cref="UserErrorException" /> inside <c>JsonException</c>(s)), returning its
-    ///     rendered message or <see langword="null" /> when the failure is a genuine unexpected error.
+    ///     <see cref="CliErrorMapper.UserFacingMessage" /> recognizes, returning its rendered message, or
+    ///     <see langword="null" /> when the failure is an unexpected error.
     /// </summary>
     private static string? FindUserFacingMessage(Exception? ex)
     {

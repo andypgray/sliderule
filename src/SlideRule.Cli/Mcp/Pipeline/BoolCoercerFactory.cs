@@ -62,12 +62,6 @@ internal sealed class BoolCoercerFactory : JsonConverterFactory
             writer.WriteBooleanValue(value);
         }
 
-        /// <summary>
-        ///     The scalar rules, shared by the top level and the single-element-array unwrap.
-        ///     <paramref name="insideArray" /> chooses the wording only: an error naming an "array element"
-        ///     tells the caller the coercer did look inside their array and still could not use what it
-        ///     found there.
-        /// </summary>
         private static bool ReadCoercedScalar(ref Utf8JsonReader reader, bool insideArray)
         {
             if (reader.TokenType == JsonTokenType.True) return true;

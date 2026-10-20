@@ -8,28 +8,22 @@ using SlideRule.Roslyn.Replay;
 namespace SlideRule.Roslyn.Caching;
 
 /// <summary>
-///     How both persisted manifests reach disk and come back — the extraction cache's
-///     <see cref="CacheManifest" /> and the build capture's <see cref="CaptureManifest" />: one
-///     <see cref="JsonSerializerOptions" />, the source-generated metadata that carries them, and the
-///     <see cref="TryRead{T}">read</see>/<see cref="TryWriteAtomic{T}">write</see> pair they share. One
-///     instance so the two files cannot drift in enum spelling or escaping; one context so neither document
-///     reaches disk through reflection; one read/write pair so neither store can degrade differently
-///     from the other.
+///     How both persisted manifests, the extraction cache's <see cref="CacheManifest" /> and the build capture's
+///     <see cref="CaptureManifest" />, reach disk and come back. One options instance, so the two files cannot
+///     drift in enum spelling or escaping; one generated context, so neither document reaches disk through
+///     reflection; one <see cref="TryRead{T}">read</see>/<see cref="TryWriteAtomic{T}">write</see> pair, so
+///     neither store can degrade differently from the other.
 /// </summary>
 internal static class ManifestJson
 {
     /// <summary>The shared serializer options for both persisted manifests.</summary>
     /// <remarks>
-    ///     Compact, with enums written as their names: readability over the few bytes, and rename-safe — an
-    ///     unrecognized name degrades to a parse-error miss rather than a silently wrong value. The
-    ///     converters are registered per enum rather than through the open
-    ///     <see cref="JsonStringEnumConverter" /> factory, so the set that reaches disk is visible and stays
-    ///     trim-safe; neither form carries a naming policy, so both spell the members verbatim. An enum
-    ///     joining the DTO graph with no entry here would fall through to the integer default and change the
-    ///     on-disk schema silently, so <c>ManifestJsonTests</c> holds this list against the graph rather than
-    ///     leaving it to vigilance — and that test is what says a new arrival is registered here rather than by a
-    ///     <see cref="JsonConverterAttribute" /> of its own, which would satisfy the serializer while
-    ///     emptying the list of the property it is kept for. Exposed for the round-trip pin.
+    ///     Compact, with enums written as their names, so a renamed member degrades to a parse-error miss rather
+    ///     than a silently wrong value. An enum joining the DTO graph with no entry here would fall through to the
+    ///     integer default and change the on-disk schema silently: <c>ManifestJsonTests</c> holds this list against
+    ///     the graph, and requires a new arrival to be registered here rather than by a
+    ///     <see cref="JsonConverterAttribute" /> of its own, which would satisfy the serializer while emptying the
+    ///     list of the property it is kept for.
     /// </remarks>
     public static readonly JsonSerializerOptions Options = new()
     {
@@ -55,12 +49,11 @@ internal static class ManifestJson
     ///     torn, garbled, or unreadable.
     /// </summary>
     /// <remarks>
-    ///     The caught set is the degradation contract both stores' remarks promise: these files are disposable
-    ///     derived data with no tamper story, so anything unreadable must degrade to "rebuild it" and never to
-    ///     a loud error or a wrong answer. Absence needs no separate probe: a missing file or
-    ///     directory arrives as an <see cref="IOException" /> and answers null down the same path. A caller
-    ///     spells <c>File.Exists</c> itself only when it must tell "nothing cached yet" apart from "something
-    ///     cached that no longer holds", because those two are different things to say to an operator.
+    ///     The caught set is the degradation contract: these files are disposable derived data with no tamper
+    ///     story, so anything unreadable must degrade to "rebuild it" and never to a loud error or a wrong answer.
+    ///     Absence needs no separate probe: a missing file or directory arrives as an <see cref="IOException" />
+    ///     and answers null down the same path. A caller spells <c>File.Exists</c> itself only when it must tell
+    ///     an operator "nothing cached yet" apart from "something cached that no longer holds".
     /// </remarks>
     internal static T? TryRead<T>(string path, JsonTypeInfo<T> typeInfo) where T : class
     {
@@ -80,10 +73,10 @@ internal static class ManifestJson
     ///     whether it landed.
     /// </summary>
     /// <remarks>
-    ///     Best-effort by the same contract <see cref="TryRead{T}" /> reads under: the caller already holds
-    ///     the answer it was going to give, so a write it cannot complete costs the next run a rebuild and
-    ///     nothing more — never the current run. <see cref="AtomicFile" /> is what stops a reader ever seeing
-    ///     half a document; this method is what stops a failed write ever surfacing as an error.
+    ///     Best-effort by the same contract <see cref="TryRead{T}" /> reads under: the caller already holds the
+    ///     answer it was going to give, so a write it cannot complete costs the next run a rebuild, never the
+    ///     current run. <see cref="AtomicFile" /> stops a reader seeing half a document; this stops a failed write
+    ///     surfacing as an error.
     /// </remarks>
     internal static bool TryWriteAtomic<T>(string path, T value, JsonTypeInfo<T> typeInfo)
     {

@@ -29,7 +29,7 @@ internal sealed class LayerNoun : SelectionNoun
         Definition = definition;
     }
 
-    /// <summary>The layer name.</summary>
+    /// <summary>The layer name, which the sentence fragments render as prose and never backtick.</summary>
     internal string Name { get; }
 
     /// <summary>
@@ -60,18 +60,12 @@ internal sealed class LayerNoun : SelectionNoun
     ///     <see cref="Globs" /> carries for the definition form.
     /// </summary>
     /// <remarks>
-    ///     The same two shapes the law drawing calls a namespace place: a namespace noun, and
-    ///     <c>arch.Types</c> narrowed by exactly one <c>InNamespace</c>. Adjectives beside them do not move
-    ///     the region, for the reason a subtractive adjective moves no node on the drawing — they narrow
-    ///     which types inside the region the layer holds, not where the region is. Computed at the mint so
-    ///     one answer serves the row's collapse, the drawing's key and the public payload.
-    ///     <para>
-    ///         The drawing has a third region shape this deliberately does not share: a place-shaped noun
-    ///         narrowed by one <c>InNamespace</c>, which it draws as that region inside the head's place. A
-    ///         <em>named</em> layer must not take it. Answering with a region here would fill
-    ///         <see cref="Globs" /> for a refinement-defined layer, which routes it down the classifier's glob
-    ///         arm, costs it the declared parent it arrives with, and flattens the box it was nested in.
-    ///     </para>
+    ///     Two shapes, the ones the law drawing calls a namespace place: a namespace noun, and <c>arch.Types</c>
+    ///     narrowed by exactly one <c>InNamespace</c>. Adjectives beside them narrow which types inside the region
+    ///     the layer holds, not where the region is, so they do not move it. The drawing's third shape, a
+    ///     place-shaped noun narrowed by one <c>InNamespace</c>, is deliberately not shared: a region answered for
+    ///     it would fill <see cref="Globs" /> for a refinement-defined layer, routing it down the classifier's glob
+    ///     arm and costing it its declared parent and the box it was nested in.
     /// </remarks>
     internal static IReadOnlyList<string> RegionOf(Selection definition)
     {
@@ -88,10 +82,6 @@ internal sealed class LayerNoun : SelectionNoun
     ///     The project a definition names when it is exactly that project — a project noun with no
     ///     adjective — or null for no definition, a union, a narrowed selection or any other noun.
     /// </summary>
-    /// <remarks>
-    ///     What the law drawing collapses a layer onto: a layer defined as exactly a project is that project,
-    ///     so a rule naming either draws one node. A narrowing is a subset no project equals, so it names none.
-    /// </remarks>
     internal static string? ProjectOf(Selection? definition)
     {
         if (definition is null or UnionSelection || definition.Adjectives.Count > 0) return null;
@@ -99,8 +89,6 @@ internal sealed class LayerNoun : SelectionNoun
         return definition.Noun is ProjectNoun project ? project.Name : null;
     }
 
-    // Bare layer names, or-joined: a layer name is prose, not an identifier, so it is not backticked —
-    // the same choice the single-layer fragment makes.
     private static string LayerNames(IReadOnlyList<SelectionNoun> group)
     {
         return ProseFormat.JoinReferences(group.Select(noun => ((LayerNoun)noun).Name).ToList());

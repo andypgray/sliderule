@@ -7,21 +7,11 @@ namespace SlideRule.Cli.Mcp.Pipeline;
 ///     so an over-budget document comes back whole at a coarser grain instead of cut at a line boundary.
 /// </summary>
 /// <remarks>
-///     <para>
-///         It walks the whole ladder rather than stepping once, because one step is not enough on a real
-///         codebase: on a large solution the overview the full survey degrades to can itself still be over
-///         the 50,000-character ceiling that bounds every budget. Stopping there hands
-///         <see cref="ResponseTruncator" /> exactly the document this class exists to avoid producing.
-///     </para>
-///     <para>
-///         Past the last rung it returns that rung anyway: a document still over budget at its coarsest grain
-///         lands on the truncator like any other response.
-///     </para>
-///     <para>
-///         The budget is read once per <see cref="Fit" /> — that is, once per tool call — and the rungs are
-///         pulled one at a time, so a document that fits at the grain the caller asked for costs exactly one
-///         serialization.
-///     </para>
+///     It walks the whole ladder, because on a large solution even the overview the full survey degrades to can
+///     be over the 50,000-character ceiling that bounds every budget. Past the last rung it returns that rung
+///     anyway, and a document still over budget at its coarsest grain lands on the truncator like any other
+///     response. The budget is read once per <see cref="Fit" />, once per tool call, and the rungs are pulled one
+///     at a time, so a document that fits at the grain the caller asked for costs exactly one serialization.
 /// </remarks>
 internal sealed class BudgetedResponseFitter(IResponseBudget budget) : IResponseFitter
 {

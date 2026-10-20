@@ -163,6 +163,7 @@ public sealed class CoercedToolSchemaTests
     [InlineData(nameof(Probe.WithUndescribedString), "plain")]
     [InlineData(nameof(Probe.WithUndescribedStringArray), "names")]
     [InlineData(nameof(Probe.WithUndescribedEnum), "severity")]
+    [InlineData(nameof(Probe.WithBool), "flag")]
     public void ExporterWithoutTheHook_ErasesAnUndescribedParameterToTrue(string methodName, string parameterName)
     {
         // The premise the undescribed rows of the restoration theories above rest on, observed with the hook

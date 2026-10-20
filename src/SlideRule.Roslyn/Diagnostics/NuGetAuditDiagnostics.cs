@@ -10,8 +10,8 @@ namespace SlideRule.Roslyn.Diagnostics;
 ///     raised it.
 /// </summary>
 /// <remarks>
-///     It rides the check, status and graph documents as it is, so its declaration order is the wire order —
-///     <c>message</c>, then <c>projects</c> — and a null <see cref="Projects" /> is what omits that key.
+///     It rides the JSON documents as it is, so its declaration order is the wire order (<c>message</c>, then
+///     <c>projects</c>), and a null <see cref="Projects" /> is what omits that key.
 /// </remarks>
 /// <param name="Message">
 ///     The advisory text after Roslyn's project-load frame, verbatim. A <c>Warning As Error: </c> prefix stays
@@ -46,27 +46,19 @@ internal sealed record PackageAuditEntry(string Message, IReadOnlyList<string>? 
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>What this decides: which key a line lands in, never a verdict.</b> The fail-closed gate reads
-///         project structure, never diagnostics (<see cref="WorkspaceDiagnostics.Gates" />), so an advisory
-///         cannot flip an exit code whether this recognises it or not. A line recognised here renders inside a
-///         <see cref="PackageAuditEntry" />; a line it misses renders in the diagnostic stream, verbatim. Both
-///         reach every surface, so a miss costs the grouping and nothing else.
+///         It decides which key a line lands in, never a verdict: a line it misses renders in the diagnostic
+///         stream verbatim, which reaches every surface too, so a miss costs the grouping and nothing else.
 ///     </para>
 ///     <para>
-///         <b>The code is not in the text, so NuGet's text is what this matches.</b> Roslyn's project-load
-///         reporting records the message and never the code, so <c>NU1902</c> is structurally absent from
-///         every diagnostic that reaches a host; what arrives is NuGet's own words inside Roslyn's frame. That
-///         frame carries the project's path, which can say anything, so both patterns run over what
-///         <see cref="Unframe" /> leaves: a load failure in a project under a <c>NU1903-repro</c> directory
-///         stays a load failure. The code match is kept for the paths that do carry one; the advisory match is
-///         what does the work.
+///         Roslyn's project-load reporting records the message and never the code, so what arrives is NuGet's own
+///         words inside Roslyn's frame. That frame carries the project's path, which can say anything, so both
+///         patterns run over what <see cref="Unframe" /> leaves: a load failure in a project under a
+///         <c>NU1903-repro</c> directory stays a load failure.
 ///     </para>
 ///     <para>
-///         <b>A frame that does not parse still groups, without projects.</b> Roslyn's frame is English and its
-///         resource is localized. A line in another language's frame, or one that never had a frame (a binlog
-///         replay's coded line, a console logger's), is matched whole and forms an entry of its own with no
-///         projects. A localized <em>advisory</em> matches nothing and stays in the stream, which is where a
-///         line nothing recognises belongs.
+///         Roslyn's frame is English and its resource is localized. A line in another language's frame, or one that
+///         never had a frame (a binlog replay's coded line, a console logger's), is matched whole and forms an entry
+///         of its own with no projects. A localized advisory matches nothing and stays in the stream.
 ///     </para>
 ///     <para>
 ///         The merge notes never come through here. They are this product's sentences rather than the load's,
@@ -81,12 +73,9 @@ internal static partial class NuGetAuditDiagnostics
     private const string FrameSeparator = "' with message: ";
 
     /// <summary>
-    ///     Whether <paramref name="diagnostic" /> is a NuGet audit advisory — NU1900 (the audit fetch itself
-    ///     failed), NU1901–1904 (low/moderate/high/critical severity advisories), NU1905, and any future
-    ///     NU19xx code — recognised in what follows Roslyn's frame, by the advisory text NuGet emits or by the
-    ///     code on the paths that keep one. Both patterns stay deliberately narrow — phrases NuGet owns, and a
-    ///     URL prefix nothing else emits — so that a false positive cannot move a genuine load diagnostic out
-    ///     of the stream a reader looks for it in.
+    ///     Whether <paramref name="diagnostic" /> is a NuGet audit advisory: NU1900 (the audit fetch itself
+    ///     failed), NU1901–1904 (low/moderate/high/critical severity advisories), NU1905, or any later NU19xx
+    ///     code, recognised in what follows Roslyn's frame.
     /// </summary>
     internal static bool IsAudit(string diagnostic)
     {
@@ -140,9 +129,7 @@ internal static partial class NuGetAuditDiagnostics
     /// </summary>
     /// <remarks>
     ///     For a reader that has a real code to match rather than a sentence, such as a
-    ///     <c>project.assets.json</c> logs entry, where NuGet records <c>code</c> and <c>level</c> as separate
-    ///     invariant fields. There the match is exact and language-independent; on the diagnostic stream,
-    ///     where <c>.Code</c> is discarded before a host sees it, it cannot be made at all.
+    ///     <c>project.assets.json</c> logs entry.
     /// </remarks>
     internal static bool IsAuditCode(string code)
     {
@@ -180,7 +167,8 @@ internal static partial class NuGetAuditDiagnostics
     /// <summary>
     ///     The advisory itself: the GHSA link every NU1901–1904 message carries, the severity phrasing, and
     ///     the two NU1900 audit-fetch failures. Case-sensitive, and anchored on wording NuGet owns rather
-    ///     than on any package or severity name a project could coincidentally produce.
+    ///     than on any package or severity name a project could coincidentally produce, so a false positive
+    ///     cannot move a load diagnostic out of the stream a reader looks for it in.
     /// </summary>
     [GeneratedRegex(
         @"https://github\.com/advisories/"

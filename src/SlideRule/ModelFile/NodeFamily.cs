@@ -12,10 +12,8 @@ internal enum NodeFamily
     /// <summary>A <c>SelectionAdjective</c>.</summary>
     Adjective,
 
-    /// <summary>A <c>MemberAdjective</c>.</summary>
     MemberAdjective,
 
-    /// <summary>A <c>ProjectAdjective</c>.</summary>
     ProjectAdjective,
 
     /// <summary>A <c>Constraint</c>, of any of the three strata.</summary>

@@ -1,11 +1,6 @@
 namespace SlideRule.Model;
 
-/// <summary>
-///     Where an adjective's fragment lands during subject assembly (GRAMMAR §6): as the subject
-///     head (<c>OfKind</c> substitutes the plural), in front of it (<c>Authored</c> premodifies),
-///     inline as a reduced relative clause, or canonicalized to sentence-final
-///     (<c>Except</c>/<c>Where</c>).
-/// </summary>
+/// <summary>Where an adjective's fragment lands during subject assembly (GRAMMAR §6).</summary>
 internal enum AdjectivePlacement
 {
     /// <summary>An inline reduced relative clause, e.g. <c> in `MyApp.*`</c>.</summary>
@@ -16,15 +11,17 @@ internal enum AdjectivePlacement
 
     /// <summary>
     ///     Premodifies the current subject head rather than replacing it, e.g. "authored types",
-    ///     "authored interfaces" — so it composes with a <see cref="Head" /> substitution. Several stack in
-    ///     the order written: "authored public types".
+    ///     "authored interfaces" — so it composes with a <see cref="Head" /> substitution, and, unlike an inline
+    ///     clause, stays on the noun it narrows when the selection renders in reference position. Several stack
+    ///     in the order written: "authored public types".
     /// </summary>
     HeadPrefix,
 
     /// <summary>
     ///     Canonicalized to sentence-final regardless of chain position (<c>Except</c>/<c>Where</c>). Within
     ///     the group an <c>Except</c> renders after every <c>Where</c> of the same subject, so the
-    ///     parenthetical it opens is the last thing before the junction that closes it (GRAMMAR §6).
+    ///     parenthetical it opens is the last thing before the junction that closes it, and no <c>Where</c>
+    ///     reads as describing the exception (GRAMMAR §6).
     /// </summary>
     SubjectFinal
 }

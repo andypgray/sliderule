@@ -5,8 +5,7 @@ namespace SlideRule.Checking;
 
 /// <summary>
 ///     A family rule's remaining tolerated debt, grouped by the cell each violation falls in. The rule's
-///     own count says how much is left; this says which cells hold it. Read it from
-///     <see cref="RuleResult.RatchetCells" />.
+///     own count says how much is left; this says which cells hold it.
 /// </summary>
 internal sealed class RatchetCellSplit
 {
@@ -28,9 +27,8 @@ internal sealed class RatchetCellSplit
     /// </summary>
     public IReadOnlyList<RatchetCell> Cells { get; }
 
-    // Derived on every check and stored nowhere, which is what lets a cell stay a fact about the spec
-    // that read the baseline rather than one the baseline has to carry: the file keys pairs, and the
-    // same pairs regroup under a respelled family without a recapture.
+    // Derived on every check and stored nowhere: the baseline file keys pairs, and the same pairs regroup
+    // under a respelled family without a recapture.
     internal static RatchetCellSplit? Of(ArchRule rule, IReadOnlyList<Violation> grandfathered)
     {
         if (!rule.IsRatcheted) return null;
@@ -42,9 +40,7 @@ internal sealed class RatchetCellSplit
         return new RatchetCellSplit(family.CellWord, Ordered(family, held));
     }
 
-    // Only cells that still hold something: a project family can carry every project in a solution, and a
-    // burndown that lists the twenty-eight of them at zero is a wall a reader has to search for the two
-    // that matter. A violation with no cell contributes nothing — it belongs to no family law.
+    // A violation with no cell contributes nothing: it belongs to no family law.
     private static Dictionary<string, (int Remaining, int Sites)> Held(IReadOnlyList<Violation> grandfathered)
     {
         var held = new Dictionary<string, (int Remaining, int Sites)>(StringComparer.Ordinal);

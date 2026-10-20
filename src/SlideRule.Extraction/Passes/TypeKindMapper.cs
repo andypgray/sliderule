@@ -5,14 +5,12 @@ using RoslynTypeKind = Microsoft.CodeAnalysis.TypeKind;
 namespace SlideRule.Extraction.Passes;
 
 /// <summary>
-///     Maps Roslyn's <see cref="RoslynTypeKind" /> onto SlideRule's Core <see cref="CoreTypeKind" />
-///     (the two enums are deliberately distinct — Roslyn must not enter Core). The alias is required
-///     because <c>TypeKind</c> is otherwise ambiguous here.
+///     Maps Roslyn's <see cref="RoslynTypeKind" /> onto Core's <see cref="CoreTypeKind" />, a separate enum
+///     so that Roslyn never enters Core.
 /// </summary>
 /// <remarks>
-///     Class → Class (records and static classes are classes at the symbol level), Interface,
-///     Struct (record structs included), Enum, Delegate. Everything else — Error, TypeParameter,
-///     Array, Pointer, Dynamic, Module, Submission, FunctionPointer — is unmappable.
+///     Records and static classes are classes at the symbol level, and record structs are structs. Every other
+///     kind (Error, TypeParameter, Array, Pointer, Dynamic, Module, Submission, FunctionPointer) is unmappable.
 /// </remarks>
 internal static class TypeKindMapper
 {

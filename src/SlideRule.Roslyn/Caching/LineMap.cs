@@ -14,8 +14,7 @@ namespace SlideRule.Roslyn.Caching;
 /// </remarks>
 internal sealed class LineMap : IEquatable<LineMap>
 {
-    // Indexed by (old line - 1) and holding 1-based new lines, so 0 can mean "no entry" without a
-    // parallel occupancy array.
+    // 1-based new lines, so 0 can mean "no entry" without a parallel occupancy array.
     private readonly int[] _newLineByOldLine;
 
     /// <summary>

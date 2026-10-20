@@ -3,9 +3,9 @@ using SlideRule.Hosting;
 namespace SlideRule.Validation;
 
 /// <summary>
-///     Thrown when a spec is loaded and something in it is wrong: <see cref="ArchModelBuilder" /> raises
-///     it instead of returning a model. <see cref="Errors" /> carries every mistake found in that one
-///     pass rather than only the first, and the message is those errors one per line.
+///     Thrown by <see cref="ArchModelBuilder" /> in place of a model when a spec is loaded and something in it
+///     is wrong. <see cref="Errors" /> carries every mistake found in that one pass rather than only the first,
+///     and the message is those errors one per line.
 /// </summary>
 internal sealed class SpecValidationException : Exception
 {
@@ -15,9 +15,6 @@ internal sealed class SpecValidationException : Exception
         Errors = errors;
     }
 
-    /// <summary>
-    ///     Gets every mistake found, in the order the checks ran. Each names its kind, the rule or scope it
-    ///     is about, and where in the spec source it was written.
-    /// </summary>
+    /// <summary>Gets every mistake found, in the order the checks ran.</summary>
     public IReadOnlyList<SpecValidationError> Errors { get; }
 }

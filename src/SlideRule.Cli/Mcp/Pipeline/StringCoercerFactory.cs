@@ -69,11 +69,8 @@ internal sealed class StringCoercerFactory : JsonConverterFactory
         }
 
         /// <summary>
-        ///     The scalar rules, shared by the top level and the single-element-array unwrap.
-        ///     <paramref name="insideArray" /> chooses the wording only: an error naming an "array element"
-        ///     tells the caller the coercer did look inside their array and still could not use what it
-        ///     found there. <see cref="JsonTokenType.Null" /> is deliberately not admitted here — the top
-        ///     level answers a bare null with "absent", which a null <em>inside</em> an array does not mean.
+        ///     The scalar rules. <see cref="JsonTokenType.Null" /> is deliberately not admitted here: the top level
+        ///     answers a bare null with "absent", which a null <em>inside</em> an array does not mean.
         /// </summary>
         private static string? ReadCoercedScalar(ref Utf8JsonReader reader, bool insideArray)
         {

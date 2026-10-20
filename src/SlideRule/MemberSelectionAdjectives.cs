@@ -232,14 +232,10 @@ public static class MemberSelectionAdjectives
         return Append(selection, new MemberAccessibilityAdjective(Accessibility.PrivateProtected));
     }
 
-    // The generic twin is receiver-typed rather than TSelf-generic, and that asymmetry with every other
-    // adjective in this file is deliberate: C# has no PARTIAL type inference, so a two-type-parameter
-    // AttributedWith<TSelf, T>(this TSelf, ...) would force `selection.AttributedWith<MethodSelection,
-    // MyAttribute>()` at every call site — the sugar's whole point is that the type argument is the only
-    // thing written. One overload per receiver recovers what TSelf was there for, so the set has to cover
-    // every concrete member selection there is; the MemberSelection overload serves .Members and .Events,
-    // whose KindMemberSelection is internal. A new projection type ships its overload here or its kind-only
-    // verb silently stops compiling after the sugar. Do not "fix" this back to TSelf.
+    // The generic AttributedWith<T> overloads are one per member-selection receiver type, not TSelf-generic:
+    // C# has no partial type inference, so a TSelf form would make every call spell both type arguments. The
+    // MemberSelection overload serves .Members and .Events, whose KindMemberSelection is internal. A new
+    // projection type ships its overload here, or its kind-only verbs stop compiling after the sugar.
 
     /// <summary>
     ///     Narrows the selection to the members carrying attribute <typeparamref name="T" />, such as

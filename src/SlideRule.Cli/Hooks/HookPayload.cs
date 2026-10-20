@@ -2,29 +2,15 @@ using System.Text.Json;
 
 namespace SlideRule.Cli.Hooks;
 
-/// <summary>
-///     The fields of a Claude Code hook payload that <c>sliderule hook</c> reads: which event fired, whose
-///     session and prompt it belongs to, where the session is, which transcripts record the turn, and what an
-///     edit touched.
-/// </summary>
+/// <summary>The fields of a Claude Code hook payload that <c>sliderule hook</c> reads.</summary>
 /// <remarks>
 ///     Parsed tolerantly, because a payload that will not parse is a hand run rather than an error. Text that is
 ///     not a JSON object is no payload at all, and a field that is absent, empty or of another kind reads as
-///     absent. The paths come back with their separators turned forward, so everything that compares them
-///     compares one spelling.
+///     absent: null, or false for <paramref name="StopHookActive" />. The paths come back with their separators
+///     turned forward, so everything that compares them compares one spelling. <paramref name="AgentId" /> is
+///     null for the main agent, and <paramref name="AgentTranscriptPath" /> is the transcript of the subagent a
+///     <c>SubagentStop</c> is for (verified 2026-10-20 on Claude Code 2.1.300).
 /// </remarks>
-/// <param name="EventName">The <c>hook_event_name</c>, or null.</param>
-/// <param name="SessionId">The <c>session_id</c>, or null.</param>
-/// <param name="PromptId">The <c>prompt_id</c>, or null.</param>
-/// <param name="AgentId">The <c>agent_id</c> a subagent's event carries, or null for the main agent.</param>
-/// <param name="Cwd">The session's directory (<c>cwd</c>), forward-slashed, or null.</param>
-/// <param name="EditedFile">The edited file (<c>tool_input.file_path</c>), forward-slashed, or null.</param>
-/// <param name="StopHookActive">Whether <c>stop_hook_active</c> is <c>true</c>.</param>
-/// <param name="TranscriptPath">The session's transcript (<c>transcript_path</c>), forward-slashed, or null.</param>
-/// <param name="AgentTranscriptPath">
-///     The transcript of the subagent a <c>SubagentStop</c> is for (<c>agent_transcript_path</c>), forward-slashed,
-///     or null.
-/// </param>
 internal sealed record HookPayload(
     string? EventName,
     string? SessionId,
@@ -40,7 +26,6 @@ internal sealed record HookPayload(
     public static HookPayload None { get; } = new(null, null, null, null, null, null, false);
 
     /// <summary>Reads the payload out of <paramref name="text" />, the whole of what arrived on stdin.</summary>
-    /// <param name="text">The text read from stdin, or null when nothing was read.</param>
     public static HookPayload Parse(string? text)
     {
         if (string.IsNullOrWhiteSpace(text)) return None;

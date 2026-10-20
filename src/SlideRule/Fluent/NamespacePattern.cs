@@ -37,12 +37,8 @@ public sealed class NamespacePattern
     {
         string glob = Guard.NotNullOrWhiteSpace(pattern, nameof(pattern));
 
-        // The pattern is immutable, so the whole of what it means is invariant: which of the three shapes
-        // it is, the subtree prefix and its `prefix + "."` probe, or the literal segments. Deriving it here
-        // rather than inside Matches spares every candidate a substring or a split of the glob, and leaves the
-        // subtree and match-everything shapes allocation-free: Matches runs once per type in the universe, per
-        // pattern, per rule. Those three are the whole of what matching reads, so the glob text itself needs
-        // no field.
+        // Derived once because Matches runs once per type, per pattern, per rule: no candidate pays a split of
+        // the glob, and the subtree and match-everything shapes match without allocating.
         _matchesEverything = glob == "*";
         if (_matchesEverything) return;
 
@@ -72,9 +68,6 @@ public sealed class NamespacePattern
     {
         if (string.IsNullOrWhiteSpace(pattern)) return "is blank";
 
-        // Only a trailing-`.*` subtree strands a wildcard: everything before the operator is matched
-        // literally, so any `*` there is dead. An interior standalone `*` (no trailing `.*`) is segment
-        // matching and is fine, as is a lone `*` (length 1, never ends with `.*`).
         if (TryParseSubtree(pattern, out string prefix) && prefix.IndexOf('*') >= 0)
             return "has a trailing `.*` subtree operator but its literal prefix contains a `*`, " +
                    "which never matches; anchor the subtree on a literal prefix";
@@ -93,7 +86,6 @@ public sealed class NamespacePattern
 
         if (_matchesEverything) return true;
 
-        // Self-inclusive subtree: `MyApp.Domain.*` matches `MyApp.Domain` and all descendants.
         if (_subtreePrefix is not null) return PrefixCovers(_subtreePrefix, _subtreePrefixDot!, @namespace);
 
         string[] patternSegments = _patternSegments!;
@@ -133,8 +125,7 @@ public sealed class NamespacePattern
         return PrefixCovers(prefix, prefix + ".", candidate);
     }
 
-    // The same rule with the `prefix + "."` probe supplied, for the matcher's hot path — it precomputes the
-    // probe once in the constructor rather than concatenating a string per candidate type.
+    // The same rule with the `prefix + "."` probe precomputed, for the matcher's hot path.
     private static bool PrefixCovers(string prefix, string prefixDot, string candidate)
     {
         return string.Equals(candidate, prefix, StringComparison.Ordinal)

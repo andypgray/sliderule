@@ -6,26 +6,19 @@ namespace SlideRule.Validation;
 ///     written at that parameter fills.
 /// </summary>
 /// <remarks>
-///     The marker is read from metadata by a compiler extension, out of whatever copy of this assembly
-///     the compilation being analysed references rather than out of the copy the extension was built
-///     against. It finds the attribute by its full name,
-///     <c>SlideRule.Validation.SpecSlotAttribute</c>, and takes the slot from the single
-///     constructor argument. That full name and that one string argument are therefore a contract with a
-///     reader no search over this assembly can find: renaming the type, moving it to another namespace,
-///     or giving the constructor a second parameter leaves the reader matching nothing and every slot
-///     silently invisible to it.
+///     A compiler extension reads the marker from metadata, out of whichever copy of this assembly the
+///     analysed compilation references, finding it by its full name, <c>SlideRule.Validation.SpecSlotAttribute</c>,
+///     and taking the slot from the single constructor argument. That name and that one string argument are a
+///     contract with a reader no search over this assembly finds: renaming the type, moving its namespace or
+///     adding a constructor parameter leaves every slot silently invisible to it.
 ///     <para>
-///         The constructor is public while the type is internal, which is what makes the arguments
-///         readable. A custom-attribute blob names the constructor it was built from, and a reader with
-///         no access to that constructor cannot decode the blob, so an internal constructor would hide
-///         the very value the marker exists to carry. Keeping the type internal keeps it off the public
-///         surface, where it would become something a spec project compiles against.
+///         The constructor is public while the type is internal: a custom-attribute blob names the
+///         constructor it was built from, and a reader with no access to that constructor cannot decode it.
+///         The type stays internal so no spec project compiles against it.
 ///     </para>
 ///     <para>
-///         <see cref="Name" /> is the <see cref="SpecSlot.Name" /> of one of the singletons on
-///         <see cref="SpecSlot" />, written at the parameter as the <c>nameof</c> of that singleton.
-///         Marker and verdict owner share one vocabulary that way, and a name no
-///         <see cref="SpecSlot.ByName" /> lookup resolves is a mistake rather than a second naming scheme.
+///         A <see cref="Name" /> no <see cref="SpecSlot.ByName" /> lookup resolves is a mistake, not a second
+///         naming scheme: marker and verdict owner share one vocabulary.
 ///     </para>
 /// </remarks>
 [AttributeUsage(AttributeTargets.Parameter)]

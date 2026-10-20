@@ -19,14 +19,9 @@ namespace SlideRule.Cli.Mcp.Infrastructure;
 internal static class ParentProcessWatcher
 {
     /// <summary>
-    ///     Resolves the parent PID, attaches a background waiter, and exits the process when the
-    ///     parent dies. Logs and returns silently when disabled, on non-Windows hosts, or when the
-    ///     parent PID cannot be resolved.
+    ///     Starts the watcher. When <paramref name="disabled" />, off Windows, or when the parent PID cannot be
+    ///     resolved, it logs why and attaches nothing.
     /// </summary>
-    /// <param name="disabled">
-    ///     The <c>SLIDERULE_DISABLE_PARENT_WATCH</c> opt-out, resolved by the caller: the watcher is
-    ///     started before the host exists, and the caller owns the one env seam.
-    /// </param>
     public static void Start(bool disabled)
     {
         Start(
@@ -35,11 +30,6 @@ internal static class ParentProcessWatcher
             disabled);
     }
 
-    /// <summary>
-    ///     Test seam: lets tests inject a fake parent-PID lookup, a fake exit action (so
-    ///     <see cref="Environment.Exit" /> doesn't kill the test host), and the disabled flag
-    ///     directly without env-var leakage between tests.
-    /// </summary>
     internal static void Start(Func<int?> parentLookup, Action onParentExited, bool disabled)
     {
         if (disabled)
@@ -80,10 +70,7 @@ internal static class ParentProcessWatcher
         _ = Task.Run(() => WatchAsync(parent, onParentExited));
     }
 
-    /// <summary>
-    ///     Returns the parent PID via <c>NtQueryInformationProcess</c>, or <c>null</c> on failure
-    ///     (non-Windows host, NT call rejected, lookup threw).
-    /// </summary>
+    /// <summary>The parent PID, read with <c>NtQueryInformationProcess</c>, or null when it cannot be read.</summary>
     internal static int? GetParentProcessId()
     {
         if (!OperatingSystem.IsWindows()) return null;

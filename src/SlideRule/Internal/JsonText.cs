@@ -27,8 +27,8 @@ internal static class JsonText
     }
 
     /// <summary>Appends <paramref name="value" /> as the quoted token <see cref="Quote" /> returns.</summary>
-    // Minimal JSON string escaper: quote, backslash, and control chars. Symbol IDs and rule IDs never
-    // need it in practice, but the format stays honest and the escape path is pinned by test.
+    // Escapes what JSON requires and nothing more: the quote, the backslash and control characters. The
+    // escape path is pinned by test.
     internal static StringBuilder AppendQuoted(this StringBuilder builder, string value)
     {
         builder.Append('"');

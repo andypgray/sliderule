@@ -11,13 +11,11 @@ namespace SlideRule.ModelFile;
 ///     <para>
 ///         <see cref="From" /> is the only thing that decides what is carried, and it decides by trying to
 ///         write: a rule that writes clean is carried and one that does not is omitted, so the partition
-///         and the text can never disagree about a rule. Nothing else may classify a node, because a
-///         second opinion is a second answer.
+///         and the text can never disagree about a rule. Nothing else may classify a node.
 ///     </para>
 ///     <para>
-///         A document read back from a file holds the same five things, and <see cref="ToModel" /> turns
-///         it into a model the checker runs unchanged — which is the whole point of the format: a reader
-///         with no spec assembly gets the rules that survived, and knows by name which ones did not.
+///         A document read back from a file holds the same members, and <see cref="ToModel" /> turns it into
+///         a model the checker runs unchanged.
 ///     </para>
 /// </remarks>
 internal sealed class ModelDocument
@@ -25,7 +23,6 @@ internal sealed class ModelDocument
     /// <summary>The version of the format this writes and reads.</summary>
     internal const int SchemaVersion = 2;
 
-    /// <summary>The file's conventional name.</summary>
     internal const string FileName = "sliderule.model.json";
 
     internal ModelDocument(
@@ -92,7 +89,6 @@ internal sealed class ModelDocument
         return new ModelDocument(spec, sorted, layers, rules, omitted);
     }
 
-    /// <summary>The carried rules and layers as a model the checker runs.</summary>
     internal ArchitectureModel ToModel()
     {
         return new ArchitectureModel(Rules, Layers);

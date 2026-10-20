@@ -11,21 +11,16 @@ using SlideRule.Rendering;
 namespace SlideRule.Analyzers;
 
 /// <summary>
-///     The six warnings the build tier reports, and the line each one carries.
+///     The warnings the build tier reports, and the line each one carries.
 /// </summary>
 /// <remarks>
 ///     <para>
-///         Every string a developer reads is here rather than at the place that reports it, so the wording
-///         can be reviewed in one sitting and the analyzer stays a description of when each warning is due.
-///     </para>
-///     <para>
-///         Three of the six are reported from a compilation end action and carry the
-///         <c>CompilationEnd</c> tag, which is what lets a host run them at the right point: the missing
-///         model file, the unchecked rule and the fault. The two rule warnings are reported from a
-///         per-document action and <see cref="UnreadableFile" /> from an additional-file action, and none
-///         of those three is tagged, because the tag would be a claim about where the warning comes from
-///         that is not true. A project that sets <c>SlideRuleTier</c> to <c>build</c> gets the rule
-///         warnings from an end action instead, under the same untagged descriptors.
+///         The missing model file, the unchecked rule and the fault are reported from a compilation end action
+///         and carry the <c>CompilationEnd</c> tag, which is what lets a host run them at the right point. The
+///         two rule warnings are reported from a per-document action and <see cref="UnreadableFile" /> from an
+///         additional-file action, and none of those is tagged, because the tag would be a claim about where
+///         the warning comes from that is not true. A project that sets <c>SlideRuleTier</c> to <c>build</c>
+///         gets the rule warnings from an end action instead, under the same untagged descriptors.
 ///     </para>
 ///     <para>
 ///         The fault's ID carries two descriptors: the fault itself, and <see cref="VersionMismatch" />, the
@@ -134,8 +129,7 @@ internal static class BuildTierDiagnostics
         WellKnownDiagnosticTags.CompilationEnd);
 
     /// <summary>
-    ///     The compiler handed the analyzer another version of SlideRule than its own, so it checked
-    ///     nothing: the fault's ID, with a message of its own.
+    ///     The compiler handed the analyzer another version of SlideRule than its own, so it checked nothing.
     /// </summary>
     internal static readonly DiagnosticDescriptor VersionMismatch = new(
         "SR2093",

@@ -22,8 +22,7 @@ namespace SlideRule.Cli.Verbs;
 ///     <para>
 ///         Zero matches and ambiguous matches (two distinct identities) are loud
 ///         <see cref="UserErrorException" />s listing the candidates — the baseline records observed
-///         reality, so the valve only admits what is actually red. Pure over the in-memory results, so
-///         ambiguity is unit-testable with synthetic nodes.
+///         reality, so the valve only admits what is actually red.
 ///     </para>
 /// </remarks>
 internal static class BaselineAddMatcher
@@ -48,10 +47,7 @@ internal static class BaselineAddMatcher
         return Resolve(ruleId, violations, candidates, echo);
     }
 
-    // A --subject matches a type-shape violation on its subject type (FullName or T: symbol ID), or a
-    // member-shape violation on its subject member (member full name, no parens, or member symbol ID,
-    // GRAMMAR §4.6) — one full name covering every overload, exactly as a member --target does (§4.5). A
-    // project matches only where the violation names no package, framework or property: those are keyed per
+    // A project matches only where the violation names no package, framework or property: those are keyed per
     // item, so they take the edge form, and the no-match listing shows each as `Project -> item`.
     private static bool MatchesSubject(Violation violation, string subject)
     {
@@ -71,8 +67,7 @@ internal static class BaselineAddMatcher
                || string.Equals(member.SymbolId, subject, StringComparison.Ordinal);
     }
 
-    // A project's bare name or its identity form (GRAMMAR §4.10) — the same pair of spellings a type
-    // subject takes, a readable name and the stored key. The key comes off the node, so this end and the
+    // A project's bare name or its identity form (GRAMMAR §4.10). The key comes off the node, so this end and the
     // mint that writes the baseline entry cannot spell it apart.
     private static bool MatchesProjectSubject(ProjectNode project, string subject)
     {
@@ -92,11 +87,8 @@ internal static class BaselineAddMatcher
     }
 
     // Every edge kind but MemberUse matches on both type endpoints, because the second type — constructed
-    // (GRAMMAR §4.5), injected (§4.7), caught or thrown (§4.8), exposed (§4.9) — rides the Target slot;
-    // MemberUse matches the source type and the banned member (by full name or member symbol ID, §4.5); a
-    // project's per-item violation matches the project and its package, framework or property (§4.10).
-    // Those Target-slot kinds need no dedicated FullNameForm arm either: the default `Source -> Target`
-    // covers them (verified by test).
+    // (GRAMMAR §4.5), injected (§4.7), caught or thrown (§4.8), exposed (§4.9) — rides the Target slot. For the
+    // same reason those kinds need no dedicated FullNameForm arm: the default `Source -> Target` covers them.
     private static bool MatchesEdge(Violation violation, string source, string target)
     {
         return violation.Kind switch
@@ -116,7 +108,7 @@ internal static class BaselineAddMatcher
     }
 
     // A package, framework or property by its bare name or its identity form (package:Serilog, framework:net48,
-    // property:Nullable@net8.0), the same pair of spellings the project end takes.
+    // property:Nullable@net8.0).
     private static bool MatchesProjectItem(string item, string itemName, string target)
     {
         return string.Equals(itemName, target, StringComparison.Ordinal)

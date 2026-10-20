@@ -10,7 +10,6 @@ namespace SlideRule.Model;
 /// </summary>
 internal sealed class MustOnlyThrowConstraint(Selection subject, IReadOnlyList<Selection> targets) : OperandConstraint(subject, targets)
 {
-    /// <summary>The permitted throw targets.</summary>
     internal IReadOnlyList<Selection> Targets => Operands;
 
     internal override string VerbPhrase => "must throw only " + Targets.TargetListProse();

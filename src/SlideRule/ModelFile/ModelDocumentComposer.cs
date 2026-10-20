@@ -11,17 +11,15 @@ namespace SlideRule.ModelFile;
 ///         <see cref="ModelDocument.From" /> or from a file that was read — so every layer and every rule
 ///         in it is known to write clean, and a refusal met here is a caller handing over a document it
 ///         built some other way. That throws rather than silently dropping the rule, because a file that
-///         quietly lost a rule enforces less than it claims.
+///         lost a rule enforces less than it claims.
 ///     </para>
 ///     <para>
-///         The layout is fixed so two runs over one model produce one byte sequence: no timestamp, no
-///         tool version, one line per entry, and a rule's properties one per line with their values
-///         compact. Nothing is sorted here either — the order is the model's, which is the spec author's.
+///         The layout is fixed so two runs over one model produce one byte sequence: no timestamp, no tool
+///         version, and nothing sorted here, since the order is the model's, which is the spec author's.
 ///     </para>
 /// </remarks>
 internal static class ModelDocumentComposer
 {
-    // Every layer of a document is one that wrote clean, so nothing here can meet an unwritable one.
     private static readonly IReadOnlyDictionary<string, string> NoUnwritableLayers =
         new Dictionary<string, string>(StringComparer.Ordinal);
 
@@ -62,8 +60,6 @@ internal static class ModelDocumentComposer
             .Append(",\n");
     }
 
-    // An empty array sits on the property's own line; a populated one opens, gives each entry its line,
-    // and closes at the property's indent.
     private static void ArrayProperty(StringBuilder builder, string key, IReadOnlyList<string> entries, bool last)
     {
         builder.Append("  ")

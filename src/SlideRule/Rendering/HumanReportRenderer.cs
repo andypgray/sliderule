@@ -7,46 +7,15 @@ using SlideRule.Model;
 namespace SlideRule.Rendering;
 
 /// <summary>
-///     Renders a <see cref="CheckReport" /> as the plain text <c>sliderule check</c> prints: one block
-///     per rule, in the order the spec declares the rules, then a one-line summary.
+///     Renders a <see cref="CheckReport" /> as the plain text <c>sliderule check</c> prints, with no colour
+///     codes: one block per rule, in the order the spec declares the rules, then a one-line summary.
 /// </summary>
-/// <remarks>
-///     <para>
-///         Each block is headed by a status word (<c>pass</c>, <c>warn</c>, <c>FAIL</c> or <c>skip</c>, with
-///         no colour codes), the rule ID and the rule's sentence. A failed rule adds its reason, its citation
-///         where it has one, its fix and its exemplar where it has them and the run reached a verdict about
-///         the code, and a line per violation site as <c>path:line</c>, the path relative to the solution
-///         directory with forward slashes and the lines ordered by path and then by line. The summary line
-///         counts the rules checked, passed, failed and skipped.
-///     </para>
-///     <para>
-///         A Migrate rule and a quarantine's containment rule also report how many violations their baseline
-///         grandfathers; those pass, so they are never listed as sites. When such a rule fails on violations
-///         a baseline could hold and none has been captured yet, the block ends with a hint to run
-///         <c>sliderule baseline init</c>, except where a pattern in one of the rule's lists matched nothing,
-///         since that command skips such a rule. Where a baseline section no rule names exists, a warning
-///         naming that section replaces the hint, and the warning's own hint offers
-///         <c>sliderule baseline rename</c>, with <c>init</c> as well on a rule measured in full. A rule whose
-///         subject swept generated types says so on a <c>subject:</c> line, and a tripwire that fired prints
-///         its warnings followed by the scope's dragons prose. Where the rule itself is what went wrong, a
-///         <c>hint:</c> line under the diagnosis says what to change, printed once however many diagnoses of
-///         the rule share it. That is the case where its subject or a part of it matched nothing, where a
-///         forbidden target matched nothing so the rule can never fire, or where a pattern in one of its lists
-///         or a part of its exemplar matched nothing. The rule's own <c>fix:</c> line is left out where the run
-///         reached no verdict about the code, because it advises correcting a violation and such a rule has none
-///         to correct; a rule that failed on what its other targets found keeps it.
-///     </para>
-/// </remarks>
 internal static class HumanReportRenderer
 {
     /// <summary>
-    ///     Writes the whole report, every rule block and then the summary line, to
-    ///     <paramref name="output" />. Violation sites are rendered relative to
+    ///     Writes the whole report to <paramref name="output" />, violation sites relative to
     ///     <paramref name="solutionDirectory" />.
     /// </summary>
-    /// <param name="output">The writer the report goes to.</param>
-    /// <param name="report">The check report to render.</param>
-    /// <param name="solutionDirectory">The directory each violation site's path is printed relative to.</param>
     public static void Render(TextWriter output, CheckReport report, string solutionDirectory)
     {
         RenderReport(output, report, solutionDirectory, includeQuietPasses: true);
@@ -58,9 +27,8 @@ internal static class HumanReportRenderer
     ///     counts the rules it leaves out.
     /// </summary>
     /// <remarks>
-    ///     For a reader that already holds the rule board and wants only what a verdict or a warning turned
-    ///     on. The pass blocks grow with the spec while the findings do not, so leaving them out is what
-    ///     keeps the findings inside a size budget a whole report outgrows.
+    ///     The pass blocks grow with the spec while the findings do not, so leaving them out keeps the
+    ///     findings inside a size budget a whole report outgrows.
     /// </remarks>
     internal static void RenderWithoutPasses(TextWriter output, CheckReport report, string solutionDirectory)
     {
@@ -92,9 +60,6 @@ internal static class HumanReportRenderer
     ///     trailing newline. This is the message the test adapter fails a test with, so a rule reads the
     ///     same whether it was checked by <c>sliderule check</c> or by a test.
     /// </summary>
-    /// <param name="result">The rule result to render.</param>
-    /// <param name="solutionDirectory">The directory each violation site's path is printed relative to.</param>
-    /// <returns>The rule's block as text.</returns>
     public static string RuleBlock(RuleResult result, string solutionDirectory)
     {
         var writer = new StringWriter { NewLine = "\n" };
@@ -219,11 +184,9 @@ internal static class HumanReportRenderer
     }
 
     // Whether the rule reached any verdict about the CODE, as against about itself. EmptySubject and
-    // RuleError are the two kinds that are about the rule — the repo's own phrase for them, on
-    // ViolationJson.Hint — so a rule failing only on those was never measured against anything. It is
-    // deliberately a second predicate beside RuleResult.HoldsBaselinableViolations rather than a shared bool:
-    // the two coincide today and ask different questions, and a kind that gained an identity without becoming
-    // a finding about the code (or the reverse) would have to move exactly one of them.
+    // RuleError are the kinds that are about the rule, so a rule failing only on those was never measured
+    // against anything. A second predicate beside RuleResult.HoldsBaselinableViolations, not a shared bool:
+    // the two coincide but ask different questions.
     private static bool ReachedAVerdictAboutTheCode(RuleResult result)
     {
         return result.Violations.Any(violation => violation.Kind is not (ViolationKind.EmptySubject or ViolationKind.RuleError));
@@ -273,16 +236,16 @@ internal static class HumanReportRenderer
         foreach (Violation violation in result.Violations)
             switch (violation.Kind)
             {
-                // The seven edge kinds place identically — one line per reference site — so they share the
-                // loop and differ only in the verb EdgeText picks.
+                // The edge kinds place identically, one line per reference site, so they share the loop and
+                // differ only in the verb EdgeText picks.
                 case ViolationKind.Reference or ViolationKind.MemberUse or ViolationKind.Construction
                     or ViolationKind.Injection or ViolationKind.Catch or ViolationKind.Throw or ViolationKind.Expose:
                     string edgeText = violation.EdgeText();
                     foreach (SourceLocation site in violation.Sites)
                         located.Add((relativizer.Relative(site.FilePath), site.Line, edgeText));
                     break;
-                // The three subject kinds place identically — one line at the first site the verb carried,
-                // or the unlocated block — so they share the arm and differ only in the text SubjectText picks.
+                // The subject kinds place identically, one line at the first site the verb carried or in the
+                // unlocated block, so they share the arm and differ only in the text SubjectText picks.
                 case ViolationKind.Shape or ViolationKind.MemberShape or ViolationKind.ProjectShape:
                     Place(violation.Sites.FirstOrDefault(), violation.SubjectText());
                     break;

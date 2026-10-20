@@ -9,12 +9,8 @@ namespace SlideRule.Rendering;
 /// </summary>
 /// <remarks>
 ///     <see cref="Relative" /> gives what <c>Path.GetRelativePath(directory, file)</c> gives with
-///     backslashes replaced by forward ones. Both arguments are made absolute first; segments are
-///     compared the way the platform compares file names, case-insensitively on Windows and macOS and
-///     ordinally on Linux; a target above the base directory is reached with <c>../</c> segments; a
-///     target that is the base directory itself comes back as <c>.</c>; and two paths with different
-///     roots, a different drive say, have no relative form at all, so the target comes back as it was
-///     with its slashes normalized.
+///     backslashes replaced by forward ones. Both arguments are made absolute first, and segments are
+///     compared the way the platform compares file names (<see cref="PathComparison" />).
 /// </remarks>
 // Path.GetRelativePath does not exist on netstandard2.0, so the walk is hand-rolled; PathFormatTests
 // pins it equivalent to Path.GetRelativePath(dir, file).Replace('\\','/'), which is what keeps the
@@ -27,40 +23,27 @@ internal static class PathFormat
     ///     Returns the forward-slashed path from <paramref name="solutionDirectory" /> to
     ///     <paramref name="filePath" />.
     /// </summary>
-    /// <param name="solutionDirectory">The directory the path is made relative to.</param>
-    /// <param name="filePath">The path to render.</param>
-    /// <returns>
-    ///     The relative path, or <paramref name="filePath" /> with its slashes normalized when the two paths
-    ///     have different roots.
-    /// </returns>
     public static string Relative(string solutionDirectory, string filePath)
     {
         return new Relativizer(solutionDirectory).Relative(filePath);
     }
 
     /// <summary>
-    ///     Reports whether <paramref name="directory" /> is <paramref name="path" /> or an ancestor of it,
-    ///     which is how the scoped agent context written to a directory is matched to a file.
+    ///     Reports whether <paramref name="directory" /> is <paramref name="path" /> or an ancestor of it.
     /// </summary>
     /// <remarks>
     ///     Both arguments are made absolute and compared segment by segment, the way the platform compares
     ///     file names, so this and <see cref="Relative" /> cannot disagree about whether two spellings are
     ///     one path. Symlinks are not resolved: canonicalize first if that matters.
     /// </remarks>
-    /// <param name="directory">The candidate directory.</param>
-    /// <param name="path">The file or directory path to test.</param>
-    /// <returns>
-    ///     <see langword="true" /> when <paramref name="path" /> lies at or under <paramref name="directory" />.
-    /// </returns>
     public static bool Contains(string directory, string path)
     {
         string[] pathSegments = Segments(Path.GetFullPath(path));
         return Contains(directory, pathSegments);
     }
 
-    // The same question for a caller asking it of many directories against one path it has already resolved and
-    // split: the `context` lookup walks every card's directory against one query path, which is normalized once
-    // there and would otherwise be re-normalized and re-split per card.
+    // The same question for a caller asking it of many directories against one path it has already resolved
+    // and split, so the path is normalized once rather than once per directory.
     internal static bool Contains(string directory, string[] pathSegments)
     {
         string[] directorySegments = Segments(Path.GetFullPath(directory));
@@ -105,34 +88,26 @@ internal static class PathFormat
         return end == parts.Length ? parts : parts.Take(end).ToArray();
     }
 
-    // The last segment of a path, after a separator of either kind — the file or directory name, with
-    // everything above it dropped. Both separators are looked for by hand rather than via Path.GetFileName,
-    // which off Windows does not treat '\' as a separator: a path captured on Windows and read on
-    // macOS or Linux would come back whole, so the same input has to leave the same leaf on every host.
-    // A path with no separator in it is already its own leaf.
+    // Both separators are looked for by hand rather than via Path.GetFileName, which off Windows does not treat
+    // '\' as a separator: a path captured on Windows and read on macOS or Linux would come back whole, so the
+    // same input has to leave the same leaf on every host.
     internal static string Leaf(string path)
     {
         int separator = path.LastIndexOfAny(LeafSeparators);
         return separator < 0 ? path : path.Substring(separator + 1);
     }
 
-    /// <summary>
-    ///     A base directory analysed once, for a caller relativizing many paths against the same one: a
-    ///     report renderer with a site per violation, say. Otherwise
-    ///     <c>PathFormat.Relative(directory, file)</c> answers the same question in one call.
-    /// </summary>
+    /// <summary>A base directory analysed once, for a caller relativizing many paths against the same one.</summary>
     // One algorithm, not two: PathFormat.Relative builds one of these and calls it.
     internal sealed class Relativizer
     {
         private readonly string[] _baseSegments;
 
-        /// <summary>Creates a relativizer rooted at <paramref name="baseDirectory" />.</summary>
         public Relativizer(string baseDirectory)
         {
             _baseSegments = Segments(Path.GetFullPath(baseDirectory));
         }
 
-        /// <summary>The forward-slashed path from the base directory to <paramref name="filePath" />.</summary>
         public string Relative(string filePath)
         {
             string[] toSegments = Segments(Path.GetFullPath(filePath));

@@ -6,24 +6,16 @@ using SlideRule.Model;
 namespace SlideRule.Checking;
 
 /// <summary>
-///     What checking one rule produced: its <see cref="Status" />, the violations that failed it, the
-///     violations a baseline tolerated, any warnings, and the counts a burndown report reads. One of
-///     these sits in <see cref="CheckReport.Results" /> for every rule the run covered.
-///     <see cref="Violations" /> and <see cref="Grandfathered" /> are each ordered the same way on every
-///     run, so two runs over unchanged code list them identically, and a warning never changes
-///     <see cref="Status" />.
+///     What checking one rule produced. <see cref="Violations" /> and <see cref="Grandfathered" /> are each in
+///     report order, the same on every run, so two runs over unchanged code list them identically.
 /// </summary>
-// Both lists come out of ArchChecker's one report comparer over Violation.OrderKey, so the red list and
-// the grandfathered list agree, and a grown pair interleaves in report order rather than trailing.
 internal sealed class RuleResult
 {
     private static readonly IReadOnlyDictionary<Violation, BaselineEntry> NothingGrown =
         new Dictionary<Violation, BaselineEntry>();
 
-    // Both the subject coverage and the ratchet measure arrive whole rather than as loose ints, and that
-    // is a correctness matter rather than a tidiness one: they land next to each other, and same-typed
-    // positionals in a row are a transposition no compiler can catch. The properties below stay ints,
-    // because that is what every renderer reads.
+    // The subject coverage and the ratchet measure arrive whole rather than as loose ints: they land next to each
+    // other, and same-typed positionals in a row are a transposition no compiler can catch.
     internal RuleResult(
         ArchRule rule,
         RuleStatus status,
@@ -78,33 +70,25 @@ internal sealed class RuleResult
             .FirstOrDefault();
     }
 
-    /// <summary>Gets the rule that was checked: its ID, posture, reason, fix and the sentence it renders as.</summary>
+    /// <summary>Gets the rule that was checked.</summary>
     public ArchRule Rule { get; }
 
     /// <summary>Gets the outcome: passed, failed, or skipped for want of a verdict.</summary>
     public RuleStatus Status { get; }
 
     /// <summary>
-    ///     Gets the violations that failed the rule, in report order. Empty unless <see cref="Status" /> is
-    ///     <see cref="RuleStatus.Failed" />: the ones a baseline tolerated are in
-    ///     <see cref="Grandfathered" /> instead. A tolerated pair that has grown past the site count its
-    ///     baseline entry records is here rather than there, and <see cref="GrownEntries" /> names the entry
-    ///     it went past.
+    ///     Gets the violations that failed the rule, in report order; empty unless <see cref="Status" /> is
+    ///     <see cref="RuleStatus.Failed" />. The ones a baseline tolerated are in <see cref="Grandfathered" />
+    ///     instead, but a tolerated pair grown past its entry's site count is here (<see cref="GrownEntries" />).
     /// </summary>
     public IReadOnlyList<Violation> Violations { get; }
 
-    /// <summary>
-    ///     Gets the warnings raised while checking the rule, each naming what it is about in its
-    ///     <see cref="CheckWarning.Kind" />. A warning never changes <see cref="Status" /> or the exit code;
-    ///     empty when there are none.
-    /// </summary>
+    /// <summary>Gets the warnings raised while checking the rule.</summary>
     public IReadOnlyList<CheckWarning> Warnings { get; }
 
     /// <summary>
-    ///     Gets why the run reached no verdict for this rule — a scope's tripwire run with no
-    ///     <c>--diff-base</c>, or a subject lying entirely in projects a <c>.slnf</c> solution filter left
-    ///     unchecked. Written to be printed as it stands, and null unless <see cref="Status" /> is
-    ///     <see cref="RuleStatus.Skipped" />.
+    ///     Gets why the run reached no verdict for this rule, written to be printed as it stands; null unless
+    ///     <see cref="Status" /> is <see cref="RuleStatus.Skipped" />.
     /// </summary>
     public string? SkipReason { get; }
 
@@ -127,9 +111,7 @@ internal sealed class RuleResult
     /// <summary>
     ///     Gets this rule's remaining tolerated debt grouped by the cell each violation falls in, or
     ///     null when there is nothing to group: the rule takes no baseline, its subject is not a family,
-    ///     or nothing is left to burn down. <see cref="GrandfatheredSiteCount" /> says how much debt
-    ///     remains and never where it sits, which on a family is the next question;
-    ///     <c>sliderule status</c> prints this under the rule's row.
+    ///     or nothing is left to burn down.
     /// </summary>
     // Both status channels read this one property — the human row's sub-line and the burndown
     // document's cells array — so a reader cannot find the two disagreeing about the same run.
@@ -167,28 +149,21 @@ internal sealed class RuleResult
     ///     the keys are those instances, compared by reference. Empty when nothing grew.
     /// </summary>
     // Reference-keyed because Violation overrides neither Equals nor GetHashCode, so the default comparer
-    // is reference identity — which is what a lookup from a rendered violation needs. A dictionary rather
-    // than a list index-aligned with Violations, because both render loops walk the violations without
-    // carrying an index, and only some of them are grown.
+    // is reference identity — which is what a lookup from a rendered violation needs.
     public IReadOnlyDictionary<Violation, BaselineEntry> GrownEntries { get; }
 
-    /// <summary>
-    ///     Gets how many violations have grown past their baseline entry — the size of <see cref="GrownEntries" />.
-    /// </summary>
+    /// <summary>Gets how many violations have grown past their baseline entry.</summary>
     public int GrownBaselineEntries => GrownEntries.Count;
 
     /// <summary>
-    ///     Gets whether a baseline has been captured for this rule. False for a rule that takes no baseline,
-    ///     and false while a rule that takes one has yet to be captured with the CLI's <c>baseline</c> verb
-    ///     — until then every violation fails.
+    ///     Gets whether a baseline has been captured for this rule; false for a rule that takes no baseline.
     /// </summary>
     public bool BaselineCaptured { get; }
 
     /// <summary>
-    ///     Gets the baseline entries that tolerated <see cref="Grandfathered" />, one for one and in the
-    ///     same order: the entry at index <c>i</c> is the one that blessed the violation at index <c>i</c>,
-    ///     and carries the reason recorded with it (<see cref="BaselineEntry.Because" />) if it has one. The
-    ///     two lists always share length and order. Empty whenever <see cref="Grandfathered" /> is.
+    ///     Gets the baseline entries that tolerated <see cref="Grandfathered" />, index-aligned with it: the entry
+    ///     at index <c>i</c> blessed the violation at index <c>i</c>, and carries the reason recorded with it
+    ///     (<see cref="BaselineEntry.Because" />) if it has one.
     /// </summary>
     public IReadOnlyList<BaselineEntry> GrandfatheredEntries { get; }
 
@@ -203,22 +178,20 @@ internal sealed class RuleResult
     /// <summary>
     ///     Gets how many of <see cref="SubjectTypes" /> a generator emitted
     ///     (<see cref="ITypeInfo.IsGenerated" />) — the rule's own answer to whether it is aimed at code
-    ///     anyone can act on. Reported for a rule that passed as readily as for one that failed.
+    ///     anyone can act on.
     /// </summary>
     public int SubjectGeneratedTypes { get; }
 
     /// <summary>
     ///     Gets whether the rule's debt has burned to zero on a run that actually measured it, so its
     ///     posture could move from <see cref="Posture.Migrate" /> to <see cref="Posture.Enforce" />: a
-    ///     captured baseline with nothing tolerated, nothing failing and nothing awaiting acceptance. The
-    ///     CLI's <c>status</c> verb reports it as a suggestion. False for every other posture, false for
-    ///     a rule the run reached no verdict for, and false for a rule the run did not measure as written
-    ///     (<see cref="MeasuredInFull" />). Burned to zero and never measured read alike in the counts, and only
-    ///     the first is progress; a rule stricter than written still holds a pattern its author has to fix.
+    ///     captured baseline with nothing tolerated, nothing failing and nothing awaiting acceptance. False for
+    ///     every other posture, for a rule the run reached no verdict for, and for a rule the run did not measure
+    ///     as written (<see cref="MeasuredInFull" />).
     /// </summary>
     // The Skipped conjunct is essential: a narrowing skip keeps BaselineCaptured truthful and zeroes
     // the counts, which is burned-to-zero's exact shape, so without it this would suggest enforcing a
-    // rule whose subject a solution filter had merely erased. MeasuredInFull is the same guard against
+    // rule whose subject a solution filter had erased. MeasuredInFull is the same guard against
     // the same shape arrived at two more ways: a rule whose target rotted passes with nothing tolerated,
     // nothing red and nothing stale, and enforcing it would pin a rule that measures nothing; a rule one of
     // whose target patterns rotted can reach those counts too, and enforcing it would pin a ban missing a
@@ -244,11 +217,9 @@ internal sealed class RuleResult
     ///     set this, because the rule's other operands were measured.
     /// </summary>
     // The one predicate both wholly rotted shapes answer, so no reader tests the violations for one shape
-    // and the warnings for the other and misses whichever it forgot. The ratchet readers ask
-    // UnmatchedEntriesTested or MeasuredInFull, which widen this by the dead operands; this one is what
-    // chooses between their whole-selection sentence and the one naming the dead operands. Distinct from
-    // ArchChecker's private SelectedNothing, which asks the narrower question of whether EVERY violation is
-    // an empty subject: that one decides a skip, and one real finding disqualifies it.
+    // and the warnings for the other and misses whichever it forgot. Distinct from ArchChecker's private
+    // SelectedNothing, which asks the narrower question of whether EVERY violation is an empty subject: that
+    // one decides a skip, and one real finding disqualifies it.
     public bool SelectionMatchedNothing =>
         Violations.Any(violation => violation.Kind == ViolationKind.EmptySubject)
         || Warnings.Any(warning => warning.Kind == CheckWarningKind.InertTarget);
@@ -301,11 +272,8 @@ internal sealed class RuleResult
     /// <summary>
     ///     Whether a baseline capture would grandfather anything of this rule's: any violation carries an identity.
     /// </summary>
-    // Asked of the identity itself rather than of the kinds that happen to lack one, because that is the fact:
-    // a violation with no baseline identity cannot be recorded, so a hint to capture it would be an instruction
-    // that silently does nothing, beside the authoring hint that says what actually went wrong. An empty subject
-    // and a rule error are both identity-less (GRAMMAR §4.3), and keying on the identity is what covers the
-    // second without anyone having to remember it.
+    // Asked of the identity rather than of the kinds that lack one: a violation with no baseline identity cannot be
+    // recorded, so a hint to capture it would be an instruction that silently does nothing.
     private bool HoldsBaselinableViolations =>
         Violations.Any(violation => violation.BaselineIdentity() is not null);
 

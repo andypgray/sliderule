@@ -26,13 +26,11 @@ namespace SlideRule.Cli.SpecLoading;
 ///     <para>
 ///         A <see cref="MissingMemberException" /> is also what a call into a rule pack or any other dependency
 ///         raises when the loaded copy lacks the member, so only a member whose declaring type this host's
-///         contract defines is taken for skew (<see cref="IsContractMember" />); the namespace alone would not
-///         do, because a pack sits under the contract's root namespace in an assembly of its own. A
+///         contract defines is taken for skew (<see cref="IsContractMember" />). A
 ///         <see cref="TypeLoadException" /> is also what a <c>typeof()</c> anchor on a .NET Framework-only type
 ///         raises, so only a type named under the contract's root namespace is taken for skew
-///         (<see cref="IsMissingContractType" />). Both host surfaces render
-///         message-only, so the missing name is folded into the text rather than left on the inner exception
-///         where nobody sees it.
+///         (<see cref="IsMissingContractType" />). Both host surfaces render message-only, so the missing name
+///         is folded into the text rather than left on the inner exception where nobody sees it.
 ///     </para>
 /// </remarks>
 internal static class SpecContractMismatch
@@ -116,9 +114,8 @@ internal static class SpecContractMismatch
     ///     contract.
     /// </summary>
     /// <remarks>
-    ///     It takes the name rather than the exception because only the runtime can set
-    ///     <see cref="TypeLoadException.TypeName" />. The whole root counts, not only the namespaces this copy
-    ///     declares, because a newer contract may add a namespace this copy has never seen.
+    ///     The whole root counts, not only the namespaces this copy declares, because a newer contract may add a
+    ///     namespace this copy has never seen.
     /// </remarks>
     internal static bool IsMissingContractType(string typeName)
     {
@@ -152,11 +149,7 @@ internal static class SpecContractMismatch
         };
     }
 
-    /// <summary>
-    ///     The refusal for <paramref name="cause" />, a failure <see cref="SkewCause" /> returned: the older-contract
-    ///     message for an access failure or for a missing name that is a moved selection type, the newer-contract
-    ///     message for anything else.
-    /// </summary>
+    /// <summary>The refusal for <paramref name="cause" />, a failure <see cref="SkewCause" /> returned.</summary>
     internal static UserErrorException MapSkew(Assembly spec, string specDllPath, Exception cause)
     {
         if (cause is TypeAccessException or MethodAccessException or FieldAccessException)

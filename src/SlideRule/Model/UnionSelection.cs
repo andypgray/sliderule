@@ -1,20 +1,13 @@
 namespace SlideRule.Model;
 
 /// <summary>
-///     The union of one or more selections — <c>arch.AnyOf(a, b, …)</c> (GRAMMAR §5.1) — and the
-///     payload the Quarantine containment desugaring feeds into an <c>Except</c> as <c>sel ∪ F</c>
-///     (§7). A sequence overload can mint one with no parts, which the validator refuses when the spec
-///     loads (§8 item 36).
+///     The union of one or more selections, <c>arch.AnyOf(a, b, …)</c> (GRAMMAR §5.1). A sequence overload can
+///     mint one with no parts, which the validator refuses when the spec loads (§8 item 36).
 /// </summary>
 /// <remarks>
-///     Adjectives apply to the union, not through it: <c>AnyOf(a, b).Except(c)</c> is
-///     <c>(a ∪ b) − c</c>, so the union carries its own adjective list and the evaluator applies it
-///     after the set union.
-///     <para>
-///         A union has no single noun — <see cref="Noun" /> throws by design. It renders through its
-///         own §6 arm instead: collapsed to one head and locative when every operand shares a noun kind
-///         that declares a collapse, or-joined operand by operand otherwise.
-///     </para>
+///     Adjectives apply to the union, not through it: <c>AnyOf(a, b).Except(c)</c> is <c>(a ∪ b) − c</c>, so
+///     the union carries its own adjective list and the evaluator applies it after the set union. A union has
+///     no single noun, so <see cref="Noun" /> throws and the renderer gives it an arm of its own (§6).
 /// </remarks>
 internal sealed class UnionSelection : Selection
 {
@@ -56,7 +49,6 @@ internal sealed class UnionSelection : Selection
         return new UnionSelection(owner, flattened);
     }
 
-    /// <summary>This union with its adjective list replaced — the union arm of the adjective append (§5.2).</summary>
     internal UnionSelection WithAdjectives(IReadOnlyList<SelectionAdjective> adjectives)
     {
         return new UnionSelection(Owner, Parts, adjectives);

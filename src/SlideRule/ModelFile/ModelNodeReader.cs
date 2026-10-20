@@ -38,13 +38,9 @@ internal sealed class ModelNodeReader
     private readonly Dictionary<string, Layer> _layers = new(StringComparer.Ordinal);
     private readonly HashSet<string> _ruleIds = new(StringComparer.Ordinal);
 
-    /// <summary>Why the text is not a model file, or null while it still is one.</summary>
     internal ModelRefusal? Refusal { get; private set; }
 
-    /// <summary>Whether a refusal has been recorded, so callers stop.</summary>
     private bool Failed => Refusal is not null;
-
-    // ---- the document --------------------------------------------------------------------------
 
     internal ModelDocument? ReadDocument(StrictJsonValue root)
     {
@@ -360,8 +356,6 @@ internal sealed class ModelNodeReader
         return new ScopeData(role, surface, baselinePath, dragons, dragonsDoc, scopeId, scoped);
     }
 
-    // ---- the model graph -----------------------------------------------------------------------
-
     private Selection? ReadSelection(StrictJsonValue value, string what)
     {
         StrictJsonValue? obj = AsObject(value, what);
@@ -470,7 +464,6 @@ internal sealed class ModelNodeReader
         return null;
     }
 
-    /// <summary>A selection's adjectives, each a node of the one family that selection takes.</summary>
     private IReadOnlyList<TNode>? ReadAdjectives<TNode>(
         StrictJsonValue obj, string family,
         IReadOnlyDictionary<string, Func<ModelNodeReader, StrictJsonValue, TNode?>> arms)
@@ -497,14 +490,12 @@ internal sealed class ModelNodeReader
         return RequiredText(node, where, "node");
     }
 
-    // The unknown-word refusal: the discriminator is quoted back and the family named, positioned at the value
-    // that named it rather than at the node, because that word is what a reader has to change.
+    // Positioned at the value that named the discriminator rather than at the node, because that word is what
+    // a reader has to change.
     private void NotA(StrictJsonValue node, string discriminator, string family)
     {
         RefuseAt(node.GetProperty("node"), JsonText.Quote(discriminator) + " is not " + family + ".");
     }
-
-    // ---- what the arms call --------------------------------------------------------------------
 
     internal Selection? RequiredSelection(StrictJsonValue obj, string where, string key)
     {
@@ -625,10 +616,9 @@ internal sealed class ModelNodeReader
     }
 
     /// <summary>
-    ///     <paramref name="list" />, read from <paramref name="obj" />'s <paramref name="key" />, when it holds at
-    ///     least one entry; otherwise refuses at that array. For the lists the spec refuses empty when it loads
-    ///     (GRAMMAR §8 item 36): a file holding one was not written from a spec that loaded, and reading it would
-    ///     mint a model the spec could not.
+    ///     Refuses an empty <paramref name="list" /> at <paramref name="obj" />'s <paramref name="key" />. For the
+    ///     lists the spec refuses empty when it loads (GRAMMAR §8 item 36): a file holding one was not written
+    ///     from a spec that loaded, and reading it would mint a model the spec could not.
     /// </summary>
     internal IReadOnlyList<T>? NonEmpty<T>(IReadOnlyList<T>? list, StrictJsonValue obj, string key)
     {
@@ -707,8 +697,6 @@ internal sealed class ModelNodeReader
         return true;
     }
 
-    // ---- leaves --------------------------------------------------------------------------------
-
     private Member? ReadMember(StrictJsonValue element)
     {
         StrictJsonValue? obj = AsObject(element, EntryOf("members"));
@@ -778,8 +766,6 @@ internal sealed class ModelNodeReader
         return value is null ? null : AsText(value, Field(key));
     }
 
-    // ---- kinds, keys and refusals --------------------------------------------------------------
-
     private StrictJsonValue? AsObject(StrictJsonValue value, string what)
     {
         if (value.ValueKind == StrictJsonKind.Object) return value;
@@ -832,7 +818,6 @@ internal sealed class ModelNodeReader
         return value is null ? null : AsArray(value, Field(key));
     }
 
-    /// <summary>Reads every element in order, or returns null at the first one that was refused.</summary>
     private static List<T>? Each<T>(StrictJsonValue array, Func<StrictJsonValue, T?> read)
         where T : class
     {

@@ -3,44 +3,23 @@ using Microsoft.CodeAnalysis;
 namespace SlideRule.Extraction;
 
 /// <summary>
-///     One compilation to extract from: the <see cref="Compilation" /> itself, the project name its types are recorded
-///     under, the names of the projects it declares a reference to, and the target framework it was compiled for.
-///     Extraction takes a list of these and needs nothing else: no MSBuild, no workspace, no project file on disk.
-///     Loading a solution produces them instead, filling the reference names in from each project's own
-///     <c>ProjectReference</c> items. An input built by hand can pass an empty reference list, and its project
-///     then references no other project in the model.
+///     One compilation to extract from, with what extraction needs to know beside it: extraction itself reads
+///     no MSBuild, no workspace and no project file on disk.
 /// </summary>
 /// <remarks>
-///     <para>
-///         <see cref="TargetFramework" /> is <see langword="null" /> wherever it is unknown or beside the
-///         point: an input built by hand, and every project that targets a single framework. It is filled
-///         in only where one project file yielded several compilations, which is exactly where the project
-///         name alone no longer says which compilation a fact came from.
-///     </para>
-///     <para>
-///         <see cref="SolutionMember" /> says whether the solution file declares this project. <see langword="false" />
-///         marks one that a <c>ProjectReference</c> dragged into the workspace, and <see langword="null" /> means
-///         nothing was read to answer with: every input built by hand, any run whose solution file would not parse, and
-///         a project whose file path the load never reported.
-///     </para>
-///     <para>
-///         <see cref="GeneratedTrees" /> names which of the compilation's syntax trees came from a source
-///         generator. A type counts as generated when a <c>GeneratedCodeAttribute</c> sits on it or on a
-///         type containing it, or when every file declaring it is generator output. A file is generator
-///         output when the workspace reported it as source-generated, which is what this property records,
-///         or when its leading comment carries an <c>&lt;auto-generated&gt;</c> banner.
-///         <see langword="null" /> leaves the banner as the only signal. The file signals are read for the
-///         compilation's own types only: a type from a referenced assembly is judged by the attribute alone.
-///     </para>
-///     <para>
-///         <see cref="UndeclaredProjectReferences" /> names the projects the compilation references that
-///         <see cref="ProjectReferences" /> does not account for, either directly or through what a declared
-///         project references in turn. A load fills it in where it read the declarations from the project file;
-///         <see langword="null" /> or empty says there is nothing to report, which is every input built by hand.
-///     </para>
+///     <see cref="ProjectName" /> names the project that produced the compilation, never its assembly name,
+///     which a project selection would miss. <see cref="ProjectReferences" /> names the projects that project
+///     declares a reference to; an input built by hand may pass an empty list, and its project then references no
+///     other project in the model. <see cref="TargetFramework" /> is <see langword="null" /> except where one project
+///     file yielded several compilations. <see cref="SolutionMember" /> is <see langword="false" /> for a project
+///     a <c>ProjectReference</c> pulled into the workspace, and <see langword="null" /> where nothing was read to
+///     answer with: an input built by hand, a solution file that would not parse, a project whose path the load
+///     never reported. <see cref="GeneratedTrees" /> holds the trees the workspace reported as source-generated,
+///     by reference rather than document path, because a build that sets <c>EmitCompilerGeneratedFiles</c> moves
+///     every generated document off its pseudo-path. <see cref="UndeclaredProjectReferences" /> names the
+///     referenced projects that <see cref="ProjectReferences" /> does not account for, directly or through what a
+///     declared project references in turn; <see langword="null" /> or empty reports none.
 /// </remarks>
-// GeneratedTrees holds trees by reference rather than document paths because a build that sets
-// EmitCompilerGeneratedFiles moves every generated document off its pseudo-path.
 internal sealed record CompilationInput(
     Compilation Compilation,
     string ProjectName,

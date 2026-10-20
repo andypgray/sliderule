@@ -8,32 +8,21 @@ namespace SlideRule.Model;
 ///     (<c>typeof(ApiControllerAttribute)</c>, <c>typeof(IHandler&lt;&gt;)</c>) or the type
 ///     definition's fully-qualified name as a verbatim string
 ///     (<c>"ModelContextProtocol.Server.McpServerToolAttribute"</c>, <c>"MyApp.Web.IHandler&lt;T&gt;"</c>).
-///     Exactly one arm is populated — <see cref="Type" /> xor <see cref="DefinitionFullName" />.
+///     A spec-built anchor populates exactly one arm, <see cref="Type" /> or <see cref="DefinitionFullName" />;
+///     an anchor parsed from a model file populates neither.
 /// </summary>
 /// <remarks>
-///     The string arm is the escape hatch for a type the spec project cannot compile against:
-///     without it, naming someone else's attribute or interface forces a package reference on the
-///     spec just to write the <c>typeof</c>.
+///     A string anchor matches definition-level, exactly and verbatim: the name is the definition's FQN in
+///     extraction format (<c>Attribute</c> suffix included, declared type-parameter names for a generic, as a
+///     report prints it), and it matches any construction of that definition, as an open-generic <c>typeof</c>
+///     does. A constructed spelling (<c>"MyApp.Web.IHandler&lt;MyApp.Web.InvoiceCreated&gt;"</c>) names no
+///     definition and never matches, and nothing is inferred from the string's shape: a dotless or
+///     suffix-less name is legal and never matches.
 ///     <para>
-///         String matching is <em>definition-level, exact, and verbatim</em>: the name is the type
-///         definition's FQN in extraction format — <c>Attribute</c> suffix included for an attribute,
-///         declared type-parameter names for a generic (<c>"MyApp.Web.IHandler&lt;T&gt;"</c>, exactly as
-///         a report prints it) — and it matches any construction of that definition, the same semantics
-///         an open-generic <c>typeof</c> anchor carries. A <em>constructed</em> spelling
-///         (<c>"N.MarkAttribute&lt;System.Int32&gt;"</c>,
-///         <c>"MyApp.Web.IHandler&lt;MyApp.Web.InvoiceCreated&gt;"</c>) names no definition and so never
-///         matches; that is the stated honesty boundary of the hatch, not a defect. Nothing is inferred
-///         from the shape of the string: a dotless or suffix-less name is a legal spelling that never
-///         matches.
-///     </para>
-///     <para>
-///         <see cref="PathSegments" />, <see cref="FullName" />, <see cref="OnDefinition" />,
-///         <see cref="IsConstructed" /> and <see cref="Unrepresentable" /> are computed once, in the
-///         constructor: every reflection an anchor ever needs happens while the spec is being built, so
-///         nothing after spec build reaches for the reflected type. <see cref="TryDefinitionKey" /> and
-///         <see cref="TryConstructionKey" /> answer out of those facts and are the only way a checker
-///         position obtains a key from an anchor — which is what lets a position compare names rather than
-///         a <see cref="System.Type" />.
+///         Every derived fact is computed in the constructor, so all the reflection an anchor needs happens
+///         while the spec is built and nothing afterwards reaches for the reflected type. A checker position
+///         obtains a key only through <see cref="TryDefinitionKey" /> or <see cref="TryConstructionKey" />,
+///         which is what lets it compare names rather than a <see cref="System.Type" />.
 ///     </para>
 /// </remarks>
 internal sealed class TypeAnchor
@@ -44,8 +33,7 @@ internal sealed class TypeAnchor
         DefinitionFullName = definitionFullName;
         PathSegments = type is not null ? TypeName.PathSegments(type) : SplitPath(definitionFullName!);
 
-        // A string anchor IS a definition FQN and nothing is inferred from its shape, so it is neither a
-        // construction nor unrepresentable: it supplies its key verbatim to either position.
+        // A string anchor is a definition FQN taken verbatim: neither a construction nor unrepresentable.
         if (type is null)
         {
             FullName = definitionFullName;
@@ -67,10 +55,8 @@ internal sealed class TypeAnchor
         }
     }
 
-    // A parsed anchor: every fact is supplied, none is derived, and no reflection happens. It populates
-    // neither arm — there is no Type to hold and no verbatim author-written name to attribute — so the
-    // xor above reads as "neither" here. The two arm properties are read only while a spec is being
-    // validated, which a parsed model never is.
+    // A parsed anchor: every fact is supplied and nothing is reflected. Its arms stay null; they are read
+    // only while a spec is being validated, which a parsed model never is.
     private TypeAnchor(string name, bool onDefinition, IReadOnlyList<string> path)
     {
         FullName = name;
@@ -78,10 +64,8 @@ internal sealed class TypeAnchor
         PathSegments = path;
     }
 
-    /// <summary>The reflected type of a <c>typeof</c> anchor; <c>null</c> on a string anchor.</summary>
     internal Type? Type { get; }
 
-    /// <summary>The verbatim definition FQN of a string anchor; <c>null</c> on a <c>typeof</c> anchor.</summary>
     internal string? DefinitionFullName { get; }
 
     /// <summary>
@@ -91,7 +75,6 @@ internal sealed class TypeAnchor
     /// </summary>
     internal IReadOnlyList<string> PathSegments { get; }
 
-    /// <summary>The unqualified display name: the anchor's last path segment.</summary>
     internal string SimpleDisplay => PathSegments[PathSegments.Count - 1];
 
     /// <summary>
@@ -154,16 +137,14 @@ internal sealed class TypeAnchor
         return true;
     }
 
-    /// <summary>Anchors on a reflected type — the <c>typeof</c> form.</summary>
     internal static TypeAnchor FromType(Type type)
     {
         return new TypeAnchor(Guard.NotNull(type, nameof(type)), null);
     }
 
     /// <summary>
-    ///     Anchors on the type definition's fully-qualified name — the string form. Only null is
-    ///     refused here; a blank name is a spec-author mistake, collected by the validation catalog
-    ///     (GRAMMAR §8 item 15) so it reports beside every other error rather than throwing first.
+    ///     Anchors on the type definition's fully-qualified name. Only null is refused here: a blank name is
+    ///     collected by validation (GRAMMAR §8 item 15) and reported beside every other error.
     /// </summary>
     internal static TypeAnchor FromName(string definitionFullName)
     {
@@ -171,15 +152,13 @@ internal sealed class TypeAnchor
     }
 
     /// <summary>
-    ///     Anchors on the names a model file carries, for a reader with no spec assembly: the name the
-    ///     anchor compares on, whether it names a definition, and the path the colliding-simple-name rule
-    ///     widens along. A null <paramref name="path" /> is derived from the name the way a string anchor's
-    ///     is, which is the right answer for every name whose dots are its own path.
+    ///     Anchors on the names a model file carries, for a reader with no spec assembly. A null
+    ///     <paramref name="path" /> is derived from the name the way a string anchor's is, which is right for
+    ///     every name whose dots are its own path.
     /// </summary>
     /// <remarks>
-    ///     A parsed anchor never refuses either key: it is neither a construction nor unrepresentable. That
-    ///     is sound rather than optimistic — an anchor that would have refused the accessor its position
-    ///     asks was never written, so no file carries one.
+    ///     A parsed anchor never refuses either key: an anchor that would have refused the key its position asks
+    ///     for was never written, so no file carries one.
     /// </remarks>
     internal static TypeAnchor FromParsed(string name, bool onDefinition, IReadOnlyList<string>? path)
     {
@@ -189,9 +168,8 @@ internal sealed class TypeAnchor
     }
 
     /// <summary>
-    ///     The <c>(first, params more)</c> anchor list of a negative hierarchy verb, each operand a
-    ///     <c>typeof</c> anchor — the hierarchy-verb shape (GRAMMAR §10), stored on the node as anchors
-    ///     and never wrapped as selections.
+    ///     A <c>(first, params more)</c> list of <c>typeof</c> anchors (GRAMMAR §10), stored on the node as
+    ///     anchors and never wrapped as selections.
     /// </summary>
     internal static IReadOnlyList<TypeAnchor> FromTypes(Type first, Type[] more)
     {
@@ -199,8 +177,7 @@ internal sealed class TypeAnchor
     }
 
     /// <summary>
-    ///     The string twin of <see cref="FromTypes" />: the same shape over type-definition names, each
-    ///     minted through <see cref="FromName" />.
+    ///     The string twin of <see cref="FromTypes" />, each name minted through <see cref="FromName" />.
     /// </summary>
     internal static IReadOnlyList<TypeAnchor> FromNames(string first, string[] more)
     {

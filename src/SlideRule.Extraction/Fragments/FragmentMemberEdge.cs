@@ -2,18 +2,14 @@ namespace SlideRule.Extraction.Fragments;
 
 /// <summary>
 ///     A directed member-use edge inside one fragment (GRAMMAR §4.5): the source type by FQN, the used
-///     member's declaring type by FQN, its simple name and <see cref="MemberKind" />, its stable
-///     <see cref="MemberSymbolId">DocumentationCommentId</see>, and the distinct <c>file:line</c> sites
-///     where the use occurs (in <see cref="FragmentSite" /> order, already same-type-filtered at
-///     extraction). The merge unions site-sets across fragments per (source, member SymbolId) and rewires
-///     the endpoints to the shared node instances.
+///     member's declaring type, simple name, <see cref="MemberKind" /> and stable
+///     <see cref="MemberSymbolId">DocumentationCommentId</see>, and the sites of the uses. A use of a member
+///     the source type declares itself is not recorded. The pure-data counterpart of
+///     <see cref="SlideRule.Codebase.MemberEdge" />.
 /// </summary>
 /// <remarks>
-///     <see cref="TargetContainingTypeFullName" />, <see cref="MemberName" />, and
-///     <see cref="MemberKind" /> are all functions of the member symbol (never re-parsed from the DocID)
-///     and are carried alongside <see cref="MemberSymbolId" /> so the merge can build the model node
-///     without re-binding — the member analog of <see cref="FragmentEdge" /> plus the member's own facts.
-///     The pure-data counterpart of <see cref="SlideRule.Codebase.MemberEdge" />.
+///     The declaring type, name and kind are read off the member symbol, never parsed back out of the DocID,
+///     and travel beside <see cref="MemberSymbolId" /> so the merge builds the model node without re-binding.
 /// </remarks>
 internal sealed record FragmentMemberEdge(
     string SourceFullName,

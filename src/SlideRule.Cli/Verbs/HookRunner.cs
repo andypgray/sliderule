@@ -57,14 +57,6 @@ namespace SlideRule.Cli.Verbs;
 ///         fail.
 ///     </para>
 /// </remarks>
-/// <param name="output">Where the hook document goes: the stdout Claude Code parses on exit 0.</param>
-/// <param name="error">Where reports go: the stderr Claude Code reads on a non-zero exit.</param>
-/// <param name="input">The payload's stdin, or null when nothing was piped in, which reads as no payload.</param>
-/// <param name="environment">
-///     The environment seam <c>CLAUDE_PROJECT_DIR</c>, the state root and <c>SLIDERULE_SOLUTION_PATH</c> are
-///     read through.
-/// </param>
-/// <param name="check">The check to spend when one is due.</param>
 internal sealed class HookRunner(
     TextWriter output,
     TextWriter error,
@@ -161,8 +153,6 @@ internal sealed class HookRunner(
         HookState state = OpenState(payload);
         var trees = new List<TreeTurn> { await ExamineAsync(tree, state, own: true, ct) };
 
-        // The project's other trees the turn wrote code into by an absolute path, each weighed by the same skips
-        // against records of its own.
         foreach (string other in await WrittenTreesAsync(hookEvent, payload, tree, ct))
             trees.Add(await ExamineAsync(other, state.ForTree(other), own: false, ct));
 
@@ -170,8 +160,7 @@ internal sealed class HookRunner(
 
         // Consecutive continuations for this prompt: a block and a warning passed on both count, and a silent green
         // resets. At the cap the hook says its piece and lets the turn end. A count that cannot be kept reads as no
-        // rounds, and the continuation that fails to count it falls back to the payload's own stop_hook_active. One
-        // count per stop, on the session's own state, however many trees the stop checks.
+        // rounds (MayContinue). One count per stop, on the session's own state, however many trees the stop checks.
         string promptId = payload.PromptId ?? NoPrompt;
         int rounds = state.RoundsFor(promptId);
         bool atCap = rounds >= request.MaxRounds;
@@ -216,7 +205,7 @@ internal sealed class HookRunner(
     // through the agent's edit tools, read from the transcript the payload names: each written code file goes to
     // the deepest of the project's working trees that holds it. A turn's writes are those under its prompt, and a
     // subagent's are its whole transcript. Any doubt, such as no transcript, one that will not read, or no answer
-    // from git, names no tree, and the stop checks the session's own tree as it always has.
+    // from git, names no tree, and the stop checks the session's own tree alone.
     private static async Task<IReadOnlyList<string>> WrittenTreesAsync(
         string hookEvent, HookPayload payload, string ownTree, CancellationToken ct)
     {
@@ -287,7 +276,7 @@ internal sealed class HookRunner(
             checks.Add((tree, await RunCheckAsync(firing.Event, tree, request, ct)));
 
         // Named when a tree other than the session's own was checked, so the agent can tell which tree a report
-        // is about; a stop that checked only its own tree reads exactly as it always has.
+        // is about; a stop that checked only its own tree names none.
         bool named = checks.Any(static check => !check.Tree.Own);
         foreach ((TreeTurn tree, HookCheckResult result) in checks)
             if (result.ExitCode is ExitCodes.Clean or ExitCodes.Violations)
@@ -600,10 +589,8 @@ internal sealed class HookRunner(
         return counted || !firing.StopHookActive;
     }
 
-    // One firing that reached the check: the event the document answers, the session's state, which keeps the round
-    // count and what was said, the trees it weighed, the round the prompt is on, whether that round is the cap, where
-    // the hook reports once and lets the turn end, and whether the payload says a stop hook has already continued
-    // this turn.
+    // One firing that reached the check. StopHookActive is the payload's own stop_hook_active: a stop hook has
+    // already continued this turn.
     private sealed record Firing(
         string Event,
         HookState State,
@@ -613,9 +600,8 @@ internal sealed class HookRunner(
         bool AtCap,
         bool StopHookActive);
 
-    // One tree a firing weighed: its top level, the state its verdict and baseline are kept in, the tree as it
-    // stood, whether it is the session's own, whether its check is due, and the changed files its tripwires are to
-    // read (null for the check to list its own).
+    // One tree a firing weighed, by its top level. ChangedFiles are what its tripwires are to read, or null for the
+    // check to list its own.
     private sealed record TreeTurn(
         string Tree,
         HookState State,

@@ -3,16 +3,12 @@ using System.Reflection;
 namespace SlideRule.Cli.Mcp.Infrastructure;
 
 /// <summary>
-///     Reads a UTF-8 text resource embedded in this assembly by its manifest (logical) name — so a
-///     renamed file or drifted resource id fails loudly rather than yielding empty text.
+///     Reads a UTF-8 text resource embedded in this assembly by its manifest (logical) name, such as
+///     <c>server-instructions.md</c>: a renamed file or drifted resource id throws
+///     <see cref="InvalidOperationException" /> rather than yielding empty text.
 /// </summary>
 internal static class EmbeddedResourceText
 {
-    /// <summary>
-    ///     Loads the embedded resource named <paramref name="logicalName" /> and returns its full text.
-    /// </summary>
-    /// <param name="logicalName">The manifest resource id — the pinned logical name, e.g. <c>server-instructions.md</c>.</param>
-    /// <exception cref="InvalidOperationException">No resource with that id is embedded in the assembly.</exception>
     internal static string Load(string logicalName)
     {
         Assembly assembly = typeof(EmbeddedResourceText).Assembly;

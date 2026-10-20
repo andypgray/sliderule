@@ -4,10 +4,8 @@ using SlideRule.Prose;
 namespace SlideRule.Hosting;
 
 /// <summary>
-///     One rule of the finished model: its ID, its posture, why it exists, the sentence it reads as, and
-///     whatever its posture carries besides. A scope contributes rules here too (a quarantine two, a
-///     caution one), each of them carrying <see cref="Scope" />, so anything reading the model sees one
-///     kind of rule whatever declared it.
+///     One rule of the finished model. A scope contributes rules here too, each of them carrying
+///     <see cref="Scope" />, so anything reading the model sees one kind of rule whatever declared it.
 /// </summary>
 internal sealed class ArchRule
 {
@@ -36,23 +34,11 @@ internal sealed class ArchRule
         Exemplar = exemplar?.ReferenceProse();
     }
 
-    /// <summary>
-    ///     Gets the rule's ID as the spec declared it: the name printed with every violation, the handle the
-    ///     CLI's <c>explain</c> takes, and the key its baseline file is named from. A scope's own rules are
-    ///     <c>{scope-id}/containment</c> and <c>{scope-id}/tripwire</c>.
-    /// </summary>
     public string Id { get; }
 
-    /// <summary>
-    ///     Gets how the rule is enforced: whether a violation fails the check, is grandfathered as debt being
-    ///     paid down, or only warns.
-    /// </summary>
     public Posture Posture { get; }
 
-    /// <summary>
-    ///     Gets why the rule exists, in the spec's own words. Rendered into the generated agent context and
-    ///     echoed with every violation.
-    /// </summary>
+    /// <summary>Gets why the rule exists, in the spec's own words.</summary>
     public string Because { get; }
 
     /// <summary>
@@ -75,15 +61,11 @@ internal sealed class ArchRule
     /// </summary>
     public string? Exemplar { get; }
 
-    /// <summary>
-    ///     Gets the selection behind <see cref="Exemplar" />, which <c>check</c> resolves against the solution
-    ///     (never part of the verdict), or null when the spec named none.
-    /// </summary>
+    /// <summary>Gets the selection behind <see cref="Exemplar" />, or null when the spec named none.</summary>
     internal Selection? ExemplarSelection { get; }
 
     /// <summary>
-    ///     Gets the rule as one English sentence — what the check report, <c>explain</c>, the generated agent
-    ///     context and SARIF output all print. Empty for a scope's tripwire rule, which asserts nothing about
+    ///     Gets the rule as one English sentence. Empty for a scope's tripwire rule, which asserts nothing about
     ///     the code: it warns about edits inside the scope rather than judging them.
     /// </summary>
     public string Sentence { get; }
@@ -95,15 +77,11 @@ internal sealed class ArchRule
     /// </summary>
     public Constraint? Constraint { get; }
 
-    /// <summary>
-    ///     Gets what a <c>Migrate</c> rule carries besides — the description of the pattern the code still
-    ///     follows, the baseline file, and the migration policy. Null for every other posture.
-    /// </summary>
+    /// <summary>Gets what a <c>Migrate</c> rule carries besides, or null for every other posture.</summary>
     public MigrateData? Migrate { get; }
 
     /// <summary>
-    ///     Gets what a rule contributed by a scope carries besides — which half of the scope it is, the
-    ///     sanctioned surface, the dragons prose. Null for a rule the spec declared directly.
+    ///     Gets what a rule contributed by a scope carries besides, or null for a rule the spec declared directly.
     /// </summary>
     public ScopeData? Scope { get; }
 
@@ -117,11 +95,7 @@ internal sealed class ArchRule
     public string? BaselinePath => Migrate?.BaselinePath
                                    ?? (Scope is { Role: ScopeRole.Containment } containment ? containment.BaselinePath : null);
 
-    /// <summary>
-    ///     Gets whether this rule grandfathers existing violations rather than failing on them — true for a
-    ///     <c>Migrate</c> rule and for a quarantine's containment rule, false for <c>Enforce</c> and for a
-    ///     scope's tripwire.
-    /// </summary>
+    /// <summary>Gets whether this rule grandfathers existing violations rather than failing on them.</summary>
     // Keyed on the payload rather than the posture: having a baseline to measure against IS what ratcheting
     // means, and containment ratchets without the posture saying so. Every reader asking the question asks
     // it through here, so a future posture that also ratchets is one edit rather than a hunt. A reader that

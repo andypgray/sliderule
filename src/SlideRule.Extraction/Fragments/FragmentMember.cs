@@ -3,31 +3,16 @@ using SlideRule.Codebase;
 namespace SlideRule.Extraction.Fragments;
 
 /// <summary>
-///     One declared member of a fragment's declared type (GRAMMAR §4.6), captured as pure data: its
-///     <see cref="MemberFacts">scalar facts</see> and its declaration sites. The member analog of
-///     <see cref="FragmentType" />, held in <see cref="FragmentType.DeclaredMembers" /> and minted into a
-///     <see cref="SlideRule.Codebase.MemberNode" /> by <see cref="ToMemberNode" />.
+///     One declared member of a fragment's declared type (GRAMMAR §4.6): its facts and its declaration sites.
 /// </summary>
-/// <remarks>
-///     <see cref="DeclarationSites" /> is in <see cref="FragmentSite" /> order (a partial method contributes
-///     each part; a field-declaration group each declarator), so the serialized fragment is stable and the
-///     merge preserves the order.
-/// </remarks>
 internal sealed record FragmentMember(
     MemberFacts Facts,
     IReadOnlyList<FragmentSite> DeclarationSites)
 {
-    /// <summary>
-    ///     Mints the merged model's node for this member (GRAMMAR §4.6) — the projection the merge applies
-    ///     to the winning fragment's member inventory, taken whole.
-    /// </summary>
+    /// <summary>Mints the model's node for this member, under <paramref name="declaringType" />.</summary>
     /// <remarks>
-    ///     The two site projections are the merge's type-side ones, taken from <see cref="FragmentSiteSets" />
-    ///     with the §5.6 first-occurrence file-order contract, which it states once for both ends of the
-    ///     pipeline. The parameter facts are already in declaration order and the attribute facts ordinal by
-    ///     constructed name, so each Select preserves order and no merge path duplicates or reorders them.
-    ///     Unlike the type-side attribute list, the member's stays string-side: no external node is minted for
-    ///     an attribute only a member wears.
+    ///     Every list keeps the order the fragment stored it in. The attributes stay string-side: unlike a
+    ///     type's, a member's attributes mint no external node.
     /// </remarks>
     public MemberNode ToMemberNode(TypeNode declaringType)
     {

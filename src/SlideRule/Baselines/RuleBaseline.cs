@@ -4,18 +4,15 @@ namespace SlideRule.Baselines;
 
 /// <summary>
 ///     One rule's captured baseline: the set of <see cref="BaselineEntry" /> identities whose
-///     violations are grandfathered — reported, but not failing the check. A section with zero entries
-///     is still a captured baseline; a rule with no captured baseline at all is absent from its
-///     <see cref="BaselineIndex" /> rather than present and empty.
+///     violations are grandfathered.
 /// </summary>
 internal sealed class RuleBaseline
 {
     private readonly Dictionary<BaselineEntry, BaselineEntry> _lookup;
 
     /// <summary>
-    ///     Builds a section from the entries read out of a baseline file. Their order does not matter, and
-    ///     entries sharing an identity are collapsed into one: the first of them keeps its reason and its
-    ///     site count.
+    ///     Builds a section from entries in any order; entries sharing an identity are collapsed into one, the
+    ///     first of them keeping its reason and its site count.
     /// </summary>
     internal RuleBaseline(IReadOnlyCollection<BaselineEntry> entries)
     {
@@ -29,25 +26,15 @@ internal sealed class RuleBaseline
         Entries = BaselineEntry.InCanonicalOrder(_lookup.Values);
     }
 
-    /// <summary>
-    ///     Gets the grandfathered entries in the baseline file's own order (by source or subject symbol
-    ///     ID, then by target, ordinal), with entries sharing an identity collapsed into one.
-    /// </summary>
     public IReadOnlyList<BaselineEntry> Entries { get; }
 
-    /// <summary>Gets how many entries this section grandfathers.</summary>
     public int Count => Entries.Count;
 
     /// <summary>
-    ///     Looks up the stored entry whose identity matches <paramref name="identity" />. Pass the entry
-    ///     <c>Violation.BaselineIdentity()</c> returns: an identity ignores the reason and the site count,
-    ///     so what comes back is the entry as the file stored it, carrying the
-    ///     <see cref="BaselineEntry.Because" /> recorded with it and the
-    ///     <see cref="BaselineEntry.SiteCount" /> it grandfathers.
+    ///     Looks up the stored entry whose identity matches <paramref name="identity" />, such as the one
+    ///     <c>Violation.BaselineIdentity()</c> returns. The match ignores the reason and the site count, so
+    ///     <paramref name="stored" /> is the entry as the file stored it, carrying both.
     /// </summary>
-    /// <param name="identity">The identity to look up; its reason and site count play no part in the match.</param>
-    /// <param name="stored">The entry as the baseline file stored it, or null when there is no match.</param>
-    /// <returns><c>true</c> when this section grandfathers an entry with that identity.</returns>
     /// <remarks>
     ///     An edge from a project to one of its packages or frameworks that has no entry of its own falls back
     ///     to the project-wide entry a file captured before items were keyed apart

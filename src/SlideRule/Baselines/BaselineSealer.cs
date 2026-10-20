@@ -12,8 +12,6 @@ namespace SlideRule.Baselines;
 ///     any of them; one instance, reused, keeps the per-entry cost to the hash itself. Not thread-safe,
 ///     which is why it is passed down one composition or one read rather than held anywhere: a hash
 ///     instance carries state between <c>ComputeHash</c> calls.
-///     <see cref="BaselineFormat.ComputeSeal" /> is the single-entry way in, and creates its own — it is
-///     a diagnostic, not this path.
 /// </remarks>
 internal sealed class BaselineSealer : IDisposable
 {

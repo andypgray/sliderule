@@ -18,16 +18,9 @@ internal interface IResponseBudget
 }
 
 /// <summary>
-///     The budget as the server reads it: the client's
-///     <see cref="SlideRuleEnvVars.MaxMcpOutputTokens" /> through the
-///     <see cref="IEnvironment" /> seam, converted by
-///     <see cref="ResponseTruncator.ComputeMaxChars" /> — which stays the pure computation its own tests pin.
+///     The budget as the server reads it: the client's <see cref="SlideRuleEnvVars.MaxMcpOutputTokens" />, through
+///     the <see cref="IEnvironment" /> seam, converted by <see cref="ResponseTruncator.ComputeMaxChars" />.
 /// </summary>
-/// <remarks>
-///     A singleton over a seam that is itself read per call. Reading <see cref="IEnvironment" /> once at
-///     construction would answer the same in a running server, whose environment its client fixed at
-///     start, and would pin the first budget for an in-process server a test drives at several.
-/// </remarks>
 internal sealed class ResponseBudget(IEnvironment environment) : IResponseBudget
 {
     /// <inheritdoc />

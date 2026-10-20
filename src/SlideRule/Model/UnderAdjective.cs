@@ -7,11 +7,6 @@ namespace SlideRule.Model;
 ///     types any one of whose declaring files sits under one of the path globs, read relative to the solution
 ///     directory.
 /// </summary>
-/// <remarks>
-///     An inline reduced relative clause, like <see cref="NamedAdjective" />: where a type is declared is a fact
-///     about the type, read after the head and its locative ("types in `MyApp.*` under `src`"), and the backticked
-///     globs are what the checker matches, case aside.
-/// </remarks>
 internal sealed class UnderAdjective(IReadOnlyList<string> globs) : SelectionAdjective
 {
     /// <summary>The path globs, in authoring order.</summary>

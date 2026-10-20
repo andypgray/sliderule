@@ -8,11 +8,7 @@ namespace SlideRule.Codebase;
 ///     <para>
 ///         A method call, a method group handed over as a delegate, a property, field or event access
 ///         (<c>?.</c>, compound assignment and <c>+=</c> / <c>-=</c> included), and a bare name brought into
-///         scope by <c>using static</c> all count. A type using its own members gives nothing. Both
-///         <see cref="Source" /> and <see cref="MemberReference.ContainingType" /> are the very type
-///         instances <see cref="CodebaseModel.Types" /> lists, so compare them by reference rather than by
-///         name. The same use is also recorded as an ordinary reference to the member's declaring type in
-///         <see cref="CodebaseModel.Edges" />, never instead of it.
+///         scope by <c>using static</c> all count.
 ///     </para>
 ///     <para>
 ///         Three uses are deliberately absent, so a rule reading these edges will not see them: a
@@ -36,10 +32,6 @@ internal sealed class MemberEdge
     /// <summary>Gets the member that was used.</summary>
     public MemberReference Member { get; }
 
-    /// <summary>
-    ///     Gets each distinct place the use occurs, ordered by file then line. Two uses of the same member on
-    ///     one line count as one site.
-    /// </summary>
     public IReadOnlyList<SourceLocation> Sites => Evidence.Sites;
 
     // A use's instance reaches a copy of the member's declaring type, the target it is attributed to.

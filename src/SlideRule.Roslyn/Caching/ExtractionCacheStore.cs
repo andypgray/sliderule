@@ -24,30 +24,16 @@ internal enum CacheOutcome
 }
 
 /// <summary>
-///     The result of <see cref="ExtractionCacheStore.ReadAndValidate" />: what to reuse and what to redo.
-///     Carries everything a caller needs to finish a run without re-reading the cache.
+///     The result of <see cref="ExtractionCacheStore.ReadAndValidate" />: what to reuse and what to redo, with
+///     everything a caller needs to finish a run without re-reading the cache.
 /// </summary>
 /// <remarks>
 ///     The recorded spec resolutions and the recorded load verdict are replayed on a hit, so cached and cold
-///     output — and the fail-closed decision — are identical on a solution that does not load completely or
-///     did not restore.
+///     output, and the fail-closed decision, are identical on a solution that does not load completely or did
+///     not restore. <paramref name="Validated" />, set on a <see cref="CacheOutcome.Partial" /> read only, hands
+///     <see cref="ExtractionCacheStore.TryCaptureOverValidation" /> the stamps and keys the validation already
+///     took.
 /// </remarks>
-/// <param name="Outcome">What the validation decided — hit, partial, or miss.</param>
-/// <param name="ReusableFragments">The clean projects' fragments, reusable as stored.</param>
-/// <param name="DirtyProjects">The project names to re-extract on a <see cref="CacheOutcome.Partial" /> read.</param>
-/// <param name="SpecResolutions">The recorded spec resolutions a hit replays without a workspace.</param>
-/// <param name="LoadDiagnostics">
-///     The recorded load verdict, carried whole rather than as the separate lists the manifest stores it in:
-///     every surface downstream reads this one value, so a hit hands them exactly what a cold load hands
-///     them and no caller can pair the lists up differently. The merge's two facts, its notes and its
-///     multi-targeted projects, are empty: the cache stores fragments, and every path regenerates both
-///     from them at merge time.
-/// </param>
-/// <param name="Validated">
-///     On a <see cref="CacheOutcome.Partial" /> read, the stamps and keys the validation already took, for
-///     <see cref="ExtractionCacheStore.TryCaptureOverValidation" /> to carry rather than re-read; null on a hit and a
-///     miss.
-/// </param>
 internal sealed record CacheReadResult(
     CacheOutcome Outcome,
     IReadOnlyList<CodebaseFragment> ReusableFragments,
@@ -88,22 +74,12 @@ internal sealed record CacheReadResult(
 ///     that follows the re-extraction reads only what changed rather than every document of the solution.
 /// </summary>
 /// <remarks>
-///     <para>
-///         A partial is never a structural change: any change to the solution, a project file, an assets file or
-///         a probe file is a miss. So the structural stamps, the project set and the reference graph a partial
-///         validated are the ones the capture would take again, and a clean project's documents, true content
-///         key and surface key are exactly what a full re-stamp would recompute.
-///     </para>
-///     <para>
-///         Every carried stamp is older than the extraction it vouches for. An edit after validation leaves a
-///         stamp that no longer matches disk, so the next validation's stat sees it and re-reads the file, under
-///         the same racy-window rule as any other stamp. That is why <see cref="ExtractionCacheStore.Write" />
-///         need not re-stat what was carried.
-///     </para>
+///     A partial is never a structural change: any change to the solution, a project file, an assets file or a
+///     probe file is a miss. So the structural stamps, the project set and the reference graph a partial
+///     validated are the ones the capture would take again, and a clean project's documents, true content key
+///     and surface key are exactly what a full re-stamp would recompute. Both lists are in manifest order, and
+///     every project outside <paramref name="DirtyProjects" /> is carried whole.
 /// </remarks>
-/// <param name="StructuralStamps">The validated structural stamps, in manifest order.</param>
-/// <param name="Projects">Every manifest project as validation left it, in manifest order.</param>
-/// <param name="DirtyProjects">The projects the run re-extracts; every other one is carried whole.</param>
 internal sealed record ValidatedStamps(
     IReadOnlyList<FileStamp> StructuralStamps,
     IReadOnlyList<ValidatedProject> Projects,
@@ -118,15 +94,12 @@ internal sealed record ValidatedStamps(
             .ToList();
 }
 
-/// <summary>One manifest project as a <see cref="CacheOutcome.Partial" /> validation left it.</summary>
-/// <param name="Entry">
-///     The manifest entry with the refreshed document stamps, the true content key and the surface key. Its
-///     Merkle key is the recorded one, which a capture recomputes.
-/// </param>
-/// <param name="UnchangedDocuments">
-///     The refreshed stamps of the documents whose bytes validation found unchanged, by path. A capture reuses
-///     these for a dirty project and stamps only the rest.
-/// </param>
+/// <summary>
+///     One manifest project as a <see cref="CacheOutcome.Partial" /> validation left it: <paramref name="Entry" />
+///     carries the refreshed document stamps and the true content and surface keys but the recorded Merkle key,
+///     which a capture recomputes, and <paramref name="UnchangedDocuments" /> holds, by path, the refreshed stamps
+///     of the documents whose bytes validation found unchanged.
+/// </summary>
 internal sealed record ValidatedProject(
     ProjectCacheEntry Entry,
     IReadOnlyDictionary<string, FileStamp> UnchangedDocuments);
@@ -135,20 +108,11 @@ internal sealed record ValidatedProject(
 ///     One project's identity as the caller knows it before any file is statted — the store fills in every
 ///     stamp and key itself, so the hashing lives in exactly one place and read/write agree by construction.
 /// </summary>
-/// <param name="ProjectName">The project (assembly) name.</param>
-/// <param name="CsprojPath">The project file path.</param>
-/// <param name="ProjectDirectory">The project directory (its cone is scanned for added <c>*.cs</c>).</param>
-/// <param name="ProjectReferences">
-///     The names of the projects this one references (Merkle dependency edges): the compiler's closure, which
-///     invalidation has to follow, and not the declared list the fragments carry.
-/// </param>
-/// <param name="DocumentPaths">The project's source-document paths.</param>
-/// <param name="EvaluatedOutputPath">
-///     The project's evaluated output path, or null when the workspace carried none. Paired with
-///     <paramref name="IntermediateAssemblyPath" /> it is what locates the restore assets file under a
-///     non-default output layout (see <see cref="IntermediateOutputTree" />).
-/// </param>
-/// <param name="IntermediateAssemblyPath">The project's intermediate assembly path, or null when unknown.</param>
+/// <remarks>
+///     <paramref name="ProjectReferences" /> is the compiler's closure, as on <see cref="ProjectCacheEntry" />.
+///     <paramref name="EvaluatedOutputPath" /> and <paramref name="IntermediateAssemblyPath" />, null when the
+///     workspace carried none, are the pair <see cref="IntermediateOutputTree.AssetsPathsOf" /> reads.
+/// </remarks>
 internal sealed record ProjectInputs(
     string ProjectName,
     string CsprojPath,
@@ -159,28 +123,22 @@ internal sealed record ProjectInputs(
     string? IntermediateAssemblyPath = null);
 
 /// <summary>
-///     A pre-extraction fingerprint of the workspace's files: the structural stamps and per-project entries
-///     (with content and Merkle keys) as they were before extraction started. Handed back to
-///     <see cref="ExtractionCacheStore.Write" />, which re-stats every input and commits only if nothing has
-///     changed since — the guard that stops a mid-run edit from poisoning the cache.
+///     A pre-extraction fingerprint of the workspace's files: the structural stamps and per-project entries, as
+///     the manifest will record them, taken before extraction started and handed back to
+///     <see cref="ExtractionCacheStore.Write" />.
 /// </summary>
-/// <param name="StructuralStamps">The structural stamps, as the manifest will record them.</param>
-/// <param name="Projects">The per-project entries, as the manifest will record them.</param>
-/// <param name="FreshStamps">
-///     The stamps this capture took from disk when it carried the rest from a partial validation, and so the
+/// <remarks>
+///     <paramref name="FreshStamps" /> holds the stamps a capture over a partial validation took from disk, the
 ///     only ones <see cref="ExtractionCacheStore.Write" /> re-stats; null when the capture stamped everything.
-/// </param>
+/// </remarks>
 internal sealed record CacheFingerprint(
     IReadOnlyList<FileStamp> StructuralStamps,
     IReadOnlyList<ProjectCacheEntry> Projects,
     IReadOnlyList<FileStamp>? FreshStamps = null);
 
 /// <summary>
-///     What a workspace-loaded run produced and wants persisted: the fragments, the spec resolutions to
-///     replay, and the load verdict whole — the same value the run itself rendered from, so a hit replays it
-///     rather than a re-paired copy of it. The manifest persists its load lists; the merge notes and
-///     multi-targeted projects it carries are regenerated from the fragments on every path and are never
-///     stored.
+///     What a workspace-loaded run produced and wants persisted. The manifest stores the load verdict's lists
+///     but not its merge notes or multi-targeted projects, which every path regenerates from the fragments.
 /// </summary>
 internal sealed record ExtractionResult(
     IReadOnlyList<CodebaseFragment> Fragments,
@@ -188,25 +146,14 @@ internal sealed record ExtractionResult(
     WorkspaceDiagnostics LoadDiagnostics);
 
 /// <summary>
-///     The read/validate/write boundary over one solution's persisted extraction cache — a single atomic
-///     <c>cache.json</c> holding the manifest and every fragment. Validation runs with zero
-///     MSBuild: it stats (and selectively re-hashes) the recorded inputs, scans each project cone for added
-///     source, and recomputes the content/Merkle keys to produce a dirty set.
+///     The read/validate/write boundary over one solution's persisted extraction cache, a single atomic
+///     <c>cache.json</c> holding the manifest and every fragment. Validation runs with zero MSBuild.
 /// </summary>
 /// <remarks>
 ///     <para>
-///         A write goes through <see cref="AtomicFile" />, so a reader never sees a half-written file. Any
-///         torn, garbled, or hand-edited content degrades to a parse-error <see cref="CacheOutcome.Miss" /> —
-///         the cache is disposable local derived data, so unlike a baseline it has no tamper story: a bad file
-///         is ignored and rebuilt, never a loud error and never a wrong answer.
-///     </para>
-///     <para>
-///         Racy-window and structural semantics mirror the warm <see cref="WorkspaceSession" />'s
-///         per-call reconcile sweep (the reference for probe chains, absence recording, and the cone scan),
-///         reusing <see cref="FileFreshness" /> for the in-memory stat comparison. The one refinement a
-///         persisted cache adds over the warm sweep is content-verification of structural files: a bare
-///         mtime touch on a csproj whose bytes are unchanged is not a miss, because a false miss here costs a
-///         full cold rebuild.
+///         Racy-window and structural semantics follow the warm <see cref="WorkspaceSession" />'s reconcile
+///         sweep, with one refinement: a structural file is content-verified, so a bare mtime touch on a csproj
+///         whose bytes are unchanged is not a miss, because a false miss here costs a full cold rebuild.
 ///     </para>
 ///     <para>
 ///         A trivia-only edit is a hit, not a partial: where a document's bytes changed but its
@@ -225,13 +172,12 @@ internal sealed record ExtractionResult(
 internal sealed class ExtractionCacheStore
 {
     // The on-disk schema of this per-solution cache file. A record written under any other version degrades to
-    // a clean Miss — the cache is disposable derived data, so a schema it cannot read is rebuilt, never a loud
-    // error. Bump this whenever a fragment gains a fact, OR changes how one is computed: a widened fact keeps
-    // its name and its type while taking a different value for identical inputs, so a hit would replay the old
-    // answer forever with nothing to distinguish it. The same holds when a manifest record gains a slot, even
-    // one that deserializes to a harmless default, so a reader never reasons about which slots a file
-    // predates. The suite cannot catch a missed bump — every run gets a fresh cache directory — so the
-    // discipline is the only guard.
+    // a clean Miss and is rebuilt. Bump this whenever a fragment gains a fact, OR changes how one is computed:
+    // a widened fact keeps its name and its type while taking a different value for identical inputs, so a hit
+    // would replay the old answer forever with nothing to distinguish it. The same holds when a manifest record
+    // gains a slot, even one that deserializes to a harmless default, so a reader never reasons about which
+    // slots a file predates. The suite cannot catch a missed bump — every run gets a fresh cache directory — so
+    // the discipline is the only guard.
     private const int CurrentSchemaVersion = 39;
 
     private static readonly IReadOnlySet<string> NoDocuments = new HashSet<string>(PathComparison.Comparer);
@@ -254,30 +200,21 @@ internal sealed class ExtractionCacheStore
     }
 
     /// <summary>
-    ///     The number of file-content reads (SHA-256 computations) performed by validation. Zero in the
-    ///     steady state, where every input is trusted on stat alone. Internal test observable — the
-    ///     persisted-cache analog of <see cref="WorkspaceSession.SweepContentReads" />; never consulted in
-    ///     production.
+    ///     The file-content reads (SHA-256 computations) validation has made, a test observable: zero in the
+    ///     steady state, where every input is trusted on stat alone. Counted through <see cref="Interlocked" />,
+    ///     because the per-project sweep is parallel and the tests that read it pin exact deltas.
     /// </summary>
-    /// <remarks>
-    ///     Counted through <see cref="Interlocked" /> because the per-project sweep is parallel, and the
-    ///     tests that read this assert exact deltas — a lost increment would not be a slightly-off number, it
-    ///     would be a flaky pin on the promise that a steady-state validation opens nothing.
-    /// </remarks>
     internal long ContentHashCount => Volatile.Read(ref contentHashCount);
 
     /// <summary>
-    ///     The absolute paths of the documents the last <see cref="ReadAndValidate" /> moved sites for
-    ///     instead of dirtying their project — empty in the steady state and on every miss. Internal test
-    ///     observable; never printed.
+    ///     The absolute paths of the documents the last <see cref="ReadAndValidate" /> moved sites for instead of
+    ///     dirtying their project; a test observable.
     /// </summary>
     internal IReadOnlySet<string> LastRemappedDocuments { get; private set; } = NoDocuments;
 
     /// <summary>
-    ///     The number of documents a capture read from disk to stamp. A capture handed a partial validation's
-    ///     stamps reads only the documents that changed or are new. Internal test observable, counted through
-    ///     <see cref="Interlocked" /> for the same reason <see cref="ContentHashCount" /> is; never consulted in
-    ///     production.
+    ///     The documents captures have read from disk to stamp, a test observable counted through
+    ///     <see cref="Interlocked" /> as <see cref="ContentHashCount" /> is.
     /// </summary>
     internal long CaptureStampCount => Volatile.Read(ref captureStampCount);
 
@@ -292,19 +229,9 @@ internal sealed class ExtractionCacheStore
     }
 
     /// <summary>
-    ///     The fingerprint to hand to <see cref="Write" />, carrying what <paramref name="validated" /> already
-    ///     stamped. A clean project is taken whole from the validation; a dirty project keeps the stamps of the
-    ///     documents validation found unchanged and stamps only the ones that changed or are new, from the
-    ///     loaded <paramref name="projects" />, which decide its document list. Without a validation, or when
-    ///     <paramref name="projects" /> holds a project the validation does not know or lacks a dirty one, every
-    ///     input is stamped now.
+    ///     The fingerprint to hand to <see cref="Write" />: the one <see cref="TryCaptureOverValidation" /> builds
+    ///     from <paramref name="validated" /> where it can, and otherwise every input stamped now.
     /// </summary>
-    /// <param name="projects">
-    ///     The loaded projects. Under a load of only the dirty projects' closure this is a subset of the
-    ///     manifest's, which is enough: every clean project comes from <paramref name="validated" />.
-    /// </param>
-    /// <param name="validated">The partial validation's stamps, or null to stamp everything.</param>
-    /// <param name="ct">Cancellation token.</param>
     public CacheFingerprint CaptureFingerprint(
         IReadOnlyList<ProjectInputs> projects, ValidatedStamps? validated, CancellationToken ct = default)
     {
@@ -313,13 +240,15 @@ internal sealed class ExtractionCacheStore
 
     /// <summary>
     ///     The fingerprint that carries <paramref name="validated" />, or null when it cannot: no validation, or
-    ///     <paramref name="projects" /> holds a project the validation does not know or lacks a dirty one. A
-    ///     caller whose <paramref name="projects" /> are only a closure must not fall back to stamping them alone,
-    ///     because a manifest without the projects it did not load would leave their fragments unvalidated.
+    ///     <paramref name="projects" /> holds a project the validation does not know or lacks a dirty one. A clean
+    ///     project is taken whole from the validation; a dirty project keeps the stamps of the documents validation
+    ///     found unchanged and stamps the rest from <paramref name="projects" />, which decide its document list
+    ///     and may be only the dirty projects' closure.
     /// </summary>
-    /// <param name="projects">The loaded projects: the whole solution's, or the dirty projects' closure.</param>
-    /// <param name="validated">The partial validation's stamps.</param>
-    /// <param name="ct">Cancellation token.</param>
+    /// <remarks>
+    ///     A caller whose <paramref name="projects" /> are only a closure must not fall back to stamping them alone,
+    ///     because a manifest without the projects it did not load would leave their fragments unvalidated.
+    /// </remarks>
     public CacheFingerprint? TryCaptureOverValidation(
         IReadOnlyList<ProjectInputs> projects, ValidatedStamps? validated, CancellationToken ct = default)
     {
@@ -425,10 +354,9 @@ internal sealed class ExtractionCacheStore
     }
 
     // A project's content and surface keys over its document stamps, its structural inputs and its cone-adds.
-    // Cone-adds are computed exactly as validation does, over the same known-document set (the stamps' full
-    // paths). Hardcoding an empty adds list here would be wrong: a *.cs on disk under the project but excluded
-    // from compilation is a validation-time add, so the capture would never validate and the project would stay
-    // dirty forever. With capture and validation running the one routine, they agree.
+    // The adds come from the routine validation uses, over the same known-document set (the stamps' full paths):
+    // a *.cs on disk under the project but excluded from compilation is a validation-time add, so a capture that
+    // left adds empty would never validate and the project would stay dirty forever.
     private static (string ContentKey, string SurfaceKey) ProjectKeysOf(
         ProjectInputs project, IReadOnlyList<FileStamp> documents, IReadOnlyDictionary<string, string?> structuralShaByPath)
     {
@@ -619,18 +547,14 @@ internal sealed class ExtractionCacheStore
         IReadOnlyList<CodebaseFragment> replayedFragments = Replay(manifest.Fragments, mapsByProject, dirtyProjects);
         LastRemappedDocuments = RemappedDocumentsOf(mapsByProject, dirtyProjects);
 
-        // Re-paired once, here, from the flat lists the manifest persists — the only place the five become a
-        // verdict again, so no consumer can assemble them in a different order. The merge's own two facts —
-        // the notes and the multi-targeted projects — are empty here on purpose: nothing persists them
-        // because a hit re-merges the stored fragments and produces both afresh.
+        // The merge's notes and multi-targeted projects are empty: nothing persists them, because a hit re-merges
+        // the stored fragments and produces both afresh.
         var loadDiagnostics = new WorkspaceDiagnostics(
             manifest.Diagnostics, [], manifest.FailedProjects, manifest.UncheckedProjects,
             manifest.RestoreFailedProjects, manifest.UnsupportedProjects, []);
 
         if (dirtyProjects.Count == 0)
         {
-            // The surface keys are the same on both sides of a remap, so the memo the pass above filled holds
-            // every surface Merkle key the promotion needs.
             IReadOnlyList<ProjectCacheEntry> refreshedProjects = RefreshedProjects(
                 manifest.Projects, checkedByIndex, trueContentKeys, surfaceKeys, referencesByName, surfaceMemo);
             PromoteIfChanged(manifest, refreshedStructural, refreshedProjects, replayedFragments);
@@ -947,10 +871,7 @@ internal sealed class ExtractionCacheStore
     }
 
     // MerkleKey(P) = hash(ContentKey(P), SurfaceMerkle(dep) for each dep in name order), where
-    // SurfaceMerkle(P) = hash(SurfaceKey(P), SurfaceMerkle(dep) for each dep in name order). So P re-walks on
-    // any change to its own content and on a change to the declaration surface of anything it references,
-    // transitively, and on nothing else: a body-only edit in a dependency moves that dependency's content key
-    // and leaves every surface key in the graph where it was.
+    // SurfaceMerkle(P) = hash(SurfaceKey(P), SurfaceMerkle(dep) for each dep in name order).
     private static string ComputeMerkleKey(
         string name,
         IReadOnlyDictionary<string, string> contentKeys,
@@ -1015,8 +936,7 @@ internal sealed class ExtractionCacheStore
         TryWriteAtomic(promoted); // best-effort; a later change is still caught by the next validation's stat delta
     }
 
-    // ManifestJson owns both halves and their degradation contract. No File.Exists probe: an absent cache
-    // reads back as null through the same catch a torn one does, and both mean the same thing here — a Miss.
+    // No File.Exists probe: an absent cache and a torn one both read back as null, and both mean a Miss here.
     private bool TryWriteAtomic(CacheManifest manifest)
     {
         return ManifestJson.TryWriteAtomic(cacheFilePath, manifest, ManifestJson.Context.CacheManifest);
@@ -1066,8 +986,6 @@ internal sealed class ExtractionCacheStore
         return FileStamping.TryReadDocument(path);
     }
 
-    // ProjectCone owns the composition, so the build capture stamps the identical set from the identical
-    // routine.
     private IReadOnlyList<string> StructuralPathsOf(IReadOnlyList<ProjectInputs> projects)
     {
         return ProjectCone.SolutionStructuralPaths(

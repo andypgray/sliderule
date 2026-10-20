@@ -3,12 +3,7 @@ using SlideRule.Prose;
 
 namespace SlideRule.Hosting;
 
-/// <summary>
-///     What a rule contributed by a scope carries beyond an ordinary rule: which half of the scope it is,
-///     the sanctioned surface, the baseline, and what the scope says is strange inside it. A quarantine
-///     contributes two rules sharing one <see cref="ScopeId" /> (the containment rule holding the
-///     surface and the baseline) and a caution the tripwire alone; both halves carry the dragons prose.
-/// </summary>
+/// <summary>What a rule contributed by a scope carries beyond an ordinary rule.</summary>
 internal sealed class ScopeData
 {
     internal ScopeData(
@@ -45,17 +40,11 @@ internal sealed class ScopeData
         Scoped = scoped;
     }
 
-    /// <summary>
-    ///     Gets which half of the scope this rule is: the containment rule that judges references into the
-    ///     scope, or the tripwire that warns about edits inside it.
-    /// </summary>
     public ScopeRole Role { get; }
 
     /// <summary>
     ///     The raw scoped selection (the scope's <c>Quarantine(sel)</c>/<c>Caution(sel)</c> operand, before
-    ///     the containment desugaring subtracts the boundary). Carried on every child: the renderer
-    ///     evaluates it in Subject position to place the scope's directory context file, and the tripwire
-    ///     maps changed files to the scoped types through it.
+    ///     the containment desugaring subtracts the boundary), carried on every child.
     /// </summary>
     internal Selection Scoped { get; }
 

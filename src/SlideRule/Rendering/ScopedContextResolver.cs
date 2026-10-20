@@ -5,29 +5,15 @@ using SlideRule.Model;
 namespace SlideRule.Rendering;
 
 /// <summary>
-///     Works out which directory each scope's card belongs in: the deepest directory holding every file
-///     inside the solution directory that declares one of the scoped types, so the card covers the scope and
-///     as little else as it can. One card per scope, rendered from a quarantine's containment rule or a
-///     caution's tripwire, so a quarantine never places two cards on one directory.
+///     Works out which directory each scope's card belongs in (<see cref="DirectoryPlacement" />), one card per
+///     scope.
 /// </summary>
-/// <remarks>
-///     Only types the solution declares are considered, and a file outside the solution directory never moves a
-///     card. A scope that matches none of those types, or only types declared outside the solution directory,
-///     comes back with a null directory and the reason, for the caller to report or ignore. A scope over a
-///     project counts only that project's copy of a type other projects also compile.
-/// </remarks>
 internal static class ScopedContextResolver
 {
     /// <summary>
     ///     Resolves a placement for every card-bearing scope in <paramref name="model" />, in the order the spec
     ///     declares the scopes.
     /// </summary>
-    /// <remarks>
-    ///     The twin of <see cref="LayerContextResolver.Resolve" />, and it takes the evaluator and the boundary
-    ///     for the same reason: a caller resolving both emission keys for one codebase hands one of each to both,
-    ///     rather than each materializing the solution-declared type list, and re-splitting the solution
-    ///     directory, for itself.
-    /// </remarks>
     internal static IReadOnlyList<ScopePlacement> Resolve(
         ArchitectureModel model, SelectionEvaluator evaluator, DirectoryPlacement.Boundary boundary)
     {

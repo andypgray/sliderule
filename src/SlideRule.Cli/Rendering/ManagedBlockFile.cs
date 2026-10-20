@@ -78,8 +78,7 @@ internal static class ManagedBlockFile
     }
 
     // Decode UTF-8 text, skipping a leading BOM so it never enters the string the splicer sees (the
-    // adapter re-emits it on write). Absent file → null (the splicer's "absent" case). A non-UTF-8 file is
-    // refused rather than decoded lossily: splicing into mojibake would commit the corruption on write.
+    // adapter re-emits it on write). Absent file → null (the splicer's "absent" case).
     private static string? Decode(string path, byte[]? bytes, bool hasBom)
     {
         if (bytes is null) return null;

@@ -70,10 +70,9 @@ internal sealed class LoadedModel : IReadHandle
 
     /// <summary>
     ///     Reads <paramref name="text" /> as a model file, holding any fault but a cancellation as the
-    ///     model's own.
+    ///     model's own; <paramref name="beforeRead" /> is a test seam run first inside the guard, null in
+    ///     production.
     /// </summary>
-    /// <param name="text">The model file's text.</param>
-    /// <param name="beforeRead">A test seam run first inside the guard; null in production.</param>
     internal static LoadedModel Load(SourceText text, Action? beforeRead)
     {
         try

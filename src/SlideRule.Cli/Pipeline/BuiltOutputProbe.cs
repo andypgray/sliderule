@@ -13,8 +13,7 @@ namespace SlideRule.Cli.Pipeline;
 ///     <para>
 ///         The probe searches because an evaluated output path can name a directory no build ever writes —
 ///         a parent props file, <c>UseArtifactsOutput</c>, or a solution built in one configuration and
-///         evaluated in another — and fixed hop counting over such a path assumes a shape it did not
-///         construct.
+///         evaluated in another.
 ///     </para>
 ///     <para>
 ///         The intermediate refusal is not implied by the anchor rule (<see cref="AnchorChainFor" />): under
@@ -26,9 +25,10 @@ namespace SlideRule.Cli.Pipeline;
 internal static class BuiltOutputProbe
 {
     // The two output-root spellings the .NET SDK owns: OutputPath's default `bin\` and ArtifactsPath's
-    // default `artifacts\`. They bound the walk; they are never the anchor. A repository that renames its
-    // output root gets the primary resolution and no cross-configuration fallback — the deliberate trade for
-    // a search that can never climb to a repository or drive root.
+    // default `artifacts\`. They bound the walk: the nearest is the widest anchor, and nothing above it is
+    // searched. A repository that renames its output root gets the primary resolution and no
+    // cross-configuration fallback — the deliberate trade for a search that can never climb to a repository
+    // or drive root.
     private static readonly string[] OutputRootNames = ["bin", "artifacts"];
 
     // Directories holding a same-named copy that must never be the answer:

@@ -7,57 +7,31 @@ using SlideRule.Roslyn.Solutions;
 
 namespace SlideRule.Roslyn;
 
-/// <summary>
-///     Builds the <see cref="CodebaseModel" /> a check reads out of Roslyn compilations: the types a codebase
-///     declares, the members they declare, and the <c>file:line</c> edges between them. Use
-///     <see cref="ExtractFromSolutionAsync" /> for a solution loaded by <see cref="WorkspaceLoader" /> or a
-///     <see cref="WorkspaceSession" />, or <see cref="ExtractFromCompilations" /> for compilations you
-///     built yourself, which needs no MSBuild at all.
-/// </summary>
+/// <summary>Builds the <see cref="CodebaseModel" /> a check reads out of Roslyn compilations.</summary>
 internal static class CodebaseExtractor
 {
     /// <summary>
-    ///     Extracts the model from compilations you built yourself, with no MSBuild involved. Every input's
-    ///     types are declared before any reference is resolved, so a type one compilation references and
-    ///     another declares is one node in the model, matched by fully-qualified name. Where two inputs declare
-    ///     the same type, the first in <paramref name="inputs" /> supplies its facts.
+    ///     Extracts the model from compilations built without MSBuild. Where two of <paramref name="inputs" />
+    ///     declare the same type, the first supplies its facts.
     /// </summary>
-    /// <param name="inputs">The compilations to extract from, in the order they are declared.</param>
-    /// <returns>The model built from every compilation in <paramref name="inputs" />.</returns>
     public static CodebaseModel ExtractFromCompilations(IReadOnlyList<CompilationInput> inputs)
     {
         return CodebaseModelBuilder.Build(inputs, null, CancellationToken.None);
     }
 
     /// <summary>
-    ///     Extracts the model from a loaded solution: its C# projects in ordinal name order, each with its
-    ///     compilation and the names of the projects it declares a reference to. Load the solution first,
-    ///     through <see cref="WorkspaceLoader" /> or a <see cref="WorkspaceSession" />; restore or build it
-    ///     before that, because a project whose packages were never restored loads without them and the types
-    ///     it gets from them are absent from the model.
-    /// </summary>
-    /// <param name="solution">The loaded solution.</param>
-    /// <param name="excludeProjects">
-    ///     Project names to leave out of the model — the way a spec project that is itself a member of the
-    ///     solution stays out of its own check. Null excludes nothing.
-    /// </param>
-    /// <param name="targetFrameworks">
-    ///     The per-project target frameworks the load reported
-    ///     (<see cref="LoadedSolution.TargetFrameworks" />), so a fact taken from a multi-target-framework
-    ///     project records the framework it came from. Null, or a project absent from it, leaves the framework
-    ///     unstamped, which is the single-framework norm.
-    /// </param>
-    /// <param name="declaredMembers">
-    ///     The absolute <c>.csproj</c> paths the solution file itself declares, symlink-resolved, stamped onto
-    ///     each project as <see cref="ProjectNode.SolutionMember" /> so that a project the workspace loaded
-    ///     only because a <c>ProjectReference</c> named it can be told from one the solution claims. Null
-    ///     leaves every project unlabeled, which is what an unreadable solution file has to degrade to.
-    /// </param>
-    /// <param name="ct">Cancellation token.</param>
-    /// <returns>
-    ///     The model built from the solution's C# projects, less any named in
+    ///     Extracts the model from a loaded solution's C# projects, less those named in
     ///     <paramref name="excludeProjects" />.
-    /// </returns>
+    /// </summary>
+    /// <remarks>
+    ///     <paramref name="targetFrameworks" /> is the load's <see cref="LoadedSolution.TargetFrameworks" />: a fact
+    ///     from a multi-targeted project records the framework it came from, and a project absent from the map, or
+    ///     a null map, leaves the framework unstamped, the single-framework norm.
+    ///     <paramref name="declaredMembers" />, the absolute symlink-resolved <c>.csproj</c> paths the solution file
+    ///     declares, sets <see cref="ProjectNode.SolutionMember" />, so a project the workspace loaded only because
+    ///     a <c>ProjectReference</c> named it can be told from one the solution claims; null, which an unreadable
+    ///     solution file degrades to, leaves every project unlabeled.
+    /// </remarks>
     // MethodImplOptions.NoInlining keeps the JIT from resolving Roslyn types before MSBuildLocator
     // registration in non-test hosts.
     [MethodImpl(MethodImplOptions.NoInlining)]
@@ -76,16 +50,12 @@ internal static class CodebaseExtractor
 
     /// <summary>
     ///     Extracts one self-contained <see cref="CodebaseFragment" /> per C# project matched by
-    ///     <paramref name="includeProjects" /> (null extracts every C# project), in the same ordinal
-    ///     project order and with the same per-project <see cref="CompilationInput" />s the merge-producing
-    ///     path uses — so the fragments a workspace-loaded run persists and the fragments a
-    ///     cache hit replays go through the identical <see cref="FragmentMerger" />, and the cache cannot
-    ///     change results by construction.
+    ///     <paramref name="includeProjects" /> (null extracts every C# project), from the same inputs
+    ///     <see cref="ExtractFromSolutionAsync" /> builds, so stored fragments merged through the one
+    ///     <see cref="FragmentMerger" /> yield the model a cold run would.
     /// </summary>
-    /// <remarks>
-    ///     <see cref="MethodImplOptions.NoInlining" /> keeps the JIT from resolving Roslyn types before
-    ///     <c>MSBuildLocator</c> registration in non-test hosts, matching <see cref="ExtractFromSolutionAsync" />.
-    /// </remarks>
+    // MethodImplOptions.NoInlining keeps the JIT from resolving Roslyn types before MSBuildLocator
+    // registration in non-test hosts.
     [MethodImpl(MethodImplOptions.NoInlining)]
     internal static async Task<IReadOnlyList<CodebaseFragment>> ExtractFragmentsAsync(
         Solution solution,
@@ -100,16 +70,14 @@ internal static class CodebaseExtractor
         return FragmentExtractor.ExtractAll(collected.Inputs, collected.ArtifactFacts, ct);
     }
 
-    // The shared project enumeration behind both entry points: C# projects passing the filter, ordered by
-    // (name, target framework), each turned into a CompilationInput carrying the names of the projects it
-    // declares a reference to, and its framework. One enumeration means the extract-all-then-merge cold
-    // path, the extract-fragments cache path, and cache hits all order identically.
+    // The one project enumeration behind both entry points, ordered by (name, target framework), so the
+    // extract-all-then-merge cold path, the extract-fragments cache path and cache hits all order identically.
     //
-    // The framework tiebreak is required, not cosmetic. One project file's several compilations share
-    // a name, so ordering by name alone would leave them in whatever order the solution enumerated them —
-    // <TargetFrameworks> declaration order — and the merge gives each type they share the facts of the FIRST
-    // input that declares it. Ordering on the framework fixes which one that is, so reordering a csproj's
-    // framework list cannot silently move a type's facts.
+    // The framework tiebreak is required. One project file's several compilations share a name, so ordering
+    // by name alone would leave them in whatever order the solution enumerated them (<TargetFrameworks>
+    // declaration order), and the merge gives each type they share the facts of the FIRST input that declares
+    // it. Ordering on the framework fixes which one that is, so reordering a csproj's framework list cannot
+    // silently move a type's facts.
     private static async Task<ExtractionInputs> CollectInputsAsync(
         Solution solution,
         Func<Project, bool> include,

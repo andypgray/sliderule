@@ -386,9 +386,6 @@ public sealed class Arch
         return new ScopeBuilder(registration);
     }
 
-    // The tail both Layer overloads share: one registration in authoring order, and the handle over that
-    // same registration, so a Purpose written on the handle lands in the declared layer whichever form
-    // minted it.
     private Layer Register(LayerNoun noun)
     {
         var registration = new LayerRegistration(noun);

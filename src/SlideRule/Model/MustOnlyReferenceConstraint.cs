@@ -9,7 +9,6 @@ namespace SlideRule.Model;
 /// </summary>
 internal sealed class MustOnlyReferenceConstraint(Selection subject, IReadOnlyList<Selection> targets) : OperandConstraint(subject, targets)
 {
-    /// <summary>The permitted reference targets.</summary>
     internal IReadOnlyList<Selection> Targets => Operands;
 
     /// <summary>

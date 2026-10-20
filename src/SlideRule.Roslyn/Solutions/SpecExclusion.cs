@@ -11,10 +11,7 @@ namespace SlideRule.Roslyn.Solutions;
 /// </summary>
 /// <remarks>
 ///     <see cref="CanonicalFilePath" /> is <see cref="FilePath" /> already canonicalized, for a producer that
-///     resolved it anyway — spec resolution holds every project's canonical spelling by the time it asks this
-///     walk anything. It is defaulted and trailing so the synthetic graphs stay two-and-a-list, which is the
-///     tuple shape that keeps the pure core testable with no disk: a slot only a workspace-backed caller can
-///     fill must not become one every caller has to spell.
+///     resolved it anyway; it is defaulted and trailing so a synthetic graph need not spell it.
 /// </remarks>
 internal sealed record SpecExclusionProject(
     string Name,
@@ -31,28 +28,23 @@ internal sealed record SpecExclusionProject(
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>The subtraction is essential and must not collapse to "the closure".</b> A spec routinely
-///         references the very code it governs: an example's spec references its application project, and
-///         this repo's own spec references projects it governs. Excluding a raw closure would drop
-///         the codebase under law and silently report green over nothing. Declared membership is the only
-///         sound discriminator — it says which projects the solution claims, independently of who happens to
-///         reference whom.
+///         The subtraction must not collapse to "the closure". A spec routinely references the very code it
+///         governs, so excluding a raw closure would drop the codebase under law and silently report green over
+///         nothing. Declared membership is the only sound discriminator: it says which projects the solution
+///         claims, independently of who happens to reference whom.
 ///     </para>
 ///     <para>
-///         <b>Never fail open into an empty universe.</b> When membership cannot be read — an unreadable or
-///         malformed solution file, a malformed filter, or a format
-///         <see cref="SolutionProjectFileParser.OwnsFormat">the parser does not own</see> — the answer
-///         degrades to <c>{spec project}</c> alone. An unparsed solution reads as zero declared members, so
-///         the alternative would subtract the whole closure. For the same reason a project whose path is
-///         unknown counts as declared: keeping a project in the universe is the safe direction, because
-///         wrongly excluding one shrinks the codebase under law silently.
+///         Never fail open into an empty universe. When membership cannot be read (an unreadable or malformed
+///         solution file, a malformed filter, or a format
+///         <see cref="SolutionProjectFileParser.OwnsFormat">the parser does not own</see>) the answer degrades to
+///         <c>{spec project}</c> alone, because an unparsed solution reads as zero declared members and the
+///         alternative would subtract the whole closure.
 ///     </para>
 ///     <para>
-///         <b>A solution filter reads through to the solution it filters</b>, and against that solution's
-///         <see cref="SolutionMembership.Declared">whole</see> membership rather than the filter's
-///         selection: membership answers "is this project solution material?", which a filter does not
-///         change. Selecting instead would exclude a member a reference dragged in anyway — the silent
-///         shrink this type exists to prevent.
+///         A solution filter reads through to the solution it filters, and against that solution's
+///         <see cref="SolutionMembership.Declared">whole</see> membership rather than the filter's selection:
+///         membership answers "is this project solution material?", which a filter does not change. Selecting
+///         instead would exclude a member a reference dragged in anyway.
 ///     </para>
 /// </remarks>
 internal static class SpecExclusion
@@ -60,9 +52,8 @@ internal static class SpecExclusion
     /// <summary>
     ///     The exclusion set for <paramref name="specProjectName" /> over a loaded
     ///     <paramref name="solution" />, against an already-read <paramref name="declaredMembers" /> set
-    ///     (<see langword="null" /> ⇒ membership unreadable ⇒ the <c>{spec project}</c> fallback). For a
-    ///     caller with no canonical view of the solution's project files; one that has already resolved them
-    ///     — spec resolution does — projects its own tuples and calls the pure core directly.
+    ///     (null when membership is unreadable, which falls back to <c>{spec project}</c>), for a caller with no
+    ///     canonical view of the solution's project files.
     /// </summary>
     internal static IReadOnlyCollection<string> Compute(
         Solution solution, IReadOnlySet<string>? declaredMembers, string specProjectName)
@@ -84,10 +75,8 @@ internal static class SpecExclusion
     }
 
     /// <summary>
-    ///     The pure core, testable over a synthetic project graph: breadth-first from
-    ///     <paramref name="specProjectName" /> across <see cref="SpecExclusionProject.ProjectReferenceNames" />,
-    ///     excluding the spec project plus every project reached that <paramref name="declaredMembers" /> does
-    ///     not declare. Ordinal-sorted so the set serializes to stable bytes in the extraction cache.
+    ///     The pure core, testable over a synthetic project graph. Ordinal-sorted so the set serializes to stable
+    ///     bytes in the extraction cache.
     /// </summary>
     internal static IReadOnlyCollection<string> Compute(
         IReadOnlyList<SpecExclusionProject> projects,
@@ -170,13 +159,11 @@ internal static class SpecExclusion
     ///     rather than have it derived a second time.
     /// </summary>
     /// <remarks>
-    ///     The canonical slot is a caller-honoured guarantee, deliberately not a validated one: nothing can
-    ///     afford to check it, because re-resolving in order to compare would pay exactly the
-    ///     filesystem-probing walk the slot exists to avoid on every warm call. Pass what
-    ///     <see cref="PathCanonicalizer.Resolve" /> would return for the same path, or pass nothing. A
-    ///     spelling the solution file never declared answers "not a member" — the silent-shrink direction
-    ///     this type says it must never be wrong in — which is why only a caller that resolved the path
-    ///     itself fills the slot, and every other caller leaves it null.
+    ///     The canonical slot is a caller-honoured guarantee and is never validated, because re-resolving to
+    ///     compare would pay the filesystem-probing walk the slot exists to avoid on every warm call. Pass what
+    ///     <see cref="PathCanonicalizer.Resolve" /> would return for the same path, or nothing: a spelling the
+    ///     solution file never declared answers "not a member", the silent-shrink direction, so only a caller that
+    ///     resolved the path itself fills the slot.
     /// </remarks>
     internal static bool IsDeclaredMember(
         IReadOnlySet<string>? declaredMembers, string? projectFilePath, string? canonicalProjectFilePath = null)
@@ -187,16 +174,13 @@ internal static class SpecExclusion
     }
 
     /// <summary>
-    ///     The same question asked as a fact to <em>report</em> rather than a set to subtract:
+    ///     The same question asked as a fact to report rather than a set to subtract:
     ///     <see langword="true" /> declared, <see langword="false" /> a passenger, <see langword="null" />
-    ///     when nothing was read — unreadable membership, or a project whose path the load never reported.
+    ///     when nothing was read (unreadable membership, or a project whose path the load never reported).
     /// </summary>
     /// <remarks>
-    ///     Deliberately not <see cref="IsDeclaredMember" /> with its answer widened. That method's
-    ///     <see langword="true" /> for the unread cases is the safe direction for <em>exclusion</em>, where
-    ///     the cost of guessing wrong is a silently shrunken universe; here the cost runs the other way, and
-    ///     an answer of "declared" that no solution file was ever read for would be an asserted fact with
-    ///     nothing behind it. The two callers want opposite fallbacks, so they get two methods.
+    ///     The unread cases answer null, not <see cref="IsDeclaredMember" />'s true: a report of "declared" that no
+    ///     solution file was ever read for would be an asserted fact with nothing behind it.
     /// </remarks>
     internal static bool? SolutionMembershipOf(
         IReadOnlySet<string>? declaredMembers, string? projectFilePath, string? canonicalProjectFilePath = null)

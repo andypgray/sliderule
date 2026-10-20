@@ -4,19 +4,13 @@ using SlideRule.Cli.Pipeline;
 namespace SlideRule.Cli.Verbs;
 
 /// <summary>
-///     The base of every verb that fronts the persisted extraction cache, and everything that follows from
-///     it: the <see cref="IEnvironment" /> seam the cache root is read through, and the observables a test
-///     reads to learn which path a run actually took.
+///     The base of every verb that fronts the persisted extraction cache: the <see cref="IEnvironment" /> seam the
+///     cache root is read through, and the observables a test reads to learn which path a run took.
 /// </summary>
 /// <remarks>
-///     The observables are deliberately kept symmetric across all of them rather than declared only where a
-///     test happens to read them today: they say the same thing about the same seam, and a runner that
-///     reported one but not the others would make "which path did this verb take" a question with several
-///     different answers. They are never printed — stdout and stderr are byte-identical whichever path a
-///     run takes, which is the whole claim the cache has to earn. What the base class does <em>not</em>
-///     decide is the policy: each runner spells its own as the <c>noCache</c> argument it passes
-///     <see cref="CodebaseSource.CreateWithSpecAsync" />, which is why <c>baseline</c> can front the cache
-///     in one mode and refuse to in two.
+///     The observables are never printed: stdout and stderr are byte-identical whichever path a run takes, which is
+///     the whole claim the cache has to earn. The base class does not decide the policy: each runner spells its own
+///     as the <c>noCache</c> argument it passes <see cref="CodebaseSource.CreateWithSpecAsync" />.
 /// </remarks>
 internal abstract class CacheWiredRunner(
     ISolutionSource source,
@@ -24,22 +18,17 @@ internal abstract class CacheWiredRunner(
     IResponseFitter? fitter = null)
     : WorkspaceRunner(source)
 {
-    /// <summary>The environment seam the cache root is resolved through.</summary>
     protected IEnvironment Environment { get; } = environment;
 
-    /// <summary>The fitter deciding which rung of a verb's grain ladder this run's caller actually gets.</summary>
     protected IResponseFitter Fitter { get; } = fitter ?? ResponseFitter.FirstRung;
 
-    /// <summary>The cache path the last run took. Internal test observable; never printed.</summary>
+    /// <summary>The last run's <see cref="CodebaseSource.Outcome" />.</summary>
     internal CodebaseSourceOutcome? LastOutcome { get; private set; }
 
-    /// <summary>The projects the last run re-extracted from a workspace. Internal test observable; never printed.</summary>
+    /// <summary>The last run's <see cref="CodebaseSource.ReExtractedProjects" />.</summary>
     internal IReadOnlySet<string> LastReExtractedProjects { get; private set; } = new HashSet<string>();
 
-    /// <summary>
-    ///     How many times the last run walked the workspace for fragments — at most one, however many models
-    ///     the verb asked its source for. Internal test observable; never printed.
-    /// </summary>
+    /// <summary>The last run's <see cref="CodebaseSource.ExtractionCount" />.</summary>
     internal int LastExtractionCount { get; private set; }
 
     /// <summary>
@@ -47,7 +36,6 @@ internal abstract class CacheWiredRunner(
     ///     the re-extraction set and the walk count are only final once every
     ///     <see cref="CodebaseSource.ExtractAsync" /> the run makes has run.
     /// </summary>
-    /// <param name="source">The source the run acquired its codebase through.</param>
     protected void RecordCacheOutcome(CodebaseSource source)
     {
         LastOutcome = source.Outcome;

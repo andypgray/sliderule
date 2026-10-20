@@ -22,9 +22,8 @@ internal static class SolutionExtensions
     ///     <para>
     ///         Each project's surviving references are set in one call rather than removed one at a time,
     ///         because every removal forks the whole <see cref="Solution" /> and the case this transform
-    ///         exists for is the unrestored solution, where <em>every</em> reference is unresolved: one fork
-    ///         per project instead of one per reference. A project with nothing unresolved is not forked at
-    ///         all.
+    ///         exists for is the unrestored solution, where every reference is unresolved. A project with
+    ///         nothing unresolved is not forked at all.
     ///     </para>
     /// </remarks>
     public static (Solution Solution, int AnalyzerCount, int MetadataCount) StripUnresolvedReferences(this Solution solution)
@@ -64,33 +63,25 @@ internal static class SolutionExtensions
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         <b>Why one spelling.</b> Roslyn's <c>MSBuildProjectLoader</c> appends a <c>(tfm)</c>
-    ///         discriminator whenever one project file yields more than one <see cref="Project" />, and
-    ///         everything downstream keys on the undecorated csproj name. Normalizing here — at the load
-    ///         boundary, where all three producers of a <see cref="Solution" /> meet — makes
-    ///         <see cref="Project.Name" /> <em>be</em> the right string, so no reader can get it
-    ///         wrong.
+    ///         Roslyn's <c>MSBuildProjectLoader</c> appends a <c>(tfm)</c> discriminator whenever one project file
+    ///         yields more than one <see cref="Project" />, and everything downstream keys on the undecorated csproj
+    ///         name. Normalizing at the load boundary makes <see cref="Project.Name" /> the right string, so no
+    ///         reader can get it wrong. The clean name is read from the project file rather than parsed out of the
+    ///         decorated one: a csproj named <c>Foo(x).csproj</c> would be mangled by stripping a trailing
+    ///         <c>(...)</c>, while the file path is exact.
     ///     </para>
     ///     <para>
-    ///         The clean name is read from the project file rather than parsed out of the decorated one: a
-    ///         csproj genuinely named <c>Foo(x).csproj</c> would be mangled by stripping a trailing
-    ///         <c>(...)</c>, while the file path is exact. The grouping is the precise inverse of Roslyn's
-    ///         own guard — a group of one is left untouched, discriminator or not.
-    ///     </para>
-    ///     <para>
-    ///         Two <em>different</em> csprojs that share a file name still collapse to one
-    ///         <see cref="Project.Name" />, because Roslyn only disambiguates within one project file, and
-    ///         nothing downstream discloses it: the merge unions the two into one
-    ///         project and writes no note naming two project files. A type both declare keeps the first
-    ///         one's facts. Where the two compilations carry different frameworks, the multi-targeting
-    ///         note reads them as one project's frameworks; otherwise no note fires at all.
+    ///         Two different csprojs that share a file name still collapse to one <see cref="Project.Name" />,
+    ///         because Roslyn only disambiguates within one project file, and nothing downstream discloses it: the
+    ///         merge unions the two into one project and writes no note naming two project files. A type both
+    ///         declare keeps the first one's facts. Where the two compilations carry different frameworks, the
+    ///         multi-targeting note reads them as one project's frameworks; otherwise no note fires at all.
     ///     </para>
     ///     <para>
     ///         The returned map is keyed by <see cref="ProjectId" />, which survives every later
-    ///         <see cref="Solution.WithDocumentText(DocumentId,Microsoft.CodeAnalysis.Text.SourceText,PreservationMode)" />,
-    ///         so a caller may carry it alongside an edited snapshot for the whole load generation. A
-    ///         single-framework solution pays nothing: no name differs, so no fork is taken and the map is
-    ///         empty.
+    ///         <c>Solution.WithDocumentText</c>, so a caller may carry it alongside an edited snapshot for the whole
+    ///         load generation. A single-framework solution pays nothing: no name differs, so no fork is taken and
+    ///         the map is empty.
     ///     </para>
     /// </remarks>
     public static (Solution Solution, IReadOnlyDictionary<ProjectId, string> TargetFrameworks)
@@ -101,7 +92,7 @@ internal static class SolutionExtensions
         foreach (Project project in solution.Projects)
         {
             // A project with no file path cannot be grouped with anything: folding the unknown-path projects
-            // together would decorate genuinely unrelated projects, and '\0' cannot occur in a path so the
+            // together would decorate unrelated projects, and '\0' cannot occur in a path so the
             // per-project sentinel cannot collide with a real key.
             string key = canonicalProjectFiles.Resolve(project.FilePath) is { } canonicalFile
                 ? PathComparison.Fold(canonicalFile)
@@ -159,10 +150,9 @@ internal static class SolutionExtensions
     }
 
     // The replay arm. Basic.CompilerLog.Util's SolutionReader applies no discriminator at all, so the name
-    // carries nothing — but the build recorded an output path of the form <obj>/Debug/net10.0/Foo.dll, whose
-    // leaf directory is the framework. The same read SpecResolver's sibling-configuration probe performs.
-    // A project that suppresses AppendTargetFrameworkToOutputPath yields the configuration directory here,
-    // one name for all its frameworks; the caller drops a group whose names repeat, so it reports none.
+    // carries nothing, but the build recorded an output path of the form <obj>/Debug/net10.0/Foo.dll, whose
+    // leaf directory is the framework, or the configuration directory for a project that suppresses
+    // AppendTargetFrameworkToOutputPath.
     private static string? OutputDirectoryLeaf(string? outputFilePath)
     {
         if (string.IsNullOrEmpty(outputFilePath)) return null;

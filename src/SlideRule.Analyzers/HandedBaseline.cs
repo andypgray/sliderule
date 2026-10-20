@@ -16,9 +16,7 @@ namespace SlideRule.Analyzers;
 ///     </para>
 ///     <para>
 ///         What the baseline read keeps per path, so it is immutable and built by <see cref="Load" /> alone,
-///         under the contract <see cref="LoadedModel" /> records: Load is the read's function and throws
-///         nothing but a cancellation, the read is the boundary <c>From</c> inside its guard, and
-///         <see cref="Result" /> is a boundary read only by another boundary and never on a faulted read.
+///         under the contract <see cref="LoadedModel" /> records for the model read.
 ///     </para>
 /// </remarks>
 internal sealed class HandedBaseline : IReadHandle
@@ -48,10 +46,9 @@ internal sealed class HandedBaseline : IReadHandle
 
     /// <summary>
     ///     Reads <paramref name="text" /> as a baseline file, holding any fault but a cancellation as the
-    ///     read's own.
+    ///     read's own; <paramref name="beforeRead" /> is a test seam run first inside the guard, null in
+    ///     production.
     /// </summary>
-    /// <param name="text">The baseline file's text.</param>
-    /// <param name="beforeRead">A test seam run first inside the guard; null in production.</param>
     internal static HandedBaseline Load(SourceText text, Action? beforeRead)
     {
         try

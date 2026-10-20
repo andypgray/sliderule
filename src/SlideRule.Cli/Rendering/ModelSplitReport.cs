@@ -11,16 +11,8 @@ namespace SlideRule.Cli.Rendering;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         Printed under the file's own <c>wrote</c> line and indented beneath it, because it is a fact
-///         about that write rather than a second target. An unchanged file prints nothing: the split did
-///         not change either, and a report that repeated itself on every run would train its reader to skip
-///         the line that matters.
-///     </para>
-///     <para>
 ///         The two headers appear only over a group that has rows. A colon promises a block, so a header
-///         over nothing reads as truncated output — the rule <c>EvidenceBlock</c> holds its callers to, kept
-///         here by the same guard rather than by a shared helper, because these rows are indented lines of a
-///         report and not a refusal's evidence.
+///         over nothing reads as truncated output.
 ///     </para>
 ///     <para>
 ///         Both reasons are quoted, never composed: the whole-solution one from the classifier and the
@@ -31,7 +23,6 @@ namespace SlideRule.Cli.Rendering;
 internal static class ModelSplitReport
 {
     /// <summary>The report's lines, already indented, in the order they are printed.</summary>
-    /// <param name="document">The document that was just written.</param>
     internal static IReadOnlyList<string> Lines(ModelDocument document)
     {
         List<(string Id, string Reason)> wholeSolution = document.Rules

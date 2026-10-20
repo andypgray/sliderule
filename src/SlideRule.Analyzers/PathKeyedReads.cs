@@ -32,7 +32,6 @@ internal interface IReadHandle
 ///         of this type binds neither when the analyzer loads.
 ///     </para>
 /// </remarks>
-/// <typeparam name="T">The read's result.</typeparam>
 internal sealed class PathKeyedReads<T>
     where T : class, IReadHandle
 {

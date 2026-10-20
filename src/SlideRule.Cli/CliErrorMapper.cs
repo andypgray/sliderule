@@ -6,25 +6,19 @@ using SlideRule.Validation;
 namespace SlideRule.Cli;
 
 /// <summary>
-///     Maps a pipeline exception to stderr text and an exit code — always <see cref="ExitCodes.Error" />, the
-///     "everything else" code.
-///     An expected error renders message-only; anything else is a bug and gets a full stack trace. Pure and
-///     Roslyn-free, so it unit-tests without a workspace.
+///     Maps a pipeline exception to stderr text and <see cref="ExitCodes.Error" />: an expected error renders
+///     message-only; anything else is a bug and gets a full stack trace.
 /// </summary>
-/// <remarks>
-///     The user-facing text is factored into <see cref="UserFacingMessage" /> so the MCP
-///     <c>GlobalCallToolFilter</c> renders the identical multi-line body on its surface.
-/// </remarks>
 internal static class CliErrorMapper
 {
     /// <summary>
-    ///     The multi-line user-facing message for an expected error: the identical text both surfaces render.
+    ///     The multi-line user-facing message for an expected error: the identical text the CLI and the MCP
+    ///     <c>GlobalCallToolFilter</c> render. Null for an unexpected bug.
     /// </summary>
     /// <remarks>
     ///     A <see cref="UserErrorException" />'s message verbatim, or a <see cref="SpecValidationException" />'s
     ///     "Spec validation failed:" header followed by one indented line per error, so every validation error is
-    ///     fixable in one pass. Null when the exception is an unexpected bug, which the CLI dumps as a stack trace
-    ///     and the MCP filter logs as a warning.
+    ///     fixable in one pass.
     /// </remarks>
     public static string? UserFacingMessage(Exception exception)
     {

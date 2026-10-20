@@ -3,10 +3,9 @@ using SlideRule.Codebase;
 namespace SlideRule.Extraction.Fragments;
 
 /// <summary>
-///     The operations both ends of the extraction pipeline run over site collections —
-///     <see cref="FragmentExtractor" />'s per-compilation accumulator tables and
-///     <see cref="FragmentMerger" />'s cross-fragment ones: get the set an axis unions into, materialize a
-///     whole table in canonical order, and project a materialized site list the two ways the model reads it.
+///     The operations both ends of the extraction pipeline, <see cref="FragmentExtractor" /> and
+///     <see cref="FragmentMerger" />, run over site collections, so the two order, materialize and project
+///     sites by one rule.
 /// </summary>
 /// <remarks>
 ///     The edge and registration tables of both ends are materialized through the sorts here, each end naming
@@ -17,8 +16,9 @@ namespace SlideRule.Extraction.Fragments;
 internal static class FragmentSiteSets
 {
     /// <summary>
-    ///     The site set <paramref name="key" /> unions into, adding an empty one on first mention. One hash
-    ///     lookup where the key is already there, a second only where it is new.
+    ///     The site set <paramref name="key" /> unions into, adding an empty one on first mention. The set takes
+    ///     the default comparer, the pinned (file, line) order of <see cref="FragmentSite.CompareTo" />, so a
+    ///     keyed table that makes its sets here cannot spell another.
     /// </summary>
     internal static SortedSet<FragmentSite> SitesFor<TKey>(this Dictionary<TKey, SortedSet<FragmentSite>> map, TKey key)
         where TKey : notnull
@@ -47,10 +47,7 @@ internal static class FragmentSiteSets
     /// <summary>
     ///     Materializes a table keyed by an endpoint pair as a list ordered by the key's first element then its
     ///     second, each through the comparer its element type is ordered by, projecting each entry through
-    ///     <paramref name="make" />. The key's tuple element names are erased at runtime, so every axis —
-    ///     <c>(src, target)</c>, <c>(src, caught)</c>, <c>(src, member SymbolId)</c> — is the one shape here,
-    ///     whether an endpoint is a name (extraction, one compilation's view) or a node key (the merge, where
-    ///     one name can denote two).
+    ///     <paramref name="make" />.
     /// </summary>
     internal static List<TOut> OrderedPairs<TFirst, TSecond, TValue, TOut>(
         this Dictionary<(TFirst, TSecond), TValue> map,
@@ -65,10 +62,6 @@ internal static class FragmentSiteSets
             .ToList();
     }
 
-    /// <summary>
-    ///     The same over a name-keyed pair, the shape extraction's own tables take — ordinal on both elements,
-    ///     so an axis there names no comparer and the sort is still spelled exactly once.
-    /// </summary>
     internal static List<TOut> OrderedPairs<TValue, TOut>(
         this Dictionary<(string, string), TValue> map, Func<string, string, TValue, TOut> make)
     {
@@ -76,15 +69,9 @@ internal static class FragmentSiteSets
     }
 
     /// <summary>
-    ///     The registration axis's own ordering, for the one table whose key is a triple rather than an
-    ///     endpoint pair: lifetime first, then ordinal by service, then ordinal by implementation with the
-    ///     no-implementation form sorting as the empty string.
+    ///     The registration table, keyed by a triple rather than an endpoint pair: lifetime first, then ordinal
+    ///     by service, then ordinal by implementation with the no-implementation form sorting as the empty string.
     /// </summary>
-    /// <remarks>
-    ///     It sits beside <see cref="OrderedPairs{TFirst,TSecond,TValue,TOut}" /> for the same reason that one
-    ///     exists: both ends of the pipeline materialize this table, and a rule spelled twice is a rule that can
-    ///     come to be spelled two ways.
-    /// </remarks>
     internal static List<TOut> OrderedRegistrations<TOut>(
         this Dictionary<(Lifetime, string, string?), SortedSet<FragmentSite>> map,
         Func<Lifetime, string, string?, SortedSet<FragmentSite>, TOut> make)
@@ -106,11 +93,9 @@ internal static class FragmentSiteSets
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         It sits here for the same reason <see cref="OrderedRegistrations{TOut}" /> does, and folds rather
-    ///         than merely sorts because both ends of the pipeline meet the duplicates too: the evaluation reads
-    ///         one project's declarations, the merge reads one project's fragments back together, and a package
-    ///         declared once per framework is declared once. The declarations themselves come back, so the end
-    ///         that carries them into the model projects the survivors itself.
+    ///         It folds rather than sorts because both ends of the pipeline meet duplicates: the evaluation
+    ///         reads one project's declarations, and the merge reads one project's fragments back together, where
+    ///         a package declared once arrives once per framework.
     ///     </para>
     ///     <para>
     ///         Deliberately stricter than restore, which keeps the first of two duplicate declarations and
@@ -132,7 +117,6 @@ internal static class FragmentSiteSets
             .ToList();
     }
 
-    // A declaration that is not private outranks one that is; between two alike, the ordinally-first site does.
     private static bool Outranks(FragmentPackageReference declaration, FragmentPackageReference held)
     {
         if (declaration.IsPrivate != held.IsPrivate) return !declaration.IsPrivate;
@@ -140,10 +124,7 @@ internal static class FragmentSiteSets
         return declaration.Site.CompareTo(held.Site) < 0;
     }
 
-    /// <summary>
-    ///     A site collection as the model's <see cref="SourceLocation" /> list — the projection every axis
-    ///     applies on the way out of extraction, order preserved exactly as the collection holds it.
-    /// </summary>
+    /// <summary>A site collection as the model's <see cref="SourceLocation" /> list, in its own order.</summary>
     internal static IReadOnlyList<SourceLocation> ToLocations(this IReadOnlyCollection<FragmentSite> sites)
     {
         if (sites.Count == 0) return [];
@@ -185,9 +166,8 @@ internal static class FragmentSiteSets
     }
 
     /// <summary>
-    ///     One site as the model's <see cref="SourceLocation" /> — the single crossing between the two
-    ///     shapes, which every projection here goes through. A site that carries a span hands it over; one
-    ///     that carries none gives a location that is a line and nothing more.
+    ///     One site as the model's <see cref="SourceLocation" />, the single crossing between the two shapes; the
+    ///     span crosses only where the site carries one.
     /// </summary>
     internal static SourceLocation ToLocation(this FragmentSite site)
     {
@@ -206,10 +186,8 @@ internal static class FragmentSiteSets
     ///     <c>FilePaths</c> contract).
     /// </summary>
     /// <remarks>
-    ///     Every collection reaching here is already (file, line) ordinal-ordered — it came out of a
-    ///     <see cref="SortedSet{T}" />, or out of a fragment that built one — so first-occurrence order
-    ///     <em>is</em> ordinal file order, and <c>Distinct</c> is what preserves it. The one-site case is the
-    ///     overwhelming majority (a type or member declared in a single file) and skips the set entirely.
+    ///     Every collection reaching here is already in (file, line) order, so first-occurrence order is ordinal
+    ///     file order and <c>Distinct</c> keeps it. The one-site case, nearly every type and member, skips the set.
     /// </remarks>
     internal static IReadOnlyList<string> FilePaths(this IReadOnlyCollection<FragmentSite> sites)
     {

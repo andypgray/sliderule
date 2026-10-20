@@ -6,11 +6,9 @@ namespace SlideRule.Validation;
 ///     What a spec's declared layer names decide between them (GRAMMAR §8 item 10): a name declared twice.
 /// </summary>
 /// <remarks>
-///     One verdict per repeat, reported at the repeat, which is the opposite shape to
-///     <see cref="SpecIdCollisions" />'s one-per-key-at-the-first-occurrence. Three layers named alike are
-///     two verdicts here and would be one there. The shapes are deliberately unalike: a rule ID names a
-///     thing the model has to be able to find, so the first claim on it wins and the collision is one
-///     fact; a layer name is a label, so each re-use of one is its own slip to fix.
+///     One verdict per repeat, reported at the repeat, unlike <see cref="SpecIdCollisions" />'s one per key at
+///     the first occurrence: a rule ID names a thing the model must find, so the first claim on it wins, while a
+///     layer name is a label, so each re-use is its own slip to fix.
 ///     <para>
 ///         A blank name is held out of the set. Two unnamed layers are two instances of one mistake, which
 ///         <see cref="SpecSlot.LayerName" /> reports under its own code, and "Duplicate layer name ''."

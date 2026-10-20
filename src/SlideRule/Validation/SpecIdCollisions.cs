@@ -16,15 +16,16 @@ internal static class SpecIdCollisions
     /// <summary>
     ///     The collisions a set of declarations carries, or an empty list when the IDs are all distinct.
     /// </summary>
-    /// <param name="declarations">Every rule and scope ID a spec declared, in authoring order.</param>
+    /// <param name="declarations">
+    ///     Every rule and scope ID a spec declared, in authoring order: a collision is reported at the first
+    ///     occurrence of the ID.
+    /// </param>
     internal static IReadOnlyList<CollisionVerdict> Decide(IReadOnlyList<IdDeclaration> declarations)
     {
         List<IdDeclaration> rules = declarations.Where(declaration => declaration.Role == IdRole.Rule).ToList();
         List<IdDeclaration> scopes = declarations.Where(declaration => declaration.Role == IdRole.Scope).ToList();
         var verdicts = new List<CollisionVerdict>();
 
-        // The full cross product: a rule ID may equal a scope ID or fall beneath its reserved prefix, and
-        // either way the generated children have nowhere to live.
         var extendsScope = new HashSet<string>(StringComparer.Ordinal);
         foreach (IdDeclaration rule in rules)
         foreach (IdDeclaration scope in scopes)
@@ -36,17 +37,15 @@ internal static class SpecIdCollisions
                 extendsScope.Add(rule.Id);
             }
 
-        // Duplicate detection over the post-desugar ID set. IDs already flagged as extends-scope are
-        // excluded so they are reported once, by the more specific code.
+        // IDs already flagged as extends-scope are left out so they are reported once, by the more specific code.
         var postDesugar = new List<(string Id, int Tag)>();
         foreach (IdDeclaration rule in rules)
             if (!extendsScope.Contains(rule.Id))
                 postDesugar.Add((rule.Id, rule.Tag));
 
-        // Both children are reserved for every scope, whatever its posture — a caution mints only the
-        // tripwire, but reserving the containment ID too is what lets a caution be promoted to a quarantine
-        // later without the ID it grows into having been taken meanwhile. So two scopes declared with one
-        // ID collide twice, on two IDs that appear nowhere in the source.
+        // Both children are reserved for every scope, a caution included, so it can be promoted to a quarantine
+        // without its containment ID having been taken meanwhile. Two scopes declared with one ID therefore
+        // collide twice, on two IDs that appear nowhere in the source.
         foreach (IdDeclaration scope in scopes)
         {
             postDesugar.Add((scope.Id + "/containment", scope.Tag));

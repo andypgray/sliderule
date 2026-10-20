@@ -13,10 +13,10 @@ namespace SlideRule.Baselines;
 ///         A baseline file is line-oriented JSON — UTF-8 with no byte-order mark, LF line endings, a
 ///         trailing newline, a two-space indent, one entry object per line — so paying off one
 ///         grandfathered violation removes exactly one line in a diff. Rules sort by ID and entries by
-///         source or subject then target, both ordinal, so the same entries always compose to the same
-///         bytes. One file holds a section per rule ID, and an entry object carries <c>source</c> and
-///         <c>target</c>, or <c>subject</c>, then an optional <c>siteCount</c>, an optional
-///         <c>because</c>, and a <c>seal</c> last.
+///         source or subject then target, both ordinal, so the same entries compose to the same bytes in any
+///         input order, except that entries sharing an identity keep the order they came in. One file holds a
+///         section per rule ID, and an entry object carries <c>source</c> and <c>target</c>, or
+///         <c>subject</c>, then an optional <c>siteCount</c>, an optional <c>because</c>, and a <c>seal</c> last.
 ///     </para>
 ///     <para>
 ///         The <c>seal</c> is computed over the rule ID and a rendering of the entry's own fields rather
@@ -30,23 +30,14 @@ namespace SlideRule.Baselines;
 ///         the human gate.
 ///     </para>
 ///     <para>
-///         Sealing each entry rather than the whole file is also what lets two branches burn the same
-///         baseline down at once. Reductions of different rules have nothing in common to conflict on.
-///         Reductions of one rule can still collide on adjacent lines, a diff being line-based — but
-///         every line that survives such a merge is a complete, self-sealed entry, so resolving it by
-///         keeping whole lines from either side yields a file the tool accepts with nothing to re-run.
+///         Every entry line seals itself, so a merge conflict between two branches burning the same baseline
+///         down resolves by keeping whole lines from either side, into a file the tool accepts with nothing
+///         to re-run.
 ///     </para>
 /// </remarks>
-// The whole-file digest is a v1-only concern, which is what LegacyDigest's name says: that grammar is
-// frozen verbatim (its own preamble, and no siteCount line) so a file written before either measure
-// existed still verifies against the digest it stored. Composing always writes SchemaVersion, so any
-// write is also the upgrade.
 internal static class BaselineFormat
 {
-    /// <summary>
-    ///     The <c>schemaVersion</c> value <see cref="ComposeFile" /> writes, so composing a file is also
-    ///     the upgrade path off <see cref="LegacySchemaVersion" />.
-    /// </summary>
+    /// <summary>The <c>schemaVersion</c> value <see cref="ComposeFile" /> writes.</summary>
     public const int SchemaVersion = 2;
 
     /// <summary>
@@ -57,10 +48,8 @@ internal static class BaselineFormat
     /// </summary>
     public const int LegacySchemaVersion = 1;
 
-    // Sixteen hex characters — 64 bits of the hash — rather than all sixty-four: a seal rides on every
-    // entry line, and the line has to stay readable by whoever resolves a merge conflict over it. Neither
-    // length hides anything, since a seal is recomputable from the entry beside it; the bar this clears is
-    // the accident and the hand edit, and 64 bits clears it by a wide margin.
+    // A truncation of the hash so that an entry line stays readable to whoever resolves a merge conflict over
+    // it. Every stored seal has this length, so changing it refuses every sealed baseline file written before.
     internal const int SealLength = 16;
     internal const int SealBytes = SealLength / 2;
 
@@ -70,11 +59,6 @@ internal static class BaselineFormat
     private const string LegacyDigestPreamble = "sliderule-baseline-digest-v1";
     private const string HexDigits = "0123456789abcdef";
 
-    /// <summary>
-    ///     Whether a baseline file declaring <paramref name="schemaVersion" /> can be read: true for
-    ///     <see cref="SchemaVersion" /> and for <see cref="LegacySchemaVersion" />, false for anything
-    ///     else, which a reader should refuse rather than guess at.
-    /// </summary>
     public static bool IsSupported(int schemaVersion)
     {
         return schemaVersion == SchemaVersion || schemaVersion == LegacySchemaVersion;
@@ -85,8 +69,6 @@ internal static class BaselineFormat
     ///     <c>siteCount</c>: true for every accepted version but <see cref="LegacySchemaVersion" />, whose
     ///     entries predate the count.
     /// </summary>
-    // The one answer both the frozen legacy digest grammar and a reader's property walk take, so the two
-    // cannot disagree about which keys a version admits.
     public static bool CarriesSiteCount(int schemaVersion)
     {
         return schemaVersion != LegacySchemaVersion;
@@ -98,20 +80,17 @@ internal static class BaselineFormat
     ///     entries are covered by one whole-file <c>digest</c> instead. Where it is carried it is
     ///     required — an entry without one is malformed, not unsealed.
     /// </summary>
-    // Same one-owner reason as CarriesSiteCount: the composer and a reader's property walk take this
-    // answer rather than each deciding for itself.
     public static bool CarriesSeal(int schemaVersion)
     {
         return schemaVersion != LegacySchemaVersion;
     }
 
     /// <summary>
-    ///     Composes the whole text of a baseline file holding the given entries, keyed by rule ID: sorts
-    ///     the rules and their entries into the file's canonical order, computes a fresh <c>seal</c> for
-    ///     each entry, and returns the file, newline-terminated and ready to write as UTF-8 with no
-    ///     byte-order mark. The order of the input and any duplicate entries in it make no difference to
-    ///     the result. The file is always <see cref="SchemaVersion" />, so writing one read at
-    ///     <see cref="LegacySchemaVersion" /> upgrades it.
+    ///     Composes the whole text of a baseline file holding the given entries, keyed by rule ID, in the
+    ///     file's canonical order with a fresh <c>seal</c> on each entry. The order of the input decides only
+    ///     the order among entries that share an identity, each of which composes to a line of its own. The
+    ///     file is always <see cref="SchemaVersion" />, so writing one read at <see cref="LegacySchemaVersion" />
+    ///     upgrades it.
     /// </summary>
     public static string ComposeFile(IReadOnlyDictionary<string, IReadOnlyList<BaselineEntry>> rules)
     {
@@ -203,9 +182,7 @@ internal static class BaselineFormat
     ///     The whole-file <c>digest</c> a <see cref="LegacySchemaVersion" /> baseline carries: the SHA-256
     ///     of the UTF-8 bytes of <see cref="LegacyDigestInput" />, in lowercase hex. This is what to
     ///     recompute when verifying a stored file that declares that version; a result differing from the
-    ///     file's own <c>digest</c> field means the file was edited by hand. A file
-    ///     <see cref="ComposeFile" /> writes carries no whole-file digest — each of its entries carries
-    ///     its own <see cref="ComputeSeal" /> instead.
+    ///     file's own <c>digest</c> field means the file was edited by hand.
     /// </summary>
     public static string LegacyDigest(IReadOnlyDictionary<string, IReadOnlyList<BaselineEntry>> rules)
     {

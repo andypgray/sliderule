@@ -20,20 +20,16 @@ internal interface IResponseFitter
     /// <summary>
     ///     Returns the document to write, given the rungs in coarsening order (finest first).
     /// </summary>
-    /// <param name="ladder">
-    ///     The composed documents, coarsest last and lazily produced — enumerate no further than needed.
-    /// </param>
     string Fit(IEnumerable<string> ladder);
 }
 
 /// <summary>
 ///     The CLI's fitter: take the grain the caller asked for and never degrade. A terminal has no response
-///     budget, so the first rung is the answer — and being a fitter rather than a null branch is what keeps
-///     one code path through every runner's render.
+///     budget, so the first rung is the answer.
 /// </summary>
 internal sealed class ResponseFitter : IResponseFitter
 {
-    /// <summary>The shared instance — it holds no state, and the default every runner falls back to.</summary>
+    /// <summary>The shared instance; it holds no state.</summary>
     public static readonly IResponseFitter FirstRung = new ResponseFitter();
 
     private ResponseFitter()

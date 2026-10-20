@@ -4,23 +4,16 @@ namespace SlideRule.Prose;
 
 /// <summary>
 ///     Assembles the deterministic law sentence from a <see cref="Constraint" /> (GRAMMAR §6). The
-///     nouns and adjectives own their local fragments; this orchestrates the cross-node concerns:
-///     the collective-vs-types voice switch, sentence-final canonicalization of <c>Except</c>/
-///     <c>Where</c> with <c>Except</c> last, closing the <c>Except</c> parenthetical with a comma at
-///     whatever junction follows it, colliding-simple-name qualification in target lists (the shared
-///     <see cref="ProseFormat.ResolvePathDisplays" /> primitive), and capitalization.
+///     nouns and adjectives own their local fragments; this orchestrates the concerns that cross nodes.
 /// </summary>
 internal static class SentenceRenderer
 {
     /// <summary>The full law sentence: <c>{Subject} {verb phrase}.</c></summary>
     internal static string Sentence(Constraint constraint)
     {
-        // One arm per subject stratum (GRAMMAR §4.6, §4.10, §6): a member constraint speaks over its member
-        // subject ("Methods of types in `MyApp.Web.*` …"), a project constraint over its project subject
-        // ("Packable projects …"), and every other constraint over its type subject. This dispatch is also
-        // what makes the bare Subject read below safe — it is null exactly for the project arm above it.
-        // The phrase and its openness come out of the same arm, so the two cannot disagree about which
-        // stratum was read.
+        // One arm per subject stratum (GRAMMAR §4.6, §4.10, §6). Subject is null exactly for the project arm,
+        // which is what makes the bare read in the last arm safe. The phrase and its openness come out of the
+        // same arm, so the two cannot disagree about which stratum was read.
         (string subject, bool endsOpen) = constraint switch
         {
             MemberConstraint member => (MemberSubject(member.MemberSubject), EndsOpen(member.MemberSubject)),
@@ -32,31 +25,22 @@ internal static class SentenceRenderer
         return subject + (endsOpen ? ", " : " ") + constraint.VerbPhrase + ".";
     }
 
-    /// <summary>The capitalized subject phrase for a selection (GRAMMAR §6).</summary>
     internal static string Subject(Selection selection)
     {
         return ProseFormat.Capitalize(Phrase(selection));
     }
 
-    /// <summary>The capitalized member-subject phrase for a member selection (GRAMMAR §4.6, §6).</summary>
     internal static string MemberSubject(MemberSelection selection)
     {
         return ProseFormat.Capitalize(MemberPhrase(selection));
     }
 
-    /// <summary>
-    ///     How a member selection reads in reference position (GRAMMAR §6): its subject phrase, uncapitalized,
-    ///     as a message quotes it or an <c>Except</c> payload renders it.
-    /// </summary>
     internal static string ReferenceProse(this MemberSelection selection)
     {
         return MemberPhrase(selection);
     }
 
-    /// <summary>
-    ///     A member <c>Except</c>'s payload list (GRAMMAR §6): each payload in reference position, or-joined with
-    ///     no Oxford comma, the final joiner closing a penultimate payload that ended open.
-    /// </summary>
+    /// <summary>A member <c>Except</c>'s payload list (GRAMMAR §6).</summary>
     internal static string ReferenceListProse(this IReadOnlyList<MemberSelection> selections)
     {
         List<string> parts = selections.Select(ReferenceProse).ToList();
@@ -64,21 +48,16 @@ internal static class SentenceRenderer
         return ProseFormat.JoinReferences(parts, closesBeforeOr);
     }
 
-    /// <summary>The capitalized project-subject phrase for a project selection (GRAMMAR §4.10, §6).</summary>
     internal static string ProjectSubject(ProjectSelection selection)
     {
         return ProseFormat.Capitalize(ProjectPhrase(selection));
     }
 
     /// <summary>
-    ///     How a project selection reads in reference position (GRAMMAR §4.10, §6) — the same phrase,
-    ///     uncapitalized, which is what an <c>Except</c> payload renders as inside a sentence.
+    ///     Subject and reference position differ by capitalization alone (GRAMMAR §4.10, §6): a project
+    ///     selection has one head and no noun that reads differently as a reference, so there is no bare-noun
+    ///     special case as on the type side.
     /// </summary>
-    /// <remarks>
-    ///     There is no bare-noun special case here as there is on the type side: a project selection has one
-    ///     head and no noun that reads differently as a reference, so subject and reference position differ
-    ///     by capitalization alone.
-    /// </remarks>
     internal static string ReferenceProse(this ProjectSelection selection)
     {
         return ProjectPhrase(selection);
@@ -91,8 +70,7 @@ internal static class SentenceRenderer
     /// </summary>
     /// <remarks>
     ///     <see cref="Phrase(Selection,string,IReadOnlyList{string})" /> decides the voice by this test, and the
-    ///     family-voice readers below ask it too, so none of them can disagree. Each of these subjects is one
-    ///     thing — one layer, one family read as a whole, one type — so its reflexive is the singular "itself".
+    ///     family-voice readers below ask it too, so none of them can disagree.
     /// </remarks>
     private static bool ReadsAsItsNoun(Selection selection)
     {
@@ -101,10 +79,9 @@ internal static class SentenceRenderer
     }
 
     /// <summary>
-    ///     The singular cell word — "layer" or "project" — a family subject speaking in the <em>types</em>
-    ///     voice names its cells by, and null for every other subject: a plain selection, which has no
-    ///     cells, or a family in the collective voice, which reads as one noun phrase and names no cell
-    ///     (GRAMMAR §5.3, §6).
+    ///     The cell word ("layer" or "project") a family subject in the types voice names its cells by; null
+    ///     for a plain selection, which has no cells, and for a family in the collective voice, which reads as
+    ///     one noun phrase and names none (GRAMMAR §5.3, §6).
     /// </summary>
     private static string? FamilyCellWord(Selection selection)
     {
@@ -114,15 +91,14 @@ internal static class SentenceRenderer
     }
 
     /// <summary>
-    ///     How a subject names itself as a reference target — the "self" the two leaf verbs allow (GRAMMAR
-    ///     §5.3): "their own layer" or "their own project" for a family in the types voice, "themselves" for
-    ///     any other subject in the types voice, and "itself" where the subject reads as its own noun: one
-    ///     layer, one family read as a whole, or one type named bare.
+    ///     How a subject names itself as a reference target, the self a leaf verb allows (GRAMMAR §5.3).
     /// </summary>
     /// <remarks>
     ///     The reflexive agrees in number with the head the sentence was assembled under (§6): a plain
     ///     types-voice subject is the plural "types", so a singular "itself" would misagree with it, and a
     ///     family in that voice names the cell instead, because its self is the cell rather than the family.
+    ///     A subject that reads as its own noun is one thing (one layer, one family read as a whole, one type),
+    ///     so its reflexive is the singular "itself".
     /// </remarks>
     internal static string SelfReference(Selection selection)
     {
@@ -132,10 +108,8 @@ internal static class SentenceRenderer
     }
 
     /// <summary>
-    ///     How a subject names its <em>other</em> cells — the far end the two family verbs forbid (GRAMMAR
-    ///     §5.3): "the other layers" or "the other projects" for a family in the types voice, and "the
-    ///     others" for a bare family or any subject with no cells to name. The twin of
-    ///     <see cref="SelfReference" />, and the same voice agreement.
+    ///     How a subject names its other cells, the far end a family verb forbids (GRAMMAR §5.3), in the voice
+    ///     agreement <see cref="SelfReference" /> follows.
     /// </summary>
     internal static string OtherCells(Selection selection)
     {
@@ -147,17 +121,10 @@ internal static class SentenceRenderer
     {
         if (selection is UnionSelection union) return UnionReference(union);
 
-        // A bare noun (no adjectives) uses its own reference fragment: "the Web layer",
-        // "types in `MyApp.*`", "`SqlConnection`". A refined selection falls back to the
-        // uncapitalized types-voice phrase.
         return selection.Adjectives.Count == 0 ? selection.Noun.ReferenceFragment : Phrase(selection);
     }
 
-    /// <summary>
-    ///     Renders a dependency verb's target/source list, qualifying colliding simple names with
-    ///     the minimal distinguishing trailing namespace segments (GRAMMAR §6), then joins with no
-    ///     Oxford comma.
-    /// </summary>
+    /// <summary>A dependency verb's target or source list (GRAMMAR §6).</summary>
     internal static string TargetListProse(this IReadOnlyList<Selection> targets)
     {
         return ProseFormat.JoinReferences(ReferenceFragments(targets), ClosesBeforeOr(targets));
@@ -198,8 +165,7 @@ internal static class SentenceRenderer
     /// <summary>
     ///     The same target list followed by a verb-phrase tail, with the last target's open <c>Except</c>
     ///     parenthetical closed before it: "…, except `TimeoutException`, without a `when` filter"
-    ///     (GRAMMAR §6). A tail that is a bracketed parenthetical closes the clause on its own and
-    ///     concatenates instead.
+    ///     (GRAMMAR §6).
     /// </summary>
     internal static string TargetListProse(this IReadOnlyList<Selection> targets, string tail)
     {
@@ -207,11 +173,9 @@ internal static class SentenceRenderer
     }
 
     /// <summary>
-    ///     Renders a member-access verb's target list (GRAMMAR §4.5, §6): each member as the
-    ///     backticked declaring-type dot member — <c>`DateTime.Now`</c>, <c>`Task.Wait()`</c> with
-    ///     <c>()</c> appended iff a method — then joins with no Oxford comma. Colliding declaring-type
-    ///     simple names widen by the same minimal-trailing-segments rule as the reference list (fed
-    ///     through <see cref="ProseFormat.ResolvePathDisplays" />), including when the member names differ.
+    ///     A member-access verb's target list (GRAMMAR §4.5, §6): <c>`DateTime.Now`</c>, <c>`Task.Wait()`</c>.
+    ///     Colliding declaring-type names widen (<see cref="ProseFormat.ResolvePathDisplays" />) even when the
+    ///     member names differ.
     /// </summary>
     internal static string MemberList(IReadOnlyList<Member> members)
     {
@@ -235,9 +199,8 @@ internal static class SentenceRenderer
     /// </summary>
     /// <remarks>
     ///     A definition spells the row's first half instead of the globs: a bare noun as its locative without
-    ///     the head — <c>project `MyApp.Core`</c>, <c>projects `A` or `B`</c> — which is how the glob row
-    ///     already reads its own noun, and anything else (a refinement, a heterogeneous union) as its
-    ///     reference phrase: <c>types in the Core layer in `MyApp.Core.Model.*`</c>.
+    ///     the head (<c>project `MyApp.Core`</c>, <c>projects `A` or `B`</c>), as the glob row reads its own
+    ///     noun, and anything else as its reference phrase: <c>types in the Core layer in `MyApp.Core.Model.*`</c>.
     /// </remarks>
     internal static string LayerDefinition(LayerNoun noun, string? purpose)
     {
@@ -246,7 +209,6 @@ internal static class SentenceRenderer
         return fragment;
     }
 
-    // The row's first half: the glob list, or what the definition names.
     private static string DefinitionPhrase(LayerNoun noun)
     {
         if (noun.Definition is not { } definition) return string.Join(", ", noun.Globs.Select(ProseFormat.Backtick));
@@ -254,10 +216,9 @@ internal static class SentenceRenderer
         return BareLocative(definition) ?? definition.ReferenceProse();
     }
 
-    // A bare noun's locative with the "types" head dropped, or null for a definition that has no such
-    // reading — one carrying adjectives, a union whose operands do not collapse, or a noun whose whole
-    // phrase is its head (a type, a registration, bare Types). Null falls through to the reference phrase,
-    // which those nouns read correctly on their own.
+    // Null for a definition with no bare locative: one carrying adjectives, a union whose operands do not
+    // collapse, or a noun whose whole phrase is its head (a type, a registration, bare Types), which the
+    // reference phrase reads correctly on its own.
     private static string? BareLocative(Selection definition)
     {
         if (definition.Adjectives.Count > 0) return null;
@@ -292,18 +253,9 @@ internal static class SentenceRenderer
         SelectionNoun noun = selection.Noun;
         IReadOnlyList<SelectionAdjective> adjectives = selection.Adjectives;
 
-        // The noun's own phrase: a bare layer or a bare family in the collective voice ("the Domain layer",
-        // "each of the Host, Adapter and Pack layers"), or a bare single type as its name ("`SqlConnection`").
-        // Any adjective switches to types voice — the switch is structural, hence deterministic (GRAMMAR
-        // §6). Asked of ReadsAsItsNoun, which the family verb phrases also ask, so the voice they agree with
-        // is the voice assembled here by construction. The union half of that test is already discharged by
-        // the early return above.
         if (ReadsAsItsNoun(selection) && headOverride is null && headPrefixOverride is null)
             return noun.ReferenceFragment;
 
-        // The head defaults to "types" (the type nouns) but is taken from the noun for a noun whose
-        // fragment IS its head — the registration noun — so a qualified Registered subject keeps its
-        // qualifier instead of collapsing to a false bare "types" (GRAMMAR §5.1, head truth).
         (string? head, IReadOnlyList<string>? headPrefixes, string inline, string subjectFinal) = Placements(
             adjectives.Select(adjective =>
                 (adjective.Placement, adjective.Fragment, adjective.OpensParenthetical)),
@@ -313,10 +265,8 @@ internal static class SentenceRenderer
         return Premodifiers(headPrefixes) + head + noun.Locative + inline + subjectFinal;
     }
 
-    // A union in reference position (GRAMMAR §6). A bare union reads as its collapsed reference when its
-    // operands agree — "types in projects `A` or `B`", "the Domain or Web layers", "`X` or `Y`" — and
-    // or-joins its operands otherwise. A union carrying its own adjectives has no bare reading, so it
-    // falls through to the phrase.
+    // A union in reference position (GRAMMAR §6): collapsed when its operands agree ("the Domain or Web
+    // layers", "`X` or `Y`"), or-joined otherwise.
     private static string UnionReference(UnionSelection union)
     {
         if (union.Adjectives.Count > 0) return UnionPhrase(union, null, null);
@@ -328,11 +278,9 @@ internal static class SentenceRenderer
     }
 
     // A union in subject (types-voice) position (GRAMMAR §6). A bare union is its reference, so the
-    // single-operand identity holds in both positions. Otherwise the union's own adjectives assemble
-    // against the collapsed head and locative exactly as they do for a single selection — head
-    // substitution, head premodification, inline, sentence-final — or, when the union does not collapse,
-    // against the or-joined operand phrases with the head and its prefixes distributed into each, the
-    // prefixes ahead of the operand's own.
+    // single-operand identity holds in both positions. Otherwise the union's own adjectives assemble against
+    // the collapsed head and locative as a single selection's do, or, when the union does not collapse, are
+    // distributed into each operand's phrase.
     private static string UnionPhrase(
         UnionSelection union, string? headOverride, IReadOnlyList<string>? headPrefixOverride)
     {
@@ -357,21 +305,13 @@ internal static class SentenceRenderer
         return ProseFormat.JoinReferences(parts, ClosesBeforeOr(union.Parts)) + clauses;
     }
 
-    // Where each adjective lands (GRAMMAR §5.2, §4.10), accumulated in authoring order: Head substitutes,
-    // HeadPrefix appends after the seeded prefixes, Inline concatenates, and SubjectFinal collects into a
-    // group the return renders in sentence-final order. A prefix already held is not appended again: every
-    // type and project prefix names exactly one fact, so a repeat narrows nothing, and a pack rule that adds
-    // `.Authored()` to a caller's subject must not read "authored authored types" when that subject already
-    // carries it. The prefixes come back null only when the seed was null and none was added, because Phrase
-    // and UnionPhrase read null as "no override" when choosing a bare reference. The caller supplies the
-    // seeds — Phrase its noun's head and whatever a union passed down, UnionPhrase the union's nullable
-    // overrides, ProjectPhrase the bare plural — so no two subject assemblies can disagree about a placement,
-    // and a fifth AdjectivePlacement is one edit rather than one per stratum. It takes (placement, fragment,
-    // opens-parenthetical) triples rather than an adjective list because the strata's adjective hierarchies
-    // are deliberately disjoint and share no base: the triples are the whole of what placement needs from
-    // any of them. MemberPhrase keeps its own variant, and that one is a real divergence rather than a copy —
-    // its HeadPrefix arm keeps a repeat because attribute prefixes can collide, and its Where clauses render
-    // ahead of the reference while its Excepts follow it, so a member Except still renders after a member Where.
+    // Where each adjective lands (GRAMMAR §5.2, §4.10), in authoring order. A prefix already held is not
+    // appended again: every type and project prefix names exactly one fact, so a repeat narrows nothing, and a
+    // pack rule that adds `.Authored()` to a caller's subject must not read "authored authored types" when that
+    // subject already carries it. The prefixes come back null only when the seed was null and none was added,
+    // because Phrase and UnionPhrase read null as "no override" when choosing a bare reference. MemberPhrase
+    // keeps a variant of its own, which keeps a repeated prefix and splits its Wheres from its Excepts around
+    // the reference.
     private static (string? Head, IReadOnlyList<string>? HeadPrefixes, string Inline, string SubjectFinal) Placements(
         IEnumerable<(AdjectivePlacement Placement, string Fragment, bool OpensParenthetical)> adjectives,
         string? head, IReadOnlyList<string>? headPrefixes)
@@ -404,8 +344,7 @@ internal static class SentenceRenderer
         return (head, prefixes, inline, subjectFinal);
     }
 
-    // The text in front of the head. Each prefix fragment carries its own trailing space, so the prefixes
-    // concatenate as they stand.
+    // Each prefix fragment carries its own trailing space, so the prefixes concatenate as they stand.
     private static string Premodifiers(IReadOnlyList<string>? headPrefixes)
     {
         return headPrefixes is null ? string.Empty : string.Concat(headPrefixes);
@@ -413,10 +352,9 @@ internal static class SentenceRenderer
 
     // The sentence-final group in rendered order (GRAMMAR §6): every Where in authoring order, then every
     // Except in authoring order, so the parenthetical is the last thing before the junction that closes it.
-    // OrderBy is stable, which is what keeps authoring order inside each half. Placements assembles the group
-    // by this and the type and project EndsOpen twins read its last clause by this, so a phrase and its
-    // openness cannot disagree. Generic over the clause type because the strata's adjective hierarchies share
-    // no base.
+    // OrderBy is stable, which is what keeps authoring order inside each half. Placements and the type and
+    // project EndsOpen twins all order by this, so a phrase and its openness cannot disagree. Generic over the
+    // clause type because the strata's adjective hierarchies share no base.
     private static IEnumerable<TClause> SentenceFinalOrder<TClause>(
         IEnumerable<TClause> clauses, Func<TClause, bool> opensParenthetical)
     {
@@ -424,9 +362,7 @@ internal static class SentenceRenderer
     }
 
     // The operand nouns of a union that collapses to one head and locative, or null when it does not
-    // (GRAMMAR §6): a single operand (which renders as the bare operand — the identity), an operand
-    // carrying adjectives, mixed noun kinds, or a noun kind that declares no collapse all fall back to
-    // the or-join.
+    // (GRAMMAR §6). A single operand does not collapse: it renders as the bare operand, the identity.
     private static IReadOnlyList<SelectionNoun>? CollapsibleNouns(UnionSelection union)
     {
         if (union.Parts.Count < 2) return null;
@@ -443,12 +379,10 @@ internal static class SentenceRenderer
         return nouns[0].CollapsedLocative(nouns) is null ? null : nouns;
     }
 
-    // Whether a phrase ends inside an Except parenthetical (GRAMMAR §6): the last clause of its
-    // sentence-final group, read in rendered rather than authoring order, says it opens one — and because a
-    // Where never follows an Except in that order, the group ends open exactly when it carries an Except —
-    // or, with no clause of its own, it is an or-joined union whose last operand ends open. A collapsed
-    // union, a bare noun and an inline-terminated phrase are closed. The composer reads this at every
-    // junction where text follows, because the fragment cannot know what follows it.
+    // Whether a phrase ends inside an Except parenthetical (GRAMMAR §6): the last clause of its sentence-final
+    // group, read in rendered rather than authoring order, opens one, or, with no clause of its own, it is an
+    // or-joined union whose last operand ends open. The composer reads this at every junction where text
+    // follows, because the fragment cannot know what follows it.
     private static bool EndsOpen(Selection selection)
     {
         IEnumerable<SelectionAdjective> clauses = selection.Adjectives
@@ -466,9 +400,7 @@ internal static class SentenceRenderer
         return EndsOpen(union.Parts[union.Parts.Count - 1]);
     }
 
-    // The project stratum's twin, reading the same rendered order. Except and Where are the only
-    // sentence-final project adjectives, and the project phrase has no union or bare-noun arm to fall
-    // through to.
+    // The project stratum's twin: the project phrase has no union or bare-noun arm to fall through to.
     private static bool EndsOpen(ProjectSelection selection)
     {
         IEnumerable<ProjectAdjective> clauses = selection.Adjectives
@@ -512,15 +444,11 @@ internal static class SentenceRenderer
         return parts.Count >= 2 && EndsOpen(parts[parts.Count - 2]);
     }
 
-    // Member-subject assembly (GRAMMAR §4.6, §6): head-prefix member adjectives in authoring order + the
-    // kind-plural + the trailing member clauses + the reference + the member Excepts. With no Returning or
-    // Where the trailing clauses are empty and the reference joins with " of ": "methods of types in X".
-    // With either, the clauses follow the kind-plural directly and the reference joins with " declared in ":
-    // "methods returning `Task` declared in types in X". A clause after the reference would read as
-    // narrowing the types, and a type-side Where before the projection would then render the same sentence
-    // as a member Where after it. Every Where precedes every Except, as on the type side. The kind-plural is
-    // the projection head; the reference is the underlying type selection in reference position. There is
-    // no head-SUBSTITUTION arm: the projection fixes the head.
+    // Member-subject assembly (GRAMMAR §4.6, §6). With no Returning or Where the reference joins with " of "
+    // ("methods of types in X"); with either, the clauses follow the kind-plural and the reference joins with
+    // " declared in " ("methods returning `Task` declared in types in X"). A clause after the reference would
+    // read as narrowing the types, and a type-side Where before the projection would then render the same
+    // sentence as a member Where after it. There is no head-substitution arm: the projection fixes the head.
     private static string MemberPhrase(MemberSelection selection)
     {
         string head = ProseFormat.MemberKindPlural(selection.Kind);
@@ -557,11 +485,8 @@ internal static class SentenceRenderer
         return headPrefix + head + trailing + join + reference + CloseBefore(EndsOpen(selection.Source), excepts);
     }
 
-    // Project-subject assembly (GRAMMAR §4.10, §6): the bare plural "projects" as the head, then the shared
-    // placement accumulator. It goes through Placements rather than a loop of its own because the project
-    // stratum's placements mean exactly what the type side's do — Named substitutes the head ("project `A`"),
-    // Packable premodifies it ("packable "), Matching is an inline reduced relative clause, and Except/Where
-    // canonicalize sentence-final. There is no locative: the head carries the whole noun.
+    // Project-subject assembly (GRAMMAR §4.10, §6), through Placements because the project stratum's
+    // placements mean what the type side's do. There is no locative: the head carries the whole noun.
     private static string ProjectPhrase(ProjectSelection selection)
     {
         (string? head, IReadOnlyList<string>? headPrefixes, string inline, string subjectFinal) = Placements(

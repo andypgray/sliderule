@@ -3,17 +3,19 @@ using System.Text;
 namespace SlideRule.Rendering;
 
 /// <summary>
-///     The Mermaid text primitives both diagram renderers share: the fence skeleton their sections are
-///     assembled into, node-ID slugging with a collision-safe dedupe, and label escaping for the
-///     characters Mermaid reads as markup. One escaping rule serves both fences of one artifact, so a
-///     character that is safe in the survey cannot be unsafe in the law.
+///     The Mermaid text primitives both diagram renderers share. One escaping rule serves both fences of one
+///     artifact, so a character that is safe in the survey cannot be unsafe in the law.
 /// </summary>
+/// <remarks>
+///     Both drawings keep one plain dialect: <c>flowchart LR</c> with quoted labels, <c>accTitle</c> and
+///     <c>accDescr</c> for screen readers, and no <c>%%{init}%%</c> block, <c>classDef</c> or colours, so a
+///     drawing renders correctly for a reader in a light or a dark theme and structure carries the meaning.
+/// </remarks>
 internal static class MermaidText
 {
     /// <summary>
-    ///     ASCII letters and digits survive; everything else becomes an underscore. Deliberately not
-    ///     <see cref="char.IsLetterOrDigit(char)" />, which is Unicode-aware and would leave accented
-    ///     letters in an identifier position where Mermaid's tolerance is unknown.
+    ///     ASCII letters and digits only, not <see cref="char.IsLetterOrDigit(char)" />, which is Unicode-aware
+    ///     and would leave accented letters in an identifier position where Mermaid's tolerance is unknown.
     /// </summary>
     private static string Slug(string name)
     {
@@ -52,9 +54,12 @@ internal static class MermaidText
     ///     nodes.
     /// </summary>
     /// <remarks>
-    ///     The prefix is the caller's — it is what keeps a name from ever being lexed as something other
-    ///     than a node, and what keeps an ID from starting with the <c>o</c> or <c>x</c> Mermaid's link
-    ///     rules read as an arrowhead.
+    ///     The prefix is the caller's, and every ID carries one. Mermaid's flowchart grammar reserves bare
+    ///     words (end, graph, class, subgraph and more), none of them anchored to the start of a statement, so
+    ///     a name that is one of them would break the whole diagram rather than just its own node; and the
+    ///     link rules read a leading <c>o</c> or <c>x</c> as an arrowhead. A prefix keeps every ID out of reach
+    ///     of both, stays safe as the grammar adds words, and makes the grammar's case sensitivity irrelevant
+    ///     rather than something to rely on.
     /// </remarks>
     private static IReadOnlyList<string> UniqueIds(string prefix, IReadOnlyList<string> names)
     {
@@ -78,9 +83,8 @@ internal static class MermaidText
     ///     <paramref name="nameOf" /> reads, zipped back onto the keys that produced them.
     /// </summary>
     /// <remarks>
-    ///     The zip lives beside the method that defines the index alignment, so no caller holds the two
-    ///     halves of that contract apart. Duplicate keys collapse to the last ID minted for them, which is
-    ///     what a caller keying on a name expects.
+    ///     Duplicate keys collapse to the last ID minted for them, which is what a caller keying on a name
+    ///     expects.
     /// </remarks>
     internal static Dictionary<TKey, string> IdMap<TKey>(
         string prefix, IReadOnlyList<TKey> keys, Func<TKey, string> nameOf, IEqualityComparer<TKey>? comparer = null)
@@ -96,14 +100,10 @@ internal static class MermaidText
     }
 
     /// <summary>
-    ///     The fence skeleton both drawings sit in: the opening code fence, the <c>flowchart LR</c>
-    ///     directive and the accessible title and description, then every non-empty section, then the
-    ///     closing fence.
+    ///     The fence skeleton both drawings sit in. A blank line precedes each section that has content, so a
+    ///     section the drawing has nothing for leaves no gap behind it and the fence's shape stays a function
+    ///     of what is in it.
     /// </summary>
-    /// <remarks>
-    ///     A blank line precedes each section that has content, so a section the drawing has nothing for
-    ///     leaves no gap behind it and the fence's shape stays a function of what is in it.
-    /// </remarks>
     internal static IReadOnlyList<string> Fence(string accTitle, string accDescr, params IReadOnlyList<string>[] sections)
     {
         var lines = new List<string>

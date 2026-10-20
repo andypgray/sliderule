@@ -17,12 +17,11 @@ namespace SlideRule.Rendering;
 ///         out, being a link to follow rather than something to act on.
 ///     </para>
 ///     <para>
-///         What broke the rule is worded by <see cref="ViolationWording" />, the human report's own owner,
-///         so the report a developer reads and the warning the compiler raises name a violation in the same
-///         words. The reason and the fix are the spec author's free text and are printed as written — never
-///         trimmed, never re-cased — except that a sentence not already ended is given a full stop, so a
-///         reason and the clause after it do not run together. The exemplar is printed as the spec names it,
-///         never resolved: one project's compilation cannot say where a type in another project is declared.
+///         What broke the rule is worded by <see cref="ViolationWording" />. The reason and the fix are the
+///         spec author's free text and are printed as written, never trimmed or re-cased, except that a
+///         sentence not already ended is given a full stop, so a reason and the clause after it do not run
+///         together. The exemplar is printed as the spec names it, never resolved: one project's compilation
+///         cannot say where a type in another project is declared.
 ///     </para>
 ///     <para>
 ///         The result holds no line break: every prose field a rule carries is single-line by construction
@@ -65,10 +64,9 @@ internal static class BuildFindingMessage
         return $"The baseline holds {baselined} of this pair and {observed} were found.";
     }
 
-    // A clause ended as a sentence, so the next one does not run into it. Question and exclamation marks end
-    // a sentence too, and a reason written as a question reads wrong with a stop after it. Every caller
-    // passes a segment that is non-empty by construction: a prefixed clause, or a sentence length-checked at
-    // the call.
+    // Question and exclamation marks end a sentence too, and a reason written as a question reads wrong with
+    // a stop after it. Every caller passes a segment that is non-empty by construction: a prefixed clause, or
+    // a sentence length-checked at the call.
     private static string Terminated(string segment)
     {
         char last = segment[segment.Length - 1];

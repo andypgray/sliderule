@@ -60,8 +60,6 @@ internal sealed class StringArrayCoercerFactory : JsonConverterFactory
             writer.WriteEndArray();
         }
 
-        // A string[] element is the string itself: the projection CoercedJsonArray takes is the identity,
-        // which is the whole of what this coercer does differently from its enum sibling.
         private static string Identity(string element)
         {
             return element;

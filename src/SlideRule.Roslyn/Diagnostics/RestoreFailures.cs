@@ -15,33 +15,28 @@ namespace SlideRule.Roslyn.Diagnostics;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         The verdict is a file read, never a diagnostic parse. A failed restore <em>does</em> write
-///         <c>project.assets.json</c> — measured — with the failure recorded in its <c>logs</c> array as a
-///         <c>{ "code": …, "level": … }</c> pair, and both fields are invariant: <c>NU1301</c> is
-///         <c>NU1301</c> and <c>Error</c> is <c>Error</c> whatever language the UI renders in. So a project
+///         The verdict is a file read, never a diagnostic parse. A failed restore does write
+///         <c>project.assets.json</c> (measured), with the failure recorded in its <c>logs</c> array as a
+///         <c>{ "code": …, "level": … }</c> pair whose fields are invariant across UI languages, so a project
 ///         whose assets file carries a non-audit <c>level: Error</c> entry failed its restore, in any locale.
 ///     </para>
 ///     <para>
-///         The candidate paths come from <see cref="IntermediateOutputTree.AssetsPathsOf" /> — the same
-///         primitive the cache stamps, so the file this reads and the file that invalidates the cache are the
-///         same file by construction. The first candidate that exists wins: default-first, then deepest-first
-///         up the intermediate tree, so a shallower shared intermediate root cannot shadow a project's own
+///         The candidate paths come from <see cref="IntermediateOutputTree.AssetsPathsOf" />, the same primitive
+///         the cache stamps, so the file this reads and the file that invalidates the cache are the same file. The
+///         first candidate that exists wins, so a shallower shared intermediate root cannot shadow a project's own
 ///         file.
 ///     </para>
 ///     <para>
-///         A bad read is not a failure: every degradation — unreadable file, malformed JSON, an unexpected
-///         node kind, an unknown layout — answers "not failed". Silence is the only safe answer for a file
-///         that could not be read, because the alternative is refusing a healthy solution, the disease the
-///         structural gate cures.
+///         A bad read is not a failure: every degradation (unreadable file, malformed JSON, an unexpected node
+///         kind, an unknown layout) answers "not failed", because the alternative is refusing a healthy solution.
 ///     </para>
 ///     <para>
-///         No assets file at all asserts nothing on its own — a non-SDK-style .NET Framework project never
-///         writes one, and those are exactly the codebases this product is built for — and asserts "the
-///         restore never ran" for an SDK-style project, which writes one on every restore and still loads
-///         completely without one. So absence is read together with <see cref="SdkStyleProject.IsSdkStyle" />,
-///         and only the SDK-style project is blamed. The residual limit: a non-SDK-style project using
-///         <c>PackageReference</c> that was never restored stays invisible, because its absent assets file
-///         cannot be told from a <c>packages.config</c> project's.
+///         No assets file at all asserts nothing on its own, since a non-SDK-style .NET Framework project never
+///         writes one, and asserts "the restore never ran" for an SDK-style project, which writes one on every
+///         restore and still loads completely without one. So absence is read together with
+///         <see cref="SdkStyleProject.IsSdkStyle" />, and only the SDK-style project is blamed. The residual limit:
+///         a non-SDK-style project using <c>PackageReference</c> that was never restored stays invisible, because
+///         its absent assets file cannot be told from a <c>packages.config</c> project's.
 ///     </para>
 ///     <para>
 ///         The NuGet audit family (NU19xx) is excluded by code even where <c>TreatWarningsAsErrors</c>
@@ -52,26 +47,23 @@ namespace SlideRule.Roslyn.Diagnostics;
 internal static class RestoreFailures
 {
     /// <summary>
-    ///     The absolute <c>.csproj</c> paths of the projects whose packages are missing from the model — an
-    ///     assets file recording a restore error, or an SDK-style project with no assets file at all —
-    ///     ordinal-sorted, deduplicated by this OS's path rule, and empty for a solution that restored cleanly
-    ///     (or whose projects were never going to write an assets file).
+    ///     The absolute <c>.csproj</c> paths of the projects whose packages are missing from the model,
+    ///     ordinal-sorted and deduplicated by this OS's path rule.
     /// </summary>
-    /// <param name="solution">The loaded solution.</param>
-    /// <param name="alreadyFailed">
-    ///     The projects <see cref="ProjectLoadFailures" /> has already blamed, subtracted from the answer so
-    ///     one project never appears in two lists. It matters because the two are not disjoint by
-    ///     construction: a project caught by the loaded-but-empty arm carries neither output path, so
-    ///     <see cref="IntermediateOutputTree.AssetsPathsOf" /> degrades to the default location — which may
-    ///     well exist and carry an error from a restore that ran before the project stopped evaluating.
-    /// </param>
+    /// <remarks>
+    ///     <paramref name="alreadyFailed" />, the projects <see cref="ProjectLoadFailures" /> blamed, is subtracted so
+    ///     one project never appears in two lists. The two can overlap: a project caught by the loaded-but-empty arm
+    ///     carries neither output path, so <see cref="IntermediateOutputTree.AssetsPathsOf" /> degrades to the
+    ///     default location, which may exist and carry an error from a restore that ran before the project stopped
+    ///     evaluating.
+    /// </remarks>
     internal static IReadOnlyList<string> Detect(Solution solution, IReadOnlyList<string> alreadyFailed)
     {
         var blamed = new HashSet<string>(PathComparison.Comparer);
 
         // Both caches are keyed on the file the verdict is read from rather than on the project, because a
-        // multi-target-framework project is several Projects behind one csproj and one assets file — so each
-        // file is read once, while a leg that genuinely resolves elsewhere is still read.
+        // multi-target-framework project is several Projects behind one csproj and one assets file: each file is
+        // read once, while a leg that resolves elsewhere is still read.
         var verdictByAssetsPath = new Dictionary<string, bool>(PathComparison.Comparer);
         var sdkStyleByProjectPath = new Dictionary<string, bool>(PathComparison.Comparer);
 
@@ -80,9 +72,9 @@ internal static class RestoreFailures
             if (project.FilePath is not { } filePath) continue;
 
             // A project in another language reaches the loaded solution with its output paths, and its
-            // packages cannot affect a model that never included it — blaming one falsely refused a
-            // solution whose C# half was restored perfectly (measured). Skipped before any file is read,
-            // so this also spares the assets probe for every project the model does not contain.
+            // packages cannot affect a model that never included it: blaming one would refuse a solution whose
+            // C# half restored cleanly (measured). Skipped before any file is read, so this also spares the
+            // assets probe for every project the model does not contain.
             if (!ProjectLanguages.IsCSharp(project)) continue;
 
             string fullPath = Path.GetFullPath(filePath);
@@ -91,8 +83,6 @@ internal static class RestoreFailures
             string? assetsPath = FirstExistingAssetsPath(
                 projectDirectory, project.OutputFilePath, project.CompilationOutputInfo.AssemblyPath);
 
-            // No assets file at all: the restore never ran, and whether that is a fact about this project
-            // depends entirely on whether it is one that would have written one.
             if (assetsPath is null)
             {
                 if (IsSdkStyle(sdkStyleByProjectPath, fullPath)) blamed.Add(fullPath);
@@ -134,15 +124,10 @@ internal static class RestoreFailures
             .FirstOrDefault(File.Exists);
     }
 
-    // Whether the assets file records a restore error: any logs entry whose level is Error and whose code is
-    // not an audit one. Every fault degrades to false — see the class remarks on why silence is the safe
-    // answer for a file that could not be read.
-    //
-    // Read rather than parsed, because of the file this asks about: a real project.assets.json is one to five
-    // megabytes of resolved dependency graph, there is one per project, and a cold load reads every one of
-    // them — to answer a question about a single top-level property. A JsonDocument would index every token
-    // in the file first. The reader still walks the whole document, so a file malformed anywhere degrades
-    // to false.
+    // Every fault degrades to false (the class remarks say why). Read rather than parsed: a real
+    // project.assets.json is one to five megabytes of resolved dependency graph, there is one per project, and a
+    // cold load reads every one of them to answer a question about a single top-level property, where a
+    // JsonDocument would index every token in the file first.
     private static bool RecordsARestoreError(string assetsPath)
     {
         try
@@ -191,8 +176,7 @@ internal static class RestoreFailures
         }
     }
 
-    // Whether any entry of the logs array the reader is positioned at records a restore error. Anything that
-    // is not an object is skipped rather than refused.
+    // Over the logs array the reader is positioned at; an entry that is not an object is skipped, not refused.
     private static bool AnyRestoreError(ref Utf8JsonReader reader)
     {
         while (reader.Read() && reader.TokenType != JsonTokenType.EndArray)
@@ -209,9 +193,8 @@ internal static class RestoreFailures
         return false;
     }
 
-    // The per-entry predicate over the object the reader is positioned at: level is the string Error, and the
-    // code — where there is one — is not an audit code. Each name is taken first-wins, and a value of any
-    // other kind reads as absent.
+    // Over the entry object the reader is positioned at. Each name is taken first-wins, and a value of any other
+    // kind reads as absent.
     private static bool IsRestoreError(ref Utf8JsonReader reader)
     {
         var levelSeen = false;

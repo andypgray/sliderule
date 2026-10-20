@@ -38,9 +38,6 @@ internal static class OneProjectSubject
     ///     family of projects included — as it stands. Where the subject matched something, its own
     ///     <c>Named</c> lists and those of the union parts kept also lose the names that matched nothing.
     /// </summary>
-    /// <param name="selections">The run's selection evaluator, which resolves each part.</param>
-    /// <param name="subject">The rule's own subject, which is left exactly as it was.</param>
-    /// <returns>The subject to evaluate, or <paramref name="subject" /> itself where nothing was dropped.</returns>
     /// <exception cref="RuleEvaluationException">
     ///     A part could not be resolved at all — an unrepresentable anchor, a pattern the model refuses.
     /// </exception>

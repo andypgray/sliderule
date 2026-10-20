@@ -6,17 +6,14 @@ namespace SlideRule.Cli.Replay;
 /// <summary>
 ///     The lazy replay source: replays a persisted, structurally-valid build capture — but only
 ///     when a runner actually acquires a workspace. A fragment-cache hit never acquires, so it stays
-///     replay-free and sub-second and byte-identical to a plain cached run.
+///     replay-free and byte-identical to a plain cached run.
 /// </summary>
 /// <remarks>
 ///     Replays the capture's binlog copy on the one <see cref="AcquireAsync" /> call the runner makes, and
 ///     owns the <see cref="ReplayedSolution" /> that produces: the handle it hands back is non-owning
 ///     (<c>owned: null</c>) because the replay's reader backs the solution's lazy per-document text loaders,
 ///     so releasing it at handle scope would come too early — <see cref="Dispose" /> releases it at run scope
-///     instead. A runtime replay failure of a copy the store validated as usable is not fatal — it raises
-///     <see cref="CaptureReplayFailedException" /> so the gate can notice-and-fall-back to a design-time build
-///     rather than break the run. No MSBuildWorkspace and no design-time build on the success path (the gate
-///     registers MSBuildLocator up front, which is what lets the binlog parser resolve its MSBuild assemblies).
+///     instead.
 /// </remarks>
 internal sealed class LazyCaptureReplaySource(string binlogCopyPath) : ISolutionSource, IDisposable
 {

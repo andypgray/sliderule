@@ -10,13 +10,8 @@ using SlideRule.Roslyn.Hosting;
 namespace SlideRule.Cli.Pipeline;
 
 /// <summary>
-///     The two spec→model primitives every workspace command needs: <see cref="DiscoverSolution" /> (which
-///     solution a run is about) and <see cref="LoadModel" /> (the ALC-loaded, validated model behind a spec
-///     DLL). <see cref="CodebaseSource" /> composes them into the one acquisition ladder — discover, acquire
-///     the workspace, resolve the spec, load the model — so both live here rather than in it: solution
-///     discovery also runs before any codebase source exists, and <c>explain</c>'s DLL fast path
-///     reaches <see cref="LoadModel" /> alone, with no workspace at all
-///     (<see cref="SpecResolver.TryResolveWithoutSolution" />).
+///     The two spec→model primitives every workspace command needs, <see cref="DiscoverSolution" /> and
+///     <see cref="LoadModel" />, each of which also runs where no <see cref="CodebaseSource" /> exists.
 /// </summary>
 internal static class ModelPipeline
 {
@@ -107,14 +102,11 @@ internal static class ModelPipeline
     /// <summary>
     ///     The <see cref="UserErrorException" /> text for a <see cref="ReflectionTypeLoadException" /> out of
     ///     spec discovery: the <em>distinct</em> loader messages (deduped, ordinal-sorted so the output is
-    ///     deterministic) under a naming/fix frame. Internal so a fabricated exception can pin the shape.
+    ///     deterministic) under a naming/fix frame.
     /// </summary>
     /// <remarks>
-    ///     The remedy names both worlds rather than asserting the packaging one, because a shared-framework
-    ///     anchor reaches this arm too and no build setting can stage it. It does not pick between them the
-    ///     way <see cref="SpecDependencyLoadFailure" /> does: this failure aggregates several loader
-    ///     exceptions that need not carry assembly identities at all, so one remedy line cannot
-    ///     branch per assembly. Naming both is what that costs.
+    ///     The remedy names both the package fix and the shared-framework one: a shared-framework anchor reaches
+    ///     this arm too, and the aggregated loader exceptions need not carry an assembly identity to branch on.
     /// </remarks>
     internal static string LoaderFailureMessage(ReflectionTypeLoadException ex, string specDllPath)
     {

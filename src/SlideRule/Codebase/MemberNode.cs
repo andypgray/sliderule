@@ -6,25 +6,6 @@ namespace SlideRule.Codebase;
 ///     implements <see cref="IMemberInfo" />, so the facts a <c>Where</c> predicate in a spec sees and the
 ///     facts here are one surface.
 /// </summary>
-/// <remarks>
-///     <para>
-///         <see cref="DeclaringType" /> is the very <see cref="TypeNode" /> instance held by
-///         <see cref="CodebaseModel.Types" /> and by <see cref="TypeNode.Members" />, so a predicate reaching
-///         through it sees the identical type facts. Only the types the solution declares carry members: a
-///         referenced framework or package type has none, and neither has an enum or a delegate.
-///     </para>
-///     <para>
-///         The flags describe the declaration as C# spells it rather than the IL behind it. An
-///         <c>override</c> member is not <see cref="IsVirtual" /> but is <see cref="IsOverride" />, only a
-///         <c>sealed override</c> is <see cref="IsSealed" /> (a member of a sealed class does not inherit
-///         it), an interface member without a body is <see cref="IsAbstract" />, and a <c>const</c> field is not
-///         <see cref="IsReadOnly" /> — those two are separate declarations, where
-///         <see cref="HasInitOnlySetter" /> instead narrows
-///         <see cref="HasSetter" />. Exactly one of <see cref="ReturnTypeFullName" /> (methods, with
-///         <c>System.Void</c> for a void one) and <see cref="MemberTypeFullName" /> (properties, fields and
-///         events) is non-null.
-///     </para>
-/// </remarks>
 internal sealed class MemberNode : IMemberInfo
 {
     internal MemberNode(
@@ -76,15 +57,13 @@ internal sealed class MemberNode : IMemberInfo
     /// <summary>
     ///     Gets the identity a baseline records for this member: its Roslyn documentation comment ID —
     ///     <c>M:</c> for a method, <c>P:</c> for a property, <c>F:</c> for a field, <c>E:</c> for an event — or
-    ///     <c>unresolved:{declaring type}.{name}</c> where the compiler gives the member no such ID. It survives
-    ///     moving, renaming or reformatting the file, where a <c>file:line</c> does not.
+    ///     <c>unresolved:{declaring type}.{name}</c> where the compiler gives the member no such ID.
     /// </summary>
     public string SymbolId { get; }
 
     /// <summary>
     ///     Gets where the member is declared, ordered by file then line: one entry per part of a partial member,
-    ///     and one per declarator of a field group. A violation about the member's shape or name cites one of
-    ///     these.
+    ///     and one per declarator of a field group.
     /// </summary>
     public IReadOnlyList<SourceLocation> DeclarationSites { get; }
 
@@ -145,9 +124,6 @@ internal sealed class MemberNode : IMemberInfo
     /// <inheritdoc />
     public IReadOnlyList<string> FilePaths { get; }
 
-    /// <summary>
-    ///     The owning type's <see cref="TypeNode.FullName" />, read off the documented invariant that
-    ///     <see cref="DeclaringType" /> is the <see cref="TypeNode" /> that declares this member.
-    /// </summary>
+    // ITypeInfo carries no full name, and the constructor takes the declaring TypeNode, so the cast holds.
     internal string DeclaringTypeFullName => ((TypeNode)DeclaringType).FullName;
 }

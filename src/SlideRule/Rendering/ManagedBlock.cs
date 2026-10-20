@@ -4,9 +4,8 @@ namespace SlideRule.Rendering;
 
 /// <summary>
 ///     The marker-delimited region of a text file that SlideRule owns, everything outside the markers
-///     preserved byte for byte. Two pure string functions: <see cref="Splice" /> puts a body in and
-///     <see cref="ExtractBody" /> reads one back out, so the host decides for itself whether and when to
-///     write the file.
+///     preserved byte for byte. Pure string functions, deterministic and safe on netstandard2.0, so the host
+///     decides for itself whether and when to write the file.
 /// </summary>
 /// <remarks>
 ///     A file carries exactly one managed block. Markers are matched as whole lines, ignoring leading
@@ -16,17 +15,14 @@ namespace SlideRule.Rendering;
 ///     Compose the body with LF line endings: <see cref="Splice" /> writes whichever ending the existing
 ///     file mostly uses, CRLF when a strict majority of its lines end that way and LF otherwise.
 /// </remarks>
-// The dependabot-style managed block, kept a pure string function (existing text + LF body -> new
-// text) so it stays netstandard2.0-safe and deterministic.
 internal static class ManagedBlock
 {
     /// <summary>
-    ///     The line that opens the managed block. Fixed text carrying no version and no attributes, so
-    ///     re-rendering an unchanged spec leaves the file byte for byte as it was.
+    ///     The line that opens the managed block. Both markers are fixed text carrying no version and no
+    ///     attributes, so re-rendering an unchanged spec leaves the file byte for byte as it was.
     /// </summary>
     public const string BeginMarker = "<!-- sliderule:begin -->";
 
-    /// <summary>The line that closes the managed block. Fixed text, carrying no version and no attributes.</summary>
     public const string EndMarker = "<!-- sliderule:end -->";
 
     private const string Lf = "\n";
@@ -38,7 +34,6 @@ internal static class ManagedBlock
     /// </summary>
     /// <param name="existing">The file's current text, or null for a file that does not exist yet.</param>
     /// <param name="body">The block's body, composed with LF line endings and no surrounding blank lines.</param>
-    /// <returns>The whole new file text.</returns>
     /// <exception cref="MalformedManagedBlockException">
     ///     <paramref name="existing" /> carries a malformed marker state; nothing is spliced.
     /// </exception>
@@ -47,7 +42,7 @@ internal static class ManagedBlock
     ///     the marked block and one trailing newline, all LF. Text with no markers keeps everything it has
     ///     and the block is appended after one blank line. Text with a marker pair keeps everything except
     ///     what lies strictly between the markers, the marker lines themselves included, and the body
-    ///     replaces that. The line endings written are the ones the existing text mostly uses.
+    ///     replaces that.
     /// </remarks>
     public static string Splice(string? existing, string body)
     {
@@ -71,11 +66,7 @@ internal static class ManagedBlock
         return prefix + ConvertNewlines(body, newline) + newline + suffix;
     }
 
-    /// <summary>
-    ///     Reads the body between the markers of <paramref name="existing" /> back out. Compare it against a
-    ///     freshly composed body to tell whether a committed file is still up to date.
-    /// </summary>
-    /// <param name="existing">The file's text.</param>
+    /// <summary>Reads the body between the markers of <paramref name="existing" /> back out.</summary>
     /// <returns>
     ///     The body, its line endings normalized to LF and its final newline removed, or null when the text
     ///     carries no markers at all.
@@ -95,7 +86,6 @@ internal static class ManagedBlock
         return StripOneTrailingNewline(region).Replace(Crlf, Lf);
     }
 
-    // The dominant existing ending: CRLF iff a strict majority of newlines are CRLF.
     private static string DominantNewline(string text)
     {
         var total = 0;
@@ -133,8 +123,7 @@ internal static class ManagedBlock
         return text;
     }
 
-    // Locates the single begin/end marker pair, validating that exactly one well-ordered pair exists.
-    // Returns null when the file carries no markers at all (the append case).
+    // Null when the file carries no markers at all (the append case).
     private static MarkerLocation? LocateMarkers(string text)
     {
         List<PhysicalLine> lines = SplitLines(text);

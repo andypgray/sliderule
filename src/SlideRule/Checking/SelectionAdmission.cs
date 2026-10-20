@@ -12,18 +12,11 @@ namespace SlideRule.Checking;
 /// <remarks>
 ///     <para>
 ///         <see cref="CountedSites" /> is the edge test, and it parts from <see cref="Contains" /> only
-///         where an endpoint is a node several projects declare. It runs over the instances the merge
-///         recorded for the edge, the record <see cref="EdgeInstances" /> states whole: the subject
-///         selection bounds which instances the rule owns at
-///         whichever end it sits, and the operand selection is the predicate at the far end, asked at
-///         that instance's project for that end. Which project a selection names a node <em>at</em> is
+///         where an endpoint is a node several projects declare; <see cref="OwnedSites" /> is its
+///         subject-at-source half for a member use. Which project a selection names a node <em>at</em> is
 ///         <see cref="NamingOf" />, and heads that are not projects (a <c>typeof</c>, a namespace, a
 ///         layer, <c>Registered</c>) name it at every project — so
 ///         <c>arch.Project("P").MustNotReference(typeof(Shared))</c> reds on P's own compiled-in copy.
-///         It answers with the owned instances' SITES rather than a bare yes, because a violation may
-///         cite only the lines the copies it is about actually make (GRAMMAR §4.3).
-///         <see cref="OwnedSites" /> is its subject-at-source half for a member use, where the ban has
-///         already matched the member by name and ownership is the whole test.
 ///     </para>
 ///     <para>
 ///         The provenance map holds an entry only for a member several projects declare, and is null
@@ -43,20 +36,12 @@ internal sealed class SelectionAdmission
         _conflated = conflated;
     }
 
-    /// <summary>
-    ///     The nodes the selection matched, by reference identity — the set the shape verbs range over
-    ///     and the subject coverage is measured from.
-    /// </summary>
+    /// <summary>The nodes the selection matched, by reference identity.</summary>
     internal HashSet<TypeNode> Nodes { get; }
 
-    /// <summary>How many nodes matched — the arity the empty-subject and inert-target gates read.</summary>
     internal int Count => Nodes.Count;
 
-    /// <summary>
-    ///     Plain N-way membership: whether the selection names this node at all, attribution aside. The
-    ///     test every position that is not an edge end takes, and what <see cref="CountedSites" /> collapses
-    ///     to on an edge neither of whose endpoints more than one project declares.
-    /// </summary>
+    /// <summary>Plain N-way membership: whether the selection names this node at all, attribution aside.</summary>
     internal bool Contains(TypeNode node)
     {
         return Nodes.Contains(node);
@@ -65,13 +50,10 @@ internal sealed class SelectionAdmission
     /// <summary>
     ///     The sites this selection counts for <paramref name="node" />: every site where one project declares
     ///     it, and otherwise the sites of the declarers the selection names it at (GRAMMAR §4.1). The
-    ///     node-level twin of the edge test — a card's placement collapses these, so a project-defined layer
-    ///     places by its own copy of a name its sibling projects also compile.
+    ///     node-level twin of the edge test.
     /// </summary>
     internal IEnumerable<SourceLocation> CountedSitesOf(TypeNode node)
     {
-        // A name one project declares is counted whole, so the roster and the per-declarer test are asked for
-        // only where the model conflates something — which on an ordinary codebase is nowhere.
         if (node.AlsoDeclaredBy.Count == 0) return node.DeclarationSites;
 
         Naming naming = NamingOf(node);
@@ -104,8 +86,7 @@ internal sealed class SelectionAdmission
     ///         The whole §4.1 edge rule, stated once for every verb at either end. The subject bounds
     ///         ownership at the end it sits — <paramref name="subjectAtSource" /> says which — and the
     ///         operand is the predicate at the other, each asked at that instance's project for that end
-    ///         (<see cref="NamingOf" />). A <c>MustNot*</c> verb counts an owned instance whose predicate
-    ///         holds; a <c>MustOnly*</c> verb one whose predicate fails.
+    ///         (<see cref="NamingOf" />).
     ///     </para>
     ///     <para>
     ///         Every such instance is walked, because all of them together are the evidence: a copy the
@@ -208,8 +189,7 @@ internal sealed class SelectionAdmission
             if (ReferenceEquals(part, all))
                 return all;
 
-        // SourceLocation overrides no equality, so the default comparer IS reference identity — the same
-        // reason a HashSet<TypeNode> holds nodes by identity throughout the checker.
+        // SourceLocation overrides no equality, so the default comparer IS reference identity.
         var held = new HashSet<SourceLocation>();
         foreach (IReadOnlyList<SourceLocation> part in parts)
         foreach (SourceLocation site in part)
@@ -226,9 +206,8 @@ internal sealed class SelectionAdmission
     /// <summary>
     ///     The fold of a rule's operand list (GRAMMAR §5.3): each operand resolved once, their memberships
     ///     unioned, and each operand's head recorded against the conflated nodes it admitted. The per-operand
-    ///     admissions it folded come back in <paramref name="parts" /> for the dead-pattern warnings, which have
-    ///     to see an operand that matched nothing beside one that did, a fact the fold destroys, since the
-    ///     united set is non-empty either way.
+    ///     admissions come back in <paramref name="parts" />, since the united set cannot say which operand
+    ///     matched nothing.
     /// </summary>
     /// <remarks>
     ///     The rule subject's gate reads this grain through <see cref="Folded" /> (GRAMMAR §4.1); this is the
@@ -250,15 +229,11 @@ internal sealed class SelectionAdmission
     internal static SelectionAdmission Collect(
         SelectionEvaluator selections, Selection selection, SelectionPosition position)
     {
-        // Every compound selection takes its parts' stance and folds them (GRAMMAR §5.1, §4.1), which is
-        // why one arm serves all three: a union's heads are its operands', a family's are its cells' — so a
-        // project cell stages its project head and a file compiled into two cells is judged at each — and a
-        // layer's are its definition's, so a project-defined layer names its nodes at that project exactly
-        // as the bare project noun would. The enclosing selection's own adjectives gate what survives.
-        // Totality over the noun hierarchy is the point rather than any one caller: spec-build item 27
-        // keeps a family out of every position but the rule subject, and the subject path collects its
-        // cells itself. A compound shape that fell through to the leaf below would lose its parts' heads,
-        // which is the silent wrong answer rather than a loud one.
+        // Every compound selection takes its parts' stance and folds them (GRAMMAR §5.1, §4.1): a union's heads
+        // are its operands', a family's its cells', and a layer's its definition's, so a project-defined layer
+        // names its nodes at that project exactly as the bare project noun would. Totality over the noun
+        // hierarchy is the point rather than any one caller: a compound shape that fell through to the leaf
+        // below would lose its parts' heads, which is the silent wrong answer rather than a loud one.
         if (selections.Composite(selection) is { } parts)
             return Folded(selections, selection, CollectAll(selections, parts, position));
 
@@ -302,15 +277,13 @@ internal sealed class SelectionAdmission
     }
 
     /// <summary>
-    ///     A union or a family folded from parts already collected in the same position — the enclosing
+    ///     A compound selection folded from parts already collected in the same position — the enclosing
     ///     selection's own adjectives applied to the united membership (GRAMMAR §5.1), and the parts' heads
-    ///     gated on what survives them. Exposed so the subject path can report per-part emptiness
-    ///     (GRAMMAR §4.1) before the fold.
+    ///     gated on what survives them.
     /// </summary>
     /// <remarks>
-    ///     One fold for both, because a union's operands and a family's cells differ in what they mean and
-    ///     not in how they combine. A family folded separately could drift from the union it is defined to
-    ///     equal.
+    ///     One fold serves every compound shape: a family folded separately could drift from the union it is
+    ///     defined to equal.
     /// </remarks>
     internal static SelectionAdmission Folded(
         SelectionEvaluator selections, Selection enclosing, IReadOnlyList<SelectionAdmission> parts)
@@ -322,7 +295,6 @@ internal sealed class SelectionAdmission
         return new SelectionAdmission(members, Merge(parts, members));
     }
 
-    // Every part of a compound selection, collected in the same position — a union's operands, a family's cells.
     private static IReadOnlyList<SelectionAdmission> CollectAll(
         SelectionEvaluator selections, IReadOnlyList<Selection> parts, SelectionPosition position)
     {
@@ -389,8 +361,7 @@ internal sealed class SelectionAdmission
     }
 
     // What one leaf selection admitted its conflated members under: the project name where the noun is a
-    // project, the attribution-insensitive flag under every other noun. A model that conflates nothing
-    // stages nothing at all, which is what makes NamingOf answer "at every project" there by construction.
+    // project, the attribution-insensitive flag under every other noun.
     private static Dictionary<TypeNode, Provenance>? Stage(
         SelectionEvaluator selections, Selection selection, HashSet<TypeNode> members)
     {
@@ -420,9 +391,6 @@ internal sealed class SelectionAdmission
         return entry;
     }
 
-    // Where this selection names one node — at every project, at the ones its project-headed selections
-    // spelled, or nowhere at all. Read once per end and then asked per instance, because it is a property
-    // of the (selection, node) pair and the instances only vary the project it is asked about.
     private Naming NamingOf(TypeNode node)
     {
         if (!Nodes.Contains(node)) return Naming.Nowhere;
@@ -435,8 +403,8 @@ internal sealed class SelectionAdmission
         return provenance.NonProjectAdmitted ? Naming.Anywhere : Naming.At(provenance.ProjectHeads);
     }
 
-    // The counting tail both edge tests share: the instances counted against a rule, and the lines those leave it
-    // to cite. The count decides three of the four answers on its own, so the walk keeps only it and the single
+    // The edge tests' counting tail: the instances counted against a rule, and the lines those leave it to cite.
+    // The count decides three of the four answers on its own, so the walk keeps only it and the single
     // instance it would name, and builds a list of shares for the one arm that needs them.
     private struct EvidenceTally
     {
@@ -466,7 +434,7 @@ internal sealed class SelectionAdmission
 
     // What admitted one conflated node into a selection: the names of the project-headed selections that
     // reached it, and whether any head that is not a project did. Mutable because it is accumulated
-    // through the fold, and read-only in effect afterwards — nothing outside this file ever holds one.
+    // through the fold, and read-only in effect afterwards.
     private sealed class Provenance
     {
         internal List<string> ProjectHeads { get; } = [];
@@ -476,9 +444,7 @@ internal sealed class SelectionAdmission
 
     /// <summary>
     ///     Where one selection names one node: at every project, at the listed ones, or nowhere. The
-    ///     per-node half of the §4.1 edge rule — <see cref="CountedSites" /> resolves one per end and then
-    ///     asks it the project each instance reached — and of the §5.1 overlap test, which asks whether two
-    ///     cells' namings meet (<see cref="SharesCopyWith" />).
+    ///     per-node half of the §4.1 edge rule and of the §5.1 overlap test (<see cref="SharesCopyWith" />).
     /// </summary>
     /// <remarks>
     ///     "At every project" covers three different reasons that need no telling apart here: the node has

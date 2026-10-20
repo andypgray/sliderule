@@ -9,11 +9,6 @@ namespace SlideRule.Checking;
 ///     names (GRAMMAR §4.6): the declared members of its underlying type selection, narrowed by the
 ///     projection's kind filter and then by each member adjective in authoring order.
 /// </summary>
-/// <remarks>
-///     Nouns/adjectives on the <em>type</em> side are resolved by <see cref="SelectionEvaluator" />
-///     (subject universe: solution-declared types, whose <see cref="TypeNode.Members" /> are populated;
-///     externals carry none).
-/// </remarks>
 internal static class MemberSelectionEvaluator
 {
     /// <summary>
@@ -22,8 +17,7 @@ internal static class MemberSelectionEvaluator
     ///     is not evaluated twice). An <c>Except</c> payload's source is resolved through
     ///     <paramref name="selections" />, since nothing has evaluated it yet. Throws
     ///     <see cref="RuleEvaluationException" /> when a <c>Returning</c> anchor, the selection's own or a
-    ///     payload's, is a closed generic construction (the check-time backstop for GRAMMAR §8 item 14) — the
-    ///     checker surfaces it as a <see cref="ViolationKind.RuleError" /> rather than crashing the run.
+    ///     payload's, is a closed generic construction (the check-time backstop for GRAMMAR §8 item 14).
     /// </summary>
     internal static IReadOnlyList<MemberNode> Resolve(
         MemberSelection selection, HashSet<TypeNode> sourceTypes, SelectionEvaluator selections)
@@ -34,9 +28,8 @@ internal static class MemberSelectionEvaluator
             .ToList();
     }
 
-    // The members a selection keeps, unordered: its source's declared members of its kind, then each adjective
-    // in authoring order. Every adjective that can throw does so while the chain is built, before anything is
-    // enumerated, so a caller that never enumerates still meets the fault.
+    // The members a selection keeps, unordered. Every adjective that can throw does so while the chain is built,
+    // before anything is enumerated, so a caller that never enumerates still meets the fault.
     private static IEnumerable<MemberNode> Narrowed(
         MemberSelection selection, IEnumerable<TypeNode> sourceTypes, SelectionEvaluator selections)
     {
@@ -47,10 +40,9 @@ internal static class MemberSelectionEvaluator
     }
 
     // What an Except removes (GRAMMAR §5.7): every member any payload names. Each payload's source resolves
-    // where an exclusion stands, in target position, as a type-side Except payload does (GRAMMAR §4.1), and the
-    // payload's own adjectives, nested Excepts included, narrow it from there. Built eagerly, so a payload whose
-    // adjective cannot be evaluated throws during resolution exactly as the subject's own would. Subtraction is
-    // by node: a member is one MemberNode wherever a selection reaches it.
+    // where an exclusion stands, in target position, as a type-side Except payload does (GRAMMAR §4.1). Built
+    // eagerly, so a payload whose adjective cannot be evaluated throws during resolution exactly as the
+    // subject's own would. Subtraction is by node: a member is one MemberNode wherever a selection reaches it.
     private static HashSet<MemberNode> Excluded(IReadOnlyList<MemberSelection> payloads, SelectionEvaluator selections)
     {
         var excluded = new HashSet<MemberNode>();
@@ -92,9 +84,7 @@ internal static class MemberSelectionEvaluator
                 return current.Where(member => names.Contains(member.Name));
             case ReturningAdjective returning:
                 // Anchor keys resolve eagerly (before the lazy Where), so a closed-generic typeof anchor throws
-                // the backstop here — during resolution — exactly like a closed-generic type noun (§4.1). A
-                // string anchor is already the definition FQN and passes through verbatim, so it reaches no
-                // reflection and needs no backstop.
+                // the backstop here — during resolution — exactly like a closed-generic type noun (§4.1).
                 HashSet<string> anchors = ReturningAnchors(returning.Anchors);
                 return current.Where(member => member.ReturnTypeFullName is { } returnType && anchors.Contains(returnType));
             case MemberAttributedWithAdjective attributed:
@@ -125,16 +115,10 @@ internal static class MemberSelectionEvaluator
     ///     instead of a type's attribute constructions.
     /// </summary>
     /// <remarks>
-    ///     It shares that matcher's arms literally: the classification is
-    ///     <see cref="SelectionEvaluator.AnchorKey" />, so a <em>string</em> anchor is the
-    ///     open-definition arm (a name is a DEFINITION name, so it matches every construction of that
-    ///     definition and a constructed spelling matches nothing), a <em>generic-definition</em>
-    ///     <c>typeof</c> anchor matches the same way, and any other <c>typeof</c> matches the constructed
-    ///     name (for a non-generic attribute the two coincide). Declared attributes
-    ///     only — no inheritance, and no accessor or <c>[return:]</c> attributes (they hang off other
-    ///     symbols). The anchor's key is read once, eagerly, so an unrepresentable anchor throws before any
-    ///     member is tested and <see cref="ArchChecker" /> contains it per-rule as a
-    ///     <see cref="ViolationKind.RuleError" />.
+    ///     It shares that matcher's arms literally, classifying the anchor through
+    ///     <see cref="SelectionEvaluator.AnchorKey" />. Declared attributes only — no inheritance, and no
+    ///     accessor or <c>[return:]</c> attributes (they hang off other symbols). The anchor's key is read once,
+    ///     eagerly, so an unrepresentable anchor throws before any member is tested.
     /// </remarks>
     internal static Func<IMemberInfo, bool> MemberAttributeMatcher(TypeAnchor anchor)
     {

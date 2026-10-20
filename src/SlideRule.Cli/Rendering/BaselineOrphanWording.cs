@@ -3,8 +3,8 @@ using SlideRule.Baselines;
 namespace SlideRule.Cli.Rendering;
 
 /// <summary>
-///     The lines that name what the orphan scan found, held once so <c>status</c> and <c>baseline init</c> word an
-///     orphan the same way.
+///     The lines that name what the orphan scan found, held once so every verb that reports an orphan words it the
+///     same way.
 /// </summary>
 internal static class BaselineOrphanWording
 {

@@ -8,9 +8,8 @@ namespace SlideRule.Model;
 ///     "projects" or a <see cref="ProjectNamedAdjective" /> substitution alike.
 /// </summary>
 /// <remarks>
-///     The glob is the shared <c>*</c> matcher's, ordinal and case-sensitive, with no dot-segment
-///     structure: a project name is one token, so there is no subtree operator to strand a wildcard behind
-///     and nothing here needs the namespace pattern's extra validation.
+///     A project name is one token, so the glob has no subtree operator and needs none of the namespace
+///     pattern's extra validation.
 /// </remarks>
 internal sealed class ProjectMatchingAdjective(IReadOnlyList<string> globs) : ProjectAdjective
 {

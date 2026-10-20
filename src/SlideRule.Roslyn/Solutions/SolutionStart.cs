@@ -1,8 +1,7 @@
 namespace SlideRule.Roslyn.Solutions;
 
 /// <summary>Where <see cref="SolutionDiscovery.Choose" /> says discovery starts.</summary>
-/// <param name="Path">The absolute solution file to check, or the absolute directory to search upwards from.</param>
-/// <param name="Kind">Which of the three it is.</param>
+/// <remarks><paramref name="Path" /> is the absolute solution file to check or directory to search from.</remarks>
 internal sealed record SolutionStart(string Path, SolutionStartKind Kind);
 
 /// <summary>What a <see cref="SolutionStart" /> path is, and so what a missing file is reported as.</summary>

@@ -3,25 +3,23 @@ using SlideRule.Fluent;
 namespace SlideRule.Rendering;
 
 /// <summary>
-///     Glob-vs-glob containment, the one question the law diagram's nesting rests on: does every
-///     namespace one glob matches also match the other? <see cref="NamespacePattern" /> answers the
-///     namespace-vs-glob question and is the semantics mirrored here — a trailing <c>.*</c> is the
-///     self-inclusive subtree operator, and its literal prefix is compared literally.
+///     Glob-vs-glob containment: does every namespace one glob matches also match the other? It mirrors
+///     <see cref="NamespacePattern" />'s semantics: a trailing <c>.*</c> is the self-inclusive subtree
+///     operator, and its literal prefix is compared literally.
 /// </summary>
 /// <remarks>
 ///     Only two glob shapes are containment-comparable: an exact name (<c>SlideRule</c>) and a
-///     subtree whose prefix carries no wildcard (<c>MyApp.Web.*</c>). Every other legal shape — an
-///     interior standalone <c>*</c>, a partial-segment <c>*</c>, the lone <c>*</c> — matches a set no
-///     prefix comparison can decide, so it is reported as not contained. That is the deliberate
-///     asymmetry: a false negative costs a drawing one flat node, and a false positive nests a node under
-///     a parent that does not contain it, which is the diagram telling the reader something untrue.
+///     subtree whose prefix carries no wildcard (<c>MyApp.Web.*</c>). Every other shape matches a set no
+///     prefix comparison can decide, so it is reported as not contained, in either direction. That is the
+///     deliberate asymmetry: a false negative costs a drawing one flat node, and a false positive nests a
+///     node under a parent that does not contain it, which is the diagram telling the reader something
+///     untrue.
 /// </remarks>
 internal static class NamespaceContainment
 {
     /// <summary>
     ///     Whether every namespace <paramref name="inner" /> matches is also matched by
-    ///     <paramref name="outer" />. Reflexive on identical comparable globs; false whenever either
-    ///     glob is a shape this comparison cannot decide.
+    ///     <paramref name="outer" />. Reflexive on identical comparable globs.
     /// </summary>
     internal static bool Implies(string inner, string outer)
     {
@@ -39,8 +37,6 @@ internal static class NamespaceContainment
         return !innerSubtree && string.Equals(innerPrefix, outerPrefix, StringComparison.Ordinal);
     }
 
-    // The comparable shapes, reduced to (literal prefix, is-subtree). Anything else fails to parse and
-    // the caller reports no containment in either direction.
     private static bool TryParse(string glob, out string prefix, out bool subtree)
     {
         subtree = NamespacePattern.TryParseSubtree(glob, out prefix);

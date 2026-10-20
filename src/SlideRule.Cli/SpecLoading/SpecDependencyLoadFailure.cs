@@ -11,10 +11,7 @@ namespace SlideRule.Cli.SpecLoading;
 ///     <see cref="UserErrorException" /> naming the spec, what could not be loaded, the cause, and the
 ///     remedy that applies.
 /// </summary>
-/// <remarks>
-///     Both host surfaces render the result message-only: the CLI top-level handler to stderr with exit 2,
-///     the MCP <c>GlobalCallToolFilter</c> to the client as an error result.
-/// </remarks>
+/// <remarks>Each host surface renders the result message-only.</remarks>
 internal static class SpecDependencyLoadFailure
 {
     /// <summary>Where the assembly that would not load stands in the spec's own dependency manifest.</summary>
@@ -55,12 +52,9 @@ internal static class SpecDependencyLoadFailure
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         The remedy is chosen by <em>structure already on disk</em> rather than by asking the reader to
-    ///         classify their own assembly. The spec's <c>.deps.json</c> is the same manifest
+    ///         The remedy turns on whether the spec's <c>.deps.json</c>, the manifest
     ///         <see cref="System.Runtime.Loader.AssemblyDependencyResolver" /> just failed to resolve through,
-    ///         so its membership answers exactly the question the remedy turns on: an assembly the manifest
-    ///         names is a package asset and staging it is the fix, while one the manifest does not name cannot
-    ///         be staged by any build setting.
+    ///         names the assembly; the reader is never asked to classify their own assembly.
     ///     </para>
     ///     <para>
     ///         A .NET <em>shared</em> framework is neither a package nor a .NET Framework assembly, and the

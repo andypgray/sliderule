@@ -36,8 +36,7 @@ internal static class HookGit
     ///     worktree, so a relative answer is resolved against the top level it came from, and both are normalised.
     ///     The case is folded by the product's one per-OS path rule, so on Linux the identity is case-sensitive.
     ///     On a case-insensitive mount, an NTFS drive under WSL, two spellings of one repository therefore compare
-    ///     as two, as every other path comparison in the product does there. That is preferred to an unconditional
-    ///     fold, which makes two Linux repositories differing only in case one.
+    ///     as two, as every other path comparison in the product does there.
     /// </remarks>
     public static async Task<string?> SharedGitDirectoryAsync(string topLevel, CancellationToken ct)
     {
@@ -65,12 +64,10 @@ internal static class HookGit
     }
 
     /// <summary>
-    ///     The git directory <paramref name="common" /> names, resolved against <paramref name="topLevel" /> and
-    ///     folded by the per-OS path rule, so two spellings of one directory compare equal wherever that rule
-    ///     ignores case.
+    ///     The git directory <paramref name="common" />, git's <c>rev-parse --git-common-dir</c> answer, names:
+    ///     resolved against the fully qualified <paramref name="topLevel" /> it was asked from and folded by the
+    ///     per-OS path rule.
     /// </summary>
-    /// <param name="common">git's answer to <c>rev-parse --git-common-dir</c>, relative or absolute.</param>
-    /// <param name="topLevel">The fully qualified top level of the tree git was asked from.</param>
     internal static string GitDirectoryIdentity(string common, string topLevel)
     {
         string full = Path.GetFullPath(common, topLevel);
@@ -158,7 +155,7 @@ internal sealed class TreeSnapshot
     /// <summary>The digest of a listed file that is not there: a deletion.</summary>
     public const string Absent = "-";
 
-    /// <summary>The digest of a file that could not be read, which equals nothing, so the file reads as changed.</summary>
+    /// <summary>The digest of an unreadable file, which equals nothing, so the file reads as changed.</summary>
     public const string Unreadable = "?";
 
     private readonly Dictionary<string, string> _digests;
@@ -201,12 +198,8 @@ internal sealed class TreeSnapshot
 
     /// <summary>
     ///     The snapshot of a tree whose HEAD and NUL-separated status listing git gave, kept to its code entries,
-    ///     each digested by <paramref name="digestOf" />.
+    ///     each digested by <paramref name="digestOf" /> from its root-relative path as the bytes are now.
     /// </summary>
-    /// <param name="head">The commit HEAD names.</param>
-    /// <param name="topLevel">The top level the listing's paths are relative to.</param>
-    /// <param name="status">The output of <c>git status --porcelain=v1 -uall -z --no-renames</c>.</param>
-    /// <param name="digestOf">The digest of a root-relative path's bytes as they are now.</param>
     internal static TreeSnapshot Of(string head, string topLevel, string status, Func<string, string> digestOf)
     {
         List<string> kept = GitChangedFiles.ParseZTerminated(status)
@@ -251,10 +244,7 @@ internal sealed class TreeSnapshot
     }
 }
 
-/// <summary>
-///     What counts as code to the hook: the extensions a check reads, spelled once for both questions put to it.
-///     A stop filters the changed-file listing with it, and an edit's payload is gated on it.
-/// </summary>
+/// <summary>What counts as code to the hook: the extensions a check reads.</summary>
 internal static class HookCodeFiles
 {
     private static readonly string[] Extensions =

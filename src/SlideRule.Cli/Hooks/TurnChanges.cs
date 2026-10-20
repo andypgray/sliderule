@@ -1,9 +1,6 @@
 namespace SlideRule.Cli.Hooks;
 
-/// <summary>
-///     Which code files changed between two snapshots of one working tree, by their bytes: the question both of the
-///     hook's skips ask, and the answer a check's tripwires are scoped to.
-/// </summary>
+/// <summary>Which code files changed between two snapshots of one working tree, by their bytes.</summary>
 /// <remarks>
 ///     A file's bytes are what count, not its timestamp and not HEAD. A file rewritten with the same bytes has not
 ///     changed, and neither has a file whose bytes a commit took in as they were. The cost is the other direction:
@@ -15,13 +12,10 @@ internal static class TurnChanges
     ///     The root-relative code paths whose bytes differ between <paramref name="before" /> and
     ///     <paramref name="after" />, in first-seen order, or null when that cannot be told.
     /// </summary>
-    /// <param name="before">The earlier snapshot: a baseline or the tree a verdict covered.</param>
-    /// <param name="after">The snapshot taken now.</param>
-    /// <param name="committed">
-    ///     The paths that differ between the two snapshots' HEADs, when those differ; null when they are the same
-    ///     commit, or when git could not say, which a moved HEAD reads as doubt.
-    /// </param>
-    /// <param name="digestNow">The digest of a root-relative path's bytes as they are now.</param>
+    /// <remarks>
+    ///     <paramref name="committed" /> lists the paths that differ between the two HEADs, and is null when they
+    ///     are one commit or git could not say, which under a moved HEAD reads as doubt.
+    /// </remarks>
     public static IReadOnlyList<string>? Between(
         TreeSnapshot before, TreeSnapshot after, IReadOnlyList<string>? committed, Func<string, string> digestNow)
     {
@@ -43,9 +37,8 @@ internal static class TurnChanges
             .ToList();
     }
 
-    // A file the earlier snapshot recorded is compared by its bytes, wherever HEAD has gone since, so a commit that
-    // took the file in as it stood changes nothing. A file it did not record was HEAD's version, which it still is
-    // unless git lists it now or a commit between the two HEADs changed it.
+    // A file the earlier snapshot did not record was HEAD's version, which it still is unless git lists it now or a
+    // commit between the two HEADs changed it.
     private static bool Changed(
         string path,
         TreeSnapshot before,

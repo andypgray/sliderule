@@ -11,7 +11,6 @@ namespace SlideRule.Model;
 /// </summary>
 internal sealed class MustNotSwallowConstraint(Selection subject, IReadOnlyList<Selection> targets) : OperandConstraint(subject, targets)
 {
-    /// <summary>The catch targets that may not be swallowed.</summary>
     internal IReadOnlyList<Selection> Targets => Operands;
 
     internal override string VerbPhrase => "must not swallow " + Targets.TargetListProse();

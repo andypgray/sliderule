@@ -5,16 +5,16 @@ using SlideRule.Roslyn.Solutions;
 namespace SlideRule.Roslyn.Caching;
 
 /// <summary>
-///     The file-system probes the warm session and both persisted caches share to decide, with zero MSBuild,
-///     whether a tree's on-disk shape has moved: the <see cref="Enumerate">cone</see> of <c>*.cs</c> a project
-///     directory globs, and the <see cref="SolutionStructuralPaths">structural path set</see> a whole solution
-///     stamps.
+///     The file-system probes that decide, with zero MSBuild, whether a tree's on-disk shape has moved: the
+///     <see cref="Enumerate">cone</see> of <c>*.cs</c> a project directory globs, and the
+///     <see cref="SolutionStructuralPaths">structural path set</see> a whole solution stamps.
 /// </summary>
 /// <remarks>
-///     Shared so the three consumers — <see cref="WorkspaceSession" />, <see cref="ExtractionCacheStore" />,
-///     and <see cref="Replay.BinlogCaptureStore" /> — cannot drift apart on what counts as a source file or
-///     how far the probe chain reaches. Every yielded path is a canonical full path, so a caller keys the
-///     results against a set built with <see cref="PathComparison.Comparer" /> and compares like for like.
+///     Every caller deciding whether a model is still valid asks these, so none can drift from another on what
+///     counts as a source file or how far the probe chain reaches: a path one stamps and another does not is a
+///     stale answer served confidently, with nothing red. Every yielded path is a canonical full path, so a
+///     caller keys the results against a set built with <see cref="PathComparison.Comparer" /> and compares like
+///     for like.
 /// </remarks>
 internal static class ProjectCone
 {
@@ -33,25 +33,18 @@ internal static class ProjectCone
 
     /// <summary>
     ///     Enumerates every <c>*.cs</c> under <paramref name="projectDirectory" /> (recursively), skipping the
-    ///     <c>bin</c>/<c>obj</c> build-output subtrees, as canonical full paths. This is the SDK default-glob
-    ///     cone — the source-membership set a stat sweep cannot see change, because an SDK-glob add touches no
-    ///     MSBuild file. A non-existent directory yields nothing. The cone is deliberately a superset of a
-    ///     project's <em>compiled</em> documents: a <c>&lt;Compile Remove&gt;</c>'d or <c>None</c>-typed
-    ///     <c>*.cs</c> still lives here, so callers must record cone membership to tell a genuine add from a
-    ///     file that was never compiled in the first place.
+    ///     <c>bin</c>/<c>obj</c> build-output subtrees; a non-existent directory yields nothing. This is the SDK
+    ///     default-glob cone, the source-membership set a stat sweep cannot see change, because an SDK-glob add
+    ///     touches no MSBuild file. The cone is a superset of a project's <em>compiled</em> documents: a
+    ///     <c>&lt;Compile Remove&gt;</c>'d or <c>None</c>-typed <c>*.cs</c> still lives here, so callers must record
+    ///     cone membership to tell a genuine add from a file that was never compiled in the first place.
     /// </summary>
     /// <remarks>
-    ///     <para>
-    ///         The walk streams, so a caller that asks only whether the cone holds anything new stops at the
-    ///         first hit. The warm session's reconcile sweep asks exactly that on every MCP tool call; the
-    ///         callers that need the whole set are unaffected.
-    ///     </para>
-    ///     <para>
-    ///         Both tests are ordinal — the <c>.cs</c> suffix and the pruned directory names — so a
-    ///         differently-cased <c>BIN</c> is not build output and a <c>.CS</c> is not source, matching
-    ///         <see cref="BuildOutputDirectories.IsUnderBuildOutput" /> exactly. Order is whatever the file
-    ///         system yields: <see cref="Adds" /> sorts, and no caller may key on the raw order.
-    ///     </para>
+    ///     The walk streams, so a caller that asks only whether the cone holds anything new stops at the first
+    ///     hit. Both tests are ordinal, the <c>.cs</c> suffix and the pruned directory names, so a differently-cased
+    ///     <c>BIN</c> is not build output and a <c>.CS</c> is not source, matching
+    ///     <see cref="BuildOutputDirectories.IsUnderBuildOutput" /> exactly. Order is whatever the file system
+    ///     yields: <see cref="Adds" /> sorts, and no caller may key on the raw order.
     /// </remarks>
     public static IEnumerable<string> Enumerate(string projectDirectory)
     {
@@ -71,9 +64,8 @@ internal static class ProjectCone
     }
 
     /// <summary>
-    ///     The cone's <c>*.cs</c> that <paramref name="known" /> does not already hold, ordinal-sorted — the
-    ///     SDK-glob adds a stat sweep cannot see. Sorted so a caller keying on the result gets the same answer
-    ///     whatever order the file system enumerated.
+    ///     The cone's <c>*.cs</c> that <paramref name="known" /> does not already hold, ordinal-sorted so a caller
+    ///     keying on the result gets the same answer whatever order the file system enumerated.
     /// </summary>
     public static IReadOnlyList<string> Adds(string projectDirectory, ICollection<string> known)
     {
@@ -89,10 +81,9 @@ internal static class ProjectCone
     ///     none — the same question <see cref="Adds" /> answers, for a caller that needs only a witness.
     /// </summary>
     /// <remarks>
-    ///     Stops the walk at the first hit, where <see cref="Adds" /> must read the whole cone before it can
-    ///     sort it. "First" is therefore first-enumerated rather than first-ordinal: the two differ only in
-    ///     <em>which</em> new file a notice names when several appeared at once, and any caller that needs
-    ///     the stable choice is asking <see cref="Adds" />.
+    ///     "First" is first-enumerated rather than first-ordinal: the two differ only in <em>which</em> new file a
+    ///     notice names when several appeared at once, and any caller that needs the stable choice is asking
+    ///     <see cref="Adds" />.
     /// </remarks>
     public static string? FirstAdd(string projectDirectory, ICollection<string> known)
     {
@@ -109,20 +100,11 @@ internal static class ProjectCone
     ///     because a probe that later appears is itself the change.
     /// </summary>
     /// <remarks>
-    ///     The composition, not just its primitives, is what the consumers must agree on: they are
-    ///     deciding whether a cached model is still valid, and a probe one of them stamps and another does not
-    ///     is a stale answer served confidently, with nothing red. The order is the order stamps are recorded
-    ///     in, so a persisted stamp list keeps its shape. A whole solution's set is
-    ///     <see cref="SolutionStructuralPaths" />; this is the per-project course of it, which the warm
-    ///     session records directly because it stamps as it walks rather than composing a list.
+    ///     The order is the order stamps are recorded in, so a persisted stamp list keeps its shape. This is the
+    ///     per-project course of <see cref="SolutionStructuralPaths" />. <see cref="WorkspaceSession" /> stamps this
+    ///     course as it walks instead of calling <see cref="SolutionStructuralPaths" />, so a leg added there must be
+    ///     added to the session's walk as well.
     /// </remarks>
-    /// <param name="projectDirectory">The directory holding the project file.</param>
-    /// <param name="evaluatedOutputPath">
-    ///     The project's evaluated output path, or null when the caller has none. Together with
-    ///     <paramref name="intermediateAssemblyPath" /> it is what lets the assets file be found under a
-    ///     non-default output layout; with either absent the default location is all that is stamped.
-    /// </param>
-    /// <param name="intermediateAssemblyPath">The project's intermediate assembly path, or null when unknown.</param>
     public static IEnumerable<string> StructuralPaths(
         string projectDirectory, string? evaluatedOutputPath, string? intermediateAssemblyPath)
     {
@@ -136,26 +118,14 @@ internal static class ProjectCone
     }
 
     /// <summary>
-    ///     One solution's whole structural set, deduplicated and in stamping order: the solution file, the
-    ///     solution a filter points at, then each project's file followed by its
+    ///     One solution's whole structural set, deduplicated and in stamping order: the solution (or filter) file
+    ///     at <paramref name="solutionPath" />, the solution a filter points at, then each of
+    ///     <paramref name="projects" />, in the order given, as its file followed by its
     ///     <see cref="StructuralPaths" />.
     /// </summary>
     /// <remarks>
-    ///     <para>
-    ///         Both persisted caches stamp this set and both decide "the structure moved" from it, so the
-    ///         composition is shared for the reason <see cref="StructuralPaths" /> is: a path one store
-    ///         watches and the other does not is a cached model that outlives its inputs on one path and not
-    ///         the other, with nothing to show for it.
-    ///     </para>
-    ///     <para>
-    ///         The filter leg costs a non-filter solution nothing: the format test comes before any I/O.
-    ///     </para>
+    ///     The filter leg costs a non-filter solution nothing: the format test comes before any I/O.
     /// </remarks>
-    /// <param name="solutionPath">The solution (or solution-filter) file the run was pointed at.</param>
-    /// <param name="projects">
-    ///     Each project's file path, directory, and evaluated output pair, in the order they are to be
-    ///     stamped.
-    /// </param>
     public static IReadOnlyList<string> SolutionStructuralPaths(
         string solutionPath,
         IEnumerable<(string CsprojPath, string ProjectDirectory, string? EvaluatedOutputPath, string?

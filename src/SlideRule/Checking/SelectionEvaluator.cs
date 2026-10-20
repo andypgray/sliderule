@@ -12,8 +12,7 @@ namespace SlideRule.Checking;
 ///     adjectives narrow it, <c>Except</c> subtracts.
 /// </summary>
 /// <remarks>
-///     The hierarchy adjectives read the construction lists, comparing names as <see cref="AnchorKey" />
-///     decides. External nodes carry empty construction lists, so hierarchy adjectives never match them (a
+///     External nodes carry empty construction lists, so hierarchy adjectives never match them (a
 ///     documented boundary, GRAMMAR §5.2).
 /// </remarks>
 internal sealed class SelectionEvaluator
@@ -37,17 +36,13 @@ internal sealed class SelectionEvaluator
 
     /// <summary>
     ///     An evaluator over <paramref name="model" />, with <paramref name="root" /> the directory path globs are
-    ///     relative to: the solution directory, or in the build analyzer the model file's. A run given no root
-    ///     cannot answer a path glob, and says so where one is asked.
+    ///     relative to. A run given no root cannot answer a path glob, and says so where one is asked.
     /// </summary>
     internal SelectionEvaluator(CodebaseModel model, SolutionRoot? root = null)
     {
         _model = model;
         _root = root;
 
-        // One pass over the type universe for two answers: the subject universe, and whether any type in
-        // the model is declared by more than one project. The second is what lets SelectionAdmission skip
-        // per-node attribution outright on a codebase where no source file compiles into two projects.
         var solutionDeclared = new List<TypeNode>();
         var multiplyDeclared = false;
         foreach (TypeNode type in model.Types)
@@ -60,16 +55,11 @@ internal sealed class SelectionEvaluator
         AnyMultiplyDeclared = multiplyDeclared;
 
         // The FQN noun index, built once per evaluator and immutable afterwards: a typeof operand is
-        // otherwise a full linear scan of the type universe — the largest list in the model — per operand
-        // per rule. It preserves Types order within a key, so the sets it feeds are populated in exactly
-        // the order the equivalent Where scan would populate them.
-        //
-        // A lookup rather than a dictionary because a full name is not unique: CodebaseModel.ShadowedNames
-        // is the model's own roster of the names that are not (GRAMMAR §4.1). An indexer here would silently
-        // keep whichever came last in Types order and make the other invisible to every typeof operand — a
-        // ban that reaches only one of two types it names is worse than a slow scan. The lookup is built
-        // unconditionally rather than gated on that roster: it is one O(n) pass either way, and a name maps
-        // to its one node through the same call whether or not anything shadows it.
+        // otherwise a full linear scan of the type universe per operand per rule. It preserves Types order
+        // within a key, so the sets it feeds are populated in exactly the order the equivalent Where scan
+        // would populate them. A lookup, because a full name is not unique (CodebaseModel.ShadowedNames,
+        // GRAMMAR §4.1): a dictionary would silently keep whichever came last in Types order and make the
+        // other invisible to every typeof operand.
         _byFullName = model.Types.ToLookup(type => type.FullName, StringComparer.Ordinal);
     }
 
@@ -80,18 +70,18 @@ internal sealed class SelectionEvaluator
     /// </summary>
     internal bool AnyMultiplyDeclared { get; }
 
-    // The declarer index, built on first use in the same shape ConstraintEvaluator's edge indexes take, so
-    // a spec with no project noun never pays the grouping pass. Keyed on EVERY project that declares a
-    // type rather than only the one whose facts the node carries: one source file compiled into several
-    // projects is one node (GRAMMAR §4.1), and a project selection over any of those projects names it. A
-    // type is listed once per declarer and the declarers are distinct, so the lookup still preserves Types
-    // order within a key — a grouping keeps first-seen order, and the outer sequence is still Types.
+    // The declarer index, built on first use so a spec with no project noun never pays the grouping pass.
+    // Keyed on EVERY project that declares a type rather than only the one whose facts the node carries: one
+    // source file compiled into several projects is one node (GRAMMAR §4.1), and a project selection over any
+    // of those projects names it. A type is listed once per declarer and the declarers are distinct, so the
+    // lookup still preserves Types order within a key — a grouping keeps first-seen order, and the outer
+    // sequence is still Types.
     private ILookup<string, TypeNode> ByProjectName =>
         _byProjectName ??= _model.Types
             .SelectMany(type => type.Declarers, (type, declarer) => (Declarer: declarer, Type: type))
             .ToLookup(pair => pair.Declarer, pair => pair.Type, StringComparer.Ordinal);
 
-    /// <summary>Whether the operand is a pattern/glob selection (anything but a bare <c>typeof</c>) — the inert-warning gate.</summary>
+    /// <summary>Whether the operand is a pattern/glob selection (anything but a bare <c>typeof</c>).</summary>
     internal static bool IsPatternSelection(Selection selection)
     {
         return selection.Adjectives.Count > 0 || selection.NounOrNull() is not TypeNoun;
@@ -102,18 +92,17 @@ internal sealed class SelectionEvaluator
     ///     union's operands, a family's cells, a layer's definition (GRAMMAR §5.1, §4.1).
     /// </summary>
     /// <remarks>
-    ///     The one answer to which selections are compound, because two walks ask it: membership here, and
-    ///     provenance in <see cref="SelectionAdmission.Collect" />. Answered in one place so a fourth
-    ///     compound shape reaches both by being added once — a shape the provenance walk did not know about
-    ///     would fall through to the leaf and silently lose its parts' heads rather than fail.
+    ///     The one answer to which selections are compound, so a compound shape added here reaches every walk
+    ///     that asks, provenance in <see cref="SelectionAdmission.Collect" /> included, where a shape it did not
+    ///     know about would fall through to the leaf and silently lose its parts' heads rather than fail.
     ///     <para>
     ///         The union arm comes first because a union has no single noun: reading
     ///         <see cref="Selection.Noun" /> on one throws by design.
     ///     </para>
     ///     <para>
-    ///         Unmemoized on purpose, all three: a layer cell may carry a <c>Where</c> predicate through its
-    ///         definition, and a project family's cells are decided by a project selection that may carry
-    ///         one directly.
+    ///         Not memoized. Only the family arm computes anything, resolving a project family's cells through a
+    ///         project selection that may carry a <c>Where</c> predicate, so a memo there would hold the answer of
+    ///         user code; the union and layer arms return what the selection already holds.
     ///     </para>
     /// </remarks>
     internal IReadOnlyList<Selection>? Composite(Selection selection)
@@ -195,16 +184,11 @@ internal sealed class SelectionEvaluator
     ///     A selection's own adjectives applied to a candidate set already resolved in the same position —
     ///     the tail of <see cref="Evaluate" /> without its noun resolution.
     /// </summary>
-    /// <remarks>
-    ///     Exposed so a caller that already holds what the selection's noun resolves to can finish the
-    ///     selection without resolving it a second time.
-    /// </remarks>
     // May hand back the very set it was given, so a caller must pass one it owns and must not go on
-    // mutating it afterwards. That is safe because a HashSet only ever reaches here from a compound fold —
-    // Evaluate's parts loop and SelectionAdmission.Folded, each of which allocates one, fills it and lets
-    // go. No ByNoun arm yields a HashSet: the universes are lists, the memo holds a list, and the rest are
-    // lazy Wheres. An adjective-free union or family is the common case, and copying its membership a
-    // second time would buy nothing.
+    // mutating it afterwards. That is safe because no ByNoun arm yields a HashSet (the universes are lists, the
+    // memo holds a list, and the rest are lazy Wheres), so the set handed back is one a compound fold allocated.
+    // An adjective-free union or family is the common case, and copying its membership a second time would buy
+    // nothing.
     internal HashSet<TypeNode> Narrow(Selection selection, IEnumerable<TypeNode> candidates)
     {
         if (selection.Adjectives.Count == 0 && candidates is HashSet<TypeNode> owned) return owned;
@@ -223,18 +207,16 @@ internal sealed class SelectionEvaluator
     ///     noun half of <see cref="Evaluate" />, asked of one type.
     /// </summary>
     /// <remarks>
-    ///     The claim trace asks this rather than restating a noun's membership, so a trace and a check cannot
-    ///     disagree about which types a noun names. A compound selection has no noun of its own to ask about;
-    ///     its parts are asked instead (<see cref="Composite" />).
+    ///     A compound selection has no noun of its own to ask about; its parts are asked instead
+    ///     (<see cref="Composite" />).
     /// </remarks>
     internal bool NounAdmits(SelectionNoun noun, SelectionPosition position, TypeNode type)
     {
         return Admitted(noun, position).Contains(type);
     }
 
-    // The nodes a noun names in one position, as a set. Memoized for the reason ByNoun memoizes its scans: a noun
-    // carries no predicate, so one noun in one position always names the same types, and a trace asks the same noun of
-    // type after type.
+    // The nodes a noun names in one position, as a set, memoized on the ground Scanned states: a trace asks the
+    // same noun of type after type.
     private HashSet<TypeNode> Admitted(SelectionNoun noun, SelectionPosition position)
     {
         (SelectionNoun noun, SelectionPosition position) key = (noun, position);
@@ -252,11 +234,6 @@ internal sealed class SelectionEvaluator
     ///     Whether <paramref name="adjective" /> keeps <paramref name="type" /> — the adjective half of
     ///     <see cref="Narrow" />, asked of one type.
     /// </summary>
-    /// <remarks>
-    ///     Sound one type at a time because a narrowing filters through the same per-type test
-    ///     (<see cref="Keeper" />). An <c>Except</c> resolves its payload in target position here exactly as it
-    ///     does inside a narrowing.
-    /// </remarks>
     internal bool AdjectiveKeeps(SelectionAdjective adjective, TypeNode type)
     {
         // One keeper per adjective rather than one per type asked about, so an arm's setup runs once however many
@@ -270,10 +247,7 @@ internal sealed class SelectionEvaluator
         return keeps(type);
     }
 
-    // Instance (not static) because the RegisteredNoun arm reads model-side registration facts
-    // (CodebaseModel.ServiceRegistrations) — membership is many-to-many and never denormalized onto a
-    // TypeNode (GRAMMAR §4.7). The other nouns select purely off the position-correct universe. Never an
-    // iterator: TypeNounFullName must refuse a closed-generic noun eagerly, before any node is tested.
+    // Never an iterator: TypeNounFullName must refuse a closed-generic noun eagerly, before any node is tested.
     private IEnumerable<TypeNode> ByNoun(SelectionNoun noun, SelectionPosition position)
     {
         // The memo's own probe, ahead of the switch: a memoized noun costs a lookup rather than a closure, a
@@ -304,19 +278,13 @@ internal sealed class SelectionEvaluator
             case ProjectNoun project:
                 return ProjectMembers(project.Name, subject);
             case TypeNoun typeNoun:
-                // The scan is a lookup wearing a Where: every node carrying the name, position-filtered.
-                // Usually that is one — one source file compiled into several projects is conflated at merge,
-                // and a name nothing declares is a single external. It is two where a project declares a name
-                // a referenced assembly also supplies (GRAMMAR §4.1), and naming BOTH is what the position
-                // filter below then makes right: in subject position the source declaration alone survives,
-                // and in target position a ban reaches either binding rather than whichever node sorted last.
+                // Every node carrying the name, position-filtered: usually one, and two where a project declares
+                // a name a referenced assembly also supplies (GRAMMAR §4.1). Then subject position keeps the
+                // source declaration alone, and in target position a ban reaches either binding.
                 string fullName = TypeNounFullName(typeNoun.Anchor);
                 return _byFullName[fullName].Where(named => !(subject && named.IsExternal));
             case RegisteredNoun registered:
-                // Membership = service ∪ implementation FQNs of the recognized registrations at this lifetime
-                // (null = any lifetime, §4.7). Filtering the position-correct universe (subject = solution-
-                // declared, target = all types incl. externals) means an external registered type matches in
-                // target position but never enters a subject — exactly the §4.1 universe discipline.
+                // An external registered type matches in target position but never enters a subject (GRAMMAR §4.1).
                 return Scanned(noun, position, () =>
                 {
                     HashSet<string> registeredNames = RegisteredFullNames(registered.Lifetime);
@@ -336,11 +304,10 @@ internal sealed class SelectionEvaluator
     ///     project selection names.
     /// </summary>
     /// <remarks>
-    ///     The one place cells are minted, so the four readers of the partition — the self-allowance, the
-    ///     leaf verbs, the emptiness gate and the overlap check — all range over the same list, resolved
-    ///     once per rule. A project cell is minted as the selection <c>arch.Project(name)</c> would be,
-    ///     stamped with the family's own owner, which is what makes <see cref="SelectionAdmission.Collect" />
-    ///     stage its project head and §4.1 attribution judge each instance at its declarer.
+    ///     The one place cells are minted, so every reader of the partition ranges over the same cells. A
+    ///     project cell is minted as the selection <c>arch.Project(name)</c> would be, stamped with the family's
+    ///     own owner, which is what makes <see cref="SelectionAdmission.Collect" /> stage its project head and
+    ///     §4.1 attribution judge each instance at its declarer.
     /// </remarks>
     internal IReadOnlyList<Selection> Cells(Selection family)
     {
@@ -354,19 +321,16 @@ internal sealed class SelectionEvaluator
             .ToList();
     }
 
-    // The ordinal declarer index, then the position filter — the same nodes in the same order a
-    // universe scan would yield, because a lookup grouping keeps Types order.
     private IEnumerable<TypeNode> ProjectMembers(string name, bool subject)
     {
         IEnumerable<TypeNode> declaring = ByProjectName[name];
         return subject ? declaring.Where(t => !t.IsExternal) : declaring;
     }
 
-    // The scanning nouns' memo, keyed on (noun, position): every one of them walks the whole position-
-    // correct universe, and a spec names the same noun in rule after rule. Caching at the NOUN level is
-    // sound because a noun carries no user predicate — a Where or Must lambda arrives as an adjective, so
-    // one noun in one position always scans to the same list. The materialized list is read-only to every
-    // consumer (Evaluate copies it into a HashSet, Narrow wraps it in a Where), so sharing it is safe.
+    // The scanning nouns' memo, keyed on (noun, position): every one of them walks the whole position-correct
+    // universe, and a spec names the same noun in rule after rule. Caching at the NOUN level is sound because a
+    // noun carries no user predicate — a Where or Must lambda arrives as an adjective, so one noun in one
+    // position always scans to the same list. Every consumer only reads the list, so sharing it is safe.
     private IReadOnlyList<TypeNode> Scanned(
         SelectionNoun noun, SelectionPosition position, Func<IEnumerable<TypeNode>> scan)
     {
@@ -378,8 +342,8 @@ internal sealed class SelectionEvaluator
         return scanned;
     }
 
-    // A layer's glob scan, and an Under list's per declaring file: an index walk rather than a LINQ Any, because it
-    // runs once per type in the universe over a list that is usually a single glob.
+    // An index walk rather than a LINQ Any, because it runs once per type in the universe over a list that is
+    // usually a single glob.
     private static bool MatchesAnyGlob(IReadOnlyList<NamespacePattern> globs, string ns)
     {
         for (var i = 0; i < globs.Count; i++)
@@ -413,9 +377,8 @@ internal sealed class SelectionEvaluator
         return Admitted(AnyLifetimeRegistered, position);
     }
 
-    // The FQN membership set of arch.Registered(lifetime) (GRAMMAR §4.7): the union of the service and
-    // implementation full names of every recognized registration at the requested lifetime (null = all
-    // lifetimes), skipping the null implementation of a factory/instance registration. The FQNs are already in
+    // The FQN membership set of arch.Registered(lifetime) (GRAMMAR §4.7); a null lifetime is every lifetime,
+    // and a factory or instance registration has no implementation name. The FQNs are already in
     // TypeNode.FullName form (definition-level, declared type-parameter names), so a node compares directly.
     private HashSet<string> RegisteredFullNames(Lifetime? lifetime)
     {
@@ -439,16 +402,14 @@ internal sealed class SelectionEvaluator
 
     /// <summary>
     ///     The extraction-format FQN of a definition-level anchor — the one helper every definition-level
-    ///     anchor position resolves through (GRAMMAR §5.2, §4.6). A closed generic construction (which
-    ///     has no definition-level node, GRAMMAR §4.1/§4.5) and a type with no source-level form are refused
-    ///     as a <see cref="RuleEvaluationException" /> — a <see cref="ViolationKind.RuleError" /> the checker
-    ///     surfaces rather than crashing. The <paramref name="closedGenericGuidance" /> tail is spliced
-    ///     after "is a closed generic construction; " so each caller states its own actionable next step;
-    ///     an open definition resolves normally.
+    ///     anchor position resolves through (GRAMMAR §5.2, §4.6).
     /// </summary>
     /// <remarks>
-    ///     A string anchor already <em>is</em> the definition FQN, so it passes through verbatim and never
-    ///     refuses, which is the escape hatch's whole point.
+    ///     A closed generic construction (which has no definition-level node, GRAMMAR §4.1/§4.5) and a type
+    ///     with no source-level form are refused as a <see cref="RuleEvaluationException" />, with
+    ///     <paramref name="closedGenericGuidance" /> spliced after "is a closed generic construction; " so each
+    ///     caller states its own actionable next step. A string anchor already <em>is</em> the definition FQN,
+    ///     so it passes through verbatim and never refuses, which is the escape hatch's whole point.
     /// </remarks>
     internal static string DefinitionFullName(TypeAnchor anchor, string closedGenericGuidance)
     {
@@ -458,9 +419,8 @@ internal sealed class SelectionEvaluator
     }
 
     // The RuleError an anchor's refusal becomes, composed in the one place both key helpers reach, so what
-    // a refusal reads like cannot drift between a definition-level and a construction-level position. The
-    // closed-generic tail is the position's own next step; a position that ADMITS a closed generic has none
-    // to splice and can only be refused for a type with no source-level form, whose message the anchor holds.
+    // a refusal reads like cannot drift between a definition-level and a construction-level position. Any
+    // refusal but a closed generic is a type with no source-level form, whose message the anchor holds.
     private static RuleEvaluationException Refused(
         TypeAnchor anchor, AnchorRefusal refusal, string closedGenericGuidance)
     {
@@ -472,9 +432,9 @@ internal sealed class SelectionEvaluator
     }
 
     // An adjective as a test of one type. An arm hands back a predicate, which has no set to look across, so every
-    // adjective filters one type at a time by construction. Its setup (an Except's payload, an anchor's matcher, a
-    // pattern) still runs here, at the call, so a refusal fires before any type is tested. DeadNames reads a
-    // Named list against a narrowing on that ground, and AdjectiveKeeps caches the keeper.
+    // adjective filters one type at a time by construction, which DeadNames and AdjectiveKeeps rely on. Its setup
+    // (an Except's payload, an anchor's matcher, a pattern) still runs here, at the call, so a refusal fires before
+    // any type is tested.
     private Func<TypeNode, bool> Keeper(SelectionAdjective adjective)
     {
         switch (adjective)
@@ -516,8 +476,7 @@ internal sealed class SelectionEvaluator
                 return t => t.Accessibility == accessibility.Accessibility;
             case UnderAdjective under:
                 // Any declaring file under any glob (GRAMMAR §5.2): a partial type is where any of its files
-                // is, and an external type, declared in no file of the solution, is under nothing. The root is
-                // asked for here, at the call, so a run given none refuses before any type is tested.
+                // is, and an external type, declared in no file of the solution, is under nothing.
                 return DeclaredUnder(under.Globs);
             default:
                 // Fail closed: an unknown adjective would silently widen the selection — and in a
@@ -527,9 +486,8 @@ internal sealed class SelectionEvaluator
         }
     }
 
-    // The three hierarchy matchers share one shape over one construction list each — interfaces, bases,
-    // attributes. Which name each anchor form compares on, and why the key is read eagerly, is stated
-    // once on AnchorKey (GRAMMAR §5.2).
+    // Which name each anchor form compares on, and why the key is read eagerly, is stated once on AnchorKey
+    // (GRAMMAR §5.2).
     internal static Func<TypeNode, bool> InterfaceMatcher(TypeAnchor anchor)
     {
         return ConstructionMatcher(anchor, t => t.AllInterfaces);
@@ -568,7 +526,6 @@ internal sealed class SelectionEvaluator
         throw Refused(anchor, refusal, string.Empty);
     }
 
-    // The one comparison the three matchers share, parameterized by which construction list to read.
     private static Func<TypeNode, bool> ConstructionMatcher(
         TypeAnchor anchor, Func<TypeNode, IReadOnlyList<TypeConstruction>> constructions)
     {
@@ -590,15 +547,12 @@ internal sealed class SelectionEvaluator
         return Invoke<TypeNode>(predicate, type, hatch, subject => subject.FullName);
     }
 
-    // The member-flavored guarded invoke (GRAMMAR §5.6): the member `.Where`/`.Must` escape hatches run
-    // here so a throwing predicate becomes a RuleError naming the member, not an aborted run.
     internal static bool InvokePredicate(Func<IMemberInfo, bool> predicate, IMemberInfo member, string hatch)
     {
         return Invoke(predicate, member, hatch, MemberIdentity);
     }
 
-    // The project-flavored guarded invoke (GRAMMAR §5.6, §4.10). A project's own name is its whole
-    // identity, so there is no qualified form to compose.
+    // A project's own name is its whole identity, so there is no qualified form to compose.
     internal static bool InvokePredicate(Func<IProjectInfo, bool> predicate, IProjectInfo project, string hatch)
     {
         return Invoke(predicate, project, hatch, subject => subject.Name);
@@ -606,9 +560,8 @@ internal sealed class SelectionEvaluator
 
     // The guard the three strata share (GRAMMAR §5.6): a predicate that throws becomes a RuleEvaluationException
     // the checker turns into a RuleError, so one bad lambda reds its own rule instead of aborting the run.
-    // Only the identity in the message differs per stratum, which is what `identityOf` supplies — and it is
-    // read in the catch, so a subject whose identity is expensive costs nothing on the passing path.
-    // Cancellation is the one throw that travels on unchanged: a predicate is the only user code a check
+    // `identityOf` is read in the catch, so a subject whose identity is expensive costs nothing on the passing
+    // path. Cancellation is the one throw that travels on unchanged: a predicate is the only user code a check
     // runs, so it is where a cancelled caller's token surfaces, and translating that into a rule error would
     // report a build the user interrupted as a defect in the spec. Must agree with the blanket arms of
     // ArchChecker.Verdict and ArchChecker.AttachExemplar, which let the same exception past for the same reason.

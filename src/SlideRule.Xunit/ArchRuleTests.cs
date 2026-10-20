@@ -254,13 +254,10 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
 
         var diagnostics = new List<string>();
         LoadedSolution? opened = null;
-        // Escapes the extraction delegate the way `opened` does, and for the same reason: every fact in it
-        // exists only once a model has been merged, and this is the one place the adapter holds one. It is
-        // composed inside the delegate rather than after the sequence returns, because the check reads
-        // the load's diagnostics too — one composition serving the checker and the completeness test is what
-        // keeps them from ever describing the same load differently. Seeded with the no-load value rather
-        // than null: the sequence invokes the delegate exactly once and the report below is its return value,
-        // so the seed is never the value read, and a nullable here would only buy a dereference to justify.
+        // Escapes the extraction delegate the way `opened` does: its facts exist only once a model has been
+        // merged, inside the delegate. The checker and the completeness test read this one composition, so they
+        // cannot describe the same load differently. The seed is never read: the sequence invokes the delegate
+        // exactly once.
         WorkspaceDiagnostics loadDiagnostics = WorkspaceDiagnostics.None;
         try
         {
@@ -271,21 +268,15 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
                     LoadedSolution loaded = await WorkspaceLoader.LoadAsync(fullSolutionPath, diagnostics.Add, ct);
                     opened = loaded; // handed out so the finally below disposes it whatever the walk does
 
-                    // The same closure the CLI applies: the spec project plus the plumbing only it references,
-                    // with the solution's declared members subtracted so a spec that references the code it
-                    // governs never excludes it. One read of that membership serves both consumers — the
-                    // subtraction here, and the per-project label the extraction stamps on the model.
+                    // The same exclusion closure the CLI applies, from one read of the solution's declared members.
                     IReadOnlySet<string>? declaredMembers = SpecExclusion.TryReadDeclaredMembers(fullSolutionPath);
                     IReadOnlyCollection<string>? exclude = excludeProjectName is null
                         ? null
                         : SpecExclusion.Compute(loaded.Solution, declaredMembers, excludeProjectName);
                     CodebaseModel codebase = await CodebaseExtractor.ExtractFromSolutionAsync(
                         loaded.Solution, exclude, loaded.TargetFrameworks, declaredMembers, ct);
-                    // Both of the merge's two facts ride this one value, and neither is rendered: the adapter
-                    // has no channel that shows them, but they are documented as one pair filled from one
-                    // read. Every list comes off this load, which is why the whole value rides the extraction
-                    // rather than the call: nothing above this line has opened a workspace to measure any of
-                    // them.
+                    // The merge notes and multi-targeted projects go unrendered here, but the record fills them as
+                    // one pair from one read.
                     var composed = new WorkspaceDiagnostics(
                         diagnostics, codebase.MergeNotes, loaded.FailedProjects, loaded.UncheckedProjects,
                         loaded.RestoreFailedProjects, loaded.UnsupportedProjects,

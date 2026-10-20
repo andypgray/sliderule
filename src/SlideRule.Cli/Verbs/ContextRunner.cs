@@ -9,22 +9,16 @@ using SlideRule.Roslyn.Diagnostics;
 namespace SlideRule.Cli.Verbs;
 
 /// <summary>
-///     The <c>arch_context</c> pipeline (the MCP <c>arch_context</c> tool's core): refuse a path that is a
-///     JSON array written as text (<see cref="Refusals" />) → load the model → if
-///     nothing is scoped to place, emit the pointer line and stop (no extraction — the cost gate
-///     <see cref="RenderRunner" /> consults too) → otherwise extract, ask
-///     <see cref="ContextFileComposer.Placements" /> for the cards <c>render</c> would splice, and write the
-///     ones whose resolved directory contains the query path (layer card(s) before scope card(s)). No
-///     card covers the path ⇒ the same pinned pointer line.
+///     The <c>arch_context</c> pipeline: the cards <c>render</c> would splice
+///     (<see cref="ContextFileComposer.Placements" />) whose directory contains the query path, layer cards before
+///     scope cards, or the pinned pointer line when none does.
 /// </summary>
 /// <remarks>
 ///     <para>
 ///         <b>Never a gate.</b> No finding about the codebase changes the exit code: context is a lookup, so
 ///         an incomplete model is announced rather than enforced. The answer opens with a caveat block naming
 ///         the load failures, because a card whose project failed to load places nowhere and the pinned
-///         pointer line would otherwise read as a clean "not dragon territory". A solution filter that left
-///         declared projects unchecked is announced the same way and for the same reason, in a
-///         <see cref="NarrowedUniverseNotice" /> stamp below that caveat.
+///         pointer line would otherwise read as a clean "not dragon territory".
 ///     </para>
 ///     <para>The card body carries no provenance line — that is a <c>render</c> file-splice concern.</para>
 /// </remarks>
@@ -37,11 +31,9 @@ internal sealed class ContextRunner(
     public async Task<int> RunAsync(ContextRequest request, CancellationToken ct)
     {
         // Ahead of the load, so the incomplete-model caveat below never prints above a refusal it does not
-        // qualify. The three glob and rule-ID shape refusals fire on a no match; this verb has no no-match
+        // qualify. The glob and rule-ID shape refusals fire on a no match; this verb has no no-match
         // state — "no card covers this path" is a legitimate answer — so a bracketed value would come back as a
         // well-formed proven negative on the exact call an agent makes before editing unfamiliar territory.
-        // check's --diff-base is the other pre-flight, for the opposite reason: its no-match state is a git
-        // failure that needs the workspace to reach, so only its shape half can be judged this early.
         RefuseAStringifiedArrayPath(request.Path);
 
         // Cache-free, and the one verb whose policy is not about what it reads absence as: arch_context has
@@ -97,7 +89,6 @@ internal sealed class ContextRunner(
         return ExitCodes.Clean;
     }
 
-    // Each matching card — layer cards before scope cards — blank line between cards.
     private void WriteCards(IReadOnlyList<string> cards)
     {
         var first = true;
@@ -121,7 +112,7 @@ internal sealed class ContextRunner(
         return PathCanonicalizer.Resolve(full);
     }
 
-    // A reader, never a repair: a directory genuinely named [weird] is refused with its own text quoted back
+    // A reader, never a repair: a directory named [weird] is refused with its own text quoted back
     // rather than silently rewritten into something the caller did not ask for. Paths this verb has never
     // seen stay legitimate — it answers what rules WILL apply somewhere — and a JSON array is not one of
     // those, so nothing here narrows what a path may be.

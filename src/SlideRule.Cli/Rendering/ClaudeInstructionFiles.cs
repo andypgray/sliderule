@@ -33,8 +33,6 @@ internal static class ClaudeInstructionFiles
     ///     when nothing stands between Claude Code and the root block: no CLAUDE file was found, or one that was
     ///     imports the block's file.
     /// </summary>
-    /// <param name="solutionDirectory">The directory the root block is written into.</param>
-    /// <param name="environment">The seam the home and configuration directories are read through.</param>
     internal static string? Warning(string solutionDirectory, IEnvironment environment)
     {
         const string agents = ContextFileComposer.FileName;
@@ -58,10 +56,9 @@ internal static class ClaudeInstructionFiles
     /// <summary>
     ///     Every CLAUDE file that counts against <c>AGENTS.md</c> for a session started in
     ///     <paramref name="solutionDirectory" />, nearest first: that directory and each one above it, stopping
-    ///     below the filesystem root, and in each directory the three names in the client's order.
+    ///     below the filesystem root, and in each directory the three names in the client's order. A full path in
+    ///     <paramref name="excludedPaths" /> never counts, however the walk reaches it.
     /// </summary>
-    /// <param name="solutionDirectory">The directory the walk starts in.</param>
-    /// <param name="excludedPaths">Full paths that never count, however the walk reaches them.</param>
     internal static IReadOnlyList<string> Find(string solutionDirectory, IReadOnlySet<string> excludedPaths)
     {
         var found = new List<string>();
@@ -81,7 +78,6 @@ internal static class ClaudeInstructionFiles
     ///     The user memory files, which never count against <c>AGENTS.md</c>: <c>.claude/CLAUDE.md</c> under the
     ///     home directory, and <c>CLAUDE.md</c> under <c>CLAUDE_CONFIG_DIR</c> when that is set.
     /// </summary>
-    /// <param name="environment">The seam the two directories are read through.</param>
     internal static IReadOnlySet<string> UserMemoryFiles(IEnvironment environment)
     {
         var files = new HashSet<string>(PathComparison.Comparer);

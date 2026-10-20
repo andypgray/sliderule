@@ -36,16 +36,12 @@ internal static class NodeWriters
         typeof(RefinedProjectSelection)
     ];
 
-    /// <summary>Every node class that has a write arm — the discriminated ones the file can carry.</summary>
     internal static IReadOnlyCollection<Type> WritableTypes => Arms.Keys;
 
-    /// <summary>The classes that hold a delegate, and so can never be written.</summary>
     internal static IReadOnlyCollection<Type> DelegateTypes => PredicateNodes.Types;
 
-    /// <summary>The selection classes written by their shape, which carry no discriminator.</summary>
     internal static IReadOnlyCollection<Type> ShapeWrittenTypes => ShapeWritten;
 
-    /// <summary>Whether a class holds a delegate, and so is unwritable rather than unregistered.</summary>
     internal static bool IsDelegateNode(Type nodeType)
     {
         return PredicateNodes.Contains(nodeType);
@@ -79,12 +75,6 @@ internal static class NodeWriters
         return char.ToLowerInvariant(name[0]) + name.Substring(1);
     }
 
-    /// <summary>
-    ///     Writes <paramref name="node" /> whole, discriminator first. A class that holds a delegate is
-    ///     refused instead, for the <c>Must</c> reason when it is a constraint and the <c>Where</c> reason
-    ///     otherwise. A class with no arm throws: the evaluator's own dispatch fails closed for the same
-    ///     reason, and so does this.
-    /// </summary>
     internal static void Write(NodeWriter writer, object node)
     {
         if (writer.Refusal is not null) return;

@@ -18,36 +18,30 @@ using SlideRule.Validation;
 namespace SlideRule.Cli.Verbs;
 
 /// <summary>
-///     The <c>baseline</c> pipeline behind its four subcommands: grandfather, shrink, deliberately grow, or rename
-///     the ratcheted baselines — both Migrate rules and Quarantine containment (GRAMMAR §7). The <c>add</c>
-///     and <c>rename</c> companions are validated first (before the workspace cost).
+///     The <c>baseline</c> pipeline behind its subcommands (<see cref="BaselineMode" />): grandfather, shrink,
+///     deliberately grow, or rename the ratcheted baselines — both Migrate rules and Quarantine containment
+///     (GRAMMAR §7).
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <c>init</c> captures each uncaptured ratcheted rule's current violations, and
-///         <c>accept-reductions</c> only ever tightens: it drops entries whose violation no longer occurs
-///         and lowers or first records site counts, refusing new entries and rises alike. <c>add</c> is the
-///         escape valve and the one route by which an entry or a site count grows: exactly one currently
-///         observed violation of a captured rule, with mandatory attribution. <c>rename</c> moves a renamed
-///         rule's section from its old ID to its new one, every entry kept and re-sealed; it reads the spec
-///         and the baseline files and never the code, so it cannot grandfather anything new, and none of the
-///         gates below applies to it.
+///         <c>add</c> is the escape valve and the one route by which an entry or a site count grows.
+///         <c>rename</c> reads the spec and the baseline files and never the code, so it cannot grandfather
+///         anything new, and none of the gates below applies to it.
 ///     </para>
 ///     <para>
 ///         <b>What it refuses.</b> Tamper refuses loudly with the recovery hint, the same as <c>check</c>,
 ///         and a workspace-load failure refuses the whole command on <c>check</c>'s terms: exit 2, nothing
-///         written, opt-out <see cref="BaselineRequest.AllowWorkspaceDiagnostics" />. <c>init</c> and
+///         written, opt-out <see cref="BaselineRequest.AllowWorkspaceDiagnostics" />, because a baseline is the
+///         team's signature on its debt and a partial model has no idea what that debt is. <c>init</c> and
 ///         <c>accept-reductions</c> read absence as evidence, so a solution filter that left declared
 ///         projects unchecked refuses them too, a rule whose unmatched entries the run could not test (its own
 ///         selection matched nothing, or one of its target patterns or <c>among:</c> parts did) is skipped, and
-///         they extract cache-free, because a stale cache hit is a smaller-than-real model that raises nothing
-///         either gate could refuse on. On any of these they would record "zero debt" or delete real entries.
+///         they extract cache-free. On any of these they would record "zero debt" or delete real entries.
 ///         <c>init</c> also skips a rule stricter than written, whose capture would record as debt the
 ///         violations its dead pattern caused.
 ///         Short of that the command reports rather than gates — a red rule is the state to capture, not a
 ///         failure, so it exits 0 on success.
 ///     </para>
-///     <para>Output/error writers are injected so the e2e tests can capture them.</para>
 /// </remarks>
 internal sealed class BaselineRunner(
     TextWriter output,
@@ -179,7 +173,7 @@ internal sealed class BaselineRunner(
     }
 
     // add: append one attributed entry to a captured rule's section (or update attribution on a present
-    // entry). Internal so the fast-tier runner tests drive it over an in-memory report (no workspace).
+    // entry).
     internal static int AddEntry(
         TextWriter output, BaselineRequest request, CheckReport report, string solutionDirectory)
     {
@@ -268,7 +262,7 @@ internal sealed class BaselineRunner(
 
     // The old ID can become a conventional path that Rename may delete. BaselineConventions refuses an ID outside
     // the grammar (a `..` segment above all) as a programming error; these guards make it an operator's refusal,
-    // both before solution work and again at the file work itself, which the fast tier reaches directly.
+    // both before solution work and again in Rename, which is callable on its own.
     private static void RefuseMalformedFrom(string from)
     {
         if (!RuleIdSyntax.IsValid(from))
@@ -285,8 +279,7 @@ internal sealed class BaselineRunner(
 
     // rename's file work: every refusal before any write, then the destination written first, so an interrupted
     // run leaves the entries under both IDs rather than under neither. The entries list moves verbatim —
-    // identity, site count and attribution — and the write re-seals each under its new ID. Internal so the
-    // fast-tier runner tests drive it over a hand-built model, as they drive add.
+    // identity, site count and attribution — and the write re-seals each under its new ID.
     internal static int Rename(
         TextWriter output, BaselineRequest request, ArchitectureModel model, string solutionDirectory)
     {
@@ -416,8 +409,7 @@ internal sealed class BaselineRunner(
 
     // A read document's sections as a map this run may write into: every section rides through untouched,
     // including the ones for rules this run is not visiting (a co-resident rule, or one that was removed).
-    // Null-tolerant because init and accept-reductions reach a file that may not exist yet, and so does
-    // rename's destination, while add has already refused an absent one.
+    // Null-tolerant because the file a run writes may not exist yet.
     private static Dictionary<string, IReadOnlyList<BaselineEntry>> MutableSections(BaselineDocument? existing)
     {
         var sections = new Dictionary<string, IReadOnlyList<BaselineEntry>>(StringComparer.Ordinal);
@@ -429,8 +421,7 @@ internal sealed class BaselineRunner(
     }
 
     // init and accept-reductions, one baseline file at a time: ordinal grouping in first-appearance order,
-    // so two rules sharing a file are read, spliced and written once between them. Internal so the fast-tier
-    // runner tests can drive both modes over an in-memory report the way they drive add — no workspace.
+    // so two rules sharing a file are read, spliced and written once between them.
     internal static void ApplyFiles(
         TextWriter output, BaselineRequest request, IEnumerable<RuleResult> ratchetResults, string solutionDirectory)
     {
@@ -472,7 +463,7 @@ internal sealed class BaselineRunner(
         output.WriteLine(WriteReport.Line(outcome, solutionDirectory, group.Key));
     }
 
-    // Whether this rule rewrote its section — what tells the caller above whether the file has anything new to say.
+    // Whether this rule rewrote its section.
     private static bool ApplyRule(
         TextWriter output, BaselineRequest request, RuleResult result,
         Dictionary<string, IReadOnlyList<BaselineEntry>> sections)

@@ -3,19 +3,13 @@ using Serilog;
 namespace SlideRule.Cli.Mcp.Infrastructure;
 
 /// <summary>
-///     Shared exit path for both watchdogs. Waits for an in-flight tool call to finish, runs any
-///     registered async disposers (with a per-disposer timeout), and flushes Serilog before terminating
-///     the process.
+///     The watchdogs' exit path: waits for an in-flight tool call to finish, runs the registered async disposers
+///     with a bound each, and flushes Serilog before terminating the process.
 /// </summary>
 /// <remarks>
-///     <para>
-///         A registered disposer may own out-of-process state — a long-lived
-///         <see cref="Roslyn.WorkspaceSession" />'s <c>MSBuildWorkspace</c> and its BuildHost child — which a
-///         bare process exit would strand.
-///     </para>
-///     <para>
-///         A per-disposer bound keeps shutdown deterministic even if a disposer hangs.
-///     </para>
+///     A registered disposer may own out-of-process state, such as a long-lived
+///     <see cref="Roslyn.WorkspaceSession" />'s <c>MSBuildWorkspace</c> and its BuildHost child, which a bare
+///     process exit would strand. A per-disposer bound keeps shutdown deterministic even if a disposer hangs.
 /// </remarks>
 internal static class ServerShutdown
 {
@@ -40,13 +34,9 @@ internal static class ServerShutdown
     internal static bool HasExited => Volatile.Read(ref s_hasExited) != 0;
 
     /// <summary>
-    ///     Adds <paramref name="dispose" /> to the list of disposers run by
-    ///     <see cref="ExitWith(string)" />. Multiple registrations run in registration order.
+    ///     Adds <paramref name="dispose" /> to the disposers <see cref="ExitWith(string)" /> runs, in
+    ///     registration order.
     /// </summary>
-    /// <param name="dispose">
-    ///     Asynchronous callback invoked during shutdown to release a resource. Faults and
-    ///     timeouts are logged at Warning but never block exit.
-    /// </param>
     public static void RegisterDisposer(Func<ValueTask> dispose)
     {
         ArgumentNullException.ThrowIfNull(dispose);
@@ -57,24 +47,14 @@ internal static class ServerShutdown
     }
 
     /// <summary>
-    ///     Production entry: drains in-flight calls, runs registered disposers with a bound each, flushes
-    ///     Serilog, then calls <see cref="Environment.Exit" /> with code 0.
+    ///     Shuts the server down and exits with code 0, logging <paramref name="reason" />, a short label such as
+    ///     <c>"idle timeout"</c>, at Warning so a post-mortem can identify the trigger.
     /// </summary>
-    /// <param name="reason">
-    ///     Short label describing why the server is shutting down (e.g. "idle timeout").
-    ///     Logged at Warning so post-mortems can identify the trigger.
-    /// </param>
     public static void ExitWith(string reason)
     {
         ExitWith(reason, static () => Environment.Exit(0), DefaultDisposalTimeout, DefaultInFlightDrainTimeout);
     }
 
-    /// <summary>
-    ///     Test seam: lets tests substitute the terminal action and shrink the disposal / in-flight-drain
-    ///     timeouts so they can verify the gate, in-flight drain, disposal-then-exit order, and timeout
-    ///     fallback without killing the test host. <paramref name="inFlightDrainTimeout" /> defaults to
-    ///     <see cref="DefaultInFlightDrainTimeout" /> when null.
-    /// </summary>
     internal static void ExitWith(string reason, Action exit, TimeSpan disposalTimeout, TimeSpan? inFlightDrainTimeout = null)
     {
         if (Interlocked.CompareExchange(ref s_hasExited, 1, 0) != 0) return;
@@ -96,14 +76,9 @@ internal static class ServerShutdown
     }
 
     /// <summary>
-    ///     Blocks until no tool call is in flight or <paramref name="timeout" /> elapses, whichever
-    ///     comes first, then returns so shutdown can proceed.
+    ///     Blocks until no tool call is in flight or <paramref name="timeout" /> elapses: this is the terminal
+    ///     shutdown path, so blocking the caller is fine.
     /// </summary>
-    /// <remarks>
-    ///     Waits on the completion source <see cref="IdleTimeoutWatchdog" /> signals when the in-flight
-    ///     count drops to zero — no busy-wait, and an already-idle server returns immediately.
-    ///     Synchronous by design: this is the terminal shutdown path, so blocking the caller is fine.
-    /// </remarks>
     private static void WaitForInFlightCalls(TimeSpan timeout)
     {
         if (timeout <= TimeSpan.Zero) return;

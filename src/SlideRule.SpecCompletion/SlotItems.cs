@@ -37,10 +37,8 @@ internal static class SlotItems
     /// </remarks>
     internal const string InsertProperty = "insert";
 
-    /// <summary>Where the segment this item replaces starts.</summary>
     private const string StartProperty = "start";
 
-    /// <summary>How long that segment is.</summary>
     private const string LengthProperty = "length";
 
     /// <summary>What a row shows instead of an assembly where it names a subtree rather than one name.</summary>
@@ -69,9 +67,10 @@ internal static class SlotItems
     private static readonly CompletionItemRules SimpleNameRules =
         Rules(commit: [], filter: ['.', '*', '<', ',', ' ']);
 
-    /// <summary>The item a host shows for one offered name.</summary>
-    /// <param name="offer">The name, its shape and where it came from.</param>
-    /// <param name="span">The segment of the literal a commit replaces.</param>
+    /// <summary>
+    ///     The item a host shows for one offered name, whose commit replaces <paramref name="span" />, the
+    ///     literal's segment.
+    /// </summary>
     internal static CompletionItem For(Offer offer, TextSpan span)
     {
         string insert = offer.Insert;
@@ -106,7 +105,6 @@ internal static class SlotItems
     ///     an item this provider did not make carries none of these properties. Writing the display text
     ///     over the item's own span is what the base implementation does.
     /// </remarks>
-    /// <param name="item">The item the host is committing.</param>
     internal static CompletionChange ChangeFor(CompletionItem item)
     {
         if (item.Properties.TryGetValue(InsertProperty, out string? insert)
@@ -127,9 +125,9 @@ internal static class SlotItems
                && int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out value);
     }
 
-    // The sort text is the rank and then the text itself, which is what puts every name the referenced
-    // projects declare above every name they do not. A subtree form lands immediately after the step it
-    // belongs to, because a dot precedes every letter ordinally.
+    // The rank and then the text itself, which puts every name the referenced projects declare above every name
+    // they do not; it must agree with the order NameUniverse sorts the list in. A subtree form lands
+    // immediately after the step it belongs to, because a dot precedes every letter ordinally.
     private static string SortTextFor(Offer offer)
     {
         return (offer.Rank == 0 ? "0" : "1") + offer.Insert;

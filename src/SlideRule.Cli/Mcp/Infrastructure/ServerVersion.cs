@@ -4,12 +4,11 @@ namespace SlideRule.Cli.Mcp.Infrastructure;
 
 /// <summary>
 ///     The running server's version, read once from the assembly's
-///     <see cref="AssemblyInformationalVersionAttribute" />. <see cref="SemVer" /> is that value
-///     truncated at the first <c>+</c> (build metadata dropped).
+///     <see cref="AssemblyInformationalVersionAttribute" />.
 /// </summary>
 internal static class ServerVersion
 {
-    /// <summary>The full informational version, e.g. <c>1.0.0+abc123</c>, or <c>"unknown"</c> if unattributed.</summary>
+    /// <summary>The full informational version, e.g. <c>1.0.0+abc123</c>, or "unknown" if unattributed.</summary>
     private static readonly string Informational =
         typeof(ServerVersion).Assembly
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion

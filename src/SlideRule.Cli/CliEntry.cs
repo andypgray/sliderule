@@ -8,9 +8,8 @@ using SlideRule.Cli.Verbs;
 namespace SlideRule.Cli;
 
 /// <summary>
-///     The invocation core, factored out of <c>Program</c> so the in-process e2e tests exercise the
-///     real command tree, parse-error remap, and action dispatch through a redirected
-///     <see cref="InvocationConfiguration" />. Building and parsing touch no Roslyn type.
+///     The invocation core under <c>Program</c>: build the command tree, parse, and run the result. Building and
+///     parsing touch no Roslyn type.
 /// </summary>
 internal static class CliEntry
 {

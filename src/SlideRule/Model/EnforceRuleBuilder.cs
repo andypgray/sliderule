@@ -3,7 +3,7 @@ using SlideRule.Internal;
 
 namespace SlideRule.Model;
 
-/// <summary>Trailer stage for an <c>Enforce</c> rule. Each trailer appends so repeats are detectable (§8 item 6).</summary>
+/// <summary>Trailer stage for an <c>Enforce</c> rule.</summary>
 internal sealed class EnforceRuleBuilder(RuleRegistration registration) : IEnforceRule
 {
     public IEnforceRule Because(string because)

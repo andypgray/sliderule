@@ -71,9 +71,7 @@ internal static class BuildFindings
         return rule.Posture == Posture.Migrate ? BuildFindingKind.NewDebt : BuildFindingKind.BrokenRule;
     }
 
-    // Where a violation's findings go, which is the human report's own placement read as a site list: every
-    // site for an edge kind, the first alone for a shape kind, and none for the two kinds that are about the
-    // rule rather than about the code and so carry no site at all.
+    // None for the kinds that are about the rule rather than about the code, which carry no site at all.
     private static IReadOnlyList<SourceLocation> PlacedSites(Violation violation)
     {
         switch (violation.Kind)

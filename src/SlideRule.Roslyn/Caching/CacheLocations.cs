@@ -4,23 +4,15 @@ namespace SlideRule.Roslyn.Caching;
 
 /// <summary>
 ///     Derives the on-disk location of a solution's persisted extraction cache. The default root is
-///     <c>%LOCALAPPDATA%/SlideRule/cache</c> (the same <c>%LOCALAPPDATA%/SlideRule</c> base
-///     the Serilog file log uses), and each solution gets its own subdirectory named
+///     <c>%LOCALAPPDATA%/SlideRule/cache</c>, and each solution gets its own subdirectory named
 ///     <c>&lt;sln-name&gt;-&lt;sha256-prefix-of-canonical-path&gt;</c> holding independent, disposable local
 ///     derived data keyed to that one solution.
 /// </summary>
 /// <remarks>
-///     <para>
-///         The root is a parameter: this type never reads an environment variable itself, and
-///         <c>SLIDERULE_CACHE_DIR</c> arrives already resolved through the CLI's <c>IEnvironment</c> seam
-///         (self-spec <c>mcp/env-through-seam</c>).
-///     </para>
-///     <para>
-///         The path identity reuses <see cref="PathCanonicalizer" /> (symlink-resolved, fully-qualified) so
-///         the same solution opened through a symlinked root still maps to one cache directory. On a
-///         case-insensitive file system the canonical path is lowercased before hashing so case-variant
-///         spellings unify too.
-///     </para>
+///     The root override is a parameter, so <c>SLIDERULE_CACHE_DIR</c> arrives already resolved and this type
+///     reads no environment variable itself. The path identity reuses <see cref="PathCanonicalizer" />
+///     (symlink-resolved, fully-qualified), lowercased before hashing on a case-insensitive file system, so the
+///     same solution opened through a symlinked root or a case-variant spelling maps to one cache directory.
 /// </remarks>
 internal static class CacheLocations
 {
@@ -35,14 +27,12 @@ internal static class CacheLocations
     private const int PathHashHexLength = 16;
 
     /// <summary>
-    ///     The product's data base, <c>%LOCALAPPDATA%/SlideRule</c>, which the cache root and the MCP
-    ///     server's log directory both sit under. Absolute even when the local application data folder does not
-    ///     exist yet; nothing here creates it.
+    ///     The product's data base, <c>%LOCALAPPDATA%/SlideRule</c>: absolute even when the local application
+    ///     data folder does not exist yet, and never created here.
     /// </summary>
     // DoNotVerify because the default option returns an empty string for a missing folder, which Path.Combine
     // turns into a path relative to the working directory; on Linux that is any XDG_DATA_HOME naming a folder
-    // not yet made. Every writer under this base creates its own directory (AtomicFile here, the Serilog file
-    // sink for the log), so a getter has no reason to create it.
+    // not yet made. Every writer under this base creates its own directory, so a getter has no reason to create it.
     internal static string ProductDataRoot()
     {
         string localApplicationData = Environment.GetFolderPath(
@@ -88,20 +78,17 @@ internal static class CacheLocations
 
     /// <summary>
     ///     The absolute path to the captured binlog copy (<c>capture.binlog</c>) for
-    ///     <paramref name="solutionPath" /> — the build log the replay path re-reads while the capture stays
-    ///     structurally valid, stored beside its <see cref="CaptureManifestPath" /> manifest.
+    ///     <paramref name="solutionPath" />, stored beside its <see cref="CaptureManifestPath" /> manifest.
     /// </summary>
     internal static string CaptureBinlogPath(string solutionPath, string? cacheRootOverride)
     {
         return CaptureBinlogPathIn(CacheDirectory(solutionPath, cacheRootOverride));
     }
 
-    /// <summary>The capture manifest inside an already-derived <paramref name="cacheDirectory" />.</summary>
-    /// <remarks>
-    ///     Deriving the directory costs a symlink resolve, a fold and a SHA-256, so the store that wants both
-    ///     capture files — and the directory itself, to create it — asks for the directory once and names the
-    ///     files against it. The naming scheme stays here either way; only the derivation moves.
-    /// </remarks>
+    /// <summary>
+    ///     The capture manifest inside an already-derived <paramref name="cacheDirectory" />, for a caller that
+    ///     derives the directory once: deriving it costs a symlink resolve, a fold and a SHA-256.
+    /// </summary>
     internal static string CaptureManifestPathIn(string cacheDirectory)
     {
         return Path.Combine(cacheDirectory, CaptureManifestFileName);

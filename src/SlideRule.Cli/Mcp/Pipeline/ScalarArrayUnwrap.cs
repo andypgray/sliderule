@@ -9,40 +9,27 @@ namespace SlideRule.Cli.Mcp.Pipeline;
 ///     same way: read one element, insist the array ends there, and refuse an array holding more.
 /// </summary>
 /// <remarks>
-///     <para>
-///         Only the protocol lives here. What counts as a readable scalar, what the empty array means, and
-///         the wording of every refusal stay with the coercer they belong to — the two differ on all three
-///         (a <c>string</c> reads <c>[]</c> as "absent"; a non-nullable <c>bool</c> has no null to fall back
-///         to), and their messages are pinned text.
-///     </para>
-///     <para>
-///         Hand-rolled rather than <c>JsonSerializer.Deserialize&lt;T&gt;</c> for the element, which would
-///         recurse straight back through the coercer's own factory.
-///     </para>
+///     Only the protocol lives here. What counts as a readable scalar, what the empty array means, and the wording
+///     of every refusal stay with the coercer they belong to: the coercers differ on all three, and their messages
+///     are pinned text. Hand-rolled rather than <c>JsonSerializer.Deserialize&lt;T&gt;</c> for the element, which
+///     would recurse straight back through the coercer's own factory.
 /// </remarks>
 internal static class ScalarArrayUnwrap
 {
     /// <summary>
-    ///     Reads one scalar of <typeparamref name="T" /> from the token <paramref name="reader" /> is
-    ///     positioned at. A custom delegate rather than a <see cref="Func{T,TResult}" /> because a
-    ///     <see cref="Utf8JsonReader" /> is a ref struct: it crosses a call boundary only by
-    ///     <see langword="ref" />, which no lambda may capture, so every caller passes a static method group.
+    ///     Reads one scalar of <typeparamref name="T" /> from the token <paramref name="reader" /> is positioned at,
+    ///     taken by <see langword="ref" /> as no <see cref="Func{T,TResult}" /> can take it.
+    ///     <paramref name="insideArray" /> chooses the coercer's wording only: an error naming an "array element"
+    ///     tells the caller the coercer did look inside their array and still could not use what it found there.
     /// </summary>
-    /// <param name="reader">The reader, positioned at the element's first token.</param>
-    /// <param name="insideArray">
-    ///     Whether the element came out of an array. The coercer's own wording depends on it: naming an
-    ///     "array element" tells the caller the coercer did look inside their array.
-    /// </param>
     internal delegate T ScalarReader<out T>(ref Utf8JsonReader reader, bool insideArray);
 
     /// <summary>
-    ///     Collapses the array <paramref name="reader" /> has opened to the single scalar it holds, applying
-    ///     <paramref name="readScalar" /> to that one element.
+    ///     Collapses the array <paramref name="reader" /> has opened, positioned at its
+    ///     <see cref="JsonTokenType.StartArray" />, to the single scalar it holds, read by the coercer's own
+    ///     <paramref name="readScalar" />; <paramref name="onEmptyArray" /> answers <c>[]</c> with a value or a
+    ///     refusal.
     /// </summary>
-    /// <param name="reader">The reader, positioned at the <see cref="JsonTokenType.StartArray" />.</param>
-    /// <param name="readScalar">The coercer's own scalar rules.</param>
-    /// <param name="onEmptyArray">What <c>[]</c> means for this coercer — a value, or a refusal.</param>
-    /// <param name="multipleElementsMessage">The refusal when the array holds more than one element.</param>
     /// <exception cref="JsonException">The JSON ended inside the array.</exception>
     /// <exception cref="UserErrorException">The array holds more than one element.</exception>
     internal static T Read<T>(

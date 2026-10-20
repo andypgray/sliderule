@@ -10,10 +10,8 @@ namespace SlideRule.Validation;
 /// </summary>
 /// <remarks>
 ///     ID checks run over the post-desugar ID set; authored-field checks run over the original
-///     registrations, keyed to the rule or scope the author wrote. Every rule/scope/member-attributed
-///     error carries the offending anchor's spec-source location (GRAMMAR §8) so all-errors-at-once
-///     lands each one at a <c>file:line</c> jump target; spec-wide errors (blank and duplicate layer
-///     names, layer globs, layer definitions, layer purposes) stay location-free by design.
+///     registrations, keyed to the rule or scope the author wrote. A rule, scope or member error carries its
+///     anchor's spec-source location (GRAMMAR §8); a layer error is spec-wide and carries none.
 /// </remarks>
 internal static class SpecValidator
 {
@@ -69,21 +67,16 @@ internal static class SpecValidator
             LayerRegistration registration = arch.Layers[index];
             LayerNoun layer = registration.Noun;
 
-            // Every layer error is spec-wide (null ID, named by layer in the message) and location-free: a
-            // layer captures no spec-source position, and its name is a unique, trivially greppable string.
             var target = new ErrorTarget(null, null, $"layer '{layer.Name}'");
 
-            // Blank and duplicate in one pass rather than two, so the two report in authoring order rather
-            // than every blank before every duplicate. A blank name draws only the blank verdict, because
-            // SpecLayerNames holds blanks out of the set it collides.
+            // Blank and duplicate in one pass, so the two report in authoring order rather than every blank
+            // before every duplicate.
             if (!CheckLiteral(layer.Name, SpecSlot.LayerName, target, errors)
                 && duplicates.TryGetValue(index, out CollisionVerdict duplicate))
                 errors.Add(new SpecValidationError(duplicate.Code, null, duplicate.Sentence));
 
-            // A layer's definition is validated here — its authoritative, use-independent home — so a bad
-            // one is caught whether or not the layer is ever used as a subject (§8 items 10, 15–16, 19).
-            // A selection definition takes every walk a rule's selections take, in the order a rule takes
-            // them.
+            // A layer's definition is validated here, its use-independent home, so a bad one is caught whether
+            // or not the layer is ever used as a subject (§8 items 10, 15–16, 19).
             if (layer.Definition is { } definition)
             {
                 CheckSelectionOperands([definition], target, arch, errors);
@@ -95,8 +88,7 @@ internal static class SpecValidator
                     CheckLiteral(glob, SpecSlot.NamespacePattern, target, errors);
             }
 
-            // A purpose is prose like any other (§8 items 5–6) and is checked where the layer is declared, on the
-            // same spec-wide terms as its globs: null ID, no location, named by layer.
+            // A purpose is prose like any other (§8 items 5–6).
             foreach (string purpose in registration.Purposes)
                 CheckLiteral(purpose, SpecSlot.Purpose, target, errors);
             CheckRepeated(registration.Purposes.Count, "Purpose", target, errors);
@@ -123,10 +115,8 @@ internal static class SpecValidator
             declarations.Add(new IdDeclaration(registration.Id, role, index));
         }
 
-        // The extends-scope and duplicate verdicts (§8 items 1 and 7), in the order the catalog reports
-        // them. Each renders at the anchor its first tag names: the rule that reaches into the reserved
-        // namespace, or the first authored occurrence of a duplicated ID. The key is already the ID the
-        // error is addressed to, desugared children included.
+        // The extends-scope and duplicate verdicts (§8 items 1 and 7). The key is already the ID the error is
+        // addressed to, desugared children included.
         foreach (CollisionVerdict collision in SpecIdCollisions.Decide(declarations))
         {
             Registration site = registrations[collision.Tags[0]];
@@ -179,8 +169,6 @@ internal static class SpecValidator
 
     private static void ValidateScope(ScopeRegistration scope, Arch arch, List<SpecValidationError> errors)
     {
-        // The posture field, not the selection: both verbs set the two together, so either would answer, but
-        // "which posture is this scope" is the question the rest of this method asks and the one item 2 reports.
         if (scope.Posture is null)
         {
             errors.Add(new SpecValidationError(Code.MissingPosture, scope.Id,
@@ -269,10 +257,9 @@ internal static class SpecValidator
         foreach ((string value, SpecSlot slot) in patterns) CheckLiteral(value, slot, target, errors);
     }
 
-    // Where an error lands and what its sentence calls the offender. A rule or scope error quotes its ID
-    // and carries the anchor's spec-source location; a layer error is spec-wide — no ID, no location, the
-    // layer named outright — which is the whole of the difference and the whole reason this is one value
-    // rather than three parameters that can be threaded apart or transposed.
+    // Where an error lands and what its sentence calls the offender: a rule or scope error quotes its ID and
+    // carries the anchor's location, and a layer error has neither and names the layer outright. One value, so
+    // the three cannot be threaded apart or transposed.
     private readonly struct ErrorTarget
     {
         private readonly string? _subject;
@@ -322,8 +309,6 @@ internal static class SpecValidator
                 $"`{call}` on {target.Subject} was given an empty list, so it {effect}; {cure}.", target.Location));
     }
 
-    // Every empty list a rule reaches: its unions on the type-side walk, then the project selections' names and
-    // globs, then the member selections' names and Except payloads, then the banned members.
     private static IEnumerable<(string Call, string Effect, string Cure)> RuleEmptyOperandLists(
         RuleRegistration rule, IEnumerable<Selection> selections)
     {
@@ -408,8 +393,7 @@ internal static class SpecValidator
 
     // Every position a rule's selections stand in, item 27's way: the subject itself is the one legal one,
     // so only what it NESTS is walked, while each operand is walked from its own root. A member constraint's
-    // Subject is the type selection its projection was taken from, which is a subject too — a family as the
-    // source of a member projection is legal.
+    // Subject, its projection's source, is a subject too, so a family there is legal.
     private static IEnumerable<(Selection Selection, string Position)> RuleFamilyPositions(RuleRegistration rule)
     {
         if (rule.Constraint is not { } constraint) yield break;
@@ -486,10 +470,8 @@ internal static class SpecValidator
 
     // The foreign-Arch walk the three strata share (GRAMMAR §8 items 4, 13, 22): the first candidate some
     // other Arch minted is reported and the walk stops, because a spec assembled from two instances is one
-    // mistake however many of its parts carry it. Each stratum supplies the noun its sentence opens with,
-    // the code the catalog files it under, and where each candidate would land — a member steers to its own
-    // arch.Member(...) call site, every other stratum to the consuming anchor's. Returns whether anything
-    // was reported, which is what lets a caller skip the per-item checks a foreign owner makes meaningless.
+    // mistake however many of its parts carry it. Returns whether anything was reported, which is what lets a
+    // caller skip the per-item checks a foreign owner makes meaningless.
     private static bool ReportFirstForeign(
         IEnumerable<(Arch Owner, SpecSourceLocation? Location)> candidates, Arch arch, Code code, string noun,
         ErrorTarget target, List<SpecValidationError> errors)
@@ -517,10 +499,8 @@ internal static class SpecValidator
         ReportFirstForeign(candidates, arch, Code.ForeignSelection, "A selection", target, errors);
     }
 
-    // GRAMMAR §8 item 22: the project-stratum sibling of CheckForeign. A project selection carries its own
-    // Arch (it has no underlying type selection to borrow one from), so it needs its own walk — the type-side
-    // one reaches nothing on a project constraint, whose Subject is null. The walk includes the Except
-    // payloads, which is the one way a project selection nests and therefore the one way a foreign one can
+    // GRAMMAR §8 item 22: the project-stratum sibling of CheckForeign, needed because the type-side walk reaches
+    // nothing on a project constraint. It includes the Except payloads, where a foreign project selection can
     // hide inside a local subject.
     private static void CheckForeignProjects(
         RuleRegistration rule, ErrorTarget target, Arch arch, List<SpecValidationError> errors)
@@ -535,12 +515,8 @@ internal static class SpecValidator
             candidates, arch, Code.ForeignProjectSelection, "A project selection", target, errors);
     }
 
-    // GRAMMAR §8 item 23: the blank check over a project subject's own operands — the .Named names and the
-    // .Matching globs. Its own code rather than the shared BlankPattern because the two shapes fail in
-    // opposite directions (a blank name matches nothing, a blank glob matches everything) and the catalog
-    // entry has to be able to say so. A .Named name is the one operand whose noun is shared with a slot
-    // under another code, which is why it has a slot of its own: the noun a project operand is named by
-    // must not drift from the noun the type-side walk names the same thing by.
+    // GRAMMAR §8 item 23: the blank check over a project subject's own .Named names and .Matching globs, under
+    // the project stratum's own code (SpecSlot.ProjectNameOperand says why).
     private static void CheckProjectPatterns(
         RuleRegistration rule, ErrorTarget target, List<SpecValidationError> errors)
     {
@@ -561,11 +537,9 @@ internal static class SpecValidator
             }
     }
 
-    // GRAMMAR §8 items 11–13: the member-access verb's operands. A foreign member is reported once per
-    // rule and stops the pass; otherwise each member is checked for a blank name and then, when named,
-    // that its anchor declares it. A member error renders at the member's own arch.Member(...) call site
-    // when it has one, falling back to the consuming rule's anchor for a verb-minted member (which carries
-    // no location — GRAMMAR §8, items 11–13/18).
+    // GRAMMAR §8 items 11–13: the member-access verb's operands. A foreign member is reported once per rule
+    // and stops the pass; a member error renders at its own arch.Member(...) call site, or at the rule's
+    // anchor for a verb-minted member, which carries no location.
     private static void CheckMembers(
         RuleRegistration rule, ErrorTarget target, Arch arch, List<SpecValidationError> errors)
     {
@@ -579,13 +553,8 @@ internal static class SpecValidator
         foreach (Member member in members) CheckMember(member, target, errors);
     }
 
-    // GRAMMAR §8 item 14: a member `.Returning` anchor is definition-level, so a closed-generic anchor
-    // (typeof(Task<int>)) is refused with guidance to the open definition (typeof(Task<>)). A non-generic
-    // or open-generic anchor is accepted; only a MemberConstraint carries a ReturningAdjective at all. The
-    // anchor is the consuming rule's statement, so it renders at the rule's location.
-    // A string anchor carries no reflected type, so TypedAnchors filters it out and nothing here judges it:
-    // blankness (item 15) is the whole of what a string anchor is validated for, and a constructed spelling
-    // is a legal name that matches nothing.
+    // GRAMMAR §8 item 14, through CheckClosedGenericAnchors: a member `.Returning` anchor is definition-level, so
+    // a closed-generic one (typeof(Task<int>)) is refused with guidance to the open definition (typeof(Task<>)).
     private static void CheckMemberReturning(RuleRegistration rule, List<SpecValidationError> errors)
     {
         if (rule.Constraint is null) return;
@@ -596,10 +565,8 @@ internal static class SpecValidator
                 CheckClosedGenericAnchors(rule, errors, returning.Anchors, Code.MemberReturningClosedGeneric, ".Returning");
     }
 
-    // GRAMMAR §8 item 34: a member Except payload of a different single kind than the selection it subtracts
-    // from removes nothing, because no member is two kinds at once. Like the closed-generic refusal it is the
-    // rule's own statement, so it renders at the rule's location. A .Members selection on either side holds
-    // every kind and clashes with none.
+    // GRAMMAR §8 item 34, rendered at the rule's location like the closed-generic refusal. A .Members selection
+    // on either side holds every kind and clashes with none.
     private static void CheckMemberExceptKinds(RuleRegistration rule, List<SpecValidationError> errors)
     {
         if (rule.Constraint is null) return;
@@ -623,12 +590,8 @@ internal static class SpecValidator
         }
     }
 
-    // GRAMMAR §8 item 20: a MustAcceptParameter anchor is definition-level, so a closed-generic anchor
-    // (typeof(IProgress<int>)) is refused with guidance to the open definition (typeof(IProgress<>)) — the
-    // sibling of the item-14 .Returning refusal, with the verb named in the steer. A non-generic or
-    // open-generic anchor is accepted; only MemberMustAcceptParameterConstraint carries the anchor. The
-    // anchor is the consuming rule's statement, so it renders at the rule's location. A string anchor is
-    // filtered out here on the item-14 terms above.
+    // GRAMMAR §8 item 20, through CheckClosedGenericAnchors: the MustAcceptParameter sibling of the item-14
+    // .Returning refusal.
     private static void CheckMemberAcceptParameter(RuleRegistration rule, List<SpecValidationError> errors)
     {
         if (rule.Constraint is not MemberMustAcceptParameterConstraint accept) return;
@@ -638,8 +601,8 @@ internal static class SpecValidator
     }
 
     // The definition-level refusal items 14 and 20 share, with the caller's verb in the steer and its own
-    // code in the catalog. A string anchor carries no reflected type, so TypedAnchors drops it before
-    // anything is judged.
+    // code in the catalog. The anchor is the consuming rule's statement, so the error renders at the rule's
+    // location; a string anchor carries no reflected type, so TypedAnchors drops it before anything is judged.
     private static void CheckClosedGenericAnchors(
         RuleRegistration rule, List<SpecValidationError> errors, IReadOnlyList<TypeAnchor> anchors,
         Code code, string verb)
@@ -651,13 +614,9 @@ internal static class SpecValidator
                     $"use typeof({TypeofForm(Generics.Definition(type))}) (used by '{rule.Id}').", rule.Location));
     }
 
-    // GRAMMAR §8 item 21, both polarities — Code.HierarchyAnchorWrongCategory carries the category rule per
-    // verb and why a wrong-category anchor is a silent slip.
-    // A string anchor carries no reflected type, so it is filtered out (TypedAnchors) rather than guessed
-    // at — in every family, hierarchy and attribute alike: there is no category to read off an FQN,
-    // extraction facts are the only authority on what a name names, and refusing a spelling the host cannot
-    // load would break the escape hatch's whole point. The cost is stated in the catalog: a wrong string is
-    // loud on a positive (always red) and silent on a negative.
+    // GRAMMAR §8 item 21, both polarities; Code.HierarchyAnchorWrongCategory carries the category rule per
+    // verb. String anchors are filtered out (TypedAnchors) in every family, so a wrong string is loud on a
+    // positive (always red) and silent on a negative.
     private static void CheckHierarchyAnchors(RuleRegistration rule, List<SpecValidationError> errors)
     {
         switch (rule.Constraint)
@@ -685,12 +644,9 @@ internal static class SpecValidator
                 CheckAttributeAnchors(rule, errors, c.Anchors, "MustNotBeAttributedWith");
                 break;
 
-            // The member attribute verbs (GRAMMAR §5.7) carry the identical category rule and, through
-            // CheckAttributeAnchors, the identical message — the verb name in the steer is the same word on
-            // either side, so a member author reads the same sentence a type author does. Only the VERBS are
-            // checked — a wrong-category member attribute ADJECTIVE stays unchecked, exactly like its
-            // type-side twin: it empties the subject, which the fail-on-empty gate reds loudly, whereas the
-            // always-passing MustNot verb is the silent slip this item exists to catch.
+            // The member attribute verbs (GRAMMAR §5.7) share the type side's rule and message. Adjectives stay
+            // unchecked on both sides: a wrong-category adjective empties the subject, which the fail-on-empty
+            // gate reds loudly, while the always-passing MustNot verb is the silent slip this item exists to catch.
             case MemberMustBeAttributedWithConstraint c:
                 CheckAttributeAnchors(rule, errors, [c.Anchor], "MustBeAttributedWith");
                 break;
@@ -700,8 +656,8 @@ internal static class SpecValidator
         }
     }
 
-    // The attribute-anchor half of item 21, shared by the four attribute verbs (type and member, both
-    // polarities): one predicate and one message template with the caller's verb name in the steer.
+    // The attribute-anchor half of item 21: one predicate and one message template, the caller's verb named in
+    // the steer.
     private static void CheckAttributeAnchors(
         RuleRegistration rule, List<SpecValidationError> errors, IReadOnlyList<TypeAnchor> anchors, string verbName)
     {
@@ -709,9 +665,6 @@ internal static class SpecValidator
             t => $"'{SafeFullDisplay(t)}' does not derive from System.Attribute; {verbName} requires an attribute anchor");
     }
 
-    // Walks a hierarchy verb's anchors (one for a positive, the whole list for a negative), emitting the
-    // shared Code.HierarchyAnchorWrongCategory with the caller's message core plus the "(used by '{id}')" tail
-    // and the rule's spec-source location, the items-19/20 convention.
     private static void CheckAnchorCategory(
         RuleRegistration rule, List<SpecValidationError> errors, IReadOnlyList<Type> anchors,
         Func<Type, bool> invalid, Func<Type, string> message)
@@ -722,21 +675,17 @@ internal static class SpecValidator
                     $"{message(anchor)} (used by '{rule.Id}').", rule.Location));
     }
 
-    // The reflected arm of an anchor list — the only anchors item 21 can judge. A string anchor names a
-    // definition FQN and nothing more, so it is dropped here; the asymmetry is deliberate, and the
-    // blank-name check (item 15, via RulePatterns) is the whole of what a string anchor is validated for.
+    // The reflected arm of an anchor list, the only anchors items 14, 20 and 21 can judge. A string anchor names a
+    // definition FQN and nothing more, so it is dropped here: the blank-name check (item 15, via RulePatterns) is
+    // the whole of what it is validated for, and a constructed spelling is a legal name that matches nothing.
     private static IReadOnlyList<Type> TypedAnchors(IReadOnlyList<TypeAnchor> anchors)
     {
         return anchors.Where(anchor => anchor.Type is not null).Select(anchor => anchor.Type!).ToList();
     }
 
-    // GRAMMAR §8 item 19: an arch.Registered noun carrying a Lifetime value outside the defined set (e.g.
-    // (Lifetime)7 via a cast) names no lifetime. Walked over every selection an anchor reaches — a rule's
-    // subject, operands, Except payloads, union parts and exemplar, a scope's scoped interior and sanctioned
-    // surface, and a layer's definition — through the same expansion the foreign-Arch and pattern walks
-    // take, so a noun cannot be checked in one position and unchecked in another. The union guard mirrors
-    // SelectionPatterns (a UnionSelection has no single noun). Reported all-at-once, and the build throws
-    // before membership resolution ever sees the bad value.
+    // GRAMMAR §8 item 19: a Lifetime outside the defined set (a cast such as (Lifetime)7) names no lifetime.
+    // Walked through the same expansion the foreign-Arch and pattern walks take, so a noun cannot be checked in
+    // one position and unchecked in another; the build throws before membership resolution sees the value.
     private static void CheckLifetimes(
         IEnumerable<Selection> selections, ErrorTarget target, List<SpecValidationError> errors)
     {
@@ -751,14 +700,12 @@ internal static class SpecValidator
 
     private static void CheckMember(Member member, ErrorTarget rule, List<SpecValidationError> errors)
     {
-        // The member's own arch.Member(...) call site steers the diagnostic when present; a verb-minted
-        // member has none, so it attributes to the consuming rule's anchor. The id stays the rule's either
-        // way — a member is never the thing a spec error is addressed to.
+        // The ID stays the rule's wherever the location comes from: a member is never what a spec error is
+        // addressed to.
         var target = new ErrorTarget(rule.Id, member.Location ?? rule.Location);
 
-        // A member minted from an unresolvable anchor expression (GRAMMAR §8, item 12's expression sibling):
-        // the resolver stored the diagnostic core; report it before touching the anchor. A poisoned Member's
-        // anchor accessors throw if read (fail closed), so this short-circuit is the only sanctioned path.
+        // A poisoned member (GRAMMAR §8, item 12's expression sibling) is reported before its throwing anchor
+        // accessors are touched.
         if (member.PoisonError is not null)
         {
             errors.Add(new SpecValidationError(Code.MemberExpressionUnresolvable, target.Id,
@@ -852,10 +799,9 @@ internal static class SpecValidator
 
         if (rule.Posture == Posture.Migrate) yield return (SpecSlot.MigrateFrom, rule.MigrateFrom);
 
-        // A path, walked as prose exactly as DragonsDoc is: blank and multi-line are the two ways to
-        // write one that no later stage can report, because a blank path resolves to the solution
-        // directory rather than failing — check then reads no baseline and the rule reds with nothing
-        // said about why, and `baseline init` tries to write the directory itself.
+        // A path, walked as prose: a blank one resolves to the solution directory rather than failing, so check
+        // reads no baseline and the rule reds with nothing said about why, and `baseline init` tries to write
+        // the directory itself.
         foreach (string baseline in rule.Baselines) yield return (SpecSlot.Baseline, baseline);
 
         if (rule.Constraint is not null)
@@ -890,8 +836,7 @@ internal static class SpecValidator
     {
         if (constraint is MustConstraint must) yield return (SpecSlot.Description, must.Description);
 
-        // The member escape hatches (GRAMMAR §4.6, §8 item 5 via the extended walk): the member Must
-        // description and any member Where descriptions on the member subject reach BlankProse/MultiLineProse.
+        // The member escape hatches (GRAMMAR §4.6, §8 item 5).
         if (constraint is MemberMustConstraint memberMust) yield return (SpecSlot.Description, memberMust.Description);
 
         if (constraint is MemberConstraint memberConstraint)
@@ -911,9 +856,7 @@ internal static class SpecValidator
             }
         }
 
-        // The project escape hatches (GRAMMAR §4.10, §8 item 5 via the same extended walk): the project Must
-        // description and any project Where descriptions on the project subject, including those nested under
-        // its Except payloads.
+        // The project escape hatches (GRAMMAR §4.10, §8 item 5), Except payloads included.
         if (constraint is ProjectMustConstraint projectMust) yield return (SpecSlot.Description, projectMust.Description);
 
         foreach (ProjectSelection selection in constraint.ProjectSelections())
@@ -921,9 +864,8 @@ internal static class SpecValidator
             if (adjective is ProjectWhereAdjective projectWhere)
                 yield return (SpecSlot.Description, projectWhere.Description);
 
-        // For a member constraint, Subject is the underlying type selection (Subject => MemberSubject.Source),
-        // so this also walks any type-side Where/Except used before the projection. Null for a project
-        // constraint, whose subject is not a type selection at all — the loop above is its walk.
+        // For a member constraint this is the projection's source, so a type-side Where or Except before the
+        // projection is walked too; a project constraint's Subject is null, and the loop above is its walk.
         if (constraint.Subject is { } subject)
             foreach ((SpecSlot, string?) prose in SelectionProse(subject))
                 yield return prose;
@@ -970,11 +912,7 @@ internal static class SpecValidator
         return constraintSelections.Concat(exemplarSelections);
     }
 
-    // The glob/affix walk (GRAMMAR §8 items 15–16), parallel to the prose and selection walks: every
-    // glob and affix a rule carries, each tagged with the slot that names it in the error and owns what a
-    // literal written there can be wrong about — the full structural check for a namespace glob, the blank
-    // check alone for every other kind. A string attribute anchor rides this walk too: blank is the only
-    // well-formedness a definition FQN has, so it joins the plain kinds under its own label.
+    // The glob, affix and string-anchor walk (GRAMMAR §8 items 15–16), parallel to the prose and selection walks.
     private static IEnumerable<(string Value, SpecSlot Slot)> RulePatterns(RuleRegistration rule)
     {
         IEnumerable<(string, SpecSlot)> constraintPatterns = rule.Constraint is null
@@ -1028,8 +966,7 @@ internal static class SpecValidator
                 break;
 
             // The attribute verbs' string anchors (GRAMMAR §8 item 15, the "attribute name" label): a blank
-            // name is a slip that would otherwise mint an anchor matching nothing, silently. Only the string
-            // arm has a name to check; a typeof anchor yields nothing here.
+            // name would otherwise mint an anchor matching nothing, silently.
             case MustBeAttributedWithConstraint c:
                 foreach ((string, SpecSlot) pattern in AnchorNamePatterns([c.Anchor], SpecSlot.AttributeName)) yield return pattern;
                 break;
@@ -1052,8 +989,7 @@ internal static class SpecValidator
                 foreach ((string, SpecSlot) pattern in AnchorNamePatterns(c.Anchors, SpecSlot.BaseTypeName)) yield return pattern;
                 break;
 
-            // The member attribute verbs' string anchors, on the same terms and under the same label — blank
-            // is the whole of a definition FQN's well-formedness on either side of the axis (item 15).
+            // The member attribute verbs' string anchors, on the same terms and under the same label.
             case MemberMustBeAttributedWithConstraint c:
                 foreach ((string, SpecSlot) pattern in AnchorNamePatterns([c.Anchor], SpecSlot.AttributeName)) yield return pattern;
                 break;
@@ -1061,8 +997,7 @@ internal static class SpecValidator
                 foreach ((string, SpecSlot) pattern in AnchorNamePatterns(c.Anchors, SpecSlot.AttributeName)) yield return pattern;
                 break;
 
-            // The parameter verb's string anchor, under its own label — blankness is the whole of its
-            // validation, the closed-generic refusal (item 20) being a typeof-arm fact.
+            // The parameter verb's string anchor, under its own label.
             case MemberMustAcceptParameterConstraint c:
                 foreach ((string, SpecSlot) pattern in AnchorNamePatterns([c.Anchor], SpecSlot.ParameterTypeName)) yield return pattern;
                 break;
@@ -1072,8 +1007,7 @@ internal static class SpecValidator
                 yield return (c.Template, SpecSlot.CounterpartTemplate);
                 break;
 
-            // GRAMMAR §8 item 24: MustOnlyTarget's monikers, where a blank one would narrow the allow-list silently,
-            // and MustTarget's, where it would red every evaluated project.
+            // GRAMMAR §8 item 24: MustOnlyTarget's and MustTarget's monikers.
             case MustOnlyTargetConstraint c:
                 foreach (string framework in c.Frameworks) yield return (framework, SpecSlot.TargetFramework);
                 break;
@@ -1096,9 +1030,8 @@ internal static class SpecValidator
                 break;
         }
 
-        // The subject selection tree (for a member constraint this is the underlying type selection,
-        // Subject => MemberSubject.Source) and the dependency-verb operands. A project constraint has no type
-        // selection here; its name operands ride CheckProjectPatterns (item 23).
+        // The subject tree and the dependency-verb operands; a project constraint's name operands ride
+        // CheckProjectPatterns (item 23).
         if (constraint.Subject is { } subject)
             foreach ((string, SpecSlot) pattern in SelectionPatterns(subject))
                 yield return pattern;
@@ -1107,8 +1040,7 @@ internal static class SpecValidator
         foreach ((string, SpecSlot) pattern in SelectionPatterns(operand))
             yield return pattern;
 
-        // The member subject's own adjectives (name/affix) — off the type-side selection walk, reached
-        // like CheckMemberReturning reaches the member .Returning anchor.
+        // The member subject's own adjectives, off the type-side selection walk.
         if (constraint is not MemberConstraint memberConstraint) yield break;
 
         foreach ((string, SpecSlot) pattern in MemberSelectionPatterns(memberConstraint.MemberSubject))
@@ -1126,8 +1058,7 @@ internal static class SpecValidator
     }
 
     // The string arm of an anchor list, under one slot: an anchor spelled as a definition FQN yields its
-    // name for the item-15 blank check, and a typeof anchor yields nothing. One projection for both anchor
-    // shapes — the single-anchor verbs pass a one-element list — so every arm above stays one line.
+    // name for the item-15 blank check, and a typeof anchor yields nothing.
     private static IEnumerable<(string Value, SpecSlot Slot)> AnchorNamePatterns(IReadOnlyList<TypeAnchor> anchors, SpecSlot slot)
     {
         foreach (TypeAnchor anchor in anchors)
@@ -1137,12 +1068,9 @@ internal static class SpecValidator
 
     private static IEnumerable<(string Value, SpecSlot Slot)> SelectionPatterns(Selection selection)
     {
-        // A NamespaceNoun carries a glob and a ProjectNoun a name, both checked here — this one arm covers
-        // every position a noun can stand in (subject, operand, Except payload, quarantined scope), because
-        // each position reaches this walk. A LayerNoun's globs are validated once in ValidateLayers (their
-        // use-independent home), so they are not re-checked here. A UnionSelection has no single noun, so
-        // its operands answer for it — and either way the adjective loop below runs, because a union
-        // carries adjectives of its own (AnyOf(a, b).InNamespace("") must reach the blank-pattern check).
+        // Every position a noun can stand in reaches this walk, though a layer's globs are validated once, in
+        // ValidateLayers, and not re-checked here. A union's operands answer for its noun, and the adjective loop
+        // runs either way: AnyOf(a, b).InNamespace("") must reach the blank-pattern check.
         if (selection is UnionSelection union)
             foreach (Selection member in union.Parts)
             foreach ((string, SpecSlot) pattern in SelectionPatterns(member))
@@ -1178,10 +1106,8 @@ internal static class SpecValidator
                     yield return (attributeName, SpecSlot.AttributeName);
                     break;
                 case ImplementingAdjective { Anchor.DefinitionFullName: { } interfaceName }:
-                    // The hierarchy adjectives' string anchors, likewise. Blankness is checked on an
-                    // adjective even though item 21's category rule deliberately is not: a blank name is a
-                    // spec-side slip either way, while a wrong CATEGORY on an adjective empties the subject
-                    // and the fail-on-empty gate reds it loudly (see CheckHierarchyAnchors).
+                    // The hierarchy adjectives' string anchors, likewise: blankness is checked on an adjective,
+                    // though item 21's category rule is not (see CheckHierarchyAnchors).
                     yield return (interfaceName, SpecSlot.InterfaceName);
                     break;
                 case DerivedFromAdjective { Anchor.DefinitionFullName: { } baseTypeName }:
@@ -1221,8 +1147,7 @@ internal static class SpecValidator
                 yield return (attributeName, SpecSlot.AttributeName);
                 break;
             case ReturningAdjective a:
-                // The return-type adjective's string anchors, on the same terms under their own label. The
-                // list form goes through the shared projection, so every anchor is reached.
+                // The return-type adjective's string anchors, on the same terms under their own label.
                 foreach ((string, SpecSlot) pattern in AnchorNamePatterns(a.Anchors, SpecSlot.ReturnTypeName)) yield return pattern;
 
                 break;

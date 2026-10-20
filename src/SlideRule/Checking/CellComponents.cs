@@ -1,20 +1,14 @@
 namespace SlideRule.Checking;
 
-/// <summary>
-///     The strongly connected components of a family's cell graph (GRAMMAR §5.1) — the one piece of graph
-///     theory the cycle gate needs. Cells are the nodes and an arrow is "some owned reference crosses from
-///     this cell into that one"; two cells share a component exactly when each can reach the other, which
-///     is to say they lie on a common circle.
-/// </summary>
+/// <summary>The strongly connected components of a family's cell graph (GRAMMAR §5.1).</summary>
 internal static class CellComponents
 {
     /// <summary>
     ///     One component id per cell, positionally aligned with the cell list: cells sharing an id lie on a
     ///     circle together, and a cell alone in its component lies on none. The ids themselves carry no
-    ///     meaning beyond equality.
+    ///     meaning beyond equality. <paramref name="hasArrow" /> says whether some owned reference crosses from
+    ///     its first cell into its second.
     /// </summary>
-    /// <param name="cellCount">How many cells the family declares.</param>
-    /// <param name="hasArrow">Whether some owned reference crosses from the first cell into the second.</param>
     /// <remarks>
     ///     Tarjan's algorithm, driven in cell index order so the ids a given graph yields never depend on
     ///     hash order or walk order — the same determinism every other checker answer holds to. The

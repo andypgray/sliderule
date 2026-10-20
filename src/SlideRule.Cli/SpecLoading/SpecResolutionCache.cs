@@ -1,58 +1,41 @@
 namespace SlideRule.Cli.SpecLoading;
 
 /// <summary>
-///     What one spec resolution produced for the run that asked: the <see cref="Resolution" /> itself and
-///     the solution's declared <see cref="DeclaredMembers" /> it was computed against — which extraction
-///     needs next, and which resolution had to read anyway.
+///     What one spec resolution produced for the run that asked: the <see cref="Resolution" /> itself and the
+///     solution's declared <see cref="DeclaredMembers" /> it was computed against (null when membership could not
+///     be read), which extraction needs next and resolution had to read anyway.
 /// </summary>
-/// <param name="Resolution">The resolved spec: the DLL to load, the spec project, the excluded projects.</param>
-/// <param name="DeclaredMembers">
-///     The solution's declared <c>.csproj</c> members, or <see langword="null" /> when membership could not
-///     be read. Travels with the resolution so one read serves resolution and extraction both, on the warm
-///     path as on the cold one.
-/// </param>
 internal readonly record struct SessionSpecResolution(
     SpecResolution Resolution,
     IReadOnlySet<string>? DeclaredMembers);
 
 /// <summary>
-///     A session-scoped cache of spec resolutions, keyed by the normalized <c>--spec</c> argument and
-///     stamped with the workspace generation each was computed under. The warm MCP server's answer to
-///     re-running the whole resolution — the solution-file membership parse, a canonicalized walk over every
-///     project, the convention's candidate scan, and the spec project's <c>ProjectReference</c> closure — on
-///     every single tool call, for something that cannot change while the workspace stands. The one-shot CLI
-///     keeps its per-process resolution untouched.
+///     A session-scoped cache of spec resolutions, keyed by the normalized <c>--spec</c> argument and stamped with
+///     the workspace generation each was computed under, so the warm MCP server does not repeat the whole
+///     resolution on every tool call for something that cannot change while the workspace stands.
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>The generation is the grain, and it is the only sound one.</b> A
-///         <see cref="Roslyn.WorkspaceSession" /> mints a fresh snapshot instance per changed document, so
-///         keying on snapshot identity would miss on every call after a <c>.cs</c> edit, the repeated call
-///         this cache exists for, and spare nothing. Everything resolution reads is structural: the project set,
-///         their <c>.csproj</c> paths, their evaluated output paths, and the solution's declared membership.
-///         None of it can change without a full reload, which bumps the generation; and the solution file
-///         itself is one of the structural fingerprints the session's reconcile sweep stats, so a project
-///         added to or removed from it arrives here as a miss. It is the same grain
-///         <see cref="Roslyn.Sessions.SessionFragmentStore" /> already flushes on, for the same reason.
+///         The generation is the only sound grain. A <see cref="Roslyn.WorkspaceSession" /> mints a fresh
+///         snapshot instance per changed document, so keying on snapshot identity would miss on every call after
+///         a <c>.cs</c> edit. Everything resolution reads is structural: the project set, their <c>.csproj</c>
+///         paths, their evaluated output paths, and the solution's declared membership. None of it can change
+///         without a full reload, which bumps the generation; and the solution file itself is one of the
+///         structural fingerprints the session's reconcile sweep stats, so a project added to or removed from it
+///         arrives here as a miss.
 ///     </para>
 ///     <para>
-///         <b>Only the candidate half is cached; the built output is resolved live on every call.</b> A hit
-///         replays through <see cref="SpecResolver.Replay" />, the one owner the persisted extraction cache's
-///         hit path also goes through — so a spec DLL that has since been rebuilt, moved or deleted answers
-///         in the cold run's words rather than with a path recorded before it went. That is a per-call
-///         <c>File.Exists</c>, against the walk it spares.
+///         Only the candidate half is cached: a hit replays through <see cref="SpecResolver.Replay" />, so a spec
+///         DLL that has since been rebuilt, moved or deleted answers in the cold run's words rather than with a
+///         path recorded before it went, at the cost of a per-call <c>File.Exists</c>. A prebuilt-DLL
+///         <c>--spec</c> never gets here; <c>CodebaseSource.ResolveSpec</c> answers it first and says why.
 ///     </para>
 ///     <para>
-///         <b>A prebuilt-DLL <c>--spec</c> never gets here.</b> The caller answers it first, exactly as the
-///         persisted cache's hit path does; <c>CodebaseSource.ResolveSpec</c> says why.
-///     </para>
-///     <para>
-///         <b>Successes only, and the expensive work stays outside the lock.</b> A resolution that throws —
-///         no spec project, an ambiguous one, nothing built — stores nothing, so every later call re-raises
-///         the identical error the cold CLI raises rather than replaying a stale success. Neither the full
-///         resolve nor the replay's disk search runs under the gate, which would otherwise serialize every
-///         tool call behind one solution's walk; two callers racing the same miss both resolve and the last
-///         one recorded wins, which costs a walk and never a wrong answer.
+///         Only successes are stored: a resolution that throws (no spec project, an ambiguous one, nothing
+///         built) stores nothing, so every later call re-raises the identical error the cold CLI raises rather
+///         than replaying a stale success. Neither the full resolve nor the replay's disk search runs under the
+///         gate, which would otherwise serialize every tool call behind one solution's walk; two callers racing
+///         the same miss both resolve and the last one recorded wins, which costs a walk and never a wrong answer.
 ///     </para>
 /// </remarks>
 internal sealed class SpecResolutionCache
@@ -62,24 +45,21 @@ internal sealed class SpecResolutionCache
     private readonly Lock gate = new();
 
     /// <summary>
-    ///     How many resolutions this cache sent to a full walk rather than replaying — one per
-    ///     <c>--spec</c> argument per workspace generation in the steady state. Internal test observable;
-    ///     never printed.
+    ///     How many resolutions this cache sent to a full walk rather than replaying, one per <c>--spec</c> argument
+    ///     per workspace generation in the steady state; never printed.
     /// </summary>
     internal int FullResolveCount { get; private set; }
 
     /// <summary>
-    ///     The resolution for <paramref name="normalizedSpecArgument" /> under
-    ///     <paramref name="generation" />: the recorded candidate half replayed against disk when one was
-    ///     computed under this same generation, otherwise <paramref name="resolveFully" /> — whose result is
-    ///     recorded for the next call.
+    ///     The resolution for <paramref name="normalizedSpecArgument" /> under <paramref name="generation" />: the
+    ///     recorded candidate half replayed against disk when one was computed under this same generation,
+    ///     otherwise <paramref name="resolveFully" />, whose result is recorded for the next call.
     /// </summary>
-    /// <param name="normalizedSpecArgument">
-    ///     The <c>--spec</c> value made absolute, or <c>""</c> for the convention default. The same key the
-    ///     persisted cache records its resolutions under, so the two agree on what "the same spec" means.
-    /// </param>
-    /// <param name="generation">The workspace load generation this call's snapshot carries.</param>
-    /// <param name="resolveFully">The cold resolution, run on a miss.</param>
+    /// <remarks>
+    ///     <paramref name="normalizedSpecArgument" /> is the <c>--spec</c> value made absolute, or <c>""</c> for the
+    ///     convention default: the key the persisted cache records its resolutions under, so the two agree on what
+    ///     "the same spec" means.
+    /// </remarks>
     internal SessionSpecResolution Resolve(
         string normalizedSpecArgument, long generation, Func<SessionSpecResolution> resolveFully)
     {

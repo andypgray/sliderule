@@ -10,7 +10,6 @@ namespace SlideRule.Model;
 /// </summary>
 internal sealed class TypeNoun(TypeAnchor anchor) : SelectionNoun
 {
-    /// <summary>The anchor the noun names, carrying every name a checker or a render reads off it.</summary>
     internal TypeAnchor Anchor { get; } = anchor;
 
     // Read only under adjectives: a bare type reads as its reference fragment in both positions.

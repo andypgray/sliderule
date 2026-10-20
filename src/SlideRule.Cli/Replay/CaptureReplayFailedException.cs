@@ -7,9 +7,7 @@ namespace SlideRule.Cli.Replay;
 ///     between validation and materialisation.
 /// </summary>
 /// <remarks>
-///     It is caught only at the gate, which prints its <see cref="System.Exception.Message" /> (already the
-///     complete notice) behind a <c>warning: </c> prefix and re-runs the command cold.
-///     Never reaches <see cref="CliErrorMapper" />: this is a recoverable fallback signal, not a user error,
-///     and acquisition precedes all rendering so the re-run produces the run's only output.
+///     A recoverable fallback signal, not a user error: its <see cref="System.Exception.Message" /> is already the
+///     complete notice, and it never reaches <see cref="CliErrorMapper" />.
 /// </remarks>
 internal sealed class CaptureReplayFailedException(string notice, Exception inner) : Exception(notice, inner);

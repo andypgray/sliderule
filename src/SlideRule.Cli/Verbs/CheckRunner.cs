@@ -10,31 +10,21 @@ using SlideRule.Roslyn.Diagnostics;
 namespace SlideRule.Cli.Verbs;
 
 /// <summary>
-///     The <c>check</c> pipeline: build a <see cref="CodebaseSource" /> (cache hit or cold workspace) →
-///     select the rules to run (<see cref="CheckRequest.Rules" />, everything by default) → run the shared
-///     <see cref="CheckPipeline" /> (baselines, extraction, ratcheted check) → render (human, JSON,
-///     or the hook document) → exit code (0 clean / 1 red violations; grandfathered violations do not
-///     fail the run). A narrowed run is a smaller report of the same shape and the same exit contract,
-///     so its verdict answers a smaller question — which is what the stamp and the document's
+///     The <c>check</c> verb over the shared <see cref="CheckPipeline" />: it renders human, JSON or the hook
+///     document, and exits 0 clean or 1 on a red rule; grandfathered violations do not fail the run. A run
+///     narrowed by <see cref="CheckRequest.Rules" /> is a smaller report of the same shape and the same exit
+///     contract, so its verdict answers a smaller question — which is what the stamp and the document's
 ///     <c>rulesFilter</c> say out loud.
 /// </summary>
 /// <remarks>
-///     <para>
-///         <b>What it refuses.</b> A workspace-load failure overrides that verdict: the model is incomplete,
-///         so <c>check</c> fails closed with exit 2 unless
-///         <see cref="CheckRequest.AllowWorkspaceDiagnostics" /> was passed — a rule that "passes" only
-///         because a project did not load is worse than no answer. The decision reads which projects failed
-///         to load or restore, never diagnostic text, and the messages every verb uses for the condition live
-///         in <see cref="IncompleteModelGate" />; <c>check</c> renders before the gate fires, so the verdict
-///         also rides the JSON document and the SARIF stamp. Expected failures surface as
-///         <see cref="UserErrorException" />; the top-level handler maps them to exit 2.
-///     </para>
-///     <para>
-///         Output/error writers are injected so the in-process e2e tests can capture them, the
-///         <see cref="IEnvironment" /> seam supplies the cache-root override, and the
-///         <see cref="IResponseFitter" /> decides which rung of the grain ladder a caller with a response
-///         budget actually gets (default: the grain they asked for).
-///     </para>
+///     <b>What it refuses.</b> A workspace-load failure overrides that verdict: the model is incomplete,
+///     so <c>check</c> fails closed with exit 2 unless
+///     <see cref="CheckRequest.AllowWorkspaceDiagnostics" /> was passed — a rule that "passes" only
+///     because a project did not load is worse than no answer. The decision reads which projects failed
+///     to load or restore, never diagnostic text, and the messages every verb uses for the condition live
+///     in <see cref="IncompleteModelGate" />; <c>check</c> renders before the gate fires, so the verdict
+///     also rides the JSON document and the SARIF stamp. Expected failures surface as
+///     <see cref="UserErrorException" />; the top-level handler maps them to exit 2.
 /// </remarks>
 internal sealed class CheckRunner(
     TextWriter output,
@@ -142,9 +132,8 @@ internal sealed class CheckRunner(
     }
 
     // The human filter stamp, written by the runner rather than by Core's shared HumanReportRenderer so an
-    // unfiltered run is byte-identical to what it always was and the xUnit adapter never sees a CLI concern.
-    // It says what the report cannot: how much of the spec this verdict covers. Human-channel only — under
-    // --json the document carries the same fact in rulesFilter.
+    // unfiltered run writes that renderer's output alone and the xUnit adapter never sees a CLI concern.
+    // It says what the report cannot: how much of the spec this verdict covers.
     private static void WriteFilterStamp(
         TextWriter human, IReadOnlyList<string> ruleGlobs, int selected, int total)
     {
@@ -208,14 +197,11 @@ internal sealed class CheckRunner(
         return request.Json ? TextWriter.Null : stdout;
     }
 
-    // The JSON report, degraded rather than cut. The runner offers every grain from the requested floor down
-    // to the coarsest as a lazy ladder and the fitter picks; a caller whose transport has a response budget
-    // gets the first rung that fits, re-composed from the result model already in hand — no second check, and
-    // byte-identical to what --grain naming that rung would have written, so the two surfaces cannot drift.
+    // The JSON report, degraded rather than cut (IResponseFitter). Each rung is re-composed from the result
+    // model already in hand, no second check, so it is byte-identical to what --grain naming it would write.
     // Degrading coarsens the grain and never touches the selection: every rule the run evaluated is still
     // here with its verdict, and the summary counts still cover exactly what ran. The two renderings arrive
-    // composed because stderr, the document and SARIF must read one composition, and the rest of what the
-    // document names is read off the source.
+    // composed because stderr, the document and SARIF must read one composition.
     private void WriteJson(
         CheckRequest request, TextWriter stdout, CheckReport report, CodebaseSource source,
         IReadOnlyList<string> renderedDiagnostics, WorkspaceTrustStamp trust, IReadOnlyList<string> ruleGlobs)

@@ -23,11 +23,11 @@ namespace SlideRule.Internal;
 ///         feed and carriage return, between tokens only. The root may be any value.
 ///     </para>
 ///     <para>
-///         Strings are read whole: every character at or above U+0020 other than a quote and a
-///         backslash passes through verbatim, including an unescaped surrogate code unit; a character
-///         below U+0020 must be escaped; and the escapes are the eight of the standard plus
-///         <c>\uXXXX</c>, whose four hex digits may be of either case. A <c>\u</c> escape naming half a
-///         surrogate pair must be joined by its other half, also escaped.
+///         Strings, keys included, are read whole and come back with every escape resolved. Every character
+///         at or above U+0020 other than a quote and a backslash passes through verbatim, including an
+///         unescaped surrogate code unit; a character below U+0020 must be escaped; and the escapes are the
+///         eight of the standard plus <c>\uXXXX</c>, whose four hex digits may be of either case. A <c>\u</c>
+///         escape naming half a surrogate pair must be joined by its other half, also escaped.
 ///     </para>
 ///     <para>
 ///         Nothing here throws for content. A refusal is a <see cref="StrictJsonError" /> naming what is
@@ -43,11 +43,6 @@ internal static class StrictJson
     /// </summary>
     internal const int MaxDepth = 64;
 
-    /// <summary>
-    ///     Reads <paramref name="text" /> whole. On success <paramref name="root" /> is the document's
-    ///     one value and <paramref name="error" /> is null; on a refusal <paramref name="root" /> is null
-    ///     and <paramref name="error" /> says what is wrong and where.
-    /// </summary>
     internal static bool TryParse(string text, out StrictJsonValue? root, out StrictJsonError? error)
     {
         Guard.NotNull(text, nameof(text));
@@ -56,15 +51,11 @@ internal static class StrictJson
         return parser.TryRead(out root, out error);
     }
 
-    /// <summary>
-    ///     One pass over one text: the position it has reached, how many containers are open there, and
-    ///     the refusal that ended it.
-    /// </summary>
+    /// <summary>One pass over one text.</summary>
     /// <remarks>
-    ///     Every reader below returns a null result — a null value, a null string, or false — once
-    ///     <see cref="_error" /> is set, and every caller returns straight back up. That is what makes
-    ///     "the first refusal wins" true of the whole class rather than of one method: nothing downstream
-    ///     of a refusal ever runs, so nothing can overwrite it.
+    ///     Every reader returns a null result (a null value, a null string, or false) once <see cref="_error" />
+    ///     is set, and every caller returns straight back up, so nothing downstream of a refusal runs and the
+    ///     first refusal wins.
     /// </remarks>
     private sealed class Parser
     {
@@ -146,8 +137,7 @@ internal static class StrictJson
         }
 
         // A bare word where a value belongs. The whole run of letters is read before it is judged, so
-        // that `true` and `false` are values, `null` is the refusal that names the convention, and
-        // anything else is quoted back to the author in full rather than one letter at a time.
+        // that `true` and `false` are values and `null` is the refusal that names the convention.
         private StrictJsonValue? ReadWord(string what)
         {
             JsonPosition start = Here;
@@ -509,15 +499,12 @@ internal static class StrictJson
             return null;
         }
 
-        // Somewhere a value belongs, so a bare word is read whole before it is quoted back.
         private StrictJsonValue? RefusedValue(string what)
         {
             Expected(what, atValuePosition: true);
             return null;
         }
 
-        // Somewhere a single punctuation mark or a key belongs, where a run of letters would say nothing
-        // the first letter does not.
         private StrictJsonValue? RefusedToken(string what)
         {
             Expected(what, atValuePosition: false);
@@ -530,8 +517,8 @@ internal static class StrictJson
             RecordHere("expected " + what + ", found " + found + ".");
         }
 
-        // What the offending character is called. A bare word at a value position is quoted whole,
-        // because the author wrote one word and a single letter would not be the thing they typed.
+        // A bare word at a value position is quoted whole, because the author wrote one word. Where a
+        // punctuation mark or a key belongs, a run of letters would say nothing the first letter does not.
         private string DescribeFound(bool atValuePosition)
         {
             if (AtEnd) return ExpectedEndOfText;
@@ -575,8 +562,6 @@ internal static class StrictJson
             for (var i = 0; i < count; i++) Advance();
         }
 
-        // A line ends at the line feed alone, so a carriage return just takes a column and a CRLF file
-        // reports the positions its line-feed-only twin would.
         private void Advance()
         {
             if (_text[_index] == '\n')
@@ -627,8 +612,6 @@ internal static class StrictJson
             return c is >= ' ' and <= '~';
         }
 
-        // What a string carries as itself: anything but the quote that closes it, the backslash that opens an
-        // escape, and a control character, which must be escaped.
         private static bool IsVerbatim(char c)
         {
             return c != '"' && c != '\\' && c >= ' ';

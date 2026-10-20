@@ -11,15 +11,11 @@ namespace SlideRule.Model;
 ///     (GRAMMAR §6).
 /// </summary>
 /// <remarks>
-///     Exactly one of <see cref="Layers" /> and <see cref="Projects" /> is non-null, which is what the
-///     two constructors guarantee. The cells are read only in the four places GRAMMAR §5.1 lists; to
-///     every other verb, walk and renderer a family is the union of its cells.
-///     <para>
-///         A one-cell layer family renders exactly as the cell would, in both positions: the family verbs
-///         and the per-cell self still apply to it, and a loop that built a family of one has said the same
-///         thing the cell says (the §5.1 union identity). The project form's cell count is a codebase fact
-///         rather than a spec one, so its sentence always says "each of".
-///     </para>
+///     The cells are read only in the places GRAMMAR §5.1 lists; to every other verb, walk and renderer a
+///     family is the union of its cells. A one-cell layer family renders exactly as the cell would, in both
+///     positions, while the family verbs and the per-cell self still apply to it (the §5.1 union identity); the
+///     project form's cell count is a codebase fact rather than a spec one, so its sentence always says
+///     "each of".
 /// </remarks>
 internal sealed class EachNoun : SelectionNoun
 {
@@ -46,9 +42,6 @@ internal sealed class EachNoun : SelectionNoun
 
     internal override string ReferenceFragment => Layers is { } cells ? LayerFragment(cells) : ProjectFragment();
 
-    // One cell reads as the cell: the identity holds in reference position, so the locative built on it
-    // holds too. Layer names are prose rather than identifiers, so they are not backticked — the same
-    // choice the single-layer and collapsed-union fragments make.
     private static string LayerFragment(IReadOnlyList<Layer> cells)
     {
         if (cells.Count == 1) return cells[0].Noun.ReferenceFragment;

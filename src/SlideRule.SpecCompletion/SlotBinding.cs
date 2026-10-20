@@ -10,44 +10,37 @@ namespace SlideRule.SpecCompletion;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>The guards are the analyzer's, mirrored.</b> A marker lives on the original definition's
-///         parameter, because a constructed generic's parameters are substitutions carrying no attribute
-///         blob of their own; an argument the caller did not write has no literal to complete in; an
-///         ordinal only means the same thing on both lists while the lists are the same length. Where the
-///         two readers disagreed, an author would be offered names for one slot and warned about another.
+///         The guards are the spec-literal analyzer's, mirrored, each for the reason its comments there give:
+///         the marker is read off the original definition's parameter, an argument the caller did not write is
+///         skipped, and the two parameter lists must be the same length. Where the two readers disagreed, an
+///         author would be offered names for one slot and warned about another.
 ///     </para>
 ///     <para>
-///         <b>One operation is asked for, and it is the literal's.</b> A params call expanded at the call
-///         site has no argument operation of its own per element, but the literal's operation has parents
-///         all the way up, through the array the compiler gathers the elements into, to the one argument
-///         carrying them all. Walking up from the literal reaches every element alike, and passes through
-///         parentheses and a null-forgiving operator, which have no operation of their own.
+///         One operation is asked for, and it is the literal's. A params call expanded at the call site has no
+///         argument operation of its own per element, but the literal's operation has parents all the way up,
+///         through the array the compiler gathers the elements into, to the one argument carrying them all.
+///         Walking up from the literal reaches every element alike, and passes through parentheses and a
+///         null-forgiving operator, which have no operation of their own.
 ///     </para>
 ///     <para>
-///         <b>Refusing is the default at every step.</b> A call that does not bind, a parameter with no
-///         marker, a marker naming a slot this assembly does not know: each of them offers nothing rather
-///         than guessing, because a name offered for the wrong slot is a name the author accepts and the
-///         checker then matches nothing against.
+///         Refusing is the default at every step. A call that does not bind, a parameter with no marker, a
+///         marker naming a slot this assembly does not know: each of them offers nothing rather than guessing,
+///         because a name offered for the wrong slot is a name the author accepts and the checker then matches
+///         nothing against.
 ///     </para>
 /// </remarks>
 internal static class SlotBinding
 {
     /// <summary>
-    ///     The operation kind a collection expression carries, and the same number the spec-literal analyzer
-    ///     matches it by. The member naming it was added to the compiler API after the version this assembly
-    ///     is built against, so the kind cannot be written here and is matched by its number instead. A
-    ///     compiler old enough not to name it is also old enough never to produce one, so the number reaches
-    ///     nothing on those.
+    ///     The operation kind a collection expression carries: the spec-literal analyzer's
+    ///     <c>CollectionExpressionKind</c>, matched by number for the reason given there.
     /// </summary>
     private const int CollectionExpressionOperationKind = 0x7F;
 
     /// <summary>
-    ///     The slot the literal fills, or <see cref="SlotKind.None" /> where nothing here can say.
+    ///     The slot <paramref name="literal" /> fills, or <see cref="SlotKind.None" /> where nothing here can
+    ///     say; <paramref name="marker" /> is the marker type as this compilation resolved it.
     /// </summary>
-    /// <param name="literal">The literal expression the caret is inside.</param>
-    /// <param name="model">The semantic model of the document the literal is in.</param>
-    /// <param name="marker">The marker type as this compilation resolved it.</param>
-    /// <param name="cancellationToken">The token the one operation lookup runs under.</param>
     internal static SlotKind KindAt(
         LiteralExpressionSyntax literal,
         SemanticModel model,
@@ -87,11 +80,9 @@ internal static class SlotBinding
         return SpecSlotNames.KindOf(SlotNameOn(declaration.Parameters[ordinal], marker));
     }
 
-    // The operations that hand on a value written inside them, named one by one. A test on the type would
-    // be wider than that and wrong: a helper returning an array, a method called on a constant receiver
-    // and a conditional choosing between two arrays are all array-typed, and each computes its value
-    // rather than carrying a written one — so completing inside any of them would offer names for a
-    // string the slot never receives.
+    // The same set the spec-literal analyzer names, for the reason given there: a test on the type would also
+    // pass a helper's array or a conditional's, and completing inside either would offer names for a string
+    // the slot never receives.
     private static bool CarriesValuesThrough(IOperation operation)
     {
         if (operation is IArrayCreationOperation or IArrayInitializerOperation or IConversionOperation)
@@ -100,9 +91,7 @@ internal static class SlotBinding
         return (int)operation.Kind == CollectionExpressionOperationKind;
     }
 
-    // The marker as it sits in metadata: one attribute of the class this compilation resolved, carrying
-    // one string. Compared by symbol rather than by rendered name, so a type of the same name from
-    // somewhere else is not read as the marker.
+    // Read as the spec-literal analyzer reads it, by symbol rather than by rendered name.
     private static string? SlotNameOn(IParameterSymbol parameter, INamedTypeSymbol marker)
     {
         foreach (AttributeData attribute in parameter.GetAttributes())

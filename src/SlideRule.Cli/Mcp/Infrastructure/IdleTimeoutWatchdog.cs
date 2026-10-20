@@ -9,18 +9,14 @@ namespace SlideRule.Cli.Mcp.Infrastructure;
 ///     SLIDERULE_IDLE_TIMEOUT_MINUTES of inactivity.
 /// </summary>
 /// <remarks>
-///     When an MCP client drops/recreates a connection abnormally without closing this
-///     server's stdin pipe and the watched parent PID stays alive, the SDK's stdin-EOF
-///     detection is missed and the server orphans; this is the backstop for that case.
-///     Timed on Stopwatch, which on Windows reads QueryPerformanceCounter and so counts
-///     time the machine spends asleep, and on Linux and macOS reads a monotonic clock
-///     that stops while the machine is suspended. On Windows a suspend longer than the
-///     timeout therefore ends the server at the first poll after wake, the same exit an
-///     idle server makes; elsewhere the idle time resumes where the suspend stopped it.
-///     A call in flight never counts as idle; a server that never receives a call still
-///     exits, timed from process start.
-///     SLIDERULE_IDLE_TIMEOUT_MINUTES=0 disables; unset/blank/invalid => the 30 min default
-///     (a config typo must not silently remove leak protection — 0 is the only opt-out).
+///     When an MCP client drops/recreates a connection abnormally without closing this server's stdin pipe and the
+///     watched parent PID stays alive, the SDK's stdin-EOF detection is missed and the server orphans; this is the
+///     backstop for that case. Timed on Stopwatch, which on Windows reads QueryPerformanceCounter and so counts
+///     time the machine spends asleep, and on Linux and macOS reads a monotonic clock that stops while the machine
+///     is suspended. On Windows a suspend longer than the timeout therefore ends the server at the first poll after
+///     wake, the same exit an idle server makes; elsewhere the idle time resumes where the suspend stopped it. A
+///     call in flight never counts as idle; a server that never receives a call still exits, timed from process
+///     start.
 /// </remarks>
 internal static class IdleTimeoutWatchdog
 {
@@ -33,17 +29,12 @@ internal static class IdleTimeoutWatchdog
     private static Func<long> s_timestampProvider = Stopwatch.GetTimestamp;
 
     /// <summary>
-    ///     The number of tool calls currently executing (bumped by <see cref="EnterCall" /> /
-    ///     <see cref="ExitCall" />). Calls parked on an outer filter have not yet reached
-    ///     <see cref="EnterCall" />, so they are correctly uncounted.
+    ///     The number of tool calls executing. Calls parked on an outer filter have not yet reached
+    ///     <see cref="EnterCall" />, so they are not counted.
     /// </summary>
     private static int InFlightCount => Volatile.Read(ref s_inFlightCount);
 
-    /// <summary>Records the start of a tool call: re-stamps the idle clock and increments the in-flight count.</summary>
-    /// <remarks>
-    ///     Pair with <see cref="ExitCall" /> in a <c>finally</c>. The in-flight count this bumps keeps a
-    ///     long first call (cold solution load) from tripping the timeout while the call is still running.
-    /// </remarks>
+    /// <summary>Records the start of a tool call; pair it with <see cref="ExitCall" /> in a <c>finally</c>.</summary>
     public static void EnterCall()
     {
         Interlocked.Exchange(ref s_lastActivityTicks, s_timestampProvider());
@@ -51,9 +42,8 @@ internal static class IdleTimeoutWatchdog
     }
 
     /// <summary>
-    ///     Records the completion of a tool call: re-stamps the idle clock, decrements the in-flight
-    ///     count, and — when that count reaches zero — releases any shutdown drain parked in
-    ///     <see cref="WhenAllCallsComplete" />.
+    ///     Records the completion of a tool call, releasing a drain parked in <see cref="WhenAllCallsComplete" />
+    ///     when it was the last in flight.
     /// </summary>
     /// <remarks>
     ///     Idle is measured from completion, so the timeout window is the gap between responses, not the time since a
@@ -74,19 +64,11 @@ internal static class IdleTimeoutWatchdog
         }
     }
 
-    /// <summary>
-    ///     Returns a task that completes when no tool call is in flight — already-completed when the
-    ///     count is zero now, otherwise completed by the <see cref="ExitCall" /> that drops the count
-    ///     to zero. Lets <see cref="ServerShutdown" /> drain a mid-flight call before teardown without
-    ///     busy-waiting.
-    /// </summary>
+    /// <summary>A task that completes when no tool call is in flight.</summary>
     /// <remarks>
-    ///     Registers the waiter and re-reads the live count under the same <c>DrainLock</c> that
-    ///     <see cref="ExitCall" /> signals under. Because that check-and-register is atomic against the
-    ///     signal, a call that reaches zero between the check and the wait still completes the waiter —
-    ///     no lost-wakeup window. The waiter uses
-    ///     <see cref="TaskCreationOptions.RunContinuationsAsynchronously" /> so the signalling thread
-    ///     never runs a continuation while holding the lock.
+    ///     The count is checked and the waiter registered under the lock <see cref="ExitCall" /> signals under, and
+    ///     the waiter runs its continuations asynchronously so the signalling thread never runs one while holding
+    ///     the lock.
     /// </remarks>
     internal static Task WhenAllCallsComplete()
     {
@@ -99,15 +81,10 @@ internal static class IdleTimeoutWatchdog
     }
 
     /// <summary>
-    ///     Attaches a background watcher that exits the process after <paramref name="rawTimeoutMinutes" />
-    ///     (or the 30-minute default) with no tool activity. Returns silently when the timeout resolves to
-    ///     zero — the explicit opt-out.
+    ///     Attaches a background watcher that exits the process after <paramref name="rawTimeoutMinutes" />, the
+    ///     unparsed <c>SLIDERULE_IDLE_TIMEOUT_MINUTES</c> value, with no tool activity. Returns silently when the
+    ///     timeout resolves to zero.
     /// </summary>
-    /// <param name="rawTimeoutMinutes">
-    ///     The unparsed <c>SLIDERULE_IDLE_TIMEOUT_MINUTES</c> value, handed in rather than read here: the
-    ///     caller starts this before the host exists and owns the one env seam, so the watchdog stays a pure
-    ///     function of its inputs.
-    /// </param>
     public static void Start(string? rawTimeoutMinutes)
     {
         // A 30-second poll against a timeout measured in minutes: the cost of overshooting the deadline by
@@ -119,11 +96,6 @@ internal static class IdleTimeoutWatchdog
             () => ServerShutdown.ExitWith("idle timeout"));
     }
 
-    /// <summary>
-    ///     Test seam: injected timeout, poll interval, fake clock, fake exit —
-    ///     instant, deterministic, never kills the test host. Mirrors
-    ///     <see cref="ParentProcessWatcher" />'s <c>Start(Func,Action,bool)</c> seam.
-    /// </summary>
     internal static void Start(
         TimeSpan timeout, TimeSpan pollInterval, Func<long> clock, Action onIdleTimeout)
     {
@@ -142,7 +114,6 @@ internal static class IdleTimeoutWatchdog
         _ = Task.Run(() => WatchAsync(timeout, pollInterval, clock, onIdleTimeout));
     }
 
-    /// <summary>Test seam: pure synchronous predicate — true iff it would exit now.</summary>
     internal static bool IsIdleExpired(TimeSpan timeout, long nowTicks)
     {
         if (Volatile.Read(ref s_inFlightCount) > 0) return false;
@@ -186,7 +157,7 @@ internal static class IdleTimeoutWatchdog
     {
         if (string.IsNullOrWhiteSpace(raw)) return TimeSpan.FromMinutes(DefaultTimeoutMinutes);
 
-        if (int.TryParse(raw, out int minutes) && minutes >= 0) return TimeSpan.FromMinutes(minutes); // includes "0" => disabled
+        if (int.TryParse(raw, out int minutes) && minutes >= 0) return TimeSpan.FromMinutes(minutes);
 
         Log.Warning("Invalid SLIDERULE_IDLE_TIMEOUT_MINUTES '{Raw}'; using {Default} min default",
             raw, DefaultTimeoutMinutes);

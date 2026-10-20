@@ -1,10 +1,8 @@
 namespace SlideRule.Codebase;
 
 /// <summary>
-///     One declared parameter of a method in the extracted model (GRAMMAR §4.6) — the ordered entries of
-///     <see cref="MemberNode.Parameters" />. It implements <see cref="IParameterInfo" /> so the
-///     member-predicate parameter contract and this Roslyn-derived data are one surface, exactly as
-///     <see cref="MemberNode" /> implements <see cref="IMemberInfo" />.
+///     One declared parameter of a method in the extracted model (GRAMMAR §4.6): an entry of
+///     <see cref="MemberNode.Parameters" />.
 /// </summary>
 internal sealed class ParameterNode : IParameterInfo
 {

@@ -5,33 +5,18 @@ using SlideRule.Roslyn.Caching;
 namespace SlideRule.Cli.SpecLoading;
 
 /// <summary>
-///     A session-scoped cache of loaded spec models, keyed by the spec DLL's file stamp. The warm MCP
-///     server's answer to re-running the whole spec load — a fresh <see cref="SpecLoadContext" />, the DLL
-///     re-read off disk, reflection over its types, the spec's own <c>Define()</c> executed, and a full
-///     model build plus validation — on every single tool call, for something that changes only when the
-///     spec project is rebuilt. The one-shot CLI keeps its per-process load untouched.
+///     A session-scoped cache of loaded spec models, keyed by the spec DLL's file stamp, so the warm MCP server
+///     does not repeat the whole spec load on every tool call for something that changes only when the spec
+///     project is rebuilt.
 /// </summary>
 /// <remarks>
-///     <para>
-///         <b>The stamp is the whole contract.</b> A hit requires <see cref="FileFreshness.CanTrust" /> —
-///         same existence, same mtime, same length, and the recorded stamp captured comfortably outside the
-///         filesystem's racy window — which is the same primitive the warm workspace's reconcile sweep and
-///         the persisted extraction cache already trust for staleness. A rebuilt spec therefore misses and
-///         reloads, and a spec rebuilt inside the racy window keeps missing (and reloading) until its stamp
-///         promotes, which is the safe direction to be wrong in.
-///     </para>
-///     <para>
-///         <b>Successes only.</b> A load that throws — a deleted DLL, a spec-validation failure, a
-///         dependency that will not resolve — stores nothing, so every later call re-raises the identical
-///         error the cold CLI raises rather than replaying a stale success or a cached exception.
-///     </para>
-///     <para>
-///         <b>What this does to assembly-load-context lifetime: strictly less.</b> A collectible context
-///         cannot actually collect while the model it produced roots the spec's <c>Type</c> references, so
-///         caching the model keeps one such context alive instead of minting a new uncollectable one per
-///         tool call. Nothing is loaded by path (<see cref="SpecLoadContext.LoadWithoutLocking" />), so no
-///         build output is pinned either way.
-///     </para>
+///     A hit requires <see cref="FileFreshness.CanTrust" />, so a rebuilt spec misses and reloads, and a spec
+///     rebuilt inside the racy window keeps missing and reloading until its stamp promotes, the safe direction to
+///     be wrong in. Only successes are stored: a load that throws (a deleted DLL, a spec-validation failure, a
+///     dependency that will not resolve) stores nothing, so every later call re-raises the identical error the
+///     cold CLI raises rather than replaying a stale success or a cached exception. A loaded model roots its
+///     collectible <see cref="SpecLoadContext" />, so caching the model keeps one such context alive instead of a
+///     new uncollectable one per tool call.
 /// </remarks>
 internal sealed class SpecModelCache
 {

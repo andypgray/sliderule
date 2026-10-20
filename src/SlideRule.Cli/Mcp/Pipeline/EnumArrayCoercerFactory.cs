@@ -13,13 +13,10 @@ namespace SlideRule.Cli.Mcp.Pipeline;
 ///     <see cref="EnumValidationConverterFactory" />.
 /// </summary>
 /// <remarks>
-///     Generic over every <c>TEnum[]</c> parameter, so the enum-array shape is coerced as forgivingly
-///     as its scalar and <c>string[]</c> siblings without a per-parameter registration: a real array, a
-///     JSON-encoded array inside a string, or a bare scalar string, each element parsed by the shared
-///     name rule. An unknown name throws <see cref="UserErrorException" /> with the full valid-values
-///     list — the same message shape as the scalar converter — and any other token kind refuses naming
-///     it. Integer elements are deliberately not admitted as enum values, and neither are
-///     comma-separated name lists — see <see cref="EnumStringHelper.ResolvesByArithmetic" />.
+///     Generic over every <c>TEnum[]</c> parameter, so the enum-array shape needs no per-parameter registration.
+///     An unknown name throws <see cref="UserErrorException" /> with the full valid-values list, and any other
+///     token kind refuses naming it. Integer elements are not admitted as enum values, and neither are
+///     comma-separated name lists (<see cref="EnumStringHelper.ResolvesByArithmetic" />).
 /// </remarks>
 internal sealed class EnumArrayCoercerFactory : JsonConverterFactory
 {

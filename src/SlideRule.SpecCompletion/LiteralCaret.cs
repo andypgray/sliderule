@@ -9,34 +9,32 @@ namespace SlideRule.SpecCompletion;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>Two readers of the same text, deliberately unlike.</b> <see cref="InsideLiteral" /> runs
-///         before anything is parsed, on one line of raw text, because the host asks whether a keystroke
-///         is worth a completion request at all and cannot afford a tree for the answer. Everything after
-///         that reads the parsed token, where the kind alone rules out an interpolated, raw or u8 literal
-///         that a text scan would have to spell out. The scan is therefore allowed to be the wider of the
-///         two: a keystroke it lets through costs one request that finds nothing.
+///         <see cref="InsideLiteral" /> runs before anything is parsed, on one line of raw text, because the
+///         host asks whether a keystroke is worth a completion request at all and cannot afford a tree for the
+///         answer. Everything after that reads the parsed token, where the kind alone rules out an
+///         interpolated, raw or u8 literal that a text scan would have to spell out. The scan is therefore
+///         allowed to be the wider of the two: a keystroke it lets through costs one request that finds
+///         nothing.
 ///     </para>
 ///     <para>
-///         <b>Every span this returns is in source coordinates.</b> A regular literal carrying a backslash
-///         and a verbatim one carrying a quote are both refused, because in either the content text and
-///         the source text stop being the same length and a segment span computed from one would land in
-///         the wrong place in the other. Neither shape can spell a namespace or a type name, so refusing
-///         them costs an author nothing.
+///         Every span this returns is in source coordinates. A regular literal carrying a backslash and a
+///         verbatim one carrying a quote are both refused, because in either the content text and the source
+///         text stop being the same length and a segment span computed from one would land in the wrong place
+///         in the other. Neither shape can spell a namespace or a type name, so refusing them costs an author
+///         nothing.
 ///     </para>
 /// </remarks>
 internal static class LiteralCaret
 {
     /// <summary>
-    ///     Whether the caret is inside a string literal, decided from the text of its own line.
+    ///     Whether the caret is inside a string literal, decided from the text of its own line;
+    ///     <paramref name="caret" /> is just past the character that was typed.
     /// </summary>
     /// <remarks>
-    ///     A literal that opened on an earlier line is not found, which is the one thing a single-line scan
-    ///     gives up: only a verbatim literal can span lines, and a namespace written across two lines is
-    ///     not a shape to design for. A <c>//</c> reached outside a literal ends the scan, so a quote in a
-    ///     comment opens nothing.
+    ///     A literal that opened on an earlier line is not found: only a verbatim literal can span lines, and a
+    ///     namespace written across two lines is not a shape to design for. A <c>//</c> reached outside a
+    ///     literal ends the scan, so a quote in a comment opens nothing.
     /// </remarks>
-    /// <param name="text">The document's text.</param>
-    /// <param name="caret">The caret's position, which is just past the character that was typed.</param>
     internal static bool InsideLiteral(SourceText text, int caret)
     {
         if (caret <= 0 || caret > text.Length) return false;
@@ -102,8 +100,6 @@ internal static class LiteralCaret
     ///     after it, or to the end of the content. An unterminated literal has no closing quote to
     ///     subtract, which is the shape a caret is in the moment the opening quote is typed.
     /// </remarks>
-    /// <param name="token">The string-literal token the caret was found in.</param>
-    /// <param name="caret">The caret's position in the document.</param>
     internal static LiteralSegment? SegmentAt(SyntaxToken token, int caret)
     {
         string text = token.Text;
@@ -122,8 +118,6 @@ internal static class LiteralCaret
 
         for (int index = contentStart; index < contentEnd; index++)
         {
-            // A backslash in a regular literal and a quote in a verbatim one are both escapes, and an
-            // escape is where the content stops agreeing character for character with the source.
             char character = text[index];
             if (character == (verbatim ? '"' : '\\')) return null;
         }
@@ -166,19 +160,11 @@ internal static class LiteralCaret
 /// <summary>
 ///     One dotted segment of a literal: what was written before it, and where it sits in the document.
 /// </summary>
-/// <param name="path">The content before the segment, with no trailing dot; empty at the first segment.</param>
-/// <param name="span">The segment itself, which is what a committed item replaces.</param>
 internal readonly struct LiteralSegment(string path, TextSpan span)
 {
-    /// <summary>
-    ///     The content before this segment, which is the namespace or type the offered names are looked up
-    ///     under. Empty where the caret is in the literal's first segment.
-    /// </summary>
+    /// <summary>The content before this segment, with no trailing dot; empty at the literal's first segment.</summary>
     internal string Path { get; } = path;
 
-    /// <summary>
-    ///     The segment's own span, which the completion list takes as its span so that a commit replaces
-    ///     the whole segment rather than appending to a half-typed one.
-    /// </summary>
+    /// <summary>The segment's own span, which is what a committed item replaces.</summary>
     internal TextSpan Span { get; } = span;
 }

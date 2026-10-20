@@ -7,34 +7,25 @@ namespace SlideRule.Checking;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         The axes are independent and each row of <see cref="OneProjectDecidability" /> keys on the ones
+///         The axes are independent, and each row of <see cref="OneProjectDecidability" /> keys on the ones
 ///         its own argument rests on. <see cref="Side" /> asks whether a wrong verdict here would be sited
-///         in code this reader reports, which is what the generated-code filter turns on;
-///         <see cref="OneProjectPolarity" /> and <see cref="OneProjectReading" /> each say what their own
-///         axis asks.
+///         in code this reader reports; <see cref="OneProjectPolarity" /> and <see cref="OneProjectReading" />
+///         each say what their own axis asks.
 ///     </para>
 ///     <para>
-///         A triple rather than a third value on <see cref="SelectionPosition" />: that enum's documented
-///         meaning is the candidate universe (GRAMMAR §4.1) and the evaluator reads it as such, so a
-///         decidability concept added to it would leak into the universe semantics of code that has no
-///         business knowing about one-project reading.
+///         A triple rather than a third value on <see cref="SelectionPosition" />, whose meaning the evaluator
+///         reads as the candidate universe.
 ///     </para>
 /// </remarks>
-/// <param name="side">Which universe the selection ranges over.</param>
-/// <param name="polarity">What a type inside the selection does to the verdict.</param>
-/// <param name="reading">What the selection's membership is asked of.</param>
 internal readonly struct OneProjectPosition(
     SelectionPosition side,
     OneProjectPolarity polarity,
     OneProjectReading reading)
 {
-    /// <summary>Which universe the selection ranges over.</summary>
     internal SelectionPosition Side { get; } = side;
 
-    /// <summary>What a type inside the selection does to the verdict.</summary>
     internal OneProjectPolarity Polarity { get; } = polarity;
 
-    /// <summary>What the selection's membership is asked of.</summary>
     internal OneProjectReading Reading { get; } = reading;
 
     /// <summary>

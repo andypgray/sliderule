@@ -4,17 +4,13 @@ using SlideRule.Codebase;
 namespace SlideRule.Rendering;
 
 /// <summary>
-///     Scoped context placement, end to end: given a selection, where does its card go? The whole step —
-///     collecting the declaration-site file paths of the solution-declared types it matches, keeping the ones
-///     inside the solution directory, then collapsing those to their <em>deepest common ancestor directory</em>
-///     — the directory whose <c>AGENTS.md</c> receives that selection's card.
+///     Scoped context placement: a selection's card goes to the deepest common directory of the declaration
+///     sites, inside the solution directory, of the solution-declared types it matches.
 /// </summary>
 /// <remarks>
 ///     <para>
-///         Both <see cref="ScopedContextResolver" /> (scopes of either posture) and
-///         <see cref="LayerContextResolver" /> (layer local-rules cards) place through this one helper, from
-///         path collection to collapse, so the two emission keys land a co-located card in exactly the same
-///         directory.
+///         Both emission keys place through this one helper, from path collection to collapse, so a layer card
+///         and a scope card that are co-located land in exactly the same directory.
 ///     </para>
 ///     <para>
 ///         The solution directory bounds every card. A project can compile a file from outside the checkout (a
@@ -121,12 +117,6 @@ internal static class DirectoryPlacement
     ///     The solution directory every card must land inside, analysed once for a caller placing several
     ///     cards against it.
     /// </summary>
-    /// <remarks>
-    ///     Splitting the directory and deciding a recorded path's verdict are both constant in the card, so a
-    ///     caller resolving both emission keys for one codebase builds one of these and hands it to both
-    ///     resolvers — and a file two cards share is normalized and split once for the run rather than once
-    ///     per card. Built where the evaluator is, and for the same reason.
-    /// </remarks>
     internal sealed class Boundary(string solutionDirectory)
     {
         private readonly string[] _segments = PathFormat.Segments(Path.GetFullPath(solutionDirectory));

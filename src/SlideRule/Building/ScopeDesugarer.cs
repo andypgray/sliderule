@@ -55,8 +55,7 @@ internal static class ScopeDesugarer
     }
 
     // The one tripwire builder both postures take, so the diff-aware touch check is the same rule node
-    // whichever verb declared the scope: no constraint, no sentence, no boundary, no baseline — just the
-    // scoped selection its changed-file mapping reads, plus the dragons every child carries.
+    // whichever verb declared the scope.
     private static ArchRule Tripwire(ScopeRegistration scope)
     {
         return new ArchRule(

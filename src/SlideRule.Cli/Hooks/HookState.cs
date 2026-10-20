@@ -4,21 +4,15 @@ using SlideRule.Internal;
 
 namespace SlideRule.Cli.Hooks;
 
-/// <summary>
-///     What <c>sliderule hook</c> keeps between the firings of one session, in a directory of its own: the last
-///     verdict with the tree it covered, the continuations counted for the prompt in flight, the baseline a turn
-///     is compared with, and what each agent was last told.
-/// </summary>
+/// <summary>What <c>sliderule hook</c> keeps between the firings of one session, in a directory of its own.</summary>
 /// <remarks>
-///     No verdict depends on it: delete it and the next stop checks. A read that fails comes back empty and
-///     a write that fails is dropped, except the round count, which the caller is told about because the round
-///     cap rests on it. A session whose directory cannot be made is stateless, where
-///     <see cref="Stateful" /> is false, every read is empty and every write does nothing, so the exit mapping
-///     reads the same whether or not there is anywhere to keep state. The files are plain text, one fact per
-///     line, with a tree kept as its HEAD and then one <c>&lt;digest&gt; &lt;path&gt;</c> line per changed code
-///     file. A record that does not read that way, such as one an older build wrote, reads as no record. Each
-///     other tree a stop weighed keeps its verdict, its baseline and its own top level under <c>trees</c>, so a
-///     prompt can list the trees the session holds records for.
+///     No verdict depends on it: delete it and the next stop checks. A read that fails comes back empty and a
+///     write that fails is dropped, except the round count, which the caller is told about because the round cap
+///     rests on it. A session whose directory cannot be made is stateless, where <see cref="Stateful" /> is
+///     false, every read is empty and every write does nothing, so the exit mapping reads the same whether or not
+///     there is anywhere to keep state. The files are plain text, one fact per line, with a tree kept as its HEAD
+///     and then one <c>&lt;digest&gt; &lt;path&gt;</c> line per changed code file. A record that does not read
+///     that way, such as one an older build wrote, reads as no record.
 /// </remarks>
 internal sealed class HookState
 {
@@ -42,7 +36,7 @@ internal sealed class HookState
         _said = said;
     }
 
-    /// <summary>No state at all: the per-edit path, and a session whose directory could not be made.</summary>
+    /// <summary>No state at all.</summary>
     public static HookState None { get; } = new(null, SaidFile);
 
     /// <summary>Whether there is a directory to keep state in.</summary>
@@ -50,12 +44,10 @@ internal sealed class HookState
 
     /// <summary>
     ///     The state of session <paramref name="sessionId" /> under <paramref name="root" />, in
-    ///     <c>sliderule-hook/&lt;session&gt;</c>, with what was said kept apart for <paramref name="agentId" />:
-    ///     a worker's warnings are in the worker's context, not the main agent's.
+    ///     <c>sliderule-hook/&lt;session&gt;</c>, with what was said kept apart for subagent
+    ///     <paramref name="agentId" />: a worker's warnings are in the worker's context, not the main agent's
+    ///     (verified 2026-10-20 on Claude Code 2.1.300).
     /// </summary>
-    /// <param name="root">The directory the state lives under.</param>
-    /// <param name="sessionId">The payload's session, or null for a payload that names none.</param>
-    /// <param name="agentId">The subagent the event is for, or null for the main agent.</param>
     /// <returns>The session's state, or <see cref="None" /> when its directory cannot be made.</returns>
     public static HookState Open(string root, string? sessionId, string? agentId)
     {
@@ -82,7 +74,9 @@ internal sealed class HookState
     ///     round count and what an agent was told belong to the stop, however many trees it checks, so they stay on
     ///     the session's own state.
     /// </remarks>
-    /// <returns>The tree's state, or <see cref="None" /> when the session has none or the directory cannot be made.</returns>
+    /// <returns>
+    ///     The tree's state, or <see cref="None" /> when the session has none or the directory cannot be made.
+    /// </returns>
     public HookState ForTree(string topLevel)
     {
         if (_directory is null) return None;
@@ -137,8 +131,7 @@ internal sealed class HookState
     }
 
     /// <summary>
-    ///     The last verdict and the tree it covered, or null when none was recorded or it cannot be read. A record
-    ///     whose first line is neither <c>green</c> nor <c>red</c> reads as no verdict.
+    ///     The last verdict and the tree it covered, or null when none was recorded or it cannot be read.
     /// </summary>
     public HookVerdict? ReadVerdict()
     {
@@ -174,10 +167,6 @@ internal sealed class HookState
         return new HookBaseline(tree, fromPrompt.Value);
     }
 
-    /// <summary>
-    ///     Records the verdict over <paramref name="tree" />: <c>green</c> when <paramref name="green" /> is true,
-    ///     otherwise <c>red</c>.
-    /// </summary>
     public void RecordVerdict(bool green, TreeSnapshot tree)
     {
         string word = green ? GreenWord : RedWord;
@@ -267,8 +256,7 @@ internal sealed class HookState
         return string.IsNullOrWhiteSpace(name) || name.Contains('\n') ? null : name;
     }
 
-    // A tree as a record keeps it: HEAD, then one line per changed code file, the digest first because a path may
-    // hold a space and a digest never does.
+    // The digest goes first because a path may hold a space and a digest never does.
     private static string TreeText(TreeSnapshot tree)
     {
         var text = new StringBuilder();
@@ -371,15 +359,8 @@ internal sealed class HookState
     }
 }
 
-/// <summary>A verdict read back from the hook's state: what the check said, and over which tree.</summary>
-/// <param name="Green">Whether the check was green; false when it was red.</param>
-/// <param name="Tree">The tree as the stop that ran the check found it.</param>
+/// <summary>A verdict read back from the hook's state: whether the check was green, and over which tree.</summary>
 internal sealed record HookVerdict(bool Green, TreeSnapshot Tree);
 
 /// <summary>A baseline read back from the hook's state: a tree, and whether a prompt or a stop recorded it.</summary>
-/// <param name="Tree">The tree the prompt in flight found, or the tree the last turn's stop left.</param>
-/// <param name="FromPrompt">
-///     True for a prompt's baseline, which stands until a stop ends its turn; false for a stop's, which the next
-///     prompt replaces.
-/// </param>
 internal sealed record HookBaseline(TreeSnapshot Tree, bool FromPrompt);

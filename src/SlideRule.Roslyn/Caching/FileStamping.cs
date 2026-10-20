@@ -9,31 +9,21 @@ using SlideRule.Roslyn.Solutions;
 namespace SlideRule.Roslyn.Caching;
 
 /// <summary>
-///     The pure file-stamping primitives shared by the twin structure-keyed cache stores — the
-///     <see cref="ExtractionCacheStore" /> and the
-///     <see cref="SlideRule.Roslyn.Replay.BinlogCaptureStore" />. Both persist a
-///     <see cref="FileStamp" /> per structural input and validate it against disk the same way: stat first,
-///     and re-hash only when the stat moved (a bare mtime touch on unchanged bytes must not invalidate).
-///     That racy-window discipline is defined once here, so the two stores cannot drift apart.
+///     The file-stamping primitives of the structure-keyed cache stores, pure over their arguments and disk
+///     state, defined once so every store validates a <see cref="FileStamp" /> against disk the same way: stat
+///     first, and re-hash only when the stat moved, since a bare mtime touch on unchanged bytes must not
+///     invalidate.
 /// </summary>
-/// <remarks>
-///     Everything here is pure over its arguments and disk state. Each store keeps its own manifest-typed
-///     read/write wrappers, its own promotion policy, and its own <c>ContentHashCount</c> observable — the
-///     last threaded back through <see cref="CheckStructural" />'s <c>onHash</c> callback so a store still
-///     counts exactly its own validation reads without this shared code knowing the counter exists.
-/// </remarks>
 internal static class FileStamping
 {
     /// <summary>
     ///     Probe files whose presence anywhere from a project directory up to the filesystem root changes
-    ///     the build — stamped even when absent, so a newly-appearing one is an existence flip. Shared by both
-    ///     cache stores and the warm <see cref="WorkspaceSession" /> reconcile sweep.
+    ///     the build — stamped even when absent, so a newly-appearing one is an existence flip.
     /// </summary>
     /// <remarks>
-    ///     <c>Directory.Packages.props</c> is here on the contract above rather than on a measured miss: a
-    ///     concrete central-package-management edit usually also rewrites <c>project.assets.json</c>, which
-    ///     <see cref="IntermediateOutputTree.AssetsPathsOf" /> already stamps. That file is a proxy, and only
-    ///     after a restore — so the probe is what holds the invariant, not the coincidence.
+    ///     <c>Directory.Packages.props</c> is here on that contract: a central-package-management edit usually
+    ///     also rewrites <c>project.assets.json</c>, which <see cref="IntermediateOutputTree.AssetsPathsOf" />
+    ///     already stamps, but only after a restore, so that file is a proxy and the probe holds the invariant.
     /// </remarks>
     internal static readonly string[] StructuralProbeFileNames =
         ["Directory.Build.props", "Directory.Build.targets", "Directory.Packages.props", "global.json"];
@@ -67,9 +57,7 @@ internal static class FileStamping
     /// </summary>
     /// <remarks>
     ///     The <see cref="FileFreshness.Capture" /> comes first, exactly as in <see cref="StampOf" />, so the
-    ///     racy-window verdict is never made against a stat taken after the read. The hash and the shape come
-    ///     from <see cref="TryReadDocument" /> — the one routine validation reads through too, which is what
-    ///     makes the two hashes and the two shapes comparable at all.
+    ///     racy-window verdict is never made against a stat taken after the read.
     /// </remarks>
     internal static FileStamp StampDocument(string path)
     {
@@ -88,9 +76,8 @@ internal static class FileStamping
     ///     failure degrades exactly as <see cref="TryHashFile" /> does.
     /// </summary>
     /// <remarks>
-    ///     Both halves must come from the same bytes and the same parse options on the capture side and the
-    ///     validation side, or a shape comparison would be answering about two different texts. That is the
-    ///     whole reason this is one routine rather than a hash call beside a parse call.
+    ///     Capture and validation both read through here: both halves must come from the same bytes and the same
+    ///     parse options on either side, or a shape comparison would be answering about two different texts.
     /// </remarks>
     internal static (string Sha256, SourceShape Shape)? TryReadDocument(string path)
     {
@@ -123,7 +110,7 @@ internal static class FileStamping
 
     /// <summary>
     ///     Lowercase-hex SHA-256 of the file's bytes, or null when it is unreadable — an I/O failure degrades, never
-    ///     throws. Streamed, because this runs over every source document in the solution on a cold run.
+    ///     throws. Streamed, so a large input such as the captured binlog is never held whole.
     /// </summary>
     /// <remarks>
     ///     Unbuffered and declared sequential rather than opened through <see cref="File.OpenRead" />: the
@@ -146,7 +133,7 @@ internal static class FileStamping
     /// <summary>
     ///     Lowercase-hex SHA-256 of <paramref name="value" />'s UTF-8 bytes — the same digest format as
     ///     <see cref="TryHashFile" />, beside it so the four decisions the two share (algorithm, encoding, hex
-    ///     case, no separator) stay one decision. Both cache stores key their on-disk identity on it.
+    ///     case, no separator) stay one decision. On-disk cache identities are computed with it.
     /// </summary>
     internal static string HashText(string value)
     {
@@ -176,21 +163,11 @@ internal static class FileStamping
     }
 
     /// <summary>
-    ///     Validates one structural stamp against disk: an existence flip is a change; a promoted stat match is
-    ///     trusted without a read; otherwise the file is re-hashed (invoking <paramref name="onHash" /> first,
-    ///     so the caller can count the read) — a real content change is a change, a bare touch refreshes the
-    ///     stamp so the next sweep is pure-stat.
+    ///     Validates one structural stamp against disk, returning whether it changed (an existence flip or a real
+    ///     content change) and the stamp to carry forward. <paramref name="onHash" /> runs immediately before each
+    ///     content hash so a store can count its own reads, and is required so that no caller goes silently
+    ///     uncounted.
     /// </summary>
-    /// <param name="stamp">The recorded stamp to check against current disk state.</param>
-    /// <param name="onHash">
-    ///     Invoked once immediately before each content hash, so a store can maintain its own read counter.
-    ///     Required: both stores expose that count as a test observable, and a caller that passed nothing
-    ///     would be silently uncounted rather than visibly opting out.
-    /// </param>
-    /// <returns>
-    ///     <c>Changed</c> is true on an existence flip or real content change; <c>Refreshed</c> is the stamp to carry
-    ///     forward.
-    /// </returns>
     internal static (bool Changed, FileStamp Refreshed) CheckStructural(FileStamp stamp, Action onHash)
     {
         FileFreshness current = FileFreshness.Capture(stamp.Path);

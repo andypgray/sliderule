@@ -12,15 +12,11 @@ namespace SlideRule.Cli.Diff;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         Three git commands run rooted at the solution directory (<c>git -C</c>):
-///         <c>rev-parse --show-toplevel</c> (the repo root the paths are relative to),
-///         <c>diff --name-only -z &lt;ref&gt; HEAD --</c> (committed since the ref), and
-///         <c>status --porcelain=v1 -uall -z --no-renames</c> (staged, unstaged and untracked, the last being the
-///         agent-hook case, an agent writing a brand-new file into dragon territory). Both path listings are
-///         toplevel-relative, and are rebased onto the toplevel.
+///         Two listings are joined, the paths committed since the ref and the status against HEAD, untracked
+///         files included, so a brand-new file an agent writes into dragon territory trips its scope.
 ///     </para>
 ///     <para>
-///         Neither listing compares the worktree with the ref directly. That diff refreshes the index quietly and
+///         Neither listing compares the worktree with the ref directly. That diff refreshes the index and
 ///         writes it back under <c>index.lock</c> whatever <c>GIT_OPTIONAL_LOCKS</c> says, so a commit made while a
 ///         hook checks fails; a diff of two trees never reads the worktree, and the status refreshes in memory
 ///         only. The listing is therefore what was committed since the ref together with what changed against
@@ -29,7 +25,7 @@ namespace SlideRule.Cli.Diff;
 ///     </para>
 ///     <para>
 ///         Every failure is loud: git missing on PATH, not a repository, a bad ref, or a timeout all throw
-///         <see cref="UserErrorException" /> (exit 2). The parse/compose halves are pure and unit-pinned.
+///         <see cref="UserErrorException" /> (exit 2).
 ///     </para>
 /// </remarks>
 internal static class GitChangedFiles

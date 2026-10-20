@@ -35,12 +35,11 @@ public abstract class ProjectSelection
     internal IReadOnlyList<ProjectAdjective> Adjectives { get; }
 
     /// <summary>
-    ///     The clone each concrete project selection returns carrying a new adjective list — the hook the
-    ///     adjective extensions build on, so a refinement never mutates the selection it refines.
+    ///     The clone each concrete project selection returns carrying a new adjective list, so a refinement
+    ///     never mutates the selection it refines.
     /// </summary>
     private protected abstract ProjectSelection Rebuild(IReadOnlyList<ProjectAdjective> adjectives);
 
-    /// <summary>Appends one adjective and clones (the assembly-internal entry the adjective extensions call).</summary>
     internal ProjectSelection Refined(ProjectAdjective adjective)
     {
         var adjectives = new List<ProjectAdjective>(Adjectives) { adjective };

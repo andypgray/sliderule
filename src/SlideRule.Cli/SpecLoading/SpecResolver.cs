@@ -12,21 +12,11 @@ namespace SlideRule.Cli.SpecLoading;
 ///     workspace.
 /// </summary>
 /// <remarks>
-///     <see cref="ReferencePaths" /> carries the project's PE metadata reference paths <em>plus</em>
-///     the output paths of its direct project references: a spec project references the contract library as a
-///     package (PE metadata) once published, but as a <c>ProjectReference</c> in a source checkout, and the
-///     convention must see both.
-///     <see cref="FilePath" /> is the candidate's own <c>.csproj</c>, and it is what the convention counts by:
-///     a multi-target-framework project file yields one Roslyn project per framework, and those are one
-///     candidate rather than an ambiguity. It carries no default on purpose — a caller with no project file in
-///     hand has to say so out loud, because a silent default would fold every unknown-path candidate together
-///     and turn genuine ambiguity green.
-///     <see cref="IsDeclaredMember" /> says whether the solution file declares this project, so the convention
-///     considers only solution material: a rule-pack library that a spec project drags into the workspace also
-///     references the contract library, and would otherwise turn every composing solution into "Multiple spec
-///     projects found".
-///     <see cref="IntermediateAssemblyPath" /> is the project's <c>obj</c>-side assembly, which the
-///     built-output search uses to refuse an intermediate result.
+///     <see cref="ReferencePaths" /> carries the project's PE metadata reference paths <em>plus</em> the output
+///     paths of its direct project references. <see cref="FilePath" /> is the candidate's own <c>.csproj</c>, which
+///     the convention counts by; it carries no default on purpose, so a caller with no project file in hand has to
+///     say so out loud. <see cref="IsDeclaredMember" /> says whether the solution file declares this project, and
+///     <see cref="IntermediateAssemblyPath" /> is its <c>obj</c>-side assembly.
 /// </remarks>
 internal sealed record SpecProjectCandidate(
     string Name,
@@ -41,20 +31,12 @@ internal sealed record SpecProjectCandidate(
 ///     projects to exclude from the checked universe — the spec project and its private plumbing
 ///     (<see cref="SpecExclusion" />). Both are empty/null for a prebuilt DLL, which excludes nothing.
 /// </summary>
-/// <param name="DllPath">The built spec assembly to load.</param>
-/// <param name="SpecProjectName">The spec project's name, or null for a prebuilt DLL.</param>
-/// <param name="ExcludeProjectNames">The projects the checked universe drops, empty for a prebuilt DLL.</param>
-/// <param name="OutputFilePaths">
-///     The evaluated output paths <see cref="DllPath" /> was chosen from — every framework's, ordinal-sorted
-///     — or null for a prebuilt DLL, which was never searched for. Carried because the extraction cache
-///     records what the resolution consumed: re-deriving it can only group the spec project's Roslyn projects
-///     by name, where resolution grouped them by canonicalized project file.
-/// </param>
-/// <param name="IntermediateAssemblyPath">
-///     The <c>obj</c>-side assembly path the built-output search refused an intermediate result under, or
-///     null for a prebuilt DLL. Recorded for the same reason as <see cref="OutputFilePaths" />: without it a
-///     cache hit would answer with the intermediate a cold run refuses.
-/// </param>
+/// <remarks>
+///     <see cref="OutputFilePaths" /> are the evaluated output paths <see cref="DllPath" /> was chosen from, every
+///     framework's, ordinal-sorted, and <see cref="IntermediateAssemblyPath" /> is the <c>obj</c>-side assembly the
+///     built-output search refused an intermediate result under; both are null for a prebuilt DLL, which was never
+///     searched for.
+/// </remarks>
 internal sealed record SpecResolution(
     string DllPath,
     string? SpecProjectName,
@@ -78,24 +60,14 @@ internal static class SpecResolver
     // nothing; three is enough to see whether the failures share a cause.
     private const int MaxQuotedDiagnostics = 3;
 
-    /// <summary>
-    ///     Resolves the spec against a loaded solution.
-    /// </summary>
-    /// <param name="solution">The loaded solution.</param>
-    /// <param name="declaredMembers">
-    ///     The solution's declared <c>.csproj</c> members, or null when membership could not be read. Passed
-    ///     in rather than read here because both branches need it and the caller needs the same set again for
-    ///     extraction — one read serves all three.
-    /// </param>
-    /// <param name="specArgument">The <c>--spec</c> value, or null/blank for the convention default.</param>
-    /// <param name="diagnostics">
-    ///     How well the workspace loaded. Not defaulted, and deliberately: an unresolved package reference
-    ///     makes the convention find nothing, so "the workspace loaded cleanly" is what decides whether zero
-    ///     candidates means "there is no spec project" or "the evidence for one did not resolve" — and unlike
-    ///     an intermediate assembly path, that is never unknown to a caller. A default is also
-    ///     untypeable: <see cref="WorkspaceDiagnostics.None" /> is a property, and
+    /// <summary>Resolves the spec against a loaded solution.</summary>
+    /// <remarks>
+    ///     <paramref name="declaredMembers" /> is null when membership could not be read.
+    ///     <paramref name="diagnostics" /> is deliberately not defaulted: whether the workspace loaded cleanly
+    ///     decides what zero convention candidates mean (<see cref="ResolveConventionProject" />), and every caller
+    ///     knows it. A default is also untypeable: <see cref="WorkspaceDiagnostics.None" /> is a property, and
     ///     <c>default(WorkspaceDiagnostics)</c> carries null lists.
-    /// </param>
+    /// </remarks>
     internal static SpecResolution Resolve(
         Solution solution, IReadOnlySet<string>? declaredMembers, string? specArgument,
         WorkspaceDiagnostics diagnostics)
@@ -113,10 +85,7 @@ internal static class SpecResolver
     ///     The resolution, or <see langword="null" /> when resolution needs the workspace — the convention
     ///     default (no <c>--spec</c>) and a solution-member csproj.
     /// </returns>
-    /// <remarks>
-    ///     A DLL path that does not exist is still a loud error. This is what lets <c>explain</c> run with no
-    ///     MSBuild load at all.
-    /// </remarks>
+    /// <remarks>A DLL path that does not exist is still a loud error.</remarks>
     internal static SpecResolution? TryResolveWithoutSolution(string? specArgument)
     {
         if (string.IsNullOrWhiteSpace(specArgument)) return null;
@@ -172,11 +141,7 @@ internal static class SpecResolver
         return MemberResolution(solution, projects, declaredMembers, chosen.Name, built);
     }
 
-    // The shared tail of both solution-member branches: the built DLL plus the projects the checked universe
-    // drops — the spec project and the plumbing only it references. A null declaredMembers is the unreadable
-    // case, which SpecExclusion degrades to just the spec project. The evaluated paths are normalized once
-    // here — the search's own filter-and-sort, which is idempotent — because they both feed the search and
-    // ride on to the extraction cache, which has to record the set the search actually consumed.
+    // A null declaredMembers is the unreadable case, which SpecExclusion degrades to just the spec project.
     private static SpecResolution MemberResolution(
         Solution solution,
         IReadOnlyList<CanonicalProject> projects,
@@ -219,8 +184,6 @@ internal static class SpecResolver
             .ToList();
     }
 
-    // Both built-output facts about one project file, from one pass over the solution.
-    //
     // Both sides of the scan are canonicalized exactly once: canonicalizing probes the filesystem for a
     // reparse point per path segment, so re-resolving the needle per candidate — or the haystack per scan —
     // costs one such walk per project in the solution, on every warm tool call.
@@ -238,8 +201,6 @@ internal static class SpecResolver
         return BuiltOutputsOf(sharingProjects);
     }
 
-    // The two built-output facts, read off the projects one .csproj was built into.
-    //
     // A multi-target-framework csproj yields one Roslyn project per framework, so any single project's
     // OutputFilePath names an arbitrary framework's DLL; the built-output check needs them all so it can pick
     // one that is actually on disk — and so a cache hit, which records the same set, replays the identical
@@ -261,9 +222,8 @@ internal static class SpecResolver
         return new BuiltOutputInputs(outputFilePaths, intermediateAssemblyPath);
     }
 
-    // Every project the solution carries, beside the canonicalized spelling of its own .csproj, resolved
-    // once for the whole resolution: both scans a resolution runs — which project a --spec needle names, and
-    // which projects a chosen .csproj was built into — ask their question against this one view.
+    // Every project the solution carries, beside the canonicalized spelling of its own .csproj, resolved once for
+    // the whole resolution, so every scan a resolution runs asks its question against this one view.
     private static List<CanonicalProject> CanonicalProjectsOf(Solution solution)
     {
         return solution.Projects
@@ -276,10 +236,9 @@ internal static class SpecResolver
         return string.IsNullOrEmpty(project.FilePath) ? null : PathCanonicalizer.Resolve(project.FilePath);
     }
 
-    // The projects built from one already-canonicalized .csproj, in solution order — a multi-target-framework
-    // project file yields one Roslyn project per framework. Canonicalizing this side too (symlinks resolved)
-    // is what lets a solution opened through a symlinked root still match, and the per-OS comparison
-    // (PathComparison) is what stops the match from missing across symlink spellings or over-matching
+    // The projects built from one already-canonicalized .csproj, in solution order. Canonicalizing this side too
+    // (symlinks resolved) is what lets a solution opened through a symlinked root still match, and the per-OS
+    // comparison (PathComparison) is what stops the match from missing across symlink spellings or over-matching
     // case-variant paths on a case-sensitive file system.
     private static List<CanonicalProject> ProjectsSharingFile(
         IReadOnlyList<CanonicalProject> projects, string canonicalProjectFile)
@@ -310,11 +269,11 @@ internal static class SpecResolver
 
     /// <summary>
     ///     The pure convention core: the unique <em>declared</em> solution member that references
-    ///     <c>SlideRule.dll</c>. Zero candidates and multiple candidates are both loud errors
-    ///     (unit-tested over tuples). Undeclared projects are workspace passengers — a spec project's own
-    ///     <c>ProjectReference</c>s pull the contract library and any rule-pack library in — and a passenger
-    ///     that references the contract is not a spec project the user chose to have. Several Roslyn projects
-    ///     sharing one <c>.csproj</c> (a multi-target-framework spec project) count once.
+    ///     <c>SlideRule.dll</c>. Zero candidates and multiple candidates are both loud errors. Undeclared projects
+    ///     are workspace passengers — a spec project's own <c>ProjectReference</c>s pull the contract library and
+    ///     any rule-pack library in — and a passenger that references the contract is not a spec project the user
+    ///     chose to have. Several Roslyn projects sharing one <c>.csproj</c> (a multi-target-framework spec
+    ///     project) count once.
     /// </summary>
     /// <remarks>
     ///     Zero candidates is reported against <paramref name="diagnostics" />, because a workspace that did
@@ -348,26 +307,17 @@ internal static class SpecResolver
     }
 
     // Zero candidates has causes whose remedies do not overlap, and a refusal naming only the first sends readers
-    // to write an argument that cannot help them. Four arms, strongest evidence first. The first two are the
-    // incomplete-model gate's own two causes, said in its words (IncompleteModelGate.SpecRefusal) and only
-    // reached from here — so they compose rather than exclude, one run being able to break both ways at once:
-    //
-    //  1. Projects failed to load. The one that would have matched may be among them, and no --spec argument
-    //     repairs a load — so this arm names them and points at the build.
-    //  2. A project's NuGet packages did not resolve. That is the measured locked-mode shape: a broken
-    //     restore leaves the spec project's reference to the contract library unresolved while the project
-    //     itself still loads completely, so the convention finds nothing and the reader must repair the
-    //     restore rather than name a project.
-    //  3. Nothing failed either way, but the load reported problems about this solution — diagnostics with no
-    //     project blamed. It says "may", because that is all it knows.
-    //  4. A clean load means the solution really has no spec project. The sentence stays byte-identical
-    //     (GETTING-STARTED.md quotes it), plus how many projects were considered, which is what tells a reader
-    //     whether the workspace held what they expected.
-    //
-    // NuGetAudit advisories are excluded from arm 3's input, and only from arm 3's: an advisory's publication
-    // date says nothing about whether this solution's references resolved, so a solution that has
-    // no spec project must not be sent to go and fix its restore. Nothing here gates — every arm is the same
-    // refusal with different evidence — so no exit code turns on that distinction.
+    // to write an argument that cannot help them, so the strongest evidence decides the refusal. Failed loads and
+    // unresolved packages are the incomplete-model gate's two causes, said in its words and composed when one run
+    // breaks both ways: no --spec argument repairs a load, and a broken restore (the measured locked-mode shape)
+    // leaves the spec project's reference to the contract library unresolved while the project itself still loads
+    // completely. Load problems that blame no project come next, worded "may" because that is all they show. A
+    // clean load means the solution really has no spec project; that sentence stays byte-identical
+    // (GETTING-STARTED.md quotes it), with the count of projects considered, which tells a reader whether the
+    // workspace held what they expected. NuGetAudit advisories are kept out of the "may" arm's input, and only
+    // that arm's: an advisory's publication date says nothing about whether this solution's references resolved,
+    // so a solution with no spec project must not be sent to fix its restore. Every arm is the same refusal with
+    // different evidence, so no exit code turns on which one fires.
     private static UserErrorException NoSpecProjectFound(
         IReadOnlyList<SpecProjectCandidate> candidates, WorkspaceDiagnostics diagnostics)
     {
@@ -393,8 +343,7 @@ internal static class SpecResolver
             + $"Considered {candidates.Count} C# project(s) in the workspace.");
     }
 
-    // One csproj that yields several Roslyn Projects (multi-TFM) is ONE candidate, not many. Group on
-    // the canonicalized project file, folded so a plain ordinal comparer carries the per-OS case rule.
+    // Group on the canonicalized project file, folded so a plain ordinal comparer carries the per-OS case rule.
     // A candidate with no project file is its own group: folding the unknown-path candidates together
     // would turn genuine ambiguity green, and '\0' cannot occur in a path so the sentinel cannot collide.
     private static string GroupKey(SpecProjectCandidate candidate, int index)
@@ -463,25 +412,12 @@ internal static class SpecResolver
     ///     <see cref="RequireBuiltOutput" /> a cold run uses.
     /// </summary>
     /// <remarks>
-    ///     The one owner of that split, because two caches need it. The persisted extraction cache
-    ///     replays a record it read off disk; the warm session replays a resolution it computed under an
-    ///     earlier tool call. Both hold a candidate half derived from a workspace they no longer have, and a
-    ///     spec output that has since been rebuilt, moved or deleted has to answer in the cold run's words —
-    ///     the bounded search from the output root, what that search refuses, and its refusal text. Running
-    ///     that half here rather than in each caller is what makes the two agreeing structural instead of a
-    ///     thing to remember.
+    ///     A replayed candidate half comes from a workspace its holder no longer has, so a spec output that has since
+    ///     been rebuilt, moved or deleted answers in the cold run's words: the bounded search from the output root,
+    ///     what that search refuses, and its refusal text. <paramref name="fallbackProjectName" /> is what a refusal
+    ///     names when <paramref name="specProjectName" /> is null: the normalized <c>--spec</c> argument, the only
+    ///     spelling of the spec the reader ever typed.
     /// </remarks>
-    /// <param name="specProjectName">The recorded spec project's name, or null when the record has none.</param>
-    /// <param name="fallbackProjectName">
-    ///     What a refusal names when <paramref name="specProjectName" /> is null — the normalized
-    ///     <c>--spec</c> argument, which is the only spelling of the spec the reader ever typed.
-    /// </param>
-    /// <param name="excludeProjectNames">The recorded exclusion set, carried through untouched.</param>
-    /// <param name="outputFilePaths">The recorded evaluated output paths the search chooses from.</param>
-    /// <param name="intermediateAssemblyPath">
-    ///     The recorded <c>obj</c>-side assembly the search refuses a result under. Replayed rather than
-    ///     dropped, because without it a replay answers with the intermediate a cold run refuses.
-    /// </param>
     internal static SpecResolution Replay(
         string? specProjectName,
         string fallbackProjectName,

@@ -18,21 +18,9 @@ internal static class BaselineRatchet
     /// <param name="stored">The entry as the baseline file holds it, not the identity synthesized from the run.</param>
     /// <param name="observedSites">How many sites the run observed; zero where it saw the pair with no evidence.</param>
     /// <remarks>
-    ///     <para>
-    ///         Two routes reach <see cref="RatchetState.NotMeasured" /> and both mean the same thing — the
-    ///         entry grandfathers its pair at pair grain and no count can be recorded for it. A subject
-    ///         entry's sites are declarations, so it never carries a measure; counting one as
-    ///         <see cref="RatchetState.Uncounted" /> would leave a naming rule's whole section reading
-    ///         "uncounted" with nothing an author could do about it. An edge with no sited evidence is the
-    ///         same state, arrived at from the run's end.
-    ///     </para>
-    ///     <para>
-    ///         The zero test must stay ahead of the allowance compare. Behind it, an edge the run saw with no
-    ///         evidence, against an entry recording sites, reads as <see cref="RatchetState.Shrunk" /> — and
-    ///         the write path then lowers the count to zero, which
-    ///         <see cref="BaselineEntry.WithSiteCount" /> refuses: an entry grandfathering nothing is a stale
-    ///         entry, reported for acceptance rather than recorded.
-    ///     </para>
+    ///     The zero test must stay ahead of the allowance compare. Behind it, an edge the run saw with no
+    ///     evidence, against an entry recording sites, reads as <see cref="RatchetState.Shrunk" /> — and the
+    ///     write path then lowers the count to zero, which <see cref="BaselineEntry.WithSiteCount" /> refuses.
     /// </remarks>
     internal static RatchetState Classify(BaselineEntry stored, int observedSites)
     {
@@ -45,18 +33,11 @@ internal static class BaselineRatchet
     }
 
     /// <summary>
-    ///     Where the entry <see cref="RuleBaseline.TryMatch" /> returned for <paramref name="identity" /> stands
-    ///     against the <paramref name="observedSites" /> the run saw under it.
+    ///     Where <paramref name="stored" />, the entry <see cref="RuleBaseline.TryMatch" /> returned for the
+    ///     <paramref name="identity" /> the run synthesized, stands against the <paramref name="observedSites" />
+    ///     the run saw under it. A stored entry other than the identity is the project-wide stand-in, which is
+    ///     <see cref="RatchetState.Uncounted" />.
     /// </summary>
-    /// <param name="identity">The identity the run synthesized for the violation.</param>
-    /// <param name="stored">The entry the section matched it to.</param>
-    /// <param name="observedSites">How many sites the run observed.</param>
-    /// <remarks>
-    ///     A project-wide entry standing in for one of the project's items is
-    ///     <see cref="RatchetState.Uncounted" />: it grandfathers every item at any number, and a write clears
-    ///     it by splitting it into one counted entry per item, as it records a count on an edge that carries
-    ///     none.
-    /// </remarks>
     internal static RatchetState Classify(BaselineEntry identity, BaselineEntry stored, int observedSites)
     {
         return stored.Equals(identity) ? Classify(stored, observedSites) : RatchetState.Uncounted;

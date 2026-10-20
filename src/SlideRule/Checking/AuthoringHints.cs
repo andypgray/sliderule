@@ -9,10 +9,8 @@ namespace SlideRule.Checking;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         The advice is chosen from the selection that came up empty, and must stay that way. An empty
-///         subject arrives from a namespace glob, a project name, a <c>typeof</c> anchor or any of the
-///         narrowing calls, and each fails for its own reason — so one fixed sentence about glob semantics
-///         would be false on most of them, at the one moment a reader is most likely to act on it.
+///         The advice is chosen from the selection that came up empty, and must stay that way: each shape
+///         fails for its own reason, so one fixed sentence would be false on most of them.
 ///     </para>
 ///     <para>
 ///         Clauses are lower-cased and unterminated so one composer can stand a clause alone or hang a
@@ -27,11 +25,9 @@ namespace SlideRule.Checking;
 ///         keep.
 ///     </para>
 ///     <para>
-///         A solution filter's narrowing replaces the three cures on a target or an allow-list for the same
-///         reason, and reaches those three entry points alone. The three subject entry points take no
-///         narrowing, and that is not an omission: a rule whose subject a narrowing emptied is skipped, so no
-///         subject cure is ever reported under one. Where a run is both narrowed and partial, the partial
-///         model's cure wins, because a broken model's repair comes before reading a smaller one.
+///         A narrowing replaces the cures on a target or an allow-list for the same reason, and reaches those
+///         entry points alone. The subject entry points take no narrowing, and that is not an omission: a rule
+///         whose subject a narrowing emptied is skipped, so no subject cure is ever reported under one.
 ///     </para>
 /// </remarks>
 internal static class AuthoringHints
@@ -39,8 +35,7 @@ internal static class AuthoringHints
     /// <summary>
     ///     The cure on a member subject that resolved to nothing. It names both shapes that fail here,
     ///     because <c>EvaluateMember</c> dispatches ahead of the type-subject gate: a member rule whose
-    ///     type selection matched nothing reports the member message, not the type one. Reached through
-    ///     <see cref="ForMemberSubject" />, which is what a partial model replaces.
+    ///     type selection matched nothing reports the member message, not the type one.
     /// </summary>
     private const string EmptyMemberSubject =
         "Either the type selection matched nothing or none of the members it reached survived; check the "
@@ -48,8 +43,7 @@ internal static class AuthoringHints
 
     /// <summary>
     ///     The cure on a project subject that resolved to nothing (GRAMMAR §4.10). It opens on the naming
-    ///     rule rather than on the emptiness: the message it sits under has just said that. Reached through
-    ///     <see cref="ForProjectSubject" />, which is what a partial model replaces.
+    ///     rule rather than on the emptiness: the message it sits under has just said that.
     /// </summary>
     private const string EmptyProjectSubject =
         "A project is named by its csproj file name, and .Matching(...) globs that name with a `*` that has "
@@ -144,10 +138,7 @@ internal static class AuthoringHints
     private const string ExemplarTail =
         "; the verdict never depends on it, so point it at a type the solution declares or remove it";
 
-    /// <summary>
-    ///     What to change when <paramref name="subject" /> selected nothing, or the partial-model cure where
-    ///     <paramref name="model" /> says part of the codebase never loaded.
-    /// </summary>
+    /// <summary>What to change when <paramref name="subject" /> selected nothing.</summary>
     internal static string ForSubject(Selection subject, IncompleteModel? model)
     {
         return model?.EmptySelectionHint ?? Sentence(ShapeAdvice(subject) + SubjectTail);
@@ -184,11 +175,8 @@ internal static class AuthoringHints
 
     /// <summary>
     ///     What to change when a forbidden-set verb's target selected nothing. The advice is the first
-    ///     pattern operand's — the same operand the inert gate itself tests for, so the sentence describes
-    ///     the selection that raised the warning rather than a sibling that did not. A partial model replaces
-    ///     it, the warning being the signal a rotted target and an unextracted one both arrive on; so does a
-    ///     narrowing, since a project the filter left out may declare what the target names. Where both
-    ///     apply, the partial model's cure is the one returned.
+    ///     pattern operand's, the same operand the inert gate itself tests for, so the sentence describes
+    ///     the selection that raised the warning rather than a sibling that did not.
     /// </summary>
     internal static string ForInertTarget(
         IReadOnlyList<Selection> operands, IncompleteModel? model, NarrowedUniverse? narrowing)
@@ -199,8 +187,7 @@ internal static class AuthoringHints
 
     /// <summary>
     ///     What to change when one of a forbidden-set verb's target operands selected nothing while another
-    ///     selected something — advice read off <paramref name="operand" /> alone, since it is the one the
-    ///     warning names. The same two replacements as <see cref="ForInertTarget" />, in the same order.
+    ///     selected something: advice read off <paramref name="operand" />, the one the warning names.
     /// </summary>
     internal static string ForInertTargetOperand(
         Selection operand, IncompleteModel? model, NarrowedUniverse? narrowing)
@@ -209,9 +196,8 @@ internal static class AuthoringHints
     }
 
     /// <summary>
-    ///     What to change when one of an allow-list verb's operands selected nothing — advice read off
-    ///     <paramref name="operand" /> alone. The same two replacements as <see cref="ForInertTarget" />, in the
-    ///     same order.
+    ///     What to change when one of an allow-list verb's operands selected nothing: advice read off
+    ///     <paramref name="operand" /> alone.
     /// </summary>
     internal static string ForDeadAllowedOperand(
         Selection operand, IncompleteModel? model, NarrowedUniverse? narrowing)
@@ -220,10 +206,9 @@ internal static class AuthoringHints
     }
 
     /// <summary>
-    ///     What to change when one membership a subject must belong to, or one piece of one, selected nothing —
-    ///     advice read off <paramref name="piece" /> alone, or the partial-model cure where
-    ///     <paramref name="model" /> says part of the codebase never loaded. A narrowing needs no replacement,
-    ///     because a narrowed run raises no warning in this position.
+    ///     What to change when one membership a subject must belong to, or one piece of one, selected nothing:
+    ///     advice read off <paramref name="piece" /> alone. It takes no narrowing, because a narrowed run raises
+    ///     no warning in this position.
     /// </summary>
     internal static string ForDeadMembership(Selection piece, IncompleteModel? model)
     {
@@ -231,8 +216,8 @@ internal static class AuthoringHints
     }
 
     /// <summary>
-    ///     What to change when one part of a counterpart verb's <c>among:</c> selected nothing — advice read off
-    ///     <paramref name="piece" /> alone, with <see cref="ForDeadMembership" />'s replacement.
+    ///     What to change when one part of a counterpart verb's <c>among:</c> selected nothing: advice read off
+    ///     <paramref name="piece" /> alone. It takes no narrowing, for <see cref="ForDeadMembership" />'s reason.
     /// </summary>
     internal static string ForDeadAmongOperand(Selection piece, IncompleteModel? model)
     {
@@ -241,18 +226,14 @@ internal static class AuthoringHints
 
     /// <summary>
     ///     What to change when <paramref name="part" />, one part of a rule's exemplar, selected nothing: advice
-    ///     read off the part alone, since it is the one the warning names, or the partial-model cure where
-    ///     <paramref name="model" /> says part of the codebase never loaded. A narrowing needs no replacement,
-    ///     because a run over a solution filter raises no dead-exemplar warning at all.
+    ///     read off the part alone, since it is the one the warning names. It takes no narrowing, because a run
+    ///     over a solution filter raises no dead-exemplar warning at all.
     /// </summary>
     internal static string ForExemplar(Selection part, IncompleteModel? model)
     {
         return model?.EmptySelectionHint ?? Sentence(ShapeAdvice(part) + ExemplarTail);
     }
 
-    // The cure on one dead piece of a target, an allow-list, a membership or an among: the advice for its own
-    // shape, with the name tail where that advice is the exact-name clause and the pattern tail everywhere
-    // else.
     private static string ForDeadPiece(
         Selection piece, string patternTail, string nameTail, IncompleteModel? model, NarrowedUniverse? narrowing)
     {

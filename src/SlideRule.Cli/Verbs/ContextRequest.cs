@@ -1,14 +1,7 @@
 namespace SlideRule.Cli.Verbs;
 
-/// <summary>The parsed inputs to an <c>arch_context</c> run — free of Roslyn types so it crosses the MSBuild gate.</summary>
-/// <param name="Path">
-///     The query path (a file or directory, absolute or solution-relative) to find architecture scope cards
-///     for.
-/// </param>
-/// <param name="Solution">The bound solution (a file, a directory, or null for cwd walk-up).</param>
-/// <param name="Spec">
-///     The bound spec: the <c>--spec</c> value (a built DLL or a solution-member csproj), else the settings file's
-///     spec, else null for the convention.
-/// </param>
-/// <param name="WorkingDirectory">The directory solution discovery walks up from.</param>
+/// <summary>
+///     The parsed inputs to an <c>arch_context</c> run: <paramref name="Path" />, a file or directory, absolute or
+///     solution-relative, against the server's bound <paramref name="Solution" /> and <paramref name="Spec" />.
+/// </summary>
 internal sealed record ContextRequest(string Path, string? Solution, string? Spec, string WorkingDirectory);

@@ -38,13 +38,10 @@ internal enum CodebaseSourceOutcome
 }
 
 /// <summary>
-///     The one model-acquisition seam, shared by every verb and tool that reads this solution. It carries
-///     everything a run needs before the codebase itself — the loaded <see cref="Model" /> and spec
-///     <see cref="Resolution" /> (both absent for the spec-less <c>graph</c> survey), the discovered
-///     <see cref="SolutionPath" />, and the workspace <see cref="Diagnostics" /> — and defers the codebase to
-///     a lazy <see cref="ExtractAsync" /> so the pipeline can still fail fast on a tampered baseline before
-///     any extraction. A workspace, where the run still needs one, is acquired through the injected
-///     <see cref="ISolutionSource" />.
+///     The one model-acquisition seam a run reads this solution through. It carries what a run needs before the
+///     codebase itself and defers the codebase to a lazy <see cref="ExtractAsync" />, so the pipeline can still
+///     fail fast on a tampered baseline before any extraction. A workspace, where the run still needs one, is
+///     acquired through the injected <see cref="ISolutionSource" />.
 /// </summary>
 /// <remarks>
 ///     The persisted cache is disposable local derived data with no tamper story: a read only ever hits when
@@ -66,11 +63,8 @@ internal sealed class CodebaseSource : IDisposable
     private readonly SolutionHandle? handle;
     private readonly WorkspaceDiagnostics loadDiagnostics;
 
-    // The models merged from the walked fragments, keyed by exclusion. Two tiers because the two costs are
-    // three orders of magnitude apart: the walk measured ~85 s on a 35-project solution, while a
-    // merge is CPU over fragments already in hand. `render --diagram` is the caller that
-    // proves the split — one walk for the whole run, then a second model over a different exclusion, because
-    // the survey fence draws every project while the cards respect the spec's exclusions. Plain, unlocked
+    // The models merged from the walked fragments, keyed by exclusion. Two tiers because a walk costs three
+    // orders of magnitude more than a merge, which is CPU over fragments already in hand. Plain, unlocked
     // collections: a source belongs to one run and its ExtractAsync is never re-entered concurrently, unlike
     // the session-lifetime store the warm path uses.
     private readonly Dictionary<string, CodebaseModel> mergedByExclusion = new(StringComparer.Ordinal);
@@ -86,7 +80,7 @@ internal sealed class CodebaseSource : IDisposable
 
     // The advisory merge notes the last ExtractAsync produced (same-FQN cross-project conflation),
     // regenerated from the fragments on every path — a cache hit re-merges, so these need no persistence.
-    // Empty until ExtractAsync runs, which is why Diagnostics is composed per read rather than captured.
+    // Empty until ExtractAsync runs.
     private IReadOnlyList<string> mergeNotes = [];
 
     // The other half of the same read: which projects arrived as several compilations. Captured beside the
@@ -95,7 +89,6 @@ internal sealed class CodebaseSource : IDisposable
 
     private HashSet<string> reExtractedProjects = new(StringComparer.Ordinal);
 
-    // A null declaredMembers mints the unforced reader; the cold spec path passes the one it already forced.
     private CodebaseSource(
         CodebaseSourceOutcome outcome,
         string solutionPath,
@@ -123,7 +116,7 @@ internal sealed class CodebaseSource : IDisposable
         this.normalizedSpecArgument = normalizedSpecArgument;
     }
 
-    /// <summary>Which path this run took. Internal test observable; never printed.</summary>
+    /// <summary>Which path this run took.</summary>
     internal CodebaseSourceOutcome Outcome { get; }
 
     /// <summary>The finalized architecture model. Absent for the spec-less <c>graph</c> survey.</summary>
@@ -135,12 +128,10 @@ internal sealed class CodebaseSource : IDisposable
         resolution ?? throw new InvalidOperationException("This codebase source was created without a spec (graph is spec-less).");
 
     /// <summary>
-    ///     How well the workspace loaded: the projects that failed to load, the ones whose NuGet packages are
-    ///     not in the model, and the load-failure diagnostics — all freshly collected on a cold run and
-    ///     replayed from the cache on a hit — plus the two facts the last <see cref="ExtractAsync" /> produced,
-    ///     its merge notes and its multi-targeted projects (both empty before it runs). Read per call rather
-    ///     than captured, so a verb that renders after extracting sees them and one that gates before it does
-    ///     not have to wait for them.
+    ///     How well the workspace loaded (collected on a cold run, replayed from the cache on a hit), with the merge
+    ///     notes and multi-targeted projects of the last <see cref="ExtractAsync" />, both empty before it runs.
+    ///     Composed per read rather than captured, so a verb that renders after extracting sees them and one that
+    ///     gates before it does not have to wait for them.
     /// </summary>
     public WorkspaceDiagnostics Diagnostics =>
         loadDiagnostics with { MergeNotes = mergeNotes, MultiTargetedProjects = multiTargetedProjects };
@@ -151,37 +142,34 @@ internal sealed class CodebaseSource : IDisposable
     public string SolutionPath { get; }
 
     /// <summary>
-    ///     The solution's file name — what every document names the run's subject by, and what a narrowing
-    ///     notice names the filter by. Machine-independent, which is why no document carries
-    ///     <see cref="SolutionPath" /> itself. Under a <c>.slnf</c> this is the filter's own name, unlike
-    ///     <see cref="SolutionDirectory" />: the filter is what the run was pointed at, and naming it is how a
-    ///     reader learns the answer covers a lens rather than the whole solution.
+    ///     The solution's file name, the machine-independent name every document gives the run's subject; no
+    ///     document carries <see cref="SolutionPath" /> itself. Under a <c>.slnf</c> this is the filter's own
+    ///     name, unlike <see cref="SolutionDirectory" />: the filter is what the run was pointed at, and naming it
+    ///     is how a reader learns the answer covers a lens rather than the whole solution.
     /// </summary>
-    // Assigned once in the ctor beside SolutionDirectory, for the same reason: every rendering verb reads it,
-    // and two of them read it twice.
     public string SolutionName { get; }
 
     /// <summary>
-    ///     The solution directory — baselines, render targets, diff resolution, <c>context --path</c> and every
-    ///     relativized evidence path anchor here. Under a <c>.slnf</c> that is the directory of the solution the
-    ///     filter <em>references</em>, not the filter's own: a filter is a lens on a solution, so a run through
-    ///     one must resolve the same conventions and write to the same places as a run over the solution itself.
+    ///     The directory the solution's conventions anchor at: baselines, the context files and model file
+    ///     <c>render</c> writes, diff resolution, <c>context --path</c>, and every evidence path a document
+    ///     relativizes. Under a <c>.slnf</c> that is the directory of the solution the filter <em>references</em>,
+    ///     not the filter's own: a filter is a lens on a solution, so a run through one must resolve the same
+    ///     conventions and write to the same places as a run over the solution itself.
     /// </summary>
-    // Assigned once in the ctor, never computed per read: under a .slnf the computation costs a file
-    // read, and the property is read 2-16 times a run.
+    // Assigned once in the ctor, never computed per read: under a .slnf the computation costs a file read.
     public string SolutionDirectory { get; }
 
     /// <summary>
     ///     The projects extracted from the workspace on this run (all of them on a miss, only the dirty set
     ///     on a partial, the session store's re-walked set on the warm path, none on a hit or a cold disabled
-    ///     run). Internal test observable for the partial re-extraction pin.
+    ///     run).
     /// </summary>
     internal IReadOnlySet<string> ReExtractedProjects => reExtractedProjects;
 
     /// <summary>
     ///     How many times this source walked the workspace for fragments — at most once for its whole
     ///     lifetime, however many exclusion sets its callers ask for, and zero on a cache hit or the warm
-    ///     path (neither walks). Internal test observable; never printed.
+    ///     path (neither walks).
     /// </summary>
     internal int ExtractionCount { get; private set; }
 
@@ -192,29 +180,15 @@ internal sealed class CodebaseSource : IDisposable
     }
 
     /// <summary>
-    ///     Discovers the solution and prepares the spec-ful source every verb that consumes a spec acquires
-    ///     through: on a cache hit the spec is replayed and the model loaded with no workspace; otherwise a
-    ///     workspace is acquired and the spec resolved against it. Discovery, spec-resolution, and spec-load
-    ///     failures surface exactly as a cold run raises them.
+    ///     Discovers the solution and prepares a spec-ful source: on a cache hit the spec is replayed and the
+    ///     model loaded with no workspace; otherwise a workspace is acquired and the spec resolved against it.
+    ///     Discovery, spec-resolution, and spec-load failures surface exactly as a cold run raises them.
     /// </summary>
-    /// <param name="source">The seam a run that needs a workspace acquires one through.</param>
-    /// <param name="environment">
-    ///     The seam the solution variable is read through for discovery and, unless <paramref name="noCache" />
-    ///     is set, the cache root.
-    /// </param>
-    /// <param name="solution">
-    ///     The run's solution: the settings file's where one applies, otherwise the positional argument (a file, a
-    ///     directory, or null for discovery).
-    /// </param>
-    /// <param name="spec">The <c>--spec</c> value, else the settings file's spec, else null for the convention.</param>
-    /// <param name="workingDirectory">The directory solution discovery walks up from.</param>
-    /// <param name="noCache">
-    ///     This caller's cache policy, spelled here rather than inherited: <c>true</c> reads nothing from
-    ///     <c>cache.json</c> and writes nothing to it, so the run touches what a plain cold run touches. It
-    ///     still acquires through the same seam either way, so a host keeping a warm session serves it that
-    ///     session's model (<see cref="SolutionHandle.WarmCodebase" />) rather than a fresh walk per call.
-    /// </param>
-    /// <param name="ct">The run's cancellation token.</param>
+    /// <remarks>
+    ///     A run with <paramref name="noCache" /> still acquires through <paramref name="source" />, so a host
+    ///     keeping a warm session serves it that session's model (<see cref="SolutionHandle.WarmCodebase" />)
+    ///     rather than a fresh walk per call.
+    /// </remarks>
     public static Task<CodebaseSource> CreateWithSpecAsync(
         ISolutionSource source,
         IEnvironment environment,
@@ -303,9 +277,7 @@ internal sealed class CodebaseSource : IDisposable
         // Captured here, off the one exit every path (hit, warm, cold) returns through, so Diagnostics can
         // surface the notes beside the workspace-load failures.
         mergeNotes = codebase.MergeNotes;
-        // The other half of the same read, off the shared projection rather than one of this file's own: the
-        // slot's contract is that it and the notes come from one merge, and an owner beside the record is
-        // what lets every composer holding a model keep that promise the same way.
+        // Off the shared projection, so every composer holding a model reads the list the same way.
         multiTargetedProjects = MultiTargetedProjects.Of(codebase);
         return codebase;
     }
@@ -326,7 +298,6 @@ internal sealed class CodebaseSource : IDisposable
             return warm.Model;
         }
 
-        // One walk per source, then one merge per distinct exclusion set over the fragments it produced.
         fragments ??= await WalkFragmentsAsync(ct);
         return MergedFor(fragments, excludeProjectNames);
     }
@@ -342,8 +313,6 @@ internal sealed class CodebaseSource : IDisposable
         return handle!.WarmCodebase;
     }
 
-    // The fragment set this source merges from, acquired once. A hit takes the cached set whole and walks
-    // nothing; every other path opens the workspace it already holds.
     private async Task<IReadOnlyList<CodebaseFragment>> WalkFragmentsAsync(CancellationToken ct)
     {
         if (Outcome == CodebaseSourceOutcome.Hit) return cacheRead.ReusableFragments;
@@ -361,8 +330,6 @@ internal sealed class CodebaseSource : IDisposable
                 solution, null, handle.TargetFrameworks, declaredMembers.Value, ct);
 
         // Fingerprint before extraction so a mid-run edit is caught by the store's re-stat at write time.
-        // Both this and the write-back sit on the one-walk path, so a second ExtractAsync re-fingerprints
-        // nothing and re-writes nothing.
         CacheFingerprint? fingerprint = TryCaptureFingerprint(solution, ct);
 
         List<CodebaseFragment> allFragments = await ExtractAllFragmentsAsync(solution, ct);
@@ -374,9 +341,8 @@ internal sealed class CodebaseSource : IDisposable
 
     // The merged model for one exclusion set, memoized against the walked fragments. Keyed through the
     // merger's own ExclusionKey, so this memo and the warm session store's cannot disagree about when two
-    // callers are asking for the same merge. Sharing the instance is safe for the reason it is there: a
-    // merged model is read-only once built, and every consumer — the checker, the renderers, the
-    // summarizer — reads.
+    // callers are asking for the same merge. Sharing the instance is safe because a merged model is read-only
+    // once built.
     private CodebaseModel MergedFor(
         IReadOnlyList<CodebaseFragment> walked, IReadOnlyCollection<string> excludeProjectNames)
     {
@@ -388,9 +354,8 @@ internal sealed class CodebaseSource : IDisposable
         return merged;
     }
 
-    // On a partial, extract only the dirty projects and reuse the clean fragments; on a miss, extract them
-    // all. Either way the result is the full fragment set in ordinal project order, so the merge and the
-    // write-back order match a cold run exactly.
+    // The full fragment set in ordinal project order on either path, so the merge and the write-back order match
+    // a cold run exactly.
     private async Task<List<CodebaseFragment>> ExtractAllFragmentsAsync(Solution solution, CancellationToken ct)
     {
         if (Outcome == CodebaseSourceOutcome.Partial)
@@ -497,9 +462,8 @@ internal sealed class CodebaseSource : IDisposable
     /// <remarks>
     ///     A closure reports the recorded load verdict, the one a hit replays, because a partial is never a
     ///     structural change: the projects it did not load are the projects the last whole load measured. What
-    ///     the closure measured itself has to agree with that record, or the run loads the whole solution and
-    ///     reports what it finds there. Nothing is printed either way, so the output stays byte-identical to a
-    ///     cold run.
+    ///     the closure measured itself has to agree with that record (<see cref="ClosureServes" />), or the run
+    ///     loads the whole solution and reports what it finds there.
     /// </remarks>
     private static async Task<SolutionHandle> AcquireForRunAsync(
         ISolutionSource source, string solutionPath, CacheReadResult cacheRead, bool closureAllowed, CancellationToken ct)
@@ -513,8 +477,6 @@ internal sealed class CodebaseSource : IDisposable
         return await source.AcquireAsync(solutionPath, ct);
     }
 
-    // Whether a closure load can stand in for the whole solution: it loaded every dirty project, nothing in it
-    // failed to load, and every restore failure and workspace message it saw is one the recorded verdict holds.
     private static bool ClosureServes(SolutionHandle closure, CacheReadResult cacheRead)
     {
         WorkspaceDiagnostics measured = closure.LoadDiagnostics;
@@ -532,11 +494,10 @@ internal sealed class CodebaseSource : IDisposable
     }
 
     /// <summary>
-    ///     Resolves the spec on a cache hit without a workspace, or returns null when the cold path is needed.
-    ///     An explicit DLL resolves directly (a missing one throws the same loud error a cold run would); a
-    ///     convention or csproj spec replays its recorded resolution, re-running the built-output check so the
-    ///     bounded search from the output root and its error text match cold; a spec with no matching record
-    ///     returns null so the caller reloads the workspace.
+    ///     Resolves the spec on a cache hit without a workspace: an explicit DLL directly, a convention or csproj
+    ///     spec by replaying its recorded resolution, and null when no record matches, so the caller reloads the
+    ///     workspace. A missing DLL throws the same loud error a cold run would, and a replay re-runs the
+    ///     built-output check, so the search and its error text match cold.
     /// </summary>
     /// <remarks>
     ///     The recorded intermediate assembly path is replayed rather than left null, because that is what
@@ -615,9 +576,7 @@ internal sealed class CodebaseSource : IDisposable
             .ToList();
     }
 
-    // What a run that has to open a workspace calls itself: a partial read keeps its clean fragments and
-    // re-extracts only the dirty ones, and every other read (a miss, or a hit the spec could not replay)
-    // extracts the lot.
+    // What a run that has to open a workspace calls itself; a hit the spec could not replay counts as a miss.
     private static CodebaseSourceOutcome ColdOutcomeFor(CacheOutcome outcome)
     {
         return outcome == CacheOutcome.Partial ? CodebaseSourceOutcome.Partial : CodebaseSourceOutcome.Miss;

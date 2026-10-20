@@ -18,20 +18,12 @@ namespace SlideRule.Cli.Verbs;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         The rule form: load the model (the DLL fast path needs no workspace; convention or a csproj loads one
-///         for resolution only, never extraction) → find the rule by ID → dump its fields
-///         (<see cref="ExplainFormatter" />) → exit 0. An unknown ID is a <see cref="UserErrorException" />
-///         listing every available (post-desugar) ID, ordinal-sorted → exit 2 — unless the ID is a JSON array
-///         written as text, which is named as that instead of rostered (<see cref="Refusals" />). A missing ID
-///         argument never reaches here — the surfaces refuse a request that names none of a rule ID, a type and a
-///         path, or more than one.
-///     </para>
-///     <para>
-///         The type and path forms: load and extract the codebase, resolve the type by name or the types a path
-///         declares, and write each one's claims
-///         (<see cref="TypeClaims" />, <see cref="ClaimsFormatter" />). An unknown type name is a
-///         <see cref="UserErrorException" /> naming the closest full names; a path declaring no type, and a type
-///         nothing claims, answer successfully saying so.
+///         The rule form dumps the rule's fields (<see cref="ExplainFormatter" />). An unknown ID is a
+///         <see cref="UserErrorException" /> listing every available (post-desugar) ID, ordinal-sorted, unless the
+///         ID is a JSON array written as text, which is named as that instead of rostered (<see cref="Refusals" />).
+///         The type and path forms write each type's claims (<see cref="TypeClaims" />,
+///         <see cref="ClaimsFormatter" />). An unknown type name is a <see cref="UserErrorException" /> naming the
+///         closest full names; a path declaring no type, and a type nothing claims, answer successfully saying so.
 ///     </para>
 ///     <para>
 ///         <b>Never a gate.</b> A workspace opened for resolution can fail partially; the rule form renders the
@@ -39,15 +31,14 @@ namespace SlideRule.Cli.Verbs;
 ///         not the codebase — a load failure cannot make the answer wrong. The DLL fast path never opens a
 ///         workspace, so it stays silent by construction. The type and path forms answer from the codebase, which
 ///         a load failure can leave short, so they also announce an incomplete or narrowed model at the top of
-///         the answer.
+///         the answer, which is <c>arch_explain</c>'s only channel.
 ///     </para>
 ///     <para>
 ///         <b>It fronts the persisted extraction cache</b> (<c>--no-cache</c> opts out), and the rule form is
 ///         what the cache does the most for: it never extracts at all, so on a hit the recorded resolution
 ///         replays and the run opens <em>no workspace</em> — the whole of what a convention or csproj
 ///         <c>--spec</c> costs. Nothing in that form reads absence as evidence: an unknown rule ID is a refusal
-///         against the spec's own rule list, which no cache state can shorten. The type and path forms extract,
-///         and front the cache as <c>check</c> does.
+///         against the spec's own rule list, which no cache state can shorten.
 ///     </para>
 /// </remarks>
 internal sealed class ExplainRunner(
@@ -81,17 +72,13 @@ internal sealed class ExplainRunner(
         if (withoutSolution is not null) return SolutionSource.LoadSpecModel(withoutSolution.DllPath);
 
         // Convention or csproj --spec: load the workspace for resolution only; never extract. The acquisition
-        // seam is the shared one, so explain's model is the model every other verb would have loaded — its
-        // lazy ExtractAsync is never called. On a cache hit the recorded resolution replays and no
-        // workspace opens either, which is this verb's entire cost.
+        // seam is the shared one, so explain's model is the model every other verb would have loaded.
         using var source = await CodebaseSource.CreateWithSpecAsync(
             SolutionSource, Environment, request.Solution, request.Spec, request.WorkingDirectory,
             request.NoCache, ct);
         RecordCacheOutcome(source);
 
         // Composed like every other verb's, so the MSBuild-selection note accompanies the load failures.
-        // Nothing gates on them here: the rule being dumped is the spec's, so a project that failed to load
-        // cannot change the answer — only the visibility of the failure.
         WorkspaceDiagnostics diagnostics = source.Diagnostics;
         WorkspaceDiagnosticsRenderer.Render(error, diagnostics);
 
@@ -100,8 +87,6 @@ internal sealed class ExplainRunner(
 
     // The type and path forms. Unlike the rule form this extracts, because who claims a type is a question about
     // the codebase as much as the spec, so it fronts the cache exactly as check does and inherits check's model.
-    // Never a gate, for context's reason: an incomplete or narrowed model is announced in the body, which is
-    // arch_explain's only channel, ahead of an answer the partial model still supports.
     private async Task<int> ExplainClaimsAsync(ExplainRequest request, CancellationToken ct)
     {
         RefuseAStringifiedArray(request);
@@ -192,9 +177,8 @@ internal sealed class ExplainRunner(
             : $"{lead}. Pass a type's full name, as check reports it, or its simple name.";
     }
 
-    // Every type the solution declares with a declaration site at or under the path: one for a file, several for
-    // a file holding several types or for a directory. The path is canonicalized as the declaration sites are, so
-    // a spelling through a symlinked root still finds them.
+    // The path arrives canonicalized as the declaration sites are, so a spelling through a symlinked root still
+    // finds them.
     private static IReadOnlyList<TypeNode> DeclaredUnder(CodebaseModel codebase, string queryFullPath)
     {
         string[] querySegments = PathFormat.Segments(queryFullPath);

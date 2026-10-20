@@ -25,10 +25,10 @@ namespace SlideRule.SpecAnalyzers;
 ///     <para>
 ///         It sees only a literal written at a marked parameter, and only within the method body it sits in.
 ///         A rule pack, a second spec class, a helper method and a second file are each out of reach of the
-///         several-literal checks, which is why those three warnings say so in their own descriptions. A call
-///         the spec never makes (one under a condition that is never taken) is read as a declaration here and
-///         not by the loader, which is one of the five places this view can be wider than the loader's rather
-///         than narrower; <c>SpecLiteralParityTests</c> names all five.
+///         several-literal checks, which is why their warnings say so in their own descriptions. A call the
+///         spec never makes (one under a condition that is never taken) is read as a declaration here and not
+///         by the loader, which is one of the places this view can be wider than the loader's rather than
+///         narrower; <c>SpecLiteralParityTests</c> names them all.
 ///     </para>
 ///     <para>
 ///         The only state is the test seams. Nothing is read from disk, the environment or a clock, and no
@@ -75,13 +75,10 @@ internal sealed class SpecLiteralAnalyzer : DiagnosticAnalyzer
     {
     }
 
-    /// <summary>
-    ///     The same analyzer with <paramref name="beforeDecide" /> invoked at the top of every call into
-    ///     the contract, and <paramref name="versions" /> in place of the two versions the version check reads.
-    /// </summary>
+    /// <summary>The same analyzer with its two test seams armed.</summary>
     /// <param name="beforeDecide">
-    ///     Runs immediately inside the guarded region, so a fault thrown from it takes the path a fault in
-    ///     the contract itself would take; null in production.
+    ///     Runs at the top of every call into the contract, immediately inside the guarded region, so a fault
+    ///     thrown from it takes the path a fault in the contract itself would take; null in production.
     /// </param>
     /// <param name="versions">
     ///     Supplies the two informational versions the version check compares, the analyzer's own first, in
@@ -106,10 +103,6 @@ internal sealed class SpecLiteralAnalyzer : DiagnosticAnalyzer
         context.RegisterCompilationStartAction(OnCompilationStart);
     }
 
-    /// <summary>
-    ///     The version <paramref name="assembly" /> was built as: its informational version, or null where it
-    ///     carries none.
-    /// </summary>
     internal static string? InformationalVersionOf(Assembly assembly)
     {
         return assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
@@ -420,8 +413,6 @@ internal sealed class SpecLiteralAnalyzer : DiagnosticAnalyzer
     ///     only where the contract cannot load at all. It runs before any other call into the contract is
     ///     compiled, because compiling one of those is what a moved member breaks.
     /// </remarks>
-    /// <param name="analyzerVersion">This analyzer's own version.</param>
-    /// <param name="contractVersion">The version of the contract the compiler loaded for it.</param>
     [MethodImpl(MethodImplOptions.NoInlining)]
     private bool VersionsAgree(out string analyzerVersion, out string contractVersion)
     {
@@ -439,15 +430,11 @@ internal sealed class SpecLiteralAnalyzer : DiagnosticAnalyzer
     ///     and null when no slot carries the name.
     /// </summary>
     /// <remarks>
-    ///     Never inlined, and the only place one literal reaches the contract. The compiler loads whatever
-    ///     copy of the contract sits beside this assembly, and a copy whose shape has moved throws when the
-    ///     method that would call into it is compiled rather than when the call runs — so keeping the call
-    ///     in a method of its own is what puts that throw inside the caller's guard instead of at the
-    ///     callback's own entry, where nothing could catch it. The code crosses back out as its number and
-    ///     its name, converted here, so nothing outside a boundary holds the contract's enum.
+    ///     A boundary, and the only place one literal reaches the contract: keeping the call in a method of its
+    ///     own puts the throw a moved member causes inside the caller's guard instead of at the callback's own
+    ///     entry, where nothing could catch it. The code crosses back out as its number and its name, converted
+    ///     here, so nothing outside a boundary holds the contract's enum.
     /// </remarks>
-    /// <param name="slotName">The slot name the marker carried.</param>
-    /// <param name="literal">The literal as it was written.</param>
     [MethodImpl(MethodImplOptions.NoInlining)]
     private Verdict? Decide(string slotName, string literal)
     {
@@ -465,15 +452,14 @@ internal sealed class SpecLiteralAnalyzer : DiagnosticAnalyzer
 
     /// <summary>
     ///     What the contract decides the collected literals of one body draw between them, in the order it
-    ///     reports them.
+    ///     reports them; <paramref name="ids" /> (every rule and scope ID) and <paramref name="layerNames" /> are
+    ///     each in source order.
     /// </summary>
     /// <remarks>
     ///     Never inlined, for the reason <see cref="Decide" /> records. A tag is an index into the list it
     ///     was built from, which is what lets the verdicts come back carrying no locations and still be
     ///     placed.
     /// </remarks>
-    /// <param name="ids">Every rule and scope ID the body declared, in source order.</param>
-    /// <param name="layerNames">Every layer name the body declared, in source order.</param>
     [MethodImpl(MethodImplOptions.NoInlining)]
     private List<Collision> DecideCollisions(IReadOnlyList<Declared> ids, IReadOnlyList<Declared> layerNames)
     {
@@ -499,16 +485,16 @@ internal sealed class SpecLiteralAnalyzer : DiagnosticAnalyzer
         return collisions;
     }
 
-    /// <summary>One literal this analysis accepted: the slot it fills, its text, and where it was written.</summary>
+    /// <summary>
+    ///     One literal this analysis accepted: the name of the slot the marker named, the literal as the constant
+    ///     folded to, and its own span, which is where a warning about it sits.
+    /// </summary>
     private readonly struct Declared(string slot, string text, Location location)
     {
-        /// <summary>The name of the slot the marker named.</summary>
         internal string Slot { get; } = slot;
 
-        /// <summary>The literal as the constant folded to.</summary>
         internal string Text { get; } = text;
 
-        /// <summary>The literal's own span, which is where a warning about it sits.</summary>
         internal Location Location { get; } = location;
     }
 
@@ -534,12 +520,10 @@ internal sealed class SpecLiteralAnalyzer : DiagnosticAnalyzer
         internal string Tail { get; } = tail;
     }
 
-    /// <summary>What the contract decided about several literals, reduced to what the warnings need.</summary>
-    /// <remarks>
-    ///     <c>Tags</c> are indexes into the list the verdict was decided over, and <c>OverIds</c> says
-    ///     which of the two lists that was. The code crosses out as a number and a name, for the reason
-    ///     <see cref="Verdict" /> records.
-    /// </remarks>
+    /// <summary>
+    ///     What the contract decided about several literals, reduced to what the warnings need; the code crosses
+    ///     out as a number and a name, as in <see cref="Verdict" /> and for the reason it records.
+    /// </summary>
     private readonly struct Collision(
         int code,
         string codeName,
@@ -547,10 +531,8 @@ internal sealed class SpecLiteralAnalyzer : DiagnosticAnalyzer
         IReadOnlyList<int> tags,
         bool overIds)
     {
-        /// <summary>Which mistake it is, as the contract's code numbers it.</summary>
         internal int Code { get; } = code;
 
-        /// <summary>The code's name, which the <c>code</c> property carries.</summary>
         internal string CodeName { get; } = codeName;
 
         /// <summary>The whole message, with no subject clause to fill in.</summary>

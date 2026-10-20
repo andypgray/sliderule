@@ -11,24 +11,17 @@ namespace SlideRule.Tests.DocHygiene;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>Why here, when release.yml already checks three of the four.</b> It checks them against
-///         the tag, in CI, at tag time — which is to say after the rewrite, after the release gate, and
-///         with the release already in flight. A bump that reached the props file and one manifest
-///         field is caught there by a job that has to be re-run against a new tag, and a tag is the one
-///         thing in this flow that publishes. Catching the same disagreement in the suite costs
-///         seconds and names the site.
+///         It holds all four sites to the props file's version in the suite, before any tag exists, and
+///         names the site that disagrees. release.yml compares every site but the SARIF golden with the
+///         tag, after the tag is pushed.
 ///     </para>
 ///     <para>
-///         <b>The fourth site is worse than unchecked.</b> The SARIF golden's driver version is held
-///         only by <c>CheckCommandE2ETests</c>, which compares whole documents — so a missed bump
-///         arrives as a JSON diff late in a Release suite, at the end of a publish run, reading like a
-///         rendering regression rather than like a number nobody changed.
+///         Besides this gate, the SARIF golden's driver version is held only by whole-document golden
+///         comparisons, where a missed bump would read as a rendering regression.
 ///     </para>
 ///     <para>
-///         <b>The props file is parsed as XML rather than matched.</b> Its own comment carries the
-///         literal <c>"&lt;Version&gt;"</c>, which is why release.yml's regex needs its closing-tag
-///         lookahead to stay correct. An element query cannot see inside a comment, so there is
-///         nothing here to get wrong and no lookahead to preserve.
+///         The props file is parsed as XML rather than matched, because its own comment carries the literal
+///         <c>"&lt;Version&gt;"</c>, and an element query cannot see inside a comment.
 ///     </para>
 /// </remarks>
 public sealed class ManifestVersionTests

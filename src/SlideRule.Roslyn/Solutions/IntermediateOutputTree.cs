@@ -5,50 +5,39 @@ namespace SlideRule.Roslyn.Solutions;
 /// <summary>
 ///     Where a project's intermediate (<c>obj</c>-side) tree is, and where the restore assets file inside it
 ///     is, derived from the two paths MSBuild evaluated for the project rather than from a layout the code
-///     assumes. Shared by the spec resolver's built-output search, which must never return an intermediate
-///     assembly, and by every probe and reader of the assets file, which must find it wherever the layout in
-///     force actually writes it.
+///     assumes.
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>Why derived rather than spelled.</b> The default layout puts the assets file at
-///         <c>&lt;projectDirectory&gt;/obj/project.assets.json</c>. <c>UseArtifactsOutput</c> puts it at
-///         <c>&lt;artifacts&gt;/obj/&lt;Project&gt;/project.assets.json</c> — outside the project directory
-///         entirely — and a redirected <c>BaseIntermediateOutputPath</c> puts it anywhere. A probe that
-///         spells the default layout finds nothing under the others, and an absent probe is not a quiet
-///         degradation: it is a structural input the cache stops watching, so a restore that changes the
-///         model is served from cache as though nothing moved (measured in field testing, not read off
-///         the code).
+///         The default layout puts the assets file at <c>&lt;projectDirectory&gt;/obj/project.assets.json</c>.
+///         <c>UseArtifactsOutput</c> puts it at <c>&lt;artifacts&gt;/obj/&lt;Project&gt;/project.assets.json</c>,
+///         outside the project directory entirely, and a redirected <c>BaseIntermediateOutputPath</c> puts it
+///         anywhere. A probe that spells the default layout finds nothing under the others, and an absent probe
+///         is a structural input the cache stops watching, so a restore that changes the model is served from
+///         cache as though nothing moved (measured).
 ///     </para>
 ///     <para>
-///         <b>Why a chain rather than one path.</b> Between the intermediate root and the assembly sit the
-///         build pivots — configuration, target framework, runtime identifier — and how many there are is
-///         the layout's business, not this code's: the default layout puts the assets file three levels
-///         above the assembly and the artifacts layout one. Every directory on that walk is therefore
-///         stamped, absent ones included, which is what makes an assets file that appears on a later restore
-///         an existence flip rather than a file nobody was watching. The extras are absent-file stats, the
-///         same cheap shape the props/targets probe chain already relies on.
+///         Between the intermediate root and the assembly sit the build pivots (configuration, target framework,
+///         runtime identifier), and how many there are is the layout's business: the default layout puts the
+///         assets file three levels above the assembly and the artifacts layout one. Every directory on that walk
+///         is therefore stamped, absent ones included (cheap absent-file stats), which makes an assets file that
+///         appears on a later restore an existence flip rather than a file nobody was watching.
 ///     </para>
 /// </remarks>
 internal static class IntermediateOutputTree
 {
-    /// <summary>The NuGet restore assets file's name — the structural input this tree is probed for.</summary>
     private const string AssetsFileName = "project.assets.json";
 
     /// <summary>
-    ///     The project's restore assets file in the <em>default</em> output layout
-    ///     (<c>&lt;projectDirectory&gt;/obj/project.assets.json</c>) — the first, and always present,
+    ///     The project's restore assets file in the default output layout, the first and always-present
     ///     candidate <see cref="AssetsPathsOf" /> yields.
     /// </summary>
     /// <remarks>
-    ///     Spelled here and nowhere else, because a second spelling of it is a layout assumption living
-    ///     outside the type that owns the derivation, free to drift from it. The extraction cache's
-    ///     per-project content key names this one path rather than the whole candidate set, which is sound
-    ///     for the narrow reason that the key is a manifest-diff aid and not the invalidation mechanism: an
-    ///     assets file that moves or changes is a structural change, and the structural sweep misses the
-    ///     whole cache before any content key is recomputed.
+    ///     Spelled here and nowhere else, so no layout assumption lives outside the type that owns the
+    ///     derivation. The extraction cache's per-project content key names this one path rather than the whole
+    ///     candidate set, which is sound because that key is a manifest-diff aid: an assets file that moves or
+    ///     changes is a structural change, and the structural sweep misses the whole cache first.
     /// </remarks>
-    /// <param name="projectDirectory">The directory holding the project file.</param>
     internal static string DefaultAssetsPathOf(string projectDirectory)
     {
         return Path.GetFullPath(Path.Combine(projectDirectory, "obj", AssetsFileName));
@@ -104,14 +93,11 @@ internal static class IntermediateOutputTree
     ///     including <see cref="RootOf">the intermediate root</see>. Ordered, deduplicated, absolute.
     /// </summary>
     /// <remarks>
-    ///     The default location leads whatever the layout, and a project whose evaluated paths are unknown
-    ///     (a binlog replay carries no intermediate assembly path) degrades to that one candidate.
-    ///     One framework's pair is enough for a multi-target-framework project: the root is derived from the
-    ///     prefix the pair shares, and that root is the same whichever framework's pair it starts from.
+    ///     A project whose evaluated paths are unknown (a binlog replay carries no intermediate assembly path)
+    ///     degrades to the default candidate alone. One framework's pair is enough for a multi-target-framework
+    ///     project: the root is derived from the prefix the pair shares, and that root is the same whichever
+    ///     framework's pair it starts from.
     /// </remarks>
-    /// <param name="projectDirectory">The directory holding the project file.</param>
-    /// <param name="evaluatedOutputPath">The project's evaluated output path, or null when unknown.</param>
-    /// <param name="intermediateAssemblyPath">The project's intermediate assembly path, or null when unknown.</param>
     internal static IReadOnlyList<string> AssetsPathsOf(
         string projectDirectory, string? evaluatedOutputPath, string? intermediateAssemblyPath)
     {

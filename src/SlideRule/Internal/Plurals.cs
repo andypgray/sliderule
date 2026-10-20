@@ -3,10 +3,8 @@ namespace SlideRule.Internal;
 /// <summary>Count inflection for rendered lines, wherever they are composed.</summary>
 /// <remarks>
 ///     Every string inflected here is pinned output, so the English rule has one owner rather than a copy
-///     per renderer, and a refinement (an irregular noun, an <c>s</c>/<c>es</c> split, a zero case) lands
-///     once instead of being hunted for across two assemblies. It sits in Core because the Roslyn host
-///     inflects counts too, and in Core's internal namespace rather than its rendering one because the checker
-///     does as well (the orphaned-baseline warning) and Checking may not reference Rendering. Not to be
+///     per renderer. It sits in Core's internal namespace because the Roslyn host and the checker inflect
+///     counts too (the orphaned-baseline warning), and Checking may not reference Rendering. Not to be
 ///     confused with <c>ProseFormat.KindPlural</c>, which looks up a grammar term's plural rather than
 ///     inflecting by count.
 /// </remarks>
@@ -14,13 +12,9 @@ internal static class Plurals
 {
     /// <summary>
     ///     <paramref name="noun" /> inflected for <paramref name="count" />: bare for exactly one,
-    ///     pluralized for anything else — zero included. A final <c>y</c> after a consonant becomes
+    ///     pluralized for anything else, zero included. A final <c>y</c> after a consonant becomes
     ///     <c>ies</c> (<c>entry</c> → <c>entries</c>); everything else takes <c>s</c>.
     /// </summary>
-    /// <remarks>
-    ///     The vowel test is the whole content of the second rule: it is what keeps <c>day</c> from
-    ///     becoming <c>daies</c>.
-    /// </remarks>
     internal static string Noun(int count, string noun)
     {
         if (count == 1) return noun;
@@ -30,36 +24,19 @@ internal static class Plurals
         return consonantY ? noun.Substring(0, last) + "ies" : noun + "s";
     }
 
-    /// <summary>
-    ///     <paramref name="count" /> followed by <paramref name="noun" /> inflected for it — the counted
-    ///     phrase itself (<c>1 project</c>, <c>3 projects</c>), which is what a sentence that counts
-    ///     actually needs.
-    /// </summary>
-    /// <remarks>
-    ///     Here rather than at each renderer for the reason <see cref="Noun" /> is: the phrase is the unit
-    ///     every caller would otherwise compose by hand around it, so the space, the order and any future refinement
-    ///     (a thousands separator, a word for zero) have the same one owner the inflection does.
-    /// </remarks>
+    /// <summary>The counted phrase: <c>1 project</c>, <c>3 projects</c>.</summary>
     internal static string Counted(int count, string noun)
     {
         return count + " " + Noun(count, noun);
     }
 
-    /// <summary>
-    ///     The copula agreeing with <paramref name="count" />: <c>is</c> for exactly one, <c>are</c>
-    ///     otherwise. The same rule as <see cref="Noun" /> applied to the verb, and a sentence that counts
-    ///     usually needs both.
-    /// </summary>
+    /// <summary>The copula agreeing with <paramref name="count" />.</summary>
     internal static string Verb(int count)
     {
         return count == 1 ? "is" : "are";
     }
 
-    /// <summary>
-    ///     The past copula agreeing with <paramref name="count" />: <c>was</c> for exactly one, <c>were</c>
-    ///     otherwise. <see cref="Verb" />'s rule in the tense the coverage sentences are written in — what a
-    ///     run could not check, read or survey is always something that already happened.
-    /// </summary>
+    /// <summary>The past copula agreeing with <paramref name="count" />.</summary>
     internal static string PastVerb(int count)
     {
         return count == 1 ? "was" : "were";

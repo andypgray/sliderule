@@ -8,9 +8,8 @@ namespace SlideRule.Baselines;
 ///     position for a syntax refusal, the offending value where a value is of the wrong kind or carries
 ///     the wrong content, the property name for a key nothing admits, the object that lacks it for a
 ///     required key, and the entry object for a refusal about an entry's shape or its seal.
-///     <see cref="Detail" /> is a lower-case sentence ending in a full stop which names neither a
-///     position nor a file path: <see cref="Describe" /> puts the position in front, in the same shape
-///     the JSON reader's own refusals take, and only a caller that knows the path says which file it is.
+///     <see cref="Describe" /> puts the position in front of <see cref="Detail" />, in the same shape the
+///     JSON reader's own refusals take, and only a caller that knows the path says which file it is.
 /// </remarks>
 internal sealed class BaselineRefusal
 {
@@ -24,10 +23,12 @@ internal sealed class BaselineRefusal
         Position = position;
     }
 
-    /// <summary>Which family of refusal this is.</summary>
     internal BaselineRefusalKind Kind { get; }
 
-    /// <summary>The refusal on its own, as a lower-case sentence ending in a full stop.</summary>
+    /// <summary>
+    ///     The refusal on its own: a lower-case sentence ending in a full stop, naming neither a position nor a
+    ///     file path.
+    /// </summary>
     internal string Detail { get; }
 
     /// <summary>
@@ -41,7 +42,6 @@ internal sealed class BaselineRefusal
     /// </summary>
     internal string? EntryIdentity { get; }
 
-    /// <summary>Where the refusal sits in the text that was read.</summary>
     internal JsonPosition Position { get; }
 
     /// <summary>The refusal with its position in front: <c>line 2, column 8: ...</c>.</summary>

@@ -7,15 +7,17 @@ namespace SlideRule.Prose;
 ///     that every multi-operand list — type, attribute and member alike — backticks, joins and
 ///     qualifies colliding simple names identically.
 /// </summary>
+/// <remarks>
+///     The anchor helpers read an anchor's simple display or its path, never a <see cref="Type" />, so a
+///     string anchor renders and widens exactly as its <c>typeof</c> twin does.
+/// </remarks>
 internal static class ProseFormat
 {
-    /// <summary>Wraps an identifier or glob in backticks: <c>SqlConnection</c> → <c>`SqlConnection`</c>.</summary>
     internal static string Backtick(string value)
     {
         return "`" + value + "`";
     }
 
-    /// <summary>Upper-cases the first character of a lowercase fragment for sentence-initial use.</summary>
     internal static string Capitalize(string phrase)
     {
         if (string.IsNullOrEmpty(phrase)) return phrase;
@@ -26,7 +28,7 @@ internal static class ProseFormat
     /// <summary>
     ///     The premodifier an <see cref="Accessibility" /> puts on the subject head (GRAMMAR §5.2):
     ///     "public types", "private types". The trailing space is part of the fragment, as it is for
-    ///     every head prefix, because prefixes concatenate in authoring order.
+    ///     every head prefix.
     /// </summary>
     internal static string AccessibilityPrefix(Accessibility accessibility)
     {
@@ -61,8 +63,6 @@ internal static class ProseFormat
     ///     bare "registered types" for any lifetime (<c>null</c>).
     /// </summary>
     /// <remarks>
-    ///     This fragment is also the noun's subject head — it survives adjectives, so a qualified
-    ///     <c>Registered</c> subject keeps the qualifier instead of collapsing to a false bare "types".
     ///     An undefined lifetime (refused at spec build, GRAMMAR §8 item 19) never reaches a render, so
     ///     it falls back to the bare fragment.
     /// </remarks>
@@ -101,9 +101,8 @@ internal static class ProseFormat
     }
 
     /// <summary>
-    ///     Brackets an attribute display with a trailing <c>Attribute</c> stripped from its final
-    ///     segment — <c>Billing.AuditAttribute</c> → <c>[Billing.Audit]</c>. Takes an already-resolved
-    ///     name so a colliding attribute list can bracket its widened, namespace-qualified form.
+    ///     Takes an already-resolved name so a colliding attribute list can bracket its widened form:
+    ///     <c>Billing.AuditAttribute</c> → <c>[Billing.Audit]</c>.
     /// </summary>
     private static string BracketAttribute(string name)
     {
@@ -119,16 +118,9 @@ internal static class ProseFormat
     }
 
     /// <summary>
-    ///     Joins backticked type names as an or-list — <c>`A` or `B`</c> (GRAMMAR §5.3, §6) — for the
-    ///     <c>MustNotImplement</c> / <c>MustNotDeriveFrom</c> anchor lists. Each anchor renders its
-    ///     simple name, widening to the minimal distinguishing trailing namespace segments when
-    ///     anchors collide (<see cref="ResolvePathDisplays" />) — the same rule the dependency target
-    ///     lists use.
+    ///     Joins the anchors' backticked names as an or-list, <c>`A` or `B`</c> (GRAMMAR §5.3, §6), widened
+    ///     where they collide (<see cref="ResolvePathDisplays" />).
     /// </summary>
-    /// <remarks>
-    ///     An open generic renders declared type-parameter names (<c>IHandler&lt;T&gt;</c>), and a string
-    ///     anchor widens exactly as its <c>typeof</c> twin does, because both supply the same path.
-    /// </remarks>
     internal static string AnchorList(IReadOnlyList<TypeAnchor> anchors)
     {
         List<IReadOnlyList<string>> paths = anchors.Select(anchor => anchor.PathSegments).ToList();
@@ -137,15 +129,9 @@ internal static class ProseFormat
     }
 
     /// <summary>
-    ///     Joins backticked, <c>Attribute</c>-stripped, bracketed attribute names as an or-list —
-    ///     <c>`[Table]` or `[ComplexType]`</c> (GRAMMAR §5.3, §6) — for the <c>MustNotBeAttributedWith</c>
-    ///     anchor list. Colliding attribute names widen inside the brackets by the shared
-    ///     minimal-trailing-segments rule (<see cref="ResolvePathDisplays" />):
-    ///     <c>`[Billing.Audit]` or `[Sales.Audit]`</c>.
+    ///     Joins the anchors' attribute names, bracketed and backticked, as an or-list (GRAMMAR §5.3, §6);
+    ///     colliding names widen inside the brackets: <c>`[Billing.Audit]` or `[Sales.Audit]`</c>.
     /// </summary>
-    /// <remarks>
-    ///     A string anchor widens exactly as its <c>typeof</c> twin does, because both supply the same path.
-    /// </remarks>
     internal static string AttributeList(IReadOnlyList<TypeAnchor> anchors)
     {
         // Collision keys on the anchor's simple name; a Foo/FooAttribute pair that shares a bracket
@@ -155,41 +141,25 @@ internal static class ProseFormat
         return BacktickedList(displays.Select(BracketAttribute).ToList());
     }
 
-    /// <summary>
-    ///     Backticks each value and joins the result as an or-list
-    ///     (<see cref="JoinReferences(IReadOnlyList{string})" />): <c>`A`</c>; <c>`A` or `B`</c>;
-    ///     <c>`A`, `B` or `C`</c> — the one spelling of "these names, as code" every list of globs, names,
-    ///     monikers and displays renders through.
-    /// </summary>
+    /// <summary>The one spelling of "these names, as code": each value backticked, joined as an or-list.</summary>
     internal static string BacktickedList(IReadOnlyList<string> values)
     {
         return JoinReferences(values.Select(Backtick).ToList());
     }
 
-    /// <summary>
-    ///     Single-quotes each value and joins the result as an and-list
-    ///     (<see cref="JoinReferencesAnd" />): <c>'A'</c>; <c>'A' and 'B'</c>; <c>'A', 'B' and 'C'</c> — the
-    ///     one spelling of "these names, quoted" the notes and diagnostics that name projects, frameworks and
-    ///     types render through.
-    /// </summary>
+    /// <summary>The one spelling of "these names, quoted": each value single-quoted, joined as an and-list.</summary>
     internal static string JoinQuotedAnd(IReadOnlyList<string> values)
     {
         List<string> quoted = values.Select(Quote).ToList();
         return JoinReferencesAnd(quoted);
     }
 
-    /// <summary>
-    ///     Single-quotes each value and joins the result as an or-list
-    ///     (<see cref="JoinReferences(IReadOnlyList{string})" />): <c>'A'</c>; <c>'A' or 'B'</c>;
-    ///     <c>'A', 'B' or 'C'</c> — the or-joined twin of <see cref="JoinQuotedAnd" />.
-    /// </summary>
     internal static string JoinQuoted(IReadOnlyList<string> values)
     {
         List<string> quoted = values.Select(Quote).ToList();
         return JoinReferences(quoted);
     }
 
-    /// <summary>Wraps a name in single quotes: <c>App.Tests</c> → <c>'App.Tests'</c>.</summary>
     private static string Quote(string value)
     {
         return "'" + value + "'";
@@ -206,8 +176,7 @@ internal static class ProseFormat
 
     /// <summary>
     ///     The same join with the final joiner closing an <c>Except</c> parenthetical the penultimate item
-    ///     left open — <c>`A`, `B`, or `C`</c> — the one place a list item can end open and still be
-    ///     followed by text (GRAMMAR §6). Items before it are already followed by a comma.
+    ///     left open: <c>`A`, `B`, or `C`</c> (GRAMMAR §6).
     /// </summary>
     internal static string JoinReferences(IReadOnlyList<string> references, bool closeBeforeOr)
     {
@@ -215,9 +184,9 @@ internal static class ProseFormat
     }
 
     /// <summary>
-    ///     The and-joined twin of <see cref="JoinReferences(IReadOnlyList{string})" />, with no Oxford
-    ///     comma either (GRAMMAR §6): 1 → <c>A</c>; 2 → <c>A and B</c>; 3+ → <c>A, B and C</c>. The join a
-    ///     family's cell list reads with, where an or-list would say the rule ranges over one of them.
+    ///     The and-joined twin of <see cref="JoinReferences(IReadOnlyList{string})" />, with no Oxford comma
+    ///     either (GRAMMAR §6): <c>A, B and C</c>. A family's cell list reads with it, where an or-list would say
+    ///     the rule ranges over one of them.
     /// </summary>
     internal static string JoinReferencesAnd(IReadOnlyList<string> references)
     {
@@ -226,16 +195,14 @@ internal static class ProseFormat
 
     /// <summary>
     ///     The inventory join, for a list that is a set of things rather than a sentence naming an
-    ///     alternative: <c>A, B, C</c>. The sanctioned surface of a quarantine reads this way on both
-    ///     surfaces that print it — the scope card and <c>explain</c> — over the same pre-rendered
-    ///     fragments (<see cref="SentenceRenderer.ReferenceFragments" />).
+    ///     alternative: <c>A, B, C</c>. A quarantine's sanctioned surface reads this way wherever it prints,
+    ///     over the fragments <see cref="SentenceRenderer.ReferenceFragments" /> renders.
     /// </summary>
     internal static string JoinInventory(IReadOnlyList<string> values)
     {
         return string.Join(", ", values);
     }
 
-    // The one join both conjunctions take: everything but the last, comma-separated, then the joiner.
     private static string Join(IReadOnlyList<string> references, string joiner)
     {
         switch (references.Count)
@@ -256,10 +223,6 @@ internal static class ProseFormat
     ///     by the minimal number of trailing segments that tells them apart — until distinct.
     /// </summary>
     /// <returns>Displays positionally aligned with <paramref name="paths" />.</returns>
-    /// <remarks>
-    ///     Taking paths rather than <see cref="Type" />s is what lets a string attribute anchor widen
-    ///     identically to its <c>typeof</c> twin.
-    /// </remarks>
     internal static IReadOnlyList<string> ResolvePathDisplays(IReadOnlyList<IReadOnlyList<string>> paths)
     {
         var displays = new string[paths.Count];
@@ -278,7 +241,6 @@ internal static class ProseFormat
                 continue;
             }
 
-            // Widen from the simple name outward until every colliding member is distinct.
             int maxDepth = indices.Max(index => paths[index].Count);
             int chosen = maxDepth;
             for (var count = 1; count <= maxDepth; count++)
@@ -294,13 +256,11 @@ internal static class ProseFormat
         return displays;
     }
 
-    /// <summary>The path's last segment — the simple name every collision group keys on.</summary>
     private static string Leaf(IReadOnlyList<string> segments)
     {
         return segments[segments.Count - 1];
     }
 
-    /// <summary>The last <paramref name="segmentCount" /> segments of a path, dotted.</summary>
     private static string Qualify(IReadOnlyList<string> segments, int segmentCount)
     {
         int take = Math.Min(Math.Max(segmentCount, 1), segments.Count);

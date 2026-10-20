@@ -1,15 +1,10 @@
 namespace SlideRule.Internal;
 
 /// <summary>
-///     What "single-line" means for every authored prose value the product carries — a spec trailer, a
-///     baseline attribution — held in one place on <see cref="Plurals" />'s precedent, so a
-///     refinement lands once rather than being hunted for across three assemblies.
+///     What "single-line" means for every authored prose value the product carries, such as a spec trailer or
+///     a baseline attribution.
 /// </summary>
-/// <remarks>
-///     Either terminator, so a value carrying a bare CR is caught as well as one carrying a newline.
-///     Blankness is deliberately not folded in: the spec catalog reports blank under its own code, and the
-///     two baseline readers say "blank or multi-line" in one breath because their channel has one message.
-/// </remarks>
+/// <remarks>Blankness is not folded in: the spec catalog reports blank under its own code.</remarks>
 internal static class SingleLineProse
 {
     internal static bool IsMultiLine(string value)

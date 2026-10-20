@@ -3,11 +3,7 @@ using SlideRule.Internal;
 
 namespace SlideRule.Model;
 
-/// <summary>
-///     Clause/trailer stage for a quarantined scope. Each clause appends so repeats are detectable
-///     (§8 item 6); <see cref="BoundaryOnlyVia(Type[])" /> also bumps a call counter so a hermetic
-///     quarantine (never called) is distinguished from an empty-boundary error (called with zero types).
-/// </summary>
+/// <summary>Clause and trailer stage for a quarantined scope.</summary>
 internal sealed class QuarantinedScopeBuilder(ScopeRegistration registration) : IQuarantinedScope
 {
     public IQuarantinedScope BoundaryOnlyVia(Selection first, params Selection[] more)

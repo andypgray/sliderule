@@ -1,10 +1,6 @@
 namespace SlideRule.Checking;
 
-/// <summary>
-///     Where a selection sits in a constraint, which fixes its candidate universe (GRAMMAR §4.1):
-///     a <see cref="Subject" /> ranges over solution-declared types only; a <see cref="Target" />
-///     (or source operand) ranges over all types, including external metadata nodes.
-/// </summary>
+/// <summary>Where a selection sits in a constraint, which fixes its candidate universe (GRAMMAR §4.1).</summary>
 internal enum SelectionPosition
 {
     /// <summary>Subject position — solution-declared types only.</summary>

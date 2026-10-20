@@ -6,12 +6,11 @@ using SlideRule.Prose;
 
 namespace SlideRule.Checking;
 
-/// <summary>
-///     How much of a rule's materialized subject set a generator emitted: <see cref="Types" /> is the whole
-///     set, <see cref="Generated" /> the part of it no author wrote. A struct so that
-///     <see langword="default" /> is the zero pair — what a rule that never reached a subject at all
-///     (errored, skipped, empty) reports, with no null to thread through the checker.
-/// </summary>
+/// <summary>How much of a rule's materialized subject set a generator emitted.</summary>
+/// <remarks>
+///     <see langword="default" /> is the zero pair, which a rule that never reached a subject at all (errored,
+///     skipped, empty) reports.
+/// </remarks>
 internal readonly struct SubjectCoverage
 {
     public SubjectCoverage(int types, int generated)
@@ -34,8 +33,7 @@ internal readonly struct SubjectCoverage
 /// </summary>
 /// <remarks>
 ///     Every verb first requires a non-empty subject set — an empty subject fails the rule by default
-///     (GRAMMAR §4.1). Violations come back unordered (the caller sorts), alongside any inert-target
-///     warnings.
+///     (GRAMMAR §4.1). Violations come back unordered (the caller sorts), alongside any warnings.
 /// </remarks>
 internal sealed class ConstraintEvaluator
 {
@@ -119,9 +117,8 @@ internal sealed class ConstraintEvaluator
     internal (IReadOnlyList<Violation> Violations, IReadOnlyList<CheckWarning> Warnings, SubjectCoverage Coverage)
         Evaluate(Constraint constraint, Selection? subject)
     {
-        // A project constraint ranges over the solution's PROJECTS (GRAMMAR §4.10), so it dispatches before
-        // everything below: it has no type subject to resolve at all — Constraint.Subject is null for it —
-        // and its own empty check speaks in project terms.
+        // A project constraint ranges over the solution's PROJECTS (GRAMMAR §4.10), and its own empty check
+        // speaks in project terms.
         if (constraint is ProjectConstraint projectConstraint) return EvaluateProject(projectConstraint);
 
         // Loud per-operand emptiness for a union subject (GRAMMAR §4.1), ahead of the member dispatch because
@@ -151,12 +148,9 @@ internal sealed class ConstraintEvaluator
         return (violations, warnings, CoverageOf(subjects));
     }
 
-    // The subject-coverage pair the report states (GRAMMAR §5.2): how big the materialized subject set is
-    // and how much of it a generator emitted. Measured HERE, on the set the verbs actually range over,
-    // rather than on the selection that produced it — which is what makes the statement self-extinguishing:
-    // adding .Authored() leaves nothing generated, and the statement disappears with no separate rule about
-    // when to suppress it. Both numbers, because "803 of 804" and "803 of 90,000" are different findings and
-    // the denominator appears nowhere else in the document.
+    // Measured on the set the verbs actually range over rather than on the selection that produced it, which
+    // is what makes the report's statement self-extinguishing (GRAMMAR §5.2): adding .Authored() leaves nothing
+    // generated, and the statement disappears with no separate rule about when to suppress it.
     private static SubjectCoverage CoverageOf(IReadOnlyCollection<TypeNode> subjects)
     {
         return new SubjectCoverage(subjects.Count, subjects.Count(type => type.IsGenerated));
@@ -171,8 +165,6 @@ internal sealed class ConstraintEvaluator
         return new SubjectCoverage(declaringTypes.Count, declaringTypes.Count(type => type.IsGenerated));
     }
 
-    // The verb dispatch, kept apart from Evaluate so the coverage pair can ride beside the pair every
-    // arm returns. No arm knows about coverage — the subject set it is measured from is already resolved.
     // Every EDGE verb reads the admission rather than the bare set: the subject bounds which of an edge's
     // per-declarer instances the rule owns, at whichever end it sits (§4.1). The member path is one of them,
     // since a member use is an edge with a name-keyed far end. The shape verbs take the set, because a rule
@@ -280,30 +272,18 @@ internal sealed class ConstraintEvaluator
     }
 
     /// <summary>
-    ///     The one walk behind every forbidden-set verb (GRAMMAR §4.1, §4.3, §4.5, §4.7, §4.8, §4.9):
-    ///     resolve the operands, ask each candidate edge which of its sites count against the rule, mint
-    ///     one violation per counting edge from exactly those sites, and — for
-    ///     the arms that warn — raise the inert-target warnings, whole-target or per operand (InertWarnings
-    ///     says when each fires). <c>requireSites</c> is the refinement
-    ///     the two catch subsets carry: an edge none of whose sites the ban forbids is green, and no
-    ///     printed <c>file:line</c> is ever a site the ban permits.
+    ///     The one walk behind every forbidden-set verb (GRAMMAR §4.1, §4.3, §4.5, §4.7, §4.8, §4.9): one
+    ///     violation per candidate edge some of whose sites count against the rule, minted from exactly those
+    ///     sites.
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         <paramref name="subject" /> rides beside the candidates because the §4.1 edge rule needs
-    ///         both ends of the same test: the subject bounds which of the edge's instances the rule owns,
-    ///         and the operand set decides the far end at each of them. <paramref name="evidenceOf" /> reads
-    ///         the evidence each edge family recorded for itself, since a copy can construct or expose
-    ///         what another copy only references. Which end the subject sits at is
-    ///         <paramref name="subjectAtSource" /> — true for every verb here but the inbound reference one.
-    ///     </para>
-    ///     <para>
-    ///         The evidence is the sites and the instances' shares of them as one value, and it is what
-    ///         makes the printed lines the owned copies' own: a verb deciding on one of a catch edge's
-    ///         narrowings passes that narrowing's evidence whole, so what it mints from is a share of the
-    ///         list it is citing. <c>requireSites</c> then tests the counted sites rather than the whole
-    ///         edge, which is what keeps an unfiltered clause made by a copy the subject does not own from
-    ///         minting a violation with nothing to point at.
+    ///         <paramref name="evidenceOf" /> reads the evidence each edge family recorded for itself, since a
+    ///         copy can construct or expose what another copy only references. <paramref name="requireSites" />
+    ///         is the catch subsets' refinement: it tests the counted sites rather than the whole edge, so an
+    ///         edge none of whose sites the ban forbids is green, no printed <c>file:line</c> is ever a site the
+    ///         ban permits, and an unfiltered clause that only a copy the subject does not own wrote cannot mint
+    ///         a violation with nothing to point at.
     ///     </para>
     ///     <para>
     ///         The live trap for the inbound arm: its operand admission is resolved in
@@ -345,9 +325,8 @@ internal sealed class ConstraintEvaluator
     // whole-target arm can never see, so the two never fire for the same rule. The per-operand arm also
     // fires whatever the live operands found, so its warning can ride a failed rule.
     //
-    // Each grain raises its own kind. Everything downstream reads the whole-target kind as "this rule
-    // measured nothing" — the ratchet counts, the baseline verb, promotion — and a rule whose other
-    // operands matched measured those.
+    // Each grain raises its own kind, because everything downstream reads the whole-target kind as "this rule
+    // measured nothing", and a rule whose other operands matched measured those.
     //
     // Only a PATTERN operand warns, at either grain: a bare typeof target absent from the codebase is
     // the win condition (GRAMMAR §4.1) and stays silent, because the compiler already checked the name.
@@ -370,16 +349,13 @@ internal sealed class ConstraintEvaluator
                 : NoWarnings;
 
         // A dead operand beside a live one. The fold hides it — the united set is non-empty, so the
-        // rule reads as guarding everything it names while one clause of the ban has gone quiet. The
-        // subject side names this grain per operand (GRAMMAR §4.1); this is the target twin.
+        // rule reads as guarding everything it names while one clause of the ban has gone quiet.
         return DeadOperandWarnings(operands, parts, DeadOperandRole.Target, SelectionPosition.Target);
     }
 
-    // The per-operand grain every permit or ban list reports at: each pattern operand that matched nothing,
-    // and below a live one each dead piece DeadPieces finds. A forbidden set reaches here only where its
-    // folded set is non-empty. An allow-list always does, and never raises the whole-target kind: an empty
-    // allow-set reds every edge, so the rule measured something and must not read as having measured
-    // nothing.
+    // The per-operand grain every permit or ban list reports at. An allow-list always reaches here and never
+    // raises the whole-target kind: an empty allow-set reds every edge, so the rule measured something and must
+    // not read as having measured nothing.
     private IReadOnlyList<CheckWarning> DeadOperandWarnings(
         IReadOnlyList<Selection> operands,
         IReadOnlyList<SelectionAdmission> parts,
@@ -424,12 +400,9 @@ internal sealed class ConstraintEvaluator
     // each dead name of the operand's own lists. Parts come before the operand's lists because they are
     // written first: the adjectives of `AnyOf(a, b).Named(...)` follow its parts.
     //
-    // Re-collecting a part costs no noun scan, since those are memoized, only its own adjectives again; and
-    // OpenedParts opens a layer only where something inside its definition can be dead, so a layer defined by
-    // a project or a namespace costs nothing here. The rule subject's own gate leaves a layer's definition
-    // folded: a per-name failure there would have to be dropped by the one-project cut too, which would mean
-    // minting a layer with a different definition. A membership or an among part is never cut that way, so
-    // it may open one here.
+    // Re-collecting a part costs no noun scan, since those are memoized, only its own adjectives again.
+    // Unlike the rule subject's own gate, this may open a layer's definition, because a membership or an among
+    // part is never cut down to one project's view.
     private IEnumerable<Selection> DeadPieces(Selection selection, SelectionAdmission matched, SelectionPosition position)
     {
         if (matched.Count == 0)
@@ -490,13 +463,12 @@ internal sealed class ConstraintEvaluator
         warnings.Add(warning);
     }
 
-    // The candidate edges of one kind for a subject-keyed walk: only those whose keyed endpoint is a
-    // subject, read off the per-kind index rather than by re-walking the whole edge list (the reference
-    // list is the biggest the extractor produces, and a re-walk costs every rule O(|edges|)). Each edge sits
-    // under exactly one key and `subjects` is a set, so no edge is yielded twice. Walk order is the
-    // subject set's rather than the model's, which is unobservable: ArchChecker re-sorts every violation
-    // list on Violation.OrderKey before it reaches a report, and edges are unique per endpoint
-    // pair, so no tie-break rides on the walk.
+    // The candidate edges whose keyed endpoint is a subject, read off the per-kind index rather than by
+    // re-walking the whole edge list: the reference list is the biggest the extractor produces, and a re-walk
+    // costs every rule O(|edges|). Each edge sits under exactly one key and `subjects` is a set, so no edge is
+    // yielded twice. Walk order is the subject set's rather than the model's, which is unobservable:
+    // ArchChecker re-sorts every violation list on Violation.OrderKey, and edges are unique per endpoint pair,
+    // so no tie-break rides on the walk.
     private static IEnumerable<TEdge> Keyed<TEdge>(HashSet<TypeNode> subjects, ILookup<TypeNode, TEdge> index)
     {
         return subjects.SelectMany(subject => index[subject]);
@@ -511,8 +483,6 @@ internal sealed class ConstraintEvaluator
     ///     The two directions are one test read from opposite ends (§4.1), which is why neither filters
     ///     the candidates first: "some instance the subject owns puts the operand at the far end" is a
     ///     claim about a declarer both ends agree on, and two independent filters cannot state it.
-    ///     Inbound, the subject sits at the target and bounds ownership there while the operand decides
-    ///     the source; outbound, the other way round.
     /// </remarks>
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenReference(
         SelectionAdmission subject, IReadOnlyList<Selection> operands, bool inbound)
@@ -567,11 +537,10 @@ internal sealed class ConstraintEvaluator
     }
 
     /// <summary>
-    ///     The construction verb (GRAMMAR §4.5, §5.3): a construction edge is a hit when its source is a
-    ///     subject AND the constructed type is a forbidden operand — the "you may use it; you may not
-    ///     create it" ban. Extraction already collapses every <c>new</c> of one type into one (source,
-    ///     constructed) edge with its sites aggregated, so one edge yields one Construction violation
-    ///     keyed on the type pair (overload-indifferent, §4.3).
+    ///     The construction verb (GRAMMAR §4.5, §5.3), the "you may use it; you may not create it" ban.
+    ///     Extraction already collapses every <c>new</c> of one type into one (source, constructed) edge with its
+    ///     sites aggregated, so one edge yields one Construction violation keyed on the type pair
+    ///     (overload-indifferent, §4.3).
     /// </summary>
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenConstruction(
         SelectionAdmission subject, IReadOnlyList<Selection> operands)
@@ -584,15 +553,12 @@ internal sealed class ConstraintEvaluator
     }
 
     /// <summary>
-    ///     The injection verb (GRAMMAR §4.7, §5.3): an injection edge is a hit when its source is a
-    ///     subject AND the injected parameter type is a forbidden operand — the captive-dependency ban.
-    ///     Extraction already collapses every constructor parameter typed on one injected type into one
-    ///     (source, injected) edge with its sites aggregated, so one edge yields one Injection violation
-    ///     keyed on the type pair (constructor-overload- and parameter-name-indifferent, §4.3). Unlike
-    ///     ForbiddenConstruction, <c>MustNotInject</c> NEVER warns — hence <c>warnInert: false</c>: its
-    ///     natural operand is a Registered selection (§4.7), and an empty Registered operand means no such
-    ///     registrations exist — the win condition, exactly like a bare <c>typeof</c> target (GRAMMAR
-    ///     §4.1). An empty operand set is silence, not a warning.
+    ///     The injection verb (GRAMMAR §4.7, §5.3), the captive-dependency ban. Extraction already collapses
+    ///     every constructor parameter typed on one injected type into one (source, injected) edge with its sites
+    ///     aggregated, so one edge yields one Injection violation keyed on the type pair (constructor-overload-
+    ///     and parameter-name-indifferent, §4.3). <c>MustNotInject</c> NEVER warns: its natural operand is a
+    ///     Registered selection (§4.7), and an empty Registered operand means no such registrations exist — the
+    ///     win condition, exactly like a bare <c>typeof</c> target (GRAMMAR §4.1).
     /// </summary>
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenInjection(
         SelectionAdmission subject, IReadOnlyList<Selection> operands)
@@ -605,12 +571,10 @@ internal sealed class ConstraintEvaluator
     }
 
     /// <summary>
-    ///     The catch verb (GRAMMAR §4.8, §5.3): a catch edge is a hit when its source is a subject AND the
-    ///     caught type is a forbidden operand — the "you may throw it; you may not swallow it" ban.
-    ///     Matching is exact definition-level FQN on the operand set (the family's shared node
-    ///     membership): <c>MustNotCatch(typeof(Exception))</c> flags only <c>catch (System.Exception)</c>
-    ///     and bare-catch edges (a bare catch already synthesized System.Exception at extraction), never a
-    ///     narrower <c>catch (IOException)</c>.
+    ///     The catch verb (GRAMMAR §4.8, §5.3), the "you may throw it; you may not swallow it" ban. Matching is
+    ///     exact definition-level FQN on the operand set: <c>MustNotCatch(typeof(Exception))</c> flags only
+    ///     <c>catch (System.Exception)</c> and bare-catch edges (a bare catch already synthesized
+    ///     System.Exception at extraction), never a narrower <c>catch (IOException)</c>.
     /// </summary>
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenCatch(
         SelectionAdmission subject, IReadOnlyList<Selection> operands)
@@ -627,15 +591,12 @@ internal sealed class ConstraintEvaluator
     ///     edges, decided on the edge's recorded UNFILTERED sites instead of its sites — and on the
     ///     instances recorded for that subset rather than for the edge, since which of a copy's clauses
     ///     spell a filter is a fact about that copy. A matching edge violates iff at least one
-    ///     <c>catch</c> clause an owned copy wrote spells no <c>when</c> filter, and the evidence is
-    ///     exactly those clauses' sites — so an edge every one of whose owned sites is filtered is GREEN,
-    ///     and no printed file:line is ever a filtered site. Extraction records the unfiltered subset as its
-    ///     own fact (§4.8), so this arm reads it directly as evidence rather than subtracting one set from
-    ///     another (the polarity that keeps a same-line collision red-biased). Identity is untouched — the
-    ///     (source, caught) type pair, the very key ForbiddenCatch's violations carry, so the unfiltered
-    ///     sites are evidence and never identity (§4.3) and a baseline entry means the same thing under
-    ///     either catch verb. Matching stays exact definition-level FQN and the inert-target warning is the
-    ///     §4.1 forbidden-set family's, both exactly as ForbiddenCatch.
+    ///     <c>catch</c> clause an owned copy wrote spells no <c>when</c> filter. Extraction records the
+    ///     unfiltered subset as its own fact (§4.8), so this arm reads it directly as evidence rather than
+    ///     subtracting one set from another (the polarity that keeps a same-line collision red-biased). Identity
+    ///     is untouched — the (source, caught) type pair, the very key ForbiddenCatch's violations carry, so the
+    ///     unfiltered sites are evidence and never identity (§4.3) and a baseline entry means the same thing
+    ///     under either catch verb.
     /// </summary>
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenUnfilteredCatch(
         SelectionAdmission subject, IReadOnlyList<Selection> operands)
@@ -651,15 +612,11 @@ internal sealed class ConstraintEvaluator
     ///     The rethrow-aware catch verb (GRAMMAR §4.8, §5.3): the same walk again over the same edges,
     ///     decided on the edge's recorded SWALLOWING sites and that subset's own instances — the ones that
     ///     are unfiltered AND do not end in a throw. A matching edge violates iff at least one clause an
-    ///     owned copy wrote holds the failure and continues, and the evidence is exactly those sites, so an
-    ///     edge whose every owned unfiltered clause rethrows or translates is GREEN and no printed
-    ///     file:line is ever a rethrowing site. Extraction
-    ///     records this subset as its own fact for the same polarity reason as the unfiltered subset
-    ///     (§4.8) — read the sites the ban forbids, never a complement. Identity is untouched: the
-    ///     (source, caught) type pair, so a baseline entry means the same thing under all three catch
-    ///     verbs, the sites stay evidence (§4.3), and narrowing which sites a violation prints never
-    ///     narrows what it keys. Matching stays exact definition-level FQN and the inert-target warning is
-    ///     the §4.1 forbidden-set family's.
+    ///     owned copy wrote holds the failure and continues. Extraction records this subset as its own fact for
+    ///     the same polarity reason as the unfiltered subset (§4.8) — read the sites the ban forbids, never a
+    ///     complement. Identity is untouched: the (source, caught) type pair, so a baseline entry means the same
+    ///     thing under all three catch verbs, the sites stay evidence (§4.3), and narrowing which sites a
+    ///     violation prints never narrows what it keys.
     /// </summary>
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenSwallow(
         SelectionAdmission subject, IReadOnlyList<Selection> operands)
@@ -672,14 +629,10 @@ internal sealed class ConstraintEvaluator
     }
 
     /// <summary>
-    ///     The throw-ban verb (GRAMMAR §4.8, §5.3): the ban polarity beside MustOnlyThrow's strict
-    ///     allow-list — a throw edge is a hit when its source is a subject AND the thrown type is a
-    ///     forbidden operand, for the case where the forbidden thrown types are enumerable and the
-    ///     permitted ones are not. Matching is exact definition-level FQN on the operand set, so a ban on
-    ///     Exception never reaches a derived throw (the narrow throw is the good state, mirroring the catch
-    ///     verbs). Inert-target warning semantics are the §4.1 forbidden-set family's, exactly as
-    ///     ForbiddenCatch — the point of departure from OnlyThrow, which never raises the whole-target
-    ///     warning because an empty allow-set is loud on its own, and warns per dead operand instead.
+    ///     The throw-ban verb (GRAMMAR §4.8, §5.3): the ban polarity beside MustOnlyThrow's strict allow-list,
+    ///     for the case where the forbidden thrown types are enumerable and the permitted ones are not. Matching
+    ///     is exact definition-level FQN on the operand set, so a ban on Exception never reaches a derived throw
+    ///     (the narrow throw is the good state, mirroring the catch verbs).
     /// </summary>
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenThrow(
         SelectionAdmission subject, IReadOnlyList<Selection> operands)
@@ -692,11 +645,10 @@ internal sealed class ConstraintEvaluator
     }
 
     /// <summary>
-    ///     The exposure verb (GRAMMAR §4.9, §5.3): an exposure edge is a hit when its source is a subject
-    ///     AND the exposed type is a forbidden operand — the "you may use it; you may not surface it on
-    ///     your public API" ban. Matching is exact definition-level FQN on the operand set (the family's
-    ///     shared node membership): <c>MustNotExpose(typeof(DataTable))</c> flags only a <c>DataTable</c>
-    ///     signature position, never a narrower <c>DataView</c> one (no hierarchy-aware matching).
+    ///     The exposure verb (GRAMMAR §4.9, §5.3), the "you may use it; you may not surface it on your public
+    ///     API" ban. Matching is exact definition-level FQN on the operand set:
+    ///     <c>MustNotExpose(typeof(DataTable))</c> flags only a <c>DataTable</c> signature position, never a
+    ///     narrower <c>DataView</c> one (no hierarchy-aware matching).
     /// </summary>
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenExposure(
         SelectionAdmission subject, IReadOnlyList<Selection> operands)
@@ -713,28 +665,15 @@ internal sealed class ConstraintEvaluator
     ///     subject whose target the allow-set does not name is a violation.
     /// </summary>
     /// <remarks>
-    ///     <para>
-    ///         The refined subject is allowed implicitly, as one more allow entry (GRAMMAR §4.1) — folded
-    ///         into the resolved admission here rather than into the Targets list, so Operands, the
-    ///         sentence and the diagram never see an entry no author wrote. External targets are exempt
-    ///         (the complement universe is solution-declared). <c>MustOnly*</c> never raises the
-    ///         whole-target warning — an empty allow-set is loud by itself, and the leaf verb's empty
-    ///         operand list resolves to subject-only rather than to nothing — but each pattern operand
-    ///         that matched nothing warns, since the edges it should have allowed red as breaches that
-    ///         name the callers rather than the dead name. Attribution survives by flipping the polarity
-    ///         <see cref="SelectionAdmission.CountedSites" /> asks with: an edge is a violation when SOME
-    ///         instance the subject owns lands outside the allow-set. So an intra-copy edge is allowed by
-    ///         an entry naming the compiling project — the subject counts as one, at the projects it names
-    ///         the node at — or by an entry that is not a project at all, and never by an entry naming some
-    ///         other declarer of the same source file.
-    ///     </para>
-    ///     <para>
-    ///         Over a family subject "self" is the cell rather than the whole subject (GRAMMAR §5.1), so
-    ///         the walk runs once per cell: the subject is that cell intersected with the family's
-    ///         membership, and the allow-set is the operands plus the same cell <em>as declared</em> — the
-    ///         whole layer or project, which is what lets a module's excluded <c>Contracts</c> cone still
-    ///         count as its own.
-    ///     </para>
+    ///     The refined subject is allowed implicitly, as one more allow entry (GRAMMAR §4.1) — folded into the
+    ///     resolved admission rather than into the Targets list, so Operands, the sentence and the diagram never
+    ///     see an entry no author wrote. Each pattern operand that matched nothing warns, since the edges it
+    ///     should have allowed red as breaches that name the callers rather than the dead name. Attribution
+    ///     survives by flipping the polarity <see cref="SelectionAdmission.CountedSites" /> asks with: an edge
+    ///     is a violation when SOME instance the subject owns lands outside the allow-set. So an intra-copy edge
+    ///     is allowed by an entry naming the compiling project (the subject counts as one, at the projects it
+    ///     names the node at) or by an entry that is not a project at all, and never by an entry naming some
+    ///     other declarer of the same source file.
     /// </remarks>
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) OnlyReference(
         SelectionAdmission subject, IReadOnlyList<Selection> allowedTargets, FamilySubject? family)
@@ -751,11 +690,7 @@ internal sealed class ConstraintEvaluator
     /// </summary>
     /// <remarks>
     ///     Edge sources are always solution-declared, so no external caveat is needed. The subject sits at
-    ///     the edge's TARGET end, so it bounds ownership there while the allow-set decides the source — one
-    ///     test rather than two, because "some instance the subject owns comes from an unallowed project"
-    ///     is a claim about one declarer and cannot be split across independent filters (§4.1). The family
-    ///     path is the outbound one read from the other end: per cell, allowed = the operands plus that
-    ///     cell as declared.
+    ///     the edge's TARGET end, so it bounds ownership there while the allow-set decides the source.
     /// </remarks>
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) OnlyBeReferencedBy(
         SelectionAdmission subject, IReadOnlyList<Selection> allowedSources, FamilySubject? family)
@@ -763,14 +698,15 @@ internal sealed class ConstraintEvaluator
         return AllowList(subject, allowedSources, family, Inbound);
     }
 
-    // The allow-list shape both directions take (GRAMMAR §4.1, §5.1): the operands resolved once, the
-    // subject allowed implicitly, and — over a family — one walk per cell whose allow-set is the operands
-    // plus that cell as declared. Only the walk differs, which is what `walk` carries; its third argument is
-    // the cell each owned edge is labelled with, and it is the LOOP index rather than anything read off the
-    // edge, so the label is the cell whose law was broken at either end. That distinction is real for the
-    // inbound direction alone: there the subject sits at the edge's target, so the referencing type is
-    // regularly outside the family altogether and has no cell to be attributed to. The walks collect edges
-    // rather than violations because a pair two cells both own is minted once, from both cells' evidence.
+    // The allow-list shape both directions take (GRAMMAR §4.1, §5.1): the operands resolved once and the
+    // subject allowed implicitly. Over a family "self" is the cell rather than the whole subject, so there is
+    // one walk per cell whose allow-set is the operands plus that cell as declared — the whole layer or
+    // project, which is what lets a module's excluded Contracts cone still count as its own. `walk`'s third
+    // argument is the cell each owned edge is labelled with, and it is the LOOP index rather than anything read
+    // off the edge, so the label is the cell whose law was broken at either end. That matters inbound alone,
+    // where the referencing type is regularly outside the family altogether and has no cell to be attributed
+    // to. The walks collect edges rather than violations because a pair two cells both own is minted once,
+    // from both cells' evidence.
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) AllowList(
         SelectionAdmission subject, IReadOnlyList<Selection> allowed, FamilySubject? family,
         Func<SelectionAdmission, SelectionAdmission, string?, List<OwnedEdge<ReferenceEdge>>> walk)
@@ -798,13 +734,11 @@ internal sealed class ConstraintEvaluator
     /// <summary>
     ///     The cross-cell ban (GRAMMAR §5.1, §5.3): per cell, an owned outbound instance whose far end
     ///     lies in any <em>other</em> cell, as declared, is a violation. Symmetric, so one outbound walk
-    ///     states the whole law, and a one-cell family passes vacuously.
+    ///     states the whole law, and a one-cell family passes, having no other cell to reach.
     /// </summary>
     /// <remarks>
-    ///     The polarity is the allow-list's flipped — <c>wantHit: true</c> over the merged other cells —
-    ///     which is what keeps one edge test behind every verb at either end (§4.1). A family subject is
-    ///     required by spec-build item 28, so the null arm fails closed rather than describing a shape a
-    ///     built model can carry.
+    ///     A family subject is required by spec-build item 28, so the null arm fails closed rather than
+    ///     describing a shape a built model can carry.
     /// </remarks>
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) EachOther(FamilySubject? family)
     {
@@ -831,13 +765,10 @@ internal sealed class ConstraintEvaluator
     ///     because it lies on no circle.
     /// </summary>
     /// <remarks>
-    ///     A violation's identity is the type pair, never the cycle: a baseline keyed on circles would churn
-    ///     as arrows close new circles and enumerating a component's circles is exponential, so the pair is
-    ///     what keeps the baseline, the ratchet, the human report and SARIF untouched by this verb. The
-    ///     consequence is that the intended direction is blamed beside the stray back-reference — both
-    ///     arrows of a two-cell circle red — by design: this verb says only that a circle exists, and the
-    ///     author who knows which way the cells should point writes an ordering rule instead. The circle's
-    ///     cell names ride on <see cref="Violation.Detail" />, which the JSON channel alone reads.
+    ///     A violation's identity is the type pair, never the cycle, which keeps the baseline, the ratchet, the
+    ///     human report and SARIF untouched by this verb; so both arrows of a two-cell circle red, the intended
+    ///     direction beside the stray back-reference. The circle's cell names ride on
+    ///     <see cref="Violation.Detail" />.
     ///     <para>
     ///         A family of layers is required by spec-build item 29, so both throws below fail closed
     ///         rather than describing a shape a built model can carry — the projects arm doubly so, since
@@ -857,10 +788,8 @@ internal sealed class ConstraintEvaluator
         IReadOnlyList<SelectionAdmission> declared = DeclaredCells(family);
         int cellCount = declared.Count;
 
-        // The cell graph as its arrows alone: crosses[i, j] is whether cell i references cell j at all.
-        // Which arrows EXIST is the whole of what the components need, and only an arrow whose two cells
-        // share one is ever a violation, so existence is asked with a walk that stops at its first edge and
-        // the type pairs realizing an arrow are collected below for the few arrows that red.
+        // crosses[i, j] is whether cell i references cell j at all: which arrows EXIST is the whole of what the
+        // components need, and the type pairs realizing an arrow are collected below for the few arrows that red.
         var crosses = new bool[cellCount, cellCount];
         for (var source = 0; source < cellCount; source++)
         for (var target = 0; target < cellCount; target++)
@@ -901,11 +830,8 @@ internal sealed class ConstraintEvaluator
                 component => $"circular references among the {ProseFormat.JoinReferencesAnd(component.Names)} layers");
     }
 
-    // The outbound reference walk the allow-list, the leaf, the cross-cell ban and the cycle gate share,
-    // parameterized by the polarity each asks with and by the labels each attaches. External targets are
-    // exempt either way: the complement universe is solution-declared, and a cell never holds an external
-    // type to be an "other" of. Each edge comes back beside the sites that counted for it, which are the
-    // owned instances' and not necessarily the whole edge's, so nothing downstream has to ask twice.
+    // External targets are exempt whatever the polarity: the complement universe is solution-declared, and a
+    // cell never holds an external type to be an "other" of.
     private List<OwnedEdge<ReferenceEdge>> OutboundEdges(
         SelectionAdmission subject, SelectionAdmission operand, bool wantHit, string? cell, string? detail)
     {
@@ -965,10 +891,9 @@ internal sealed class ConstraintEvaluator
             .ToList();
     }
 
-    // One edge a walk found and the rule owns: the edge itself, the sites that counted for it — the owned
-    // instances' and not necessarily the whole edge's — and the labels the mint will carry. The cell is the
-    // walk's loop index and the detail the cycle gate's circle sentence; both are null on the paths that
-    // have neither.
+    // One edge a walk found and the rule owns. Its sites are the ones that counted for it, the owned instances'
+    // and not necessarily the whole edge's; the cell is the walk's loop index and the detail the cycle gate's
+    // circle sentence, both null on the paths that have neither.
     private readonly struct OwnedEdge<TEdge>(
         TEdge edge,
         IReadOnlyList<SourceLocation> sites,
@@ -985,18 +910,14 @@ internal sealed class ConstraintEvaluator
         internal string? Detail { get; } = detail;
     }
 
-    // One violation per edge however many cells found it (GRAMMAR §4.3), carrying every cell's evidence. No two
-    // cells hold one copy, but where one source file compiles into two of them — project cells, or layers defined
-    // by those projects — each holds its own copy and owns its own instance of the same edge, so the edge can be
-    // found once per cell while the baseline still keys on the type pair. Merging their evidence rather than
-    // keeping the first cell's alone is what keeps such a pair citing every line the rule is about: each cell
-    // owns a different copy, and dropping one would silently drop that copy's lines. Keeping the FIRST cell's
-    // LABEL settles which cell the edge is attributed to — the first in declaration order, the walk being in
-    // that order — so the burndown's per-cell split still names one cell per pair and totals to the rule's own
-    // count.
-    //
-    // Grouping is on the EDGE by identity rather than on the (source, target) names: one model edge per type
-    // pair per family, and a model object is compared by reference throughout the checker.
+    // One violation per edge however many cells found it (GRAMMAR §4.3). Where one source file compiles into
+    // two cells (project cells, or layers defined by those projects), each owns its own instance of the same
+    // edge, so the edge can be found once per cell while the baseline keys on the type pair. The evidence is
+    // merged, since each cell owns a different copy and dropping one would silently drop that copy's lines;
+    // the FIRST cell's LABEL is kept, the walk being in declaration order, so the burndown's per-cell split
+    // names one cell per pair and totals to the rule's own count. Grouping is on the EDGE by identity rather
+    // than on the (source, target) names: one model edge per type pair per family, and a model object is
+    // compared by reference throughout the checker.
     private static IReadOnlyList<Violation> MintedPerEdge<TEdge>(
         List<OwnedEdge<TEdge>> owned,
         Func<TEdge, IReadOnlyList<SourceLocation>> sitesOf,
@@ -1041,8 +962,6 @@ internal sealed class ConstraintEvaluator
         return violations;
     }
 
-    // The reference mint both allow-list directions and the cycle gate share: the circle detail rides along
-    // where the gate attached one, and the cell labels the finding either way.
     private static Violation MintReference(OwnedEdge<ReferenceEdge> found)
     {
         ReferenceEdge edge = found.Edge;
@@ -1055,15 +974,11 @@ internal sealed class ConstraintEvaluator
 
     // The throw verb (GRAMMAR §4.8, §5.3): a STRICT allow-list — every throw edge from a subject whose thrown
     // type is not in the allowed set is a violation, EXTERNAL thrown types included. This is OnlyReference
-    // MINUS its external-target exemption: MustOnlyThrow constrains external throws too, so an unlisted
-    // System.TimeoutException throw is red unless typeof(TimeoutException) is in the allow-set (a Type-sugar
-    // operand resolves the external node by FQN, since the target universe includes externals). An allowed
-    // type absent from the model resolves empty and allows nothing, silently where it is a typeof and with a
-    // per-operand warning where it is a pattern; the whole-target warning never fires, since an empty
-    // allow-set is loud by itself (the point of departure from ForbiddenCatch). The allow-set is a
-    // target position like any other, so §4.1 attribution decides membership here too: a project-headed
-    // entry allows a throw of a type several projects compile only at the instance whose throwing
-    // compilation reached that project's copy.
+    // MINUS the external-target exemption its OutboundEdges walk applies: an unlisted System.TimeoutException
+    // throw is red unless typeof(TimeoutException) is in the allow-set (a Type-sugar operand resolves the
+    // external node by FQN, since the target universe includes externals). An allowed type absent from the
+    // model resolves empty and allows nothing, silently where it is a typeof and with a per-operand warning
+    // where it is a pattern.
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) OnlyThrow(
         SelectionAdmission subject, IReadOnlyList<Selection> allowedThrows)
     {
@@ -1093,13 +1008,9 @@ internal sealed class ConstraintEvaluator
     }
 
     // The subject, resolved once: its membership, the heads that admitted each conflated node in it, and
-    // the per-operand emptiness verdict a union subject carries (GRAMMAR §4.1). Law must load predictably, so a typo'd
-    // project name inside a four-way union fails the rule in its own right instead of being silently
-    // absorbed by its siblings — one never-baselinable EmptySubject violation per empty operand, in
-    // operand order, and no admission at all, because a rule that fails this gate never reaches a verb and
-    // must never have the union's own adjectives applied. Target position keeps the softer per-operand
-    // inert-target warning instead. A non-union subject has no operands and resolves straight through; a
-    // union's operands ARE the union, so collecting them here is what keeps it from being resolved twice.
+    // the per-operand emptiness verdict a union subject carries (GRAMMAR §4.1) — one never-baselinable
+    // EmptySubject violation per empty operand, in operand order, and no admission at all, because a rule
+    // that fails this gate never reaches a verb and must never have the union's own adjectives applied.
     //
     // A Named list on the subject is read per name in the same register, because Named(a, b) names exactly
     // what AnyOf(Named(a), Named(b)) names and the two spellings must fail alike: each dead name is an
@@ -1131,13 +1042,10 @@ internal sealed class ConstraintEvaluator
         return (Array.Empty<Violation>(), SelectionAdmission.Folded(_selections, union, operands), null);
     }
 
-    // The one part walk behind every per-part emptiness report: each part collected in subject position, in
-    // part order, with what of it is dead beside — the part itself where it matched nothing, else each dead
-    // name of its own lists, spelled as the part with that one name. A union's operands, a family's cells and
-    // an exemplar's parts are loud for the same reason and must report alike; the subject gate fails on what
-    // comes back and the exemplar warns on it. Each dead part is cured on its own terms, since the parts of
-    // one union need not share a shape. A family's cells carry no list of their own, so only a union part
-    // ever answers per name there.
+    // The one part walk behind every per-part emptiness report, in part order: the part itself where it
+    // matched nothing, else each dead name of its own lists, spelled as the part with that one name. A union's
+    // operands, a family's cells and an exemplar's parts are loud for the same reason and must report alike. A
+    // family's cells carry no list of their own, so only a union part ever answers per name there.
     private (List<SelectionAdmission> Collected, List<Selection> Dead) WalkParts(IReadOnlyList<Selection> parts)
     {
         var collected = new List<SelectionAdmission>(parts.Count);
@@ -1172,8 +1080,7 @@ internal sealed class ConstraintEvaluator
     ///     reach, in the warning register): each union operand and each name of a <c>Named</c> list that matched
     ///     nothing, or the whole exemplar where the whole did. Never a verdict. Under a solution filter the types
     ///     are resolved and no part warns, since a project the filter left out may declare the type. Throws
-    ///     <see cref="RuleEvaluationException" /> where the exemplar cannot be evaluated at all; the caller turns
-    ///     that into the fault form of the same warning.
+    ///     <see cref="RuleEvaluationException" /> where the exemplar cannot be evaluated at all.
     /// </summary>
     internal (IReadOnlyList<TypeNode> Types, IReadOnlyList<CheckWarning> Warnings) ResolveExemplar(Selection exemplar)
     {
@@ -1332,9 +1239,7 @@ internal sealed class ConstraintEvaluator
     // one identity: the key is the subject's symbol ID either way, because counterparts are evidence and
     // never identity, so a grandfathered subject stays grandfathered when the arm flips. The among selection
     // resolves in SUBJECT position, like a membership: it names where a counterpart may live rather than
-    // the far end of an edge. Each dead pattern of it warns per piece, as a membership's does, but not as
-    // making the rule stricter: a dead part reds a subject whose only counterpart it held, and passes one it
-    // would have made ambiguous, so the rule's unmatched entries are not known to be fixed.
+    // the far end of an edge. Each dead pattern of it warns per piece, as a membership's does.
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) Counterparts(
         HashSet<TypeNode> subjects, MustHaveExactlyOneCounterpartConstraint constraint)
     {
@@ -1377,13 +1282,9 @@ internal sealed class ConstraintEvaluator
             .ToList();
     }
 
-    // The negative hierarchy/attribute verbs (GRAMMAR §5.3, §5.7): a subject VIOLATES iff ANY anchor matches,
-    // so it PASSES iff NONE do — the per-subject negation over the anchor list. The matchers are the same ones
-    // backing the positives (SelectionEvaluator / MemberSelectionEvaluator), built once eagerly per anchor so
-    // an unrepresentable anchor throws (→ RuleError) before any subject is tested, exactly as the positive
-    // Shape arms do. Every anchor in every family is a TypeAnchor (typeof or definition name, GRAMMAR §5.2),
-    // so the only axis left to be generic over is the subject kind: the same negation serves a type subject
-    // and a member one, whose matchers differ in what they read rather than in what they are anchored on.
+    // The negative hierarchy/attribute verbs (GRAMMAR §5.3, §5.7): a subject VIOLATES iff ANY anchor matches.
+    // The matchers are the ones backing the positives, built once eagerly per anchor so an unrepresentable
+    // anchor throws (→ RuleError) before any subject is tested, exactly as the positive Shape arms do.
     //
     // This family raises no inert report, and must not: an anchor no subject matches is what a satisfied ban
     // looks like, so a misspelt anchor cannot be told apart from a working rule (GRAMMAR §4.5, §4.6).
@@ -1401,11 +1302,9 @@ internal sealed class ConstraintEvaluator
         };
     }
 
-    // The member modal verbs (GRAMMAR §5.7): resolve the member subject, then test each surviving member
-    // against the verb's shape/naming/accessibility/flag predicate — a failing member is a MemberShape
-    // violation at its own declaration sites, identity keyed on its DocId (§4.6). An empty member subject
-    // fails with the member-flavored message (the analog of the empty type subject). Resolution can throw
-    // RuleEvaluationException (a closed-generic .Returning anchor); ArchChecker turns that into a RuleError.
+    // The member modal verbs (GRAMMAR §5.7): a failing member is a MemberShape violation at its own
+    // declaration sites, identity keyed on its DocId (§4.6). Resolution can throw RuleEvaluationException (a
+    // closed-generic .Returning anchor).
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>, SubjectCoverage) EvaluateMember(
         MemberConstraint constraint, HashSet<TypeNode> sourceTypes)
     {
@@ -1439,7 +1338,6 @@ internal sealed class ConstraintEvaluator
         return (violations, warnings, MemberCoverageOf(members));
     }
 
-    // The member-verb dispatch, kept apart from EvaluateMember for the same reason Dispatch is.
     private static (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) DispatchMember(
         MemberConstraint constraint, IReadOnlyList<MemberNode> members)
     {
@@ -1479,9 +1377,7 @@ internal sealed class ConstraintEvaluator
                 // is already there.
                 return MemberShape(members, m => m.IsReadOnly || m.IsConst);
             case MemberMustBeAttributedWithConstraint c:
-                // The same matcher the member attribute ADJECTIVE narrows with (MemberSelectionEvaluator),
-                // built once eagerly per anchor so an unrepresentable anchor throws (→ RuleError) before any
-                // member is tested — the member twin of the type-side Shape arms.
+                // The same matcher the member attribute ADJECTIVE narrows with (MemberSelectionEvaluator).
                 return MemberShape(members, MemberSelectionEvaluator.MemberAttributeMatcher(c.Anchor));
             case MemberMustNotBeAttributedWithConstraint c:
                 return MemberShape(members, NoneOf(c.Anchors, MemberSelectionEvaluator.MemberAttributeMatcher));
@@ -1489,8 +1385,7 @@ internal sealed class ConstraintEvaluator
                 // The anchor resolves through the SHARED definition-FQN path (SelectionEvaluator.DefinitionFullName,
                 // the same helper .Returning's anchors resolve through) — so a method passes iff one declared
                 // parameter's definition-level TypeFullName equals the anchor's (a non-generic anchor exactly, an
-                // open-generic anchor on any construction, GRAMMAR §4.6), and a string anchor passes through
-                // verbatim because it already IS that form. Resolving eagerly here is the check-time
+                // open-generic anchor on any construction, GRAMMAR §4.6). Resolving eagerly here is the check-time
                 // closed-generic BACKSTOP for the typeof arm: a constructed anchor throws RuleEvaluationException
                 // (→ RuleError) before any member is tested. (.Returning's backstop fires a step earlier, inside
                 // subject resolution — a divergence observable only for a validation-bypassed empty subject.)
@@ -1529,11 +1424,8 @@ internal sealed class ConstraintEvaluator
         return (violations, NoWarnings);
     }
 
-    // The packaging verbs (GRAMMAR §4.10): resolve the project subject, then test each surviving project
-    // against the verb's artifact predicate. An empty project subject fails with the project-flavored
-    // message (the analog of the empty type and member subjects). Coverage is the zero pair — it counts
-    // TYPES, and a project rule materializes none, so reporting anything else would be a claim about a set
-    // this rule never had.
+    // The packaging verbs (GRAMMAR §4.10). Coverage is the zero pair: it counts TYPES, and a project rule
+    // materializes none, so reporting anything else would be a claim about a set this rule never had.
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>, SubjectCoverage) EvaluateProject(
         ProjectConstraint constraint)
     {
@@ -1549,11 +1441,10 @@ internal sealed class ConstraintEvaluator
         return (violations, NoWarnings, default);
     }
 
-    // The project-verb dispatch, kept apart from EvaluateProject for the same reason Dispatch is. Every arm
-    // holds one honesty rule: a fact nothing evaluated is null, and unknown PASSES — a rule that redded on
-    // an unevaluated project would be reporting the load's own gaps as architecture violations. No arm has
-    // anything advisory to say, so the packaging stratum answers in violations alone and EvaluateProject
-    // supplies the empty warning list once.
+    // Every arm holds one honesty rule: a fact nothing evaluated is null, and unknown PASSES — a rule that
+    // redded on an unevaluated project would be reporting the load's own gaps as architecture violations. No
+    // arm has anything advisory to say, so the packaging stratum answers in violations alone and
+    // EvaluateProject supplies the empty warning list once.
     private static IReadOnlyList<Violation> DispatchProject(
         ProjectConstraint constraint, IReadOnlyList<ProjectNode> subjects)
     {
@@ -1564,26 +1455,23 @@ internal sealed class ConstraintEvaluator
             case MustTargetConstraint c:
                 return MissingFramework(subjects, c.Framework);
             case MustReferenceNoPackagesConstraint:
-                // MustReferenceNoPackages (GRAMMAR §4.10): one violation per DECLARED package that is not private,
-                // sited at that reference's own declaration, so a project taking eight packages reports eight lines
-                // to delete rather than one line saying eight. A private reference reaches neither the project's own
-                // package nor a project referencing it, so it is nobody's dependency and never counts. A project
-                // declaring none passes — and so does a project nothing evaluated, because an empty package list is
-                // those two states wearing one face and the honest reading of both is silence.
+                // One violation per DECLARED package that is not private (GRAMMAR §4.10), so a project taking eight
+                // packages reports eight lines to delete rather than one line saying eight. A private reference
+                // reaches neither the project's own package nor a project referencing it, so it is nobody's
+                // dependency and never counts. A project declaring none passes — and so does a project nothing
+                // evaluated, because an empty package list is those two states wearing one face.
                 return PackageShape(subjects, package => !package.IsPrivate);
             case MustOnlyReferencePackagesConstraint c:
-                // MustOnlyReferencePackages (GRAMMAR §4.10): MustReferenceNoPackages with an allow-list. One violation
-                // per declared package that is not private and that no pattern matches, sited at its own declaration,
-                // the identifiers compared ignoring case as NuGet compares them. A pattern that matches nothing is
-                // silence rather than a warning: a project taking none of the permitted packages is obeying the rule.
+                // MustReferenceNoPackages with an allow-list (GRAMMAR §4.10), the identifiers compared ignoring
+                // case as NuGet compares them. A pattern that matches nothing is silence rather than a warning: a
+                // project taking none of the permitted packages is obeying the rule.
                 return PackageShape(
                     subjects,
                     package => !package.IsPrivate && !Wildcard.MatchesAny(c.Patterns, package.Name, ignoreCase: true));
             case MustNotReferencePackagesConstraint c:
-                // MustNotReferencePackages (GRAMMAR §4.10): one violation per declared package a pattern matches,
-                // private or not, since a banned package is banned however it is declared. As on the allow-list, a
-                // pattern that matches nothing is silence: no reference to a banned package is the state the rule
-                // asks for.
+                // A matching package counts private or not (GRAMMAR §4.10), since a banned package is banned
+                // however it is declared. As on the allow-list, a pattern that matches nothing is silence: no
+                // reference to a banned package is the state the rule asks for.
                 return PackageShape(
                     subjects, package => Wildcard.MatchesAny(c.Patterns, package.Name, ignoreCase: true));
             case MustSetPropertyConstraint c:
@@ -1696,16 +1584,12 @@ internal sealed class ConstraintEvaluator
         return string.Equals(actual.Trim(), expected.Trim(), StringComparison.OrdinalIgnoreCase);
     }
 
-    // A nullable fact site as a violation's evidence list: the one site it has, or nothing to point at.
     private static IReadOnlyList<SourceLocation> AtSite(SourceLocation? site)
     {
         return site is null ? Array.Empty<SourceLocation>() : [site];
     }
 
-    // A verb's forbidden set or allow-list: every operand resolved in target position and folded into one
-    // admission, which carries both the membership the non-edge tests read and the per-node attribution
-    // an edge test needs where several projects declare one type (GRAMMAR §4.1). The per-operand
-    // admissions the fold would discard come back beside it, for the per-operand report.
+    // A verb's forbidden set or allow-list, resolved in target position (GRAMMAR §4.1).
     private SelectionAdmission ResolveOperands(
         IReadOnlyList<Selection> operands, out IReadOnlyList<SelectionAdmission> parts)
     {
@@ -1713,12 +1597,11 @@ internal sealed class ConstraintEvaluator
     }
 
     // One edge kind's index, built on first use so a spec that never uses (say) a catch verb never pays
-    // for a catch index. Keyed on the endpoint the SUBJECT set is tested against — Source for the
-    // outbound verbs, Target for the two referenced-by verbs — with the default (reference) comparer,
-    // the same identity the subject's HashSet<TypeNode> tests membership with. A key is a node, not a name, and the
-    // distinction is real rather than pedantic: a name a project declares and a referenced assembly also
-    // supplies denotes two nodes (GRAMMAR §4.1), and a reference into one of them must not index under the
-    // other. Reference identity is what keeps them apart — do not give TypeNode value equality on FullName.
+    // for a catch index. Keyed on the endpoint the SUBJECT set is tested against, with the default (reference)
+    // comparer, the same identity the subject's HashSet<TypeNode> tests membership with. A key is a node, not a
+    // name: a name a project declares and a referenced assembly also supplies denotes two nodes (GRAMMAR §4.1),
+    // and a reference into one of them must not index under the other. Reference identity is what keeps them
+    // apart — do not give TypeNode value equality on FullName.
     private sealed class EdgeIndex<TEdge>
     {
         private readonly IReadOnlyList<TEdge> _edges;
@@ -1734,11 +1617,9 @@ internal sealed class ConstraintEvaluator
         internal ILookup<TypeNode, TEdge> Lookup => _lookup ??= _edges.ToLookup(_key);
     }
 
-    // A family subject resolved once per rule (GRAMMAR §5.1): the cells themselves, and the subject each
-    // cell's law ranges over — that cell intersected with the family's own membership, so an Except on the
-    // family narrows what every cell governs. Held rather than recomputed because four verbs read it and
-    // a project family resolves its cells against the project list to find them. The cells as DECLARED are
-    // not held here: only the verbs that read the cells as declared need them, and they resolve them themselves.
+    // A family subject resolved once per rule (GRAMMAR §5.1). Each cell's subject is that cell intersected with
+    // the family's own membership, so an Except on the family narrows what every cell governs; it is held
+    // rather than recomputed because a project family resolves its cells against the project list to find them.
     private sealed class FamilySubject(
         IReadOnlyList<Selection> cells,
         IReadOnlyList<SelectionAdmission> subjects,
@@ -1754,14 +1635,12 @@ internal sealed class ConstraintEvaluator
         internal IReadOnlyList<Layer>? LayerCells { get; } = layerCells;
 
         /// <summary>
-        ///     The name of the cell at <paramref name="index" /> — the layer's, or the project's for a
-        ///     project family — which is what a violation minted under that cell's law is labelled with.
+        ///     The name of the cell at <paramref name="index" />: the layer's, or the project's for a project
+        ///     family.
         /// </summary>
         /// <remarks>
-        ///     Read off the cell's own noun rather than held beside it: a project cell is minted as
-        ///     <c>arch.Project(name)</c> would be, so the name it resolved to is already there. A cell can
-        ///     be nothing else, and a noun with no name is a new cell kind whose label nobody has decided —
-        ///     so it throws rather than grouping the burndown under a blank.
+        ///     Read off the cell's own noun. A noun with no name is a new cell kind whose label nobody has
+        ///     decided, so it throws rather than grouping the burndown under a blank.
         /// </remarks>
         internal string CellName(int index)
         {

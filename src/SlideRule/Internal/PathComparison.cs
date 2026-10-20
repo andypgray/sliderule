@@ -3,9 +3,8 @@ using System.Runtime.InteropServices;
 namespace SlideRule.Internal;
 
 /// <summary>
-///     The one per-OS rule for comparing file-system path segments: case-insensitive on Windows and
-///     macOS, ordinal (case-sensitive) on Linux — the file-name reality of each platform. Shared by
-///     every path compare across the codebase so they cannot drift apart.
+///     The one per-OS rule for comparing file-system path segments, so no two path compares drift apart:
+///     case-insensitive on Windows and macOS, ordinal on Linux, the file-name reality of each platform.
 /// </summary>
 /// <remarks>
 ///     Core is netstandard2.0, so the platform test uses <see cref="RuntimeInformation.IsOSPlatform" />
@@ -16,24 +15,16 @@ internal static class PathComparison
     private static readonly bool CaseInsensitive =
         RuntimeInformation.IsOSPlatform(OSPlatform.Windows) || RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
 
-    /// <summary>The <see cref="StringComparison" /> for path segments on this OS.</summary>
     public static readonly StringComparison Comparison =
         CaseInsensitive ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
 
-    /// <summary>The matching <see cref="StringComparer" /> for path-keyed sets and dictionaries on this OS.</summary>
     public static readonly StringComparer Comparer =
         CaseInsensitive ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
 
     /// <summary>
-    ///     <paramref name="path" /> case-folded by the same rule — lowercased where this OS ignores case,
-    ///     returned as-is where it does not.
+    ///     <paramref name="path" /> folded by the same rule, lowercased where this OS ignores case: the form to
+    ///     key on when a key must be a string rather than a comparer, such as a hashed cache identity.
     /// </summary>
-    /// <remarks>
-    ///     The form to key on when the key must be a <em>string</em> rather than a comparer: a hashed
-    ///     cache identity, a path baked into a content key. Sharing the fold with
-    ///     <see cref="Comparison" /> and <see cref="Comparer" /> is what stops a cache splitting or
-    ///     colliding against the comparisons made elsewhere about the same path.
-    /// </remarks>
     public static string Fold(string path)
     {
         return CaseInsensitive ? path.ToLowerInvariant() : path;

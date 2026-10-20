@@ -10,10 +10,11 @@ namespace SlideRule.Cli.Pipeline;
 
 /// <summary>
 ///     The MSBuildLocator quarantine. Neither <c>Program</c> nor the command wiring references a
-///     Roslyn/MSBuild type; the command actions call in here. <see cref="MethodImplOptions.NoInlining" />
-///     keeps the JIT from resolving the runners (and through them <c>MSBuildWorkspace</c>) until after
-///     registration and the source-selection decision have run. In tests MSBuild is already registered by a
-///     <c>[ModuleInitializer]</c>, so <see cref="MsBuildBootstrap.EnsureInitialized" /> is a no-op.
+///     Roslyn/MSBuild type, the request records it builds included; the command actions call in here.
+///     <see cref="MethodImplOptions.NoInlining" /> keeps the JIT from resolving the runners (and through them
+///     <c>MSBuildWorkspace</c>) until after registration and the source-selection decision have run. In tests
+///     MSBuild is already registered by a <c>[ModuleInitializer]</c>, so
+///     <see cref="MsBuildBootstrap.EnsureInitialized" /> is a no-op.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -40,9 +41,7 @@ internal static class MsBuildGate
     /// <remarks>
     ///     The box stays <c>null</c> for a verb that never reaches the decision. Install it before the call it
     ///     should record. Synchronous on purpose: a value an async method sets is discarded when it returns, so
-    ///     only a synchronous installer leaves the box in place for its caller. Internal test observable — output
-    ///     is byte-identical whichever branch runs, so this only tells a test which path was chosen; never
-    ///     printed, and a run with no box installed records nothing.
+    ///     only a synchronous installer leaves the box in place for its caller.
     /// </remarks>
     internal static StrongBox<GateAcquisition?> RecordAcquisitionOnThisFlow()
     {
@@ -87,13 +86,9 @@ internal static class MsBuildGate
             ct);
     }
 
-    // explain / render / baseline take the plain path: cache-aware, never replay-aware.
-    //
-    // These three front the persisted extraction cache, and so take the environment seam the cache root is
-    // read through, exactly as the three above do. What they do NOT take is the replay
-    // decision: none of them carries --binlog, so there is no capture to validate and nothing for
-    // SelectSourceAndRunAsync to choose between — a fragment-cache hit is decided down in CodebaseSource,
-    // where their --no-cache argument travels to.
+    // explain / render / baseline take the plain path: cache-aware, never replay-aware. None of them carries
+    // --binlog, so there is no capture to validate and nothing for SelectSourceAndRunAsync to choose between;
+    // a fragment-cache hit is decided down in CodebaseSource, where their --no-cache argument travels to.
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     public static Task<int> RunExplainAsync(
@@ -122,14 +117,11 @@ internal static class MsBuildGate
         return InvokeBaselineAsync(request, output, error, hostSource, environment, ct);
     }
 
-    // The pre-decision: an explicit --binlog wins (replay-first, eagerly); otherwise, unless --no-cache, a
-    // structurally-valid capture replays lazily, a stale/unreadable one prints its notice and falls back to a
-    // design-time build, and an absent one runs the plain cold path. Registration runs once up front: the
-    // binlog parser (MSBuild.StructuredLogger, under Basic.CompilerLog.Util) binds Microsoft.Build.Framework
-    // through MSBuildLocator, so every branch — replay included — needs it, though no replay branch opens an
-    // MSBuildWorkspace or runs a design-time build. The decision itself touches only Replay-namespace + BCL
-    // types (no MSBuildWorkspace resolves here), and the runner types stay quarantined behind the NoInlining
-    // stepping stones until after it.
+    // Registration runs once up front: the binlog parser (MSBuild.StructuredLogger, under Basic.CompilerLog.Util)
+    // binds Microsoft.Build.Framework through MSBuildLocator, so every branch — replay included — needs it, though
+    // no replay branch opens an MSBuildWorkspace or runs a design-time build. The decision itself touches only
+    // Replay-namespace + BCL types (no MSBuildWorkspace resolves here), and the runner types stay quarantined
+    // behind the NoInlining stepping stones until after it.
     //
     // Every branch hands the runner the solution argument this decision settled on: the discovered absolute
     // file where the gate had to discover one to validate a capture, and the caller's own argument where it
@@ -190,11 +182,10 @@ internal static class MsBuildGate
         return await invokeRunner(solutionPath, source);
     }
 
-    // A structurally-valid capture: replay it lazily, so a fragment-cache hit stays replay-free and
-    // byte-identical to a plain cached run. A runtime replay failure of the validated copy is recoverable —
-    // acquisition precedes all rendering, so we print the notice and re-run cold (MSBuildLocator is already
-    // registered from the up-front call); the two runner invocations build independent runners and the failed
-    // one wrote nothing, so the retry cannot double-render.
+    // A structurally-valid capture, replayed lazily (LazyCaptureReplaySource). A runtime replay failure of the
+    // validated copy is recoverable — acquisition precedes all rendering, so we print the notice and re-run cold
+    // (MSBuildLocator is already registered from the up-front call); the two runner invocations build independent
+    // runners and the failed one wrote nothing, so the retry cannot double-render.
     private static async Task<int> RunCaptureReplayAsync(
         string binlogCopyPath, string solutionPath, TextWriter error, ISolutionSource hostSource,
         Func<string?, ISolutionSource, Task<int>> invokeRunner)
@@ -214,8 +205,7 @@ internal static class MsBuildGate
         }
     }
 
-    // A stale/unreadable capture: run cold, printing the capture's notice at workspace-acquisition time
-    // (never at startup) so a fragment-cache hit acquires nothing and prints nothing.
+    // A stale/unreadable capture: run cold behind the capture's notice (NoticingSolutionSource).
     private static async Task<int> RunNoticeColdAsync(
         string notice, string solutionPath, TextWriter error, ISolutionSource hostSource,
         Func<string?, ISolutionSource, Task<int>> invokeRunner)

@@ -4,12 +4,14 @@ namespace SlideRule.Checking;
 internal enum RuleStatus
 {
     /// <summary>
-    ///     The rule holds. It may still carry a warning — a target pattern that matched nothing, or an edit
-    ///     inside a scope.
+    ///     The rule holds. It may still carry warnings, and a baseline may grandfather every violation it has.
     /// </summary>
     Passed,
 
-    /// <summary>The rule is violated, its subject matched nothing, or it could not be evaluated.</summary>
+    /// <summary>
+    ///     The rule does not hold: it carries a violation no baseline grandfathers, its subject matched nothing,
+    ///     or it errored while being evaluated.
+    /// </summary>
     Failed,
 
     /// <summary>

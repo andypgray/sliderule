@@ -7,13 +7,12 @@ namespace SlideRule.Extraction.Passes;
 
 /// <summary>
 ///     Recognizes container-registration calls (GRAMMAR §4.7) inside one compilation's syntax and reports
-///     each as a <see cref="RecognizedRegistration" /> (lifetime + service symbol + optional implementation
-///     symbol). The recognition gate is <b>symbol-first</b> — never name-only: the invoked method must
-///     resolve (its reduced form for an extension call) to a method whose containing namespace is
-///     <c>Microsoft.Extensions.DependencyInjection</c> (or its <c>.Extensions</c> sub-namespace, the
-///     <c>TryAdd*</c> family's home), whose name is one of the armed calls, and whose first parameter is
-///     <c>IServiceCollection</c>. A look-alike extension in a user namespace is not recognized; an
-///     in-solution wrapper whose body calls the real thing <em>is</em> seen, because the extractor walks
+///     each as a <see cref="RecognizedRegistration" />. The recognition gate is <b>symbol-first</b> — never
+///     name-only: the invoked method must resolve (its reduced form for an extension call) to a method whose
+///     containing namespace is <c>Microsoft.Extensions.DependencyInjection</c> (or its <c>.Extensions</c>
+///     sub-namespace, the <c>TryAdd*</c> family's home), whose name is one of the armed calls, and whose first
+///     parameter is <c>IServiceCollection</c>. A look-alike extension in a user namespace is not recognized;
+///     an in-solution wrapper whose body calls the real thing <em>is</em> seen, because the extractor walks
 ///     the wrapper's body like any other tree.
 /// </summary>
 /// <remarks>
@@ -60,23 +59,22 @@ internal sealed class RegistrationRecognizer
 
     /// <summary>
     ///     False when <c>Microsoft.Extensions.DependencyInjection.IServiceCollection</c> is not referenced by
-    ///     the compilation — the gate can never pass, so the extractor skips the registration walk entirely.
+    ///     the compilation, so the gate can never pass.
     /// </summary>
     public bool IsActive => _serviceCollection is not null;
 
     /// <summary>
-    ///     Reports the registration(s) an invocation makes, or nothing when it is not a recognized call. A
-    ///     single invocation reports at most one registration today; the enumerable shape leaves room for
-    ///     future one-call-many-registrations forms without a signature change.
+    ///     Reports the registration an invocation makes, at most one, or nothing when it is not a recognized
+    ///     call.
     /// </summary>
     public IEnumerable<RecognizedRegistration> Recognize(InvocationExpressionSyntax invocation, SemanticModel model)
     {
         // Syntactic pre-filter, ahead of the symbol gate: GetSymbolInfo binds the enclosing member body, and
-        // pass R offers it every invocation in the solution to find the few dozen in a composition root. C#
-        // gives an invoked method the same identifier text in every spelling (extension, static, generic,
-        // conditional access), so a readable name that is not armed can never reach an arm — while a shape
-        // whose name cannot be read (an invoked delegate-valued expression, say) falls through to the gate
-        // below, which decides it.
+        // the registration walk offers it every invocation in the solution to find the few dozen in a
+        // composition root. C# gives an invoked method the same identifier text in every spelling (extension,
+        // static, generic, conditional access), so a readable name that is not armed can never reach an arm —
+        // while a shape whose name cannot be read (an invoked delegate-valued expression, say) falls through to
+        // the gate below, which decides it.
         if (InvokedName(invocation) is { } invoked && !ArmedCalls.Contains(invoked)) return [];
 
         if (model.GetSymbolInfo(invocation).BestCandidate() is not IMethodSymbol method) return [];
@@ -112,11 +110,9 @@ internal sealed class RegistrationRecognizer
         };
     }
 
-    // Symbol-first gate: MEDI (or its .Extensions sub-namespace) + first parameter IServiceCollection. The
-    // name is checked by the caller's switch, so a MEDI-namespace method with the wrong name (Configure,
+    // The name is checked by the caller's switch, so a MEDI-namespace method with the wrong name (Configure,
     // AddKeyedSingleton, TryAddEnumerable) passes here yet falls through to the no-arm default — the §4.7
-    // honesty boundary. A user-namespace look-alike fails the namespace check; a wrong first parameter (an
-    // extension on some other type) fails the last check.
+    // honesty boundary.
     private bool PassesGate(IMethodSymbol signature)
     {
         if (signature.Parameters.Length == 0) return false;
@@ -133,15 +129,10 @@ internal sealed class RegistrationRecognizer
     /// </summary>
     /// <remarks>
     ///     The three generic arms decode the same shape and must keep deciding it identically, so the split
-    ///     lives here once: two type arguments are (service, implementation) with an unusable second slot
-    ///     recorded as "no distinct implementation"; one is the service, whose implementation is either
-    ///     itself or nothing, and <paramref name="selfWhenSingle" /> is the axis the arms differ on
-    ///     — <c>AddHttpClient&lt;TClient&gt;</c> and <c>AddDbContext&lt;TContext&gt;</c> always register the
-    ///     type as its own implementation, while the Add family does so only in the receiver-only form (a
-    ///     factory or instance overload names no implementation type). An unusable <em>first</em> type
-    ///     argument — a type parameter, an array, <c>dynamic</c>, a name the compiler cannot find at all —
-    ///     makes the whole call unreadable, which is the §4.7 honesty boundary: absent from the model rather
-    ///     than guessed at.
+    ///     lives here once, with <paramref name="selfWhenSingle" /> the axis they differ on. An unusable second
+    ///     type argument records "no distinct implementation"; an unusable first one (a type parameter, an
+    ///     array, <c>dynamic</c>, a name the compiler cannot find at all) makes the whole call unreadable, which
+    ///     is the §4.7 honesty boundary: absent from the model rather than guessed at.
     /// </remarks>
     private static (INamedTypeSymbol Service, INamedTypeSymbol? Implementation)? ServiceAndImplementation(
         ImmutableArray<ITypeSymbol> typeArguments, bool selfWhenSingle)
@@ -317,12 +308,10 @@ internal sealed class RegistrationRecognizer
 }
 
 /// <summary>
-///     One recognized registration reported by <see cref="RegistrationRecognizer" />: the
-///     <see cref="Lifetime" />, the service type symbol, and the implementation type symbol (null when the
-///     registration names no distinct implementation — a factory/instance form, or the
-///     <c>AddHostedService</c> unresolvable-service fallback where <see cref="Service" /> holds the
-///     implementation). The extractor takes each symbol's <c>OriginalDefinition</c> FQN (definition-level,
-///     §4.1) and records the fact string-side.
+///     One recognized registration reported by <see cref="RegistrationRecognizer" />. The implementation is
+///     null when the registration names no distinct one: a factory/instance form, or the
+///     <c>AddHostedService</c> unresolvable-service fallback, where <see cref="Service" /> holds the
+///     implementation.
 /// </summary>
 internal readonly record struct RecognizedRegistration(
     Lifetime Lifetime,

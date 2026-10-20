@@ -404,9 +404,8 @@ public static class SelectionAdjectives
         return Append(selection, new AccessibilityAdjective(Accessibility.Private));
     }
 
-    // The excluded set for one or more operands: a single operand passes through as the payload unchanged —
-    // byte for byte the model a one-operand Except has always built — and several mint the union arch.AnyOf
-    // would (GRAMMAR §5.1), so prose and evaluation both reach them by paths that already exist.
+    // One operand stays the bare payload, never a union of one; several become the union arch.AnyOf would
+    // build (GRAMMAR §5.1).
     private static Selection AppendExcept(Selection selection, IReadOnlyList<Selection> exclusions)
     {
         Selection payload = exclusions.Count == 1 ? exclusions[0] : UnionSelection.Create(selection.Owner, exclusions);

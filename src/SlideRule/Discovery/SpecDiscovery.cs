@@ -6,26 +6,18 @@ namespace SlideRule.Discovery;
 
 /// <summary>
 ///     Finds the <see cref="IArchitectureSpec" /> classes an assembly declares and creates one of each.
-///     A class is found when it is a non-abstract class visible from outside the assembly: public, or
-///     public nested inside a public chain. Each must also declare a public parameterless constructor,
-///     since one of each is created here; when a class found has none, no spec is created and a
-///     <see cref="SpecDiscoveryException" /> names every such class. Creating a spec runs its
-///     constructor, and nothing else in the assembly runs until <c>Define</c> is called.
+///     Creating a spec runs its constructor, and nothing else in the assembly runs until <c>Define</c> is
+///     called.
 /// </summary>
-// netstandard2.0-safe, so it runs in the Core. Visibility is Type.IsVisible — top-level public, or
-// public nested through a public chain — not Type.IsPublic, which is false for any nested type.
-// Order is Type.FullName ordinal, because a spec must load predictably (GRAMMAR §9). The
-// AssemblyLoadContext that isolates a prebuilt spec DLL is a host concern, not the Core's.
+// Visibility is Type.IsVisible — top-level public, or public nested through a public chain — not
+// Type.IsPublic, which is false for any nested type. Order is Type.FullName ordinal, because a spec must
+// load predictably (GRAMMAR §9).
 internal static class SpecDiscovery
 {
     /// <summary>
-    ///     Finds every visible <see cref="IArchitectureSpec" /> class in the assembly and creates one of
-    ///     each, ordered by full type name so that the same assembly always yields the same order. Every
-    ///     class found is checked for a public parameterless constructor before any is created. Hand the
-    ///     result to <c>ArchModelBuilder.Build</c>.
+    ///     Creates one instance of each non-abstract <see cref="IArchitectureSpec" /> class visible from outside
+    ///     <paramref name="assembly" />, ordered by full type name.
     /// </summary>
-    /// <param name="assembly">The assembly to search, usually the compiled spec project.</param>
-    /// <returns>One new instance of each spec class found, ordered by full type name.</returns>
     /// <exception cref="SpecDiscoveryException">
     ///     The assembly declares no such class, or a class found has no public parameterless constructor.
     ///     The message names every class without one, ordered by full type name.

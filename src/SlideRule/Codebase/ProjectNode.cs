@@ -1,22 +1,9 @@
 namespace SlideRule.Codebase;
 
 /// <summary>
-///     One project in the extracted codebase: its name, whether the solution file declares it, the
-///     projects it references, the frameworks it targets, the packages it declares, whether it packs
-///     and locks its restore, and the MSBuild properties the solution sets for it. These are the facts
-///     a rule about a project is judged on. Only forward project references are stored; build the
-///     reverse graph yourself if you need it.
+///     One project in the extracted codebase: the facts a rule about a project is judged on. Only forward
+///     project references are stored.
 /// </summary>
-/// <remarks>
-///     The framework, package, packable and lock facts are evaluated rather than read out of the project
-///     file's XML: the value that wins is very often set somewhere else, in a
-///     <c>Directory.Build.props</c> above the project, or nowhere at all, as an SDK default, and only an
-///     evaluation knows which. Each is paired with the <c>file:line</c> that set it, and
-///     <see langword="null" /> means the evaluation never happened rather than that the property is off,
-///     the same reading <see cref="SolutionMember" /> holds to. Every project verb passes on a fact that
-///     is <see langword="null" />, so a load that could not evaluate a project reports gaps rather than
-///     violations.
-/// </remarks>
 internal sealed class ProjectNode : IProjectInfo
 {
     internal ProjectNode(
@@ -56,16 +43,12 @@ internal sealed class ProjectNode : IProjectInfo
             .ToList();
     }
 
-    /// <summary>
-    ///     Gets the project (assembly) name.
-    /// </summary>
+    /// <inheritdoc />
     public string Name { get; }
 
     /// <summary>
-    ///     Gets this project's stable identity: <c>project:</c> followed by its <see cref="Name" />, displayed verbatim
-    ///     wherever an identity is printed. It is what a baseline entry for a project rule is keyed by and what the
-    ///     CLI's <c>--subject</c> filter matches, beside the type and member identities <c>TypeNode.SymbolId</c> and
-    ///     <c>MemberNode.SymbolId</c>.
+    ///     Gets this project's identity, <c>project:</c> followed by its <see cref="Name" />: the key a baseline entry
+    ///     for a project rule records, beside the type and member identities.
     /// </summary>
     // A project has no DocumentationCommentId to key on, so the tag is minted here rather than by
     // extraction. It wears a DocId's shape without ever colliding with one: every DocId tag is a single
@@ -77,11 +60,7 @@ internal sealed class ProjectNode : IProjectInfo
     /// <summary>The tag every project identity starts with, so a baseline entry can tell a project's key from a type's.</summary>
     internal const string SymbolIdPrefix = "project:";
 
-    /// <summary>
-    ///     Gets the names of the projects this project declares a reference to, ordinal-ordered. Declared references
-    ///     only, never the transitive closure, and never a reference that only orders the build
-    ///     (<c>ReferenceOutputAssembly="false"</c>).
-    /// </summary>
+    /// <inheritdoc />
     public IReadOnlyList<string> ProjectReferences { get; }
 
     /// <summary>
@@ -90,8 +69,6 @@ internal sealed class ProjectNode : IProjectInfo
     ///     whose declarations explain everything it compiles against, which is every project whose file evaluated
     ///     the way the workspace load did, and for any model built from compilations.
     /// </summary>
-    // Not on IProjectInfo: it describes how far the declared list can be trusted rather than the project, and the
-    // survey is where a reader needs it. A non-empty list means an evaluation lost a declaration the load saw.
     internal IReadOnlyList<string> UndeclaredProjectReferences { get; }
 
     /// <summary>
@@ -108,9 +85,9 @@ internal sealed class ProjectNode : IProjectInfo
     /// <summary>
     ///     Gets every target framework this project declares, ordinal-ordered and normalized to the short moniker, so a
     ///     classic project's <c>&lt;TargetFrameworkVersion&gt;v4.8&lt;/TargetFrameworkVersion&gt;</c> reads
-    ///     <c>net48</c> beside an SDK project's own spelling; <c>MustOnlyTarget</c> and <c>MustTarget</c> compare
-    ///     against these forms. Empty only where there was nothing to read them from, which is any model built from
-    ///     compilations rather than from a solution.
+    ///     <c>net48</c> beside an SDK project's own spelling. Empty only where there was nothing to read them from:
+    ///     a model built from compilations rather than from a solution, or a project nothing evaluated that
+    ///     compiled once.
     /// </summary>
     /// <remarks>
     ///     Read from an evaluation where one ran, and otherwise from the frameworks the load itself told
@@ -118,8 +95,7 @@ internal sealed class ProjectNode : IProjectInfo
     ///     <see langword="null" />. That fallback sees only what compiled, so it says nothing about a
     ///     framework a filtered run left out and nothing at all about a project that compiled once. A project
     ///     that compiled once per framework is still one project here: its types, its references and its
-    ///     membership are the union of every compilation. A type several of those frameworks declare takes its
-    ///     members and hierarchy from one of them (see <see cref="FactsFollow" />).
+    ///     membership are the union of every compilation.
     /// </remarks>
     public IReadOnlyList<string> TargetFrameworks { get; }
 
@@ -152,13 +128,8 @@ internal sealed class ProjectNode : IProjectInfo
     public string? FactsFollow { get; }
 
     /// <summary>
-    ///     Gets the packages this project declares, ordinal by name, each with the <c>file:line</c> that declares it,
-    ///     which may sit in a props file above the project, whether it is private
-    ///     (<see cref="PackageReference.IsPrivate" />), and the frameworks that declare it
-    ///     (<see cref="PackageReference.Frameworks" />). Private references are listed too. Declared references only:
-    ///     the transitive package graph is a different fact and is not in the model, and the references the SDK adds
-    ///     implicitly, which nobody wrote and nobody can remove, are left out. Empty where nothing was evaluated, and
-    ///     empty for a project that declares none.
+    ///     Gets the packages this project declares, as <see cref="IProjectInfo.PackageReferences" /> describes them.
+    ///     The references the SDK adds implicitly, which nobody wrote and nobody can remove, are not among them.
     /// </summary>
     public IReadOnlyList<PackageReference> PackageReferences { get; }
 
@@ -189,16 +160,12 @@ internal sealed class ProjectNode : IProjectInfo
     public bool? LocksPackages { get; }
 
     /// <summary>
-    ///     Gets where <see cref="LocksPackages" /> was set, or <see langword="null" /> when it has no value. This is
-    ///     the fact most often declared away from the project, in a solution-wide <c>Directory.Build.props</c>, so the
-    ///     site is regularly a file the project itself never mentions.
+    ///     Gets where <see cref="LocksPackages" /> was set, or <see langword="null" /> when it has no value.
     /// </summary>
     public SourceLocation? LocksPackagesSite { get; }
 
     /// <summary>
-    ///     Gets the MSBuild properties a declaration in the solution set for this project, one per property and
-    ///     evaluation, ordinal by name and then by framework (<see cref="IProjectInfo.Properties" />). Empty where
-    ///     nothing evaluated the project.
+    ///     Gets every evaluation's properties in one list, as <see cref="IProjectInfo.Properties" /> describes it.
     /// </summary>
     public IReadOnlyList<EvaluatedProperty> Properties { get; }
 
@@ -209,8 +176,6 @@ internal sealed class ProjectNode : IProjectInfo
     ///     framework with an evaluation no framework was told apart in first. Empty where nothing evaluated the
     ///     project.
     /// </summary>
-    // Not on IProjectInfo: the flat Properties list is what a predicate reads, and this is the shape a rule about a
-    // missing property needs, since an unset property leaves no entry of its own in that list.
     internal IReadOnlyList<ProjectEvaluation> Evaluations { get; }
 
     /// <summary>
@@ -221,17 +186,12 @@ internal sealed class ProjectNode : IProjectInfo
     ///     Not <see cref="Name" />: an <c>&lt;AssemblyName&gt;</c> property or a renamed project file parts
     ///     them, and this is the name that appears on disk and inside a reference. Usually one entry even
     ///     for a multi-targeted project, because its frameworks compile to one name; more than one means
-    ///     they disagree. The model file records the names, so a reader with no project system to ask can
-    ///     tell whether a compilation in hand is one the file speaks about.
+    ///     they disagree.
     /// </remarks>
     internal IReadOnlyList<string> AssemblyNames { get; }
 }
 
-/// <summary>
-///     One package a project declares: the package's identifier, the <c>file:line</c> of the declaration,
-///     whether the reference is private, and the frameworks whose evaluation declared it. What a project
-///     predicate reads of it is <see cref="IPackageReferenceInfo" />.
-/// </summary>
+/// <summary>One package a project declares.</summary>
 internal sealed class PackageReference : IPackageReferenceInfo
 {
     internal PackageReference(

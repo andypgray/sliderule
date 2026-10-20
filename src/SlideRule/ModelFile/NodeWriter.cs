@@ -21,10 +21,9 @@ namespace SlideRule.ModelFile;
 ///         given was built and validated, so what it writes is whatever that model holds.
 ///     </para>
 ///     <para>
-///         Two shapes of text come out of one builder. Entries and the values inside them are compact —
-///         one line each, <c>{ "k": v }</c> and <c>[a, b]</c> — while a rule is an envelope whose
-///         properties sit one per line with a compact value on each. That split is the file's whole
-///         layout, so it is spelled once, here, rather than being recomputed by each caller.
+///         Two shapes of text come out of one builder, and the split is the file's whole layout: entries and
+///         the values inside them are compact, one line each, while a rule is an envelope whose properties sit
+///         one per line with a compact value on each.
 ///     </para>
 /// </remarks>
 internal sealed class NodeWriter
@@ -41,31 +40,26 @@ internal sealed class NodeWriter
     private bool _firstRuleProperty = true;
 
     /// <summary>
-    ///     Writes against <paramref name="unwritableLayers" />: the layers already found unwritable, by
-    ///     name, each with its own reason. A rule naming one of them is left out carrying that reason.
+    ///     <paramref name="unwritableLayers" /> maps each layer already found unwritable, by name, to its own
+    ///     reason.
     /// </summary>
     internal NodeWriter(IReadOnlyDictionary<string, string> unwritableLayers)
     {
         _unwritableLayers = unwritableLayers;
     }
 
-    /// <summary>Why this entry cannot be written, or null when it can.</summary>
     internal string? Refusal { get; private set; }
 
-    /// <summary>The entry's text. Meaningless once <see cref="Refusal" /> is set.</summary>
+    /// <summary>Meaningless once <see cref="Refusal" /> is set.</summary>
     internal string Text => _builder.ToString();
 
     private bool Refused => Refusal is not null;
 
-    /// <summary>Records the first reason met; a later one cannot displace it.</summary>
     internal void Refuse(string reason)
     {
         Refusal ??= reason;
     }
 
-    // ---- entries -------------------------------------------------------------------------------
-
-    /// <summary>One line of the <c>projects</c> array.</summary>
     internal void WriteProject(ModelDocumentProject project)
     {
         _builder.Append(EntryIndent);
@@ -75,7 +69,6 @@ internal sealed class NodeWriter
         EndObject();
     }
 
-    /// <summary>One line of the <c>omitted</c> array.</summary>
     internal void WriteOmitted(OmittedRule omitted)
     {
         _builder.Append(EntryIndent);
@@ -86,8 +79,8 @@ internal sealed class NodeWriter
     }
 
     /// <summary>
-    ///     One line of the <c>layers</c> array. A layer defined by a selection writes that selection and no
-    ///     globs, because its globs are derived from it and would be a second, staler copy.
+    ///     A layer defined by a selection writes that selection and no globs, because its globs are derived
+    ///     from it and would be a second, staler copy.
     /// </summary>
     internal void WriteLayer(LayerDefinition layer)
     {
@@ -108,7 +101,6 @@ internal sealed class NodeWriter
         EndObject();
     }
 
-    /// <summary>One object of the <c>rules</c> array, its properties one per line.</summary>
     internal void WriteRule(ArchRule rule)
     {
         _builder.Append(EntryIndent)
@@ -163,8 +155,6 @@ internal sealed class NodeWriter
             .Append('}');
     }
 
-    // ---- the model graph -----------------------------------------------------------------------
-
     internal void WriteSelection(Selection selection)
     {
         if (Refused) return;
@@ -206,12 +196,11 @@ internal sealed class NodeWriter
         EndObject();
     }
 
-    /// <summary>The constraint's spine first, then its own fields, then whether it is a predicate at all.</summary>
-    /// <remarks>
-    ///     A predicate verb is met after its subject deliberately: a rule whose subject narrows by a
-    ///     <c>Where</c> and whose verb is a <c>Must</c> is left out for the <c>Where</c>, because that is
-    ///     the first thing a reader walking the file in order would reach.
-    /// </remarks>
+    /// <summary>
+    ///     A predicate verb is met after its subject: a rule whose subject narrows by a <c>Where</c> and whose
+    ///     verb is a <c>Must</c> is left out for the <c>Where</c>, because that is the first thing a reader
+    ///     walking the file in order would reach.
+    /// </summary>
     internal void WriteConstraint(Constraint constraint)
     {
         if (Refused) return;
@@ -219,8 +208,6 @@ internal sealed class NodeWriter
         if (NodeWriters.IsDelegateNode(constraint.GetType())) WriteDelegateSubject(constraint);
         NodeWriters.Write(this, constraint);
     }
-
-    // ---- the pieces an arm writes --------------------------------------------------------------
 
     internal void Subject(Selection selection)
     {
@@ -368,14 +355,12 @@ internal sealed class NodeWriter
         Elements(values, Str);
     }
 
-    /// <summary>A key and its string value.</summary>
     internal void Field(string key, string value)
     {
         Key(key);
         Str(value);
     }
 
-    /// <summary>A key and its string value, or nothing at all when the value is null.</summary>
     private void OptionalField(string key, string? value)
     {
         if (value is null) return;
@@ -384,22 +369,18 @@ internal sealed class NodeWriter
         Str(value);
     }
 
-    /// <summary>A key and its array of strings.</summary>
     internal void StringsField(string key, IReadOnlyList<string> values)
     {
         Key(key);
         Strings(values);
     }
 
-    /// <summary>A key and its enum value, camel-cased.</summary>
     internal void EnumField<TEnum>(string key, TEnum value)
         where TEnum : struct, Enum
     {
         Key(key);
         EnumValue(value);
     }
-
-    // ---- inner walks ---------------------------------------------------------------------------
 
     private void Elements<T>(IReadOnlyList<T> items, Action<T> write)
     {
@@ -421,8 +402,7 @@ internal sealed class NodeWriter
         Elements(adjectives, adjective => NodeWriters.Write(this, adjective));
     }
 
-    // The subject of a predicate verb, walked but not written: whatever the subject holds is met before
-    // the verb, so a Where inside it is the reason rather than the Must around it.
+    // The subject of a predicate verb, walked but not written: the Must refuses the entry after it.
     private void WriteDelegateSubject(Constraint constraint)
     {
         switch (constraint)
@@ -536,8 +516,6 @@ internal sealed class NodeWriter
         OptionalField("dragonsDoc", scope.DragonsDoc);
         EndObject();
     }
-
-    // ---- the two layouts -----------------------------------------------------------------------
 
     private void RuleProperty(string key)
     {

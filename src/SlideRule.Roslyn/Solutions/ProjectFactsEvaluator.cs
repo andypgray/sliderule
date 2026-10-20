@@ -17,36 +17,27 @@ namespace SlideRule.Roslyn.Solutions;
 internal readonly record struct ProjectEvaluationRequest(string? ProjectFile, string? TargetFramework);
 
 /// <summary>
-///     Reads a project's artifact facts by <em>evaluating</em> it — the packages it declares and which of them
-///     are private, the projects it declares a reference to, whether it packs, whether its restore locks, and
-///     the frameworks it targets — rather than by parsing its XML.
+///     Reads a project's <see cref="ProjectArtifactFacts" /> by evaluating it rather than by parsing its XML:
+///     every fact here is regularly decided somewhere the project file does not mention, a
+///     <c>Directory.Build.props</c> above it, a package's imported targets, or an SDK default nobody wrote
+///     (<c>IsPackable</c> is true unless something says otherwise).
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>Why evaluation and not the csproj's own text.</b> Every fact here is regularly decided
-///         somewhere the project file does not mention: a <c>Directory.Build.props</c> above it, a package's
-///         imported targets, or an SDK default nobody wrote (<c>IsPackable</c> is true unless something says
-///         otherwise). A reader of the XML sees the declarations and misses the value; an evaluation sees
-///         the value and can still say which declaration won.
+///         A batch is split by project file into a few shards that evaluate in parallel, each serially in a
+///         <see cref="ProjectCollection" /> of its own, created for the call and disposed with it: a collection is
+///         not safe for concurrent evaluation, and it caches loaded projects and parsed imports by path, so one
+///         shared across calls would answer a later call from an earlier read of a file that has since changed,
+///         the staleness the warm session's per-call reconcile exists to prevent. The projects of one solution
+///         share nearly all of their imports, so a shard's first evaluation pays for them and the rest do not.
+///         Each project is unloaded once its facts are copied out; the shared imports stay with the collection,
+///         so a shard holds one evaluated project at a time.
 ///     </para>
 ///     <para>
-///         <b>Lifetime and threading.</b> A batch is split by project file into a few shards that evaluate in
-///         parallel, and each shard evaluates serially in a <see cref="ProjectCollection" /> of its own, created
-///         for the call and disposed with it — a collection is not safe for concurrent evaluation, and it
-///         caches both loaded projects and parsed imports by path, so one shared across calls would answer a
-///         later call from an earlier call's read of a file that has since changed. That is the exact
-///         staleness the warm session's per-call reconcile exists to prevent, so nothing here outlives the
-///         call. The collection is what makes a shard affordable: the projects of one solution share nearly
-///         all of their imports, so a shard's first evaluation pays for them and the rest do not, and a few
-///         shards pay for them a few times. Each project is unloaded as soon as its facts have been copied out
-///         of it — the parsed imports it shares are held by the collection rather than by it, so a shard keeps
-///         them while holding one evaluated project at a time rather than all of them.
-///     </para>
-///     <para>
-///         <b>Every failure is an absence.</b> MSBuild may be unavailable in this process, an import may not
-///         resolve, a project may not parse. Each of those records nothing for the project rather than a
-///         default, because a default here is indistinguishable from a fact and would be checked as one. The
-///         filter on the catch is what keeps a cancellation travelling.
+///         Every failure is an absence. MSBuild may be unavailable in this process, an import may not resolve, a
+///         project may not parse. Each of those records nothing for the project rather than a default, because a
+///         default here is indistinguishable from a fact and would be checked as one. The filter on the catch is
+///         what keeps a cancellation travelling.
 ///     </para>
 /// </remarks>
 internal static class ProjectFactsEvaluator
@@ -58,10 +49,9 @@ internal static class ProjectFactsEvaluator
     // The two spellings of a project's frameworks, in the order ReadTargetFrameworks tries them.
     private static readonly string[] FrameworkProperties = ["TargetFrameworks", "TargetFramework"];
 
-    // The properties naming where files sit that are not the repository's, which ForeignRoots reads: a project's
-    // packages' own files, the .NET install the SDK was resolved from (its sdk, packs and workload manifests), and
-    // the MSBuild toolset with the SDKs beside it. Each names a location rather than an import chain, because the
-    // repository's own Directory.Build.props is imported by the SDK's Microsoft.Common.props.
+    // The properties naming where files sit that are not the repository's (see ForeignRoots). Each names a
+    // location rather than an import chain, because the repository's own Directory.Build.props is imported by the
+    // SDK's Microsoft.Common.props.
     private static readonly string[] ForeignRootProperties =
     [
         "MSBuildProjectExtensionsPath", "NuGetPackageRoot", "NetCoreRoot", "MSBuildExtensionsPath", "MSBuildToolsPath",
@@ -73,16 +63,14 @@ internal static class ProjectFactsEvaluator
     private const int MaxShards = 4;
 
     /// <summary>
-    ///     Evaluates <paramref name="requests" />, returning one result per request by index —
-    ///     <see langword="null" /> where that project could not be evaluated at all.
+    ///     Evaluates <paramref name="requests" />, returning one result per request by index, null where that
+    ///     project could not be evaluated at all.
     /// </summary>
-    /// <param name="requests">The project files and frameworks to evaluate, in the caller's order.</param>
-    /// <param name="solutionFile">
-    ///     The solution file the projects were loaded from, which <see cref="SolutionProperties" /> turns into the
-    ///     solution-level properties the load evaluated under; <see langword="null" /> evaluates each project as a
-    ///     build of that project alone would.
-    /// </param>
-    /// <param name="ct">Cancellation token.</param>
+    /// <remarks>
+    ///     <paramref name="solutionFile" /> is the solution file the projects were loaded from, which
+    ///     <see cref="SolutionProperties" /> turns into the properties the load evaluated under; null evaluates
+    ///     each project as a build of that project alone would.
+    /// </remarks>
     internal static IReadOnlyList<ProjectArtifactFacts?> EvaluateAll(
         IReadOnlyList<ProjectEvaluationRequest> requests, string? solutionFile, CancellationToken ct)
     {
@@ -91,17 +79,10 @@ internal static class ProjectFactsEvaluator
     }
 
     /// <summary>
-    ///     Evaluates <paramref name="requests" /> as at most <paramref name="shardCount" /> shards in parallel,
-    ///     returning one result per request by index — <see langword="null" /> where that project could not be
-    ///     evaluated at all.
+    ///     Evaluates <paramref name="requests" /> as at most <paramref name="shardCount" /> shards in parallel (one
+    ///     evaluates the batch serially), with the result and <paramref name="solutionFile" /> as the overload
+    ///     without a shard count describes them.
     /// </summary>
-    /// <param name="requests">The project files and frameworks to evaluate, in the caller's order.</param>
-    /// <param name="solutionFile">
-    ///     The solution file the projects were loaded from, or <see langword="null" /> for none; see the overload
-    ///     without a shard count.
-    /// </param>
-    /// <param name="shardCount">The most shards to evaluate at once; one evaluates the batch serially.</param>
-    /// <param name="ct">Cancellation token.</param>
     internal static IReadOnlyList<ProjectArtifactFacts?> EvaluateAll(
         IReadOnlyList<ProjectEvaluationRequest> requests, string? solutionFile, int shardCount, CancellationToken ct)
     {
@@ -137,7 +118,6 @@ internal static class ProjectFactsEvaluator
     ///     <c>SolutionDir</c>, the solution's directory with a trailing separator, when that directory exists, and
     ///     nothing otherwise.
     /// </summary>
-    /// <param name="solutionFile">The solution file the projects were loaded from, or <see langword="null" />.</param>
     // These must be the properties the workspace load evaluated under, or a declared reference that the load
     // followed is lost here and the two reference lists differ by more than the closure: MSBuild's common targets
     // define an unset SolutionDir as *Undefined*, so an include spelled with it becomes a wildcard that matches no
@@ -189,8 +169,8 @@ internal static class ProjectFactsEvaluator
     }
 
     // Split out and never inlined so that a runtime unable to load the MSBuild engine assemblies fails at
-    // the call above — inside its catch — rather than while jitting the caller. Same discipline the
-    // extraction entry points keep around Roslyn's own types. Shards write disjoint indices of `facts`.
+    // the call above, inside its catch, rather than while jitting the caller. Shards write disjoint indices of
+    // `facts`.
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void EvaluateInto(
         ProjectArtifactFacts?[] facts,
@@ -501,7 +481,7 @@ internal static class ProjectFactsEvaluator
         return cone;
     }
 
-    // The project's own directory and every directory above it, each folded — precisely the cone MSBuild
+    // The project's own directory and every directory above it, each folded: the cone MSBuild
     // discovers Directory.Build.props in, so a solution-wide policy file is cited and an SDK or package-cache
     // import is not. Built once per project because every site this reads is tested against it, and the
     // common case — a declaration outside the cone — is the one that walks the chain to the drive root.

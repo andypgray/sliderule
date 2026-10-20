@@ -14,7 +14,6 @@ internal sealed class OmittedRule
         Reason = reason;
     }
 
-    /// <summary>The rule's id.</summary>
     internal string Id { get; }
 
     /// <summary>Why the rule is not carried, as a sentence.</summary>

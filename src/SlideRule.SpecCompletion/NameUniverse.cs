@@ -9,65 +9,53 @@ namespace SlideRule.SpecCompletion;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>What is offered is the referenced product's names, not the spec project's own.</b> A spec
-///         project declares rules and nothing a rule anchors on, so its own namespaces and types are the
-///         one part of the compilation an author never writes into a slot; the contract's are the other,
-///         except in the repository that writes a spec over the contract itself. Both are taken out, and
-///         everything else the compilation can see — the referenced projects, their packages, the
-///         framework — is offered, with the referenced projects ranked first.
+///         What is offered is the referenced product's names, not the spec project's own. A spec project
+///         declares rules and nothing a rule anchors on, so its own namespaces and types are the one part of
+///         the compilation an author never writes into a slot; the contract's are the other, except in the
+///         repository that writes a spec over the contract itself. Both are taken out, and everything else the
+///         compilation can see — the referenced projects, their packages, the framework — is offered, with the
+///         referenced projects ranked first.
 ///     </para>
 ///     <para>
-///         <b>Product is decided by project reference and matched by assembly name.</b> A workspace hands
-///         a project's reference either as a compilation or as a skeleton image depending on what it has
-///         built, and the two are different symbols; the name is the one thing both carry. A host whose
-///         workspace populates no project references loses the ranking and offers the same names
-///         unranked, which is the right way for that to degrade.
+///         Product is decided by project reference and matched by assembly name. A workspace hands a project's
+///         reference either as a compilation or as a skeleton image depending on what it has built, and the
+///         two are different symbols; the name is the one thing both carry. A host whose workspace populates no
+///         project references loses the ranking and offers the same names unranked, which is the right way for
+///         that to degrade.
 ///     </para>
 ///     <para>
-///         <b>A name is offered whether or not anything matches beneath it.</b> A namespace with no type
-///         under it is still a namespace an author can write a glob over, and a walk that dead-ends is
-///         still the walk the author is in the middle of. Filtering by what lies beneath would make the
-///         list depend on how much of the name had been typed.
+///         A name is offered whether or not anything matches beneath it: a namespace with no type under it is
+///         still one an author can write a glob over.
 ///     </para>
 /// </remarks>
 internal sealed class NameUniverse
 {
     /// <summary>
-    ///     A type's own name as a slot spells it — the leaf of the full name the extractor renders, with
-    ///     declared type-parameter names and no namespace.
+    ///     A type's own name as a slot spells it: the leaf of the full name the extractor renders, with declared
+    ///     type-parameter names, no namespace and no keyword for a special type, so that it and the path before
+    ///     it compose to exactly the full name an anchor is compared against.
     /// </summary>
-    /// <remarks>
-    ///     This and the path before it compose to exactly the full name a report prints, which is the name
-    ///     an anchor is compared against. Type parameters are included because the anchor names a
-    ///     definition; special types are not spelled as keywords, because a keyword names nothing the
-    ///     comparison would match.
-    /// </remarks>
     private static readonly SymbolDisplayFormat LeafFormat = new(
         SymbolDisplayGlobalNamespaceStyle.Omitted,
         SymbolDisplayTypeQualificationStyle.NameOnly,
         SymbolDisplayGenericsOptions.IncludeTypeParameters);
 
     /// <summary>
-    ///     The simple names one assembly declares, kept per assembly symbol for as long as the symbol
-    ///     lives.
+    ///     The simple names one assembly declares, kept per assembly symbol for as long as the symbol lives,
+    ///     because the exact-name slot is the one that walks a whole assembly rather than one namespace.
     /// </summary>
     /// <remarks>
-    ///     The exact-name slot is the one that walks a whole assembly rather than one namespace, so it is
-    ///     the one worth remembering. Held on the instance and never in a static field: an editor keeps
-    ///     one provider per workspace and a static table would hold symbols from every solution the
-    ///     process has opened.
+    ///     Held on the instance and never in a static field: an editor keeps one provider per workspace and a
+    ///     static table would hold symbols from every solution the process has opened.
     /// </remarks>
     private readonly ConditionalWeakTable<IAssemblySymbol, IReadOnlyList<SimpleName>> _simpleNames = new();
 
     /// <summary>
     ///     What the slot can be filled with at this point in the literal, in the order the list shows.
+    ///     <paramref name="project" />'s references decide what counts as product, <paramref name="marker" />'s
+    ///     assembly is the contract to leave out, and <paramref name="path" /> is what was written before the
+    ///     segment the caret is in.
     /// </summary>
-    /// <param name="project">The document's project, whose references decide what counts as product.</param>
-    /// <param name="compilation">The compilation the names are drawn from.</param>
-    /// <param name="marker">The marker type, whose assembly is the contract to leave out.</param>
-    /// <param name="kind">The slot being filled.</param>
-    /// <param name="path">What was written before the segment the caret is in.</param>
-    /// <param name="cancellationToken">The token the walk observes, once per product assembly.</param>
     internal IReadOnlyList<Offer> Offers(
         Project project,
         Compilation compilation,
@@ -127,9 +115,8 @@ internal sealed class NameUniverse
         return Ordered(offers);
     }
 
-    // The order the list is shown in, which is the order the sort text spells: everything the referenced
-    // projects declare, then everything else, each ordinally by the text that would be inserted. A
-    // subtree form sorts straight after the step it belongs to, because a dot precedes every letter.
+    // The order the list is shown in, which must be the order SlotItems' sort text spells: everything the
+    // referenced projects declare, then everything else, each ordinally by the text that would be inserted.
     private static List<Offer> Ordered(List<Offer> offers)
     {
         offers.Sort(static (left, right) =>
@@ -327,9 +314,7 @@ internal sealed class NameUniverse
         };
     }
 
-    // The assembly names of everything the project references, transitively. Names rather than symbols,
-    // because the two ends of a project reference are different symbols depending on what the workspace
-    // has built, and only the name is the same on both.
+    // The assembly names of everything the project references, transitively.
     private static HashSet<string> ProductAssemblyNames(Project project)
     {
         Solution solution = project.Solution;
@@ -389,17 +374,12 @@ internal enum OfferShape
 }
 
 /// <summary>One name the universe offers, before it is turned into an item the host shows.</summary>
-/// <param name="insert">The text a commit writes into the segment.</param>
-/// <param name="shape">Which shape the name takes, which decides the commit and filter rules.</param>
-/// <param name="rank">0 for a name the referenced projects declare and for the lone star, 1 for every other.</param>
-/// <param name="assembly">The one assembly the name came from, or null where several or none did.</param>
-/// <param name="tag">The tag the host draws the row's glyph from.</param>
 internal readonly struct Offer(string insert, OfferShape shape, int rank, string? assembly, string tag)
 {
     /// <summary>The text a commit writes into the segment, generic type parameters included.</summary>
     internal string Insert { get; } = insert;
 
-    /// <summary>Which shape the name takes in the list.</summary>
+    /// <summary>Which shape the name takes in the list, which decides the commit and filter rules.</summary>
     internal OfferShape Shape { get; } = shape;
 
     /// <summary>
@@ -408,7 +388,7 @@ internal readonly struct Offer(string insert, OfferShape shape, int rank, string
     /// </summary>
     internal int Rank { get; } = rank;
 
-    /// <summary>The assembly shown beside the row, or null where the row names no single one.</summary>
+    /// <summary>The one assembly the name came from, shown beside the row; null where several or none did.</summary>
     internal string? Assembly { get; } = assembly;
 
     /// <summary>The tag the host draws the row's glyph from.</summary>

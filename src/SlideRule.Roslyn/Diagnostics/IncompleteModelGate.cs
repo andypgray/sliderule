@@ -4,25 +4,24 @@ using SlideRule.ModelFile;
 namespace SlideRule.Roslyn.Diagnostics;
 
 /// <summary>
-///     The one answer to a partially-loaded workspace, shared by every surface that consumes the model —
-///     the CLI verbs, the MCP tools, and the xUnit adapter.
+///     The one answer to a partially-loaded workspace, shared by every surface that consumes the model.
 /// </summary>
 /// <remarks>
 ///     <para>
 ///         A partially-loaded workspace is never silently treated as the model: a surface either refuses on
-///         its error channel (CLI stderr and exit 2, an MCP error result, the adapter's failing
-///         <c>Workspace_LoadedCompletely</c>) unless <c>--allow-workspace-diagnostics</c> or
-///         <c>AllowWorkspaceDiagnostics</c> opts out, or states the incomplete model on the answer it gives
-///         anyway. Whether the gate fires is decided by <see cref="WorkspaceDiagnostics.Gates" />; this class
-///         holds only the wording each surface uses once it has.
+///         its error channel unless <c>--allow-workspace-diagnostics</c> or <c>AllowWorkspaceDiagnostics</c> opts
+///         out, or states the incomplete model on the answer it gives anyway. Whether the gate fires is decided by
+///         <see cref="WorkspaceDiagnostics.Gates" />; this class holds only the wording each surface uses once it
+///         has.
 ///     </para>
 ///     <para>
 ///         Every message names the projects, and one with both causes puts the load block before the restore
 ///         block: a project that never loaded is the more broken of the two, and the repairs differ
-///         (<c>dotnet build</c> versus <c>dotnet restore</c>). The four CLI verbs print the workspace
-///         diagnostics immediately above their refusal, so their tails send the reader to those warnings for
-///         why each project failed instead of repeating them. The restore tail does so only for "a restore that
-///         ran", because the SDK replays NuGet's own logs into later builds only where a restore actually ran.
+///         (<c>dotnet build</c> versus <c>dotnet restore</c>). A refusal written to stderr below the workspace
+///         diagnostics sends the reader to those warnings instead of repeating them; the restore tail does so only
+///         for "a restore that ran", because the SDK replays NuGet's own logs into later builds only where a restore
+///         actually ran. A refusal or caveat whose surface has nothing above it points at no warnings and carries
+///         the MSBuild selection note in its own block.
 ///     </para>
 /// </remarks>
 internal static class IncompleteModelGate
@@ -36,10 +35,7 @@ internal static class IncompleteModelGate
         "the workspace did not load completely, so no verdict was reached; see Workspace_LoadedCompletely for "
         + "the projects that failed to load or whose NuGet packages did not resolve.";
 
-    /// <summary>
-    ///     The stderr lines <c>check</c> emits before exit 2, printed after the per-project load warnings
-    ///     they refer to, and naming the opt-out flag.
-    /// </summary>
+    /// <summary>The stderr lines <c>check</c> emits before exit 2.</summary>
     internal static string CheckMessage(WorkspaceDiagnostics diagnostics)
     {
         return Message(
@@ -56,11 +52,9 @@ internal static class IncompleteModelGate
     }
 
     /// <summary>
-    ///     The stderr lines <c>baseline</c> emits before exit 2, having written nothing. A baseline is the
-    ///     team's signature on its debt: captured from a partial model it grandfathers "zero debt" for rules
-    ///     that were never measured, and <c>accept-reductions</c> deletes real entries as "no longer
-    ///     occurring" when the only thing that changed is that a project stopped loading — or that its
-    ///     packages stopped resolving.
+    ///     The stderr lines <c>baseline</c> emits before exit 2, having written nothing: from a partial model it
+    ///     would grandfather "zero debt" for rules never measured, and <c>accept-reductions</c> would delete real
+    ///     entries as "no longer occurring" because a project stopped loading or its packages stopped resolving.
     /// </summary>
     internal static string BaselineMessage(WorkspaceDiagnostics diagnostics)
     {
@@ -79,11 +73,7 @@ internal static class IncompleteModelGate
             + "--allow-workspace-diagnostics.");
     }
 
-    /// <summary>
-    ///     The stderr lines <c>status</c> emits before exit 2, after rendering the burndown it does have.
-    ///     Unloaded projects declare no types, and unresolved packages declare no edges, so every count in
-    ///     that burndown reads low either way.
-    /// </summary>
+    /// <summary>The stderr lines <c>status</c> emits before exit 2, after rendering the burndown it has.</summary>
     internal static string StatusMessage(WorkspaceDiagnostics diagnostics)
     {
         return Message(
@@ -102,10 +92,8 @@ internal static class IncompleteModelGate
     }
 
     /// <summary>
-    ///     The stderr lines <c>render</c> emits before exit 2, having written nothing. Rendered files are
-    ///     committed context: a card whose project failed to load resolves no directory and is silently
-    ///     dropped rather than written wrong, and <c>--diagram</c> draws the very survey <c>graph</c>
-    ///     refuses to print from a partial model.
+    ///     The stderr lines <c>render</c> emits before exit 2, having written nothing; <c>--diagram</c> would draw
+    ///     the survey <c>graph</c> refuses to print from a partial model.
     /// </summary>
     internal static string RenderMessage(WorkspaceDiagnostics diagnostics)
     {
@@ -126,9 +114,8 @@ internal static class IncompleteModelGate
 
     /// <summary>
     ///     The stderr block <c>render</c> emits before exit 2 when <c>--model</c> was passed explicitly and a
-    ///     project failed to load. The model file names every project the spec governs, so one written from a
-    ///     partial model would silently leave out exactly the projects that failed — and a reader with no spec
-    ///     assembly has nothing to compare it against.
+    ///     project failed to load; a reader of the model file with no spec assembly has nothing to compare it
+    ///     against.
     /// </summary>
     /// <remarks>
     ///     A load failure alone, never a restore one: a project whose restore failed is still in the codebase
@@ -148,13 +135,11 @@ internal static class IncompleteModelGate
 
     /// <summary>
     ///     The one stderr line <c>render</c> emits when a model file already exists and a project failed to
-    ///     load: the block and the cards render from the partial model as they always do, and the model file
-    ///     is neither compared nor written.
+    ///     load, and the model file is neither compared nor written.
     /// </summary>
     /// <remarks>
-    ///     One line rather than this class's usual evidence block, for the reason
-    ///     <see cref="EmptySelectionHint" /> is one: nothing is being refused, so there is no remedy to hang a
-    ///     project list from — the run carried on, and the projects themselves are in the warnings above it.
+    ///     One line rather than an evidence block: nothing is refused, so there is no remedy to hang a project list
+    ///     from, and the projects themselves are in the warnings above it.
     /// </remarks>
     internal static string RenderModelWarning(WorkspaceDiagnostics diagnostics)
     {
@@ -164,17 +149,12 @@ internal static class IncompleteModelGate
     }
 
     /// <summary>
-    ///     The <c>graph</c> refusal, thrown as a <see cref="UserErrorException" /> before extraction
-    ///     rather than written to a stream — so the identical text reaches CLI stderr (exit 2, via
-    ///     <c>CliErrorMapper</c>) and an MCP <c>arch_graph</c> error result (via
-    ///     <c>GlobalCallToolFilter</c>).
+    ///     The <c>graph</c> refusal, one text for CLI stderr and an MCP <c>arch_graph</c> error result. On MCP
+    ///     there is nothing above it, because <c>arch_graph</c> discards its error writer.
     /// </summary>
     /// <remarks>
-    ///     It carries the failed projects inline rather than pointing at warnings printed above, because on
-    ///     the MCP surface there is nothing above: <c>arch_graph</c> discards its error writer, so a refusal
-    ///     that said "see the warnings" would name evidence the caller cannot reach. <c>graph</c> is also the
-    ///     entry point that needs no spec — a stranger's first command on an unfamiliar codebase — so the
-    ///     refusal names the fix in both dialects rather than assuming which surface asked.
+    ///     <c>graph</c> is the entry point that needs no spec, a stranger's first command on an unfamiliar
+    ///     codebase, so the refusal names the fix in both dialects rather than assuming which surface asked.
     /// </remarks>
     internal static string GraphRefusal(WorkspaceDiagnostics diagnostics)
     {
@@ -200,16 +180,9 @@ internal static class IncompleteModelGate
     /// <remarks>
     ///     <para>
     ///         Like <see cref="ContextCaveat" /> it gates nothing: it is the same two causes with the same two
-    ///         remedies, said where spec resolution meets them. It belongs here rather than at the call site
-    ///         because spec resolution runs <em>before</em> any verb's gate can fire, so this is the message a
-    ///         reader on a broken tree actually meets.
-    ///     </para>
-    ///     <para>
-    ///         It carries the blamed projects inline rather than pointing at warnings printed above, for
-    ///         <see cref="GraphRefusal" />'s reason and a stronger one of its own: this refusal is thrown
-    ///         before a runner exists to render any diagnostics beside it, so on <em>both</em> its surfaces
-    ///         there is nothing above to point at. The MSBuild selection note rides that block for the same
-    ///         reason — a reader who cannot reach the warnings cannot read the selection off them either.
+    ///         remedies, said where spec resolution meets them, which is before any verb's gate can fire. It is
+    ///         thrown before a runner exists to render any diagnostics beside it, so on both its surfaces there is
+    ///         nothing above it.
     ///     </para>
     ///     <para>
     ///         Both ledes keep the <c>No spec project found</c> prefix every arm of spec resolution's refusal
@@ -234,12 +207,9 @@ internal static class IncompleteModelGate
     ///     The caveat block <c>context</c> writes above its answer when the model is incomplete.
     /// </summary>
     /// <remarks>
-    ///     Context never gates — it is a lookup an agent runs mid-edit, and a partial answer beats none — but a
-    ///     partial load is exactly the state in which "no architecture scope covers this path" can be a
-    ///     false all-clear: a card whose project failed to load resolves no directory and places nowhere, and
-    ///     a rule about a package the restore never fetched answered without ever measuring anything.
-    ///     Stdout is context's only channel (no CLI twin, no <c>--json</c>), so the caveat rides the body,
-    ///     the blamed projects inline, ahead of whatever answer the partial model still supports.
+    ///     Context never gates: it is a lookup an agent runs mid-edit, and a partial answer beats none. Stdout is
+    ///     its only channel, so the caveat rides the body, ahead of whatever answer the partial model still
+    ///     supports.
     /// </remarks>
     internal static string ContextCaveat(WorkspaceDiagnostics diagnostics)
     {
@@ -257,9 +227,7 @@ internal static class IncompleteModelGate
 
     /// <summary>
     ///     The caveat block <c>explain --type</c> and <c>explain --path</c> write above their answer when the
-    ///     model is incomplete: a type declared only by a project that failed to load is not in the model, and a
-    ///     selection that reads a package's base types or attributes was never given them where the restore
-    ///     failed. Like <see cref="ContextCaveat" /> it gates nothing and rides the body, because the body is
+    ///     model is incomplete. Like <see cref="ContextCaveat" /> it gates nothing and rides the body, which is
     ///     <c>arch_explain</c>'s only channel.
     /// </summary>
     internal static string ExplainCaveat(WorkspaceDiagnostics diagnostics)
@@ -277,10 +245,8 @@ internal static class IncompleteModelGate
     }
 
     /// <summary>
-    ///     The <c>Workspace_LoadedCompletely</c> failure body — the CLI gate transposed to a test report:
-    ///     <c>check</c> gates and emits no verdict, so the adapter emits no rule verdicts. It carries the
-    ///     blamed projects inline for <see cref="GraphRefusal" />'s exact reason: in a test report there is
-    ///     nothing above to point at.
+    ///     The <c>Workspace_LoadedCompletely</c> failure body, the CLI gate transposed to a test report: as
+    ///     <c>check</c> emits no verdict, the adapter emits no rule verdicts. A test report has nothing above it.
     /// </summary>
     internal static string AdapterRefusal(WorkspaceDiagnostics diagnostics)
     {
@@ -319,18 +285,15 @@ internal static class IncompleteModelGate
     }
 
     /// <summary>
-    ///     The cure a rule whose own selection matched nothing reports while the model is partial — an empty
-    ///     subject or an inert target alike. It gates nothing, like <see cref="ContextCaveat" />: it is the
-    ///     same two causes with the same two remedies, said at the one moment a reader is about to act on
-    ///     advice that would otherwise send them after a spec defect that is not there.
+    ///     The cure a rule whose own selection matched nothing reports while the model is partial, an empty
+    ///     subject or an inert target alike, in place of advice that would send the reader after a spec defect
+    ///     that is not there. Like <see cref="ContextCaveat" /> it gates nothing.
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         One sentence rather than this class's usual evidence block, and that is the constraint that
-    ///         shapes it: an authoring cure is a single line on a single slot, so it cannot carry a block, a
-    ///         project list, or the two-blocks-one-per-cause shape <see cref="Message" /> composes. The causes
-    ///         therefore fold into one clause and the remedies into one, keeping load's repair ahead of
-    ///         restore's wherever both apply — the same precedence every message here keeps.
+    ///         An authoring cure is a single line on a single slot, so it cannot carry a block, a project list, or
+    ///         the one-block-per-cause shape <see cref="Message" /> composes. The causes fold into one clause and
+    ///         the remedies into one, load's repair ahead of restore's as in every message here.
     ///     </para>
     ///     <para>
     ///         It must read in the voice of the cures it replaces, which are pinned as one line ending in a

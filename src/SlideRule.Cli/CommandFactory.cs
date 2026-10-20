@@ -14,8 +14,7 @@ namespace SlideRule.Cli;
 
 /// <summary>
 ///     Builds the command tree (System.CommandLine): every verb the CLI exposes, each with its options and
-///     its action. Exposed so the in-process e2e tests drive the exact same tree the real entry point does,
-///     capturing output via a redirected <see cref="InvocationConfiguration" />.
+///     its action.
 /// </summary>
 internal static class CommandFactory
 {
@@ -697,8 +696,7 @@ internal static class CommandFactory
         return Resolved(solutionValue, specValue, environment, build);
     }
 
-    // The same resolution over values a builder settled itself, which explain needs: its positional is the
-    // solution only once the rule ID turns out to be absent.
+    // The same resolution over values a builder settled itself.
     private static TRequest Resolved<TRequest>(
         string? solution, string? spec, IEnvironment environment, Func<InvocationTargets, TRequest> build)
     {
@@ -762,9 +760,7 @@ internal static class CommandFactory
     }
 
     // The rung names, the parse and the refusal all come from DocumentGrains, so this option and the grain tool
-    // parameter accept the same words in any case and refuse the rest with one text. The validator adds that
-    // refusal as the parse error; the completions offer the rungs, and the help label lists them finest first,
-    // the order the refusal names them in.
+    // parameter accept the same words in any case and refuse the rest with one text.
     private static Option<string?> GrainOption(string description)
     {
         Option<string?> grain = new("--grain")
@@ -792,7 +788,7 @@ internal static class CommandFactory
     }
 
     // The one opt-out of the incomplete-model gate, worded per verb but always the same flag name: the
-    // five verbs the gate guards answer a partial load the same way, so an operator learns one flag.
+    // verbs the gate guards answer a partial load the same way, so an operator learns one flag.
     private static Option<bool> AllowWorkspaceDiagnosticsOption(string description)
     {
         return new Option<bool>("--allow-workspace-diagnostics") { Description = description };

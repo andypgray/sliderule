@@ -12,30 +12,16 @@ namespace SlideRule.Cli.Rendering;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         One vocabulary across every document that has a ladder, so a caller learns the rung names once and
-///         the two surfaces cannot spell them apart: <c>graph</c> coarsens its survey and <c>check</c> its
-///         report against the same enum, the same wire names and the same parse. What a
-///         rung elides is each renderer's own to say; that it is strictly coarser than the rung below is this
-///         type's.
-///     </para>
-///     <para>
 ///         Grain is never scope. Every rung answers about the same subject — <c>--projects</c> and
 ///         <c>--rules</c> are the knobs that narrow that — which is what makes an automatic degrade safe: the
 ///         answer stays about the codebase the caller asked about, only in less detail.
 ///     </para>
 ///     <para>
-///         The rungs are ordered by size for exactly one reason: a caller with a response budget walks down
-///         until a whole document fits, rather than handing the truncator a document to cut in half. The
-///         elided levels were chosen by measurement — the bulk of each document is the array that scales with
-///         the codebase rather than with the spec.
-///     </para>
-///     <para>
-///         <see cref="Index" /> is where that reasoning ends: every rung above it still carries something
-///         that scales with the codebase, and it carries nothing that does. What survives it is the roster —
-///         every project name, every rule id — which scales with the authored and structural dimension
-///         alone, so no realistic solution reaches the truncator through it. That is what makes the floor
-///         rung the narrowing menu as well as the smallest answer: the arguments <c>--projects</c> and
-///         <c>--rules</c> take are exactly what it lists.
+///         The rungs are ordered by size, so a caller with a response budget walks down until a whole document
+///         fits, and each elides the array that scales with the codebase rather than with the spec, which
+///         measurement found to be the bulk. <see cref="Index" /> carries nothing that scales with the codebase:
+///         what survives it is the roster, every project name and every rule ID, which is exactly what
+///         <c>--projects</c> and <c>--rules</c> take.
 ///     </para>
 /// </remarks>
 internal enum DocumentGrain
@@ -92,7 +78,9 @@ internal static class DocumentGrains
     ///     Whether <paramref name="name" /> names a rung, and which: the one test both surfaces apply, so the CLI
     ///     option and the tool parameter accept the same words in any case.
     /// </summary>
-    /// <param name="name">A wire name from <see cref="Names" />, compared ignoring case and trimmed; null or blank means full.</param>
+    /// <param name="name">
+    ///     A wire name from <see cref="Names" />, compared ignoring case and trimmed; null or blank means full.
+    /// </param>
     /// <param name="grain">The rung named, or <see cref="DocumentGrain.Full" /> when the name is not one.</param>
     public static bool TryParse([NotNullWhen(false)] string? name, out DocumentGrain grain)
     {
@@ -107,11 +95,7 @@ internal static class DocumentGrains
         return true;
     }
 
-    /// <summary>
-    ///     The grain a caller named, or <see cref="DocumentGrain.Full" /> for none. One parse for both
-    ///     surfaces, so the CLI option and the tool parameter accept the same words and refuse the same way.
-    /// </summary>
-    /// <param name="name">A wire name from <see cref="Names" />, compared ignoring case; null or blank means full.</param>
+    /// <summary>The grain a caller named, read as <see cref="TryParse" /> reads it.</summary>
     /// <exception cref="UserErrorException">The name is not a rung, or is a JSON array written as text.</exception>
     public static DocumentGrain Parse(string? name)
     {
@@ -121,8 +105,7 @@ internal static class DocumentGrains
     }
 
     /// <summary>
-    ///     The one refusal for a grain that names no rung: <see cref="Parse" /> throws it, and the CLI option adds it
-    ///     as its parse error, so both surfaces refuse with the same text.
+    ///     The one refusal text for a grain that names no rung, so every surface that parses a grain refuses alike.
     /// </summary>
     /// <param name="name">The value as the caller wrote it.</param>
     public static string Refusal(string name)
@@ -144,7 +127,10 @@ internal static class DocumentGrains
     ///     elision it guards, so a new rung below reaches them all unedited.
     /// </remarks>
     /// <param name="floor">The grain the caller asked for: the finest rung offered, and always yielded.</param>
-    /// <param name="compose">Composes the whole document at one grain.</param>
+    /// <param name="compose">
+    ///     Composes the whole document at one grain, from inputs the caller composed once for every rung, such as
+    ///     the load's rendered diagnostics and trust stamp.
+    /// </param>
     public static IEnumerable<string> Ladder(this DocumentGrain floor, Func<DocumentGrain, string> compose)
     {
         for (DocumentGrain at = floor; at <= DocumentGrain.Index; at++) yield return compose(at);
@@ -165,15 +151,10 @@ internal static class DocumentGrains
     ///     the count once it does not, and neither where there is nothing to say.
     /// </summary>
     /// <remarks>
-    ///     The empty case is what parts these slots from an array that is simply elided: a solution with
-    ///     nothing to report carries neither key at any grain, so its document is byte-identical to the one
-    ///     written before the statement existed. Stated here rather than in each renderer because the report
-    ///     and the survey both elide this way, and a rung that disagreed between them would be a document
-    ///     shape a reader cannot predict from the grain.
+    ///     The empty case is what parts these slots from an array that is elided: a solution with nothing to
+    ///     report carries neither key at any grain, so its document is byte-identical to the one written before
+    ///     the statement existed.
     /// </remarks>
-    /// <param name="items">The array the slot carries.</param>
-    /// <param name="elide">Whether this rung has dropped the rows in favour of their count.</param>
-    /// <typeparam name="T">The row type, written to the wire as it stands.</typeparam>
     public static (IReadOnlyList<T>? Rows, int? Count) CoverageRung<T>(IReadOnlyList<T> items, bool elide)
     {
         if (items.Count == 0) return (null, null);
@@ -185,11 +166,6 @@ internal static class DocumentGrains
     ///     The same rung for an array whose rows are a projection of the model's — mapped only where the
     ///     rung keeps them, so an elided rung pays for no row it will not write.
     /// </summary>
-    /// <param name="items">The model rows the slot is composed from.</param>
-    /// <param name="elide">Whether this rung has dropped the rows in favour of their count.</param>
-    /// <param name="map">Composes one wire row from one model row.</param>
-    /// <typeparam name="T">The model row type.</typeparam>
-    /// <typeparam name="TJson">The wire row type.</typeparam>
     public static (IReadOnlyList<TJson>? Rows, int? Count) CoverageRung<T, TJson>(
         IReadOnlyList<T> items, bool elide, Func<T, TJson> map)
     {

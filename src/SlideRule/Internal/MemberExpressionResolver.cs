@@ -6,15 +6,12 @@ using SlideRule.Validation;
 namespace SlideRule.Internal;
 
 /// <summary>
-///     Reduces a member-anchor lambda — <c>arch.Member&lt;T&gt;(x =&gt; x.M)</c> or
-///     <c>arch.Member(() =&gt; Type.M)</c> (GRAMMAR §4.5) — to the same <see cref="Member" /> leaf the
-///     <c>typeof</c> + <c>nameof</c> form mints, or to a poisoned <see cref="Member" /> whose
-///     <see cref="Member.PoisonError" /> the §8 validation pass reports (
-///     <see cref="Validation.SpecValidationErrorCode.MemberExpressionUnresolvable" />)
-///     before anything reads the anchor. Pure authoring sugar: the anchor is the tree's <em>resolved</em>
-///     member — <see cref="MemberInfo.DeclaringType" /> (never <see cref="MemberInfo.ReflectedType" />),
-///     with a constructed generic normalized to its definition — so an expression-minted member reifies,
-///     renders, and checks byte-identically to the <c>typeof</c>-minted one.
+///     Reduces a member-anchor lambda, <c>arch.Member&lt;T&gt;(x =&gt; x.M)</c> or
+///     <c>arch.Member(() =&gt; Type.M)</c> (GRAMMAR §4.5), to the <see cref="Member" /> leaf the
+///     <c>typeof</c> + <c>nameof</c> form mints, so the two reify, render and check byte-identically; or to a
+///     poisoned <see cref="Member" /> whose <see cref="Member.PoisonError" /> the §8 validation pass reports
+///     (<see cref="Validation.SpecValidationErrorCode.MemberExpressionUnresolvable" />) before anything reads
+///     the anchor.
 /// </summary>
 internal static class MemberExpressionResolver
 {
@@ -55,10 +52,8 @@ internal static class MemberExpressionResolver
         "construction is not a member use, so ban the constructed type with the MustNotConstruct verb instead";
 
     /// <summary>
-    ///     Resolves <paramref name="lambda" /> (already null-checked by the calling <see cref="Arch" />
-    ///     <c>Member</c> overload) to a resolved or poisoned <see cref="Member" /> stamped with
-    ///     <paramref name="owner" /> and the anchor's spec-source <paramref name="location" /> (null for a
-    ///     verb-minted lambda, which cannot carry caller info — GRAMMAR §8).
+    ///     Expects <paramref name="lambda" /> already null-checked. <paramref name="location" /> is the anchor's
+    ///     spec-source location, null for a verb-minted lambda, which cannot carry caller info (GRAMMAR §8).
     /// </summary>
     internal static Member Resolve(Arch owner, LambdaExpression lambda, SpecSourceLocation? location = null)
     {
@@ -86,14 +81,10 @@ internal static class MemberExpressionResolver
                        ?? Anchor(owner, member.Member.DeclaringType!, member.Member.Name, location);
 
             case ConstantExpression:
-                // The lambda body inlined to a compile-time value (a const field, enum member, or literal),
-                // peeled by Unwrap to its ConstantExpression — no member remains in the tree to anchor.
                 return Poison(owner, CompileTimeConstant, location);
 
             case NewExpression:
-                // An object-creation body (`() => new Foo()`, including target-typed `new()`) names a constructor,
-                // which is outside the member-anchor surface (§4.5); the cure is the MustNotConstruct verb (§5.3),
-                // not a member ban. An arm of its own, so it steers instead of falling to NotMemberAccess.
+                // An arm of its own, so the message steers to MustNotConstruct instead of falling to NotMemberAccess.
                 return Poison(owner, ObjectCreation, location);
 
             default:
@@ -101,11 +92,8 @@ internal static class MemberExpressionResolver
         }
     }
 
-    // The receiver rules: the instance form wants the lambda parameter itself, reached only
-    // through identity-preserving casts — a reference/interface Convert with no operator method, or an
-    // as-cast (both peeled by PeelIdentityCast); a user-defined conversion stops the peel and is reported,
-    // since following it would silently anchor the post-conversion type. The static form wants no receiver.
-    // Returns a poison Member on a mismatch, or null to mean "receiver is fine".
+    // The instance form wants the lambda parameter itself, seen through PeelIdentityCast; the static form wants
+    // no receiver. Returns a poison Member on a mismatch, or null to mean "receiver is fine".
     private static Member? ClassifyReceiver(
         Arch owner, Expression? receiver, bool instanceForm, LambdaExpression lambda, SpecSourceLocation? location)
     {

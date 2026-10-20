@@ -4,12 +4,9 @@ using SlideRule.Extraction.Fragments;
 namespace SlideRule.Extraction;
 
 /// <summary>
-///     Builds a <see cref="CodebaseModel" /> from a set of compilations by extracting each input into a
-///     self-contained <see cref="CodebaseFragment" /> (<see cref="FragmentExtractor" />) and then
-///     unifying the fragments by fully-qualified name (<see cref="FragmentMerger" />). This is deliberately
-///     the <em>one</em> code path for cold runs, the MSBuild-free fast test path, and cache
-///     hits — a hit replays persisted fragments through the same merge — so the cache cannot change results
-///     by construction.
+///     Builds a <see cref="CodebaseModel" /> from a set of compilations: <see cref="FragmentExtractor" />
+///     extracts each input into a self-contained <see cref="CodebaseFragment" />, and
+///     <see cref="FragmentMerger" /> unifies the fragments by fully-qualified name.
 /// </summary>
 internal static class CodebaseModelBuilder
 {

@@ -5,15 +5,16 @@ using SlideRule.Roslyn.Solutions;
 namespace SlideRule.Roslyn;
 
 /// <summary>
-///     Resolves which solution file to load: the argument, a solution file or a directory to search; then the caller's
-///     reading of <c>SLIDERULE_SOLUTION_PATH</c>; then a search up from the working directory for a <c>.sln</c>,
-///     <c>.slnx</c> or <c>.slnf</c>. Any argument, a directory included, beats the variable. The first ancestor
-///     directory holding exactly one solution wins, where a <c>.slnf</c> counts only when no full solution stands
-///     beside it. Nothing is guessed: a directory holding several solutions is climbed past rather than chosen
-///     from, and a search that reaches the root without finding a directory that holds exactly one throws rather than
-///     picking one. Every path returned is absolute and symlink-free (<see cref="PathCanonicalizer" />), so it compares
-///     equal to a path another tool resolved.
+///     Resolves which solution file to load, by the precedence <see cref="Choose" /> states, and returns it absolute
+///     and symlink-free (<see cref="PathCanonicalizer" />), so it compares equal to a path another tool resolved,
+///     such as git's toplevel.
 /// </summary>
+/// <remarks>
+///     A search climbs from its start to the first directory holding exactly one <c>.sln</c>, <c>.slnx</c> or
+///     <c>.slnf</c>, where a <c>.slnf</c> counts only when no full solution stands beside it. Nothing is guessed: a
+///     directory holding several solutions is climbed past rather than chosen from, and a search that reaches the
+///     root without finding a directory that holds exactly one throws rather than picking one.
+/// </remarks>
 // Both refusals must keep naming the solution argument before the environment variable, and the
 // "nothing anywhere" one must keep naming any solution one level down; the pinned message texts are
 // what hold that.
@@ -26,44 +27,26 @@ internal static class SolutionDiscovery
     // something else, never the repository's own, and naming it would send the reader somewhere wrong.
     private static readonly string[] SkippedDirectories = ["bin", "obj", ".git", ".vs", "node_modules", "packages"];
 
-    // Both refusals end here. The argument comes first because it is the better answer on both surfaces the
-    // walk-up serves: at the CLI it is the normal spelling, and for an MCP client the args array in the
-    // server registration is where the answer has to live — the environment variable would have to be set
-    // for whatever process launches the client. No runner is named: the line is also read from MCP sessions
-    // a registry manifest launched, which have no `sliderule` command to put in front of the verb.
+    // Both refusals end here. No runner is named: the line is also read from MCP sessions a registry manifest
+    // launched, which have no `sliderule` command to put in front of the verb.
     private static string FixLine =>
         "Pass the solution as the argument (<command> <solution>, or in your MCP client "
         + $"config's args), or set {SlideRuleEnvVars.SolutionPath} to it.";
 
     /// <summary>
-    ///     Discovers the solution file to load: <paramref name="argument" /> when it is set, then
-    ///     <paramref name="environmentPath" />, then a search upwards from <paramref name="workingDirectory" />.
+    ///     Discovers the solution file to load from <paramref name="argument" />,
+    ///     <paramref name="environmentPath" /> (the caller's reading of <c>SLIDERULE_SOLUTION_PATH</c>) and
+    ///     <paramref name="workingDirectory" />, an absolute path, by the precedence <see cref="Choose" /> states.
     /// </summary>
-    /// <param name="argument">
-    ///     The solution argument: a solution file, which must exist, or a directory to search upwards from.
-    ///     Relative paths resolve against <paramref name="workingDirectory" />.
-    /// </param>
-    /// <param name="workingDirectory">The absolute directory to search upwards from when nothing names a solution.</param>
-    /// <param name="environmentPath">
-    ///     The caller's non-blank reading of <c>SLIDERULE_SOLUTION_PATH</c>, or null. It names a solution file,
-    ///     which must exist, and resolves against <paramref name="workingDirectory" /> when relative.
-    /// </param>
-    /// <returns>The absolute, symlink-free path to the resolved solution file.</returns>
     /// <exception cref="FileNotFoundException">A solution file was named but no file exists there.</exception>
     /// <exception cref="InvalidOperationException">
-    ///     The search reached the root without finding a directory that holds exactly one solution. The
-    ///     message is written for a person: it lists what was found and says to pass the solution as an
-    ///     argument or set <c>SLIDERULE_SOLUTION_PATH</c>, and when the search found nothing anywhere it also
-    ///     names any solution one level below the starting directory.
+    ///     The search reached the root without finding a directory that holds exactly one solution.
     /// </exception>
     public static string DiscoverSolution(string? argument, string workingDirectory, string? environmentPath)
     {
         SolutionStart start = Choose(argument, workingDirectory, environmentPath);
         if (start.Kind == SolutionStartKind.Search) return Search(start.Path);
 
-        // Every returned path is canonicalized (symlinks resolved) so the workspace's document paths
-        // agree with git's canonical toplevel — the tripwire prefix match otherwise misses on a
-        // symlinked root (macOS /var → /private/var, a symlinked home, a junction). See PathCanonicalizer.
         string resolved = PathCanonicalizer.Resolve(start.Path);
         if (File.Exists(resolved)) return resolved;
 
@@ -99,7 +82,8 @@ internal static class SolutionDiscovery
 
     /// <summary>
     ///     <paramref name="start" /> and each directory above it, nearest first, with the solution files each holds
-    ///     (<see cref="FindSlnFiles" />). Both walks up read it: this one and the settings resolver's.
+    ///     (<see cref="FindSlnFiles" />). The settings resolver walks the same ancestors, so a change here moves
+    ///     where settings are found too.
     /// </summary>
     internal static IEnumerable<(string Directory, string[] Solutions)> Ancestors(string start)
     {
@@ -107,8 +91,6 @@ internal static class SolutionDiscovery
             yield return (directory.FullName, FindSlnFiles(directory.FullName));
     }
 
-    // Up from start to the first directory holding exactly one solution. A directory holding several is climbed
-    // past, and named in the refusal only when nothing above it holds exactly one.
     private static string Search(string start)
     {
         (string Directory, string[] Solutions)? firstAmbiguous = null;
@@ -126,12 +108,10 @@ internal static class SolutionDiscovery
     }
 
     /// <summary>
-    ///     The refusal when the first directory holding any solution holds several. Pure, and internal so the
-    ///     text pins without a filesystem — the split <see cref="MsBuild.MsBuildBootstrap.DescribeSelection" />
-    ///     makes for the same reason.
+    ///     The refusal when no ancestor holds exactly one solution and <paramref name="directory" />, the nearest
+    ///     that held several, held <paramref name="candidates" />. Pure, and internal so the text pins without a
+    ///     filesystem.
     /// </summary>
-    /// <param name="directory">The ancestor that held them.</param>
-    /// <param name="candidates">The solution files found there; rendered by file name.</param>
     internal static string AmbiguousMessage(string directory, IReadOnlyList<string> candidates)
     {
         List<string> names = candidates
@@ -142,15 +122,11 @@ internal static class SolutionDiscovery
     }
 
     /// <summary>
-    ///     The refusal when the whole walk-up found nothing, naming any solution one level below the start
-    ///     directory (<paramref name="nearMisses" />) so a repository whose solution sits under <c>src\</c> is
-    ///     one copy-paste from working rather than a dead end. The list is capped, with an "and N more" tail.
+    ///     The refusal when the whole walk-up from <paramref name="directory" /> found nothing, naming any solution
+    ///     one level below it (<paramref name="nearMisses" />, absolute, rendered relative to
+    ///     <paramref name="directory" />) so a repository whose solution sits under <c>src\</c> is one copy-paste
+    ///     from working rather than a dead end.
     /// </summary>
-    /// <param name="directory">The directory the walk-up started from.</param>
-    /// <param name="nearMisses">
-    ///     Absolute paths from <see cref="NearMisses" />; rendered relative to
-    ///     <paramref name="directory" />.
-    /// </param>
     internal static string NotFoundMessage(string directory, IReadOnlyList<string> nearMisses)
     {
         var header = $"No .sln, .slnf or .slnx file found in '{directory}' or any parent directory.";
@@ -169,10 +145,9 @@ internal static class SolutionDiscovery
     }
 
     /// <summary>
-    ///     Solutions in the immediate subdirectories of <paramref name="startDirectory" />, ordered, with the
-    ///     build-output and tooling directories skipped. One bounded scan, run only when the walk-up has
-    ///     already failed: discovery reports what it saw and still refuses — it never widens the search into
-    ///     a guess. An unreadable directory yields nothing rather than replacing the refusal with an I/O error.
+    ///     Solutions in the immediate subdirectories of <paramref name="startDirectory" />, ordered, for the
+    ///     refusal to name: discovery reports what it saw and still refuses, never widening the search into a
+    ///     guess. An unreadable directory yields nothing rather than replacing the refusal with an I/O error.
     /// </summary>
     internal static IReadOnlyList<string> NearMisses(string startDirectory)
     {
@@ -191,12 +166,9 @@ internal static class SolutionDiscovery
     }
 
     /// <summary>
-    ///     The solution files in one directory, ordered, with filters demoted: a <c>.slnf</c> standing beside
-    ///     a <c>.sln</c> or <c>.slnx</c> drops out of the candidate set entirely. A filter is a view of a
-    ///     solution, so the two together is a normal layout rather than a question — and a refusal naming a
-    ///     filter would invite a fix (delete it, pass it explicitly) that changes nothing. Where no full
-    ///     solution stands beside them, the filters are the candidates: one resolves, and several make the
-    ///     directory ambiguous, so the walk climbs past it.
+    ///     The solution files in one directory, ordered, less any <c>.slnf</c> standing beside a <c>.sln</c> or
+    ///     <c>.slnx</c>: a filter is a view of a solution, so the two together is a normal layout rather than a
+    ///     question.
     /// </summary>
     private static string[] FindSlnFiles(string directory)
     {

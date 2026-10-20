@@ -8,12 +8,8 @@ using SlideRule.Roslyn.Diagnostics;
 namespace SlideRule.Cli.Verbs;
 
 /// <summary>
-///     The <c>graph</c> pipeline: build a spec-less <see cref="CodebaseSource" /> (cache hit or cold
-///     workspace) → extract the whole codebase (no project exclusions, no spec) → summarize → render the
-///     survey (human or JSON). Deliberately spec-free: the survey is a property of the codebase, and derive
-///     runs before any spec exists — so unlike the other verbs there is no spec resolution here, only the
-///     shared solution discovery and workspace acquisition through an <see cref="ISolutionSource" /> (cold by
-///     default), fronted by the persisted extraction cache.
+///     The <c>graph</c> verb: a survey of the whole codebase, human or JSON, through a spec-less
+///     <see cref="CodebaseSource" /> fronted by the persisted extraction cache.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -22,9 +18,7 @@ namespace SlideRule.Cli.Verbs;
 ///         failed to load is missing from the map entirely, so the run refuses before extraction on
 ///         <c>check</c>'s terms, opt-out <see cref="GraphRequest.AllowWorkspaceDiagnostics" />
 ///         (<see cref="IncompleteModelGate" />). That refusal, like a discovery/workspace failure, surfaces
-///         as a <see cref="UserErrorException" /> — exit 2 on the CLI, an error result on MCP — which is why
-///         it is thrown rather than written: this is the one verb with no spec to resolve, so it is the
-///         first command a stranger runs and the first that must explain itself on whichever surface asked.
+///         as a <see cref="UserErrorException" /> — exit 2 on the CLI, an error result on MCP.
 ///     </para>
 ///     <para>
 ///         Two knobs narrow what a caller reads, and they are independent: <see cref="GraphRequest.Projects" />
@@ -33,12 +27,6 @@ namespace SlideRule.Cli.Verbs;
 ///         A filter matching no project refuses with the available names rather than surveying nothing —
 ///         or, where the filter is a JSON array written as text, names that shape instead
 ///         (<see cref="Refusals" />).
-///     </para>
-///     <para>
-///         Output/error writers are injected so the in-process e2e tests can capture them, the
-///         <see cref="IEnvironment" /> seam supplies the cache-root override, and the
-///         <see cref="IResponseFitter" /> decides which rung of the grain ladder a caller with a response
-///         budget actually gets (default: the grain they asked for).
 ///     </para>
 /// </remarks>
 internal sealed class GraphRunner(
@@ -101,12 +89,9 @@ internal sealed class GraphRunner(
         return ExitCodes.Clean;
     }
 
-    // The JSON survey, degraded rather than cut. The runner offers every grain from the requested floor down
-    // to the coarsest as a lazy ladder and the fitter picks; a caller whose transport has a response budget
-    // gets the first rung that fits, re-composed from the summary already in hand — no second extraction, and
-    // byte-identical to what --grain naming that rung would have written, so the two surfaces cannot drift.
-    // Degrading coarsens the grain and never touches the scope: the answer stays about the codebase the
-    // caller asked about, and every rung carries the same narrowing.
+    // The JSON survey, degraded rather than cut (IResponseFitter). Each rung is re-composed from the summary
+    // already in hand, no second extraction, so it is byte-identical to what --grain naming it would write.
+    // Degrading coarsens the grain and never touches the scope: every rung carries the same narrowing.
     private void WriteJson(
         GraphRequest request, GraphSummary scoped, string solutionName,
         IReadOnlyList<string> renderedDiagnostics, WorkspaceTrustStamp trust,
@@ -124,9 +109,9 @@ internal sealed class GraphRunner(
         }
     }
 
-    // The human survey. The scope stamp is written here rather than by the formatter so an unscoped run is
-    // byte-identical to what it always was, and so the stamp can say what the formatter cannot see: how much
-    // of the solution this covers, and why an edge below may name a project the roster does not.
+    // The human survey. The scope stamp is written here rather than by the formatter so an unscoped run writes
+    // the formatter's output alone, and so the stamp can say what the formatter cannot see: how much of the
+    // solution this covers, and why an edge below may name a project the roster does not.
     private void WriteHuman(
         GraphRequest request, GraphSummary summary, GraphSummary scoped, string solutionName,
         IReadOnlyList<string> projectGlobs, WorkspaceTrustStamp trust)

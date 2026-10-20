@@ -33,8 +33,6 @@ internal sealed class ClaimStep
 
     internal string Text { get; }
 
-    // A layer's definition, a union operand that carries adjectives of its own, a family cell and an Except's
-    // payload each trace as a group under the step that names them.
     internal IReadOnlyList<ClaimStep> Steps { get; }
 }
 

@@ -8,10 +8,7 @@ namespace SlideRule.Codebase;
 /// <remarks>
 ///     <para>
 ///         Types are recorded at their definition, so <c>new Box&lt;int&gt;()</c> gives an edge to
-///         <c>Box&lt;&gt;</c>. A type creating itself gives nothing. Both ends are the very type instances
-///         <see cref="CodebaseModel.Types" /> lists, so compare them by reference rather than by name, and
-///         the same expression is also recorded as an ordinary reference in
-///         <see cref="CodebaseModel.Edges" />, never instead of it.
+///         <c>Box&lt;&gt;</c>.
 ///     </para>
 ///     <para>
 ///         Five spellings never appear here, none of them a creation of the type written: an attribute
@@ -39,10 +36,6 @@ internal sealed class ConstructorEdge : IEdgeEnds
 
     TypeNode IEdgeEnds.Target => Constructed;
 
-    /// <summary>
-    ///     Gets each distinct place the creation occurs, ordered by file then line. Two creations of the same
-    ///     type on one line count as one site.
-    /// </summary>
     public IReadOnlyList<SourceLocation> Sites => Evidence.Sites;
 
     internal EdgeEvidence Evidence { get; }

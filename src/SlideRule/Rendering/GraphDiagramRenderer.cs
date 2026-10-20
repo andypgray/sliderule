@@ -4,31 +4,21 @@ using SlideRule.Internal;
 namespace SlideRule.Rendering;
 
 /// <summary>
-///     Draws a solution's projects and the references between them as a Mermaid flowchart: the body
-///     <c>sliderule render --diagram</c> writes into a file's managed block. Pure over a
+///     Draws a solution's projects and the references between them as a Mermaid flowchart. Pure over a
 ///     <see cref="GraphSummary" />, so the drawing shows exactly what the <c>sliderule graph</c>
 ///     survey reports. The output is always LF and carries no timestamp or tool version, so an unchanged
 ///     codebase re-renders to no diff at all.
 /// </summary>
 /// <remarks>
-///     The drawing is deliberately plain: <c>flowchart LR</c> with quoted labels,
-///     <c>accTitle</c> and <c>accDescr</c> for screen readers, and no <c>%%{init}%%</c> block,
-///     <c>classDef</c> or colours, so it renders correctly for a reader in a light or a dark theme.
-///     Structure carries the meaning: a solid <c>--&gt;</c> is a cross-project reference the code
-///     actually makes, and a dotted <c>-.-&gt;</c> is a project reference that is declared and never
-///     used. Labels carry no type or reference counts, so a committed drawing does not change every time
-///     the code does; the counts are in the <c>sliderule graph</c> survey, which nothing commits.
+///     A solid <c>--&gt;</c> is a cross-project reference the code actually makes, and a dotted
+///     <c>-.-&gt;</c> is a project reference that is declared and never used. Labels carry no type or
+///     reference counts, so a committed drawing does not change every time the code does; the counts are in
+///     the <c>sliderule graph</c> survey, which nothing commits.
 /// </remarks>
 internal static class GraphDiagramRenderer
 {
-    // Every node ID carries this prefix, which is what keeps a project name from ever being lexed as
-    // something other than a node. Mermaid's flowchart grammar reserves bare words — end, graph, class,
-    // subgraph and more — none of them anchored to the start of a statement, so a project of any of
-    // those names would break the whole diagram rather than just its own node, and in someone else's
-    // solution "graph" or "class" is a plausible project name. A prefix stays safe as the grammar adds
-    // words. It also makes the grammar's case sensitivity irrelevant rather than something to rely on,
-    // and it closes a second hazard for free: the link rules read a leading o or x as an arrowhead,
-    // and no prefixed ID can begin with either.
+    // In someone else's solution "graph" or "class" is a plausible project name, which is why every node ID
+    // carries a prefix (MermaidText.UniqueIds).
     private const string NodeIdPrefix = "p_";
 
     private const string EmptyScopeNodeId = NodeIdPrefix + "none";
@@ -36,24 +26,18 @@ internal static class GraphDiagramRenderer
     private const string EmptyScopeLabel = "(no projects in scope)";
 
     /// <summary>
-    ///     The managed-block body for a diagram file: a provenance caption, then the fenced Mermaid diagram.
-    ///     The caption sits outside the fence, so the fence stays paste-able into any Mermaid renderer.
+    ///     The managed-block body for a diagram file: a provenance caption, a blank line, then the fenced
+    ///     Mermaid diagram. The caption sits outside the fence, so the fence stays paste-able into any Mermaid
+    ///     renderer. A null <paramref name="scope" /> draws every project.
     /// </summary>
-    /// <param name="summary">The codebase survey to draw.</param>
-    /// <param name="solutionName">The solution file's name, named in the caption and in the accessible title.</param>
-    /// <param name="scope">
-    ///     The project filter; null draws every project (<see cref="DiagramScope.Everything" />).
-    /// </param>
     /// <remarks>
     ///     Only projects the solution declares are drawn, under any <paramref name="scope" />: a workspace
     ///     also loads whatever a project reference reaches, and an unfiltered drawing would otherwise put
     ///     those on a page captioned "Projects in this solution". <paramref name="scope" /> narrows within
     ///     that set. A project whose membership could not be read at all
     ///     (<c>ProjectSummary.SolutionMember</c> is null) is drawn rather than dropped, so an unparseable
-    ///     solution file degrades the drawing instead of emptying it. To see the projects a drawing leaves
-    ///     out, run <c>sliderule graph</c>.
+    ///     solution file degrades the drawing instead of emptying it.
     /// </remarks>
-    /// <returns>The caption and the fenced diagram, separated by a blank line, with LF line endings.</returns>
     public static string Block(GraphSummary summary, string solutionName, DiagramScope? scope = null)
     {
         Guard.NotNull(summary, nameof(summary));
@@ -75,10 +59,9 @@ internal static class GraphDiagramRenderer
         return ProvenanceLine(solutionName) + "\n\n" + string.Join("\n", lines);
     }
 
-    // The provenance/warning caption. Names the solution rather than the spec: the survey is a property of
-    // the codebase, so there is no spec to go and edit — the remedy is a re-render. That em-dash is the one
-    // ARCHITECTURE.md carries outside its fences, which is why the law caption below it spells the same
-    // clause with a full stop; see LawDiagramRenderer.Caption before adding a second one here.
+    // Names the solution rather than the spec: the survey is a property of the codebase, so there is no spec
+    // to go and edit, and the remedy is a re-render. Its em-dash is the one ARCHITECTURE.md carries outside
+    // its fences; see LawDiagramRenderer.Caption before adding a second one here.
     private static string ProvenanceLine(string solutionName)
     {
         return $"*Generated by `sliderule render` from `{solutionName}` — " +
@@ -118,10 +101,7 @@ internal static class GraphDiagramRenderer
         return lines;
     }
 
-    // Project name → Mermaid node ID: the prefix plus a deterministic slug, deduped with an ordinal suffix
-    // so two names that slug alike (MyApp.Web and MyApp-Web) still get distinct nodes. Slugging, dedupe
-    // and label escaping are MermaidText's, shared with the law fence in the same artifact. The map is
-    // keyed by the name, because that is what an edge names at both ends.
+    // Keyed by the project name, because that is what an edge names at both ends.
     private static Dictionary<string, string> NodeIds(IReadOnlyList<ProjectSummary> projects)
     {
         List<string> names = projects.Select(project => project.Name).ToList();

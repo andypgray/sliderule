@@ -5,15 +5,14 @@ using SlideRule.Prose;
 namespace SlideRule.Cli.Rendering;
 
 /// <summary>
-///     How <c>status</c> and <c>baseline</c> name the dead patterns of a rule the run did not measure as
-///     written: <c>the target operand "A"</c>, <c>the allow-list operands "A" and "B"</c>, and what clears them.
+///     How a verb names the dead patterns of a rule the run did not measure as written:
+///     <c>the target operand "A"</c>, <c>the allow-list operands "A" and "B"</c>, and what clears them.
 /// </summary>
 /// <remarks>
-///     One owner for both verbs, because both name the same patterns of the same rule in the same run, and
-///     a reader who meets the two sentences side by side should find one spelling. Double quotes, as the
-///     check's own warning quotes the same reference, so the two can be matched by eye. The noun for each
-///     role is the one the check warning uses, with a target's "target selection operand" shortened to
-///     "target operand".
+///     One owner, so two verbs naming the same patterns of the same rule in the same run spell them alike.
+///     Double quotes, as the check's own warning quotes the same reference, so the two can be matched by eye.
+///     The noun for each role is the one the check warning uses, with a target's "target selection operand"
+///     shortened to "target operand".
 /// </remarks>
 internal static class DeadOperandWording
 {

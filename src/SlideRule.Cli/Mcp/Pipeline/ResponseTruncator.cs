@@ -5,27 +5,16 @@ namespace SlideRule.Cli.Mcp.Pipeline;
 ///     client's context window.
 /// </summary>
 /// <remarks>
-///     <para>
-///         It is deliberately a backstop and not the answer: a document cut at a line boundary is corrupt
-///         JSON, which evicts a client from the tool rather than narrowing what it reads. When truncation
-///         does fire, the footer says how much was dropped and — for the tools that have a narrowing knob —
-///         names the knobs that would have avoided it.
-///     </para>
-///     <para>
-///         <c>arch_graph</c> and <c>arch_check</c> both degrade down a grain ladder against this same budget
-///         before reaching here, so what still lands here from them is a budget too small for any answer at
-///         all (the suites set 10 tokens), and it is cut like any other response.
-///     </para>
+///     It is only a backstop: a document cut at a line boundary is corrupt JSON, and an agent handed one was
+///     measured abandoning the tool for the CLI rather than reading less.
 /// </remarks>
 internal static class ResponseTruncator
 {
     private const int ClientDefaultTokens = 25_000;
     private const int ClientPersistenceThreshold = 50_000;
 
-    // Selected in Hint by the neutral name constants, never by the tool class: this stage runs on the startup
-    // path and must not pull the MSBuildLocator-quarantined tool type into it. arch_status, arch_explain and
-    // arch_context are absent on purpose — they have no knob, so a hint would be noise at the exact moment a
-    // reader is looking for something to do.
+    // arch_status, arch_explain and arch_context are absent on purpose: they have no knob, so a hint would be
+    // noise at the exact moment a reader is looking for something to do.
     //
     // Neither hint names a grain. Both tools coarsen their own grain against this same budget before a
     // response can reach here, so anything that still overruns has already been through the ladder and
@@ -58,12 +47,10 @@ internal static class ResponseTruncator
     ///         could be.
     ///     </para>
     ///     <para>
-    ///         This rule is mirrored out of process. Nothing reports the effective budget, so a consumer that
-    ///         needs it — a tool deriving what a reply was allowed to be, for a run whose binary it cannot
-    ///         call because that release is not installed where the tool runs — carries its
-    ///         own copy of the arithmetic in its own language. A change here is therefore a breaking change for
-    ///         a copy this repository cannot edit, and the <c>ComputeMaxChars_*</c> rows are the tripwire that
-    ///         says so.
+    ///         This rule is mirrored out of process: nothing reports the effective budget, so a tool that derives
+    ///         what a reply was allowed to be carries its own copy of the arithmetic. A change here breaks that
+    ///         copy, which this repository cannot edit, and the <c>ComputeMaxChars_*</c> rows are the tripwire
+    ///         that says so.
     ///     </para>
     /// </remarks>
     internal static int ComputeMaxChars(string? maxMcpOutputTokens)
@@ -94,9 +81,8 @@ internal static class ResponseTruncator
         int cutPoint = text.LastIndexOf('\n', maxChars - 1);
         if (cutPoint <= 0) cutPoint = maxChars;
 
-        // Never cut between the high and low half of a UTF-16 surrogate pair (that strands a lone surrogate —
-        // a broken astral char, e.g. an emoji). When the character kept just before the cut is a high
-        // surrogate and the one dropped at the cut is its low surrogate, step back one so the pair stays whole.
+        // Never cut between the high and low half of a UTF-16 surrogate pair: that strands a lone surrogate, a
+        // broken astral char such as an emoji.
         if (cutPoint > 0 && cutPoint < text.Length
                          && char.IsHighSurrogate(text[cutPoint - 1]) && char.IsLowSurrogate(text[cutPoint]))
             cutPoint--;

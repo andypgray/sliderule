@@ -10,12 +10,9 @@ namespace SlideRule.Model;
 ///     own surface".
 /// </summary>
 /// <remarks>
-///     Derives from <see cref="Constraint" /> directly for the reason its outbound twin does: the operand
-///     list is empty by construction rather than by accident. No external-packages caveat is needed —
-///     only solution types can be observed referencing (GRAMMAR §4.1) — which is the same asymmetry
-///     <see cref="MustOnlyBeReferencedByConstraint" /> carries against
-///     <see cref="MustOnlyReferenceConstraint" />. The self phrase is
-///     <see cref="SentenceRenderer.SelfReference" />'s, as its twin's is.
+///     Derives from <see cref="Constraint" /> directly, as its outbound twin does, and like
+///     <see cref="MustOnlyBeReferencedByConstraint" /> needs no external-packages caveat. The self phrase is
+///     <see cref="SentenceRenderer.SelfReference" />'s.
 /// </remarks>
 internal sealed class MustOnlyBeReferencedByItselfConstraint(Selection subject) : Constraint(subject)
 {

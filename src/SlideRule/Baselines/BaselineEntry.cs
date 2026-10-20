@@ -20,9 +20,8 @@ namespace SlideRule.Baselines;
 ///     amount of reformatting; renaming the type or member it names, or moving it to another namespace
 ///     or containing type, is what makes it a different entry. Two entries are equal when all three
 ///     slots match ordinally, which leaves <see cref="Because" /> and <see cref="SiteCount" /> free to
-///     be re-recorded without forking the entry. An entry no violation in a run matches is stale (the
-///     debt it recorded has been paid off), which <c>sliderule status</c> lists and
-///     <c>sliderule baseline accept-reductions</c> retires.
+///     be re-recorded without forking the entry. An entry no violation in a run matches is stale: the
+///     debt it recorded has been paid off.
 /// </remarks>
 internal sealed class BaselineEntry : IEquatable<BaselineEntry>
 {
@@ -39,28 +38,26 @@ internal sealed class BaselineEntry : IEquatable<BaselineEntry>
     ///     Gets the symbol ID of the type the violation comes from: the type that holds the reference, the
     ///     <c>new</c>, the injected constructor parameter, the <c>catch</c>, the <c>throw</c>, the exposed
     ///     signature position or the banned member access, or the identity of the project that declares a
-    ///     package or targets a framework. Null on an entry keyed by a subject.
+    ///     package or targets a framework.
     /// </summary>
     public string? Source { get; }
 
     /// <summary>
     ///     Gets the symbol ID of what the source reached: the referenced or constructed type, the injected
     ///     parameter's type, the caught or thrown exception type, the exposed type, the banned member
-    ///     itself, or the project's package or framework. Null on an entry keyed by a subject.
+    ///     itself, or the project's package or framework.
     /// </summary>
     public string? Target { get; }
 
     /// <summary>
     ///     Gets the symbol ID of the type, member or project the rule judged, for a violation that names
-    ///     one thing rather than a pair. Null on an entry keyed by a source and a target.
+    ///     one thing rather than a pair.
     /// </summary>
     public string? Subject { get; }
 
     /// <summary>
-    ///     Gets the reason recorded with the entry, or null when it was captured without one — a bulk
-    ///     capture records no reason, while <c>sliderule baseline add</c> requires one. A single
-    ///     non-blank line, printed beside the grandfathered violation in the check report. Excluded from
-    ///     the entry's identity, so re-recording it never creates a second entry.
+    ///     Gets the reason recorded with the entry, a single non-blank line, or null when it was captured
+    ///     without one.
     /// </summary>
     public string? Because { get; }
 
@@ -70,13 +67,8 @@ internal sealed class BaselineEntry : IEquatable<BaselineEntry>
     ///     with none to record.
     /// </summary>
     /// <remarks>
-    ///     A pair that has since grown past the recorded count fails the check instead of being
-    ///     grandfathered; the same or fewer passes, and <c>sliderule baseline accept-reductions</c>
-    ///     lowers the recorded count to what is left. An entry with no count grandfathers its pair however
-    ///     many sites it grows to, so a file whose older entries carry no count still passes. Only an entry
-    ///     keyed by a pair carries a count: a subject entry's sites are declarations. Excluded from the
-    ///     entry's identity and folded into the entry's seal, so an edited count is refused rather than
-    ///     silently widening the allowance.
+    ///     <see cref="BaselineRatchet" /> decides how a run's sites stand against it. It is sealed with the
+    ///     entry, so an edited count is refused rather than silently widening the allowance.
     /// </remarks>
     public int? SiteCount { get; }
 
@@ -115,13 +107,9 @@ internal sealed class BaselineEntry : IEquatable<BaselineEntry>
     }
 
     /// <summary>
-    ///     Creates an entry keyed by a pair of symbol IDs, the shape a reference, construction, injection,
-    ///     banned member use, catch, throw or exposure violation takes. The entry carries no reason and no
-    ///     site count; add them with <see cref="WithBecause" /> and <see cref="WithSiteCount" />.
+    ///     Creates an entry keyed by a pair of symbol IDs, with no reason and no site count; add them with
+    ///     <see cref="WithBecause" /> and <see cref="WithSiteCount" />.
     /// </summary>
-    /// <param name="source">The symbol ID of the type the violation comes from.</param>
-    /// <param name="target">The symbol ID of what the source reached: a type, or a banned member.</param>
-    /// <returns>An entry keyed by <paramref name="source" /> and <paramref name="target" />.</returns>
     public static BaselineEntry ForEdge(string source, string target)
     {
         return new BaselineEntry(
@@ -129,22 +117,18 @@ internal sealed class BaselineEntry : IEquatable<BaselineEntry>
     }
 
     /// <summary>
-    ///     Creates an entry keyed by one symbol ID, the shape a violation about a single type, member or
-    ///     project takes — shape, naming, inheritance, attribute, or a custom <c>Must</c> predicate. A
-    ///     subject entry never carries a site count; add a reason with <see cref="WithBecause" />.
+    ///     Creates an entry keyed by one symbol ID, with no reason; add one with <see cref="WithBecause" />. A
+    ///     subject entry never carries a site count.
     /// </summary>
-    /// <param name="subject">The symbol ID of the type, member or project the rule judged.</param>
-    /// <returns>An entry keyed by <paramref name="subject" />.</returns>
     public static BaselineEntry ForSubject(string subject)
     {
         return new BaselineEntry(null, null, Guard.NotNull(subject, nameof(subject)), null, null);
     }
 
     /// <summary>
-    ///     Returns <paramref name="entries" /> in the canonical baseline order: ordinal by
-    ///     <c>Source ?? Subject</c>, then by <c>Target ?? ""</c>. Single-sourced here because the on-disk
-    ///     file, a parsed section's <see cref="RuleBaseline.Entries" /> and a legacy file's whole-file digest
-    ///     are all computed over it: a drift between any two of them would change a stored digest without
+    ///     Returns <paramref name="entries" /> in the canonical baseline order. Single-sourced here because the
+    ///     on-disk file, a parsed section's <see cref="RuleBaseline.Entries" /> and a legacy file's whole-file
+    ///     digest are all computed over it: a drift between any two of them would change a stored digest without
     ///     changing an entry.
     /// </summary>
     internal static IReadOnlyList<BaselineEntry> InCanonicalOrder(IEnumerable<BaselineEntry> entries)
@@ -160,8 +144,6 @@ internal sealed class BaselineEntry : IEquatable<BaselineEntry>
     ///     grandfathered — the same identity, and the same <see cref="SiteCount" />, so attributing an
     ///     entry never disturbs what it grandfathers.
     /// </summary>
-    /// <param name="because">The reason, as a single non-blank line.</param>
-    /// <returns>The copy, carrying the reason.</returns>
     /// <exception cref="ArgumentException"><paramref name="because" /> is blank or spans more than one line.</exception>
     public BaselineEntry WithBecause(string because)
     {
@@ -177,8 +159,6 @@ internal sealed class BaselineEntry : IEquatable<BaselineEntry>
     ///     identity, and the same <see cref="Because" />, so the two copy calls compose in either order
     ///     and re-recording a count never drops the reason that justified the entry.
     /// </summary>
-    /// <param name="siteCount">The number of distinct <c>file:line</c> sites; at least 1.</param>
-    /// <returns>The copy, carrying the count.</returns>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="siteCount" /> is less than 1.</exception>
     /// <exception cref="InvalidOperationException">This entry is keyed by a subject and has no site count.</exception>
     // Zero is refused rather than stored: an entry that grandfathers nothing is a stale entry, which
@@ -202,10 +182,7 @@ internal sealed class BaselineEntry : IEquatable<BaselineEntry>
         return Equals(obj as BaselineEntry);
     }
 
-    /// <summary>
-    ///     Returns a hash over the entry's three symbol-ID slots, ordinal, consistent with
-    ///     <c>Equals</c>.
-    /// </summary>
+    /// <inheritdoc />
     // Hand-rolled because System.HashCode is unavailable on netstandard2.0.
     public override int GetHashCode()
     {

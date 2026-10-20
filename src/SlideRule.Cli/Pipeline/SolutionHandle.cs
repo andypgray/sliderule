@@ -6,12 +6,7 @@ using SlideRule.Roslyn.Solutions;
 
 namespace SlideRule.Cli.Pipeline;
 
-/// <summary>
-///     What an <see cref="ISolutionSource" /> hands back: the loaded, unresolved-reference-stripped
-///     <see cref="Solution" />, the discovered solution path and how well the workspace loaded
-///     (<see cref="LoadDiagnostics" />) — plus an optional <see cref="IDisposable" /> the handle owns (see
-///     <see cref="Dispose" />).
-/// </summary>
+/// <summary>What an <see cref="ISolutionSource" /> hands back.</summary>
 /// <remarks>
 ///     A <see cref="Solution" /> stays usable after its workspace is disposed, so a handle read in flight is
 ///     safe even once a later call has reloaded.
@@ -38,8 +33,7 @@ internal sealed class SolutionHandle(
 
     /// <summary>
     ///     The target framework each multi-target-framework project was loaded for, keyed by
-    ///     <see cref="ProjectId" /> — what the extraction stamps onto its fragments so the merge can name the
-    ///     framework whose facts won. Empty for a solution whose projects each target one framework.
+    ///     <see cref="ProjectId" />; empty for a solution whose projects each target one framework.
     /// </summary>
     public IReadOnlyDictionary<ProjectId, string> TargetFrameworks { get; } =
         targetFrameworks ?? TargetFrameworkMaps.None;
@@ -47,41 +41,22 @@ internal sealed class SolutionHandle(
     /// <summary>Absolute path to the discovered <c>.sln</c>/<c>.slnx</c>, or to the <c>.slnf</c> filtering one.</summary>
     public string SolutionPath { get; } = solutionPath;
 
-    /// <summary>
-    ///     How well the workspace loaded, as the one value the source computed: the failure diagnostics the
-    ///     caller renders, the projects that failed to load, the ones whose NuGet packages are not in the
-    ///     model and the ones a filter left unchecked. Merge notes are empty here — only extraction produces
-    ///     them, and a handle is what a load hands back.
-    /// </summary>
+    /// <summary>How well the workspace loaded. Its merge notes are empty: only extraction produces them.</summary>
     public WorkspaceDiagnostics LoadDiagnostics { get; } = loadDiagnostics;
 
     /// <summary>
-    ///     The warm path's incremental codebase producer, or null on the cold/one-shot path. When present
-    ///     (the warm MCP source), the extraction seam calls it instead of re-walking the whole solution: it
-    ///     captures this call's snapshot plus the session's <see cref="SessionFragmentStore" />, which decides
-    ///     what to re-walk and memoizes the merge. It takes the caller's excluded project names because the
-    ///     exclusion is applied at merge time, which is what lets one store serve every tool whatever each
-    ///     drops, and the caller's declared solution membership because the read belongs to the one seam that
-    ///     already knows the solution path. Null falls through to the CLI's own one-walk-per-run path.
+    ///     The warm session's codebase producer over this call's snapshot (<see cref="SessionFragmentStore" />),
+    ///     taking the caller's excluded project names and declared solution membership; null on the cold/one-shot
+    ///     path, which walks the solution once per run.
     /// </summary>
     public Func<IReadOnlyCollection<string>, IReadOnlySet<string>?, CancellationToken, Task<SessionCodebase>>?
         WarmCodebase { get; } = warmCodebase;
 
     /// <summary>
-    ///     The warm path's spec-resolution memo, or null on the cold/one-shot path. When present (the warm
-    ///     MCP source), the resolution seam hands it the normalized <c>--spec</c> argument and the cold
-    ///     resolution as a callback, and gets back either a replay of the resolution this session already
-    ///     computed under the same load generation or the result of running that callback. It captures the
-    ///     session's <see cref="SpecResolutionCache" /> and this call's generation, which is what makes an
-    ///     edit to a <c>.cs</c> file free and a structural change a miss. Null falls straight through to the
-    ///     callback, so the CLI path resolves with no memo at all.
+    ///     The warm session's spec-resolution memo under this call's generation (<see cref="SpecResolutionCache" />),
+    ///     taking the normalized <c>--spec</c> argument and the cold resolution as a callback, so what resolution
+    ///     knows stays at the one seam that resolves; null on the cold/one-shot path, which runs the callback.
     /// </summary>
-    /// <remarks>
-    ///     The cold resolution goes down as a callback rather than the seam handing over its inputs, so
-    ///     everything resolution knows — which spec argument means what, which membership read serves both
-    ///     halves, how a failure surfaces — stays at that one seam, and the warm side contributes only the
-    ///     memo and the generation to stamp it with.
-    /// </remarks>
     public Func<string, Func<SessionSpecResolution>, SessionSpecResolution>? WarmSpecResolution { get; } =
         warmSpecResolution;
 

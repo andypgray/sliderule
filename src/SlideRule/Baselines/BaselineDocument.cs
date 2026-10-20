@@ -20,13 +20,11 @@ internal sealed class BaselineDocument
     // sharing one is safe, and a race only builds a duplicate that GetOrAdd discards.
     private readonly ConcurrentDictionary<string, RuleBaseline> _baselines = new(StringComparer.Ordinal);
 
-    /// <summary>Creates a document over <paramref name="sections" />, keyed by rule ID.</summary>
     internal BaselineDocument(IReadOnlyDictionary<string, IReadOnlyList<BaselineEntry>> sections)
     {
         Sections = sections;
     }
 
-    /// <summary>Gets the file's rule sections, keyed by rule ID.</summary>
     internal IReadOnlyDictionary<string, IReadOnlyList<BaselineEntry>> Sections { get; }
 
     /// <summary>

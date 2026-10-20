@@ -5,10 +5,8 @@ namespace SlideRule.Cli.Mcp.Pipeline;
 ///     stages that key on a tool name cannot drift apart.
 /// </summary>
 /// <remarks>
-///     They live here rather than on the tool class because the pipeline must be able to name a tool without
-///     referencing it: the tool type reaches Roslyn workspace types through its runners and is JITted only at
-///     the first tool call, after MSBuildLocator has registered. A filter or a truncator that touched it to
-///     read a string would pull that quarantined type into a path that runs at startup.
+///     The pipeline must name a tool without referencing the tool type, which reaches Roslyn workspace types
+///     through its runners and must not be JITted on the startup path, before MSBuildLocator has registered.
 /// </remarks>
 internal static class ArchToolNames
 {

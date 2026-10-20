@@ -12,15 +12,12 @@ namespace SlideRule.Roslyn.Sessions;
 ///     What one <see cref="SessionFragmentStore.GetFragmentsAsync" /> call produced: the full fragment set
 ///     for every C# project — in the ordinal-project-name order a cold run yields, so the downstream
 ///     <see cref="FragmentMerger" /> is byte-identical — plus the names of the projects this call actually
-///     re-walked.
+///     re-walked, empty in the steady state.
 /// </summary>
-/// <param name="Fragments">Every C# project's fragments, in cold order.</param>
-/// <param name="ReExtractedProjects">The projects this call re-walked; empty in the steady state.</param>
-/// <param name="Version">
-///     The store's fragment-set version these fragments were taken at — bumped only when the stored
-///     fragments actually change, so two sets sharing a version hold the identical fragment instances. It
-///     is what <see cref="SessionFragmentStore.GetCodebaseAsync" /> memoizes the merge against.
-/// </param>
+/// <remarks>
+///     <paramref name="Version" /> is the store's fragment-set version, bumped only when the stored fragments
+///     actually change, so two sets sharing a version hold the identical fragment instances.
+/// </remarks>
 internal readonly record struct SessionFragmentSet(
     IReadOnlyList<CodebaseFragment> Fragments,
     IReadOnlySet<string> ReExtractedProjects,
@@ -28,73 +25,53 @@ internal readonly record struct SessionFragmentSet(
 
 /// <summary>
 ///     What one <see cref="SessionFragmentStore.GetCodebaseAsync" /> call produced: the merged
-///     <see cref="CodebaseModel" /> — shared, and possibly memoized from an earlier call — plus the names of
-///     the projects that call re-walked, which the caller surfaces as its re-extraction observable.
+///     <see cref="CodebaseModel" />, possibly the instance an earlier call built, plus the names of the projects
+///     that call re-walked.
 /// </summary>
 internal readonly record struct SessionCodebase(
     CodebaseModel Model,
     IReadOnlySet<string> ReExtractedProjects);
 
 /// <summary>
-///     A session-lifetime, incremental fragment store for the warm MCP server. It holds the
-///     last-extracted <see cref="CodebaseFragment" />s keyed by project name and, on each
-///     <see cref="GetFragmentsAsync" />, reuses the clean projects' fragments, re-extracts only the ones
-///     whose shape changed — expanded to the reference-graph dependents of those whose declaration surface
-///     changed — and moves the sites of the ones where only trivia moved, before returning the whole set,
-///     which the caller feeds to the one
-///     <see cref="FragmentMerger" /> every extraction path terminates in. One store pairs with one
+///     A session-lifetime, incremental fragment store. It holds the last-extracted
+///     <see cref="CodebaseFragment" />s keyed by project name and, on each <see cref="GetFragmentsAsync" />,
+///     reuses the clean projects' fragments, re-extracts or remaps only what changed, and returns the whole set
+///     for the one <see cref="FragmentMerger" /> every extraction path terminates in. One store pairs with one
 ///     <see cref="WorkspaceSession" /> for its whole lifetime.
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>Generation is the flush signal.</b> A <see cref="WorkspaceSnapshot" /> carries the session's
-///         load <see cref="WorkspaceSnapshot.Generation" />, bumped on every full (re)load. A snapshot from a
-///         new generation — or the very first call — flushes the store and re-extracts every C# project, so
-///         the structural-reload case falls out of this one check with no special handling. Within a
-///         generation, the snapshot's <see cref="WorkspaceSnapshot.ProjectEditVersions" /> pinpoints the
-///         dirty projects. The store assumes every snapshot it is handed comes from its one paired session,
-///         so a generation value is never aliased by a foreign session's — true by construction.
+///         A snapshot from a new <see cref="WorkspaceSnapshot.Generation" />, or the very first call, flushes the
+///         store and re-extracts every C# project; within a generation, the snapshot's
+///         <see cref="WorkspaceSnapshot.ProjectEditVersions" /> pinpoint the dirty projects. The store assumes
+///         every snapshot it is handed comes from its one paired session, so a generation value is never aliased
+///         by a foreign session's.
 ///     </para>
 ///     <para>
-///         <b>Dirty ∪ the dependents of a surface change.</b> A change to project P's declaration surface
-///         (<see cref="SourceShape.SurfaceHash" />) dirties P plus every project that transitively references
-///         P, because it can alter what a dependent compilation binds to or sees as an external type — the
-///         same rule the persisted extraction cache folds into its Merkle keys. A body-only edit dirties P
-///         alone: a dependent reads P only through the declarations it binds to, never through P's syntax or
-///         lines, so its fragment cannot move. An added or removed document, or a changed additional or
-///         analyzer-config document, counts as a surface change.
+///         A change to project P's declaration surface (<see cref="SourceShape.SurfaceHash" />) dirties P plus
+///         every project that transitively references P, because it can alter what a dependent compilation binds
+///         to or sees as an external type — the same rule the persisted extraction cache folds into its Merkle
+///         keys. A body-only edit dirties P alone: a dependent reads P only through the declarations it binds to,
+///         never through P's syntax or lines, so its fragment cannot move.
 ///     </para>
 ///     <para>
-///         <b>Trivia-only edits remap; everything else re-walks.</b> A content-dirty project is re-walked
-///         only when one of its changed documents changed <em>shape</em> (<see cref="SourceShape" />): when
-///         every changed document is shape-equal to the text its fragments were extracted from and yields a
-///         line map, the stored fragments keep every fact and have their sites moved through the maps
-///         (<see cref="FragmentSiteRemapper" />) instead, each fragment through those of the framework it
-///         was extracted under. That is sound because a fragment's facts are read from tokens and directives
-///         and never from comments or whitespace, and every site is a token-start line. Dependents of a
-///         remapped project are left alone: their compilations see the same metadata, and their sites are in
-///         their own files. Any doubt — a split line, two maps for one path under one framework that
-///         disagree, a shape that changed — puts the project back on the re-walk path, which is never wrong,
-///         only slower; and since none of those moves its surface, it re-walks alone.
+///         A content-dirty project is re-walked only when one of its changed documents changed <em>shape</em>
+///         (<see cref="SourceShape" />): when every changed document is shape-equal to the text its fragments were
+///         extracted from and yields a line map, the stored fragments keep every fact and have their sites moved
+///         through the maps (<see cref="FragmentSiteRemapper" />) instead, each fragment through those of the
+///         framework it was extracted under. That is sound because a fragment's facts are read from tokens and
+///         directives and never from comments or whitespace, and every site is a token-start line. Dependents of a
+///         remapped project are left alone: their compilations see the same metadata, and their sites are in their
+///         own files. Any doubt (a split line, two maps for one path under one framework that disagree, a shape
+///         that changed) puts the project back on the re-walk path, which is always correct; and since none of
+///         those moves its surface, it re-walks alone.
 ///     </para>
 ///     <para>
-///         <b>No exclusion in the stored set.</b> The store always holds and returns fragments for
-///         <em>every</em> C# project, the spec project included, so one store serves every tool whatever each
-///         excludes; the exclusion is applied at merge time, by <see cref="GetCodebaseAsync" />, from the set
-///         its caller passes.
-///     </para>
-///     <para>
-///         <b>Concurrency.</b> Tool calls may overlap and extraction is asynchronous (a plain lock cannot
-///         span the <c>await</c>), so a <see cref="SemaphoreSlim" /> serializes the whole compare-and-extract:
-///         a read never races a re-extraction, and the returned set is always internally consistent.
-///     </para>
-///     <para>
-///         <b>The merge is memoized too.</b> <see cref="GetCodebaseAsync" /> memoizes the merged model
-///         against <see cref="SessionFragmentSet.Version" /> and the caller's exclusion set, so a
-///         steady-state call hands back the model its predecessor built. Handing back the same instance is
-///         safe because a merged model is read-only once built: the merge is the only writer of a
-///         <c>TypeNode</c>'s hierarchy and members, and every consumer — the checker, the renderers, the
-///         summarizer — reads.
+///         The store holds and returns fragments for every C# project, the spec project included; the exclusion
+///         is applied at merge time, by <see cref="GetCodebaseAsync" />, from the set its caller passes. Calls may
+///         overlap and extraction is asynchronous (a plain lock cannot span the <c>await</c>), so a
+///         <see cref="SemaphoreSlim" /> serializes the whole compare-and-extract: a read never races a
+///         re-extraction, and the returned set is always internally consistent.
 ///     </para>
 /// </remarks>
 internal sealed class SessionFragmentStore : IDisposable
@@ -128,66 +105,46 @@ internal sealed class SessionFragmentStore : IDisposable
     // The edit-version map the stored fragments were extracted at, for same-generation dirty diffing.
     private IReadOnlyDictionary<string, int> extractedVersions = new Dictionary<string, int>(StringComparer.Ordinal);
 
-    // Bumped only when the stored fragments actually change (every full walk, and an incremental walk that
-    // re-extracted or remapped something), so a steady-state call reports the version its predecessor did —
-    // which is exactly the condition under which the merged model can be handed back rather than rebuilt.
+    // The version SessionFragmentSet.Version reports.
     private long fragmentSetVersion;
 
     // The fragment-set version the memo above holds models for; -1 until the first merge.
     private long mergedVersion = -1;
 
-    // The ordered whole set for the version in orderedVersion, and that version (-1 until the first walk) —
-    // the merge memo's discipline one field up, so a steady-state call re-sorts nothing. Both fields are
-    // only ever touched under the extraction gate, which the two walks and their one reader all hold.
+    // The ordered whole set for the version in orderedVersion, and that version (-1 until the first walk), so a
+    // steady-state call re-sorts nothing. Both fields are only ever touched under the extraction gate.
     private IReadOnlyList<CodebaseFragment>? orderedFragments;
     private long orderedVersion = -1;
 
     /// <summary>
-    ///     The project names the last <see cref="GetFragmentsAsync" /> re-walked: every C# project on a full
-    ///     walk, the shape-changed ∪ dependents set on an incremental one, empty on a steady-state call and on
-    ///     one whose every content change was trivia-only. Internal test observable ("a warm re-extract walks
-    ///     only projects whose compilation identity changed"); never printed.
+    ///     The project names the last <see cref="GetFragmentsAsync" /> re-walked, a test observable: every C#
+    ///     project on a full walk; on an incremental one, the shape-changed projects and the dependents of those
+    ///     whose surface moved.
     /// </summary>
     internal IReadOnlySet<string> LastReExtractedProjects { get; private set; } = NoProjects;
 
     /// <summary>
-    ///     The project names the last <see cref="GetFragmentsAsync" /> moved sites for without re-walking —
-    ///     the content-dirty projects whose every changed document kept its shape. Empty on a full walk and on
-    ///     a steady-state call. Internal test observable; never printed.
+    ///     The project names the last <see cref="GetFragmentsAsync" /> moved sites for without re-walking — the
+    ///     content-dirty projects whose every changed document kept its shape; a test observable.
     /// </summary>
     internal IReadOnlySet<string> LastRemappedProjects { get; private set; } = NoProjects;
 
-    /// <summary>
-    ///     The number of full flush-and-re-extract-everything walks — the first call plus every generation
-    ///     change (structural reload). Internal test observable; never printed.
-    /// </summary>
+    /// <summary>The full walks, the first call and every generation change; a test observable.</summary>
     internal long FullWalkCount { get; private set; }
 
-    /// <summary>
-    ///     Releases the extraction gate. The store is a session-lifetime singleton, so this runs when the
-    ///     server's provider is disposed rather than at any call boundary — the fragments and merged models it
-    ///     holds are plain managed state with nothing of their own to release.
-    /// </summary>
     public void Dispose()
     {
         gate.Dispose();
     }
 
-    /// <summary>
-    ///     Returns the full fragment set for <paramref name="snapshot" />, reusing everything it can. A new
-    ///     generation (or the first call) flushes and re-extracts all C# projects; otherwise it re-extracts
-    ///     exactly the projects a changed document re-shaped since the last call, expanded to the transitive
-    ///     reference-graph dependents of those whose declaration surface moved, remaps the stored sites of the
-    ///     projects only trivia moved within, and
-    ///     reuses the rest. The fragments come back in the ordinal-project-name order a cold run produces, so
-    ///     the caller's <see cref="FragmentMerger" /> yields the identical model.
-    /// </summary>
+    /// <summary>Returns the full fragment set for <paramref name="snapshot" />, reusing everything it can.</summary>
     /// <remarks>
     ///     <paramref name="declaredMembers" /> rides down to the extraction rather than being applied to the
     ///     stored set, and a reused fragment therefore keeps the membership it was extracted with. That is
-    ///     safe because membership can only change when the solution file does, and
-    ///     the solution file is a structural input of the paired session's reconcile sweep — so the change
-    ///     arrives as a new generation, which flushes this store before any of it is read again.
+    ///     safe because membership can only change when the solution file does, and the solution file is a
+    ///     structural input of the paired session's reconcile sweep — so the change arrives as a new
+    ///     generation, which flushes this store before any of it is read again. Under a solution filter it is
+    ///     not: the solution the filter references is no input of that sweep.
     /// </remarks>
     internal async Task<SessionFragmentSet> GetFragmentsAsync(
         WorkspaceSnapshot snapshot, IReadOnlySet<string>? declaredMembers, CancellationToken ct)
@@ -200,16 +157,15 @@ internal sealed class SessionFragmentStore : IDisposable
 
     /// <summary>
     ///     The merged codebase for <paramref name="snapshot" />, dropping
-    ///     <paramref name="excludeProjectNames" /> at merge time — <see cref="GetFragmentsAsync" /> followed
-    ///     by the one <see cref="FragmentMerger" /> every extraction path terminates in, memoized so a call
-    ///     that re-walked nothing hands back the model its predecessor built rather than rebuilding it from
-    ///     the identical fragments.
+    ///     <paramref name="excludeProjectNames" /> at merge time, memoized so a call that re-walked nothing hands
+    ///     back the model its predecessor built.
     /// </summary>
     /// <remarks>
     ///     The memo is keyed by the fragment-set version <em>and</em> the exclusion set, so it can never
     ///     serve a model built from other inputs; a version change empties it. Two overlapping calls
     ///     can therefore both merge (the loser's entry is re-made), which costs a merge and never a wrong
-    ///     model.
+    ///     model. Handing back the same instance is safe because a merged model is read-only once built: the
+    ///     merge is the only writer of a <c>TypeNode</c>'s hierarchy and members.
     /// </remarks>
     internal async Task<SessionCodebase> GetCodebaseAsync(
         WorkspaceSnapshot snapshot,
@@ -329,10 +285,8 @@ internal sealed class SessionFragmentStore : IDisposable
     }
 
     /// <summary>
-    ///     What each content-dirty project's edits were, keyed by project name: the line maps where every
-    ///     changed document kept its <see cref="SourceShape" />, and whether every changed document kept its
-    ///     declaration surface. A dirty name absent from the result is one the caller must re-walk with its
-    ///     dependents, which covers every name this cannot answer for: the solution reports no change under it.
+    ///     Each content-dirty project's classified edits, keyed by project name. A dirty name absent from the
+    ///     result, one the solution reports no change under, is one the caller must re-walk with its dependents.
     /// </summary>
     /// <remarks>
     ///     The comparison is against <see cref="extractedSolution" /> rather than against the previous call's
@@ -495,9 +449,6 @@ internal sealed class SessionFragmentStore : IDisposable
         return dirty;
     }
 
-    // Expands a content-dirty set to include every project that transitively references a dirty one, over the
-    // reverse edges of the snapshot's project-reference graph (name -> names that reference it), walked
-    // breadth-first from the seed.
     private static HashSet<string> ExpandToDependents(HashSet<string> seed, Solution solution)
     {
         if (seed.Count == 0) return seed;
@@ -558,10 +509,8 @@ internal sealed class SessionFragmentStore : IDisposable
 
     // The whole stored set in ordinal-project-name order. OrderBy is a stable sort, so within a name the
     // fragments keep their stored (cold) order — reproducing a cold run's fragment order exactly, and with
-    // it the merged model byte for byte. Held against the fragment-set version, which is bumped by exactly
-    // the two walks that can change what is stored, so a call that re-walked nothing hands back the list its
-    // predecessor built. Sharing the instance is safe for the reason the shared model is: a fragment is
-    // immutable data and every consumer reads.
+    // it the merged model byte for byte. Sharing the cached list is safe for the reason the shared model is:
+    // a fragment is immutable data and every consumer reads.
     private IReadOnlyList<CodebaseFragment> OrderedFragments()
     {
         if (orderedVersion == fragmentSetVersion && orderedFragments is { } cached) return cached;

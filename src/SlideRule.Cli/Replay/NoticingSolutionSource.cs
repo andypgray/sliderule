@@ -10,8 +10,8 @@ namespace SlideRule.Cli.Replay;
 ///     This is the shape a persisted capture takes when it is <em>invalid</em> (stale or unreadable): the run
 ///     falls back to a design-time build, and the notice must land exactly once, at acquisition time rather
 ///     than at startup, so a fragment-cache hit — which acquires no workspace — prints nothing and stays
-///     byte-identical to a plain cached run. The runner acquires at most once, so the guard flag is
-///     belt-and-suspenders.
+///     byte-identical to a plain cached run. A closure acquire that cannot stand in for the whole solution is
+///     followed by a whole-solution acquire, and the guard flag keeps that run to one notice.
 /// </remarks>
 internal sealed class NoticingSolutionSource(string notice, TextWriter error, ISolutionSource inner) : ISolutionSource
 {

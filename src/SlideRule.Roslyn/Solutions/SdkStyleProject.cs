@@ -12,45 +12,39 @@ namespace SlideRule.Roslyn.Solutions;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>The three shapes, and why all three.</b> An SDK-style project can declare its SDK as an
-///         attribute on the root (<c>&lt;Project Sdk="Microsoft.NET.Sdk"&gt;</c> — what every template
-///         writes), as a child element (<c>&lt;Sdk Name="…" /&gt;</c>), or as a pair of explicit imports
+///         An SDK-style project can declare its SDK as an attribute on the root
+///         (<c>&lt;Project Sdk="Microsoft.NET.Sdk"&gt;</c>, what every template writes), as a child element
+///         (<c>&lt;Sdk Name="…" /&gt;</c>), or as a pair of explicit imports
 ///         (<c>&lt;Import Sdk="…" Project="Sdk.props" /&gt;</c>, the form a project pinning an SDK version
 ///         between the props and targets halves has to use). All three are the same fact to MSBuild, so all
 ///         three are the same fact here.
 ///     </para>
 ///     <para>
-///         <b>Local names throughout, and never the namespace.</b> The legacy shape declares the 2003 MSBuild
-///         XML namespace and the SDK shape declares none, so the <c>xmlns</c> looks like the discriminator and
-///         is not one: MSBuild accepts an SDK-style project that declares the 2003 namespace anyway, and the
-///         attribute is what decides. Reading local names means both are read correctly rather than one being
-///         inferred from the other.
+///         Names are matched by local name, never by namespace. The legacy shape declares the 2003 MSBuild XML
+///         namespace and the SDK shape declares none, so the <c>xmlns</c> looks like the discriminator and is
+///         not one: MSBuild accepts an SDK-style project that declares the 2003 namespace anyway, and the
+///         attribute is what decides.
 ///     </para>
 ///     <para>
-///         <b>Where the read is deliberately narrower than "anywhere in the file".</b> The <c>Sdk</c> element
-///         is looked for among the root's own children, where MSBuild defines it, rather than anywhere in the
-///         document — a legacy project is free to declare a <em>property</em> called <c>Sdk</c>, and reading
-///         that as an SDK declaration would blame a healthy legacy project for a file it was never going to
-///         write. <c>Import</c> is looked for among all descendants, because an <c>ImportGroup</c> may
-///         legitimately hold one.
+///         The <c>Sdk</c> element is looked for among the root's own children, where MSBuild defines it, rather
+///         than anywhere in the document: a legacy project is free to declare a property called <c>Sdk</c>, and
+///         reading that as an SDK declaration would blame a healthy legacy project for a file it was never going
+///         to write. <c>Import</c> is looked for among all descendants, because an <c>ImportGroup</c> may hold
+///         one.
 ///     </para>
 ///     <para>
-///         <b>Every degradation answers <see langword="false" />.</b> An unreadable file, malformed XML, a
-///         DOCTYPE, a root element that is not <c>Project</c>, a missing file — each says "not SDK-style", the
-///         same posture <see cref="RestoreFailures" /> takes for a file it could not read. A false negative
-///         leaves a partial model undetected, as if this check did not exist; a false positive refuses a
-///         healthy solution, which is the outcome the structural gate exists to prevent.
+///         Every degradation (an unreadable file, malformed XML, a DOCTYPE, a root element that is not
+///         <c>Project</c>, a missing file) answers "not SDK-style", the same posture
+///         <see cref="RestoreFailures" /> takes for a file it could not read: a false negative leaves a partial
+///         model undetected, where a false positive would refuse a healthy solution.
 ///     </para>
 /// </remarks>
 internal static class SdkStyleProject
 {
     /// <summary>
-    ///     Whether the project file at <paramref name="projectFilePath" /> declares an MSBuild SDK — by an
-    ///     <c>Sdk</c> attribute on the root, an <c>Sdk</c> element among the root's children, or an
-    ///     <c>Import</c> carrying an <c>Sdk</c> attribute. False for a legacy project, and false for every
-    ///     file this cannot read.
+    ///     Whether the project file at the absolute <paramref name="projectFilePath" /> declares an MSBuild SDK in
+    ///     any of those shapes; false for a legacy project and for every file this cannot read.
     /// </summary>
-    /// <param name="projectFilePath">The absolute path to the project file.</param>
     internal static bool IsSdkStyle(string projectFilePath)
     {
         try

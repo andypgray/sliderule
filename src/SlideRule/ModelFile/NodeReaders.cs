@@ -8,10 +8,10 @@ namespace SlideRule.ModelFile;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         Five tables rather than one, because a discriminator is only unique inside a stratum: a noun
-///         and a verb may share a word without either meaning the other. A lookup with no arm is content,
-///         not a bug — some file says a word this reader does not know — so it becomes a refusal naming
-///         the word, and only the writer's side of the pair throws for a class it was never taught.
+///         One table per <see cref="NodeFamily" />: a noun and a verb may share a word without either meaning
+///         the other. A lookup with no arm is content, not a bug (some file says a word this reader does not
+///         know), so it becomes a refusal naming the word, and only the writer's side of the pair throws for a
+///         class it was never taught.
 ///     </para>
 ///     <para>
 ///         The keys come from the same mechanical rule the writer spells its discriminators with, so the
@@ -76,8 +76,6 @@ internal static class NodeReaders
 
     internal static IReadOnlyDictionary<string, Func<ModelNodeReader, StrictJsonValue, Constraint?>> ConstraintArms =>
         Constraints;
-
-    // ---- nouns ---------------------------------------------------------------------------------
 
     private static Dictionary<string, Func<ModelNodeReader, StrictJsonValue, SelectionNoun?>> BuildNouns()
     {
@@ -153,8 +151,6 @@ internal static class NodeReaders
         ProjectSelection? selected = reader.RequiredProjectSelection(value, NounWhere, "projects");
         return selected is null ? null : new EachNoun(selected);
     }
-
-    // ---- selection adjectives ------------------------------------------------------------------
 
     private static Dictionary<string, Func<ModelNodeReader, StrictJsonValue, SelectionAdjective?>> BuildAdjectives()
     {
@@ -260,8 +256,6 @@ internal static class NodeReaders
         return map;
     }
 
-    // ---- member adjectives ---------------------------------------------------------------------
-
     private static Dictionary<string, Func<ModelNodeReader, StrictJsonValue, MemberAdjective?>> BuildMemberAdjectives()
     {
         var map = new Dictionary<string, Func<ModelNodeReader, StrictJsonValue, MemberAdjective?>>(
@@ -338,8 +332,6 @@ internal static class NodeReaders
         return map;
     }
 
-    // ---- project adjectives --------------------------------------------------------------------
-
     private static Dictionary<string, Func<ModelNodeReader, StrictJsonValue, ProjectAdjective?>> BuildProjectAdjectives()
     {
         var map = new Dictionary<string, Func<ModelNodeReader, StrictJsonValue, ProjectAdjective?>>(
@@ -374,8 +366,6 @@ internal static class NodeReaders
 
         return map;
     }
-
-    // ---- verbs ---------------------------------------------------------------------------------
 
     private static Dictionary<string, Func<ModelNodeReader, StrictJsonValue, Constraint?>> BuildConstraints()
     {
@@ -585,8 +575,6 @@ internal static class NodeReaders
         });
     }
 
-    // ---- the shapes several verbs share --------------------------------------------------------
-
     private static void Subject<TConstraint>(
         Dictionary<string, Func<ModelNodeReader, StrictJsonValue, Constraint?>> map, Func<Selection, TConstraint> build)
         where TConstraint : Constraint
@@ -673,8 +661,6 @@ internal static class NodeReaders
         });
     }
 
-    // A project subject and one list of strings under one key: MustOnlyTarget's frameworks and the package
-    // verbs' identifier globs.
     private static void ProjectTexts<TConstraint>(
         Dictionary<string, Func<ModelNodeReader, StrictJsonValue, Constraint?>> map,
         string key,

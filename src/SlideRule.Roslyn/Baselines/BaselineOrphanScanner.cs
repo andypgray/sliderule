@@ -22,8 +22,8 @@ internal static class BaselineOrphanScanner
     // status and status --json, which are otherwise the same on every machine.
     private const string CouldNotOpen = "the file could not be opened.";
 
-    // An inaccessible subdirectory is skipped rather than thrown on: the scan runs inside every check, status,
-    // hook and adapter run, and it is a nudge, never a reason for one of them to stop.
+    // An inaccessible subdirectory is skipped rather than thrown on: the scan is a nudge, never a reason for the
+    // run that asked for it to stop.
     private static readonly EnumerationOptions EveryReachableFile = new()
     {
         RecurseSubdirectories = true,

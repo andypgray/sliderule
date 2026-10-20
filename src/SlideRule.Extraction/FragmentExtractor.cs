@@ -13,9 +13,7 @@ namespace SlideRule.Extraction;
 
 /// <summary>
 ///     Extracts one <see cref="CompilationInput" /> into a self-contained <see cref="CodebaseFragment" />
-///     by running the model's passes over a <em>single</em> compilation: declare the types, fill their
-///     hierarchy, then mint each edge family. Each <c>Walk*</c> method below states what its own family
-///     keys on.
+///     by running the model's passes over a <em>single</em> compilation.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -24,18 +22,9 @@ namespace SlideRule.Extraction;
 ///         §4.1).
 ///     </para>
 ///     <para>
-///         Hierarchy fills <em>by FQN</em>, recording every referenced-but-not-declared FQN in
-///         <see cref="CodebaseFragment.Externals" /> with the facts from this compilation's metadata view.
-///         That is what makes a fragment self-contained, and it is why a type another project declares
-///         still lands in <c>Externals</c> here: this is the per-input half of the split builder, and the
-///         merge — not this pass — decides unification (declared-beats-external). See
-///         <see cref="FragmentMerger" />.
-///     </para>
-///     <para>
-///         Those facts never read another assembly's syntax, on any path. A reference to another project
-///         reaches a compilation either as that project's source symbols or as a metadata image, and only
-///         the first carries trees, so another assembly's type takes its generated fact from the attribute
-///         alone. An external's facts are then the same whichever form the reference took.
+///         No fact recorded about another assembly's type reads syntax, on any path: a reference to another
+///         project reaches a compilation as its source symbols or as a metadata image, and only the first
+///         carries trees, so an external's facts are the same whichever form the reference took.
 ///     </para>
 /// </remarks>
 internal static class FragmentExtractor
@@ -54,11 +43,8 @@ internal static class FragmentExtractor
     ///     for one type's worth of work.
     /// </summary>
     /// <remarks>
-    ///     Those three grains are the whole of the polling: one type's worth of work is short enough to
-    ///     finish after a cancel, so the per-node walker and the Roslyn calls under it take no token. The
-    ///     token is per-call state, held on the <see cref="ExtractState" /> that dies with the compilation —
-    ///     never static, because both halves of extraction are loaded inside the compiler and every analysis
-    ///     carries its own.
+    ///     The token is per-call state on the <see cref="ExtractState" />, never static, because extraction also
+    ///     runs inside the compiler, where every analysis carries its own.
     /// </remarks>
     internal static CodebaseFragment Extract(CompilationInput input, CancellationToken cancellationToken)
     {
@@ -79,21 +65,26 @@ internal static class FragmentExtractor
     /// <remarks>
     ///     <para>
     ///         The direction is the contract: this view may report <em>less</em> than a check over the whole
-    ///         solution and must never report what that check would not. Every drop below serves it. A type
-    ///         this compilation cannot vouch for — an error type, one in an assembly
-    ///         <paramref name="siblingProjects" /> attributes to several projects, or a sibling with an
-    ///         error type in its hierarchy, which is what a truncated reference closure looks like from here
-    ///         — is left out of the side fragments <em>and</em> off the far end of every own edge, so no
-    ///         verb of either polarity judges it. A sibling's own facts and hierarchy are all that is
-    ///         recorded: it carries no declaration sites and no members, because the member inventory read
-    ///         from an image is not the one read from source, and sites in a file this compilation does not
-    ///         hold cannot be pointed at.
+    ///         solution and must never report what that check would not. A type this compilation cannot vouch
+    ///         for (an error type, one in an assembly <paramref name="siblingProjects" /> attributes to several
+    ///         projects, or a sibling with an error type in its hierarchy, which is what a truncated reference
+    ///         closure looks like from here) is left out of the side fragments <em>and</em> off the far end of
+    ///         every own edge, so no verb of either polarity judges it. A sibling's own facts and hierarchy are
+    ///         all that is recorded: it carries no declaration sites and no members, because the member
+    ///         inventory read from an image is not the one read from source, and sites in a file this
+    ///         compilation does not hold cannot be pointed at.
     ///     </para>
     ///     <para>
     ///         Must agree with <see cref="FragmentMerger" /> on two points, or the merge mints a shadow node
     ///         and a note about types that are not split at all: a side fragment's assembly name is the one
     ///         its symbols were bound from, and a name this compilation declares itself is left out of every
     ///         side fragment's externals.
+    ///     </para>
+    ///     <para>
+    ///         A null <paramref name="siblingProjects" /> builds no side fragment, and the own fragment is then
+    ///         the ordinary extraction's without its registrations and project references.
+    ///         <paramref name="cancellationToken" /> is polled at the grains
+    ///         <see cref="Extract(CompilationInput,CancellationToken)" /> names, and once per sibling type.
     ///     </para>
     /// </remarks>
     internal static IReadOnlyList<CodebaseFragment> ExtractOneProject(
@@ -108,56 +99,30 @@ internal static class FragmentExtractor
     /// <summary>
     ///     One document of a compilation extracted as the same kind of view <see cref="ExtractOneProject" />
     ///     takes of a whole one: the types <paramref name="tree" /> holds a declaring part of, each carried
-    ///     <em>whole</em> — every part's declaration sites and every part's edges, wherever those parts sit
-    ///     — as the own fragment, then one facts-only fragment per project-and-assembly whose types it
-    ///     touched, ordered ordinally by project name and then assembly name. Nothing here merges or checks
-    ///     anything.
+    ///     <em>whole</em> (every part's declaration sites and edges, wherever those parts sit) as the own
+    ///     fragment, then the side fragments, ordered as there.
     /// </summary>
     /// <remarks>
     ///     <para>
     ///         The union over a compilation's documents of what this returns is what
-    ///         <see cref="ExtractOneProject" /> returns of the compilation, and that is the whole contract:
-    ///         a rule answered per document must say what the same rule answers over the project, so a type
-    ///         is extracted whole from any one of its files rather than a file's slice of it.
+    ///         <see cref="ExtractOneProject" /> returns of the compilation: a rule answered per document must say
+    ///         what the same rule answers over the project, so a type is extracted whole from any one of its
+    ///         files rather than a file's slice of it.
     ///     </para>
     ///     <para>
-    ///         The own project is a sibling of itself here, which is the one structural difference from the
-    ///         whole-compilation view: a type of this compilation that <em>another</em> document declares is
-    ///         not in this document's own fragment, so it arrives as a side fragment under the own project
-    ///         name and the own assembly name — facts and hierarchy, no members and no declaration sites,
-    ///         exactly as another project's type does. Two things follow from it being this compilation's
-    ///         own type rather than a sibling's. Its generated verdict reads the file signals as well as the
-    ///         attribute, because these are trees this compilation holds and the document that declares it
-    ///         reads them too. And a half-resolved hierarchy does not drop it, because the truncated
-    ///         reference closure that screen exists for is not something that can happen to a type compiled
-    ///         here.
+    ///         The own project is a sibling of itself here, the one structural difference from the
+    ///         whole-compilation view: a type of this compilation that <em>another</em> document declares
+    ///         arrives as a side fragment under the own project name and the own assembly name, with facts and
+    ///         hierarchy but no members and no declaration sites, exactly as another project's type does.
+    ///     </para>
+    ///     <para>
+    ///         A tree declaring no type yields one own fragment with nothing declared in it.
+    ///         <paramref name="semanticModel" /> is the model the caller already holds for
+    ///         <paramref name="tree" />, or <see langword="null" /> to mint one. A null
+    ///         <paramref name="siblingProjects" /> builds no side fragment at all, the own project's included.
+    ///         <paramref name="cancellationToken" /> is polled as <see cref="ExtractOneProject" /> polls it.
     ///     </para>
     /// </remarks>
-    /// <param name="input">
-    ///     The compilation the document belongs to, whose <see cref="CompilationInput.ProjectName" /> names
-    ///     the project that produced it — the name the own project's own side fragment is recorded under.
-    /// </param>
-    /// <param name="tree">
-    ///     The document to extract, one of <paramref name="input" />'s syntax trees. A tree declaring no
-    ///     type is not an error: it yields one own fragment with nothing declared in it.
-    /// </param>
-    /// <param name="semanticModel">
-    ///     The model the caller already holds for <paramref name="tree" />, or <see langword="null" /> to
-    ///     mint one. Every other tree this extraction reads mints its own on first ask either way, which is
-    ///     what a partial type declared across several files needs.
-    /// </param>
-    /// <param name="declaringTrees">
-    ///     Which types each of the compilation's trees holds a declaring part of, built once for the
-    ///     compilation and handed to every document's extraction.
-    /// </param>
-    /// <param name="siblingProjects">
-    ///     Which project of the solution produces each assembly, or null where nothing said: with no map no
-    ///     side fragment is built at all, the own project's included.
-    /// </param>
-    /// <param name="cancellationToken">
-    ///     Observed at the grains <see cref="Extract(CompilationInput,CancellationToken)" /> names, plus
-    ///     once per sibling type.
-    /// </param>
     internal static IReadOnlyList<CodebaseFragment> ExtractDocument(
         CompilationInput input, SyntaxTree tree, SemanticModel? semanticModel, DeclaringTrees declaringTrees,
         SiblingProjects? siblingProjects, CancellationToken cancellationToken)
@@ -171,13 +136,14 @@ internal static class FragmentExtractor
     /// <summary>
     ///     Every input extracted, in <em>input</em> order — the ordinal order the merge's first-declarer-wins
     ///     rule reads, so the model is byte-identical however the work is scheduled.
+    ///     <paramref name="artifactFacts" /> pairs with <paramref name="inputs" /> by index, and it, or an entry of
+    ///     it, is null wherever nothing evaluated the project.
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         Extraction is the dominant phase of a cold run and the one that is embarrassingly parallel:
-    ///         each input gets its own <see cref="ExtractState" />, the statics this class shares are pure,
-    ///         and Roslyn's symbol and semantic-model APIs are thread-safe. Order is kept by writing each
-    ///         fragment to its own slot rather than by the order the work finishes in — a
+    ///         Parallel because extraction dominates a cold run: each input gets its own
+    ///         <see cref="ExtractState" />, the statics this class shares are pure, and Roslyn's symbol and
+    ///         semantic-model APIs are thread-safe. Each fragment is written to its own slot, because a
     ///         completion-ordered list would silently move which fragment declares a shared FQN.
     ///     </para>
     ///     <para>
@@ -211,11 +177,8 @@ internal static class FragmentExtractor
         return artifactFacts is not null && index < artifactFacts.Count ? artifactFacts[index] : null;
     }
 
-    // Stamped onto the finished fragment rather than threaded through the extraction, because none of it
-    // comes from the compilation: an evaluated fact and a bound symbol are two different reads of the same
-    // project, and only one of them has anything to say about a hand-built input. The declared project
-    // references are left out on purpose. They are paths and the fragment states names, and the loader has
-    // already turned them into the input's reference names, which is where the fragment's list comes from.
+    // The declared project references are left out: they are paths and the fragment states names, and the loader
+    // has already turned them into the input's reference names, which is where the fragment's list comes from.
     private static CodebaseFragment WithArtifactFacts(CodebaseFragment fragment, ProjectArtifactFacts? facts)
     {
         if (facts is null) return fragment;
@@ -238,10 +201,6 @@ internal static class FragmentExtractor
     ///     namespace walk rather than a syntax walk, which is what admits a top-level-statements
     ///     <c>Program</c>, declared by no type-declaration syntax at all.
     /// </summary>
-    /// <remarks>
-    ///     <see cref="DeclaringTrees" /> indexes this same walk by tree, so a document run declares exactly
-    ///     the types one file holds a part of.
-    /// </remarks>
     internal static IEnumerable<INamedTypeSymbol> DeclaredTypes(Compilation compilation)
     {
         return TypesInNamespace(compilation.Assembly.GlobalNamespace);
@@ -286,23 +245,18 @@ internal static class FragmentExtractor
         };
     }
 
-    // The ratified exclusion filter (GRAMMAR §4.6): drop every compiler-generated/implicitly-declared member
-    // (auto-property and field-like-event backing fields, the record equality/clone/deconstruct surface),
-    // every member with no source-writable name, every non-Ordinary method (which is exactly accessors,
-    // constructors incl. static, operators, conversions, finalizers, and explicit interface METHOD
-    // implementations), indexers, and anything that is not a method/property/field/event. Explicit interface
-    // implementations are excluded uniformly across all three member kinds: a METHOD impl falls out via the
-    // non-Ordinary MethodKind screen, a PROPERTY or EVENT impl via its non-empty
-    // ExplicitInterfaceImplementations. An explicit impl is interface plumbing (Private, its name fixed by
-    // the interface), never authored surface — so no member subject ever sees one.
+    // The member inventory filter (GRAMMAR §4.6). IsImplicitlyDeclared drops the backing fields and the record
+    // equality, clone and deconstruct surface; the Ordinary screen drops accessors, constructors (static ones
+    // included), operators, conversions, finalizers and explicit interface method implementations, and the two
+    // ExplicitInterfaceImplementations screens drop the property and event ones. An explicit implementation is
+    // interface plumbing (private, its name fixed by the interface), never authored surface.
     private static bool IsInventoried(ISymbol member)
     {
         if (member.IsImplicitlyDeclared) return false;
 
-        // The member-side twin of the type-side screen in Declare: a member source cannot name is not
-        // authored surface, so no rule can be about it. Subtracts exactly the synthesized top-level-statements
-        // entry point `<Main>$` — every other unwritable member is already gone on the screens below — which a
-        // project-noun subject reaches (the enclosing Program type IS authored surface and stays inventoried).
+        // A member source cannot name is not authored surface. Of the members the other screens keep, this drops
+        // only the synthesized top-level-statements entry point `<Main>$`, which a project-noun subject would
+        // reach; the enclosing Program stays inventoried.
         if (!member.CanBeReferencedByName) return false;
 
         return member switch
@@ -315,8 +269,6 @@ internal static class FragmentExtractor
         };
     }
 
-    // The attribute classes one symbol wears, nulls dropped. The one spelling of the projection both the
-    // type side and the member side read attributes through.
     private static IEnumerable<INamedTypeSymbol> AttributeClassesOf(ISymbol symbol)
     {
         return symbol.GetAttributes()
@@ -336,10 +288,8 @@ internal static class FragmentExtractor
         };
     }
 
-    // Declaration sites for a member: the identifier line of each declaring syntax — a partial method
-    // has two, a field/field-like-event declarator has its own — deduped and ordered by (file, line), the
-    // same discipline the type declaration-site pass uses. Almost every member declares once, and that case
-    // needs neither the ordering set nor the list it would be copied into.
+    // A partial method declares twice and a field or field-like event declarator has its own site; almost every
+    // member declares once, which needs neither the ordering set nor the list it would be copied into.
     private static IReadOnlyList<FragmentSite> MemberDeclarationSites(ISymbol member)
     {
         ImmutableArray<SyntaxReference> references = member.DeclaringSyntaxReferences;
@@ -377,11 +327,9 @@ internal static class FragmentExtractor
         };
     }
 
-    // The definition-level endpoints one constructor-parameter type contributes as injection edges (GRAMMAR
-    // §4.7), decomposed exactly like a type edge (§4.1): a constructed generic yields its definition and every
-    // type argument (recursively), an array yields its element type (recursively), a plain named type yields
-    // itself. Type parameters, pointers, and dynamic contribute nothing. Endpoints are gated the same way a
-    // type-edge target is (implicitly declared / un-nameable / TypeKindMapper non-match are skipped).
+    // A signature type's definition-level endpoints, decomposed as a type edge's are (GRAMMAR §4.1): a
+    // constructed generic yields its definition and its type arguments, an array its element type, and type
+    // parameters, pointers and dynamic yield nothing.
     private static IEnumerable<INamedTypeSymbol> DecomposeType(ITypeSymbol type)
     {
         switch (type)
@@ -401,13 +349,9 @@ internal static class FragmentExtractor
         }
     }
 
-    // The signature-position types one inventoried member contributes as exposure edges (GRAMMAR §4.9): a
-    // method's return type (System.Void skipped — a void return names nothing) and each parameter type; a
-    // property/field/event's own type. Only members IsInventoried admits reach here (Ordinary methods,
-    // non-indexer properties, fields, events — never an explicit interface impl of any kind), so constructors,
-    // accessors, operators, and the delegate Invoke never contribute. Each yielded type is decomposed
-    // definition-level by DecomposeType, exactly like a
-    // constructor-parameter type on the injection axis.
+    // The types in one inventoried member's signature positions (GRAMMAR §4.9), a void return skipped. Only
+    // inventoried members reach here, which is what keeps constructors, accessors, operators and a delegate's
+    // Invoke out without a screen of their own.
     private static IEnumerable<ITypeSymbol> SignatureTypesOf(ISymbol member)
     {
         switch (member)
@@ -429,12 +373,8 @@ internal static class FragmentExtractor
         }
     }
 
-    // Effective visibility (GRAMMAR §4.9): the member is public AND every containing type up the chain is
-    // public. A public member nested in an internal type is not surface, so it mints nothing — the honesty
-    // boundary (an internal member is not part of the type's external contract). No explicit interface
-    // implementation ever reaches this gate — IsInventoried (§4.6) drops all three kinds before the
-    // exposure pass runs, so the inventory filter, not this gate, is what keeps explicit impls (Private
-    // plumbing) out of the exposure graph.
+    // Effective visibility (GRAMMAR §4.9): a public member of an internal type is not surface, so it mints
+    // nothing.
     private static bool IsEffectivelyPublicMember(ISymbol member)
     {
         if (member.DeclaredAccessibility != RoslynAccessibility.Public) return false;
@@ -444,10 +384,8 @@ internal static class FragmentExtractor
         return true;
     }
 
-    // The declaration site of a constructor parameter: its in-source identifier location (a primary-constructor
-    // parameter, an ordinary-constructor parameter — both point at the parameter name), file path raw from the
-    // syntax tree and 1-based line, the same discipline every other site pass uses. Null for a parameter with
-    // no source location (should not arise for a source-declared constructor).
+    // The parameter's name, for a primary constructor as for an ordinary one; null only for a parameter with no
+    // source location, which a source-declared constructor does not produce.
     private static FragmentSite? ParameterSite(IParameterSymbol parameter)
     {
         foreach (Location location in parameter.Locations)
@@ -457,8 +395,8 @@ internal static class FragmentExtractor
         return null;
     }
 
-    // The site of a registration call: the invoked method-name identifier (so a fluent chain records each
-    // .AddX() on its own line, not the shared receiver line), file path raw from the syntax tree, 1-based line.
+    // The invoked method-name identifier, so a fluent chain records each .AddX() on its own line rather than on
+    // the shared receiver's.
     private static FragmentSite RegistrationSite(InvocationExpressionSyntax invocation)
     {
         SyntaxNode anchor = invocation.Expression is MemberAccessExpressionSyntax memberAccess
@@ -467,40 +405,31 @@ internal static class FragmentExtractor
         return FragmentSite.Of(anchor);
     }
 
+    // One compilation's extraction state. Its memos hold symbols and trees, so they live here and die with the
+    // compilation, never in a static.
     private sealed class ExtractState
     {
-        // What a bare `catch` catches here (GRAMMAR §4.8), resolved once for the compilation rather than
-        // once per clause — the walk is handed the answer. Null where System.Exception cannot be resolved,
-        // which mints nothing.
+        // What a bare `catch` catches (GRAMMAR §4.8), resolved once per compilation; null where System.Exception
+        // does not resolve, and a bare catch then mints nothing.
         private readonly INamedTypeSymbol? _bareCatchType;
 
-        // Observed at the three grains Extract names and nowhere else: a cancelled caller waits at worst for
-        // one type's worth of work, so the per-node walker never polls.
         private readonly CancellationToken _cancellationToken;
         private readonly Dictionary<(string Src, string Caught), SortedSet<FragmentSite>> _catchEdgeSites = new();
 
-        // The swallowing subset of _catchEdgeUnfilteredSites, keyed identically (GRAMMAR §4.8): unfiltered AND
-        // not ending in a throw. Recorded as its own parallel fact for the same polarity reason as the
-        // unfiltered subset — a ban must read the sites it forbids directly, never a complement, because sites
-        // dedupe by (file, line) and a complement would hide the swallowing clause of a same-line collision.
+        // The swallowing subset of _catchEdgeUnfilteredSites (GRAMMAR §4.8): unfiltered and not ending in a throw,
+        // recorded directly for the unfiltered subset's reason.
         private readonly Dictionary<(string Src, string Caught), SortedSet<FragmentSite>> _catchEdgeSwallowingSites = new();
 
-        // The unfiltered subset of _catchEdgeSites, keyed identically (GRAMMAR §4.8). Recorded as its own
-        // parallel fact rather than derived by complement: sites dedupe by (file, line), so a filtered and an
-        // unfiltered catch of one type on one physical line collapse to a single site, and a complement would
-        // then hide the unfiltered clause. Recording the unfiltered sites is truthful for a ban either way.
+        // The unfiltered subset of _catchEdgeSites, keyed identically (GRAMMAR §4.8) and recorded directly rather
+        // than derived by complement: sites dedupe by (file, line), so a filtered and an unfiltered catch of one
+        // type on one line collapse to one site, and a complement would hide the unfiltered clause.
         private readonly Dictionary<(string Src, string Caught), SortedSet<FragmentSite>> _catchEdgeUnfilteredSites = new();
         private readonly Compilation _compilation;
 
-        // The memo behind ConstructedName, the sibling of _fullNames for the one fact that must NOT erase a
-        // construction: it keys on the constructed symbol rather than its definition, so IEnumerable<int> and
-        // IEnumerable<string> get an entry each and neither can be served the other's name.
-        //
-        // Both symbol-keyed memos here are suppressed for RS1024. The rule wants a symbol-keyed dictionary
-        // built with SymbolEqualityComparer, which is what both are; the analyzer that ships with the
-        // compiler-API version this project floors on reports them anyway, and spelling the dictionary type
-        // out instead of inferring it makes no difference. Measured, not assumed. The suppression is two
-        // lines wide at each memo so a future symbol-keyed table built WITHOUT the comparer still reds.
+        // RS1024 is suppressed at both symbol-keyed memos: each is built with SymbolEqualityComparer, as the rule
+        // asks, and the analyzer that ships with the compiler-API version this project floors on reports them
+        // anyway, however the dictionary type is spelled (measured). Each suppression stays two lines wide so a
+        // symbol-keyed table built without the comparer still reds.
 #pragma warning disable RS1024 // false positive: the comparer below is exactly what the rule asks for
         private readonly Dictionary<ISymbol, string> _constructedNames = new(SymbolEqualityComparer.Default);
 #pragma warning restore RS1024
@@ -510,54 +439,42 @@ internal static class FragmentExtractor
         private readonly Dictionary<(string Src, string Exposed), SortedSet<FragmentSite>> _exposureEdgeSites = new();
         private readonly Dictionary<string, FragmentExternal> _externals = new(StringComparer.Ordinal);
 
-        // The per-compilation memo behind this state's FullNameOf. The display walk is the most expensive
-        // per-reference operation in extraction and the same handful of symbols recur across thousands of
-        // sites, so the memo is keyed on OriginalDefinition — what FullNameOf reads — and every construction of
-        // one generic shares its entry. It holds symbols, so it is scoped to the state that dies with the
-        // compilation.
+        // The memo behind this state's FullNameOf, keyed on OriginalDefinition so every construction of one generic
+        // shares an entry: the display walk is the most expensive per-reference operation in extraction, and a
+        // handful of symbols recur across thousands of sites.
 #pragma warning disable RS1024 // false positive, as above
         private readonly Dictionary<ISymbol, string> _fullNames = new(SymbolEqualityComparer.Default);
 #pragma warning restore RS1024
 
-        // [System.CodeDom.Compiler.GeneratedCode] as this compilation resolves it, or null where the type is
-        // not referenced at all — in which case nothing can wear it and every type is authored. Resolved once
-        // so the generated screen is a symbol compare per attribute rather than a full display walk.
+        // [System.CodeDom.Compiler.GeneratedCode] as this compilation resolves it, or null where nothing
+        // references the type, so nothing can wear it. Resolved once so the generated screen is a symbol compare
+        // per attribute rather than a full display walk.
         private readonly INamedTypeSymbol? _generatedCodeAttribute;
 
-        // Which of this compilation's trees the workspace reported as generator output, and the memo over
-        // the whole per-tree verdict (provenance or banner). The verdict is asked only of this compilation's
-        // own trees: once per declaring part of every declared type, and on a document run again for each own
-        // type another document declares, while a tree typically declares many types — so the memo turns a
-        // per-type root walk into a per-file one. Both hold trees, so both are scoped to the state that dies
-        // with the compilation.
+        // The trees the workspace reported as generator output, and a memo of each tree's whole verdict
+        // (provenance or banner): a tree typically declares many types, so the memo turns a per-type root walk
+        // into a per-file one.
         private readonly IReadOnlyCollection<SyntaxTree>? _generatorOutputTrees;
         private readonly Dictionary<SyntaxTree, bool> _generatedTreeVerdicts = new();
         private readonly Dictionary<(string Src, string Injected), SortedSet<FragmentSite>> _injectionEdgeSites = new();
         private readonly Dictionary<(string Src, string MemberSymbolId), MemberEdgeBuilder> _memberEdges = new();
         private readonly Dictionary<(Lifetime Lifetime, string Service, string? Impl), SortedSet<FragmentSite>> _registrationSites = new();
 
-        // The per-tree semantic-model memo. Compilation.GetSemanticModel mints a NEW model every call — no
-        // provider is attached — and the edge pass asks once per declaring syntax reference, so one model
-        // per tree is minted on first ask and dies with this state.
+        // Compilation.GetSemanticModel mints a new model on every call (no provider is attached), and the edge
+        // pass asks once per declaring syntax reference, so ModelFor keeps one model per tree.
         private readonly Dictionary<SyntaxTree, SemanticModel> _semanticModels = new();
 
-        // Which project produces each referenced assembly, supplied only through the one-project and document
-        // entries. Null is what keeps their whole apparatus — the recording below, the sibling pass, the
-        // unvouched set — unreachable from the ordinary extraction, whose fragment is compared byte for byte
-        // against the goldens and against the persisted cache.
+        // Null on the ordinary extraction, which keeps the sibling apparatus (the recording, the sibling pass, the
+        // unvouched set) unreachable from it: that fragment is compared byte for byte against the goldens and
+        // against the persisted cache.
         private readonly SiblingProjects? _siblingProjects;
 
-        // The own project's name on a document run, null on every other path. Null is what keeps the
-        // own-project arm of SortOneProjectName unreachable from the ordinary extraction and from the
-        // whole-compilation one-project view, so neither view's fragment depends on it; on those paths an
-        // own-assembly type falls through to the sibling map.
+        // Set on a document run alone. Null keeps the own-project arm of SortOneProjectName unreachable from every
+        // other view, where an own-assembly type falls through to the sibling map.
         private string? _ownProjectName;
 
-        // Full name → the symbol this compilation bound it from, where it lives, and whether that is this
-        // compilation's own assembly. Keyed by name rather than by symbol because that is the identity the
-        // merge unifies on, and because the side fragment states one type per name whichever construction
-        // was mentioned first. The own-assembly flag records the answer SortOneProjectName reached, for the
-        // one reader that needs it: the sibling pass's truncated-closure screen, which an own type skips.
+        // Keyed by full name rather than by symbol, the identity the merge unifies on: a side fragment states one
+        // type per name, whichever construction was mentioned first.
         private readonly Dictionary<string, (INamedTypeSymbol Definition, string ProjectName, string AssemblyName, bool IsOwnAssembly)>
             _siblingSymbols = new(StringComparer.Ordinal);
 
@@ -582,58 +499,34 @@ internal static class FragmentExtractor
         {
             WalkOwnTypes(DeclaredTypes(_compilation));
 
-            // Pass R — registration facts, over every syntax tree rather than per declared type.
             WalkRegistrations();
 
             return Materialize(input, input.ProjectReferences);
         }
 
-        /// <summary>
-        ///     The one-project run: this compilation's own passes, then the sibling pass, then the own
-        ///     fragment ahead of the side fragments it found.
-        /// </summary>
         public IReadOnlyList<CodebaseFragment> RunOneProject(CompilationInput input)
         {
-            // Pass R is skipped: every rule that reads a service registration is outside the set a
-            // one-project view can decide, and the walk costs a pass over every syntax tree in every build.
-            // The fragment's ServiceRegistrations is therefore empty here.
+            // The registration walk is skipped: every rule that reads a service registration is outside the set
+            // a one-project view can decide, and the walk costs a pass over every syntax tree in every build. The
+            // fragment's ServiceRegistrations is therefore empty here.
             return RunView(input, DeclaredTypes(_compilation));
         }
 
-        /// <summary>
-        ///     The document run: the own passes over the types one syntax tree holds a declaring part of,
-        ///     then the sibling pass, then the own fragment ahead of the side fragments it found.
-        /// </summary>
-        /// <remarks>
-        ///     <see cref="RunOneProject" /> but for two things: what pass 1 ranges over, and the own project
-        ///     joining the sibling set so that a type another document declares still reaches the merge as a
-        ///     solution type. Passes 2 onwards read every declaring part of every type pass 1 declared, so
-        ///     the two runs differ in <em>which</em> types are extracted and never in how much of one.
-        /// </remarks>
         public IReadOnlyList<CodebaseFragment> RunDocument(
             CompilationInput input, SyntaxTree tree, SemanticModel? semanticModel, DeclaringTrees declaringTrees)
         {
-            // The compiler's own model for the document where the caller held one. Every other tree this
-            // run reads — the other parts of a partial type — still mints its own on first ask.
             if (semanticModel is not null) _semanticModels[tree] = semanticModel;
 
             _ownProjectName = input.ProjectName;
 
-            // Pass R is skipped for RunOneProject's reason and for one more: a registration fact is a
-            // whole-compilation walk, so running it per document would read every tree of the compilation
-            // once per document and record the same facts that many times.
+            // The registration walk is skipped for RunOneProject's reason and one more: it is a whole-compilation
+            // walk, so running it per document would read every tree once per document and record the same facts
+            // that many times.
             return RunView(input, declaringTrees.In(tree));
         }
 
-        /// <summary>
-        ///     The run both views share: the own passes over <paramref name="ownTypes" />, then the sibling
-        ///     pass, then the own fragment ahead of the side fragments it found.
-        /// </summary>
-        /// <remarks>
-        ///     The sibling pass runs last because its subjects are exactly the names the own passes minted
-        ///     as externals, and it runs before materialization because what it cannot vouch for decides
-        ///     which of the own edges survive.
-        /// </remarks>
+        // The sibling pass runs after the own passes, because its subjects are the names they minted as
+        // externals, and before materialization, because what it cannot vouch for decides which own edges survive.
         private IReadOnlyList<CodebaseFragment> RunView(CompilationInput input, IEnumerable<INamedTypeSymbol> ownTypes)
         {
             WalkOwnTypes(ownTypes);
@@ -646,42 +539,38 @@ internal static class FragmentExtractor
             return fragments;
         }
 
-        // Pass 1 ranges over what the caller hands it — every type of the compilation on a whole-compilation
-        // run, the types one document holds a part of on a document run — and every pass after it ranges
-        // over what pass 1 declared.
+        // The declaring pass ranges over what the caller hands it (every type of the compilation, or the types one
+        // document holds a part of), and every later pass ranges over what it declared, every declaring part
+        // included.
         private void WalkOwnTypes(IEnumerable<INamedTypeSymbol> types)
         {
-            // Pass 1 — declare every solution-declared type this run is about.
             foreach (INamedTypeSymbol symbol in types)
             {
                 _cancellationToken.ThrowIfCancellationRequested();
                 Declare(symbol);
             }
 
-            // Pass 2 — hierarchy (once per declared type, in first-declaration order).
             foreach (DeclaredBuilder builder in _declared.Values)
             {
                 _cancellationToken.ThrowIfCancellationRequested();
                 PopulateHierarchy(builder, ResolveName);
             }
 
-            // Pass 3 — edges (every declaring part; sites dedupe).
             foreach (DeclaredBuilder builder in _declared.Values)
             {
                 _cancellationToken.ThrowIfCancellationRequested();
                 WalkEdges(builder.Symbol);
             }
 
-            // Pass 3b — injection edges (declared instance constructors; primary ctors included).
             foreach (DeclaredBuilder builder in _declared.Values)
             {
                 _cancellationToken.ThrowIfCancellationRequested();
                 WalkInjectionEdges(builder.Symbol);
             }
 
-            // Pass 3c — exposure edges (signature positions of effectively-public members). Its own
-            // declaration-side pass, never folded into the Pass-1 inventory loop: an in-solution endpoint must
-            // resolve against the fully-populated _declared table, not be minted as an external mid-inventory.
+            // Exposure edges are never folded into the declaring pass that builds the inventory they screen: an
+            // in-solution endpoint must resolve against the fully populated _declared table, not be minted as an
+            // external mid-inventory.
             foreach (DeclaredBuilder builder in _declared.Values)
             {
                 _cancellationToken.ThrowIfCancellationRequested();
@@ -721,18 +610,14 @@ internal static class FragmentExtractor
                 .Select(nameOf)
                 .ToList();
 
-            // The two attribute facts read one walk of the attribute list, not one each — they differ in what
-            // they record (a resolved FQN vs a definition/construction pair) and in their order, never in what
-            // they range over.
+            // One walk of the attribute list serves both attribute facts, which differ in what they record and in
+            // their order, never in what they range over.
             List<INamedTypeSymbol> attributeClasses = AttributeClassesOf(symbol).ToList();
 
             builder.Attributes = attributeClasses
                 .Select(nameOf)
                 .ToList();
 
-            // Construction-preserving facts: the Definition side resolves to the OriginalDefinition FQN
-            // (via nameOf), while the constructed name displays the CONSTRUCTED symbol, so a closed
-            // generic keeps its substituted arguments.
             builder.AllInterfaces = symbol.AllInterfaces
                 .Select(Construction)
                 .OrderBy(c => c.ConstructedName, StringComparer.Ordinal)
@@ -753,11 +638,8 @@ internal static class FragmentExtractor
         {
             string srcFqn = FullNameOf(symbol);
 
-            // The recipe every channel below runs, held once — the extractor-side twin of
-            // FragmentMerger.MergeSimpleEdge. The order inside is the essential part: name the endpoint,
-            // drop the self-edge, and only THEN resolve, so a self-edge mints no external. Returns the
-            // endpoint's FQN, or null when the channel was empty or self-dropped — which is what lets the
-            // catch channel gate its two parallel subsets on the same decision rather than restating it.
+            // Drops the self-edge before resolving, so a self-edge mints no external. Returns the endpoint's FQN, or
+            // null for an empty or self-dropped channel: the decision the catch subsets gate on.
             string? Record(INamedTypeSymbol? endpoint, Dictionary<(string, string), SortedSet<FragmentSite>> map, FragmentSite site)
             {
                 if (endpoint is null) return null;
@@ -776,24 +658,17 @@ internal static class FragmentExtractor
                 SemanticModel model = ModelFor(root.SyntaxTree);
                 foreach ((WalkChannels channels, FragmentSite site) in ReferenceWalker.Walk(root, model, _bareCatchType))
                 {
-                    // The type channel: mint the reference edge (and any member use riding it), self-edges dropped.
-                    // The member's containing type is the type-channel target (they agree by construction), so
-                    // Record already resolved it; the member edge reuses that FQN and records the member.
+                    // A member use rides the type channel: its containing type is the channel's target, which Record
+                    // has already resolved, so its edge reuses that name.
                     if (Record(channels.Target, _edgeSites, site) is { } tgtFqn && channels.Member is { } member)
                         RecordMemberEdge(srcFqn, tgtFqn, member, site);
 
-                    // The construct channel: mint the construction edge, self-construction dropped to mirror the
-                    // type-edge self-drop (§4.1). Rides independently of the type channel — an explicit `new Foo()`
-                    // arrives here with target=null, so a shared self-edge `continue` would silently drop it.
+                    // Every channel below records independently of the type channel: an explicit `new Foo()` and a
+                    // catch clause arrive with no target (a typed catch's type name mints the reference edge on its
+                    // own visit), so a shared self-edge `continue` would drop them.
                     Record(channels.Constructed, _constructorEdgeSites, site);
 
-                    // The catch channel (§4.8): mint the catch edge, self-catch dropped like the type-edge self-drop.
-                    // Rides independently — a typed catch arrives here with target=null (its type-name syntax minted
-                    // the reference edge on its own visit) and a bare catch names no type at all. The same site also
-                    // joins the edge's unfiltered subset when the clause spells no `when` filter, so the subset holds
-                    // by construction; a bare `catch` is unfiltered, a bare `catch when (…)` is not. It joins the
-                    // swallowing subset in turn when it is unfiltered AND its block does not end in a throw, so the
-                    // subset-of-a-subset holds by construction too.
+                    // Both subsets are recorded inside Record's decision, so each stays a subset of the one before.
                     if (Record(channels.Caught, _catchEdgeSites, site) is { } caughtFqn)
                     {
                         if (!channels.CaughtHasFilter) _catchEdgeUnfilteredSites.SitesFor((srcFqn, caughtFqn)).Add(site);
@@ -801,16 +676,14 @@ internal static class FragmentExtractor
                             _catchEdgeSwallowingSites.SitesFor((srcFqn, caughtFqn)).Add(site);
                     }
 
-                    // The throw channel (§4.8): mint the throw edge, self-throw dropped like the type-edge self-drop.
-                    // Rides independently of the construct channel — a `throw new X()` mints BOTH the construction
-                    // edge (above) and the throw edge here at the same site.
+                    // A `throw new X()` mints both the construction edge and the throw edge, at the same site.
                     Record(channels.Thrown, _throwEdgeSites, site);
                 }
             }
         }
 
-        // One member edge per (source, member DocumentationCommentId); sites union like the type-edge pass. The
-        // SymbolId fallback mirrors TypeFacts's (unresolved:{fqn}) for a member with no DocID (error/unnamed).
+        // The unresolved: fallback, for a member with no documentation ID (an error or unnamed symbol), mirrors the
+        // type facts' own.
         private void RecordMemberEdge(string srcFqn, string containingFqn, ISymbol member, FragmentSite site)
         {
             string memberSymbolId = member.GetDocumentationCommentId() ?? "unresolved:" + containingFqn + "." + member.Name;
@@ -824,11 +697,9 @@ internal static class FragmentExtractor
             builder.Sites.Add(site);
         }
 
-        // Injection edges (GRAMMAR §4.7): the declared instance constructors of one type. Primary constructors
-        // are included; the !IsImplicitlyDeclared filter drops the record copy constructor and the parameterless
-        // default, and InstanceConstructors already excludes the static constructor. Each parameter's type
-        // decomposes definition-level like a type edge (§4.1); self-injection is dropped like the type-edge
-        // self-drop; ResolveName runs on every decomposed endpoint so external injected types get nodes.
+        // Injection edges (GRAMMAR §4.7) from the declared instance constructors, primary ones included:
+        // IsImplicitlyDeclared drops the record copy constructor and the parameterless default, and
+        // InstanceConstructors holds no static constructor.
         private void WalkInjectionEdges(INamedTypeSymbol symbol)
         {
             string srcFqn = FullNameOf(symbol);
@@ -843,22 +714,15 @@ internal static class FragmentExtractor
                     foreach (INamedTypeSymbol endpoint in DecomposeType(parameter.Type))
                     {
                         string injectedFqn = ResolveName(endpoint);
-                        if (injectedFqn == srcFqn) continue; // self-injection dropped
+                        if (injectedFqn == srcFqn) continue;
                         _injectionEdgeSites.SitesFor((srcFqn, injectedFqn)).Add(site);
                     }
                 }
             }
         }
 
-        // Exposure edges (GRAMMAR §4.9): a declaration-side pass over the members of one type. An edge is minted
-        // from every public signature position (SignatureTypesOf: a method's return + parameter types, a
-        // property/field/event's type) of each effectively-public member — an inventoried member (§4.6) that is
-        // itself public AND nested only in public types. Each signature type decomposes definition-level like a
-        // type edge (§4.1); self-exposure is dropped like the type-edge self-drop; ResolveName runs on every
-        // decomposed endpoint so external exposed types get nodes. The member's declaration sites (a partial
-        // member's several parts union) are the edge's sites. The pass screens pass 1's inventory, so the §4.6
-        // filter and the sites are read, not recomputed, and an enum or a delegate, which inventories nothing,
-        // contributes nothing here.
+        // Exposure edges (GRAMMAR §4.9) from the signature positions of each effectively public member, sited at the
+        // member's own declarations.
         private void WalkExposureEdges(DeclaredBuilder builder)
         {
             string srcFqn = FullNameOf(builder.Symbol);
@@ -870,18 +734,16 @@ internal static class FragmentExtractor
                 foreach (INamedTypeSymbol endpoint in DecomposeType(signatureType))
                 {
                     string exposedFqn = ResolveName(endpoint);
-                    if (exposedFqn == srcFqn) continue; // self-exposure dropped
+                    if (exposedFqn == srcFqn) continue;
                     SortedSet<FragmentSite> sites = _exposureEdgeSites.SitesFor((srcFqn, exposedFqn));
                     foreach (FragmentSite site in member.DeclarationSites) sites.Add(site);
                 }
             }
         }
 
-        // Registration facts (GRAMMAR §4.7): a whole-compilation walk over every syntax tree. Registration is a
-        // string-side fact needing no per-type attribution — its most common composition root is a
-        // top-level-statements Program — so one pass over every tree is the natural formulation. Each
-        // recognized call (RegistrationRecognizer) yields a (lifetime, service, implementation?) fact recorded
-        // string-side (definition-level FQNs, never resolved to nodes — registration is many-to-many).
+        // Registration facts (GRAMMAR §4.7), walked over every tree because a registration needs no per-type
+        // attribution (its most common composition root is a top-level-statements Program), and recorded as
+        // definition-level names, never resolved to nodes, because registration is many-to-many.
         private void WalkRegistrations()
         {
             var recognizer = new RegistrationRecognizer(_compilation);
@@ -906,18 +768,12 @@ internal static class FragmentExtractor
         }
 
         /// <summary>
-        ///     The memoized <see cref="FragmentExtractor.FullNameOf" />. Declaring it here hides the outer
-        ///     static one throughout <see cref="ExtractState" />, so every name this state reads — the walk's
-        ///     four channels, each pass's source name, <see cref="ResolveName" />'s own lookup — comes back
-        ///     through the memo, and the same symbol is displayed once per compilation rather than once per
-        ///     site.
+        ///     The memoized <see cref="FragmentExtractor.FullNameOf" />. Declared here, it hides the outer static
+        ///     throughout <see cref="ExtractState" />, so every name this state reads comes back through the memo.
         /// </summary>
         /// <remarks>
-        ///     That claim is why the member-facts helpers (<see cref="BuildMember" />, <see cref="ParametersOf" />,
-        ///     <see cref="AttributeConstructionsOf" /> and <see cref="MemberTypeNames" />) live on this state
-        ///     rather than on the outer class: a static helper's call would bind to the outer
-        ///     <see cref="FragmentExtractor.FullNameOf" /> and walk the display again for every member,
-        ///     parameter, and member attribute in the compilation.
+        ///     A helper that names types therefore lives on this state: on the outer class, its calls would bind to
+        ///     the outer static and walk the display again at every site.
         /// </remarks>
         // ReSharper disable once MemberHidesStaticFromOuterClass
         private string FullNameOf(INamedTypeSymbol symbol)
@@ -959,7 +815,6 @@ internal static class FragmentExtractor
             return name;
         }
 
-        /// <summary>The one semantic model for <paramref name="tree" />, minted on first ask.</summary>
         private SemanticModel ModelFor(SyntaxTree tree)
         {
             if (_semanticModels.TryGetValue(tree, out SemanticModel? model)) return model;
@@ -969,17 +824,14 @@ internal static class FragmentExtractor
             return model;
         }
 
-        // Scalar shape + identity facts read once from the original definition, whose FQN the caller has
-        // already resolved. Shape facts are normalized to C# declaration semantics: a static class is encoded
-        // abstract+sealed in metadata (and may be so from source), and the `&& !isStatic` mask converges both
-        // paths so a static class reports neither. All three facts a symbol can fail to answer are total here,
-        // because the external-mint path reaches symbols the compiler never resolved (a partially-loaded
-        // workspace yields error symbols through base types, interfaces, and attribute classes): TypeKind falls
-        // back to Class, the baseline key (GRAMMAR §4.3) to an unresolved:{fqn} form when the symbol has no
-        // DocumentationCommentId at all (an error symbol does have one — Roslyn's "!:" form — so this covers
-        // unnamed types), and accessibility to Public — an unresolved external is not a rule subject (§4.1),
-        // its accessibility is informational, and a type reached across an assembly boundary is
-        // visibly-public surface. Declared types always map, so all three fallbacks are no-ops for them.
+        // Shape facts follow C# declaration semantics: metadata encodes a static class as abstract and sealed (and
+        // source may too), so the `&& !isStatic` mask reports neither. The three facts a symbol can fail to answer
+        // are total, because the external mint reaches symbols the compiler never resolved (a partially loaded
+        // workspace yields error symbols through base types, interfaces and attribute classes): the kind falls back
+        // to Class, the baseline key (GRAMMAR §4.3) to unresolved:{fqn} for a symbol with no documentation ID at all
+        // (an unnamed type; an error symbol has Roslyn's "!:" form), and accessibility to Public, which is
+        // informational for an unresolved external (not a rule subject, §4.1) and true of a type reached across an
+        // assembly boundary. Declared types always map, so the fallbacks never apply to them.
         private TypeFacts ExtractFacts(INamedTypeSymbol definition, string fqn)
         {
             CoreTypeKind kind = TypeKindMapper.TryMap(definition, out CoreTypeKind mapped) ? mapped : CoreTypeKind.Class;
@@ -1000,27 +852,23 @@ internal static class FragmentExtractor
                 IsGeneratedType(definition));
         }
 
-        // The generated fact `.Authored()` filters on (GRAMMAR §5.2), from two independent signals. A type is
-        // generated when [System.CodeDom.Compiler.GeneratedCode] sits on it or on any type containing it — so the
-        // nested types a generator emits inside an attributed container ride along without carrying their own
-        // attribute — OR when every file declaring it is generator output (GeneratedSourceSignals). The second
-        // signal is what reaches the generators that emit no attribute at all — a compiled Razor view, measured.
+        // The generated fact `.Authored()` filters on (GRAMMAR §5.2). A type is generated when
+        // [System.CodeDom.Compiler.GeneratedCode] sits on it or on a type containing it, so the nested types a
+        // generator emits inside an attributed container ride along, or when every file declaring it is generator
+        // output (GeneratedSourceSignals), the only signal a generator that emits no attribute leaves (a compiled
+        // Razor view, measured).
         //
-        // The file signals are read for this compilation's own types only. Every external on every path is
-        // minted through here, and another assembly's type declares files only when the reference arrived as
-        // that project's source: held as an image, the same type declares none. Reading them would make its
-        // verdict depend on the form the reference took, and would parse another project's trees to do it, so
-        // another assembly's type is judged by the attribute alone, which both forms carry.
+        // The file signals are read for this compilation's own types only: every external on every path is minted
+        // through here, and another assembly's type is judged by the attribute alone, which both forms of a
+        // reference carry.
         //
-        // ALL declaring files, never any: the attribute is a claim about a type, the file signals are claims
-        // about a file, and a file fact lifts to a type only when it holds of every file declaring it. The
-        // generator that completes an author's partial class writes ONE of its files — [GeneratedRegex] emits
-        // the author's own class beside wholly generated ones in a single banner-carrying tree — and any-part
-        // would hand the author's class to the generated side.
+        // Every declaring file, never any: the generator that completes an author's partial class writes one of its
+        // files ([GeneratedRegex] emits the author's own class beside wholly generated ones in a single
+        // banner-carrying tree), and any-part would hand the author's class to the generated side.
         //
-        // The Length check guards the own types that declare no file at all, and All() over an empty sequence
-        // is true. An unresolved name is one: Roslyn places it in this compilation's own global namespace, so
-        // it passes the screen above with nothing to test, and would otherwise report generated.
+        // The Length check matters because All() over no files is true, and an unresolved name declares none:
+        // Roslyn places it in this compilation's own global namespace, so it passes the own-assembly screen with
+        // nothing to test and would otherwise report generated.
         private bool IsGeneratedType(INamedTypeSymbol definition)
         {
             if (HasGeneratedCodeAttribute(definition)) return true;
@@ -1030,7 +878,6 @@ internal static class FragmentExtractor
             return declarations.Length > 0 && declarations.All(d => IsGeneratedTree(d.SyntaxTree));
         }
 
-        // Whether a type belongs to this compilation's own assembly rather than to one it references.
         private bool IsInOwnAssembly(INamedTypeSymbol definition)
         {
             return SymbolEqualityComparer.Default.Equals(definition.ContainingAssembly, _compilation.Assembly);
@@ -1040,7 +887,7 @@ internal static class FragmentExtractor
         // attribute on the generated METHOD, so the author's own partial class stays authored.
         private bool HasGeneratedCodeAttribute(INamedTypeSymbol definition)
         {
-            if (_generatedCodeAttribute is null) return false; // unreferenced — nothing in this compilation wears it
+            if (_generatedCodeAttribute is null) return false;
 
             for (INamedTypeSymbol? current = definition; current is not null; current = current.ContainingType)
                 if (current.GetAttributes().Any(IsGeneratedCodeAttribute))
@@ -1063,13 +910,9 @@ internal static class FragmentExtractor
             return SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, _generatedCodeAttribute);
         }
 
-        // The declared-member inventory of one type (GRAMMAR §4.6): its Ordinary methods, non-indexer
-        // properties, fields, and events. Enum and delegate types contribute nothing — an enum's fields are its
-        // values (an enum-value read stays a recorded member USE, §4.5) and a delegate's Invoke/BeginInvoke are
-        // runtime plumbing. Ordered ordinal by the member's DocumentationCommentId, so the fragment (and the
-        // merged node built from it) is deterministic.
-        // Each survivor is kept paired with the symbol it was built from: the exposure pass (§4.9) screens this
-        // same inventory rather than re-walking GetMembers and recomputing every member's declaration sites.
+        // The member inventory of one type (GRAMMAR §4.6), ordinal by documentation ID so the fragment and the
+        // merged node are deterministic. An enum's fields are its values (reading one stays a member use, §4.5)
+        // and a delegate's Invoke and BeginInvoke are runtime plumbing, so neither kind inventories anything.
         private IReadOnlyList<(ISymbol Symbol, FragmentMember Member)> BuildMembers(INamedTypeSymbol type, CoreTypeKind kind)
         {
             if (kind is CoreTypeKind.Enum or CoreTypeKind.Delegate) return [];
@@ -1112,13 +955,10 @@ internal static class FragmentExtractor
             return new FragmentMember(facts, MemberDeclarationSites(member));
         }
 
-        // The declared parameters of a member (GRAMMAR §4.6, §5.6): a method's own parameter list in declaration
-        // order, each type normalized by the same DefinitionName helper the return type uses (a constructed generic
-        // erases to its definition). The list is read off the DECLARED symbol, so an extension method's `this`
-        // parameter is included and a default-valued parameter counts; ref/in/out leave the recorded type alone,
-        // a `params T[]` records the array type, and a `T?` records System.Nullable<T>'s definition form. A
-        // property/field/event carries no parameters, so it yields the empty list — as does the parameterless
-        // method that is the common case, without building a projection to discover it.
+        // The declared parameters (GRAMMAR §4.6, §5.6), each type at definition level as the return type is. Read
+        // off the declared symbol, so an extension method's `this` and a default-valued parameter count; ref/in/out
+        // leave the recorded type alone, a `params T[]` records the array type, and a `T?` records
+        // System.Nullable<T>'s definition form.
         private IReadOnlyList<ParameterFacts> ParametersOf(ISymbol member)
         {
             if (member is not IMethodSymbol method) return [];
@@ -1129,16 +969,12 @@ internal static class FragmentExtractor
                 .ToList();
         }
 
-        // The declared attributes of a member (GRAMMAR §4.6): what the member symbol itself carries, each as the
-        // same definition/constructed name pair the type-side attribute-construction fact records — so a C# 11
-        // generic attribute's definition (N.MarkAttribute<T>) and its construction (N.MarkAttribute<System.Int32>)
-        // are both readable, and for the ordinary non-generic case the two names coincide. DECLARED-ONLY is the
-        // boundary: attributes are read off this one symbol, so a property's accessor attributes and a method's
-        // [return:] attributes are deliberately outside the fact — they hang off different symbols (the accessor
-        // method, the return-value pseudo-symbol) that no member subject ever ranges over. Unlike the type side
-        // this mints nothing: the member model keeps its by-FQN-string discipline, so there is no ResolveName
-        // here and no external node is created for an attribute only a member wears. Sorted ordinal by constructed
-        // name so a persisted fragment is byte-stable however Roslyn happened to order the attribute list.
+        // The attributes the member symbol itself carries (GRAMMAR §4.6), as the definition and constructed name pair
+        // the type side records, so a generic attribute's definition and construction are both readable. An
+        // accessor's attributes and a method's [return:] ones hang off other symbols, which no member subject
+        // ranges over, and stay outside the fact. Unlike the type side this mints nothing: member facts stay
+        // by-name strings, so there is no ResolveName and no external node for an attribute only a member wears.
+        // Ordinal by constructed name, so a persisted fragment is byte-stable however Roslyn ordered the list.
         private IReadOnlyList<FragmentConstruction> AttributeConstructionsOf(ISymbol member)
         {
             if (member.GetAttributes().IsEmpty) return []; // the majority of members, short of the projection
@@ -1149,10 +985,8 @@ internal static class FragmentExtractor
                 .ToList();
         }
 
-        // Exactly one of the two names is non-null: a method carries its return type (System.Void for void), a
-        // property/field/event its member type. Both are the definition-level FQN in extraction format — the
-        // return type read off OriginalDefinition so `Task<int>` matches a `.Returning(typeof(Task<>))` anchor
-        // (§4.6), the same construction-erasing normalization ResolveName uses for edge targets (§4.1).
+        // Definition-level, as edge targets are (GRAMMAR §4.1), so `Task<int>` matches a
+        // `.Returning(typeof(Task<>))` anchor (§4.6); a void method records System.Void.
         private (string? ReturnTypeFullName, string? MemberTypeFullName) MemberTypeNames(ISymbol member)
         {
             return member switch
@@ -1166,9 +1000,8 @@ internal static class FragmentExtractor
         }
 
         /// <summary>
-        ///     The FQN of a referenced type's original definition. When that FQN is not declared by this
-        ///     input, it is a referenced-but-not-declared type, so an external record (first mention wins)
-        ///     is minted from this compilation's metadata view, deferring cross-input unification to the merge.
+        ///     The FQN of a referenced type's definition, minting an external from this compilation's metadata
+        ///     view on first mention where this input does not declare it; unification is the merge's.
         /// </summary>
         private string ResolveName(INamedTypeSymbol symbol)
         {
@@ -1184,14 +1017,12 @@ internal static class FragmentExtractor
             return fqn;
         }
 
-        // The one-project view's half of the mint above, entered only when a sibling map was supplied and
-        // only on first mention, which is where the mint's own first-wins rule already puts the work. The
-        // external is minted either way: the merge discards it wherever a side fragment declares the same
-        // name, because externals are recorded after declarations.
+        // The one-project view's half of the mint above, on first mention only. The external is minted either way:
+        // the merge discards it wherever a side fragment declares the same name, because externals are recorded
+        // after declarations.
         //
-        // What keeps an error type out of the sibling set is the screen Declare applies to a type of this
-        // compilation, not the absence of an assembly — a type whose metadata never loaded still has a
-        // containing assembly with a real name.
+        // An error type is screened by its kind, not by a missing assembly: a type whose metadata never loaded
+        // still has a containing assembly with a real name.
         private void SortOneProjectName(INamedTypeSymbol definition, string fqn)
         {
             if (definition.TypeKind == RoslynTypeKind.Error)
@@ -1210,10 +1041,9 @@ internal static class FragmentExtractor
 
             if (!definition.IsModelledType()) return;
 
-            // The own-project arm, reachable on a document run alone: a type of this compilation that some
-            // OTHER document declares. The sibling map answers the own project as absent — it is nobody's
-            // sibling — so without this arm such a type would leave the view entirely and every edge to it
-            // would point at an external with no layer, which is the opposite of what this view is for.
+            // The own-project arm, reachable on a document run alone, for a type of this compilation that another
+            // document declares: the sibling map answers the own project as absent, so without this arm such a type
+            // would leave the view and every edge to it would point at an external with no layer.
             if (_ownProjectName is { } ownProjectName
                 && IsInOwnAssembly(definition)
                 && !_declared.ContainsKey(fqn))
@@ -1227,12 +1057,9 @@ internal static class FragmentExtractor
             _siblingSymbols[fqn] = (definition, projectName!, assemblyName, IsOwnAssembly: false);
         }
 
-        // The sibling pass (GRAMMAR §4.1 reads the same facts of a type that is not the subject): one
-        // FragmentType per recorded sibling, carrying its scalar facts and its hierarchy and nothing else —
-        // no declaration sites, no members, no edges. Closure is first-order by construction: a sibling is
-        // declared here only because this compilation named it, and its own hierarchy names are homed as the
-        // side fragment's externals rather than promoted to siblings of their own, which would grow the set
-        // differently on the two forms a reference can take.
+        // The sibling pass (GRAMMAR §4.1). Closure is first-order: a sibling is declared here only because this
+        // compilation named it, and its own hierarchy names are homed as the side fragment's externals rather than
+        // promoted to siblings, which would grow the set differently on the two forms a reference can take.
         private List<SideFragment> WalkSiblings()
         {
             var sides = new Dictionary<(string Project, string Assembly), SideFragment>();
@@ -1249,16 +1076,12 @@ internal static class FragmentExtractor
                 for (INamedTypeSymbol? current = definition.BaseType; current is not null; current = current.BaseType)
                     baseChain.Add(current); // nearest-first, as the declared-type pass reads it
 
-                // A hierarchy this compilation only half resolved is the truncated-closure case: the chain
-                // stops at the error type and AllInterfaces thins, while the whole-solution check reads the
-                // sibling from its own compilation and sees all of it. Neither is repairable from here, so
-                // the type is dropped rather than judged against a hierarchy that is missing pieces.
-                //
-                // A type of this compilation's OWN assembly skips the screen, because a truncated closure is
-                // not what an error in its hierarchy means: the compilation holds all of it, an unresolved
-                // base is the author's own broken code, and the document that declares the type records it
-                // whole — error base and all — so dropping it here would have two documents of one project
-                // disagree about whether their own type exists.
+                // A half-resolved hierarchy is the truncated-closure case: the chain stops at the error type and
+                // AllInterfaces thins, while the whole-solution check reads the sibling from its own compilation
+                // and sees all of it, so the type is dropped rather than judged on missing pieces. An own-assembly
+                // type skips the screen: an unresolved base there is the author's own broken code, which the
+                // document declaring the type records whole, and dropping it here would have two documents of one
+                // project disagree about whether their own type exists.
                 if (!isOwnAssembly
                     && (HasErrorType(baseChain) || HasErrorType(definition.Interfaces)
                                                 || HasErrorType(definition.AllInterfaces) || HasErrorType(attributeClasses)))
@@ -1292,12 +1115,9 @@ internal static class FragmentExtractor
             return side;
         }
 
-        // One sibling's type, filled by PopulateHierarchy the way a declared one is — symbols only, never
-        // syntax — but with every name homed through SiblingName, and through a DeclaredBuilder given the
-        // empty member list this type deliberately has. Its facts are the ones the mint recorded when this
-        // compilation first named it, taken unchanged: the mint reads another project's generated fact from
-        // the attribute alone and an own type's from its files as well, which is the verdict the document
-        // declaring that own type reaches.
+        // One sibling's type, filled from symbols alone. Its facts are the mint's, taken unchanged: the mint reads
+        // another project's generated fact from the attribute alone and an own type's from its files as well,
+        // which is the verdict the document declaring that own type reaches.
         private FragmentType SiblingType(SideFragment side, INamedTypeSymbol definition, string fqn)
         {
             var builder = new DeclaredBuilder(_externals[fqn].Facts, definition, []);
@@ -1306,11 +1126,10 @@ internal static class FragmentExtractor
             return builder.ToFragmentType();
         }
 
-        // ResolveName's non-promoting twin: the same definition-level FQN, homed in the SIDE fragment's own
-        // externals. Every hierarchy name of a side-fragment type must have a home — the merge indexes its
-        // external facts unguarded for a name nothing declares — and a name THIS compilation declares is
-        // deliberately left without one: a file linked into both projects would otherwise put the sibling's
-        // assembly beside the own declaration, which the merge reads as one name meaning two types.
+        // ResolveName's non-promoting twin, homing the name in the side fragment's own externals. Every hierarchy
+        // name of a side-fragment type needs a home, because the merge indexes external facts unguarded for a name
+        // nothing declares; a name this compilation declares gets none, or a file linked into both projects would
+        // put the sibling's assembly beside the own declaration, which the merge reads as one name meaning two types.
         private string SiblingName(SideFragment side, INamedTypeSymbol symbol)
         {
             INamedTypeSymbol definition = symbol.OriginalDefinition;
@@ -1318,13 +1137,10 @@ internal static class FragmentExtractor
 
             if (_declared.ContainsKey(fqn) || side.Externals.ContainsKey(fqn)) return fqn;
 
-            // Homed under the own assembly wherever the own assembly declares the name, whatever assembly
-            // this symbol was bound from. On a document run a sibling's hierarchy can name a type this
-            // compilation declares in ANOTHER document — a file linked into both projects, whose copy
-            // arrives here bound to the sibling — and homing that under the sibling's assembly has the merge
-            // read one name as two types, minting a shadow node and a note about a split that is not one.
-            // On a whole-compilation run every such name is already declared, so the early return above has
-            // taken it and this cannot fire.
+            // Homed under the own assembly wherever it declares the name, whatever assembly the symbol was bound
+            // from, for the same reason: on a document run a sibling's hierarchy can name a type another document
+            // of this compilation declares (a linked file's copy, bound to the sibling). On a whole-compilation run
+            // the early return above has already taken every such name.
             string assemblyName = OwnAssemblyDeclares(definition)
                 ? _compilation.Assembly.Name
                 : definition.ContainingAssembly?.Name ?? "";
@@ -1334,10 +1150,8 @@ internal static class FragmentExtractor
             return fqn;
         }
 
-        // Whether this compilation's own assembly declares a type of the same namespace, name and arity as
-        // one it bound from somewhere else. Answered by walking the assembly's namespace tree down the
-        // definition's own containing chain and asking for that one name, never by walking the assembly's
-        // types: the cost is the depth of a single name, asked once per hierarchy name of a side fragment.
+        // Whether the own assembly declares a type of the same namespace, name and arity, found by walking down the
+        // definition's own containing chain rather than the assembly's types, so the cost is one name's depth.
         private bool OwnAssemblyDeclares(INamedTypeSymbol definition)
         {
             INamespaceSymbol? containing = OwnNamespace(definition.ContainingNamespace);
@@ -1358,9 +1172,8 @@ internal static class FragmentExtractor
             return found is not null;
         }
 
-        // The own assembly's namespace of the same name as the one given, or null where it declares none —
-        // which is the common answer and the cheap one, since a foreign namespace stops the walk at its
-        // outermost segment.
+        // Null where the own assembly declares no namespace of that name, the common answer and the cheap one: a
+        // foreign namespace stops the walk at its outermost segment.
         private INamespaceSymbol? OwnNamespace(INamespaceSymbol? namespaceSymbol)
         {
             if (namespaceSymbol is null || namespaceSymbol.IsGlobalNamespace) return _compilation.Assembly.GlobalNamespace;
@@ -1372,15 +1185,12 @@ internal static class FragmentExtractor
                 .FirstOrDefault();
         }
 
-        // The own fragment's project references in this view: the sibling PROJECTS among the assemblies the
-        // compilation was given, ordinal and distinct. The input's own list cannot answer it, because what a
-        // compiler hands an analysis is assemblies and what the model states is project names.
-        //
-        // That makes this the compiler's referenced closure, not the declared list a whole-solution check
-        // reports: the SDK passes the compiler every project output in the closure, and a compilation carries
-        // no project file to read the declarations from. Nothing this view feeds reads the list, because every
-        // verb and predicate that could is held out of the one-project set (OneProjectDecidability); making
-        // one decidable means handing this view the declared list first.
+        // The sibling projects among the assemblies the compilation was given, ordinal and distinct: a compiler
+        // hands an analysis assemblies, so the input's own list cannot answer. That is the referenced closure (the
+        // SDK passes the compiler every project output in it), not the declared list a whole-solution check
+        // reports. Nothing this view feeds reads it, because every verb and predicate that could is held out of
+        // the one-project set (OneProjectDecidability); making one decidable means handing this view the declared
+        // list first.
         private IReadOnlyList<string> SiblingProjectReferences()
         {
             if (_siblingProjects is null) return [];
@@ -1397,8 +1207,7 @@ internal static class FragmentExtractor
         // external is not enough: the throw allow-list has no external exemption, and an Except payload
         // reads an external's empty hierarchy as "not exempt", so both would report against a type the
         // whole-solution check judges on facts this compilation never had. A source endpoint is always one
-        // of this compilation's own declarations, so only the target is tested. The ordinary extraction
-        // vouches for everything, and hands back the list it built.
+        // of this compilation's own declarations, so only the target is tested.
         private List<TEdge> Vouched<TEdge>(List<TEdge> edges, Func<TEdge, string> targetOf)
         {
             if (_unvouched.Count == 0) return edges;
@@ -1418,14 +1227,11 @@ internal static class FragmentExtractor
         }
 
         /// <summary>
-        ///     The fragment this compilation's passes built, with <paramref name="projectReferences" /> for
-        ///     the one fact the passes cannot state: which projects it references, which the caller knows
-        ///     and the compilation does not.
+        ///     The fragment the passes built, with <paramref name="projectReferences" /> from the caller: which
+        ///     projects it references is the one fact the compilation cannot state.
         /// </summary>
         private CodebaseFragment Materialize(CompilationInput input, IReadOnlyList<string> projectReferences)
         {
-            // Canonical ordering makes the serialized fragment stable; the merge re-derives global order,
-            // so a fragment's internal order never affects the model.
             List<FragmentType> declaredTypes = _declared.Values
                 .Select(b => b.ToFragmentType())
                 .OrderBy(t => t.Facts.FullName, StringComparer.Ordinal)
@@ -1452,9 +1258,8 @@ internal static class FragmentExtractor
                 _injectionEdgeSites.OrderedPairs((src, injected, sites) => new FragmentInjectionEdge(src, injected, sites.ToList())),
                 edge => edge.InjectedFullName);
 
-            // An edge whose every site is filtered has no entry in either parallel table, which materializes as
-            // the empty list — the honest reading, since nothing about that edge is unfiltered. An edge whose
-            // every unfiltered site ends in a throw materializes the third list empty for the same reason.
+            // An edge with no unfiltered (or no swallowing) site has no entry in that table, and materializes the
+            // empty list there.
             List<FragmentCatchEdge> catchEdges = Vouched(
                 _catchEdgeSites.OrderedPairs((src, caught, sites) => new FragmentCatchEdge(
                     src, caught, sites.ToList(),
@@ -1474,10 +1279,9 @@ internal static class FragmentExtractor
                 _registrationSites.OrderedRegistrations((lifetime, service, impl, sites) =>
                     new FragmentServiceRegistration(lifetime, service, impl, sites.ToList()));
 
-            // The assembly name is read off the IAssemblySymbol rather than the compilation's own option
-            // string, because the merge compares it against a FragmentExternal's — which ResolveName
-            // reads off ContainingAssembly.Name, the same surface. Taking both operands from Roslyn's one
-            // notion of an assembly's name is what makes that comparison meaningful by construction.
+            // The assembly name is read off the IAssemblySymbol rather than the compilation's own option string,
+            // because the merge compares it against a FragmentExternal's, which ResolveName reads off
+            // ContainingAssembly.Name: both operands must come from that one surface.
             return new CodebaseFragment(
                 input.ProjectName, input.TargetFramework, projectReferences, declaredTypes, externals, edges,
                 memberEdges, constructorEdges, injectionEdges, catchEdges, throwEdges, exposureEdges,
@@ -1509,12 +1313,9 @@ internal static class FragmentExtractor
             ///     own fragment materializes them in.
             /// </summary>
             /// <remarks>
-            ///     Every other slot is empty or unknown, and each deliberately. No edge, registration or
-            ///     project reference is recorded because none was read — this fragment states another
-            ///     project's types, not its behaviour. The target framework and solution membership are
-            ///     <see langword="null" /> for the same reason: nothing here read the project file or the
-            ///     solution file, and unknown is the answer every project verb passes on, where a guess
-            ///     would have the merge note a framework collapse this view never observed.
+            ///     Every other slot is empty or unknown: this fragment states another project's types, not its
+            ///     behaviour, and nothing here read the project file or the solution file. A guessed target
+            ///     framework would have the merge note a framework collapse this view never observed.
             /// </remarks>
             internal CodebaseFragment ToFragment()
             {
@@ -1532,24 +1333,18 @@ internal static class FragmentExtractor
         }
     }
 
-    /// <summary>
-    ///     Mutable accumulator for one declared type: fixed facts + representative symbol, unioned declaration
-    ///     sites, and hierarchy filled in pass 2.
-    /// </summary>
     private sealed class DeclaredBuilder(
         TypeFacts facts,
         INamedTypeSymbol symbol,
         IReadOnlyList<(ISymbol Symbol, FragmentMember Member)> members)
     {
-        // Private where its siblings are not, because the distinction is real: the owner reads Symbol and
-        // Members as it walks, while Facts is only ever handed straight back out by ToFragmentType below.
         private TypeFacts Facts { get; } = facts;
 
         public INamedTypeSymbol Symbol { get; } = symbol;
 
         /// <summary>
-        ///     The §4.6 inventory, each member paired with the symbol it was read from — pass 1's work, held so
-        ///     the exposure pass reads the members and their declaration sites rather than deriving them twice.
+        ///     The §4.6 inventory, each member paired with the symbol it was read from, so the exposure pass
+        ///     screens the members and their declaration sites rather than deriving them a second time.
         /// </summary>
         public IReadOnlyList<(ISymbol Symbol, FragmentMember Member)> Members { get; } = members;
 
@@ -1577,9 +1372,8 @@ internal static class FragmentExtractor
     }
 
     /// <summary>
-    ///     Mutable accumulator for one member-use edge, keyed by (source FQN, member DocumentationCommentId): the
-    ///     member's declaring-type FQN, simple name, and kind (all functions of the member symbol) plus its unioned
-    ///     use sites. The facts are captured once on first mention; every later site of the same member unions in.
+    ///     Mutable accumulator for one member-use edge. Its facts are functions of the member symbol, captured on
+    ///     first mention; every later site of the same member unions in.
     /// </summary>
     private sealed class MemberEdgeBuilder(string containingFullName, string memberName, MemberKind kind)
     {

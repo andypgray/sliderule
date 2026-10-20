@@ -10,22 +10,11 @@ namespace SlideRule.Hosting;
 /// <summary>
 ///     Turns <see cref="IArchitectureSpec" /> implementations into an <see cref="ArchitectureModel" />:
 ///     runs each spec's <c>Define</c> against one shared <see cref="Arch" />, reports everything wrong
-///     with the result together, and hands back the finished model. The way in for anything hosting
-///     SlideRule.
+///     with the result together, and hands back the finished model.
 /// </summary>
 internal static class ArchModelBuilder
 {
-    /// <summary>
-    ///     Builds the model from the given specs. They share one <see cref="Arch" />, so their rule, scope
-    ///     and layer names must be unique across all of them, and each spec's <c>Define</c> runs in the order
-    ///     given. Nothing is checked against any code here: the result is the spec as data.
-    /// </summary>
-    /// <param name="specs">The specs to build from, such as the ones <c>SpecDiscovery.FindSpecs</c> returns.</param>
-    /// <returns>The finished model, holding every rule and layer the specs declared.</returns>
-    /// <exception cref="SpecValidationException">
-    ///     Something in the specs is wrong. Every mistake found is in
-    ///     <see cref="SpecValidationException.Errors" />, not only the first.
-    /// </exception>
+    /// <inheritdoc cref="Build(IEnumerable{IArchitectureSpec})" />
     public static ArchitectureModel Build(params IArchitectureSpec[] specs)
     {
         return Build((IEnumerable<IArchitectureSpec>)specs);
@@ -36,8 +25,6 @@ internal static class ArchModelBuilder
     ///     and layer names must be unique across all of them, and each spec's <c>Define</c> runs in the order
     ///     the sequence yields it. Nothing is checked against any code here: the result is the spec as data.
     /// </summary>
-    /// <param name="specs">The specs to build from, such as the ones <c>SpecDiscovery.FindSpecs</c> returns.</param>
-    /// <returns>The finished model, holding every rule and layer the specs declared.</returns>
     /// <exception cref="SpecValidationException">
     ///     Something in the specs is wrong. Every mistake found is in
     ///     <see cref="SpecValidationException.Errors" />, not only the first.

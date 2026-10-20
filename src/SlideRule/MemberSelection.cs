@@ -36,7 +36,6 @@ public abstract class MemberSelection
     /// <summary>The underlying type selection the members are drawn from; the inherited constraint subject (GRAMMAR §4.6).</summary>
     internal Selection Source { get; }
 
-    /// <summary>Which member kind the projection selected.</summary>
     internal MemberKindFilter Kind { get; }
 
     /// <summary>The ordered member-adjective refinements applied to the projected member set.</summary>
@@ -49,7 +48,6 @@ public abstract class MemberSelection
     /// </summary>
     private protected abstract MemberSelection Rebuild(IReadOnlyList<MemberAdjective> adjectives);
 
-    /// <summary>Appends one adjective and clones (the assembly-internal entry the adjective extensions call).</summary>
     internal MemberSelection Refined(MemberAdjective adjective)
     {
         var adjectives = new List<MemberAdjective>(Adjectives) { adjective };
@@ -57,8 +55,7 @@ public abstract class MemberSelection
     }
 
     /// <summary>
-    ///     The same projection over the same source, carrying <paramref name="adjectives" /> in place of its own
-    ///     — how a checker spells this selection with one list narrowed, without writing to it.
+    ///     The same projection over the same source, carrying <paramref name="adjectives" /> in place of its own.
     /// </summary>
     internal MemberSelection WithAdjectives(IReadOnlyList<MemberAdjective> adjectives)
     {

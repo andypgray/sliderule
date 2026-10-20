@@ -1,16 +1,14 @@
 namespace SlideRule.Model;
 
 /// <summary>
-///     The selector-position escape hatch (<c>.Where(pred, description:)</c>, GRAMMAR §5.6). The
-///     predicate is stored but never evaluated at spec build; the description renders verbatim as a
-///     sentence-final relative clause continuing the noun phrase ("… whose name contains a digit").
+///     The selector-position escape hatch (<c>.Where(pred, description:)</c>, GRAMMAR §5.6), one of the
+///     <see cref="PredicateNodes" />: its description continues the noun phrase ("… whose name contains a
+///     digit").
 /// </summary>
 internal sealed class WhereAdjective(Func<ITypeInfo, bool> predicate, string description) : SelectionAdjective
 {
-    /// <summary>The stored predicate (evaluated at check time).</summary>
     internal Func<ITypeInfo, bool> Predicate { get; } = predicate;
 
-    /// <summary>The mandatory description that renders in place of the opaque lambda.</summary>
     internal string Description { get; } = description;
 
     internal override AdjectivePlacement Placement => AdjectivePlacement.SubjectFinal;

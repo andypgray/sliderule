@@ -3,59 +3,23 @@ using SlideRule.Extraction.Fragments;
 namespace SlideRule.Extraction;
 
 /// <summary>
-///     What one evaluation of one project file said about the artifact it builds: the frameworks it
-///     declares, the packages it declares, whether it packs, whether its restore locks, and the properties
-///     the repository sets for it — each paired with the <c>file:line</c> that decided it. It also names the
-///     project files the project declares a reference to.
+///     What one evaluation of one project file said about the artifact it builds, one value per
+///     <em>compilation</em> rather than per project file: a condition on <c>$(TargetFramework)</c> can add a
+///     package to one framework and not another, and an outer-build evaluation would see neither.
 /// </summary>
 /// <remarks>
-///     <para>
-///         One value per <em>compilation</em>, not per project file: a multi-targeted project is evaluated
-///         once per framework, because a condition on <c>$(TargetFramework)</c> can add a package to one
-///         framework and not another, and an outer-build evaluation would see neither. The merge folds the
-///         per-framework values back into one project.
-///     </para>
-///     <para>
-///         Absence of the whole value means no evaluation happened. Absence <em>inside</em> it means
-///         something narrower and is documented per member, because the two spellings of "no" are not the
-///         same fact: an undeclared <c>RestorePackagesWithLockFile</c> says restore does not lock,
-///         while an undefined <c>IsPackable</c> says this project is outside the machinery that would answer.
-///     </para>
+///     Each of <paramref name="TargetFrameworksSite" />, <paramref name="IsPackableSite" /> and
+///     <paramref name="LocksPackagesSite" /> is the <c>file:line</c> of the declaration that decided its fact, or
+///     the project file where no declaration the repository owns decided it. <paramref name="TargetFrameworks" />
+///     is ordinal-ordered and normalized to the short moniker, and empty where the project declares none this
+///     reader recognises. <paramref name="PackageReferences" /> holds the packages the project declares, ordinal
+///     by name, never the SDK's implicit references or the transitive closure. <paramref name="IsPackable" /> is
+///     <see langword="null" /> where the property is undefined: a project that imports no pack targets has no
+///     answer rather than a negative one. An undeclared lock policy reads as <paramref name="LocksPackages" />
+///     <see langword="false" />. <paramref name="ProjectReferencePaths" /> holds the full path of each project
+///     file the project declares a reference to, in declaration order, never the SDK's transitive closure or an
+///     item that only orders the build (<c>ReferenceOutputAssembly="false"</c>).
 /// </remarks>
-/// <param name="TargetFrameworks">
-///     Every framework the project declares, ordinal-ordered and normalized to the short moniker. Empty
-///     where the project declares none this reader recognises.
-/// </param>
-/// <param name="TargetFrameworksSite">
-///     Where the frameworks are declared; the project file where nothing declares them.
-/// </param>
-/// <param name="PackageReferences">
-///     The packages the project declares, ordinal by name, each private where its evaluated
-///     <c>PrivateAssets</c> covers every asset — never the implicit references the SDK adds, and never the
-///     transitive closure.
-/// </param>
-/// <param name="IsPackable">
-///     Whether the project packs, or <see langword="null" /> where the property is undefined — a project
-///     that imports no pack targets has no answer rather than a negative one.
-/// </param>
-/// <param name="IsPackableSite">
-///     Where packability was decided; the project file where the winning declaration is not
-///     local.
-/// </param>
-/// <param name="LocksPackages">Whether restore writes a lock file. Undeclared reads <see langword="false" />.</param>
-/// <param name="LocksPackagesSite">
-///     Where the lock policy was decided; the project file where nothing declares it.
-/// </param>
-/// <param name="ProjectReferencePaths">
-///     The full path of every project file the project declares a reference to, in declaration order:
-///     never the transitive closure the SDK adds, and never an item that only orders the build
-///     (<c>ReferenceOutputAssembly="false"</c>). Paths rather than names, because which loaded project a
-///     path is belongs to the loader to say.
-/// </param>
-/// <param name="Properties">
-///     Every property a declaration in the repository set, with the project file this evaluation read: never a
-///     global, environment or reserved property, and never one only an SDK or a package import set.
-/// </param>
 internal sealed record ProjectArtifactFacts(
     IReadOnlyList<string> TargetFrameworks,
     FragmentSite TargetFrameworksSite,
@@ -68,19 +32,10 @@ internal sealed record ProjectArtifactFacts(
     FragmentProperties Properties);
 
 /// <summary>
-///     What one enumeration of a solution produced: the compilations to extract from, and what MSBuild said
-///     about each of their projects — one entry per input, at the same index.
-/// </summary>
-/// <remarks>
-///     Two lists rather than one field on <see cref="CompilationInput" />, because the facts come from a
-///     different engine than the compilation does and are absent on every path that hands compilations over
-///     directly. Pairing them here keeps that asymmetry at the one place that knows about both.
-/// </remarks>
-/// <param name="Inputs">The compilations, in extraction order.</param>
-/// <param name="ArtifactFacts">
-///     The evaluated facts for each input's project, by index; <see langword="null" /> where that project
+///     What one enumeration of a solution produced: the compilations to extract from, in extraction order, and
+///     at the same index what MSBuild said about each one's project, <see langword="null" /> where that project
 ///     could not be evaluated.
-/// </param>
+/// </summary>
 internal sealed record ExtractionInputs(
     IReadOnlyList<CompilationInput> Inputs,
     IReadOnlyList<ProjectArtifactFacts?> ArtifactFacts);

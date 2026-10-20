@@ -9,7 +9,6 @@ namespace SlideRule.Model;
 /// </summary>
 internal sealed class MustNotCatchConstraint(Selection subject, IReadOnlyList<Selection> targets) : OperandConstraint(subject, targets)
 {
-    /// <summary>The forbidden catch targets.</summary>
     internal IReadOnlyList<Selection> Targets => Operands;
 
     internal override string VerbPhrase => "must not catch " + Targets.TargetListProse();

@@ -1,15 +1,12 @@
 namespace SlideRule.Codebase;
 
 /// <summary>
-///     A type in the extracted model, carrying everything a rule can ask about one type: its name and where
-///     it is declared, its shape, its hierarchy, its attributes and its declared members. It implements
-///     <see cref="ITypeInfo" />, so the facts a <c>Where</c> predicate in a spec sees and the facts here are
-///     one surface.
+///     A type in the extracted model. It implements <see cref="ITypeInfo" />, so the facts a <c>Where</c>
+///     predicate in a spec sees and the facts here are one surface.
 /// </summary>
 /// <remarks>
-///     Every type the solution declares is present, and so is every framework or package type the solution
-///     merely references; <see cref="IsExternal" /> tells the two apart. Compare types by reference and
-///     never by name, because one fully-qualified name can belong to two of them.
+///     Compare types by reference and never by name: where a project declares a name a referenced assembly
+///     also supplies, two types wear it, told apart by <see cref="ProjectName" /> and <see cref="IsExternal" />.
 /// </remarks>
 // Minted shallow (identity only) and filled through the internal setters during model construction, which
 // is what tolerates self-referential shapes such as `[Foo] class FooAttribute`, where a type is its own
@@ -51,20 +48,14 @@ internal sealed class TypeNode : ITypeInfo
     ///     <c>MyApp.Web.IHandler&lt;T&gt;</c>, <c>MyApp.Domain.Order.Line</c>. Always the definition's name; a
     ///     constructed generic is never named here.
     /// </summary>
-    /// <remarks>
-    ///     The name is not an identity. Where a project declares a name a referenced assembly also supplies, two
-    ///     types wear it, told apart by <see cref="ProjectName" /> and <see cref="IsExternal" /> — which is why
-    ///     every set and lookup over the types in this model compares by reference.
-    /// </remarks>
     public string FullName { get; }
 
     /// <summary>
     ///     Gets the identity a baseline records for this type: its Roslyn documentation comment ID in the
     ///     <c>T:</c> form — <c>T:MyApp.Web.HomeController</c>, <c>T:MyApp.Web.IHandler`1</c> for an open
     ///     generic, <c>T:MyApp.Domain.Order.Line</c> for a nested type — or <c>unresolved:{FullName}</c> where
-    ///     the compiler gives the type no such ID. It survives moving, renaming or reformatting the file, where a
-    ///     <c>file:line</c> does not. Two types sharing a <see cref="FullName" /> share this ID as well, so a
-    ///     baseline entry written for either covers the other.
+    ///     the compiler gives the type no such ID. Two types sharing a <see cref="FullName" /> share this ID as
+    ///     well, so a baseline entry written for either covers the other.
     /// </summary>
     public string SymbolId { get; }
 
@@ -79,7 +70,6 @@ internal sealed class TypeNode : ITypeInfo
 
     /// <summary>
     ///     Gets where the type is declared, one entry per part of a partial type, ordered by file then line.
-    ///     Empty for an external type.
     /// </summary>
     public IReadOnlyList<SourceLocation> DeclarationSites { get; internal set; }
 
@@ -99,42 +89,37 @@ internal sealed class TypeNode : ITypeInfo
     public IReadOnlyList<string> AlsoDeclaredBy { get; internal set; }
 
     // Each declaring project's own declaration sites, keyed by project name, set beside AlsoDeclaredBy during model
-    // construction and non-null exactly when that roster is non-empty. DeclarationSites stays the union every rule
-    // reads; card placement reads these, so a project-headed selection places by its own copy (GRAMMAR §4.1, §6).
+    // construction and non-null exactly when that roster is non-empty. DeclarationSites stays their union; these
+    // let a project-headed selection count and place by its own copy (GRAMMAR §4.1, §6).
     internal IReadOnlyDictionary<string, IReadOnlyList<SourceLocation>>? DeclarationSitesByDeclarer { get; set; }
 
     /// <summary>
     ///     Gets every interface the type implements, directly or through a base class or interface inheritance,
-    ///     with type arguments substituted and ordered ordinal by <see cref="TypeConstruction.FullName" />.
-    ///     This is what <c>Implementing</c> and <c>MustImplement</c> read. Empty for an external type, so those
-    ///     never match an external type as a subject; a declared type's list runs on through the assemblies it
-    ///     references, so an external interface is still matched when a declared type implements it.
+    ///     with type arguments substituted and ordered ordinal by <see cref="TypeConstruction.FullName" />. A
+    ///     declared type's list runs on through the assemblies it references, so it includes external interfaces.
     /// </summary>
     public IReadOnlyList<TypeConstruction> AllInterfaces { get; internal set; }
 
     /// <summary>
-    ///     Gets the base types in derivation order, nearest first, ending at <c>System.Object</c>. The order is
-    ///     meaningful, so this list is not sorted. This is what <c>DerivedFrom</c> and <c>MustDeriveFrom</c>
-    ///     read. Empty for an interface and for an external type; a declared type's chain runs on through the
-    ///     assemblies it references, so an external base type is still matched.
+    ///     Gets the base types in derivation order, nearest first, ending at <c>System.Object</c>; the order is
+    ///     meaningful, so this list is not sorted. Empty for an interface. A declared type's chain runs on through
+    ///     the assemblies it references, so it includes external base types.
     /// </summary>
     public IReadOnlyList<TypeConstruction> BaseTypeChain { get; internal set; }
 
     /// <summary>
     ///     Gets the attributes written on the type's own declaration, ordered ordinal by
     ///     <see cref="TypeConstruction.FullName" />; attributes inherited from a base type are not included. A
-    ///     generic attribute is recorded like any other, keeping both its definition and its construction. This
-    ///     is what <c>AttributedWith</c> and <c>MustBeAttributedWith</c> read. Empty for an external type.
+    ///     generic attribute is recorded like any other, keeping both its definition and its construction.
     /// </summary>
     public IReadOnlyList<TypeConstruction> AttributeConstructions { get; internal set; }
 
     /// <summary>
     ///     Gets the type's declared methods, properties, fields and events, ordered ordinal by
-    ///     <see cref="MemberNode.SymbolId" /> — the members a member selection such as <c>Types.Methods</c> or
-    ///     <c>Types.Members</c> ranges over. Each member's <see cref="MemberNode.DeclaringType" /> is this same
+    ///     <see cref="MemberNode.SymbolId" />. Each member's <see cref="MemberNode.DeclaringType" /> is this same
     ///     instance. Constructors, accessors, operators, conversions, finalizers, indexers, explicit interface
-    ///     implementations and compiler-generated members are all left out. Empty for an external type, and for
-    ///     an enum or a delegate, which contribute no members.
+    ///     implementations and compiler-generated members are all left out, and an enum or a delegate
+    ///     contributes none.
     /// </summary>
     public IReadOnlyList<MemberNode> Members { get; internal set; }
 
@@ -181,13 +166,9 @@ internal sealed class TypeNode : ITypeInfo
     public IReadOnlyList<ITypeInfo> Attributes { get; internal set; }
 
     /// <summary>
-    ///     Reports whether <paramref name="projectName" /> declares this type: <see cref="ProjectName" /> or any
-    ///     entry of <see cref="AlsoDeclaredBy" />, compared ordinal. This is the membership test behind a rule
-    ///     that names a project — a type several projects declare is one type here, and every one of them
-    ///     names it.
+    ///     Reports whether <paramref name="projectName" />, as <see cref="ProjectNode.Name" /> reports it, declares
+    ///     this type: <see cref="ProjectName" /> or any entry of <see cref="AlsoDeclaredBy" />, compared ordinal.
     /// </summary>
-    /// <param name="projectName">The project's name, as <see cref="ProjectNode.Name" /> reports it.</param>
-    /// <returns><see langword="true" /> when that project declares this type.</returns>
     // Walked rather than cached, because AlsoDeclaredBy is stamped during model construction, after the node
     // is minted — a roster built at mint time would be stale for every conflated type. The list is empty for
     // every ordinary type, so the walk is one comparison.

@@ -23,13 +23,10 @@ internal sealed class LawPlaces(IReadOnlyList<LayerDefinition> layers)
 
     private readonly List<LawPlace> _ordered = [];
 
-    /// <summary>Every registered place, in the order the rules first named them.</summary>
     internal IReadOnlyList<LawPlace> Ordered => _ordered;
 
-    /// <summary>The places drawn at the top level, in registration order.</summary>
     internal IReadOnlyList<LawPlace> Roots => _ordered.Where(place => place.Parent is null).ToList();
 
-    /// <summary>Registers a rule's subject, or returns null when the subject is not place-shaped.</summary>
     internal LawPlace? Subject(Selection? selection)
     {
         LawPlace? place = Register(LawPlaceClassifier.SubjectPlace(selection, layers));
@@ -38,13 +35,11 @@ internal sealed class LawPlaces(IReadOnlyList<LayerDefinition> layers)
         return place;
     }
 
-    /// <summary>Registers one of a verb's operands, or returns null when it is not place-shaped.</summary>
     internal LawPlace? Operand(Selection? selection)
     {
         return Register(LawPlaceClassifier.OperandPlace(selection, layers));
     }
 
-    /// <summary>Registers a quarantined scope's interior as a place carrying the scope's identity.</summary>
     internal LawPlace? Scope(Selection? selection, string scopeId)
     {
         LawPlace? place = Subject(selection);
@@ -54,9 +49,8 @@ internal sealed class LawPlaces(IReadOnlyList<LayerDefinition> layers)
     }
 
     /// <summary>
-    ///     Registers one sanctioned-surface operand as a child of its scope's place, or returns null when
-    ///     the operand is not place-shaped. A region named in facade position keeps its own place and gains
-    ///     the facade standing, so a namespace two rules name is still one node.
+    ///     A region named in facade position keeps its own place and gains the facade standing, so a namespace
+    ///     two rules name is still one node.
     /// </summary>
     internal LawPlace? Facade(Selection? selection, LawPlace scope)
     {
@@ -68,7 +62,6 @@ internal sealed class LawPlaces(IReadOnlyList<LayerDefinition> layers)
         return place;
     }
 
-    /// <summary>The places drawn inside <paramref name="place" />, in registration order.</summary>
     internal IReadOnlyList<LawPlace> Children(LawPlace place)
     {
         return _ordered.Where(candidate => ReferenceEquals(candidate.Parent, place)).ToList();
@@ -89,9 +82,7 @@ internal sealed class LawPlaces(IReadOnlyList<LayerDefinition> layers)
                 .Where(other => !ReferenceEquals(other, place) && other.Globs.Count > 0 && StrictlyContains(other, place))
                 .ToList();
 
-            // The most specific container is the one every other container also covers. Two containers
-            // that cover neither each other nor a common candidate leave no such place, and the node
-            // stays where it is.
+            // The most specific container is the one every other container also covers.
             place.Parent = containers.FirstOrDefault(candidate => containers.All(other => ReferenceEquals(other, candidate) || Contains(other, candidate)));
         }
     }

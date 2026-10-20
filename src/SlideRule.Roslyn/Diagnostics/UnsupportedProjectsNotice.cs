@@ -8,15 +8,16 @@ namespace SlideRule.Roslyn.Diagnostics;
 ///     human twin of the documents' <c>unsupportedProjects</c> slot.
 /// </summary>
 /// <remarks>
-///     Every tail closes on the reading being denied rather than on a command. There is no <c>graph</c>
-///     stamp: the survey lists these projects as a section of its own roster, and a stamp as well would say
-///     it twice.
+///     Every tail closes on the reading being denied rather than on a command, because no command would widen
+///     the answer. There is no <c>graph</c> stamp: the survey lists these projects as a section of its own
+///     roster, and a stamp as well would say it twice. The stamps take the entries <see cref="Relative" />
+///     composes.
 /// </remarks>
 internal static class UnsupportedProjectsNotice
 {
     /// <summary>
-    ///     Why a project of this <paramref name="kind" /> is outside the model, as a reader reads it — the
-    ///     one author of that sentence, on every surface.
+    ///     Why a project of this <paramref name="kind" /> is outside the model, as a reader reads it: the one
+    ///     author of that sentence, on every surface.
     /// </summary>
     /// <remarks>
     ///     <para>
@@ -24,19 +25,12 @@ internal static class UnsupportedProjectsNotice
     ///         second would leave the line with two.
     ///     </para>
     ///     <para>
-    ///         <b>
-    ///             The fallback arm is <see cref="UnsupportedProjectKind.NotCsharp" />, and a test is what
-    ///             guards it.
-    ///         </b>
-    ///         That kind is the catch-all classification, so falling to it is the right
-    ///         default — but it also means a kind added without wording is quietly described as the wrong
-    ///         thing, which is the defect this taxonomy exists to retire. The compiler cannot help: dropping
-    ///         the arm to make a missing member a warning makes every <em>unnamed</em> value one instead
-    ///         (CS8524), permanently. So <c>UnsupportedProjectsNoticeTests</c> asserts that every declared
-    ///         kind reads differently from the others, which reds on exactly the omission this arm allows.
+    ///         The discard arm reads as <see cref="UnsupportedProjectKind.NotCsharp" />, the catch-all, so a kind
+    ///         added without its own arm is described as the wrong thing. <c>UnsupportedProjectsNoticeTests</c>
+    ///         asserts that every declared kind reads differently from the others, which reds on that omission;
+    ///         dropping the discard arm instead would trade it for CS8524 on every unnamed value.
     ///     </para>
     /// </remarks>
-    /// <param name="kind">The classification the project's producer made.</param>
     internal static string Reason(UnsupportedProjectKind kind)
     {
         return kind switch
@@ -47,11 +41,9 @@ internal static class UnsupportedProjectsNotice
     }
 
     /// <summary>
-    ///     The entry as a human line reads it: the project, then why. One owner, so the survey's own section
-    ///     and the stamp a verb writes above its answer cannot spell the same entry two ways.
+    ///     The entry as a human line reads it: the project, then why. One owner, so no two surfaces spell the same
+    ///     entry two ways.
     /// </summary>
-    /// <param name="project">The project, as the surface spells it (solution-relative, forward-slashed).</param>
-    /// <param name="reason">Why the run did not reach it, from <see cref="Reason" />.</param>
     internal static string Entry(string project, string reason)
     {
         return $"{project} — {reason}";
@@ -63,12 +55,9 @@ internal static class UnsupportedProjectsNotice
     ///     lands in output a golden pins.
     /// </summary>
     /// <remarks>
-    ///     <see cref="NarrowedUniverseNotice.Relative" />'s twin, and it composes where that one only
-    ///     relativizes: the reason is half of what an entry says, and a caller that had to add it would be a
-    ///     second author for this file's sentence.
+    ///     It composes where <see cref="NarrowedUniverseNotice.Relative" /> only relativizes: a caller that had to
+    ///     add the reason would be a second author for this file's sentence.
     /// </remarks>
-    /// <param name="projects">The projects, with their kinds.</param>
-    /// <param name="solutionDirectory">The directory their paths are shown relative to.</param>
     internal static IReadOnlyList<string> Relative(
         IReadOnlyList<UnsupportedProject> projects, string solutionDirectory)
     {
@@ -78,11 +67,7 @@ internal static class UnsupportedProjectsNotice
             .ToList();
     }
 
-    /// <summary>
-    ///     The stamp <c>check</c> writes above its report. A rule cannot be violated in a project the model
-    ///     does not contain, so a clean verdict over a polyglot solution is the reading this prevents.
-    /// </summary>
-    /// <param name="unsupportedProjects">The solution-relative paths, each with its reason.</param>
+    /// <summary>The stamp <c>check</c> writes above its report.</summary>
     internal static string CheckStamp(IReadOnlyList<string> unsupportedProjects)
     {
         return Block(
@@ -91,11 +76,7 @@ internal static class UnsupportedProjectsNotice
             + "a clean solution.");
     }
 
-    /// <summary>
-    ///     The stamp <c>status</c> writes above its burndown. Unlike a filter's narrowing, this zero is
-    ///     permanent: no future run of this product will find debt in these projects to burn down.
-    /// </summary>
-    /// <param name="unsupportedProjects">The solution-relative paths, each with its reason.</param>
+    /// <summary>The stamp <c>status</c> writes above its burndown.</summary>
     internal static string StatusStamp(IReadOnlyList<string> unsupportedProjects)
     {
         return Block(
@@ -105,12 +86,9 @@ internal static class UnsupportedProjectsNotice
     }
 
     /// <summary>
-    ///     The <c>Workspace_LoadedCompletely</c> skip reason over a solution declaring projects this run
-    ///     could not reach — the adapter's twin of the CLI stamps, and a skip rather than a pass for
-    ///     <see cref="NarrowedUniverseNotice.AdapterSkip" />'s reason: the rule verdicts are real, but a test
-    ///     by that name cannot pass while the solution declares projects the model never held.
+    ///     The <c>Workspace_LoadedCompletely</c> skip reason over a solution declaring projects this run could not
+    ///     reach, the adapter's twin of the CLI stamps.
     /// </summary>
-    /// <param name="unsupportedProjects">The solution-relative entries, each already carrying its reason.</param>
     internal static string AdapterSkip(IReadOnlyList<string> unsupportedProjects)
     {
         return Block(
@@ -119,21 +97,15 @@ internal static class UnsupportedProjectsNotice
             + "while the solution declares projects the model never held.");
     }
 
-    // The stamps' own lede — fixed, because a stamp scopes an answer that still follows and has nothing else
-    // to say first. Deliberately no remedy: unlike its two neighbours there is no command that would widen
-    // the answer, and inventing one would be worse than saying nothing.
     private static string Block(IReadOnlyList<string> unsupportedProjects, string tail)
     {
         var lede = $"{Subject(unsupportedProjects.Count)}:";
         return EvidenceBlock.Compose(lede, unsupportedProjects, tail);
     }
 
-    // The count as a clause every lede can take, in both numbers — the sentence a reader stops trusting is
-    // "1 projects ... were not surveyed".
-    //
-    // It states no cause: a cause clause would duplicate what every entry beneath it says — and "C# only"
-    // would be false about a shared project, whose code is very often C#. A lede scopes; the entries say
-    // why, each for itself.
+    // The count as a clause every lede can take, in both numbers: the sentence a reader stops trusting is
+    // "1 projects ... were not surveyed". It states no cause, because each entry beneath it says its own, and
+    // "C# only" would be false about a shared project.
     private static string Subject(int unsupportedProjectCount)
     {
         string noun = Plurals.Noun(unsupportedProjectCount, "project");

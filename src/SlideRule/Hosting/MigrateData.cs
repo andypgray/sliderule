@@ -1,10 +1,6 @@
 namespace SlideRule.Hosting;
 
-/// <summary>
-///     What a <c>Migrate</c> rule carries beyond an ordinary <see cref="ArchRule" />: the description of
-///     the pattern the code still follows, the sentence it is moving toward, the file recording its
-///     grandfathered violations, and what an editor passing through should do about them.
-/// </summary>
+/// <summary>What a <c>Migrate</c> rule carries beyond an ordinary <see cref="ArchRule" />.</summary>
 internal sealed class MigrateData
 {
     internal MigrateData(string from, string toSentence, string baselinePath, MigrationPolicy policy)
@@ -28,16 +24,15 @@ internal sealed class MigrateData
     public string ToSentence { get; }
 
     /// <summary>
-    ///     Gets the file recording the rule's grandfathered violations. Never null: where the spec named no
-    ///     baseline it is <c>arch/baselines/{rule-id}.json</c>, each <c>/</c> in the rule ID becoming a
-    ///     directory. Stored with forward slashes and resolved against the solution directory.
+    ///     Gets the file recording the rule's grandfathered violations: the path the spec named, or the
+    ///     <see cref="SlideRule.Baselines.BaselineConventions.DefaultPath" /> default. Never null, stored with forward
+    ///     slashes and resolved against the solution directory.
     /// </summary>
     public string BaselinePath { get; }
 
     /// <summary>
-    ///     Gets what an editor already changing a file with grandfathered violations is asked to do about
-    ///     them; <see cref="MigrationPolicy.MigrateIfSmall" /> where the spec set none. Rendered into the
-    ///     generated agent context as guidance, and nothing checks it.
+    ///     Gets the policy the spec set with <c>WhileYoureThere</c>, or <see cref="MigrationPolicy.MigrateIfSmall" />
+    ///     where it set none.
     /// </summary>
     public MigrationPolicy Policy { get; }
 }

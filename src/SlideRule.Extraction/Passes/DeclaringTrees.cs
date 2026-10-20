@@ -3,27 +3,15 @@ using Microsoft.CodeAnalysis;
 namespace SlideRule.Extraction.Passes;
 
 /// <summary>
-///     Which types each of a compilation's syntax trees holds a declaring part of — the lookup a
-///     per-document extraction is steered by, built once for the compilation and read once per document.
+///     Which types each of a compilation's syntax trees holds a declaring part of, built once for the
+///     compilation and read once per document.
 /// </summary>
 /// <remarks>
-///     <para>
-///         The walk is <see cref="FragmentExtractor.DeclaredTypes" />'s, shared rather than restated: an
-///         index built from a second walk could disagree with extraction about which types exist. It is
-///         also why the walk is over namespaces rather than over type-declaration syntax — a
-///         top-level-statements <c>Program</c> is declared by no type declaration at all, and a syntax walk
-///         would leave the only document that could carry it empty.
-///     </para>
-///     <para>
-///         A type is keyed under <em>every</em> tree holding one of its declaring parts, so each part of a
-///         partial type names the whole type. That is what lets a document's extraction carry the type
-///         whole — every part's sites and edges — rather than the slice one file can see.
-///     </para>
-///     <para>
-///         The screen that decides which declared types are rule subjects is deliberately not applied
-///         here: this states what a tree declares, and extraction asks that question where it already
-///         does, over whatever it is handed.
-///     </para>
+///     The walk is <see cref="FragmentExtractor.DeclaredTypes" />'s, so this index and extraction agree about
+///     which types exist, a top-level-statements <c>Program</c> included, which no type declaration declares. A
+///     type is keyed under every tree holding one of its declaring parts, so a document's extraction carries a
+///     partial type whole rather than the slice one file can see. No rule-subject screen applies here:
+///     extraction screens whatever it is handed.
 /// </remarks>
 internal sealed class DeclaringTrees
 {
@@ -37,10 +25,6 @@ internal sealed class DeclaringTrees
     {
     }
 
-    /// <summary>
-    ///     Every type <paramref name="compilation" /> declares, under each syntax tree that holds one of its
-    ///     declaring parts.
-    /// </summary>
     internal static DeclaringTrees Of(Compilation compilation)
     {
         var declaringTrees = new DeclaringTrees();
@@ -52,10 +36,7 @@ internal sealed class DeclaringTrees
         return declaringTrees;
     }
 
-    /// <summary>
-    ///     The types declared in <paramref name="tree" />, in declaration-walk order; empty when it declares
-    ///     none.
-    /// </summary>
+    /// <summary>The types declared in <paramref name="tree" />, in declaration-walk order.</summary>
     internal IReadOnlyList<INamedTypeSymbol> In(SyntaxTree tree)
     {
         return _byTree.TryGetValue(tree, out List<INamedTypeSymbol>? types) ? types : None;

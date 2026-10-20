@@ -4,10 +4,9 @@ namespace SlideRule.Model;
 
 /// <summary>
 ///     Types named in a source-visible container registration — <c>arch.Registered(Lifetime)</c>, or
-///     <c>arch.Registered()</c> for any lifetime (GRAMMAR §4.7, §5.1). Reifies data only: it carries the
-///     optional <see cref="Lifetime" /> filter (<c>null</c> = any lifetime). Membership — the service ∪
-///     implementation FQNs of recognized registrations — is resolved model-side in the checker, never
-///     denormalized onto a type node.
+///     <c>arch.Registered()</c> for any lifetime (GRAMMAR §4.7, §5.1). Reifies data only: membership — the
+///     service ∪ implementation FQNs of recognized registrations — is resolved model-side in the checker,
+///     never denormalized onto a type node.
 /// </summary>
 /// <remarks>
 ///     Its fragment ("singleton-registered types" / "registered types") is the noun's <b>head</b>:

@@ -9,12 +9,9 @@ using SlideRule.Roslyn.Checking;
 namespace SlideRule.Cli.Pipeline;
 
 /// <summary>
-///     The CLI's half of the check core over a <see cref="CodebaseSource" />, reused by <c>check</c> and
-///     <c>status</c>: pick the rules, name the two things only the host can supply — how to extract this
-///     run's codebase, and which files changed (as the caller listed them, or since the run's
-///     <c>--diff-base</c>) — and hand them to <see cref="ArchCheckSequence" />, which owns the order they run
-///     in. The two commands differ only in how they render the resulting <see cref="CheckReport" /> and their
-///     exit codes — <c>check</c> gates, <c>status</c> reports (and passes no diff base, so its tripwires skip).
+///     The CLI's half of the check core over a <see cref="CodebaseSource" />: pick the rules, name the two things
+///     only the host can supply — how to extract this run's codebase, and which files changed — and hand them to
+///     <see cref="ArchCheckSequence" />, which owns the order they run in.
 /// </summary>
 /// <remarks>
 ///     Both fail-fast preconditions — a tampered baseline, an unresolvable <c>--diff-base</c> — precede

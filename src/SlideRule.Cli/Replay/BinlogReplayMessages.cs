@@ -1,16 +1,10 @@
 namespace SlideRule.Cli.Replay;
 
 /// <summary>
-///     The CLI-side user-facing text for the <c>--binlog</c> replay path: the loud refusals for
-///     a user-supplied binlog that cannot be replayed, and the soft notice for a persisted capture whose copy
-///     fails to replay at runtime.
+///     The CLI-side user-facing text for the <c>--binlog</c> replay path: the replay-failure surface the gate
+///     raises. The ingest refusals and the structural-invalidation notices are
+///     <see cref="Roslyn.Replay.BinlogCaptureStore" />'s own.
 /// </summary>
-/// <remarks>
-///     The sibling of <see cref="Roslyn.Replay.BinlogCaptureStore" />'s own factories (which own the ingest
-///     refusals and the structural-invalidation notices); these three own the replay-failure surface the
-///     gate raises. Exposed as factories so tests pin the text without duplicating the format, and so the
-///     first-line extraction lives in exactly one place.
-/// </remarks>
 internal static class BinlogReplayMessages
 {
     /// <summary>
@@ -36,9 +30,8 @@ internal static class BinlogReplayMessages
     }
 
     /// <summary>
-    ///     The soft notice (printed behind a <c>warning: </c> prefix, then a cold fallback) when a
-    ///     structurally-valid capture's binlog copy fails to replay at runtime — a torn copy or a vanished
-    ///     reference. It quotes the first line of <paramref name="underlyingMessage" />.
+    ///     The soft notice when a structurally-valid capture's binlog copy fails to replay at runtime — a torn
+    ///     copy or a vanished reference. It quotes the first line of <paramref name="underlyingMessage" />.
     /// </summary>
     internal static string CaptureReplayFailedNotice(string underlyingMessage)
     {

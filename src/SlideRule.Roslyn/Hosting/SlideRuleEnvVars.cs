@@ -1,14 +1,11 @@
 namespace SlideRule.Roslyn.Hosting;
 
 /// <summary>
-///     Every environment variable the product reads, named once. "What can an operator set" is a question
-///     with one answer only if the names live together; spelled at each reader they are an inventory
-///     nobody holds, and the prose that documents them (the MCP server instructions, the MSBuild
-///     quarantine's dragons note) cites names it cannot check.
+///     Every environment variable the product reads, named once, so "what can an operator set" has one answer.
 /// </summary>
 /// <remarks>
-///     The last six are not ours: they belong to the host, Claude Code or the operating system, and are read
-///     to fit in with it rather than to configure anything of SlideRule's.
+///     The names without the <c>SLIDERULE_</c> prefix are not ours: they belong to the host, Claude Code or the
+///     operating system, and are read to fit in with it rather than to configure anything of SlideRule's.
 /// </remarks>
 internal static class SlideRuleEnvVars
 {
@@ -45,16 +42,10 @@ internal static class SlideRuleEnvVars
     /// </summary>
     internal const string HookStateDirectory = "SLIDERULE_HOOK_STATE_DIR";
 
-    /// <summary>
-    ///     The launching agent session's id, set by Claude Code. Tagged onto every log line so concurrent
-    ///     servers sharing one daily file can be told apart and correlated with the session that started them.
-    /// </summary>
+    /// <summary>The launching agent session's id, set by Claude Code.</summary>
     internal const string ClaudeCodeSessionId = "CLAUDE_CODE_SESSION_ID";
 
-    /// <summary>
-    ///     The project's root directory, set by Claude Code for every hook it fires. <c>sliderule hook</c> checks
-    ///     that tree unless the session is in another working tree of the same repository.
-    /// </summary>
+    /// <summary>The project's root directory, set by Claude Code for every hook it fires.</summary>
     internal const string ClaudeProjectDirectory = "CLAUDE_PROJECT_DIR";
 
     /// <summary>The MCP client's per-response token budget, read to size the response cap.</summary>

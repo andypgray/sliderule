@@ -7,9 +7,9 @@ namespace SlideRule.Cli.Rendering;
 /// <remarks>
 ///     Pure over the summary, so the line shapes are unit-pinned. Mirrors
 ///     <see cref="StatusFormatter" />'s terse, em-dashed voice; an empty section reads <c>(none)</c> rather
-///     than vanishing, so the survey's shape is stable — which is also why overview grain replaces the
-///     namespace inventory with an elision line instead of dropping the section: a reader can see what was
-///     left out and how to get it back.
+///     than vanishing, because a section that appears only when it has content is one a reader never learns
+///     to look for — which is also why overview grain replaces the namespace inventory with an elision line
+///     instead of dropping the section: a reader can see what was left out and how to get it back.
 /// </remarks>
 internal static class GraphFormatter
 {
@@ -31,20 +31,13 @@ internal static class GraphFormatter
     /// <summary>
     ///     The survey's lines. A coarser <paramref name="grain" /> renders the same sections with less in
     ///     them, an elided section down to one line naming the flag to drop, and no section ever disappears.
-    ///     A coverage statement with nothing to report keeps its <c>(none)</c> at every grain instead, which
-    ///     is why a healthy solution's skeleton still says outright that no type is declared twice.
     /// </summary>
-    /// <param name="summary">The survey to format.</param>
-    /// <param name="solutionName">The solution's file name, for the heading.</param>
-    /// <param name="grain">How much of each section to render.</param>
-    /// <param name="unsupportedProjects">
-    ///     The declared projects the survey does not cover, as the shared trust stamp composed them —
-    ///     relativized, and each already carrying its reason, so this line and the document's own key cannot
-    ///     disagree about what the run reached. Passed in rather than taken off <paramref name="summary" />
-    ///     because it is a fact about the load rather than about the codebase: the summary describes what was
-    ///     extracted, and this names what never could be. For that reason it is also unaffected by
-    ///     <c>--projects</c>, which scopes the summary alone.
-    /// </param>
+    /// <remarks>
+    ///     <paramref name="unsupportedProjects" /> arrives as the shared trust stamp composed it, relativized and
+    ///     each entry carrying its reason, so this line and the document's own key cannot disagree about what
+    ///     the run reached. It is a fact about the load rather than about the codebase, so <c>--projects</c>,
+    ///     which scopes <paramref name="summary" />, does not narrow it.
+    /// </remarks>
     public static IReadOnlyList<string> Lines(
         GraphSummary summary, string solutionName, DocumentGrain grain,
         IReadOnlyList<UnsupportedProjectStamp> unsupportedProjects)
@@ -82,11 +75,8 @@ internal static class GraphFormatter
     }
 
     // Sited straight under the roster, because it is the roster's own caveat: these are the projects that
-    // would have been lines above it. Reads "(none)" on a solution the survey covers whole rather than
-    // vanishing, per this formatter's standing rule: a section that appears only when it has content is one
-    // a reader never learns to look for. Never elided at any grain: it is bounded by the solution rather
-    // than the codebase, and a coarser survey is where a reader most needs to know it is of part of the
-    // solution.
+    // would have been lines above it. Never elided at any grain: it is bounded by the solution rather than
+    // the codebase, and a coarser survey is where a reader most needs to know it is of part of the solution.
     private static IEnumerable<string> UnsupportedProjectLines(
         IReadOnlyList<UnsupportedProjectStamp> unsupportedProjects)
     {
@@ -229,9 +219,7 @@ internal static class GraphFormatter
     }
 
     // The survey's coverage statement, sited straight after the edges it explains: one reason a project
-    // pair is absent from the block above is that one of them compiles the other's type itself. It reads
-    // "(none)" on a healthy solution rather than vanishing, for the same reason every other section does —
-    // a section that only appears when it has content is one a reader never learns to look for.
+    // pair is absent from the block above is that one of them compiles the other's type itself.
     private static IEnumerable<string> MultiplyDeclaredTypeLines(GraphSummary summary, DocumentGrain grain)
     {
         return CoverageSection(

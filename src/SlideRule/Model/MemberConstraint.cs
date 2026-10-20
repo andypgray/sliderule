@@ -5,12 +5,9 @@ namespace SlideRule.Model;
 ///     a member modal verb phrase.
 /// </summary>
 /// <remarks>
-///     Carries the <see cref="MemberSubject" /> for member-subject assembly (GRAMMAR §6) and the checker,
-///     but its inherited <see cref="Constraint.Subject" /> is the underlying <b>type</b> selection
-///     (<c>Subject =&gt; MemberSubject.Source</c>), so every walk that reaches through the base subject —
-///     foreign-<see cref="Arch" /> detection (§8 item 10), Quarantine desugaring (§7) — keeps working
-///     unchanged on the type side. That is the point of departure from <see cref="ProjectConstraint" />,
-///     which has no such selection to hand up and passes <see langword="null" />.
+///     Its inherited <see cref="Constraint.Subject" /> is the type selection the members are drawn from, so a
+///     walk that reaches through the base subject (foreign-<see cref="Arch" /> detection, §8 item 10; Quarantine
+///     desugaring, §7) works unchanged on the type side.
 /// </remarks>
 internal abstract class MemberConstraint : Constraint
 {
@@ -20,6 +17,5 @@ internal abstract class MemberConstraint : Constraint
         MemberSubject = subject;
     }
 
-    /// <summary>The member selection the constraint is asserted over.</summary>
     internal MemberSelection MemberSubject { get; }
 }

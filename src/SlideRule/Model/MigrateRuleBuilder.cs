@@ -3,7 +3,7 @@ using SlideRule.Internal;
 
 namespace SlideRule.Model;
 
-/// <summary>Trailer/option stage for a <c>Migrate</c> rule. Each appends so repeats are detectable (§8 item 6).</summary>
+/// <summary>Trailer stage for a <c>Migrate</c> rule.</summary>
 internal sealed class MigrateRuleBuilder(RuleRegistration registration) : IMigrateRule
 {
     public IMigrateRule Because(string because)

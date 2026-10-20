@@ -35,7 +35,7 @@ public sealed class Member
 
     // A member read back from a model file: the declaring type arrives as an anchor and IsMethod as a
     // fact, because both were settled by reflection when the spec was built and neither can be recovered
-    // from names alone. DeclaringType has nothing to hand back and says so rather than returning null.
+    // from names alone.
     internal Member(Arch owner, TypeAnchor declaringAnchor, string name, bool isMethod)
     {
         Owner = owner;
@@ -44,14 +44,11 @@ public sealed class Member
         _isMethod = isMethod;
     }
 
-    // Poison ctor for an unresolvable member-anchor expression (GRAMMAR §8, MemberExpressionUnresolvable):
-    // MemberExpressionResolver could not reduce the lambda to a declared (type, name). It records only the
-    // diagnostic core and leaves the DeclaringType/DeclaringAnchor/Name/IsMethod backing fields at their
-    // defaults — reading any of the four throws (fail closed, enforced not merely documented), so a
-    // poisoned Member can never be mistaken for a resolved one. Nothing reaches for the anchor in practice
-    // either: the whole spec is validated before any node is projected or rendered, so the poison is
-    // reported first. Owner is stamped so the foreign-Arch check (§8 item 13) still precedes the poison
-    // report.
+    // Poison ctor for a lambda MemberExpressionResolver could not reduce to a declared (type, name) (GRAMMAR §8,
+    // MemberExpressionUnresolvable). It records only the diagnostic core; DeclaringType, DeclaringAnchor, Name
+    // and IsMethod throw rather than hand back defaults a reader could mistake for a resolved member. The whole
+    // spec is validated before any node is projected or rendered, so the poison is reported first; Owner is
+    // stamped so the foreign-Arch check (§8 item 13) still precedes that report.
     internal Member(Arch owner, string poisonError, SpecSourceLocation? location = null)
     {
         Owner = owner;
@@ -69,16 +66,13 @@ public sealed class Member
     ///     The spec-source position of the <c>arch.Member(...)</c> call that minted this leaf (GRAMMAR §8),
     ///     or null for a verb-minted member (the <c>MustNotUse(() =&gt; ...)</c> expression forms cannot carry
     ///     caller info past <c>params</c>) — whose errors then attribute to the consuming rule's anchor.
-    ///     Always safe to read, including on a poisoned member (unlike the fail-closed anchor accessors).
     /// </summary>
     internal SpecSourceLocation? Location { get; }
 
     /// <summary>
-    ///     Non-null when this member was minted from an unresolvable anchor expression: the diagnostic
-    ///     core (GRAMMAR §8, <see cref="Validation.SpecValidationErrorCode.MemberExpressionUnresolvable" />)
-    ///     that <see cref="Validation.SpecValidator" /> reports before any reader touches the fail-closed
-    ///     <see cref="DeclaringType" />/<see cref="DeclaringAnchor" />/<see cref="Name" />. Null for every
-    ///     resolved member.
+    ///     The diagnostic core of a member minted from an unresolvable anchor expression, which
+    ///     <see cref="Validation.SpecValidator" /> reports as
+    ///     <see cref="Validation.SpecValidationErrorCode.MemberExpressionUnresolvable" />; null when resolved.
     /// </summary>
     internal string? PoisonError { get; }
 
@@ -108,12 +102,10 @@ public sealed class Member
 
     /// <summary>
     ///     Whether the anchored member resolves to a method, decided once at construction against the
-    ///     normalized generic definition; drives the trailing <c>()</c> in prose (GRAMMAR §6).
+    ///     normalized generic definition.
     /// </summary>
     internal bool IsMethod => PoisonError is null ? _isMethod : throw PoisonRead();
 
-    // A poisoned member anchor never populated its resolved fields; reading one is a caller bug. Fail closed
-    // rather than hand back a default that could masquerade as a resolved anchor.
     private static InvalidOperationException PoisonRead()
     {
         return new InvalidOperationException(
@@ -129,10 +121,9 @@ public sealed class Member
             "A member read from a model file carries no reflected DeclaringType; read its DeclaringAnchor.");
     }
 
-    // Any declared member of that name that is a MethodInfo makes this a method. The lookup is
-    // DeclaredMember's — the same one validation asks whether the anchor declares the member at all, so
-    // the two cannot disagree. A blank or typo'd name yields no hits (false); validation rejects those
-    // later (GRAMMAR §8 items 11–12).
+    // The lookup is DeclaredMember's, the one validation asks whether the anchor declares the member at all,
+    // so the two cannot disagree. A blank or typo'd name yields false here and is rejected by validation later
+    // (GRAMMAR §8 items 11–12).
     private static bool ResolveIsMethod(Type declaringType, string name)
     {
         foreach (MemberInfo hit in DeclaredMember.Of(declaringType, name))

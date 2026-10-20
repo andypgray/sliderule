@@ -38,12 +38,11 @@ namespace SlideRule.Analyzers;
 ///     <para>
 ///         The only static state is the two path-keyed reads, one of model files and one of baselines, which
 ///         keep one read per path and replace it when the text at that path changes, so a host that analyses
-///         many projects in one process reads a given file once rather than once per project. The instance
-///         holds the test seams and the reads it goes through, which are those two unless a seam over a read
-///         is armed, when they are reads of its own. The live tier's per-compilation state lives in the closure
-///         the start action builds, never in a field, because the compiler shares one analyzer instance across
-///         compilations. Nothing is read from disk, the environment or a clock: the compilation and the
-///         additional files the build supplies are the whole input.
+///         many projects in one process reads a given file once rather than once per project. The live tier's
+///         per-compilation state lives in the closure the start action builds, never in a field, because the
+///         compiler shares one analyzer instance across compilations. Nothing is read from disk, the
+///         environment or a clock: the compilation and the additional files the build supplies are the whole
+///         input.
 ///     </para>
 ///     <para>
 ///         The compiler binds this analyzer to whichever copy of SlideRule it loaded, which can be
@@ -61,7 +60,6 @@ internal sealed class BuildTierAnalyzer : DiagnosticAnalyzer
 {
     private const string TierProperty = "build_property.SlideRuleTier";
 
-    // The three values the property takes; an absent or unrecognised value is Live.
     private enum Tier
     {
         Off,
@@ -99,7 +97,9 @@ internal sealed class BuildTierAnalyzer : DiagnosticAnalyzer
     ///     Runs inside the guard of whichever action checks — once per compilation on the build tier, once
     ///     per document that declares a type on the live tier — and before any extraction.
     /// </param>
-    /// <param name="beforeStart">Runs first inside the boundary the compilation start calls past the version check.</param>
+    /// <param name="beforeStart">
+    ///     Runs first inside the boundary the compilation start calls past the version check.
+    /// </param>
     /// <param name="beforeModelRead">
     ///     Runs inside the model read's guard, before the read. Arming it gives this instance reads of its own
     ///     over the same guarded read, so the reads every analyzer shares are never handed a fault and a read
@@ -151,10 +151,6 @@ internal sealed class BuildTierAnalyzer : DiagnosticAnalyzer
         context.RegisterCompilationStartAction(OnCompilationStart);
     }
 
-    /// <summary>
-    ///     The version <paramref name="assembly" /> was built as: its informational version, or null where it
-    ///     carries none.
-    /// </summary>
     internal static string? InformationalVersionOf(Assembly assembly)
     {
         return assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
@@ -253,11 +249,9 @@ internal sealed class BuildTierAnalyzer : DiagnosticAnalyzer
         Dictionary<string, AdditionalText> baselineFiles =
             BaselineFilesFor(loaded.InRules, modelDirectory, context.Options.AdditionalFiles);
 
-        // Every baseline file the In rules name, read through the path-keyed read so a host reads a given
-        // file once however many projects name it. The read is shared by the action that reports a refusal
-        // and the check that consumes the document, because reading in both would read the same file twice
-        // per compilation.
-        // A refusal is placed in this compilation's own text, which rides beside the read for that.
+        // Every baseline file the In rules name, read once here and shared by the action that reports a refusal
+        // and the check that consumes the document, because reading in both would read the same file twice per
+        // compilation. This compilation's own text rides beside each read, for placing a refusal.
         var handed = new Dictionary<AdditionalText, (HandedBaseline Baseline, SourceText Text)>();
         var handedByPath = new Dictionary<string, HandedBaseline>(PathComparison.Comparer);
         foreach (KeyValuePair<string, AdditionalText> baselineFile in baselineFiles)
@@ -421,15 +415,13 @@ internal sealed class BuildTierAnalyzer : DiagnosticAnalyzer
                 context.ReportDiagnostic(BuildTierDiagnostics.RuleNotChecked(rule.Id));
     }
 
-    // The one place a fault becomes a warning, on either tier. A fault in the analyzer must reach the
-    // developer as a warning they can exclude by ID rather than as the compiler's own AD0001, which a
-    // warnings-as-errors build fails on; cancellation is not a fault and passes through every guard.
+    // The one place a fault becomes a warning, on either tier; cancellation is not a fault and passes through
+    // every guard.
     private static void ReportFault(CompilationAnalysisContext context, Exception fault)
     {
         context.ReportDiagnostic(BuildTierDiagnostics.AnalyzerFailed(fault));
     }
 
-    // The compilation's one fault, where any action held one.
     private static void ReportHeldFault(CompilationAnalysisContext context, FaultSlot faults)
     {
         if (faults.Fault is { } fault) ReportFault(context, fault);
@@ -685,15 +677,13 @@ internal sealed class BuildTierAnalyzer : DiagnosticAnalyzer
         return trees;
     }
 
-    // A site's span is the reference the extractor recorded — a qualified type name, a `new` through its
-    // arguments, a `catch` through its declaration, an identifier for a shape — so the squiggle covers that
-    // and nothing else. A site with no span (one built by hand, or one read back from the cache, which never
-    // stores a span) falls back to the line from its first non-blank character to its end, and so does a span
-    // the text cannot hold or one that starts on a line other than the site's, because the site's line is the
-    // identity every report agrees on and a squiggle must not contradict it. Either way a pragma on the
-    // site's line suppresses the warning. A line outside the text cannot happen, the site having come from
-    // this compilation, and falls back to the first line rather than throwing inside the guard for a reason
-    // no reader could act on.
+    // A site's span is the reference the extractor recorded, so the squiggle covers that and nothing else. A
+    // site with no span (one built by hand, or one read back from the cache, which never stores a span) falls
+    // back to the line from its first non-blank character to its end, and so does a span the text cannot hold
+    // or one that starts on a line other than the site's, because the site's line is the identity every report
+    // agrees on and a squiggle must not contradict it. Either way a pragma on the site's line suppresses the
+    // warning. A line outside the text cannot happen, the site having come from this compilation, and falls
+    // back to the first line rather than throwing inside the guard for a reason no reader could act on.
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static Location SiteLocation(SyntaxTree tree, BuildFinding finding, CancellationToken cancellationToken)
     {
@@ -819,13 +809,13 @@ internal sealed class BuildTierAnalyzer : DiagnosticAnalyzer
         /// <summary>The project this compilation's types are recorded under.</summary>
         internal string OwnProject { get; }
 
-        /// <summary>The model file's directory, which path globs read against; a string, so no Core type rides here.</summary>
+        /// <summary>
+        ///     The model file's directory, which path globs read against; a string, so no Core type rides here.
+        /// </summary>
         private string ModelDirectory { get; }
 
-        /// <summary>The rules to check and the baselines to check them against.</summary>
         private RulePlan Plan { get; }
 
-        /// <summary>Which project of the solution produces each assembly.</summary>
         internal SiblingProjects Siblings
         {
             [MethodImpl(MethodImplOptions.NoInlining)]
@@ -875,13 +865,11 @@ internal sealed class BuildTierAnalyzer : DiagnosticAnalyzer
             }
         }
 
-        /// <summary>Records that a finding of <paramref name="ruleId" /> was counted rather than printed.</summary>
         private void Withhold(string ruleId)
         {
             _withheld.TryAdd(ruleId, 0);
         }
 
-        /// <summary>Whether a finding of <paramref name="ruleId" /> was withheld.</summary>
         internal bool IsWithheld(string ruleId)
         {
             return _withheld.ContainsKey(ruleId);
@@ -897,12 +885,10 @@ internal sealed class BuildTierAnalyzer : DiagnosticAnalyzer
         /// <summary>The first fault held, or null where none was.</summary>
         internal Exception? Fault => Volatile.Read(ref _fault);
 
-        /// <summary>Holds <paramref name="exception" />, if nothing was held before it.</summary>
-        /// <remarks>
-        ///     First one wins and the rest are dropped, so a fault that stopped every document is named once
-        ///     rather than once per document: the warning says the analyzer failed here, and a second copy of
-        ///     that adds nothing a reader can act on.
-        /// </remarks>
+        /// <summary>
+        ///     Holds <paramref name="exception" />, if nothing was held before it, so a fault that stopped every
+        ///     document is named once rather than once per document.
+        /// </summary>
         internal void Hold(Exception exception)
         {
             Interlocked.CompareExchange(ref _fault, exception, null);

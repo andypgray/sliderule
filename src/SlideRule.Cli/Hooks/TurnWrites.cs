@@ -11,9 +11,13 @@ namespace SlideRule.Cli.Hooks;
 /// <remarks>
 ///     The transcript is the client's own format, one JSON object per line, read as it is still being appended
 ///     to. An assistant row carries the tool calls, and the user row answering one carries its result under
-///     the prompt's id, so a turn's writes are the calls whose results that prompt's rows hold. A line that will
-///     not parse, such as the last one half written, is passed over. Writes made through a shell never appear
-///     here, which is why the session's own tree is always checked as well.
+///     the prompt's id, so a turn's writes are the calls whose results that prompt's rows hold
+///     (verified 2026-10-20 on Claude Code 2.1.300). A line that will not parse, such as the last one half
+///     written, is passed over. The client appends rows from a queue it drains on a 100 ms timer and does not
+///     drain before a stop's hooks run, so a write is on disk at the stop because a model response always follows
+///     its result, and a writer that stalls for longer than that response hides the write
+///     (measured 2026-10-20 on Claude Code 2.1.300). Writes made through a shell never appear here either, which
+///     is why the session's own tree is always checked as well.
 /// </remarks>
 internal static class TurnWrites
 {
@@ -25,9 +29,6 @@ internal static class TurnWrites
     ///     <paramref name="promptId" />, or for a null id across the whole transcript, which is how a subagent's
     ///     own transcript holds its run. Null when the transcript cannot be read.
     /// </summary>
-    /// <param name="transcript">The transcript the hook payload names.</param>
-    /// <param name="promptId">The prompt whose writes are wanted, or null for every write the transcript holds.</param>
-    /// <param name="ct">Cancels the read.</param>
     public static async Task<IReadOnlyList<string>?> ReadAsync(
         string transcript, string? promptId, CancellationToken ct)
     {

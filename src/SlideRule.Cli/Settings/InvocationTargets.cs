@@ -8,8 +8,8 @@ namespace SlideRule.Cli.Settings;
 
 /// <summary>
 ///     The solution and spec a run is about once a committed <c>sliderule.json</c> has had its say, and the
-///     settings that said it. Every surface resolves through <see cref="Resolve" /> before building its request —
-///     each verb, the MCP server and the hook — so one file binds them all the same way.
+///     settings that said it. Every surface resolves through <see cref="Resolve" /> before building its request,
+///     so one file binds them all the same way.
 /// </summary>
 /// <param name="Solution">
 ///     The solution to hand the pipeline: the settings' solution where a settings file applies, otherwise the
@@ -36,10 +36,6 @@ internal sealed record InvocationTargets(string? Solution, string? Spec, Project
     ///         over the plain walk. A directory argument is searched the way the working directory is.
     ///     </para>
     /// </remarks>
-    /// <param name="solution">The solution argument: a file, a directory to search, or null.</param>
-    /// <param name="spec">The <c>--spec</c> value, or null.</param>
-    /// <param name="workingDirectory">Where a run with no solution argument starts looking.</param>
-    /// <param name="environment">The environment <c>SLIDERULE_SOLUTION_PATH</c> is read from.</param>
     /// <exception cref="UserErrorException">A settings file that applies is malformed or names a missing solution.</exception>
     public static InvocationTargets Resolve(string? solution, string? spec, string workingDirectory, IEnvironment environment)
     {

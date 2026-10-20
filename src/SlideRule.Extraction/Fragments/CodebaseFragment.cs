@@ -2,64 +2,31 @@ namespace SlideRule.Extraction.Fragments;
 
 /// <summary>
 ///     The extraction of one <see cref="CompilationInput" /> (one project, one target framework) as pure,
-///     self-contained data. It holds no Roslyn types (no <c>ISymbol</c>, <c>Compilation</c>, or
-///     <c>Location</c>) so it is System.Text.Json-serializable by design — the persisted extraction cache
-///     stores exactly this — and <see cref="FragmentMerger.Merge" /> reconstructs a
-///     <see cref="SlideRule.Codebase.CodebaseModel" /> from a set of fragments, reproducing the
-///     global cross-input semantics.
+///     self-contained data, which the persisted extraction cache stores as it stands.
 /// </summary>
 /// <remarks>
 ///     <para>
-///         A single fragment is one compilation's <em>narrow view</em>: a type another project declares still
-///         appears in its <see cref="Externals" /> (as metadata), and the merge — not the fragment — decides
-///         unification. The fragment's own collections are materialized in a canonical order so serialization
-///         is stable; global ordering is re-derived at merge, so a fragment's internal order never affects the
-///         model.
+///         No record of the fragment holds a Roslyn type (no <c>ISymbol</c>, <c>Compilation</c> or
+///         <c>Location</c>) and its enums are the Core ones, so it round-trips through System.Text.Json
+///         unchanged. Every site list is distinct and in <see cref="FragmentSite" /> order, and no edge list
+///         holds a self-edge. A fragment is one compilation's narrow view: a type another project declares
+///         still appears in its <see cref="Externals" />, and the merge decides unification. Its collections
+///         are in a canonical order so serialization is stable, and the merge re-derives global order, so a
+///         fragment's internal order never affects the model.
 ///     </para>
 ///     <para>
-///         <see cref="TargetFramework" /> sits beside <see cref="ProjectName" /> because it is the other half
-///         of the same identity: where one project file yielded several compilations, the project name alone
-///         no longer says which one a fact came from. It is <see langword="null" /> for the common
-///         single-framework project, and the merge's framework-collapse note is gated on both sides being
-///         known.
-///     </para>
-///     <para>
-///         <see cref="SolutionMember" /> is the third identity fact and the one that is about the
-///         <em>solution</em> rather than the compilation: whether the solution file declares this project, or
-///         <see langword="null" /> where membership was never read. It trails the collections, and carries a
-///         default, only so a hand-built fragment need not name a fact it has no way to know, for which
-///         unknown is the correct answer.
-///     </para>
-///     <para>
-///         <see cref="AssemblyName" /> is the fourth, and it is <em>not</em> <see cref="ProjectName" /> under
-///         another name: the project name is the csproj's own file name, while this is what the compilation
-///         emits, and an <c>&lt;AssemblyName&gt;</c> property or a renamed csproj parts them. The distinction
-///         matters because this is the only string comparable against a
-///         <see cref="FragmentExternal.AssemblyName" /> — the assembly some other fragment's compilation
-///         actually bound a name to — which is how the merge tells a reference this project satisfied from one
-///         a referenced assembly of the same full name satisfied. It carries a default for the same reason
-///         <see cref="SolutionMember" /> does, and <see langword="null" /> is read as unknown throughout: an
-///         unknown assembly never makes the merge conclude anything.
-///     </para>
-///     <para>
-///         The trailing artifact facts are the fifth group, and the only ones that come from MSBuild rather
-///         than from the compilation: what the project declares it targets, the packages it declares, whether
-///         it packs, and whether its restore locks — each with the <c>file:line</c> that decided it, which is
-///         regularly in a props file above the project. They carry defaults for
-///         <see cref="SolutionMember" />'s reason and are read the same way: absent is unevaluated, never
-///         off. <see cref="DeclaredTargetFrameworks" /> is <see cref="TargetFramework" />'s counterpart
-///         rather than a longer spelling of it — this fragment is one framework's compilation, and that list
-///         is every framework the project file names, which stays the same across the fragments of one
-///         multi-targeted project.
-///     </para>
-///     <para>
-///         <see cref="UndeclaredProjectReferences" /> trails them all but one: the projects this compilation
-///         references that <see cref="ProjectReferences" /> does not account for, read beside the declarations,
-///         and <see langword="null" /> or empty wherever there is nothing to report.
-///     </para>
-///     <para>
-///         <see cref="Properties" /> is last: the properties this compilation's evaluation found the repository
-///         setting, with the project file it read, and <see langword="null" /> wherever nothing evaluated it.
+///         <see cref="TargetFramework" /> is the other half of the identity <see cref="ProjectName" /> starts:
+///         where one project file yielded several compilations, the project name alone does not say which one
+///         a fact came from. It is null for a single-framework project. The parameters from
+///         <see cref="SolutionMember" /> on carry defaults so that a hand-built fragment need not name facts it
+///         has no way to know, and null in them reads as unknown, never as off, except in
+///         <see cref="UndeclaredProjectReferences" />, where null and empty both mean nothing to report.
+///         <see cref="AssemblyName" /> is what the compilation emits, which an <c>&lt;AssemblyName&gt;</c>
+///         property or a renamed csproj parts from <see cref="ProjectName" />, the csproj's own file name; it is
+///         the string comparable against <see cref="FragmentExternal.AssemblyName" />. The artifact facts come
+///         from MSBuild rather than the compilation, each with the <c>file:line</c> that decided it, regularly a
+///         props file above the project. <see cref="DeclaredTargetFrameworks" /> is every framework the project
+///         file names, the same in each fragment of a multi-targeted project.
 ///     </para>
 /// </remarks>
 internal sealed record CodebaseFragment(

@@ -9,33 +9,21 @@ namespace SlideRule.Roslyn.Diagnostics;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>Verbs that report over the universe declare; verbs that read absence as evidence refuse.</b> A
-///         narrowed universe is a smaller true answer, so <c>check</c>, <c>status</c>, <c>graph</c>,
-///         <c>context</c> and <c>explain --type</c> or <c>--path</c> answer over it and stamp what was not
-///         checked — unlike <see cref="IncompleteModelGate" />, with which these blocks share a composer
-///         (<see cref="EvidenceBlock" />) but not a subject: a broken model rather than a small one. But
-///         <c>baseline init</c>, <c>baseline accept-reductions</c> and <c>render</c> read what is absent
-///         as evidence — zero debt to capture, an entry no longer occurring, a card with no home — and write
-///         files that outlive the run, so under a narrowing filter they refuse on the gate's own terms
-///         (exit 2, nothing written), and the adapter's completeness test skips rather than pass under a name
-///         the filtered run cannot vouch for.
+///         A narrowed universe is a smaller true answer, so a verb that reports over the universe answers over it
+///         and stamps what was not checked, and a verb that reads absence as evidence and writes files that
+///         outlive the run refuses on the gate's own terms (exit 2, nothing written).
 ///     </para>
 ///     <para>
-///         <b>It names what was not checked, never what the filter did not select.</b> Those are different
-///         sets and only the first is true: Roslyn loads a filter's selection plus its transitive
-///         <c>ProjectReference</c> closure, so filter text over-names. The evidence therefore comes from
-///         <c>WorkspaceDiagnostics.UncheckedProjects</c> — what actually loaded, subtracted from what the
-///         solution declares — and is empty, so nothing prints, whenever a filter narrows nothing.
+///         A <c>filterName</c> here is the <c>.slnf</c>'s file name, and <c>uncheckedProjects</c> the unchecked
+///         projects as <see cref="Relative" /> shows them. Those come from
+///         <c>WorkspaceDiagnostics.UncheckedProjects</c>, what the load did not check rather than what the filter
+///         did not select (<see cref="ProjectLoadFailures" /> says why the two differ), so a filter that narrows
+///         nothing prints nothing.
 ///     </para>
 /// </remarks>
 internal static class NarrowedUniverseNotice
 {
-    /// <summary>
-    ///     The stamp <c>check</c> writes above its report: a clean verdict over a subset is the exact reading
-    ///     this exists to prevent.
-    /// </summary>
-    /// <param name="filterName">The <c>.slnf</c>'s file name.</param>
-    /// <param name="uncheckedProjects">The solution-relative paths that were not checked.</param>
+    /// <summary>The stamp <c>check</c> writes above its report.</summary>
     internal static string CheckStamp(string filterName, IReadOnlyList<string> uncheckedProjects)
     {
         return Block(
@@ -45,12 +33,7 @@ internal static class NarrowedUniverseNotice
             + "solution.");
     }
 
-    /// <summary>
-    ///     The stamp <c>status</c> writes above its burndown. An unchecked project declares no types and so
-    ///     contributes no violations, which reads as progress rather than as absence.
-    /// </summary>
-    /// <param name="filterName">The <c>.slnf</c>'s file name.</param>
-    /// <param name="uncheckedProjects">The solution-relative paths that were not checked.</param>
+    /// <summary>The stamp <c>status</c> writes above its burndown.</summary>
     internal static string StatusStamp(string filterName, IReadOnlyList<string> uncheckedProjects)
     {
         return Block(
@@ -60,12 +43,7 @@ internal static class NarrowedUniverseNotice
             + "violations, so every count reads low.");
     }
 
-    /// <summary>
-    ///     The stamp <c>graph</c> writes above its survey — the verb a stranger runs first on an unfamiliar
-    ///     codebase, where a missing project reads as a codebase that does not have one.
-    /// </summary>
-    /// <param name="filterName">The <c>.slnf</c>'s file name.</param>
-    /// <param name="uncheckedProjects">The solution-relative paths that were not checked.</param>
+    /// <summary>The stamp <c>graph</c> writes above its survey.</summary>
     internal static string GraphStamp(string filterName, IReadOnlyList<string> uncheckedProjects)
     {
         return Block(
@@ -76,13 +54,10 @@ internal static class NarrowedUniverseNotice
     }
 
     /// <summary>
-    ///     The stamp <c>context</c> writes above its answer, beside the caveat
-    ///     <see cref="IncompleteModelGate.ContextCaveat" /> writes for a partial model. Stdout is context's
-    ///     only channel and it is an MCP tool, so this block is the only way <c>arch_context</c> learns that
-    ///     the universe was narrowed.
+    ///     The stamp <c>context</c> writes above its answer, beside <see cref="IncompleteModelGate.ContextCaveat" />.
+    ///     Stdout is context's only channel, so this block is the only way <c>arch_context</c> learns that the
+    ///     universe was narrowed.
     /// </summary>
-    /// <param name="filterName">The <c>.slnf</c>'s file name.</param>
-    /// <param name="uncheckedProjects">The solution-relative paths that were not checked.</param>
     internal static string ContextStamp(string filterName, IReadOnlyList<string> uncheckedProjects)
     {
         return Block(
@@ -93,12 +68,9 @@ internal static class NarrowedUniverseNotice
     }
 
     /// <summary>
-    ///     The stamp <c>explain --type</c> and <c>explain --path</c> write above their answer, beside the caveat
-    ///     <see cref="IncompleteModelGate.ExplainCaveat" /> writes for a partial model, for the reason
-    ///     <see cref="ContextStamp" /> gives: the body is <c>arch_explain</c>'s only channel.
+    ///     The stamp <c>explain --type</c> and <c>explain --path</c> write above their answer, beside
+    ///     <see cref="IncompleteModelGate.ExplainCaveat" />; the body is <c>arch_explain</c>'s only channel.
     /// </summary>
-    /// <param name="filterName">The <c>.slnf</c>'s file name.</param>
-    /// <param name="uncheckedProjects">The solution-relative paths that were not checked.</param>
     internal static string ExplainStamp(string filterName, IReadOnlyList<string> uncheckedProjects)
     {
         return Block(
@@ -109,13 +81,9 @@ internal static class NarrowedUniverseNotice
     }
 
     /// <summary>
-    ///     The stderr lines <c>baseline init</c> and <c>baseline accept-reductions</c> emit before exit 2,
-    ///     having written nothing. A baseline is the team's signature on its debt, and both modes read absence
-    ///     as evidence: <c>init</c> captures "zero debt" for rules whose subjects live in projects the filter
-    ///     left out, and <c>accept-reductions</c> deletes real entries as violations that no longer occur.
+    ///     The stderr lines <c>baseline init</c> and <c>baseline accept-reductions</c> emit before exit 2, having
+    ///     written nothing.
     /// </summary>
-    /// <param name="filterName">The <c>.slnf</c>'s file name.</param>
-    /// <param name="uncheckedProjects">The solution-relative paths that were not checked.</param>
     internal static string BaselineRefusal(string filterName, IReadOnlyList<string> uncheckedProjects)
     {
         return EvidenceBlock.Compose(
@@ -127,13 +95,7 @@ internal static class NarrowedUniverseNotice
             "Run baseline against the solution the filter references rather than through the filter.");
     }
 
-    /// <summary>
-    ///     The stderr lines <c>render</c> emits before exit 2, having written nothing. Its output is committed
-    ///     context that outlives the run: a card from an unchecked project resolves no directory and is
-    ///     dropped rather than written wrong, and <c>--diagram</c> draws a survey missing whole projects.
-    /// </summary>
-    /// <param name="filterName">The <c>.slnf</c>'s file name.</param>
-    /// <param name="uncheckedProjects">The solution-relative paths that were not checked.</param>
+    /// <summary>The stderr lines <c>render</c> emits before exit 2, having written nothing.</summary>
     internal static string RenderRefusal(string filterName, IReadOnlyList<string> uncheckedProjects)
     {
         return EvidenceBlock.Compose(
@@ -146,13 +108,9 @@ internal static class NarrowedUniverseNotice
     }
 
     /// <summary>
-    ///     The <c>Workspace_LoadedCompletely</c> skip reason under a narrowing filter — the adapter's twin of
-    ///     the CLI stamps, and a skip rather than a pass for
-    ///     <see cref="IncompleteModelGate.AdapterOptedIn" />'s reason: the rule verdicts are real, but a test
-    ///     by that name cannot pass while the solution declares projects this run never checked.
+    ///     The <c>Workspace_LoadedCompletely</c> skip reason under a narrowing filter, the adapter's twin of the CLI
+    ///     stamps.
     /// </summary>
-    /// <param name="filterName">The <c>.slnf</c>'s file name.</param>
-    /// <param name="uncheckedProjects">The solution-relative paths that were not checked.</param>
     internal static string AdapterSkip(string filterName, IReadOnlyList<string> uncheckedProjects)
     {
         return Block(
@@ -164,18 +122,14 @@ internal static class NarrowedUniverseNotice
     }
 
     /// <summary>
-    ///     The reason a rule the filter emptied reports, on every surface a report reaches: one line, no
-    ///     evidence block, because the projects themselves ride the stamp above the report (or the adapter's
-    ///     <see cref="AdapterSkip" />) — one place to read them, not one copy per rule, which is
-    ///     <see cref="IncompleteModelGate.AdapterSkipReason" />'s reasoning for the same shape.
+    ///     The reason a rule the filter emptied reports, on every surface a report reaches. One line, no evidence
+    ///     block, because the projects themselves ride the stamp above the report, or the adapter's
+    ///     <see cref="AdapterSkip" />.
     /// </summary>
     /// <remarks>
-    ///     It ends by denying the reading that makes a narrowed run dangerous. A skipped rule prints beside
-    ///     passing ones and gates nothing, so the sentence has to say outright that this is not the rule
-    ///     holding — only the run declining to claim either way.
+    ///     A skipped rule prints beside passing ones and gates nothing, so the sentence ends by saying outright that
+    ///     this is not the rule holding, only the run declining to claim either way.
     /// </remarks>
-    /// <param name="filterName">The <c>.slnf</c>'s file name.</param>
-    /// <param name="uncheckedProjectCount">How many declared projects this run did not check.</param>
     internal static string RuleSkipReason(string filterName, int uncheckedProjectCount)
     {
         return Lede(filterName, uncheckedProjectCount)
@@ -189,12 +143,9 @@ internal static class NarrowedUniverseNotice
     ///     line with no evidence block, for <see cref="RuleSkipReason" />'s reason.
     /// </summary>
     /// <remarks>
-    ///     It keeps the decision the shape advice closes on and moves it behind a run over the whole solution.
-    ///     An inert rule passes forever, so whether to keep one is a real question, but a filtered run cannot
-    ///     answer it: the rule may hold across the solution the filter references.
+    ///     It keeps the decision the shape advice closes on, whether to keep the rule, and defers it to a run over
+    ///     the whole solution.
     /// </remarks>
-    /// <param name="filterName">The <c>.slnf</c>'s file name.</param>
-    /// <param name="uncheckedProjectCount">How many declared projects this run did not check.</param>
     internal static string InertTargetHint(string filterName, int uncheckedProjectCount)
     {
         return Lede(filterName, uncheckedProjectCount)
@@ -203,11 +154,9 @@ internal static class NarrowedUniverseNotice
     }
 
     /// <summary>
-    ///     The unchecked projects as a notice shows them — solution-relative and forward-slashed, like every
-    ///     path in the documents beside them, so a machine path never lands in output a golden pins.
+    ///     The absolute <paramref name="projects" /> as a notice shows them: solution-relative and forward-slashed,
+    ///     like every path in the documents beside them, so a machine path never lands in output a golden pins.
     /// </summary>
-    /// <param name="projects">The absolute <c>.csproj</c> paths.</param>
-    /// <param name="solutionDirectory">The directory they are shown relative to.</param>
     internal static IReadOnlyList<string> Relative(IReadOnlyList<string> projects, string solutionDirectory)
     {
         var relativizer = new PathFormat.Relativizer(solutionDirectory);
@@ -224,10 +173,8 @@ internal static class NarrowedUniverseNotice
         return EvidenceBlock.Compose(lede, uncheckedProjects, tail);
     }
 
-    // The clause the stamp and both per-rule sentences open with, unpunctuated so each of them finishes it in
-    // its own voice: a full stop for the stamp, a continuing clause for the other two. One owner, because
-    // three sentences naming the same filter and the same count are three chances to word it differently,
-    // and a reader comparing two surfaces reads the difference as a difference in fact.
+    // The clause every stamp and per-rule sentence opens with, unpunctuated so each finishes it in its own voice.
+    // One owner, because a reader comparing two surfaces reads a difference in wording as a difference in fact.
     private static string Lede(string filterName, int uncheckedProjectCount)
     {
         return $"'{filterName}' narrowed this run: {Subject(uncheckedProjectCount)}";

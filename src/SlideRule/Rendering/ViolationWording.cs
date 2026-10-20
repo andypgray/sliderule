@@ -10,15 +10,12 @@ namespace SlideRule.Rendering;
 /// <remarks>
 ///     Wording only: which site a violation lands at, how many lines or results it yields, and the stamps
 ///     and notifications a surface composes for itself stay with each caller, because that is where the
-///     three surfaces differ. A wording change therefore lands on the human report, the build finding and
-///     the SARIF result at once, and the render tests pin each surface against this class, so a surface that
-///     grows a twin of its own reds there. Members are spelled through <c>MemberDisplay</c>, because that
-///     form is also what <c>baseline add</c> resolves names against.
+///     surfaces differ. The render tests pin each surface against this class, so a surface that grows a twin
+///     of its own reds there. Members are spelled through <c>MemberDisplay</c>.
 /// </remarks>
 internal static class ViolationWording
 {
     /// <summary>The phrase an edge violation reads as: the source, the verb its kind names, and the far end.</summary>
-    // What each of the seven edge kinds says, with placement left to the caller.
     internal static string EdgeText(this Violation violation)
     {
         return violation.Kind switch
@@ -35,11 +32,6 @@ internal static class ViolationWording
     }
 
     /// <summary>The phrase a shape violation reads as: the type, member or project that failed the verb.</summary>
-    // What each of the three subject kinds says, with placement left to the caller. The project
-    // arm is the Shape parallel over a project: its name, at whichever declaration carried the fact the verb
-    // read — which may be a props file above the project, and may be nothing at all. A per-package or
-    // per-framework violation names the item too, in EdgeText's register (no backticks: these lines are jump
-    // targets, not prose), and a framework the project lacks reads as one it does not target.
     internal static string SubjectText(this Violation violation)
     {
         return violation.Kind switch
@@ -62,8 +54,11 @@ internal static class ViolationWording
         };
     }
 
-    // The project arm on its own. A property violation says what the judged build holds, and names the
-    // framework only where the build told one apart.
+    // The Shape parallel over a project: its name, at whichever declaration carried the fact the verb read,
+    // which may be a props file above the project or nothing at all. A per-package or per-framework violation
+    // names the item too, in EdgeText's register (no backticks: these lines are jump targets, not prose), and a
+    // framework the project lacks reads as one it does not target. A property violation says what the judged
+    // build holds, and names the framework only where the build told one apart.
     private static string ProjectText(Violation violation)
     {
         string project = violation.SubjectProject!.Name;

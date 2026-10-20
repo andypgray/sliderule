@@ -14,15 +14,13 @@ using SlideRule.Roslyn.Diagnostics;
 namespace SlideRule.Cli.Rendering;
 
 /// <summary>
-///     Renders a <see cref="CheckReport" /> as a SARIF 2.1.0 file — a third render target over the same
-///     result model (human and <c>--json</c> untouched) for GitHub/ADO code scanning and IDE problem
-///     imports.
+///     Renders a <see cref="CheckReport" /> as a SARIF 2.1.0 file, for GitHub/ADO code scanning and IDE
+///     problem imports.
 /// </summary>
 /// <remarks>
-///     One run: a driver whose <c>rules[]</c> is every rule in model order, and one result per violation
-///     <em>site</em> plus one per check warning. Site-less violations (EmptySubject, RuleError) contribute
-///     no results and still gate through the CLI exit code. Pinned by the golden
-///     <c>Cli/Golden/violated-check.sarif</c>.
+///     Site-less violations (EmptySubject, RuleError) contribute no results and still gate through the CLI
+///     exit code. The log composes its own pointers, stamps and notifications rather than borrowing the human
+///     report's; a violation's wording is the exception, with <see cref="ViolationWording" /> as its one owner.
 /// </remarks>
 internal static class SarifReportRenderer
 {
@@ -43,8 +41,8 @@ internal static class SarifReportRenderer
     /// <summary>
     ///     Writes the SARIF file for <paramref name="report" /> to <paramref name="sarifPath" /> —
     ///     <see cref="Serialize" /> then an atomic, directory-creating write (UTF-8 no BOM, one trailing
-    ///     newline). Throws on a bad path or I/O failure rather than swallowing, exactly like the
-    ///     managed-block writer, so the top-level handler maps it to exit 2.
+    ///     newline). Throws on a bad path or I/O failure rather than swallowing, so the top-level handler maps
+    ///     it to exit 2.
     /// </summary>
     public static void Render(
         string sarifPath,
@@ -59,15 +57,10 @@ internal static class SarifReportRenderer
     }
 
     /// <summary>
-    ///     Serializes <paramref name="report" /> to the SARIF 2.1.0 JSON string — the workspace-free,
-    ///     filesystem-free seam the unit tests drive directly. <paramref name="solutionDirectory" /> makes
-    ///     every site path solution-relative; <paramref name="executionSuccessful" /> becomes the
-    ///     invocation verdict (false when the incomplete-model gate will exit 2); and
-    ///     <paramref name="workspaceDiagnostics" /> become tool-execution notifications (omitted when empty),
-    ///     after one for each NuGet audit advisory <paramref name="trust" /> carries.
-    ///     The failed, restore-failed, unchecked and unsupported projects <paramref name="trust" />
-    ///     carries each add one further structured notification when non-empty, so a whole, healthy run
-    ///     (<see cref="WorkspaceDiagnostics.None" />) carries none of them.
+    ///     Serializes <paramref name="report" /> to the SARIF 2.1.0 JSON string, with no workspace or filesystem
+    ///     behind it. <paramref name="solutionDirectory" /> makes every site path solution-relative, and
+    ///     <paramref name="executionSuccessful" /> becomes the invocation verdict, false when the
+    ///     incomplete-model gate will exit 2.
     /// </summary>
     internal static string Serialize(
         CheckReport report,
@@ -92,9 +85,8 @@ internal static class SarifReportRenderer
     }
 
     // Every rule, in model order — passed and skipped rules included (metadata carries the whole spec, not
-    // just what failed). shortDescription is the law Sentence, omitted when empty (a scope tripwire, of
-    // either posture); fullDescription is the Because; helpUri is the Citation; help is the Fix, the resolved
-    // exemplar and the citation together, omitted when the rule carries none of them.
+    // just what failed). A scope tripwire, of either posture, has no sentence, so its shortDescription is
+    // omitted.
     private static IReadOnlyList<SarifReportingDescriptor> BuildRules(
         CheckReport report, PathFormat.Relativizer relativizer)
     {
@@ -134,8 +126,7 @@ internal static class SarifReportRenderer
     }
 
     // Each resolved type by its simple name and first declaration site, the same pointer the human report
-    // prints, composed here per this file's convention that each renderer composes its own pointers, stamps
-    // and notifications; a violation's wording is the exception, with ViolationWording as the one owner.
+    // prints.
     private static string ExemplarText(RuleResult result, PathFormat.Relativizer relativizer)
     {
         IEnumerable<string> pointers = result.Exemplar.Select(type => ExemplarPointer(type, relativizer));
@@ -164,7 +155,7 @@ internal static class SarifReportRenderer
 
     // Exactly one invocation. executionSuccessful is false when the workspace-diagnostics gate will exit 2;
     // the diagnostics themselves ride as warning-level notifications — each NuGet audit advisory as one, ahead
-    // of the stream's own, in the order stderr writes them — and the four structured facts add one
+    // of the stream's own, in the order stderr writes them — and the structured facts add one
     // notification each after them, in the order the CLI refusals state them: the model being wrong outranks
     // the model being small, and a failed load outranks a failed restore. Each is written where the stamp
     // carries it, which is the stamp's own empty-to-null policy read as the presence test it already was.
@@ -220,16 +211,14 @@ internal static class SarifReportRenderer
             ErrorLevel);
     }
 
-    // The counted head both incomplete-model notifications open with. Local to this file rather than taken
-    // from the human stamp or the narrowing notice, per the convention that each renderer composes its own
-    // messages; what every sentence here does borrow is the inflection, which is a rule about English rather
-    // than a sentence about this log.
+    // The inflection is borrowed rather than composed here: it is a rule about English, not a sentence about
+    // this log.
     private static string ProjectSubject(int count)
     {
         return Plurals.Counted(count, "project");
     }
 
-    // The subject both partial-coverage notifications open with: the counted head, then what the solution
+    // The subject the partial-coverage notifications open with: the counted head, then what the solution
     // declares but this run did not do to it. One sentence shape, the participle apart, so the narrowed and
     // the unsupported halves of "these results cover part of the solution" cannot drift in wording or number.
     private static string DeclaredSubject(int count, string participle)
@@ -240,11 +229,6 @@ internal static class SarifReportRenderer
     // A narrowed run's results describe part of the solution, and code scanning has no exit code to read
     // that from — a clean SARIF over a filter would close every alert the unchecked projects would have
     // raised. Warning rather than error: the results are true, they are not the whole solution's.
-    // Composed here rather than shared with the human stamp, per this file's convention that each renderer
-    // composes its own stamps and notifications; the paths arrive already solution-relative, like every other
-    // path in the log.
-    // The sentence is this file's; its noun and copula are the one inflection owner's, so the two numbers of
-    // it cannot be written by hand into disagreement.
     private static SarifNotification NarrowingNotification(IReadOnlyList<string> uncheckedProjects)
     {
         string subject = DeclaredSubject(uncheckedProjects.Count, "checked");
@@ -260,9 +244,8 @@ internal static class SarifReportRenderer
     // project written in a language this product cannot read is never in the model, so no alert can ever be
     // raised in it and a clean scan over a polyglot solution silently reads as clean over all of it. Warning
     // rather than error, beside the narrowing one and for its reason: the results are true, they are not the
-    // whole solution's. Composed here per this file's convention that each renderer composes its own
-    // stamps and notifications; the reason each entry carries is the shared stamp's, so the prose and the JSON
-    // key cannot disagree about what the run could read.
+    // whole solution's. The reason each entry carries is the shared stamp's, so the prose and the JSON key
+    // cannot disagree about what the run could read.
     private static SarifNotification UnsupportedNotification(IReadOnlyList<UnsupportedProjectStamp> unsupportedProjects)
     {
         string subject = DeclaredSubject(unsupportedProjects.Count, "surveyed");
@@ -333,9 +316,7 @@ internal static class SarifReportRenderer
     // `new`, because no baseline holds a warning.
     //
     // The message alone, never the warning's Hint: a hint is authoring advice for whoever writes the rule,
-    // and this document is read by code scanning, where an alert stands in front of the whole team. The
-    // empty-subject hint could not join it in any case — those violations are site-less and mint no result
-    // at all — so carrying one here would land a family's cure on one signal of several.
+    // and this document is read by code scanning, where an alert stands in front of the whole team.
     //
     // Ordinal 0 always, so the rest of the key is what keeps two warnings of one rule apart. A tripwire warns
     // once per changed file and keys on the path, and a whole-target inert warning is at most one per rule and
@@ -365,9 +346,7 @@ internal static class SarifReportRenderer
     }
 
     // The one fingerprint format, so a sixth slot or a v2 bump cannot reach one result kind and miss the
-    // other. A warning leaves the source and subject slots empty because it has no edge, and the target slot
-    // too unless it names a dead operand, an orphan or a dead exemplar part — written as empty arguments rather
-    // than as counted pipes in a literal. A dead-exemplar warning is the one that fills the source slot.
+    // other. A warning's empty slots are written as empty arguments rather than as counted pipes in a literal.
     private static Dictionary<string, string> Fingerprint(
         string source, string target, string subject, string path, int ordinal)
     {

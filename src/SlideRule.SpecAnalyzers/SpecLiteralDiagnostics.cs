@@ -5,33 +5,28 @@ using Microsoft.CodeAnalysis;
 namespace SlideRule.SpecAnalyzers;
 
 /// <summary>
-///     The eighteen warnings the spec-literal analyzer reports: seventeen verdicts a string literal draws
-///     where it is written, and the analyzer's own fault, which comes in two forms.
+///     The warnings the spec-literal analyzer reports: the verdicts a string literal draws where it is
+///     written, and the analyzer's own fault, which comes in two forms.
 /// </summary>
 /// <remarks>
 ///     <para>
-///         Every string a developer reads is here rather than at the place that reports it, so the wording
-///         can be reviewed in one sitting and the analyzer stays a description of when each warning is due.
-///         The seventeen carry <c>{0}</c> as their whole message: the sentence is decided in the contract,
-///         by the same types the spec loader decides with, so the warning at the literal and the error at
-///         load cannot drift into different English.
+///         Every verdict carries <c>{0}</c> as its whole message: the sentence is decided in the contract, by
+///         the same types the spec loader decides with, so the warning at the literal and the error at load
+///         cannot drift into different English.
 ///     </para>
 ///     <para>
-///         <b>Each descriptor is written out, never generated from the code enum.</b> The enum is public
-///         contract surface and grows by appending, so a newer contract beside an older analyzer can hand
-///         back a code that has no title, no description and no entry in the release-tracking file here.
-///         A generated descriptor would report that code under invented wording; <see cref="For" /> answers
-///         null instead and the caller stays silent. Under-reporting is the safe direction, because
-///         loading the spec still reports every one of them.
+///         Each descriptor is written out, never generated from the code enum: the enum is public contract
+///         surface and grows by appending, so a newer contract beside an older analyzer can hand back a code
+///         that has no wording here. <see cref="For" /> answers null for it and the caller stays silent, the
+///         safe direction, because loading the spec still reports every one of them.
 ///     </para>
 ///     <para>
-///         <b>One custom tag, on one descriptor.</b> <c>CompilationEnd</c> is a claim that a host must run a
-///         compilation end action to get the warning, and no verdict needs one: a literal is decided where
-///         it is written and a collision is decided when the method body it sits in ends, both of which a
-///         live editor reaches. Tagging them would cost the squiggle while the author is typing. The
-///         exception is <see cref="VersionMismatch" />, which is reported from an end action because a
-///         version difference is a fact about the project rather than about a literal, and while it holds
-///         the analyzer reads no literal at all.
+///         <c>CompilationEnd</c> is a claim that a host must run a compilation end action to get the warning,
+///         and no verdict needs one: a literal is decided where it is written and a collision when the method
+///         body it sits in ends, both of which a live editor reaches, and the tag would cost the squiggle while
+///         the author is typing. Only <see cref="VersionMismatch" /> carries it, because a version difference is
+///         a fact about the project rather than about a literal, and while it holds the analyzer reads no
+///         literal at all.
 ///     </para>
 ///     <para>
 ///         The fault's ID carries two descriptors, the fault and the version difference, which has a message
@@ -47,7 +42,6 @@ internal static class SpecLiteralDiagnostics
     private const string HelpLink =
         "https://github.com/andypgray/sliderule/blob/main/src/SlideRule/README.md#diagnostics";
 
-    /// <summary>The prefix every ID here carries, ahead of the number a code maps to.</summary>
     private const string IdPrefix = "SR";
 
     /// <summary>
@@ -58,8 +52,8 @@ internal static class SpecLiteralDiagnostics
     private const int CodeOffset = 1000;
 
     /// <summary>
-    ///     The closing sentence every verdict description ends with, written once so that seventeen
-    ///     descriptions cannot come to say it seventeen ways.
+    ///     The closing sentence every verdict description ends with, written once so that the descriptions
+    ///     cannot come to say it in different ways.
     /// </summary>
     private const string SameVerdictAtLoad =
         "Loading the spec reports the same mistake as a validation error, from 'sliderule check', "
@@ -337,7 +331,7 @@ internal static class SpecLiteralDiagnostics
         HelpLink,
         WellKnownDiagnosticTags.CompilationEnd);
 
-    // The seventeen a verdict can be reported under, which are all the lookup below holds: the fault's two
+    // The descriptors a verdict can be reported under, which are all the lookup below holds: the fault's two
     // share one ID, and neither is a verdict.
     private static readonly ImmutableArray<DiagnosticDescriptor> Verdicts = ImmutableArray.Create(
         DuplicateId, IdExtendsScope, BlankProse, MultiLineProse, MalformedId, DuplicateLayerName,
@@ -349,8 +343,8 @@ internal static class SpecLiteralDiagnostics
     internal static ImmutableArray<DiagnosticDescriptor> All { get; } = Verdicts.Add(AnalyzerFault)
         .Add(VersionMismatch);
 
-    // Built from the seventeen verdicts rather than from the code enum, which is the whole point of writing
-    // them out: a code with no entry here has no descriptor, and no descriptor means no report.
+    // Built from the written-out verdicts rather than from the code enum: a code with no entry here has no
+    // descriptor, and no descriptor means no report.
     private static readonly ImmutableDictionary<string, DiagnosticDescriptor> ById =
         Verdicts.ToImmutableDictionary(descriptor => descriptor.Id, StringComparer.Ordinal);
 
@@ -363,7 +357,6 @@ internal static class SpecLiteralDiagnostics
     ///     as supported throws inside the analyzer driver, which reaches the developer as the compiler's
     ///     own <c>AD0001</c> and fails any build treating warnings as errors.
     /// </remarks>
-    /// <param name="code">The number of the code the contract decided the literal under.</param>
     private static DiagnosticDescriptor? For(int code)
     {
         int number = CodeOffset + code;
@@ -373,14 +366,10 @@ internal static class SpecLiteralDiagnostics
     }
 
     /// <summary>
-    ///     The warning one literal draws, at the literal itself, or null when the code has no descriptor.
+    ///     The warning one literal draws, at <paramref name="location" />, the literal's own span, or null when
+    ///     <paramref name="code" /> has no descriptor. <paramref name="head" /> and <paramref name="tail" /> are
+    ///     the verdict's sentence before and after its subject clause.
     /// </summary>
-    /// <param name="code">The number of the code the contract decided the literal under.</param>
-    /// <param name="codeName">That code's name, which the <c>code</c> property carries.</param>
-    /// <param name="slot">The name of the slot the literal fills.</param>
-    /// <param name="head">The verdict's sentence up to its subject clause.</param>
-    /// <param name="tail">The verdict's sentence after its subject clause.</param>
-    /// <param name="location">The literal's own span.</param>
     internal static Diagnostic? AtTheLiteral(
         int code, string codeName, string slot, string head, string tail, Location location)
     {
@@ -393,20 +382,14 @@ internal static class SpecLiteralDiagnostics
     }
 
     /// <summary>
-    ///     The warning several literals draw between them, at one of them, with the others as related
-    ///     locations; null when the code has no descriptor.
+    ///     The warning several literals draw between them, at <paramref name="location" />, with
+    ///     <paramref name="related" /> the other literals that took part; null when the code has no descriptor.
     /// </summary>
     /// <remarks>
     ///     A collision names no subject, so the whole sentence rides as the head and the tail is empty.
     ///     A reader of the properties can therefore treat head and tail alike whichever kind of verdict it
     ///     came from.
     /// </remarks>
-    /// <param name="code">The number of the code the contract decided the collision under.</param>
-    /// <param name="codeName">That code's name, which the <c>code</c> property carries.</param>
-    /// <param name="slot">The name of the slot the reported literal fills.</param>
-    /// <param name="sentence">The collision's whole message.</param>
-    /// <param name="location">The literal this warning sits on.</param>
-    /// <param name="related">The other literals that took part.</param>
     internal static Diagnostic? Collision(
         int code, string codeName, string slot, string sentence, Location location, IEnumerable<Location> related)
     {
@@ -419,11 +402,10 @@ internal static class SpecLiteralDiagnostics
     }
 
     /// <summary>
-    ///     The warning an analyzer fault becomes: the exception's type name and the first line of its
-    ///     message, so a reader can tell two faults apart without a stack trace in a build log.
+    ///     The warning an analyzer fault becomes, at <paramref name="location" />, where the analysis was when it
+    ///     failed: the exception's type name and the first line of its message, so a reader can tell two faults
+    ///     apart without a stack trace in a build log.
     /// </summary>
-    /// <param name="exception">The fault that stopped one callback.</param>
-    /// <param name="location">Where the analysis was when it failed.</param>
     internal static Diagnostic AnalyzerFailed(Exception exception, Location location)
     {
         return Diagnostic.Create(AnalyzerFault, location, exception.GetType().Name, Opening(exception.Message));
@@ -433,8 +415,6 @@ internal static class SpecLiteralDiagnostics
     ///     The warning for an analyzer handed another version of the contract than its own, naming both
     ///     versions, the analyzer's first.
     /// </summary>
-    /// <param name="analyzerVersion">The analyzer's own version.</param>
-    /// <param name="contractVersion">The version of the contract the compiler loaded for it.</param>
     internal static Diagnostic VersionsMismatched(string analyzerVersion, string contractVersion)
     {
         return Diagnostic.Create(VersionMismatch, Location.None, analyzerVersion, contractVersion);

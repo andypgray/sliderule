@@ -1,10 +1,6 @@
 namespace SlideRule.Codebase;
 
-/// <summary>
-///     One property a declaration in the solution set for a project, in one evaluation: its name, its evaluated
-///     value, the framework the evaluation was for, and the <c>file:line</c> of the definition that won. What a
-///     project predicate reads of it is <see cref="IProjectPropertyInfo" />.
-/// </summary>
+/// <summary>One property a declaration in the solution set for a project, in one evaluation.</summary>
 internal sealed class EvaluatedProperty : IProjectPropertyInfo
 {
     internal EvaluatedProperty(string name, string value, string? targetFramework, SourceLocation site)

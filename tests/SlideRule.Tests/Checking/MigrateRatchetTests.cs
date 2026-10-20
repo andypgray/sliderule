@@ -15,10 +15,13 @@ namespace SlideRule.Tests.Checking;
 ///     baseline = grandfathered (pass); not in it — including new code in the old pattern and a new
 ///     forbidden target from a grandfathered source — = red. An edge entry may also record how many
 ///     sites it grandfathers, and then the count decides too: more is growth and red, fewer is a
-///     reduction that passes, and an entry recording nothing holds its pair at any size.
-///     <c>EmptySubject</c>/<c>RuleError</c> are
-///     never baselinable; an inert target still warns-and-passes; the two-arg overload sees no baselines;
-///     an Enforce rule ignores the index entirely.
+///     reduction that passes, and an entry recording nothing holds its pair at any size. A stale entry is
+///     counted and never reds. <c>EmptySubject</c>/<c>RuleError</c> are never baselinable; an inert target
+///     still warns-and-passes. A rule whose selection matched nothing, or matched only in part, reads as not
+///     measured in full, so its unmatched entries are not counted as fixed and it is not promotable; a
+///     stricter-than-written pattern still counts them as fixed. An uncaptured failing rule beside orphaned
+///     baseline sections gets one rename hint per orphan. The two-arg overload sees no baselines; an Enforce
+///     rule ignores the index entirely.
 /// </summary>
 public sealed class MigrateRatchetTests
 {

@@ -3,8 +3,7 @@ using SlideRule.Prose;
 namespace SlideRule.Model;
 
 /// <summary>
-///     <c>.OfKind(TypeKind.Interface)</c> substitutes the subject head plural: "interfaces"
-///     (GRAMMAR §5.2). It never renders inline — it replaces the default "types" head.
+///     <c>.OfKind(TypeKind.Interface)</c> substitutes the subject head plural: "interfaces" (GRAMMAR §5.2).
 /// </summary>
 internal sealed class OfKindAdjective(TypeKind kind) : SelectionAdjective
 {

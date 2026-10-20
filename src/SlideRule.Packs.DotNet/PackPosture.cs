@@ -17,7 +17,6 @@ public sealed class PackPosture
     /// <summary>Gets the binding posture: the rule must hold, and every violation fails the check.</summary>
     public static PackPosture Enforce { get; } = new(false, null);
 
-    /// <summary>Gets whether this is <see cref="Migrate" /> rather than <see cref="Enforce" />.</summary>
     // The pack's own record of the choice: the contract's posture type is internal to it, and a pack is an ordinary
     // library with no grant to see it, so this pack can do only what a third-party pack could.
     internal bool Migrates { get; }

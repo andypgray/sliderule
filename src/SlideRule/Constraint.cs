@@ -17,13 +17,9 @@ public abstract class Constraint
 
     /// <summary>The type selection the constraint is asserted over, or null for a project constraint.</summary>
     /// <remarks>
-    ///     Null <em>exactly</em> when the constraint is a project constraint (GRAMMAR §4.10), whose subject
-    ///     is a project selection and has no type selection to stand in — where a member constraint hands up
-    ///     the type selection its projection was taken from. Every type-side reader of this slot therefore
-    ///     either dispatches on the constraint type first (the sentence renderer, the checker) or runs
-    ///     downstream of a reader that did. Nothing enforces that by hand: the nullable-flow analysis is the
-    ///     audit, so a forgotten dispatch is a build warning rather than a
-    ///     <see cref="NullReferenceException" /> in the field.
+    ///     Null exactly for a project constraint (GRAMMAR §4.10). A type-side reader dispatches on the constraint
+    ///     type first, or runs downstream of a reader that did; the nullable-flow analysis warns on a forgotten
+    ///     dispatch.
     /// </remarks>
     internal Selection? Subject { get; }
 
@@ -31,15 +27,13 @@ public abstract class Constraint
     internal abstract string VerbPhrase { get; }
 
     /// <summary>
-    ///     Selection operands beyond the subject — the target/source list of a dependency verb.
-    ///     Empty for shape/naming/escape-hatch verbs. Together with the subject these reach every
-    ///     selection a rule names, which is what the foreign-selection walk needs (GRAMMAR §8 item 10).
+    ///     Selection operands beyond the subject: the target or source list of a dependency verb. With the subject
+    ///     they must reach every selection a rule names, for the foreign-selection walk (GRAMMAR §8 item 10).
     /// </summary>
     internal virtual IReadOnlyList<Selection> Operands => Array.Empty<Selection>();
 
     /// <summary>
-    ///     Member operands of the member-access verb (<c>MustNotUse</c>) — the banned member targets
-    ///     (GRAMMAR §4.5). Walked by validation (GRAMMAR §8 items 11–13); empty for every other verb.
+    ///     The banned members of <c>MustNotUse</c> (GRAMMAR §4.5), which validation walks (GRAMMAR §8 items 11–13).
     /// </summary>
     internal virtual IReadOnlyList<Member> MemberOperands => Array.Empty<Member>();
 }

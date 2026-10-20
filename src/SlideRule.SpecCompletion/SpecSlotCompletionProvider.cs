@@ -14,10 +14,6 @@ namespace SlideRule.SpecCompletion;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         Nothing but blankness is checked in a type-name slot, so a misspelt name is a legal rule that
-///         checks green over a subject nothing matches. A name picked from this list cannot be misspelt.
-///     </para>
-///     <para>
 ///         An editor builds a project's completion providers by reflection and does it inside catch blocks
 ///         that report nothing, so an assembly that cannot be loaded, a type that cannot be constructed and a
 ///         member that no longer binds all produce the same thing: no list, and no message anywhere saying
@@ -49,10 +45,6 @@ internal sealed class SpecSlotCompletionProvider : CompletionProvider
     ///     invocation rather than an insertion and never reach here at all, which is what makes the list
     ///     re-appear as an author keeps typing a name.
     /// </remarks>
-    /// <param name="text">The document's text.</param>
-    /// <param name="caretPosition">Where the caret is, just past the character that was typed.</param>
-    /// <param name="trigger">What caused the request.</param>
-    /// <param name="options">The host's options, which nothing here reads.</param>
     public override bool ShouldTriggerCompletion(
         SourceText text, int caretPosition, CompletionTrigger trigger, OptionSet options)
     {
@@ -68,7 +60,6 @@ internal sealed class SpecSlotCompletionProvider : CompletionProvider
     ///     then the marker lookup that decides whether this is a spec project, and only then the semantic
     ///     work of binding the call and walking the compilation's namespaces.
     /// </remarks>
-    /// <param name="context">The request, which is also where the items and the list's span are put.</param>
     public override async Task ProvideCompletionsAsync(CompletionContext context)
     {
         Document document = context.Document;
@@ -99,8 +90,9 @@ internal sealed class SpecSlotCompletionProvider : CompletionProvider
             _universe.Offers(document.Project, compilation, marker, kind, segment.Path, cancellationToken);
         if (offers.Count == 0) return;
 
-        // Set before the first item is added, because adding an item stamps that item's own span from
-        // here — the two ways to set a span on an item afterwards are both errors at this compiler API.
+        // The whole segment, so that a commit replaces it rather than appending to a half-typed one. Set before
+        // the first item is added, because adding an item stamps that item's own span from here — the two ways
+        // to set a span on an item afterwards are both errors at this compiler API.
         context.CompletionListSpan = segment.Span;
 
         foreach (Offer offer in offers) context.AddItem(SlotItems.For(offer, segment.Span));
@@ -111,11 +103,7 @@ internal sealed class SpecSlotCompletionProvider : CompletionProvider
         context.IsExclusive = true;
     }
 
-    /// <summary>The edit that commits an item, which is never just its display text.</summary>
-    /// <param name="document">The document being edited, which nothing here reads.</param>
-    /// <param name="item">The item the host is committing.</param>
-    /// <param name="commitKey">The character that committed it, which nothing here reads.</param>
-    /// <param name="cancellationToken">The token the caller passed, which nothing here waits on.</param>
+    /// <summary>The edit that commits <paramref name="item" />, which is never just its display text.</summary>
     public override Task<CompletionChange> GetChangeAsync(
         Document document, CompletionItem item, char? commitKey, CancellationToken cancellationToken)
     {

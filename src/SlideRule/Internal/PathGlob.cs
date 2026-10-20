@@ -14,10 +14,8 @@ namespace SlideRule.Internal;
 ///     </para>
 ///     <para>
 ///         <see cref="Validate" /> refuses a shape rather than normalizing it, so what an author wrote is what
-///         the model carries and what every reader matches with: a rooted glob, a backslash, a <c>.</c> or
-///         <c>..</c> segment, an empty segment and a <c>**</c> written into a longer segment all come back as a
-///         reason. Nothing here touches the file system or <c>System.IO.Path</c>, so the analyzer can run it
-///         inside the compiler.
+///         the model carries and what every reader matches with. Nothing here touches the file system or
+///         <c>System.IO.Path</c>, so the analyzer can run it inside the compiler.
 ///     </para>
 /// </remarks>
 internal sealed class PathGlob

@@ -6,7 +6,7 @@ using SlideRule.Roslyn.Solutions;
 
 namespace SlideRule.Roslyn.Replay;
 
-/// <summary>The three states <see cref="BinlogCaptureStore.Validate" /> can report.</summary>
+/// <summary>The states <see cref="BinlogCaptureStore.Validate" /> can report.</summary>
 internal enum CaptureState
 {
     /// <summary>No capture exists for this solution; the run takes the cold path with no notice.</summary>
@@ -44,37 +44,29 @@ internal sealed record CaptureValidation(CaptureState State, string? BinlogCopyP
 }
 
 /// <summary>
-///     The ingest/validate boundary over one solution's persisted <b>build capture</b> — a copied binlog plus
-///     a structure-only-keyed manifest that lets a later run replay the build with no design-time build, as
-///     long as the tree's structure has not moved. It is the sibling of the
-///     <see cref="ExtractionCacheStore" /> and mirrors its disciplines exactly.
+///     The ingest/validate boundary over one solution's persisted build capture: a copied binlog plus a
+///     structure-only-keyed manifest that lets a later run replay the build with no design-time build, as long
+///     as the tree's structure has not moved. It is the sibling of the <see cref="ExtractionCacheStore" /> and
+///     mirrors its disciplines.
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>Why a second, structure-only cache layer.</b> The fragment cache keys on structure
-///         <em>and</em> per-document content, so any source edit re-extracts. The capture keys on structure
-///         alone, because replay reads source text from current disk — content edits are invisible to it and
-///         must stay valid. What invalidates a capture is anything that changes the captured csc command
-///         lines' meaning: a csproj/sln/props/targets/global.json/assets edit (the structural stamps), a
-///         source add (the project-cone scan), or a source/obj-generated file that has gone missing (the
-///         document existence sweep — a <c>dotnet clean</c> deletes <c>*.GlobalUsings.g.cs</c> and friends,
-///         which replay cannot regenerate, so the capture must go invalid rather than drift).
+///         The fragment cache keys on structure and per-document content; the capture keys on structure alone,
+///         because replay reads source text from current disk, so content edits are invisible to it and must
+///         leave it valid. What invalidates a capture is anything that changes the meaning of the captured csc
+///         command lines.
 ///     </para>
 ///     <para>
-///         <b>Ingest is explicit and sanity-checked.</b> A binlog older than the tree's structural files, or
-///         one that does not cover exactly the solution's csproj set, is a loud
-///         <see cref="UserErrorException" /> refusal — the
-///         capture contract is "from a build of the current tree", and a subset binlog would silently shrink
-///         the model forever. A capture invalidated <em>later</em> is not loud: <see cref="Validate" />
-///         reports an <see cref="CaptureState.Invalid" /> notice and the run falls back to a design-time
-///         build, because a hard error would break CI on any csproj change until re-capture.
+///         A binlog older than the tree's structural files, or one that does not cover exactly the solution's
+///         csproj set, is a loud <see cref="UserErrorException" /> refusal at ingest: the capture contract is
+///         "from a build of the current tree", and a subset binlog would silently shrink the model forever. A
+///         capture invalidated later is not loud: <see cref="Validate" /> reports an
+///         <see cref="CaptureState.Invalid" /> notice and the run falls back to a design-time build, because a
+///         hard error would break CI on any csproj change until re-capture.
 ///     </para>
 ///     <para>
-///         <b>Persistence is best-effort.</b> The caller already holds its replayed solution, so an I/O
-///         failure while persisting must not fail the run — <see cref="Ingest" /> returns whether it
-///         persisted. The binlog copy is written <em>before</em> the manifest, so a torn write leaves a
-///         manifest-less orphan (validated as <see cref="CaptureState.Absent" />), never a manifest pointing
-///         at a missing binlog.
+///         Persistence is best-effort: the caller already holds its replayed solution, so an I/O failure while
+///         persisting must not fail the run.
 ///     </para>
 /// </remarks>
 internal sealed class BinlogCaptureStore
@@ -88,7 +80,10 @@ internal sealed class BinlogCaptureStore
         "build capture is unreadable; running a design-time build instead. Re-capture: rebuild with -bl and "
         + "re-run with --binlog.";
 
-    /// <summary>The <see cref="CaptureState.Invalid" /> notice when the capture is from another tool version.</summary>
+    /// <summary>
+    ///     The <see cref="CaptureState.Invalid" /> notice when the capture is from another tool version: replay
+    ///     fidelity is guaranteed only against the version that captured it.
+    /// </summary>
     internal const string VersionMismatchNotice =
         "build capture was written by a different SlideRule version; running a design-time build instead. "
         + "Re-capture: rebuild with -bl and re-run with --binlog.";
@@ -102,8 +97,8 @@ internal sealed class BinlogCaptureStore
     ///     Creates a store for <paramref name="solutionPath" />'s capture. The files live under
     ///     <paramref name="cacheRootOverride" /> when given, else the default cache root — either way in the
     ///     per-solution subdirectory <see cref="CacheLocations" /> derives. Never reads an environment
-    ///     variable itself: <c>SLIDERULE_CACHE_DIR</c> arrives here already resolved through an
-    ///     <c>IEnvironment</c> seam (self-spec <c>mcp/env-through-seam</c>).
+    ///     variable itself: <c>SLIDERULE_CACHE_DIR</c> arrives here already resolved through the caller's
+    ///     <c>IEnvironment</c> seam.
     /// </summary>
     public BinlogCaptureStore(string solutionPath, string? cacheRootOverride = null)
     {
@@ -118,10 +113,8 @@ internal sealed class BinlogCaptureStore
     }
 
     /// <summary>
-    ///     The number of file-content reads (SHA-256 computations) performed by <see cref="Validate" />. Zero
-    ///     in the steady state, where every structural input is trusted on stat alone. Internal test
-    ///     observable — the capture's analog of <see cref="ExtractionCacheStore.ContentHashCount" />; never
-    ///     consulted in production.
+    ///     The number of file-content reads (SHA-256 computations) <see cref="Validate" /> has performed: zero in
+    ///     the steady state, where every structural input is trusted on stat alone. A test observable only.
     /// </summary>
     internal long ContentHashCount { get; private set; }
 
@@ -147,7 +140,7 @@ internal sealed class BinlogCaptureStore
             "Build the whole solution with -bl and pass that binlog.");
     }
 
-    /// <summary>The refusal text when the capture target is a solution filter (.slnf) rather than a full solution.</summary>
+    /// <summary>The refusal text when the capture target is a solution filter rather than a full solution.</summary>
     internal static string SolutionFilterNotSupportedMessage(string solutionFileName)
     {
         return $"'{solutionFileName}' is a solution filter (.slnf); build captures require the full solution. "
@@ -175,19 +168,11 @@ internal sealed class BinlogCaptureStore
     }
 
     /// <summary>
-    ///     Sanity-checks <paramref name="replayedSolution" /> against <paramref name="binlogFullPath" /> and,
-    ///     if it passes, persists the capture.
+    ///     Sanity-checks <paramref name="replayedSolution" />, just replayed from the absolute
+    ///     <paramref name="binlogFullPath" />, and if it passes persists the capture, returning false when a
+    ///     best-effort I/O step failed. Refusals quote <paramref name="binlogArgument" />, the user's as-typed
+    ///     <c>--binlog</c> value, verbatim.
     /// </summary>
-    /// <remarks>
-    ///     In order: refuse a solution filter; refuse if any structural file is strictly newer than the binlog
-    ///     (a stale build); refuse if the binlog does not cover exactly the solution's csproj set; then copy the
-    ///     binlog and write the manifest, both atomically and best-effort.
-    /// </remarks>
-    /// <param name="replayedSolution">The solution just produced by replaying <paramref name="binlogFullPath" />.</param>
-    /// <param name="binlogFullPath">The absolute path to the binlog that was replayed.</param>
-    /// <param name="binlogArgument">The user's as-typed <c>--binlog</c> value, used verbatim in refusals.</param>
-    /// <param name="ct">Cancellation token.</param>
-    /// <returns><c>true</c> if the capture was persisted; <c>false</c> if a best-effort I/O step failed.</returns>
     /// <exception cref="UserErrorException">
     ///     The solution is a solution filter, or the binlog is stale or does not cover exactly the solution.
     /// </exception>
@@ -198,13 +183,11 @@ internal sealed class BinlogCaptureStore
         ArgumentException.ThrowIfNullOrWhiteSpace(binlogArgument);
 
         // A solution filter narrows a build to a subset; a capture keyed on it would silently shrink the
-        // model, and a replay owns no workspace to announce the narrowing from. Refuse it explicitly and
-        // early. The cold .slnf path via MSBuildWorkspace is unaffected — it loads honestly and declares
-        // what it left out — because this guard is only about persisting a build capture.
-        //
-        // The early refusal is also what keeps RefuseIfCoverageMismatch's unguarded ReadCsprojMembers below
-        // safe: that is deliberately the raw-membership reader, which runs the classic-.sln regex over a
-        // filter's JSON and gets zero members. Reaching it with a .slnf would refuse for a nonsense reason.
+        // model, and a replay owns no workspace to announce the narrowing from. The cold .slnf path is
+        // unaffected: this guard is only about persisting a build capture. Refusing early is also what keeps
+        // RefuseIfCoverageMismatch's unguarded ReadCsprojMembers safe: that raw-membership reader runs the
+        // classic-.sln regex over a filter's JSON and gets zero members, so a .slnf would refuse for a nonsense
+        // reason there.
         if (SolutionProjectFileParser.IsFilterFormat(solutionPath))
             throw new UserErrorException(SolutionFilterNotSupportedMessage(Path.GetFileName(solutionPath)));
 
@@ -305,17 +288,12 @@ internal sealed class BinlogCaptureStore
         return TryWriteManifestAtomic(manifest);
     }
 
-    /// <summary>
-    ///     Validates the persisted capture against disk with zero MSBuild. Reports <see cref="CaptureState.Absent" />
-    ///     (no capture — silent cold path), <see cref="CaptureState.Usable" /> (replay the binlog copy), or
-    ///     <see cref="CaptureState.Invalid" /> (a notice to print, then fall back).
-    /// </summary>
+    /// <summary>Validates the persisted capture against disk with zero MSBuild.</summary>
     /// <remarks>
     ///     Existence flips and content changes on structural inputs invalidate; a bare mtime touch with unchanged
     ///     bytes does not (hash-verified on a stat mismatch, then the manifest is rewritten with promoted stamps so
-    ///     the next run is pure-stat). Every recorded document must still exist, and no <c>*.cs</c> may have
-    ///     appeared in a project cone. Never throws (bar cancellation): an unexpected failure is the unreadable
-    ///     variant — a capture must never break a run.
+    ///     the next run is pure-stat). Never throws (bar cancellation): an unexpected failure is the unreadable
+    ///     variant, because a capture must never break a run.
     /// </remarks>
     public CaptureValidation Validate(CancellationToken ct = default)
     {
@@ -326,9 +304,7 @@ internal sealed class BinlogCaptureStore
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             // Any unexpected failure (I/O mid-sweep, a malformed record STJ still bound) degrades to the
-            // unreadable variant: the capture is disposable, so the run falls back rather than surfacing it.
-            // The filter is the whole cancellation clause — it names what this handler is NOT for, so a
-            // cancellation travels on untouched.
+            // unreadable variant, since the capture is disposable; the filter lets a cancellation travel on.
             return CaptureValidation.Invalid(UnreadableNotice);
         }
     }
@@ -375,10 +351,8 @@ internal sealed class BinlogCaptureStore
         return CaptureValidation.Usable(captureBinlogPath);
     }
 
-    // The first cone add — a *.cs present in neither the recorded ConeFiles nor the compiled DocumentPaths,
-    // i.e. the SDK-glob add a stat sweep cannot see. An excluded stray that was in the cone at ingest is in
-    // ConeFiles, so it is not read as an add; only a file new since ingest trips this. ProjectCone.FirstAdd
-    // owns the scan and stops at the first hit: this asks whether the membership moved, not by how much.
+    // The SDK-glob add a stat sweep cannot see: a *.cs in neither ConeFiles nor DocumentPaths. ProjectCone.FirstAdd
+    // stops at the first hit, because this asks whether the membership moved, not by how much.
     private static string? FirstConeAdd(CaptureProjectEntry project)
     {
         var known = new HashSet<string>(project.DocumentPaths, PathComparison.Comparer);
@@ -395,11 +369,11 @@ internal sealed class BinlogCaptureStore
         TryWriteManifestAtomic(promoted); // best-effort; a later change is still caught by the next stat delta
     }
 
-    // One entry per C# project, with the FULL document set — obj-generated sources included, deliberately:
-    // they are csc inputs the binlog's command line fixes and replay cannot regenerate, so a clean that
-    // deletes one must invalidate the capture rather than let replay drift from the real build. That
-    // predicate is this store's only departure from the shared collapse; everything else, the
-    // multi-target-framework collapse included, is SolutionProjects' answer and the fragment cache's too.
+    // One entry per C# project, with the full document set, obj-generated sources included: they are csc inputs
+    // the binlog's command line fixes and replay cannot regenerate, so a clean that deletes one must invalidate
+    // the capture rather than let replay drift from the real build. That predicate is this store's only
+    // departure from the shared collapse; everything else, the multi-target-framework collapse included, is
+    // SolutionProjects' answer and the fragment cache's too.
     private static IReadOnlyList<CaptureProjectEntry> CollectProjects(Solution solution)
     {
         return SolutionProjects.Collect(solution, static (_, _) => true)
@@ -409,7 +383,6 @@ internal sealed class BinlogCaptureStore
 
     private static CaptureProjectEntry ToEntry(ProjectInputs project)
     {
-        // Snapshot the cone at ingest so a later scan can tell a genuine add from an already-excluded stray.
         List<string> coneFiles = ProjectCone.Enumerate(project.ProjectDirectory)
             .OrderBy(path => path, StringComparer.Ordinal)
             .ToList();
@@ -424,10 +397,8 @@ internal sealed class BinlogCaptureStore
             project.IntermediateAssemblyPath);
     }
 
-    // ManifestJson owns both halves and the degradation contract they share with the fragment cache; all this
-    // pair adds is which file and which generated metadata. Absence is asked separately by ValidateCore,
-    // which — unlike the fragment cache — must tell "no capture" (silent cold path) from "a capture that no
-    // longer reads" (a notice the operator has to act on).
+    // Absence is asked separately by ValidateCore, which, unlike the fragment cache, must tell "no capture"
+    // (silent cold path) from "a capture that no longer reads" (a notice the operator has to act on).
     private CaptureManifest? TryReadManifest()
     {
         return ManifestJson.TryRead(captureManifestPath, ManifestJson.Context.CaptureManifest);

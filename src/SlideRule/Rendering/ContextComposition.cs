@@ -1,10 +1,8 @@
 namespace SlideRule.Rendering;
 
 /// <summary>
-///     The whole result of composing a solution's agent-context files: the <see cref="Files" /> to
-///     write, and a <see cref="Warnings" /> entry for every card that resolved to no directory, a layer
-///     or scope having matched no type declared inside the solution directory. Nothing is printed: the
-///     caller decides whether the warnings reach anyone.
+///     The whole result of composing a solution's agent-context files. Nothing is printed: the caller
+///     decides whether the warnings reach anyone.
 /// </summary>
 internal sealed class ContextComposition
 {
@@ -19,8 +17,6 @@ internal sealed class ContextComposition
     /// </summary>
     public IReadOnlyList<ContextFile> Files { get; }
 
-    /// <summary>
-    ///     Gets why each unplaced card was skipped, in placement order.
-    /// </summary>
+    /// <summary>Gets why each unplaced card was skipped, in placement order.</summary>
     public IReadOnlyList<string> Warnings { get; }
 }

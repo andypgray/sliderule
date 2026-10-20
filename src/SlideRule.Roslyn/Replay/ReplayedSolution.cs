@@ -11,15 +11,17 @@ namespace SlideRule.Roslyn.Replay;
 ///     unresolved-reference-stripped snapshot, identical in kind to the MSBuild path's output.
 /// </summary>
 /// <remarks>
-///     Unlike <see cref="LoadedSolution" /> there is no MSBuild <c>BuildHost</c> to release, because no
-///     design-time build ran: the structure came from a real build's binlog and the source text is read
-///     from current disk.
-///     Owns two disposables: the <see cref="AdhocWorkspace" /> and the <see cref="SolutionReader" />
-///     whose lazy per-document text loaders back the solution's source (and whose analyzer host holds
-///     the on-disk analyzer assemblies). A Roslyn <see cref="Solution" /> outlives the workspace that
-///     produced it — the same contract <see cref="LoadedSolution" /> keeps everywhere in this repo — so
-///     callers may keep reading a <see cref="Solution" /> already materialised by extraction after
-///     <see cref="Dispose" />; disposal only frees the workspace and reader resources.
+///     <para>
+///         There is no MSBuild <c>BuildHost</c> to release, because no design-time build ran. The
+///         <see cref="SolutionReader" />'s lazy per-document text loaders back the solution's source, and its
+///         analyzer host holds the on-disk analyzer assemblies. A Roslyn <see cref="Solution" /> outlives the
+///         workspace that produced it, as with <see cref="LoadedSolution" />, so a caller may keep reading a
+///         <see cref="Solution" /> already materialised by extraction after <see cref="Dispose" />.
+///     </para>
+///     <para>
+///         The project lists carry the same facts as <see cref="LoadedSolution" />'s, absolute and ordinal-sorted,
+///         so the gate and every document read one thing on both paths.
+///     </para>
 /// </remarks>
 internal sealed class ReplayedSolution : IDisposable
 {
@@ -43,21 +45,16 @@ internal sealed class ReplayedSolution : IDisposable
         UnsupportedProjects = unsupportedProjects ?? [];
     }
 
-    /// <summary>The replayed, unresolved-reference-stripped solution.</summary>
     public Solution Solution { get; }
 
     /// <summary>
-    ///     The target framework each multi-target-framework project was built for, keyed by
-    ///     <see cref="ProjectId" />, read from the recorded output paths (the replay reader applies no name
-    ///     discriminator of its own). Empty for a solution whose projects each target one framework, and for
-    ///     any project that suppresses the framework segment of its output path.
+    ///     The target framework each multi-target-framework project was built for, read from the recorded output
+    ///     paths (the replay reader applies no name discriminator of its own); absent for a project that
+    ///     suppresses the framework segment of its output path.
     /// </summary>
     public IReadOnlyDictionary<ProjectId, string> TargetFrameworks { get; }
 
-    /// <summary>
-    ///     The absolute <c>.csproj</c> paths of the projects that failed to load — the same fact
-    ///     <see cref="LoadedSolution.FailedProjects" /> carries, so the gate reads one thing on both paths.
-    /// </summary>
+    /// <summary>The <c>.csproj</c> paths of the projects that failed to load.</summary>
     /// <remarks>
     ///     On this path every entry is a project the solution declares and the binlog never built. A replayed
     ///     project comes from a compiler invocation a real build actually made, so it carries an output path
@@ -69,44 +66,32 @@ internal sealed class ReplayedSolution : IDisposable
     public IReadOnlyList<string> FailedProjects { get; }
 
     /// <summary>
-    ///     The absolute <c>.csproj</c> paths the solution declares that a solution filter left out of this run
-    ///     and the binlog did not build — the same fact <see cref="LoadedSolution.UncheckedProjects" />
-    ///     carries. Empty unless the replay was given a solution filter.
+    ///     The <c>.csproj</c> paths the solution declares that a solution filter left out of this run and the
+    ///     binlog did not build; empty unless the replay was given a solution filter.
     /// </summary>
     public IReadOnlyList<string> UncheckedProjects { get; }
 
-    /// <summary>
-    ///     The absolute <c>.csproj</c> paths of the projects whose NuGet packages are not in the model — the
-    ///     same fact <see cref="LoadedSolution.RestoreFailedProjects" /> carries, so the gate reads one thing
-    ///     on both paths.
-    /// </summary>
+    /// <summary>The <c>.csproj</c> paths of the projects whose NuGet packages are not in the model.</summary>
     /// <remarks>
-    ///     Empty by construction on this path, and pinned so for a different reason than
-    ///     <see cref="FailedProjects" />: there is no moment to read. An assets file describes the restore
-    ///     as it stands on disk <em>now</em>, so reading one here would stamp today's restore onto
-    ///     yesterday's model — and a capture that was replayed because it was structurally valid is, by
-    ///     construction, a capture of a build that compiled.
+    ///     Always empty on this path, because there is no moment to read: an assets file describes the restore
+    ///     as it stands on disk now, so reading one here would stamp today's restore onto yesterday's model, and
+    ///     a capture replayed because it was structurally valid is a capture of a build that compiled.
     /// </remarks>
     private IReadOnlyList<string> RestoreFailedProjects { get; } = [];
 
     /// <summary>The projects this capture built in a language the replay cannot read.</summary>
     /// <remarks>
-    ///     Read from the capture rather than from a solution file, which is the only difference between the
-    ///     two paths here: a binlog records what was built, so the compiler invocations the C#-only predicate
-    ///     declines <em>are</em> the answer, and they are collected at the moment of declining them. Every
-    ///     entry is therefore <see cref="UnsupportedProjectKind.NotCsharp" />, and that is a property of the
-    ///     evidence rather than a simplification: this path sees compilations, and a shared project is not
-    ///     one. A project the build skipped entirely is invisible here — the replay analog of the MSBuild
-    ///     path's undeclared-passenger limit.
+    ///     Read from the capture rather than from a solution file: a binlog records what was built, so the
+    ///     compiler invocations the C#-only predicate declines are the answer. A project the build skipped
+    ///     entirely is invisible here.
     /// </remarks>
     private IReadOnlyList<UnsupportedProject> UnsupportedProjects { get; }
 
     /// <summary>
-    ///     This replay's verdict as the one value every surface reads — the four project lists above beside
-    ///     the replay messages the caller's own sink collected, which never land on this type. The merge's two
-    ///     facts are empty by construction, as on the MSBuild path.
+    ///     This replay's verdict as the one value every surface reads: the project lists above beside
+    ///     <paramref name="loadFailures" />, the replay messages the caller's own sink collected, which never land
+    ///     on this type. The merge's facts stay empty, as on the MSBuild path.
     /// </summary>
-    /// <param name="loadFailures">The replay messages this load wrote to the caller's sink.</param>
     internal WorkspaceDiagnostics LoadDiagnosticsWith(IReadOnlyList<string> loadFailures)
     {
         return new WorkspaceDiagnostics(

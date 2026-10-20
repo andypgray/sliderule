@@ -2,14 +2,13 @@ using System.Text;
 
 namespace SlideRule.Prose;
 
-/// <summary>
-///     Renders a <see cref="Type" /> to prose (GRAMMAR §5–6). Simple names are generic-aware and
-///     use declared type-parameter names (<c>IHandler&lt;T&gt;</c>, <c>IDictionary&lt;TKey, TValue&gt;</c>);
-///     the full-path helpers back the colliding-simple-name qualification rule.
-/// </summary>
+/// <summary>Renders a <see cref="Type" /> to prose (GRAMMAR §5–6).</summary>
 internal static class TypeName
 {
-    /// <summary>The simple (unqualified) display name, generic-aware: <c>IHandler&lt;T&gt;</c>, <c>Order</c>.</summary>
+    /// <summary>
+    ///     The simple (unqualified) display name, generic-aware with declared type-parameter names:
+    ///     <c>IHandler&lt;T&gt;</c>, <c>IDictionary&lt;TKey, TValue&gt;</c>, <c>Order</c>.
+    /// </summary>
     internal static string Simple(Type type)
     {
         if (!type.IsGenericType) return type.Name;
@@ -37,7 +36,7 @@ internal static class TypeName
     ///     The type is a pointer, by-ref, or partially-open construction — no source-level form exists.
     /// </exception>
     /// <remarks>
-    ///     This is the essential correspondence that lets a spec's <c>typeof(...)</c> match an
+    ///     The correspondence that lets a spec's <c>typeof(...)</c> match an
     ///     extracted <see cref="Codebase.TypeNode.FullName" /> /
     ///     <see cref="Codebase.TypeConstruction.FullName" /> (GRAMMAR §4.1, §5.2). Forms:
     ///     <list type="bullet">
@@ -114,9 +113,8 @@ internal static class TypeName
     ///     colliding-simple-name rule widens outward along (GRAMMAR §6).
     /// </summary>
     /// <remarks>
-    ///     This is the reflection arm of that rule's input; a string anchor supplies the same shape from
-    ///     its own FQN (<see cref="Model.TypeAnchor" />), so the widening algorithm itself
-    ///     (<see cref="ProseFormat.ResolvePathDisplays" />) never sees a <see cref="Type" />.
+    ///     A string anchor supplies the same shape from its own FQN (<see cref="Model.TypeAnchor" />), and the
+    ///     two must agree.
     /// </remarks>
     internal static IReadOnlyList<string> PathSegments(Type type)
     {
@@ -128,8 +126,7 @@ internal static class TypeName
     }
 
     /// <summary>
-    ///     The reflection name with any backtick arity suffix removed: <c>IHandler`1</c> →
-    ///     <c>IHandler</c>. Shared with validation, whose <c>typeof(...)</c> steer spells the same bare name.
+    ///     The reflection name with any backtick arity suffix removed: <c>IHandler`1</c> → <c>IHandler</c>.
     /// </summary>
     internal static string StripArity(string name)
     {

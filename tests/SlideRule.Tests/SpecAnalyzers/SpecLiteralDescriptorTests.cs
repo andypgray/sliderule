@@ -10,9 +10,9 @@ using Xunit;
 namespace SlideRule.Tests.SpecAnalyzers;
 
 /// <summary>
-///     The seventeen warnings the spec analyzer declares: their IDs, the title, message and description each
-///     one ships with, the numbering that ties sixteen of them to a validation code, and the claim that
-///     those sixteen are exactly the verdicts the contract can hand back.
+///     The warnings the spec analyzer declares: their IDs, the title, message and description each one
+///     ships with, the numbering that ties every one but the tool fault to a validation code, and the claim
+///     that those are exactly the verdicts the contract can hand back.
 /// </summary>
 /// <remarks>
 ///     <para>

@@ -10,8 +10,7 @@ namespace SlideRule.Xunit;
 /// </summary>
 // Deliberately self-contained: it names one contract type, which every version carries, and nothing else of the
 // contract's, because every other member is exactly what a mismatched copy may not have. The analyzers make the
-// same check the same way (SR2093), and a version is compared up to its first '+', so one version built from two
-// commits still agrees.
+// same check the same way (SR2093).
 internal static class ContractVersion
 {
     /// <summary>

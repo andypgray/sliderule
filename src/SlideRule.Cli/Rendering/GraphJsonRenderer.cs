@@ -8,24 +8,15 @@ namespace SlideRule.Cli.Rendering;
 ///     Renders a <see cref="GraphSummary" /> as the <c>graph --json</c> document (its own
 ///     <c>schemaVersion</c>, <see cref="SchemaVersion" />) — the pre-spec codebase survey.
 /// </summary>
-/// <remarks>
-///     The document is composed as a string rather than written straight out, so a caller with a response
-///     budget can measure the full survey and, if it overruns, re-compose it a rung coarser from the same
-///     summary — one extraction, one render per rung walked, and never a document cut mid-array.
-/// </remarks>
 internal static class GraphJsonRenderer
 {
     /// <summary>The version of the document this writes.</summary>
     internal const int SchemaVersion = 1;
 
     /// <summary>
-    ///     The survey document as a string. <paramref name="grain" /> decides how much of each project is
-    ///     rendered and stamps itself on the document; <paramref name="projectsScope" /> is the filter the
-    ///     summary was already narrowed by, recorded so the document says what it covers.
-    ///     <paramref name="workspaceDiagnostics" /> is the rendered stream the caller composed and
-    ///     <paramref name="trust" /> the stamp it read off the load — the project lists the document carries,
-    ///     and the grouped advisories that become <c>packageAudit</c>. Both are composed once by the caller
-    ///     and handed to every rung, because a ladder renders the same load several times over.
+    ///     The survey document at <paramref name="grain" />, one rung of a <see cref="DocumentGrains.Ladder" />.
+    ///     <paramref name="projectsScope" /> is the filter the summary was already narrowed by, recorded so the
+    ///     document says what it covers.
     /// </summary>
     public static string Document(
         GraphSummary summary,
@@ -85,19 +76,14 @@ internal static class GraphJsonRenderer
         return JsonSerializer.Serialize(document, SlideRuleJson.Context.GraphJson);
     }
 
-    // The row's own ladder. What a project targets, whether it packs and whether it locks scale with the
-    // solution's projects, so they survive every rung down to index, where the row is cut to what names
-    // and sizes a project. Each is omitted where it has no answer, which
-    // for the frameworks means no evaluation happened at all. The declared project references are the reason
-    // index exists: they scale with the solution's edges rather than its projects, so on a large solution
-    // they are most of the roster's bulk. The declared packages leave a rung earlier, at skeleton, beside
-    // the external-reference rows they are the build-side twin of, and the private subset leaves with them. The
-    // undeclared references qualify the declared ones, so they leave at index with them and are absent when empty.
-    // Both elide bare, as the namespaces do at overview — a row's array needs no count of its own when the
-    // document already stamps the grain that dropped it. The private subset is also absent where it is
-    // empty, because a non-null empty list serializes as [] on every row of every solution without one. The
-    // package frameworks are absent where there are none, for the private subset's reason: a solution with no
-    // framework-conditioned package surveys exactly as it did before the key existed.
+    // The row's own ladder, whose rungs GraphProjectJson states. What a project targets, whether it packs and
+    // whether it locks scale with the solution's projects, so they survive every rung above index, where the row
+    // is cut to what names and sizes it; the declared project references are the reason index exists, since they
+    // scale with the solution's edges rather than its projects and on a large solution are most of the roster's
+    // bulk. The declared packages leave at skeleton, beside the external-reference rows they are the build-side
+    // twin of. A row's arrays elide bare, as the namespaces do at overview: the document already stamps the grain
+    // that dropped them. The qualifier lists are absent where empty, because a non-null empty list serializes as
+    // [] on every row of every solution without one.
     private static GraphProjectJson ToProject(ProjectSummary project, DocumentGrain grain)
     {
         bool index = grain >= DocumentGrain.Index;
@@ -132,8 +118,6 @@ internal static class GraphJsonRenderer
             .ToList();
     }
 
-    // The packages the project declares for only some of its frameworks, each with the frameworks that declare it,
-    // in package order.
     private static IReadOnlyList<GraphPackageFrameworksJson> PackageFrameworks(ProjectSummary project)
     {
         return project.PackageReferences

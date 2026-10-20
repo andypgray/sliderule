@@ -4,64 +4,20 @@ using SlideRule.Roslyn.Diagnostics;
 namespace SlideRule.Roslyn.Caching;
 
 /// <summary>
-///     The persisted extraction cache as a single serializable document: a self-describing manifest plus
-///     every <see cref="CodebaseFragment" /> the last workspace-loaded run extracted. One
-///     <see cref="ExtractionCacheStore" /> reads, validates, and (re)writes exactly one of these to one
-///     atomic file. The manifest is deliberately self-contained — it records every input
-///     path and its stamp so validation needs no MSBuild and no <see cref="CodebaseFragment" /> inspection.
+///     The persisted extraction cache as one serializable document, which <see cref="ExtractionCacheStore" />
+///     writes to one atomic file: a self-describing manifest plus every <see cref="CodebaseFragment" /> the last
+///     workspace-loaded run extracted, in cold (ordinal-project) order. The manifest records every input path and
+///     its stamp, so validation needs no MSBuild and no fragment inspection.
 /// </summary>
 /// <remarks>
-///     <para>
-///         The stamps are the manifest's own rather than <see cref="FileFreshness" />: a stamp is durable on-disk
-///         data; <see cref="FileFreshness.RecordedAtUtc" /> is a runtime notion (the wall-clock instant of a
-///         capture) that has no meaning across process boundaries. So the racy-window decision is frozen at
-///         write time into <see cref="FileStamp.Promoted" /> instead, and validation reconstitutes a
-///         <see cref="FileFreshness" /> only for the pure stat comparison (<see cref="FileFreshness.MatchesStat" />).
-///     </para>
+///     The JSON shape is the cache's on-disk schema, versioned by <paramref name="SchemaVersion" />;
+///     <paramref name="ToolVersion" /> is <see cref="FileStamping.CurrentToolVersion" /> at write time, and
+///     <paramref name="StructuralStamps" /> stamps every path <see cref="ProjectCone.SolutionStructuralPaths" />
+///     yields, absent files included. <paramref name="Diagnostics" /> and the project lists after it are the
+///     recorded run's load verdict, field for field the <see cref="WorkspaceDiagnostics" /> its load reported,
+///     stored because a hit opens no workspace to recompute them from; each unsupported project's kind is stored
+///     rather than re-derived, so a cold run and a hit stay word-identical.
 /// </remarks>
-/// <param name="SchemaVersion">The manifest schema version; a mismatch is a whole-cache miss.</param>
-/// <param name="ToolVersion">
-///     The writing tool's informational version (<see cref="FileStamping.CurrentToolVersion" />); a
-///     mismatch is a whole-cache miss.
-/// </param>
-/// <param name="StructuralStamps">
-///     The stamps of every structural input (<see cref="ProjectCone.SolutionStructuralPaths" />), absent
-///     files included.
-/// </param>
-/// <param name="Projects">One entry per cached project, carrying its stamps and invalidation keys.</param>
-/// <param name="SpecResolutions">The recorded spec resolutions a hit replays without a workspace.</param>
-/// <param name="Diagnostics">
-///     The workspace-load diagnostics the recorded run collected, replayed verbatim on a hit so cached and
-///     cold output are byte-identical on a diagnostic-bearing solution.
-/// </param>
-/// <param name="UncheckedProjects">
-///     The absolute <c>.csproj</c> paths the recorded run did not check — non-empty only when it went
-///     through a solution filter. Persisted for the same reason as <see cref="FailedProjects" /> and no
-///     other: a hit owns no workspace to recompute it from, and a filtered run whose cached verdict came
-///     back as a bare green would be exactly the silence this field exists to break.
-/// </param>
-/// <param name="FailedProjects">
-///     The absolute <c>.csproj</c> paths of the projects that failed to load on the recorded run — half the
-///     fail-closed gate's input. Persisted rather than recomputed because a hit owns no workspace to read the
-///     loaded structure from, and a hit that answered green where the cold run refuses would be the one thing
-///     this cache promises it cannot do.
-/// </param>
-/// <param name="RestoreFailedProjects">
-///     The absolute <c>.csproj</c> paths of the projects whose NuGet packages were not in the model on the
-///     recorded run — the gate's other input, persisted for exactly the reason above. It could in principle
-///     be recomputed on a hit, since the assets files (and the project files behind the ones with no assets
-///     file at all) are still on disk, but it must not be: a hit means every one of those paths stamped
-///     identical, so recomputing can only ever agree — at the cost of a parse per project on the path whose
-///     whole promise is that it opens nothing.
-/// </param>
-/// <param name="UnsupportedProjects">
-///     The projects the solution declared that no extractor reached on the recorded run, each with the
-///     <see cref="UnsupportedProjectKind" /> its producer classified it as. The kind is stored rather than
-///     re-derived on a hit — a consumer's own extension read reached a different answer for a
-///     <c>.shproj</c>, measured — so a cold run and a hit stay word-identical. Persisted at all for its
-///     siblings' reason: a hit owns no solution file read of its own.
-/// </param>
-/// <param name="Fragments">Every fragment the recorded run extracted, in cold (ordinal-project) order.</param>
 internal sealed record CacheManifest(
     int SchemaVersion,
     string ToolVersion,
@@ -76,29 +32,18 @@ internal sealed record CacheManifest(
     IReadOnlyList<CodebaseFragment> Fragments);
 
 /// <summary>
-///     A file's recorded existence and content fingerprint at cache-write time — the durable, cross-process
-///     counterpart of a <see cref="FileFreshness" /> capture. Used for both the structural set (solution,
-///     csprojs, <c>Directory.Build.*</c>/<c>global.json</c> probe-chain entries, per-project
-///     <c>project.assets.json</c>) and a project's source documents.
+///     A file's recorded existence and content fingerprint at cache-write time, the durable cross-process
+///     counterpart of a <see cref="FileFreshness" /> capture, for a structural input or a source document.
 /// </summary>
-/// <param name="Path">The absolute, OS-native path, stored verbatim.</param>
-/// <param name="Exists">
-///     Whether the file existed at capture. Recorded even when <c>false</c> (an absent probe-chain entry):
-///     an absent-then-appearing file is an existence flip validation must catch.
-/// </param>
-/// <param name="LastWriteTimeUtcTicks">The last-write time in UTC ticks, or 0 when absent.</param>
-/// <param name="Length">The byte length, or 0 when absent.</param>
-/// <param name="Sha256">The lowercase-hex SHA-256 of the file's bytes, or null when absent or unreadable.</param>
-/// <param name="Promoted">
-///     Whether this stamp can be trusted on stat-equality alone — the frozen racy-window verdict
-///     (<see cref="FileFreshness.IsPromoted" /> at capture). When false, validation must re-hash even on a
-///     stat match, because a same-tick write could have shared the recorded mtime.
-/// </param>
-/// <param name="Shape">
-///     The document's <see cref="SourceShape" /> at capture, or null for a structural stamp, the binlog
-///     copy, an absent file, or a document that could not be read — what lets validation tell a trivia-only
-///     edit from a real one.
-/// </param>
+/// <remarks>
+///     <paramref name="Path" /> is absolute and OS-native, stored verbatim, and <paramref name="Sha256" /> is
+///     lowercase hex, null for a file that could not be read. An absent file is still recorded, with
+///     <paramref name="Exists" /> false, zero ticks and length and no hash, so a file that appears later is an
+///     existence flip validation catches. <paramref name="Promoted" /> is the frozen racy-window verdict,
+///     <see cref="FileFreshness.IsPromoted" /> at capture: whether a stat match alone proves the file unchanged.
+///     <paramref name="Shape" /> is the document's <see cref="SourceShape" />, null for a structural stamp, the
+///     binlog copy, an absent file or a document that could not be read.
+/// </remarks>
 internal sealed record FileStamp(
     string Path,
     bool Exists,
@@ -109,34 +54,18 @@ internal sealed record FileStamp(
     SourceShape? Shape = null);
 
 /// <summary>
-///     One cached project (keyed by name; a multi-target-framework project has one entry — its several
-///     <see cref="Microsoft.CodeAnalysis.Project" />s share the name the load boundary normalized them to —
-///     but one <see cref="CodebaseFragment" /> per framework): its structural inputs, its source-document
-///     stamps, and the two invalidation keys.
+///     One cached project, keyed by its project (assembly) name, which ties the entry to its fragments. A
+///     multi-targeted project has one entry, its several <see cref="Microsoft.CodeAnalysis.Project" />s sharing
+///     the name the load boundary normalized them to, but one <see cref="CodebaseFragment" /> per framework.
 /// </summary>
-/// <param name="ProjectName">The project (assembly) name — the key that ties this entry to its fragments.</param>
-/// <param name="CsprojPath">The absolute path to the project file (also present in the structural set).</param>
-/// <param name="ProjectDirectory">The project directory, scanned for newly-added <c>*.cs</c> at validation.</param>
-/// <param name="ProjectReferences">
-///     The names of the projects this one references — the Merkle dependency edges. These are the compiler's
-///     closure, which invalidation has to follow, and not the declared list the fragments carry.
-/// </param>
-/// <param name="Documents">The stamps of the project's source documents (mtime/length and SHA-256).</param>
-/// <param name="ContentKey">
-///     A hash over this project's own inputs — its document hashes, its structural (csproj/assets) hashes
-///     and the paths of any source file added under its directory. Changes iff the project's own content
-///     changes.
-/// </param>
-/// <param name="MerkleKey">
-///     A hash over this project's <see cref="ContentKey" /> and, in a deterministic order, the surface keys
-///     of its dependency cone, so a change to its own content or to the declaration surface of anything it
-///     references changes this key, and a body-only edit in a dependency does not. The dirty set is exactly
-///     the projects whose recomputed <see cref="MerkleKey" /> no longer matches.
-/// </param>
-/// <param name="SurfaceKey">
-///     The same hash as <see cref="ContentKey" /> taken over each document's <see cref="SourceShape.SurfaceHash" />
-///     instead of its bytes: what a dependent's Merkle key folds in for this project.
-/// </param>
+/// <remarks>
+///     <paramref name="CsprojPath" /> is absolute and also in the structural set.
+///     <paramref name="ProjectReferences" /> names the projects this one references, the Merkle dependency
+///     edges: the compiler's closure, which invalidation has to follow, not the declared list the fragments
+///     carry. <paramref name="ContentKey" /> hashes the project's own inputs, <paramref name="SurfaceKey" /> the
+///     same inputs with each document's <see cref="SourceShape.SurfaceHash" /> in place of its bytes, and
+///     <paramref name="MerkleKey" /> the content key with the surface keys of the project's dependency cone.
+/// </remarks>
 // ContentKey and SurfaceKey are persisted schema: validation recomputes keys bottom-up from documents rather
 // than reading the stored values, which exist so a manifest diff shows whether a project's own content, its
 // declaration surface, or only its dependency cone moved.
@@ -151,9 +80,9 @@ internal sealed record ProjectCacheEntry(
     string SurfaceKey);
 
 /// <summary>
-///     A recorded spec resolution, keyed by the normalized <c>--spec</c> argument that produced it. Stored
-///     faithfully so a cache hit can replay spec resolution without a workspace, resolving identically to a
-///     cold run — including the built-output search, what that search refuses, and its error text.
+///     A recorded spec resolution, keyed by the normalized <c>--spec</c> argument that produced it, so a cache hit
+///     replays spec resolution without a workspace and resolves as a cold run did, down to what the built-output
+///     search refuses and its error text.
 /// </summary>
 /// <param name="NormalizedSpecArgument">
 ///     The normalized <c>--spec</c> value this record resolves (an absolute csproj/dll path, or the empty
@@ -161,22 +90,17 @@ internal sealed record ProjectCacheEntry(
 /// </param>
 /// <param name="SpecProjectName">The solution-member spec project's name, or null for an explicit DLL.</param>
 /// <param name="ExcludeProjectNames">
-///     Every project to drop from the checked universe — the spec project plus the private plumbing only it
-///     references (<c>SpecExclusion</c>). Recorded whole rather than recomputed, because deriving it needs
-///     the workspace a hit deliberately never opens.
+///     Every project to drop from the checked universe: the spec project plus the private plumbing only it
+///     references (<c>SpecExclusion</c>).
 /// </param>
 /// <param name="OutputFilePaths">
-///     Every Debug-evaluated output path of the spec project, ordinal-sorted, or empty for an explicit DLL. A
-///     multi-target-framework spec project evaluates one per framework, and recording only one would let a hit
-///     load a different framework's DLL than the cold run chose — the one thing this record promises it cannot
-///     do.
+///     Every Debug-evaluated output path of the spec project, one per framework, ordinal-sorted, or empty for an
+///     explicit DLL, so a hit loads the framework's DLL the cold run chose.
 /// </param>
 /// <param name="IntermediateAssemblyPath">
 ///     The spec project's intermediate (<c>obj</c>-side) assembly path, or null when the workspace did not
-///     carry one. Recorded because the built-output search reads it to refuse an intermediate result: without
-///     it a hit would answer where a cold run refuses. One path is enough for a multi-target-framework
-///     project — the search derives the intermediate root from the prefix it shares with the evaluated path,
-///     and that root is the same whichever framework's pair it starts from.
+///     carry one. One path serves every framework: the built-output search derives the intermediate root from the
+///     prefix it shares with the evaluated path, and that root is the same whichever framework's pair it starts from.
 /// </param>
 internal sealed record SpecResolutionRecord(
     string NormalizedSpecArgument,

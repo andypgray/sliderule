@@ -10,10 +10,9 @@ namespace SlideRule.Checking;
 ///     authoring order.
 /// </summary>
 /// <remarks>
-///     There is no noun to pick a candidate set with and no position to pick a universe with — a project
-///     is only ever a subject, and the universe is always <see cref="CodebaseModel.Projects" />, which the
-///     extractor already orders by name. So resolution is the adjective fold alone, and the result keeps
-///     that order, which is what makes violations deterministic without a re-sort.
+///     A project is only ever a subject and the universe is always <see cref="CodebaseModel.Projects" />, so
+///     resolution is the adjective fold alone. The extractor orders that list by name and the result keeps the
+///     order, which is what makes violations deterministic without a re-sort.
 /// </remarks>
 internal static class ProjectSelectionEvaluator
 {

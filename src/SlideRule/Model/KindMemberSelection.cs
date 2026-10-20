@@ -1,12 +1,8 @@
 namespace SlideRule.Model;
 
 /// <summary>
-///     The member selection minted by the <c>.Members</c> and <c>.Events</c> projections (GRAMMAR §4.6) —
-///     every projection except <c>.Methods</c>, <c>.Properties</c> and <c>.Fields</c>, which mint the
-///     specialized <see cref="MethodSelection" />, <see cref="PropertySelection" /> and
-///     <see cref="FieldSelection" /> their kind-only verbs bind to. Carries only its
-///     <see cref="MemberKindFilter" />; the shared member adjectives clone it through
-///     <see cref="Rebuild" />.
+///     The member selection the <c>.Members</c> and <c>.Events</c> projections mint (GRAMMAR §4.6), which have
+///     no kind-only verbs to bind.
 /// </summary>
 internal sealed class KindMemberSelection : MemberSelection
 {

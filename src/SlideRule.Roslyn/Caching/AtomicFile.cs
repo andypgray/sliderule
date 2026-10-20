@@ -4,21 +4,15 @@ namespace SlideRule.Roslyn.Caching;
 ///     Writes or copies a file atomically and durably, so a reader never sees a half-written file.
 /// </summary>
 /// <remarks>
-///     The bytes go to a uniquely-named sibling temp file in the target's own directory, are flushed to disk,
-///     and the temp is then <see cref="File.Move(string,string,bool)" />d over the target. A crash mid-write
-///     leaves either the intact old file or the intact new one, never a truncated one; and, because the flush
-///     persists the bytes before the rename, a power loss in the move window cannot leave the renamed target
-///     pointing at content still sitting unwritten in the OS cache. The unique temp name (not a fixed
-///     <c>.tmp</c>) lets two writers of the same target coexist without clobbering each other's scratch file.
-///     Failure semantics are deliberate: this throws rather than swallowing to a bool, because a
-///     silently-dropped write to a user-owned, version-controlled file would be a lie. A caller persisting
-///     disposable derived data, which is rebuilt next run, wraps this and re-swallows the throw itself. The
-///     temp file is deleted on the failure path.
-///     On Windows the move is retried for under a second while another process holds the target or the temp
-///     open, which is a passing hold rather than a failure of the write itself; any other I/O failure surfaces
-///     at once.
-///     Lives in the Roslyn (net10.0) project because the overwriting
-///     <see cref="File.Move(string,string,bool)" /> overload does not exist on Core's netstandard2.0.
+///     A crash mid-write leaves either the intact old file or the intact new one, never a truncated one, and a
+///     power loss in the move window cannot leave the target pointing at content still unwritten in the OS cache.
+///     Both verbs create the target directory when it is absent. Failures throw rather than returning a bool,
+///     because a silently dropped write to a user-owned, version-controlled file would be a lie; the temp file is
+///     deleted first, and a caller persisting disposable derived data, which is rebuilt next run, wraps this and
+///     swallows the throw itself. On Windows the move is retried for under a second while another process holds
+///     the target or the temp open; any other I/O failure surfaces at once. It lives in this net10.0 project
+///     because the overwriting <see cref="File.Move(string,string,bool)" /> overload does not exist on Core's
+///     netstandard2.0.
 /// </remarks>
 internal static class AtomicFile
 {
@@ -26,25 +20,14 @@ internal static class AtomicFile
     private const int LockViolation = unchecked((int)0x80070021);
 
     // About 750 ms in all. The holds this outlasts are an antivirus or indexer scan of a file seconds old and
-    // an editor re-reading a file it has open, each measured in milliseconds; hosted Windows CI lost a
-    // baseline add's rewrite to one.
+    // an editor re-reading a file it has open, each measured in milliseconds.
     private static readonly int[] MoveRetryDelaysMs = [50, 100, 200, 400];
 
-    /// <summary>
-    ///     Writes <paramref name="bytes" /> to <paramref name="path" /> atomically and durably — a temp
-    ///     sibling, flushed to disk, then an overwriting move — creating the target directory if it is absent.
-    ///     Throws on any I/O failure, after a best-effort delete of the temp file.
-    /// </summary>
     public static void WriteAllBytes(string path, byte[] bytes)
     {
         PromoteViaTemp(path, temp => WriteDurably(temp, bytes));
     }
 
-    /// <summary>
-    ///     Copies <paramref name="source" /> to <paramref name="destination" /> atomically and durably — into a
-    ///     temp sibling, flushed to disk, then an overwriting move — creating the destination directory if it is
-    ///     absent. Throws on any I/O failure, after a best-effort delete of the temp file.
-    /// </summary>
     public static void Copy(string source, string destination)
     {
         PromoteViaTemp(destination, temp =>

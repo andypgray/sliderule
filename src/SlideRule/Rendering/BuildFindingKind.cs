@@ -1,16 +1,12 @@
 namespace SlideRule.Rendering;
 
 /// <summary>
-///     What a <see cref="BuildFinding" /> is about: a law that was broken, or debt that has grown past what
-///     its baseline records. A reader deciding how loudly to report a finding asks this and nothing else.
+///     What a <see cref="BuildFinding" /> is about. A reader deciding how loudly to report a finding asks
+///     this and nothing else.
 /// </summary>
 internal enum BuildFindingKind
 {
-    /// <summary>
-    ///     A rule that is law was broken. An <c>Enforce</c> rule, and a quarantine's containment rule —
-    ///     which ratchets, but states a boundary rather than a migration, so a new crossing of it is not
-    ///     scheduled debt.
-    /// </summary>
+    /// <summary>A rule that is law was broken: an <c>Enforce</c> rule, or a quarantine's containment rule.</summary>
     BrokenRule,
 
     /// <summary>

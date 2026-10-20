@@ -52,11 +52,7 @@ internal sealed record SarifReportingDescriptor(
 /// <summary>A rule's default configuration — its severity <c>level</c>.</summary>
 internal sealed record SarifReportingConfiguration(string Level);
 
-/// <summary>
-///     A rule's SlideRule-specific property bag — currently just its posture, the model's own enum cased
-///     for the wire by <see cref="SlideRuleJson.Options" /> exactly as <c>check --json</c> cases it. A
-///     posture added to the enum therefore reaches the wire with no edit here.
-/// </summary>
+/// <summary>A rule's SlideRule-specific property bag: its posture, cased as every document cases it.</summary>
 internal sealed record SarifRuleProperties(Posture Posture);
 
 /// <summary>
@@ -89,7 +85,9 @@ internal sealed record SarifLocation(SarifPhysicalLocation PhysicalLocation);
 /// </summary>
 internal sealed record SarifPhysicalLocation(SarifArtifactLocation ArtifactLocation, SarifRegion? Region);
 
-/// <summary>An artifact reference — a solution-relative URI resolved against the <see cref="UriBaseId" /> base.</summary>
+/// <summary>
+///     An artifact reference — a solution-relative URI resolved against the <see cref="UriBaseId" /> base.
+/// </summary>
 internal sealed record SarifArtifactLocation(string Uri, string UriBaseId);
 
 /// <summary>The empty base descriptor (<c>{}</c>) the SRCROOT URI base id maps to.</summary>

@@ -9,7 +9,6 @@ namespace SlideRule.Model;
 /// </summary>
 internal sealed class MustNotInjectConstraint(Selection subject, IReadOnlyList<Selection> targets) : OperandConstraint(subject, targets)
 {
-    /// <summary>The forbidden injection targets.</summary>
     internal IReadOnlyList<Selection> Targets => Operands;
 
     internal override string VerbPhrase => "must not inject " + Targets.TargetListProse();

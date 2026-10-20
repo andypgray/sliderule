@@ -19,8 +19,7 @@ internal static class GlobList
     }
 
     /// <summary>
-    ///     The option value that <see cref="Parse" /> reads back as <paramref name="globs" />, or null for none:
-    ///     how a list a settings file holds as JSON reaches an option that takes this form.
+    ///     The option value that <see cref="Parse" /> reads back as <paramref name="globs" />, or null for none.
     /// </summary>
     public static string? Join(IReadOnlyList<string>? globs)
     {

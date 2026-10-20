@@ -10,12 +10,9 @@ using SlideRule.Roslyn.Solutions;
 namespace SlideRule.Roslyn;
 
 /// <summary>
-///     Loads a solution once, for a host that reads it once: a check, a render, a test run.
-///     <see cref="LoadAsync" /> opens a fresh MSBuild workspace, reads the solution, drops references that
-///     did not resolve, gives a multi-target-framework project's several compilations one name, and hands
-///     back a <see cref="LoadedSolution" /> the caller disposes. What it returns is as current as the
-///     moment of the load and is never reconciled afterwards; a host that reads one solution many times
-///     wants <see cref="WorkspaceSession" />, which keeps this loader's result warm.
+///     Loads a solution once, for a host that reads it once: a check, a render, a test run. What it returns is
+///     as current as the moment of the load and is never reconciled afterwards; a host that reads one solution
+///     many times wants <see cref="WorkspaceSession" />.
 /// </summary>
 internal static class WorkspaceLoader
 {
@@ -26,22 +23,17 @@ internal static class WorkspaceLoader
     private static long _loadCount;
 
     /// <summary>
-    ///     The number of times <see cref="LoadAsync" /> has opened an <see cref="MSBuildWorkspace" /> in
-    ///     this process, whoever caused it — the run's total. The binlog-replay path deliberately bypasses
-    ///     this method, so a run that replays a capture leaves this counter unchanged. A test that needs the
-    ///     loads of one call alone, whatever runs beside it, reads <see cref="CountLoadsOnThisFlow" />
-    ///     instead. Internal test observable, incremented with <see cref="Interlocked" />; never consulted in
-    ///     production.
+    ///     The <see cref="MSBuildWorkspace" />s <see cref="LoadAsync" /> has opened in this process, a test
+    ///     observable. It counts every caller's loads, so a test that needs one call's loads alone, whatever runs
+    ///     beside it, reads <see cref="CountLoadsOnThisFlow" />.
     /// </summary>
     internal static long LoadCount => Interlocked.Read(ref _loadCount);
 
     /// <summary>
     ///     Starts counting the loads of this async flow and the tasks it starts, and returns the box
-    ///     <see cref="LoadAsync" /> increments for each. Install it before the call whose loads it should
-    ///     count. A counter installed further out keeps counting too, so a per-test count and a per-call count
-    ///     can nest. Synchronous on purpose: a value an async method sets is discarded when it returns, so only
-    ///     a synchronous installer leaves the box in place for its caller. Internal test observable; never
-    ///     consulted in production.
+    ///     <see cref="LoadAsync" /> increments for each; a test observable. Install it before the call whose loads
+    ///     it should count. It is synchronous because a value an async method sets is discarded when it returns,
+    ///     so only a synchronous installer leaves the box in place for its caller.
     /// </summary>
     internal static StrongBox<long> CountLoadsOnThisFlow()
     {
@@ -52,33 +44,23 @@ internal static class WorkspaceLoader
     }
 
     /// <summary>
-    ///     Opens <paramref name="solutionPath" /> through a fresh MSBuild workspace and returns the loaded
-    ///     solution. MSBuild must be registered in the process before the first call, for example through the
-    ///     <c>Microsoft.Build.Locator</c> package. Restore or build the solution beforehand, or the result
-    ///     reports the projects it could not load or restore.
+    ///     Opens <paramref name="solutionPath" />, the absolute path of a <c>.sln</c>, <c>.slnx</c> or <c>.slnf</c>
+    ///     filter, through a fresh MSBuild workspace; the caller disposes the result, which owns the workspace.
+    ///     MSBuild must be registered in the process before the first call, for example through the
+    ///     <c>Microsoft.Build.Locator</c> package.
     /// </summary>
-    /// <param name="solutionPath">
-    ///     Absolute path to the <c>.sln</c>/<c>.slnx</c> to load, or to a <c>.slnf</c> filter over one. A
-    ///     filter loads the projects it selects plus their transitive references, and what it leaves out is
-    ///     reported as <see cref="LoadedSolution.UncheckedProjects" /> rather than as a failure.
-    /// </param>
-    /// <param name="diagnosticLog">
-    ///     Optional sink for the workspace's own failure messages. A failure never aborts the load: a partial
-    ///     load still yields a usable model, and these messages are for a host to render. Whether the model is
-    ///     incomplete is <see cref="LoadedSolution.FailedProjects" />'s and
-    ///     <see cref="LoadedSolution.RestoreFailedProjects" />'s answer, not this sink's.
-    /// </param>
-    /// <param name="ct">Cancellation token.</param>
-    /// <returns>
-    ///     The loaded solution. It owns the workspace and its out-of-process build host: dispose it when the
-    ///     read is done.
-    /// </returns>
+    /// <remarks>
+    ///     A filter loads the projects it selects plus their transitive references. A failure never aborts the
+    ///     load, since a partial load still yields a usable model: <paramref name="diagnosticLog" /> receives the
+    ///     workspace's failure messages for a host to render, and whether the model is incomplete is
+    ///     <see cref="LoadedSolution.FailedProjects" />' and <see cref="LoadedSolution.RestoreFailedProjects" />'
+    ///     answer, never the messages'.
+    /// </remarks>
     /// <exception cref="UserErrorException">
-    ///     The <c>.slnf</c> filter at <paramref name="solutionPath" /> could not be read. Its message is
-    ///     written for the person who ran the tool and is complete on its own.
+    ///     The <c>.slnf</c> filter at <paramref name="solutionPath" /> could not be read.
     /// </exception>
     // MethodImplOptions.NoInlining keeps the JIT from resolving MSBuild/Roslyn assemblies before
-    // MSBuildLocator registration in non-test hosts (the CLI); in tests registration happens in a
+    // MSBuildLocator registration in non-test hosts; in tests registration happens in a
     // [ModuleInitializer], so ordering is already safe there.
     [MethodImpl(MethodImplOptions.NoInlining)]
     public static async Task<LoadedSolution> LoadAsync(
@@ -118,20 +100,17 @@ internal static class WorkspaceLoader
 
     /// <summary>
     ///     Loads only <paramref name="projectFiles" /> and their transitive project references out of
-    ///     <paramref name="solutionPath" />, through a temporary solution filter over the solution: the same load a
-    ///     whole solution takes, seeded with fewer projects, so each project it loads compiles exactly as it does
-    ///     in a whole load. Returns null when the subset cannot be expressed as a filter: a project the solution
-    ///     does not declare, a solution format the filter cannot name, or a filter the load refuses.
+    ///     <paramref name="solutionPath" />, a solution or a filter over one, through a temporary solution filter:
+    ///     the same load a whole solution takes, seeded with fewer projects, so each project it loads compiles
+    ///     exactly as it does in a whole load. Returns null when the subset cannot be expressed as a filter: a
+    ///     project the solution does not declare, a solution format the filter cannot name, or a filter the load
+    ///     refuses.
     /// </summary>
     /// <remarks>
     ///     The verdict on the result is measured against the temporary filter, so its unchecked projects are
     ///     everything outside the closure. Only the loaded projects' failures and restore failures speak for
     ///     the solution; the caller answers for the rest.
     /// </remarks>
-    /// <param name="solutionPath">The solution, or a filter over one, whose projects to load a subset of.</param>
-    /// <param name="projectFiles">The project files to load, each with its transitive references.</param>
-    /// <param name="diagnosticLog">Optional sink for the workspace's own failure messages.</param>
-    /// <param name="ct">Cancellation token.</param>
     internal static async Task<LoadedSolution?> LoadClosureAsync(
         string solutionPath, IReadOnlyCollection<string> projectFiles, Action<string>? diagnosticLog = null,
         CancellationToken ct = default)
@@ -207,10 +186,9 @@ internal static class WorkspaceLoader
     }
 
     /// <summary>
-    ///     The refusal when a solution filter cannot be read. Pure, and internal so the text pins without a
-    ///     filesystem — the same split <see cref="SolutionDiscovery.AmbiguousMessage" /> makes.
+    ///     The refusal when the solution filter at <paramref name="filterPath" /> cannot be read. Pure, and
+    ///     internal so the text pins without a filesystem.
     /// </summary>
-    /// <param name="filterPath">The <c>.slnf</c> that could not be read.</param>
     internal static string UnreadableFilterMessage(string filterPath)
     {
         return $"Could not read the solution filter '{filterPath}'.\n"
@@ -219,11 +197,10 @@ internal static class WorkspaceLoader
     }
 
     // Roslyn's SolutionFilterReader signals every filter fault by throwing a bare Exception out of
-    // OpenSolutionAsync — measured as the same "Failed to load solution filter" for malformed JSON, a
-    // missing 'solution' key, a solution path that does not resolve, and a project entry naming a
-    // non-member. Unmapped it reaches the user as a stack trace. The gate is the extension, never the
-    // message: matching wording is the mistake ProjectLoadFailures exists to undo. The original is kept as
-    // the inner exception, so a fault that is not the filter's is still recoverable from a log.
+    // OpenSolutionAsync, measured as the same "Failed to load solution filter" for malformed JSON, a missing
+    // 'solution' key, a solution path that does not resolve and a project entry naming a non-member; unmapped
+    // it reaches the user as a stack trace. The gate is the extension, never the message. The original is kept
+    // as the inner exception, so a fault that is not the filter's is still recoverable from a log.
     private static async Task<Solution> OpenAsync(
         MSBuildWorkspace workspace, string solutionPath, CancellationToken ct)
     {

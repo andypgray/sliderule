@@ -153,14 +153,11 @@ internal sealed class ArchTools(
         string? grain = null,
         CancellationToken cancellationToken = default)
     {
-        // Exit code and error writer deliberately discarded — everything they would carry is in the document.
-        // Violations ride in rules[]; which projects failed to load or to restore rides in failedProjects and
-        // restoreFailedProjects, the NuGet audit advisories ride in packageAudit, and the load's
-        // own diagnostics ride in workspaceDiagnostics along with the MSBuild-selection note, which
-        // WorkspaceDiagnostics puts in the list both surfaces read rather than appending at write time
-        // (TextWriter.Null would otherwise swallow that one line, and "which MSBuild opened it" is the next
-        // question after any load failure). The gate verdict the exit code would have expressed rides in
-        // modelIncomplete, and an unmatched --rules filter surfaces as an error result rather than exit 2.
+        // Exit code and error writer deliberately discarded: everything they would carry is in the document. That
+        // holds for the MSBuild-selection note only because WorkspaceDiagnostics puts it in the list both surfaces
+        // read rather than appending it at write time, which TextWriter.Null would swallow. The gate verdict the
+        // exit code would have expressed rides in modelIncomplete, and an unmatched --rules filter surfaces as an
+        // error result rather than exit 2.
         return await CaptureAsync(output => new CheckRunner(output, TextWriter.Null, source, environment, fitter)
             .RunAsync(
                 binding.CheckRequest(diffBase, rules, DocumentGrains.Parse(grain)),
@@ -278,9 +275,8 @@ internal sealed class ArchTools(
                 cancellationToken));
     }
 
-    // Every tool's shell: give the run a stdout to write into, discard the exit code it returns, and answer
-    // with what it wrote. Only BCL types appear here, so a runner is reached solely from inside a tool
-    // method's own body, which keeps the MSBuildLocator JIT quarantine intact.
+    // Only BCL types appear here, so a runner is reached solely from inside a tool method's own body, which keeps
+    // the MSBuildLocator JIT quarantine intact.
     private static async Task<string> CaptureAsync(Func<TextWriter, Task<int>> run)
     {
         var output = new StringWriter();

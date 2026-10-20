@@ -542,9 +542,10 @@ public sealed class OneProjectExtractionTests
     }
 
     [Fact]
-    public void ExtractOneProject_NoSiblingMap_ProducesTheFragmentTheOrdinaryExtractionDoes()
+    public void ExtractOneProject_NoSiblingMapOverAProjectThatRegistersAndReferencesNothing_ProducesTheOrdinaryFragment()
     {
-        // Arrange
+        // Arrange — with no sibling map the view records no registrations and no project references, so the two
+        // fragments agree only over an input with neither. The test below pins the registration difference.
         CompilationInput input = CompilationFactory.Compile("TestProject", FragmentQuery.EveryPassSource);
 
         // Act

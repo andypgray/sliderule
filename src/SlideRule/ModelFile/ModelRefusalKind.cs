@@ -1,19 +1,14 @@
 namespace SlideRule.ModelFile;
 
 /// <summary>Why a model file was refused.</summary>
-/// <remarks>
-///     The version arms are parted from <see cref="Malformed" /> because they mean something a caller can
-///     act on: a file this reader is too old for is a reason to update the tool, and one it is too new
-///     for is a reason to rewrite the file. A malformed file is neither.
-/// </remarks>
 internal enum ModelRefusalKind
 {
     /// <summary>The text is not a model file: bad JSON, a missing or unexpected key, a bad value.</summary>
     Malformed,
 
-    /// <summary>The file declares a schema version above the one this reader understands.</summary>
+    /// <summary>The file declares a schema version above this reader's: a reason to update the tool.</summary>
     Newer,
 
-    /// <summary>The file declares a schema version below the one this reader understands.</summary>
+    /// <summary>The file declares a schema version below this reader's: a reason to rewrite the file.</summary>
     Older
 }

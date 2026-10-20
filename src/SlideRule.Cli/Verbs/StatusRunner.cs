@@ -8,23 +8,16 @@ using SlideRule.Roslyn.Diagnostics;
 namespace SlideRule.Cli.Verbs;
 
 /// <summary>
-///     The <c>status</c> pipeline: build a <see cref="CodebaseSource" /> (cache hit or cold workspace) → run
-///     the shared <see cref="CheckPipeline" /> (baselines, extraction, ratcheted check) → render the burndown
-///     (human or JSON). Unlike <c>check</c>, status <em>reports</em> — it exits 0 even with red rules; only an
-///     error (a tampered baseline, an unresolvable spec) exits 2 via the top-level handler.
+///     The <c>status</c> verb: the burndown over the shared <see cref="CheckPipeline" />, human or JSON. Unlike
+///     <c>check</c>, status <em>reports</em> — it exits 0 even with red rules; only an error (a tampered baseline,
+///     an unresolvable spec) exits 2 via the top-level handler.
 /// </summary>
 /// <remarks>
-///     <para>
-///         <b>What it refuses.</b> The one thing status gates on is the model not being the codebase: a
-///         project that failed to load declares no types, so every burndown count reads low and a ratchet
-///         read against it looks like progress that never happened. That fails closed on <c>check</c>'s
-///         terms — the burndown still renders, then exit 2, opt-out
-///         <see cref="StatusRequest.AllowWorkspaceDiagnostics" /> (<see cref="IncompleteModelGate" />).
-///     </para>
-///     <para>
-///         Output/error writers are injected for the in-process e2e tests, and the
-///         <see cref="IEnvironment" /> seam supplies the cache-root override.
-///     </para>
+///     <b>What it refuses.</b> The one thing status gates on is the model not being the codebase: a
+///     project that failed to load declares no types, so every burndown count reads low and a ratchet
+///     read against it looks like progress that never happened. That fails closed on <c>check</c>'s
+///     terms — the burndown still renders, then exit 2, opt-out
+///     <see cref="StatusRequest.AllowWorkspaceDiagnostics" /> (<see cref="IncompleteModelGate" />).
 /// </remarks>
 internal sealed class StatusRunner(
     TextWriter output,
@@ -42,8 +35,8 @@ internal sealed class StatusRunner(
             SolutionSource, Environment, request.Solution, request.Spec, request.WorkingDirectory, request.NoCache, ct);
 
         // status carries no --rules flag: a burndown of part of the spec would read as progress on all of
-        // it. The empty selection — every rule — is spelled out so both callers of the shared pipeline
-        // choose their rules the same way.
+        // it. The empty selection — every rule — is spelled out so every caller of the shared pipeline
+        // chooses its rules the same way.
         IReadOnlyList<ArchRule> rules = CheckPipeline.SelectRules(source.Model, []);
 
         CheckReport report = await CheckPipeline.ExecuteAsync(source, null, null, rules, ct);

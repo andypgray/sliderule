@@ -13,10 +13,8 @@ internal sealed class ModelReadResult
         Refusal = refusal;
     }
 
-    /// <summary>The document the text carried, or null when the text was refused.</summary>
     internal ModelDocument? Document { get; }
 
-    /// <summary>Why the text was refused, or null when it read.</summary>
     internal ModelRefusal? Refusal { get; }
 
     internal static ModelReadResult Read(ModelDocument document)

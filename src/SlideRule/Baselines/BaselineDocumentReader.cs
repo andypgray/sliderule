@@ -37,7 +37,7 @@ internal static class BaselineDocumentReader
     /// <remarks>
     ///     Every method returns null once a refusal is recorded and every caller returns straight back
     ///     up, which is what makes "the first refusal wins" true of the whole read rather than of one
-    ///     method. Nothing here throws for content.
+    ///     method.
     /// </remarks>
     private sealed class Walk
     {
@@ -121,8 +121,6 @@ internal static class BaselineDocumentReader
             return false;
         }
 
-        // The whole-file digest is a legacy-version field: a current file carries none, its entries
-        // sealing themselves one at a time.
         private string? ReadDigest(StrictJsonValue value)
         {
             if (value.ValueKind != StrictJsonKind.String)

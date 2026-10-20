@@ -30,15 +30,9 @@ internal static class VsWhereLocator
         "vswhere.exe");
 
     /// <summary>
-    ///     Runs vswhere and returns the instances it lists, or why it listed none.
+    ///     Runs vswhere and returns the instances it lists with a null <c>WhyNone</c>, or no instances and a
+    ///     one-line reason.
     /// </summary>
-    /// <returns>
-    ///     The discovered instances with a null <c>WhyNone</c>, or no instances and a one-line reason:
-    ///     vswhere absent, timed out, failed to start or exited nonzero, or its output held no usable
-    ///     instance. Callers treat no instances as a signal to fall back to
-    ///     <see cref="Microsoft.Build.Locator.MSBuildLocator.RegisterDefaults" />, and carry the reason
-    ///     into the selection they report.
-    /// </returns>
     internal static (IReadOnlyList<VsInstance> Instances, string? WhyNone) Query()
     {
         if (!OperatingSystem.IsWindows()) return ([], "this host is not Windows");
@@ -63,17 +57,9 @@ internal static class VsWhereLocator
     }
 
     /// <summary>
-    ///     Reads one vswhere run's exit code and output into the instances it lists, or why it listed none.
+    ///     Reads one vswhere run's exit code and output (the JSON array <c>vswhere -format json</c> prints) into the
+    ///     instances it lists, or why it listed none. A nonzero exit is a failure whatever it printed.
     /// </summary>
-    /// <param name="exitCode">vswhere's exit code; anything but zero is a failure whatever it printed.</param>
-    /// <param name="standardOutput">The JSON array emitted by <c>vswhere -format json</c>.</param>
-    /// <param name="standardError">vswhere's error output, whose first line explains a nonzero exit.</param>
-    /// <returns>
-    ///     One record per array element with a valid <c>installationPath</c> and parseable
-    ///     <c>installationVersion</c> and a null <c>WhyNone</c>; or no records and a one-line reason when
-    ///     the run failed, printed nothing, printed something other than a JSON array, or listed no
-    ///     usable entry.
-    /// </returns>
     internal static (IReadOnlyList<VsInstance> Instances, string? WhyNone) Interpret(
         int exitCode, string standardOutput, string standardError)
     {
@@ -147,14 +133,11 @@ internal static class VsWhereLocator
         return line.Length <= MaxDetailLength ? line : line[..MaxDetailLength] + "…";
     }
 
-    // Synchronous on purpose, and the reason ChildProcess carries a synchronous arm at all. This probe
-    // runs inside MsBuildBootstrap, which the CLI and the xUnit adapter both call from a NoInlining JIT
-    // quarantine: no MSBuild type may be resolvable before MSBuildLocator has registered, so that chain
-    // cannot become asynchronous without either breaking the quarantine or blocking on a Task somewhere
-    // in it. ChildProcess.Run blocks on the process handle and never on a Task, so this path stays
-    // within the no-blocking-waits rule while keeping the quarantine intact — and it still gets the
-    // closed stdin that keeps a child from inheriting (and wedging on) the MCP server's live JSON-RPC
-    // pipe, plus a bounded wait and a kill-tree on expiry.
+    // Synchronous on purpose. This probe runs inside MsBuildBootstrap, which is called from a NoInlining JIT
+    // quarantine: no MSBuild type may be resolvable before MSBuildLocator has registered, so that chain cannot
+    // become asynchronous without either breaking the quarantine or blocking on a Task somewhere in it.
+    // ChildProcess.Run blocks on the process handle and never on a Task, so this path stays within the
+    // no-blocking-waits rule.
     private static ChildProcess.ProcessResult RunVsWhere()
     {
         ProcessStartInfo psi = new(VsWherePath, "-all -prerelease -format json -products *")

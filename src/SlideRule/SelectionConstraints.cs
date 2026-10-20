@@ -1113,11 +1113,9 @@ public static class SelectionConstraints
         return OperandList.ZeroOrMore(members, member => member, nameof(members));
     }
 
-    // The static-form MustNotUse sugar: each lambda resolves through MemberExpressionResolver stamped with
-    // the subject's owner (the Wrap precedent), minting the identical Member leaf as arch.Member(() => ...).
-    // Generic over the concrete lambda type so the two delegate-shape overloads (Func<object?> / Action)
-    // share one body with no array-covariance conversion. Null/empty params edges mirror the
-    // Members/WrappedTypes helpers exactly.
+    // The static-form MustNotUse sugar: each lambda resolves against the subject's owner into the same Member
+    // leaf arch.Member(() => ...) mints. Generic over the lambda type so the Func<object?> and Action overloads
+    // share one body with no array-covariance conversion.
     private static IReadOnlyList<Member> ResolvedMembers<TLambda>(Selection subject, TLambda first, TLambda[] more)
         where TLambda : LambdaExpression
     {
@@ -1126,8 +1124,6 @@ public static class SelectionConstraints
         return OperandList.OneOrMore(first, more, lambda => MemberExpressionResolver.Resolve(owner, lambda));
     }
 
-    // A bare type target wraps as a single-type selection stamped with the subject's owner, so the
-    // sugar overload is exactly the selection overload with arch.Type(...) written for the caller.
     private static Selection Wrap(Selection subject, Type type)
     {
         return subject.Owner.Type(type);

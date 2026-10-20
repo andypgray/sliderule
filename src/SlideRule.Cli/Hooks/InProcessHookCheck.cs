@@ -6,7 +6,8 @@ namespace SlideRule.Cli.Hooks;
 
 /// <summary>
 ///     The check in this process: the same pipeline, runner and error handler <c>sliderule check</c> goes
-///     through, writing into buffers instead of the console.
+///     through, over the solution source and environment the CLI was given, writing into buffers instead of the
+///     console.
 /// </summary>
 internal sealed class InProcessHookCheck(ISolutionSource hostSource, IEnvironment environment) : IHookCheck
 {

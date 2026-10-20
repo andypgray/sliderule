@@ -6,17 +6,11 @@ namespace SlideRule.Internal;
 ///     solution. It turns a declaring file's path into the segments a <see cref="PathGlob" /> matches.
 /// </summary>
 /// <remarks>
-///     <para>
-///         Text arithmetic and nothing else, on <c>BaselinePathResolver</c>'s grounds: a reader running inside the
-///         compiler has no current directory worth consulting, and the <c>System.IO.Path</c> members either read
-///         one or, on .NET Framework, throw on a character they dislike. Both <c>/</c> and <c>\</c> separate on
-///         every operating system, an empty or <c>.</c> segment is dropped, and a <c>..</c> folds into the segment
-///         before it, so a path the build wrote with mixed separators and one an author would write compare alike.
-///     </para>
-///     <para>
-///         The root is compared segment by segment ignoring case, as the globs are matched, and a file outside it,
-///         or a path with no segments at all, is under no glob: <see cref="Relative" /> answers null.
-///     </para>
+///     Text arithmetic and nothing else, on <c>BaselinePathResolver</c>'s grounds: a reader running inside the
+///     compiler has no current directory worth consulting, and the <c>System.IO.Path</c> members either read one
+///     or, on .NET Framework, throw on a character they dislike. Both <c>/</c> and <c>\</c> separate on every
+///     operating system, so a path the build wrote with mixed separators and one an author would write compare
+///     alike. The root is compared ignoring case, as the globs are matched.
 /// </remarks>
 internal sealed class SolutionRoot
 {
