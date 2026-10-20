@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The MCP server, started on a `.slnf` solution filter, now reloads the workspace when the solution the
+  filter names changes. Before, adding or removing a project there went unseen until something else
+  forced a reload, so `uncheckedProjects` and `unsupportedProjects` could describe the solution as it was.
+
 ## [0.2.0] - 2026-10-18
 
 ### Added

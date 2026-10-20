@@ -28,6 +28,20 @@ internal static class SolutionPaths
     }
 
     /// <summary>
+    ///     A filter named <c>Whole.slnf</c> under <paramref name="directory" />, naming
+    ///     <paramref name="solutionPath" /> by absolute path, so it can sit outside a leased fixture copy. Its
+    ///     <c>projects</c> array is empty, which is Roslyn's spelling of "no filtering at all": the run loads the
+    ///     whole solution yet still goes through a filter.
+    /// </summary>
+    internal static string WriteWholeSolutionFilter(TempDirectory directory, string solutionPath)
+    {
+        string filter = directory.PathOf("Whole.slnf");
+        string declaredPath = solutionPath.Replace('\\', '/');
+        File.WriteAllText(filter, $$"""{ "solution": { "path": "{{declaredPath}}", "projects": [] } }""");
+        return filter;
+    }
+
+    /// <summary>
     ///     Asserts that neither <paramref name="directory" /> nor any of its ancestors holds a solution file.
     /// </summary>
     /// <remarks>

@@ -479,7 +479,7 @@ public sealed class FilteredSolutionE2ETests
         // what keeps the row's verdict independent of anything that reached the bed before it.
         using var workspace = new TempFixtureWorkspace();
         using TempDirectory filterDirectory = TestTempRoot.Fresh("filter-write-anchor");
-        string filter = WriteWholeSolutionFilter(filterDirectory, workspace.SolutionPath);
+        string filter = SolutionPaths.WriteWholeSolutionFilter(filterDirectory, workspace.SolutionPath);
         string renderedTarget = workspace.PathOf("AGENTS.md");
         DeleteRenderTargets(workspace);
 
@@ -558,19 +558,5 @@ public sealed class FilteredSolutionE2ETests
     {
         var file = new FileInfo(path);
         return $"{path}|{file.Length}|{file.LastWriteTimeUtc.Ticks}";
-    }
-
-    /// <summary>
-    ///     A filter naming its solution by absolute path, in a directory of its own outside the copy — the
-    ///     arrangement that lets a write-anchor row use a leased copy at all, since every other filter here is
-    ///     pinned in place by a relative path. Its <c>projects</c> array is empty, which is Roslyn's spelling
-    ///     of "no filtering at all", so the run gets past the refusal the rows above pin.
-    /// </summary>
-    private static string WriteWholeSolutionFilter(TempDirectory directory, string solutionPath)
-    {
-        string filter = directory.PathOf("Whole.slnf");
-        string declaredPath = solutionPath.Replace('\\', '/');
-        File.WriteAllText(filter, $$"""{ "solution": { "path": "{{declaredPath}}", "projects": [] } }""");
-        return filter;
     }
 }

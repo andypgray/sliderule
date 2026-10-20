@@ -101,9 +101,7 @@ internal static class ProjectCone
     /// </summary>
     /// <remarks>
     ///     The order is the order stamps are recorded in, so a persisted stamp list keeps its shape. This is the
-    ///     per-project course of <see cref="SolutionStructuralPaths" />. <see cref="WorkspaceSession" /> stamps this
-    ///     course as it walks instead of calling <see cref="SolutionStructuralPaths" />, so a leg added there must be
-    ///     added to the session's walk as well.
+    ///     per-project course of <see cref="SolutionStructuralPaths" />.
     /// </remarks>
     public static IEnumerable<string> StructuralPaths(
         string projectDirectory, string? evaluatedOutputPath, string? intermediateAssemblyPath)

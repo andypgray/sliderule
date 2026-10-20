@@ -17,10 +17,10 @@ namespace SlideRule.Roslyn;
 /// <remarks>
 ///     <para>
 ///         Nothing is loaded until the first <see cref="GetCurrentAsync" />, which pays the whole solution load; later
-///         calls pay only the reconcile. A structural change (the solution or filter file, a project file, a
-///         restore assets file, or any of the <see cref="FileStamping.StructuralProbeFileNames" /> at or above a
-///         project) or a source file added or deleted reloads the solution wholesale. The solution a filter
-///         references is not stamped, so an edit there waits for another reload. An edit to a file already in
+///         calls pay only the reconcile. A structural change (the solution or filter file, the solution a filter
+///         references, a project file, a restore assets file, or any of the
+///         <see cref="FileStamping.StructuralProbeFileNames" /> at or above a project) or a source file added or
+///         deleted reloads the solution wholesale. An edit to a file already in
 ///         the solution is folded into a fresh snapshot, and an unchanged tree hands back the very snapshot
 ///         instance the previous call returned.
 ///     </para>
@@ -372,10 +372,10 @@ internal sealed class WorkspaceSession : IAsyncDisposable
     ///     content-checks each once and promotes it.
     /// </summary>
     /// <remarks>
-    ///     The structural chain is recorded per <see cref="Project" /> rather than per project directory,
-    ///     because where the restore assets file lands follows the project's own evaluated output paths and
-    ///     not its directory. Recording is idempotent, so a multi-targeted project's several
-    ///     <see cref="Project" />s contributing the same paths costs nothing.
+    ///     The structural set is the one the persisted caches stamp, from
+    ///     <see cref="Caching.ProjectCone.SolutionStructuralPaths" />, taken per <see cref="Project" /> rather than per
+    ///     project directory, because where the restore assets file lands follows the project's own evaluated
+    ///     output paths and not its directory.
     /// </remarks>
     private void RecordAllFingerprints(string solutionPath, Solution solution)
     {
@@ -394,22 +394,20 @@ internal sealed class WorkspaceSession : IAsyncDisposable
             ids.Add(document.Id);
         }
 
-        RecordStructural(solutionPath);
-
+        List<(string CsprojPath, string ProjectDirectory, string? EvaluatedOutputPath, string? IntermediateAssemblyPath)>
+            projects = [];
         foreach (Project project in solution.Projects)
         {
             if (project.FilePath is null) continue;
 
             string projectFile = Path.GetFullPath(project.FilePath);
-            RecordStructural(projectFile);
-
             string projectDirectory = Path.GetDirectoryName(projectFile)!;
             projectDirectories.Add(projectDirectory);
-
-            foreach (string path in ProjectCone.StructuralPaths(
-                         projectDirectory, project.OutputFilePath, project.CompilationOutputInfo.AssemblyPath))
-                RecordStructural(path);
+            projects.Add((projectFile, projectDirectory, project.OutputFilePath, project.CompilationOutputInfo.AssemblyPath));
         }
+
+        foreach (string path in ProjectCone.SolutionStructuralPaths(solutionPath, projects))
+            RecordStructural(path);
 
         foreach (string projectDirectory in projectDirectories)
         foreach (string coneFile in ProjectCone.Enumerate(projectDirectory))

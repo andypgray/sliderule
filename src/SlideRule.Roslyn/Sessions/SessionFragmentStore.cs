@@ -141,10 +141,10 @@ internal sealed class SessionFragmentStore : IDisposable
     /// <remarks>
     ///     <paramref name="declaredMembers" /> rides down to the extraction rather than being applied to the
     ///     stored set, and a reused fragment therefore keeps the membership it was extracted with. That is
-    ///     safe because membership can only change when the solution file does, and the solution file is a
-    ///     structural input of the paired session's reconcile sweep — so the change arrives as a new
-    ///     generation, which flushes this store before any of it is read again. Under a solution filter it is
-    ///     not: the solution the filter references is no input of that sweep.
+    ///     safe because membership can only change when the solution file does, and the solution file (under a
+    ///     filter, the solution it references as well) is a structural input of the paired session's reconcile
+    ///     sweep — so the change arrives as a new generation, which flushes this store before any of it is read
+    ///     again.
     /// </remarks>
     internal async Task<SessionFragmentSet> GetFragmentsAsync(
         WorkspaceSnapshot snapshot, IReadOnlySet<string>? declaredMembers, CancellationToken ct)

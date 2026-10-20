@@ -14,10 +14,9 @@ namespace SlideRule.Roslyn;
 ///     disposed. Every member but the solution and <see cref="ProjectEditVersions" /> describes the load, not
 ///     any one file: a full (re)load replaces it and bumps <see cref="Generation" />, and the document edits a
 ///     reconcile folds in leave it alone. Such an edit adds or removes no project, and the files that decide
-///     restore and membership (the solution or filter file, each <c>project.assets.json</c>, absent ones
-///     included) are structural inputs of the reconcile sweep, so a change to one forces a full reload. Under a
-///     filter, the solution it references is not one: an edit there that changes membership stays unseen until
-///     something else reloads. The fail-closed gate keys on <see cref="FailedProjects" /> and
+///     restore and membership (the solution or filter file, the solution a filter references, each
+///     <c>project.assets.json</c>, absent ones included) are structural inputs of the reconcile sweep, so a
+///     change to one forces a full reload. The fail-closed gate keys on <see cref="FailedProjects" /> and
 ///     <see cref="RestoreFailedProjects" />; <see cref="Diagnostics" />, the workspace's failure messages, only
 ///     renders.
 /// </remarks>

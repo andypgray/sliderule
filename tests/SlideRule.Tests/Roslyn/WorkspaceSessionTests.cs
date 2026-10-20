@@ -223,6 +223,30 @@ public sealed class WorkspaceSessionTests(SharedWorkspaceSession shared) : IClas
     }
 
     [Fact]
+    public async Task GetCurrentAsync_SolutionAFilterReferencesTouched_TriggersReload()
+    {
+        // Under a filter, the solution the filter names decides membership while the filter's own bytes stay
+        // put, so the sweep has to stamp it too. Its own session: a filter path on the shared one would force
+        // a load there and another on the next shared case.
+
+        // Arrange
+        using var fixture = new TempFixtureWorkspace();
+        using TempDirectory filterDirectory = TestTempRoot.Fresh("session-filter");
+        string filter = SolutionPaths.WriteWholeSolutionFilter(filterDirectory, fixture.SolutionPath);
+        await using var session = new WorkspaceSession();
+        WorkspaceSnapshot before = await session.GetCurrentAsync(filter, Ct);
+        long reloadsBefore = session.FullReloadCount;
+
+        // Act — a structural touch on the referenced solution, the filter and every project left alone.
+        File.SetLastWriteTimeUtc(fixture.SolutionPath, DateTime.UtcNow.AddSeconds(2));
+        WorkspaceSnapshot after = await session.GetCurrentAsync(filter, Ct);
+
+        // Assert
+        (session.FullReloadCount - reloadsBefore).ShouldBe(1);
+        after.Generation.ShouldBeGreaterThan(before.Generation);
+    }
+
+    [Fact]
     public async Task GetCurrentAsync_TenConcurrentCallers_AllSucceedWithSingleLoad()
     {
         // Arrange — fire the very first (loading) call ten times at once.
