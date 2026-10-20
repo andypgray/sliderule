@@ -170,8 +170,8 @@ internal static class GraphFormatter
     // Past two frameworks the parenthesis states the rule rather than naming one framework: each shared type
     // follows the first of the listed frameworks that declares it, and where they share different sets of
     // types that is not one framework for all of them. With two, only the first can win, so naming it is exact.
-    // Empty only where nothing evaluated the project, which is where the survey has nothing to say rather
-    // than something unremarkable to leave out.
+    // Empty only where nothing evaluated a project compiled once, which is where the survey has nothing to say
+    // rather than something unremarkable to leave out.
     private static string FrameworksClause(ProjectSummary project)
     {
         if (project.TargetFrameworks.Count == 0) return "";

@@ -557,7 +557,7 @@ matching identifiers ignoring case; `MustSetProperty(name, value)` asks that a d
 solution set an MSBuild property, per framework, an SDK default not counting; `MustNotBePackable()`
 makes an internal project's opt-out checkable, since the SDK defaults `IsPackable` on. Every project
 fact is evaluated rather than parsed, so a violation points at the declaration that won, often a
-`Directory.Build.props` above the project, and a fact nothing evaluated passes. The flagship:
+`Directory.Build.props` above the project, and an unknown fact passes. The flagship:
 `arch.Projects.Matching("MyApp.*").Except(arch.Projects.Named("MyApp.Cli")).MustNotBePackable()` —
 *"Projects matching `MyApp.*`, except project `MyApp.Cli`, must not be packable."*
 

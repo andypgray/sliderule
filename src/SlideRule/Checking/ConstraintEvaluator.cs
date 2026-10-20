@@ -1528,8 +1528,8 @@ internal sealed class ConstraintEvaluator
 
     // MustOnlyTarget (GRAMMAR §4.10): one violation per target framework the rule does not permit, each sited at
     // the declaration of the project's framework list, so a migrated rule keys every framework apart and the next
-    // one a project adds is red. A project with no framework list, which is what nothing evaluated looks like,
-    // declares nothing to judge and passes.
+    // one a project adds is red. A project with no framework list, which is what nothing evaluated leaves for a
+    // project compiled once, declares nothing to judge and passes.
     private static IReadOnlyList<Violation> ForbiddenFrameworks(
         IReadOnlyList<ProjectNode> subjects, IReadOnlyList<string> frameworks)
     {
@@ -1545,8 +1545,8 @@ internal sealed class ConstraintEvaluator
 
     // MustTarget (GRAMMAR §4.10): one violation per project whose framework list lacks the required moniker,
     // sited where that list is declared and keyed by the moniker, as MustOnlyTarget's are. The empty list is
-    // tested for rather than walked: it is what nothing evaluated looks like, and a floor verb would otherwise
-    // red every unevaluated project, where the ceiling's walk passes it for free by finding nothing to judge.
+    // tested for rather than walked: it is what nothing evaluated leaves for a project compiled once, and a floor
+    // verb would otherwise red every such project, where the ceiling's walk passes it by finding nothing to judge.
     private static IReadOnlyList<Violation> MissingFramework(IReadOnlyList<ProjectNode> subjects, string framework)
     {
         var violations = new List<Violation>();

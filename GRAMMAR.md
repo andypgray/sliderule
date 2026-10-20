@@ -1295,9 +1295,11 @@ properties it sets.
 - **Unknown passes.** A load path that cannot carry a fact records absence, never a default,
   and every project verb passes on absence: a rule that reds on a project nothing evaluated
   is reporting the load's own gaps as architecture violations, which is `modelIncomplete`'s
-  channel, not a verdict's. A verb that bounds a list passes an unevaluated project for free,
-  finding nothing in the empty list to judge. `MustTarget` asks for a framework to be present,
-  so it tests for the empty list instead of walking it, and passes the project the same way.
+  channel, not a verdict's. A verb that bounds a list passes an empty list for free, finding
+  nothing in it to judge, and an empty framework list is what nothing evaluated leaves for a
+  project compiled once; one compiled once per framework keeps the frameworks the load told
+  apart, and those are judged. `MustTarget` asks for a framework to be present, so it tests for
+  the empty list instead of walking it, and passes the project the same way.
 - **A package pattern that matches nothing is silence.** It draws no warning, unlike a type
   operand that resolves to nothing (§4.1): no reference to a permitted or a banned package is
   an ordinary state, and a ban on retired packages is in it from the day they retire.
@@ -1790,8 +1792,9 @@ with an `init`-only setter has a setter. The
 contract grows additively, exactly like `ITypeInfo`.
 
 Project-predicate input contract (`IProjectInfo`, the input to a project `.Where`/`.Must`,
-§4.10): `Name`, `TargetFrameworks` (ordinal-ordered, normalized to the short moniker; empty
-where nothing evaluated the project), `PackageReferences` (every declared package, private ones
+§4.10): `Name`, `TargetFrameworks` (ordinal-ordered, normalized to the short moniker; where
+nothing evaluated the project, only the frameworks it was compiled for one at a time, so empty
+for a project compiled once), `PackageReferences` (every declared package, private ones
 included, ordinal by name, each an `IPackageReferenceInfo` of `Name`, `FilePath` and `Line` (its
 declaration site, which may be a props file above the project), `IsPrivate`, and `Frameworks`
 (the target frameworks whose evaluation declared it, ordinal; empty where the evaluation could

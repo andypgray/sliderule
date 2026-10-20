@@ -27,7 +27,7 @@ public static class ProjectSelectionConstraints
     ///     the list is one violation, and under <c>Migrate</c> each is grandfathered on its own, so a
     ///     framework the project adds after the baseline was captured fails the check. Monikers are
     ///     compared case-sensitively against normalized short forms, so a classic project's <c>v4.8</c>
-    ///     reads <c>net48</c>. A project whose frameworks nothing evaluated passes. At least one moniker is
+    ///     reads <c>net48</c>. A project with no known framework passes. At least one moniker is
     ///     required, and a blank one is reported when the spec is loaded.
     /// </summary>
     public static Constraint MustOnlyTarget(
@@ -47,8 +47,8 @@ public static class ProjectSelectionConstraints
     ///     makes, where <c>MustOnlyTarget</c> states the ceiling. A project that does not target it is one
     ///     violation, sited at the declaration of the project's framework list, and under <c>Migrate</c> each
     ///     project is grandfathered on its own. The moniker is compared case-sensitively against normalized
-    ///     short forms, so a classic project's <c>v4.8</c> reads <c>net48</c>. A project whose frameworks
-    ///     nothing evaluated passes. One framework per rule: to require two, write two rules. A blank moniker
+    ///     short forms, so a classic project's <c>v4.8</c> reads <c>net48</c>. A project with no known
+    ///     framework passes. One framework per rule: to require two, write two rules. A blank moniker
     ///     is reported when the spec is loaded.
     /// </summary>
     public static Constraint MustTarget(

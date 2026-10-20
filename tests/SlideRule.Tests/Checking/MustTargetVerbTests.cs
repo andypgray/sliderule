@@ -11,8 +11,9 @@ namespace SlideRule.Tests.Checking;
 /// </summary>
 /// <remarks>
 ///     The absent-fact pass is the decision pinned here that <c>MustOnlyTarget</c> gets for free. A project
-///     nothing evaluated has an empty framework list, and the ceiling's walk finds nothing in it to judge,
-///     while a floor read naively would find its framework missing from it and red every such project.
+///     nothing evaluated that compiled once has an empty framework list, and the ceiling's walk finds
+///     nothing in it to judge, while a floor read naively would find its framework missing from it and red
+///     every such project.
 ///     Unknown passes, so the floor tests for the empty list rather than walking it.
 /// </remarks>
 public sealed class MustTargetVerbTests
