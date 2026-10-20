@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The MCP server, started on a `.slnf` solution filter, now reloads the workspace when the solution the
   filter names changes. Before, adding or removing a project there went unseen until something else
   forced a reload, so `uncheckedProjects` and `unsupportedProjects` could describe the solution as it was.
+- A baseline file holding two lines for one violation, as a merge that kept both sides' line does, now
+  grandfathers the smaller of their site counts and keeps a reason either line carries, and `baseline`
+  writes the pair back as one line. Before, both lines were written back, and which count applied depended
+  on which line came first.
 
 ## [0.2.0] - 2026-10-18
 

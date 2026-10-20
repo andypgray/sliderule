@@ -140,6 +140,36 @@ internal sealed class BaselineEntry : IEquatable<BaselineEntry>
     }
 
     /// <summary>
+    ///     Returns one entry per identity in <paramref name="entries" />, in the order each identity first
+    ///     appears. Where several share an identity, the one returned carries the smallest
+    ///     <see cref="SiteCount" /> any of them records (none only when none records one) and the first
+    ///     <see cref="Because" /> any of them carries. The smallest count is the strictest allowance, so a
+    ///     merge that kept both sides' line for one entry never widens what the baseline grandfathers.
+    /// </summary>
+    internal static IReadOnlyList<BaselineEntry> Collapsed(IEnumerable<BaselineEntry> entries)
+    {
+        var order = new List<BaselineEntry>();
+        var merged = new Dictionary<BaselineEntry, BaselineEntry>();
+        foreach (BaselineEntry entry in entries)
+        {
+            if (!merged.TryGetValue(entry, out BaselineEntry? kept))
+            {
+                order.Add(entry);
+                merged[entry] = entry;
+                continue;
+            }
+
+            int? siteCount = kept.SiteCount is { } keptCount && entry.SiteCount is { } count
+                ? Math.Min(keptCount, count)
+                : kept.SiteCount ?? entry.SiteCount;
+            string? because = kept.Because ?? entry.Because;
+            merged[entry] = new BaselineEntry(kept.Source, kept.Target, kept.Subject, because, siteCount);
+        }
+
+        return order.Select(identity => merged[identity]).ToList();
+    }
+
+    /// <summary>
     ///     Returns a copy of this entry carrying <paramref name="because" /> as the reason it is
     ///     grandfathered — the same identity, and the same <see cref="SiteCount" />, so attributing an
     ///     entry never disturbs what it grandfathers.

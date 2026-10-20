@@ -95,6 +95,36 @@ public sealed class BaselineMergeTests : IDisposable
             "resolved.json", KeepWhatBothSidesKept(merged.Text), Entry("A"), Entry("B"), Entry("C"));
     }
 
+    [Fact]
+    public void MergeFile_BothBranchesEditOneEntryAndBothLinesAreKept_TheSmallerCountHoldsAndWritesBackAsOneLine()
+    {
+        // One branch pays A down from five sites to three; the other attributes A at five. Both rewrote the
+        // same line, so it conflicts, and keeping both whole lines is a resolution the reader accepts. The
+        // stricter allowance is the one that holds, and the next write folds the pair into one line that
+        // also keeps the reason.
+        BaselineEntry a = Entry("A");
+        MergeResult merged = Merge(
+            BaselineComposer.Compose(Rule, a.WithSiteCount(5), Entry("B"), Entry("C")),
+            BaselineComposer.Compose(Rule, a.WithSiteCount(3), Entry("B"), Entry("C")),
+            BaselineComposer.Compose(Rule, a.WithSiteCount(5).WithBecause("legacy import"), Entry("B"), Entry("C")));
+        merged.Conflicts.ShouldBeGreaterThan(0);
+
+        string path = _temp.WriteFile(
+            ["kept-both.json"], string.Join("\n", ResolveConflicts(merged.Text, (ours, theirs) => ours.Concat(theirs))));
+        BaselineDocument document = BaselineStore.TryReadDocument(path).ShouldNotBeNull();
+        document.Sections[Rule].ShouldBe([a, a, Entry("B"), Entry("C")]);
+
+        document.SectionFor(Rule)!.TryMatch(a, out BaselineEntry? stored).ShouldBeTrue();
+        stored.ShouldNotBeNull().SiteCount.ShouldBe(3);
+
+        BaselineStore.Write(path, document);
+        string written = File.ReadAllText(path);
+        written.Split('\n')
+            .Where(line => line.Contains("T:MyApp.Web.AController"))
+            .ShouldHaveSingleItem()
+            .ShouldContain("\"siteCount\": 3, \"because\": \"legacy import\"");
+    }
+
     private static BaselineEntry Entry(string name)
     {
         return BaselineEntry.ForEdge($"T:MyApp.Web.{name}Controller", Target);

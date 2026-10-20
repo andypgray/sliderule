@@ -13,8 +13,8 @@ namespace SlideRule.Baselines;
 ///         A baseline file is line-oriented JSON — UTF-8 with no byte-order mark, LF line endings, a
 ///         trailing newline, a two-space indent, one entry object per line — so paying off one
 ///         grandfathered violation removes exactly one line in a diff. Rules sort by ID and entries by
-///         source or subject then target, both ordinal, so the same entries compose to the same bytes in any
-///         input order, except that entries sharing an identity keep the order they came in. One file holds a
+///         source or subject then target, both ordinal, and entries sharing an identity compose to one line, so
+///         the same entries compose to the same bytes in any input order. One file holds a
 ///         section per rule ID, and an entry object carries <c>source</c> and <c>target</c>, or
 ///         <c>subject</c>, then an optional <c>siteCount</c>, an optional <c>because</c>, and a <c>seal</c> last.
 ///     </para>
@@ -87,14 +87,18 @@ internal static class BaselineFormat
 
     /// <summary>
     ///     Composes the whole text of a baseline file holding the given entries, keyed by rule ID, in the
-    ///     file's canonical order with a fresh <c>seal</c> on each entry. The order of the input decides only
-    ///     the order among entries that share an identity, each of which composes to a line of its own. The
-    ///     file is always <see cref="SchemaVersion" />, so writing one read at <see cref="LegacySchemaVersion" />
+    ///     file's canonical order with a fresh <c>seal</c> on each entry. Entries that share an identity compose
+    ///     to one line, with the smallest site count and the first reason any of them carries. The file is
+    ///     always <see cref="SchemaVersion" />, so writing one read at <see cref="LegacySchemaVersion" />
     ///     upgrades it.
     /// </summary>
     public static string ComposeFile(IReadOnlyDictionary<string, IReadOnlyList<BaselineEntry>> rules)
     {
-        IReadOnlyList<SortedRule> sorted = SortRules(rules);
+        // Collapsed here rather than in SortRules: the legacy digest shares that sort, and a stored digest was
+        // taken over a file's entries as written, duplicates included.
+        Dictionary<string, IReadOnlyList<BaselineEntry>> collapsed = Guard.NotNull(rules, nameof(rules))
+            .ToDictionary(kv => kv.Key, kv => BaselineEntry.Collapsed(kv.Value), StringComparer.Ordinal);
+        IReadOnlyList<SortedRule> sorted = SortRules(collapsed);
 
         using var sealer = new BaselineSealer();
         var builder = new StringBuilder();

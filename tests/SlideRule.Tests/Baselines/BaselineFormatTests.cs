@@ -96,6 +96,22 @@ public sealed class BaselineFormatTests
     }
 
     [Fact]
+    public void ComposeFile_EntriesSharingAnIdentity_ComposeToOneLineWhateverTheirOrder()
+    {
+        BaselineEntry larger = BaselineEntry.ForEdge("T:N.Src", "T:N.Tgt").WithSiteCount(5).WithBecause("legacy");
+        BaselineEntry smaller = BaselineEntry.ForEdge("T:N.Src", "T:N.Tgt").WithSiteCount(3);
+
+        string forward = BaselineFormat.ComposeFile(BaselineComposer.Rules(("r", [larger, smaller])));
+        string reversed = BaselineFormat.ComposeFile(BaselineComposer.Rules(("r", [smaller, larger])));
+
+        forward.ShouldBe(reversed);
+        forward.Split('\n')
+            .Where(line => line.Contains("T:N.Src"))
+            .ShouldHaveSingleItem()
+            .ShouldContain("\"siteCount\": 3, \"because\": \"legacy\"");
+    }
+
+    [Fact]
     public void ComposeFile_EmptyEntries_RendersEmptyArrayOnOneLine()
     {
         string composed = BaselineFormat.ComposeFile(BaselineComposer.Rules(("data-access/no-inline-sql", [])));

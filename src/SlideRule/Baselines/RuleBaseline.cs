@@ -11,17 +11,14 @@ internal sealed class RuleBaseline
     private readonly Dictionary<BaselineEntry, BaselineEntry> _lookup;
 
     /// <summary>
-    ///     Builds a section from entries in any order; entries sharing an identity are collapsed into one, the
-    ///     first of them keeping its reason and its site count.
+    ///     Builds a section from entries in any order; entries sharing an identity are collapsed into one as
+    ///     <see cref="BaselineEntry.Collapsed" /> collapses them, the rule a write applies too.
     /// </summary>
     internal RuleBaseline(IReadOnlyCollection<BaselineEntry> entries)
     {
         Guard.NotNull(entries, nameof(entries));
-        _lookup = new Dictionary<BaselineEntry, BaselineEntry>();
-
-        foreach (BaselineEntry entry in entries)
-            if (!_lookup.ContainsKey(entry))
-                _lookup.Add(entry, entry);
+        _lookup = BaselineEntry.Collapsed(entries)
+            .ToDictionary(entry => entry, entry => entry);
 
         Entries = BaselineEntry.InCanonicalOrder(_lookup.Values);
     }
@@ -33,7 +30,7 @@ internal sealed class RuleBaseline
     /// <summary>
     ///     Looks up the stored entry whose identity matches <paramref name="identity" />, such as the one
     ///     <c>Violation.BaselineIdentity()</c> returns. The match ignores the reason and the site count, so
-    ///     <paramref name="stored" /> is the entry as the file stored it, carrying both.
+    ///     <paramref name="stored" /> is the entry as the file records it, carrying both.
     /// </summary>
     /// <remarks>
     ///     An edge from a project to one of its packages or frameworks that has no entry of its own falls back

@@ -277,4 +277,59 @@ public sealed class BaselineEntryTests
         Should.Throw<ArgumentException>(() => entry.WithBecause("a\nb"))
             .Message.ShouldContain("non-blank single line");
     }
+
+    [Fact]
+    public void Collapsed_TwoCountsForOneEdge_KeepsTheSmallerInEitherOrder()
+    {
+        BaselineEntry five = BaselineEntry.ForEdge("T:N.Src", "T:N.Tgt").WithSiteCount(5);
+        BaselineEntry three = BaselineEntry.ForEdge("T:N.Src", "T:N.Tgt").WithSiteCount(3);
+
+        BaselineEntry.Collapsed([five, three]).ShouldHaveSingleItem().SiteCount.ShouldBe(3);
+        BaselineEntry.Collapsed([three, five]).ShouldHaveSingleItem().SiteCount.ShouldBe(3);
+    }
+
+    [Fact]
+    public void Collapsed_CountedAndUncountedCopies_KeepsTheCount()
+    {
+        // An entry with no count grandfathers any number of sites, so it is the loosest of all and never wins.
+        BaselineEntry uncounted = BaselineEntry.ForEdge("T:N.Src", "T:N.Tgt");
+        BaselineEntry counted = BaselineEntry.ForEdge("T:N.Src", "T:N.Tgt").WithSiteCount(4);
+
+        BaselineEntry.Collapsed([uncounted, counted]).ShouldHaveSingleItem().SiteCount.ShouldBe(4);
+        BaselineEntry.Collapsed([counted, uncounted]).ShouldHaveSingleItem().SiteCount.ShouldBe(4);
+    }
+
+    [Fact]
+    public void Collapsed_ReasonOnTheLargerCountLine_SurvivesBesideTheSmallerCount()
+    {
+        // The case a merge produces: one branch paid sites down, the other attributed the entry.
+        BaselineEntry paidDown = BaselineEntry.ForEdge("T:N.Src", "T:N.Tgt").WithSiteCount(2);
+        BaselineEntry attributed = BaselineEntry.ForEdge("T:N.Src", "T:N.Tgt").WithSiteCount(5).WithBecause("legacy import");
+
+        BaselineEntry kept = BaselineEntry.Collapsed([paidDown, attributed]).ShouldHaveSingleItem();
+
+        kept.SiteCount.ShouldBe(2);
+        kept.Because.ShouldBe("legacy import");
+    }
+
+    [Fact]
+    public void Collapsed_TwoReasonsForOneSubject_KeepsTheFirst()
+    {
+        BaselineEntry first = BaselineEntry.ForSubject("T:N.Thing").WithBecause("first");
+        BaselineEntry second = BaselineEntry.ForSubject("T:N.Thing").WithBecause("second");
+
+        BaselineEntry kept = BaselineEntry.Collapsed([first, second]).ShouldHaveSingleItem();
+
+        kept.Because.ShouldBe("first");
+        kept.SiteCount.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Collapsed_DistinctIdentities_KeepsEachInFirstAppearanceOrder()
+    {
+        BaselineEntry b = BaselineEntry.ForSubject("T:N.B");
+        BaselineEntry a = BaselineEntry.ForSubject("T:N.A");
+
+        BaselineEntry.Collapsed([b, a, b]).ShouldBe([b, a]);
+    }
 }
