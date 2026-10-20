@@ -5,8 +5,10 @@ using Xunit;
 namespace SlideRule.Tests.Mcp;
 
 /// <summary>
-///     Pins the embedded server instructions under the client's truncation cliff, so growth past it
-///     turns up as a red here rather than as a silent cut in every session.
+///     Pins the embedded server instructions under the client's truncation cliff, and each text's first line to
+///     one whole sentence, so growth past the cliff turns up as a red here rather than as a silent cut in every
+///     session, and a lead-in opening reds here rather than reading as a fragment in a client that shows only
+///     that line.
 /// </summary>
 /// <remarks>
 ///     Claude Code renders MCP server instructions into the session system prompt whole only up to a
@@ -14,7 +16,9 @@ namespace SlideRule.Tests.Mcp;
 ///     2,048 before 2.1.296, 4,096 from it (read in the 2.1.300 binary on 2026-10-18). The pin holds
 ///     the stricter of the two, because clients older than 2.1.296 are still in use. Of the other
 ///     coding harnesses surveyed that day, only Codex cuts shorter: to 1,000 bytes for a server
-///     installed as a Codex plugin, and to the first line in an optional summary mode.
+///     installed as a Codex plugin, and to the first line, cut at 250 characters, in an optional
+///     summary mode. Copilot CLI retrieves a non-allowlisted server's text by search, so in both the
+///     opening carries more weight than the length.
 ///     <see cref="string.Length" /> counts the same units the client slices, so this pin measures
 ///     exactly what the client measures. When it reds, cut or move content — tool descriptions are
 ///     the per-fetch channel — never raise the budget. The unbound banner
@@ -44,6 +48,12 @@ public sealed class ServerInstructionsTests
     /// </remarks>
     private const int BannerBudget = 780;
 
+    /// <summary>
+    ///     The shortest cut any surveyed client makes: Codex's optional summary mode keeps only the first line of
+    ///     the instructions, to this many characters. Each text opens with one whole sentence within it.
+    /// </summary>
+    private const int FirstLineCap = 250;
+
     [Fact]
     public void Text_FitsUnderTheClientTruncationCliff()
     {
@@ -66,7 +76,8 @@ public sealed class ServerInstructionsTests
 
         string instructions = ServerInstructions.For(failure);
 
-        instructions.ShouldStartWith("**This server is running but is not bound to a solution.**");
+        instructions.ShouldStartWith(
+            "**This server is running but is not bound to a solution, because solution discovery failed.**");
         // Verbatim: the discovery message names the files and the fix, and re-wording it here would
         // make the handshake and the per-call tool error disagree about what went wrong.
         instructions.ShouldContain(failure);
@@ -173,5 +184,30 @@ public sealed class ServerInstructionsTests
             .Length - ServerInstructions.Text.Length - failure.Length;
 
         bannerLength.ShouldBeLessThanOrEqualTo(BannerBudget);
+    }
+
+    [Fact]
+    public void Text_OpensWithOneWholeSentence()
+    {
+        ShouldOpenWithOneWholeSentence(ServerInstructions.Text);
+    }
+
+    [Fact]
+    public void For_UnboundServer_OpensWithOneWholeSentence()
+    {
+        // The banner, not the discovery text, owns the first line: a client that shows only that line must
+        // learn from it that the server is unbound.
+        ShouldOpenWithOneWholeSentence(ServerInstructions.For("x"));
+    }
+
+    private static void ShouldOpenWithOneWholeSentence(string instructions)
+    {
+        string firstLine = instructions.Split('\n')[0];
+
+        // Shown alone, the line has no list under it to complete, so it can neither run past the cap nor end as
+        // a lead-in to one. Bold markers close the banner's line, and the sentence sits inside them.
+        firstLine.Length.ShouldBeLessThanOrEqualTo(FirstLineCap, firstLine);
+        firstLine.TrimEnd('*')
+            .ShouldEndWith(".", customMessage: firstLine);
     }
 }

@@ -56,13 +56,14 @@ internal static class ServerInstructions
     /// </summary>
     /// <remarks>
     ///     The banner is only ever prepended and the embedded resource never edited, so a bound server and an
-    ///     unbound one describe the same tools in the same words.
+    ///     unbound one describe the same tools in the same words. The banner's first line is one sentence on its
+    ///     own, because a client that shows only the first line of the instructions shows that one.
     /// </remarks>
     internal static string For(string? bindingFailure)
     {
         if (bindingFailure is null) return Text;
 
-        return "**This server is running but is not bound to a solution.** Solution discovery failed:\n\n"
+        return "**This server is running but is not bound to a solution, because solution discovery failed.**\n\n"
                + bindingFailure
                + "\n\n"
                + UnboundCallCoda

@@ -1,4 +1,4 @@
-SlideRule exposes this codebase's architecture spec — one reified model, enforced and explained. Five read-only tools:
+SlideRule exposes this codebase's architecture spec, one reified model enforced and explained, as five read-only tools.
 
 - `arch_check` — the spec's verdict as a JSON report. Call before finishing work that touched architecture-relevant code; narrow with `rules` globs.
 - `arch_status` — the migration burndown: per-rule grandfathered/stale counts and promotion suggestions.

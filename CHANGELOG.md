@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The MCP server instructions open with one whole sentence, and so does the banner an unbound server puts
+  above them, so a client that shows only the first line or retrieves the text by search reads a summary
+  rather than a lead-in. The tools and the rest of the text are unchanged.
+
 ### Fixed
 
 - The MCP server, started on a `.slnf` solution filter, now reloads the workspace when the solution the
