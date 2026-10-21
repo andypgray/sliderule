@@ -20,9 +20,8 @@ internal static class ResponseTruncator
     // response can reach here, so anything that still overruns has already been through the ladder and
     // overview: true would only name a rung it took. What is left in each case is the subject.
     //
-    // Neither offers to redirect the CLI to a file either: paging a document through the shell is the exact
-    // move the served instructions call out by name, and text at the moment of failure is what a reader acts
-    // on, so an offer here would be the product contradicting itself.
+    // Neither offers to redirect the CLI to a file either: text at the moment of failure is what a reader acts
+    // on, so a reader offered a redirect pages the whole document through the shell rather than narrowing it.
     private const string GraphNarrowingHint =
         "Narrow the subject rather than read half a survey: the grain ladder is already exhausted, so "
         + "projects: \"<name globs>\" surveys part of the solution and is the knob left. On the CLI, "

@@ -31,8 +31,7 @@ internal sealed class ArchTools(
     private const string CheckDescription =
         "Run the architecture spec against the bound solution and return the JSON check report " +
         "(schemaVersion 3): rules[] keyed by id, plus summary counts. Violations are data — a red rule is a " +
-        "finding, not an error. The rules parameter narrows what is evaluated, and the report then covers " +
-        "only those. " +
+        "finding, not an error. " +
         "Narrow with grain (overview, skeleton or index) or rules (fewer rules); an over-budget " +
         "report coarsens its own grain, as far as index, rather than being cut — and index lists every rule " +
         "ID, which is what rules globs match. " +
@@ -72,12 +71,12 @@ internal sealed class ArchTools(
         "fail to load or to restore, a type or path answer opens with a caveat naming them.";
 
     private const string ContextDescription =
-        "Return the architecture scope card(s) covering a path — a quarantined scope's dragons + sanctioned surface, " +
-        "a cautioned scope's dragons, or a layer's local rules — or a pointer line when none apply. If projects " +
-        "fail to load or to restore, the answer opens with a caveat naming them: cards from unloaded projects " +
-        "cannot be placed, and a rule about a package the restore never fetched was never measured, so treat a " +
-        "no-coverage answer as unproven there. A .slnf solution filter gets the same caveat for the declared " +
-        "projects it left unchecked: treat a no-coverage answer as unproven under them as well.";
+        "Return the architecture scope card(s) covering a file or directory — a quarantined scope's dragons + " +
+        "sanctioned surface, a cautioned scope's dragons, or a layer's local rules — or a pointer line when none " +
+        "apply. If projects fail to load or to restore, the answer opens with a caveat naming them: cards from " +
+        "unloaded projects cannot be placed, and a rule about a package the restore never fetched was never " +
+        "measured, so treat a no-coverage answer as unproven there. A .slnf solution filter gets the same caveat " +
+        "for the declared projects it left unchecked: treat a no-coverage answer as unproven under them as well.";
 
     private const string GraphDescription =
         "Return the JSON codebase survey (schemaVersion 1): projects[] with namespace inventories, " +

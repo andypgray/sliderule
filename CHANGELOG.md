@@ -11,7 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The MCP server instructions open with one whole sentence, and so does the banner an unbound server puts
   above them, so a client that shows only the first line or retrieves the text by search reads a summary
-  rather than a lead-in. The tools and the rest of the text are unchanged.
+  rather than a lead-in. The instructions also drop three notes that the tool descriptions already carry:
+  that violations are data, that an over-budget document coarsens its own grain, and that a partial or
+  filtered model is stamped on the answer. A client puts the instructions into every session that registers
+  the server, and they are now a quarter shorter.
 
 ### Fixed
 
