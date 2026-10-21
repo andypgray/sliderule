@@ -48,7 +48,7 @@
          were the VSTest half and are gone. What a quickstart reader copies is this ItemGroup, so it is the
          shape a consumer of the adapter needs: the metapackage alone. -->
     <ItemGroup>
-        <PackageReference Include="xunit.v3" Version="4.0.1" />
+        <PackageReference Include="xunit.v3" Version="4.0.2" />
     </ItemGroup>
 
     <ItemGroup>
