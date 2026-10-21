@@ -18,9 +18,12 @@ namespace SlideRule.Tests.DocHygiene;
 ///         build stays green over the mix.
 ///     </para>
 ///     <para>
-///         Dependency updates keep the pair current, which moves the requirement without anyone editing the
-///         package description or the README that state it to a consumer, or the test projects here that
-///         run the adapter the way a consumer does. Each arm holds one of those places to the pair.
+///         The pair is a support floor, not a dependency to keep fresh, so every nuget entry of the
+///         Dependabot configuration ignores both packages by name: an update run that raised it would move
+///         the requirement in a PR that looks like any other bump. When a person does raise it, the package
+///         description and the README that state it to a consumer, and the test projects here that run the
+///         adapter the way a consumer does, have to move with it. Each arm holds one of those places to the
+///         pair.
 ///     </para>
 /// </remarks>
 public sealed class XunitRequirementSyncTests
@@ -114,6 +117,33 @@ public sealed class XunitRequirementSyncTests
             .Where(runner => !IsAtOrAbove(runner.Version, pair))
             .Select(runner => $"{runner.Project} keeps {Metapackage} {runner.Version}, below the {pair} the "
                               + "adapter is built against."));
+
+        // Assert
+        findings.ShouldReportNothing(Header);
+    }
+
+    [Fact]
+    public void EveryUpdateEntry_IgnoresThePair()
+    {
+        // Arrange: every entry rather than the one that lists the adapter, since a run bumps packages in
+        // whatever its projects reach. No entry at all is a finding rather than a pass.
+        IReadOnlyList<string[]> entries = DependabotEntries.NuGetEntries();
+        List<string> findings = new();
+
+        // Act
+        if (entries.Count == 0)
+            findings.Add($"{DependabotEntries.ConfigPath} carries no nuget update entry, so nothing ignores the pair.");
+
+        foreach (string[] entry in entries)
+        {
+            IReadOnlyList<string> ignored = DependabotEntries.IgnoredNames(entry);
+            string directories = string.Join(", ", DependabotEntries.Directories(entry));
+            findings.AddRange(AuthoringPair
+                .Where(package => !ignored.Contains(package, StringComparer.Ordinal))
+                .Select(package => $"{DependabotEntries.ConfigPath}'s nuget entry for {directories} carries no "
+                                   + $"'ignore:' naming {package}, so its next update run raises the adapter's "
+                                   + "xunit.v3 requirement."));
+        }
 
         // Assert
         findings.ShouldReportNothing(Header);

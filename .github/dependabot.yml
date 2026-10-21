@@ -41,6 +41,13 @@ updates:
   # projects move to net11.0. MsBuildLinePinTests holds these ignores, the pins and the target
   # framework to each other.
   #
+  # xunit.v3.extensibility.core and xunit.v3.assert are the xUnit adapter's support floor: the oldest
+  # xunit.v3 metapackage a consumer's test project can keep beside the adapter, as its package
+  # description and README state. Raising the pair raises that requirement for every consumer, so it is
+  # a decision for a person, like the compiler-API floor. The test project's own xunit.v3 metapackage is
+  # not ignored and stays current. XunitRequirementSyncTests holds these ignores, the pair and the stated
+  # requirement to each other.
+  #
   # Changing the directory list orphans the pull requests the old list opened: no later run refreshes
   # or closes them, so close them by hand.
   - package-ecosystem: nuget
@@ -70,3 +77,5 @@ updates:
         versions: [">= 18.10"]
       - dependency-name: Microsoft.NET.StringTools
         versions: [">= 18.10"]
+      - dependency-name: xunit.v3.extensibility.core
+      - dependency-name: xunit.v3.assert
