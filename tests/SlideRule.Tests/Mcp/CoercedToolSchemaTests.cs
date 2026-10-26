@@ -33,7 +33,7 @@ namespace SlideRule.Tests.Mcp;
 ///         scalar-string and bool branches are reachable through a real <c>tools/list</c>.
 ///     </para>
 /// </remarks>
-public sealed class CoercedToolSchemaTests
+public sealed class CoercedToolSchemaTests(AdvertisedToolsFixture advertised) : IClassFixture<AdvertisedToolsFixture>
 {
     // Both erasures, one claim: whatever keyword the exporter had left to erase, a string parameter reaches
     // the client as a plain "string".
@@ -131,12 +131,12 @@ public sealed class CoercedToolSchemaTests
     }
 
     [Fact]
-    public async Task LiveBoolParameter_KeepsItsTypeDescriptionAndDefault()
+    public void LiveBoolParameter_KeepsItsTypeDescriptionAndDefault()
     {
         // The repair puts back only the erased type, so the keywords the exporter still emits must survive
         // it. Their order in the object shifts — `type` lands last rather than first — which is not
         // something a client can read as meaning; their presence and values are.
-        JsonObject property = await ShouldHaveLiveSchemaPropertyForAsync("arch_graph", "allowWorkspaceDiagnostics");
+        JsonObject property = ShouldHaveLiveSchemaPropertyFor("arch_graph", "allowWorkspaceDiagnostics");
 
         property["type"]!.GetValue<string>()
             .ShouldBe("boolean");
@@ -199,15 +199,13 @@ public sealed class CoercedToolSchemaTests
     }
 
     [Fact]
-    public async Task EveryLiveArchToolParameter_AdvertisesAType()
+    public void EveryLiveArchToolParameter_AdvertisesAType()
     {
         // The live half of the repair, and the standing form of "no arch_* parameter may move": each one
         // reaches the client with a type only because this hook puts back what the coercers erased, and
         // both erasures — `{}` and `true` — read to a client as "any value at all".
         List<string> checkedParameters = [];
-        IList<McpClientTool> tools = await ServedArchToolsAsync();
-
-        foreach (McpClientTool tool in tools)
+        foreach (McpClientTool tool in advertised.Tools)
         {
             JsonObject schema = JsonNode.Parse(tool.ProtocolTool.InputSchema.GetRawText())!.AsObject();
             JsonObject properties = schema["properties"]
@@ -230,29 +228,13 @@ public sealed class CoercedToolSchemaTests
     }
 
     /// <summary>
-    ///     The real <c>arch_*</c> tools as the server lists them to a client over <c>tools/list</c>, from a host of the
-    ///     caller's own, disposed before the caller reads the schemas it returns.
-    /// </summary>
-    private static async Task<IList<McpClientTool>> ServedArchToolsAsync()
-    {
-        await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
-            McpServerBindings.MyAppWithCleanSpec(), Ct);
-
-        return await harness.Client.ListToolsAsync(cancellationToken: Ct);
-    }
-
-    /// <summary>
     ///     The advertised schema node for <paramref name="parameterName" /> on the real
     ///     <paramref name="toolName" />, so a claim about the repair can be made against a shipped
     ///     parameter rather than a probe standing in for one.
     /// </summary>
-    private static async Task<JsonObject> ShouldHaveLiveSchemaPropertyForAsync(string toolName, string parameterName)
+    private JsonObject ShouldHaveLiveSchemaPropertyFor(string toolName, string parameterName)
     {
-        IList<McpClientTool> tools = await ServedArchToolsAsync();
-        McpClientTool? tool = tools.SingleOrDefault(candidate => candidate.ProtocolTool.Name == toolName);
-        tool.ShouldNotBeNull($"no live tool is named '{toolName}'");
-
-        JsonObject schema = JsonNode.Parse(tool.ProtocolTool.InputSchema.GetRawText())!.AsObject();
+        JsonObject schema = JsonNode.Parse(advertised.ShouldHaveTool(toolName).InputSchema.GetRawText())!.AsObject();
         JsonNode? property = schema["properties"]?[parameterName];
         property.ShouldNotBeNull($"{toolName} advertises no '{parameterName}' property: {schema.ToJsonString()}");
         property.ShouldBeOfType<JsonObject>(

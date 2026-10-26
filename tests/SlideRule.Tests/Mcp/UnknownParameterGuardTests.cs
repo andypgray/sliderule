@@ -7,51 +7,52 @@ using Xunit;
 namespace SlideRule.Tests.Mcp;
 
 /// <summary>
-///     Tests for <see cref="UnknownParameterGuard" />: a JSON argument key matching no declared parameter
-///     of an <c>arch_*</c> tool is surfaced as an actionable, self-correcting error instead of being
-///     silently dropped by the SDK's <c>UnmappedMemberHandling = Skip</c>.
+///     Tests for <see cref="UnknownParameterGuard" />: a JSON argument key matching no declared parameter of an
+///     <c>arch_*</c> tool, or a required parameter with no key, is surfaced as an actionable, self-correcting error
+///     instead of being dropped by the SDK or failed inside its binder. The guard is handed each tool as a real
+///     <c>tools/list</c> advertises it.
 /// </summary>
-public sealed class UnknownParameterGuardTests
+public sealed class UnknownParameterGuardTests(AdvertisedToolsFixture advertised) : IClassFixture<AdvertisedToolsFixture>
 {
-    // Value is never inspected by the guard (only keys are), so a single shared dummy suffices.
+    // Value is never inspected by the guard (only keys are), so a single shared dummy suffices. It is never
+    // disposed: disposing a JsonDocument invalidates the elements it handed out.
     private static readonly JsonElement DummyValue = JsonDocument.Parse("null")
         .RootElement;
+
+    /// <summary>
+    ///     Gets the argument keys of arch_context calls that leave out its required <c>path</c>: no arguments at all, and
+    ///     an empty object.
+    /// </summary>
+    public static TheoryData<string[]?> KeysWithoutPath => new() { (string[]?)null, { [] } };
 
     [Fact]
     public void Validate_UnknownKeyOnRealTool_NamesBadKeyToolAndValidList()
     {
         // Act — "rule" is the classic typo of arch_explain's "ruleId" parameter.
         string? message = UnknownParameterGuard.Validate(
-            "arch_explain",
+            advertised.ShouldHaveTool("arch_explain"),
             new Dictionary<string, JsonElement> { ["rule"] = DummyValue });
 
-        // Assert — names the bad key (quoted), the tool, and the real parameter list.
-        message.ShouldNotBeNull();
-        message.ShouldContain("\"rule\"");
-        message.ShouldContain("arch_explain");
-        message.ShouldContain("ruleId");
+        // Assert
+        message.ShouldBe("Unknown parameter \"rule\" on \"arch_explain\". Valid: ruleId, type, path.");
     }
 
     [Fact]
-    public void Validate_EveryDeclaredParameter_ReturnsNull()
+    public void Validate_EveryReflectedParameter_IsAcceptedOnItsAdvertisedTool()
     {
-        // Arrange — independently reflect every tool's JSON parameter names. Services arrive via primary
-        // constructors, so the only context-bound method parameter is CancellationToken; IsJsonBound
-        // encodes exactly that, independently of the guard's own predicate. A newly introduced
-        // context-bound parameter type will (correctly) trip this test.
+        // Arrange — every parameter the tool methods bind from JSON, read by reflection rather than from the
+        // schema the guard reads, so a parameter the schema stopped advertising shows up here.
         List<string> failures = [];
 
-        foreach ((string toolName, MethodInfo method) in ToolAttributeDiscovery.GetNamedToolMethods())
+        foreach ((string toolName, IReadOnlyList<ParameterInfo> parameters) in LiveToolParameters.ByTool())
         {
-            Dictionary<string, JsonElement> arguments = method.GetParameters()
-                .Where(IsJsonBound)
-                .ToDictionary(p => p.Name!, _ => DummyValue);
+            Dictionary<string, JsonElement> arguments = parameters.ToDictionary(p => p.Name!, _ => DummyValue);
 
-            string? message = UnknownParameterGuard.Validate(toolName, arguments);
+            string? message = UnknownParameterGuard.Validate(advertised.ShouldHaveTool(toolName), arguments);
             if (message is not null) failures.Add($"{toolName}: {message}");
         }
 
-        // Assert — every real parameter name is accepted; any failure is schema drift.
+        // Assert
         failures.ShouldBeEmpty();
     }
 
@@ -60,24 +61,11 @@ public sealed class UnknownParameterGuardTests
     {
         // Act — the SDK binds each argument by its parameter's exact name, so a casing slip binds nothing.
         string? message = UnknownParameterGuard.Validate(
-            "arch_explain",
+            advertised.ShouldHaveTool("arch_explain"),
             new Dictionary<string, JsonElement> { ["RuleId"] = DummyValue });
 
         // Assert
         message.ShouldBe("Unknown parameter \"RuleId\" on \"arch_explain\". Valid: ruleId, type, path.");
-    }
-
-    [Fact]
-    public void Validate_WrongCaseToolName_ReturnsNull()
-    {
-        // Act — the SDK dispatches by exact name too and answers an unknown tool itself. A parameter error
-        // here would send the caller to fix a key on a tool the call can never reach.
-        string? message = UnknownParameterGuard.Validate(
-            "Arch_Explain",
-            new Dictionary<string, JsonElement> { ["rule"] = DummyValue });
-
-        // Assert
-        message.ShouldBeNull();
     }
 
     [Theory]
@@ -88,7 +76,7 @@ public sealed class UnknownParameterGuardTests
         // Act — overview, skeleton and index are the retired grain booleans, so a client still sending them is
         // told the grain parameter's name rather than silently served a full document.
         string? message = UnknownParameterGuard.Validate(
-            tool,
+            advertised.ShouldHaveTool(tool),
             new Dictionary<string, JsonElement>
             {
                 ["overview"] = DummyValue,
@@ -102,36 +90,54 @@ public sealed class UnknownParameterGuardTests
         message.ShouldContain("grain");
     }
 
-    [Fact]
-    public void Validate_UnknownToolName_ReturnsNull()
+    [Theory]
+    [MemberData(nameof(KeysWithoutPath))]
+    public void Validate_ContextWithoutPath_NamesTheMissingKeyAndTheValidList(string[]? keys)
     {
-        // Act — unknown-tool dispatch is the SDK's concern; the guard never blocks it.
+        // Act
         string? message = UnknownParameterGuard.Validate(
-            "no_such_tool",
-            new Dictionary<string, JsonElement> { ["whatever"] = DummyValue });
+            advertised.ShouldHaveTool("arch_context"),
+            keys?.ToDictionary(key => key, _ => DummyValue));
+
+        // Assert
+        message.ShouldBe("Missing required parameter \"path\" on \"arch_context\". Valid: path.");
+    }
+
+    [Fact]
+    public void Validate_RequiredKeyPresentWithNullValue_ReturnsNull()
+    {
+        // Act — the key is present, so the tool answers the null value itself, not the guard.
+        string? message = UnknownParameterGuard.Validate(
+            advertised.ShouldHaveTool("arch_context"),
+            new Dictionary<string, JsonElement> { ["path"] = DummyValue });
 
         // Assert
         message.ShouldBeNull();
     }
 
     [Fact]
-    public void Validate_NullArguments_ReturnsNull()
+    public void Validate_MisspeltRequiredKey_IsReportedAsUnknownRatherThanMissing()
     {
-        UnknownParameterGuard.Validate("arch_check", null)
+        // Act — "file" also leaves "path" out, and a misspelt key usually is the missing one.
+        string? message = UnknownParameterGuard.Validate(
+            advertised.ShouldHaveTool("arch_context"),
+            new Dictionary<string, JsonElement> { ["file"] = DummyValue });
+
+        // Assert
+        message.ShouldBe("Unknown parameter \"file\" on \"arch_context\". Valid: path.");
+    }
+
+    [Fact]
+    public void Validate_NullArgumentsOnAToolWithNoRequiredParameter_ReturnsNull()
+    {
+        UnknownParameterGuard.Validate(advertised.ShouldHaveTool("arch_check"), null)
             .ShouldBeNull();
     }
 
     [Fact]
-    public void Validate_EmptyArguments_ReturnsNull()
+    public void Validate_EmptyArgumentsOnAToolWithNoRequiredParameter_ReturnsNull()
     {
-        UnknownParameterGuard.Validate("arch_check", new Dictionary<string, JsonElement>())
+        UnknownParameterGuard.Validate(advertised.ShouldHaveTool("arch_check"), new Dictionary<string, JsonElement>())
             .ShouldBeNull();
-    }
-
-    // Independent oracle for "is this a JSON-bound parameter": the only context-bound method-parameter
-    // type in this server is CancellationToken. Deliberately NOT calling the guard's own predicate.
-    private static bool IsJsonBound(ParameterInfo p)
-    {
-        return p.Name is not null && p.ParameterType != typeof(CancellationToken);
     }
 }

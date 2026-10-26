@@ -49,7 +49,7 @@ public sealed class ToolDescriptionSchemaVersionTests
 
     private static Dictionary<string, string> LiveToolDescriptions()
     {
-        return ToolAttributeDiscovery.GetNamedToolMethods()
+        return LiveToolParameters.NamedToolMethods()
             .ToDictionary(
                 static tool => tool.Name,
                 static tool => tool.Method.GetCustomAttribute<DescriptionAttribute>()!.Description);

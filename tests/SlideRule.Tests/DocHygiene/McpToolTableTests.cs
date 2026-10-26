@@ -145,7 +145,7 @@ public sealed class McpToolTableTests
     private static HashSet<string> CellSpellings(MethodInfo method)
     {
         return method.GetParameters()
-            .Where(ToolAttributeDiscovery.IsJsonBoundParameter)
+            .Where(LiveToolParameters.IsJsonBound)
             .Select(CellSpelling)
             .ToHashSet(StringComparer.Ordinal);
     }

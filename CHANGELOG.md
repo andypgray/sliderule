@@ -25,6 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- An MCP tool call that leaves out a required parameter, such as `arch_context` with no `path`, is now
+  refused with a message that names the missing parameter and lists the ones the tool takes, and the server
+  logs nothing. Before, the call failed with the SDK's own binding message and was logged as an unexpected
+  tool failure.
 - An `arch_check` or `arch_graph` reply within one or two characters of the client's response budget now
   comes back whole at a coarser grain. Before, the grain was chosen without counting the document's final
   line end, so the reply was then cut at the budget into JSON that would not parse.

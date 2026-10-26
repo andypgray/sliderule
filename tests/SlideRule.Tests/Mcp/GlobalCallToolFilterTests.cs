@@ -33,6 +33,12 @@ namespace SlideRule.Tests.Mcp;
 /// </remarks>
 public sealed class GlobalCallToolFilterTests
 {
+    /// <summary>
+    ///     Gets the argument keys of arch_context calls that leave out its required <c>path</c>: no arguments at all, and
+    ///     an empty object.
+    /// </summary>
+    public static TheoryData<string[]?> KeysWithoutPath => new() { (string[]?)null, { [] } };
+
     [Fact]
     public async Task CallTool_UserError_ReturnsErrorResultAndLogsNothing()
     {
@@ -258,6 +264,41 @@ public sealed class GlobalCallToolFilterTests
         result.ShouldHaveRefused()
             .ShouldBe("Unknown parameter \"Path\" on \"arch_context\". Valid: path.");
         harness.Logs.Warnings.ShouldBeEmpty();
+    }
+
+    [Theory]
+    [MemberData(nameof(KeysWithoutPath))]
+    public async Task CallTool_RequiredKeyOmitted_ReturnsGuardErrorAndLogsNothing(string[]? keys)
+    {
+        // Arrange — with no "path" key the binder fails arch_context with an ArgumentException, which the filter
+        // could only log as unexpected; the guard has to answer first.
+        await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
+            McpServerBindings.MyAppWithViolatedSpec(), Ct);
+        Dictionary<string, object?>? arguments = keys?.ToDictionary(key => key, object? (_) => "x");
+
+        // Act
+        CallToolResult result = await harness.Client.CallToolAsync("arch_context", arguments, cancellationToken: Ct);
+
+        // Assert
+        result.ShouldHaveRefused()
+            .ShouldBe("Missing required parameter \"path\" on \"arch_context\". Valid: path.");
+        harness.Logs.Warnings.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task CallTool_WrongCaseToolName_IsLeftToTheSdk()
+    {
+        // Arrange — the SDK dispatches by exact name, so "Arch_Context" matches no tool, and a parameter error
+        // here would send the caller to fix a key on a tool the call can never reach.
+        await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
+            McpServerBindings.MyAppWithViolatedSpec(), Ct);
+
+        // Act
+        CallToolResult result = await harness.Client.CallToolAsync("Arch_Context", cancellationToken: Ct);
+
+        // Assert — the SDK's own answer, not the guard's.
+        result.ShouldHaveRefused()
+            .ShouldBe("Unknown tool: 'Arch_Context'");
     }
 
     [Fact]

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Protocol;
+using ModelContextProtocol.Server;
 using SlideRule.Cli.Mcp.Infrastructure;
 using SlideRule.Roslyn;
 
@@ -40,10 +41,12 @@ internal static class GlobalCallToolFilter
                     CallToolResult result;
                     try
                     {
-                        // Reject unknown argument keys before binding; its message is a UserErrorException,
-                        // so it flows through the silent-user-error path below.
-                        if (UnknownParameterGuard.Validate(context.Params.Name, context.Params.Arguments) is { } unknownParameterError)
-                            throw new UserErrorException(unknownParameterError);
+                        // Reject unknown or missing argument keys before binding, against the tool the SDK matched;
+                        // a call that matched none is left to the SDK's own unknown-tool answer. The guard's message
+                        // is a UserErrorException, so it flows through the silent-user-error path below.
+                        if (context.MatchedPrimitive is McpServerTool tool
+                            && UnknownParameterGuard.Validate(tool.ProtocolTool, context.Params.Arguments) is { } parameterError)
+                            throw new UserErrorException(parameterError);
 
                         result = await next(context, cancellationToken);
                     }
@@ -91,7 +94,7 @@ internal static class GlobalCallToolFilter
     /// </summary>
     /// <remarks>
     ///     The coda rides every error while unbound, whatever failed: every dispatched call ends in the discovery
-    ///     refusal anyway, and the calls that fail earlier (the unknown-key guard, a coercer) would only reach it once
+    ///     refusal anyway, and the calls that fail earlier (the parameter guard, a coercer) would only reach it once
     ///     the argument was fixed, so the advice is true of all of them. Errors bypass the truncator, so the coda can
     ///     never be the part that gets cut.
     /// </remarks>
