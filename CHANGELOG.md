@@ -25,6 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   grandfathers the smaller of their site counts and keeps a reason either line carries, and `baseline`
   writes the pair back as one line. Before, both lines were written back, and which count applied depended
   on which line came first.
+- A `git` process that SlideRule starts and that outlives its 30-second limit now ends the call with the
+  timeout error, or with the caller's cancellation, even when part of its process tree cannot be killed.
+  Before, the error from the partial kill replaced either one.
 
 ## [0.2.0] - 2026-10-18
 

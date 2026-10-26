@@ -50,6 +50,9 @@ internal static class ChildProcess
         ProcessStartInfo startInfo,
         TimeSpan? timeout = null,
         string? standardInput = null,
+        // A deliberate test seam: a real tree kill refuses only when a descendant cannot be ended, which no test
+        // can arrange, so a test passes a kill that refuses. Null kills the tree.
+        Action<Process>? killTree = null,
         CancellationToken ct = default)
     {
         TimeSpan bound = timeout ?? DefaultTimeout;
@@ -71,7 +74,7 @@ internal static class ChildProcess
         }
         catch (OperationCanceledException)
         {
-            TryKillTree(process);
+            TryKillTree(process, killTree);
             await ObserveKilledReadsAsync(output, error).ConfigureAwait(false);
 
             // A caller cancel is a cancel, not a timeout: only the ceiling produces a TimeoutException.
@@ -105,7 +108,7 @@ internal static class ChildProcess
 
         if (!process.WaitForExit((int)bound.TotalMilliseconds))
         {
-            TryKillTree(process);
+            TryKillTree(process, null);
             throw new TimeoutException(TimeoutMessage(startInfo, bound));
         }
 
@@ -137,16 +140,24 @@ internal static class ChildProcess
     }
 
     // The tree, not the process: git on Windows is a wrapper that execs the real binary as a grandchild,
-    // and killing only the wrapper would leave the grandchild holding the pipes open.
-    private static void TryKillTree(Process process)
+    // and killing only the wrapper would leave the grandchild holding the pipes open. A tree kill that cannot
+    // end some descendant ends the rest and throws AggregateException, which must not take the place of the
+    // timeout or the cancellation the caller is owed.
+    private static void TryKillTree(Process process, Action<Process>? killTree)
     {
         try
         {
-            if (!process.HasExited) process.Kill(true);
+            if (process.HasExited) return;
+
+            if (killTree is not null)
+                killTree(process);
+            else
+                process.Kill(true);
         }
-        catch (Exception ex) when (ex is InvalidOperationException or NotSupportedException or Win32Exception)
+        catch (Exception ex) when (ex is InvalidOperationException or NotSupportedException or Win32Exception
+                                       or AggregateException)
         {
-            // Already gone or inaccessible — nothing left to clean up.
+            // Already gone, inaccessible, or partly killed: nothing more this call can clean up.
         }
     }
 
