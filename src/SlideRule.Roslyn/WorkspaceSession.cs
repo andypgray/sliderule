@@ -193,9 +193,10 @@ internal sealed class WorkspaceSession : IAsyncDisposable
 
         // Until it is stored in loaded, nothing else will dispose the fresh workspace and its build host.
         Solution materialized;
+        IReadOnlyDictionary<string, FileFreshness> statsBeforeRead;
         try
         {
-            materialized = await MaterializeDocumentTextsAsync(freshlyLoaded.Solution, ct).ConfigureAwait(false);
+            (materialized, statsBeforeRead) = await MaterializeDocumentTextsAsync(freshlyLoaded.Solution, ct).ConfigureAwait(false);
         }
         catch
         {
@@ -211,7 +212,7 @@ internal sealed class WorkspaceSession : IAsyncDisposable
         projectFiles = freshlyLoaded.ProjectFiles;
         generation++;
         SeedEditVersions(materialized);
-        RecordAllFingerprints(solutionPath, materialized);
+        RecordAllFingerprints(solutionPath, materialized, statsBeforeRead);
         snapshot = MintSnapshot();
         FullReloadCount++;
         return;
@@ -369,8 +370,7 @@ internal sealed class WorkspaceSession : IAsyncDisposable
     }
 
     /// <summary>
-    ///     Records the load-time fingerprints. Documents are captured unverified, so the first sweep
-    ///     content-checks each once and promotes it.
+    ///     Records the load-time fingerprints, each document's being the stat taken before materialization read it.
     /// </summary>
     /// <remarks>
     ///     The structural set follows the rule the persisted caches stamp theirs by,
@@ -379,14 +379,14 @@ internal sealed class WorkspaceSession : IAsyncDisposable
     ///     <see cref="Project" /> rather than per project directory, because where the restore assets file lands
     ///     follows the project's own evaluated output paths and not its directory.
     /// </remarks>
-    private void RecordAllFingerprints(string solutionPath, Solution solution)
+    private void RecordAllFingerprints(string solutionPath, Solution solution, IReadOnlyDictionary<string, FileFreshness> statsBeforeRead)
     {
         foreach (Document document in solution.Projects.SelectMany(p => p.Documents))
         {
             if (document.FilePath is null) continue;
 
             string full = Path.GetFullPath(document.FilePath);
-            documentFingerprints[full] = FileFreshness.CaptureUnverified(full);
+            documentFingerprints[full] = statsBeforeRead[full];
             if (!documentIds.TryGetValue(full, out List<DocumentId>? ids))
             {
                 ids = [];
@@ -425,44 +425,53 @@ internal sealed class WorkspaceSession : IAsyncDisposable
     ///     Pulls every document's text into a concrete in-memory <see cref="SourceText" />, anchoring the
     ///     reconcile baseline. MSBuildWorkspace backs documents with lazy file-text loaders, so an unforced
     ///     <see cref="TextDocument.GetTextAsync" /> during a later sweep would re-read disk, comparing on-disk
-    ///     content against itself and masking every external edit.
+    ///     content against itself and masking every external edit. Returns the materialized solution and each
+    ///     document path's stat, keyed by full path.
     /// </summary>
     /// <remarks>
-    ///     The reads overlap against the one immutable solution handed in, and only then are the texts folded in
-    ///     by a run of <see cref="Solution.WithDocumentText(DocumentId,SourceText,PreservationMode)" />:
-    ///     interleaving the two would make every read walk a solution one fork deeper than the last.
+    ///     <para>
+    ///         Each path is stat'ed before it is read, as the reconcile sweep does, so a recorded stat is never
+    ///         newer than the text it vouches for and can be trusted from the first sweep. A write between the
+    ///         stat and the read moves the stat and costs that file one sweep read. Each path is read once and its
+    ///         text folded into every document there, the several a multi-targeted project gives one file.
+    ///         A document with no file path is not on disk, so it is left on its loader.
+    ///     </para>
+    ///     <para>
+    ///         The reads overlap against the one immutable solution handed in, and only then are the texts folded
+    ///         in by a run of <see cref="Solution.WithDocumentText(DocumentId,SourceText,PreservationMode)" />:
+    ///         interleaving the two would make every read walk a solution one fork deeper than the last.
+    ///     </para>
     /// </remarks>
-    private static async Task<Solution> MaterializeDocumentTextsAsync(Solution solution, CancellationToken ct)
+    private static async Task<(Solution Solution, IReadOnlyDictionary<string, FileFreshness> StatsBeforeRead)>
+        MaterializeDocumentTextsAsync(Solution solution, CancellationToken ct)
     {
-        List<DocumentId> ids = solution.Projects
-            .SelectMany(project => project.DocumentIds)
+        List<IGrouping<string, DocumentId>> paths = solution.Projects
+            .SelectMany(project => project.Documents)
+            .Where(document => document.FilePath is not null)
+            .GroupBy(document => Path.GetFullPath(document.FilePath!), document => document.Id, PathComparison.Comparer)
             .ToList();
 
-        List<Task<SourceText?>> reads = ids
-            .Select(id => ReadLoadedTextAsync(solution, id, ct))
+        Dictionary<string, FileFreshness> statsBeforeRead = paths.ToDictionary(
+            group => group.Key,
+            group => FileFreshness.Capture(group.Key),
+            PathComparison.Comparer);
+
+        List<Task<SourceText>> reads = paths
+            .Select(group => solution.GetDocument(group.First())!.GetTextAsync(ct))
             .ToList();
 
-        SourceText?[] texts = await Task.WhenAll(reads).ConfigureAwait(false);
+        SourceText[] texts = await Task.WhenAll(reads).ConfigureAwait(false);
 
         Solution result = solution;
-        for (var index = 0; index < ids.Count; index++)
+        for (var index = 0; index < paths.Count; index++)
         {
             ct.ThrowIfCancellationRequested();
 
-            if (texts[index] is { } text) result = result.WithDocumentText(ids[index], text);
+            foreach (DocumentId id in paths[index])
+                result = result.WithDocumentText(id, texts[index]);
         }
 
-        return result;
-    }
-
-    // A document with no file path is not on disk, so no fingerprint will ever compare against it: null asks
-    // the caller to leave it on its loader rather than fold a text in.
-    private static async Task<SourceText?> ReadLoadedTextAsync(Solution solution, DocumentId id, CancellationToken ct)
-    {
-        Document? document = solution.GetDocument(id);
-        if (document?.FilePath is null) return null;
-
-        return await document.GetTextAsync(ct).ConfigureAwait(false);
+        return (result, statsBeforeRead);
     }
 
     private static async Task<SourceText> ReadTextAsync(string path, CancellationToken ct)

@@ -48,20 +48,6 @@ internal readonly record struct FileFreshness(bool Exists, DateTime LastWriteTim
     }
 
     /// <summary>
-    ///     Stats <paramref name="fullPath" /> now but records the capture instant as the file's own last-write
-    ///     time, which leaves the fingerprint unpromoted until its first content check. Use it when recording a
-    ///     file you have just read: "unchanged since the read" cannot be told from "rewritten in the same tick
-    ///     with its timestamp preserved" without reading the content once, and this forces that one read.
-    /// </summary>
-    public static FileFreshness CaptureUnverified(string fullPath)
-    {
-        var info = new FileInfo(fullPath);
-        return info.Exists
-            ? new FileFreshness(true, info.LastWriteTimeUtc, info.Length, info.LastWriteTimeUtc)
-            : new FileFreshness(false, default, 0, default);
-    }
-
-    /// <summary>
     ///     Whether <paramref name="current" />, a fresh capture of the same path, has the same existence,
     ///     last-write time and length: a stat comparison only, with no content read and no racy window, for files
     ///     cheap enough to reload wholesale on any difference.

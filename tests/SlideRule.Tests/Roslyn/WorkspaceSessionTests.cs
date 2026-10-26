@@ -58,30 +58,51 @@ public sealed class WorkspaceSessionTests(SharedWorkspaceSession shared) : IClas
     [Fact]
     public async Task GetCurrentAsync_NoChange_ReturnsSameSnapshotAndReadsNothing()
     {
-        // Arrange — load, then promote every document past the racy window with one warmup sweep, so the
-        // measured sweep is a pure O(stat) no-op (the steady-state case).
+        // Arrange — a first load lets the design-time build write the generated sources it owns under obj/;
+        // then the whole tree, inputs and outputs alike, is stamped well outside the racy window, so the
+        // measured load writes nothing and every stat it takes is trusted from the first sweep: the steady
+        // state, reached with no warmup sweep.
         using var fixture = new TempFixtureWorkspace();
+        await using (var settling = new WorkspaceSession())
+        {
+            await settling.GetCurrentAsync(fixture.SolutionPath, Ct);
+        }
+
+        FixtureEdits.BackdateTree(Path.GetDirectoryName(fixture.SolutionPath)!);
         await using var session = new WorkspaceSession();
         WorkspaceSnapshot loaded = await session.GetCurrentAsync(fixture.SolutionPath, Ct);
-        // Best-effort: a file that cannot be re-stamped stays racy and re-reads, which the warmup
-        // below absorbs into the baseline.
-        FixtureEdits.BackdateAllDocuments(loaded);
-        await session.GetCurrentAsync(fixture.SolutionPath, Ct); // warmup: content-verifies + promotes
-        long readsAfterWarmup = session.SweepContentReads;
 
-        // Act — sweep twice more with disk untouched.
+        // Act — sweep twice with disk untouched.
         WorkspaceSnapshot again = await session.GetCurrentAsync(fixture.SolutionPath, Ct);
         WorkspaceSnapshot againTwice = await session.GetCurrentAsync(fixture.SolutionPath, Ct);
 
-        // Assert — same snapshot instance throughout, and zero additional content reads.
+        // Assert — same snapshot instance throughout, and no sweep re-read a document the load already read.
         again.ShouldBeSameAs(loaded);
         againTwice.ShouldBeSameAs(loaded);
-        (session.SweepContentReads - readsAfterWarmup).ShouldBe(0);
+        session.SweepContentReads.ShouldBe(0);
 
         // …and the delta the store diffs is stable: the generation holds and no project version ever bumped
         // (a pure no-op lifecycle never edits a document, so every seeded counter is still 0).
         again.Generation.ShouldBe(loaded.Generation);
         again.ProjectEditVersions.Values.ShouldAllBe(version => version == 0);
+    }
+
+    [Fact]
+    public async Task GetCurrentAsync_FileCompiledForTwoFrameworks_IsReadOnceForBoth()
+    {
+        // Arrange — MultiTfm.Core targets two frameworks, so its Widget.cs is one file behind two documents.
+        using var fixture = new TempFixtureWorkspace("TestSolutions/MultiTfm", "MultiTfm.sln");
+        await using var session = new WorkspaceSession();
+        string widgetFile = Path.GetFullPath(fixture.PathOf("MultiTfm.Core", "Widget.cs"));
+
+        // Act
+        WorkspaceSnapshot loaded = await session.GetCurrentAsync(fixture.SolutionPath, Ct);
+
+        // Assert — one read served both documents: they hold the same text instance, not two equal ones.
+        SourceText[] texts = await Task.WhenAll(loaded.Solution.GetDocumentIdsWithFilePath(widgetFile)
+            .Select(id => loaded.Solution.GetDocument(id)!.GetTextAsync(Ct)));
+        texts.Length.ShouldBe(2, "Widget.cs is compiled for both of MultiTfm.Core's target frameworks");
+        texts[1].ShouldBeSameAs(texts[0]);
     }
 
     [Fact]
