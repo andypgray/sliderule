@@ -171,23 +171,25 @@ public sealed class CheckCommandTests
     }
 
     [Theory]
+    [InlineData(-2)]
+    [InlineData(-1)]
     [InlineData(0)]
     [InlineData(1_000)]
     [InlineData(50_000)]
     public async Task Check_DegradedDocument_SurvivesTheTruncatorThatRunsAfterIt(int headroom)
     {
         // Arrange — the two stages composed, which is the gap a runner pinned in isolation cannot see: the
-        // runner degrades against a budget and the filter behind it then cuts at the same number. Budgets are
-        // taken from the skeleton's own size upward, because that is the range where the ladder can deliver a
-        // whole answer and therefore must.
+        // runner degrades against a budget and the filter behind it then cuts at the same number. The rows one
+        // and two characters short of the skeleton's written size are where a fitter and a truncator measuring
+        // different text disagree, since a line terminator is one or two characters. Every row is a budget the
+        // ladder can answer whole, and so must.
         int budget = await LengthAt(DocumentGrain.Skeleton) + headroom;
         var output = new StringWriter();
 
         // Act — the runner degrades against the budget, then the truncator sees what it produced.
         await Runner(output, FixedResponseBudget.Fitter(budget))
             .RunAsync(Request(), Ct);
-        string document = output.ToString()
-            .TrimEnd('\r', '\n');
+        string document = output.ToString();
         string afterTruncation = ResponseTruncator.TruncateIfNeeded(document, ArchToolNames.Check, budget);
 
         // Assert — the truncator is a no-op here, and what the caller holds is a whole document.
@@ -208,8 +210,7 @@ public sealed class CheckCommandTests
         // Act
         await Runner(output, FixedResponseBudget.Fitter(belowSkeleton))
             .RunAsync(Request(), Ct);
-        string document = output.ToString()
-            .TrimEnd('\r', '\n');
+        string document = output.ToString();
         string afterTruncation = ResponseTruncator.TruncateIfNeeded(document, ArchToolNames.Check, belowSkeleton);
 
         // Assert — a whole report at the floor rung, untouched by the truncator behind it.
@@ -233,8 +234,7 @@ public sealed class CheckCommandTests
         // Act
         await Runner(output, FixedResponseBudget.Fitter(belowIndex))
             .RunAsync(Request(), Ct);
-        string document = output.ToString()
-            .TrimEnd('\r', '\n');
+        string document = output.ToString();
         string afterTruncation = ResponseTruncator.TruncateIfNeeded(document, ArchToolNames.Check, belowIndex);
 
         // Assert — cut, and the hint names the one knob still worth reaching for. Naming a grain here would
@@ -317,16 +317,14 @@ public sealed class CheckCommandTests
         return new CheckRunner(output, TextWriter.Null, WarmWorkspacePool.Source, new SystemEnvironment(), fitter);
     }
 
-    // The composed document's length, not the writer's: the runner measures the document against the budget
-    // before Render appends a line terminator, so counting that terminator here would shift every budget
-    // these tests derive by the width of one newline — and on Windows that is two characters, not one.
+    // The written document's length, terminator included: the fitter measures each rung as it will be written,
+    // which is also the text the MCP truncator measures, so every budget these tests derive is in that unit.
     private static async Task<int> LengthAt(DocumentGrain grain)
     {
         var output = new StringWriter();
         await Runner(output)
             .RunAsync(Request(grain), Ct);
         return output.ToString()
-            .TrimEnd('\r', '\n')
             .Length;
     }
 

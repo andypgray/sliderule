@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- An `arch_check` or `arch_graph` reply within one or two characters of the client's response budget now
+  comes back whole at a coarser grain. Before, the grain was chosen without counting the document's final
+  line end, so the reply was then cut at the budget into JSON that would not parse.
 - The MCP server, started on a `.slnf` solution filter, now reloads the workspace when the solution the
   filter names changes. Before, adding or removing a project there went unseen until something else
   forced a reload, so `uncheckedProjects` and `unsupportedProjects` could describe the solution as it was.

@@ -443,17 +443,15 @@ public sealed class CliMcpParityTests
     /// </summary>
     private static int ShouldHaveBudgetBetween(CliResult larger, CliResult smaller)
     {
-        int largerChars = larger.Out.TrimEnd('\r', '\n')
-            .Length;
-        int smallerChars = smaller.Out.TrimEnd('\r', '\n')
-            .Length;
+        int largerChars = larger.Out.Length;
+        int smallerChars = smaller.Out.Length;
         // Working back from characters to the token budget a client would declare: at two characters per token,
         // this many tokens puts the cap near the midpoint of the two documents. The two assertions below are what
         // keep that honest if the truncator's rule ever moves.
         int tokens = (largerChars + smallerChars) / 4;
         int budget = ResponseTruncator.ComputeMaxChars(tokens.ToString(CultureInfo.InvariantCulture));
 
-        budget.ShouldBeGreaterThanOrEqualTo(smallerChars + Environment.NewLine.Length);
+        budget.ShouldBeGreaterThanOrEqualTo(smallerChars);
         budget.ShouldBeLessThan(largerChars);
 
         return tokens;

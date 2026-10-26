@@ -90,7 +90,8 @@ internal sealed class GraphRunner(
     }
 
     // The JSON survey, degraded rather than cut (IResponseFitter). Each rung is re-composed from the summary
-    // already in hand, no second extraction, so it is byte-identical to what --grain naming it would write.
+    // already in hand, no second extraction, so it is byte-identical to what --grain naming it would write,
+    // and carries its terminator, so the fitter measures the text the MCP truncator measures after it.
     // Degrading coarsens the grain and never touches the scope: every rung carries the same narrowing.
     private void WriteJson(
         GraphRequest request, GraphSummary scoped, string solutionName,
@@ -99,13 +100,14 @@ internal sealed class GraphRunner(
     {
         IEnumerable<string> ladder = request.Grain.Ladder(Compose);
         string document = Fitter.Fit(ladder);
-        output.WriteLine(document);
+        output.Write(document);
         return;
 
         string Compose(DocumentGrain at)
         {
-            return GraphJsonRenderer.Document(
+            string composed = GraphJsonRenderer.Document(
                 scoped, solutionName, renderedDiagnostics, trust, at, projectGlobs);
+            return SlideRuleJson.Terminated(composed);
         }
     }
 

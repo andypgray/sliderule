@@ -328,7 +328,7 @@ internal sealed class HookRunner(
         if (firing.AtCap || !MayContinue(firing)) return EndTurn(firing);
 
         state.RememberSaid(document);
-        await output.WriteLineAsync(document);
+        await output.WriteAsync(SlideRuleJson.Terminated(document));
         return HookExitCodes.Proceed;
     }
 

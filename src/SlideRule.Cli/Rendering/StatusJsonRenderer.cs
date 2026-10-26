@@ -51,7 +51,7 @@ internal static class StatusJsonRenderer
                 SlideRuleJson.OmitZero(report.UncountedBaselineEntryCount),
                 SlideRuleJson.OmitZero(report.UnmeasuredBaselineEntryCount)));
 
-        output.WriteLine(JsonSerializer.Serialize(document, SlideRuleJson.Context.StatusJson));
+        output.Write(SlideRuleJson.Terminated(JsonSerializer.Serialize(document, SlideRuleJson.Context.StatusJson)));
     }
 
     private static IReadOnlyList<StatusOrphanJson>? Orphans(BaselineOrphanScan scan)

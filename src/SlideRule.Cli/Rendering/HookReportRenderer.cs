@@ -39,8 +39,8 @@ internal static class HookReportRenderer
 
     /// <summary>
     ///     The one-object document carrying <paramref name="report" /> as additional context for
-    ///     <paramref name="hookEvent" />, with no trailing newline (the caller's <c>WriteLine</c> supplies
-    ///     it).
+    ///     <paramref name="hookEvent" />, with no trailing newline (the caller writes it through
+    ///     <see cref="SlideRuleJson.Terminated" />).
     /// </summary>
     public static string Document(string report, string hookEvent)
     {

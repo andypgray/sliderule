@@ -46,6 +46,15 @@ internal static class SlideRuleJson
     public static readonly SlideRuleJsonContext Context = new(Options);
 
     /// <summary>
+    ///     A document as the CLI writes it: the text and its one line terminator. A budget measured against
+    ///     the document must measure this text, because it is what reaches stdout and the MCP truncator.
+    /// </summary>
+    public static string Terminated(string document)
+    {
+        return document + Environment.NewLine;
+    }
+
+    /// <summary>
     ///     A count for an additive wire slot: itself when there is something to report, and null — omitted,
     ///     under <see cref="Options" />' null handling — at zero. Zero and absent say the same thing, and a
     ///     key that appears only when it means something keeps a clean document clean.

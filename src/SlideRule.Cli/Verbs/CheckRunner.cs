@@ -128,7 +128,7 @@ internal sealed class CheckRunner(
 
         if (warnings == 0) return;
 
-        output.WriteLine(HookReportRenderer.Document(composed.TrimEnd('\r', '\n'), hookEvent));
+        output.Write(SlideRuleJson.Terminated(HookReportRenderer.Document(composed.TrimEnd('\r', '\n'), hookEvent)));
     }
 
     // The human filter stamp, written by the runner rather than by Core's shared HumanReportRenderer so an
@@ -198,7 +198,8 @@ internal sealed class CheckRunner(
     }
 
     // The JSON report, degraded rather than cut (IResponseFitter). Each rung is re-composed from the result
-    // model already in hand, no second check, so it is byte-identical to what --grain naming it would write.
+    // model already in hand, no second check, so it is byte-identical to what --grain naming it would write,
+    // and carries its terminator, so the fitter measures the text the MCP truncator measures after it.
     // Degrading coarsens the grain and never touches the selection: every rule the run evaluated is still
     // here with its verdict, and the summary counts still cover exactly what ran. The two renderings arrive
     // composed because stderr, the document and SARIF must read one composition.
@@ -209,14 +210,15 @@ internal sealed class CheckRunner(
         string specAssembly = Path.GetFileName(source.Resolution.DllPath);
         IEnumerable<string> ladder = request.Grain.Ladder(Compose);
         string document = Fitter.Fit(ladder);
-        stdout.WriteLine(document);
+        stdout.Write(document);
         return;
 
         string Compose(DocumentGrain at)
         {
-            return JsonReportRenderer.Document(
+            string composed = JsonReportRenderer.Document(
                 report, source.SolutionDirectory, source.SolutionName, specAssembly, request.DiffBase,
                 renderedDiagnostics, trust, ruleGlobs, at);
+            return SlideRuleJson.Terminated(composed);
         }
     }
 }
