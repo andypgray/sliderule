@@ -31,7 +31,7 @@ internal sealed record HookRun(
 ///         A bare <c>Result.Exit.ShouldBe(2)</c> says <c>1 should be 2</c> and hides the stderr line that explains
 ///         it, and a bare check on the recorded requests says <c>False should be True</c> and not one word about
 ///         where the hook did look. Every assertion here passes <see cref="Describe" /> as its Shouldly reason
-///         instead, so the exit code, both channels, every check with its directory and event, and the two
+///         instead, so the exit code, both channels, the directory of every check, and the two
 ///         directories the run was pointed at are in front of the reader.
 ///     </para>
 ///     <para>

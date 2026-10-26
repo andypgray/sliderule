@@ -6,7 +6,9 @@ using Xunit;
 
 namespace SlideRule.Tests.Mcp;
 
-/// <summary><see cref="ToolAttributeDiscovery" />: the one definition of which methods the server registers as tools.</summary>
+/// <summary>
+///     <see cref="ToolAttributeDiscovery" />: the one definition of which methods the server registers as tools.
+/// </summary>
 public sealed class ToolAttributeDiscoveryTests
 {
     [Fact]

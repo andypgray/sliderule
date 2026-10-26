@@ -4,8 +4,8 @@ using Xunit;
 namespace SlideRule.Tests.TestSupport;
 
 /// <summary>
-///     A class fixture over the run's one model of the checked-in <c>MyApp</c> fixture solution: the first
-///     consumer class to start pays the load and the extraction through <see cref="FixtureCodebase" />, and
+///     A class fixture over the run's one model of the checked-in <c>MyApp</c> fixture solution: whichever reader
+///     of that bed starts first pays the load and the extraction through <see cref="FixtureCodebase" />, and
 ///     every later one awaits the same task. Tests only read <see cref="Model" />, so one shared instance is
 ///     safe.
 /// </summary>
@@ -17,7 +17,7 @@ public sealed class WorkspaceFixture : IAsyncLifetime
     /// <summary>The extracted model. Set during <see cref="InitializeAsync" />.</summary>
     internal CodebaseModel Model { get; private set; } = null!;
 
-    /// <summary>Opens the fixture solution and extracts <see cref="Model" /> from it.</summary>
+    /// <summary>Awaits the run's one extraction of the fixture solution into <see cref="Model" />.</summary>
     public async ValueTask InitializeAsync()
     {
         Model = await FixtureCodebase.Of(SolutionPath);

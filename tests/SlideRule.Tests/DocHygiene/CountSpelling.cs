@@ -18,10 +18,7 @@ internal enum CountStyle
     WordToTen
 }
 
-/// <summary>
-///     The count-spelling grammar the count gates share: how each <see cref="CountStyle" /> writes a count,
-///     the fragment a registered template composes, and what a count reads as where a gate scans prose for one.
-/// </summary>
+/// <summary>The count-spelling grammar the count gates share.</summary>
 internal static class CountSpelling
 {
     internal static readonly string[] Units =
@@ -35,8 +32,8 @@ internal static class CountSpelling
         ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"];
 
     // Declared after Units and Tens because the initializer calls Spell, which reads them: a static field
-    // initializer runs in declaration order, so hoisting this above them would leave the set built from
-    // nulls.
+    // initializer runs in declaration order, so hoisting this above them would have Spell read them while
+    // they are still null, and the type would fail to initialize.
     private static readonly HashSet<string> CountWords = Enumerable.Range(0, 100)
         .SelectMany(static count => Enum.GetValues<CountStyle>()
             .Select(style => Spell(count, style)))
@@ -87,8 +84,8 @@ internal static class CountSpelling
     internal const string CountToken = @"(?<count>[A-Za-z][a-z]*(-[a-z]+)?|\d+)";
 
     /// <summary>
-    ///     Whether <paramref name="written" /> is a count as this repository's prose spells one: a number
-    ///     word in running or sentence-initial case, or a numeral.
+    ///     Whether <paramref name="written" /> is a count from 0 to 99 as this repository's prose spells one:
+    ///     a number word in running or sentence-initial case, or a numeral.
     /// </summary>
     /// <remarks>
     ///     The set is derived from <see cref="Spell" /> rather than written out a second time, which is

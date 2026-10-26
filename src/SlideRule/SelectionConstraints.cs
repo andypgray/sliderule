@@ -32,8 +32,9 @@ namespace SlideRule;
 ///     for a bare <c>typeof</c> operand the codebase never mentions, or for <c>MustNotUse</c> and
 ///     <c>MustNotInject</c>, whose banned targets are meant to be absent.
 /// </summary>
-// The (first, params more) shape on every list verb is what keeps a zero-operand call a compile error
-// instead of a GRAMMAR §8 item; the shapes that legitimately name no operand carry nullary verbs of
+// The (first, params more) shape on the list verbs is what keeps a zero-operand call a compile error
+// instead of a GRAMMAR §8 item. An overload that takes a whole list, such as MustNotUse(IEnumerable<Member>),
+// cannot, and reports an empty list when the spec is loaded. The shapes that legitimately name no operand carry nullary verbs of
 // their own (GRAMMAR §3.3, §10). Polarity stays lexical (GRAMMAR §2 principle 3): no verb here may
 // grow a Not() combinator or a polarity flag.
 public static class SelectionConstraints

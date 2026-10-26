@@ -180,9 +180,10 @@ public sealed class CheckCommandTests
     {
         // Arrange — the two stages composed, which is the gap a runner pinned in isolation cannot see: the
         // runner degrades against a budget and the filter behind it then cuts at the same number. The rows one
-        // and two characters short of the skeleton's written size are where a fitter and a truncator measuring
-        // different text disagree, since a line terminator is one or two characters. Every row is a budget the
-        // ladder can answer whole, and so must.
+        // and two characters short of the skeleton's written size are the budgets at which a fitter that measured
+        // the document without its terminator (the LF every document ends in, or a CRLF if the writer went back
+        // to the platform's line end) would pass a rung the truncator then cuts. Every row is a budget the ladder
+        // can answer whole, and so must.
         int budget = await LengthAt(DocumentGrain.Skeleton) + headroom;
         var output = new StringWriter();
 

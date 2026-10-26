@@ -18,11 +18,10 @@ namespace SlideRule.Tests.Mcp;
 /// <remarks>
 ///     <para>
 ///         Most rows ride the <c>arch_explain</c> DLL fast path (a built-DLL spec resolves with no
-///         workspace), so the whole stack is proven in milliseconds. The two over-budget graph rows need a
-///         real survey: one lands on a coarser grain, and the other proves that the narrowing hint, keyed on
-///         the tool name, travels. The bool-coercer and wrong-case-key rows call <c>arch_graph</c> or
-///         <c>arch_context</c> and fail ahead of any survey: the coercer at binding, the wrong-case keys at the
-///         guard.
+///         workspace), so the whole stack is proven in milliseconds. The over-budget graph row needs a real
+///         survey, to prove that the narrowing hint, keyed on the tool name, travels. The bool-coercer and
+///         parameter-key rows call <c>arch_graph</c> or <c>arch_context</c> and fail ahead of any survey: the
+///         coercer at binding, the keys at the guard.
 ///     </para>
 ///     <para>
 ///         The filter brackets each call with the shared
@@ -35,8 +34,8 @@ namespace SlideRule.Tests.Mcp;
 public sealed class GlobalCallToolFilterTests
 {
     /// <summary>
-    ///     Gets the argument keys of arch_context calls that leave out its required <c>path</c>: no arguments at all, and
-    ///     an empty object.
+    ///     Gets the argument keys of arch_context calls that leave out its required <c>path</c>: no arguments at
+    ///     all, and an empty object.
     /// </summary>
     public static TheoryData<string[]?> KeysWithoutPath => new() { (string[]?)null, { [] } };
 
@@ -85,8 +84,8 @@ public sealed class GlobalCallToolFilterTests
     [Fact]
     public async Task CallTool_StringifiedArrayArgument_RefusesOnTheShapeWithoutTheRoster()
     {
-        // Arrange — the defect as filed, on the surface it was filed against: a client serialized a JSON
-        // array into the string parameter it was binding, so the tool received one token carrying brackets.
+        // Arrange — a client that serializes a JSON array into the string parameter it binds, so the tool
+        // receives one token carrying brackets.
         // A real one-element array never reaches the runner (StringCoercerFactory unwraps it); a string that
         // merely looks like one survives untouched, which is the value under test.
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(

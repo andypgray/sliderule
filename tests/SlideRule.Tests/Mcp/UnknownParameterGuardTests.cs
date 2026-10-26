@@ -20,8 +20,8 @@ public sealed class UnknownParameterGuardTests(AdvertisedToolsFixture advertised
         .RootElement;
 
     /// <summary>
-    ///     Gets the argument keys of arch_context calls that leave out its required <c>path</c>: no arguments at all, and
-    ///     an empty object.
+    ///     Gets the argument keys of arch_context calls that leave out its required <c>path</c>: no arguments at
+    ///     all, and an empty object.
     /// </summary>
     public static TheoryData<string[]?> KeysWithoutPath => new() { (string[]?)null, { [] } };
 

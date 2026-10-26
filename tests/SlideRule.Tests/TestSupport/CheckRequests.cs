@@ -7,8 +7,7 @@ namespace SlideRule.Tests.TestSupport;
 ///     The plain <c>check</c> run every <see cref="CheckRunner" /> row starts from: the human report at full
 ///     grain, over the cache, with no diff base, no binlog, no SARIF, no rule filter and workspace
 ///     diagnostics not allowed. A row that cares about one of those says so with a <c>with</c> clause
-///     instead of respelling twelve positional arguments, four of them a bare <c>false</c> and four a bare
-///     <c>null</c>.
+///     instead of respelling every positional argument, most of them a bare <c>false</c> or <c>null</c>.
 /// </summary>
 /// <remarks>
 ///     The twin of <see cref="BaselineRequests" />, and for its reason: what a row is about should be the

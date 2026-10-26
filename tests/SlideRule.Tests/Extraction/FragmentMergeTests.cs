@@ -1097,13 +1097,11 @@ public sealed class FragmentMergeTests
     [Fact]
     public void ExtractFromCompilations_FrameworkThatLeavesOutItsProjectsCopy_ShareTheSiteBothFrameworksMade()
     {
-        // One project, two frameworks: the older declares Formatter itself, as a #if-guarded polyfill would, and the
-        // newer leaves it out and binds Core's copy through a real reference. Each compilation reached a different
-        // copy, so the one edge both make is two instances, and asking the project whether it declares the name
-        // would have folded the newer framework's reference into the project's own copy. There is one site, made
-        // from one line of one file by both compilations. Each instance holds that site — the same object, not
-        // a copy — because the merge unions sites and never partitions them, which is the invariant the
-        // checker's by-reference filter over several instances' evidence rests on.
+        // The two frameworks bound different copies, so the one edge both make is two instances; asking the
+        // project whether it declares the name would fold the newer framework's reference into the project's own
+        // copy. There is one site, made from one line of one file by both compilations. Each instance holds that
+        // site — the same object, not a copy — because the merge unions sites and never partitions them, which is
+        // the invariant the checker's by-reference filter over several instances' evidence rests on.
         CodebaseModel model = FrameworkWithoutItsProjectsCopy();
 
         ReferenceEdge fromPage = model.Edge("App.Page", "Drift.Formatter");

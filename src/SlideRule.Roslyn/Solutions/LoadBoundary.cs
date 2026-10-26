@@ -27,7 +27,7 @@ internal static class LoadBoundary
     ///     what loaded against <paramref name="solutionPath" />, the solution file the load came from or was run
     ///     over, or null when none is known.
     /// </summary>
-    // The three steps read and write disjoint facts (references; names; file and output paths), so the order
+    // The steps read and write disjoint facts (references; names; file and output paths), so the order
     // decides nothing; it is fixed here so that both paths run one sequence. The project files are resolved once,
     // here, for the steps that compare them and for every reader of the load after them.
     internal static SettledSolution Settle(Solution solution, string? solutionPath)

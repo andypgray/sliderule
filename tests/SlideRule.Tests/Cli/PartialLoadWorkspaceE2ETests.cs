@@ -381,8 +381,8 @@ public sealed class PartialLoadWorkspaceE2ETests
     }
 
     /// <summary>
-    ///     This class's leased copy of the BrokenApp fixture, with the arrange-time guard that keeps this whole class
-    ///     honest: <c>BrokenApp.Contracts</c> must still be absent. Creating that directory — or committing a
+    ///     This class's leased copy of the BrokenApp fixture, with the arrange-time guard the whole class depends
+    ///     on: <c>BrokenApp.Contracts</c> must still be absent. Creating that directory — or committing a
     ///     stub csproj for it — is the single edit that would silently turn every fact above into a test of
     ///     nothing, so it fails loudly here instead.
     /// </summary>

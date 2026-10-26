@@ -7,6 +7,11 @@ namespace SlideRule.Rendering;
 ///     Where a violation lands in the human report and in the build warnings: an edge violation at every site
 ///     it carries, a shape violation at the first, so the two surfaces point a reader at the same lines.
 /// </summary>
+/// <remarks>
+///     An edge violation lands at every site because a pair that has grown is red at all of them, and the reader
+///     cannot be told which one is new. A shape violation lands at one because it is about the subject rather
+///     than about any one of its declarations.
+/// </remarks>
 internal static class ViolationPlacement
 {
     // None for the kinds that are about the rule rather than about the code, which carry no site at all.

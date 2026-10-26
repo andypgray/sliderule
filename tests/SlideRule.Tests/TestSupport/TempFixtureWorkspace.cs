@@ -69,8 +69,8 @@ internal sealed class TempFixtureWorkspace : IDisposable
     /// <param name="solutionFileName">The solution file's name inside that directory.</param>
     /// <param name="restore">Whether to <c>dotnet restore</c> the copy before handing it back.</param>
     /// <param name="callerFilePath">
-    ///     Compiler-supplied; never passed explicitly. The calling source file is the lease key, which by the
-    ///     repository's one-type-per-file rule is exactly "the test class".
+    ///     Compiler-supplied, or forwarded from a helper's own caller-info parameter. The calling source file is
+    ///     the lease key, which by the repository's one-type-per-file rule is exactly "the test class".
     /// </param>
     public TempFixtureWorkspace(
         string fixtureDirectory = DefaultFixtureDirectory,
@@ -273,10 +273,9 @@ internal sealed class TempFixtureWorkspace : IDisposable
     }
 
     /// <summary>
-    ///     Whether a changed file obliges the copy to re-restore: the project itself, any of the three
-    ///     solution formats, and the MSBuild imports that can add a package reference. Internal so the
-    ///     accepted set pins without leasing a tree — a format missing here fails silently, leaving the copy
-    ///     on a stale <c>project.assets.json</c> rather than reporting anything.
+    ///     Whether a changed file obliges a re-restore: the project itself, any of the three solution formats,
+    ///     and the MSBuild imports that can add a package reference. A format missing here fails silently,
+    ///     leaving the tree on a stale <c>project.assets.json</c> rather than reporting anything.
     /// </summary>
     internal static bool IsProjectFile(string path)
     {

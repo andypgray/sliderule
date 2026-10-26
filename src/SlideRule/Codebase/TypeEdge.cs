@@ -1,8 +1,8 @@
 namespace SlideRule.Codebase;
 
 /// <summary>
-///     An edge whose far end is a type: its source and the evidence it cites. Each family names its far end for
-///     what it is and answers <see cref="Target" /> with it.
+///     An edge whose far end is a type. Each family names its far end for what it is and answers
+///     <see cref="Target" /> with it.
 /// </summary>
 internal abstract class TypeEdge : IEdgeEnds
 {

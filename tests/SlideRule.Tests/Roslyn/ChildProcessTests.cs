@@ -8,9 +8,9 @@ using Xunit;
 namespace SlideRule.Tests.Roslyn;
 
 /// <summary>
-///     Covers <see cref="ChildProcess" />'s expiry path on both arms: a real tree kill ends the child before the
-///     caller gets its timeout, and a refused kill still leaves the caller its timeout, or its own cancellation,
-///     rather than the kill's failure.
+///     Covers <see cref="ChildProcess" />'s expiry path: on both arms a real tree kill ends the child before the
+///     caller gets its timeout, and on the async arm a refused kill still leaves the caller its timeout, or its own
+///     cancellation, rather than the kill's failure.
 /// </summary>
 /// <remarks>
 ///     The refused kill is injected because a real tree kill refuses only when a descendant cannot be ended, which no
@@ -65,8 +65,8 @@ public sealed class ChildProcessTests
         kill.Calls.ShouldBe(1);
     }
 
-    // A child that outlives any bound here and ends on its own if no kill comes. With recordsPid it first writes
-    // its own PID to the file named by RecordedChild.PidFileVariable.
+    // A child that is still asleep when each test's timeout or cancel fires, and ends on its own if no kill comes.
+    // With recordsPid it first writes its own PID to the file named by RecordedChild.PidFileVariable.
     private static ProcessStartInfo Sleeper(bool recordsPid = false)
     {
         if (OperatingSystem.IsWindows())
@@ -110,9 +110,10 @@ public sealed class ChildProcessTests
     {
         internal const string PidFileVariable = "SLIDERULE_TEST_CHILD_PID_FILE";
 
-        // How long a child the kill missed is given to show itself, by recording its PID or by exiting.
+        // How long the child is given to record its PID, and then to exit after the expiry's kill.
         private static readonly TimeSpan Settle = TimeSpan.FromSeconds(10);
 
+        // Dispose kills a recorded PID only under these names, since by then the PID may name another process.
         private static readonly string[] SleeperNames = ["powershell", "sh", "sleep"];
 
         private readonly TempDirectory _directory;

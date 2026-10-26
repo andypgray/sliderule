@@ -750,7 +750,7 @@ public class VocabularyFragmentTests
     public void MustNotReferencePackages_CarriesTheHonestyBoundaryAndNoPrivacyClause()
     {
         // Privacy exempts nothing from a ban, so the sentence names no privacy clause; the declared-only boundary
-        // still rides, as on every package verb.
+        // still rides, as on every package-reference verb.
         SentenceRenderer.Sentence(Arch.Projects.Matching("MassTransit*").MustNotReferencePackages("GreenPipes"))
             .ShouldBe(
                 "Projects matching `MassTransit*` must not reference NuGet packages matching `GreenPipes` (declared "

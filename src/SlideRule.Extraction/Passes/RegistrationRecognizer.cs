@@ -64,8 +64,8 @@ internal sealed class RegistrationRecognizer
     public bool IsActive => _serviceCollection is not null;
 
     /// <summary>
-    ///     Reports the registration an invocation makes, at most one, or nothing when it is not a recognized
-    ///     call.
+    ///     Reports the registration an invocation makes, or null when it is not a recognized call or its types or
+    ///     lifetime cannot be read.
     /// </summary>
     public RecognizedRegistration? Recognize(InvocationExpressionSyntax invocation, SemanticModel model)
     {

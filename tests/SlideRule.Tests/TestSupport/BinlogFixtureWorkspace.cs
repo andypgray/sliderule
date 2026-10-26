@@ -64,9 +64,9 @@ public sealed class BinlogFixtureWorkspace : IDisposable
 
     /// <summary>
     ///     Writes a second solution file beside <see cref="SolutionPath" /> declaring its members plus
-    ///     <see cref="UnbuiltProject" />, a project with no file on disk that the binlog therefore never built,
-    ///     and returns it as a scope that deletes it on dispose. It carries the original's write time, so a
-    ///     capture's ingest reads it as no newer than the build rather than refusing the binlog as stale.
+    ///     <see cref="UnbuiltProject" />, and returns it as a scope that deletes it on dispose. It carries the
+    ///     original's write time, so a capture's ingest reads it as no newer than the build rather than refusing
+    ///     the binlog as stale.
     /// </summary>
     internal ScopedFile WriteSolutionWithUnbuiltMember()
     {

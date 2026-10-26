@@ -16,9 +16,9 @@ namespace SlideRule;
 // A closed hierarchy: the constructor is private protected, so no foreign assembly can add a node, and
 // every node is walkable and renderable by construction. The vocabulary ships as extension methods
 // (SelectionAdjectives, SelectionConstraints) that build the internal nodes; the member projections are
-// instance properties so that a Layer inherits them (GRAMMAR §4.6). A selection is one SelectionNoun
-// plus an ordered list of SelectionAdjective refinements, which is exactly what sentence assembly reads
-// (GRAMMAR §6).
+// instance properties so that a Layer inherits them (GRAMMAR §4.6). A selection is one SelectionNoun, or a
+// union's parts, plus an ordered list of SelectionAdjective refinements, which is exactly what sentence
+// assembly reads (GRAMMAR §6).
 public abstract class Selection
 {
     private protected Selection(Arch owner)
@@ -29,7 +29,9 @@ public abstract class Selection
     /// <summary>The <see cref="Arch" /> this selection was minted on (GRAMMAR §3.2 fresh-instance contract).</summary>
     internal Arch Owner { get; }
 
-    /// <summary>The noun head the adjectives refine; null for a union, which has no single noun (GRAMMAR §5.1).</summary>
+    /// <summary>
+    ///     The noun head the adjectives refine; null for a union, which has no single noun (GRAMMAR §5.1).
+    /// </summary>
     internal abstract SelectionNoun? Noun { get; }
 
     /// <summary>The ordered adjective refinements applied to the noun.</summary>

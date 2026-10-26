@@ -128,8 +128,8 @@ internal static class GraphJsonRenderer
             .ToList();
     }
 
-    // Omitted at zero on both keys, which is what keeps the survey of a solution with no generators exactly
-    // the document it was before the key existed — and keeps the skeleton grain inside its token budget.
+    // Omitted at zero on both keys, so the survey of a solution with no generators carries neither key, and
+    // the skeleton grain stays inside its token budget.
     private static GraphNamespaceJson ToNamespace(NamespaceCount @namespace)
     {
         return new GraphNamespaceJson(

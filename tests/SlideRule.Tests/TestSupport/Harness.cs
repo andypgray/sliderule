@@ -24,13 +24,17 @@ internal static class Harness
         return CodebaseModelBuilder.Build(inputs, Ct);
     }
 
-    /// <summary>Checks every rule with no baselines and no diff, so every violation fails and every tripwire skips.</summary>
+    /// <summary>
+    ///     Checks every rule with no baselines and no diff, so every violation fails and every tripwire skips.
+    /// </summary>
     public static CheckReport Check(ArchitectureModel model, CodebaseModel codebase)
     {
         return Check(model.Rules, codebase, BaselineIndex.Empty, null);
     }
 
-    /// <summary>Checks every rule against <paramref name="baselines" /> with no diff, so every tripwire skips.</summary>
+    /// <summary>
+    ///     Checks every rule against <paramref name="baselines" /> with no diff, so every tripwire skips.
+    /// </summary>
     public static CheckReport Check(ArchitectureModel model, CodebaseModel codebase, BaselineIndex baselines)
     {
         return Check(model.Rules, codebase, baselines, null);

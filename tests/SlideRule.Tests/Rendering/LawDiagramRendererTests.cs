@@ -344,7 +344,7 @@ public sealed class LawDiagramRendererTests
     public void Block_AFacadeThatIsOrCoversItsScope_KeepsTheScopeBoxAndSendsItsRuleUnderTheFence(string boundary)
     {
         // Arrange — a box cannot be drawn inside itself or inside a box it sits in, so the sanctioned surface
-        // has no honest node, as a named facade has none.
+        // gets no node of its own, as a named facade gets none.
         ArchitectureModel model = Checker.Model(arch =>
             arch.Scope("legacy/pricing")
                 .Quarantine(arch.Namespace("Shop.Legacy.Pricing.*"))

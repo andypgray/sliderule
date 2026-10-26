@@ -362,7 +362,7 @@ public sealed class WorkspaceExtractionTests(WorkspaceFixture fixture) : IClassF
         ext.IsAbstract.ShouldBeFalse();
         ext.Accessibility.ShouldBe(Accessibility.Public);
 
-        // The pinned two-file partial: FilePaths, solution-relative, in site order: Order.Validation.cs sorts
+        // The pinned two-file partial: FilePaths in site order, read solution-relative. Order.Validation.cs sorts
         // before Order.cs ('V' < 'c' ordinal).
         TypeNode order = fixture.Model.Type("MyApp.Domain.Order");
         order.FilePaths.Select(fixture.RelativePath)

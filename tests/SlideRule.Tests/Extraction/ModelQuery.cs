@@ -7,7 +7,7 @@ internal static class ModelQuery
 {
     /// <summary>The lines of a list of sites, in recorded order: <c>edge.Sites.Lines()</c>.</summary>
     /// <remarks>
-    ///     On the sites rather than on each edge: the eight edge kinds share no sited contract in the shipped
+    ///     On the sites rather than on each edge: the edge kinds share no sited contract in the shipped
     ///     model, and naming the list at the call site says which of an edge's site lists is meant.
     /// </remarks>
     public static IReadOnlyList<int> Lines(this IEnumerable<SourceLocation> sites)
@@ -286,7 +286,7 @@ internal static class ModelQuery
             .ToList();
     }
 
-    // A node as ModelDump renders an endpoint, so two nodes wearing one name read apart.
+    // A node as ModelDump renders an endpoint, so two nodes that share a name read apart.
     private static string Endpoint(TypeNode node)
     {
         return $"{node.FullName}@{node.ProjectName}";

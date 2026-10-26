@@ -102,8 +102,8 @@ internal static class UnsupportedProjectsNotice
         return EvidenceBlock.Compose(lede, unsupportedProjects, tail);
     }
 
-    // It states no cause, because each entry beneath it says its own, and "C# only" would be false about a
-    // shared project.
+    // The clause states no cause, because each entry beneath it says its own, and "C# only" would be false
+    // about a shared project.
     private static string Subject(int unsupportedProjectCount)
     {
         return DeclaredProjectsClause.Subject(unsupportedProjectCount, "surveyed");

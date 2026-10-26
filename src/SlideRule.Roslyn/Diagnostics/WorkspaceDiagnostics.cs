@@ -80,7 +80,7 @@ internal sealed record UnsupportedProject(string Path, UnsupportedProjectKind Ki
 ///     <para>
 ///         Every project path here is absolute, and every list of them ordinal-sorted. The fail-closed gate rests
 ///         on two of those lists, <see cref="FailedProjects" /> and <see cref="RestoreFailedProjects" />, read at
-///         the load boundary by <see cref="ProjectLoadFailures" /> and <see cref="RestoreFailures" />, and never on
+///         load time by <see cref="ProjectLoadFailures" /> and <see cref="RestoreFailures" />, and never on
 ///         diagnostic text, which is neither a contract nor language-independent: the diagnostics render and
 ///         decide nothing. The two causes stay two lists, with separate remedies, and meet at
 ///         <see cref="IsIncomplete" />. The other lists scope the verdict and never reach <see cref="Gates" />: the
@@ -92,9 +92,10 @@ internal sealed record UnsupportedProject(string Path, UnsupportedProjectKind Ki
 ///     </para>
 /// </remarks>
 /// <param name="LoadFailures">
-///     The workspace-load failure diagnostics, raw, NuGet audit advisories among them, which is how the
-///     extraction cache persists them. Never a gate input: MSBuild severity does not survive the trip, so an
-///     entry can be a fatal evaluation error or a restore warning and nothing downstream can tell.
+///     The workspace-load failure diagnostics, raw, NuGet audit advisories among them, and the load's own warnings
+///     beside them, which is how the extraction cache persists them. Never a gate input: MSBuild severity does not
+///     survive the trip, so an entry can be a fatal evaluation error or a restore warning and nothing downstream
+///     can tell.
 /// </param>
 /// <param name="MergeNotes">The advisory notes the fragment merge raised.</param>
 /// <param name="FailedProjects">The <c>.csproj</c> paths of the projects that failed to load.</param>

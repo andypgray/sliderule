@@ -127,8 +127,9 @@ internal sealed class HookRunner(
 
         state.RecordBaseline(snapshot);
 
-        // A tree that is gone, or whose directory git no longer answers for as that top level, keeps its records as
-        // they are; so does a record that names no tree.
+        // Each other tree's baseline is replaced too, so the next stop that weighs it reads the turn's own changes
+        // rather than everything since the last stop that weighed it. A tree that is gone, or whose directory git no
+        // longer answers for as that top level, keeps its records as they are; so does a record that names no tree.
         foreach ((string other, HookState otherState, TreeSnapshot otherSnapshot) in await othersRun)
             if (otherSnapshot.Known && otherSnapshot.TopLevel is { } topLevel && SameDirectory(topLevel, other))
                 otherState.RecordBaseline(otherSnapshot);
@@ -136,10 +137,8 @@ internal sealed class HookRunner(
         return HookExitCodes.Proceed;
     }
 
-    // Each other tree a stop of this session has weighed, as the prompt finds it: each gets the prompt's baseline
-    // too, replacing whatever stands there, so the next stop that weighs it reads the turn's own changes rather than
-    // everything since the last stop that weighed it. The prompt waits on them, and they share nothing with each
-    // other or with the session's own tree, so they are snapshotted together with it.
+    // Each other tree a stop of this session has weighed, as the prompt finds it. The prompt waits on them, and they
+    // share nothing with each other or with the session's own tree, so they are snapshotted together with it.
     private static async Task<(string Tree, HookState State, TreeSnapshot Snapshot)[]> SnapshotOtherTreesAsync(
         HookState state, string ownTree, CancellationToken ct)
     {
@@ -155,8 +154,8 @@ internal sealed class HookRunner(
         string tree = await SessionTreeAsync(payload.Cwd, projectDirectory, ct) ?? request.WorkingDirectory;
         HookState state = OpenState(payload);
 
-        // The trees share nothing, so each is examined beside the others, and the list keeps the session's own
-        // first, then the others in the order the turn wrote them.
+        // The trees share nothing, so the session's own is examined while the others are found, and the others
+        // beside each other. The list keeps the session's own first, then the others in the order the turn wrote them.
         Task<TreeTurn> ownRun = ExamineAsync(tree, state, own: true, ct);
         Task<IReadOnlyList<string>> writtenRun = WrittenTreesAsync(hookEvent, payload, tree, ct);
         await Task.WhenAll(ownRun, writtenRun);
@@ -566,8 +565,8 @@ internal sealed class HookRunner(
         return string.Join("\n\n", reports);
     }
 
-    // The hook document for the clean checks, naming the event that fired, or "" when none had anything to say. Each
-    // check's text goes under a line naming its tree when the stop is `named`, in one document.
+    // The hook document for the clean checks, naming the stop's event or the per-edit path's, or "" when none had
+    // anything to say. Each check's text goes under a line naming its tree when the stop is `named`, in one document.
     private static string Document(
         string hookEvent, IReadOnlyList<(TreeTurn Tree, HookCheckResult Result)> checks, bool named)
     {

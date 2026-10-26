@@ -150,8 +150,9 @@ public sealed class SpecResolverTests
     [Fact]
     public void ResolveConventionProject_SameCsprojSpelledTwoWays_ResolvesToOneCandidate()
     {
-        // The group key canonicalizes before it folds, so two spellings of one project file are one
-        // candidate. A '.'/'..' round trip proves it without needing a symlink on the test machine.
+        // The group key is the candidate's canonical spelling rather than its file path as written, so two
+        // spellings of one project file are one candidate. A '.'/'..' round trip proves it without needing a
+        // symlink on the test machine.
         SpecProjectCandidate chosen = SpecResolver.ResolveConventionProject([
             CandidateAt("MyApp.Arch", "C:/repo/src/MyApp.Arch/MyApp.Arch.csproj", "C:/out/net10.0/MyApp.Arch.dll"),
             CandidateAt(

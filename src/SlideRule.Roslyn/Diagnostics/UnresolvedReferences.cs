@@ -15,7 +15,7 @@ namespace SlideRule.Roslyn.Diagnostics;
 ///     <para>
 ///         The project file is read because Roslyn's build host never exposes ResolveAssemblyReferences' items, so
 ///         the declared side has no other source. Only a literal item outside any <c>Condition</c> counts, and a
-///         name counts as resolved when any metadata reference's file carries it, whatever HintPath it was
+///         name counts as resolved when any metadata reference's file has that name, whatever HintPath it was
 ///         declared with: a stale HintPath the build satisfied from the framework or the GAC is not reported.
 ///     </para>
 ///     <para>
@@ -26,7 +26,7 @@ namespace SlideRule.Roslyn.Diagnostics;
 internal static class UnresolvedReferences
 {
     /// <summary>
-    ///     Each C# project, by its absolute <c>.csproj</c> path, whose declared references no leg of its build
+    ///     Each C# project, by its absolute <c>.csproj</c> path, that declares references no leg of its build
     ///     resolved, ordinal-sorted by path, with those references' simple names ordinal-sorted. The projects in
     ///     <paramref name="alreadyFailed" /> are left out.
     /// </summary>
@@ -43,6 +43,8 @@ internal static class UnresolvedReferences
             string fullPath = Path.GetFullPath(filePath);
             if (!resolvedByProjectPath.TryGetValue(fullPath, out HashSet<string>? resolved))
             {
+                // Assembly simple names compare case-insensitively, as the runtime and MSBuild compare them, so a
+                // reference spelled in another case than its file is still resolved.
                 resolved = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 resolvedByProjectPath[fullPath] = resolved;
             }

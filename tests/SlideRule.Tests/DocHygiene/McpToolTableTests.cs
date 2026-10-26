@@ -15,9 +15,9 @@ namespace SlideRule.Tests.DocHygiene;
 ///     exactly the optional ones.
 /// </summary>
 /// <remarks>
-///     The live side is the enumeration <see cref="Mcp.CoercerCoverageTests" /> audits the coercers with: the
-///     tool methods gated on the attribute's name, then their JSON-bound parameters, a parameter being optional
-///     when it declares a default. The prompts are read the same way, from the prompt types the server
+///     The live side is <see cref="LiveToolParameters.ByTool" />: the tool methods gated on the attribute's
+///     name, then their JSON-bound parameters, a parameter being optional when it declares a default. The
+///     prompts are read the same way, from the prompt types the server
 ///     registers, non-public and static methods included, because the one prompt is both. The documented side
 ///     is the backticked names in each Params cell, read outside parentheses, because a parenthetical glosses a
 ///     type and never names a parameter; a cell of "none" names none. The Returns column stays prose, held by

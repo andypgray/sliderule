@@ -14,8 +14,8 @@ namespace SlideRule.Tests.Analyzers;
 /// <remarks>
 ///     Each leaf ships alone beside its own dependencies, and the code copied here runs where Core may be a
 ///     foreign version, so no assembly can hold one copy for all of them. What is compared is the member's
-///     tokens without its modifiers and attributes: a copy may differ in accessibility, documentation,
-///     comments and layout, and in nothing that compiles.
+///     tokens without its modifiers and attributes: a copy may differ in those, in documentation, comments and
+///     layout, and in nothing else.
 /// </remarks>
 public sealed class CopiedMemberParityTests
 {

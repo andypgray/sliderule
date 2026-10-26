@@ -74,11 +74,11 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         + "package references that resolved to nothing produce no edges, so a rule about a package is "
         + "measured against a model that never saw it:";
 
-    // The four injected-diagnostic runs this class reads from more than one row. Each is a read-only
-    // check over one solution, one spec and one injected cause; the rows differ only in which channel
-    // they assert on, so one run answers them all — the shape CheckCommandE2ETests and
-    // TripwireDiffE2ETests already use. Nothing here writes, so a shared result cannot leak state, and each
-    // runs uncancellable, because the row that starts it is not the only row that awaits it.
+    // The injected-diagnostic runs, each made once for the class. Each is a read-only check over one solution,
+    // one spec and one injected cause, and the rows that share one differ only in which channel they assert on
+    // — the shape CheckCommandE2ETests and TripwireDiffE2ETests already use. Nothing here writes, so a shared
+    // result cannot leak state, and each runs uncancellable, because a run held for the class outlives the row
+    // that starts it.
     private static readonly Lazy<Task<CliResult>> LoadDiagnosticHuman =
         new(() => RunWithInjectedDiagnosticAsync(
             CliRunner.CleanSpecDll, false, false, cancellationToken: CancellationToken.None));

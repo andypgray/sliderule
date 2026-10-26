@@ -15,10 +15,9 @@ namespace SlideRule.Tests.Replay;
 /// <summary>
 ///     The fidelity gate: a binlog replayed into an <c>AdhocWorkspace</c> must produce the
 ///     same <see cref="CodebaseModel" /> the MSBuildWorkspace path produces from the same tree — edge for
-///     edge, external for external, site for site. The tests share this class's own binlog fixture, except
-///     one whose bed needs a reference the fixture lacks, and run sequentially, so the freshness test may mutate the copy
-///     in place and revert it without racing
-///     the others. Pinned facts are the spec.
+///     edge, external for external, site for site. The tests that read this class's binlog fixture run
+///     sequentially, so the freshness test may mutate the copy in place and revert it without racing the
+///     others. Pinned facts are the spec.
 /// </summary>
 public sealed class BinlogReplayFidelityTests(BinlogFixtureWorkspace fixture) : IClassFixture<BinlogFixtureWorkspace>
 {

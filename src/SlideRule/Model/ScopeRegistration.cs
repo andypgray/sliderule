@@ -1,9 +1,8 @@
 namespace SlideRule.Model;
 
 /// <summary>
-///     Mutable backing state for a scope anchor; trailers append to lists, as on <see cref="RuleRegistration" />.
-///     A null <see cref="Posture" /> means no posture verb was called (dangling, §8 item 2), and the two verbs
-///     set <see cref="Scoped" /> together with it.
+///     Mutable backing state for a scope anchor. Each posture verb sets <see cref="Scoped" /> together with the
+///     posture.
 /// </summary>
 internal sealed class ScopeRegistration(string id) : Registration(id)
 {

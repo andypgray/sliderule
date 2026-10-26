@@ -56,9 +56,9 @@ internal static class ModelDocumentAssertions
     /// <param name="spec">The spec name the file records.</param>
     /// <param name="projects">The projects of the checked universe; see <see cref="ModelDocumentProject.ListOf" />.</param>
     /// <param name="check">
-    ///     Runs a rule list with the caller's own codebase, baselines, diff, narrowing and partial-model
-    ///     arguments — a delegate rather than those five parameters, so one verb serves every way a caller
-    ///     checks a rule list without restating any of them.
+    ///     Runs a rule list with the caller's own codebase and every condition its run was given — a delegate
+    ///     rather than one parameter per condition, so one verb serves every way a caller checks a rule list
+    ///     without restating any of them.
     /// </param>
     /// <param name="liveReport">
     ///     The report the caller already computed over the whole model, used as the live side when nothing

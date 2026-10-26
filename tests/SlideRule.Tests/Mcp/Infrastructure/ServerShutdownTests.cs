@@ -217,7 +217,6 @@ public sealed class ServerShutdownTests : IDisposable
         exited.ShouldBeTrue();
     }
 
-    // A disposer that does its work and completes before it returns.
     private static void RegisterSynchronousDisposer(Action dispose)
     {
         ServerShutdown.RegisterDisposer(() =>

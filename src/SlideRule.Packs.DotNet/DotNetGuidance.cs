@@ -424,7 +424,8 @@ public static class DotNetGuidance
         NoMappingAttributes(arch, subject, posture);
     }
 
-    // The async methods both async rules govern: the authored ones returning a task or a value task.
+    // The authored methods returning a task or a value task, generic or not, defined once so the async rules
+    // agree on which methods they govern.
     private static MethodSelection TaskReturningMethods(Selection subject)
     {
         return subject.Authored().Methods

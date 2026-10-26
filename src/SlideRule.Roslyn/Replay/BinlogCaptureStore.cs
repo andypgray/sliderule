@@ -357,7 +357,7 @@ internal sealed class BinlogCaptureStore
         TryWriteManifestAtomic(promoted); // best-effort; a later change is still caught by the next stat delta
     }
 
-    // One entry per C# project, with the full document set, obj-generated sources included: they are csc inputs
+    // Each C# project with its full document set, obj-generated sources included: they are csc inputs
     // the binlog's command line fixes and replay cannot regenerate, so a clean that deletes one must invalidate
     // the capture rather than let replay drift from the real build. That predicate is this store's only
     // departure from the shared collapse; everything else, the multi-target-framework collapse included, is

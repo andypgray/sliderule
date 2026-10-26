@@ -33,7 +33,10 @@ internal sealed class CheckRunner(
     IEnvironment environment,
     IResponseFitter? fitter = null) : CacheWiredRunner(source, environment, fitter)
 {
-    /// <summary>Runs the check and writes it to the real writers, on the channels <paramref name="request" /> asks for.</summary>
+    /// <summary>
+    ///     Runs the check and streams it to the runner's output and error writers, on the channels
+    ///     <paramref name="request" /> asks for.
+    /// </summary>
     public async Task<int> RunAsync(CheckRequest request, CancellationToken ct)
     {
         return (await ExecuteAsync(request, output, error, forHook: false, ct)).Code;
@@ -48,9 +51,7 @@ internal sealed class CheckRunner(
     /// </summary>
     public async Task<int> RunForHookAsync(CheckRequest request, CancellationToken ct)
     {
-        // The platform's own line terminator, deliberately: everything but the clean-with-warnings case is
-        // flushed verbatim, and a buffer that normalized would make hook mode change the bytes of a report it
-        // has no business touching.
+        // The platform's line terminator is left as it is: the hook folds line ends to LF where it writes its output.
         var composed = new StringWriter();
         (int code, bool cleanWithWarnings) = await ExecuteAsync(request, composed, composed, forHook: true, ct);
         if (code != ExitCodes.Clean || cleanWithWarnings) await output.WriteAsync(composed.ToString());
@@ -158,8 +159,8 @@ internal sealed class CheckRunner(
         else if (withoutPasses)
             // Exactly the run the hook hands the agent as context (exit 0 with a warning), and the one report
             // hook mode may reshape, because it is the one it does not flush verbatim. The agent holds
-            // the rule board already, and a pass block per rule is what pushed this repository's own context
-            // past the client's inline limit, where the preview it got was pass lines and nothing else.
+            // the rule board already, and a pass block per rule can push a large spec's report past the
+            // client's inline limit, where the agent's preview would be pass lines and nothing else.
             HumanReportRenderer.RenderWithoutPasses(stdout, report, source.SolutionDirectory);
         else
             HumanReportRenderer.Render(stdout, report, source.SolutionDirectory);

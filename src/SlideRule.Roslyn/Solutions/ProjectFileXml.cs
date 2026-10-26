@@ -15,9 +15,6 @@ internal static class ProjectFileXml
     ///     is a <c>Project</c> element matched by local name; null for a missing, unreadable or malformed file, a
     ///     DOCTYPE, and any other root.
     /// </summary>
-    /// <remarks>
-    ///     A caller treats null as "nothing to report", so a file this cannot read never refuses a healthy solution.
-    /// </remarks>
     internal static XElement? TryReadProjectRoot(string projectFilePath)
     {
         try

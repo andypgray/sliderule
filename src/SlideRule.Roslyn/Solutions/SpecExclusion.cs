@@ -11,9 +11,8 @@ namespace SlideRule.Roslyn.Solutions;
 /// </summary>
 /// <remarks>
 ///     <see cref="CanonicalFilePath" /> is <see cref="FilePath" /> as the load's <see cref="CanonicalProjectFiles" />
-///     holds it, which only the overload of
-///     <see cref="SpecExclusion.Compute(Solution, CanonicalProjectFiles, IReadOnlySet{string}, string)" />
-///     taking a solution fills; a synthetic graph leaves it null and has <see cref="FilePath" /> resolved instead.
+///     holds it. A synthetic graph may leave <see cref="CanonicalFilePath" /> null, and <see cref="FilePath" /> is
+///     then resolved instead.
 /// </remarks>
 internal sealed record SpecExclusionProject(
     string Name,
@@ -183,7 +182,7 @@ internal static class SpecExclusion
     }
 
     // The declared set is canonical, so a project is compared in its canonical spelling, never in the one the
-    // load reported; the canonical path is null exactly when the project file path is empty.
+    // load reported; the canonical path is null only when the project file path is empty.
     private static bool IsMember(
         IReadOnlySet<string>? declaredMembers, string? projectFilePath, string? canonicalProjectFilePath)
     {

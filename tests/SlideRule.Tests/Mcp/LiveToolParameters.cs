@@ -26,8 +26,8 @@ internal static class LiveToolParameters
     }
 
     /// <summary>
-    ///     Every tool the server registers, by its wire name, with the parameters it binds from the argument
-    ///     object in declaration order. A tool that binds none is listed with an empty list.
+    ///     Every named tool, by its wire name, with the parameters it binds from the argument object in declaration
+    ///     order. A tool that binds none is listed with an empty list.
     /// </summary>
     internal static IReadOnlyList<(string Tool, IReadOnlyList<ParameterInfo> Parameters)> ByTool()
     {

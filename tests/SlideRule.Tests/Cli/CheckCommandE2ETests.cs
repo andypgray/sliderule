@@ -30,12 +30,11 @@ namespace SlideRule.Tests.Cli;
 /// </remarks>
 public sealed class CheckCommandE2ETests
 {
-    // The violated-spec report, run once for the whole class at each grain a fact reads. A dozen facts
-    // below assert different slices of one report from a byte-identical command line, over paths that are
+    // The violated-spec report, run once for the whole class at each grain a fact reads. The facts below
+    // assert different slices of one report from a byte-identical command line, over paths that are
     // run-stable statics and a fixture tree no fact here mutates — so re-running the check per fact would
-    // buy a dozen identical extractions and no isolation. Each Lazy defers its run until the first fact that
-    // needs it and shares the fault if it throws; every other fact (clean spec, --sarif, --rules, missing
-    // spec) still runs its own command line.
+    // repeat an identical extraction and buy no isolation. Each Lazy defers its run until the first fact that
+    // needs it and shares the fault if it throws; a fact with any other command line runs its own.
     private static readonly Lazy<Task<CliResult>> ViolatedHuman = new(() =>
         CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll));
 

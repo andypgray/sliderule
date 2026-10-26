@@ -12,9 +12,9 @@ namespace SlideRule.Tests.Oracle;
 ///     dependency model from Roslyn source; ArchUnitNET builds its model from compiled IL
 ///     (Mono.Cecil). Each row below expresses the same architecture rule on both substrates over the same
 ///     <c>MyApp</c> fixture and asserts they reach the same verdict — the set of type FullNames
-///     that violate. Every row pins that set against a hand-derived expected truth and asserts the
-///     two substrates equal each other: agreeing with each other alone could mean both are wrong the same
-///     way, so the pinned truth is the third leg.
+///     that violate. Every row pins each substrate's set against the same hand-derived expected truth,
+///     which also makes the two agree; comparing the two with each other alone would pass when both are
+///     wrong the same way.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -400,7 +400,7 @@ public sealed class OracleCaseTableTests(WorkspaceFixture workspace, OracleArchi
 
     // The four readers below stay raw rather than stating their sets through the RuleResult outcome verbs:
     // each projects a slot of its own choosing — a source rather than an edge, a declaring type rather than the
-    // member — and the value has to survive as a set for AssertOracleAgreement to compare it three ways.
+    // member — and the value has to survive as a set for AssertOracleAgreement to compare it with the pinned set.
     private IReadOnlySet<string> ShouldHaveSlideRuleReferenceViolators(Action<Arch> define)
     {
         return ShouldReachAVerdict(define)

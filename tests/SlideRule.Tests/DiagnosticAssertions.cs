@@ -5,7 +5,7 @@ using Shouldly;
 namespace SlideRule.Tests;
 
 /// <summary>
-///     The Shouldly surface both analyzers' tests share: which warnings came back, and what each one says and
+///     The Shouldly surface over the warnings an analyzer reports: which came back, and what each one says and
 ///     carries as properties.
 /// </summary>
 /// <remarks>

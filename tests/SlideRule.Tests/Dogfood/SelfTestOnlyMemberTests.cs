@@ -10,15 +10,17 @@ namespace SlideRule.Tests.Dogfood;
 
 /// <summary>
 ///     No member of a <c>src/</c> project is kept alive by the tests alone: a non-private member that only
-///     test-side code uses is either a seam named in <see cref="Allowed" /> with its reason, or weight the
-///     product carries for the suite and should lose.
+///     test-side code uses is either a seam named in <see cref="Allowed" /> with its reason, or a member to delete
+///     or move into the tests.
 /// </summary>
 /// <remarks>
-///     The interim guard until the grammar can say a member must be used by something. Member edges propose the
-///     candidates, and the compiler confirms each one, because the edges do not record a type's use of its own
-///     members or a call made through an interface or base member, and a member production reaches only those
-///     ways would otherwise read as test-only. A member nothing uses at all is not a candidate: whether it is dead
-///     is a different question from whether the tests alone keep it.
+///     A test states this law because the grammar has no verb that says a member must be used by something. Member
+///     edges propose the candidates and the compiler confirms each one. The edges record no use of a member from
+///     inside its own type, and they record a call through an interface or base member against that member, not
+///     against the members that implement or override it. A member that production reaches only in those ways
+///     would therefore read as test-only on edges alone.
+///     A member nothing uses at all is not a candidate: whether it is dead is a different question from whether the
+///     tests alone keep it.
 /// </remarks>
 public sealed class SelfTestOnlyMemberTests
 {

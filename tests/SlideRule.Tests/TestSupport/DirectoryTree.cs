@@ -1,8 +1,8 @@
 namespace SlideRule.Tests.TestSupport;
 
 /// <summary>
-///     The test project's one recursive directory copy. A fixture's private copy, a spec's staged output
-///     and a staged MCP server directory all take this walk, differing only in which files they keep.
+///     The test project's one recursive directory copy. Every copy takes this walk, differing only in which
+///     files it keeps.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -40,8 +40,7 @@ internal static class DirectoryTree
 
     /// <summary>
     ///     <see cref="Copy" /> into <paramref name="destination" /> emptied first, so it holds what
-    ///     <paramref name="source" /> holds now and nothing an earlier copy left there. The emptying gets past the
-    ///     read-only files an earlier copy carried across.
+    ///     <paramref name="source" /> holds now and nothing an earlier copy left there.
     /// </summary>
     internal static void Replace(string source, string destination, Func<string, bool>? include = null)
     {

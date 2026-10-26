@@ -39,10 +39,9 @@ internal static class ArchChecker
     /// <summary>
     ///     Checks exactly <paramref name="rules" />, the whole model's or the subset <see cref="SelectRules" />
     ///     chose, and reports on those alone; choosing a subset changes nothing about how a rule is judged.
-    ///     <paramref name="baselines" /> grandfathers what it records (<see cref="BaselineIndex.Empty" /> nothing),
-    ///     and every tripwire skips where <paramref name="diff" /> is null. <paramref name="narrowing" /> is set
-    ///     where the run's universe is smaller than the solution, and <paramref name="incompleteModel" /> where
-    ///     part of the model never loaded; each is null where the universe or the model is whole.
+    ///     <paramref name="narrowing" /> is set where the run's universe is smaller than the solution, and
+    ///     <paramref name="incompleteModel" /> where part of the model never loaded; each is null where the
+    ///     universe or the model is whole.
     ///     <paramref name="root" /> is the directory path globs are relative to, or null for a run that has none
     ///     to give. <paramref name="cancellationToken" /> is observed once before each rule is evaluated, so a
     ///     caller that has given up waits at worst for the rule already running.
@@ -61,7 +60,7 @@ internal static class ArchChecker
     ///         A rule is the grain of cancellation because it is the unit whose result the report carries: a run
     ///         abandoned part-way returns nothing at all rather than a report silently missing its tail.
     ///         Cancellation therefore leaves by being thrown, and the blanket arms in <see cref="Verdict" /> and
-    ///         <see cref="AttachExemplar" /> let it past for that reason. The token is per-call, and the two
+    ///         <see cref="AttachExemplar" /> let it past for that reason. The token is per-call, and the
     ///         evaluators built here hold no static state, so concurrent runs over one model cannot see each
     ///         other's.
     ///     </para>
@@ -160,8 +159,8 @@ internal static class ArchChecker
 
             // The cut is the checker's, never the evaluator's, for the type subject and a member subject alike.
             // The evaluator's gates are what make an empty part or a dead name an authoring error, and they stay
-            // exactly that for every run over a whole solution; what a run over one project's compilation may
-            // honestly be asked is decided before the evaluator is.
+            // exactly that for every run over a whole solution; which parts a run over one project's compilation
+            // can judge is decided here, before the evaluator runs.
             Selection? subject = rule.Constraint!.Subject;
             MemberSelection? memberSubject = (rule.Constraint as MemberConstraint)?.MemberSubject;
             if (narrowing is { Kind: NarrowingKind.OneProject } && subject is not null)

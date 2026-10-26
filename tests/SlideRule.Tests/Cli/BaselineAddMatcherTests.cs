@@ -13,7 +13,8 @@ namespace SlideRule.Tests.Cli;
 ///     Pins <see cref="BaselineAddMatcher" />'s resolution semantics — a name matches a type by its
 ///     FullName or its <c>T:</c> symbol ID, and an edge's source and target must match the same
 ///     violation; a member <c>--target</c> matches a MemberUse violation by member full name
-///     (<c>N.T.M</c>) or member symbol ID (<c>M:</c>/<c>P:</c>…), one full name covering every overload
+///     (<c>N.T.M</c>, or <c>N.T.M()</c> as the no-match listing prints a method) or member symbol ID
+///     (<c>M:</c>/<c>P:</c>…), one full name covering every overload
 ///     (GRAMMAR §4.5) — and the shapes of its two loud refusals: a no-match that lists the rule's current
 ///     grandfatherable violations (or reports it has none), and an ambiguity that lists the matched
 ///     identities in symbol-ID form and steers to the symbol-ID form. Pure over synthetic nodes.

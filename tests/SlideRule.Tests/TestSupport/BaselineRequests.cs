@@ -44,7 +44,7 @@ internal static class BaselineRequests
     /// <summary>
     ///     Runs <paramref name="request" /> through <see cref="BaselineRunner.ApplyFiles" /> over
     ///     <paramref name="results" />, resolving baseline paths against the request's working directory (no
-    ///     request built here names a solution), and returns what the runner wrote. The exit code is dropped.
+    ///     request built here names a solution), and returns what the runner wrote.
     /// </summary>
     internal static string Apply(this BaselineRequest request, IEnumerable<RuleResult> results)
     {

@@ -23,7 +23,7 @@ namespace SlideRule.Tests.DocHygiene;
 /// </remarks>
 public sealed class RuleQuoteSyncTests
 {
-    /// <summary>The reader every card lookup below goes through, held for the class so each card is read once.</summary>
+    /// <summary>The reader every card lookup goes through, held for the class so each card is read once.</summary>
     private static readonly Func<string, string?> ReadDiskText = RepoRoot.TextReader();
 
     /// <summary>The rule-quoting docs, each paired with the example root whose rendered bullets it quotes.</summary>

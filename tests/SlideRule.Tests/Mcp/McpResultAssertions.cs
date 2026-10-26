@@ -17,10 +17,10 @@ namespace SlideRule.Tests.Mcp;
 ///         <see cref="SlideRule.Tests.Checking.RuleResultAssertions" />.
 ///     </para>
 ///     <para>
-///         The frame overloads take a <see cref="string" /> receiver, which reaches only files in this
-///         namespace. None of them may ever be named for one of the case-sensitive string assertions the
-///         suite's root namespace shadows — a nearer applicable method wins the extension lookup, so such a
-///         name would silently return this folder to Shouldly's case-insensitive default.
+///         Every extension here with a <see cref="string" /> receiver reaches only files in this namespace.
+///         None of them may ever be named for one of the case-sensitive string assertions the suite's root
+///         namespace shadows — a nearer applicable method wins the extension lookup, so such a name would
+///         silently return this folder to Shouldly's case-insensitive default.
 ///     </para>
 /// </remarks>
 internal static class McpResultAssertions

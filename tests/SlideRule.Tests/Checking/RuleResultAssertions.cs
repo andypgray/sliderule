@@ -57,8 +57,7 @@ internal static class RuleResultAssertions
     /// </summary>
     /// <remarks>
     ///     Holds the warning's pinned wording. The cure beside it is held to being <em>there</em> rather than
-    ///     to its words: which cure a target earns depends on its shape, and every caller here is about its
-    ///     verb.
+    ///     to its words, because which cure a target earns depends on its shape.
     /// </remarks>
     internal static CheckWarning ShouldHaveWarnedInertTarget(this RuleResult result)
     {

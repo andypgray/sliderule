@@ -25,7 +25,9 @@ internal static class DiagnosticStreamAssertions
         parsed.ShouldElideSlotTo(Key, CountKey, count);
     }
 
-    /// <summary>Asserts <paramref name="document" /> carries its diagnostic stream whole, with no count beside it.</summary>
+    /// <summary>
+    ///     Asserts <paramref name="document" /> carries its diagnostic stream whole, with no count beside it.
+    /// </summary>
     internal static void ShouldKeepDiagnosticStreamWhole(this string document)
     {
         using JsonDocument parsed = CheckJsonAssertions.ShouldParseAsJson(document);

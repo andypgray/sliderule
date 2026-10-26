@@ -14,7 +14,9 @@ internal sealed class CollapsedText(string text, IReadOnlyList<int> lines)
     // collapsing walks the whole file.
     private static readonly ConcurrentDictionary<string, CollapsedText> Collapsed = new(StringComparer.Ordinal);
 
-    /// <summary>The collapsed text: no line breaks, every whitespace run one space.</summary>
+    /// <summary>
+    ///     The collapsed text: no line breaks, no whitespace at either end, every other whitespace run one space.
+    /// </summary>
     public string Text { get; } = text;
 
     /// <summary><paramref name="doc" />'s committed text collapsed, read and collapsed once per run.</summary>
@@ -26,8 +28,7 @@ internal sealed class CollapsedText(string text, IReadOnlyList<int> lines)
     /// <summary>
     ///     Collapses <paramref name="docText" />'s whitespace runs to single spaces, keeping the doc line
     ///     each surviving character came from. Prose wraps, so a registered fragment routinely spans a
-    ///     line break; collapsing is what lets containment find it, and the retained line numbers are
-    ///     what let a match still be reported — and claimed — by position.
+    ///     line break; collapsing is what lets containment find it.
     /// </summary>
     internal static CollapsedText From(string docText)
     {
@@ -68,7 +69,7 @@ internal sealed class CollapsedText(string text, IReadOnlyList<int> lines)
 
     /// <summary>
     ///     The inclusive doc line range spanned by <paramref name="fragment" />, or
-    ///     <see langword="null" /> when the collapsed text does not contain it.
+    ///     <see langword="null" /> when the fragment is empty or the collapsed text does not contain it.
     /// </summary>
     public (int First, int Last)? Span(string fragment)
     {

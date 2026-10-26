@@ -61,7 +61,7 @@ public sealed class EvaluatorFailClosedTests
     {
         // A real verb over a fake-adjective subject: the throw propagates out of ConstraintEvaluator and is
         // contained by ArchChecker.Verdict as a per-rule RuleError (the run continues; the rule is Failed). The
-        // fault is not an evaluation refusal, so the detail carries the blanket arm's wording.
+        // fault is not a RuleEvaluationException, so the detail carries the blanket arm's prefix.
         var arch = new Arch();
         var selection = new RefinedSelection(arch, TypesNoun.Instance, [new UnknownAdjective()]);
         Constraint constraint = selection.MustHavePrefix("I");

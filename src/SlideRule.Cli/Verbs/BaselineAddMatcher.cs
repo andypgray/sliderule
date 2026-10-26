@@ -14,8 +14,8 @@ namespace SlideRule.Cli.Verbs;
 ///     <para>
 ///         <b>What matches what.</b> Every name is compared ordinally with the spellings of its candidate: the
 ///         readable full name and the stored symbol ID, such as <c>System.DateTime.Now</c> and
-///         <c>P:System.DateTime.Now</c> for a member, whose full name takes no parentheses, and for a member also
-///         the display form the no-match listing prints, such as <c>App.Home.Save()</c>. An edge's source
+///         <c>P:System.DateTime.Now</c> for a member, whose full name takes no parentheses. A member has a third
+///         spelling, the display form the no-match listing prints, such as <c>App.Home.Save()</c>. An edge's source
 ///         and target must match the <em>same</em> violation, and a member full name naming an overloaded
 ///         method matches every overload, so the ambiguity error lists the distinct IDs to retry with
 ///         (GRAMMAR §4.5, §4.6).

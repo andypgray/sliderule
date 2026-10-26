@@ -47,10 +47,10 @@ internal readonly struct EdgeInstance
 ///     reaching its target's.
 /// </summary>
 /// <remarks>
-///     The checker walks the same record directly to decide which instances a rule owns, and never through
-///     here: it asks per candidate edge per rule, and <see cref="Of" /> builds a one-element list for every
-///     edge with no record. The checker and the survey must keep reading that one record, or a verdict and the
-///     survey that led an author to it can disagree about which project made a reference.
+///     The checker and the survey read the same record directly, edge by edge, and never through
+///     <see cref="Of" />, which builds a one-element list for every edge with no record. The two must keep
+///     reading that one record, or a verdict and the survey that led an author to it can disagree about which
+///     project made a reference.
 /// </remarks>
 internal static class EdgeInstances
 {
@@ -59,8 +59,7 @@ internal static class EdgeInstances
         return edge.Evidence.Instances ?? [Implicit(edge)];
     }
 
-    // What an edge with no record stands for: the edge itself, made at its source's project and reaching its
-    // target's.
+    // The one instance an edge with no record stands for.
     internal static EdgeInstance Implicit(ReferenceEdge edge)
     {
         return new EdgeInstance(edge.Source.ProjectName, edge.Target.ProjectName, edge.Sites);

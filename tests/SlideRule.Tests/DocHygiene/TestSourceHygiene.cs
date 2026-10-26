@@ -8,7 +8,7 @@ using SlideRule.Tests.TestSupport;
 namespace SlideRule.Tests.DocHygiene;
 
 /// <summary>
-///     Three habits held out of the test sources, read from syntax alone: a member that asserts carries a
+///     The rules the test sources are held to, read from syntax alone: a member that asserts carries a
 ///     <c>Should*</c> name, a test never returns early on an operating-system check, and a test passes the
 ///     running test's token rather than one that never cancels. Each check reports a finding as
 ///     <c>path:line Member — what is wrong</c>.

@@ -126,7 +126,6 @@ public class ContextFileComposerTests
 
     [Theory]
     [InlineData("Quarantined")]
-    // The layer-cards-first ordering is a property of the composer, not of which scope posture it met.
     [InlineData("Cautioned")]
     public void Compose_LayerAndScopeInOneDirectory_MergeIntoOneFileLayerCardFirst(string posture)
     {

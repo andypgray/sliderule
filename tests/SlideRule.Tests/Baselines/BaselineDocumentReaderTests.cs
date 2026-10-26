@@ -7,8 +7,8 @@ namespace SlideRule.Tests.Baselines;
 
 /// <summary>
 ///     Every refusal the baseline reader can make, and the two files it accepts: a current one and a
-///     legacy one. Each row pins the whole detail sentence, which of the four families it belongs to, the
-///     rule and entry it names, and where in the text it sits.
+///     legacy one. Each row pins the refusal's kind, the whole detail sentence (which names the rule and the
+///     entry when the refusal is about one), and where in the text it sits.
 /// </summary>
 /// <remarks>
 ///     <para>

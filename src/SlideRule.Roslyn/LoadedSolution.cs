@@ -9,10 +9,6 @@ namespace SlideRule.Roslyn;
 ///     A loaded MSBuild solution together with the workspace that produced it. Dispose it to release the
 ///     workspace and its out-of-process build host; the <see cref="Solution" /> stays readable afterwards.
 /// </summary>
-/// <remarks>
-///     How completely the solution loaded is the project lists of the value <see cref="LoadDiagnosticsWith" />
-///     builds, each ordinal-sorted and meaning what its namesake on <see cref="WorkspaceDiagnostics" /> means.
-/// </remarks>
 internal sealed class LoadedSolution : IDisposable
 {
     private readonly MSBuildWorkspace _workspace;
@@ -55,8 +51,9 @@ internal sealed class LoadedSolution : IDisposable
 
     /// <summary>
     ///     This load's verdict as the one value every surface reads. <paramref name="loadFailures" /> are the
-    ///     failure messages the loader wrote to the caller's sink, which never land on this type; the merge's
-    ///     notes and multi-targeted projects stay empty, since only extraction produces them.
+    ///     messages the loader wrote to the caller's sink, the workspace's failures and the load's own warnings,
+    ///     which never land on this type; the merge's notes and multi-targeted projects stay empty, since only
+    ///     extraction produces them.
     /// </summary>
     internal WorkspaceDiagnostics LoadDiagnosticsWith(IReadOnlyList<string> loadFailures)
     {

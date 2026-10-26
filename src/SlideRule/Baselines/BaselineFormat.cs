@@ -53,7 +53,8 @@ internal static class BaselineFormat
     internal const int SealLength = 16;
     internal const int SealBytes = SealLength / 2;
 
-    // The whole-file digest of a legacy file is a SHA-256 in lowercase hex.
+    // The whole-file digest of a legacy file is a SHA-256 in lowercase hex. BaselineDocumentReader's digest
+    // refusal spells the number in its message, so the two must agree.
     internal const int LegacyDigestLength = 64;
 
     // Every seal and digest on disk is hashed over these preambles, so changing either would fail every

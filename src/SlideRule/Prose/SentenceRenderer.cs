@@ -17,6 +17,10 @@ internal static class SentenceRenderer
         return subject + (endsOpen ? ", " : " ") + constraint.VerbPhrase + ".";
     }
 
+    /// <summary>
+    ///     The subject phrase of <paramref name="constraint" />'s sentence, and whether it ends inside an
+    ///     <c>Except</c> parenthetical that the text after it must close.
+    /// </summary>
     internal static (string Subject, bool EndsOpen) SubjectOf(Constraint constraint)
     {
         // One arm per subject stratum (GRAMMAR §4.6, §4.10, §6). Subject is null exactly for the project arm,

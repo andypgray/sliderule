@@ -78,10 +78,6 @@ internal sealed class CodebaseSource : IDisposable
     // whole from a cache hit. Null until the first ExtractAsync, and written exactly once after it.
     private IReadOnlyList<CodebaseFragment>? fragments;
 
-    // The load's verdict with the merge notes (same-FQN cross-project conflation) and multi-targeted projects of
-    // the last ExtractAsync, regenerated from the fragments on every path — a cache hit re-merges, so these need
-    // no persistence. Both are empty until ExtractAsync runs.
-
     private HashSet<string> reExtractedProjects = new(StringComparer.Ordinal);
 
     private CodebaseSource(
@@ -197,8 +193,6 @@ internal sealed class CodebaseSource : IDisposable
         ExtractionCacheStore? store = noCache ? null : TryCreateStore(solutionPath, environment);
         string normalized = NormalizeSpecArgument(spec);
 
-        // A null store is a Disabled run: nothing read from cache.json and nothing written to it, which is what
-        // --no-cache and every cache-free caller mean.
         if (store is null)
             return await CreateColdWithSpecAsync(
                 source, solutionPath, spec, normalized, null, CacheReadResult.Miss(),

@@ -581,8 +581,8 @@ public sealed class BaselineRunnerCountTests : IDisposable
             .Apply(results);
     }
 
-    // add through its own seam, handing back what the runner said — the exit code is dropped here as it
-    // is in BaselineRequests.Apply; the one row that claims it keeps its own writer.
+    // add through its own seam, handing back what the runner said and dropping its exit code; a row that
+    // asserts the exit code calls the runner with its own writer.
     private string AddEntry(string because, CheckReport report)
     {
         var output = new StringWriter();

@@ -13,10 +13,10 @@ namespace SlideRule.Tests.Extraction;
 /// <remarks>
 ///     Line numbers are 1-based and count from the first content line of each raw source literal.
 ///     The <see cref="CatchEdge.UnfilteredSites" /> rows carry the filter fact: which sites spell no
-///     <c>when</c> filter, including the two corners that decided the recorded subset's polarity — a
+///     <c>when</c> filter, including the corners a subset derived by subtraction would get wrong — a
 ///     same-line collision and a filter that diverges across fragments. The
 ///     <see cref="CatchEdge.SwallowingSites" /> rows carry the rethrow fact on top of it: which of those
-///     sites do not end in a <c>throw</c>, the same two polarity corners, and both sides of the syntactic
+///     sites do not end in a <c>throw</c>, the same corners, and both sides of the syntactic
 ///     honesty boundary — a throw that is the last statement but not on every path, and a throw on some path
 ///     that is not the last statement.
 /// </remarks>

@@ -34,7 +34,6 @@ internal static class TrackedFiles
     /// <summary>The directory the GitHub Actions workflows sit in, with its trailing slash.</summary>
     internal const string WorkflowDirectory = ".github/workflows/";
 
-    /// <summary>The CI workflow.</summary>
     internal const string CiWorkflow = WorkflowDirectory + "ci.yml";
 
     // How much of a file the text/binary sniff reads — the same window `git grep -I` looks at.

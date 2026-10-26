@@ -160,9 +160,9 @@ public sealed class StringifiedArrayRefusalCoverageTests
 
     /// <summary>
     ///     Every parameter the server binds from a <c>tools/call</c> argument object whose type is exactly
-    ///     <see cref="string" />, as the tool's wire name plus the parameter. Exactly <c>string</c> rather
-    ///     than assignable to it: a future <c>string[]</c> parameter is legitimately array-shaped and has
-    ///     nothing to refuse.
+    ///     <see cref="string" />, as the tool's wire name plus the parameter. Only a <c>string</c> parameter
+    ///     can receive an array the client wrote as a string; a <c>string[]</c> parameter receives the array
+    ///     itself and has nothing to refuse.
     /// </summary>
     private static IEnumerable<(string Tool, ParameterInfo Parameter)> LiveStringParameters()
     {

@@ -140,8 +140,8 @@ internal static class SarifReportRenderer
     // of the stream's own, in the order stderr writes them — and the structured facts add one
     // notification each after them, in the order the CLI refusals state them: the model being wrong outranks
     // the model being small, and a failed load outranks a failed restore. Each is written where the stamp
-    // carries it, which is the stamp's own empty-to-null policy read as the presence test it already was.
-    // The block is omitted when there is nothing to say, so a whole clean run is unchanged.
+    // carries it: the stamp's empty-to-null policy is the presence test. The notifications are omitted when
+    // there is nothing to say, so a clean run's invocation carries none.
     private static IReadOnlyList<SarifInvocation> BuildInvocations(
         bool executionSuccessful, WorkspaceTrustStamp trust, IReadOnlyList<string> workspaceDiagnostics)
     {
@@ -177,7 +177,7 @@ internal static class SarifReportRenderer
 
     // The quieter half of the same fact, and the one a reader cannot recover by noticing something absent:
     // these projects are all present with all their types, and only the edges their package references would
-    // have produced are gone — which is how a failing rule was measured turning green. Worded for both ways
+    // have produced are gone, which is how a failing rule turns green with nothing reported. Worded for both ways
     // that happens, a restore that ran and failed and one that never ran, because the remedy and the
     // consequence are identical and this channel has no room to say which.
     private static SarifNotification RestoreFailureNotification(IReadOnlyList<string> restoreFailedProjects)

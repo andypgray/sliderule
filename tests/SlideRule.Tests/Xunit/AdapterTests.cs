@@ -286,7 +286,7 @@ public sealed class AdapterTests
     // The fixture's layering/domain-independent rule verbatim, beside both scope postures over MyApp, in one
     // spec so the adapter loads the solution once. Checked with no project excluded, as the CLI does for a
     // by-path DLL spec, so the rule's block is the CLI's; the quarantine over MyApp.Legacy.Billing and the
-    // caution over MyApp.Domain desugar to tripwires that skip without a --diff-base, which is what the two
+    // caution over MyApp.Domain desugar to tripwires that skip without a --diff-base, which is what the
     // tripwire rows read.
     private sealed class MyAppViolatedInlineSpec : IArchitectureSpec
     {
@@ -418,8 +418,8 @@ public sealed class AdapterTests
 
     private const string SharedSpecRuleId = "layering/domain-independent";
 
-    // Driven only by TwoClassesOverOneSpec_EachCheckTheirOwnSolution, whose two classes over it are the only
-    // runs it ever gets.
+    // Reserved for TwoClassesOverOneSpec_EachCheckTheirOwnSolution: its two classes must be the only runs over
+    // this spec.
     private sealed class SharedInlineSpec : IArchitectureSpec
     {
         public void Define(Arch arch)

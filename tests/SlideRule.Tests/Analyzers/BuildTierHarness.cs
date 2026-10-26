@@ -14,7 +14,9 @@ using SlideRule.Tests.TestSupport;
 
 namespace SlideRule.Tests.Analyzers;
 
-/// <summary>An additional file the build hands over, held in memory; a null text is a file that would not read.</summary>
+/// <summary>
+///     An additional file the build hands over, held in memory; a null text is a file that would not read.
+/// </summary>
 internal sealed class InMemoryAdditionalText(string path, string? content) : AdditionalText
 {
     private readonly SourceText? _text = content is null ? null : SourceText.From(content);
@@ -173,7 +175,9 @@ internal static class BuildTier
     /// <summary>The fix the rule carries, which its warning repeats.</summary>
     internal const string Fix = "Take the value from a domain service and let that service own the store.";
 
-    /// <summary>What <c>SR2093</c> says for the fault <see cref="Boom" /> throws: its first line only.</summary>
+    /// <summary>
+    ///     What <c>SR2093</c> says for the fault <see cref="Boom" /> throws, which quotes only the fault's first line.
+    /// </summary>
     internal const string FaultMessage =
         "The SlideRule analyzer failed in this project, so some or all of its findings are missing: "
         + "InvalidOperationException: boom. This is a fault in the analyzer and says nothing about the code, "

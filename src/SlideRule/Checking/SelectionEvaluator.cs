@@ -194,7 +194,8 @@ internal sealed class SelectionEvaluator
     /// </summary>
     // May hand back the very set it was given, so a caller must pass one it owns and must not go on
     // mutating it afterwards. That is safe because no ByNoun arm yields a HashSet (the universes are lists, the
-    // memo holds a list, and the rest are lazy Wheres), so the set handed back is one a compound fold allocated.
+    // noun memo holds lists, and the rest are lazy Wheres) and Admitted's memoized sets must never be passed
+    // here, so a set handed back unchanged is never a memo's.
     // An adjective-free union or family is the common case, and copying its membership a second time would buy
     // nothing.
     internal HashSet<TypeNode> Narrow(Selection selection, IEnumerable<TypeNode> candidates)
@@ -363,8 +364,8 @@ internal sealed class SelectionEvaluator
         };
     }
 
-    // -1 where no glob matches. An index walk rather than a LINQ Any, because it runs once per type in the universe over a list that is
-    // usually a single glob.
+    // The index of the first glob that matches, or -1 where none does. An index walk rather than LINQ, because it
+    // runs once per type in the universe over a list that is usually a single glob.
     internal static int FirstMatchingGlob(IReadOnlyList<NamespacePattern> globs, string ns)
     {
         for (var i = 0; i < globs.Count; i++)

@@ -1,9 +1,6 @@
 namespace SlideRule.Model;
 
-/// <summary>
-///     The shape every adjective stratum shares: where the fragment lands in the subject phrase, the fragment
-///     itself, and whether it leaves a parenthetical open.
-/// </summary>
+/// <summary>The shape every adjective stratum shares.</summary>
 internal abstract class Adjective
 {
     internal abstract AdjectivePlacement Placement { get; }

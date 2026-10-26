@@ -7,8 +7,9 @@ using Xunit;
 namespace SlideRule.Tests.Roslyn;
 
 /// <summary>
-///     The exclusion walk over synthetic project graphs — no workspace, no MSBuild. The pins are the two
-///     shapes the product actually has (a spec that references the app it governs; a spec that references
+///     The exclusion walk over synthetic project graphs, with no MSBuild; a membership row loads each project
+///     it asks about into an in-memory workspace of its own. The pins are the two shapes the product actually
+///     has (a spec that references the app it governs; a spec that references
 ///     the libraries it dogfoods) plus the fallback that keeps an unreadable solution file from emptying the
 ///     checked universe. Membership tests hit the disk only through
 ///     <see cref="SpecExclusion.TryReadDeclaredMembers" />, which has its own cases at the bottom.

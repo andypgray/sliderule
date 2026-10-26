@@ -47,7 +47,7 @@ public sealed class AuthoringHintTests
     [Fact]
     public void TypesNarrowedByOneInNamespace_EarnsTheGlobSemanticsToo()
     {
-        // The same namespace region spelled the other way round: RegionOf reads it off arch.Types plus a
+        // The namespace noun's region spelled the other way round: RegionOf reads it off arch.Types plus a
         // single InNamespace exactly as it reads it off the noun.
         var arch = new Arch();
 
@@ -562,7 +562,7 @@ public sealed class AuthoringHintTests
 
     private delegate string InertCure(Selection piece, IncompleteModel? model, NarrowedUniverse? narrowing);
 
-    // The three cures on a target or an allow-list, the entry points a narrowing reaches. Walked rather than listed
+    // The cures on a target or an allow-list, the entry points a narrowing reaches. Walked rather than listed
     // per row, for EveryShape's reason: an entry point left off a hand-kept list is one whose replacements and voice
     // nothing checks.
     private static (string Cure, InertCure HintFor)[] EveryInertCure()

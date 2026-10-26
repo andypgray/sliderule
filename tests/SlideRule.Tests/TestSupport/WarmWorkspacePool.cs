@@ -36,14 +36,15 @@ namespace SlideRule.Tests.TestSupport;
 ///         workspaces; each such test says so at its own call site.
 ///     </para>
 ///     <para>
-///         <b>Bounded.</b> At most <see cref="WorkspacePool.Capacity" /> sessions are live, evicted least-recently-used
-///         first, because each holds an <c>MSBuildWorkspace</c> and its out-of-process BuildHost. Eviction
+///         <b>Bounded.</b> A new session evicts the least recently used once <see cref="WorkspacePool.Capacity" />
+///         sessions are live, because each holds an <c>MSBuildWorkspace</c> and its out-of-process BuildHost. Eviction
 ///         passes over one key, this repo's own solution: it is the single most expensive load there is, and
 ///         its consumers sit far apart in a run, with enough leased fixture copies between them, each a fresh
 ///         key, that recency alone evicts it before the next consumer arrives. It still counts toward
-///         <see cref="WorkspacePool.Capacity" />, and <see cref="DropUnder" /> and <see cref="DropAll" /> still release it.
-///         A session with a call in flight is never evicted, so while every other session is mid-call the
-///         pool runs over <see cref="WorkspacePool.Capacity" />, by at most the number of callers.
+///         <see cref="WorkspacePool.Capacity" />, and <see cref="DropUnder" /> and <see cref="DropAll" /> still
+///         release it. A session with a call in flight is never evicted either, so when every session but the
+///         pinned one is mid-call the pool runs over <see cref="WorkspacePool.Capacity" />, by at most the
+///         number of callers.
 ///     </para>
 /// </remarks>
 internal static class WarmWorkspacePool
@@ -83,7 +84,7 @@ internal static class WarmWorkspacePool
     }
 
     /// <summary>
-    ///     A pool of its own that pins no key, for the class whose subject is the pool itself: no class running
+    ///     A pool of its own that pins no key, for a test class whose subject is the pool itself: no class running
     ///     beside it can evict its sessions. The caller disposes it.
     /// </summary>
     internal static WorkspacePool Private()

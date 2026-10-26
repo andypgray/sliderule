@@ -10,8 +10,8 @@ namespace SlideRule.Tests.Mcp;
 ///     advertised tool surface.
 /// </summary>
 /// <remarks>
-///     Every case in such a class asks its question of the same answer, so a harness per case would start a
-///     server per case to read one response. The list is read uncancellably, because a fixture's work is shared
+///     Every case in such a class reads the same response, so a harness per case would start a server per case
+///     to read it. The list is read uncancellably, because a fixture's work is shared
 ///     by every case in the class.
 /// </remarks>
 public sealed class AdvertisedToolsFixture : IAsyncLifetime

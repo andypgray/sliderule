@@ -10,15 +10,13 @@ namespace SlideRule.Tests.Mcp;
 
 /// <summary>
 ///     <see cref="LiveToolParameters.IsJsonBound" />, the definition of which tool parameters arrive in a
-///     <c>tools/call</c> argument object rather than from request context or DI. The gates that hold every bound
-///     parameter to a coercer, every bound string to its refusal and every parameter to the public tool table read
-///     their answer from it, so an exclusion that stopped excluding would widen all of them at once.
+///     <c>tools/call</c> argument object rather than from request context or DI. The gates over the tools' bound
+///     parameters read their answer from it, so an exclusion that stopped excluding would widen all of them at once.
 /// </summary>
 /// <remarks>
 ///     Only <see cref="CancellationToken" /> is live: every <c>arch_*</c> tool declares one, and services
-///     arrive through primary constructors rather than method parameters. The rest of the list is
-///     defensive, mirroring the SDK's own augmentation set, and this is the only place that says what it
-///     is for — no real tool signature can demonstrate it.
+///     arrive through primary constructors rather than method parameters. No real tool signature exercises the
+///     rest of the list, so these rows are its only test.
 /// </remarks>
 public sealed class LiveToolParametersTests
 {

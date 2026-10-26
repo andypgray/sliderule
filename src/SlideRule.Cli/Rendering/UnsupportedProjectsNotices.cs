@@ -10,8 +10,8 @@ namespace SlideRule.Cli.Rendering;
 /// <remarks>
 ///     The wording is <see cref="UnsupportedProjectsNotice" />'s, which the factory comes from; what lives here is
 ///     the CLI's half. This line and the verb's <c>--json</c> document spell each path and its reason alike,
-///     because both compose each entry through <see cref="UnsupportedProjectsNotice.Entry" /> and
-///     <see cref="UnsupportedProjectsNotice.Reason" /> over a solution-relative path.
+///     because both make the path solution-relative and take the reason from
+///     <see cref="UnsupportedProjectsNotice.Reason" />.
 /// </remarks>
 internal static class UnsupportedProjectsNotices
 {

@@ -99,7 +99,7 @@ public sealed class ServerInstructionsTests
     public void For_UnboundServer_PutsTheInSessionRecoveryBeforeTheConfigRemedies()
     {
         // The point of the ordering: a reader who stops early must meet the thing they can do, not the
-        // two things they cannot. "x" keeps the discovery text out of it, so neither index can match inside
+        // two things they cannot. "x" keeps the discovery text out of it, so neither marker can match inside
         // the quoted failure; Text carries neither marker, so neither can match below the banner either.
         string instructions = ServerInstructions.For("x");
 

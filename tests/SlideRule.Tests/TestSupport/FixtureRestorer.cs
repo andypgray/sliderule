@@ -7,13 +7,14 @@ namespace SlideRule.Tests.TestSupport;
 /// <remarks>
 ///     NuGet restore state (<c>obj/project.assets.json</c>) is gitignored, so a fresh clone — and
 ///     therefore CI — arrives with unrestored fixture projects. An unrestored fixture loads without its
-///     references, silently degrading everything under test. <see cref="EnsureRestored" /> restores
-///     exactly once per process, thread-safely.
+///     references, silently degrading everything under test. <see cref="EnsureRestored" /> checks the
+///     beds once per process, thread-safely, and restores them only when a project is unrestored or a
+///     project file changed since the last sweep.
 /// </remarks>
 internal static class FixtureRestorer
 {
-    // Run-once, thread-safe: Lazy (ExecutionAndPublication) guarantees exactly one restore even under
-    // concurrent entry; repeat calls are free.
+    // Run-once, thread-safe: Lazy (ExecutionAndPublication) guarantees one check, and at most one restore, even
+    // under concurrent entry; repeat calls are free.
     private static readonly Lazy<bool> RestoreGate = new(RestoreAll);
 
     private static readonly string[] SolutionExtensions = [".sln", ".slnx"];

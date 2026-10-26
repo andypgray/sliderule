@@ -74,7 +74,6 @@ internal sealed class HookState
     {
         if (_directory is null) return None;
 
-        // A short digest of the folded path: ample to keep two trees from colliding while keeping the path short.
         string identity = CacheLocations.PathIdentity(PathComparison.Fold(topLevel));
         string directory = Path.Combine(_directory, TreesDirectory, identity);
         if (!TryCreate(directory)) return None;
@@ -225,8 +224,8 @@ internal sealed class HookState
         return string.IsNullOrWhiteSpace(name) || name.Contains('\n') ? null : name;
     }
 
-    // A record as RecordVerdict and RecordBaseline write one: a leading word, true for `trueWord` and false for
-    // `falseWord`, then the tree. Null when the file is missing or does not read that way.
+    // A verdict or baseline record: a leading word, true for `trueWord` and false for `falseWord`, then the tree.
+    // Null when the file is missing or does not read that way.
     private (bool Flag, TreeSnapshot Tree)? ReadRecord(string name, string trueWord, string falseWord)
     {
         if (ReadLines(name) is not { } lines) return null;

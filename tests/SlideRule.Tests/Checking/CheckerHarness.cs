@@ -100,9 +100,9 @@ internal static class Checker
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         Every <c>Run</c> overload comes through here, with <paramref name="check" /> closing over
-    ///         whichever of the codebase, baselines, diff, narrowing and partial-model arguments that overload
-    ///         was given, so the parsed rules are judged under exactly the conditions the live ones were.
+    ///         Every <c>Run</c> overload comes through here, with <paramref name="check" /> closing over the
+    ///         codebase and every condition that overload was given, so the parsed rules are judged under exactly
+    ///         the conditions the live ones were.
     ///     </para>
     ///     <para>
     ///         Deliberately not on the path of <see cref="HandBuilt" />, whose models bypass spec-build
@@ -358,7 +358,7 @@ internal static class Checker
 
     /// <summary>
     ///     The violations of one <paramref name="kind" />, each rendered by <paramref name="identify" />, in
-    ///     report order — the one walk every violation-listing assertion below is a naming of.
+    ///     report order — the one walk every violation-listing reader below is a naming of.
     /// </summary>
     /// <remarks>
     ///     <para>

@@ -443,7 +443,7 @@ public sealed class HumanReportRendererTests
     [Fact]
     public void RuleBlock_ExposeViolation_RendersExposesLineAtExposureSite()
     {
-        // A Expose kind missing from IsEdge would render nothing and a red report would
+        // An Expose kind missing from IsEdge would render nothing and a red report would
         // read green. Pin the located line text: `Source exposes Target` at the exposing member's site (GRAMMAR §4.9).
         Violation exposeViolation = Violation.Expose(
             SyntheticNodes.Type("App.Facade"), SyntheticNodes.Type("Secrets.Secret"),

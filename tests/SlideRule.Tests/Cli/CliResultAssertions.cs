@@ -88,8 +88,9 @@ internal static class CliResultAssertions
     }
 
     /// <summary>
-    ///     Asserts stdout is <paramref name="expected" /> verbatim, line endings aside. Unlike <see cref="ShouldPrint" />,
-    ///     nothing is trimmed: the whitespace around the whole counts, the trailing newline included.
+    ///     Asserts stdout is <paramref name="expected" /> verbatim, line endings aside. Unlike
+    ///     <see cref="ShouldPrint" />, nothing is trimmed: the whitespace around the whole counts, the trailing
+    ///     newline included.
     /// </summary>
     internal static CliResult ShouldPrintVerbatim(this CliResult result, string expected)
     {
@@ -150,7 +151,7 @@ internal static class CliResultAssertions
 
     /// <summary>
     ///     Asserts stdout is the one hook document, answering for <paramref name="expectedEvent" />, and
-    ///     hands back its <c>additionalContext</c> — the text the hook passes through to Claude Code.
+    ///     hands back its <c>additionalContext</c> — the text Claude Code turns into a message the agent reads.
     /// </summary>
     /// <remarks>
     ///     The event is named by every caller rather than defaulted, because it decides whether the context

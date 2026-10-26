@@ -46,7 +46,7 @@ namespace SlideRule.Tests.Mcp;
 /// </remarks>
 public sealed class McpChildServerRepoHandleTests
 {
-    /// <summary>The five read tools, in call order, each with the arguments it is called with.</summary>
+    /// <summary>Every read tool, in call order, each with the arguments it is called with.</summary>
     private static readonly (string Tool, string Arguments)[] ReadToolCalls =
     [
         ("arch_check", """{"diffBase":"HEAD"}"""),

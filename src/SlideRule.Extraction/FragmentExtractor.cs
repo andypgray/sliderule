@@ -445,6 +445,8 @@ internal static class FragmentExtractor
         private readonly Dictionary<ISymbol, string> _fullNames = new(SymbolEqualityComparer.Default);
 #pragma warning restore RS1024
 
+        // The memo behind MemberSymbolIdOf: a member used at many sites would otherwise have its documentation ID
+        // built again at each one.
 #pragma warning disable RS1024 // false positive, as above
         private readonly Dictionary<ISymbol, string> _memberSymbolIds = new(SymbolEqualityComparer.Default);
 #pragma warning restore RS1024
@@ -1234,8 +1236,8 @@ internal static class FragmentExtractor
 
         /// <summary>
         ///     The fragment the passes built, with the input's artifact facts and with
-        ///     <paramref name="projectReferences" /> from the caller: which
-        ///     projects it references is the one fact the compilation cannot state.
+        ///     <paramref name="projectReferences" /> from the caller: which projects it references is a fact the
+        ///     compilation cannot state.
         /// </summary>
         private CodebaseFragment Materialize(IReadOnlyList<string> projectReferences)
         {

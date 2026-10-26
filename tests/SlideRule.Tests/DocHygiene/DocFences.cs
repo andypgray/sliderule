@@ -3,19 +3,16 @@ using SlideRule.Tests.TestSupport;
 namespace SlideRule.Tests.DocHygiene;
 
 /// <summary>
-///     The fenced-block scanner the doc gates share: a doc's fenced blocks with their info strings and line
-///     numbers, its fenced lines, and its prose. A change to how it reads a fence changes what every gate built
+///     The fenced-block scanner the doc gates share. A change to how it reads a fence changes what every gate built
 ///     on it sees, so the gates and the unit tests exercise this one code path.
 /// </summary>
 internal static class DocFences
 {
     /// <summary>
-    ///     Splits <paramref name="docText" /> into its fenced code blocks in document order, each with the
-    ///     info string its opening delimiter carries, its content lines, every line paired with its 1-based
-    ///     line number in the doc, and the line number of the opening delimiter. The info string is the rest
-    ///     of the opening line after the backtick or tilde run, with spaces and tabs trimmed both sides, and
-    ///     empty for a bare fence; an unclosed final fence keeps its info string. <see cref="Scan" /> decides
-    ///     everything else: where a fence opens and closes, and which lines it holds.
+    ///     Splits <paramref name="docText" /> into its fenced code blocks in document order. The info string
+    ///     is the rest of the opening line after the backtick or tilde run, with spaces and tabs trimmed both
+    ///     sides, and empty for a bare fence; an unclosed final fence keeps its info string. <see cref="Scan" />
+    ///     decides everything else: where a fence opens and closes, and which lines it holds.
     /// </summary>
     public static IReadOnlyList<TaggedBlock> TaggedBlocks(string docText)
     {
@@ -52,14 +49,8 @@ internal static class DocFences
     ///     Splits <paramref name="docText" /> into the content of each fenced code block, one list per
     ///     block in document order, each line paired with its 1-based line number in the doc so a caller
     ///     can name the exact place a quote lives: <see cref="TaggedBlocks" /> with each block reduced to its lines.
-    ///     The fence lines themselves are dropped and the lines between them are kept verbatim, and an
-    ///     unclosed fence keeps every line to the end of the text as its final block.
+    ///     The fence lines themselves are dropped and the lines between them are kept verbatim.
     /// </summary>
-    /// <remarks>
-    ///     A caller needing both block identity and position — a <c>grandfathered: N</c> sub-line takes its
-    ///     rule id from the header line above it <em>in the same fence</em>, and must still fail naming
-    ///     <c>doc:line</c> — reads this directly.
-    /// </remarks>
     public static IReadOnlyList<IReadOnlyList<(string Text, int Number)>> FencedBlocks(string docText)
     {
         return TaggedBlocks(docText)
@@ -97,7 +88,7 @@ internal static class DocFences
     /// <summary>
     ///     Every line of <paramref name="docText" /> outside every fenced code block, paired with its
     ///     1-based line number in the doc — the fence delimiter lines and everything between them dropped.
-    ///     This is the doc's prose, which the prose-hygiene checks measure.
+    ///     This is the doc's prose.
     /// </summary>
     public static IReadOnlyList<(string Text, int Number)> ProseLines(string docText)
     {
@@ -143,13 +134,9 @@ internal static class DocFences
     ///     made of it. A fence opens on a line whose first non-whitespace content is a run of three or more
     ///     backticks or tildes and closes on the next line with at least as long a run of the same
     ///     character and nothing after it but whitespace; an unclosed fence holds every line to the end of
-    ///     the text. Input newlines are normalized to <c>"\n"</c> first, so a <c>\r</c> never reaches a
-    ///     caller.
+    ///     the text. CRLF line ends are folded to <c>"\n"</c> first, so the <c>\r</c> of a CRLF never reaches
+    ///     a caller.
     /// </summary>
-    /// <remarks>
-    ///     This is the one fence scanner the quote gates share, and the only place the state machine
-    ///     lives; every other view of a doc here is a filter over it.
-    /// </remarks>
     private static IEnumerable<(string Text, int Number, LineKind Kind)> Scan(string docText)
     {
         string[] lines = docText.NormalizedLines()
@@ -224,7 +211,6 @@ internal static class DocFences
         return true;
     }
 
-    // The info string of an opening delimiter: what follows its backtick or tilde run, trimmed of spaces and tabs.
     private static string InfoString(string line)
     {
         int index = SkipLeadingWhitespace(line);

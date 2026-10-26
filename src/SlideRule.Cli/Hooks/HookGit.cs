@@ -34,11 +34,12 @@ internal static class HookGit
     /// </summary>
     /// <remarks>
     ///     The shared directory is spelled so that two trees of one repository compare equal under the product's
-    ///     per-OS path rule. Git names it relative to the directory asked from when it lies near and absolutely
-    ///     otherwise, as from a linked worktree, so a relative answer is resolved against that directory, and both
-    ///     are normalised. The case is folded by the product's one per-OS path rule, so on Linux the identity is
-    ///     case-sensitive. On a case-insensitive mount, an NTFS drive under WSL, two spellings of one repository
-    ///     therefore compare as two, as every other path comparison in the product does there.
+    ///     per-OS path rule. Git names it relative to the directory asked from when the tree's <c>.git</c> is a
+    ///     directory, as in a main checkout, and absolutely when <c>.git</c> is a file, as in a linked worktree, so
+    ///     a relative answer is resolved against that directory, and both are normalised. The case is folded by the
+    ///     product's one per-OS path rule, so on Linux the identity is case-sensitive. On a case-insensitive mount,
+    ///     an NTFS drive under WSL, two spellings of one repository therefore compare as two, as every other path
+    ///     comparison in the product does there.
     /// </remarks>
     public static async Task<(string TopLevel, string SharedGitDirectory)?> TreeIdentityAsync(
         string directory, CancellationToken ct)

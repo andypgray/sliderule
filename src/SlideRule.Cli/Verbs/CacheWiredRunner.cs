@@ -48,8 +48,8 @@ internal abstract class CacheWiredRunner(
     }
 
     /// <summary>
-    ///     A run's human channel: <paramref name="stdout" />, or nowhere under <c>--json</c>, which owns stdout,
-    ///     where the document is the only thing written, so every stamp and notice goes nowhere.
+    ///     A run's human channel: <paramref name="stdout" />, or nowhere under <c>--json</c>, where the document is
+    ///     the only thing written to stdout.
     /// </summary>
     protected static TextWriter HumanChannel(bool json, TextWriter stdout)
     {
@@ -77,9 +77,10 @@ internal abstract class CacheWiredRunner(
     ///     A built-DLL spec resolves without ever opening the solution. The model still comes through the source,
     ///     so a warm host serves its cached one rather than reloading the DLL per call. When the directory is
     ///     wanted the solution is discovered first, so a missing solution is the error reported before a bad DLL.
-    ///     A convention or csproj spec loads the workspace for resolution only and never extracts, through the
-    ///     shared acquisition seam, so the model is the model every other verb would have loaded; its diagnostics
-    ///     are composed like every other verb's, so the MSBuild-selection note accompanies the load failures.
+    ///     A convention or csproj spec is resolved through the shared acquisition seam, which replays a cached
+    ///     resolution or loads the workspace for resolution alone and never extracts, so the model is the model
+    ///     every other verb would have loaded; its diagnostics are composed like every other verb's, so the
+    ///     MSBuild-selection note accompanies the load failures.
     /// </remarks>
     protected async Task<(ArchitectureModel Model, string? SolutionDirectory)> LoadSpecModelAsync(
         string? solution, string? spec, string workingDirectory, bool noCache, bool needsSolutionDirectory,

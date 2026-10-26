@@ -8,10 +8,10 @@ namespace SlideRule.Rendering;
 ///     one-line message, and the text of a SARIF result.
 /// </summary>
 /// <remarks>
-///     Wording only: which site a violation lands at, how many lines or results it yields, and the stamps
-///     and notifications a surface composes for itself stay with each caller, because that is where the
-///     surfaces differ. The render tests pin each surface against this class, so a surface that grows a twin
-///     of its own reds there. Members are spelled through <c>MemberDisplay</c>.
+///     Wording only. Which site a violation lands at is <see cref="ViolationPlacement" />'s, and how many lines
+///     or results it yields and the stamps and notifications a surface composes for itself stay with each
+///     caller, because that is where the surfaces differ. The render tests pin each surface against this class,
+///     so a surface that grows a twin of its own reds there. Members are spelled through <c>MemberDisplay</c>.
 /// </remarks>
 internal static class ViolationWording
 {

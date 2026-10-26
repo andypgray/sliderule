@@ -139,7 +139,7 @@ internal static class ProjectCone
 
     /// <summary>
     ///     <see cref="SolutionStructuralPaths(string, IEnumerable{ProjectInputs})" /> over projects given by their
-    ///     structural facts alone, each <c>CsprojPath</c> already absolute.
+    ///     structural facts alone, each <c>CsprojPath</c> and <c>ProjectDirectory</c> already absolute.
     /// </summary>
     public static IReadOnlyList<string> SolutionStructuralPaths(
         string solutionPath,

@@ -40,7 +40,7 @@ public sealed class NamespacePattern
         string glob = Guard.NotNullOrWhiteSpace(pattern, nameof(pattern));
 
         // Derived once because Matches runs once per type, per pattern, per rule: no candidate pays a split of
-        // the glob, and the subtree and match-everything shapes match without allocating.
+        // the glob, and the subtree, literal and match-everything shapes match without allocating.
         _matchesEverything = glob == "*";
         if (_matchesEverything) return;
 

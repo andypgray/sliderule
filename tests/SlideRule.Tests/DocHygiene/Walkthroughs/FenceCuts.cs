@@ -110,10 +110,8 @@ internal static class FenceCuts
     ///     at the <c> …</c> the fence's context ends with, after as many characters as the fence keeps.
     /// </summary>
     /// <remarks>
-    ///     The quoted context is read with its line endings folded, because a page can be checked out with CRLF;
-    ///     the run's context is LF on every OS. What the fence keeps must be the run's own prefix;
-    ///     where it is not, the run cut at the same length is what the red prints. With no fence to read the cut
-    ///     from, the document comes back whole.
+    ///     What the fence keeps must be the run's own prefix; where it is not, the run cut at the same length is
+    ///     what the red prints. With no fence to read the cut from, the document comes back whole.
     /// </remarks>
     internal static string ContextCutAsQuoted(string document, IReadOnlyList<string> fence)
     {
@@ -132,10 +130,7 @@ internal static class FenceCuts
         return run.ToJsonString(SlideRuleJson.Options);
     }
 
-    /// <summary>
-    ///     <paramref name="text" /> with CRLF folded to LF, so a page checked out with CRLF compares equal to a
-    ///     run on any platform.
-    /// </summary>
+    /// <summary><paramref name="text" /> with CRLF folded to LF.</summary>
     internal static string Folded(string text)
     {
         return text.NormalizedLines();

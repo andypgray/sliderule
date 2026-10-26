@@ -11,8 +11,6 @@ namespace SlideRule.Tests.Extraction;
 /// </summary>
 public sealed class CodebaseExtractorInjectionEdgeTests
 {
-    // One row per constructor shape that injects: an explicit constructor on a class, a primary constructor on a
-    // class, and an explicit constructor on a record. Each mints the edge at the parameter's line.
     [Theory]
     [InlineData("public class Svc { public Svc(IDep d) {} }", "N.Svc")]
     [InlineData("public class Svc(IDep d) { }", "N.Svc")]

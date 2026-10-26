@@ -167,8 +167,8 @@ public sealed class FilteredSolutionE2ETests
         result.ShouldSucceed(
             "\nskip data-access/no-inline-sql — ",
             "\n  skipped: " + RuleSkipReason,
-            // The whole verdict, so a skip that quietly became a pass — or a second rule that started skipping —
-            // cannot hide behind the two fragments above.
+            // The whole verdict, so a skip that became a pass — or a second rule that started skipping — cannot
+            // hide behind the two fragments above.
             "Checked 3 rules: 2 passed, 0 failed, 1 skipped (0 violations, 1 warning).");
     }
 

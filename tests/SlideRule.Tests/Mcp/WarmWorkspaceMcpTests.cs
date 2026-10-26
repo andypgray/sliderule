@@ -461,8 +461,8 @@ public sealed class WarmWorkspaceMcpTests
     [Fact]
     public async Task DeclaredMembership_ReadOncePerLoad_AndAgainWhenTheSolutionDropsAProject()
     {
-        // Arrange — a warm server over a private copy, bound to a prebuilt spec DLL: arch_graph and a DLL-bound
-        // arch_check are the two calls that read the solution's declared membership.
+        // Arrange — a warm server over a private copy, bound to a prebuilt spec DLL. arch_graph and arch_check
+        // both read the solution's declared membership through the warm source.
         using var fixture = new TempFixtureWorkspace();
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
             McpServerBindings.For(fixture.SolutionPath, CliRunner.CleanSpecDll), Ct);

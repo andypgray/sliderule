@@ -8,7 +8,7 @@ namespace SlideRule.Tests.Checking;
 /// <summary>
 ///     The checker over the real MyApp fixture, reusing the shared <see cref="WorkspaceFixture.Model" />
 ///     (no extra MSBuild load): the <c>layering/domain-independent</c> rule fires with a locatable site. The
-///     clean verdicts over the same fixture are the oracle's rows.
+///     clean verdicts over the same fixture are rows of <see cref="SlideRule.Tests.Oracle.OracleCaseTableTests" />.
 /// </summary>
 public sealed class CheckerFixtureIntegrationTests(WorkspaceFixture fixture) : IClassFixture<WorkspaceFixture>
 {

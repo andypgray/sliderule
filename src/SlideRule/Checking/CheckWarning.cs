@@ -79,10 +79,8 @@ internal sealed class CheckWarning
     }
 
     /// <summary>
-    ///     A warning that the pattern <paramref name="operand" />, holding <paramref name="role" />, matched no
-    ///     types: a target pattern while the rule's other targets matched some; an allow-list pattern, or a
-    ///     membership (a selection a subject must belong to, or the reside pair's namespace glob or project name),
-    ///     so the rule is stricter than written; or a part of a counterpart verb's <c>among:</c>.
+    ///     A warning that the pattern <paramref name="operand" /> matched no types in the position
+    ///     <paramref name="role" /> names.
     /// </summary>
     internal static CheckWarning DeadOperand(DeadOperandRole role, string operand, string? hint)
     {

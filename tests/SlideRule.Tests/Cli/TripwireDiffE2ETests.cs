@@ -230,7 +230,7 @@ public sealed class TripwireDiffE2ETests
     {
         // The same repository untouched: the tripwire finds no changed file, and a hook with nothing to say
         // must say nothing rather than post an empty document. Silence is what keeps the channel bearable at
-        // all, so it is pinned as tightly as the document itself.
+        // all, so it is pinned as tightly as a warned run's text.
         CliResult result = (await Caution.Value).Clean;
 
         result.ShouldSucceed();

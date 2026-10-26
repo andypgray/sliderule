@@ -61,8 +61,8 @@ public sealed class DocFencesTests
     [Fact]
     public void FencedLinesAndFences_AreTheSameScannerAsFencedBlocks()
     {
-        // Arrange: one state machine, three shapes — a doc mixing fence characters, indentation and an
-        // empty block would drift the day any of them grew a loop of its own.
+        // Arrange: a doc mixing fence characters, indentation and an empty block, on which the three views
+        // would disagree if any of them scanned the doc with a loop of its own.
         string[] lines =
         [
             "intro",

@@ -87,7 +87,7 @@ public sealed class BuildTierBaselineTests
             .ShouldSay(expected);
     }
 
-    /// <summary>Each way a ratcheted rule's baseline can fail to reach the build captured.</summary>
+    /// <summary>Each way the build can be given no captured baseline for a ratcheted rule.</summary>
     public static TheoryData<string> Uncaptured =>
     [
         "no baseline file handed over",

@@ -89,6 +89,8 @@ internal sealed class LawPlaces(IReadOnlyList<LayerDefinition> layers)
         }
     }
 
+    // Containment is read off globs, so a place with none, such as a project place, covers and is covered by
+    // nothing but itself.
     private static bool IsOrCovers(LawPlace candidate, LawPlace place)
     {
         if (candidate.Key == place.Key) return true;

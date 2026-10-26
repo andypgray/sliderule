@@ -22,7 +22,7 @@ public sealed class PublicSurfaceTests
     public void Render_ListsTypesInOrdinalOrderAndEndsOnOneNewline()
     {
         // Arrange: handed in an order that is neither the ordinal one nor the reverse of it. The open generic
-        // also pins the spelling, because it is where the three differ most: ToString appends the type
+        // also pins the spelling, because it is where the three spellings differ most: ToString appends the type
         // parameter list, AssemblyQualifiedName appends the assembly identity, and only FullName is the name a
         // consumer would recognise.
         Type[] types = [typeof(Outer.Inner), typeof(Generic<>), typeof(Outer)];

@@ -261,8 +261,8 @@ public sealed class AtomicFileTests
         File.WriteAllBytes(source, [1, 2, 3]);
         string path = temp.PathOf("target.bin");
 
-        // Four must agree with the length of AtomicFile's retry schedule: a hold that lets go only inside the
-        // fourth refused rename still ends in a move, which holds the schedule's length without a clock.
+        // Four is the length of AtomicFile's retry schedule: a hold that lets go only inside the fourth refused
+        // rename still ends in a move, which holds the schedule to at least four retries without a clock.
         using FileHold hold = FileHold.WithoutDeleteSharing(source);
         hold.ReleaseOnRefusal(nth: 4);
 

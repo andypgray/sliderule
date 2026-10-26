@@ -8,7 +8,7 @@ namespace SlideRule.Tests;
 ///     <c>Implementing</c>/<c>DerivedFrom</c>/<c>AttributedWith</c> adjective twins, and the
 ///     <c>MustImplement</c>/<c>MustDeriveFrom</c>/<c>MustBeAttributedWith</c> constraint twins each reify
 ///     identically to their <c>typeof</c> counterpart: the same model-file text and the same sentence. A
-///     <c>[Fact]</c> per family: type arguments are compile-time, so there is nothing to theorize. (Open
+///     <c>[Fact]</c> per family: type arguments are compile-time, so they cannot be theory data. (Open
 ///     generics stay <c>typeof</c> — inexpressible as a type argument — and are out of scope by design.)
 /// </summary>
 public class GenericSugarTests
@@ -137,8 +137,8 @@ public class GenericSugarTests
     public void MemberAttributedWith_GenericOnMembers_ServesTheKindOnlyReceiver()
     {
         // .Members is typed MemberSelection — its KindMemberSelection is internal, so no per-kind overload
-        // can name it and the MemberSelection overload is the only one that binds. This test and the .Events
-        // one below are the only ones in the suite that reach that overload.
+        // can name it and the MemberSelection overload is the only one that binds, so a receiver typed
+        // MemberSelection is what reaches that overload.
         Checker.ShouldReifyAlike(
             arch => arch.Types.Members.AttributedWith<SugarAttribute>()
                 .MustBePublic(),

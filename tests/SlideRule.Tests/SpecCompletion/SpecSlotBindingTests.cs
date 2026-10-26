@@ -3,13 +3,13 @@ using Xunit;
 namespace SlideRule.Tests.SpecCompletion;
 
 /// <summary>
-///     Which slot a literal fills and whether that slot completes: the seven that do, the ones that do not,
+///     Which slot a literal fills and whether that slot completes: the slots that do, the ones that do not,
 ///     and the written shapes an argument can arrive in.
 /// </summary>
 /// <remarks>
 ///     Every silent case here is a claim that nothing was offered, and a body that failed to compile would
 ///     make every one of them pass on the strength of the typo — so each goes through the entry point that
-///     holds the source to compiling first. Two do not: the call that cannot bind, whose comment says why,
+///     holds the source to compiling first. The exceptions are the call that cannot bind, whose comment says why,
 ///     and the project with no contract, which is asked through an entry point of its own.
 /// </remarks>
 public sealed class SpecSlotBindingTests(SpecCompletionFixture fixture) : IClassFixture<SpecCompletionFixture>

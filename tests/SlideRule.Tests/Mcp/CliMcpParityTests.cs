@@ -20,8 +20,8 @@ namespace SlideRule.Tests.Mcp;
 ///         Each method starts one harness over one solution+spec binding, and several share the violated
 ///         spec's. The rule-ID explain rows ride the DLL fast path (no workspace), while the type and path
 ///         rows extract the codebase their claims are traced over. <c>arch_context</c> is pinned against the
-///         render card text, and the <c>diffBase</c> row mirrors <see cref="TripwireDiffE2ETests" /> over a
-///         real git repo.
+///         render card text, and the <c>diffBase</c> rows run over a real git repo, the tripwire one mirroring
+///         <see cref="TripwireDiffE2ETests" />.
 ///     </para>
 ///     <para>
 ///         The filter brackets each call with the shared
@@ -52,9 +52,9 @@ namespace SlideRule.Tests.Mcp;
 /// </remarks>
 public sealed class CliMcpParityTests
 {
-    // The four cold graph documents this suite measures against — one per rung of the grain ladder — each
+    // The cold graph documents this suite measures against — one per rung of the grain ladder — each
     // produced once. Several rows want more than one of them, and the solution behind them is never mutated
-    // here — the diff-base row edits its own TempGitRepo copy — so the same document answers every row.
+    // here — the diff-base rows edit their own TempGitRepo copies — so the same document answers every row.
     // Memoizing the task does not warm anything: the run underneath is still CliRunner.InvokeColdAsync, which
     // never reads the harness's warm session, as the remarks above require; it is awaited more than once instead
     // of re-run.
@@ -70,9 +70,9 @@ public sealed class CliMcpParityTests
     private static readonly Lazy<Task<CliResult>> ColdGraphIndex =
         new(() => CliRunner.InvokeColdAsync("graph", CliRunner.MyAppSolution, "--json", "--grain", "index"));
 
-    // The four cold check documents, memoized for the same reason and against the same spec every row here
-    // binds to. Nothing mutates the solution behind them either — the diff-base row runs against its own
-    // TempGitRepo copy — so the same full document answers the parity row and the budget row alike.
+    // The cold check documents, one per grain, memoized for the same reason, each over the violated spec the
+    // check rows bind. Nothing mutates the solution behind them either — the diff-base rows run against their own
+    // TempGitRepo copies — so the same full document answers the parity row and the budget row alike.
     private static readonly Lazy<Task<CliResult>> ColdCheckFull =
         new(() => CliRunner.InvokeColdAsync(
             "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json"));

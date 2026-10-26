@@ -45,8 +45,8 @@ public sealed class PolyglotSurveyE2ETests
     [InlineData("status")]
     public async Task Json_SolutionDeclaringAnFsproj_NamesItAndWhyFromTheDocumentAlone(string verb)
     {
-        // The whole content of the coverage statement, as data: which project, and why it is not in the
-        // document. A reader holding the survey alone can tell a two-project codebase from a survey that read
+        // The whole content of the coverage statement, as data: which project, and why the document does not
+        // cover it. A reader holding the survey alone can tell a two-project codebase from a survey that read
         // one project of two. The spec's one rule holds over the C# project, so the check is clean, and that
         // is the point there: no rule can be violated in a project that is not in the model, so only the
         // report can say one is missing. And a project this product cannot read contributes no violations to
@@ -75,9 +75,8 @@ public sealed class PolyglotSurveyE2ETests
     [Fact]
     public async Task Graph_SolutionDeclaringAnFsproj_SurveysTheCsharpProjectAndOnlyIt()
     {
-        // The control beside the coverage statement. Naming what was not read is only half the
-        // fix; the other half is that what WAS read is unchanged, so the key is an addition to a correct
-        // survey rather than a repair to a broken one.
+        // The control beside the coverage statement: naming what was not read leaves what WAS read as it is,
+        // so the key is an addition to a correct survey rather than a repair to a broken one.
 
         // Act
         CliResult result = await CliRunner.InvokeAsync("graph", FixtureBeds.PolyglotAppSolution, "--json");

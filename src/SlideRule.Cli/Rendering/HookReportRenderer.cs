@@ -22,7 +22,7 @@ namespace SlideRule.Cli.Rendering;
 /// </remarks>
 internal static class HookReportRenderer
 {
-    /// <summary>The event a run renders for when the request names none: the per-edit shape.</summary>
+    /// <summary>The event the per-edit path's document names, a hand run's included.</summary>
     public const string DefaultEvent = "PostToolUse";
 
     /// <summary>The turn-end event the recommended hook fires on: the agent claiming it is done.</summary>

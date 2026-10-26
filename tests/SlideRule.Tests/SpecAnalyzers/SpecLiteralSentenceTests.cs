@@ -10,12 +10,12 @@ namespace SlideRule.Tests.SpecAnalyzers;
 /// <remarks>
 ///     <para>
 ///         The wording belongs to the contract rather than to the analyzer, which carries <c>{0}</c> as its
-///         whole message format and hands the sentence through. This table writes every one of them down,
+///         whole message format and hands the sentence through. This table writes every verdict's sentence down,
 ///         and types each expected message out rather than composing it from the owners that produce it: a
 ///         golden derived from its subject agrees with whatever that subject says today.
 ///     </para>
 ///     <para>
-///         One statement per row, so the table can be read straight through. Three of the verdicts need two
+///         One statement per row, so the table can be read straight through. The collision verdicts need two
 ///         declarations rather than one, because a collision is what two literals decide between them.
 ///     </para>
 /// </remarks>

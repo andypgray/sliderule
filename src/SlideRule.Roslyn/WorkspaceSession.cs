@@ -375,7 +375,7 @@ internal sealed class WorkspaceSession : IAsyncDisposable
     /// <remarks>
     ///     The structural set follows the rule the persisted caches stamp theirs by,
     ///     <see cref="Caching.ProjectCone.SolutionStructuralPaths(string, IEnumerable{Caching.ProjectInputs})" />,
-    ///     over every project with a file rather than only the C# ones those caches collect, and taken per
+    ///     over every project with a file rather than only the C# ones those caches collect. It is taken per
     ///     <see cref="Project" /> rather than per project directory, because where the restore assets file lands
     ///     follows the project's own evaluated output paths and not its directory.
     /// </remarks>

@@ -73,7 +73,7 @@ internal static class BaselineComposer
 
     /// <summary>
     ///     The composer's input for <paramref name="sections" /> — one ordinal-keyed rule section each, in
-    ///     order: the shape <see cref="BaselineFormat.ComposeFile" /> and the seal and digest verbs take, for
+    ///     order: the shape <see cref="BaselineFormat.ComposeFile" /> and the legacy digest verbs take, for
     ///     the rows that call the format directly rather than through
     ///     <see cref="Compose(ValueTuple{string, BaselineEntry[]}[])" />.
     /// </summary>

@@ -235,10 +235,9 @@ internal sealed class BaselineRunner(
         return ExitCodes.Clean;
     }
 
-    // rename: the model the way explain loads it, then the file work. A malformed --from is refused before any
-    // solution work, as add's companions are. A built-DLL --spec never opens a workspace; a convention or csproj
-    // spec opens one for resolution only, never extracts, and never gates on a failed load, because a project
-    // that failed to load cannot change which rules the spec declares and nothing this mode writes is measured.
+    // rename: the spec's model, then the file work. A malformed --from is refused before any solution work, as
+    // add's companions are. rename never gates on a failed load, because a project that failed to load cannot
+    // change which rules the spec declares and nothing it writes is measured.
     private async Task<int> RenameAsync(BaselineRequest request, CancellationToken ct)
     {
         BaselineRename rename = request.Rename ?? throw MisassembledRenameRequest();

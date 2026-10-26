@@ -32,9 +32,10 @@ namespace SlideRule.Tests.Mcp;
 ///         <see cref="McpChildServerRepoHandleTests" /> drives the same conversation over the same
 ///         plumbing, so the setups are near-identical, but every one of its facts opens with
 ///         <c>ProcessFileFootprint.SkipUnlessSupported()</c>, and the footprint scan
-///         is Windows-x64 only. CI runs ubuntu and macos legs too, and on those this is the only
-///         real-child-over-real-stdio coverage there is. Deleting it would leave the stdin-inheritance
-///         wedge unguarded on two of four legs.
+///         is Windows-x64 only. CI runs ubuntu and macos legs too, and on those this is the only real
+///         child over real stdio whose tool call shells git: <see cref="McpUnboundServerTests" /> runs a
+///         real child as well, but an unbound one, whose tool calls never reach git. Deleting it would leave
+///         the stdin-inheritance wedge unguarded on those legs.
 ///     </para>
 /// </remarks>
 public sealed class McpStdioChildServerTests

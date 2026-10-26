@@ -63,15 +63,15 @@ internal static class GitChangedFiles
     }
 
     /// <summary>
-    ///     The <c>git status</c> arguments both changed-file listings are read with, this one and the hook's snapshot.
-    ///     <see cref="StatusPaths" /> slices an entry correctly only under exactly these flags.
+    ///     The arguments a <c>git status</c> changed-file listing is read with. <see cref="StatusPaths" /> slices an
+    ///     entry correctly only under exactly these flags.
     /// </summary>
     internal static readonly string[] StatusArguments = ["status", "--porcelain=v1", "-uall", "-z", "--no-renames"];
 
     /// <summary>
     ///     The <c>git diff</c> arguments that list the paths differing between commits <paramref name="from" /> and
-    ///     <paramref name="to" />, for this listing and the hook's alike. With renames off a rename names both of its
-    ///     paths, so a file moved out of a directory is listed at the path it left.
+    ///     <paramref name="to" />. With renames off a rename names both of its paths, so a file moved out of a
+    ///     directory is listed at the path it left.
     /// </summary>
     internal static string[] CommittedArguments(string from, string to)
     {

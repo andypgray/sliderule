@@ -4,7 +4,8 @@ namespace SlideRule.Model;
 
 /// <summary>
 ///     A rule or scope anchor registered on an <see cref="Arch" /> the moment <c>Rule</c>/<c>Scope</c>
-///     is called (register-on-anchor, GRAMMAR §3.2).
+///     is called (register-on-anchor, GRAMMAR §3.2). Trailers append to lists so a repeated trailer
+///     (<c>Because</c> twice, two <c>Baseline</c>s) is detectable by validation (§8 item 6).
 /// </summary>
 internal abstract class Registration(string id)
 {
@@ -16,6 +17,7 @@ internal abstract class Registration(string id)
     /// </summary>
     internal SpecSourceLocation? Location { get; set; }
 
+    /// <summary>Null when no posture verb was called, which leaves the anchor dangling (§8 item 2).</summary>
     internal Posture? Posture { get; private set; }
 
     /// <summary>

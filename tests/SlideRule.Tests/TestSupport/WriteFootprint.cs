@@ -3,7 +3,7 @@ namespace SlideRule.Tests.TestSupport;
 /// <summary>
 ///     The "wrote nothing" oracle: every file under the roots a verb could write to, as path, length and last-write
 ///     time, so a rewrite in place shows as well as a file added or removed. bin/ and obj/ are left out, because a
-///     design-time build touches them legitimately.
+///     design-time build writes to them.
 /// </summary>
 internal static class WriteFootprint
 {

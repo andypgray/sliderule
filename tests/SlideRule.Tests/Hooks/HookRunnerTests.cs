@@ -11,8 +11,9 @@ namespace SlideRule.Tests.Hooks;
 
 /// <summary>
 ///     Drives <c>sliderule hook</c>'s policy in process and holds it to the contract it publishes: the exit-code
-///     mapping a Claude Code hook depends on (clean → 0 with whatever the check wrote passed through on stdout, a red
-///     rule → 2 with the report on stderr, SlideRule's own error → 1 under a <c>sliderule config error:</c> line),
+///     mapping a Claude Code hook depends on (clean → 0 with stdout empty or holding the check's text in one hook
+///     document, a red rule → 2 with the report on stderr, SlideRule's own error → 1 under a
+///     <c>sliderule config error:</c> line),
 ///     the turn-end behaviour a <c>Stop</c> payload buys, and the guards that decide whether an event spends a check
 ///     at all. A scripted check supplies the exit code and the output, and records every check the hook asked for,
 ///     so the policy is measured without a workspace.

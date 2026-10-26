@@ -6,8 +6,8 @@ namespace SlideRule.Tests.Extraction;
 
 /// <summary>
 ///     Type-node facts over the fast path: kind mapping, identity (FullName / nested / open generic),
-///     partial merge, and the <see cref="ITypeInfo" /> hierarchy surface (base type, interfaces,
-///     attributes).
+///     partial merge, and the hierarchy facts a type node carries and <see cref="ITypeInfo" /> exposes (base
+///     type, interfaces, attributes).
 /// </summary>
 public sealed class CodebaseExtractorTypeTests
 {

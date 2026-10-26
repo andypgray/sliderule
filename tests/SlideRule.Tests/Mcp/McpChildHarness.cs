@@ -198,10 +198,6 @@ internal static class McpChildHarness
         await server.StandardInput.FlushAsync(Ct);
     }
 
-    /// <summary>
-    ///     The <c>tools/call</c> frame calling <paramref name="tool" /> with <paramref name="arguments" /> under
-    ///     JSON-RPC id <paramref name="id" />.
-    /// </summary>
     private static string ToolCallFrame(int id, string tool, string arguments)
     {
         var frame = new JsonObject
@@ -294,7 +290,7 @@ internal static class McpChildHarness
         catch (Exception ex) when (ex is InvalidOperationException or NotSupportedException or Win32Exception
                                        or AggregateException)
         {
-            // Already gone or inaccessible: nothing left to clean up.
+            // Already gone or out of reach; a refused kill must not replace the conversation's outcome.
         }
     }
 

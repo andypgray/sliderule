@@ -3,9 +3,8 @@ using System.Reflection;
 namespace SlideRule.Tests.TestSupport;
 
 /// <summary>
-///     Where the fixture beds and the built fixture assemblies sit in the test output: the solution beds the
-///     build copies under <c>Fixtures/TestSolutions</c>, and the DLL paths it bakes into this assembly's
-///     metadata.
+///     Where the fixture beds and the built fixture assemblies are: the solution beds the build copies into the
+///     test output under <c>Fixtures/TestSolutions</c>, and the DLL paths it bakes into this assembly's metadata.
 /// </summary>
 internal static class FixtureBeds
 {
@@ -18,7 +17,6 @@ internal static class FixtureBeds
     /// <summary>The MyApp bed's directory: its solution, its projects and its <c>arch/</c> baselines.</summary>
     internal static string MyAppRoot => Path.Combine(TestSolutionsRoot, "MyApp");
 
-    /// <summary>The MyApp bed's solution.</summary>
     internal static string MyAppSolution => Path.Combine(MyAppRoot, "MyApp.sln");
 
     /// <summary>The polyglot bed's solution, which declares an F# project beside a C# one.</summary>
@@ -30,7 +28,6 @@ internal static class FixtureBeds
     /// <summary>The multi-targeting bed's directory, whose core project targets two frameworks.</summary>
     internal static string MultiTfmRoot => Path.Combine(TestSolutionsRoot, "MultiTfm");
 
-    /// <summary>The multi-targeting bed's solution.</summary>
     internal static string MultiTfmSolution => Path.Combine(MultiTfmRoot, "MultiTfm.sln");
 
     /// <summary>

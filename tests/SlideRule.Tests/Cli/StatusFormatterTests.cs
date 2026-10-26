@@ -62,7 +62,6 @@ public sealed class StatusFormatterTests
             .Because("b");
     });
 
-    // The one result's whole report, for the rows that read more than its first line.
     private static IReadOnlyList<string> Lines(RuleResult result)
     {
         return StatusFormatter.Lines(new CheckReport([result]));

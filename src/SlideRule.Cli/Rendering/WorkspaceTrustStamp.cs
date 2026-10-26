@@ -32,10 +32,10 @@ internal sealed record UnsupportedProjectStamp(string Project, string Reason)
 ///     </para>
 ///     <para>
 ///         A verdict list that is empty says nothing, so it is carried as <see langword="null" /> and the key is
-///         omitted rather than written as <c>[]</c>, which keeps a clean document byte-identical to the one it
-///         always was; <paramref name="ModelIncomplete" /> is <see langword="true" /> or <see langword="null" /> on
-///         the same policy. <paramref name="PackageAudit" /> is carried whole, empty included, and each document
-///         omits it at its own wire. Every document still declares its own slots and their order.
+///         omitted rather than written as <c>[]</c>, and a clean document carries none of these keys;
+///         <paramref name="ModelIncomplete" /> is <see langword="true" /> or <see langword="null" /> on the same
+///         policy. <paramref name="PackageAudit" /> is carried whole, empty included, and each document omits it at
+///         its own wire. Every document still declares its own slots and their order.
 ///     </para>
 ///     <para>
 ///         The unsupported projects' reason is read here, from <see cref="UnsupportedProjectsNotice.Reason" />, so

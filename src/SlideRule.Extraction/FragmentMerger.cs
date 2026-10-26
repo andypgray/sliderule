@@ -884,8 +884,8 @@ internal static class FragmentMerger
 
             internal FragmentSite? TargetFrameworksSite { get; private set; }
 
-            // Every target framework the project's fragments carried. Built over all fragments, not just the
-            // declaring ones, so a note can name the project's whole framework set.
+            // Every target framework any of the project's fragments carried, so a note can name the project's whole
+            // framework set.
             internal SortedSet<string> CarriedFrameworks { get; } = new(StringComparer.Ordinal);
 
             internal void Absorb(CodebaseFragment fragment)

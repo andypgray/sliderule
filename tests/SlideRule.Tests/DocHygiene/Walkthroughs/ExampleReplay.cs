@@ -38,9 +38,7 @@ namespace SlideRule.Tests.DocHygiene.Walkthroughs;
 ///     <para>
 ///         One run per example, made once and cached. The cache is started with no cancellation token, so the
 ///         first test to ask cannot leave a cancelled run behind for every test after it, and it keeps reports and
-///         strings rather than a <see cref="Solution" />, so the warm pool may evict the workspace at no cost. The
-///         read-only verbs run inside it too, right after the load, so what they print is read without reloading
-///         the workspace.
+///         strings rather than a <see cref="Solution" />, so the warm pool may evict the workspace at no cost.
 ///     </para>
 /// </remarks>
 internal static class ExampleReplay
@@ -241,7 +239,8 @@ internal static class ExampleReplay
 
     /// <summary>
     ///     Makes a scenario's edits to the example's loaded solution and extracts the result the way the verbs
-    ///     extract the committed tree: the same exclusions, target frameworks and declared members.
+    ///     extract the committed tree: the same exclusions, target frameworks, declared members and canonical
+    ///     project paths.
     /// </summary>
     private sealed class ScenarioEditor(
         WorkspaceSnapshot snapshot,

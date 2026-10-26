@@ -52,8 +52,8 @@ internal static class WorkspaceLoader
     /// <remarks>
     ///     A filter loads the projects it selects plus their transitive references. A failure never aborts the
     ///     load, since a partial load still yields a usable model: <paramref name="diagnosticLog" /> receives the
-    ///     workspace's failure messages for a host to render, and whether the model is incomplete is the answer of
-    ///     <see cref="WorkspaceDiagnostics.FailedProjects" /> and
+    ///     workspace's failure messages and the load's own warnings for a host to render, and whether the model
+    ///     is incomplete is the answer of <see cref="WorkspaceDiagnostics.FailedProjects" /> and
     ///     <see cref="WorkspaceDiagnostics.RestoreFailedProjects" /> on
     ///     <see cref="LoadedSolution.LoadDiagnosticsWith" />, never the messages'.
     /// </remarks>

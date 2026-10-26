@@ -32,8 +32,8 @@ internal static class BuildTierDiagnosticAssertions
 
     /// <summary>
     ///     Asserts exactly <paramref name="count" /> warnings came back and every one carries <paramref name="id" />,
-    ///     with <paramref name="customMessage" /> heading the red when one is given, and returns them in the order
-    ///     they came back.
+    ///     with <paramref name="customMessage" /> heading a wrong count's red when one is given, and returns them
+    ///     in the order they came back.
     /// </summary>
     internal static IReadOnlyList<Diagnostic> ShouldAllBe(
         this IReadOnlyList<Diagnostic> reported, string id, int count, string? customMessage = null)

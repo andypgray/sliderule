@@ -405,9 +405,10 @@ public sealed class GraphCommandTests
     {
         // Arrange — the two stages composed. A pin of the runner alone and a pin of the truncator alone cannot
         // see a runner that emits an over-budget document for the filter behind it to cut at the same number.
-        // The rows one and two characters short of the skeleton's written size are where a fitter and a
-        // truncator measuring different text disagree, since a line terminator is one or two characters. Every
-        // row is a budget the ladder can answer whole, and so must.
+        // The rows one and two characters short of the skeleton's written size are the budgets at which a fitter
+        // that measured the document without its terminator (the LF every document ends in, or a CRLF if the
+        // writer went back to the platform's line end) would pass a rung the truncator then cuts. Every row is a
+        // budget the ladder can answer whole, and so must.
         int budget = await LengthAt(DocumentGrain.Skeleton) + headroom;
         var output = new StringWriter();
 

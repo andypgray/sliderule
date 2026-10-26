@@ -260,12 +260,9 @@ internal sealed class ParitySubject(
 internal static class ParityHarness
 {
     /// <summary>
-    ///     One solution under <paramref name="model" />, with the baselines that sit beside the solution.
+    ///     One solution under <paramref name="model" />, with the baselines that sit beside the solution;
+    ///     <paramref name="name" /> is what a failure calls the subject.
     /// </summary>
-    /// <param name="name">What a failure calls this subject.</param>
-    /// <param name="model">The spec, already built.</param>
-    /// <param name="solutionPath">The solution the model governs.</param>
-    /// <param name="cancellationToken">The token the workspace load and the binding run under.</param>
     internal static async Task<ParitySubject> ForSolutionAsync(
         string name, ArchitectureModel model, string solutionPath, CancellationToken cancellationToken)
     {
@@ -274,11 +271,10 @@ internal static class ParityHarness
         return await ForSolutionAsync(name, model, solutionPath, compilations);
     }
 
-    /// <summary>The same, over compilations a caller already read off the bed.</summary>
-    /// <param name="name">What a failure calls this subject.</param>
-    /// <param name="model">The spec, already built.</param>
-    /// <param name="solutionPath">The solution the model governs.</param>
-    /// <param name="compilations">One compilation per C# project of that solution, in extraction order.</param>
+    /// <summary>
+    ///     The same, over <paramref name="compilations" /> a caller already read off the bed: one per C# project
+    ///     of the solution, in extraction order.
+    /// </summary>
     internal static async Task<ParitySubject> ForSolutionAsync(
         string name, ArchitectureModel model, string solutionPath, IReadOnlyList<ParityCompilation> compilations)
     {
@@ -471,11 +467,9 @@ internal static class ParityHarness
     }
 
     /// <summary>
-    ///     One compilation per C# project of the solution at <paramref name="solutionPath" />, ordered as
-    ///     the whole-solution extraction orders them.
+    ///     One compilation per C# project of the solution at <paramref name="solutionPath" />, opened through the
+    ///     shared warm pool and ordered as the whole-solution extraction orders them.
     /// </summary>
-    /// <param name="solutionPath">The solution to open, through the shared warm pool.</param>
-    /// <param name="cancellationToken">The token the load and the binding run under.</param>
     internal static async Task<IReadOnlyList<ParityCompilation>> CompilationsOfAsync(
         string solutionPath, CancellationToken cancellationToken)
     {

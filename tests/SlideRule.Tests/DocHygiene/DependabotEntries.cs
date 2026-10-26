@@ -24,7 +24,7 @@ internal static class DependabotEntries
 
     /// <summary>
     ///     The lines of each nuget update entry in file order, from its own <c>- package-ecosystem:</c> line
-    ///     to the line before the next entry of any ecosystem, and throws where the configuration carries none, so
+    ///     to the line before the next entry of any ecosystem. Throws where the configuration carries none, so
     ///     no gate that reads it can pass over nothing.
     /// </summary>
     internal static IReadOnlyList<string[]> NuGetEntries()
@@ -116,9 +116,9 @@ internal static class DependabotEntries
     }
 
     /// <summary>
-    ///     One finding per nuget update entry whose <c>ignore:</c> list does not name one of
-    ///     <paramref name="packages" /> exactly, ending in <paramref name="consequence" />, what that entry's next
-    ///     update run does.
+    ///     One finding per nuget update entry and package of <paramref name="packages" /> that the entry's
+    ///     <c>ignore:</c> list does not name exactly, ending in <paramref name="consequence" />, what that entry's
+    ///     next update run does.
     /// </summary>
     internal static IReadOnlyList<string> MissingIgnores(IReadOnlyList<string> packages, string consequence)
     {

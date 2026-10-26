@@ -40,7 +40,6 @@ internal sealed class SolutionRoot
         return segments.GetRange(_segments.Count, segments.Count - _segments.Count);
     }
 
-    // Both separators split on every operating system, and an empty segment is no segment.
     private static List<string> Folded(string path)
     {
         IEnumerable<string> segments = path.Split('/', '\\').Where(segment => segment.Length > 0);

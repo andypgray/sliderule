@@ -12,7 +12,7 @@ namespace SlideRule;
 // these nodes (GRAMMAR §2).
 public abstract class Constraint
 {
-    // The null guard for every verb's receiver: each verb names its receiver subject, so the ParamName is
+    // The null guard for every type verb's receiver: each verb names its receiver subject, so the ParamName is
     // the one on the overload the caller called.
     private protected Constraint(Selection subject)
     {

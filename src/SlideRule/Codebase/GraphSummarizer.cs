@@ -109,8 +109,8 @@ internal static class GraphSummarizer
             Add(projectPairs, (instance.SourceProject, instance.TargetProject), 1);
     }
 
-    // The per-key counts a survey line carries, tallied rather than grouped: a lookup retains one entry per
-    // edge INSTANCE only to read each group's size, where the survey keeps one line per distinct key.
+    // A survey line's counts are tallied per key rather than grouped: a lookup retains one entry per edge
+    // INSTANCE only to read each group's size, where the survey keeps one line per distinct key.
     private static void Add<TKey>(Dictionary<TKey, int> counts, TKey key, int count)
         where TKey : notnull
     {

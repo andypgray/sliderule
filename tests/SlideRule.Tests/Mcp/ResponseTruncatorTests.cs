@@ -177,7 +177,7 @@ public sealed class ResponseTruncatorTests
     [InlineData("some_other_tool")]
     public void TruncateIfNeeded_ToolWithNoNarrowingKnob_FooterEndsWithoutAHint(string toolName)
     {
-        // Nothing to name: these three take no filter and an unknown name has none, so the footer stops at the
+        // Nothing to name: the named tools take no filter and an unknown name has none, so the footer stops at the
         // incompleteness itself.
         string result = ResponseTruncator.TruncateIfNeeded(new string('x', 50), toolName, 20);
 

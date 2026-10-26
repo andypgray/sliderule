@@ -64,7 +64,6 @@ internal static class SpecResolver
 
     /// <summary>Resolves the spec against a loaded solution.</summary>
     /// <remarks>
-    ///     <paramref name="projectFiles" /> is the load's canonical project files.
     ///     <paramref name="declaredMembers" /> is null when membership could not be read.
     ///     <paramref name="diagnostics" /> is deliberately not defaulted: whether the workspace loaded cleanly
     ///     decides what zero convention candidates mean (<see cref="ResolveConventionProject" />), and every caller

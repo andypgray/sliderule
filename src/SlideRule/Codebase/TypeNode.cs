@@ -161,12 +161,16 @@ internal sealed class TypeNode : ITypeInfo
 
     ITypeInfo? ITypeInfo.BaseType => BaseType;
 
-    /// <summary>Gets the nodes of the interfaces the type implements, as <see cref="ITypeInfo.Interfaces" /> describes them.</summary>
+    /// <summary>
+    ///     Gets the nodes of the interfaces the type implements, as <see cref="ITypeInfo.Interfaces" /> describes them.
+    /// </summary>
     public IReadOnlyList<TypeNode> Interfaces { get; internal set; }
 
     IReadOnlyList<ITypeInfo> ITypeInfo.Interfaces => Interfaces;
 
-    /// <summary>Gets the nodes of the type's attribute classes, as <see cref="ITypeInfo.Attributes" /> describes them.</summary>
+    /// <summary>
+    ///     Gets the nodes of the type's attribute classes, as <see cref="ITypeInfo.Attributes" /> describes them.
+    /// </summary>
     public IReadOnlyList<TypeNode> Attributes { get; internal set; }
 
     IReadOnlyList<ITypeInfo> ITypeInfo.Attributes => Attributes;

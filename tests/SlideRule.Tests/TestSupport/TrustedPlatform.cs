@@ -16,7 +16,9 @@ internal static class TrustedPlatform
     /// <summary>Every assembly the host resolves against, with exactly one copy of the contract among them.</summary>
     internal static ImmutableArray<MetadataReference> References { get; } = ReferencesOf(Entries);
 
-    /// <summary>The whole set less the contract: what a compilation that brings its own contract builds against.</summary>
+    /// <summary>
+    ///     The whole set less the contract: what a compilation that brings its own contract builds against.
+    /// </summary>
     internal static ImmutableArray<MetadataReference> WithoutContract { get; } =
         ReferencesOf(Entries.Where(entry => !IsContract(entry.Path)));
 
@@ -49,6 +51,7 @@ internal static class TrustedPlatform
         List<string> paths = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
             .Split(Path.PathSeparator)
             .Where(path => path.Length > 0)
+            // The host can list a path twice (System.Private.CoreLib, measured on .NET 10).
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 

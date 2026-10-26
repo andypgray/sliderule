@@ -58,10 +58,10 @@ internal static class ProjectLoadFailures
 
         // Arm 2 first, over what did load: a multi-target-framework project is several Projects behind one
         // file path, so the set collapses them to the one csproj a reader would go and fix. A project in
-        // another language is skipped: F# reaches a loaded solution with its output paths — measured — so this
-        // arm can see a project the model was never going to contain, and blaming one would refuse a healthy
-        // polyglot solution as a load failure; the run states such a project under its coverage statement
-        // instead.
+        // another language is skipped. An F# project reaches a loaded solution with its output paths (measured),
+        // so this arm can see a project the model was never going to contain, and blaming one would refuse a
+        // healthy polyglot solution as a load failure. The run states such a project under its coverage
+        // statement instead.
         foreach (Project project in solution.Projects)
             if (ProjectLanguages.IsCSharp(project) && LoadedEmpty(project) && project.FilePath is { } filePath)
                 failed.Add(Path.GetFullPath(filePath));

@@ -3,10 +3,9 @@ namespace SlideRule.Tests.TestSupport;
 /// <summary>
 ///     Rendered agent-context text that more than one suite is pinned against — a family rule's bullet,
 ///     which appears on both of its cells' cards; the whole cards the MCP surface returns and the render
-///     verb splices into a file; and the recovery paragraph every root block carries. Spelled once because two copies of a
-///     string would let one drift:
-///     the CLI-versus-MCP parity rows and the end-to-end render goldens only mean the same thing while
-///     the text they compare is literally the same text.
+///     verb splices into a file; and the recovery paragraph every root block carries. Spelled once because
+///     two copies of a string would let one drift: the CLI-versus-MCP parity rows and the end-to-end render
+///     goldens only mean the same thing while the text they compare is literally the same text.
 /// </summary>
 /// <remarks>
 ///     The cards here carry no provenance line — that is a render file-splice concern rather than part of
@@ -14,18 +13,12 @@ namespace SlideRule.Tests.TestSupport;
 /// </remarks>
 internal static class RenderedLawText
 {
-    /// <summary>
-    ///     The sentence inside <see cref="InstallNote" /> a row asserts on its own, spelled apart so the claim and the
-    ///     goldens carrying it cannot drift apart.
-    /// </summary>
+    /// <summary>The sentence inside <see cref="InstallNote" /> that a row asserts on its own.</summary>
     internal const string SdkPinSentence =
         "Inside a repository whose `global.json` pins an SDK below 10, both commands fail, so run them " +
         "from outside it and pass the solution's absolute path.";
 
-    /// <summary>
-    ///     The recovery line every rendered root block carries, spelled once so no two goldens that carry it can drift
-    ///     apart on it.
-    /// </summary>
+    /// <summary>The recovery line every rendered root block carries.</summary>
     internal const string InstallNote =
         "*If the `sliderule` command is missing (a configured MCP server dies without it), " +
         "install the tool with `dotnet tool install -g SlideRule.Cli`, or run any command " +

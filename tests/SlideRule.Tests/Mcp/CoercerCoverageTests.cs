@@ -12,7 +12,7 @@ namespace SlideRule.Tests.Mcp;
 ///     fail loudly: it falls through to the SDK default, where a mis-spelled argument comes back as a
 ///     byte-position deserializer error the CLI's error mapper reads as a bug rather than as user input —
 ///     the exact failure this pipeline exists to prevent. Both tests compute the live set from
-///     <see cref="ToolAttributeDiscovery" /> rather than restating it, so the covered set tracks the tools
+///     <see cref="LiveToolParameters" /> rather than restating it, so the covered set tracks the tools
 ///     instead of drifting away from them silently.
 /// </summary>
 public sealed class CoercerCoverageTests

@@ -352,7 +352,8 @@ internal static class CheckJsonAssertions
     ///     A truncated or non-JSON payload is a regression in its own right, and a raw
     ///     <see cref="JsonException" /> reports it as an error rather than a failure, with none of the text
     ///     that would say what was written. <c>CliResultAssertions.ShouldHaveJsonStdout</c> holds this for a
-    ///     CLI run's stdout; this covers the MCP tool text, which nothing else parses.
+    ///     CLI run's stdout; this covers a document held as plain text, such as an MCP tool's reply or a
+    ///     renderer's output.
     /// </remarks>
     internal static JsonDocument ShouldParseAsJson(string report)
     {

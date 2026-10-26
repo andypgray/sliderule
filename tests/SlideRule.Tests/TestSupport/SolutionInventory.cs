@@ -45,7 +45,9 @@ internal sealed record SolutionProject(
     bool IsTool,
     bool IncludeBuildOutput);
 
-/// <summary>A property's <paramref name="Value" /> and the repository-relative <paramref name="File" /> that declared it.</summary>
+/// <summary>
+///     A property's <paramref name="Value" /> and the repository-relative <paramref name="File" /> that declared it.
+/// </summary>
 internal sealed record PropertyDeclaration(string Value, string File);
 
 /// <summary>
@@ -55,9 +57,9 @@ internal sealed record PropertyDeclaration(string Value, string File);
 /// <remarks>
 ///     Committed bytes only: the solution and the project files are parsed as XML, and nothing here loads a
 ///     workspace, runs MSBuild or evaluates a property, so every gate built on it stays cheap,
-///     cross-platform and parallel-safe. The cost is that an imported or conditioned property is invisible,
-///     and what is read is what a project file declares for itself at the top level — which is also the
-///     granularity the lists being held are written at.
+///     cross-platform and parallel-safe. The cost is that no condition is evaluated, and the only import
+///     followed is <see cref="SrcProps" />, which <see cref="Effective" /> reads. What is read is what a file
+///     declares for itself at the top level, which is also the granularity the lists being held are written at.
 /// </remarks>
 internal static class SolutionInventory
 {

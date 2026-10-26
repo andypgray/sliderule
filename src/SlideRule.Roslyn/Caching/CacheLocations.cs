@@ -10,8 +10,8 @@ namespace SlideRule.Roslyn.Caching;
 /// </summary>
 /// <remarks>
 ///     The root override is a parameter, so <c>SLIDERULE_CACHE_DIR</c> arrives already resolved and this type
-///     reads no environment variable itself. The path identity reuses <see cref="PathCanonicalizer" />
-///     (symlink-resolved, fully-qualified), lowercased before hashing on a case-insensitive file system, so the
+///     reads no environment variable itself. The subdirectory's identity reuses <see cref="PathCanonicalizer" />
+///     (symlink-resolved, fully-qualified), lowercased before hashing where the OS ignores path case, so the
 ///     same solution opened through a symlinked root or a case-variant spelling maps to one cache directory.
 /// </remarks>
 internal static class CacheLocations
@@ -22,8 +22,8 @@ internal static class CacheLocations
     private const string CaptureManifestFileName = "capture.json";
     private const string CaptureBinlogFileName = "capture.binlog";
 
-    // 16 hex chars (64 bits) of the canonical-path SHA-256 — ample to keep two distinct solutions from
-    // colliding while keeping the directory name short. The <sln-name> prefix is for human readability only.
+    // 16 hex chars (64 bits) of the path's SHA-256 — ample to keep two distinct paths from colliding while
+    // keeping a directory name short. A cache directory's <sln-name> prefix is for human readability only.
     private const int PathHashHexLength = 16;
 
     /// <summary>
@@ -61,8 +61,8 @@ internal static class CacheLocations
 
     /// <summary>
     ///     The short on-disk identity of <paramref name="foldedPath" />, a path already folded by
-    ///     <see cref="PathComparison.Fold" />: the prefix of its lowercase-hex SHA-256 that cache directories are
-    ///     named by.
+    ///     <see cref="PathComparison.Fold" />: the prefix of its lowercase-hex SHA-256 that names a directory
+    ///     kept for that path.
     /// </summary>
     internal static string PathIdentity(string foldedPath)
     {

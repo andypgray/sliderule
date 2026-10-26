@@ -16,11 +16,7 @@ namespace SlideRule.Roslyn;
 ///     reconcile folds in leave it alone. Such an edit adds or removes no project, and the files that decide
 ///     restore and membership (the solution or filter file, the solution a filter references, each
 ///     <c>project.assets.json</c>, absent ones included) are structural inputs of the reconcile sweep, so a
-///     change to one forces a full reload. The fail-closed gate keys on <see cref="LoadDiagnostics" />'
-///     <see cref="WorkspaceDiagnostics.FailedProjects" /> and
-///     <see cref="WorkspaceDiagnostics.RestoreFailedProjects" />; its <see cref="WorkspaceDiagnostics.LoadFailures" />,
-///     the workspace's failure messages, only render. The merge's notes and multi-targeted projects stay empty
-///     there: only extraction produces them.
+///     change to one forces a full reload.
 /// </remarks>
 internal sealed record WorkspaceSnapshot(Solution Solution, WorkspaceDiagnostics LoadDiagnostics)
 {
@@ -48,6 +44,8 @@ internal sealed record WorkspaceSnapshot(Solution Solution, WorkspaceDiagnostics
     /// </summary>
     internal IReadOnlyDictionary<ProjectId, string> TargetFrameworks { get; init; } = TargetFrameworkMaps.None;
 
-    /// <summary>Each loaded project's canonical <c>.csproj</c> path, resolved once for <see cref="Generation" />.</summary>
+    /// <summary>
+    ///     Each loaded project's canonical <c>.csproj</c> path, resolved once for <see cref="Generation" />.
+    /// </summary>
     internal required CanonicalProjectFiles ProjectFiles { get; init; }
 }

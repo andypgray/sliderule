@@ -614,7 +614,7 @@ public sealed class MemberSubjectVerbTests
         // - a token behind another parameter counts (any position), so FetchWithToken passes;
         // - a `CancellationToken cancellationToken = default` parameter counts, the most common compliant
         //   signature: extraction reads the declared symbol, so a default value never drops the parameter;
-        // - definition-level honesty (GRAMMAR §4.6): a CancellationToken? parameter records System.Nullable<T>'s
+        // - matching is definition-level (GRAMMAR §4.6): a CancellationToken? parameter records System.Nullable<T>'s
         //   definition and a params CancellationToken[] records the array type, and NEITHER equals the
         //   System.Threading.CancellationToken anchor, so both red over real extracted facts;
         // - a tokenless method reds.
@@ -672,7 +672,7 @@ public sealed class MemberSubjectVerbTests
         progressStringed.ShouldBe(progressTyped);
 
         // Non-vacuous, and the two anchors disagree about the fixture, so neither comparison stands in for the
-        // other. The exact red sets are the bare-subject row's.
+        // other. The bare-subject row pins the red sets themselves, the token anchor's exactly.
         tokenTyped.ShouldNotBeEmpty();
         progressTyped.ShouldNotBeEmpty();
         progressTyped.ShouldNotBe(tokenTyped);

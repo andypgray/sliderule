@@ -97,14 +97,19 @@ internal enum ViolationKind
 /// <summary>The families of <see cref="ViolationKind" /> that surfaces treat alike.</summary>
 internal static class ViolationKinds
 {
-    /// <summary>Whether <paramref name="kind" /> is an edge between two types, carrying both <c>Source</c> and <c>Target</c>.</summary>
+    /// <summary>
+    ///     Whether <paramref name="kind" /> is an edge between two types, carrying both <c>Source</c> and
+    ///     <c>Target</c>.
+    /// </summary>
     internal static bool IsTypeEdge(this ViolationKind kind)
     {
         return kind is ViolationKind.Reference or ViolationKind.Construction or ViolationKind.Injection
             or ViolationKind.Catch or ViolationKind.Throw or ViolationKind.Expose;
     }
 
-    /// <summary>Whether <paramref name="kind" /> is an edge from a source type: a type edge, or a use of a member.</summary>
+    /// <summary>
+    ///     Whether <paramref name="kind" /> is an edge from a source type: a type edge, or a use of a member.
+    /// </summary>
     internal static bool IsEdge(this ViolationKind kind)
     {
         return kind.IsTypeEdge() || kind == ViolationKind.MemberUse;

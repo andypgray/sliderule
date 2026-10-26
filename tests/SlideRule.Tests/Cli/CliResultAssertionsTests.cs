@@ -4,8 +4,9 @@ using Xunit;
 namespace SlideRule.Tests.Cli;
 
 /// <summary>
-///     The stdout comparisons of <see cref="CliResultAssertions" /> fold the CRLF the in-process capture writes on
-///     Windows and nothing else: each passes over CRLF output and still reds on output that differs in any other way.
+///     <see cref="CliResultAssertions.ShouldOpenWith" /> and <see cref="CliResultAssertions.ShouldPrintVerbatim" />
+///     fold the CRLF the in-process capture writes on Windows and nothing else: each passes over CRLF output, and
+///     reds with the run's transcript on output that differs in any other way.
 /// </summary>
 public sealed class CliResultAssertionsTests
 {

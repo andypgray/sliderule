@@ -14,16 +14,10 @@ namespace SlideRule.Model;
 /// </remarks>
 internal sealed class MustReferenceNoPackagesConstraint(ProjectSelection subject) : ProjectConstraint(subject)
 {
-    /// <summary>
-    ///     The honesty boundary every package verb's sentence closes with, held in one place so a correction to
-    ///     what the model sees cannot land on one verb and miss another.
-    /// </summary>
+    /// <summary>The honesty boundary every package-reference verb's sentence closes with.</summary>
     internal const string DeclaredOnlyCaveat = " (declared references only; transitive dependencies are not seen)";
 
-    /// <summary>
-    ///     The privacy exemption the allow-list package verbs state, held in one place so a correction to what
-    ///     "private" means cannot land on one verb and miss another.
-    /// </summary>
+    /// <summary>The privacy exemption the allow-list package verbs state.</summary>
     internal const string PrivateExemption = "other than private ones, whose `PrivateAssets` is `all`";
 
     internal override string VerbPhrase => "must reference no NuGet packages " + PrivateExemption + DeclaredOnlyCaveat;

@@ -47,9 +47,10 @@ internal sealed class ConstraintEvaluator
     internal const string EmptyProjectSubjectMessage = "The subject selection matched no solution-declared projects.";
 
     /// <summary>
-    ///     The pinned warning text every forbidden-set verb raises on an inert target (GRAMMAR §4.1) —
-    ///     one string for the whole family, so a correction to what "inert" means cannot land on some
-    ///     verbs and miss others.
+    ///     The pinned warning text a forbidden-set verb raises on an inert target (GRAMMAR §4.1) — one
+    ///     string for every verb that warns, so a correction to what "inert" means cannot land on some
+    ///     verbs and miss others. <c>MustNotInject</c> never warns, because its banned targets are meant
+    ///     to be absent.
     /// </summary>
     private const string InertTargetMessage = "This rule is inert: its target selection matched no types.";
 
@@ -276,9 +277,9 @@ internal sealed class ConstraintEvaluator
     }
 
     /// <summary>
-    ///     The one walk behind every forbidden-set verb (GRAMMAR §4.1, §4.3, §4.5, §4.7, §4.8, §4.9): one
-    ///     violation per candidate edge some of whose sites count against the rule, minted from exactly those
-    ///     sites.
+    ///     A ban over one edge family (GRAMMAR §4.1, §4.3, §4.5, §4.8, §4.9): the violations
+    ///     <see cref="OwnedViolations{TEdge}" /> mints for the edges that hit an operand, and the inert-target
+    ///     warnings.
     /// </summary>
     /// <remarks>
     ///     <para>
@@ -313,8 +314,8 @@ internal sealed class ConstraintEvaluator
         return (violations, InertWarnings(operands, parts, operandSet, violations.Count));
     }
 
-    // The walk from owned edge to violation that every ban and the throw allow-list share: each edge keyed on a
-    // subject node whose counted sites are not null mints one violation from exactly those sites.
+    // The walk from owned edge to violation: each edge keyed on a subject node whose counted sites are not null
+    // mints one violation from exactly those sites.
     private static List<Violation> OwnedViolations<TEdge>(
         ILookup<TypeNode, TEdge> index,
         SelectionAdmission subject,

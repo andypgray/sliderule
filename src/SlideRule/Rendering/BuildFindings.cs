@@ -9,13 +9,7 @@ namespace SlideRule.Rendering;
 /// <summary>
 ///     A check report projected into the warnings a build should print: one per offending site a caller owns.
 /// </summary>
-/// <remarks>
-///     Placement is the human report's, so a developer who reads the report and one who reads the build
-///     warnings are pointed at the same lines. An edge violation yields a finding at every site, because a
-///     pair that has grown is red at all of them and the reader cannot be told which one is new. A shape
-///     violation yields one, at the site the verb carried first, because the violation is about the subject
-///     rather than about any one of its declarations.
-/// </remarks>
+/// <remarks>Placement is <see cref="ViolationPlacement" />'s, shared with the human report.</remarks>
 internal static class BuildFindings
 {
     /// <summary>

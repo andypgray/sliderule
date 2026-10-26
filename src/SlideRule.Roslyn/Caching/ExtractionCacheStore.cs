@@ -337,11 +337,10 @@ internal sealed class ExtractionCacheStore
             ComputeContentKey(project.ProjectName, SurfacesOf(documents), csprojSha, assetsSha, adds));
     }
 
-    // The structural shas and cone-adds of a project's content keys. Capture and validation both take them
-    // here, over the same known-document set (the stamps' full paths): a *.cs on disk under the project but
-    // excluded from compilation is a validation-time add, so an always-present excluded stray lands in both adds
-    // lists and cancels and only a genuine add moves, where a capture that left adds empty would never validate
-    // and the project would stay dirty forever.
+    // The structural shas and cone-adds of a project's content keys. Capture and validation must compute these
+    // alike, over the same known-document set (the stamps' full paths), so that a *.cs on disk under the project
+    // but excluded from compilation is an add on both sides and cancels, and only a genuine add moves the key. A
+    // capture that left adds empty would never validate, and the project would stay dirty forever.
     private static (string? CsprojSha, string? AssetsSha, IReadOnlyList<string> Adds) KeyInputsOf(
         string csprojPath,
         string projectDirectory,
@@ -391,8 +390,8 @@ internal sealed class ExtractionCacheStore
         return new CacheFingerprint(structuralStamps, WithMerkleKeys(entryByIndex));
     }
 
-    // The one Merkle pass every capture runs over entries whose Merkle key is still empty, over the same kinds
-    // of key validation recomputes, so capture and validation agree by construction.
+    // The one Merkle pass every capture runs, setting each entry's Merkle key from the same kinds of key
+    // validation recomputes, so capture and validation agree by construction.
     private static List<ProjectCacheEntry> WithMerkleKeys(IReadOnlyList<ProjectCacheEntry> entries)
     {
         var surfaceKeys = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -416,10 +415,9 @@ internal sealed class ExtractionCacheStore
     /// <summary>
     ///     Commits <paramref name="extraction" /> to the cache, keyed to <paramref name="fingerprint" />.
     ///     Re-stats every input the capture took from disk first; if any changed since
-    ///     <see cref="CaptureFingerprint(IReadOnlyList{ProjectInputs}, ValidatedStamps, CancellationToken)" /> (a
-    ///     mid-run edit),
-    ///     skips the write and returns <c>false</c>. A best-effort I/O failure also returns <c>false</c>.
-    ///     Otherwise writes atomically and returns <c>true</c>.
+    ///     <see cref="CaptureFingerprint(IReadOnlyList{ProjectInputs}, ValidatedStamps, CancellationToken)" />
+    ///     (a mid-run edit), skips the write and returns <c>false</c>. A best-effort I/O failure also returns
+    ///     <c>false</c>. Otherwise writes atomically and returns <c>true</c>.
     /// </summary>
     /// <remarks>
     ///     A stamp carried from a partial validation is not re-statted. It was taken before the extraction began,
