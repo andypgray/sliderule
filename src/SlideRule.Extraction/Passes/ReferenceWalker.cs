@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Operations;
 using Microsoft.CodeAnalysis.Text;
 using SlideRule.Extraction.Fragments;
 
@@ -191,7 +192,7 @@ internal static class ReferenceWalker
             // Covers type references and member references (invocations, property/field/event access,
             // static receivers, attribute names, method groups, extension methods, nameof operands).
             case SimpleNameSyntax name when name is not IdentifierNameSyntax { IsVar: true }:
-                ISymbol? symbol = model.GetSymbolInfo(name).BestCandidate();
+                ISymbol? symbol = SymbolOf(name, model);
                 return new WalkChannels(ContainingTypeOf(symbol), MemberUseOf(symbol, name));
 
             // Explicit `new Foo()`: the inner `Foo` name syntax already mints the type edge on its own visit,
@@ -230,6 +231,65 @@ internal static class ReferenceWalker
 
             default:
                 return WalkChannels.None;
+        }
+    }
+
+    /// <summary>
+    ///     What <paramref name="name" /> binds to, as <see cref="SymbolInfoExtensions.BestCandidate(SymbolInfo)" />
+    ///     reads it, asked of the call or creation that owns the name where that one agrees with the name.
+    /// </summary>
+    /// <remarks>
+    ///     The binder keeps no bound node of its own for an invoked method's name or a created type's name, so a
+    ///     query on one rebinds its whole binding root. In a method body that root is the enclosing statement,
+    ///     which the member model hands back from its cache; a field or property initializer has no statement and
+    ///     is rebound in full on every such query, which makes the walk of a large initializer quadratic in its
+    ///     size. The owning call or creation does have a bound node. Each arm takes its answer only for the
+    ///     symbol kinds where the two are the same symbol, and asks the name itself otherwise: a delegate or
+    ///     function-pointer call resolves to the delegate's <c>Invoke</c> while the name is the variable, and a
+    ///     creation of a COM interface resolves to its coclass's constructor while the name is the interface.
+    /// </remarks>
+    private static ISymbol? SymbolOf(SimpleNameSyntax name, SemanticModel model)
+    {
+        switch (OwnerOf(name))
+        {
+            case InvocationExpressionSyntax invocation:
+                ISymbol? called = model.GetSymbolInfo(invocation).BestCandidate();
+                if (called is IMethodSymbol { MethodKind: MethodKind.Ordinary or MethodKind.ReducedExtension or MethodKind.LocalFunction })
+                    return called;
+
+                // A `nameof` operator binds no symbol to its keyword.
+                if (called is null && model.GetOperation(invocation) is INameOfOperation) return null;
+                break;
+
+            case ObjectCreationExpressionSyntax creation:
+                if (model.GetSymbolInfo(creation).BestCandidate() is IMethodSymbol { MethodKind: MethodKind.Constructor } constructor
+                    && SymbolEqualityComparer.Default.Equals(constructor.ContainingType, model.GetTypeInfo(creation).Type))
+                    return constructor.ContainingType;
+                break;
+        }
+
+        return model.GetSymbolInfo(name).BestCandidate();
+    }
+
+    // The call a name is the invoked expression of, directly or as the member a member access names, or the creation
+    // whose type it is; null for any other name.
+    private static ExpressionSyntax? OwnerOf(SimpleNameSyntax name)
+    {
+        switch (name.Parent)
+        {
+            case InvocationExpressionSyntax invocation when invocation.Expression == name:
+                return invocation;
+
+            case MemberAccessExpressionSyntax memberAccess when memberAccess.Name == name
+                                                                && memberAccess.Parent is InvocationExpressionSyntax invocation
+                                                                && invocation.Expression == memberAccess:
+                return invocation;
+
+            case ObjectCreationExpressionSyntax creation when creation.Type == name:
+                return creation;
+
+            default:
+                return null;
         }
     }
 

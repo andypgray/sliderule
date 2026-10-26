@@ -54,8 +54,6 @@ internal static class VocabularyCatalog
         .. ProjectVerbRows()
     ];
 
-    // Each group's rows are built in a member of their own because the extractor's walk binds a single
-    // initializer holding every row as one expression, which costs seconds where nine members cost milliseconds.
     private static VocabularyRow[] TypeNounRows()
     {
         return

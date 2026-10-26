@@ -113,6 +113,27 @@ public sealed class CodebaseExtractorConstructorEdgeTests
     }
 
     [Fact]
+    public void ExtractFromCompilations_ComInterfaceCreation_ReferencesTheInterfaceAndConstructsTheCoClass()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         using System.Runtime.InteropServices;
+                                                         namespace N;
+                                                         [ComImport, Guid("00000000-0000-0000-0000-000000000001"), CoClass(typeof(Engine))]
+                                                         public interface IEngine {}
+                                                         public class Engine : IEngine {}
+                                                         public static class Maker { public static object Made { get; } = new IEngine(); }
+                                                         """);
+
+        // `new IEngine()` binds the coclass's constructor while its name still names the interface.
+        model.Edge("N.Maker", "N.IEngine")
+            .Sites.Lines()
+            .ShouldBe([6]);
+        model.ConstructorEdge("N.Maker", "N.Engine")
+            .Sites.Lines()
+            .ShouldBe([6]);
+    }
+
+    [Fact]
     public void ExtractFromCompilations_AttributeApplication_ProducesNoConstructorEdge()
     {
         CodebaseModel model = CompilationFactory.Extract("""

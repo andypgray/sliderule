@@ -126,6 +126,31 @@ public sealed class CodebaseExtractorMemberEdgeTests
     }
 
     [Fact]
+    public void ExtractFromCompilations_DelegateMemberInvoked_ProducesEdgeToTheMemberNotToInvoke()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         using System;
+                                                         namespace N;
+                                                         public static class Hooks
+                                                         {
+                                                             public static Action Ping = () => {};
+                                                             public static Func<int> Count => () => 1;
+                                                         }
+                                                         public static class Caller
+                                                         {
+                                                             public static object[] Calls { get; } = [Run(() => Hooks.Ping()), Hooks.Count()];
+                                                             private static object Run(Action a) => a;
+                                                         }
+                                                         """);
+
+        // The call binds the delegate's Invoke; the name it invokes is the field or property.
+        model.MemberEdges("N.Caller")
+            .Select(e => e.Member.SymbolId)
+            .OrderBy(id => id, StringComparer.Ordinal)
+            .ShouldBe(["F:N.Hooks.Ping", "P:N.Hooks.Count"]);
+    }
+
+    [Fact]
     public void ExtractFromCompilations_EventSubscribe_ProducesEventEdge()
     {
         CodebaseModel model = CompilationFactory.Extract("""

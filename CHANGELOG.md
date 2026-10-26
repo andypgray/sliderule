@@ -45,6 +45,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Two test classes deriving `ArchRuleTests<TSpec>` over one spec, with different `SolutionPath` or
   `ExcludeProjectName` values, now each check their own solution. Before, every class over that spec got
   the run of whichever class's test ran first, so a test could pass against the wrong solution.
+- Extracting a field or property initializer now takes time in proportion to its size. Before, each method
+  call or object creation in it bound the whole initializer again, so an initializer of 400 rows took
+  28.8 s where it now takes 0.3 s. The build analyzer, the xUnit adapter and every command and MCP tool
+  that reads the code run this extraction, and what it extracts is unchanged.
 
 ## [0.2.0] - 2026-10-18
 
