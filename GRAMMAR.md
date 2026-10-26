@@ -2717,6 +2717,40 @@ arm distinction in the document — `Violation.Detail` reaches the JSON channel 
 report reads it for the identity-less kinds alone and SARIF never does, so the site policy
 carries missing-versus-ambiguous until a design reaches all three channels.
 
+On inbound existence: a positive-existence verb, `MustBeUsedBy(selection)` on member subjects
+(§4.6) and `MustBeReferencedBy(selection)` on types, reading "every subject has at least one inbound
+edge whose source the operand matches". Every verb in §5.3 constrains edges that exist, so a
+subject with no inbound edges passes all of them, and a law such as "no internal member is kept
+alive by the tests alone" cannot be written. Its consumer is
+`.Members.ThatAreInternal().MustBeUsedBy(production)`, where `production` selects the types of
+every project except the tests. It waits on the semantics of an absence and on two uses that
+member edges (§4.5) leave out. A violation has no edge and no site, so
+its identity keys the subject alone, as the zero-counterpart arm of `MustHaveExactlyOneCounterpart`
+does (§5.3, §4.3). The use that satisfies it may sit in any project, so a run over one project's
+compilation cannot decide it and could only skip it.
+
+Member edges drop a use made inside the member's own declaring type. A helper that only its own
+type's methods call would therefore read as unused. The verb reads a separate fact instead, each
+member's uses from inside its declaring type. No ban verb reads that fact, so `MustNotUse` keeps the
+same-type drop and no existing verdict or baseline changes. An own-type use counts as a use by the
+declaring type, and satisfies the verb when the operand matches that type. On type subjects the
+self-reference stays dropped, because a type that references only itself is not used from anywhere
+else. Member edges are not dispatch-aware either, and a call through an interface or a base type
+lands on the declared member. For this verb, a use of an interface member, or of a virtual or
+abstract member, also counts as a use of each member in the solution that implements or overrides
+it. The count follows a chain of overrides to its end. The extractor records which members each
+member implements or overrides, and the compiler reports that for every member it compiles. The
+rendered sentence states the rule, because the ban verbs remain source-visibility bans. Both
+readings lean toward a pass. A member that only the tests reach through its interface satisfies the
+verb, so the rule can miss a test-only member. It does not red a member that production calls from
+its own type or through an interface.
+
+The uses §4.5 leaves out (`nameof`, indexers, members the compiler binds from a
+pattern) and members reached by reflection or found by an attribute (a test framework, a
+container's assembly scan, a tool table) have no source edge at all, so each needs an `Except`,
+which then records the exemption where the rule is read. A public member of a shipped library is
+used from outside the solution, so the useful subject is internal members.
+
 Elsewhere: a family whose cells are the matches
 of one namespace pattern (ArchUnit's `(*)` capture) — no consumer, the field's families being
 projects and the corpus's declared layers; an intersection
