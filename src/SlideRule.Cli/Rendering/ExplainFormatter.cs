@@ -53,7 +53,7 @@ internal static class ExplainFormatter
     {
         // Keyed on the payload rather than the posture: only a scope's children carry one, so a posture
         // added later gets its role in the header with no edit here.
-        string posture = rule.Posture.ToString().ToLowerInvariant();
+        string posture = rule.Posture.Word();
         if (rule.Scope is { } scope) posture += "/" + scope.Role.ToString().ToLowerInvariant();
 
         return $"{rule.Id} ({posture})";

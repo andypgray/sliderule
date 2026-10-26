@@ -28,20 +28,27 @@ internal static class HookGit
     }
 
     /// <summary>
-    ///     The git directory every working tree of <paramref name="topLevel" />'s repository shares, spelled so that
-    ///     two trees of one repository compare equal under the product's per-OS path rule, or null.
+    ///     The top level of the working tree <paramref name="directory" /> belongs to, as git spells it, with the git
+    ///     directory every working tree of its repository shares, or null when it belongs to none. One git process
+    ///     answers both.
     /// </summary>
     /// <remarks>
-    ///     Asked from a top level, git names it relative to the main checkout and absolutely from a linked
-    ///     worktree, so a relative answer is resolved against the top level it came from, and both are normalised.
-    ///     The case is folded by the product's one per-OS path rule, so on Linux the identity is case-sensitive.
-    ///     On a case-insensitive mount, an NTFS drive under WSL, two spellings of one repository therefore compare
-    ///     as two, as every other path comparison in the product does there.
+    ///     The shared directory is spelled so that two trees of one repository compare equal under the product's
+    ///     per-OS path rule. Git names it relative to the directory asked from when it lies near and absolutely
+    ///     otherwise, as from a linked worktree, so a relative answer is resolved against that directory, and both
+    ///     are normalised. The case is folded by the product's one per-OS path rule, so on Linux the identity is
+    ///     case-sensitive. On a case-insensitive mount, an NTFS drive under WSL, two spellings of one repository
+    ///     therefore compare as two, as every other path comparison in the product does there.
     /// </remarks>
-    public static async Task<string?> SharedGitDirectoryAsync(string topLevel, CancellationToken ct)
+    public static async Task<(string TopLevel, string SharedGitDirectory)?> TreeIdentityAsync(
+        string directory, CancellationToken ct)
     {
-        string? common = NonBlank(await RunAsync(topLevel, ct, "rev-parse", "--git-common-dir"));
-        return common is null || !Path.IsPathFullyQualified(topLevel) ? null : GitDirectoryIdentity(common, topLevel);
+        string[] answers = (await RunAsync(directory, ct, "rev-parse", "--show-toplevel", "--git-common-dir") ?? "")
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (answers.Length != 2) return null;
+
+        string askedFrom = Path.GetFullPath(directory);
+        return (answers[0], GitDirectoryIdentity(answers[1], askedFrom));
     }
 
     /// <summary>
@@ -65,12 +72,12 @@ internal static class HookGit
 
     /// <summary>
     ///     The git directory <paramref name="common" />, git's <c>rev-parse --git-common-dir</c> answer, names:
-    ///     resolved against the fully qualified <paramref name="topLevel" /> it was asked from and folded by the
-    ///     per-OS path rule.
+    ///     resolved against the fully qualified <paramref name="askedFrom" /> directory and folded by the per-OS
+    ///     path rule.
     /// </summary>
-    internal static string GitDirectoryIdentity(string common, string topLevel)
+    internal static string GitDirectoryIdentity(string common, string askedFrom)
     {
-        string full = Path.GetFullPath(common, topLevel);
+        string full = Path.GetFullPath(common, askedFrom);
         return PathComparison.Fold(full);
     }
 
@@ -236,8 +243,7 @@ internal sealed class TreeSnapshot
             byte[] hash = SHA256.HashData(stream);
             return Convert.ToHexStringLower(hash);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException
-                                       or NotSupportedException)
+        catch (Exception ex) when (HookState.IsFileSystemFailure(ex))
         {
             return Unreadable;
         }

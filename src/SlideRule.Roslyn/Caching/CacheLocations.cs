@@ -55,9 +55,18 @@ internal static class CacheLocations
         string root = string.IsNullOrWhiteSpace(cacheRootOverride) ? DefaultCacheRoot() : cacheRootOverride;
         string canonical = PathCanonicalizer.Resolve(solutionPath);
         string identityKey = PathComparison.Fold(canonical);
-        string hashHex = FileStamping.HashText(identityKey);
         string name = Path.GetFileNameWithoutExtension(canonical);
-        return Path.Combine(root, $"{name}-{hashHex[..PathHashHexLength]}");
+        return Path.Combine(root, $"{name}-{PathIdentity(identityKey)}");
+    }
+
+    /// <summary>
+    ///     The short on-disk identity of <paramref name="foldedPath" />, a path already folded by
+    ///     <see cref="PathComparison.Fold" />: the prefix of its lowercase-hex SHA-256 that cache directories are
+    ///     named by.
+    /// </summary>
+    internal static string PathIdentity(string foldedPath)
+    {
+        return FileStamping.HashText(foldedPath)[..PathHashHexLength];
     }
 
     /// <summary>The absolute path to the single atomic cache file for <paramref name="solutionPath" />.</summary>

@@ -125,7 +125,7 @@ internal static class SpecResolver
         List<CanonicalProject> projects = CanonicalProjectsOf(solution);
 
         List<SpecProjectCandidate> candidates = projects
-            .Where(entry => entry.Project.Language == LanguageNames.CSharp)
+            .Where(entry => ProjectLanguages.IsCSharp(entry.Project))
             .Select(entry => new SpecProjectCandidate(
                 entry.Project.Name,
                 ReferencePathsOf(entry.Project, solution),
@@ -170,17 +170,8 @@ internal static class SpecResolver
             .Select(entry => new SpecExclusionProject(
                 entry.Project.Name,
                 entry.Project.FilePath,
-                ReferencedProjectNames(entry.Project, solution),
+                solution.ReferencedProjectNames(entry.Project).ToList(),
                 entry.CanonicalFilePath))
-            .ToList();
-    }
-
-    private static IReadOnlyList<string> ReferencedProjectNames(Project project, Solution solution)
-    {
-        return project.ProjectReferences
-            .Select(reference => solution.GetProject(reference.ProjectId)?.Name)
-            .Where(name => !string.IsNullOrEmpty(name))
-            .Select(name => name!)
             .ToList();
     }
 
@@ -226,14 +217,10 @@ internal static class SpecResolver
     // the whole resolution, so every scan a resolution runs asks its question against this one view.
     private static List<CanonicalProject> CanonicalProjectsOf(Solution solution)
     {
+        var canonicalizer = new ProjectFileCanonicalizer();
         return solution.Projects
-            .Select(project => new CanonicalProject(project, CanonicalFileOf(project)))
+            .Select(project => new CanonicalProject(project, canonicalizer.Resolve(project.FilePath)))
             .ToList();
-    }
-
-    private static string? CanonicalFileOf(Project project)
-    {
-        return string.IsNullOrEmpty(project.FilePath) ? null : PathCanonicalizer.Resolve(project.FilePath);
     }
 
     // The projects built from one already-canonicalized .csproj, in solution order. Canonicalizing this side too

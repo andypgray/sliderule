@@ -27,19 +27,19 @@ internal static class StatusJsonRenderer
         WorkspaceTrustStamp trust)
     {
         var document = new StatusJson(
-            SchemaVersion,
-            solutionName,
-            specAssembly,
-            report.Results.Select(ToRule).ToList(),
-            trust.PackageAudit,
-            SlideRuleJson.OmitEmpty(workspaceDiagnostics),
-            trust.ModelIncomplete,
-            trust.FailedProjects,
-            trust.UncheckedProjects,
-            trust.RestoreFailedProjects,
-            trust.UnsupportedProjects,
-            Orphans(report.OrphanScan),
-            new StatusSummaryJson(
+            SchemaVersion: SchemaVersion,
+            Solution: solutionName,
+            SpecAssembly: specAssembly,
+            Rules: report.Results.Select(ToRule).ToList(),
+            PackageAudit: SlideRuleJson.OmitEmpty(trust.PackageAudit),
+            WorkspaceDiagnostics: SlideRuleJson.OmitEmpty(workspaceDiagnostics),
+            ModelIncomplete: trust.ModelIncomplete,
+            FailedProjects: trust.FailedProjects,
+            UncheckedProjects: trust.UncheckedProjects,
+            RestoreFailedProjects: trust.RestoreFailedProjects,
+            UnsupportedProjects: trust.UnsupportedProjects,
+            Orphans: Orphans(report.OrphanScan),
+            Summary: new StatusSummaryJson(
                 report.RulesChecked,
                 report.RulesPassed,
                 report.RulesFailed,

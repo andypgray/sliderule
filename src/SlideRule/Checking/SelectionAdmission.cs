@@ -288,6 +288,14 @@ internal sealed class SelectionAdmission
     internal static SelectionAdmission Folded(
         SelectionEvaluator selections, Selection enclosing, IReadOnlyList<SelectionAdmission> parts)
     {
+        if (parts.Count == 1)
+        {
+            HashSet<TypeNode> narrowed = selections.Narrow(enclosing, parts[0].Nodes);
+            return ReferenceEquals(narrowed, parts[0].Nodes)
+                ? parts[0]
+                : new SelectionAdmission(narrowed, Merge(parts, narrowed));
+        }
+
         var united = new HashSet<TypeNode>();
         foreach (SelectionAdmission part in parts) united.UnionWith(part.Nodes);
 

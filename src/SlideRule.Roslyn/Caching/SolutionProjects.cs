@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+using SlideRule.Roslyn.Diagnostics;
 using SlideRule.Roslyn.Solutions;
 
 namespace SlideRule.Roslyn.Caching;
@@ -40,7 +41,7 @@ internal static class SolutionProjects
 
         foreach (Project project in solution.Projects)
         {
-            if (project.Language != LanguageNames.CSharp || project.FilePath is null) continue;
+            if (!ProjectLanguages.IsCSharp(project) || project.FilePath is null) continue;
 
             string csprojPath = Path.GetFullPath(project.FilePath);
             string projectDirectory = Path.GetDirectoryName(csprojPath)!;
@@ -64,9 +65,8 @@ internal static class SolutionProjects
                 if (includeDocument(projectDirectory, documentPath)) accumulator.Documents.Add(documentPath);
             }
 
-            foreach (ProjectReference reference in project.ProjectReferences)
-                if (solution.GetProject(reference.ProjectId)?.Name is { } referenceName)
-                    accumulator.References.Add(referenceName);
+            foreach (string referenceName in solution.ReferencedProjectNames(project))
+                accumulator.References.Add(referenceName);
         }
 
         return byName.Values

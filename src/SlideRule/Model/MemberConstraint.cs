@@ -1,3 +1,5 @@
+using SlideRule.Internal;
+
 namespace SlideRule.Model;
 
 /// <summary>
@@ -12,7 +14,7 @@ namespace SlideRule.Model;
 internal abstract class MemberConstraint : Constraint
 {
     private protected MemberConstraint(MemberSelection subject)
-        : base(subject.Source)
+        : base(Guard.NotNull(subject, nameof(subject)).Source)
     {
         MemberSubject = subject;
     }

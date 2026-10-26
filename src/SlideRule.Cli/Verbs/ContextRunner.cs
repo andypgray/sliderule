@@ -57,27 +57,9 @@ internal sealed class ContextRunner(
 
         // Nothing scoped to place — no scope of either posture and no anchored layer — ⇒ skip the
         // extraction cost and point at the root block.
-        if (!ContextFileComposer.HasAnythingToPlace(source.Model))
-        {
-            await output.WriteLineAsync(PointerLine(request.Path));
-            return ExitCodes.Clean;
-        }
-
-        CodebaseModel codebase = await source.ExtractAsync(source.Resolution.ExcludeProjectNames, ct);
-
-        string queryFullPath = ResolveQueryPath(request.Path, source.SolutionDirectory);
-
-        // Split once for the whole walk: the query path is already resolved, and every card below asks the
-        // same question of it against a different directory.
-        string[] querySegments = PathFormat.Segments(queryFullPath);
-
-        // The composer's own placements, filtered to the ones covering the query path: layer local-rules
-        // card(s) ahead of scope card(s), the same cards in the same order render splices. An
-        // unplaceable card carries a null directory and so covers nothing.
-        List<string> cards = ContextFileComposer.Placements(source.Model, codebase, source.SolutionDirectory)
-            .Where(card => card.Destination.DirectoryPath is not null && PathFormat.Contains(card.Destination.DirectoryPath, querySegments))
-            .Select(card => card.Body)
-            .ToList();
+        List<string> cards = ContextFileComposer.HasAnythingToPlace(source.Model)
+            ? await CoveringCardsAsync(request, source, ct)
+            : [];
 
         if (cards.Count == 0)
         {
@@ -87,6 +69,26 @@ internal sealed class ContextRunner(
 
         WriteCards(cards);
         return ExitCodes.Clean;
+    }
+
+    // The composer's own placements, filtered to the ones covering the query path: layer local-rules card(s)
+    // ahead of scope card(s), the same cards in the same order render splices. An unplaceable card carries a null
+    // directory and so covers nothing.
+    private static async Task<List<string>> CoveringCardsAsync(
+        ContextRequest request, CodebaseSource source, CancellationToken ct)
+    {
+        CodebaseModel codebase = await source.ExtractAsync(source.Resolution.ExcludeProjectNames, ct);
+
+        string queryFullPath = ResolveQueryPath(request.Path, source.SolutionDirectory);
+
+        // Split once for the whole walk: the query path is already resolved, and every card below asks the
+        // same question of it against a different directory.
+        string[] querySegments = PathFormat.Segments(queryFullPath);
+
+        return ContextFileComposer.Placements(source.Model, codebase, source.SolutionDirectory)
+            .Where(card => card.Destination.DirectoryPath is not null && PathFormat.Contains(card.Destination.DirectoryPath, querySegments))
+            .Select(card => card.Body)
+            .ToList();
     }
 
     private void WriteCards(IReadOnlyList<string> cards)
@@ -119,8 +121,7 @@ internal sealed class ContextRunner(
     private static void RefuseAStringifiedArrayPath(string path)
     {
         var lead = $"Cannot find architecture scope for '{path}'";
-        if (Refusals.SingleValueRefusal(path, lead, "pass one path") is { } refusal)
-            throw new UserErrorException(refusal);
+        Refusals.RefuseSingleValue(path, lead, "pass one path");
     }
 
     private static string PointerLine(string path)

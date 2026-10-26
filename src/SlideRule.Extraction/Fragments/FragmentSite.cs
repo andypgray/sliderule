@@ -72,11 +72,11 @@ internal readonly record struct FragmentSite(string File, int Line) : IComparabl
     /// </summary>
     /// <remarks>
     ///     The one place a syntax site's 0-based Roslyn line becomes the 1-based <see cref="Line" />. Reading the
-    ///     line span off the tree also skips allocating a <see cref="Location" /> per mention.
+    ///     line off the tree's text also skips allocating a <see cref="Location" /> per mention.
     /// </remarks>
     internal static FragmentSite Of(SyntaxTree tree, TextSpan span)
     {
-        int line = tree.GetLineSpan(span).StartLinePosition.Line + 1;
+        int line = tree.GetText().Lines.GetLineFromPosition(span.Start).LineNumber + 1;
         return new FragmentSite(tree.FilePath, line) { Start = span.Start, Length = span.Length };
     }
 }

@@ -53,6 +53,9 @@ internal static class BaselineFormat
     internal const int SealLength = 16;
     internal const int SealBytes = SealLength / 2;
 
+    // The whole-file digest of a legacy file is a SHA-256 in lowercase hex.
+    internal const int LegacyDigestLength = 64;
+
     // Every seal and digest on disk is hashed over these preambles, so changing either would fail every
     // baseline file written before the change.
     private const string SealPreamble = "sliderule-baseline-seal-v2";
@@ -209,6 +212,12 @@ internal static class BaselineFormat
         }
 
         return new string(chars);
+    }
+
+    /// <summary>Whether <paramref name="value" /> is exactly <paramref name="length" /> lowercase hex digits.</summary>
+    internal static bool IsLowerHex(string value, int length)
+    {
+        return value.Length == length && value.All(c => c is >= '0' and <= '9' or >= 'a' and <= 'f');
     }
 
     private static void AppendEntries(StringBuilder builder, BaselineSealer sealer, SortedRule rule)

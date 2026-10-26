@@ -19,6 +19,8 @@ public sealed class NamespacePattern
     /// <summary>The subtree operator's spelling (GRAMMAR §4.2), so the literal and its length live in one place.</summary>
     private const string SubtreeSuffix = ".*";
 
+    private readonly string? _literal;
+
     private readonly bool _matchesEverything;
 
     private readonly string[]? _patternSegments;
@@ -46,6 +48,12 @@ public sealed class NamespacePattern
         {
             _subtreePrefix = prefix;
             _subtreePrefixDot = prefix + ".";
+            return;
+        }
+
+        if (glob.IndexOf('*') < 0)
+        {
+            _literal = glob;
             return;
         }
 
@@ -88,9 +96,13 @@ public sealed class NamespacePattern
 
         if (_subtreePrefix is not null) return PrefixCovers(_subtreePrefix, _subtreePrefixDot!, @namespace);
 
+        if (_literal is not null) return string.Equals(@namespace, _literal, StringComparison.Ordinal);
+
+        // A `*` never crosses a dot, so a namespace of another depth is rejected before it is split.
         string[] patternSegments = _patternSegments!;
+        if (DotCount(@namespace) != patternSegments.Length - 1) return false;
+
         string[] namespaceSegments = @namespace.Split('.');
-        if (patternSegments.Length != namespaceSegments.Length) return false;
 
         for (var i = 0; i < patternSegments.Length; i++)
             if (!SegmentMatches(patternSegments[i], namespaceSegments[i]))
@@ -130,6 +142,16 @@ public sealed class NamespacePattern
     {
         return string.Equals(candidate, prefix, StringComparison.Ordinal)
                || candidate.StartsWith(prefixDot, StringComparison.Ordinal);
+    }
+
+    private static int DotCount(string value)
+    {
+        var count = 0;
+        foreach (char c in value)
+            if (c == '.')
+                count++;
+
+        return count;
     }
 
     private static bool SegmentMatches(string pattern, string segment)

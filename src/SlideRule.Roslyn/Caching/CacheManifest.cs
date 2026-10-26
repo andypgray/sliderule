@@ -12,8 +12,9 @@ namespace SlideRule.Roslyn.Caching;
 /// <remarks>
 ///     The JSON shape is the cache's on-disk schema, versioned by <paramref name="SchemaVersion" />;
 ///     <paramref name="ToolVersion" /> is <see cref="FileStamping.CurrentToolVersion" /> at write time, and
-///     <paramref name="StructuralStamps" /> stamps every path <see cref="ProjectCone.SolutionStructuralPaths" />
-///     yields, absent files included. <paramref name="Diagnostics" /> and the project lists after it are the
+///     <paramref name="StructuralStamps" /> stamps every path
+///     <see cref="ProjectCone.SolutionStructuralPaths(string, IEnumerable{ProjectInputs})" /> yields, absent files
+///     included. <paramref name="Diagnostics" /> and the project lists after it are the
 ///     recorded run's load verdict, field for field the <see cref="WorkspaceDiagnostics" /> its load reported,
 ///     stored because a hit opens no workspace to recompute them from; each unsupported project's kind is stored
 ///     rather than re-derived, so a cold run and a hit stay word-identical.

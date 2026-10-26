@@ -92,7 +92,7 @@ internal sealed class WorkspaceSession : IAsyncDisposable
     /// <summary>
     ///     Creates a session with nothing loaded. <paramref name="diagnosticSink" /> receives the session's own
     ///     commentary (why a call reloaded, a file the reconcile could not read), never the load's failures, which
-    ///     a snapshot's <see cref="WorkspaceSnapshot.Diagnostics" /> carries.
+    ///     a snapshot's <see cref="WorkspaceSnapshot.LoadDiagnostics" /> carries.
     /// </summary>
     public WorkspaceSession(Action<string>? diagnosticSink = null)
     {
@@ -251,9 +251,8 @@ internal sealed class WorkspaceSession : IAsyncDisposable
     private bool ConeScanDetectsNewFile()
     {
         foreach (string projectDirectory in projectDirectories)
-        foreach (string file in ProjectCone.Enumerate(projectDirectory))
         {
-            if (knownConeFiles.Contains(file)) continue;
+            if (ProjectCone.FirstAdd(projectDirectory, knownConeFiles) is not { } file) continue;
 
             diagnosticSink?.Invoke($"New source file detected, reloading: {file}");
             return true;
@@ -330,13 +329,9 @@ internal sealed class WorkspaceSession : IAsyncDisposable
     /// </summary>
     private WorkspaceSnapshot MintSnapshot()
     {
-        return new WorkspaceSnapshot(current!, loadVerdict.LoadFailures)
+        return new WorkspaceSnapshot(current!, loadVerdict)
         {
             Generation = generation,
-            FailedProjects = loadVerdict.FailedProjects,
-            UncheckedProjects = loadVerdict.UncheckedProjects,
-            RestoreFailedProjects = loadVerdict.RestoreFailedProjects,
-            UnsupportedProjects = loadVerdict.UnsupportedProjects,
             ProjectEditVersions = new Dictionary<string, int>(projectEditVersions, StringComparer.Ordinal),
             TargetFrameworks = targetFrameworks
         };
@@ -350,7 +345,7 @@ internal sealed class WorkspaceSession : IAsyncDisposable
     {
         projectEditVersions.Clear();
         foreach (Project project in solution.Projects)
-            if (project.Language == LanguageNames.CSharp)
+            if (ProjectLanguages.IsCSharp(project))
                 projectEditVersions[project.Name] = 0;
     }
 
@@ -372,10 +367,11 @@ internal sealed class WorkspaceSession : IAsyncDisposable
     ///     content-checks each once and promotes it.
     /// </summary>
     /// <remarks>
-    ///     The structural set is the one the persisted caches stamp, from
-    ///     <see cref="Caching.ProjectCone.SolutionStructuralPaths" />, taken per <see cref="Project" /> rather than per
-    ///     project directory, because where the restore assets file lands follows the project's own evaluated
-    ///     output paths and not its directory.
+    ///     The structural set follows the rule the persisted caches stamp theirs by,
+    ///     <see cref="Caching.ProjectCone.SolutionStructuralPaths(string, IEnumerable{Caching.ProjectInputs})" />,
+    ///     over every project with a file rather than only the C# ones those caches collect, and taken per
+    ///     <see cref="Project" /> rather than per project directory, because where the restore assets file lands
+    ///     follows the project's own evaluated output paths and not its directory.
     /// </remarks>
     private void RecordAllFingerprints(string solutionPath, Solution solution)
     {

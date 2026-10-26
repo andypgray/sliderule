@@ -227,11 +227,19 @@ internal static partial class SolutionProjectFileParser
 
     /// <summary>
     ///     Reads <paramref name="solutionPath" /> from disk and returns the absolute paths of its
-    ///     <c>.csproj</c> members, reading a <c>.slnx</c> as XML and anything else as a classic <c>.sln</c>, so a
-    ///     solution filter is not resolved.
+    ///     <c>.csproj</c> members, reading a <c>.slnx</c> as XML and anything else but a solution filter as a
+    ///     classic <c>.sln</c>.
     /// </summary>
+    /// <exception cref="ArgumentException">
+    ///     <paramref name="solutionPath" /> is a <c>.slnf</c> solution filter.
+    /// </exception>
     internal static IReadOnlyList<string> ReadCsprojMembers(string solutionPath)
     {
+        if (IsFilterFormat(solutionPath))
+            throw new ArgumentException(
+                $"'{solutionPath}' is a solution filter; read the members of the solution it references.",
+                nameof(solutionPath));
+
         return ReadDeclaredProjects(solutionPath).Csproj;
     }
 

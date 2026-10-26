@@ -252,12 +252,11 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
     // is its own extraction — a cold one-shot workspace, opened inside the delegate so the sequence's
     // baselines-before-extraction ordering covers the load too.
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static async Task<ArchCheckRun> RunPipelineAsync(string solutionPath, string? excludeProjectName)
+    private static async Task<ArchCheckRun> RunPipelineAsync(string fullSolutionPath, string? excludeProjectName)
     {
         EnsureMsBuild();
 
         ArchitectureModel model = ArchModelBuilder.Build(new TSpec());
-        string fullSolutionPath = Path.GetFullPath(solutionPath);
         string solutionDirectory = SolutionProjectFileParser.AnchorDirectory(fullSolutionPath);
 
         var diagnostics = new List<string>();
@@ -283,12 +282,7 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
                         : SpecExclusion.Compute(loaded.Solution, declaredMembers, excludeProjectName);
                     CodebaseModel codebase = await CodebaseExtractor.ExtractFromSolutionAsync(
                         loaded.Solution, exclude, loaded.TargetFrameworks, declaredMembers, ct);
-                    // The merge notes and multi-targeted projects go unrendered here, but the record fills them as
-                    // one pair from one read.
-                    var composed = new WorkspaceDiagnostics(
-                        diagnostics, codebase.MergeNotes, loaded.FailedProjects, loaded.UncheckedProjects,
-                        loaded.RestoreFailedProjects, loaded.UnsupportedProjects,
-                        MultiTargetedProjects.Of(codebase));
+                    WorkspaceDiagnostics composed = loaded.LoadDiagnosticsWith(diagnostics).WithModel(codebase);
                     loadDiagnostics = composed;
                     return new ExtractedCodebase(codebase, composed);
                 },

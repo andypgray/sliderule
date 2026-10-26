@@ -259,7 +259,7 @@ internal static class OneProjectDecidability
                 if (WalkSelection(part, position) is { } partReason)
                     return partReason;
         }
-        else if (WalkNoun(selection.Noun, position) is { } nounReason)
+        else if (selection.Noun is { } noun && WalkNoun(noun, position) is { } nounReason)
         {
             return nounReason;
         }
@@ -390,20 +390,14 @@ internal static class OneProjectDecidability
         // The side-keyed adjective rows: what each costs depends on whose types it is filtering. Neither of
         // these two is rescued by polarity — a filter that can answer either way over another project's types
         // both admits types the whole solution excludes and excludes ones it admits.
-        rows.Add(
-            typeof(AuthoredAdjective),
-            position => position.Side == SelectionPosition.Target ? AuthoredReason : null);
-        rows.Add(
-            typeof(AttributedWithAdjective),
-            position => position.Side == SelectionPosition.Target ? AttributedWithReason : null);
+        OutOnTargetSide(rows, AuthoredReason, typeof(AuthoredAdjective));
+        OutOnTargetSide(rows, AttributedWithReason, typeof(AttributedWithAdjective));
 
         // The third side-keyed row. The own project's types carry the paths of the files that declare them, so a
         // glob over them is decidable; another project's carry none here, so a glob can only exclude them. A ban
         // would survive that, but an allow-list and an Except payload, which stand on the same side, would not, and
         // the row keys on the side rather than on which of the three a position is.
-        rows.Add(
-            typeof(UnderAdjective),
-            position => position.Side == SelectionPosition.Target ? UnderReason : null);
+        OutOnTargetSide(rows, UnderReason, typeof(UnderAdjective));
     }
 
     private static void AddMemberAdjectives(Dictionary<Type, Func<OneProjectPosition, string?>> rows)
@@ -528,5 +522,11 @@ internal static class OneProjectDecidability
         Dictionary<Type, Func<OneProjectPosition, string?>> rows, string reason, params Type[] nodes)
     {
         foreach (Type node in nodes) rows.Add(node, _ => reason);
+    }
+
+    private static void OutOnTargetSide(
+        Dictionary<Type, Func<OneProjectPosition, string?>> rows, string reason, Type node)
+    {
+        rows.Add(node, position => position.Side == SelectionPosition.Target ? reason : null);
     }
 }

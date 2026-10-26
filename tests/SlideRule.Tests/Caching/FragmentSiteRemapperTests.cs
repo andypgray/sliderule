@@ -166,7 +166,7 @@ public sealed class FragmentSiteRemapperTests
         ShouldMapEachFileBetween(Before, AfterInsertions);
 
     private static readonly IReadOnlyList<CodebaseFragment> BeforeFragments =
-        FragmentExtractor.ExtractAll(Before, artifactFacts: null, CancellationToken.None);
+        FragmentExtractor.ExtractAll(Before, CancellationToken.None);
 
     // One selector per site family, read twice by ShouldHaveMovedEverySiteFamily — once for the stored
     // fragment and once for the remapped one. Spelled once so a pair can never name two different families.
@@ -192,7 +192,7 @@ public sealed class FragmentSiteRemapperTests
     public void TryRemap_LinesInsertedInEveryFile_SerializesLikeAColdWalk()
     {
         // Arrange
-        IReadOnlyList<CodebaseFragment> afterEdit = FragmentExtractor.ExtractAll(AfterInsertions, artifactFacts: null, Ct);
+        IReadOnlyList<CodebaseFragment> afterEdit = FragmentExtractor.ExtractAll(AfterInsertions, Ct);
 
         // Act
         var remapped = new List<CodebaseFragment>();

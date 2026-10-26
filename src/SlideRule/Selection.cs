@@ -29,7 +29,8 @@ public abstract class Selection
     /// <summary>The <see cref="Arch" /> this selection was minted on (GRAMMAR §3.2 fresh-instance contract).</summary>
     internal Arch Owner { get; }
 
-    internal abstract SelectionNoun Noun { get; }
+    /// <summary>The noun head the adjectives refine; null for a union, which has no single noun (GRAMMAR §5.1).</summary>
+    internal abstract SelectionNoun? Noun { get; }
 
     /// <summary>The ordered adjective refinements applied to the noun.</summary>
     internal abstract IReadOnlyList<SelectionAdjective> Adjectives { get; }
@@ -38,12 +39,13 @@ public abstract class Selection
     ///     This selection with its adjective list replaced: a union keeps its parts and takes the list as its
     ///     own (GRAMMAR §5.1), and any other selection keeps its noun.
     /// </summary>
-    // Rebuilding a union as a RefinedSelection would read its Noun, which throws.
-    internal Selection WithRefinements(IReadOnlyList<SelectionAdjective> adjectives)
+    internal abstract Selection WithRefinements(IReadOnlyList<SelectionAdjective> adjectives);
+
+    /// <summary>This selection with <paramref name="adjective" /> appended to its adjective list.</summary>
+    internal Selection Refined(SelectionAdjective adjective)
     {
-        return this is UnionSelection union
-            ? union.WithAdjectives(adjectives)
-            : new RefinedSelection(Owner, Noun, adjectives);
+        var adjectives = new List<SelectionAdjective>(Adjectives) { adjective };
+        return WithRefinements(adjectives);
     }
 
     /// <summary>

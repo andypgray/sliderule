@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
+using SlideRule.Internal;
 using SlideRule.Roslyn.Hosting;
 
 namespace SlideRule.Roslyn.MsBuild;
@@ -93,7 +94,7 @@ internal static class VsWhereLocator
 
             List<VsInstance> instances = ParseEntries(doc.RootElement);
             if (instances.Count == 0)
-                return ([], $"vswhere listed {listed} {(listed == 1 ? "instance" : "instances")}, none with a "
+                return ([], $"vswhere listed {Plurals.Counted(listed, "instance")}, none with a "
                             + "readable installationPath and installationVersion");
 
             return (instances, null);

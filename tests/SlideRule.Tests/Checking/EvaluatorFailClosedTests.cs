@@ -127,16 +127,15 @@ public sealed class EvaluatorFailClosedTests
     }
 
     [Fact]
-    public void UnionSelection_Noun_ThrowsBecauseUnionHasNoSingleNoun()
+    public void UnionSelection_Noun_IsNullBecauseUnionHasNoSingleNoun()
     {
         // A UnionSelection is a union of selections (GRAMMAR §5.1), so it has no single noun: it renders
-        // through its own §6 arm, collapsed or or-joined. Reading .Noun still throws rather than inventing
-        // one — a subject union is admitted by the renderer's union arm, not by minting a fake head.
+        // through its own §6 arm, collapsed or or-joined. Its noun is absent rather than invented — a subject
+        // union is admitted by the renderer's union arm, not by minting a fake head.
         var arch = new Arch();
         var union = new UnionSelection(arch, [arch.Types]);
 
-        var ex = Should.Throw<InvalidOperationException>(() => _ = union.Noun);
-        ex.Message.ShouldBe("A union selection has no single noun; render it in reference position.");
+        union.Noun.ShouldBeNull();
     }
 
     private sealed class UnknownNoun : SelectionNoun

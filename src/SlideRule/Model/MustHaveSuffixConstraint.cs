@@ -7,5 +7,5 @@ internal sealed class MustHaveSuffixConstraint(Selection subject, string suffix)
 {
     internal string Suffix { get; } = suffix;
 
-    internal override string VerbPhrase => "must be named " + ProseFormat.Backtick("*" + Suffix);
+    internal override string VerbPhrase => "must be named " + ProseFormat.SuffixGlob(Suffix);
 }

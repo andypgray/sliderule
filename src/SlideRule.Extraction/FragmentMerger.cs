@@ -1,5 +1,6 @@
 using SlideRule.Codebase;
 using SlideRule.Extraction.Fragments;
+using SlideRule.Internal;
 using SlideRule.Prose;
 
 namespace SlideRule.Extraction;
@@ -103,10 +104,6 @@ internal static class FragmentMerger
         private readonly EdgeTable<NodeKey> _exposureEdges = new();
         private readonly Dictionary<NodeKey, FragmentExternal> _externalFacts = new();
 
-        // Project name → every target framework its fragments carried, ordinal-sorted. Built over all
-        // fragments, not just the declaring ones, so a note can name the project's whole framework set.
-        private readonly Dictionary<string, SortedSet<string>> _frameworksByProject = new(StringComparer.Ordinal);
-
         private readonly EdgeTable<NodeKey> _injectionEdges = new();
         private readonly EdgeTable<string> _memberEdges = new();
         private readonly Dictionary<string, MemberEdgeFacts> _memberFacts = new(StringComparer.Ordinal);
@@ -147,10 +144,7 @@ internal static class FragmentMerger
             _fragments = fragments;
 
             foreach (CodebaseFragment fragment in fragments)
-            {
-                RecordTargetFramework(fragment);
                 _projectsByAssembly.Record(fragment.AssemblyName, fragment.ProjectName);
-            }
 
             for (var index = 0; index < fragments.Count; index++)
             {
@@ -203,25 +197,23 @@ internal static class FragmentMerger
             for (var index = 0; index < fragments.Count; index++)
             {
                 CodebaseFragment fragment = fragments[index];
-                Dictionary<string, string> fragmentSuppliers = suppliers[index];
-                string projectName = fragment.ProjectName;
+                var binding = new FragmentBinding(suppliers[index], fragment.ProjectName);
 
                 foreach (FragmentEdge edge in fragment.Edges)
-                    MergeSimpleEdge(
-                        fragmentSuppliers, projectName, edge.SourceFullName, edge.TargetFullName, _edges, edge.Sites);
+                    MergeSimpleEdge(binding, edge.SourceFullName, edge.TargetFullName, _edges, edge.Sites);
 
                 foreach (FragmentMemberEdge memberEdge in fragment.MemberEdges)
-                    MergeMemberEdge(fragmentSuppliers, projectName, memberEdge);
+                    MergeMemberEdge(binding, memberEdge);
 
                 foreach (FragmentConstructorEdge constructorEdge in fragment.ConstructorEdges)
                     MergeSimpleEdge(
-                        fragmentSuppliers, projectName, constructorEdge.SourceFullName,
-                        constructorEdge.ConstructedFullName, _constructorEdges, constructorEdge.Sites);
+                        binding, constructorEdge.SourceFullName, constructorEdge.ConstructedFullName, _constructorEdges,
+                        constructorEdge.Sites);
 
                 foreach (FragmentInjectionEdge injectionEdge in fragment.InjectionEdges)
                     MergeSimpleEdge(
-                        fragmentSuppliers, projectName, injectionEdge.SourceFullName, injectionEdge.InjectedFullName,
-                        _injectionEdges, injectionEdge.Sites);
+                        binding, injectionEdge.SourceFullName, injectionEdge.InjectedFullName, _injectionEdges,
+                        injectionEdge.Sites);
 
                 // Registrations (GRAMMAR §4.7) resolve to no node: they are many-to-many and matched model-side at
                 // evaluation, so a shadowed name needs nothing here, both its nodes wearing the name.
@@ -229,28 +221,18 @@ internal static class FragmentMerger
                     MergeRegistration(registration);
 
                 foreach (FragmentCatchEdge catchEdge in fragment.CatchEdges)
-                    MergeCatchEdge(fragmentSuppliers, projectName, catchEdge);
+                    MergeCatchEdge(binding, catchEdge);
 
                 foreach (FragmentThrowEdge throwEdge in fragment.ThrowEdges)
-                    MergeSimpleEdge(
-                        fragmentSuppliers, projectName, throwEdge.SourceFullName, throwEdge.ThrownFullName, _throwEdges,
-                        throwEdge.Sites);
+                    MergeSimpleEdge(binding, throwEdge.SourceFullName, throwEdge.ThrownFullName, _throwEdges, throwEdge.Sites);
 
                 foreach (FragmentExposureEdge exposureEdge in fragment.ExposureEdges)
                     MergeSimpleEdge(
-                        fragmentSuppliers, projectName, exposureEdge.SourceFullName, exposureEdge.ExposedFullName,
-                        _exposureEdges, exposureEdge.Sites);
+                        binding, exposureEdge.SourceFullName, exposureEdge.ExposedFullName, _exposureEdges,
+                        exposureEdge.Sites);
             }
 
             return Materialize();
-        }
-
-        private void RecordTargetFramework(CodebaseFragment fragment)
-        {
-            if (fragment.TargetFramework is not { } targetFramework) return;
-
-            _frameworksByProject.OrdinalNamesFor(fragment.ProjectName)
-                .Add(targetFramework);
         }
 
         private void DeclareMerged(FragmentType declared, CodebaseFragment fragment, int fragmentIndex)
@@ -322,9 +304,9 @@ internal static class FragmentMerger
 
         // One note per multi-framework project whose frameworks share a type. A single winner, which is every
         // project targeting two frameworks, keeps the plain sentence.
-        private string FrameworkCollapseNote(string projectName)
+        private string FrameworkCollapseNote(string projectName, ProjectArtifacts artifacts)
         {
-            SortedSet<string> frameworks = _frameworksByProject[projectName];
+            SortedSet<string> frameworks = artifacts.CarriedFrameworks;
             SortedSet<string> winners = _multiFrameworkWinners[projectName];
             string targeted = ProseFormat.JoinQuotedAnd([.. frameworks]);
 
@@ -388,7 +370,7 @@ internal static class FragmentMerger
         {
             string types = ProseFormat.JoinQuotedAnd([.. shadowed.Types]);
             string assemblies = ProseFormat.JoinQuotedAnd([.. shadowed.Assemblies]);
-            string noun = shadowed.Assemblies.Count == 1 ? "assembly" : "assemblies";
+            string noun = Plurals.Noun(shadowed.Assemblies.Count, "assembly");
             string verb = shadowed.Assemblies.Count == 1 ? "supplies" : "supply";
 
             return $"Project '{projectName}' declares {types}, which referenced {noun} {assemblies} also {verb}; "
@@ -503,16 +485,15 @@ internal static class FragmentMerger
         // for a self-edge, a guard that is defensive because extraction already drops them. A source endpoint is
         // always a type this fragment declared, so NodeKeyFor hands it straight back; mapping it anyway is what
         // makes the guard compare nodes rather than names once one name can denote two.
-        private EdgeMerge? ResolveEdge(
-            IReadOnlyDictionary<string, string> suppliers, string projectName, string source, string target)
+        private EdgeMerge? ResolveEdge(FragmentBinding binding, string source, string target)
         {
-            NodeKey sourceKey = NodeKeyFor(suppliers, source);
-            NodeKey targetKey = NodeKeyFor(suppliers, target);
+            NodeKey sourceKey = NodeKeyFor(binding.Suppliers, source);
+            NodeKey targetKey = NodeKeyFor(binding.Suppliers, target);
             if (sourceKey == targetKey) return null;
 
             ResolveNode(sourceKey);
             TypeNode targetNode = ResolveNode(targetKey);
-            InstanceKey? instance = InstanceOf(suppliers, projectName, sourceKey, targetKey, targetNode);
+            InstanceKey? instance = InstanceOf(binding, sourceKey, targetKey, targetNode);
             return new EdgeMerge((sourceKey, targetKey), instance);
         }
 
@@ -520,14 +501,9 @@ internal static class FragmentMerger
         // axis carrying parallel narrowings (catch) gates them on the same guard and records them under the same
         // key rather than restating either.
         private EdgeMerge? MergeSimpleEdge(
-            IReadOnlyDictionary<string, string> suppliers,
-            string projectName,
-            string source,
-            string target,
-            EdgeTable<NodeKey> table,
-            IReadOnlyList<FragmentSite> sites)
+            FragmentBinding binding, string source, string target, EdgeTable<NodeKey> table, IReadOnlyList<FragmentSite> sites)
         {
-            if (ResolveEdge(suppliers, projectName, source, target) is not { } merged) return null;
+            if (ResolveEdge(binding, source, target) is not { } merged) return null;
 
             table.Merge(merged.Key, merged.Instance, sites);
             return merged;
@@ -540,12 +516,7 @@ internal static class FragmentMerger
         // target node cannot say either. An edge between names one project each declares keeps no record, because
         // its two nodes already name its one instance. A target bound from an assembly shadowing the name is the
         // assembly's node, not a shared target, however many projects declare the name.
-        private InstanceKey? InstanceOf(
-            IReadOnlyDictionary<string, string> suppliers,
-            string projectName,
-            NodeKey sourceKey,
-            NodeKey targetKey,
-            TypeNode targetNode)
+        private InstanceKey? InstanceOf(FragmentBinding binding, NodeKey sourceKey, NodeKey targetKey, TypeNode targetNode)
         {
             bool sharedSource = SharedRoster(sourceKey.FullName) is not null;
             DeclarerRoster? sharedTarget = targetKey.SupplyingAssembly is null ? SharedRoster(targetKey.FullName) : null;
@@ -553,10 +524,10 @@ internal static class FragmentMerger
 
             // A shared target's node is the first declarer's, so the copy it reached comes from ReachedCopy.
             string reached = sharedTarget is not null
-                ? ReachedCopy(suppliers, projectName, targetKey.FullName, sharedTarget)
+                ? ReachedCopy(binding, targetKey.FullName, sharedTarget)
                 : targetNode.ProjectName;
 
-            return new InstanceKey(projectName, reached);
+            return new InstanceKey(binding.ProjectName, reached);
         }
 
         // The roster of a name several projects declare, or null. Until some name gains a later declarer no roster
@@ -574,11 +545,10 @@ internal static class FragmentMerger
         // copy of the declarer producing that assembly. Asking the project instead would be wrong for a
         // multi-targeted project whose #if declares the name under one framework only. Every unknown falls back to
         // the first declarer, the copy whose facts the node carries.
-        private string ReachedCopy(
-            IReadOnlyDictionary<string, string> suppliers, string projectName, string fqn, DeclarerRoster roster)
+        private string ReachedCopy(FragmentBinding binding, string fqn, DeclarerRoster roster)
         {
-            if (!suppliers.TryGetValue(fqn, out string? assembly))
-                return roster.Declares(projectName) ? projectName : roster.Winner;
+            if (!binding.Suppliers.TryGetValue(fqn, out string? assembly))
+                return roster.Declares(binding.ProjectName) ? binding.ProjectName : roster.Winner;
 
             if (!_projectsByAssembly.TryGetProducer(assembly, out string? supplier)) return roster.Winner;
 
@@ -587,11 +557,9 @@ internal static class FragmentMerger
 
         // A use is attributed the way an edge into the member's declaring type is, through ResolveEdge, so a rule
         // owning one copy's instances reads that copy's uses.
-        private void MergeMemberEdge(
-            IReadOnlyDictionary<string, string> suppliers, string projectName, FragmentMemberEdge edge)
+        private void MergeMemberEdge(FragmentBinding binding, FragmentMemberEdge edge)
         {
-            if (ResolveEdge(suppliers, projectName, edge.SourceFullName, edge.TargetContainingTypeFullName)
-                is not { } merged) return;
+            if (ResolveEdge(binding, edge.SourceFullName, edge.TargetContainingTypeFullName) is not { } merged) return;
 
             // Member facts are functions of the SymbolId, so the first mention wins and every later one agrees.
             // The containing type is stored as the NODE key BuildMemberEdges resolves with, or a member on a
@@ -603,11 +571,9 @@ internal static class FragmentMerger
             _memberEdges.Merge((merged.Key.Source, edge.MemberSymbolId), merged.Instance, edge.Sites);
         }
 
-        private void MergeCatchEdge(
-            IReadOnlyDictionary<string, string> suppliers, string projectName, FragmentCatchEdge edge)
+        private void MergeCatchEdge(FragmentBinding binding, FragmentCatchEdge edge)
         {
-            if (MergeSimpleEdge(
-                    suppliers, projectName, edge.SourceFullName, edge.CaughtFullName, _catchEdges, edge.Sites)
+            if (MergeSimpleEdge(binding, edge.SourceFullName, edge.CaughtFullName, _catchEdges, edge.Sites)
                 is not { } merged) return;
 
             // Both narrowings union under the same key, the same guard and the same INSTANCE key, so a rule that owns
@@ -695,11 +661,13 @@ internal static class FragmentMerger
                 _registrationSites.OrderedRegistrations((lifetime, service, impl, sites) =>
                     new ServiceRegistration(lifetime, service, impl, sites.ToLocations()));
 
+            Dictionary<string, ProjectArtifacts> artifactsByProject = ArtifactsByProject();
+
             // In the order CodebaseModel.MergeNotes documents, each kind sorted on the key it groups by, so the list
             // is stable across runs regardless of the order the distinct notes were first raised.
             IEnumerable<string> frameworkCollapseNotes = _multiFrameworkWinners.Keys
                 .OrderBy(projectName => projectName, StringComparer.Ordinal)
-                .Select(FrameworkCollapseNote);
+                .Select(projectName => FrameworkCollapseNote(projectName, artifactsByProject[projectName]));
             IEnumerable<string> shadowedNameNotes = ShadowedNamesByProject()
                 .OrderBy(entry => entry.Key, StringComparer.Ordinal)
                 .Select(entry => ShadowedNamesNote(entry.Key, entry.Value));
@@ -714,7 +682,7 @@ internal static class FragmentMerger
 
             return new CodebaseModel(
                 types, edges, memberEdges, constructorEdges, injectionEdges, catchEdges, throwEdges,
-                exposureEdges, serviceRegistrations, BuildProjects(), BuildShadowedNames(), mergeNotes);
+                exposureEdges, serviceRegistrations, BuildProjects(artifactsByProject), BuildShadowedNames(), mergeNotes);
         }
 
         private List<TEdge> BuildEdges<TEdge>(
@@ -774,13 +742,27 @@ internal static class FragmentMerger
                     _nodes[src], MemberReferenceFor(symbolId), _memberEdges.EvidenceOf((src, symbolId), sites)));
         }
 
+        // Every fragment folded into its project's artifacts, one entry per project.
+        private Dictionary<string, ProjectArtifacts> ArtifactsByProject()
+        {
+            Dictionary<string, ProjectArtifacts> artifactsByProject = new(StringComparer.Ordinal);
+            foreach (CodebaseFragment fragment in _fragments)
+            {
+                if (!artifactsByProject.TryGetValue(fragment.ProjectName, out ProjectArtifacts? artifacts))
+                    artifactsByProject[fragment.ProjectName] = artifacts = new ProjectArtifacts();
+
+                artifacts.Absorb(fragment);
+            }
+
+            return artifactsByProject;
+        }
+
         // Every per-project table the merge keeps reaches the model here or nowhere: a table this method does not
         // read is lost.
-        private List<ProjectNode> BuildProjects()
+        private List<ProjectNode> BuildProjects(Dictionary<string, ProjectArtifacts> artifactsByProject)
         {
             Dictionary<string, SortedSet<string>> refsByProject = new(StringComparer.Ordinal);
             Dictionary<string, SortedSet<string>> undeclaredByProject = new(StringComparer.Ordinal);
-            Dictionary<string, ProjectArtifacts> artifactsByProject = new(StringComparer.Ordinal);
             foreach (CodebaseFragment fragment in _fragments)
             {
                 SortedSet<string> refs = refsByProject.OrdinalNamesFor(fragment.ProjectName);
@@ -788,11 +770,6 @@ internal static class FragmentMerger
 
                 SortedSet<string> undeclared = undeclaredByProject.OrdinalNamesFor(fragment.ProjectName);
                 foreach (string reference in fragment.UndeclaredProjectReferences ?? []) undeclared.Add(reference);
-
-                if (!artifactsByProject.TryGetValue(fragment.ProjectName, out ProjectArtifacts? artifacts))
-                    artifactsByProject[fragment.ProjectName] = artifacts = new ProjectArtifacts();
-
-                artifacts.Absorb(fragment);
             }
 
             return refsByProject
@@ -817,7 +794,7 @@ internal static class FragmentMerger
                 projectReferences: projectReferences.ToList(),
                 undeclaredProjectReferences: undeclaredReferences.ToList(),
                 solutionMember: artifacts.SolutionMember,
-                targetFrameworks: TargetFrameworksOf(projectName, artifacts),
+                targetFrameworks: artifacts.TargetFrameworksOrCarried(),
                 targetFrameworksSite: artifacts.TargetFrameworksSite.ToLocation(),
                 factsFollow: winners?.Min,
                 packageReferences: artifacts.PackageReferences(),
@@ -827,19 +804,6 @@ internal static class FragmentMerger
                 locksPackagesSite: artifacts.LocksPackagesSite.ToLocation(),
                 assemblyNames: artifacts.AssemblyNames(),
                 evaluations: artifacts.Evaluations());
-        }
-
-        // What the project declares, whatever it compiled to, so a solution filter that extracted one of a project's
-        // two frameworks still reports both. The frameworks its fragments carried are only the fallback: they exist
-        // only where a load told the compilations apart, so a project nothing evaluated says what it can and a
-        // hand-built input says nothing.
-        private IReadOnlyList<string>? TargetFrameworksOf(string projectName, ProjectArtifacts artifacts)
-        {
-            IReadOnlyList<string> declared = artifacts.TargetFrameworks();
-            if (declared.Count > 0) return declared;
-
-            _frameworksByProject.TryGetValue(projectName, out SortedSet<string>? carried);
-            return carried is { Count: > 0 } ? carried.ToList() : null;
         }
 
         /// <summary>
@@ -920,9 +884,14 @@ internal static class FragmentMerger
 
             internal FragmentSite? TargetFrameworksSite { get; private set; }
 
+            // Every target framework the project's fragments carried. Built over all fragments, not just the
+            // declaring ones, so a note can name the project's whole framework set.
+            internal SortedSet<string> CarriedFrameworks { get; } = new(StringComparer.Ordinal);
+
             internal void Absorb(CodebaseFragment fragment)
             {
                 foreach (string framework in fragment.DeclaredTargetFrameworks ?? []) _frameworks.Add(framework);
+                if (fragment.TargetFramework is { } carried) CarriedFrameworks.Add(carried);
                 if (fragment.TargetFrameworksSite is { } frameworksSite && TargetFrameworksSite is null)
                     TargetFrameworksSite = frameworksSite;
 
@@ -947,9 +916,15 @@ internal static class FragmentMerger
                     _evaluations[evaluated ?? string.Empty] = (evaluated, properties);
             }
 
-            internal IReadOnlyList<string> TargetFrameworks()
+            // What the project declares, whatever it compiled to, so a solution filter that extracted one of a
+            // project's two frameworks still reports both. The frameworks its fragments carried are only the fallback:
+            // they exist only where a load told the compilations apart, so a project nothing evaluated says what it can
+            // and a hand-built input says nothing.
+            internal IReadOnlyList<string>? TargetFrameworksOrCarried()
             {
-                return _frameworks.ToList();
+                if (_frameworks.Count > 0) return _frameworks.ToList();
+
+                return CarriedFrameworks.Count > 0 ? CarriedFrameworks.ToList() : null;
             }
 
             internal IReadOnlyList<string> AssemblyNames()
@@ -1172,7 +1147,9 @@ internal static class FragmentMerger
                 (NodeKey Source, TTarget Target) key, SortedSet<FragmentSite> all,
                 IReadOnlyList<SourceLocation> allLocations)
             {
-                if (ByInstance(key) is not { } byInstance) return null;
+                if (_instances is null
+                    || !_instances.TryGetValue(key, out Dictionary<InstanceKey, SortedSet<FragmentSite>>? byInstance))
+                    return null;
 
                 return byInstance
                     .OrderBy(entry => entry.Key.SourceProject, StringComparer.Ordinal)
@@ -1182,16 +1159,13 @@ internal static class FragmentMerger
                         FragmentSiteSets.Subsequence(all, allLocations, entry.Value)))
                     .ToList();
             }
-
-
-            private Dictionary<InstanceKey, SortedSet<FragmentSite>>? ByInstance((NodeKey Source, TTarget Target) key)
-            {
-                if (_instances is null) return null;
-
-                _instances.TryGetValue(key, out Dictionary<InstanceKey, SortedSet<FragmentSite>>? byInstance);
-                return byInstance;
-            }
         }
+
+        /// <summary>
+        ///     What one fragment's edges are merged through: the assembly it bound each name in dispute from, and
+        ///     the project that compiled it.
+        /// </summary>
+        private readonly record struct FragmentBinding(IReadOnlyDictionary<string, string> Suppliers, string ProjectName);
 
         /// <summary>
         ///     Which instance of an edge one fragment's compilation made: the project that compiled the

@@ -7,7 +7,8 @@ namespace SlideRule.Roslyn.Caching;
 /// <summary>
 ///     The file-system probes that decide, with zero MSBuild, whether a tree's on-disk shape has moved: the
 ///     <see cref="Enumerate">cone</see> of <c>*.cs</c> a project directory globs, and the
-///     <see cref="SolutionStructuralPaths">structural path set</see> a whole solution stamps.
+///     <see cref="SolutionStructuralPaths(string, IEnumerable{ProjectInputs})">structural path set</see> a whole
+///     solution stamps.
 /// </summary>
 /// <remarks>
 ///     Every caller deciding whether a model is still valid asks these, so none can drift from another on what
@@ -101,7 +102,7 @@ internal static class ProjectCone
     /// </summary>
     /// <remarks>
     ///     The order is the order stamps are recorded in, so a persisted stamp list keeps its shape. This is the
-    ///     per-project course of <see cref="SolutionStructuralPaths" />.
+    ///     per-project course of <see cref="SolutionStructuralPaths(string, IEnumerable{ProjectInputs})" />.
     /// </remarks>
     public static IEnumerable<string> StructuralPaths(
         string projectDirectory, string? evaluatedOutputPath, string? intermediateAssemblyPath)
@@ -124,6 +125,22 @@ internal static class ProjectCone
     /// <remarks>
     ///     The filter leg costs a non-filter solution nothing: the format test comes before any I/O.
     /// </remarks>
+    public static IReadOnlyList<string> SolutionStructuralPaths(
+        string solutionPath, IEnumerable<ProjectInputs> projects)
+    {
+        return SolutionStructuralPaths(
+            solutionPath,
+            projects.Select(project => (
+                Path.GetFullPath(project.CsprojPath),
+                Path.GetFullPath(project.ProjectDirectory),
+                project.EvaluatedOutputPath,
+                project.IntermediateAssemblyPath)));
+    }
+
+    /// <summary>
+    ///     <see cref="SolutionStructuralPaths(string, IEnumerable{ProjectInputs})" /> over projects given by their
+    ///     structural facts alone, each <c>CsprojPath</c> already absolute.
+    /// </summary>
     public static IReadOnlyList<string> SolutionStructuralPaths(
         string solutionPath,
         IEnumerable<(string CsprojPath, string ProjectDirectory, string? EvaluatedOutputPath, string?

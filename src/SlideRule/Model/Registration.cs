@@ -15,4 +15,27 @@ internal abstract class Registration(string id)
     ///     captured via caller info (GRAMMAR §8), or null when none was captured.
     /// </summary>
     internal SpecSourceLocation? Location { get; set; }
+
+    internal Posture? Posture { get; private set; }
+
+    /// <summary>
+    ///     How many times a posture verb was called. The stage machine (§3.2) forbids a fluent double-call, but a
+    ///     stored builder reference is mutable, so a posture verb called twice on it silently overwrites (on a
+    ///     scope, the scoped selection too); a count &gt; 1 is the repeated-posture error (§8 item 17).
+    /// </summary>
+    internal int PostureCount { get; private set; }
+
+    internal List<string> Becauses { get; } = [];
+
+    internal List<string> Baselines { get; } = [];
+
+    /// <summary>
+    ///     Records a posture verb's call. Each verb assigns its operand first, so a recorded posture always has
+    ///     its operand.
+    /// </summary>
+    internal void RecordPosture(Posture posture)
+    {
+        PostureCount++;
+        Posture = posture;
+    }
 }

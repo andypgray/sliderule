@@ -60,8 +60,7 @@ internal sealed class CheckRunner(
     private static void RefuseAStringifiedArrayDiffBase(string diffBase)
     {
         var lead = $"Cannot resolve changed files since '{diffBase}'";
-        if (Refusals.SingleValueRefusal(diffBase, lead, "pass one git ref") is { } refusal)
-            throw new UserErrorException(refusal);
+        Refusals.RefuseSingleValue(diffBase, lead, "pass one git ref");
     }
 
     // The check proper, over whichever pair of channels the caller handed it: the report and the human
@@ -73,7 +72,7 @@ internal sealed class CheckRunner(
     {
         if (request.DiffBase is { } diffBase) RefuseAStringifiedArrayDiffBase(diffBase);
 
-        TextWriter human = HumanChannel(request, stdout);
+        TextWriter human = HumanChannel(request.Json, stdout);
 
         using var source = await CodebaseSource.CreateWithSpecAsync(
             SolutionSource, Environment, request.Solution, request.Spec, request.WorkingDirectory, request.NoCache, ct);
@@ -101,7 +100,7 @@ internal sealed class CheckRunner(
         // verdict the gate below returns.
         bool gated = diagnostics.Gates(request.AllowWorkspaceDiagnostics);
 
-        Render(request, stdout, stderr, report, source, !gated, ruleGlobs);
+        Render(request, stdout, human, stderr, report, source, !gated, ruleGlobs);
 
         // The incomplete-model gate: exit 2 overrides the 0/1 verdict. SARIF (if requested) was already
         // written above with executionSuccessful: false, so the gate verdict still reaches code scanning.
@@ -146,11 +145,9 @@ internal sealed class CheckRunner(
     }
 
     private void Render(
-        CheckRequest request, TextWriter stdout, TextWriter stderr, CheckReport report,
+        CheckRequest request, TextWriter stdout, TextWriter human, TextWriter stderr, CheckReport report,
         CodebaseSource source, bool executionSuccessful, IReadOnlyList<string> ruleGlobs)
     {
-        TextWriter human = HumanChannel(request, stdout);
-
         // check is the one verb that folds the advisory merge notes into its rendered diagnostics stream
         // (stderr warning: lines + the JSON workspaceDiagnostics array + SARIF notifications), load failures
         // first, because it is the verb that prints the violations a merge advisory can explain. The NuGet
@@ -190,16 +187,7 @@ internal sealed class CheckRunner(
         }
     }
 
-    // This run's human channel. --json owns stdout, where the document is the only thing written, so under
-    // it every stamp and notice goes nowhere.
-    private static TextWriter HumanChannel(CheckRequest request, TextWriter stdout)
-    {
-        return request.Json ? TextWriter.Null : stdout;
-    }
-
-    // The JSON report, degraded rather than cut (IResponseFitter). Each rung is re-composed from the result
-    // model already in hand, no second check, so it is byte-identical to what --grain naming it would write,
-    // and carries its terminator, so the fitter measures the text the MCP truncator measures after it.
+    // The JSON report, each rung re-composed from the result model already in hand, no second check.
     // Degrading coarsens the grain and never touches the selection: every rule the run evaluated is still
     // here with its verdict, and the summary counts still cover exactly what ran. The two renderings arrive
     // composed because stderr, the document and SARIF must read one composition.
@@ -208,17 +196,8 @@ internal sealed class CheckRunner(
         IReadOnlyList<string> renderedDiagnostics, WorkspaceTrustStamp trust, IReadOnlyList<string> ruleGlobs)
     {
         string specAssembly = Path.GetFileName(source.Resolution.DllPath);
-        IEnumerable<string> ladder = request.Grain.Ladder(Compose);
-        string document = Fitter.Fit(ladder);
-        stdout.Write(document);
-        return;
-
-        string Compose(DocumentGrain at)
-        {
-            string composed = JsonReportRenderer.Document(
-                report, source.SolutionDirectory, source.SolutionName, specAssembly, request.DiffBase,
-                renderedDiagnostics, trust, ruleGlobs, at);
-            return SlideRuleJson.Terminated(composed);
-        }
+        WriteFitted(stdout, request.Grain, at => JsonReportRenderer.Document(
+            report, source.SolutionDirectory, source.SolutionName, specAssembly, request.DiffBase,
+            renderedDiagnostics, trust, ruleGlobs, at));
     }
 }

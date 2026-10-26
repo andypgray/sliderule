@@ -13,10 +13,7 @@ namespace SlideRule.Roslyn.Diagnostics;
 internal sealed record ProjectLoadReport(
     IReadOnlyList<string> Failed,
     IReadOnlyList<string> Unchecked,
-    IReadOnlyList<UnsupportedProject> Unsupported)
-{
-    internal static ProjectLoadReport Empty { get; } = new([], [], []);
-}
+    IReadOnlyList<UnsupportedProject> Unsupported);
 
 /// <summary>
 ///     Which projects failed to load, answered from the structure of the loaded <see cref="Solution" /> rather
@@ -59,9 +56,12 @@ internal static class ProjectLoadFailures
 
         // Arm 2 first, over what did load: a multi-target-framework project is several Projects behind one
         // file path, so the set collapses them to the one csproj a reader would go and fix. A project in
-        // another language is skipped — see NotACsharpProject on why it must not be able to gate.
+        // another language is skipped: F# reaches a loaded solution with its output paths — measured — so this
+        // arm can see a project the model was never going to contain, and blaming one would refuse a healthy
+        // polyglot solution as a load failure; the run states such a project under its coverage statement
+        // instead.
         foreach (Project project in solution.Projects)
-            if (!NotACsharpProject(project) && LoadedEmpty(project) && project.FilePath is { } filePath)
+            if (ProjectLanguages.IsCSharp(project) && LoadedEmpty(project) && project.FilePath is { } filePath)
                 failed.Add(Path.GetFullPath(filePath));
 
         var uncheckedMembers = new HashSet<string>(PathComparison.Comparer);
@@ -112,13 +112,5 @@ internal static class ProjectLoadFailures
     private static bool LoadedEmpty(Project project)
     {
         return project.OutputFilePath is null && project.CompilationOutputInfo.AssemblyPath is null;
-    }
-
-    // F# reaches a loaded solution with its output paths — measured — so this arm can see a project the
-    // model was never going to contain, and blaming one would refuse a healthy polyglot solution as a load
-    // failure; the run states such a project under its coverage statement instead.
-    private static bool NotACsharpProject(Project project)
-    {
-        return !ProjectLanguages.IsCSharp(project);
     }
 }

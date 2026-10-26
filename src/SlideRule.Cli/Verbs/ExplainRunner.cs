@@ -2,7 +2,6 @@ using SlideRule.Checking;
 using SlideRule.Cli.Mcp.Infrastructure;
 using SlideRule.Cli.Pipeline;
 using SlideRule.Cli.Rendering;
-using SlideRule.Cli.SpecLoading;
 using SlideRule.Codebase;
 using SlideRule.Hosting;
 using SlideRule.Internal;
@@ -55,34 +54,16 @@ internal sealed class ExplainRunner(
     {
         if (request.RuleId is not { } ruleId) return await ExplainClaimsAsync(request, ct);
 
-        ArchitectureModel model = await LoadModelAsync(request, ct);
+        // A built-DLL --spec answers with no solution in reach, so none is discovered.
+        (ArchitectureModel model, _) = await LoadSpecModelAsync(
+            request.Solution, request.Spec, request.WorkingDirectory, request.NoCache, needsSolutionDirectory: false,
+            error, ct);
 
         ArchRule? rule = model.Rules.FirstOrDefault(candidate => candidate.Id == ruleId);
         if (rule is null) throw new UserErrorException(UnknownRuleMessage(ruleId, model));
 
         foreach (string line in ExplainFormatter.Lines(rule)) await output.WriteLineAsync(line);
         return ExitCodes.Clean;
-    }
-
-    private async Task<ArchitectureModel> LoadModelAsync(ExplainRequest request, CancellationToken ct)
-    {
-        // Fast path: a built-DLL --spec resolves without ever opening the solution. The model still comes
-        // through the source, so a warm host serves its cached one rather than reloading the DLL per call.
-        SpecResolution? withoutSolution = SpecResolver.TryResolveWithoutSolution(request.Spec);
-        if (withoutSolution is not null) return SolutionSource.LoadSpecModel(withoutSolution.DllPath);
-
-        // Convention or csproj --spec: load the workspace for resolution only; never extract. The acquisition
-        // seam is the shared one, so explain's model is the model every other verb would have loaded.
-        using var source = await CodebaseSource.CreateWithSpecAsync(
-            SolutionSource, Environment, request.Solution, request.Spec, request.WorkingDirectory,
-            request.NoCache, ct);
-        RecordCacheOutcome(source);
-
-        // Composed like every other verb's, so the MSBuild-selection note accompanies the load failures.
-        WorkspaceDiagnostics diagnostics = source.Diagnostics;
-        WorkspaceDiagnosticsRenderer.Render(error, diagnostics);
-
-        return source.Model;
     }
 
     // The type and path forms. Unlike the rule form this extracts, because who claims a type is a question about
@@ -136,7 +117,7 @@ internal sealed class ExplainRunner(
         (string value, string lead, string advice) = request.Type is { } type
             ? (type, $"Cannot explain type '{type}'", "pass one type name")
             : (request.Path!, $"Cannot explain path '{request.Path}'", "pass one path");
-        if (Refusals.SingleValueRefusal(value, lead, advice) is { } refusal) throw new UserErrorException(refusal);
+        Refusals.RefuseSingleValue(value, lead, advice);
     }
 
     // By full name first, the spelling check reports; then by simple name, every match, since a simple name is

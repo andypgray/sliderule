@@ -210,6 +210,9 @@ internal sealed class SpecLiteralAnalyzer : DiagnosticAnalyzer
         IMethodSymbol target = invocation.TargetMethod;
         IMethodSymbol declaration = target.OriginalDefinition;
 
+        // The marker is internal to the contract assembly, so only the contract's own parameters can carry it.
+        if (!SymbolEqualityComparer.Default.Equals(declaration.ContainingAssembly, marker.ContainingAssembly)) return;
+
         // The declaration is where a marker lives: a constructed generic's parameters are substitutions
         // and carry no attribute blob of their own, so an argument's own parameter symbol may have none.
         // In C# the target is never reduced and the arguments include an extension call's receiver, so an
@@ -274,9 +277,10 @@ internal sealed class SpecLiteralAnalyzer : DiagnosticAnalyzer
     {
         try
         {
+            if (ids.IsEmpty && layerNames.IsEmpty) return;
+
             List<Declared> declaredIds = InSourceOrder(ids);
             List<Declared> declaredNames = InSourceOrder(layerNames);
-            if (declaredIds.Count == 0 && declaredNames.Count == 0) return;
 
             foreach (Collision collision in DecideCollisions(declaredIds, declaredNames))
             {

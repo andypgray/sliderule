@@ -1,4 +1,5 @@
 using SlideRule.Internal;
+using SlideRule.Rendering;
 
 namespace SlideRule.Roslyn.Solutions;
 
@@ -71,11 +72,8 @@ internal static class IntermediateOutputTree
         string[] evaluatedSegments = SegmentsBelow(evaluated, evaluatedRoot);
         string[] intermediateSegments = SegmentsBelow(intermediate, intermediateRoot);
 
-        var shared = 0;
-        while (shared < evaluatedSegments.Length
-               && shared < intermediateSegments.Length
-               && string.Equals(evaluatedSegments[shared], intermediateSegments[shared], PathComparison.Comparison))
-            shared++;
+        int limit = Math.Min(evaluatedSegments.Length, intermediateSegments.Length);
+        int shared = PathFormat.CommonPrefixLength(evaluatedSegments, intermediateSegments, limit);
 
         // One guard collapses every degenerate case: the intermediate path equal to the evaluated one, the
         // same directory under a different file name, and an intermediate assembly sitting directly beside

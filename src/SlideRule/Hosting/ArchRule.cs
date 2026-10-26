@@ -101,4 +101,8 @@ internal sealed class ArchRule
     // it through here, so a future posture that also ratchets is one edit rather than a hunt. A reader that
     // needs the file itself reads BaselinePath instead — that is a different question.
     public bool IsRatcheted => BaselinePath is not null;
+
+    /// <summary>Gets whether this rule is a scope's tripwire.</summary>
+    // Keyed on the payload rather than the posture: both scope postures mint a tripwire.
+    public bool IsTripwire => Scope is { Role: ScopeRole.Tripwire };
 }

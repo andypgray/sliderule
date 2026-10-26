@@ -165,10 +165,10 @@ internal sealed class NodeWriter
             Key("union");
             Elements(union.Parts, WriteSelection);
         }
-        else
+        else if (selection.Noun is { } noun)
         {
             Key("noun");
-            NodeWriters.Write(this, selection.Noun);
+            NodeWriters.Write(this, noun);
         }
 
         WriteAdjectives(selection.Adjectives);

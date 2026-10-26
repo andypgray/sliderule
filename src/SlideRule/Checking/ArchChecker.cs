@@ -156,7 +156,7 @@ internal static class ArchChecker
             // The tripwire carries no closed-vocabulary constraint (its Constraint is null and must never reach the
             // evaluator). Inside the try because the class promises every evaluation fault becomes a RuleError rather
             // than aborting the run, and evaluating the scoped selection is an evaluation like any other.
-            if (rule.Scope is { Role: ScopeRole.Tripwire }) return Tripwire(rule, selections, diff);
+            if (rule.IsTripwire) return Tripwire(rule, selections, diff);
 
             // The cut is the checker's, never the evaluator's. The evaluator's gates are what make an empty
             // part an authoring error, and they stay exactly that for every run over a whole solution; what a
@@ -301,27 +301,15 @@ internal static class ArchChecker
 
         List<CheckWarning> touched = scoped
             .Where(type => !type.IsExternal)
-            .SelectMany(type => type.DeclarationSites)
-            .Select(site => site.FilePath)
+            .SelectMany(type => type.FilePaths)
             .Distinct(StringComparer.Ordinal)
             .Where(diff.Contains)
             .Select(diff.SolutionRelative)
             .OrderBy(path => path, StringComparer.Ordinal)
-            .Select(path => CheckWarning.ScopeTouched(caution, TripwireMessage(path, scopeId, rule.Id, caution), path))
+            .Select(path => CheckWarning.ScopeTouched(caution, path, scopeId, rule.Id))
             .ToList();
 
         return new RuleResult(rule, RuleStatus.Passed, Array.Empty<Violation>(), touched);
-    }
-
-    // The command names the RULE, which is the tripwire's own id, rather than respelling how one is minted from a
-    // scope: text the reader is told to paste must not go stale against that mint.
-    private static string TripwireMessage(string relativePath, string scopeId, string ruleId, bool caution)
-    {
-        return caution
-            ? $"Changed file '{relativePath}' is inside cautioned scope '{scopeId}' — read the dragons before " +
-              $"editing: sliderule explain {ruleId}."
-            : $"Changed file '{relativePath}' is inside quarantined scope '{scopeId}' — does the task actually " +
-              $"require editing dragon territory? Dragons: sliderule explain {ruleId}.";
     }
 
     // A rule the narrowed run never had in view: its subject selection matched nothing, and nothing is

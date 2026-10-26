@@ -1,7 +1,7 @@
 namespace SlideRule.Codebase;
 
 /// <summary>
-///     One type creating another: <see cref="Source" />'s own source creates <see cref="Constructed" /> with
+///     One type creating another: <see cref="TypeEdge.Source" />'s own source creates <see cref="Constructed" /> with
 ///     an object-creation expression, either <c>new Foo()</c> or a target-typed <c>new()</c>. Read them from
 ///     <see cref="CodebaseModel.ConstructorEdges" />.
 /// </summary>
@@ -19,24 +19,16 @@ namespace SlideRule.Codebase;
 ///         ordinary creation and is recorded.
 ///     </para>
 /// </remarks>
-internal sealed class ConstructorEdge : IEdgeEnds
+internal sealed class ConstructorEdge : TypeEdge
 {
     internal ConstructorEdge(TypeNode source, TypeNode constructed, EdgeEvidence evidence)
+        : base(source, evidence)
     {
-        Source = source;
         Constructed = constructed;
-        Evidence = evidence;
     }
-
-    /// <summary>Gets the constructing type.</summary>
-    public TypeNode Source { get; }
 
     /// <summary>Gets the type that is created.</summary>
     public TypeNode Constructed { get; }
 
-    TypeNode IEdgeEnds.Target => Constructed;
-
-    public IReadOnlyList<SourceLocation> Sites => Evidence.Sites;
-
-    internal EdgeEvidence Evidence { get; }
+    public override TypeNode Target => Constructed;
 }

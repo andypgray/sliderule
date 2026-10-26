@@ -71,23 +71,23 @@ internal sealed class SpecResolutionCache
 
         if (cached is not null && cached.Generation == generation)
         {
-            SpecResolution recorded = cached.Resolution;
+            SpecResolution recorded = cached.Resolved.Resolution;
             SpecResolution replayed = SpecResolver.Replay(
                 recorded.SpecProjectName, normalizedSpecArgument, recorded.ExcludeProjectNames,
                 recorded.OutputFilePaths, recorded.IntermediateAssemblyPath);
-            return new SessionSpecResolution(replayed, cached.DeclaredMembers);
+            return cached.Resolved with { Resolution = replayed };
         }
 
         SessionSpecResolution resolved = resolveFully();
 
         lock (gate)
         {
-            entries[normalizedSpecArgument] = new Entry(generation, resolved.Resolution, resolved.DeclaredMembers);
+            entries[normalizedSpecArgument] = new Entry(generation, resolved);
             FullResolveCount++;
         }
 
         return resolved;
     }
 
-    private sealed record Entry(long Generation, SpecResolution Resolution, IReadOnlySet<string>? DeclaredMembers);
+    private sealed record Entry(long Generation, SessionSpecResolution Resolved);
 }

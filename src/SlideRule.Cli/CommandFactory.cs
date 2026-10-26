@@ -626,8 +626,9 @@ internal static class CommandFactory
     }
 
     // The hook resolves nothing in its request builder: its paths are relative to the working tree the hook fires
-    // for, which only the payload names, and a refusal there would reach the handler below as exit 2, the one code
-    // that tells an agent to keep working. The runner resolves inside its own handling instead.
+    // for, which only the payload names, so the runner resolves inside its own handling. Its handler is the hook's
+    // own, so a failure anywhere, the request builder included, is SlideRule's own error in Claude Code's codes and
+    // never exit 2, the one code that tells an agent to keep working.
     private static Command BuildHookCommand(ISolutionSource hostSource, IEnvironment environment, TextReader? input)
     {
         Argument<string?> solution = SolutionArgument(
@@ -679,7 +680,8 @@ internal static class CommandFactory
                 Directory.GetCurrentDirectory()),
             (request, output, error, ct) => new HookRunner(
                     output, error, input, environment, new InProcessHookCheck(hostSource, environment))
-                .RunAsync(request, ct));
+                .RunAsync(request, ct),
+            HookRunner.RunReportingConfigErrorAsync);
 
         return hook;
     }
@@ -706,20 +708,23 @@ internal static class CommandFactory
     }
 
     // The action shape every command shares: build the request off the parse and run it, both under the
-    // top-level error handler and with the SAME error writer the run itself writes to. The request is built
-    // inside the handler so a binding failure is reported as a failure of the run: a user error's message alone,
-    // and exit 2. One place, so a verb added later cannot wire the two apart, and CliErrorMapper cannot end up
-    // writing somewhere the verb's own diagnostics did not.
+    // command's error handler and with the SAME error writer the run itself writes to. The request is built
+    // inside the handler so a binding failure is reported as a failure of the run: under the default handler, the
+    // top-level one, a user error's message alone and exit 2. One place, so a verb added later cannot wire the two
+    // apart, and CliErrorMapper cannot end up writing somewhere the verb's own diagnostics did not. `handle`
+    // replaces the default for a command that answers in codes of its own.
     internal static void SetRequestAction<TRequest>(
         Command command,
         Func<ParseResult, TRequest> requestFrom,
-        Func<TRequest, TextWriter, TextWriter, CancellationToken, Task<int>> run)
+        Func<TRequest, TextWriter, TextWriter, CancellationToken, Task<int>> run,
+        Func<Func<Task<int>>, TextWriter, CancellationToken, Task<int>>? handle = null)
     {
+        Func<Func<Task<int>>, TextWriter, CancellationToken, Task<int>> handler = handle ?? CommandEntryPoint.RunAsync;
         command.SetAction((parseResult, ct) =>
         {
             TextWriter output = parseResult.InvocationConfiguration.Output;
             TextWriter error = parseResult.InvocationConfiguration.Error;
-            return CommandEntryPoint.RunAsync(
+            return handler(
                 () =>
                 {
                     TRequest request = requestFrom(parseResult);

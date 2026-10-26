@@ -52,9 +52,10 @@ internal static class WorkspaceLoader
     /// <remarks>
     ///     A filter loads the projects it selects plus their transitive references. A failure never aborts the
     ///     load, since a partial load still yields a usable model: <paramref name="diagnosticLog" /> receives the
-    ///     workspace's failure messages for a host to render, and whether the model is incomplete is
-    ///     <see cref="LoadedSolution.FailedProjects" />' and <see cref="LoadedSolution.RestoreFailedProjects" />'
-    ///     answer, never the messages'.
+    ///     workspace's failure messages for a host to render, and whether the model is incomplete is the answer of
+    ///     <see cref="WorkspaceDiagnostics.FailedProjects" /> and
+    ///     <see cref="WorkspaceDiagnostics.RestoreFailedProjects" /> on
+    ///     <see cref="LoadedSolution.LoadDiagnosticsWith" />, never the messages'.
     /// </remarks>
     /// <exception cref="UserErrorException">
     ///     The <c>.slnf</c> filter at <paramref name="solutionPath" /> could not be read.
@@ -204,14 +205,12 @@ internal static class WorkspaceLoader
     private static async Task<Solution> OpenAsync(
         MSBuildWorkspace workspace, string solutionPath, CancellationToken ct)
     {
-        if (!SolutionProjectFileParser.IsFilterFormat(solutionPath))
-            return await workspace.OpenSolutionAsync(solutionPath, cancellationToken: ct).ConfigureAwait(false);
-
         try
         {
             return await workspace.OpenSolutionAsync(solutionPath, cancellationToken: ct).ConfigureAwait(false);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (ex is not OperationCanceledException
+                                   && SolutionProjectFileParser.IsFilterFormat(solutionPath))
         {
             throw new UserErrorException(UnreadableFilterMessage(solutionPath), ex);
         }

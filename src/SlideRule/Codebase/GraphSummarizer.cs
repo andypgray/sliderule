@@ -29,13 +29,16 @@ internal static class GraphSummarizer
             .Select(project => SummarizeProject(project, declaredByProject[project.Name]))
             .ToList();
 
-        List<ProjectEdgeSummary> projectEdges = Tally(CrossProjectPairs(model))
+        (Dictionary<(string Source, string Target), int> projectPairs,
+            Dictionary<(string Source, string Root), int> externalRoots) = TallyReferences(model);
+
+        List<ProjectEdgeSummary> projectEdges = projectPairs
             .Select(pair => new ProjectEdgeSummary(pair.Key.Source, pair.Key.Target, pair.Value))
             .OrderBy(edge => edge.Source, StringComparer.Ordinal)
             .ThenBy(edge => edge.Target, StringComparer.Ordinal)
             .ToList();
 
-        List<ExternalEdgeSummary> externalEdges = Tally(ExternalReferences(model))
+        List<ExternalEdgeSummary> externalEdges = externalRoots
             .Select(reference => new ExternalEdgeSummary(reference.Key.Source, reference.Key.Root, reference.Value))
             .OrderBy(edge => edge.Source, StringComparer.Ordinal)
             .ThenBy(edge => edge.TargetNamespaceRoot, StringComparer.Ordinal)
@@ -62,50 +65,56 @@ internal static class GraphSummarizer
             .ToList();
     }
 
-    // The project pairs the code actually declares, one per edge instance that crosses a boundary. The
-    // model carries one node per full name and one edge per type PAIR, so where several projects declare a
-    // name, N compilations of one reference collapse into one entry, which EdgeInstances unfolds. Reading the
-    // pair off the edge's two nodes instead would invent dependencies no project file declares and credit one
-    // copy's references to another (GRAMMAR §4.1). An instance is emitted per (maker, reached) pair, so a
-    // pair is still counted once per type pair per project pair.
-    private static IEnumerable<(string Source, string Target)> CrossProjectPairs(CodebaseModel model)
+    // The project pairs the code actually declares, one per edge instance that crosses a boundary, and the
+    // external namespace roots each project reaches, one per instance whose target is outside the solution.
+    // The model carries one node per full name and one edge per type PAIR, so where several projects declare a
+    // name, N compilations of one reference collapse into one entry, whose recorded instances unfold it.
+    // Reading the pair off the edge's two nodes instead would invent dependencies no project file declares and
+    // credit one copy's references to another (GRAMMAR §4.1). An instance is recorded per (maker, reached) pair,
+    // so a pair is still counted once per type pair per project pair. One walk, so the two tallies cannot drift
+    // on which record they read or on what an unrecorded edge stands for.
+    private static (Dictionary<(string Source, string Target), int> ProjectPairs,
+        Dictionary<(string Source, string Root), int> ExternalRoots) TallyReferences(CodebaseModel model)
     {
-        return Instances(model, external: false)
-            .Where(found => !found.Instance.IsIntraProject)
-            .Select(found => (found.Instance.SourceProject, found.Instance.TargetProject));
-    }
+        var projectPairs = new Dictionary<(string Source, string Target), int>();
+        var externalNamespaces = new Dictionary<(string Source, string Namespace), int>();
 
-    private static IEnumerable<(string Source, string Root)> ExternalReferences(CodebaseModel model)
-    {
-        return Instances(model, external: true)
-            .Select(found => (found.Instance.SourceProject, NamespaceRoot(found.Edge.Target.Namespace)));
-    }
-
-    // Every reference edge whose target sits on the asked side of the solution boundary, unfolded into the
-    // instances the merge recorded for it. One walk, so the project pairs and the external references cannot
-    // drift on which record they read or on what an unrecorded edge stands for.
-    private static IEnumerable<(ReferenceEdge Edge, EdgeInstance Instance)> Instances(CodebaseModel model, bool external)
-    {
         foreach (ReferenceEdge edge in model.Edges)
         {
-            if (edge.Target.IsExternal != external) continue;
+            if (edge.Evidence.Instances is not { } recorded)
+            {
+                CountInstance(edge, EdgeInstances.Implicit(edge), projectPairs, externalNamespaces);
+                continue;
+            }
 
-            IReadOnlyList<EdgeInstance> instances = EdgeInstances.Of(edge);
-            for (var i = 0; i < instances.Count; i++)
-                yield return (edge, instances[i]);
+            for (var i = 0; i < recorded.Count; i++)
+                CountInstance(edge, recorded[i], projectPairs, externalNamespaces);
         }
+
+        // Folded to roots once per distinct namespace a project reaches rather than once per instance.
+        var externalRoots = new Dictionary<(string Source, string Root), int>();
+        foreach (KeyValuePair<(string Source, string Namespace), int> reached in externalNamespaces)
+            Add(externalRoots, (reached.Key.Source, NamespaceRoot(reached.Key.Namespace)), reached.Value);
+
+        return (projectPairs, externalRoots);
+    }
+
+    private static void CountInstance(
+        ReferenceEdge edge, EdgeInstance instance, Dictionary<(string Source, string Target), int> projectPairs,
+        Dictionary<(string Source, string Namespace), int> externalNamespaces)
+    {
+        if (edge.Target.IsExternal)
+            Add(externalNamespaces, (instance.SourceProject, edge.Target.Namespace), 1);
+        else if (!instance.IsIntraProject)
+            Add(projectPairs, (instance.SourceProject, instance.TargetProject), 1);
     }
 
     // The per-key counts a survey line carries, tallied rather than grouped: a lookup retains one entry per
     // edge INSTANCE only to read each group's size, where the survey keeps one line per distinct key.
-    private static Dictionary<TKey, int> Tally<TKey>(IEnumerable<TKey> keys)
+    private static void Add<TKey>(Dictionary<TKey, int> counts, TKey key, int count)
         where TKey : notnull
     {
-        var counts = new Dictionary<TKey, int>();
-        foreach (TKey key in keys)
-            counts[key] = counts.TryGetValue(key, out int made) ? made + 1 : 1;
-
-        return counts;
+        counts[key] = counts.TryGetValue(key, out int made) ? made + count : count;
     }
 
     private static IReadOnlyList<string> DeclarersOf(TypeNode type)
@@ -188,8 +197,7 @@ internal static class GraphSummarizer
     {
         if (@namespace.Length == 0) return GlobalNamespaceLabel;
 
-        // Found by scanning to the second dot rather than splitting: this runs once per external reference
-        // edge — the largest edge population in the model — and a split allocates an array plus a substring
+        // Found by scanning to the second dot rather than splitting, which allocates an array plus a substring
         // per segment to keep two of them.
         int firstDot = @namespace.IndexOf('.');
         if (firstDot < 0) return @namespace;

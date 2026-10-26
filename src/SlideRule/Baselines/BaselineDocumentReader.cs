@@ -41,10 +41,6 @@ internal static class BaselineDocumentReader
     /// </remarks>
     private sealed class Walk
     {
-        // The whole-file digest is a fixed-width lowercase SHA-256 in hex; the message below says the
-        // same number in words a reader can check against the field in front of them.
-        private const int LegacyDigestLength = 64;
-
         /// <summary>Why the text is not a baseline file, or null while it still is one.</summary>
         internal BaselineRefusal? Refusal { get; private set; }
 
@@ -130,8 +126,7 @@ internal static class BaselineDocumentReader
             }
 
             string digest = value.GetString();
-            bool wellFormed = digest.Length == LegacyDigestLength && digest.All(IsLowerHex);
-            if (wellFormed) return digest;
+            if (BaselineFormat.IsLowerHex(digest, BaselineFormat.LegacyDigestLength)) return digest;
 
             RefuseAt(value, "digest must be 64 lowercase hex characters.");
             return null;
@@ -333,8 +328,7 @@ internal static class BaselineDocumentReader
             string? text = RequireNonEmptyString(ruleId, "because", value);
             if (text is null) return null;
 
-            bool blankOrMultiline = string.IsNullOrWhiteSpace(text) || SingleLineProse.IsMultiLine(text);
-            if (!blankOrMultiline) return text;
+            if (BaselineEntry.IsValidBecause(text)) return text;
 
             RefuseAt(value, $"rule '{ruleId}' has a blank or multi-line 'because'.");
             return null;
@@ -349,8 +343,7 @@ internal static class BaselineDocumentReader
             }
 
             string seal = value.GetString();
-            bool wellFormed = seal.Length == BaselineFormat.SealLength && seal.All(IsLowerHex);
-            if (wellFormed) return seal;
+            if (BaselineFormat.IsLowerHex(seal, BaselineFormat.SealLength)) return seal;
 
             string length = JsonText.Digits(BaselineFormat.SealLength);
             RefuseAt(value, $"rule '{ruleId}' has a 'seal' that is not {length} lowercase hex characters.");
@@ -384,11 +377,6 @@ internal static class BaselineDocumentReader
             }
 
             return true;
-        }
-
-        private static bool IsLowerHex(char c)
-        {
-            return c is >= '0' and <= '9' or >= 'a' and <= 'f';
         }
 
         // The offending value's own start, which is where a reader opens the file.

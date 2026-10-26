@@ -43,8 +43,6 @@ internal static class BinlogReplayMessages
     // stack-shaped detail on later lines that would bury the refusal.
     private static string FirstLine(string message)
     {
-        if (string.IsNullOrEmpty(message)) return message;
-
         int end = message.IndexOfAny(['\r', '\n']);
         return end < 0 ? message : message[..end];
     }

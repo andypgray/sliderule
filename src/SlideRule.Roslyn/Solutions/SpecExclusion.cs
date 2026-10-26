@@ -63,11 +63,7 @@ internal static class SpecExclusion
             .Select(project => new SpecExclusionProject(
                 project.Name,
                 project.FilePath,
-                project.ProjectReferences
-                    .Select(reference => solution.GetProject(reference.ProjectId)?.Name)
-                    .Where(name => !string.IsNullOrEmpty(name))
-                    .Select(name => name!)
-                    .ToList(),
+                solution.ReferencedProjectNames(project).ToList(),
                 canonicalProjectFiles.Resolve(project.FilePath)))
             .ToList();
 
@@ -148,7 +144,9 @@ internal static class SpecExclusion
     /// </summary>
     internal static IReadOnlySet<string> CanonicalMemberSet(IEnumerable<string> csprojPaths)
     {
-        return new HashSet<string>(csprojPaths.Select(PathCanonicalizer.Resolve), PathComparison.Comparer);
+        var canonicalizer = new ProjectFileCanonicalizer();
+        IEnumerable<string> canonical = csprojPaths.Select(canonicalizer.Resolve).OfType<string>();
+        return new HashSet<string>(canonical, PathComparison.Comparer);
     }
 
     /// <summary>
@@ -161,7 +159,7 @@ internal static class SpecExclusion
     /// <remarks>
     ///     The canonical slot is a caller-honoured guarantee and is never validated, because re-resolving to
     ///     compare would pay the filesystem-probing walk the slot exists to avoid on every warm call. Pass what
-    ///     <see cref="PathCanonicalizer.Resolve" /> would return for the same path, or nothing: a spelling the
+    ///     <see cref="PathCanonicalizer.Resolve(string)" /> would return for the same path, or nothing: a spelling the
     ///     solution file never declared answers "not a member", the silent-shrink direction, so only a caller that
     ///     resolved the path itself fills the slot.
     /// </remarks>

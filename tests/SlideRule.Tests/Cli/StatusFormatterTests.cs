@@ -799,13 +799,13 @@ public sealed class StatusFormatterTests
             .ToList();
         if (inertHint is not null) warned.Add(CheckWarning.InertTarget("inert", inertHint));
         foreach (string operand in inertOperands ?? [])
-            warned.Add(CheckWarning.InertTargetOperand(operand, operandHint));
+            warned.Add(CheckWarning.DeadOperand(DeadOperandRole.Target, operand, operandHint));
         foreach (string operand in allowedOperands ?? [])
-            warned.Add(CheckWarning.DeadAllowedOperand(operand, operandHint));
+            warned.Add(CheckWarning.DeadOperand(DeadOperandRole.AllowList, operand, operandHint));
         foreach (string membership in memberships ?? [])
-            warned.Add(CheckWarning.DeadMembership(membership, operandHint));
+            warned.Add(CheckWarning.DeadOperand(DeadOperandRole.Membership, membership, operandHint));
         foreach (string operand in amongOperands ?? [])
-            warned.Add(CheckWarning.DeadAmongOperand(operand, operandHint));
+            warned.Add(CheckWarning.DeadOperand(DeadOperandRole.Among, operand, operandHint));
 
         IReadOnlyList<Violation> red = emptySubjectHint is null
             ? SyntheticNodes.RuleErrors(violations)

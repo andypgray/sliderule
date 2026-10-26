@@ -163,4 +163,15 @@ internal static class SolutionExtensions
         string leaf = Path.GetFileName(directory);
         return string.IsNullOrEmpty(leaf) ? null : leaf;
     }
+
+    /// <summary>
+    ///     The names of the projects <paramref name="project" /> references, in reference order; a reference that
+    ///     resolves to no project in <paramref name="solution" /> drops out.
+    /// </summary>
+    internal static IEnumerable<string> ReferencedProjectNames(this Solution solution, Project project)
+    {
+        return project.ProjectReferences
+            .Select(reference => solution.GetProject(reference.ProjectId)?.Name)
+            .OfType<string>();
+    }
 }

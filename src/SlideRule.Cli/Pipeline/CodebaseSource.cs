@@ -78,14 +78,9 @@ internal sealed class CodebaseSource : IDisposable
     // whole from a cache hit. Null until the first ExtractAsync, and written exactly once after it.
     private IReadOnlyList<CodebaseFragment>? fragments;
 
-    // The advisory merge notes the last ExtractAsync produced (same-FQN cross-project conflation),
-    // regenerated from the fragments on every path — a cache hit re-merges, so these need no persistence.
-    // Empty until ExtractAsync runs.
-    private IReadOnlyList<string> mergeNotes = [];
-
-    // The other half of the same read: which projects arrived as several compilations. Captured beside the
-    // notes because it comes off the same merged model and must not be able to disagree with them.
-    private IReadOnlyList<MultiTargetedProject> multiTargetedProjects = [];
+    // The load's verdict with the merge notes (same-FQN cross-project conflation) and multi-targeted projects of
+    // the last ExtractAsync, regenerated from the fragments on every path — a cache hit re-merges, so these need
+    // no persistence. Both are empty until ExtractAsync runs.
 
     private HashSet<string> reExtractedProjects = new(StringComparer.Ordinal);
 
@@ -108,6 +103,7 @@ internal sealed class CodebaseSource : IDisposable
         this.declaredMembers = declaredMembers
                                ?? new Lazy<IReadOnlySet<string>?>(() => SpecExclusion.TryReadDeclaredMembers(solutionPath));
         this.loadDiagnostics = loadDiagnostics;
+        Diagnostics = loadDiagnostics;
         this.model = model;
         this.resolution = resolution;
         this.handle = handle;
@@ -129,12 +125,11 @@ internal sealed class CodebaseSource : IDisposable
 
     /// <summary>
     ///     How well the workspace loaded (collected on a cold run, replayed from the cache on a hit), with the merge
-    ///     notes and multi-targeted projects of the last <see cref="ExtractAsync" />, both empty before it runs.
-    ///     Composed per read rather than captured, so a verb that renders after extracting sees them and one that
-    ///     gates before it does not have to wait for them.
+    ///     notes and multi-targeted projects of the last <see cref="ExtractAsync" />, both empty before it runs, so
+    ///     a verb that renders after extracting sees them and one that gates before it does not have to wait for
+    ///     them.
     /// </summary>
-    public WorkspaceDiagnostics Diagnostics =>
-        loadDiagnostics with { MergeNotes = mergeNotes, MultiTargetedProjects = multiTargetedProjects };
+    public WorkspaceDiagnostics Diagnostics { get; private set; }
 
     /// <summary>
     ///     Absolute path to the discovered <c>.sln</c>/<c>.slnx</c>, or to the <c>.slnf</c> filtering one.
@@ -189,7 +184,7 @@ internal sealed class CodebaseSource : IDisposable
     ///     keeping a warm session serves it that session's model (<see cref="SolutionHandle.WarmCodebase" />)
     ///     rather than a fresh walk per call.
     /// </remarks>
-    public static Task<CodebaseSource> CreateWithSpecAsync(
+    public static async Task<CodebaseSource> CreateWithSpecAsync(
         ISolutionSource source,
         IEnvironment environment,
         string? solution,
@@ -200,17 +195,10 @@ internal sealed class CodebaseSource : IDisposable
     {
         string solutionPath = ModelPipeline.DiscoverSolution(solution, workingDirectory, environment);
         ExtractionCacheStore? store = noCache ? null : TryCreateStore(solutionPath, environment);
-        return CreateWithSpecCoreAsync(source, solutionPath, spec, store, ct);
-    }
-
-    // The rest of CreateWithSpecAsync, from the point the cache store is settled. A null store is a Disabled
-    // run: nothing read from cache.json and nothing written to it, which is what --no-cache and every
-    // cache-free caller mean.
-    private static async Task<CodebaseSource> CreateWithSpecCoreAsync(
-        ISolutionSource source, string solutionPath, string? spec, ExtractionCacheStore? store, CancellationToken ct)
-    {
         string normalized = NormalizeSpecArgument(spec);
 
+        // A null store is a Disabled run: nothing read from cache.json and nothing written to it, which is what
+        // --no-cache and every cache-free caller mean.
         if (store is null)
             return await CreateColdWithSpecAsync(
                 source, solutionPath, spec, normalized, null, CacheReadResult.Miss(),
@@ -276,9 +264,7 @@ internal sealed class CodebaseSource : IDisposable
         CodebaseModel codebase = await ExtractCoreAsync(excludeProjectNames, ct);
         // Captured here, off the one exit every path (hit, warm, cold) returns through, so Diagnostics can
         // surface the notes beside the workspace-load failures.
-        mergeNotes = codebase.MergeNotes;
-        // Off the shared projection, so every composer holding a model reads the list the same way.
-        multiTargetedProjects = MultiTargetedProjects.Of(codebase);
+        Diagnostics = loadDiagnostics.WithModel(codebase);
         return codebase;
     }
 
@@ -303,14 +289,12 @@ internal sealed class CodebaseSource : IDisposable
     }
 
     // The warm path's producer when this run takes it: a cold-loaded handle carrying a session codebase, and
-    // no persisted store to prefer over it. Null on a hit (which owns no handle) and whenever a store is
-    // live, since the store path serves every caller from the fragments it also writes back.
+    // no persisted store to prefer over it. Null whenever a persisted store is live, which every hit has, since
+    // the store path serves every caller from the fragments it also writes back.
     private Func<IReadOnlyCollection<string>, IReadOnlySet<string>?, CancellationToken, Task<SessionCodebase>>?
         WarmCodebaseProducer()
     {
-        if (Outcome == CodebaseSourceOutcome.Hit || store is not null) return null;
-
-        return handle!.WarmCodebase;
+        return store is null ? handle!.WarmCodebase : null;
     }
 
     private async Task<IReadOnlyList<CodebaseFragment>> WalkFragmentsAsync(CancellationToken ct)

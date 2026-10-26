@@ -196,74 +196,25 @@ internal static class NodeWriters
         Operands<MustNotExposeConstraint>(arms);
         Operands<MustBelongToConstraint>(arms);
 
-        Add<MustImplementConstraint>(arms, (w, c) =>
-        {
-            w.Subject(c.Subject!);
-            w.ConstructionAnchor("anchor", c.Anchor);
-        });
-        Add<MustDeriveFromConstraint>(arms, (w, c) =>
-        {
-            w.Subject(c.Subject!);
-            w.ConstructionAnchor("anchor", c.Anchor);
-        });
-        Add<MustBeAttributedWithConstraint>(arms, (w, c) =>
-        {
-            w.Subject(c.Subject!);
-            w.ConstructionAnchor("anchor", c.Anchor);
-        });
-        Add<MustNotImplementConstraint>(arms, (w, c) =>
-        {
-            w.Subject(c.Subject!);
-            w.ConstructionAnchors("anchors", c.Anchors);
-        });
-        Add<MustNotDeriveFromConstraint>(arms, (w, c) =>
-        {
-            w.Subject(c.Subject!);
-            w.ConstructionAnchors("anchors", c.Anchors);
-        });
-        Add<MustNotBeAttributedWithConstraint>(arms, (w, c) =>
-        {
-            w.Subject(c.Subject!);
-            w.ConstructionAnchors("anchors", c.Anchors);
-        });
+        Subject<MustImplementConstraint>(arms, (w, c) => w.ConstructionAnchor("anchor", c.Anchor));
+        Subject<MustDeriveFromConstraint>(arms, (w, c) => w.ConstructionAnchor("anchor", c.Anchor));
+        Subject<MustBeAttributedWithConstraint>(arms, (w, c) => w.ConstructionAnchor("anchor", c.Anchor));
+        Subject<MustNotImplementConstraint>(arms, (w, c) => w.ConstructionAnchors("anchors", c.Anchors));
+        Subject<MustNotDeriveFromConstraint>(arms, (w, c) => w.ConstructionAnchors("anchors", c.Anchors));
+        Subject<MustNotBeAttributedWithConstraint>(arms, (w, c) => w.ConstructionAnchors("anchors", c.Anchors));
 
-        Add<MustResideInNamespaceConstraint>(arms, (w, c) =>
-        {
-            w.Subject(c.Subject!);
-            w.Field("glob", c.Glob);
-        });
-        Add<MustResideInProjectConstraint>(arms, (w, c) =>
-        {
-            w.Subject(c.Subject!);
-            w.Field("projectName", c.ProjectName);
-        });
-        Add<MustHaveSuffixConstraint>(arms, (w, c) =>
-        {
-            w.Subject(c.Subject!);
-            w.Field("suffix", c.Suffix);
-        });
-        Add<MustHavePrefixConstraint>(arms, (w, c) =>
-        {
-            w.Subject(c.Subject!);
-            w.Field("prefix", c.Prefix);
-        });
-        Add<MustHaveNameMatchingConstraint>(arms, (w, c) =>
-        {
-            w.Subject(c.Subject!);
-            w.Field("glob", c.Glob);
-        });
+        Subject<MustResideInNamespaceConstraint>(arms, (w, c) => w.Field("glob", c.Glob));
+        Subject<MustResideInProjectConstraint>(arms, (w, c) => w.Field("projectName", c.ProjectName));
+        Subject<MustHaveSuffixConstraint>(arms, (w, c) => w.Field("suffix", c.Suffix));
+        Subject<MustHavePrefixConstraint>(arms, (w, c) => w.Field("prefix", c.Prefix));
+        Subject<MustHaveNameMatchingConstraint>(arms, (w, c) => w.Field("glob", c.Glob));
 
-        Add<MustHaveExactlyOneCounterpartConstraint>(arms, (w, c) =>
+        Subject<MustHaveExactlyOneCounterpartConstraint>(arms, (w, c) =>
         {
-            w.Subject(c.Subject!);
             w.Operands(c.Among);
             w.Field("template", c.Template);
         });
-        Add<MustNotUseConstraint>(arms, (w, c) =>
-        {
-            w.Subject(c.Subject!);
-            w.Members(c.MemberOperands);
-        });
+        Subject<MustNotUseConstraint>(arms, (w, c) => w.Members(c.MemberOperands));
     }
 
     private static void AddMemberVerbs(Dictionary<Type, Action<NodeWriter, object>> arms)
@@ -279,36 +230,13 @@ internal static class NodeWriters
         MemberSubject<MemberMustBeGetOnlyConstraint>(arms);
         MemberSubject<MemberMustBeReadonlyConstraint>(arms);
 
-        Add<MemberMustHaveSuffixConstraint>(arms, (w, c) =>
-        {
-            w.MemberSubject(c.MemberSubject);
-            w.Field("suffix", c.Suffix);
-        });
-        Add<MemberMustHavePrefixConstraint>(arms, (w, c) =>
-        {
-            w.MemberSubject(c.MemberSubject);
-            w.Field("prefix", c.Prefix);
-        });
-        Add<MemberMustHaveNameMatchingConstraint>(arms, (w, c) =>
-        {
-            w.MemberSubject(c.MemberSubject);
-            w.Field("glob", c.Glob);
-        });
-        Add<MemberMustBeAttributedWithConstraint>(arms, (w, c) =>
-        {
-            w.MemberSubject(c.MemberSubject);
-            w.ConstructionAnchor("anchor", c.Anchor);
-        });
-        Add<MemberMustNotBeAttributedWithConstraint>(arms, (w, c) =>
-        {
-            w.MemberSubject(c.MemberSubject);
-            w.ConstructionAnchors("anchors", c.Anchors);
-        });
-        Add<MemberMustAcceptParameterConstraint>(arms, (w, c) =>
-        {
-            w.MemberSubject(c.MemberSubject);
-            w.DefinitionAnchor("anchor", c.Anchor);
-        });
+        MemberSubject<MemberMustHaveSuffixConstraint>(arms, (w, c) => w.Field("suffix", c.Suffix));
+        MemberSubject<MemberMustHavePrefixConstraint>(arms, (w, c) => w.Field("prefix", c.Prefix));
+        MemberSubject<MemberMustHaveNameMatchingConstraint>(arms, (w, c) => w.Field("glob", c.Glob));
+        MemberSubject<MemberMustBeAttributedWithConstraint>(arms, (w, c) => w.ConstructionAnchor("anchor", c.Anchor));
+        MemberSubject<MemberMustNotBeAttributedWithConstraint>(arms,
+            (w, c) => w.ConstructionAnchors("anchors", c.Anchors));
+        MemberSubject<MemberMustAcceptParameterConstraint>(arms, (w, c) => w.DefinitionAnchor("anchor", c.Anchor));
     }
 
     private static void AddProjectVerbs(Dictionary<Type, Action<NodeWriter, object>> arms)
@@ -317,60 +245,55 @@ internal static class NodeWriters
         ProjectSubject<MustLockPackagesConstraint>(arms);
         ProjectSubject<MustNotBePackableConstraint>(arms);
 
-        Add<MustOnlyTargetConstraint>(arms, (w, c) =>
+        ProjectSubject<MustOnlyTargetConstraint>(arms, (w, c) => w.StringsField("frameworks", c.Frameworks));
+        ProjectSubject<MustTargetConstraint>(arms, (w, c) => w.Field("framework", c.Framework));
+        ProjectSubject<MustOnlyReferencePackagesConstraint>(arms, (w, c) => w.StringsField("patterns", c.Patterns));
+        ProjectSubject<MustNotReferencePackagesConstraint>(arms, (w, c) => w.StringsField("patterns", c.Patterns));
+        ProjectSubject<MustSetPropertyConstraint>(arms, (w, c) =>
         {
-            w.ProjectSubject(c.ProjectSubject);
-            w.StringsField("frameworks", c.Frameworks);
-        });
-        Add<MustTargetConstraint>(arms, (w, c) =>
-        {
-            w.ProjectSubject(c.ProjectSubject);
-            w.Field("framework", c.Framework);
-        });
-        Add<MustOnlyReferencePackagesConstraint>(arms, (w, c) =>
-        {
-            w.ProjectSubject(c.ProjectSubject);
-            w.StringsField("patterns", c.Patterns);
-        });
-        Add<MustNotReferencePackagesConstraint>(arms, (w, c) =>
-        {
-            w.ProjectSubject(c.ProjectSubject);
-            w.StringsField("patterns", c.Patterns);
-        });
-        Add<MustSetPropertyConstraint>(arms, (w, c) =>
-        {
-            w.ProjectSubject(c.ProjectSubject);
             w.Field("property", c.Name);
             w.Field("value", c.Value);
         });
     }
 
-    private static void Subject<TConstraint>(Dictionary<Type, Action<NodeWriter, object>> arms)
-        where TConstraint : Constraint
-    {
-        Add<TConstraint>(arms, (w, c) => w.Subject(c.Subject!));
-    }
-
-    private static void Operands<TConstraint>(Dictionary<Type, Action<NodeWriter, object>> arms)
+    // `rest` writes the fields that follow the subject.
+    private static void Subject<TConstraint>(
+        Dictionary<Type, Action<NodeWriter, object>> arms, Action<NodeWriter, TConstraint>? rest = null)
         where TConstraint : Constraint
     {
         Add<TConstraint>(arms, (w, c) =>
         {
             w.Subject(c.Subject!);
-            w.Operands(c.Operands);
+            rest?.Invoke(w, c);
         });
     }
 
-    private static void MemberSubject<TConstraint>(Dictionary<Type, Action<NodeWriter, object>> arms)
-        where TConstraint : MemberConstraint
+    private static void Operands<TConstraint>(Dictionary<Type, Action<NodeWriter, object>> arms)
+        where TConstraint : Constraint
     {
-        Add<TConstraint>(arms, (w, c) => w.MemberSubject(c.MemberSubject));
+        Subject<TConstraint>(arms, (w, c) => w.Operands(c.Operands));
     }
 
-    private static void ProjectSubject<TConstraint>(Dictionary<Type, Action<NodeWriter, object>> arms)
+    private static void MemberSubject<TConstraint>(
+        Dictionary<Type, Action<NodeWriter, object>> arms, Action<NodeWriter, TConstraint>? rest = null)
+        where TConstraint : MemberConstraint
+    {
+        Add<TConstraint>(arms, (w, c) =>
+        {
+            w.MemberSubject(c.MemberSubject);
+            rest?.Invoke(w, c);
+        });
+    }
+
+    private static void ProjectSubject<TConstraint>(
+        Dictionary<Type, Action<NodeWriter, object>> arms, Action<NodeWriter, TConstraint>? rest = null)
         where TConstraint : ProjectConstraint
     {
-        Add<TConstraint>(arms, (w, c) => w.ProjectSubject(c.ProjectSubject));
+        Add<TConstraint>(arms, (w, c) =>
+        {
+            w.ProjectSubject(c.ProjectSubject);
+            rest?.Invoke(w, c);
+        });
     }
 
     private static void Add<TNode>(Dictionary<Type, Action<NodeWriter, object>> arms, Action<NodeWriter, TNode> write)

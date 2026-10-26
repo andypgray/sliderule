@@ -7,15 +7,7 @@ namespace SlideRule.Model;
 /// </summary>
 internal sealed class ScopeRegistration(string id) : Registration(id)
 {
-    internal Posture? Posture { get; set; }
-
     internal Selection? Scoped { get; set; }
-
-    /// <summary>
-    ///     How many times <c>Quarantine</c>/<c>Caution</c> was called, for the reason
-    ///     <see cref="RuleRegistration.PostureCount" /> gives; a repeat overwrites the scoped selection too.
-    /// </summary>
-    internal int PostureCount { get; set; }
 
     /// <summary>The accumulated boundary selections across every <c>BoundaryOnlyVia</c> call.</summary>
     internal List<Selection> Boundary { get; } = [];
@@ -27,11 +19,7 @@ internal sealed class ScopeRegistration(string id) : Registration(id)
     /// </summary>
     internal int BoundaryOnlyViaCount { get; set; }
 
-    internal List<string> Baselines { get; } = [];
-
     internal List<string> Dragons { get; } = [];
 
     internal List<string> DragonsDocs { get; } = [];
-
-    internal List<string> Becauses { get; } = [];
 }

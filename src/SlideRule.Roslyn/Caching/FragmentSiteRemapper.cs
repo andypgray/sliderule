@@ -118,20 +118,12 @@ internal static class FragmentSiteRemapper
             Func<T, IReadOnlyList<FragmentSite>, T> withSites)
             where T : class
         {
-            List<T>? rebuilt = null;
-            for (var index = 0; index < items.Count; index++)
+            return RemapEach(items, item =>
             {
-                T item = items[index];
                 IReadOnlyList<FragmentSite> sites = sitesOf(item);
                 IReadOnlyList<FragmentSite> remapped = RemapSites(sites);
-                bool unchanged = ReferenceEquals(remapped, sites);
-                if (unchanged && rebuilt is null) continue;
-
-                rebuilt ??= Carry(items, index);
-                rebuilt.Add(unchanged ? item : withSites(item, remapped));
-            }
-
-            return rebuilt ?? items;
+                return ReferenceEquals(remapped, sites) ? item : withSites(item, remapped);
+            });
         }
 
         /// <summary>The axes carrying more than one site-bearing member, remapped whole by <paramref name="remap" />.</summary>

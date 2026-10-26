@@ -126,16 +126,11 @@ internal static class SpecValidator
 
     private static void ValidateRule(RuleRegistration rule, Arch arch, List<SpecValidationError> errors)
     {
-        if (rule.Posture is null)
-        {
-            errors.Add(new SpecValidationError(Code.MissingPosture, rule.Id,
-                $"Rule '{rule.Id}' has no posture; call .Enforce(...) or .Migrate(...).", rule.Location));
+        if (!CheckPosture(rule, rule.Posture, rule.PostureCount, "Rule", ".Enforce(...) or .Migrate(...)", errors))
             return;
-        }
 
-        if (rule.PostureCount > 1)
-            errors.Add(new SpecValidationError(Code.RepeatedPosture, rule.Id,
-                $"Rule '{rule.Id}' has more than one posture; call .Enforce(...) or .Migrate(...) exactly once.", rule.Location));
+        // The posture verbs assign the constraint before recording the posture.
+        Constraint constraint = rule.Constraint!;
 
         var target = new ErrorTarget(rule.Id, rule.Location);
 
@@ -146,40 +141,31 @@ internal static class SpecValidator
         CheckRepeated(rule.Baselines.Count, "Baseline", target, errors);
         CheckRepeated(rule.Policies.Count, "WhileYoureThere", target, errors);
 
-        foreach ((SpecSlot slot, string? value) in RuleProse(rule))
+        foreach ((SpecSlot slot, string? value) in RuleProse(rule, constraint))
             CheckLiteral(value, slot, target, errors);
 
-        List<Selection> selections = RuleSelections(rule).ToList();
+        List<Selection> selections = RuleSelections(rule, constraint).ToList();
 
         CheckForeign(selections, target, arch, errors);
-        CheckForeignProjects(rule, target, arch, errors);
-        CheckProjectPatterns(rule, target, errors);
-        CheckMembers(rule, target, arch, errors);
-        CheckMemberReturning(rule, errors);
-        CheckMemberExceptKinds(rule, errors);
-        CheckMemberAcceptParameter(rule, errors);
-        CheckHierarchyAnchors(rule, errors);
-        CheckPatterns(RulePatterns(rule), target, errors);
+        CheckForeignProjects(rule, constraint, target, arch, errors);
+        CheckProjectPatterns(constraint, target, errors);
+        CheckMembers(constraint, target, arch, errors);
+        CheckMemberReturning(constraint, target, errors);
+        CheckMemberExceptKinds(constraint, target, errors);
+        CheckMemberAcceptParameter(constraint, target, errors);
+        CheckHierarchyAnchors(constraint, target, errors);
+        CheckPatterns(RulePatterns(rule, constraint), target, errors);
         CheckLifetimes(selections, target, errors);
-        CheckFamilies(RuleFamilyPositions(rule), target, errors);
-        CheckEachOtherSubject(rule, errors);
-        CheckCircularReferencesSubject(rule, errors);
-        CheckEmptyOperandLists(RuleEmptyOperandLists(rule, selections), target, errors);
+        CheckFamilies(RuleFamilyPositions(rule, constraint), target, errors);
+        CheckEachOtherSubject(constraint, target, errors);
+        CheckCircularReferencesSubject(constraint, target, errors);
+        CheckEmptyOperandLists(RuleEmptyOperandLists(constraint, selections), target, errors);
     }
 
     private static void ValidateScope(ScopeRegistration scope, Arch arch, List<SpecValidationError> errors)
     {
-        if (scope.Posture is null)
-        {
-            errors.Add(new SpecValidationError(Code.MissingPosture, scope.Id,
-                $"Scope '{scope.Id}' has no posture; call .Quarantine(...) or .Caution(...).", scope.Location));
+        if (!CheckPosture(scope, scope.Posture, scope.PostureCount, "Scope", ".Quarantine(...) or .Caution(...)", errors))
             return;
-        }
-
-        if (scope.PostureCount > 1)
-            errors.Add(new SpecValidationError(Code.RepeatedPosture, scope.Id,
-                $"Scope '{scope.Id}' has more than one posture; call .Quarantine(...) or .Caution(...) exactly once.",
-                scope.Location));
 
         var target = new ErrorTarget(scope.Id, scope.Location);
 
@@ -188,9 +174,8 @@ internal static class SpecValidator
         CheckRepeated(scope.DragonsDocs.Count, "DragonsDoc", target, errors);
         CheckRepeated(scope.Baselines.Count, "Baseline", target, errors);
 
-        if (scope.BoundaryOnlyViaCount > 1)
-            errors.Add(new SpecValidationError(Code.RepeatedCall, scope.Id, $"Repeated .BoundaryOnlyVia(...) on '{scope.Id}'.", scope.Location));
-        else if (scope is { BoundaryOnlyViaCount: 1, Boundary.Count: 0 })
+        CheckRepeated(scope.BoundaryOnlyViaCount, "BoundaryOnlyVia", target, errors);
+        if (scope is { BoundaryOnlyViaCount: 1, Boundary.Count: 0 })
             errors.Add(new SpecValidationError(Code.EmptyBoundary, scope.Id,
                 $"BoundaryOnlyVia() on '{scope.Id}' names no types; omit the call for a hermetic quarantine.", scope.Location));
 
@@ -208,6 +193,25 @@ internal static class SpecValidator
 
         CheckSelectionOperands(ScopeOperands(scope), target, arch, errors);
         CheckFamilies(ScopeFamilyPositions(scope), target, errors);
+    }
+
+    // False when the registration has no posture, which leaves nothing else about it to validate.
+    private static bool CheckPosture(
+        Registration registration, Posture? posture, int postureCount, string noun, string verbs,
+        List<SpecValidationError> errors)
+    {
+        if (posture is null)
+        {
+            errors.Add(new SpecValidationError(Code.MissingPosture, registration.Id,
+                $"{noun} '{registration.Id}' has no posture; call {verbs}.", registration.Location));
+            return false;
+        }
+
+        if (postureCount > 1)
+            errors.Add(new SpecValidationError(Code.RepeatedPosture, registration.Id,
+                $"{noun} '{registration.Id}' has more than one posture; call {verbs} exactly once.", registration.Location));
+
+        return true;
     }
 
     private static void CheckBecause(List<string> becauses, ErrorTarget target, List<SpecValidationError> errors)
@@ -310,11 +314,9 @@ internal static class SpecValidator
     }
 
     private static IEnumerable<(string Call, string Effect, string Cure)> RuleEmptyOperandLists(
-        RuleRegistration rule, IEnumerable<Selection> selections)
+        Constraint constraint, IEnumerable<Selection> selections)
     {
         foreach ((string, string, string) empty in EmptyUnions(selections)) yield return empty;
-
-        if (rule.Constraint is not { } constraint) yield break;
 
         foreach (ProjectSelection selection in constraint.ProjectSelections())
         foreach (ProjectAdjective adjective in selection.Adjectives)
@@ -356,48 +358,49 @@ internal static class SpecValidator
     // GRAMMAR §8 item 28: the cross-cell ban's targets are the subject's own cells, so a subject with no
     // cells names nothing to forbid. The message names the verb the author meant, because over a plain
     // selection there is one and it is not a rewrite of the rule.
-    private static void CheckEachOtherSubject(RuleRegistration rule, List<SpecValidationError> errors)
+    private static void CheckEachOtherSubject(
+        Constraint constraint, ErrorTarget target, List<SpecValidationError> errors)
     {
-        if (rule.Constraint is not MustNotReferenceEachOtherConstraint constraint) return;
+        if (constraint is not MustNotReferenceEachOtherConstraint eachOther) return;
 
-        if (constraint.Subject.FamilyNounOrNull() is not null) return;
+        if (eachOther.Subject.FamilyNounOrNull() is not null) return;
 
-        errors.Add(new SpecValidationError(Code.EachOtherWithoutFamily, rule.Id,
-            $"`MustNotReferenceEachOther` on '{rule.Id}' needs a family subject (`arch.Each`); "
-            + "over a plain selection write `MustNotReference`.", rule.Location));
+        errors.Add(new SpecValidationError(Code.EachOtherWithoutFamily, target.Id,
+            $"`MustNotReferenceEachOther` on {target.Subject} needs a family subject (`arch.Each`); "
+            + "over a plain selection write `MustNotReference`.", target.Location));
     }
 
     // GRAMMAR §8 item 29: the cycle gate needs a family of LAYERS. A plain selection has no cells to be the
     // nodes of a cell graph; a family of projects has cells the build already forbids a circle among, so the
     // law would hold by construction and the rule could never red. Two wordings, because the two shapes are
     // wrong for different reasons and each has its own answer.
-    private static void CheckCircularReferencesSubject(RuleRegistration rule, List<SpecValidationError> errors)
+    private static void CheckCircularReferencesSubject(
+        Constraint constraint, ErrorTarget target, List<SpecValidationError> errors)
     {
-        if (rule.Constraint is not MustNotHaveCircularReferencesConstraint constraint) return;
+        if (constraint is not MustNotHaveCircularReferencesConstraint circular) return;
 
-        if (constraint.Subject.FamilyNounOrNull() is not { } family)
+        if (circular.Subject.FamilyNounOrNull() is not { } family)
         {
-            errors.Add(new SpecValidationError(Code.CircularReferencesNeedLayerFamily, rule.Id,
-                $"`MustNotHaveCircularReferences` on '{rule.Id}' needs a family of layers (`arch.Each`); "
-                + "over a plain selection there are no layers to reference each other.", rule.Location));
+            errors.Add(new SpecValidationError(Code.CircularReferencesNeedLayerFamily, target.Id,
+                $"`MustNotHaveCircularReferences` on {target.Subject} needs a family of layers (`arch.Each`); "
+                + "over a plain selection there are no layers to reference each other.", target.Location));
             return;
         }
 
         if (family.Layers is not null) return;
 
-        errors.Add(new SpecValidationError(Code.CircularReferencesNeedLayerFamily, rule.Id,
-            $"`MustNotHaveCircularReferences` on '{rule.Id}' needs a family of layers; projects cannot have "
+        errors.Add(new SpecValidationError(Code.CircularReferencesNeedLayerFamily, target.Id,
+            $"`MustNotHaveCircularReferences` on {target.Subject} needs a family of layers; projects cannot have "
             + "circular references, so over a family of projects the law holds by construction. Write "
-            + "`MustNotReferenceEachOther` or an ordering rule.", rule.Location));
+            + "`MustNotReferenceEachOther` or an ordering rule.", target.Location));
     }
 
     // Every position a rule's selections stand in, item 27's way: the subject itself is the one legal one,
     // so only what it NESTS is walked, while each operand is walked from its own root. A member constraint's
     // Subject, its projection's source, is a subject too, so a family there is legal.
-    private static IEnumerable<(Selection Selection, string Position)> RuleFamilyPositions(RuleRegistration rule)
+    private static IEnumerable<(Selection Selection, string Position)> RuleFamilyPositions(
+        RuleRegistration rule, Constraint constraint)
     {
-        if (rule.Constraint is not { } constraint) yield break;
-
         if (constraint.Subject is { } subject)
             foreach ((Selection, string) nested in NestedFamilyPositions(subject))
                 yield return nested;
@@ -503,11 +506,9 @@ internal static class SpecValidator
     // nothing on a project constraint. It includes the Except payloads, where a foreign project selection can
     // hide inside a local subject.
     private static void CheckForeignProjects(
-        RuleRegistration rule, ErrorTarget target, Arch arch, List<SpecValidationError> errors)
+        RuleRegistration rule, Constraint constraint, ErrorTarget target, Arch arch, List<SpecValidationError> errors)
     {
-        if (rule.Constraint is null) return;
-
-        IEnumerable<ProjectSelection> selections = rule.Constraint.ProjectSelections();
+        IEnumerable<ProjectSelection> selections = constraint.ProjectSelections();
         IEnumerable<(Arch Owner, SpecSourceLocation? Location)> candidates =
             selections.Select(selection => (selection.Owner, rule.Location));
 
@@ -518,11 +519,9 @@ internal static class SpecValidator
     // GRAMMAR §8 item 23: the blank check over a project subject's own .Named names and .Matching globs, under
     // the project stratum's own code (SpecSlot.ProjectNameOperand says why).
     private static void CheckProjectPatterns(
-        RuleRegistration rule, ErrorTarget target, List<SpecValidationError> errors)
+        Constraint constraint, ErrorTarget target, List<SpecValidationError> errors)
     {
-        if (rule.Constraint is null) return;
-
-        foreach (ProjectSelection selection in rule.Constraint.ProjectSelections())
+        foreach (ProjectSelection selection in constraint.ProjectSelections())
         foreach (ProjectAdjective adjective in selection.Adjectives)
             switch (adjective)
             {
@@ -541,9 +540,9 @@ internal static class SpecValidator
     // and stops the pass; a member error renders at its own arch.Member(...) call site, or at the rule's
     // anchor for a verb-minted member, which carries no location.
     private static void CheckMembers(
-        RuleRegistration rule, ErrorTarget target, Arch arch, List<SpecValidationError> errors)
+        Constraint constraint, ErrorTarget target, Arch arch, List<SpecValidationError> errors)
     {
-        IReadOnlyList<Member> members = rule.Constraint?.MemberOperands ?? Array.Empty<Member>();
+        IReadOnlyList<Member> members = constraint.MemberOperands;
         if (members.Count == 0) return;
 
         IEnumerable<(Arch Owner, SpecSourceLocation? Location)> candidates =
@@ -555,23 +554,21 @@ internal static class SpecValidator
 
     // GRAMMAR §8 item 14, through CheckClosedGenericAnchors: a member `.Returning` anchor is definition-level, so
     // a closed-generic one (typeof(Task<int>)) is refused with guidance to the open definition (typeof(Task<>)).
-    private static void CheckMemberReturning(RuleRegistration rule, List<SpecValidationError> errors)
+    private static void CheckMemberReturning(
+        Constraint constraint, ErrorTarget target, List<SpecValidationError> errors)
     {
-        if (rule.Constraint is null) return;
-
-        foreach (MemberSelection selection in rule.Constraint.MemberSelections())
+        foreach (MemberSelection selection in constraint.MemberSelections())
         foreach (MemberAdjective adjective in selection.Adjectives)
             if (adjective is ReturningAdjective returning)
-                CheckClosedGenericAnchors(rule, errors, returning.Anchors, Code.MemberReturningClosedGeneric, ".Returning");
+                CheckClosedGenericAnchors(returning.Anchors, Code.MemberReturningClosedGeneric, ".Returning", target, errors);
     }
 
     // GRAMMAR §8 item 34, rendered at the rule's location like the closed-generic refusal. A .Members selection
     // on either side holds every kind and clashes with none.
-    private static void CheckMemberExceptKinds(RuleRegistration rule, List<SpecValidationError> errors)
+    private static void CheckMemberExceptKinds(
+        Constraint constraint, ErrorTarget target, List<SpecValidationError> errors)
     {
-        if (rule.Constraint is null) return;
-
-        foreach (MemberSelection host in rule.Constraint.MemberSelections())
+        foreach (MemberSelection host in constraint.MemberSelections())
         foreach (MemberAdjective adjective in host.Adjectives)
         {
             if (adjective is not MemberExceptAdjective except) continue;
@@ -583,104 +580,141 @@ internal static class SpecValidator
 
                 string taken = ProseFormat.MemberKindPlural(payload.Kind);
                 string from = ProseFormat.MemberKindPlural(host.Kind);
-                errors.Add(new SpecValidationError(Code.MemberExceptKindDisjoint, rule.Id,
-                    $"`Except` on '{rule.Id}' takes {taken} from {from}, so it removes nothing: no member is both. "
-                    + $"Project the payload with `.{ProseFormat.Capitalize(from)}` or `.Members`.", rule.Location));
+                errors.Add(new SpecValidationError(Code.MemberExceptKindDisjoint, target.Id,
+                    $"`Except` on {target.Subject} takes {taken} from {from}, so it removes nothing: no member is both. "
+                    + $"Project the payload with `.{ProseFormat.Capitalize(from)}` or `.Members`.", target.Location));
             }
         }
     }
 
     // GRAMMAR §8 item 20, through CheckClosedGenericAnchors: the MustAcceptParameter sibling of the item-14
     // .Returning refusal.
-    private static void CheckMemberAcceptParameter(RuleRegistration rule, List<SpecValidationError> errors)
+    private static void CheckMemberAcceptParameter(
+        Constraint constraint, ErrorTarget target, List<SpecValidationError> errors)
     {
-        if (rule.Constraint is not MemberMustAcceptParameterConstraint accept) return;
+        if (constraint is not MemberMustAcceptParameterConstraint accept) return;
 
         CheckClosedGenericAnchors(
-            rule, errors, [accept.Anchor], Code.MemberAcceptParameterClosedGeneric, "MustAcceptParameter");
+            [accept.Anchor], Code.MemberAcceptParameterClosedGeneric, "MustAcceptParameter", target, errors);
     }
 
     // The definition-level refusal items 14 and 20 share, with the caller's verb in the steer and its own
     // code in the catalog. The anchor is the consuming rule's statement, so the error renders at the rule's
     // location; a string anchor carries no reflected type, so TypedAnchors drops it before anything is judged.
     private static void CheckClosedGenericAnchors(
-        RuleRegistration rule, List<SpecValidationError> errors, IReadOnlyList<TypeAnchor> anchors,
-        Code code, string verb)
+        IReadOnlyList<TypeAnchor> anchors, Code code, string verb, ErrorTarget target,
+        List<SpecValidationError> errors)
     {
-        foreach (Type type in TypedAnchors(anchors))
-            if (Generics.IsConstructed(type))
-                errors.Add(new SpecValidationError(code, rule.Id,
-                    $"'{SafeFullDisplay(type)}' is a closed generic; {verb} matches definition-level — " +
-                    $"use typeof({TypeofForm(Generics.Definition(type))}) (used by '{rule.Id}').", rule.Location));
+        foreach (TypeAnchor anchor in TypedAnchors(anchors))
+            if (anchor.IsConstructed)
+                errors.Add(new SpecValidationError(code, target.Id,
+                    $"'{AnchorDisplay(anchor)}' is a closed generic; {verb} matches definition-level — " +
+                    $"use typeof({TypeofForm(Generics.Definition(anchor.Type!))}) (used by {target.Subject}).",
+                    target.Location));
     }
 
     // GRAMMAR §8 item 21, both polarities; Code.HierarchyAnchorWrongCategory carries the category rule per
     // verb. String anchors are filtered out (TypedAnchors) in every family, so a wrong string is loud on a
     // positive (always red) and silent on a negative.
-    private static void CheckHierarchyAnchors(RuleRegistration rule, List<SpecValidationError> errors)
+    private static void CheckHierarchyAnchors(
+        Constraint constraint, ErrorTarget target, List<SpecValidationError> errors)
     {
-        switch (rule.Constraint)
+        if (AnchorsOf(constraint) is not { } anchored) return;
+
+        IReadOnlyList<TypeAnchor> anchors = anchored.Anchors;
+        switch (constraint)
         {
-            case MustImplementConstraint c:
-                CheckAnchorCategory(rule, errors, TypedAnchors([c.Anchor]), t => !t.IsInterface,
-                    t => $"'{SafeFullDisplay(t)}' is not an interface; MustImplement requires an interface anchor — use MustDeriveFrom for a base class");
+            case MustImplementConstraint:
+                CheckHierarchyCategory(anchors, "MustImplement", true, "MustDeriveFrom", target, errors);
                 break;
-            case MustNotImplementConstraint c:
-                CheckAnchorCategory(rule, errors, TypedAnchors(c.Anchors), t => !t.IsInterface,
-                    t => $"'{SafeFullDisplay(t)}' is not an interface; MustNotImplement requires an interface anchor — use MustNotDeriveFrom for a base class");
+            case MustNotImplementConstraint:
+                CheckHierarchyCategory(anchors, "MustNotImplement", true, "MustNotDeriveFrom", target, errors);
                 break;
-            case MustDeriveFromConstraint c:
-                CheckAnchorCategory(rule, errors, TypedAnchors([c.Anchor]), t => t.IsInterface,
-                    t => $"'{SafeFullDisplay(t)}' is an interface; MustDeriveFrom requires a non-interface anchor — use MustImplement for an interface");
+            case MustDeriveFromConstraint:
+                CheckHierarchyCategory(anchors, "MustDeriveFrom", false, "MustImplement", target, errors);
                 break;
-            case MustNotDeriveFromConstraint c:
-                CheckAnchorCategory(rule, errors, TypedAnchors(c.Anchors), t => t.IsInterface,
-                    t => $"'{SafeFullDisplay(t)}' is an interface; MustNotDeriveFrom requires a non-interface anchor — use MustNotImplement for an interface");
-                break;
-            case MustBeAttributedWithConstraint c:
-                CheckAttributeAnchors(rule, errors, [c.Anchor], "MustBeAttributedWith");
-                break;
-            case MustNotBeAttributedWithConstraint c:
-                CheckAttributeAnchors(rule, errors, c.Anchors, "MustNotBeAttributedWith");
+            case MustNotDeriveFromConstraint:
+                CheckHierarchyCategory(anchors, "MustNotDeriveFrom", false, "MustNotImplement", target, errors);
                 break;
 
             // The member attribute verbs (GRAMMAR §5.7) share the type side's rule and message. Adjectives stay
             // unchecked on both sides: a wrong-category adjective empties the subject, which the fail-on-empty
             // gate reds loudly, while the always-passing MustNot verb is the silent slip this item exists to catch.
-            case MemberMustBeAttributedWithConstraint c:
-                CheckAttributeAnchors(rule, errors, [c.Anchor], "MustBeAttributedWith");
+            case MustBeAttributedWithConstraint or MemberMustBeAttributedWithConstraint:
+                CheckAttributeAnchors(anchors, "MustBeAttributedWith", target, errors);
                 break;
-            case MemberMustNotBeAttributedWithConstraint c:
-                CheckAttributeAnchors(rule, errors, c.Anchors, "MustNotBeAttributedWith");
+            case MustNotBeAttributedWithConstraint or MemberMustNotBeAttributedWithConstraint:
+                CheckAttributeAnchors(anchors, "MustNotBeAttributedWith", target, errors);
                 break;
         }
+    }
+
+    // The hierarchy-anchor half of item 21: the category the verb wants, and the verb for the other category
+    // named in the steer.
+    private static void CheckHierarchyCategory(
+        IReadOnlyList<TypeAnchor> anchors, string verb, bool wantsInterface, string alternative, ErrorTarget target,
+        List<SpecValidationError> errors)
+    {
+        CheckAnchorCategory(TypedAnchors(anchors), type => type.IsInterface != wantsInterface,
+            display => wantsInterface
+                ? $"'{display}' is not an interface; {verb} requires an interface anchor — use {alternative} for a base class"
+                : $"'{display}' is an interface; {verb} requires a non-interface anchor — use {alternative} for an interface",
+            target, errors);
     }
 
     // The attribute-anchor half of item 21: one predicate and one message template, the caller's verb named in
     // the steer.
     private static void CheckAttributeAnchors(
-        RuleRegistration rule, List<SpecValidationError> errors, IReadOnlyList<TypeAnchor> anchors, string verbName)
+        IReadOnlyList<TypeAnchor> anchors, string verbName, ErrorTarget target, List<SpecValidationError> errors)
     {
-        CheckAnchorCategory(rule, errors, TypedAnchors(anchors), t => !t.IsSubclassOf(typeof(Attribute)),
-            t => $"'{SafeFullDisplay(t)}' does not derive from System.Attribute; {verbName} requires an attribute anchor");
+        CheckAnchorCategory(TypedAnchors(anchors), type => !type.IsSubclassOf(typeof(Attribute)),
+            display => $"'{display}' does not derive from System.Attribute; {verbName} requires an attribute anchor",
+            target, errors);
     }
 
+    // Over typed anchors only; the message is handed the anchor's display name.
     private static void CheckAnchorCategory(
-        RuleRegistration rule, List<SpecValidationError> errors, IReadOnlyList<Type> anchors,
-        Func<Type, bool> invalid, Func<Type, string> message)
+        IReadOnlyList<TypeAnchor> anchors, Func<Type, bool> invalid, Func<string, string> message, ErrorTarget target,
+        List<SpecValidationError> errors)
     {
-        foreach (Type anchor in anchors)
-            if (invalid(anchor))
-                errors.Add(new SpecValidationError(Code.HierarchyAnchorWrongCategory, rule.Id,
-                    $"{message(anchor)} (used by '{rule.Id}').", rule.Location));
+        foreach (TypeAnchor anchor in anchors)
+            if (invalid(anchor.Type!))
+                errors.Add(new SpecValidationError(Code.HierarchyAnchorWrongCategory, target.Id,
+                    $"{message(AnchorDisplay(anchor))} (used by {target.Subject}).", target.Location));
     }
 
     // The reflected arm of an anchor list, the only anchors items 14, 20 and 21 can judge. A string anchor names a
     // definition FQN and nothing more, so it is dropped here: the blank-name check (item 15, via RulePatterns) is
     // the whole of what it is validated for, and a constructed spelling is a legal name that matches nothing.
-    private static IReadOnlyList<Type> TypedAnchors(IReadOnlyList<TypeAnchor> anchors)
+    private static IReadOnlyList<TypeAnchor> TypedAnchors(IReadOnlyList<TypeAnchor> anchors)
     {
-        return anchors.Where(anchor => anchor.Type is not null).Select(anchor => anchor.Type!).ToList();
+        return anchors.Where(anchor => anchor.Type is not null).ToList();
+    }
+
+    // A typed anchor's extraction-format name, or Type.ToString() for a pointer, by-ref or partially-open anchor
+    // that has none (GRAMMAR §8 item 12).
+    private static string AnchorDisplay(TypeAnchor anchor)
+    {
+        return anchor.FullName ?? anchor.Type!.ToString();
+    }
+
+    // Which constraints carry type anchors, and the slot that names a string anchor among them. The pattern walk
+    // and the category check both read it, so an anchor verb cannot reach one and miss the other.
+    private static (IReadOnlyList<TypeAnchor> Anchors, SpecSlot Slot)? AnchorsOf(Constraint constraint)
+    {
+        return constraint switch
+        {
+            MustImplementConstraint c => ([c.Anchor], SpecSlot.InterfaceName),
+            MustNotImplementConstraint c => (c.Anchors, SpecSlot.InterfaceName),
+            MustDeriveFromConstraint c => ([c.Anchor], SpecSlot.BaseTypeName),
+            MustNotDeriveFromConstraint c => (c.Anchors, SpecSlot.BaseTypeName),
+            MustBeAttributedWithConstraint c => ([c.Anchor], SpecSlot.AttributeName),
+            MemberMustBeAttributedWithConstraint c => ([c.Anchor], SpecSlot.AttributeName),
+            MustNotBeAttributedWithConstraint c => (c.Anchors, SpecSlot.AttributeName),
+            MemberMustNotBeAttributedWithConstraint c => (c.Anchors, SpecSlot.AttributeName),
+            MemberMustAcceptParameterConstraint c => ([c.Anchor], SpecSlot.ParameterTypeName),
+            _ => null
+        };
     }
 
     // GRAMMAR §8 item 19: a Lifetime outside the defined set (a cast such as (Lifetime)7) names no lifetime.
@@ -690,7 +724,7 @@ internal static class SpecValidator
         IEnumerable<Selection> selections, ErrorTarget target, List<SpecValidationError> errors)
     {
         foreach (Selection selection in selections)
-            if (selection.NounOrNull() is RegisteredNoun { Lifetime: { } lifetime }
+            if (selection.Noun is RegisteredNoun { Lifetime: { } lifetime }
                 && !Enum.IsDefined(typeof(Lifetime), lifetime))
                 errors.Add(new SpecValidationError(Code.UndefinedLifetime, target.Id,
                     $"'(Lifetime){(int)lifetime}' is not a defined Lifetime — " +
@@ -791,7 +825,7 @@ internal static class SpecValidator
     }
 
     // A rule's authored prose, each value tagged with the slot it was written in.
-    private static IEnumerable<(SpecSlot Slot, string? Value)> RuleProse(RuleRegistration rule)
+    private static IEnumerable<(SpecSlot Slot, string? Value)> RuleProse(RuleRegistration rule, Constraint constraint)
     {
         foreach (string because in rule.Becauses) yield return (SpecSlot.Because, because);
 
@@ -804,9 +838,7 @@ internal static class SpecValidator
         // the directory itself.
         foreach (string baseline in rule.Baselines) yield return (SpecSlot.Baseline, baseline);
 
-        if (rule.Constraint is not null)
-            foreach ((SpecSlot, string?) prose in ConstraintProse(rule.Constraint))
-                yield return prose;
+        foreach ((SpecSlot, string?) prose in ConstraintProse(constraint)) yield return prose;
 
         // GRAMMAR §8 items 5, 6 and 30: a Citation is prose and a link both, and its one slot decides all three.
         foreach (string citation in rule.Citations) yield return (SpecSlot.Citation, citation);
@@ -903,21 +935,17 @@ internal static class SpecValidator
 
     // The constraint's selections, then the exemplar's: an exemplar is spec-authored selection like any
     // other, so the foreign-Arch and lifetime walks reach it, though the verdict never reads it.
-    private static IEnumerable<Selection> RuleSelections(RuleRegistration rule)
+    private static IEnumerable<Selection> RuleSelections(RuleRegistration rule, Constraint constraint)
     {
-        IEnumerable<Selection> constraintSelections = rule.Constraint is null
-            ? Enumerable.Empty<Selection>()
-            : rule.Constraint.Selections();
+        IEnumerable<Selection> constraintSelections = constraint.Selections();
         IEnumerable<Selection> exemplarSelections = rule.Exemplars.SelectMany(SelectionWalk.ExpandSelection);
         return constraintSelections.Concat(exemplarSelections);
     }
 
     // The glob, affix and string-anchor walk (GRAMMAR §8 items 15–16), parallel to the prose and selection walks.
-    private static IEnumerable<(string Value, SpecSlot Slot)> RulePatterns(RuleRegistration rule)
+    private static IEnumerable<(string Value, SpecSlot Slot)> RulePatterns(RuleRegistration rule, Constraint constraint)
     {
-        IEnumerable<(string, SpecSlot)> constraintPatterns = rule.Constraint is null
-            ? Enumerable.Empty<(string, SpecSlot)>()
-            : ConstraintPatterns(rule.Constraint);
+        IEnumerable<(string, SpecSlot)> constraintPatterns = ConstraintPatterns(constraint);
         IEnumerable<(string, SpecSlot)> exemplarPatterns = rule.Exemplars.SelectMany(SelectionPatterns);
         return constraintPatterns.Concat(exemplarPatterns);
     }
@@ -965,43 +993,6 @@ internal static class SpecValidator
                 yield return (c.Prefix, SpecSlot.MemberPrefix);
                 break;
 
-            // The attribute verbs' string anchors (GRAMMAR §8 item 15, the "attribute name" label): a blank
-            // name would otherwise mint an anchor matching nothing, silently.
-            case MustBeAttributedWithConstraint c:
-                foreach ((string, SpecSlot) pattern in AnchorNamePatterns([c.Anchor], SpecSlot.AttributeName)) yield return pattern;
-                break;
-            case MustNotBeAttributedWithConstraint c:
-                foreach ((string, SpecSlot) pattern in AnchorNamePatterns(c.Anchors, SpecSlot.AttributeName)) yield return pattern;
-                break;
-
-            // The hierarchy verbs' string anchors, on the same item-15 terms under their own labels, so the
-            // error names which kind of anchor was left blank ("Blank interface name on 'rule/id'.").
-            case MustImplementConstraint c:
-                foreach ((string, SpecSlot) pattern in AnchorNamePatterns([c.Anchor], SpecSlot.InterfaceName)) yield return pattern;
-                break;
-            case MustNotImplementConstraint c:
-                foreach ((string, SpecSlot) pattern in AnchorNamePatterns(c.Anchors, SpecSlot.InterfaceName)) yield return pattern;
-                break;
-            case MustDeriveFromConstraint c:
-                foreach ((string, SpecSlot) pattern in AnchorNamePatterns([c.Anchor], SpecSlot.BaseTypeName)) yield return pattern;
-                break;
-            case MustNotDeriveFromConstraint c:
-                foreach ((string, SpecSlot) pattern in AnchorNamePatterns(c.Anchors, SpecSlot.BaseTypeName)) yield return pattern;
-                break;
-
-            // The member attribute verbs' string anchors, on the same terms and under the same label.
-            case MemberMustBeAttributedWithConstraint c:
-                foreach ((string, SpecSlot) pattern in AnchorNamePatterns([c.Anchor], SpecSlot.AttributeName)) yield return pattern;
-                break;
-            case MemberMustNotBeAttributedWithConstraint c:
-                foreach ((string, SpecSlot) pattern in AnchorNamePatterns(c.Anchors, SpecSlot.AttributeName)) yield return pattern;
-                break;
-
-            // The parameter verb's string anchor, under its own label.
-            case MemberMustAcceptParameterConstraint c:
-                foreach ((string, SpecSlot) pattern in AnchorNamePatterns([c.Anchor], SpecSlot.ParameterTypeName)) yield return pattern;
-                break;
-
             // GRAMMAR §8 items 25–26: the counterpart template, blank or placeholder-free, both decided by its slot.
             case MustHaveExactlyOneCounterpartConstraint c:
                 yield return (c.Template, SpecSlot.CounterpartTemplate);
@@ -1029,6 +1020,13 @@ internal static class SpecValidator
                 yield return (c.Value, SpecSlot.PropertyValue);
                 break;
         }
+
+        // The anchor verbs' string anchors (GRAMMAR §8 item 15), under the slot that names which kind of anchor
+        // was left blank ("Blank interface name on 'rule/id'."): a blank name would otherwise mint an anchor
+        // matching nothing, silently.
+        if (AnchorsOf(constraint) is { } anchored)
+            foreach ((string, SpecSlot) pattern in AnchorNamePatterns(anchored.Anchors, anchored.Slot))
+                yield return pattern;
 
         // The subject tree and the dependency-verb operands; a project constraint's name operands ride
         // CheckProjectPatterns (item 23).

@@ -38,7 +38,7 @@ public sealed class RatchetSurveyNoticeTests
             Result(Model.Rule("layering/domain-independent"), RuleStatus.Passed)
         ]);
 
-        RatchetSurveyNotice.Lines(report, anyRatchetedRule: false)
+        RatchetSurveyNotice.Lines(report)
             .ShouldBe(
             [
                 "no ratcheted rules (Migrate or Quarantine containment) in the spec; nothing to do."
@@ -54,7 +54,7 @@ public sealed class RatchetSurveyNoticeTests
             Result(Model.Rule("layering/domain-independent"), RuleStatus.Failed, 3)
         ]);
 
-        RatchetSurveyNotice.Lines(report, anyRatchetedRule: false)
+        RatchetSurveyNotice.Lines(report)
             .ShouldBe(
             [
                 "no ratcheted rules (Migrate or Quarantine containment) in the spec; nothing to capture.",
@@ -75,7 +75,7 @@ public sealed class RatchetSurveyNoticeTests
             Result(Model.Rule("layering/domain-independent"), RuleStatus.Failed, 2)
         ]);
 
-        IReadOnlyList<string> lines = RatchetSurveyNotice.Lines(report, anyRatchetedRule: true);
+        IReadOnlyList<string> lines = RatchetSurveyNotice.Lines(report);
 
         lines.ShouldBe(
         [
@@ -92,7 +92,7 @@ public sealed class RatchetSurveyNoticeTests
     {
         var report = new CheckReport([Result(Model.Rule("data-access/no-inline-sql"), RuleStatus.Failed, 2)]);
 
-        RatchetSurveyNotice.Lines(report, anyRatchetedRule: true)
+        RatchetSurveyNotice.Lines(report)
             .ShouldBeEmpty();
     }
 
@@ -101,7 +101,7 @@ public sealed class RatchetSurveyNoticeTests
     {
         var report = new CheckReport([Result(Model.Rule("layering/domain-independent"), RuleStatus.Failed, 1)]);
 
-        IReadOnlyList<string> lines = RatchetSurveyNotice.Lines(report, anyRatchetedRule: false);
+        IReadOnlyList<string> lines = RatchetSurveyNotice.Lines(report);
 
         lines[1]
             .ShouldBe("1 rule is failing with no baseline to capture (1 violation):");

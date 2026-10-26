@@ -46,7 +46,7 @@ internal static class JsonReportRenderer
         // still words about the environment rather than about the verdict.
         bool index = grain >= DocumentGrain.Index;
         (IReadOnlyList<PackageAuditEntry>? packageAuditRows, int? packageAuditCount) =
-            DocumentGrains.CoverageRung(trust.PackageAudit ?? [], index);
+            DocumentGrains.CoverageRung(trust.PackageAudit, index);
         bool elideDiagnostics = index && workspaceDiagnostics.Count > 0;
 
         // Every argument is named, which is what holds the trust slots to the record's declaration order for

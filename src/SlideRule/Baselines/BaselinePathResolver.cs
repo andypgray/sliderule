@@ -50,19 +50,14 @@ internal static class BaselinePathResolver
     internal static string Resolve(string baselinePath, string baseDirectory)
     {
         PathParts path = Parse(Guard.NotNull(baselinePath, nameof(baselinePath)));
-        if (path.Root.Length > 0) return Join(path.Root, Fold(path.Segments, anchored: true));
+        if (path.Root.Length > 0) return Render(path);
 
         PathParts basis = Parse(Guard.NotNull(baseDirectory, nameof(baseDirectory)));
-        if (path.RootRelative)
-        {
-            string root = basis.Root.Length > 0 ? basis.Root : Separator;
-            return Join(root, Fold(path.Segments, anchored: true));
-        }
+        if (path.RootRelative) return Render(new PathParts(basis.Root, basis.Root.Length == 0, path.Segments));
 
         var combined = new List<string>(basis.Segments);
         combined.AddRange(path.Segments);
-        string prefix = Prefix(basis);
-        return Join(prefix, Fold(combined, prefix.Length > 0));
+        return Render(new PathParts(basis.Root, basis.RootRelative, combined));
     }
 
     /// <summary>
@@ -73,8 +68,7 @@ internal static class BaselinePathResolver
     internal static string Normalize(string absolutePath)
     {
         PathParts parts = Parse(Guard.NotNull(absolutePath, nameof(absolutePath)));
-        string prefix = Prefix(parts);
-        return Join(prefix, Fold(parts.Segments, prefix.Length > 0));
+        return Render(parts);
     }
 
     /// <summary>
@@ -89,7 +83,7 @@ internal static class BaselinePathResolver
     {
         PathParts parts = Parse(Guard.NotNull(filePath, nameof(filePath)));
         string prefix = Prefix(parts);
-        List<string> folded = Fold(parts.Segments, prefix.Length > 0);
+        List<string> folded = PathSegments.Fold(parts.Segments, prefix.Length > 0);
         if (folded.Count > 0) folded.RemoveAt(folded.Count - 1);
 
         return Join(prefix, folded);
@@ -154,33 +148,12 @@ internal static class BaselinePathResolver
         return segments;
     }
 
-    private static List<string> Fold(IEnumerable<string> segments, bool anchored)
+    // A path with a prefix is anchored to it, so a `..` there stops at the root.
+    private static string Render(PathParts parts)
     {
-        var folded = new List<string>();
-        foreach (string segment in segments)
-        {
-            if (string.Equals(segment, ".", StringComparison.Ordinal)) continue;
-
-            if (!string.Equals(segment, "..", StringComparison.Ordinal))
-            {
-                folded.Add(segment);
-                continue;
-            }
-
-            int last = folded.Count - 1;
-            bool climbable = last >= 0 && !string.Equals(folded[last], "..", StringComparison.Ordinal);
-            if (climbable)
-            {
-                folded.RemoveAt(last);
-                continue;
-            }
-
-            // A `..` at the root stays at the root. Above a path with no root it is kept instead, there
-            // being nothing there to stop at and a dropped one naming a different directory.
-            if (!anchored) folded.Add("..");
-        }
-
-        return folded;
+        string prefix = Prefix(parts);
+        List<string> folded = PathSegments.Fold(parts.Segments, prefix.Length > 0);
+        return Join(prefix, folded);
     }
 
     private static string Prefix(PathParts parts)

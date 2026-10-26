@@ -11,7 +11,7 @@ internal sealed class KindMemberSelection : MemberSelection
     {
     }
 
-    private protected override MemberSelection Rebuild(IReadOnlyList<MemberAdjective> adjectives)
+    internal override MemberSelection WithAdjectives(IReadOnlyList<MemberAdjective> adjectives)
     {
         return new KindMemberSelection(Source, Kind, adjectives);
     }

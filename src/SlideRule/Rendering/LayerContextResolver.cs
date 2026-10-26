@@ -67,12 +67,8 @@ internal static class LayerContextResolver
     // does not.
     private static bool IsAnchoredOn(ArchRule rule, LayerDefinition layer)
     {
-        // Kept as separate conjuncts because the order is the guard: the UnionSelection test has to be
-        // read before .Noun, which throws on a union. A merged pattern preserves that order but buries it.
-        // ReSharper disable once MergeIntoPattern
-        return rule.Constraint?.Subject is { } subject
-               && subject is not UnionSelection
-               && MatchingCell(subject.Noun, layer.Name) is not null;
+        SelectionNoun? head = rule.Constraint?.Subject?.Noun;
+        return MatchingCell(head, layer.Name) is not null;
     }
 
     // The whole layer as a bare Selection (its noun, no adjectives), so evaluation ranges over every
@@ -87,11 +83,10 @@ internal static class LayerContextResolver
         // matched a cell on it, which no rule with a null constraint and no project-subject rule (whose
         // Subject is null, GRAMMAR §4.10) can do. Only an anchored rule reaches here.
         Selection subject = anchoredRule.Constraint!.Subject!;
-        return new RefinedSelection(
-            subject.Owner, MatchingCell(subject.Noun, layer.Name)!, Array.Empty<SelectionAdjective>());
+        return new RefinedSelection(subject.Owner, MatchingCell(subject.Noun, layer.Name)!);
     }
 
-    private static LayerNoun? MatchingCell(SelectionNoun noun, string layerName)
+    private static LayerNoun? MatchingCell(SelectionNoun? noun, string layerName)
     {
         if (noun is LayerNoun head)
             return string.Equals(head.Name, layerName, StringComparison.Ordinal) ? head : null;

@@ -35,7 +35,7 @@ internal static class ContextFileComposer
 
         var units = new List<ContentUnit>
         {
-            new(solutionDirectory, AgentContextRenderer.RootBlock(model, specName), true)
+            new(solutionDirectory, AgentContextRenderer.RootBlock(model, specName))
         };
         var warnings = new List<string>();
 
@@ -117,12 +117,12 @@ internal static class ContextFileComposer
                 continue;
             }
 
-            units.Add(new ContentUnit(card.Destination.DirectoryPath, card.Body, false));
+            units.Add(new ContentUnit(card.Destination.DirectoryPath, card.Body));
         }
     }
 
-    // Groups in first-seen order, so the root file comes first. A group that includes the root uses the root
-    // block's own provenance line; a scoped-only file gets one prepended.
+    // Groups in first-seen order. The root block is the first unit, so the first group holds it and uses the
+    // root block's own provenance line; every other file is scoped-only and gets one prepended.
     private static IReadOnlyList<ContextFile> Group(IReadOnlyList<ContentUnit> units, string specName)
     {
         var groups = new List<FileGroup>();
@@ -140,21 +140,19 @@ internal static class ContextFileComposer
             }
 
             group.Bodies.Add(unit.Body);
-            group.HasRoot |= unit.IsRoot;
         }
 
-        return groups.Select(group => new ContextFile(
+        return groups.Select((group, index) => new ContextFile(
             Path.Combine(group.Directory, FileName),
-            group.HasRoot
+            index == 0
                 ? string.Join("\n\n", group.Bodies)
                 : AgentContextRenderer.ProvenanceLine(specName) + "\n\n" + string.Join("\n\n", group.Bodies))).ToList();
     }
 
-    private sealed class ContentUnit(string directory, string body, bool isRoot)
+    private sealed class ContentUnit(string directory, string body)
     {
         public string Directory { get; } = directory;
         public string Body { get; } = body;
-        public bool IsRoot { get; } = isRoot;
     }
 
     private sealed class FileGroup(string key, string directory)
@@ -162,6 +160,5 @@ internal static class ContextFileComposer
         public string Key { get; } = key;
         public string Directory { get; } = directory;
         public List<string> Bodies { get; } = [];
-        public bool HasRoot { get; set; }
     }
 }

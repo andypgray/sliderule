@@ -98,12 +98,25 @@ internal static class PathFormat
     {
         private readonly string[] _baseSegments;
 
+        // Keyed by the path as recorded: a report's sites repeat a handful of files many times over. One
+        // instance serves one render on one thread, so the map takes no lock.
+        private readonly Dictionary<string, string> _relative = new(StringComparer.Ordinal);
+
         public Relativizer(string baseDirectory)
         {
             _baseSegments = Segments(Path.GetFullPath(baseDirectory));
         }
 
         public string Relative(string filePath)
+        {
+            if (_relative.TryGetValue(filePath, out string? known)) return known;
+
+            string relative = Compute(filePath);
+            _relative[filePath] = relative;
+            return relative;
+        }
+
+        private string Compute(string filePath)
         {
             string[] toSegments = Segments(Path.GetFullPath(filePath));
 

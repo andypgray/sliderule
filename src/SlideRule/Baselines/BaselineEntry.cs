@@ -177,11 +177,19 @@ internal sealed class BaselineEntry : IEquatable<BaselineEntry>
     /// <exception cref="ArgumentException"><paramref name="because" /> is blank or spans more than one line.</exception>
     public BaselineEntry WithBecause(string because)
     {
-        bool blankOrMultiline = string.IsNullOrWhiteSpace(because) || SingleLineProse.IsMultiLine(because);
-        if (blankOrMultiline)
+        if (!IsValidBecause(because))
             throw new ArgumentException("A baseline attribution must be a non-blank single line.", nameof(because));
 
         return new BaselineEntry(Source, Target, Subject, because, SiteCount);
+    }
+
+    /// <summary>
+    ///     Whether <paramref name="because" /> is an attribution <see cref="WithBecause" /> accepts: a
+    ///     non-blank single line.
+    /// </summary>
+    internal static bool IsValidBecause(string? because)
+    {
+        return because is not null && !string.IsNullOrWhiteSpace(because) && !SingleLineProse.IsMultiLine(because);
     }
 
     /// <summary>

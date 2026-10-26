@@ -7,7 +7,7 @@ namespace SlideRule.Model;
 /// <remarks>
 ///     Adjectives apply to the union, not through it: <c>AnyOf(a, b).Except(c)</c> is <c>(a ∪ b) − c</c>, so
 ///     the union carries its own adjective list and the evaluator applies it after the set union. A union has
-///     no single noun, so <see cref="Noun" /> throws and the renderer gives it an arm of its own (§6).
+///     no single noun, so <see cref="Noun" /> is null and the renderer gives it an arm of its own (§6).
 /// </remarks>
 internal sealed class UnionSelection : Selection
 {
@@ -26,8 +26,7 @@ internal sealed class UnionSelection : Selection
     /// <summary>The unioned selections, in order (named <c>Parts</c> to stay clear of the <c>.Members</c> projection, §4.6).</summary>
     internal IReadOnlyList<Selection> Parts { get; }
 
-    internal override SelectionNoun Noun
-        => throw new InvalidOperationException("A union selection has no single noun; render it in reference position.");
+    internal override SelectionNoun? Noun => null;
 
     internal override IReadOnlyList<SelectionAdjective> Adjectives { get; }
 
@@ -49,7 +48,7 @@ internal sealed class UnionSelection : Selection
         return new UnionSelection(owner, flattened);
     }
 
-    internal UnionSelection WithAdjectives(IReadOnlyList<SelectionAdjective> adjectives)
+    internal override Selection WithRefinements(IReadOnlyList<SelectionAdjective> adjectives)
     {
         return new UnionSelection(Owner, Parts, adjectives);
     }

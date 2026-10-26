@@ -7,5 +7,5 @@ internal sealed class MustHavePrefixConstraint(Selection subject, string prefix)
 {
     internal string Prefix { get; } = prefix;
 
-    internal override string VerbPhrase => "must be named " + ProseFormat.Backtick(Prefix + "*");
+    internal override string VerbPhrase => "must be named " + ProseFormat.PrefixGlob(Prefix);
 }

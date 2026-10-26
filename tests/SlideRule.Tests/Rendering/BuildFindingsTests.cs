@@ -271,7 +271,7 @@ public sealed class BuildFindingsTests
         var passed = new RuleResult(Checker.Rule("r/pass"), RuleStatus.Passed, []);
         var warned = new RuleResult(
             Checker.Rule("r/warn"), RuleStatus.Passed, [],
-            [CheckWarning.ScopeTouched(caution: true, "Changed file 'Helpers.cs' is inside the scope.", "Helpers.cs")]);
+            [CheckWarning.ScopeTouched(caution: true, "Helpers.cs", "shared/utilities", "shared/utilities/tripwire")]);
         var skipped = new RuleResult(
             Checker.Rule("r/skip"), RuleStatus.Skipped, [ViolationOfKind(ViolationKind.Shape, OneSite)], [],
             "'BillingOnly.slnf' narrowed this run.", []);

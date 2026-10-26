@@ -32,10 +32,6 @@ internal sealed record ProjectArtifactFacts(
     FragmentProperties Properties);
 
 /// <summary>
-///     What one enumeration of a solution produced: the compilations to extract from, in extraction order, and
-///     at the same index what MSBuild said about each one's project, <see langword="null" /> where that project
-///     could not be evaluated.
+///     What one enumeration of a solution produced: the compilations to extract from, in extraction order.
 /// </summary>
-internal sealed record ExtractionInputs(
-    IReadOnlyList<CompilationInput> Inputs,
-    IReadOnlyList<ProjectArtifactFacts?> ArtifactFacts);
+internal sealed record ExtractionInputs(IReadOnlyList<CompilationInput> Inputs);

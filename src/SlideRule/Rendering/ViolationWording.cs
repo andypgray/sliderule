@@ -46,12 +46,7 @@ internal static class ViolationWording
     // rather than reaching through a slot it leaves null.
     internal static string Text(this Violation violation)
     {
-        return violation.Kind switch
-        {
-            ViolationKind.Shape or ViolationKind.MemberShape or ViolationKind.ProjectShape =>
-                violation.SubjectText(),
-            _ => violation.EdgeText()
-        };
+        return violation.Kind.IsShape() ? violation.SubjectText() : violation.EdgeText();
     }
 
     // The Shape parallel over a project: its name, at whichever declaration carried the fact the verb read,

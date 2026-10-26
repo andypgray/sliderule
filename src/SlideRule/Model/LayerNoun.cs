@@ -69,8 +69,6 @@ internal sealed class LayerNoun : SelectionNoun
     /// </remarks>
     internal static IReadOnlyList<string> RegionOf(Selection definition)
     {
-        if (definition is UnionSelection) return Array.Empty<string>();
-
         if (definition.Noun is NamespaceNoun ns) return [ns.Glob];
         if (definition.Noun is not TypesNoun) return Array.Empty<string>();
 
@@ -84,7 +82,7 @@ internal sealed class LayerNoun : SelectionNoun
     /// </summary>
     internal static string? ProjectOf(Selection? definition)
     {
-        if (definition is null or UnionSelection || definition.Adjectives.Count > 0) return null;
+        if (definition is null || definition.Adjectives.Count > 0) return null;
 
         return definition.Noun is ProjectNoun project ? project.Name : null;
     }

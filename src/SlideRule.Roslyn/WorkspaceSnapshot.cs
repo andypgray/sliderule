@@ -16,11 +16,13 @@ namespace SlideRule.Roslyn;
 ///     reconcile folds in leave it alone. Such an edit adds or removes no project, and the files that decide
 ///     restore and membership (the solution or filter file, the solution a filter references, each
 ///     <c>project.assets.json</c>, absent ones included) are structural inputs of the reconcile sweep, so a
-///     change to one forces a full reload. The fail-closed gate keys on <see cref="FailedProjects" /> and
-///     <see cref="RestoreFailedProjects" />; <see cref="Diagnostics" />, the workspace's failure messages, only
-///     renders.
+///     change to one forces a full reload. The fail-closed gate keys on <see cref="LoadDiagnostics" />'
+///     <see cref="WorkspaceDiagnostics.FailedProjects" /> and
+///     <see cref="WorkspaceDiagnostics.RestoreFailedProjects" />; its <see cref="WorkspaceDiagnostics.LoadFailures" />,
+///     the workspace's failure messages, only render. The merge's notes and multi-targeted projects stay empty
+///     there: only extraction produces them.
 /// </remarks>
-internal sealed record WorkspaceSnapshot(Solution Solution, IReadOnlyList<string> Diagnostics)
+internal sealed record WorkspaceSnapshot(Solution Solution, WorkspaceDiagnostics LoadDiagnostics)
 {
     private static readonly IReadOnlyDictionary<string, int> NoEditVersions =
         new Dictionary<string, int>(StringComparer.Ordinal);
@@ -45,29 +47,4 @@ internal sealed record WorkspaceSnapshot(Solution Solution, IReadOnlyList<string
     ///     <c>Solution.WithDocumentText</c>, so the map holds across the generation's edits.
     /// </summary>
     internal IReadOnlyDictionary<ProjectId, string> TargetFrameworks { get; init; } = TargetFrameworkMaps.None;
-
-    /// <summary>The absolute <c>.csproj</c> paths of the projects that failed to load.</summary>
-    internal IReadOnlyList<string> FailedProjects { get; init; } = [];
-
-    /// <summary>
-    ///     The absolute <c>.csproj</c> paths the solution declares that the load did not check; non-empty only
-    ///     under a solution filter. It scopes the verdict rather than gating it.
-    /// </summary>
-    internal IReadOnlyList<string> UncheckedProjects { get; init; } = [];
-
-    /// <summary>The absolute <c>.csproj</c> paths of the projects whose NuGet packages are not in the model.</summary>
-    internal IReadOnlyList<string> RestoreFailedProjects { get; init; } = [];
-
-    /// <summary>
-    ///     The projects the solution declares that no extractor reaches, each with its
-    ///     <see cref="UnsupportedProjectKind" />. It states coverage and is never a gate input.
-    /// </summary>
-    internal IReadOnlyList<UnsupportedProject> UnsupportedProjects { get; init; } = [];
-
-    /// <summary>
-    ///     This snapshot's load verdict as the one value every surface reads. The merge's notes and
-    ///     multi-targeted projects stay empty: only extraction produces them.
-    /// </summary>
-    internal WorkspaceDiagnostics LoadDiagnostics =>
-        new(Diagnostics, [], FailedProjects, UncheckedProjects, RestoreFailedProjects, UnsupportedProjects, []);
 }

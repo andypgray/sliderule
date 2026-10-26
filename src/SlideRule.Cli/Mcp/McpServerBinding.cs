@@ -70,7 +70,7 @@ internal sealed record McpServerBinding(string? Solution, string? Spec, string W
     ///     persisted-cache leg applies.
     /// </summary>
     /// <exception cref="UserErrorException">Not exactly one of the three is given.</exception>
-    internal ExplainRequest ExplainRequest(string? ruleId, string? type = null, string? path = null)
+    internal ExplainRequest ExplainRequest(string? ruleId, string? type, string? path)
     {
         // An empty string counts as absent rather than as a rule ID, type or path that names nothing, so a caller
         // that fills every optional argument with one still names a single form.

@@ -141,12 +141,24 @@ internal static class FileStamping
     }
 
     /// <summary>
-    ///     Reconstitutes a <see cref="FileFreshness" /> from a stamp for a pure stat comparison; the racy verdict is the
-    ///     persisted <see cref="FileStamp.Promoted" /> flag, not a re-derived instant.
+    ///     Reconstitutes a <see cref="FileFreshness" /> from a stamp for a pure stat comparison
+    ///     (<see cref="FileFreshness.MatchesStat" />). The value is never promoted, so
+    ///     <see cref="FileFreshness.CanTrust" /> on it trusts nothing: the persisted racy verdict is the
+    ///     <see cref="FileStamp.Promoted" /> flag, read through <see cref="IsTrustedBy" />.
     /// </summary>
     internal static FileFreshness ToFreshness(this FileStamp stamp)
     {
         return new FileFreshness(stamp.Exists, new DateTime(stamp.LastWriteTimeUtcTicks, DateTimeKind.Utc), stamp.Length, default);
+    }
+
+    /// <summary>
+    ///     Whether <paramref name="stamp" /> proves, without a content read, that its file is unchanged against
+    ///     <paramref name="current" />, a fresh capture of the same path: the persisted form of
+    ///     <see cref="FileFreshness.CanTrust" />.
+    /// </summary>
+    internal static bool IsTrustedBy(this FileStamp stamp, FileFreshness current)
+    {
+        return stamp.Promoted && stamp.ToFreshness().MatchesStat(current);
     }
 
     /// <summary>
@@ -155,11 +167,33 @@ internal static class FileStamping
     /// </summary>
     internal static bool StampsEqual(IReadOnlyList<FileStamp> left, IReadOnlyList<FileStamp> right)
     {
-        if (left.Count != right.Count) return false;
-        for (var i = 0; i < left.Count; i++)
-            if (left[i] != right[i])
-                return false;
-        return true;
+        return left.SequenceEqual(right);
+    }
+
+    /// <summary>
+    ///     Validates every stamp of <paramref name="stamps" /> in order through <see cref="CheckStructural" />,
+    ///     returning the stamps to carry forward, or null with <paramref name="changed" /> set to the first stamp
+    ///     that changed. <paramref name="onHash" /> is as <see cref="CheckStructural" /> takes it.
+    /// </summary>
+    internal static IReadOnlyList<FileStamp>? SweepStructural(
+        IReadOnlyList<FileStamp> stamps, Action onHash, CancellationToken ct, out FileStamp? changed)
+    {
+        var refreshedStamps = new List<FileStamp>(stamps.Count);
+        foreach (FileStamp stamp in stamps)
+        {
+            ct.ThrowIfCancellationRequested();
+            (bool stampChanged, FileStamp refreshed) = CheckStructural(stamp, onHash);
+            if (stampChanged)
+            {
+                changed = stamp;
+                return null;
+            }
+
+            refreshedStamps.Add(refreshed);
+        }
+
+        changed = null;
+        return refreshedStamps;
     }
 
     /// <summary>
@@ -173,7 +207,7 @@ internal static class FileStamping
         FileFreshness current = FileFreshness.Capture(stamp.Path);
         if (stamp.Exists != current.Exists) return (true, stamp);
         if (!stamp.Exists) return (false, stamp);
-        if (stamp.ToFreshness().MatchesStat(current) && stamp.Promoted) return (false, stamp);
+        if (stamp.IsTrustedBy(current)) return (false, stamp);
 
         onHash();
         string? sha = TryHashFile(stamp.Path);

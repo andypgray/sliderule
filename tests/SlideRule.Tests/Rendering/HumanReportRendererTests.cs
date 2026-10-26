@@ -407,7 +407,7 @@ public sealed class HumanReportRendererTests
     [Fact]
     public void RuleBlock_ConstructionViolation_RendersConstructsLineAtNewSite()
     {
-        // ViolationLines has no default arm, so a missing Construction case would render nothing and a red
+        // A Construction kind missing from IsEdge would render nothing and a red
         // report would read green. Pin the located line text: `Source constructs Target` at the `new` site.
         var construction = Violation.Construction(
             SyntheticNodes.Type("App.Factory"), SyntheticNodes.Type("Widgets.Widget"),
@@ -425,7 +425,7 @@ public sealed class HumanReportRendererTests
     [Fact]
     public void RuleBlock_CatchViolation_RendersCatchesLineAtCatchSite()
     {
-        // ViolationLines has no default arm, so a missing Catch case would render nothing and a red report would
+        // A Catch kind missing from IsEdge would render nothing and a red report would
         // read green. Pin the located line text: `Source catches Target` at the `catch` site (GRAMMAR §4.8).
         Violation catchViolation = Violation.Catch(
             SyntheticNodes.Type("App.Handler"), SyntheticNodes.Type("Errors.DbError"),
@@ -443,7 +443,7 @@ public sealed class HumanReportRendererTests
     [Fact]
     public void RuleBlock_ExposeViolation_RendersExposesLineAtExposureSite()
     {
-        // ViolationLines has no default arm, so a missing Expose case would render nothing and a red report would
+        // A Expose kind missing from IsEdge would render nothing and a red report would
         // read green. Pin the located line text: `Source exposes Target` at the exposing member's site (GRAMMAR §4.9).
         Violation exposeViolation = Violation.Expose(
             SyntheticNodes.Type("App.Facade"), SyntheticNodes.Type("Secrets.Secret"),
@@ -780,7 +780,7 @@ public sealed class HumanReportRendererTests
     {
         bool caution = tripwire.Posture == Posture.Caution;
         List<CheckWarning> warnings = files
-            .Select(file => CheckWarning.ScopeTouched(caution, $"Changed file '{file}' is inside the scope.", file))
+            .Select(file => CheckWarning.ScopeTouched(caution, file, tripwire.Scope!.ScopeId, tripwire.Id))
             .ToList();
 
         return new RuleResult(tripwire, RuleStatus.Passed, [], warnings);

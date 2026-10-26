@@ -1,4 +1,3 @@
-using SlideRule.Internal;
 using SlideRule.Model;
 
 namespace SlideRule;
@@ -23,6 +22,6 @@ public static class PropertySelectionConstraints
     /// </summary>
     public static Constraint MustBeGetOnly(this PropertySelection subject)
     {
-        return new MemberMustBeGetOnlyConstraint(Guard.NotNull(subject, nameof(subject)));
+        return new MemberMustBeGetOnlyConstraint(subject);
     }
 }

@@ -323,6 +323,32 @@ public sealed class BaselineAddMatcherTests
     }
 
     [Fact]
+    public void ResolveSubject_MethodInTheFormTheNoMatchListingPrints_ReturnsMatchingViolation()
+    {
+        // The listing below prints a method as 'Save()', so that line pasted back has to resolve.
+        Violation shape = Violation.MemberShape(
+            SyntheticNodes.MemberSubject("MyApp.Web.HomeController", "Save", "M:MyApp.Web.HomeController.Save", MemberKind.Method),
+            Array.Empty<SourceLocation>());
+
+        Violation resolved = BaselineAddMatcher.ResolveSubject("r", [shape], "MyApp.Web.HomeController.Save()");
+
+        resolved.ShouldBeSameAs(shape);
+    }
+
+    [Fact]
+    public void ResolveEdge_MethodInTheFormTheNoMatchListingPrints_ReturnsMatchingViolation()
+    {
+        Violation use = Violation.MemberUse(
+            SyntheticNodes.Type("App.Home"),
+            SyntheticNodes.Member("N.Svc", "Save", "M:N.Svc.Save", MemberKind.Method),
+            Array.Empty<SourceLocation>());
+
+        Violation resolved = BaselineAddMatcher.ResolveEdge("r", [use], "App.Home", "N.Svc.Save()");
+
+        resolved.ShouldBeSameAs(use);
+    }
+
+    [Fact]
     public void ResolveSubject_MemberNoMatch_ListsMemberFullNameFormWithParens()
     {
         // The no-match candidate list echoes the member as 'Save()' (parens iff method), exactly as

@@ -40,24 +40,10 @@ internal sealed class SolutionRoot
         return segments.GetRange(_segments.Count, segments.Count - _segments.Count);
     }
 
-    // The path's segments with every empty and `.` segment dropped and each `..` folded into the segment before
-    // it; a `..` with nothing before it is dropped, as one at the root stays at the root.
+    // Both separators split on every operating system, and an empty segment is no segment.
     private static List<string> Folded(string path)
     {
-        var segments = new List<string>();
-        foreach (string segment in path.Split('/', '\\'))
-        {
-            if (segment.Length == 0 || segment == ".") continue;
-
-            if (segment == "..")
-            {
-                if (segments.Count > 0) segments.RemoveAt(segments.Count - 1);
-                continue;
-            }
-
-            segments.Add(segment);
-        }
-
-        return segments;
+        IEnumerable<string> segments = path.Split('/', '\\').Where(segment => segment.Length > 0);
+        return PathSegments.Fold(segments, anchored: true);
     }
 }

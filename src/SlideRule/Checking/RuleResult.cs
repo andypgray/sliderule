@@ -14,6 +14,9 @@ internal sealed class RuleResult
     private static readonly IReadOnlyDictionary<Violation, BaselineEntry> NothingGrown =
         new Dictionary<Violation, BaselineEntry>();
 
+    private readonly RatchetMeasure _ratchet;
+    private readonly SubjectCoverage _coverage;
+
     // The subject coverage and the ratchet measure arrive whole rather than as loose ints: they land next to each
     // other, and same-typed positionals in a row are a transposition no compiler can catch.
     internal RuleResult(
@@ -38,36 +41,22 @@ internal sealed class RuleResult
         Grandfathered = grandfathered ?? Array.Empty<Violation>();
         GrandfatheredSiteCount = Grandfathered.Sum(violation => violation.Sites.Count);
         RatchetCells = RatchetCellSplit.Of(rule, Grandfathered);
-        StaleBaselineEntries = ratchet.Stale;
-        ShrunkBaselineEntries = ratchet.Shrunk;
-        UncountedBaselineEntries = ratchet.Uncounted;
+        _ratchet = ratchet;
         BaselineCaptured = baselineCaptured;
         GrandfatheredEntries = grandfatheredEntries ?? Array.Empty<BaselineEntry>();
-        SubjectTypes = coverage.Types;
-        SubjectGeneratedTypes = coverage.Generated;
+        _coverage = coverage;
         GrownEntries = grownEntries ?? NothingGrown;
         Exemplar = exemplar ?? Array.Empty<TypeNode>();
-        List<CheckWarning> deadOperands = Warnings
-            .Where(warning => warning.Kind == CheckWarningKind.DeadOperand)
-            .ToList();
-        List<CheckWarning> untested = deadOperands
-            .Where(warning => !warning.Role.IsStricter())
-            .ToList();
-        List<CheckWarning> stricter = deadOperands
-            .Where(warning => warning.Role.IsStricter())
-            .ToList();
-        UntestedOperands = untested
+        UntestedWarnings = DeadOperands(Warnings, stricter: false);
+        StricterWarnings = DeadOperands(Warnings, stricter: true);
+        UntestedOperands = UntestedWarnings
             .Select(warning => warning.Key!)
             .ToList();
-        StricterOperands = stricter
+        StricterOperands = StricterWarnings
             .Select(warning => warning.Key!)
             .ToList();
-        UntestedRole = untested
-            .Select(warning => warning.Role)
-            .FirstOrDefault();
-        StricterRole = stricter
-            .Select(warning => warning.Role)
-            .FirstOrDefault();
+        UntestedRole = UntestedWarnings.Count > 0 ? UntestedWarnings[0].Role : DeadOperandRole.None;
+        StricterRole = StricterWarnings.Count > 0 ? StricterWarnings[0].Role : DeadOperandRole.None;
     }
 
     /// <summary>Gets the rule that was checked.</summary>
@@ -125,13 +114,13 @@ internal sealed class RuleResult
     ///     so a tolerated pair that has grown is matched and live rather than stale, even though it now fails
     ///     the rule. Zero for a rule that takes no baseline.
     /// </summary>
-    public int StaleBaselineEntries { get; }
+    public int StaleBaselineEntries => _ratchet.Stale;
 
     /// <summary>
     ///     Gets how many matched baseline entries now cover fewer sites than they record — a real reduction.
     ///     Each still passes, and <c>sliderule baseline accept-reductions</c> lowers the recorded count.
     /// </summary>
-    public int ShrunkBaselineEntries { get; }
+    public int ShrunkBaselineEntries => _ratchet.Shrunk;
 
     /// <summary>
     ///     Gets how many matched baseline entries record no site count, so each tolerates its pair however
@@ -139,7 +128,7 @@ internal sealed class RuleResult
     ///     pair never count here: they carry no site measure at all, so nothing an author could do would
     ///     clear them from this total.
     /// </summary>
-    public int UncountedBaselineEntries { get; }
+    public int UncountedBaselineEntries => _ratchet.Uncounted;
 
     /// <summary>
     ///     Gets, for each violation that has grown, the baseline entry it went past: a tolerated pair now
@@ -173,14 +162,14 @@ internal sealed class RuleResult
     ///     that reached no subject at all: one that errored, one the run reached no verdict for, a scope's
     ///     tripwire, or a subject that matched nothing.
     /// </summary>
-    public int SubjectTypes { get; }
+    public int SubjectTypes => _coverage.Types;
 
     /// <summary>
     ///     Gets how many of <see cref="SubjectTypes" /> a generator emitted
     ///     (<see cref="ITypeInfo.IsGenerated" />) — the rule's own answer to whether it is aimed at code
     ///     anyone can act on.
     /// </summary>
-    public int SubjectGeneratedTypes { get; }
+    public int SubjectGeneratedTypes => _coverage.Generated;
 
     /// <summary>
     ///     Gets whether the rule's debt has burned to zero on a run that actually measured it, so its
@@ -231,6 +220,18 @@ internal sealed class RuleResult
     ///     over one project's compilation, which never resolves one.
     /// </summary>
     internal IReadOnlyList<TypeNode> Exemplar { get; }
+
+    /// <summary>
+    ///     The <see cref="CheckWarningKind.DeadOperand" /> warnings behind <see cref="UntestedOperands" />, in
+    ///     warning order.
+    /// </summary>
+    internal IReadOnlyList<CheckWarning> UntestedWarnings { get; }
+
+    /// <summary>
+    ///     The <see cref="CheckWarningKind.DeadOperand" /> warnings behind <see cref="StricterOperands" />, in
+    ///     warning order.
+    /// </summary>
+    internal IReadOnlyList<CheckWarning> StricterWarnings { get; }
 
     /// <summary>
     ///     The dead patterns whose death may hide a violation — target patterns and <c>among:</c> parts — each
@@ -307,11 +308,18 @@ internal sealed class RuleResult
             Warnings.Concat(warnings).ToList(),
             SkipReason,
             Grandfathered,
-            new RatchetMeasure(StaleBaselineEntries, ShrunkBaselineEntries, UncountedBaselineEntries),
+            _ratchet,
             BaselineCaptured,
             GrandfatheredEntries,
-            new SubjectCoverage(SubjectTypes, SubjectGeneratedTypes),
+            _coverage,
             GrownEntries,
             exemplar);
+    }
+
+    private static List<CheckWarning> DeadOperands(IReadOnlyList<CheckWarning> warnings, bool stricter)
+    {
+        return warnings
+            .Where(warning => warning.Kind == CheckWarningKind.DeadOperand && warning.Role.IsStricter() == stricter)
+            .ToList();
     }
 }

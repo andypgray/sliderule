@@ -1,3 +1,4 @@
+using SlideRule.Internal;
 using SlideRule.Prose;
 
 namespace SlideRule.Model;
@@ -17,7 +18,7 @@ internal sealed class ProjectNamedAdjective(IReadOnlyList<string> names) : Proje
     {
         get
         {
-            string head = Names.Count == 1 ? "project " : "projects ";
+            string head = Plurals.Noun(Names.Count, "project") + " ";
             return head + ProseFormat.BacktickedList(Names);
         }
     }

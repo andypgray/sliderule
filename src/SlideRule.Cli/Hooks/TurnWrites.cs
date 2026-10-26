@@ -42,14 +42,16 @@ internal static class TurnWrites
             using var reader = new StreamReader(stream);
             while (await reader.ReadLineAsync(ct) is { } line)
             {
-                if (line.Contains("\"tool_use\"", StringComparison.Ordinal))
+                // Text a row must hold to matter, tested before the row is parsed: the parse still decides.
+                if (line.Contains("\"tool_use\"", StringComparison.Ordinal) && NamesAWrittenPath(line))
                     written.AddRange(ToolWrites(line));
-                if (promptId is not null && line.Contains("\"tool_result\"", StringComparison.Ordinal))
+                if (promptId is not null
+                    && line.Contains("\"tool_result\"", StringComparison.Ordinal)
+                    && line.Contains(promptId, StringComparison.Ordinal))
                     answered.UnionWith(ResultsUnder(line, promptId));
             }
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException
-                                       or NotSupportedException)
+        catch (Exception ex) when (HookState.IsFileSystemFailure(ex))
         {
             return null;
         }
@@ -58,6 +60,13 @@ internal static class TurnWrites
             .Select(static write => write.Path)
             .Distinct(PathComparison.Comparer)
             .ToList();
+    }
+
+    // Whether a line holds a property PathOf reads.
+    private static bool NamesAWrittenPath(string line)
+    {
+        return line.Contains("\"file_path\"", StringComparison.Ordinal)
+               || line.Contains("\"notebook_path\"", StringComparison.Ordinal);
     }
 
     // The writes an assistant row's tool calls name: the id of each call with the absolute path it wrote.
@@ -69,15 +78,14 @@ internal static class TurnWrites
         foreach (JsonElement block in content.EnumerateArray())
         {
             if (block.ValueKind != JsonValueKind.Object
-                || StringOf(block, "type") != "tool_use"
-                || StringOf(block, "id") is not { } id
-                || StringOf(block, "name") is not { } name
+                || HookPayload.StringOf(block, "type") != "tool_use"
+                || HookPayload.StringOf(block, "id") is not { } id
+                || HookPayload.StringOf(block, "name") is not { } name
                 || !block.TryGetProperty("input", out JsonElement input)
                 || input.ValueKind != JsonValueKind.Object)
                 continue;
 
-            string? path = PathOf(name, input)
-                ?.Replace('\\', '/');
+            string? path = HookPayload.Forward(PathOf(name, input));
             if (path is not null && HookGit.IsRooted(path)) writes.Add((id, path));
         }
 
@@ -90,8 +98,9 @@ internal static class TurnWrites
         if (Row(line, "user", promptId) is not { } content) return [];
 
         return content.EnumerateArray()
-            .Where(static block => block.ValueKind == JsonValueKind.Object && StringOf(block, "type") == "tool_result")
-            .Select(static block => StringOf(block, "tool_use_id"))
+            .Where(static block => block.ValueKind == JsonValueKind.Object
+                                   && HookPayload.StringOf(block, "type") == "tool_result")
+            .Select(static block => HookPayload.StringOf(block, "tool_use_id"))
             .OfType<string>()
             .ToList();
     }
@@ -105,8 +114,8 @@ internal static class TurnWrites
             using JsonDocument document = JsonDocument.Parse(line);
             JsonElement root = document.RootElement;
             if (root.ValueKind != JsonValueKind.Object
-                || StringOf(root, "type") != type
-                || (promptId is not null && StringOf(root, "promptId") != promptId)
+                || HookPayload.StringOf(root, "type") != type
+                || (promptId is not null && HookPayload.StringOf(root, "promptId") != promptId)
                 || !root.TryGetProperty("message", out JsonElement message)
                 || message.ValueKind != JsonValueKind.Object
                 || !message.TryGetProperty("content", out JsonElement content)
@@ -124,16 +133,8 @@ internal static class TurnWrites
     // The path a call to tool `name` writes, read from its input, or null for a tool that writes nothing.
     private static string? PathOf(string name, JsonElement input)
     {
-        if (FilePathTools.Contains(name, StringComparer.Ordinal)) return StringOf(input, "file_path");
+        if (FilePathTools.Contains(name, StringComparer.Ordinal)) return HookPayload.StringOf(input, "file_path");
 
-        return name == NotebookTool ? StringOf(input, "notebook_path") : null;
-    }
-
-    private static string? StringOf(JsonElement element, string name)
-    {
-        if (!element.TryGetProperty(name, out JsonElement value) || value.ValueKind != JsonValueKind.String) return null;
-
-        string? text = value.GetString();
-        return string.IsNullOrEmpty(text) ? null : text;
+        return name == NotebookTool ? HookPayload.StringOf(input, "notebook_path") : null;
     }
 }

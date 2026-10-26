@@ -31,10 +31,11 @@ internal sealed record UnsupportedProjectStamp(string Project, string Reason)
 ///         on its own which list is which.
 ///     </para>
 ///     <para>
-///         A list that is empty says nothing, so it is carried as <see langword="null" /> and the key is omitted
-///         rather than written as <c>[]</c>, which keeps a clean document byte-identical to the one it always was;
-///         <paramref name="ModelIncomplete" /> is <see langword="true" /> or <see langword="null" /> on the same
-///         policy. Every document still declares its own slots and their order.
+///         A verdict list that is empty says nothing, so it is carried as <see langword="null" /> and the key is
+///         omitted rather than written as <c>[]</c>, which keeps a clean document byte-identical to the one it
+///         always was; <paramref name="ModelIncomplete" /> is <see langword="true" /> or <see langword="null" /> on
+///         the same policy. <paramref name="PackageAudit" /> is carried whole, empty included, and each document
+///         omits it at its own wire. Every document still declares its own slots and their order.
 ///     </para>
 ///     <para>
 ///         The unsupported projects' reason is read here, from <see cref="UnsupportedProjectsNotice.Reason" />, so
@@ -49,7 +50,7 @@ internal readonly record struct WorkspaceTrustStamp(
     IReadOnlyList<string>? RestoreFailedProjects,
     IReadOnlyList<UnsupportedProjectStamp>? UnsupportedProjects,
     IReadOnlyList<MultiTargetedProject>? MultiTargetedProjects,
-    IReadOnlyList<PackageAuditEntry>? PackageAudit)
+    IReadOnlyList<PackageAuditEntry> PackageAudit)
 {
     /// <summary>
     ///     Reads the stamp off a load's own verdict, relativizing every project path against
@@ -59,13 +60,13 @@ internal readonly record struct WorkspaceTrustStamp(
     {
         var relativizer = new PathFormat.Relativizer(solutionDirectory);
         return new WorkspaceTrustStamp(
-            diagnostics.IsIncomplete ? true : null,
+            SlideRuleJson.OmitFalse(diagnostics.IsIncomplete),
             Relative(diagnostics.FailedProjects, relativizer),
             Relative(diagnostics.UncheckedProjects, relativizer),
             Relative(diagnostics.RestoreFailedProjects, relativizer),
             Unsupported(diagnostics.UnsupportedProjects, relativizer),
-            diagnostics.MultiTargetedProjects.Count == 0 ? null : diagnostics.MultiTargetedProjects,
-            diagnostics.PackageAudit is { Count: > 0 } audit ? audit : null);
+            SlideRuleJson.OmitEmpty(diagnostics.MultiTargetedProjects),
+            diagnostics.PackageAudit);
     }
 
     private static IReadOnlyList<string>? Relative(

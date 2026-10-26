@@ -29,7 +29,7 @@ public static class MemberSelectionConstraints
     public static Constraint MustHaveSuffix(
         this MemberSelection subject, [SpecSlot(nameof(SpecSlot.MemberSuffix))] string suffix)
     {
-        return new MemberMustHaveSuffixConstraint(Subject(subject), NotNull(suffix, nameof(suffix)));
+        return new MemberMustHaveSuffixConstraint(subject, NotNull(suffix, nameof(suffix)));
     }
 
     /// <summary>
@@ -43,7 +43,7 @@ public static class MemberSelectionConstraints
     public static Constraint MustHavePrefix(
         this MemberSelection subject, [SpecSlot(nameof(SpecSlot.MemberPrefix))] string prefix)
     {
-        return new MemberMustHavePrefixConstraint(Subject(subject), NotNull(prefix, nameof(prefix)));
+        return new MemberMustHavePrefixConstraint(subject, NotNull(prefix, nameof(prefix)));
     }
 
     /// <summary>
@@ -56,7 +56,7 @@ public static class MemberSelectionConstraints
     public static Constraint MustHaveNameMatching(
         this MemberSelection subject, [SpecSlot(nameof(SpecSlot.MemberNamePattern))] string glob)
     {
-        return new MemberMustHaveNameMatchingConstraint(Subject(subject), NotNull(glob, nameof(glob)));
+        return new MemberMustHaveNameMatchingConstraint(subject, NotNull(glob, nameof(glob)));
     }
 
     /// <summary>
@@ -66,7 +66,7 @@ public static class MemberSelectionConstraints
     /// </summary>
     public static Constraint MustBePublic(this MemberSelection subject)
     {
-        return new MemberMustBePublicConstraint(Subject(subject));
+        return new MemberMustBePublicConstraint(subject);
     }
 
     /// <summary>
@@ -76,7 +76,7 @@ public static class MemberSelectionConstraints
     /// </summary>
     public static Constraint MustBeInternal(this MemberSelection subject)
     {
-        return new MemberMustBeInternalConstraint(Subject(subject));
+        return new MemberMustBeInternalConstraint(subject);
     }
 
     /// <summary>
@@ -89,7 +89,7 @@ public static class MemberSelectionConstraints
     /// </summary>
     public static Constraint MustBeProtected(this MemberSelection subject)
     {
-        return new MemberMustBeProtectedConstraint(Subject(subject));
+        return new MemberMustBeProtectedConstraint(subject);
     }
 
     /// <summary>
@@ -99,7 +99,7 @@ public static class MemberSelectionConstraints
     /// </summary>
     public static Constraint MustBePrivate(this MemberSelection subject)
     {
-        return new MemberMustBePrivateConstraint(Subject(subject));
+        return new MemberMustBePrivateConstraint(subject);
     }
 
     /// <summary>
@@ -108,7 +108,7 @@ public static class MemberSelectionConstraints
     /// </summary>
     public static Constraint MustBeStatic(this MemberSelection subject)
     {
-        return new MemberMustBeStaticConstraint(Subject(subject));
+        return new MemberMustBeStaticConstraint(subject);
     }
 
     /// <summary>
@@ -119,7 +119,7 @@ public static class MemberSelectionConstraints
     /// </summary>
     public static Constraint MustBeAbstract(this MemberSelection subject)
     {
-        return new MemberMustBeAbstractConstraint(Subject(subject));
+        return new MemberMustBeAbstractConstraint(subject);
     }
 
     /// <summary>
@@ -131,7 +131,7 @@ public static class MemberSelectionConstraints
     /// </summary>
     public static Constraint MustBeVirtual(this MemberSelection subject)
     {
-        return new MemberMustBeVirtualConstraint(Subject(subject));
+        return new MemberMustBeVirtualConstraint(subject);
     }
 
     /// <summary>
@@ -146,7 +146,7 @@ public static class MemberSelectionConstraints
     /// </summary>
     public static Constraint MustBeOverridable(this MemberSelection subject)
     {
-        return new MemberMustBeOverridableConstraint(Subject(subject));
+        return new MemberMustBeOverridableConstraint(subject);
     }
 
     /// <summary>
@@ -162,7 +162,7 @@ public static class MemberSelectionConstraints
     public static Constraint MustBeAttributedWith(this MemberSelection subject, Type attributeType)
     {
         TypeAnchor anchor = TypeAnchor.FromType(NotNull(attributeType, nameof(attributeType)));
-        return new MemberMustBeAttributedWithConstraint(Subject(subject), anchor);
+        return new MemberMustBeAttributedWithConstraint(subject, anchor);
     }
 
     /// <summary>
@@ -182,7 +182,7 @@ public static class MemberSelectionConstraints
         this MemberSelection subject, [SpecSlot(nameof(SpecSlot.AttributeName))] string attributeFullName)
     {
         TypeAnchor anchor = TypeAnchor.FromName(NotNull(attributeFullName, nameof(attributeFullName)));
-        return new MemberMustBeAttributedWithConstraint(Subject(subject), anchor);
+        return new MemberMustBeAttributedWithConstraint(subject, anchor);
     }
 
     /// <summary>
@@ -210,7 +210,7 @@ public static class MemberSelectionConstraints
     /// </summary>
     public static Constraint MustNotBeAttributedWith(this MemberSelection subject, Type first, params Type[] more)
     {
-        return new MemberMustNotBeAttributedWithConstraint(Subject(subject), TypeAnchor.FromTypes(first, more));
+        return new MemberMustNotBeAttributedWithConstraint(subject, TypeAnchor.FromTypes(first, more));
     }
 
     /// <summary>
@@ -233,7 +233,7 @@ public static class MemberSelectionConstraints
         [SpecSlot(nameof(SpecSlot.AttributeName))]
         params string[] more)
     {
-        return new MemberMustNotBeAttributedWithConstraint(Subject(subject), TypeAnchor.FromNames(first, more));
+        return new MemberMustNotBeAttributedWithConstraint(subject, TypeAnchor.FromNames(first, more));
     }
 
     /// <summary>
@@ -268,11 +268,6 @@ public static class MemberSelectionConstraints
         [SpecSlot(nameof(SpecSlot.Description))]
         string description)
     {
-        return new MemberMustConstraint(Subject(subject), NotNull(predicate, nameof(predicate)), NotNull(description, nameof(description)));
-    }
-
-    private static MemberSelection Subject(MemberSelection subject)
-    {
-        return NotNull(subject, nameof(subject));
+        return new MemberMustConstraint(subject, NotNull(predicate, nameof(predicate)), NotNull(description, nameof(description)));
     }
 }

@@ -41,4 +41,9 @@ public sealed class Layer : Selection
     internal override SelectionNoun Noun => _registration.Noun;
 
     internal override IReadOnlyList<SelectionAdjective> Adjectives => Array.Empty<SelectionAdjective>();
+
+    internal override Selection WithRefinements(IReadOnlyList<SelectionAdjective> adjectives)
+    {
+        return new RefinedSelection(Owner, Noun, adjectives);
+    }
 }

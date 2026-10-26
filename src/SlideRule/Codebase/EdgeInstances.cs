@@ -56,6 +56,13 @@ internal static class EdgeInstances
 {
     internal static IReadOnlyList<EdgeInstance> Of(ReferenceEdge edge)
     {
-        return edge.Evidence.Instances ?? [new EdgeInstance(edge.Source.ProjectName, edge.Target.ProjectName, edge.Sites)];
+        return edge.Evidence.Instances ?? [Implicit(edge)];
+    }
+
+    // What an edge with no record stands for: the edge itself, made at its source's project and reaching its
+    // target's.
+    internal static EdgeInstance Implicit(ReferenceEdge edge)
+    {
+        return new EdgeInstance(edge.Source.ProjectName, edge.Target.ProjectName, edge.Sites);
     }
 }

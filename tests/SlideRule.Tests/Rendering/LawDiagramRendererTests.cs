@@ -392,9 +392,9 @@ public sealed class LawDiagramRendererTests
     }
 
     [Fact]
-    public void Block_AUnionSubject_IsListedAndNeverReadsTheNoun()
+    public void Block_AUnionSubject_IsListed()
     {
-        // Arrange — UnionSelection.Noun throws by design; this rendering at all is the pin.
+        // Arrange — a union has no single noun, so it is no place the drawing can draw.
         ArchitectureModel model = Checker.Model(arch =>
             arch.Rule("r/union")
                 .Enforce(arch.AnyOf(arch.Namespace("A.*"), arch.Namespace("B.*"))

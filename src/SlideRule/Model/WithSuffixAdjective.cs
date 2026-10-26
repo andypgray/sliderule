@@ -9,5 +9,5 @@ internal sealed class WithSuffixAdjective(string suffix) : SelectionAdjective
 
     internal override AdjectivePlacement Placement => AdjectivePlacement.Inline;
 
-    internal override string Fragment => $" named {ProseFormat.Backtick("*" + Suffix)}";
+    internal override string Fragment => $" named {ProseFormat.SuffixGlob(Suffix)}";
 }

@@ -8,18 +8,18 @@ internal sealed class RuleBuilder(RuleRegistration registration) : IRuleBuilder
 {
     public IEnforceRule Enforce(Constraint constraint)
     {
-        registration.PostureCount++;
-        registration.Posture = Posture.Enforce;
         registration.Constraint = Guard.NotNull(constraint, nameof(constraint));
+        registration.RecordPosture(Posture.Enforce);
         return new EnforceRuleBuilder(registration);
     }
 
     public IMigrateRule Migrate(string from, Constraint to)
     {
-        registration.PostureCount++;
-        registration.Posture = Posture.Migrate;
-        registration.MigrateFrom = Guard.NotNull(from, nameof(from));
-        registration.Constraint = Guard.NotNull(to, nameof(to));
+        string guardedFrom = Guard.NotNull(from, nameof(from));
+        Constraint guardedTo = Guard.NotNull(to, nameof(to));
+        registration.MigrateFrom = guardedFrom;
+        registration.Constraint = guardedTo;
+        registration.RecordPosture(Posture.Migrate);
         return new MigrateRuleBuilder(registration);
     }
 }

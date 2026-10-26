@@ -184,21 +184,13 @@ internal sealed class BinlogCaptureStore
 
         // A solution filter narrows a build to a subset; a capture keyed on it would silently shrink the
         // model, and a replay owns no workspace to announce the narrowing from. The cold .slnf path is
-        // unaffected: this guard is only about persisting a build capture. Refusing early is also what keeps
-        // RefuseIfCoverageMismatch's unguarded ReadCsprojMembers safe: that raw-membership reader runs the
-        // classic-.sln regex over a filter's JSON and gets zero members, so a .slnf would refuse for a nonsense
-        // reason there.
+        // unaffected: this guard is only about persisting a build capture.
         if (SolutionProjectFileParser.IsFilterFormat(solutionPath))
             throw new UserErrorException(SolutionFilterNotSupportedMessage(Path.GetFileName(solutionPath)));
 
-        IReadOnlyList<CaptureProjectEntry> projects = CollectProjects(replayedSolution);
-        IReadOnlyList<string> structuralPaths = ProjectCone.SolutionStructuralPaths(
-            solutionPath,
-            projects.Select(project => (
-                project.CsprojPath,
-                project.ProjectDirectory,
-                project.EvaluatedOutputPath,
-                project.IntermediateAssemblyPath)));
+        IReadOnlyList<ProjectInputs> inputs = CollectProjects(replayedSolution);
+        IReadOnlyList<string> structuralPaths = ProjectCone.SolutionStructuralPaths(solutionPath, inputs);
+        List<CaptureProjectEntry> projects = inputs.Select(ToEntry).ToList();
 
         RefuseIfStale(structuralPaths, binlogFullPath, binlogArgument, ct);
         RefuseIfCoverageMismatch(projects, binlogArgument);
@@ -323,14 +315,10 @@ internal sealed class BinlogCaptureStore
         if (!File.Exists(captureBinlogPath)) return CaptureValidation.Invalid(UnreadableNotice);
 
         // Structural sweep — an existence flip or content change is the stale variant, naming the file.
-        var refreshedStructural = new List<FileStamp>(manifest.StructuralStamps.Count);
-        foreach (FileStamp stamp in manifest.StructuralStamps)
-        {
-            ct.ThrowIfCancellationRequested();
-            (bool changed, FileStamp refreshed) = FileStamping.CheckStructural(stamp, () => ContentHashCount++);
-            if (changed) return CaptureValidation.Invalid(StaleNotice(stamp.Path));
-            refreshedStructural.Add(refreshed);
-        }
+        if (FileStamping.SweepStructural(
+                manifest.StructuralStamps, () => ContentHashCount++, ct, out FileStamp? changed)
+            is not { } refreshedStructural)
+            return CaptureValidation.Invalid(StaleNotice(changed!.Path));
 
         // Every recorded document (source and obj-generated) must still exist — a delete or clean is stale.
         foreach (CaptureProjectEntry project in manifest.Projects)
@@ -374,11 +362,9 @@ internal sealed class BinlogCaptureStore
     // the capture rather than let replay drift from the real build. That predicate is this store's only
     // departure from the shared collapse; everything else, the multi-target-framework collapse included, is
     // SolutionProjects' answer and the fragment cache's too.
-    private static IReadOnlyList<CaptureProjectEntry> CollectProjects(Solution solution)
+    private static IReadOnlyList<ProjectInputs> CollectProjects(Solution solution)
     {
-        return SolutionProjects.Collect(solution, static (_, _) => true)
-            .Select(ToEntry)
-            .ToList();
+        return SolutionProjects.Collect(solution, static (_, _) => true);
     }
 
     private static CaptureProjectEntry ToEntry(ProjectInputs project)

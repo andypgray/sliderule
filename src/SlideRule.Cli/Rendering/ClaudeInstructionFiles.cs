@@ -121,11 +121,8 @@ internal static class ClaudeInstructionFiles
     {
         try
         {
-            if (new FileInfo(file).ResolveLinkTarget(returnFinalTarget: true) is { } target
-                && string.Equals(
-                    PathCanonicalizer.Resolve(target.FullName),
-                    PathCanonicalizer.Resolve(blockFile),
-                    PathComparison.Comparison))
+            if (string.Equals(
+                    PathCanonicalizer.Resolve(file), PathCanonicalizer.Resolve(blockFile), PathComparison.Comparison))
                 return true;
 
             string text = File.ReadAllText(file);

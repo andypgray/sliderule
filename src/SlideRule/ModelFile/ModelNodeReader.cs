@@ -40,8 +40,6 @@ internal sealed class ModelNodeReader
 
     internal ModelRefusal? Refusal { get; private set; }
 
-    private bool Failed => Refusal is not null;
-
     internal ModelDocument? ReadDocument(StrictJsonValue root)
     {
         StrictJsonValue? obj = AsObject(root, RootWhere);
@@ -147,15 +145,14 @@ internal sealed class ModelNodeReader
         StrictJsonValue? definition = Optional(entry, "definition");
         if (globs is null == definition is null)
         {
-            RefuseAt(entry, "a layer takes exactly one of " + Field("globs") + " and " + Field("definition") + ".");
+            RefuseExactlyOneOf(entry, "a layer", "globs", "definition");
             return null;
         }
 
         Layer? minted = definition is null ? MintGlobLayer(entry, name, globs!) : MintDefinedLayer(name, definition);
         if (minted is null) return null;
 
-        string? purpose = OptionalText(entry, "purpose");
-        if (Failed) return null;
+        if (!OptionalText(entry, "purpose", out string? purpose)) return null;
         if (purpose is not null) minted.Purpose(purpose);
 
         _layers.Add(name, minted);
@@ -171,7 +168,7 @@ internal sealed class ModelNodeReader
         // A layer with no glob at all has neither of the two things a layer is defined by.
         if (patterns.Count == 0)
         {
-            RefuseAt(entry, "a layer takes exactly one of " + Field("globs") + " and " + Field("definition") + ".");
+            RefuseExactlyOneOf(entry, "a layer", "globs", "definition");
             return null;
         }
 
@@ -216,11 +213,9 @@ internal sealed class ModelNodeReader
         string? because = RequiredText(entry, "a rule", "because");
         if (because is null) return null;
 
-        string? fix = OptionalText(entry, "fix");
-        if (Failed) return null;
+        if (!OptionalText(entry, "fix", out string? fix)) return null;
 
-        string? citation = OptionalText(entry, "citation");
-        if (Failed) return null;
+        if (!OptionalText(entry, "citation", out string? citation)) return null;
 
         Selection? exemplar = null;
         if (Optional(entry, "exemplar") is { } exemplarValue)
@@ -344,14 +339,11 @@ internal sealed class ModelNodeReader
         IReadOnlyList<string>? surface = RequiredTexts(obj, "the scope", "surface");
         if (surface is null) return null;
 
-        string? baselinePath = OptionalText(obj, "baselinePath");
-        if (Failed) return null;
+        if (!OptionalText(obj, "baselinePath", out string? baselinePath)) return null;
 
-        string? dragons = OptionalText(obj, "dragons");
-        if (Failed) return null;
+        if (!OptionalText(obj, "dragons", out string? dragons)) return null;
 
-        string? dragonsDoc = OptionalText(obj, "dragonsDoc");
-        if (Failed) return null;
+        if (!OptionalText(obj, "dragonsDoc", out string? dragonsDoc)) return null;
 
         return new ScopeData(role, surface, baselinePath, dragons, dragonsDoc, scopeId, scoped);
     }
@@ -366,7 +358,7 @@ internal sealed class ModelNodeReader
         StrictJsonValue? union = Optional(obj, "union");
         if (noun is null == union is null)
         {
-            RefuseAt(obj, "a selection takes exactly one of " + Field("noun") + " and " + Field("union") + ".");
+            RefuseExactlyOneOf(obj, "a selection", "noun", "union");
             return null;
         }
 
@@ -401,7 +393,7 @@ internal sealed class ModelNodeReader
         if (adjectives is null) return null;
 
         var built = UnionSelection.Create(_arch, parts);
-        return adjectives.Count == 0 ? built : built.WithAdjectives(adjectives);
+        return adjectives.Count == 0 ? built : built.WithRefinements(adjectives);
     }
 
     private MemberSelection? ReadMemberSelection(StrictJsonValue value, string what)
@@ -454,47 +446,38 @@ internal sealed class ModelNodeReader
         StrictJsonValue? node = AsObject(value, what);
         if (node is null) return null;
 
-        string? discriminator = Discriminator(node, family);
+        string? discriminator = RequiredText(node, family, "node");
         if (discriminator is null) return null;
 
         if (arms.TryGetValue(discriminator, out Func<ModelNodeReader, StrictJsonValue, TNode?> arm))
             return arm(this, node);
 
-        NotA(node, discriminator, family);
+        // Positioned at the value that named the discriminator rather than at the node, because that word is
+        // what a reader has to change.
+        RefuseNotA(node.GetProperty("node"), discriminator, family);
         return null;
     }
 
+    // Absence reads as empty, and an empty array is accepted too, because a hand-edited file may carry one.
     private IReadOnlyList<TNode>? ReadAdjectives<TNode>(
         StrictJsonValue obj, string family,
         IReadOnlyDictionary<string, Func<ModelNodeReader, StrictJsonValue, TNode?>> arms)
         where TNode : class
     {
-        StrictJsonValue? array = Adjectives(obj);
-        if (array is null) return Failed ? null : Array.Empty<TNode>();
+        if (Optional(obj, "adjectives") is not { } value) return Array.Empty<TNode>();
 
-        return Each(array, element => ReadNode(element, EntryOf("adjectives"), family, arms));
+        StrictJsonValue? array = AsArray(value, Field("adjectives"));
+        return array is null ? null : Each(array, element => ReadNode(element, EntryOf("adjectives"), family, arms));
     }
 
-    // The adjectives array, or null for "there is none" — absence reads as empty, and an empty array is
-    // accepted too, because a hand-edited file may carry one.
-    private StrictJsonValue? Adjectives(StrictJsonValue obj)
+    private void RefuseNotA(StrictJsonValue at, string word, string family)
     {
-        StrictJsonValue? value = Optional(obj, "adjectives");
-        if (value is null) return null;
-
-        return AsArray(value, Field("adjectives"));
+        RefuseAt(at, JsonText.Quote(word) + " is not " + family + ".");
     }
 
-    private string? Discriminator(StrictJsonValue node, string where)
+    internal void RefuseExactlyOneOf(StrictJsonValue at, string where, string first, string second)
     {
-        return RequiredText(node, where, "node");
-    }
-
-    // Positioned at the value that named the discriminator rather than at the node, because that word is what
-    // a reader has to change.
-    private void NotA(StrictJsonValue node, string discriminator, string family)
-    {
-        RefuseAt(node.GetProperty("node"), JsonText.Quote(discriminator) + " is not " + family + ".");
+        RefuseAt(at, where + " takes exactly one of " + Field(first) + " and " + Field(second) + ".");
     }
 
     internal Selection? RequiredSelection(StrictJsonValue obj, string where, string key)
@@ -635,13 +618,7 @@ internal sealed class ModelNodeReader
         StrictJsonValue? value = Required(obj, where, key);
         if (value is null) return false;
 
-        string? text = AsText(value, Field(key));
-        if (text is null) return false;
-
-        if (TryParseEnum(text, out parsed)) return true;
-
-        RefuseAt(value, JsonText.Quote(text) + " is not " + family + ".");
-        return false;
+        return AsEnum(value, key, family, out parsed);
     }
 
     private bool RequiredFlag(StrictJsonValue obj, string where, string key, out bool flag)
@@ -661,17 +638,10 @@ internal sealed class ModelNodeReader
         StrictJsonValue? value = Optional(obj, key);
         if (value is null) return true;
 
-        string? text = AsText(value, Field(key));
-        if (text is null) return false;
+        if (!AsEnum(value, key, family, out TEnum read)) return false;
 
-        if (TryParseEnum(text, out TEnum read))
-        {
-            parsed = read;
-            return true;
-        }
-
-        RefuseAt(value, JsonText.Quote(text) + " is not " + family + ".");
-        return false;
+        parsed = read;
+        return true;
     }
 
     private bool OptionalFlag(StrictJsonValue obj, string key, out bool flag)
@@ -760,10 +730,14 @@ internal sealed class ModelNodeReader
         return Each(array, element => AsText(element, EntryOf(key)));
     }
 
-    private string? OptionalText(StrictJsonValue obj, string key)
+    private bool OptionalText(StrictJsonValue obj, string key, out string? text)
     {
+        text = null;
         StrictJsonValue? value = Optional(obj, key);
-        return value is null ? null : AsText(value, Field(key));
+        if (value is null) return true;
+
+        text = AsText(value, Field(key));
+        return text is not null;
     }
 
     private StrictJsonValue? AsObject(StrictJsonValue value, string what)
@@ -802,6 +776,19 @@ internal sealed class ModelNodeReader
 
         flag = value.GetBoolean();
         return true;
+    }
+
+    private bool AsEnum<TEnum>(StrictJsonValue value, string key, string family, out TEnum parsed)
+        where TEnum : struct, Enum
+    {
+        parsed = default;
+        string? text = AsText(value, Field(key));
+        if (text is null) return false;
+
+        if (TryParseEnum(text, out parsed)) return true;
+
+        RefuseNotA(value, text, family);
+        return false;
     }
 
     private StrictJsonValue? Required(StrictJsonValue obj, string where, string key)

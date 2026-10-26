@@ -1,4 +1,5 @@
 using SlideRule.Cli.Pipeline;
+using SlideRule.Hosting;
 
 namespace SlideRule.Cli.Replay;
 
@@ -30,6 +31,12 @@ internal sealed class NoticingSolutionSource(string notice, TextWriter error, IS
     {
         Notice();
         return inner.AcquireClosureAsync(solutionPath, projectFiles, ct);
+    }
+
+    /// <inheritdoc />
+    public ArchitectureModel LoadSpecModel(string specDllPath)
+    {
+        return inner.LoadSpecModel(specDllPath);
     }
 
     private void Notice()

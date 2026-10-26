@@ -27,6 +27,6 @@ public sealed class FragmentExtractorCancellationTests
         using var cancelled = new CancellationTokenSource();
         cancelled.Cancel();
 
-        Should.Throw<OperationCanceledException>(() => FragmentExtractor.ExtractAll([input], null, cancelled.Token));
+        Should.Throw<OperationCanceledException>(() => FragmentExtractor.ExtractAll([input], cancelled.Token));
     }
 }

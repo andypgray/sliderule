@@ -123,9 +123,9 @@ internal static class ReferenceWalker
 
         if (ReferenceEquals(widest, name)) return name.Span;
 
-        SyntaxTree tree = name.SyntaxTree;
-        int nameLine = tree.GetLineSpan(name.Span).StartLinePosition.Line;
-        int widestLine = tree.GetLineSpan(widest.Span).StartLinePosition.Line;
+        TextLineCollection lines = name.SyntaxTree.GetText().Lines;
+        int nameLine = lines.GetLineFromPosition(name.SpanStart).LineNumber;
+        int widestLine = lines.GetLineFromPosition(widest.SpanStart).LineNumber;
 
         return widestLine == nameLine ? widest.Span : name.Span;
     }
@@ -314,7 +314,7 @@ internal static class ReferenceWalker
         CatchClauseSyntax catchClause, SemanticModel model, INamedTypeSymbol? bareCatchType)
     {
         if (catchClause.Declaration is { } declaration)
-            return model.GetTypeInfo(declaration.Type).Type?.BestCandidate() as INamedTypeSymbol;
+            return model.GetTypeInfo(declaration.Type).Type.BestNamedCandidate();
 
         return bareCatchType;
     }
@@ -328,7 +328,7 @@ internal static class ReferenceWalker
     /// </summary>
     private static INamedTypeSymbol? ThrownTypeOf(ExpressionSyntax expression, SemanticModel model)
     {
-        return model.GetTypeInfo(expression).Type?.BestCandidate() as INamedTypeSymbol;
+        return model.GetTypeInfo(expression).Type.BestNamedCandidate();
     }
 
     /// <summary>
@@ -340,8 +340,7 @@ internal static class ReferenceWalker
         ISymbol? ctor = model.GetSymbolInfo(creation).BestCandidate();
         if (ctor is IMethodSymbol constructor) return constructor.ContainingType;
 
-        ISymbol? created = model.GetTypeInfo(creation).Type?.BestCandidate();
-        return created as INamedTypeSymbol;
+        return model.GetTypeInfo(creation).Type.BestNamedCandidate();
     }
 
     /// <summary>

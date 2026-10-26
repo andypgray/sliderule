@@ -50,8 +50,8 @@ internal static class FragmentExtractor
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        return new ExtractState(input.Compilation, input.GeneratedTrees, siblingProjects: null, cancellationToken)
-            .Run(input);
+        return new ExtractState(input, siblingProjects: null, cancellationToken)
+            .Run();
     }
 
     /// <summary>
@@ -92,8 +92,8 @@ internal static class FragmentExtractor
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        return new ExtractState(input.Compilation, input.GeneratedTrees, siblingProjects, cancellationToken)
-            .RunOneProject(input);
+        return new ExtractState(input, siblingProjects, cancellationToken)
+            .RunOneProject();
     }
 
     /// <summary>
@@ -129,15 +129,13 @@ internal static class FragmentExtractor
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        return new ExtractState(input.Compilation, input.GeneratedTrees, siblingProjects, cancellationToken)
-            .RunDocument(input, tree, semanticModel, declaringTrees);
+        return new ExtractState(input, siblingProjects, cancellationToken)
+            .RunDocument(tree, semanticModel, declaringTrees);
     }
 
     /// <summary>
     ///     Every input extracted, in <em>input</em> order — the ordinal order the merge's first-declarer-wins
     ///     rule reads, so the model is byte-identical however the work is scheduled.
-    ///     <paramref name="artifactFacts" /> pairs with <paramref name="inputs" /> by index, and it, or an entry of
-    ///     it, is null wherever nothing evaluated the project.
     /// </summary>
     /// <remarks>
     ///     <para>
@@ -154,15 +152,13 @@ internal static class FragmentExtractor
     ///         extraction threw.
     ///     </para>
     /// </remarks>
-    public static CodebaseFragment[] ExtractAll(
-        IReadOnlyList<CompilationInput> inputs, IReadOnlyList<ProjectArtifactFacts?>? artifactFacts,
-        CancellationToken cancellationToken)
+    public static CodebaseFragment[] ExtractAll(IReadOnlyList<CompilationInput> inputs, CancellationToken cancellationToken)
     {
         var fragments = new CodebaseFragment[inputs.Count];
 
         try
         {
-            Parallel.For(0, inputs.Count, i => fragments[i] = WithArtifactFacts(Extract(inputs[i], cancellationToken), ArtifactFactsAt(artifactFacts, i)));
+            Parallel.For(0, inputs.Count, i => fragments[i] = Extract(inputs[i], cancellationToken));
         }
         catch (AggregateException aggregate) when (aggregate.InnerExceptions.Count > 0)
         {
@@ -170,11 +166,6 @@ internal static class FragmentExtractor
         }
 
         return fragments;
-    }
-
-    private static ProjectArtifactFacts? ArtifactFactsAt(IReadOnlyList<ProjectArtifactFacts?>? artifactFacts, int index)
-    {
-        return artifactFacts is not null && index < artifactFacts.Count ? artifactFacts[index] : null;
     }
 
     // The declared project references are left out: they are paths and the fragment states names, and the loader
@@ -194,6 +185,19 @@ internal static class FragmentExtractor
             LocksPackagesSite = facts.LocksPackagesSite,
             Properties = facts.Properties
         };
+    }
+
+    // Every fragment's declared types and externals are ordinal by FQN, so a persisted fragment is byte-stable.
+    private static List<FragmentType> OrderedByName(IEnumerable<FragmentType> types)
+    {
+        return types.OrderBy(t => t.Facts.FullName, StringComparer.Ordinal)
+            .ToList();
+    }
+
+    private static List<FragmentExternal> OrderedByName(IEnumerable<FragmentExternal> externals)
+    {
+        return externals.OrderBy(e => e.Facts.FullName, StringComparer.Ordinal)
+            .ToList();
     }
 
     /// <summary>
@@ -223,11 +227,6 @@ internal static class FragmentExtractor
         foreach (INamedTypeSymbol nested in type.GetTypeMembers())
         foreach (INamedTypeSymbol descendant in TypeAndNested(nested))
             yield return descendant;
-    }
-
-    private static string FullNameOf(INamedTypeSymbol symbol)
-    {
-        return symbol.OriginalDefinition.ToDisplayString(FullNameFormat);
     }
 
     private static string NamespaceOf(INamedTypeSymbol symbol)
@@ -426,7 +425,7 @@ internal static class FragmentExtractor
         private readonly Dictionary<(string Src, string Caught), SortedSet<FragmentSite>> _catchEdgeUnfilteredSites = new();
         private readonly Compilation _compilation;
 
-        // RS1024 is suppressed at both symbol-keyed memos: each is built with SymbolEqualityComparer, as the rule
+        // RS1024 is suppressed at every symbol-keyed memo: each is built with SymbolEqualityComparer, as the rule
         // asks, and the analyzer that ships with the compiler-API version this project floors on reports them
         // anyway, however the dictionary type is spelled (measured). Each suppression stays two lines wide so a
         // symbol-keyed table built without the comparer still reds.
@@ -439,11 +438,15 @@ internal static class FragmentExtractor
         private readonly Dictionary<(string Src, string Exposed), SortedSet<FragmentSite>> _exposureEdgeSites = new();
         private readonly Dictionary<string, FragmentExternal> _externals = new(StringComparer.Ordinal);
 
-        // The memo behind this state's FullNameOf, keyed on OriginalDefinition so every construction of one generic
-        // shares an entry: the display walk is the most expensive per-reference operation in extraction, and a
-        // handful of symbols recur across thousands of sites.
+        // The memo behind this state's DefinitionName, keyed on OriginalDefinition so every construction of one
+        // generic shares an entry: the display walk is the most expensive per-reference operation in extraction, and
+        // a handful of symbols recur across thousands of sites.
 #pragma warning disable RS1024 // false positive, as above
         private readonly Dictionary<ISymbol, string> _fullNames = new(SymbolEqualityComparer.Default);
+#pragma warning restore RS1024
+
+#pragma warning disable RS1024 // false positive, as above
+        private readonly Dictionary<ISymbol, string> _memberSymbolIds = new(SymbolEqualityComparer.Default);
 #pragma warning restore RS1024
 
         // [System.CodeDom.Compiler.GeneratedCode] as this compilation resolves it, or null where nothing
@@ -457,6 +460,7 @@ internal static class FragmentExtractor
         private readonly IReadOnlyCollection<SyntaxTree>? _generatorOutputTrees;
         private readonly Dictionary<SyntaxTree, bool> _generatedTreeVerdicts = new();
         private readonly Dictionary<(string Src, string Injected), SortedSet<FragmentSite>> _injectionEdgeSites = new();
+        private readonly CompilationInput _input;
         private readonly Dictionary<(string Src, string MemberSymbolId), MemberEdgeBuilder> _memberEdges = new();
         private readonly Dictionary<(Lifetime Lifetime, string Service, string? Impl), SortedSet<FragmentSite>> _registrationSites = new();
 
@@ -483,57 +487,56 @@ internal static class FragmentExtractor
         private readonly HashSet<string> _unvouched = new(StringComparer.Ordinal);
         private readonly Dictionary<(string Src, string Thrown), SortedSet<FragmentSite>> _throwEdgeSites = new();
 
-        public ExtractState(
-            Compilation compilation, IReadOnlyCollection<SyntaxTree>? generatorOutputTrees,
-            SiblingProjects? siblingProjects, CancellationToken cancellationToken)
+        public ExtractState(CompilationInput input, SiblingProjects? siblingProjects, CancellationToken cancellationToken)
         {
-            _compilation = compilation;
-            _bareCatchType = ReferenceWalker.BareCatchTypeOf(compilation);
-            _generatedCodeAttribute = compilation.GetTypeByMetadataName(GeneratedCodeAttributeFullName);
-            _generatorOutputTrees = generatorOutputTrees;
+            _input = input;
+            _compilation = input.Compilation;
+            _bareCatchType = ReferenceWalker.BareCatchTypeOf(_compilation);
+            _generatedCodeAttribute = _compilation.GetTypeByMetadataName(GeneratedCodeAttributeFullName);
+            _generatorOutputTrees = input.GeneratedTrees;
             _cancellationToken = cancellationToken;
             _siblingProjects = siblingProjects;
         }
 
-        public CodebaseFragment Run(CompilationInput input)
+        public CodebaseFragment Run()
         {
             WalkOwnTypes(DeclaredTypes(_compilation));
 
             WalkRegistrations();
 
-            return Materialize(input, input.ProjectReferences);
+            return Materialize(_input.ProjectReferences);
         }
 
-        public IReadOnlyList<CodebaseFragment> RunOneProject(CompilationInput input)
+        public IReadOnlyList<CodebaseFragment> RunOneProject()
         {
             // The registration walk is skipped: every rule that reads a service registration is outside the set
             // a one-project view can decide, and the walk costs a pass over every syntax tree in every build. The
             // fragment's ServiceRegistrations is therefore empty here.
-            return RunView(input, DeclaredTypes(_compilation));
+            return RunView(DeclaredTypes(_compilation));
         }
 
         public IReadOnlyList<CodebaseFragment> RunDocument(
-            CompilationInput input, SyntaxTree tree, SemanticModel? semanticModel, DeclaringTrees declaringTrees)
+            SyntaxTree tree, SemanticModel? semanticModel, DeclaringTrees declaringTrees)
         {
             if (semanticModel is not null) _semanticModels[tree] = semanticModel;
 
-            _ownProjectName = input.ProjectName;
+            _ownProjectName = _input.ProjectName;
 
             // The registration walk is skipped for RunOneProject's reason and one more: it is a whole-compilation
             // walk, so running it per document would read every tree once per document and record the same facts
             // that many times.
-            return RunView(input, declaringTrees.In(tree));
+            return RunView(declaringTrees.In(tree));
         }
 
         // The sibling pass runs after the own passes, because its subjects are the names they minted as
         // externals, and before materialization, because what it cannot vouch for decides which own edges survive.
-        private IReadOnlyList<CodebaseFragment> RunView(CompilationInput input, IEnumerable<INamedTypeSymbol> ownTypes)
+        private IReadOnlyList<CodebaseFragment> RunView(IEnumerable<INamedTypeSymbol> ownTypes)
         {
             WalkOwnTypes(ownTypes);
 
             List<SideFragment> sides = WalkSiblings();
 
-            var fragments = new List<CodebaseFragment> { Materialize(input, SiblingProjectReferences()) };
+            var fragments = new List<CodebaseFragment> { Materialize(SiblingProjectReferences()) };
             foreach (SideFragment side in sides) fragments.Add(side.ToFragment());
 
             return fragments;
@@ -638,16 +641,12 @@ internal static class FragmentExtractor
         {
             string srcFqn = FullNameOf(symbol);
 
-            // Drops the self-edge before resolving, so a self-edge mints no external. Returns the endpoint's FQN, or
-            // null for an empty or self-dropped channel: the decision the catch subsets gate on.
+            // Returns the endpoint's FQN, or null for an empty or self-dropped channel: the decision the catch subsets
+            // gate on.
             string? Record(INamedTypeSymbol? endpoint, Dictionary<(string, string), SortedSet<FragmentSite>> map, FragmentSite site)
             {
-                if (endpoint is null) return null;
+                if (EdgeEndpoint(srcFqn, endpoint) is not { } fqn) return null;
 
-                string fqn = FullNameOf(endpoint);
-                if (fqn == srcFqn) return null;
-
-                ResolveName(endpoint);
                 map.SitesFor((srcFqn, fqn)).Add(site);
                 return fqn;
             }
@@ -682,11 +681,23 @@ internal static class FragmentExtractor
             }
         }
 
-        // The unresolved: fallback, for a member with no documentation ID (an error or unnamed symbol), mirrors the
-        // type facts' own.
+        // Drops the self-edge before resolving, so a self-edge mints no external; null for an empty or dropped
+        // endpoint.
+        private string? EdgeEndpoint(string srcFqn, INamedTypeSymbol? endpoint)
+        {
+            if (endpoint is null) return null;
+
+            INamedTypeSymbol definition = endpoint.OriginalDefinition;
+            string fqn = FullNameOf(definition);
+            if (fqn == srcFqn) return null;
+
+            ResolveName(definition, fqn);
+            return fqn;
+        }
+
         private void RecordMemberEdge(string srcFqn, string containingFqn, ISymbol member, FragmentSite site)
         {
-            string memberSymbolId = member.GetDocumentationCommentId() ?? "unresolved:" + containingFqn + "." + member.Name;
+            string memberSymbolId = MemberSymbolIdOf(member);
 
             if (!_memberEdges.TryGetValue((srcFqn, memberSymbolId), out MemberEdgeBuilder? builder))
             {
@@ -712,11 +723,8 @@ internal static class FragmentExtractor
                     if (ParameterSite(parameter) is not { } site) continue;
 
                     foreach (INamedTypeSymbol endpoint in DecomposeType(parameter.Type))
-                    {
-                        string injectedFqn = ResolveName(endpoint);
-                        if (injectedFqn == srcFqn) continue;
-                        _injectionEdgeSites.SitesFor((srcFqn, injectedFqn)).Add(site);
-                    }
+                        if (EdgeEndpoint(srcFqn, endpoint) is { } injectedFqn)
+                            _injectionEdgeSites.SitesFor((srcFqn, injectedFqn)).Add(site);
                 }
             }
         }
@@ -733,8 +741,7 @@ internal static class FragmentExtractor
                 foreach (ITypeSymbol signatureType in SignatureTypesOf(symbol))
                 foreach (INamedTypeSymbol endpoint in DecomposeType(signatureType))
                 {
-                    string exposedFqn = ResolveName(endpoint);
-                    if (exposedFqn == srcFqn) continue;
+                    if (EdgeEndpoint(srcFqn, endpoint) is not { } exposedFqn) continue;
                     SortedSet<FragmentSite> sites = _exposureEdgeSites.SitesFor((srcFqn, exposedFqn));
                     foreach (FragmentSite site in member.DeclarationSites) sites.Add(site);
                 }
@@ -755,8 +762,8 @@ internal static class FragmentExtractor
 
                 SemanticModel model = ModelFor(tree);
                 foreach (InvocationExpressionSyntax invocation in tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>())
-                foreach (RecognizedRegistration registration in recognizer.Recognize(invocation, model))
-                    RecordRegistration(registration, RegistrationSite(invocation));
+                    if (recognizer.Recognize(invocation, model) is { } registration)
+                        RecordRegistration(registration, RegistrationSite(invocation));
             }
         }
 
@@ -767,29 +774,16 @@ internal static class FragmentExtractor
             _registrationSites.SitesFor((registration.Lifetime, serviceFqn, implFqn)).Add(site);
         }
 
-        /// <summary>
-        ///     The memoized <see cref="FragmentExtractor.FullNameOf" />. Declared here, it hides the outer static
-        ///     throughout <see cref="ExtractState" />, so every name this state reads comes back through the memo.
-        /// </summary>
-        /// <remarks>
-        ///     A helper that names types therefore lives on this state: on the outer class, its calls would bind to
-        ///     the outer static and walk the display again at every site.
-        /// </remarks>
-        // ReSharper disable once MemberHidesStaticFromOuterClass
+        /// <summary><see cref="DefinitionName" /> for a named type.</summary>
         private string FullNameOf(INamedTypeSymbol symbol)
         {
-            INamedTypeSymbol definition = symbol.OriginalDefinition;
-            if (_fullNames.TryGetValue(definition, out string? fqn)) return fqn;
-
-            fqn = FragmentExtractor.FullNameOf(definition);
-            _fullNames[definition] = fqn;
-            return fqn;
+            return DefinitionName(symbol);
         }
 
         /// <summary>
-        ///     The definition-level FQN of any type in extraction format — <see cref="FullNameOf" /> widened
-        ///     to the types a signature position can hold (arrays, pointers, type parameters), sharing its
-        ///     memo because both key on the same <c>OriginalDefinition</c> and read the same display format.
+        ///     The definition-level FQN of any type in extraction format, named types and the other types a
+        ///     signature position can hold (arrays, pointers, type parameters) alike, memoized on its
+        ///     <c>OriginalDefinition</c>.
         /// </summary>
         private string DefinitionName(ITypeSymbol type)
         {
@@ -799,6 +793,18 @@ internal static class FragmentExtractor
             name = definition.ToDisplayString(FullNameFormat);
             _fullNames[definition] = name;
             return name;
+        }
+
+        // The ID a member-use edge and the member inventory both carry, so a member reference joins its node. The
+        // unresolved: fallback, for a member with no documentation ID (an error or unnamed symbol), mirrors the
+        // type facts' own.
+        private string MemberSymbolIdOf(ISymbol member)
+        {
+            if (_memberSymbolIds.TryGetValue(member, out string? id)) return id;
+
+            id = member.GetDocumentationCommentId() ?? "unresolved:" + FullNameOf(member.ContainingType) + "." + member.Name;
+            _memberSymbolIds[member] = id;
+            return id;
         }
 
         /// <summary>
@@ -928,8 +934,7 @@ internal static class FragmentExtractor
 
         private FragmentMember BuildMember(ISymbol member)
         {
-            string symbolId = member.GetDocumentationCommentId()
-                              ?? "unresolved:" + FullNameOf(member.ContainingType) + "." + member.Name;
+            string symbolId = MemberSymbolIdOf(member);
             (string? returnTypeFullName, string? memberTypeFullName) = MemberTypeNames(member);
 
             var facts = new MemberFacts(
@@ -1008,13 +1013,16 @@ internal static class FragmentExtractor
             INamedTypeSymbol definition = symbol.OriginalDefinition;
             string fqn = FullNameOf(definition);
 
-            if (!_declared.ContainsKey(fqn) && !_externals.ContainsKey(fqn))
-            {
-                _externals[fqn] = new FragmentExternal(ExtractFacts(definition, fqn), definition.ContainingAssembly?.Name ?? "");
-                if (_siblingProjects is not null) SortOneProjectName(definition, fqn);
-            }
-
+            ResolveName(definition, fqn);
             return fqn;
+        }
+
+        private void ResolveName(INamedTypeSymbol definition, string fqn)
+        {
+            if (_declared.ContainsKey(fqn) || _externals.ContainsKey(fqn)) return;
+
+            _externals[fqn] = new FragmentExternal(ExtractFacts(definition, fqn), definition.ContainingAssembly?.Name ?? "");
+            if (_siblingProjects is not null) SortOneProjectName(definition, fqn);
         }
 
         // The one-project view's half of the mint above, on first mention only. The external is minted either way:
@@ -1044,9 +1052,7 @@ internal static class FragmentExtractor
             // The own-project arm, reachable on a document run alone, for a type of this compilation that another
             // document declares: the sibling map answers the own project as absent, so without this arm such a type
             // would leave the view and every edge to it would point at an external with no layer.
-            if (_ownProjectName is { } ownProjectName
-                && IsInOwnAssembly(definition)
-                && !_declared.ContainsKey(fqn))
+            if (_ownProjectName is { } ownProjectName && IsInOwnAssembly(definition))
             {
                 _siblingSymbols[fqn] = (definition, ownProjectName, _compilation.Assembly.Name, IsOwnAssembly: true);
                 return;
@@ -1227,19 +1233,16 @@ internal static class FragmentExtractor
         }
 
         /// <summary>
-        ///     The fragment the passes built, with <paramref name="projectReferences" /> from the caller: which
+        ///     The fragment the passes built, with the input's artifact facts and with
+        ///     <paramref name="projectReferences" /> from the caller: which
         ///     projects it references is the one fact the compilation cannot state.
         /// </summary>
-        private CodebaseFragment Materialize(CompilationInput input, IReadOnlyList<string> projectReferences)
+        private CodebaseFragment Materialize(IReadOnlyList<string> projectReferences)
         {
-            List<FragmentType> declaredTypes = _declared.Values
-                .Select(b => b.ToFragmentType())
-                .OrderBy(t => t.Facts.FullName, StringComparer.Ordinal)
-                .ToList();
+            IEnumerable<FragmentType> built = _declared.Values.Select(b => b.ToFragmentType());
+            List<FragmentType> declaredTypes = OrderedByName(built);
 
-            List<FragmentExternal> externals = _externals.Values
-                .OrderBy(e => e.Facts.FullName, StringComparer.Ordinal)
-                .ToList();
+            List<FragmentExternal> externals = OrderedByName(_externals.Values);
 
             List<FragmentEdge> edges = Vouched(
                 _edgeSites.OrderedPairs((src, tgt, sites) => new FragmentEdge(src, tgt, sites.ToList())),
@@ -1282,11 +1285,13 @@ internal static class FragmentExtractor
             // The assembly name is read off the IAssemblySymbol rather than the compilation's own option string,
             // because the merge compares it against a FragmentExternal's, which ResolveName reads off
             // ContainingAssembly.Name: both operands must come from that one surface.
-            return new CodebaseFragment(
-                input.ProjectName, input.TargetFramework, projectReferences, declaredTypes, externals, edges,
+            var fragment = new CodebaseFragment(
+                _input.ProjectName, _input.TargetFramework, projectReferences, declaredTypes, externals, edges,
                 memberEdges, constructorEdges, injectionEdges, catchEdges, throwEdges, exposureEdges,
-                serviceRegistrations, input.SolutionMember, input.Compilation.Assembly.Name,
-                UndeclaredProjectReferences: input.UndeclaredProjectReferences);
+                serviceRegistrations, _input.SolutionMember, _compilation.Assembly.Name,
+                UndeclaredProjectReferences: _input.UndeclaredProjectReferences);
+
+            return WithArtifactFacts(fragment, _input.ArtifactFacts);
         }
 
         /// <summary>
@@ -1309,8 +1314,8 @@ internal static class FragmentExtractor
             internal Dictionary<string, FragmentExternal> Externals { get; } = new(StringComparer.Ordinal);
 
             /// <summary>
-            ///     The fragment itself, its two collections in the same ordinal-by-FQN order a compilation's
-            ///     own fragment materializes them in.
+            ///     The fragment itself, its two collections ordered by the <c>OrderedByName</c> pair a
+            ///     compilation's own fragment is materialized through.
             /// </summary>
             /// <remarks>
             ///     Every other slot is empty or unknown: this fragment states another project's types, not its
@@ -1319,12 +1324,8 @@ internal static class FragmentExtractor
             /// </remarks>
             internal CodebaseFragment ToFragment()
             {
-                List<FragmentType> declaredTypes = Declared.Values
-                    .OrderBy(t => t.Facts.FullName, StringComparer.Ordinal)
-                    .ToList();
-                List<FragmentExternal> externals = Externals.Values
-                    .OrderBy(e => e.Facts.FullName, StringComparer.Ordinal)
-                    .ToList();
+                List<FragmentType> declaredTypes = OrderedByName(Declared.Values);
+                List<FragmentExternal> externals = OrderedByName(Externals.Values);
 
                 return new CodebaseFragment(
                     ProjectName, null, [], declaredTypes, externals, [], [], [], [], [], [], [], [],

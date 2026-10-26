@@ -18,6 +18,18 @@ internal static class ProseFormat
         return "`" + value + "`";
     }
 
+    /// <summary>The glob a name prefix stands for, backticked: <c>`Legacy*`</c>.</summary>
+    internal static string PrefixGlob(string prefix)
+    {
+        return Backtick(prefix + "*");
+    }
+
+    /// <summary>The glob a name suffix stands for, backticked: <c>`*Controller`</c>.</summary>
+    internal static string SuffixGlob(string suffix)
+    {
+        return Backtick("*" + suffix);
+    }
+
     internal static string Capitalize(string phrase)
     {
         if (string.IsNullOrEmpty(phrase)) return phrase;

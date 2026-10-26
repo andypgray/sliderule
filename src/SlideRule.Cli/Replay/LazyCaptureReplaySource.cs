@@ -42,20 +42,16 @@ internal sealed class LazyCaptureReplaySource(string binlogCopyPath) : ISolution
         {
             replayed = BinlogReplayer.Replay(binlogCopyPath, solutionPath, diagnostics.Add, ct);
         }
-        catch (OperationCanceledException)
-        {
-            // Cancellation is the caller's, not a bad capture: let it propagate rather than be reported as a
-            // replay failure that would send the gate off to re-run the whole thing cold.
-            throw;
-        }
-        catch (Exception ex)
+        // Cancellation is the caller's, not a bad capture: let it propagate rather than be reported as a
+        // replay failure that would send the gate off to re-run the whole thing cold.
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             throw new CaptureReplayFailedException(BinlogReplayMessages.CaptureReplayFailedNotice(ex.Message), ex);
         }
 
         _replayed = replayed;
-        return Task.FromResult(new SolutionHandle(
-            replayed.Solution, replayed.LoadDiagnosticsWith(diagnostics), null,
-            targetFrameworks: replayed.TargetFrameworks));
+        var source = new ReplayedSolutionSource(
+            replayed.Solution, replayed.LoadDiagnosticsWith(diagnostics), replayed.TargetFrameworks);
+        return source.AcquireAsync(solutionPath, ct);
     }
 }

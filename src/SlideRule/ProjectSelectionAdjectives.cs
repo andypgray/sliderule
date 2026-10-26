@@ -33,7 +33,7 @@ public static class ProjectSelectionAdjectives
         [SpecSlot(nameof(SpecSlot.ProjectNameOperand))]
         params string[] more)
     {
-        IReadOnlyList<string> names = OperandList.OneOrMore(first, more, name => name);
+        IReadOnlyList<string> names = OperandList.OneOrMore(first, more);
         return Append(selection, new ProjectNamedAdjective(names));
     }
 
@@ -50,7 +50,7 @@ public static class ProjectSelectionAdjectives
         [SpecSlot(nameof(SpecSlot.ProjectNameOperand))]
         IEnumerable<string> names)
     {
-        IReadOnlyList<string> list = OperandList.ZeroOrMore(names, name => name, nameof(names));
+        IReadOnlyList<string> list = OperandList.ZeroOrMore(names, nameof(names));
         return Append(selection, new ProjectNamedAdjective(list));
     }
 
@@ -69,7 +69,7 @@ public static class ProjectSelectionAdjectives
         [SpecSlot(nameof(SpecSlot.ProjectNamePattern))]
         params string[] more)
     {
-        IReadOnlyList<string> globs = OperandList.OneOrMore(glob, more, pattern => pattern, nameof(glob));
+        IReadOnlyList<string> globs = OperandList.OneOrMore(glob, more, nameof(glob));
         return Append(selection, new ProjectMatchingAdjective(globs));
     }
 
@@ -86,7 +86,7 @@ public static class ProjectSelectionAdjectives
         [SpecSlot(nameof(SpecSlot.ProjectNamePattern))]
         IEnumerable<string> globs)
     {
-        IReadOnlyList<string> list = OperandList.ZeroOrMore(globs, pattern => pattern, nameof(globs));
+        IReadOnlyList<string> list = OperandList.ZeroOrMore(globs, nameof(globs));
         return Append(selection, new ProjectMatchingAdjective(list));
     }
 

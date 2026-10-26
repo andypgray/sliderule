@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 using Microsoft.Build.Construction;
 using Microsoft.Build.Definition;
 using Microsoft.Build.Evaluation;
+using Microsoft.Build.Evaluation.Context;
 using SlideRule.Extraction;
 using SlideRule.Extraction.Fragments;
 using SlideRule.Internal;
@@ -31,7 +32,9 @@ internal readonly record struct ProjectEvaluationRequest(string? ProjectFile, st
 ///         the staleness the warm session's per-call reconcile exists to prevent. The projects of one solution
 ///         share nearly all of their imports, so a shard's first evaluation pays for them and the rest do not.
 ///         Each project is unloaded once its facts are copied out; the shared imports stay with the collection,
-///         so a shard holds one evaluated project at a time.
+///         so a shard holds one evaluated project at a time. Every shard of a call evaluates under one shared
+///         <see cref="EvaluationContext" />, so SDK resolution and file-system probes are paid once per call; it
+///         is created for the call and never outlives it, for the same reason the collections do not.
 ///     </para>
 ///     <para>
 ///         Every failure is an absence. MSBuild may be unavailable in this process, an import may not resolve, a
@@ -94,10 +97,7 @@ internal static class ProjectFactsEvaluator
         IReadOnlyList<IReadOnlyList<int>> shards = Shards(requests, shardCount);
         try
         {
-            var options = new ParallelOptions { CancellationToken = ct, MaxDegreeOfParallelism = shards.Count };
-            Parallel.For(
-                0, shards.Count, options,
-                shard => EvaluateInto(facts, requests, shards[shard], solutionProperties, solutionDirectory, ct));
+            EvaluateShards(facts, requests, shards, solutionProperties, solutionDirectory, ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -169,15 +169,31 @@ internal static class ProjectFactsEvaluator
     }
 
     // Split out and never inlined so that a runtime unable to load the MSBuild engine assemblies fails at
-    // the call above, inside its catch, rather than while jitting the caller. Shards write disjoint indices of
-    // `facts`.
+    // the call in EvaluateAll, inside its catch, rather than while jitting the caller. Shards write disjoint
+    // indices of `facts`.
     [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void EvaluateShards(
+        ProjectArtifactFacts?[] facts,
+        IReadOnlyList<ProjectEvaluationRequest> requests,
+        IReadOnlyList<IReadOnlyList<int>> shards,
+        IReadOnlyDictionary<string, string> solutionProperties,
+        string? solutionDirectory,
+        CancellationToken ct)
+    {
+        var context = EvaluationContext.Create(EvaluationContext.SharingPolicy.Shared);
+        var options = new ParallelOptions { CancellationToken = ct, MaxDegreeOfParallelism = shards.Count };
+        Parallel.For(
+            0, shards.Count, options,
+            shard => EvaluateInto(facts, requests, shards[shard], solutionProperties, solutionDirectory, context, ct));
+    }
+
     private static void EvaluateInto(
         ProjectArtifactFacts?[] facts,
         IReadOnlyList<ProjectEvaluationRequest> requests,
         IReadOnlyList<int> shard,
         IReadOnlyDictionary<string, string> solutionProperties,
         string? solutionDirectory,
+        EvaluationContext context,
         CancellationToken ct)
     {
         // Every project of the batch evaluates under the solution's properties, so the collection carries them:
@@ -196,7 +212,8 @@ internal static class ProjectFactsEvaluator
             (string, string?) key = (PathComparison.Fold(projectFile), request.TargetFramework);
             if (!evaluated.TryGetValue(key, out ProjectArtifactFacts? result))
             {
-                result = TryEvaluate(collection, cones, projectFile, request.TargetFramework, solutionDirectory);
+                result = TryEvaluate(
+                    collection, context, cones, projectFile, request.TargetFramework, solutionDirectory);
                 evaluated[key] = result;
             }
 
@@ -206,6 +223,7 @@ internal static class ProjectFactsEvaluator
 
     private static ProjectArtifactFacts? TryEvaluate(
         ProjectCollection collection,
+        EvaluationContext context,
         Dictionary<string, HashSet<string>> cones,
         string projectFile,
         string? targetFramework,
@@ -213,7 +231,7 @@ internal static class ProjectFactsEvaluator
     {
         try
         {
-            return Evaluate(collection, cones, projectFile, targetFramework, solutionDirectory);
+            return Evaluate(collection, context, cones, projectFile, targetFramework, solutionDirectory);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -223,6 +241,7 @@ internal static class ProjectFactsEvaluator
 
     private static ProjectArtifactFacts Evaluate(
         ProjectCollection collection,
+        EvaluationContext context,
         Dictionary<string, HashSet<string>> cones,
         string projectFile,
         string? targetFramework,
@@ -234,6 +253,7 @@ internal static class ProjectFactsEvaluator
         var options = new ProjectOptions
         {
             ProjectCollection = collection,
+            EvaluationContext = context,
             GlobalProperties = globalProperties,
             LoadSettings = ProjectLoadSettings.IgnoreMissingImports
                            | ProjectLoadSettings.IgnoreInvalidImports

@@ -32,4 +32,16 @@ internal static class SymbolInfoExtensions
     {
         return type is IErrorTypeSymbol error ? error.CandidateSymbols.FirstOrDefault() : type;
     }
+
+    /// <summary>The same policy, projected to a named type; null for an absent type.</summary>
+    internal static INamedTypeSymbol? BestNamedCandidate(this ITypeSymbol? type)
+    {
+        return type?.BestCandidate() as INamedTypeSymbol;
+    }
+
+    /// <summary>The same policy, projected to a named type.</summary>
+    internal static INamedTypeSymbol? BestNamedCandidate(this SymbolInfo info)
+    {
+        return info.BestCandidate() as INamedTypeSymbol;
+    }
 }

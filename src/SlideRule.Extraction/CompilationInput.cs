@@ -19,6 +19,8 @@ namespace SlideRule.Extraction;
 ///     every generated document off its pseudo-path. <see cref="UndeclaredProjectReferences" /> names the
 ///     referenced projects that <see cref="ProjectReferences" /> does not account for, directly or through what a
 ///     declared project references in turn; <see langword="null" /> or empty reports none.
+///     <see cref="ArtifactFacts" /> is what evaluating the project file said about its artifact, and
+///     <see langword="null" /> where nothing evaluated the project.
 /// </remarks>
 internal sealed record CompilationInput(
     Compilation Compilation,
@@ -27,4 +29,5 @@ internal sealed record CompilationInput(
     string? TargetFramework = null,
     bool? SolutionMember = null,
     IReadOnlyCollection<SyntaxTree>? GeneratedTrees = null,
-    IReadOnlyList<string>? UndeclaredProjectReferences = null);
+    IReadOnlyList<string>? UndeclaredProjectReferences = null,
+    ProjectArtifactFacts? ArtifactFacts = null);

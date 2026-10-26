@@ -294,7 +294,7 @@ public sealed class ExtractionCacheStoreTests
         solution.AddProject("A", [], ("A.cs", "class A {}"));
         solution.BackdateAll();
         ExtractionCacheStore store = solution.NewStore();
-        CacheFingerprint fingerprint = store.CaptureFingerprint(solution.Projects, Ct);
+        CacheFingerprint fingerprint = store.CaptureFingerprint(solution.Projects, null, Ct);
 
         File.WriteAllText(solution.PathOf("A", "A.cs"), "class A { int y; }");
         File.SetLastWriteTimeUtc(solution.PathOf("A", "A.cs"), DateTime.UtcNow);
@@ -1230,7 +1230,7 @@ file static class ExtractionCacheStoreAssertions
     internal static void ShouldWrite(
         this ExtractionCacheStore store, IReadOnlyList<ProjectInputs> projects, ExtractionResult extraction)
     {
-        CacheFingerprint fingerprint = store.CaptureFingerprint(projects, Ct);
+        CacheFingerprint fingerprint = store.CaptureFingerprint(projects, null, Ct);
         store.Write(fingerprint, extraction, Ct)
             .ShouldBeTrue();
     }

@@ -5,6 +5,7 @@ using SlideRule.Cli.Mcp.Infrastructure;
 using SlideRule.Cli.Rendering;
 using SlideRule.Cli.Settings;
 using SlideRule.Internal;
+using SlideRule.Rendering;
 using SlideRule.Roslyn.Hosting;
 
 namespace SlideRule.Cli.Verbs;
@@ -117,33 +118,36 @@ internal sealed class HookRunner(
         if (!state.Stateful || state.ReadBaseline() is { FromPrompt: true }) return HookExitCodes.Proceed;
 
         string tree = await SessionTreeAsync(payload.Cwd, projectDirectory, ct) ?? request.WorkingDirectory;
-        TreeSnapshot snapshot = await HookGit.SnapshotAsync(tree, ct);
+        Task<TreeSnapshot> ownRun = HookGit.SnapshotAsync(tree, ct);
+        Task<(string Tree, HookState State, TreeSnapshot Snapshot)[]> othersRun =
+            SnapshotOtherTreesAsync(state, tree, ct);
+        await Task.WhenAll(ownRun, othersRun);
+
+        TreeSnapshot snapshot = await ownRun;
         if (!snapshot.Known) return HookExitCodes.Proceed;
 
         state.RecordBaseline(snapshot);
-        await RecordOtherBaselinesAsync(state, tree, ct);
+
+        // A tree that is gone, or whose directory git no longer answers for as that top level, keeps its records as
+        // they are; so does a record that names no tree.
+        foreach ((string other, HookState otherState, TreeSnapshot otherSnapshot) in await othersRun)
+            if (otherSnapshot.Known && otherSnapshot.TopLevel is { } topLevel && SameDirectory(topLevel, other))
+                otherState.RecordBaseline(otherSnapshot);
 
         return HookExitCodes.Proceed;
     }
 
-    // Each other tree a stop of this session has weighed gets the prompt's baseline too, replacing whatever stands
-    // there, so the next stop that weighs it reads the turn's own changes rather than everything since the last stop
-    // that weighed it. The prompt waits on them, and they share nothing, so they are snapshotted together. A tree
-    // that is gone, or whose directory git no longer answers for as that top level, keeps its records as they are;
-    // so does a record that names no tree.
-    private static async Task RecordOtherBaselinesAsync(HookState state, string ownTree, CancellationToken ct)
+    // Each other tree a stop of this session has weighed, as the prompt finds it: each gets the prompt's baseline
+    // too, replacing whatever stands there, so the next stop that weighs it reads the turn's own changes rather than
+    // everything since the last stop that weighed it. The prompt waits on them, and they share nothing with each
+    // other or with the session's own tree, so they are snapshotted together with it.
+    private static async Task<(string Tree, HookState State, TreeSnapshot Snapshot)[]> SnapshotOtherTreesAsync(
+        HookState state, string ownTree, CancellationToken ct)
     {
-        IEnumerable<Task> recordings = state.RecordedTrees()
+        IEnumerable<Task<(string, HookState, TreeSnapshot)>> snapshots = state.RecordedTrees()
             .Where(other => IsOtherTreeOnDisk(other.TopLevel, ownTree))
-            .Select(other => RecordBaselineAsync(other.TopLevel, other.State, ct));
-        await Task.WhenAll(recordings);
-    }
-
-    private static async Task RecordBaselineAsync(string tree, HookState state, CancellationToken ct)
-    {
-        TreeSnapshot snapshot = await HookGit.SnapshotAsync(tree, ct);
-        if (snapshot.Known && snapshot.TopLevel is { } topLevel && SameDirectory(topLevel, tree))
-            state.RecordBaseline(snapshot);
+            .Select(async other => (other.TopLevel, other.State, await HookGit.SnapshotAsync(other.TopLevel, ct)));
+        return await Task.WhenAll(snapshots);
     }
 
     private async Task<int> CloseTurnAsync(
@@ -151,10 +155,18 @@ internal sealed class HookRunner(
     {
         string tree = await SessionTreeAsync(payload.Cwd, projectDirectory, ct) ?? request.WorkingDirectory;
         HookState state = OpenState(payload);
-        var trees = new List<TreeTurn> { await ExamineAsync(tree, state, own: true, ct) };
 
-        foreach (string other in await WrittenTreesAsync(hookEvent, payload, tree, ct))
-            trees.Add(await ExamineAsync(other, state.ForTree(other), own: false, ct));
+        // The trees share nothing, so each is examined beside the others, and the list keeps the session's own
+        // first, then the others in the order the turn wrote them.
+        Task<TreeTurn> ownRun = ExamineAsync(tree, state, own: true, ct);
+        Task<IReadOnlyList<string>> writtenRun = WrittenTreesAsync(hookEvent, payload, tree, ct);
+        await Task.WhenAll(ownRun, writtenRun);
+
+        IReadOnlyList<string> others = await writtenRun;
+        TreeTurn[] otherTurns =
+            await Task.WhenAll(others.Select(other => ExamineAsync(other, state.ForTree(other), own: false, ct)));
+        var trees = new List<TreeTurn> { await ownRun };
+        trees.AddRange(otherTurns);
 
         if (!trees.Any(static turn => turn.Due)) return EndTurn(hookEvent, trees);
 
@@ -163,9 +175,9 @@ internal sealed class HookRunner(
         // rounds (MayContinue). One count per stop, on the session's own state, however many trees the stop checks.
         string promptId = payload.PromptId ?? NoPrompt;
         int rounds = state.RoundsFor(promptId);
-        bool atCap = rounds >= request.MaxRounds;
 
-        var firing = new Firing(hookEvent, state, trees, promptId, rounds, atCap, payload.StopHookActive);
+        var firing = new Firing(
+            hookEvent, state, trees, promptId, rounds, request.MaxRounds, payload.StopHookActive);
         return await CheckAsync(firing, request, ct);
     }
 
@@ -178,8 +190,10 @@ internal sealed class HookRunner(
 
         // The skip that makes a question-and-answer turn free: the last verdict still stands if it was green and no
         // code file's bytes have changed since the tree it covered.
+        var committedByHead = new Dictionary<string, IReadOnlyList<string>?>(StringComparer.Ordinal);
         HookVerdict? verdict = known ? state.ReadVerdict() : null;
-        if (verdict is { Green: true } && await ChangesAsync(tree, verdict.Tree, snapshot, ct) is { Count: 0 })
+        if (verdict is { Green: true }
+            && await ChangesAsync(tree, verdict.Tree, snapshot, committedByHead, ct) is { Count: 0 })
             return new TreeTurn(tree, state, snapshot, own, Due: false, ChangedFiles: null);
 
         // The same question put to the baseline, which a session's first stop can ask too: a turn that has changed
@@ -187,7 +201,7 @@ internal sealed class HookRunner(
         // or earlier turns. Never past a red verdict, which is this session's own and still unanswered.
         HookBaseline? baseline = known ? state.ReadBaseline() : null;
         IReadOnlyList<string>? turnChanges =
-            baseline is null ? null : await ChangesAsync(tree, baseline.Tree, snapshot, ct);
+            baseline is null ? null : await ChangesAsync(tree, baseline.Tree, snapshot, committedByHead, ct);
         if (verdict is not { Green: false } && turnChanges is { Count: 0 })
             return new TreeTurn(tree, state, snapshot, own, Due: false, ChangedFiles: null);
 
@@ -214,13 +228,14 @@ internal sealed class HookRunner(
         string? promptId = subagent ? null : payload.PromptId;
         if (transcript is null || (!subagent && promptId is null)) return [];
 
+        // Only another tree on disk can be named, so a repository with none never reads the transcript.
+        IReadOnlyList<string>? roots = await HookGit.WorktreesAsync(ownTree, ct);
+        if (roots is null || !roots.Any(root => IsOtherTreeOnDisk(root, ownTree))) return [];
+
         IReadOnlyList<string>? written = await TurnWrites.ReadAsync(transcript, promptId, ct);
         List<string> code = written?.Where(HookCodeFiles.IsCode)
             .ToList() ?? [];
         if (code.Count == 0) return [];
-
-        IReadOnlyList<string>? roots = await HookGit.WorktreesAsync(ownTree, ct);
-        if (roots is null) return [];
 
         return code.Select(path => DeepestRootOf(path, roots))
             .OfType<string>()
@@ -240,7 +255,8 @@ internal sealed class HookRunner(
     // inside the main checkout by path, and the file belongs to the worktree.
     private static string? DeepestRootOf(string path, IReadOnlyList<string> roots)
     {
-        return roots.Where(root => path.StartsWith(DirectoryForm(root).TrimEnd('/') + "/", PathComparison.Comparison))
+        string[] file = PathFormat.Segments(path);
+        return roots.Where(root => PathFormat.IsWithin(PathFormat.Segments(root), file))
             .MaxBy(static root => root.Length);
     }
 
@@ -262,7 +278,8 @@ internal sealed class HookRunner(
         TreeTurn[] trees =
             [new(tree, HookState.None, TreeSnapshot.Unknown, Own: true, Due: true, ChangedFiles: null)];
         var firing = new Firing(
-            HookReportRenderer.DefaultEvent, HookState.None, trees, NoPrompt, 0, AtCap: false, StopHookActive: false);
+            HookReportRenderer.DefaultEvent, HookState.None, trees, NoPrompt, 0, request.MaxRounds,
+            StopHookActive: false);
         return await CheckAsync(firing, request, ct);
     }
 
@@ -279,10 +296,10 @@ internal sealed class HookRunner(
         // is about; a stop that checked only its own tree names none.
         bool named = checks.Any(static check => !check.Tree.Own);
         foreach ((TreeTurn tree, HookCheckResult result) in checks)
-            if (result.ExitCode is ExitCodes.Clean or ExitCodes.Violations)
+            if (GaveVerdict(result))
                 tree.State.RecordVerdict(result.ExitCode == ExitCodes.Clean, tree.Snapshot);
 
-        List<(TreeTurn Tree, HookCheckResult Result)> failed = checks.Where(static check => check.Result.ExitCode is not (ExitCodes.Clean or ExitCodes.Violations))
+        List<(TreeTurn Tree, HookCheckResult Result)> failed = checks.Where(static check => !GaveVerdict(check.Result))
             .ToList();
         if (failed.Count > 0)
         {
@@ -292,9 +309,14 @@ internal sealed class HookRunner(
 
         List<(TreeTurn Tree, HookCheckResult Result)> red = checks.Where(static check => check.Result.ExitCode == ExitCodes.Violations)
             .ToList();
-        if (red.Count > 0) return await RedAsync(firing, Reports(red, named), request.MaxRounds);
+        if (red.Count > 0) return await RedAsync(firing, Reports(red, named));
 
         return await CleanAsync(firing, checks, named);
+
+        static bool GaveVerdict(HookCheckResult result)
+        {
+            return result.ExitCode is ExitCodes.Clean or ExitCodes.Violations;
+        }
     }
 
     private async Task<int> CleanAsync(
@@ -332,12 +354,12 @@ internal sealed class HookRunner(
         return HookExitCodes.Proceed;
     }
 
-    private async Task<int> RedAsync(Firing firing, string report, int maxRounds)
+    private async Task<int> RedAsync(Firing firing, string report)
     {
         if (firing.AtCap)
         {
             // The user reads it and the turn ends: a rule the agent cannot satisfy stops being a loop.
-            await WriteLineAsync(error, $"sliderule: still red after {maxRounds} rounds; not blocking again.");
+            await WriteLineAsync(error, $"sliderule: still red after {firing.MaxRounds} rounds; not blocking again.");
             await WriteLineAsync(error, report);
             return EndTurn(firing, HookExitCodes.Report);
         }
@@ -398,18 +420,28 @@ internal sealed class HookRunner(
     private static async Task<string?> SessionTreeAsync(
         string? sessionDirectory, string? projectDirectory, CancellationToken ct)
     {
-        string? tree = sessionDirectory is null ? null : await HookGit.TopLevelAsync(sessionDirectory, ct);
-        if (tree is null || projectDirectory is null || SameDirectory(tree, projectDirectory))
-            return tree ?? projectDirectory;
+        if (sessionDirectory is null) return projectDirectory;
 
-        string? projectTree = await HookGit.TopLevelAsync(projectDirectory, ct);
-        if (projectTree is null || string.Equals(tree, projectTree, StringComparison.Ordinal)) return tree;
+        // A project directory spelled as the session's has the session's answer, so git is asked once for it.
+        bool apart = projectDirectory is not null
+                     && !string.Equals(
+                         DirectoryForm(sessionDirectory), DirectoryForm(projectDirectory), PathComparison.Comparison);
+        Task<(string TopLevel, string SharedGitDirectory)?> sessionRun = HookGit.TreeIdentityAsync(sessionDirectory, ct);
+        Task<(string TopLevel, string SharedGitDirectory)?> projectRun = apart
+            ? HookGit.TreeIdentityAsync(projectDirectory!, ct)
+            : Task.FromResult<(string, string)?>(null);
+        (string TopLevel, string SharedGitDirectory)? session = await sessionRun;
+        (string TopLevel, string SharedGitDirectory)? project = await projectRun;
 
-        Task<string?> treeGitDirectoryRun = HookGit.SharedGitDirectoryAsync(tree, ct);
-        Task<string?> projectGitDirectoryRun = HookGit.SharedGitDirectoryAsync(projectTree, ct);
-        string? treeGitDirectory = await treeGitDirectoryRun;
-        string? projectGitDirectory = await projectGitDirectoryRun;
-        return string.Equals(treeGitDirectory, projectGitDirectory, StringComparison.Ordinal) ? tree : projectDirectory;
+        if (session is not { TopLevel: var tree } || projectDirectory is null || SameDirectory(tree, projectDirectory))
+            return session?.TopLevel ?? projectDirectory;
+
+        if (project is not { } projectTree || string.Equals(tree, projectTree.TopLevel, StringComparison.Ordinal))
+            return tree;
+
+        return string.Equals(session.Value.SharedGitDirectory, projectTree.SharedGitDirectory, StringComparison.Ordinal)
+            ? tree
+            : projectDirectory;
     }
 
     // Inside by path is not inside by tree: a linked worktree lives under the project directory, and git names the
@@ -460,15 +492,22 @@ internal sealed class HookRunner(
     }
 
     // The code files whose bytes changed between `before` and `after`, or null for doubt. Only a moved HEAD costs a
-    // question, the paths its commits changed, asked commit against commit so the index is never touched.
+    // question, the paths its commits changed, asked commit against commit so the index is never touched, and asked
+    // once per `before` HEAD: `committedByHead` keeps each answer, null included, for the examination it belongs to.
     private static async Task<IReadOnlyList<string>?> ChangesAsync(
-        string tree, TreeSnapshot before, TreeSnapshot after, CancellationToken ct)
+        string tree, TreeSnapshot before, TreeSnapshot after,
+        Dictionary<string, IReadOnlyList<string>?> committedByHead, CancellationToken ct)
     {
         if (!before.Known || !after.Known || after.TopLevel is not { } topLevel) return null;
 
-        IReadOnlyList<string>? committed = string.Equals(before.Head, after.Head, StringComparison.Ordinal)
-            ? null
-            : await HookGit.CommittedBetweenAsync(tree, before.Head!, after.Head!, ct);
+        IReadOnlyList<string>? committed = null;
+        if (!string.Equals(before.Head, after.Head, StringComparison.Ordinal)
+            && !committedByHead.TryGetValue(before.Head!, out committed))
+        {
+            committed = await HookGit.CommittedBetweenAsync(tree, before.Head!, after.Head!, ct);
+            committedByHead[before.Head!] = committed;
+        }
+
         return TurnChanges.Between(
             before, after, committed, path => TreeSnapshot.Digest(Path.Combine(topLevel, path)));
     }
@@ -537,7 +576,7 @@ internal sealed class HookRunner(
     private static string Document(
         string hookEvent, IReadOnlyList<(TreeTurn Tree, HookCheckResult Result)> checks, bool named)
     {
-        if (!named) return checks.Count == 0 ? "" : checks[0].Result.Output.TrimEnd('\r', '\n');
+        if (!named) return checks[0].Result.Output.TrimEnd('\r', '\n');
 
         List<string> contexts = checks.Select(check => (check.Tree, Context: ContextOf(check.Result.Output)))
             .Where(static check => check.Context.Length > 0)
@@ -604,8 +643,11 @@ internal sealed class HookRunner(
         IReadOnlyList<TreeTurn> Trees,
         string PromptId,
         int Rounds,
-        bool AtCap,
-        bool StopHookActive);
+        int MaxRounds,
+        bool StopHookActive)
+    {
+        public bool AtCap => Rounds >= MaxRounds;
+    }
 
     // One tree a firing weighed, by its top level. ChangedFiles are what its tripwires are to read, or null for the
     // check to list its own.

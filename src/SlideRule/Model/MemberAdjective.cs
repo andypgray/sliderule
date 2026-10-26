@@ -12,13 +12,4 @@ namespace SlideRule.Model;
 ///     rather than like the type side's clause on a different subject. Head prefixes concatenate in authoring
 ///     order, an intersection the sentence states whole.
 /// </remarks>
-internal abstract class MemberAdjective
-{
-    internal abstract AdjectivePlacement Placement { get; }
-
-    /// <summary>As <see cref="SelectionAdjective.Fragment" />.</summary>
-    internal abstract string Fragment { get; }
-
-    /// <summary>The member twin of <see cref="SelectionAdjective.OpensParenthetical" />.</summary>
-    internal virtual bool OpensParenthetical => false;
-}
+internal abstract class MemberAdjective : Adjective;

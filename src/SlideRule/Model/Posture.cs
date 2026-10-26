@@ -30,3 +30,13 @@ internal enum Posture
     /// </summary>
     Caution
 }
+
+/// <summary>Spellings of a <see cref="Posture" />.</summary>
+internal static class Postures
+{
+    /// <summary>The posture as reports name it: its member name in lower case.</summary>
+    internal static string Word(this Posture posture)
+    {
+        return posture.ToString().ToLowerInvariant();
+    }
+}

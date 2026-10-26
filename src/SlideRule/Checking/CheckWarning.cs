@@ -79,59 +79,48 @@ internal sealed class CheckWarning
     }
 
     /// <summary>
-    ///     A warning that the target pattern <paramref name="operand" /> matched no types while the rule's other
-    ///     targets matched some.
+    ///     A warning that the pattern <paramref name="operand" />, holding <paramref name="role" />, matched no
+    ///     types: a target pattern while the rule's other targets matched some; an allow-list pattern, or a
+    ///     membership (a selection a subject must belong to, or the reside pair's namespace glob or project name),
+    ///     so the rule is stricter than written; or a part of a counterpart verb's <c>among:</c>.
     /// </summary>
-    internal static CheckWarning InertTargetOperand(string operand, string? hint)
+    internal static CheckWarning DeadOperand(DeadOperandRole role, string operand, string? hint)
     {
-        string message = InertTargetOperandMessage(operand);
-        return new CheckWarning(
-            CheckWarningKind.DeadOperand, message, file: null, hint: hint, key: operand, role: DeadOperandRole.Target);
+        string message = role switch
+        {
+            // The target-position twin of ConstraintEvaluator.EmptyOperandMessage (GRAMMAR §4.1, §5.1). Its own
+            // wording rather than the whole-target one, because the rule is still enforcing what its other
+            // operands name: what has stopped is one clause of the ban, not the ban.
+            DeadOperandRole.Target =>
+                $"This rule is partly inert: its target selection operand \"{operand}\" matched no types.",
+            DeadOperandRole.AllowList =>
+                $"This rule is stricter than written: its allow-list operand \"{operand}\" matched no types.",
+            DeadOperandRole.Membership =>
+                $"This rule is stricter than written: its membership \"{operand}\" matched no types.",
+            DeadOperandRole.Among =>
+                $"This rule is not measured as written: its among operand \"{operand}\" matched no types.",
+            _ => throw new ArgumentOutOfRangeException(nameof(role), role, "Not a dead operand's role.")
+        };
+        return new CheckWarning(CheckWarningKind.DeadOperand, message, file: null, hint: hint, key: operand, role: role);
     }
 
     /// <summary>
-    ///     A warning that the allow-list pattern <paramref name="operand" /> matched no types, so the rule is
-    ///     stricter than written.
+    ///     A warning that the changed <paramref name="file" /> declares a type inside the scope
+    ///     <paramref name="scopeId" />, cautioned or, where <paramref name="caution" /> is false, quarantined, whose
+    ///     tripwire is the rule <paramref name="ruleId" />.
     /// </summary>
-    internal static CheckWarning DeadAllowedOperand(string operand, string? hint)
-    {
-        var message = $"This rule is stricter than written: its allow-list operand \"{operand}\" matched no types.";
-        return new CheckWarning(
-            CheckWarningKind.DeadOperand, message, file: null, hint: hint, key: operand, role: DeadOperandRole.AllowList);
-    }
-
-    /// <summary>
-    ///     A warning that the membership <paramref name="operand" /> — a selection a subject must belong to, or
-    ///     the reside pair's namespace glob or project name — matched no types, so the rule is stricter than
-    ///     written.
-    /// </summary>
-    internal static CheckWarning DeadMembership(string operand, string? hint)
-    {
-        var message = $"This rule is stricter than written: its membership \"{operand}\" matched no types.";
-        return new CheckWarning(
-            CheckWarningKind.DeadOperand, message, file: null, hint: hint, key: operand, role: DeadOperandRole.Membership);
-    }
-
-    /// <summary>
-    ///     A warning that the part <paramref name="operand" /> of a counterpart verb's <c>among:</c> matched no
-    ///     types.
-    /// </summary>
-    internal static CheckWarning DeadAmongOperand(string operand, string? hint)
-    {
-        var message = $"This rule is not measured as written: its among operand \"{operand}\" matched no types.";
-        return new CheckWarning(
-            CheckWarningKind.DeadOperand, message, file: null, hint: hint, key: operand, role: DeadOperandRole.Among);
-    }
-
-    /// <summary>
-    ///     A warning that the changed <paramref name="file" /> declares a type inside a cautioned scope, or a
-    ///     quarantined one where <paramref name="caution" /> is false.
-    /// </summary>
-    internal static CheckWarning ScopeTouched(bool caution, string message, string file)
+    internal static CheckWarning ScopeTouched(bool caution, string file, string scopeId, string ruleId)
     {
         CheckWarningKind kind = caution
             ? CheckWarningKind.CautionedScopeTouched
             : CheckWarningKind.QuarantinedScopeTouched;
+        // The command names the RULE, which is the tripwire's own id, rather than respelling how one is minted from
+        // a scope: text the reader is told to paste must not go stale against that mint.
+        string message = caution
+            ? $"Changed file '{file}' is inside cautioned scope '{scopeId}' — read the dragons before " +
+              $"editing: sliderule explain {ruleId}."
+            : $"Changed file '{file}' is inside quarantined scope '{scopeId}' — does the task actually " +
+              $"require editing dragon territory? Dragons: sliderule explain {ruleId}.";
         return new CheckWarning(kind, message, file: file, hint: null, key: null);
     }
 
@@ -170,16 +159,5 @@ internal sealed class CheckWarning
     {
         var message = $"This rule's exemplar could not be resolved: {fault}";
         return new CheckWarning(CheckWarningKind.DeadExemplar, message, file: null, hint: null, key: reference);
-    }
-
-    /// <summary>
-    ///     The pinned warning on a single dead target <em>operand</em> beside a live sibling — the
-    ///     target-position twin of <see cref="ConstraintEvaluator.EmptyOperandMessage" /> (GRAMMAR §4.1, §5.1). Its
-    ///     own wording rather than the whole-target one, because the rule is still enforcing what its other
-    ///     operands name: what has stopped is one clause of the ban, not the ban.
-    /// </summary>
-    private static string InertTargetOperandMessage(string operandReference)
-    {
-        return $"This rule is partly inert: its target selection operand \"{operandReference}\" matched no types.";
     }
 }

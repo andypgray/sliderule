@@ -64,7 +64,6 @@ internal static class EnumStringHelper
     /// </remarks>
     internal static bool LooksNumeric(string value)
     {
-        ReadOnlySpan<char> trimmed = value.AsSpan().Trim();
-        return long.TryParse(trimmed, out _) || BigInteger.TryParse(trimmed, out _);
+        return BigInteger.TryParse(value.AsSpan().Trim(), out _);
     }
 }

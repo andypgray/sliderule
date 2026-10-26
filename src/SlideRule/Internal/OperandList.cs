@@ -24,6 +24,12 @@ internal static class OperandList
         return list;
     }
 
+    internal static IReadOnlyList<T> OneOrMore<T>(T first, T[] more, string firstName = "first")
+        where T : class
+    {
+        return OneOrMore(first, more, static item => item, firstName);
+    }
+
     /// <summary>
     ///     Enumerates <paramref name="operands" /> exactly once, so a lazy sequence runs its query once and a list
     ///     changed after the call does not change the spec. An empty sequence gives an empty list rather than
@@ -39,5 +45,12 @@ internal static class OperandList
         foreach (TIn item in sequence) list.Add(project(Guard.NotNull(item, name)));
 
         return list;
+    }
+
+    /// <inheritdoc cref="ZeroOrMore{TIn,TOut}" />
+    internal static IReadOnlyList<T> ZeroOrMore<T>(IEnumerable<T> operands, string name)
+        where T : class
+    {
+        return ZeroOrMore(operands, static item => item, name);
     }
 }

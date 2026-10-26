@@ -1,7 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.MSBuild;
 using SlideRule.Roslyn.Diagnostics;
-using SlideRule.Roslyn.Solutions;
 
 namespace SlideRule.Roslyn;
 
@@ -10,27 +9,29 @@ namespace SlideRule.Roslyn;
 ///     workspace and its out-of-process build host; the <see cref="Solution" /> stays readable afterwards.
 /// </summary>
 /// <remarks>
-///     The project lists say how completely the solution loaded. Each is ordinal-sorted and means what its
-///     namesake on <see cref="WorkspaceDiagnostics" /> means, the value <see cref="LoadDiagnosticsWith" />
-///     builds.
+///     How completely the solution loaded is the project lists of the value <see cref="LoadDiagnosticsWith" />
+///     builds, each ordinal-sorted and meaning what its namesake on <see cref="WorkspaceDiagnostics" /> means.
 /// </remarks>
 internal sealed class LoadedSolution : IDisposable
 {
     private readonly MSBuildWorkspace _workspace;
+    private readonly WorkspaceDiagnostics _loadVerdict;
 
     internal LoadedSolution(
         MSBuildWorkspace workspace, Solution solution,
-        IReadOnlyDictionary<ProjectId, string>? targetFrameworks = null,
-        ProjectLoadReport? report = null,
-        IReadOnlyList<string>? restoreFailedProjects = null)
+        IReadOnlyDictionary<ProjectId, string> targetFrameworks,
+        ProjectLoadReport report,
+        IReadOnlyList<string> restoreFailedProjects)
     {
         _workspace = workspace;
         Solution = solution;
-        TargetFrameworks = targetFrameworks ?? TargetFrameworkMaps.None;
-        FailedProjects = (report ?? ProjectLoadReport.Empty).Failed;
-        UncheckedProjects = (report ?? ProjectLoadReport.Empty).Unchecked;
-        UnsupportedProjects = (report ?? ProjectLoadReport.Empty).Unsupported;
-        RestoreFailedProjects = restoreFailedProjects ?? [];
+        TargetFrameworks = targetFrameworks;
+        _loadVerdict = WorkspaceDiagnostics.OfLoad(
+            loadFailures: [],
+            failedProjects: report.Failed,
+            uncheckedProjects: report.Unchecked,
+            restoreFailedProjects: restoreFailedProjects,
+            unsupportedProjects: report.Unsupported);
     }
 
     /// <summary>
@@ -46,27 +47,6 @@ internal sealed class LoadedSolution : IDisposable
     /// </summary>
     public IReadOnlyDictionary<ProjectId, string> TargetFrameworks { get; }
 
-    /// <summary>Gets the absolute <c>.csproj</c> paths of the projects that failed to load.</summary>
-    public IReadOnlyList<string> FailedProjects { get; }
-
-    /// <summary>
-    ///     Gets the absolute <c>.csproj</c> paths of the projects whose NuGet packages are not in the model.
-    /// </summary>
-    public IReadOnlyList<string> RestoreFailedProjects { get; }
-
-    /// <summary>
-    ///     Gets the absolute <c>.csproj</c> paths this solution declares that the load did not read; non-empty
-    ///     only when a <c>.slnf</c> filter left members out.
-    /// </summary>
-    public IReadOnlyList<string> UncheckedProjects { get; }
-
-    /// <summary>
-    ///     The projects this solution declares that no extractor reaches, each with its
-    ///     <see cref="UnsupportedProjectKind" />, read off the solution file rather than the load, since a
-    ///     project that was never going to load leaves no shape in one.
-    /// </summary>
-    internal IReadOnlyList<UnsupportedProject> UnsupportedProjects { get; }
-
     /// <summary>
     ///     This load's verdict as the one value every surface reads. <paramref name="loadFailures" /> are the
     ///     failure messages the loader wrote to the caller's sink, which never land on this type; the merge's
@@ -74,8 +54,7 @@ internal sealed class LoadedSolution : IDisposable
     /// </summary>
     internal WorkspaceDiagnostics LoadDiagnosticsWith(IReadOnlyList<string> loadFailures)
     {
-        return new WorkspaceDiagnostics(
-            loadFailures, [], FailedProjects, UncheckedProjects, RestoreFailedProjects, UnsupportedProjects, []);
+        return _loadVerdict with { LoadFailures = loadFailures };
     }
 
     public void Dispose()

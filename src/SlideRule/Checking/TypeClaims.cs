@@ -108,7 +108,7 @@ internal sealed class TypeClaims
                 ClaimTrace scopeTrace = tracer.Trace(scope.Scoped, type);
                 if (ListFor(scopeTrace, scopes) is { } scopeList)
                 {
-                    var name = $"{scope.ScopeId} ({rule.Posture.ToString().ToLowerInvariant()})";
+                    var name = $"{scope.ScopeId} ({rule.Posture.Word()})";
                     string scoped = SentenceRenderer.Subject(scope.Scoped);
                     scopeList.Add(new Claimant(ClaimantKind.Scope, name, scoped, scopeTrace));
                 }
@@ -119,9 +119,7 @@ internal sealed class TypeClaims
             ClaimTrace ruleTrace = tracer.Trace(subject, type);
             if (ListFor(ruleTrace, rules) is not { } ruleList) continue;
 
-            string phrase = rule.Constraint is MemberConstraint member
-                ? SentenceRenderer.MemberSubject(member.MemberSubject)
-                : SentenceRenderer.Subject(subject);
+            string phrase = SentenceRenderer.SubjectOf(rule.Constraint).Subject;
             ruleList.Add(new Claimant(ClaimantKind.Rule, rule.Id, phrase, ruleTrace));
         }
 

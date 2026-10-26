@@ -12,5 +12,5 @@ internal sealed class MemberWithPrefixAdjective(string prefix) : MemberAdjective
 
     internal override AdjectivePlacement Placement => AdjectivePlacement.HeadPrefix;
 
-    internal override string Fragment => ProseFormat.Backtick(Prefix + "*") + " ";
+    internal override string Fragment => ProseFormat.PrefixGlob(Prefix) + " ";
 }

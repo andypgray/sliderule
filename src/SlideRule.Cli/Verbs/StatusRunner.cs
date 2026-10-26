@@ -27,9 +27,7 @@ internal sealed class StatusRunner(
 {
     public async Task<int> RunAsync(StatusRequest request, CancellationToken ct)
     {
-        // This run's human channel. --json owns stdout, where the burndown document is the only thing
-        // written, so under it the stamp below goes nowhere.
-        TextWriter human = request.Json ? TextWriter.Null : output;
+        TextWriter human = HumanChannel(request.Json, output);
 
         using var source = await CodebaseSource.CreateWithSpecAsync(
             SolutionSource, Environment, request.Solution, request.Spec, request.WorkingDirectory, request.NoCache, ct);

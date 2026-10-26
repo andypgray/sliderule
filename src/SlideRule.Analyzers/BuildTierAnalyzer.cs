@@ -326,7 +326,7 @@ internal sealed class BuildTierAnalyzer : DiagnosticAnalyzer
         var declaringTrees = new Lazy<DeclaringTrees>(() => DeclaringTrees.Of(compilation));
 
         return new CheckState(
-            loaded, ownProjectName, modelDirectory, plan, siblings, TreesByPath(compilation), declaringTrees);
+            ownProjectName, modelDirectory, plan, siblings, TreesByPath(compilation), declaringTrees);
     }
 
     // One document's whole share of the work, from deciding whether it has any to reporting its findings.
@@ -395,7 +395,7 @@ internal sealed class BuildTierAnalyzer : DiagnosticAnalyzer
         if (state is not null)
             try
             {
-                ReportWithheld(context, state);
+                state.ReportWithheld(context);
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
@@ -403,16 +403,6 @@ internal sealed class BuildTierAnalyzer : DiagnosticAnalyzer
             }
 
         ReportHeldFault(context, faults);
-    }
-
-    // The rules whose findings were counted rather than printed, walked in model order rather than in the
-    // order the findings arrived, so two builds of one project report them the same way round.
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ReportWithheld(CompilationAnalysisContext context, CheckState state)
-    {
-        foreach (ArchRule rule in state.Loaded.InRules)
-            if (state.IsWithheld(rule.Id))
-                context.ReportDiagnostic(BuildTierDiagnostics.RuleNotChecked(rule.Id));
     }
 
     // The one place a fault becomes a warning, on either tier; cancellation is not a fault and passes through
@@ -467,7 +457,7 @@ internal sealed class BuildTierAnalyzer : DiagnosticAnalyzer
             context.ReportDiagnostic(BuildTierDiagnostics.Finding(finding, site));
         }
 
-        ReportWithheld(context, state);
+        state.ReportWithheld(context);
     }
 
     // Every rule is checked except a ratcheted one whose baseline file would not read, which is dropped
@@ -578,19 +568,12 @@ internal sealed class BuildTierAnalyzer : DiagnosticAnalyzer
     [MethodImpl(MethodImplOptions.NoInlining)]
     internal static string? OwnProjectName(ModelDocument document, Compilation compilation)
     {
-        string assemblyName = compilation.Assembly.Name;
-        string? owner = null;
+        var producers = new AssemblyProducers();
         foreach (ModelDocumentProject project in document.Projects)
-        {
-            bool produces = project.Assemblies.Any(name => string.Equals(name, assemblyName, StringComparison.Ordinal));
-            if (!produces) continue;
+        foreach (string assembly in project.Assemblies)
+            producers.Record(assembly, project.Name);
 
-            if (owner is not null) return null;
-
-            owner = project.Name;
-        }
-
-        return owner;
+        return producers.TryGetProducer(compilation.Assembly.Name, out string? owner) ? owner : null;
     }
 
     // The own project rides in the table it is the own project of: the carrier answers it as absent and
@@ -791,10 +774,9 @@ internal sealed class BuildTierAnalyzer : DiagnosticAnalyzer
 
         [MethodImpl(MethodImplOptions.NoInlining)]
         internal CheckState(
-            LoadedModel loaded, string ownProjectName, string modelDirectory, RulePlan plan, SiblingProjects siblings,
+            string ownProjectName, string modelDirectory, RulePlan plan, SiblingProjects siblings,
             IReadOnlyDictionary<string, SyntaxTree> treesByPath, Lazy<DeclaringTrees> declaringTrees)
         {
-            Loaded = loaded;
             OwnProject = ownProjectName;
             ModelDirectory = modelDirectory;
             Plan = plan;
@@ -802,9 +784,6 @@ internal sealed class BuildTierAnalyzer : DiagnosticAnalyzer
             FirstDeclarers = treesByPath;
             DeclaringTrees = declaringTrees;
         }
-
-        /// <summary>The model the build handed over, whose rule order the end action walks.</summary>
-        internal LoadedModel Loaded { get; }
 
         /// <summary>The project this compilation's types are recorded under.</summary>
         internal string OwnProject { get; }
@@ -870,9 +849,20 @@ internal sealed class BuildTierAnalyzer : DiagnosticAnalyzer
             _withheld.TryAdd(ruleId, 0);
         }
 
-        internal bool IsWithheld(string ruleId)
+        private bool IsWithheld(string ruleId)
         {
             return _withheld.ContainsKey(ruleId);
+        }
+
+        // The rules whose findings were counted rather than printed, walked in Plan.ToCheck's order, which is
+        // model order, rather than in the order the findings arrived, so two builds of one project report them the
+        // same way round.
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        internal void ReportWithheld(CompilationAnalysisContext context)
+        {
+            foreach (ArchRule rule in Plan.ToCheck)
+                if (IsWithheld(rule.Id))
+                    context.ReportDiagnostic(BuildTierDiagnostics.RuleNotChecked(rule.Id));
         }
     }
 

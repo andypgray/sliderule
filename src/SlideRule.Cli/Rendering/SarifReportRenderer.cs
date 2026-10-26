@@ -6,7 +6,6 @@ using SlideRule.Cli.Mcp.Infrastructure;
 using SlideRule.Codebase;
 using SlideRule.Hosting;
 using SlideRule.Internal;
-using SlideRule.Model;
 using SlideRule.Rendering;
 using SlideRule.Roslyn.Caching;
 using SlideRule.Roslyn.Diagnostics;
@@ -116,30 +115,13 @@ internal static class SarifReportRenderer
         ArchRule rule = result.Rule;
         var clauses = new List<string>();
         if (rule.Fix is { } fix) clauses.Add(fix);
-        if (result.Exemplar.Count > 0) clauses.Add($"Exemplar: {ExemplarText(result, relativizer)}.");
+        if (result.Exemplar.Count > 0) clauses.Add($"Exemplar: {HumanReportRenderer.ExemplarText(result, relativizer)}.");
         string advice = string.Join(" ", clauses);
 
         if (rule.Citation is not { } citation) return advice.Length > 0 ? new SarifMessage(advice) : null;
 
         string prefix = advice.Length > 0 ? advice + " " : string.Empty;
         return new SarifMessage($"{prefix}See {citation}.", $"{prefix}See <{citation}>.");
-    }
-
-    // Each resolved type by its simple name and first declaration site, the same pointer the human report
-    // prints.
-    private static string ExemplarText(RuleResult result, PathFormat.Relativizer relativizer)
-    {
-        IEnumerable<string> pointers = result.Exemplar.Select(type => ExemplarPointer(type, relativizer));
-        return string.Join(", ", pointers);
-    }
-
-    private static string ExemplarPointer(TypeNode type, PathFormat.Relativizer relativizer)
-    {
-        if (type.DeclarationSites.Count == 0) return type.Name;
-
-        SourceLocation first = type.DeclarationSites[0];
-        string path = relativizer.Relative(first.FilePath);
-        return $"{type.Name} ({path}:{first.Line})";
     }
 
     // The severity a rule reports at when it reports, which for the scope tripwires is not error: a tripwire
@@ -150,7 +132,7 @@ internal static class SarifReportRenderer
     // its level from the role it declares, with no edit here.
     private static string DefaultLevel(ArchRule rule)
     {
-        return rule.Scope is { Role: ScopeRole.Tripwire } ? WarningLevel : ErrorLevel;
+        return rule.IsTripwire ? WarningLevel : ErrorLevel;
     }
 
     // Exactly one invocation. executionSuccessful is false when the workspace-diagnostics gate will exit 2;
@@ -163,8 +145,7 @@ internal static class SarifReportRenderer
     private static IReadOnlyList<SarifInvocation> BuildInvocations(
         bool executionSuccessful, WorkspaceTrustStamp trust, IReadOnlyList<string> workspaceDiagnostics)
     {
-        IReadOnlyList<PackageAuditEntry> packageAudit = trust.PackageAudit ?? [];
-        IEnumerable<string> advisories = packageAudit.Select(entry => entry.Describe());
+        IEnumerable<string> advisories = trust.PackageAudit.Select(entry => entry.Describe());
         List<SarifNotification> notifications = advisories
             .Concat(workspaceDiagnostics)
             .Select(text => new SarifNotification(new SarifMessage(text), WarningLevel))
@@ -185,7 +166,7 @@ internal static class SarifReportRenderer
     // the opt-out buys a different exit code, not a different truth about the model.
     private static SarifNotification LoadFailureNotification(IReadOnlyList<string> failedProjects)
     {
-        string subject = ProjectSubject(failedProjects.Count);
+        string subject = Plurals.Counted(failedProjects.Count, "project");
 
         return new SarifNotification(
             new SarifMessage(
@@ -201,7 +182,7 @@ internal static class SarifReportRenderer
     // consequence are identical and this channel has no room to say which.
     private static SarifNotification RestoreFailureNotification(IReadOnlyList<string> restoreFailedProjects)
     {
-        string subject = ProjectSubject(restoreFailedProjects.Count);
+        string subject = Plurals.Counted(restoreFailedProjects.Count, "project");
 
         return new SarifNotification(
             new SarifMessage(
@@ -211,27 +192,12 @@ internal static class SarifReportRenderer
             ErrorLevel);
     }
 
-    // The inflection is borrowed rather than composed here: it is a rule about English, not a sentence about
-    // this log.
-    private static string ProjectSubject(int count)
-    {
-        return Plurals.Counted(count, "project");
-    }
-
-    // The subject the partial-coverage notifications open with: the counted head, then what the solution
-    // declares but this run did not do to it. One sentence shape, the participle apart, so the narrowed and
-    // the unsupported halves of "these results cover part of the solution" cannot drift in wording or number.
-    private static string DeclaredSubject(int count, string participle)
-    {
-        return $"{ProjectSubject(count)} the solution declares {Plurals.PastVerb(count)} not {participle}";
-    }
-
     // A narrowed run's results describe part of the solution, and code scanning has no exit code to read
     // that from — a clean SARIF over a filter would close every alert the unchecked projects would have
     // raised. Warning rather than error: the results are true, they are not the whole solution's.
     private static SarifNotification NarrowingNotification(IReadOnlyList<string> uncheckedProjects)
     {
-        string subject = DeclaredSubject(uncheckedProjects.Count, "checked");
+        string subject = DeclaredProjectsClause.Subject(uncheckedProjects.Count, "checked");
 
         return new SarifNotification(
             new SarifMessage(
@@ -248,7 +214,7 @@ internal static class SarifReportRenderer
     // cannot disagree about what the run could read.
     private static SarifNotification UnsupportedNotification(IReadOnlyList<UnsupportedProjectStamp> unsupportedProjects)
     {
-        string subject = DeclaredSubject(unsupportedProjects.Count, "surveyed");
+        string subject = DeclaredProjectsClause.Subject(unsupportedProjects.Count, "surveyed");
         IEnumerable<string> entries = unsupportedProjects
             .Select(project => $"{project.Project} ({project.Reason})");
 

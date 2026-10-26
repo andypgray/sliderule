@@ -1,4 +1,3 @@
-using SlideRule.Internal;
 using SlideRule.Rendering;
 
 namespace SlideRule.Roslyn.Diagnostics;
@@ -180,14 +179,10 @@ internal static class NarrowedUniverseNotice
         return $"'{filterName}' narrowed this run: {Subject(uncheckedProjectCount)}";
     }
 
-    // The count as a clause every lede can take, in both numbers: a block that read "1 projects ... were not
-    // checked" is the sentence a reader stops trusting. Taken as a count rather than the list, because the
-    // per-rule sentences name the number without ever showing the paths.
+    // Taken as a count rather than the list, because the per-rule sentences name the number without ever
+    // showing the paths.
     private static string Subject(int uncheckedProjectCount)
     {
-        string noun = Plurals.Noun(uncheckedProjectCount, "project");
-        string copula = Plurals.PastVerb(uncheckedProjectCount);
-
-        return $"{uncheckedProjectCount} {noun} the solution declares {copula} not checked";
+        return DeclaredProjectsClause.Subject(uncheckedProjectCount, "checked");
     }
 }

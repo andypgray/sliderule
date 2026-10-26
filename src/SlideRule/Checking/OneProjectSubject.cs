@@ -43,7 +43,6 @@ internal static class OneProjectSubject
     /// </exception>
     internal static Selection Cut(SelectionEvaluator selections, Selection subject)
     {
-        // The union arm first: UnionSelection.Noun throws by design, so reading the noun would fault here.
         Selection cut = subject switch
         {
             UnionSelection union => CutUnion(selections, union),
@@ -69,7 +68,7 @@ internal static class OneProjectSubject
         if (!changed || kept.Count == 0) return union;
 
         // The internal constructor rather than UnionSelection.Create, which re-flattens a nested union.
-        return new UnionSelection(union.Owner, kept).WithAdjectives(union.Adjectives);
+        return new UnionSelection(union.Owner, kept).WithRefinements(union.Adjectives);
     }
 
     // A selection as the evaluator's subject gate will read it here: null where it matched nothing, and

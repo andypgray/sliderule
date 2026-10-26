@@ -26,52 +26,54 @@ internal static class GraphJsonRenderer
         DocumentGrain grain,
         IReadOnlyList<string> projectsScope)
     {
-        bool skeleton = grain >= DocumentGrain.Skeleton;
-        bool index = grain >= DocumentGrain.Index;
+        bool coverageElided = grain >= SurveyRungs.CoverageStatements;
+        bool loadReportElided = grain >= SurveyRungs.LoadReport;
+        bool projectEdgesElided = grain >= SurveyRungs.ProjectEdges;
+        bool externalEdgesElided = grain >= SurveyRungs.ExternalEdges;
 
         // The coverage statements ride the same rung as the external rows, and for the same reason: their
         // length scales with the codebase, so a skeleton carries the count instead. The load's own two rides
         // one rung lower, at index, where MSBuild's words and the audit's go together.
         (IReadOnlyList<GraphMultiplyDeclaredTypeJson>? multiplyDeclaredRows, int? multiplyDeclaredCount) =
             DocumentGrains.CoverageRung(
-                summary.MultiplyDeclaredTypes, skeleton,
+                summary.MultiplyDeclaredTypes, coverageElided,
                 t => new GraphMultiplyDeclaredTypeJson(t.Type, t.DeclaredBy, t.FactsFollow));
         (IReadOnlyList<GraphShadowedTypeJson>? shadowedRows, int? shadowedCount) =
             DocumentGrains.CoverageRung(
-                summary.ShadowedTypes, skeleton,
+                summary.ShadowedTypes, coverageElided,
                 t => new GraphShadowedTypeJson(t.Type, t.DeclaredBy, t.SuppliedBy, t.BoundFromAssemblyBy));
         (IReadOnlyList<PackageAuditEntry>? packageAuditRows, int? packageAuditCount) =
-            DocumentGrains.CoverageRung(trust.PackageAudit ?? [], index);
+            DocumentGrains.CoverageRung(trust.PackageAudit, loadReportElided);
         (IReadOnlyList<string>? diagnosticRows, int? diagnosticCount) =
-            DocumentGrains.CoverageRung(workspaceDiagnostics, index);
+            DocumentGrains.CoverageRung(workspaceDiagnostics, loadReportElided);
 
         var document = new GraphJson(
-            SchemaVersion,
-            solutionName,
-            grain.Wire(),
-            SlideRuleJson.OmitEmpty(projectsScope),
-            summary.Projects.Select(project => ToProject(project, grain)).ToList(),
-            index
+            SchemaVersion: SchemaVersion,
+            Solution: solutionName,
+            Grain: grain.Wire(),
+            ProjectsScope: SlideRuleJson.OmitEmpty(projectsScope),
+            Projects: summary.Projects.Select(project => ToProject(project, grain)).ToList(),
+            ProjectEdges: projectEdgesElided
                 ? null
                 : summary.ProjectEdges.Select(e => new GraphProjectEdgeJson(e.Source, e.Target, e.References)).ToList(),
-            index ? summary.ProjectEdges.Count : null,
-            skeleton
+            ProjectEdgeCount: projectEdgesElided ? summary.ProjectEdges.Count : null,
+            ExternalEdges: externalEdgesElided
                 ? null
                 : summary.ExternalEdges.Select(e => new GraphExternalEdgeJson(e.Source, e.TargetNamespaceRoot, e.References)).ToList(),
-            skeleton ? summary.ExternalEdges.Count : null,
-            multiplyDeclaredRows,
-            multiplyDeclaredCount,
-            shadowedRows,
-            shadowedCount,
-            packageAuditRows,
-            packageAuditCount,
-            diagnosticRows,
-            diagnosticCount,
-            trust.ModelIncomplete,
-            trust.FailedProjects,
-            trust.UncheckedProjects,
-            trust.RestoreFailedProjects,
-            trust.UnsupportedProjects);
+            ExternalEdgeCount: externalEdgesElided ? summary.ExternalEdges.Count : null,
+            MultiplyDeclaredTypes: multiplyDeclaredRows,
+            MultiplyDeclaredTypeCount: multiplyDeclaredCount,
+            ShadowedTypes: shadowedRows,
+            ShadowedTypeCount: shadowedCount,
+            PackageAudit: packageAuditRows,
+            PackageAuditCount: packageAuditCount,
+            WorkspaceDiagnostics: diagnosticRows,
+            WorkspaceDiagnosticCount: diagnosticCount,
+            ModelIncomplete: trust.ModelIncomplete,
+            FailedProjects: trust.FailedProjects,
+            UncheckedProjects: trust.UncheckedProjects,
+            RestoreFailedProjects: trust.RestoreFailedProjects,
+            UnsupportedProjects: trust.UnsupportedProjects);
 
         return JsonSerializer.Serialize(document, SlideRuleJson.Context.GraphJson);
     }
@@ -86,8 +88,8 @@ internal static class GraphJsonRenderer
     // [] on every row of every solution without one.
     private static GraphProjectJson ToProject(ProjectSummary project, DocumentGrain grain)
     {
-        bool index = grain >= DocumentGrain.Index;
-        bool skeleton = grain >= DocumentGrain.Skeleton;
+        bool index = grain >= SurveyRungs.ProjectRow;
+        bool skeleton = grain >= SurveyRungs.PackageReferences;
 
         return new GraphProjectJson(
             project.Name,
@@ -103,7 +105,7 @@ internal static class GraphJsonRenderer
             skeleton ? null : SlideRuleJson.OmitEmpty(PackageFrameworks(project)),
             project.Types,
             SlideRuleJson.OmitZero(project.Generated),
-            grain >= DocumentGrain.Overview
+            grain >= SurveyRungs.Namespaces
                 ? null
                 : project.Namespaces.Select(ToNamespace).ToList());
     }

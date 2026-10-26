@@ -1,6 +1,7 @@
 using SlideRule.Checking;
 using SlideRule.Internal;
 using SlideRule.Model;
+using SlideRule.Rendering;
 
 namespace SlideRule.Cli.Rendering;
 
@@ -66,43 +67,35 @@ internal static class StatusFormatter
         }
         else if (result.UntestedOperands.Count > 0)
         {
-            diagnosis = PartlyMeasuredLine(result);
+            // A rule with a dead target or among pattern measured its other operands, so what its unmatched
+            // entries are cannot be read off this run. Captured, that is the whole sentence; uncaptured, what the
+            // reader will meet next is the capture the verb refuses, so the line says why and what clears it.
+            diagnosis = DeadOperandLine(
+                "not measured", result.UntestedRole, result.UntestedOperands, result.BaselineCaptured,
+                ", so this rule's unmatched entries may be untested rather than fixed.");
             cure = OperandCure(result, stricter: false);
         }
         else
         {
-            diagnosis = StricterLine(result);
+            // A rule with a dead allowed pattern or membership only gained violations, so its row's counts
+            // already say what they seem to; the sentence names the pattern behind the extra reds and,
+            // uncaptured, the capture the verb refuses because it would record them as debt.
+            diagnosis = DeadOperandLine(
+                "stricter than written", result.StricterRole, result.StricterOperands, result.BaselineCaptured, ".");
             cure = OperandCure(result, stricter: true);
         }
 
         return cure is not null ? $"{diagnosis} {cure}" : diagnosis;
     }
 
-    // A rule with a dead target or among pattern measured its other operands, so what its unmatched entries
-    // are cannot be read off this run. Captured, that is the whole sentence; uncaptured, what the reader will
-    // meet next is the capture the verb refuses, so the line says why and what clears it.
-    private static string PartlyMeasuredLine(RuleResult result)
+    private static string DeadOperandLine(
+        string label, DeadOperandRole role, IReadOnlyList<string> operands, bool captured, string capturedTail)
     {
-        string named = result.UntestedRole.NamedOperands(result.UntestedOperands);
+        var head = $"  {label}: {role.NamedOperands(operands)} matched no types";
 
-        return result.BaselineCaptured
-            ? $"  not measured: {named} matched no types, so this rule's unmatched entries may be untested rather "
-              + "than fixed."
-            : $"  not measured: {named} matched no types, so 'sliderule baseline init' skips this rule until "
-              + $"each dead operand {result.UntestedRole.UntilClause()}.";
-    }
-
-    // A rule with a dead allowed pattern or membership only gained violations, so its row's counts already say
-    // what they seem to; the sentence names the pattern behind the extra reds and, uncaptured, the capture the
-    // verb refuses because it would record them as debt.
-    private static string StricterLine(RuleResult result)
-    {
-        string named = result.StricterRole.NamedOperands(result.StricterOperands);
-
-        return result.BaselineCaptured
-            ? $"  stricter than written: {named} matched no types."
-            : $"  stricter than written: {named} matched no types, so 'sliderule baseline init' skips this rule "
-              + $"until each dead operand {result.StricterRole.UntilClause()}.";
+        return captured
+            ? head + capturedTail
+            : $"{head}, so 'sliderule baseline init' skips this rule until each dead operand {role.UntilClause()}.";
     }
 
     // The cure the signal already carries — the empty subject's first, since that shape fails the rule and a
@@ -126,10 +119,8 @@ internal static class StatusFormatter
     // sentence it follows.
     private static string? OperandCure(RuleResult result, bool stricter)
     {
-        return result.Warnings
-            .Where(warning => warning.Kind == CheckWarningKind.DeadOperand && warning.Role.IsStricter() == stricter)
-            .Select(warning => warning.Hint)
-            .FirstOrDefault(hint => hint is not null);
+        IReadOnlyList<CheckWarning> bucket = stricter ? result.StricterWarnings : result.UntestedWarnings;
+        return bucket.Select(warning => warning.Hint).FirstOrDefault(hint => hint is not null);
     }
 
     // The per-cell split of a family rule's burndown, or null when there is none to state. A count alone
@@ -149,7 +140,7 @@ internal static class StatusFormatter
     {
         // A tripwire keeps its own line whatever its status and whichever posture minted it: it says what a
         // diff-aware skip is and what to run to get a verdict, which is the same fact under both.
-        if (IsTripwire(result)) return TripwireLine(result);
+        if (result.Rule.IsTripwire) return TripwireLine(result);
 
         // Ahead of the posture dispatch, because posture is what would mislead: a narrowing-skipped Migrate
         // rule falls to RatchetLine and reads "pass … 0 new, 2 fixed awaiting acceptance" — a pass and a
@@ -163,13 +154,8 @@ internal static class StatusFormatter
         // like Migrate but never suggests promotion — RuleResult.Promotable already gates that on the
         // posture, so the label is the only thing left for the posture to supply.
         return result.Rule.IsRatcheted
-            ? RatchetLine(result, result.Rule.Posture.ToString().ToLowerInvariant())
+            ? RatchetLine(result)
             : EnforceLine(result);
-    }
-
-    private static bool IsTripwire(RuleResult result)
-    {
-        return result.Rule.Scope is { Role: ScopeRole.Tripwire };
     }
 
     // The one tripwire line both scope postures print. A caution's only rule is its tripwire, so the
@@ -202,9 +188,9 @@ internal static class StatusFormatter
     // promotion (Quarantine→Migrate) is a human decision, so a burned-to-zero containment reads plain. The
     // suggestion is the model's own RuleResult.Promotable rather than a second reading of the same counts,
     // so this line and the status document can never disagree about which rules are ready.
-    private static string RatchetLine(RuleResult result, string postureLabel)
+    private static string RatchetLine(RuleResult result)
     {
-        return $"{Marker(result)} {result.Rule.Id} ({postureLabel}) — {RatchetDetail(result)}";
+        return $"{Marker(result)} {result.Rule.Id} ({result.Rule.Posture.Word()}) — {RatchetDetail(result)}";
     }
 
     // The whole result rather than its counts one by one: six ints in a row feed this line, and a
@@ -285,14 +271,11 @@ internal static class StatusFormatter
         string nudge = recordable ? "; run 'sliderule baseline accept-reductions' to record site counts" : string.Empty;
         string uncountedClause = uncounted > 0 ? $", {uncounted} uncounted{nudge}" : string.Empty;
 
-        string rules = Plurals.Noun(report.RulesChecked, "rule");
-
         // The rotted share, extinguishing itself at zero like the measure clauses: a run where every rule
         // measured in full reads exactly as it did before rot had a term. It sits beside the fixed total rather
         // than inside it because the report partitions them — what is here may never have been tested, and
         // counting it as fixed would make the roll-up read a rotted rule as progress.
-        return $"Checked {report.RulesChecked} {rules}: {report.RulesPassed} passed, {report.RulesFailed} failed, " +
-               $"{report.RulesSkipped} skipped. Burndown: {remaining} grandfathered remaining" +
+        return HumanReportRenderer.RuleTally(report) + $". Burndown: {remaining} grandfathered remaining" +
                $"{Sites(remaining, report.GrandfatheredSiteCount)}, " +
                $"{report.StaleBaselineEntryCount} fixed awaiting acceptance" +
                $"{Clause(report.UnmeasuredBaselineEntryCount, "not measured")}" +

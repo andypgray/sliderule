@@ -108,7 +108,7 @@ internal sealed class NameUniverse
             if (exclusions.Cover(type.ContainingAssembly)) continue;
             if (!Accepts(kind, type)) continue;
 
-            string leaf = type.OriginalDefinition.ToDisplayString(LeafFormat);
+            string leaf = LeafOf(type);
             offers.Add(Offer.Type(leaf, IsProduct(type, product), type.ContainingAssembly?.Name, TagOf(type)));
         }
 
@@ -196,6 +196,12 @@ internal sealed class NameUniverse
         return container;
     }
 
+    // LeafFormat renders a non-generic type as its bare name, so the display walk is paid only for a generic one.
+    private static string LeafOf(INamedTypeSymbol type)
+    {
+        return type.Arity == 0 ? type.Name : type.OriginalDefinition.ToDisplayString(LeafFormat);
+    }
+
     private static INamespaceOrTypeSymbol? Step(INamespaceOrTypeSymbol container, string segment)
     {
         if (container is INamespaceSymbol region)
@@ -205,7 +211,7 @@ internal sealed class NameUniverse
 
         foreach (INamedTypeSymbol type in container.GetTypeMembers())
         {
-            string leaf = type.OriginalDefinition.ToDisplayString(LeafFormat);
+            string leaf = LeafOf(type);
             if (string.Equals(leaf, segment, StringComparison.Ordinal)) return type;
         }
 

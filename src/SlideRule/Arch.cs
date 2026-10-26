@@ -38,7 +38,7 @@ public sealed class Arch
     ///     as <c>InNamespace</c>, <c>Implementing</c> or <c>Named</c>, leave generated code out with
     ///     <c>Authored</c>, or use it as it is.
     /// </summary>
-    public Selection Types => new RefinedSelection(this, TypesNoun.Instance, Array.Empty<SelectionAdjective>());
+    public Selection Types => new RefinedSelection(this, TypesNoun.Instance);
 
     /// <summary>
     ///     Gets every project the solution declares, as build artifacts rather than as the types they
@@ -72,7 +72,7 @@ public sealed class Arch
     {
         Guard.NotNull(name, nameof(name));
 
-        IReadOnlyList<string> globs = OperandList.OneOrMore(glob, more, pattern => pattern, nameof(glob));
+        IReadOnlyList<string> globs = OperandList.OneOrMore(glob, more, nameof(glob));
         return Register(new LayerNoun(name, globs));
     }
 
@@ -108,7 +108,7 @@ public sealed class Arch
     {
         Guard.NotNull(glob, nameof(glob));
 
-        return new RefinedSelection(this, new NamespaceNoun(glob), Array.Empty<SelectionAdjective>());
+        return new RefinedSelection(this, new NamespaceNoun(glob));
     }
 
     /// <summary>
@@ -122,7 +122,7 @@ public sealed class Arch
     {
         Guard.NotNull(name, nameof(name));
 
-        return new RefinedSelection(this, new ProjectNoun(name), Array.Empty<SelectionAdjective>());
+        return new RefinedSelection(this, new ProjectNoun(name));
     }
 
     /// <summary>
@@ -136,7 +136,7 @@ public sealed class Arch
     {
         Guard.NotNull(type, nameof(type));
 
-        return new RefinedSelection(this, new TypeNoun(TypeAnchor.FromType(type)), Array.Empty<SelectionAdjective>());
+        return new RefinedSelection(this, new TypeNoun(TypeAnchor.FromType(type)));
     }
 
     /// <summary>
@@ -162,7 +162,7 @@ public sealed class Arch
     /// </summary>
     public Selection AnyOf(Selection first, params Selection[] more)
     {
-        IReadOnlyList<Selection> parts = OperandList.OneOrMore(first, more, selection => selection);
+        IReadOnlyList<Selection> parts = OperandList.OneOrMore(first, more);
         return UnionSelection.Create(this, parts);
     }
 
@@ -176,7 +176,7 @@ public sealed class Arch
     /// </summary>
     public Selection AnyOf(IEnumerable<Selection> selections)
     {
-        IReadOnlyList<Selection> parts = OperandList.ZeroOrMore(selections, selection => selection, nameof(selections));
+        IReadOnlyList<Selection> parts = OperandList.ZeroOrMore(selections, nameof(selections));
         return UnionSelection.Create(this, parts);
     }
 
@@ -188,11 +188,7 @@ public sealed class Arch
     /// </summary>
     public Selection AnyOf(Type first, params Type[] more)
     {
-        // A method group here would read as the bare word Type, which at this call site is far more
-        // naturally the System.Type the operands already are. The lambda names the call.
-        // ReSharper disable once ConvertClosureToMethodGroup
-        IReadOnlyList<Selection> parts = OperandList.OneOrMore(first, more, type => Type(type));
-        return UnionSelection.Create(this, parts);
+        return UnionSelection.Create(this, TypeSelections(first, more));
     }
 
     /// <summary>
@@ -204,10 +200,18 @@ public sealed class Arch
     /// </summary>
     public Selection AnyOf(IEnumerable<Type> types)
     {
-        // As on the params form: a method group would read as the bare word Type.
+        // As in TypeSelections: a method group would read as the bare word Type.
         // ReSharper disable once ConvertClosureToMethodGroup
         IReadOnlyList<Selection> parts = OperandList.ZeroOrMore(types, type => Type(type), nameof(types));
         return UnionSelection.Create(this, parts);
+    }
+
+    internal IReadOnlyList<Selection> TypeSelections(Type first, Type[] more)
+    {
+        // A method group here would read as the bare word Type, which at this call site is far more
+        // naturally the System.Type the operands already are. The lambda names the call.
+        // ReSharper disable once ConvertClosureToMethodGroup
+        return OperandList.OneOrMore(first, more, type => Type(type));
     }
 
     /// <summary>
@@ -224,8 +228,8 @@ public sealed class Arch
     /// </summary>
     public Selection Each(Layer first, params Layer[] more)
     {
-        IReadOnlyList<Layer> cells = OperandList.OneOrMore(first, more, layer => layer);
-        return new RefinedSelection(this, new EachNoun(cells), Array.Empty<SelectionAdjective>());
+        IReadOnlyList<Layer> cells = OperandList.OneOrMore(first, more);
+        return new RefinedSelection(this, new EachNoun(cells));
     }
 
     /// <summary>
@@ -242,7 +246,7 @@ public sealed class Arch
     {
         Guard.NotNull(projects, nameof(projects));
 
-        return new RefinedSelection(this, new EachNoun(projects), Array.Empty<SelectionAdjective>());
+        return new RefinedSelection(this, new EachNoun(projects));
     }
 
     /// <summary>
@@ -257,7 +261,7 @@ public sealed class Arch
     /// </summary>
     public Selection Registered(Lifetime lifetime)
     {
-        return new RefinedSelection(this, new RegisteredNoun(lifetime), Array.Empty<SelectionAdjective>());
+        return new RefinedSelection(this, new RegisteredNoun(lifetime));
     }
 
     /// <summary>
@@ -271,7 +275,7 @@ public sealed class Arch
     /// </summary>
     public Selection Registered()
     {
-        return new RefinedSelection(this, new RegisteredNoun(null), Array.Empty<SelectionAdjective>());
+        return new RefinedSelection(this, new RegisteredNoun(null));
     }
 
     /// <summary>

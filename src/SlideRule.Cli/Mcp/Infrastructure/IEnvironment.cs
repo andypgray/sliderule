@@ -36,4 +36,14 @@ internal static class EnvironmentReadings
     {
         return environment.NonBlankVariable(SlideRuleEnvVars.CacheDirectory);
     }
+
+    /// <summary>
+    ///     Whether the opt-out <paramref name="name" /> is set, in the spelling every <c>SLIDERULE_*</c> opt-out
+    ///     takes: the literal <c>true</c>, case-insensitively, and nothing else, so a value nobody meant as a flag
+    ///     leaves the behaviour on.
+    /// </summary>
+    internal static bool IsFlagSet(this IEnvironment environment, string name)
+    {
+        return string.Equals(environment.GetVariable(name), "true", StringComparison.OrdinalIgnoreCase);
+    }
 }

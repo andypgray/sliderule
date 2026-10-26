@@ -1,6 +1,6 @@
-using System.Security.Cryptography;
 using System.Text;
 using SlideRule.Internal;
+using SlideRule.Roslyn.Caching;
 
 namespace SlideRule.Cli.Hooks;
 
@@ -52,14 +52,7 @@ internal sealed class HookState
     public static HookState Open(string root, string? sessionId, string? agentId)
     {
         string directory = Path.Combine(root, "sliderule-hook", sessionId ?? "nosession");
-        try
-        {
-            Directory.CreateDirectory(directory);
-        }
-        catch (Exception ex) when (IsFileSystemFailure(ex))
-        {
-            return None;
-        }
+        if (!TryCreate(directory)) return None;
 
         return new HookState(directory, agentId is null ? SaidFile : $"{SaidFile}-{agentId}");
     }
@@ -81,18 +74,10 @@ internal sealed class HookState
     {
         if (_directory is null) return None;
 
-        byte[] digest = SHA256.HashData(Encoding.UTF8.GetBytes(PathComparison.Fold(topLevel)));
-        // 16 hex characters (64 bits) of the digest, the same cut the extraction cache keys its directories by:
-        // ample to keep two trees from colliding while keeping the path short.
-        string directory = Path.Combine(_directory, TreesDirectory, Convert.ToHexStringLower(digest)[..16]);
-        try
-        {
-            Directory.CreateDirectory(directory);
-        }
-        catch (Exception ex) when (IsFileSystemFailure(ex))
-        {
-            return None;
-        }
+        // A short digest of the folded path: ample to keep two trees from colliding while keeping the path short.
+        string identity = CacheLocations.PathIdentity(PathComparison.Fold(topLevel));
+        string directory = Path.Combine(_directory, TreesDirectory, identity);
+        if (!TryCreate(directory)) return None;
 
         var tree = new HookState(directory, SaidFile);
         if (tree.ReadTreeName() != topLevel) tree.Write(TreeFile, topLevel + "\n");
@@ -135,17 +120,9 @@ internal sealed class HookState
     /// </summary>
     public HookVerdict? ReadVerdict()
     {
-        if (ReadLines(VerdictFile) is not { } lines) return null;
-
-        bool? green = lines[0] switch
-        {
-            GreenWord => true,
-            RedWord => false,
-            _ => null
-        };
-        if (green is null || TreeFrom(lines) is not { } tree) return null;
-
-        return new HookVerdict(green.Value, tree);
+        return ReadRecord(VerdictFile, GreenWord, RedWord) is { } record
+            ? new HookVerdict(record.Flag, record.Tree)
+            : null;
     }
 
     /// <summary>
@@ -154,17 +131,9 @@ internal sealed class HookState
     /// </summary>
     public HookBaseline? ReadBaseline()
     {
-        if (ReadLines(BaselineFile) is not { } lines) return null;
-
-        bool? fromPrompt = lines[0] switch
-        {
-            PromptWord => true,
-            StopWord => false,
-            _ => null
-        };
-        if (fromPrompt is null || TreeFrom(lines) is not { } tree) return null;
-
-        return new HookBaseline(tree, fromPrompt.Value);
+        return ReadRecord(BaselineFile, PromptWord, StopWord) is { } record
+            ? new HookBaseline(record.Tree, record.Flag)
+            : null;
     }
 
     public void RecordVerdict(bool green, TreeSnapshot tree)
@@ -254,6 +223,19 @@ internal sealed class HookState
         string? name = ReadText(TreeFile)
             ?.TrimEnd('\r', '\n');
         return string.IsNullOrWhiteSpace(name) || name.Contains('\n') ? null : name;
+    }
+
+    // A record as RecordVerdict and RecordBaseline write one: a leading word, true for `trueWord` and false for
+    // `falseWord`, then the tree. Null when the file is missing or does not read that way.
+    private (bool Flag, TreeSnapshot Tree)? ReadRecord(string name, string trueWord, string falseWord)
+    {
+        if (ReadLines(name) is not { } lines) return null;
+
+        string word = lines[0];
+        bool? flag = word == trueWord ? true : word == falseWord ? false : null;
+        if (flag is null || TreeFrom(lines) is not { } tree) return null;
+
+        return (flag.Value, tree);
     }
 
     // The digest goes first because a path may hold a space and a digest never does.
@@ -353,7 +335,25 @@ internal sealed class HookState
         return Path.Combine(_directory!, name);
     }
 
-    private static bool IsFileSystemFailure(Exception ex)
+    // Whether a directory could be made, or already stood.
+    private static bool TryCreate(string directory)
+    {
+        try
+        {
+            Directory.CreateDirectory(directory);
+            return true;
+        }
+        catch (Exception ex) when (IsFileSystemFailure(ex))
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    ///     Whether <paramref name="ex" /> is a file read, write or path failing, which the hook reads as doubt
+    ///     rather than as its own failure.
+    /// </summary>
+    internal static bool IsFileSystemFailure(Exception ex)
     {
         return ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException;
     }

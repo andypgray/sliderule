@@ -60,7 +60,11 @@ internal sealed record HookPayload(
         }
     }
 
-    private static string? StringOf(JsonElement element, string name)
+    /// <summary>
+    ///     The string property <paramref name="name" /> of <paramref name="element" />, or null when it is absent,
+    ///     empty or of another kind.
+    /// </summary>
+    internal static string? StringOf(JsonElement element, string name)
     {
         if (!element.TryGetProperty(name, out JsonElement value) || value.ValueKind != JsonValueKind.String) return null;
 
@@ -68,7 +72,8 @@ internal sealed record HookPayload(
         return string.IsNullOrEmpty(text) ? null : text;
     }
 
-    private static string? Forward(string? path)
+    /// <summary><paramref name="path" /> with its separators turned forward.</summary>
+    internal static string? Forward(string? path)
     {
         return path?.Replace('\\', '/');
     }

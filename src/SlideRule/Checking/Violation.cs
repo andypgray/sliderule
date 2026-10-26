@@ -185,9 +185,7 @@ internal sealed class Violation
     {
         return Kind switch
         {
-            ViolationKind.Reference or ViolationKind.Construction or ViolationKind.Injection
-                or ViolationKind.Catch or ViolationKind.Throw or ViolationKind.Expose =>
-                BaselineEntry.ForEdge(Source!.SymbolId, Target!.SymbolId),
+            _ when Kind.IsTypeEdge() => BaselineEntry.ForEdge(Source!.SymbolId, Target!.SymbolId),
             ViolationKind.MemberUse => BaselineEntry.ForEdge(Source!.SymbolId, Member!.SymbolId),
             ViolationKind.Shape => BaselineEntry.ForSubject(Subject!.SymbolId),
             ViolationKind.MemberShape => BaselineEntry.ForSubject(SubjectMember!.SymbolId),

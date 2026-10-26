@@ -67,7 +67,7 @@ internal sealed class RegistrationRecognizer
     ///     Reports the registration an invocation makes, at most one, or nothing when it is not a recognized
     ///     call.
     /// </summary>
-    public IEnumerable<RecognizedRegistration> Recognize(InvocationExpressionSyntax invocation, SemanticModel model)
+    public RecognizedRegistration? Recognize(InvocationExpressionSyntax invocation, SemanticModel model)
     {
         // Syntactic pre-filter, ahead of the symbol gate: GetSymbolInfo binds the enclosing member body, and
         // the registration walk offers it every invocation in the solution to find the few dozen in a
@@ -75,14 +75,14 @@ internal sealed class RegistrationRecognizer
         // static, generic, conditional access), so a readable name that is not armed can never reach an arm —
         // while a shape whose name cannot be read (an invoked delegate-valued expression, say) falls through to
         // the gate below, which decides it.
-        if (InvokedName(invocation) is { } invoked && !ArmedCalls.Contains(invoked)) return [];
+        if (InvokedName(invocation) is { } invoked && !ArmedCalls.Contains(invoked)) return null;
 
-        if (model.GetSymbolInfo(invocation).BestCandidate() is not IMethodSymbol method) return [];
+        if (model.GetSymbolInfo(invocation).BestCandidate() is not IMethodSymbol method) return null;
 
         // The unreduced signature carries the IServiceCollection `this` parameter and the true namespace/name
         // (an extension call resolves to the reduced method, whose first parameter is the first value arg).
         IMethodSymbol signature = method.ReducedFrom ?? method;
-        if (!PassesGate(signature)) return [];
+        if (!PassesGate(signature)) return null;
 
         if (AddFamilyCalls.Contains(signature.Name)) return RecognizeAddFamily(signature.Name, method, invocation, model);
 
@@ -91,7 +91,7 @@ internal sealed class RegistrationRecognizer
             HostedServiceCall => RecognizeHostedService(method),
             DbContextCall or DbContextPoolCall => RecognizeDbContext(method, invocation, model),
             HttpClientCall => RecognizeHttpClient(method),
-            _ => []
+            _ => null
         };
     }
 
@@ -138,14 +138,14 @@ internal sealed class RegistrationRecognizer
         ImmutableArray<ITypeSymbol> typeArguments, bool selfWhenSingle)
     {
         if (typeArguments.Length is not (1 or 2)) return null;
-        if (AsNamed(typeArguments[0]) is not { } service) return null;
+        if (typeArguments[0].BestNamedCandidate() is not { } service) return null;
 
-        if (typeArguments.Length == 2) return (service, AsNamed(typeArguments[1]));
+        if (typeArguments.Length == 2) return (service, typeArguments[1].BestNamedCandidate());
 
         return selfWhenSingle ? (service, service) : (service, null);
     }
 
-    private IEnumerable<RecognizedRegistration> RecognizeAddFamily(
+    private RecognizedRegistration? RecognizeAddFamily(
         string name, IMethodSymbol method, InvocationExpressionSyntax invocation, SemanticModel model)
     {
         Lifetime lifetime = LifetimeFromName(name);
@@ -154,73 +154,72 @@ internal sealed class RegistrationRecognizer
         // receiver-only, since a factory/instance overload names no implementation type.
         bool receiverOnly = method.Parameters.Length == 0;
         if (ServiceAndImplementation(method.TypeArguments, receiverOnly) is { } decoded)
-            return [new RecognizedRegistration(lifetime, decoded.Service, decoded.Implementation)];
+            return new RecognizedRegistration(lifetime, decoded.Service, decoded.Implementation);
 
         // No usable type-args → the typeof overloads, mirroring the split by Type-parameter count.
         return RecognizeTypeofAddFamily(lifetime, method, invocation, model);
     }
 
-    private IEnumerable<RecognizedRegistration> RecognizeTypeofAddFamily(
+    private RecognizedRegistration? RecognizeTypeofAddFamily(
         Lifetime lifetime, IMethodSymbol method, InvocationExpressionSyntax invocation, SemanticModel model)
     {
         ImmutableArray<IParameterSymbol> parameters = method.Parameters;
         SeparatedSyntaxList<ArgumentSyntax> arguments = invocation.ArgumentList.Arguments;
-        if (parameters.Length == 0 || !IsSystemType(parameters[0].Type) || arguments.Count == 0) return [];
+        if (parameters.Length == 0 || !IsSystemType(parameters[0].Type) || arguments.Count == 0) return null;
 
-        if (TypeFromTypeofArgument(arguments[0], model) is not { } service) return [];
+        if (TypeFromTypeofArgument(arguments[0], model) is not { } service) return null;
 
         // Add(typeof(IFoo), typeof(Foo)) → (service, impl); the impl slot may be a non-typeof Type (skipped).
         if (parameters.Length >= 2 && IsSystemType(parameters[1].Type))
         {
             INamedTypeSymbol? impl = arguments.Count >= 2 ? TypeFromTypeofArgument(arguments[1], model) : null;
-            return [new RecognizedRegistration(lifetime, service, impl)];
+            return new RecognizedRegistration(lifetime, service, impl);
         }
 
         // Add(typeof(Foo)) → (Foo, Foo); Add(typeof(Foo), factory/instance) → (Foo, null).
         return parameters.Length == 1
-            ? [new RecognizedRegistration(lifetime, service, service)]
-            : [new RecognizedRegistration(lifetime, service, null)];
+            ? new RecognizedRegistration(lifetime, service, service)
+            : new RecognizedRegistration(lifetime, service, null);
     }
 
-    private IEnumerable<RecognizedRegistration> RecognizeHostedService(IMethodSymbol method)
+    private RecognizedRegistration? RecognizeHostedService(IMethodSymbol method)
     {
-        if (method.TypeArguments.Length != 1 || AsNamed(method.TypeArguments[0]) is not { } impl) return [];
+        if (method.TypeArguments.Length != 1) return null;
+        if (method.TypeArguments[0].BestNamedCandidate() is not { } impl) return null;
 
         // Service is the synthesized IHostedService (no syntactic mention); implementation-only fallback (T
         // in the service slot, impl null) when the framework type is not resolvable in this compilation.
         return _hostedService is not null
-            ? [new RecognizedRegistration(Lifetime.Singleton, _hostedService, impl)]
-            : [new RecognizedRegistration(Lifetime.Singleton, impl, null)];
+            ? new RecognizedRegistration(Lifetime.Singleton, _hostedService, impl)
+            : new RecognizedRegistration(Lifetime.Singleton, impl, null);
     }
 
-    private static IEnumerable<RecognizedRegistration> RecognizeHttpClient(IMethodSymbol method)
+    private static RecognizedRegistration? RecognizeHttpClient(IMethodSymbol method)
     {
         // AddHttpClient<TClient, TImpl>() → (TClient, TImpl); AddHttpClient<TClient>() → (TClient, TClient);
         // the named-only string form (no type-args) registers no user type → nothing.
-        if (ServiceAndImplementation(method.TypeArguments, selfWhenSingle: true) is not { } decoded) return [];
+        if (ServiceAndImplementation(method.TypeArguments, selfWhenSingle: true) is not { } decoded) return null;
 
-        return [new RecognizedRegistration(Lifetime.Transient, decoded.Service, decoded.Implementation)];
+        return new RecognizedRegistration(Lifetime.Transient, decoded.Service, decoded.Implementation);
     }
 
-    private IEnumerable<RecognizedRegistration> RecognizeDbContext(
+    private RecognizedRegistration? RecognizeDbContext(
         IMethodSymbol method, InvocationExpressionSyntax invocation, SemanticModel model)
     {
         // AddDbContext<TContext>() → (TContext, TContext); AddDbContext<TContext, TImpl>() → (TContext, TImpl).
-        if (ServiceAndImplementation(method.TypeArguments, selfWhenSingle: true) is not { } decoded) return [];
+        if (ServiceAndImplementation(method.TypeArguments, selfWhenSingle: true) is not { } decoded) return null;
 
-        (bool present, bool literal, Lifetime value) = ContextLifetime(method, invocation, model);
-        if (present && !literal) return []; // a non-literal lifetime argument → never guess
-        Lifetime lifetime = present ? value : Lifetime.Scoped;
-        return [new RecognizedRegistration(lifetime, decoded.Service, decoded.Implementation)];
+        if (ContextLifetime(method, invocation, model) is not { } lifetime) return null;
+
+        return new RecognizedRegistration(lifetime, decoded.Service, decoded.Implementation);
     }
 
     // The context lifetime of an AddDbContext/AddDbContextPool call: the argument bound to the first
-    // ServiceLifetime parameter. Absent (default value used) → Scoped is applied by the caller; a literal
-    // ServiceLifetime.X enum member → honored; anything else → present-but-not-literal → the caller skips.
-    private (bool Present, bool Literal, Lifetime Value) ContextLifetime(
-        IMethodSymbol method, InvocationExpressionSyntax invocation, SemanticModel model)
+    // ServiceLifetime parameter. Absent (default value used) → Scoped; a literal ServiceLifetime.X enum member →
+    // honored; anything else → null, present but not a literal, so the caller never guesses and skips the call.
+    private Lifetime? ContextLifetime(IMethodSymbol method, InvocationExpressionSyntax invocation, SemanticModel model)
     {
-        if (_serviceLifetime is null) return (false, false, default);
+        if (_serviceLifetime is null) return Lifetime.Scoped;
 
         ImmutableArray<IParameterSymbol> parameters = method.Parameters;
         int lifetimeParameter = -1;
@@ -231,16 +230,16 @@ internal sealed class RegistrationRecognizer
                 break;
             }
 
-        if (lifetimeParameter < 0) return (false, false, default);
+        if (lifetimeParameter < 0) return Lifetime.Scoped;
 
         ExpressionSyntax? argument = ArgumentForParameter(invocation.ArgumentList.Arguments, parameters, lifetimeParameter);
-        if (argument is null) return (false, false, default); // default value → absent
+        if (argument is null) return Lifetime.Scoped; // default value → absent
 
         if (model.GetSymbolInfo(argument).Symbol is IFieldSymbol { ContainingType.TypeKind: RoslynTypeKind.Enum } field
             && SymbolEqualityComparer.Default.Equals(field.ContainingType.OriginalDefinition, _serviceLifetime))
-            return (true, true, MapLifetime(field.Name));
+            return MapLifetime(field.Name);
 
-        return (true, false, default);
+        return null;
     }
 
     // The argument expression bound to the reduced method's parameter at parameterIndex — matched by
@@ -282,14 +281,6 @@ internal sealed class RegistrationRecognizer
         };
     }
 
-    // A type argument the compiler could not bind exactly arrives as an error type. It takes the error type's first
-    // candidate, as the typeof operand does, so both spellings of one registration record the same type; one with no
-    // candidate is unusable, as an unresolvable typeof operand is.
-    private static INamedTypeSymbol? AsNamed(ITypeSymbol type)
-    {
-        return type.BestCandidate() as INamedTypeSymbol;
-    }
-
     private bool IsSystemType(ITypeSymbol type)
     {
         return SymbolEqualityComparer.Default.Equals(type, _systemType);
@@ -302,7 +293,7 @@ internal sealed class RegistrationRecognizer
     private static INamedTypeSymbol? TypeFromTypeofArgument(ArgumentSyntax argument, SemanticModel model)
     {
         return argument.Expression is TypeOfExpressionSyntax typeOf
-            ? model.GetSymbolInfo(typeOf.Type).BestCandidate() as INamedTypeSymbol
+            ? model.GetSymbolInfo(typeOf.Type).BestNamedCandidate()
             : null;
     }
 }

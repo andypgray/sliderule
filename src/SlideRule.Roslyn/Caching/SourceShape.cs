@@ -92,7 +92,7 @@ internal sealed record SourceShape(string Hash, IReadOnlyList<int> TokensPerLine
 
             if (token.Span.IsEmpty) continue;
 
-            int line = tree.GetLineSpan(token.Span).StartLinePosition.Line;
+            int line = text.Lines.GetLineFromPosition(token.SpanStart).LineNumber;
             tokensPerLine[line]++;
         }
 

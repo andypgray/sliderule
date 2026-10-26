@@ -65,7 +65,7 @@ public sealed class MethodSelection : MemberSelection
         return (MethodSelection)Refined(new ReturningAdjective(anchors));
     }
 
-    private protected override MemberSelection Rebuild(IReadOnlyList<MemberAdjective> adjectives)
+    internal override MemberSelection WithAdjectives(IReadOnlyList<MemberAdjective> adjectives)
     {
         return new MethodSelection(Source, adjectives);
     }

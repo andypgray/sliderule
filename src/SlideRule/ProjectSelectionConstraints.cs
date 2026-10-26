@@ -37,8 +37,8 @@ public static class ProjectSelectionConstraints
         [SpecSlot(nameof(SpecSlot.TargetFramework))]
         params string[] more)
     {
-        IReadOnlyList<string> frameworks = OperandList.OneOrMore(first, more, framework => framework);
-        return new MustOnlyTargetConstraint(Subject(subject), frameworks);
+        IReadOnlyList<string> frameworks = OperandList.OneOrMore(first, more);
+        return new MustOnlyTargetConstraint(subject, frameworks);
     }
 
     /// <summary>
@@ -56,7 +56,7 @@ public static class ProjectSelectionConstraints
         [SpecSlot(nameof(SpecSlot.TargetFramework))]
         string framework)
     {
-        return new MustTargetConstraint(Subject(subject), NotNull(framework, nameof(framework)));
+        return new MustTargetConstraint(subject, NotNull(framework, nameof(framework)));
     }
 
     /// <summary>
@@ -76,7 +76,7 @@ public static class ProjectSelectionConstraints
     /// </summary>
     public static Constraint MustReferenceNoPackages(this ProjectSelection subject)
     {
-        return new MustReferenceNoPackagesConstraint(Subject(subject));
+        return new MustReferenceNoPackagesConstraint(subject);
     }
 
     /// <summary>
@@ -99,8 +99,8 @@ public static class ProjectSelectionConstraints
         [SpecSlot(nameof(SpecSlot.PackagePattern))]
         params string[] more)
     {
-        IReadOnlyList<string> patterns = OperandList.OneOrMore(first, more, pattern => pattern);
-        return new MustOnlyReferencePackagesConstraint(Subject(subject), patterns);
+        IReadOnlyList<string> patterns = OperandList.OneOrMore(first, more);
+        return new MustOnlyReferencePackagesConstraint(subject, patterns);
     }
 
     /// <summary>
@@ -123,8 +123,8 @@ public static class ProjectSelectionConstraints
         [SpecSlot(nameof(SpecSlot.PackagePattern))]
         params string[] more)
     {
-        IReadOnlyList<string> patterns = OperandList.OneOrMore(first, more, pattern => pattern);
-        return new MustNotReferencePackagesConstraint(Subject(subject), patterns);
+        IReadOnlyList<string> patterns = OperandList.OneOrMore(first, more);
+        return new MustNotReferencePackagesConstraint(subject, patterns);
     }
 
     /// <summary>
@@ -135,7 +135,7 @@ public static class ProjectSelectionConstraints
     /// </summary>
     public static Constraint MustLockPackages(this ProjectSelection subject)
     {
-        return new MustLockPackagesConstraint(Subject(subject));
+        return new MustLockPackagesConstraint(subject);
     }
 
     /// <summary>
@@ -146,7 +146,7 @@ public static class ProjectSelectionConstraints
     /// </summary>
     public static Constraint MustNotBePackable(this ProjectSelection subject)
     {
-        return new MustNotBePackableConstraint(Subject(subject));
+        return new MustNotBePackableConstraint(subject);
     }
 
     /// <summary>
@@ -169,7 +169,7 @@ public static class ProjectSelectionConstraints
         [SpecSlot(nameof(SpecSlot.PropertyValue))]
         string value)
     {
-        return new MustSetPropertyConstraint(Subject(subject), NotNull(name, nameof(name)), NotNull(value, nameof(value)));
+        return new MustSetPropertyConstraint(subject, NotNull(name, nameof(name)), NotNull(value, nameof(value)));
     }
 
     /// <summary>
@@ -192,11 +192,6 @@ public static class ProjectSelectionConstraints
         [SpecSlot(nameof(SpecSlot.Description))]
         string description)
     {
-        return new ProjectMustConstraint(Subject(subject), NotNull(predicate, nameof(predicate)), NotNull(description, nameof(description)));
-    }
-
-    private static ProjectSelection Subject(ProjectSelection subject)
-    {
-        return NotNull(subject, nameof(subject));
+        return new ProjectMustConstraint(subject, NotNull(predicate, nameof(predicate)), NotNull(description, nameof(description)));
     }
 }

@@ -219,18 +219,9 @@ internal sealed class ExtractionCacheStore
     internal long CaptureStampCount => Volatile.Read(ref captureStampCount);
 
     /// <summary>
-    ///     Stats and hashes every input <em>now</em>, returning the pre-extraction fingerprint to hand to
-    ///     <see cref="Write" /> after extraction. Does not touch <see cref="ContentHashCount" /> (that counts
-    ///     validation reads only) and writes nothing.
-    /// </summary>
-    public CacheFingerprint CaptureFingerprint(IReadOnlyList<ProjectInputs> projects, CancellationToken ct = default)
-    {
-        return CaptureFingerprint(projects, null, ct);
-    }
-
-    /// <summary>
     ///     The fingerprint to hand to <see cref="Write" />: the one <see cref="TryCaptureOverValidation" /> builds
-    ///     from <paramref name="validated" /> where it can, and otherwise every input stamped now.
+    ///     from <paramref name="validated" /> where it can, and otherwise every input stamped now. Does not touch
+    ///     <see cref="ContentHashCount" /> (that counts validation reads only) and writes nothing.
     /// </summary>
     public CacheFingerprint CaptureFingerprint(
         IReadOnlyList<ProjectInputs> projects, ValidatedStamps? validated, CancellationToken ct = default)
@@ -271,7 +262,7 @@ internal sealed class ExtractionCacheStore
     {
         Dictionary<string, string?> structuralShaByPath = BuildStructuralShaLookup(validated.StructuralStamps);
 
-        // Re-keyed by name in input order, so a repeated name resolves to its last occurrence, as in a full capture.
+        // Re-keyed by name in input order, so a repeated name resolves to its last occurrence.
         var loadedByName = new Dictionary<string, ProjectInputs>(StringComparer.Ordinal);
         foreach (ProjectInputs project in projects) loadedByName[project.ProjectName] = project;
 
@@ -293,25 +284,7 @@ internal sealed class ExtractionCacheStore
                 loadedByName[carried.Entry.ProjectName], carried.UnchangedDocuments, structuralShaByPath, ct);
         });
 
-        var contentKeys = new Dictionary<string, string>(StringComparer.Ordinal);
-        var surfaceKeys = new Dictionary<string, string>(StringComparer.Ordinal);
-        var referencesByName = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
-        foreach (ProjectCacheEntry entry in entryByIndex)
-        {
-            contentKeys[entry.ProjectName] = entry.ContentKey;
-            surfaceKeys[entry.ProjectName] = entry.SurfaceKey;
-            referencesByName[entry.ProjectName] = entry.ProjectReferences;
-        }
-
-        // The same Merkle pass a full capture runs, over the same kinds of key, so capture and validation still
-        // agree by construction.
-        var surfaceMemo = new Dictionary<string, string>(StringComparer.Ordinal);
-        List<ProjectCacheEntry> entries = entryByIndex
-            .Select(entry => entry with
-            {
-                MerkleKey = ComputeMerkleKey(entry.ProjectName, contentKeys, surfaceKeys, referencesByName, surfaceMemo)
-            })
-            .ToList();
+        List<ProjectCacheEntry> entries = WithMerkleKeys(entryByIndex);
 
         return new CacheFingerprint(validated.StructuralStamps, entries, freshByIndex.SelectMany(stamps => stamps).ToList());
     }
@@ -354,26 +327,39 @@ internal sealed class ExtractionCacheStore
     }
 
     // A project's content and surface keys over its document stamps, its structural inputs and its cone-adds.
-    // The adds come from the routine validation uses, over the same known-document set (the stamps' full paths):
-    // a *.cs on disk under the project but excluded from compilation is a validation-time add, so a capture that
-    // left adds empty would never validate and the project would stay dirty forever.
     private static (string ContentKey, string SurfaceKey) ProjectKeysOf(
         ProjectInputs project, IReadOnlyList<FileStamp> documents, IReadOnlyDictionary<string, string?> structuralShaByPath)
     {
         List<(string Path, string? Sha256)> documentShas = documents.Select(d => (d.Path, d.Sha256)).ToList();
-        string? csprojSha = structuralShaByPath.GetValueOrDefault(Path.GetFullPath(project.CsprojPath));
-        string? assetsSha = structuralShaByPath.GetValueOrDefault(
-            IntermediateOutputTree.DefaultAssetsPathOf(project.ProjectDirectory));
-
-        var knownDocuments = new HashSet<string>(documents.Select(d => d.Path), PathComparison.Comparer);
-        IReadOnlyList<string> adds = ProjectCone.Adds(Path.GetFullPath(project.ProjectDirectory), knownDocuments);
+        (string? csprojSha, string? assetsSha, IReadOnlyList<string> adds) = KeyInputsOf(
+            project.CsprojPath, project.ProjectDirectory, documents, structuralShaByPath);
         return (ComputeContentKey(project.ProjectName, documentShas, csprojSha, assetsSha, adds),
             ComputeContentKey(project.ProjectName, SurfacesOf(documents), csprojSha, assetsSha, adds));
     }
 
+    // The structural shas and cone-adds of a project's content keys. Capture and validation both take them
+    // here, over the same known-document set (the stamps' full paths): a *.cs on disk under the project but
+    // excluded from compilation is a validation-time add, so an always-present excluded stray lands in both adds
+    // lists and cancels and only a genuine add moves, where a capture that left adds empty would never validate
+    // and the project would stay dirty forever.
+    private static (string? CsprojSha, string? AssetsSha, IReadOnlyList<string> Adds) KeyInputsOf(
+        string csprojPath,
+        string projectDirectory,
+        IReadOnlyList<FileStamp> documents,
+        IReadOnlyDictionary<string, string?> structuralShaByPath)
+    {
+        string? csprojSha = structuralShaByPath.GetValueOrDefault(Path.GetFullPath(csprojPath));
+        string? assetsSha = structuralShaByPath.GetValueOrDefault(
+            IntermediateOutputTree.DefaultAssetsPathOf(projectDirectory));
+
+        var knownDocuments = new HashSet<string>(documents.Select(d => d.Path), PathComparison.Comparer);
+        IReadOnlyList<string> adds = ProjectCone.Adds(Path.GetFullPath(projectDirectory), knownDocuments);
+        return (csprojSha, assetsSha, adds);
+    }
+
     private CacheFingerprint CaptureEverything(IReadOnlyList<ProjectInputs> projects, CancellationToken ct)
     {
-        List<FileStamp> structuralStamps = StructuralPathsOf(projects)
+        List<FileStamp> structuralStamps = ProjectCone.SolutionStructuralPaths(solutionPath, projects)
             .Select(FileStamping.StampOf)
             .ToList();
 
@@ -381,58 +367,57 @@ internal sealed class ExtractionCacheStore
 
         // Each project's fingerprint reads only its own files, so the whole hash-and-parse pass over the
         // solution's sources runs in parallel — the one place a cold run spends real wall-clock — and lands
-        // in position-indexed slots. The Merkle pass below needs every content key before it can start, so
-        // it stays sequential.
-        var contentKeyByIndex = new string[projects.Count];
-        var surfaceKeyByIndex = new string[projects.Count];
-        var documentsByIndex = new IReadOnlyList<FileStamp>[projects.Count];
+        // in position-indexed slots. The Merkle pass needs every content key before it can start, so it
+        // stays sequential.
+        var entryByIndex = new ProjectCacheEntry[projects.Count];
 
         Parallel.For(0, projects.Count, new ParallelOptions { CancellationToken = ct }, index =>
         {
             ProjectInputs project = projects[index];
 
             IReadOnlyList<FileStamp> documents = StampDocuments(project.DocumentPaths, ct);
-            (contentKeyByIndex[index], surfaceKeyByIndex[index]) = ProjectKeysOf(project, documents, structuralShaByPath);
-            documentsByIndex[index] = documents;
-        });
-
-        // Re-keyed by name in input order, so a repeated name resolves to its last occurrence.
-        var contentKeys = new Dictionary<string, string>(StringComparer.Ordinal);
-        var surfaceKeys = new Dictionary<string, string>(StringComparer.Ordinal);
-        var referencesByName = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
-        var documentsByName = new Dictionary<string, IReadOnlyList<FileStamp>>(StringComparer.Ordinal);
-        for (var index = 0; index < projects.Count; index++)
-        {
-            ProjectInputs project = projects[index];
-            contentKeys[project.ProjectName] = contentKeyByIndex[index];
-            surfaceKeys[project.ProjectName] = surfaceKeyByIndex[index];
-            referencesByName[project.ProjectName] = project.ProjectReferences;
-            documentsByName[project.ProjectName] = documentsByIndex[index];
-        }
-
-        var surfaceMemo = new Dictionary<string, string>(StringComparer.Ordinal);
-        var entries = new List<ProjectCacheEntry>(projects.Count);
-        foreach (ProjectInputs project in projects)
-        {
-            string merkleKey = ComputeMerkleKey(project.ProjectName, contentKeys, surfaceKeys, referencesByName, surfaceMemo);
-            entries.Add(new ProjectCacheEntry(
+            (string contentKey, string surfaceKey) = ProjectKeysOf(project, documents, structuralShaByPath);
+            entryByIndex[index] = new ProjectCacheEntry(
                 project.ProjectName,
                 Path.GetFullPath(project.CsprojPath),
                 Path.GetFullPath(project.ProjectDirectory),
                 project.ProjectReferences,
-                documentsByName[project.ProjectName],
-                contentKeys[project.ProjectName],
-                merkleKey,
-                surfaceKeys[project.ProjectName]));
+                documents,
+                contentKey,
+                "",
+                surfaceKey);
+        });
+
+        return new CacheFingerprint(structuralStamps, WithMerkleKeys(entryByIndex));
+    }
+
+    // The one Merkle pass every capture runs over entries whose Merkle key is still empty, over the same kinds
+    // of key validation recomputes, so capture and validation agree by construction.
+    private static List<ProjectCacheEntry> WithMerkleKeys(IReadOnlyList<ProjectCacheEntry> entries)
+    {
+        var surfaceKeys = new Dictionary<string, string>(StringComparer.Ordinal);
+        var referencesByName = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
+        foreach (ProjectCacheEntry entry in entries)
+        {
+            surfaceKeys[entry.ProjectName] = entry.SurfaceKey;
+            referencesByName[entry.ProjectName] = entry.ProjectReferences;
         }
 
-        return new CacheFingerprint(structuralStamps, entries);
+        var surfaceMemo = new Dictionary<string, string>(StringComparer.Ordinal);
+        return entries
+            .Select(entry => entry with
+            {
+                MerkleKey = ComputeMerkleKey(
+                    entry.ContentKey, entry.ProjectName, surfaceKeys, referencesByName, surfaceMemo)
+            })
+            .ToList();
     }
 
     /// <summary>
     ///     Commits <paramref name="extraction" /> to the cache, keyed to <paramref name="fingerprint" />.
     ///     Re-stats every input the capture took from disk first; if any changed since
-    ///     <see cref="CaptureFingerprint(IReadOnlyList{ProjectInputs}, CancellationToken)" /> (a mid-run edit),
+    ///     <see cref="CaptureFingerprint(IReadOnlyList{ProjectInputs}, ValidatedStamps, CancellationToken)" /> (a
+    ///     mid-run edit),
     ///     skips the write and returns <c>false</c>. A best-effort I/O failure also returns <c>false</c>.
     ///     Otherwise writes atomically and returns <c>true</c>.
     /// </summary>
@@ -496,15 +481,10 @@ internal sealed class ExtractionCacheStore
         if (!string.Equals(manifest.ToolVersion, FileStamping.CurrentToolVersion, StringComparison.Ordinal)) return CacheReadResult.Miss();
 
         // Structural sweep — any existence flip or content change is a full miss.
-        var refreshedStructural = new List<FileStamp>(manifest.StructuralStamps.Count);
-        foreach (FileStamp stamp in manifest.StructuralStamps)
-        {
-            ct.ThrowIfCancellationRequested();
-            (bool missed, FileStamp refreshed) = FileStamping.CheckStructural(
-                stamp, () => Interlocked.Increment(ref contentHashCount));
-            if (missed) return CacheReadResult.Miss();
-            refreshedStructural.Add(refreshed);
-        }
+        if (FileStamping.SweepStructural(
+                manifest.StructuralStamps, () => Interlocked.Increment(ref contentHashCount), ct, out _)
+            is not { } refreshedStructural)
+            return CacheReadResult.Miss();
 
         Dictionary<string, string?> structuralShaByPath = BuildStructuralShaLookup(refreshedStructural);
 
@@ -516,15 +496,11 @@ internal sealed class ExtractionCacheStore
         Parallel.For(0, manifest.Projects.Count, new ParallelOptions { CancellationToken = ct },
             index => checkedByIndex[index] = CheckProject(manifest.Projects[index], structuralShaByPath, ct));
 
-        var decisionContentKeys = new Dictionary<string, string>(StringComparer.Ordinal);
-        var trueContentKeys = new Dictionary<string, string>(StringComparer.Ordinal);
         var surfaceKeys = new Dictionary<string, string>(StringComparer.Ordinal);
         var referencesByName = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
         var mapsByProject = new Dictionary<string, IReadOnlyDictionary<string, LineMap>>(StringComparer.Ordinal);
         foreach (ProjectCheck check in checkedByIndex)
         {
-            decisionContentKeys[check.ProjectName] = check.DecisionContentKey;
-            trueContentKeys[check.ProjectName] = check.TrueContentKey;
             surfaceKeys[check.ProjectName] = check.SurfaceKey;
             referencesByName[check.ProjectName] = check.ProjectReferences;
             if (check.Maps is { } maps) mapsByProject[check.ProjectName] = maps;
@@ -536,10 +512,12 @@ internal sealed class ExtractionCacheStore
         // dependent of a project whose declaration surface changed.
         var dirtyProjects = new HashSet<string>(StringComparer.Ordinal);
         var surfaceMemo = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (ProjectCacheEntry project in manifest.Projects)
+        for (var index = 0; index < manifest.Projects.Count; index++)
         {
+            ProjectCacheEntry project = manifest.Projects[index];
             string recomputedMerkle = ComputeMerkleKey(
-                project.ProjectName, decisionContentKeys, surfaceKeys, referencesByName, surfaceMemo);
+                checkedByIndex[index].DecisionContentKey, project.ProjectName, surfaceKeys, referencesByName,
+                surfaceMemo);
             if (!string.Equals(recomputedMerkle, project.MerkleKey, StringComparison.Ordinal))
                 dirtyProjects.Add(project.ProjectName);
         }
@@ -549,14 +527,17 @@ internal sealed class ExtractionCacheStore
 
         // The merge's notes and multi-targeted projects are empty: nothing persists them, because a hit re-merges
         // the stored fragments and produces both afresh.
-        var loadDiagnostics = new WorkspaceDiagnostics(
-            manifest.Diagnostics, [], manifest.FailedProjects, manifest.UncheckedProjects,
-            manifest.RestoreFailedProjects, manifest.UnsupportedProjects, []);
+        WorkspaceDiagnostics loadDiagnostics = WorkspaceDiagnostics.OfLoad(
+            loadFailures: manifest.Diagnostics,
+            failedProjects: manifest.FailedProjects,
+            uncheckedProjects: manifest.UncheckedProjects,
+            restoreFailedProjects: manifest.RestoreFailedProjects,
+            unsupportedProjects: manifest.UnsupportedProjects);
 
         if (dirtyProjects.Count == 0)
         {
             IReadOnlyList<ProjectCacheEntry> refreshedProjects = RefreshedProjects(
-                manifest.Projects, checkedByIndex, trueContentKeys, surfaceKeys, referencesByName, surfaceMemo);
+                manifest.Projects, checkedByIndex, surfaceKeys, referencesByName, surfaceMemo);
             PromoteIfChanged(manifest, refreshedStructural, refreshedProjects, replayedFragments);
             return CacheReadResult.Hit(replayedFragments, manifest.SpecResolutions, loadDiagnostics);
         }
@@ -623,7 +604,6 @@ internal sealed class ExtractionCacheStore
     private static IReadOnlyList<ProjectCacheEntry> RefreshedProjects(
         IReadOnlyList<ProjectCacheEntry> projects,
         IReadOnlyList<ProjectCheck> checkedByIndex,
-        IReadOnlyDictionary<string, string> trueContentKeys,
         IReadOnlyDictionary<string, string> surfaceKeys,
         IReadOnlyDictionary<string, IReadOnlyList<string>> referencesByName,
         Dictionary<string, string> surfaceMemo)
@@ -634,7 +614,7 @@ internal sealed class ExtractionCacheStore
             ProjectCacheEntry project = projects[index];
             ProjectCheck check = checkedByIndex[index];
             string trueMerkle = ComputeMerkleKey(
-                project.ProjectName, trueContentKeys, surfaceKeys, referencesByName, surfaceMemo);
+                check.TrueContentKey, project.ProjectName, surfaceKeys, referencesByName, surfaceMemo);
             refreshed.Add(project with
             {
                 Documents = check.RefreshedDocuments,
@@ -732,13 +712,11 @@ internal sealed class ExtractionCacheStore
         var decisionShas = new List<(string Path, string? Sha)>(project.Documents.Count);
         var trueShas = new List<(string Path, string? Sha)>(project.Documents.Count);
         var refreshedDocuments = new List<FileStamp>(project.Documents.Count);
-        var knownDocuments = new HashSet<string>(PathComparison.Comparer);
         Dictionary<string, LineMap>? maps = null;
 
         foreach (FileStamp document in project.Documents)
         {
             ct.ThrowIfCancellationRequested();
-            knownDocuments.Add(document.Path);
 
             DocumentCheck check = CheckDocument(document);
             decisionShas.Add((document.Path, check.DecisionSha));
@@ -751,12 +729,8 @@ internal sealed class ExtractionCacheStore
             }
         }
 
-        // Capture and validation compute cone-adds through the one routine over the same known-document set,
-        // so an always-present excluded stray lands in both adds lists and cancels; only a genuine add moves.
-        IReadOnlyList<string> adds = ProjectCone.Adds(project.ProjectDirectory, knownDocuments);
-        string? csprojSha = structuralShaByPath.GetValueOrDefault(project.CsprojPath);
-        string? assetsSha = structuralShaByPath.GetValueOrDefault(
-            IntermediateOutputTree.DefaultAssetsPathOf(project.ProjectDirectory));
+        (string? csprojSha, string? assetsSha, IReadOnlyList<string> adds) = KeyInputsOf(
+            project.CsprojPath, project.ProjectDirectory, project.Documents, structuralShaByPath);
         string decisionKey = ComputeContentKey(project.ProjectName, decisionShas, csprojSha, assetsSha, adds);
         string trueKey = maps is null
             ? decisionKey
@@ -790,7 +764,7 @@ internal sealed class ExtractionCacheStore
             return new DocumentCheck(null, null, refreshed, null);
         }
 
-        if (document.ToFreshness().MatchesStat(current) && document.Promoted)
+        if (document.IsTrustedBy(current))
             // provably unchanged: trust the recorded hash
             return new DocumentCheck(document.Sha256, document.Sha256, document, null);
 
@@ -873,19 +847,16 @@ internal sealed class ExtractionCacheStore
     // MerkleKey(P) = hash(ContentKey(P), SurfaceMerkle(dep) for each dep in name order), where
     // SurfaceMerkle(P) = hash(SurfaceKey(P), SurfaceMerkle(dep) for each dep in name order).
     private static string ComputeMerkleKey(
+        string contentKey,
         string name,
-        IReadOnlyDictionary<string, string> contentKeys,
         IReadOnlyDictionary<string, string> surfaceKeys,
         IReadOnlyDictionary<string, IReadOnlyList<string>> referencesByName,
         Dictionary<string, string> surfaceMemo)
     {
         var builder = new StringBuilder();
-        builder.Append(contentKeys.GetValueOrDefault(name, "UNKNOWN"));
-        if (referencesByName.TryGetValue(name, out IReadOnlyList<string>? dependencies))
-            foreach (string dependency in dependencies.OrderBy(d => d, StringComparer.Ordinal))
-                if (surfaceKeys.ContainsKey(dependency))
-                    builder.Append('\0').Append(ComputeSurfaceMerkleKey(
-                        dependency, surfaceKeys, referencesByName, surfaceMemo, new HashSet<string>(StringComparer.Ordinal)));
+        builder.Append(contentKey);
+        AppendDependencySurfaces(
+            builder, name, surfaceKeys, referencesByName, surfaceMemo, new HashSet<string>(StringComparer.Ordinal));
 
         return FileStamping.HashText(builder.ToString());
     }
@@ -906,15 +877,30 @@ internal sealed class ExtractionCacheStore
 
         var builder = new StringBuilder();
         builder.Append(self);
-        if (referencesByName.TryGetValue(name, out IReadOnlyList<string>? dependencies))
-            foreach (string dependency in dependencies.OrderBy(d => d, StringComparer.Ordinal))
-                if (surfaceKeys.ContainsKey(dependency))
-                    builder.Append('\0').Append(ComputeSurfaceMerkleKey(dependency, surfaceKeys, referencesByName, memo, visiting));
+        AppendDependencySurfaces(builder, name, surfaceKeys, referencesByName, memo, visiting);
 
         visiting.Remove(name);
         string key = FileStamping.HashText(builder.ToString());
         memo[name] = key;
         return key;
+    }
+
+    // Each dependency of name that has a surface key, in name order, as '\0' and its surface Merkle key. Every
+    // ComputeSurfaceMerkleKey call removes from visiting what it adds, so one set serves a whole sibling list.
+    private static void AppendDependencySurfaces(
+        StringBuilder builder,
+        string name,
+        IReadOnlyDictionary<string, string> surfaceKeys,
+        IReadOnlyDictionary<string, IReadOnlyList<string>> referencesByName,
+        Dictionary<string, string> memo,
+        HashSet<string> visiting)
+    {
+        if (!referencesByName.TryGetValue(name, out IReadOnlyList<string>? dependencies)) return;
+
+        foreach (string dependency in dependencies.OrderBy(d => d, StringComparer.Ordinal))
+            if (surfaceKeys.ContainsKey(dependency))
+                builder.Append('\0')
+                    .Append(ComputeSurfaceMerkleKey(dependency, surfaceKeys, referencesByName, memo, visiting));
     }
 
     // The stamp comparison covers the remap case too: a document whose sites moved is a document whose hash
@@ -966,10 +952,7 @@ internal sealed class ExtractionCacheStore
 
     private static bool StatChangedSinceCapture(FileStamp stamp)
     {
-        FileFreshness current = FileFreshness.Capture(stamp.Path);
-        if (stamp.Exists != current.Exists) return true;
-        if (!stamp.Exists) return false;
-        return !stamp.ToFreshness().MatchesStat(current);
+        return !stamp.ToFreshness().MatchesStat(FileFreshness.Capture(stamp.Path));
     }
 
     private string? HashDuringValidation(string path)
@@ -984,17 +967,6 @@ internal sealed class ExtractionCacheStore
     {
         Interlocked.Increment(ref contentHashCount);
         return FileStamping.TryReadDocument(path);
-    }
-
-    private IReadOnlyList<string> StructuralPathsOf(IReadOnlyList<ProjectInputs> projects)
-    {
-        return ProjectCone.SolutionStructuralPaths(
-            solutionPath,
-            projects.Select(project => (
-                Path.GetFullPath(project.CsprojPath),
-                Path.GetFullPath(project.ProjectDirectory),
-                project.EvaluatedOutputPath,
-                project.IntermediateAssemblyPath)));
     }
 
     private static Dictionary<string, string?> BuildStructuralShaLookup(IReadOnlyList<FileStamp> stamps)

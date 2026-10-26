@@ -47,7 +47,7 @@ internal static class WorkspaceDiagnosticsRenderer
     internal static void Render(
         TextWriter error, WorkspaceTrustStamp trust, IReadOnlyList<string> diagnostics, bool json)
     {
-        Render(error, trust.PackageAudit ?? [], diagnostics, json);
+        Render(error, trust.PackageAudit, diagnostics, json);
     }
 
     private static string Line(string text, bool json)

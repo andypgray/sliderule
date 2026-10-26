@@ -27,13 +27,32 @@ internal static class ScopeDesugarer
             : [Containment(scope), Tripwire(scope)];
     }
 
+    internal static string ContainmentId(string scopeId)
+    {
+        return scopeId + "/containment";
+    }
+
+    internal static string TripwireId(string scopeId)
+    {
+        return scopeId + "/tripwire";
+    }
+
+    // The boundary a containment rule was desugared from, in the spec's order: its constraint's operands after
+    // the scoped selection, as BuildContainment lays them out. A model read back from a file carries the
+    // constraint whole, so this holds for a parsed model as for a built one.
+    internal static IEnumerable<Selection> BoundaryOf(ArchRule containment)
+    {
+        return containment.Constraint!.Operands.Skip(1);
+    }
+
     private static ArchRule Containment(ScopeRegistration scope)
     {
         Selection quarantined = scope.Scoped!;
         IReadOnlyList<Selection> boundary = scope.Boundary;
+        string id = ContainmentId(scope.Id);
         // .Baseline(path) omitted ⇒ the conventional default derived from the containment rule ID
         // (GRAMMAR §4.4/§7), so the containment child's baseline is never null post-build.
-        string baseline = scope.Baselines.FirstOrDefault() ?? BaselineConventions.DefaultPath(scope.Id + "/containment");
+        string baseline = scope.Baselines.FirstOrDefault() ?? BaselineConventions.DefaultPath(id);
 
         Constraint containment = BuildContainment(quarantined, boundary);
         // The Fix names the first sanctioned operand as the sentence would refer to it (GRAMMAR §5.5):
@@ -43,7 +62,7 @@ internal static class ScopeDesugarer
             : null;
 
         return new ArchRule(
-            scope.Id + "/containment",
+            id,
             Posture.Quarantine,
             Because(scope),
             fix,
@@ -59,7 +78,7 @@ internal static class ScopeDesugarer
     private static ArchRule Tripwire(ScopeRegistration scope)
     {
         return new ArchRule(
-            scope.Id + "/tripwire",
+            TripwireId(scope.Id),
             scope.Posture!.Value,
             Because(scope),
             null,

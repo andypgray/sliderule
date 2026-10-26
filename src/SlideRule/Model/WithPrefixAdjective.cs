@@ -9,5 +9,5 @@ internal sealed class WithPrefixAdjective(string prefix) : SelectionAdjective
 
     internal override AdjectivePlacement Placement => AdjectivePlacement.Inline;
 
-    internal override string Fragment => $" named {ProseFormat.Backtick(Prefix + "*")}";
+    internal override string Fragment => $" named {ProseFormat.PrefixGlob(Prefix)}";
 }

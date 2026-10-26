@@ -441,7 +441,7 @@ public class ModelReificationTests
     [Fact]
     public void StaticAdjective_ReifiesOntoTheMemberSelection_KeepingTheConcreteType()
     {
-        // The adjective lands in the member selection's adjective list, and Rebuild returns the concrete
+        // The adjective lands in the member selection's adjective list, and WithAdjectives returns the concrete
         // type — which is what keeps the kind-only verb reachable after it, in any order.
         var constraint = ShouldReifyTo<MemberMustBeReadonlyConstraint>(arch => arch.Namespace("MyApp.Web.*").Fields.ThatAreStatic()
             .MustBeReadonly());
@@ -580,7 +580,7 @@ public class ModelReificationTests
         constraint.Subject!.Noun.ShouldBeOfType<RegisteredNoun>()
             .Lifetime.ShouldBe(Lifetime.Singleton);
         constraint.Operands.ShouldBe(constraint.Targets);
-        constraint.Targets.Select(target => ((RegisteredNoun)target.Noun).Lifetime)
+        constraint.Targets.Select(target => target.Noun.ShouldBeOfType<RegisteredNoun>().Lifetime)
             .ShouldBe([Lifetime.Scoped, Lifetime.Transient]);
         // MustNotInject is a dependency-shape verb (overrides Operands, not MemberOperands).
         constraint.MemberOperands.ShouldBeEmpty();

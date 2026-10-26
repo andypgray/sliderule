@@ -25,12 +25,23 @@ internal static class PathCanonicalizer
     /// </summary>
     public static string Resolve(string path)
     {
+        return Resolve(path, null);
+    }
+
+    /// <summary>
+    ///     <see cref="Resolve(string)" />, answering each directory's reparse probe from
+    ///     <paramref name="linkTargets" /> (keyed by <see cref="FileSystemInfo.FullName" />, ordinal) when an
+    ///     earlier call asked it already, and recording the answer there otherwise. A caller keeps the memo for
+    ///     one walk only: it records what the filesystem said at one instant.
+    /// </summary>
+    internal static string Resolve(string path, Dictionary<string, string?>? linkTargets)
+    {
         if (string.IsNullOrEmpty(path)) return path;
 
         string current = Path.GetFullPath(path);
         for (var iteration = 0; iteration < MaxIterations; iteration++)
         {
-            string? resolved = ResolveDeepestSymlink(current);
+            string? resolved = ResolveDeepestSymlink(current, linkTargets);
             if (resolved is null) return current; // no symlinked ancestor left — fixed point reached
 
             current = Path.GetFullPath(resolved);
@@ -51,17 +62,30 @@ internal static class PathCanonicalizer
 
     // The path with its deepest symlinked ancestor replaced by that link's final target and the remainder
     // reattached, or null when no ancestor is a symlink.
-    private static string? ResolveDeepestSymlink(string current)
+    private static string? ResolveDeepestSymlink(string current, Dictionary<string, string?>? linkTargets)
     {
         for (DirectoryInfo? dir = new(current); dir is not null; dir = dir.Parent)
         {
-            if (TryResolveLinkTarget(dir) is not { } target) continue;
+            if (LinkTargetOf(dir, linkTargets) is not { } target) continue;
 
             string remainder = Path.GetRelativePath(dir.FullName, current);
             return remainder == "." ? target : Path.Combine(target, remainder);
         }
 
         return null;
+    }
+
+    private static string? LinkTargetOf(DirectoryInfo dir, Dictionary<string, string?>? linkTargets)
+    {
+        if (linkTargets is null) return TryResolveLinkTarget(dir);
+
+        if (!linkTargets.TryGetValue(dir.FullName, out string? target))
+        {
+            target = TryResolveLinkTarget(dir);
+            linkTargets[dir.FullName] = target;
+        }
+
+        return target;
     }
 
     // ResolveLinkTarget probes the path as a reparse point, which throws on drive roots ("C:\"),

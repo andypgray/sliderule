@@ -129,6 +129,34 @@ internal readonly record struct WorkspaceDiagnostics(
     internal static WorkspaceDiagnostics None { get; } = new([], [], [], [], [], [], []);
 
     /// <summary>
+    ///     A load's verdict before any extraction: the merge's notes and multi-targeted projects stay empty, since
+    ///     only extraction produces them, and <see cref="WithModel" /> fills them.
+    /// </summary>
+    internal static WorkspaceDiagnostics OfLoad(
+        IReadOnlyList<string> loadFailures,
+        IReadOnlyList<string> failedProjects,
+        IReadOnlyList<string> uncheckedProjects,
+        IReadOnlyList<string> restoreFailedProjects,
+        IReadOnlyList<UnsupportedProject> unsupportedProjects)
+    {
+        return new WorkspaceDiagnostics(
+            loadFailures, [], failedProjects, uncheckedProjects, restoreFailedProjects, unsupportedProjects, []);
+    }
+
+    /// <summary>
+    ///     This verdict with <see cref="MergeNotes" /> and <see cref="MultiTargetedProjects" /> filled from the
+    ///     one merged model <paramref name="codebase" />.
+    /// </summary>
+    internal WorkspaceDiagnostics WithModel(CodebaseModel codebase)
+    {
+        return this with
+        {
+            MergeNotes = codebase.MergeNotes,
+            MultiTargetedProjects = Diagnostics.MultiTargetedProjects.Of(codebase)
+        };
+    }
+
+    /// <summary>
     ///     The load failures that are not NuGet audit advisories, with the MSBuild-selection note appended; empty
     ///     when there are none.
     /// </summary>

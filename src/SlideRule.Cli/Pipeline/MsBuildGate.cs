@@ -237,11 +237,7 @@ internal static class MsBuildGate
         {
             return BinlogReplayer.Replay(binlogFullPath, solutionPath, diagnostics.Add, ct);
         }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             throw new UserErrorException(BinlogReplayMessages.ReplayFailedMessage(binlogArgument, ex.Message), ex);
         }

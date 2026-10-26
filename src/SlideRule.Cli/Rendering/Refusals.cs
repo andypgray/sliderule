@@ -1,4 +1,5 @@
 using SlideRule.Hosting;
+using SlideRule.Roslyn;
 
 namespace SlideRule.Cli.Rendering;
 
@@ -133,5 +134,14 @@ internal static class Refusals
     internal static string? SingleValueRefusal(string value, string lead, string advice)
     {
         return StringifiedArrayRefusal(value, lead, elements => SingleValueAdvice(advice, elements));
+    }
+
+    /// <summary>
+    ///     Refuses a scalar parameter whose <paramref name="value" /> is a stringified array, with the
+    ///     <see cref="SingleValueRefusal" /> text as a <see cref="UserErrorException" />; any other value passes.
+    /// </summary>
+    internal static void RefuseSingleValue(string value, string lead, string advice)
+    {
+        if (SingleValueRefusal(value, lead, advice) is { } refusal) throw new UserErrorException(refusal);
     }
 }

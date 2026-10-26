@@ -53,7 +53,7 @@ internal static class McpServerCommand
         SerilogConfiguration.RegisterCrashHandlers();
 
         // Watchers first, so they cover the whole lifetime including MSBuild registration.
-        ParentProcessWatcher.Start(IsTrue(environment, SlideRuleEnvVars.DisableParentWatch));
+        ParentProcessWatcher.Start(environment.IsFlagSet(SlideRuleEnvVars.DisableParentWatch));
         IdleTimeoutWatchdog.Start(environment.GetVariable(SlideRuleEnvVars.IdleTimeoutMinutes));
 
         EnsureMsBuildRegistered();
@@ -120,7 +120,7 @@ internal static class McpServerCommand
         services.AddSingleton<ISolutionSource>(provider =>
         {
             var environment = provider.GetRequiredService<IEnvironment>();
-            if (IsTrue(environment, SlideRuleEnvVars.DisableWarmWorkspace)) return new ColdSolutionSource();
+            if (environment.IsFlagSet(SlideRuleEnvVars.DisableWarmWorkspace)) return new ColdSolutionSource();
 
             var session = provider.GetRequiredService<WorkspaceSession>();
             var store = provider.GetRequiredService<SessionFragmentStore>();
@@ -129,13 +129,6 @@ internal static class McpServerCommand
             ServerShutdown.RegisterDisposer(session.DisposeAsync);
             return new WarmSolutionSource(session, store, specs, resolutions);
         });
-    }
-
-    // The spelling every SLIDERULE_* opt-out takes: the literal "true", case-insensitively, and nothing
-    // else — so a value nobody meant as a flag leaves the behaviour on.
-    private static bool IsTrue(IEnvironment environment, string variable)
-    {
-        return string.Equals(environment.GetVariable(variable), "true", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -158,8 +151,9 @@ internal static class McpServerCommand
     ///         cannot disagree about the bind.
     ///     </para>
     ///     <para>
-    ///         Whitespace splits with null because <see cref="ModelPipeline.DiscoverSolution" /> treats the two
-    ///         alike: an argument is fatal only when discovery honours it. NoInlining matches the quarantine
+    ///         A blank argument is reported like no argument and any other propagates, because
+    ///         <see cref="ModelPipeline.DiscoverSolution" /> treats whitespace as absent: an argument is fatal only
+    ///         when discovery honours it. NoInlining matches the quarantine
     ///         style below; SolutionDiscovery is file I/O with no MSBuildWorkspace touch, so it is safe before
     ///         registration.
     ///     </para>
@@ -167,18 +161,12 @@ internal static class McpServerCommand
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static string? ResolveBoundSolution(McpServerBinding binding, IEnvironment environment)
     {
-        if (!string.IsNullOrWhiteSpace(binding.Solution))
+        try
         {
             ModelPipeline.DiscoverSolution(binding.Solution, binding.WorkingDirectory, environment);
             return null;
         }
-
-        try
-        {
-            ModelPipeline.DiscoverSolution(null, binding.WorkingDirectory, environment);
-            return null;
-        }
-        catch (UserErrorException ex)
+        catch (UserErrorException ex) when (string.IsNullOrWhiteSpace(binding.Solution))
         {
             return ex.Message;
         }

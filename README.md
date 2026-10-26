@@ -43,12 +43,12 @@ FAIL cli/no-stdout — The Host layer must not use `Console.Out`, `Console.Write
   because: Stdout is a protocol channel here — the MCP server speaks JSON-RPC over it and CLI output flows through System.CommandLine's console — so a direct Console write corrupts the wire and is invisible to the in-process tests.
   citation: https://modelcontextprotocol.io/specification/2025-06-18/basic/transports#stdio
   fix: Write CLI output through the command's InvocationConfiguration console; route server diagnostics to the logger or Console.Error.
-  subject: 194 types, 1 generated
+  subject: 195 types, 1 generated
   src/SlideRule.Cli/Rendering/ProgressPrinter.cs:10 — SlideRule.Cli.Rendering.ProgressPrinter uses System.Console.WriteLine()
   src/SlideRule.Cli/Rendering/ProgressPrinter.cs:15 — SlideRule.Cli.Rendering.ProgressPrinter uses System.Console.WriteLine()
 ```
 
-The report gives the rule, its reason, its citation, the fix and each offending line. The `subject:` line appears only when a rule's subject includes generated code, here 1 of its 193 types. The agent routes the output through the command's console instead, and the next stop is clean.
+The report gives the rule, its reason, its citation, the fix and each offending line. The `subject:` line appears only when a rule's subject includes generated code, here 1 of its 195 types. The agent routes the output through the command's console instead, and the next stop is clean.
 
 The [SlideRule on itself](https://github.com/andypgray/sliderule/blob/main/SELF-CHECK.md) page shows this repository's own spec on the other surfaces too, from the prose it renders to code scanning and the graph. It also explains how every excerpt on both pages is held to its source.
 

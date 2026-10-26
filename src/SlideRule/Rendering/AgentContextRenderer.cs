@@ -153,14 +153,13 @@ internal static class AgentContextRenderer
     // noun to carry it, or out of a Registered noun in the subject or any operand. The noun half descends
     // through Except payloads and the internal Quarantine union, since a Registered noun in any of those still
     // renders the word in the block's prose and so must gate the glossary line. The descent is the shared
-    // SelectionWalk, so the block glosses exactly the nouns validation sees; the union guard is
-    // SpecValidator.CheckLifetimes's, and it is required because a UnionSelection has no noun to read.
+    // SelectionWalk, so the block glosses exactly the nouns validation sees.
     private static bool NeedsRegisteredGlossary(Constraint constraint)
     {
         if (constraint is MustBeRegisteredConstraint) return true;
 
         IEnumerable<Selection> selections = constraint.Selections();
-        return selections.Any(selection => selection.NounOrNull() is RegisteredNoun);
+        return selections.Any(selection => selection.Noun is RegisteredNoun);
     }
 
     /// <summary>Composes a quarantined scope's card for its own directory's <c>AGENTS.md</c>.</summary>
@@ -177,8 +176,7 @@ internal static class AgentContextRenderer
         {
             $"- {ProseFormat.Backtick(containmentRule.Id)} — {containmentRule.Sentence} {containmentRule.Because}"
         };
-        if (quarantine.Surface.Count > 0)
-            bullets.Add($"- Sanctioned surface: {ProseFormat.JoinInventory(quarantine.Surface)}.");
+        if (SurfaceSentence(quarantine) is { } surface) bullets.Add("- " + surface);
 
         return ScopeCardBody(
             "quarantined", "do not spread references into it.",
@@ -329,9 +327,15 @@ internal static class AgentContextRenderer
     {
         ScopeData quarantine = rule.Scope!;
         var bullet = $"- {ProseFormat.Backtick(quarantine.ScopeId)} — {rule.Sentence} {rule.Because}";
-        if (quarantine.Surface.Count > 0)
-            bullet += $" Sanctioned surface: {ProseFormat.JoinInventory(quarantine.Surface)}.";
+        if (SurfaceSentence(quarantine) is { } surface) bullet += " " + surface;
         return bullet;
+    }
+
+    private static string? SurfaceSentence(ScopeData quarantine)
+    {
+        return quarantine.Surface.Count > 0
+            ? $"Sanctioned surface: {ProseFormat.JoinInventory(quarantine.Surface)}."
+            : null;
     }
 
     private static string PolicySentence(MigrationPolicy policy)

@@ -1,7 +1,7 @@
 namespace SlideRule.Codebase;
 
 /// <summary>
-///     One type catching an exception type: a <c>catch</c> clause in <see cref="Source" />'s own source
+///     One type catching an exception type: a <c>catch</c> clause in <see cref="TypeEdge.Source" />'s own source
 ///     catches <see cref="Caught" />. Read them from <see cref="CodebaseModel.CatchEdges" />. A bare
 ///     <c>catch</c> is recorded as catching <c>System.Exception</c>, which is what the language means by it.
 /// </summary>
@@ -12,7 +12,11 @@ namespace SlideRule.Codebase;
 ///         resolve, records nothing at all.
 ///     </para>
 ///     <para>
-///         Three site lists narrow one another: <see cref="Sites" />, then
+///         A <c>catch</c> written inside a lambda or a local function counts for the type that encloses it,
+///         and one in top-level statements for <c>Program</c>.
+///     </para>
+///     <para>
+///         Three site lists narrow one another: <see cref="TypeEdge.Sites" />, then
 ///         <see cref="UnfilteredSites" />, then <see cref="SwallowingSites" />. Both narrowings read what
 ///         the source spells and never analyse it — <c>when (true)</c> counts as a filter, and only the
 ///         block's last statement decides whether a clause throws.
@@ -22,7 +26,7 @@ namespace SlideRule.Codebase;
 // (file, line): a filtered and an unfiltered catch of one type on one physical line collapse to a single
 // site, and a filter a #if applies under one target framework but not another reaches the merge as one
 // site reported both ways (GRAMMAR §4.8). Subtracting one set from another loses both cases.
-internal sealed class CatchEdge : IEdgeEnds
+internal sealed class CatchEdge : TypeEdge
 {
     internal CatchEdge(
         TypeNode source,
@@ -30,30 +34,21 @@ internal sealed class CatchEdge : IEdgeEnds
         EdgeEvidence evidence,
         EdgeEvidence unfilteredEvidence,
         EdgeEvidence swallowingEvidence)
+        : base(source, evidence)
     {
-        Source = source;
         Caught = caught;
-        Evidence = evidence;
         UnfilteredEvidence = unfilteredEvidence;
         SwallowingEvidence = swallowingEvidence;
     }
 
-    /// <summary>
-    ///     Gets the catching type. A <c>catch</c> written inside a lambda or a local function counts for the
-    ///     type that encloses it, and one in top-level statements for <c>Program</c>.
-    /// </summary>
-    public TypeNode Source { get; }
-
     /// <summary>Gets the caught exception type — <c>System.Exception</c> for a bare <c>catch</c>.</summary>
     public TypeNode Caught { get; }
 
-    TypeNode IEdgeEnds.Target => Caught;
-
-    public IReadOnlyList<SourceLocation> Sites => Evidence.Sites;
+    public override TypeNode Target => Caught;
 
     /// <summary>
-    ///     Gets the sites of <see cref="Sites" /> whose <c>catch</c> clause spells no <c>when</c> filter, in the
-    ///     same order. A bare <c>catch</c> is unfiltered; a bare <c>catch when (...)</c> is not.
+    ///     Gets the sites of <see cref="TypeEdge.Sites" /> whose <c>catch</c> clause spells no <c>when</c> filter,
+    ///     in the same order. A bare <c>catch</c> is unfiltered; a bare <c>catch when (...)</c> is not.
     /// </summary>
     public IReadOnlyList<SourceLocation> UnfilteredSites => UnfilteredEvidence.Sites;
 
@@ -63,8 +58,6 @@ internal sealed class CatchEdge : IEdgeEnds
     ///     is absent from this list, and <c>catch { if (x) throw; Cleanup(); }</c> is in it.
     /// </summary>
     public IReadOnlyList<SourceLocation> SwallowingSites => SwallowingEvidence.Sites;
-
-    internal EdgeEvidence Evidence { get; }
 
     // UnfilteredSites with the same instances as Evidence, in the same order, each carrying its share of this list
     // instead — the narrowing has to carry its own, because which of a copy's catch clauses spell a filter is a

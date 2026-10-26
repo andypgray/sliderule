@@ -47,12 +47,16 @@ internal static class HumanReportRenderer
 
         output.WriteLine();
 
-        string rules = Plurals.Noun(report.RulesChecked, "rule");
-        string violations = Plurals.Noun(report.ViolationCount, "violation");
-        string warnings = Plurals.Noun(report.WarningCount, "warning");
-        output.WriteLine(
-            $"Checked {report.RulesChecked} {rules}: {report.RulesPassed} passed, {report.RulesFailed} failed, " +
-            $"{report.RulesSkipped} skipped ({report.ViolationCount} {violations}, {report.WarningCount} {warnings}).");
+        string violations = Plurals.Counted(report.ViolationCount, "violation");
+        string warnings = Plurals.Counted(report.WarningCount, "warning");
+        output.WriteLine($"{RuleTally(report)} ({violations}, {warnings}).");
+    }
+
+    // The rule counts a summary line opens with, up to the punctuation that closes them.
+    internal static string RuleTally(CheckReport report)
+    {
+        return $"Checked {Plurals.Counted(report.RulesChecked, "rule")}: {report.RulesPassed} passed, " +
+               $"{report.RulesFailed} failed, {report.RulesSkipped} skipped";
     }
 
     /// <summary>
@@ -140,8 +144,8 @@ internal static class HumanReportRenderer
     {
         if (result.SubjectGeneratedTypes == 0) return;
 
-        string types = Plurals.Noun(result.SubjectTypes, "type");
-        output.WriteLine($"  subject: {result.SubjectTypes} {types}, {result.SubjectGeneratedTypes} generated");
+        string types = Plurals.Counted(result.SubjectTypes, "type");
+        output.WriteLine($"  subject: {types}, {result.SubjectGeneratedTypes} generated");
     }
 
     // The ratchet's human lines (Migrate and Quarantine containment). Baselined violations pass, so they
@@ -168,7 +172,7 @@ internal static class HumanReportRenderer
     // Each resolved type by its simple name and its first declaration site, the place a reader opens to copy
     // the pattern; a partial type's other parts are one jump away from there. The types arrive ordered by full
     // name, so the line is stable across runs.
-    private static string ExemplarText(RuleResult result, PathFormat.Relativizer relativizer)
+    internal static string ExemplarText(RuleResult result, PathFormat.Relativizer relativizer)
     {
         IEnumerable<string> pointers = result.Exemplar.Select(type => ExemplarPointer(type, relativizer));
         return string.Join(", ", pointers);
@@ -222,39 +226,31 @@ internal static class HumanReportRenderer
         var unlocated = new List<string>();
         var hints = new List<string>();
 
-        // Where a one-line violation lands: its first carried site as a jump target, or the unlocated
-        // block when it carries none. The site always comes off the violation — every shape kind's
-        // evidence is minted where the verb decided it points, and the renderer only reads it.
-        void Place(SourceLocation? at, string text)
-        {
-            if (at is not null)
-                located.Add((relativizer.Relative(at.FilePath), at.Line, text));
-            else
-                unlocated.Add(text);
-        }
-
         foreach (Violation violation in result.Violations)
             switch (violation.Kind)
             {
-                // The edge kinds place identically, one line per reference site, so they share the loop and
-                // differ only in the verb EdgeText picks.
-                case ViolationKind.Reference or ViolationKind.MemberUse or ViolationKind.Construction
-                    or ViolationKind.Injection or ViolationKind.Catch or ViolationKind.Throw or ViolationKind.Expose:
-                    string edgeText = violation.EdgeText();
-                    foreach (SourceLocation site in violation.Sites)
-                        located.Add((relativizer.Relative(site.FilePath), site.Line, edgeText));
-                    break;
-                // The subject kinds place identically, one line at the first site the verb carried or in the
-                // unlocated block, so they share the arm and differ only in the text SubjectText picks.
-                case ViolationKind.Shape or ViolationKind.MemberShape or ViolationKind.ProjectShape:
-                    Place(violation.Sites.FirstOrDefault(), violation.SubjectText());
-                    break;
                 case ViolationKind.EmptySubject:
                     unlocated.Add(violation.Detail ?? "the subject selection matched no types");
                     if (violation.Hint is { } hint && !hints.Contains(hint)) hints.Add(hint);
                     break;
                 case ViolationKind.RuleError:
                     unlocated.Add($"error: {violation.Detail}");
+                    break;
+                // One line per placed site; a shape violation that carries no site lands in the unlocated block,
+                // and an edge violation that carries none renders nothing.
+                default:
+                    IReadOnlyList<SourceLocation> placed = violation.PlacedSites();
+                    if (placed.Count > 0)
+                    {
+                        string text = violation.Text();
+                        foreach (SourceLocation site in placed)
+                            located.Add((relativizer.Relative(site.FilePath), site.Line, text));
+                    }
+                    else if (violation.Kind.IsShape())
+                    {
+                        unlocated.Add(violation.SubjectText());
+                    }
+
                     break;
             }
 

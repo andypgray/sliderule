@@ -20,8 +20,7 @@ internal sealed class ScopeBuilder(ScopeRegistration registration) : IScopeBuild
 
     private void Record(Selection selection, Posture posture)
     {
-        registration.PostureCount++;
-        registration.Posture = posture;
         registration.Scoped = Guard.NotNull(selection, nameof(selection));
+        registration.RecordPosture(posture);
     }
 }

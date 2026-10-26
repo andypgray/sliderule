@@ -13,21 +13,6 @@ namespace SlideRule.Cli.Rendering;
 /// </remarks>
 internal static class GraphFormatter
 {
-    private const string OverviewElisionLine =
-        "  (elided at overview grain — rerun at --grain full for the per-project namespace inventory)";
-
-    private const string SkeletonElisionLine =
-        "  (elided at skeleton grain — rerun at --grain full for the external references)";
-
-    private const string SkeletonMultiplyDeclaredElisionLine =
-        "  (elided at skeleton grain — rerun at --grain full for the multiply-declared types)";
-
-    private const string SkeletonShadowedElisionLine =
-        "  (elided at skeleton grain — rerun at --grain full for the shadowed type names)";
-
-    private const string IndexProjectEdgeElisionLine =
-        "  (elided at index grain — rerun at --grain full for the observed project references)";
-
     /// <summary>
     ///     The survey's lines. A coarser <paramref name="grain" /> renders the same sections with less in
     ///     them, an elided section down to one line naming the flag to drop, and no section ever disappears.
@@ -87,7 +72,9 @@ internal static class GraphFormatter
 
     private static IEnumerable<string> NamespaceLines(GraphSummary summary, DocumentGrain grain)
     {
-        return grain >= DocumentGrain.Overview ? [OverviewElisionLine] : summary.Projects.Select(NamespaceLine);
+        return grain >= SurveyRungs.Namespaces
+            ? [Elided(SurveyRungs.Namespaces, "the per-project namespace inventory")]
+            : summary.Projects.Select(NamespaceLine);
     }
 
     // Only the passenger is annotated. Membership is the unremarkable case — every project of a healthy
@@ -106,7 +93,7 @@ internal static class GraphFormatter
         // whether the solution declares it, and how big it is. What it declares and what it targets are
         // both qualifiers on that, and both multiply by the project count on the one rung whose whole job is
         // to stay proportional to the roster.
-        if (grain >= DocumentGrain.Index) return line;
+        if (grain >= SurveyRungs.ProjectRow) return line;
 
         string references = project.ProjectReferences.Count > 0 ? string.Join(", ", project.ProjectReferences) : "(none)";
         return $"{line}; {FrameworksClause(project)}references: {references}"
@@ -133,7 +120,7 @@ internal static class GraphFormatter
     // parenthesis where both apply.
     private static string PackagesClause(ProjectSummary project, DocumentGrain grain)
     {
-        if (grain >= DocumentGrain.Skeleton) return "";
+        if (grain >= SurveyRungs.PackageReferences) return "";
 
         IReadOnlyList<PackageReference> packages = project.PackageReferences;
         if (packages.Count == 0) return "; packages: (none)";
@@ -211,19 +198,16 @@ internal static class GraphFormatter
     // section takes the ordinary rule and elides whether or not it has rows.
     private static IEnumerable<string> ProjectEdgeLines(GraphSummary summary, DocumentGrain grain)
     {
-        if (grain >= DocumentGrain.Index) return [IndexProjectEdgeElisionLine];
-
-        return summary.ProjectEdges.Count > 0
-            ? summary.ProjectEdges.Select(e => $"  {e.Source} -> {e.Target}: {e.References}")
-            : ["  (none)"];
+        return OrdinarySection(
+            summary.ProjectEdges, grain, SurveyRungs.ProjectEdges, "the observed project references",
+            e => $"  {e.Source} -> {e.Target}: {e.References}");
     }
 
     // The survey's coverage statement, sited straight after the edges it explains: one reason a project
     // pair is absent from the block above is that one of them compiles the other's type itself.
     private static IEnumerable<string> MultiplyDeclaredTypeLines(GraphSummary summary, DocumentGrain grain)
     {
-        return CoverageSection(
-            summary.MultiplyDeclaredTypes, grain, SkeletonMultiplyDeclaredElisionLine, MultiplyDeclaredTypeLine);
+        return CoverageSection(summary.MultiplyDeclaredTypes, grain, "the multiply-declared types", MultiplyDeclaredTypeLine);
     }
 
     private static string MultiplyDeclaredTypeLine(MultiplyDeclaredTypeSummary type)
@@ -237,7 +221,7 @@ internal static class GraphFormatter
     // name means two types, and the line names both halves plus who reaches the far one.
     private static IEnumerable<string> ShadowedTypeLines(GraphSummary summary, DocumentGrain grain)
     {
-        return CoverageSection(summary.ShadowedTypes, grain, SkeletonShadowedElisionLine, ShadowedTypeLine);
+        return CoverageSection(summary.ShadowedTypes, grain, "the shadowed type names", ShadowedTypeLine);
     }
 
     // No empty-roster arm: an entry exists only because some project's compilation bound the name from the
@@ -254,19 +238,32 @@ internal static class GraphFormatter
     // IS its finding, and only a non-empty one elides its rows at skeleton, where the list scales with the
     // codebase and the fact that there is something there to read is what a coarse survey has room for.
     private static IEnumerable<string> CoverageSection<T>(
-        IReadOnlyList<T> items, DocumentGrain grain, string elisionLine, Func<T, string> line)
+        IReadOnlyList<T> items, DocumentGrain grain, string what, Func<T, string> line)
     {
         if (items.Count == 0) return ["  (none)"];
 
-        return grain >= DocumentGrain.Skeleton ? [elisionLine] : items.Select(line);
+        return grain >= SurveyRungs.CoverageStatements
+            ? [Elided(SurveyRungs.CoverageStatements, what)]
+            : items.Select(line);
     }
 
     private static IEnumerable<string> ExternalEdgeLines(GraphSummary summary, DocumentGrain grain)
     {
-        if (grain >= DocumentGrain.Skeleton) return [SkeletonElisionLine];
+        return OrdinarySection(
+            summary.ExternalEdges, grain, SurveyRungs.ExternalEdges, "the external references",
+            e => $"  {e.Source} -> {e.TargetNamespaceRoot}: {e.References}");
+    }
 
-        return summary.ExternalEdges.Count > 0
-            ? summary.ExternalEdges.Select(e => $"  {e.Source} -> {e.TargetNamespaceRoot}: {e.References}")
-            : ["  (none)"];
+    private static IEnumerable<string> OrdinarySection<T>(
+        IReadOnlyList<T> items, DocumentGrain grain, DocumentGrain rung, string what, Func<T, string> line)
+    {
+        if (grain >= rung) return [Elided(rung, what)];
+
+        return items.Count > 0 ? items.Select(line) : ["  (none)"];
+    }
+
+    private static string Elided(DocumentGrain rung, string what)
+    {
+        return $"  (elided at {rung.Wire()} grain — rerun at --grain full for {what})";
     }
 }

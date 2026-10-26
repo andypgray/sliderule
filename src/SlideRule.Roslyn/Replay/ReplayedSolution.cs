@@ -1,7 +1,6 @@
 using Basic.CompilerLog.Util;
 using Microsoft.CodeAnalysis;
 using SlideRule.Roslyn.Diagnostics;
-using SlideRule.Roslyn.Solutions;
 
 namespace SlideRule.Roslyn.Replay;
 
@@ -19,30 +18,43 @@ namespace SlideRule.Roslyn.Replay;
 ///         <see cref="Solution" /> already materialised by extraction after <see cref="Dispose" />.
 ///     </para>
 ///     <para>
-///         The project lists carry the same facts as <see cref="LoadedSolution" />'s, absolute and ordinal-sorted,
-///         so the gate and every document read one thing on both paths.
+///         The project lists of <see cref="LoadDiagnosticsWith" /> carry the same facts as
+///         <see cref="LoadedSolution" />'s, absolute and ordinal-sorted, so the gate and every document read one
+///         thing on both paths.
 ///     </para>
 /// </remarks>
 internal sealed class ReplayedSolution : IDisposable
 {
     private readonly AdhocWorkspace _workspace;
     private readonly SolutionReader _reader;
+    private readonly WorkspaceDiagnostics _loadVerdict;
     private bool _disposed;
 
     internal ReplayedSolution(
         AdhocWorkspace workspace, SolutionReader reader, Solution solution,
-        IReadOnlyDictionary<ProjectId, string>? targetFrameworks = null,
-        IReadOnlyList<string>? failedProjects = null,
-        IReadOnlyList<string>? uncheckedProjects = null,
-        IReadOnlyList<UnsupportedProject>? unsupportedProjects = null)
+        IReadOnlyDictionary<ProjectId, string> targetFrameworks,
+        IReadOnlyList<string> failedProjects,
+        IReadOnlyList<string> uncheckedProjects,
+        IReadOnlyList<UnsupportedProject> unsupportedProjects)
     {
         _workspace = workspace;
         _reader = reader;
         Solution = solution;
-        TargetFrameworks = targetFrameworks ?? TargetFrameworkMaps.None;
-        FailedProjects = failedProjects ?? [];
-        UncheckedProjects = uncheckedProjects ?? [];
-        UnsupportedProjects = unsupportedProjects ?? [];
+        TargetFrameworks = targetFrameworks;
+        FailedProjects = failedProjects;
+        UncheckedProjects = uncheckedProjects;
+        _loadVerdict = WorkspaceDiagnostics.OfLoad(
+            loadFailures: [],
+            failedProjects: FailedProjects,
+            uncheckedProjects: UncheckedProjects,
+            // Always empty on this path, because there is no moment to read: an assets file describes the restore
+            // as it stands on disk now, so reading one here would stamp today's restore onto yesterday's model, and
+            // a capture replayed because it was structurally valid is a capture of a build that compiled.
+            restoreFailedProjects: [],
+            // Read from the capture rather than from a solution file: a binlog records what was built, so the
+            // compiler invocations the C#-only predicate declines are the answer. A project the build skipped
+            // entirely is invisible here.
+            unsupportedProjects: unsupportedProjects);
     }
 
     public Solution Solution { get; }
@@ -71,31 +83,14 @@ internal sealed class ReplayedSolution : IDisposable
     /// </summary>
     public IReadOnlyList<string> UncheckedProjects { get; }
 
-    /// <summary>The <c>.csproj</c> paths of the projects whose NuGet packages are not in the model.</summary>
-    /// <remarks>
-    ///     Always empty on this path, because there is no moment to read: an assets file describes the restore
-    ///     as it stands on disk now, so reading one here would stamp today's restore onto yesterday's model, and
-    ///     a capture replayed because it was structurally valid is a capture of a build that compiled.
-    /// </remarks>
-    private IReadOnlyList<string> RestoreFailedProjects { get; } = [];
-
-    /// <summary>The projects this capture built in a language the replay cannot read.</summary>
-    /// <remarks>
-    ///     Read from the capture rather than from a solution file: a binlog records what was built, so the
-    ///     compiler invocations the C#-only predicate declines are the answer. A project the build skipped
-    ///     entirely is invisible here.
-    /// </remarks>
-    private IReadOnlyList<UnsupportedProject> UnsupportedProjects { get; }
-
     /// <summary>
-    ///     This replay's verdict as the one value every surface reads: the project lists above beside
+    ///     This replay's verdict as the one value every surface reads: the project lists beside
     ///     <paramref name="loadFailures" />, the replay messages the caller's own sink collected, which never land
     ///     on this type. The merge's facts stay empty, as on the MSBuild path.
     /// </summary>
     internal WorkspaceDiagnostics LoadDiagnosticsWith(IReadOnlyList<string> loadFailures)
     {
-        return new WorkspaceDiagnostics(
-            loadFailures, [], FailedProjects, UncheckedProjects, RestoreFailedProjects, UnsupportedProjects, []);
+        return _loadVerdict with { LoadFailures = loadFailures };
     }
 
     /// <summary>

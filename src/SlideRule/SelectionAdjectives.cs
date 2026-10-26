@@ -109,7 +109,7 @@ public static class SelectionAdjectives
         [SpecSlot(nameof(SpecSlot.ExactTypeName))]
         params string[] more)
     {
-        IReadOnlyList<string> names = OperandList.OneOrMore(first, more, name => name);
+        IReadOnlyList<string> names = OperandList.OneOrMore(first, more);
         return Append(selection, new NamedAdjective(names));
     }
 
@@ -131,7 +131,7 @@ public static class SelectionAdjectives
         [SpecSlot(nameof(SpecSlot.PathGlob))] string first,
         [SpecSlot(nameof(SpecSlot.PathGlob))] params string[] more)
     {
-        IReadOnlyList<string> globs = OperandList.OneOrMore(first, more, glob => glob);
+        IReadOnlyList<string> globs = OperandList.OneOrMore(first, more);
         return Append(selection, new UnderAdjective(globs));
     }
 
@@ -304,7 +304,7 @@ public static class SelectionAdjectives
     public static Selection Except(this Selection selection, Selection first, params Selection[] more)
     {
         NotNull(selection, nameof(selection));
-        return AppendExcept(selection, OperandList.OneOrMore(first, more, exclusion => exclusion));
+        return AppendExcept(selection, OperandList.OneOrMore(first, more));
     }
 
     /// <summary>
@@ -317,8 +317,7 @@ public static class SelectionAdjectives
     public static Selection Except(this Selection selection, Type first, params Type[] more)
     {
         NotNull(selection, nameof(selection));
-        Arch owner = selection.Owner;
-        return AppendExcept(selection, OperandList.OneOrMore(first, more, owner.Type));
+        return AppendExcept(selection, selection.Owner.TypeSelections(first, more));
     }
 
     /// <summary>
@@ -414,9 +413,6 @@ public static class SelectionAdjectives
 
     private static Selection Append(Selection selection, SelectionAdjective adjective)
     {
-        NotNull(selection, nameof(selection));
-        var adjectives = new List<SelectionAdjective>(selection.Adjectives) { adjective };
-
-        return selection.WithRefinements(adjectives);
+        return NotNull(selection, nameof(selection)).Refined(adjective);
     }
 }

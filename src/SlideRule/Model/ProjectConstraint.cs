@@ -1,3 +1,5 @@
+using SlideRule.Internal;
+
 namespace SlideRule.Model;
 
 /// <summary>
@@ -8,9 +10,8 @@ namespace SlideRule.Model;
 internal abstract class ProjectConstraint : Constraint
 {
     private protected ProjectConstraint(ProjectSelection subject)
-        : base(null)
     {
-        ProjectSubject = subject;
+        ProjectSubject = Guard.NotNull(subject, nameof(subject));
     }
 
     internal ProjectSelection ProjectSubject { get; }

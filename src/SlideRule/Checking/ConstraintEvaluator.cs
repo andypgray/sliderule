@@ -212,13 +212,13 @@ internal sealed class ConstraintEvaluator
                 var namespacePattern = new NamespacePattern(c.Glob);
                 return Resided(
                     Shape(subjects, t => namespacePattern.Matches(t.Namespace)),
-                    new RefinedSelection(c.Subject!.Owner, new NamespaceNoun(c.Glob), Array.Empty<SelectionAdjective>()));
+                    c.Subject!.Owner.Namespace(c.Glob));
             case MustResideInProjectConstraint c:
                 // The N-way declarer predicate, never ProjectName equality: one source file compiled into
                 // several projects resides in every one of them (GRAMMAR §4.1).
                 return Resided(
                     Shape(subjects, t => t.IsDeclaredBy(c.ProjectName)),
-                    new RefinedSelection(c.Subject!.Owner, new ProjectNoun(c.ProjectName), Array.Empty<SelectionAdjective>()));
+                    c.Subject!.Owner.Project(c.ProjectName));
             case MustBelongToConstraint c:
                 // Memberships resolve in SUBJECT position — they name where a subject may live, not an
                 // edge's far end — and the test is plain membership, because there is no edge to attribute.
@@ -278,12 +278,12 @@ internal sealed class ConstraintEvaluator
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         <paramref name="evidenceOf" /> reads the evidence each edge family recorded for itself, since a
-    ///         copy can construct or expose what another copy only references. <paramref name="requireSites" />
-    ///         is the catch subsets' refinement: it tests the counted sites rather than the whole edge, so an
-    ///         edge none of whose sites the ban forbids is green, no printed <c>file:line</c> is ever a site the
-    ///         ban permits, and an unfiltered clause that only a copy the subject does not own wrote cannot mint
-    ///         a violation with nothing to point at.
+    ///         Each edge family's own recorded evidence is read unless <paramref name="evidenceOf" /> picks one of
+    ///         a catch edge's narrowings, since a copy can construct or expose what another copy only references.
+    ///         <paramref name="requireSites" /> is the catch subsets' refinement: it tests the counted sites
+    ///         rather than the whole edge, so an edge none of whose sites the ban forbids is green, no printed
+    ///         <c>file:line</c> is ever a site the ban permits, and an unfiltered clause that only a copy the
+    ///         subject does not own wrote cannot mint a violation with nothing to point at.
     ///     </para>
     ///     <para>
     ///         The live trap for the inbound arm: its operand admission is resolved in
@@ -293,23 +293,42 @@ internal sealed class ConstraintEvaluator
     ///     </para>
     /// </remarks>
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenEdge<TEdge>(
-        IEnumerable<TEdge> candidates,
+        ILookup<TypeNode, TEdge> index,
         SelectionAdmission subject,
         IReadOnlyList<Selection> operands,
-        Func<TEdge, EdgeEvidence> evidenceOf,
         Func<TypeNode, TypeNode, IReadOnlyList<SourceLocation>, Violation> toViolation,
         bool subjectAtSource,
-        bool requireSites,
-        bool warnInert)
-        where TEdge : IEdgeEnds
+        Func<TEdge, EdgeEvidence>? evidenceOf = null,
+        bool requireSites = false)
+        where TEdge : TypeEdge
     {
         SelectionAdmission operandSet = ResolveOperands(operands, out IReadOnlyList<SelectionAdmission> parts);
+        List<Violation> violations = OwnedViolations(
+            index, subject, operandSet, toViolation, subjectAtSource, wantHit: true, evidenceOf, requireSites);
+
+        return (violations, InertWarnings(operands, parts, operandSet, violations.Count));
+    }
+
+    // The walk from owned edge to violation that every ban and the throw allow-list share: each edge keyed on a
+    // subject node whose counted sites are not null mints one violation from exactly those sites.
+    private static List<Violation> OwnedViolations<TEdge>(
+        ILookup<TypeNode, TEdge> index,
+        SelectionAdmission subject,
+        SelectionAdmission operandSet,
+        Func<TypeNode, TypeNode, IReadOnlyList<SourceLocation>, Violation> toViolation,
+        bool subjectAtSource,
+        bool wantHit,
+        Func<TEdge, EdgeEvidence>? evidenceOf = null,
+        bool requireSites = false)
+        where TEdge : TypeEdge
+    {
         var violations = new List<Violation>();
 
-        foreach (TEdge edge in candidates)
+        foreach (TEdge edge in Keyed(subject.Nodes, index))
         {
+            EdgeEvidence evidence = evidenceOf is null ? edge.Evidence : evidenceOf(edge);
             IReadOnlyList<SourceLocation>? sites = SelectionAdmission.CountedSites(
-                subject, operandSet, edge, evidenceOf(edge), subjectAtSource, wantHit: true);
+                subject, operandSet, edge, evidence, subjectAtSource, wantHit);
 
             if (sites is null) continue;
             if (requireSites && sites.Count == 0) continue;
@@ -317,7 +336,7 @@ internal sealed class ConstraintEvaluator
             violations.Add(toViolation(edge.Source, edge.Target, sites));
         }
 
-        return (violations, InertWarnings(operands, parts, operandSet, violations.Count, warnInert));
+        return violations;
     }
 
     // The inert-target report, at both grains. The whole-target arm answers an empty folded set; the
@@ -334,11 +353,8 @@ internal sealed class ConstraintEvaluator
         IReadOnlyList<Selection> operands,
         IReadOnlyList<SelectionAdmission> parts,
         SelectionAdmission operandSet,
-        int violationCount,
-        bool warnInert)
+        int violationCount)
     {
-        if (!warnInert) return NoWarnings;
-
         if (operandSet.Count == 0)
             return violationCount == 0 && operands.Any(SelectionEvaluator.IsPatternSelection)
                 ?
@@ -388,9 +404,11 @@ internal sealed class ConstraintEvaluator
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) Resided(
         (IReadOnlyList<Violation> Violations, IReadOnlyList<CheckWarning> Warnings) verdict, Selection home)
     {
-        SelectionAdmission.Operands(
-            _selections, [home], SelectionPosition.Subject, out IReadOnlyList<SelectionAdmission> parts);
-        return (verdict.Violations, SubjectSideDeadWarnings([home], parts, DeadOperandRole.Membership));
+        // The warnings are silent under a narrowing, so the home is not collected there.
+        if (_narrowing is not null) return (verdict.Violations, NoWarnings);
+
+        SelectionAdmission matched = SelectionAdmission.Collect(_selections, home, SelectionPosition.Subject);
+        return (verdict.Violations, SubjectSideDeadWarnings([home], [matched], DeadOperandRole.Membership));
     }
 
     // What of one operand, or of one part of one, is dead: the whole of it where it matched nothing and is a
@@ -448,19 +466,8 @@ internal sealed class ConstraintEvaluator
             warning.Kind == CheckWarningKind.DeadOperand && warning.Key == reference);
         if (raised) return;
 
-        CheckWarning warning = role switch
-        {
-            DeadOperandRole.Target => CheckWarning.InertTargetOperand(
-                reference, AuthoringHints.ForInertTargetOperand(piece, _incompleteModel, _narrowing)),
-            DeadOperandRole.AllowList => CheckWarning.DeadAllowedOperand(
-                reference, AuthoringHints.ForDeadAllowedOperand(piece, _incompleteModel, _narrowing)),
-            DeadOperandRole.Membership => CheckWarning.DeadMembership(
-                reference, AuthoringHints.ForDeadMembership(piece, _incompleteModel)),
-            DeadOperandRole.Among => CheckWarning.DeadAmongOperand(
-                reference, AuthoringHints.ForDeadAmongOperand(piece, _incompleteModel)),
-            _ => throw new ArgumentOutOfRangeException(nameof(role), role, "Not a dead operand's role.")
-        };
-        warnings.Add(warning);
+        string hint = AuthoringHints.ForDeadOperand(role, piece, _incompleteModel, _narrowing);
+        warnings.Add(CheckWarning.DeadOperand(role, reference, hint));
     }
 
     // The candidate edges whose keyed endpoint is a subject, read off the per-kind index rather than by
@@ -489,11 +496,7 @@ internal sealed class ConstraintEvaluator
     {
         ILookup<TypeNode, ReferenceEdge> index = inbound ? _edgesByTarget.Lookup : _edgesBySource.Lookup;
 
-        return ForbiddenEdge(
-            Keyed(subject.Nodes, index), subject, operands,
-            e => e.Evidence,
-            Violation.Reference,
-            subjectAtSource: !inbound, requireSites: false, warnInert: true);
+        return ForbiddenEdge(index, subject, operands, Violation.Reference, subjectAtSource: !inbound);
     }
 
     // The member-access verb (GRAMMAR §4.5): a member edge is a hit when its source is a subject AND
@@ -546,10 +549,7 @@ internal sealed class ConstraintEvaluator
         SelectionAdmission subject, IReadOnlyList<Selection> operands)
     {
         return ForbiddenEdge(
-            Keyed(subject.Nodes, _constructorEdgesBySource.Lookup), subject, operands,
-            e => e.Evidence,
-            Violation.Construction,
-            subjectAtSource: true, requireSites: false, warnInert: true);
+            _constructorEdgesBySource.Lookup, subject, operands, Violation.Construction, subjectAtSource: true);
     }
 
     /// <summary>
@@ -563,11 +563,12 @@ internal sealed class ConstraintEvaluator
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenInjection(
         SelectionAdmission subject, IReadOnlyList<Selection> operands)
     {
-        return ForbiddenEdge(
-            Keyed(subject.Nodes, _injectionEdgesBySource.Lookup), subject, operands,
-            e => e.Evidence,
-            Violation.Injection,
-            subjectAtSource: true, requireSites: false, warnInert: false);
+        SelectionAdmission operandSet = ResolveOperands(operands, out _);
+        List<Violation> violations = OwnedViolations(
+            _injectionEdgesBySource.Lookup, subject, operandSet, Violation.Injection,
+            subjectAtSource: true, wantHit: true);
+
+        return (violations, NoWarnings);
     }
 
     /// <summary>
@@ -579,11 +580,7 @@ internal sealed class ConstraintEvaluator
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenCatch(
         SelectionAdmission subject, IReadOnlyList<Selection> operands)
     {
-        return ForbiddenEdge(
-            Keyed(subject.Nodes, _catchEdgesBySource.Lookup), subject, operands,
-            e => e.Evidence,
-            Violation.Catch,
-            subjectAtSource: true, requireSites: false, warnInert: true);
+        return ForbiddenEdge(_catchEdgesBySource.Lookup, subject, operands, Violation.Catch, subjectAtSource: true);
     }
 
     /// <summary>
@@ -602,10 +599,8 @@ internal sealed class ConstraintEvaluator
         SelectionAdmission subject, IReadOnlyList<Selection> operands)
     {
         return ForbiddenEdge(
-            Keyed(subject.Nodes, _catchEdgesBySource.Lookup), subject, operands,
-            e => e.UnfilteredEvidence,
-            Violation.Catch,
-            subjectAtSource: true, requireSites: true, warnInert: true);
+            _catchEdgesBySource.Lookup, subject, operands, Violation.Catch, subjectAtSource: true,
+            evidenceOf: e => e.UnfilteredEvidence, requireSites: true);
     }
 
     /// <summary>
@@ -622,10 +617,8 @@ internal sealed class ConstraintEvaluator
         SelectionAdmission subject, IReadOnlyList<Selection> operands)
     {
         return ForbiddenEdge(
-            Keyed(subject.Nodes, _catchEdgesBySource.Lookup), subject, operands,
-            e => e.SwallowingEvidence,
-            Violation.Catch,
-            subjectAtSource: true, requireSites: true, warnInert: true);
+            _catchEdgesBySource.Lookup, subject, operands, Violation.Catch, subjectAtSource: true,
+            evidenceOf: e => e.SwallowingEvidence, requireSites: true);
     }
 
     /// <summary>
@@ -637,11 +630,7 @@ internal sealed class ConstraintEvaluator
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenThrow(
         SelectionAdmission subject, IReadOnlyList<Selection> operands)
     {
-        return ForbiddenEdge(
-            Keyed(subject.Nodes, _throwEdgesBySource.Lookup), subject, operands,
-            e => e.Evidence,
-            Violation.Throw,
-            subjectAtSource: true, requireSites: false, warnInert: true);
+        return ForbiddenEdge(_throwEdgesBySource.Lookup, subject, operands, Violation.Throw, subjectAtSource: true);
     }
 
     /// <summary>
@@ -653,11 +642,7 @@ internal sealed class ConstraintEvaluator
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) ForbiddenExposure(
         SelectionAdmission subject, IReadOnlyList<Selection> operands)
     {
-        return ForbiddenEdge(
-            Keyed(subject.Nodes, _exposureEdgesBySource.Lookup), subject, operands,
-            e => e.Evidence,
-            Violation.Expose,
-            subjectAtSource: true, requireSites: false, warnInert: true);
+        return ForbiddenEdge(_exposureEdgesBySource.Lookup, subject, operands, Violation.Expose, subjectAtSource: true);
     }
 
     /// <summary>
@@ -678,9 +663,7 @@ internal sealed class ConstraintEvaluator
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) OnlyReference(
         SelectionAdmission subject, IReadOnlyList<Selection> allowedTargets, FamilySubject? family)
     {
-        return AllowList(
-            subject, allowedTargets, family,
-            (cell, allowed, label) => OutboundEdges(cell, allowed, wantHit: false, label, detail: null));
+        return AllowList(subject, allowedTargets, family, inbound: false);
     }
 
     /// <summary>
@@ -695,27 +678,26 @@ internal sealed class ConstraintEvaluator
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) OnlyBeReferencedBy(
         SelectionAdmission subject, IReadOnlyList<Selection> allowedSources, FamilySubject? family)
     {
-        return AllowList(subject, allowedSources, family, Inbound);
+        return AllowList(subject, allowedSources, family, inbound: true);
     }
 
     // The allow-list shape both directions take (GRAMMAR §4.1, §5.1): the operands resolved once and the
     // subject allowed implicitly. Over a family "self" is the cell rather than the whole subject, so there is
     // one walk per cell whose allow-set is the operands plus that cell as declared — the whole layer or
-    // project, which is what lets a module's excluded Contracts cone still count as its own. `walk`'s third
-    // argument is the cell each owned edge is labelled with, and it is the LOOP index rather than anything read
-    // off the edge, so the label is the cell whose law was broken at either end. That matters inbound alone,
-    // where the referencing type is regularly outside the family altogether and has no cell to be attributed
-    // to. The walks collect edges rather than violations because a pair two cells both own is minted once,
-    // from both cells' evidence.
+    // project, which is what lets a module's excluded Contracts cone still count as its own. The cell each owned
+    // edge is labelled with is the LOOP index rather than anything read off the edge, so the label is the cell
+    // whose law was broken at either end. That matters inbound alone, where the referencing type is regularly
+    // outside the family altogether and has no cell to be attributed to. The walks collect edges rather than
+    // violations because a pair two cells both own is minted once, from both cells' evidence.
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) AllowList(
-        SelectionAdmission subject, IReadOnlyList<Selection> allowed, FamilySubject? family,
-        Func<SelectionAdmission, SelectionAdmission, string?, List<OwnedEdge<ReferenceEdge>>> walk)
+        SelectionAdmission subject, IReadOnlyList<Selection> allowed, FamilySubject? family, bool inbound)
     {
         SelectionAdmission operands = ResolveOperands(allowed, out IReadOnlyList<SelectionAdmission> parts);
-        List<OwnedEdge<ReferenceEdge>> owned;
+        List<OwnedEdge> owned;
         if (family is null)
         {
-            owned = walk(subject, operands.IncludingSelf(subject), null);
+            owned = OwnedReferences(
+                subject, operands.IncludingSelf(subject), inbound, wantHit: false, cell: null, detail: null);
         }
         else
         {
@@ -723,12 +705,14 @@ internal sealed class ConstraintEvaluator
             owned = [];
             for (var cell = 0; cell < declared.Count; cell++)
                 owned.AddRange(
-                    walk(family.Subjects[cell], operands.IncludingSelf(declared[cell]), family.CellName(cell)));
+                    OwnedReferences(
+                        family.Subjects[cell], operands.IncludingSelf(declared[cell]), inbound, wantHit: false,
+                        family.CellName(cell), detail: null));
         }
 
         IReadOnlyList<CheckWarning> dead =
             DeadOperandWarnings(allowed, parts, DeadOperandRole.AllowList, SelectionPosition.Target);
-        return (MintedPerEdge(owned, e => e.Sites, MintReference), dead);
+        return (MintedPerEdge(owned), dead);
     }
 
     /// <summary>
@@ -747,14 +731,14 @@ internal sealed class ConstraintEvaluator
                 "`MustNotReferenceEachOther` needs a family subject (`arch.Each`); this subject declares no cells.");
 
         IReadOnlyList<SelectionAdmission> declared = DeclaredCells(family);
-        var owned = new List<OwnedEdge<ReferenceEdge>>();
+        var owned = new List<OwnedEdge>();
         for (var cell = 0; cell < declared.Count; cell++)
             owned.AddRange(
-                OutboundEdges(
-                    family.Subjects[cell], SelectionAdmission.AllBut(declared, cell), wantHit: true,
+                OwnedReferences(
+                    family.Subjects[cell], SelectionAdmission.AllBut(declared, cell), inbound: false, wantHit: true,
                     family.CellName(cell), detail: null));
 
-        return (MintedPerEdge(owned, e => e.Sites, MintReference), NoWarnings);
+        return (MintedPerEdge(owned), NoWarnings);
     }
 
     /// <summary>
@@ -799,7 +783,7 @@ internal sealed class ConstraintEvaluator
         int[] components = CellComponents.Of(cellCount, (source, target) => crosses[source, target]);
         Dictionary<int, string> circles = CircleDetails(layerCells, components);
 
-        var owned = new List<OwnedEdge<ReferenceEdge>>();
+        var owned = new List<OwnedEdge>();
         for (var source = 0; source < cellCount; source++)
         for (var target = 0; target < cellCount; target++)
         {
@@ -807,10 +791,12 @@ internal sealed class ConstraintEvaluator
 
             string detail = circles[components[source]];
             string cell = family.CellName(source);
-            owned.AddRange(OutboundEdges(family.Subjects[source], declared[target], wantHit: true, cell, detail));
+            owned.AddRange(
+                OwnedReferences(
+                    family.Subjects[source], declared[target], inbound: false, wantHit: true, cell, detail));
         }
 
-        return (MintedPerEdge(owned, e => e.Sites, MintReference), NoWarnings);
+        return (MintedPerEdge(owned), NoWarnings);
     }
 
     // One detail sentence per component that holds a circle, naming its cells in family DECLARATION order —
@@ -830,20 +816,23 @@ internal sealed class ConstraintEvaluator
                 component => $"circular references among the {ProseFormat.JoinReferencesAnd(component.Names)} layers");
     }
 
-    // External targets are exempt whatever the polarity: the complement universe is solution-declared, and a
-    // cell never holds an external type to be an "other" of.
-    private List<OwnedEdge<ReferenceEdge>> OutboundEdges(
-        SelectionAdmission subject, SelectionAdmission operand, bool wantHit, string? cell, string? detail)
+    // The reference walk in either direction. Inbound it keys on the edge's target, so the subject bounds
+    // ownership where it sits. Outbound, external targets are exempt whatever the polarity: the complement
+    // universe is solution-declared, and a cell never holds an external type to be an "other" of.
+    private List<OwnedEdge> OwnedReferences(
+        SelectionAdmission subject, SelectionAdmission operand, bool inbound, bool wantHit, string? cell,
+        string? detail)
     {
-        var edges = new List<OwnedEdge<ReferenceEdge>>();
-        foreach (ReferenceEdge edge in Keyed(subject.Nodes, _edgesBySource.Lookup))
+        ILookup<TypeNode, ReferenceEdge> index = inbound ? _edgesByTarget.Lookup : _edgesBySource.Lookup;
+        var edges = new List<OwnedEdge>();
+        foreach (ReferenceEdge edge in Keyed(subject.Nodes, index))
         {
-            if (edge.Target.IsExternal) continue;
+            if (!inbound && edge.Target.IsExternal) continue;
 
             IReadOnlyList<SourceLocation>? sites = SelectionAdmission.CountedSites(
-                subject, operand, edge, edge.Evidence, subjectAtSource: true, wantHit);
+                subject, operand, edge, edge.Evidence, subjectAtSource: !inbound, wantHit);
 
-            if (sites is not null) edges.Add(new OwnedEdge<ReferenceEdge>(edge, sites, cell, detail));
+            if (sites is not null) edges.Add(new OwnedEdge(edge, sites, cell, detail));
         }
 
         return edges;
@@ -866,21 +855,6 @@ internal sealed class ConstraintEvaluator
         return false;
     }
 
-    // The inbound twin, keyed on the edge's target so the subject bounds ownership where it sits.
-    private List<OwnedEdge<ReferenceEdge>> Inbound(SelectionAdmission subject, SelectionAdmission allowed, string? cell)
-    {
-        var owned = new List<OwnedEdge<ReferenceEdge>>();
-        foreach (ReferenceEdge edge in Keyed(subject.Nodes, _edgesByTarget.Lookup))
-        {
-            IReadOnlyList<SourceLocation>? sites = SelectionAdmission.CountedSites(
-                subject, allowed, edge, edge.Evidence, subjectAtSource: false, wantHit: false);
-
-            if (sites is not null) owned.Add(new OwnedEdge<ReferenceEdge>(edge, sites, cell, null));
-        }
-
-        return owned;
-    }
-
     // A family's cells collected in TARGET position — each cell as declared, which is what "self" means on
     // a family (GRAMMAR §5.1). Resolved here rather than in ResolveSubject so a family rule whose verb
     // never reads the partition pays nothing for it.
@@ -894,14 +868,13 @@ internal sealed class ConstraintEvaluator
     // One edge a walk found and the rule owns. Its sites are the ones that counted for it, the owned instances'
     // and not necessarily the whole edge's; the cell is the walk's loop index and the detail the cycle gate's
     // circle sentence, both null on the paths that have neither.
-    private readonly struct OwnedEdge<TEdge>(
-        TEdge edge,
+    private readonly struct OwnedEdge(
+        ReferenceEdge edge,
         IReadOnlyList<SourceLocation> sites,
         string? cell,
         string? detail)
-        where TEdge : class
     {
-        internal TEdge Edge { get; } = edge;
+        internal ReferenceEdge Edge { get; } = edge;
 
         internal IReadOnlyList<SourceLocation> Sites { get; } = sites;
 
@@ -918,24 +891,20 @@ internal sealed class ConstraintEvaluator
     // names one cell per pair and totals to the rule's own count. Grouping is on the EDGE by identity rather
     // than on the (source, target) names: one model edge per type pair per family, and a model object is
     // compared by reference throughout the checker.
-    private static IReadOnlyList<Violation> MintedPerEdge<TEdge>(
-        List<OwnedEdge<TEdge>> owned,
-        Func<TEdge, IReadOnlyList<SourceLocation>> sitesOf,
-        Func<OwnedEdge<TEdge>, Violation> mint)
-        where TEdge : class
+    private static IReadOnlyList<Violation> MintedPerEdge(List<OwnedEdge> owned)
     {
         if (owned.Count < 2)
             return owned
-                .Select(mint)
+                .Select(MintReference)
                 .ToList();
 
-        var firstAt = new Dictionary<TEdge, int>(owned.Count);
-        var perEdge = new List<(OwnedEdge<TEdge> Found, List<IReadOnlyList<SourceLocation>>? More)>(owned.Count);
-        foreach (OwnedEdge<TEdge> found in owned)
+        var firstAt = new Dictionary<ReferenceEdge, int>(owned.Count);
+        var perEdge = new List<(OwnedEdge Found, List<IReadOnlyList<SourceLocation>>? More)>(owned.Count);
+        foreach (OwnedEdge found in owned)
         {
             if (firstAt.TryGetValue(found.Edge, out int at))
             {
-                (OwnedEdge<TEdge> first, List<IReadOnlyList<SourceLocation>>? more) = perEdge[at];
+                (OwnedEdge first, List<IReadOnlyList<SourceLocation>>? more) = perEdge[at];
                 more ??= [first.Sites];
                 more.Add(found.Sites);
                 perEdge[at] = (first, more);
@@ -947,22 +916,22 @@ internal sealed class ConstraintEvaluator
         }
 
         var violations = new List<Violation>(perEdge.Count);
-        foreach ((OwnedEdge<TEdge> found, List<IReadOnlyList<SourceLocation>>? more) in perEdge)
+        foreach ((OwnedEdge found, List<IReadOnlyList<SourceLocation>>? more) in perEdge)
         {
             if (more is null)
             {
-                violations.Add(mint(found));
+                violations.Add(MintReference(found));
                 continue;
             }
 
-            IReadOnlyList<SourceLocation> merged = SelectionAdmission.MergedEvidence(sitesOf(found.Edge), more);
-            violations.Add(mint(new OwnedEdge<TEdge>(found.Edge, merged, found.Cell, found.Detail)));
+            IReadOnlyList<SourceLocation> merged = SelectionAdmission.MergedEvidence(found.Edge.Sites, more);
+            violations.Add(MintReference(new OwnedEdge(found.Edge, merged, found.Cell, found.Detail)));
         }
 
         return violations;
     }
 
-    private static Violation MintReference(OwnedEdge<ReferenceEdge> found)
+    private static Violation MintReference(OwnedEdge found)
     {
         ReferenceEdge edge = found.Edge;
         Violation violation = found.Detail is { } detail
@@ -974,7 +943,7 @@ internal sealed class ConstraintEvaluator
 
     // The throw verb (GRAMMAR §4.8, §5.3): a STRICT allow-list — every throw edge from a subject whose thrown
     // type is not in the allowed set is a violation, EXTERNAL thrown types included. This is OnlyReference
-    // MINUS the external-target exemption its OutboundEdges walk applies: an unlisted System.TimeoutException
+    // MINUS the external-target exemption its OwnedReferences walk applies: an unlisted System.TimeoutException
     // throw is red unless typeof(TimeoutException) is in the allow-set (a Type-sugar operand resolves the
     // external node by FQN, since the target universe includes externals). An allowed type absent from the
     // model resolves empty and allows nothing, silently where it is a typeof and with a per-operand warning
@@ -983,28 +952,12 @@ internal sealed class ConstraintEvaluator
         SelectionAdmission subject, IReadOnlyList<Selection> allowedThrows)
     {
         SelectionAdmission allowed = ResolveOperands(allowedThrows, out IReadOnlyList<SelectionAdmission> parts);
-        var owned = new List<OwnedEdge<ThrowEdge>>();
+        List<Violation> violations = OwnedViolations(
+            _throwEdgesBySource.Lookup, subject, allowed, Violation.Throw, subjectAtSource: true, wantHit: false);
 
-        foreach (ThrowEdge edge in Keyed(subject.Nodes, _throwEdgesBySource.Lookup))
-        {
-            IReadOnlyList<SourceLocation>? sites = SelectionAdmission.CountedSites(
-                subject, allowed, edge, edge.Evidence, subjectAtSource: true, wantHit: false);
-
-            if (sites is not null) owned.Add(new OwnedEdge<ThrowEdge>(edge, sites, null, null));
-        }
-
-        // One walk, so each edge is here once and the merge step mints it as found; it goes through that step
-        // all the same, so no path invents a second way to turn an owned edge into a violation.
         IReadOnlyList<CheckWarning> dead =
             DeadOperandWarnings(allowedThrows, parts, DeadOperandRole.AllowList, SelectionPosition.Target);
-        return (MintedPerEdge(owned, e => e.Sites, MintThrow), dead);
-    }
-
-    // The throw mint, which carries neither a cell nor a circle: MustOnlyThrow has no family form.
-    private static Violation MintThrow(OwnedEdge<ThrowEdge> found)
-    {
-        ThrowEdge edge = found.Edge;
-        return Violation.Throw(edge.Source, edge.Thrown, found.Sites);
+        return (violations, dead);
     }
 
     // The subject, resolved once: its membership, the heads that admitted each conflated node in it, and
@@ -1127,7 +1080,7 @@ internal sealed class ConstraintEvaluator
     private (IReadOnlyList<Violation>, SelectionAdmission?, FamilySubject?) ResolveFamilySubject(
         Selection subject, EachNoun noun)
     {
-        IReadOnlyList<Selection> cells = _selections.Cells(subject);
+        IReadOnlyList<Selection> cells = _selections.Cells(subject, noun);
         RequireDistinctLayerCells(noun.Layers);
 
         (List<SelectionAdmission> collected, List<Selection> dead) = WalkParts(cells);
@@ -1644,7 +1597,7 @@ internal sealed class ConstraintEvaluator
         /// </remarks>
         internal string CellName(int index)
         {
-            return Cells[index].NounOrNull() switch
+            return Cells[index].Noun switch
             {
                 LayerNoun layer => layer.Name,
                 ProjectNoun project => project.Name,

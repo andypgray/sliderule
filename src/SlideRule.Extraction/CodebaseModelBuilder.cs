@@ -10,11 +10,9 @@ namespace SlideRule.Extraction;
 /// </summary>
 internal static class CodebaseModelBuilder
 {
-    public static CodebaseModel Build(
-        IReadOnlyList<CompilationInput> inputs, IReadOnlyList<ProjectArtifactFacts?>? artifactFacts,
-        CancellationToken cancellationToken)
+    public static CodebaseModel Build(IReadOnlyList<CompilationInput> inputs, CancellationToken cancellationToken)
     {
-        CodebaseFragment[] fragments = FragmentExtractor.ExtractAll(inputs, artifactFacts, cancellationToken);
+        CodebaseFragment[] fragments = FragmentExtractor.ExtractAll(inputs, cancellationToken);
 
         return FragmentMerger.Merge(fragments);
     }

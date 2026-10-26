@@ -3,7 +3,6 @@ using SlideRule.Checking;
 using SlideRule.Cli.Mcp.Infrastructure;
 using SlideRule.Cli.Pipeline;
 using SlideRule.Cli.Rendering;
-using SlideRule.Cli.SpecLoading;
 using SlideRule.Codebase;
 using SlideRule.Hosting;
 using SlideRule.Internal;
@@ -12,7 +11,6 @@ using SlideRule.Rendering;
 using SlideRule.Roslyn;
 using SlideRule.Roslyn.Baselines;
 using SlideRule.Roslyn.Diagnostics;
-using SlideRule.Roslyn.Solutions;
 using SlideRule.Validation;
 
 namespace SlideRule.Cli.Verbs;
@@ -104,9 +102,14 @@ internal sealed class BaselineRunner(
 
         // Evaluate against an empty baseline so every current violation surfaces as the state to capture.
         // No narrowing goes down: this report is a capture survey rather than a verdict, the two modes that
-        // read absence as evidence have already refused above, and add branches out before the survey.
+        // read absence as evidence have already refused above, and add branches out before the survey. add reads
+        // one rule's result, so it evaluates that rule alone; a rule the spec lacks leaves the report empty.
+        IReadOnlyList<ArchRule> rules = request.Mode == BaselineMode.Add
+            ? source.Model.Rules.Where(rule => string.Equals(rule.Id, request.Addition!.Rule, StringComparison.Ordinal))
+                .ToList()
+            : source.Model.Rules;
         CheckReport report = ArchChecker.Check(
-            source.Model.Rules, codebase, BaselineIndex.Empty, null, null, null, new SolutionRoot(source.SolutionDirectory), ct);
+            rules, codebase, BaselineIndex.Empty, null, null, null, new SolutionRoot(source.SolutionDirectory), ct);
 
         // Branch to the single-rule add path before the ratchet survey below, so a bad --rule refuses instead of exiting 0.
         if (request.Mode == BaselineMode.Add)
@@ -115,7 +118,7 @@ internal sealed class BaselineRunner(
         List<RuleResult> ratchetResults = report.Results.Where(r => r.Rule.IsRatcheted).ToList();
         if (ratchetResults.Count == 0)
         {
-            foreach (string line in RatchetSurveyNotice.Lines(report, anyRatchetedRule: false))
+            foreach (string line in RatchetSurveyNotice.Lines(report))
                 await output.WriteLineAsync(line);
             return ExitCodes.Clean;
         }
@@ -126,7 +129,7 @@ internal sealed class BaselineRunner(
         ApplyFiles(output, request, ratchetResults, solutionDirectory);
 
         // The survey's last word: name the failing rules no baseline can capture, after the per-file lines.
-        foreach (string line in RatchetSurveyNotice.Lines(report, anyRatchetedRule: true))
+        foreach (string line in RatchetSurveyNotice.Lines(report))
             await output.WriteLineAsync(line);
 
         return ExitCodes.Clean;
@@ -140,9 +143,7 @@ internal sealed class BaselineRunner(
         if (addition.Rule is null)
             throw new UserErrorException("baseline add requires --rule <id>.");
 
-        bool blankOrMultiline =
-            string.IsNullOrWhiteSpace(addition.Because) || SingleLineProse.IsMultiLine(addition.Because);
-        if (blankOrMultiline)
+        if (!BaselineEntry.IsValidBecause(addition.Because))
             throw new UserErrorException("baseline add requires a non-blank, single-line --because.");
 
         bool edgeForm = addition.Source is not null && addition.Target is not null && addition.Subject is null;
@@ -243,21 +244,11 @@ internal sealed class BaselineRunner(
         BaselineRename rename = request.Rename ?? throw MisassembledRenameRequest();
         RefuseMalformedFrom(rename.From);
 
-        SpecResolution? withoutSolution = SpecResolver.TryResolveWithoutSolution(request.Spec);
-        if (withoutSolution is not null)
-        {
-            string solutionPath = ModelPipeline.DiscoverSolution(request.Solution, request.WorkingDirectory, Environment);
-            string anchor = SolutionProjectFileParser.AnchorDirectory(solutionPath);
-            ArchitectureModel model = SolutionSource.LoadSpecModel(withoutSolution.DllPath);
-            return Rename(output, request, model, anchor);
-        }
+        (ArchitectureModel model, string? solutionDirectory) = await LoadSpecModelAsync(
+            request.Solution, request.Spec, request.WorkingDirectory, noCache: false, needsSolutionDirectory: true,
+            error, ct);
 
-        using var source = await CodebaseSource.CreateWithSpecAsync(
-            SolutionSource, Environment, request.Solution, request.Spec, request.WorkingDirectory, false, ct);
-        WorkspaceDiagnosticsRenderer.Render(error, source.Diagnostics);
-        RecordCacheOutcome(source);
-
-        return Rename(output, request, source.Model, source.SolutionDirectory);
+        return Rename(output, request, model, solutionDirectory!);
     }
 
     // The old ID can become a conventional path that Rename may delete. BaselineConventions refuses an ID outside
@@ -412,12 +403,7 @@ internal sealed class BaselineRunner(
     // Null-tolerant because the file a run writes may not exist yet.
     private static Dictionary<string, IReadOnlyList<BaselineEntry>> MutableSections(BaselineDocument? existing)
     {
-        var sections = new Dictionary<string, IReadOnlyList<BaselineEntry>>(StringComparer.Ordinal);
-        if (existing is not null)
-            foreach (KeyValuePair<string, IReadOnlyList<BaselineEntry>> section in existing.Sections)
-                sections[section.Key] = section.Value;
-
-        return sections;
+        return existing is null ? new Dictionary<string, IReadOnlyList<BaselineEntry>>(StringComparer.Ordinal) : new Dictionary<string, IReadOnlyList<BaselineEntry>>(existing.Sections, StringComparer.Ordinal);
     }
 
     // init and accept-reductions, one baseline file at a time: ordinal grouping in first-appearance order,

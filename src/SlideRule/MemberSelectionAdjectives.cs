@@ -84,7 +84,7 @@ public static class MemberSelectionAdjectives
         params string[] more)
         where TSelf : MemberSelection
     {
-        IReadOnlyList<string> names = OperandList.OneOrMore(first, more, name => name);
+        IReadOnlyList<string> names = OperandList.OneOrMore(first, more);
         return Append(selection, new MemberNamedAdjective(names));
     }
 
@@ -105,7 +105,7 @@ public static class MemberSelectionAdjectives
         IEnumerable<string> names)
         where TSelf : MemberSelection
     {
-        IReadOnlyList<string> list = OperandList.ZeroOrMore(names, name => name, nameof(names));
+        IReadOnlyList<string> list = OperandList.ZeroOrMore(names, nameof(names));
         return Append(selection, new MemberNamedAdjective(list));
     }
 
@@ -310,7 +310,7 @@ public static class MemberSelectionAdjectives
     public static TSelf Except<TSelf>(this TSelf selection, MemberSelection first, params MemberSelection[] more)
         where TSelf : MemberSelection
     {
-        IReadOnlyList<MemberSelection> payloads = OperandList.OneOrMore(first, more, exclusion => exclusion);
+        IReadOnlyList<MemberSelection> payloads = OperandList.OneOrMore(first, more);
         return Append(selection, new MemberExceptAdjective(payloads));
     }
 
@@ -329,7 +329,7 @@ public static class MemberSelectionAdjectives
         where TSelf : MemberSelection
     {
         IReadOnlyList<MemberSelection> payloads =
-            OperandList.ZeroOrMore(exclusions, exclusion => exclusion, nameof(exclusions));
+            OperandList.ZeroOrMore(exclusions, nameof(exclusions));
         return Append(selection, new MemberExceptAdjective(payloads));
     }
 

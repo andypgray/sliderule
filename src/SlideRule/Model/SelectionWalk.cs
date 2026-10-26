@@ -90,21 +90,12 @@ internal static class SelectionWalk
     }
 
     /// <summary>
-    ///     The noun head of a selection, or null for a <see cref="UnionSelection" />, whose
-    ///     <see cref="Selection.Noun" /> throws (GRAMMAR §5.1), and for a null receiver.
-    /// </summary>
-    internal static SelectionNoun? NounOrNull(this Selection? selection)
-    {
-        return selection is null or UnionSelection ? null : selection.Noun;
-    }
-
-    /// <summary>
     ///     The family noun of a family subject, or null for every other selection and for a null receiver
     ///     (GRAMMAR §5.1).
     /// </summary>
     internal static EachNoun? FamilyNounOrNull(this Selection? selection)
     {
-        return selection.NounOrNull() as EachNoun;
+        return selection?.Noun as EachNoun;
     }
 
     /// <summary>The project selection itself, then the payloads of its own <c>Except</c> adjectives.</summary>
@@ -129,8 +120,7 @@ internal static class SelectionWalk
 
         // As in SpecValidator.SelectionProse: a union carries adjectives of its own, so AnyOf(a, b).Except(bad)
         // must reach the payload walk too, and a family's layer cells are walked on the same terms, so a cell
-        // minted on another Arch is reached (GRAMMAR §5.1, §8). The arms are exclusive because reading .Noun on a
-        // union throws.
+        // minted on another Arch is reached (GRAMMAR §5.1, §8).
         if (selection is UnionSelection union)
             foreach (Selection member in union.Parts)
             foreach (Selection nested in ExpandSelection(member))

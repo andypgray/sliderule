@@ -1,10 +1,10 @@
 namespace SlideRule.Codebase;
 
 /// <summary>
-///     One type naming another in its public API: a member of <see cref="Source" /> names
+///     One type naming another in its public API: a member of <see cref="TypeEdge.Source" /> names
 ///     <see cref="Exposed" /> in a signature position — a method's return type or one of its parameter
 ///     types, or a property, field or event's type. Read them from
-///     <see cref="CodebaseModel.ExposureEdges" />.
+///     <see cref="CodebaseModel.ExposureEdges" />. Its sites are the declaration line of each exposing member.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -30,25 +30,16 @@ namespace SlideRule.Codebase;
 ///         <c>object</c> exposes <c>System.Object</c> and nothing else, whatever the caller casts it to.
 ///     </para>
 /// </remarks>
-internal sealed class ExposureEdge : IEdgeEnds
+internal sealed class ExposureEdge : TypeEdge
 {
     internal ExposureEdge(TypeNode source, TypeNode exposed, EdgeEvidence evidence)
+        : base(source, evidence)
     {
-        Source = source;
         Exposed = exposed;
-        Evidence = evidence;
     }
-
-    /// <summary>Gets the exposing type — the one whose public member names the exposed type.</summary>
-    public TypeNode Source { get; }
 
     /// <summary>Gets the type named in the signature.</summary>
     public TypeNode Exposed { get; }
 
-    TypeNode IEdgeEnds.Target => Exposed;
-
-    /// <summary>Gets the declaration line of each exposing member.</summary>
-    public IReadOnlyList<SourceLocation> Sites => Evidence.Sites;
-
-    internal EdgeEvidence Evidence { get; }
+    public override TypeNode Target => Exposed;
 }

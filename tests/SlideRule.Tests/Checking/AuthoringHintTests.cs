@@ -128,7 +128,7 @@ public sealed class AuthoringHintTests
     public void ANamedList_EarnsTheExactNameRuleFromTheSubjectAndBothInertTargetHints()
     {
         // A list that came up empty failed on its names, whichever signal reports it, so ForSubject,
-        // ForInertTarget and ForInertTargetOperand all say what an exact name is; only the action clause differs.
+        // ForInertTarget and a target's ForDeadOperand all say what an exact name is; only the action clause differs.
         var arch = new Arch();
         Selection named = arch.Types.Named("Orders.Line", "Acme.Widget");
 
@@ -136,7 +136,7 @@ public sealed class AuthoringHintTests
             .ShouldBe(NamedClause + "; check the selection against what the solution declares.");
         AuthoringHints.ForInertTarget([named], null, null)
             .ShouldBe(NamedClause + "; a rule whose target matches nothing passes forever, so decide before keeping it.");
-        AuthoringHints.ForInertTargetOperand(named, null, null)
+        AuthoringHints.ForDeadOperand(DeadOperandRole.Target, named, null, null)
             .ShouldBe(NamedClause + "; a name that matches nothing bans nothing, so decide before keeping it.");
     }
 
@@ -153,7 +153,7 @@ public sealed class AuthoringHintTests
 
         AuthoringHints.ForSubject(under, null)
             .ShouldBe(pathClause + "; check the selection against what the solution declares.");
-        AuthoringHints.ForInertTargetOperand(under, null, null)
+        AuthoringHints.ForDeadOperand(DeadOperandRole.Target, under, null, null)
             .ShouldBe(pathClause + "; a pattern that matches nothing bans nothing, so decide before keeping it.");
     }
 
@@ -258,12 +258,12 @@ public sealed class AuthoringHintTests
         // calls the piece a pattern or a name by the piece's own shape, and a one-name list is a name.
         var arch = new Arch();
 
-        AuthoringHints.ForDeadAllowedOperand(arch.Namespace("App.Ghost.*"), null, null)
+        AuthoringHints.ForDeadOperand(DeadOperandRole.AllowList, arch.Namespace("App.Ghost.*"), null, null)
             .ShouldBe(
                 "A trailing `.*` covers the namespace itself and everything under it, and `Legacy*` never crosses a "
                 + "dot; a pattern that matches nothing allows nothing, so what it was meant to allow is reported as "
                 + "a violation.");
-        AuthoringHints.ForDeadAllowedOperand(arch.Types.Named("Ghost"), null, null)
+        AuthoringHints.ForDeadOperand(DeadOperandRole.AllowList, arch.Types.Named("Ghost"), null, null)
             .ShouldBe(
                 NamedClause + "; a name that matches nothing allows nothing, so what it was meant to allow is "
                             + "reported as a violation.");
@@ -276,16 +276,16 @@ public sealed class AuthoringHintTests
         // ways, and its tail says so. Each calls the piece a pattern or a name by the piece's own shape.
         var arch = new Arch();
 
-        AuthoringHints.ForDeadMembership(arch.Namespace("App.Ghost.*"), null)
+        AuthoringHints.ForDeadOperand(DeadOperandRole.Membership, arch.Namespace("App.Ghost.*"), null, null)
             .ShouldBe(
                 "A trailing `.*` covers the namespace itself and everything under it, and `Legacy*` never crosses a "
                 + "dot; a pattern that matches nothing holds no type, so each subject it was meant to hold is "
                 + "reported as a violation.");
-        AuthoringHints.ForDeadMembership(arch.Types.Named("Ghost"), null)
+        AuthoringHints.ForDeadOperand(DeadOperandRole.Membership, arch.Types.Named("Ghost"), null, null)
             .ShouldBe(NamedClause + "; a name that " + HoldsNoTypeAction + ".");
-        AuthoringHints.ForDeadAmongOperand(arch.Namespace("App.Ghost.*"), null)
+        AuthoringHints.ForDeadOperand(DeadOperandRole.Among, arch.Namespace("App.Ghost.*"), null, null)
             .ShouldEndWith("; a pattern that " + HoldsNoCounterpartAction + ".");
-        AuthoringHints.ForDeadAmongOperand(arch.Types.Named("Ghost"), null)
+        AuthoringHints.ForDeadOperand(DeadOperandRole.Among, arch.Types.Named("Ghost"), null, null)
             .ShouldBe(NamedClause + "; a name that " + HoldsNoCounterpartAction + ".");
     }
 
@@ -571,8 +571,8 @@ public sealed class AuthoringHintTests
         [
             (nameof(AuthoringHints.ForInertTarget),
                 (piece, model, narrowing) => AuthoringHints.ForInertTarget([piece], model, narrowing)),
-            (nameof(AuthoringHints.ForInertTargetOperand), AuthoringHints.ForInertTargetOperand),
-            (nameof(AuthoringHints.ForDeadAllowedOperand), AuthoringHints.ForDeadAllowedOperand)
+            DeadOperandCure(DeadOperandRole.Target),
+            DeadOperandCure(DeadOperandRole.AllowList)
         ];
     }
 
@@ -584,8 +584,16 @@ public sealed class AuthoringHintTests
     {
         return
         [
-            (nameof(AuthoringHints.ForDeadMembership), AuthoringHints.ForDeadMembership),
-            (nameof(AuthoringHints.ForDeadAmongOperand), AuthoringHints.ForDeadAmongOperand)
+            ($"{nameof(AuthoringHints.ForDeadOperand)}({DeadOperandRole.Membership})",
+                (piece, model) => AuthoringHints.ForDeadOperand(DeadOperandRole.Membership, piece, model, null)),
+            ($"{nameof(AuthoringHints.ForDeadOperand)}({DeadOperandRole.Among})",
+                (piece, model) => AuthoringHints.ForDeadOperand(DeadOperandRole.Among, piece, model, null))
         ];
+    }
+
+    private static (string Cure, InertCure HintFor) DeadOperandCure(DeadOperandRole role)
+    {
+        return ($"{nameof(AuthoringHints.ForDeadOperand)}({role})",
+            (piece, model, narrowing) => AuthoringHints.ForDeadOperand(role, piece, model, narrowing));
     }
 }

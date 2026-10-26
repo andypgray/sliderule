@@ -223,7 +223,7 @@ internal static class ExampleReplay
         using TempDirectory capture = TestTempRoot.Fresh("walkthrough-baseline-init");
         var output = new StringWriter { NewLine = "\n" };
         BaselineRunner.ApplyFiles(output, BaselineRequests.Init(capture.Path), ratcheted, capture.Path);
-        foreach (string line in RatchetSurveyNotice.Lines(survey, anyRatchetedRule: true)) output.WriteLine(line);
+        foreach (string line in RatchetSurveyNotice.Lines(survey)) output.WriteLine(line);
 
         Dictionary<string, byte[]> files = Directory.EnumerateFiles(capture.Path, "*", SearchOption.AllDirectories)
             .ToDictionary(

@@ -22,7 +22,7 @@ namespace SlideRule;
 // and it is disjoint from Selection and ProjectSelection so the shared adjective and verb names
 // bind by receiver type rather than by overload resolution (GRAMMAR §3.2). The three slots below —
 // Source, Kind, Adjectives — are exactly what member-subject sentence assembly reads (§6); the
-// adjectives ship as generic self-type extensions that clone through Rebuild, which is what keeps a
+// adjectives ship as generic self-type extensions that clone through WithAdjectives, which is what keeps a
 // concrete projection's kind-only vocabulary reachable after one.
 public abstract class MemberSelection
 {
@@ -46,19 +46,11 @@ public abstract class MemberSelection
     ///     new adjective list, so an adjective extension preserves <see cref="MethodSelection" /> (and
     ///     keeps <c>.Returning</c> reachable) in any order.
     /// </summary>
-    private protected abstract MemberSelection Rebuild(IReadOnlyList<MemberAdjective> adjectives);
+    internal abstract MemberSelection WithAdjectives(IReadOnlyList<MemberAdjective> adjectives);
 
     internal MemberSelection Refined(MemberAdjective adjective)
     {
         var adjectives = new List<MemberAdjective>(Adjectives) { adjective };
-        return Rebuild(adjectives);
-    }
-
-    /// <summary>
-    ///     The same projection over the same source, carrying <paramref name="adjectives" /> in place of its own.
-    /// </summary>
-    internal MemberSelection WithAdjectives(IReadOnlyList<MemberAdjective> adjectives)
-    {
-        return Rebuild(adjectives);
+        return WithAdjectives(adjectives);
     }
 }

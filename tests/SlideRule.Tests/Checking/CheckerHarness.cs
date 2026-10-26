@@ -141,7 +141,7 @@ internal static class Checker
     public static ArchRule Tripwire(Action<Arch> define)
     {
         return SingleMatch(
-            Model(define).Rules, rule => rule.Scope is { Role: ScopeRole.Tripwire }, rule => rule.Id,
+            Model(define).Rules, rule => rule.IsTripwire, rule => rule.Id,
             "the scope's tripwire");
     }
 

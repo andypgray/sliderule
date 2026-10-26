@@ -1,3 +1,5 @@
+using SlideRule.Internal;
+
 namespace SlideRule;
 
 /// <summary>
@@ -10,9 +12,15 @@ namespace SlideRule;
 // these nodes (GRAMMAR §2).
 public abstract class Constraint
 {
-    private protected Constraint(Selection? subject)
+    // The null guard for every verb's receiver: each verb names its receiver subject, so the ParamName is
+    // the one on the overload the caller called.
+    private protected Constraint(Selection subject)
     {
-        Subject = subject;
+        Subject = Guard.NotNull(subject, nameof(subject));
+    }
+
+    private protected Constraint()
+    {
     }
 
     /// <summary>The type selection the constraint is asserted over, or null for a project constraint.</summary>

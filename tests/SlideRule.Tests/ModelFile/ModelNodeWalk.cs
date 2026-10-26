@@ -93,7 +93,7 @@ internal static class ModelNodeWalk
                     foreach (SelectionAdjective adjective in union.Adjectives) Visit(adjective);
                     break;
                 case Selection selection:
-                    Visit(selection.Noun);
+                    Visit(selection.Noun!);
                     foreach (SelectionAdjective adjective in selection.Adjectives) Visit(adjective);
                     break;
                 case MemberSelection members:

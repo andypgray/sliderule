@@ -17,13 +17,9 @@ namespace SlideRule.Checking;
 /// </remarks>
 internal sealed class SelectionEvaluator
 {
-    // The one noun MustBeRegistered resolves through, shared by every rule that uses the verb: the Scanned
-    // memo is keyed on the noun by reference, so a per-call instance would rescan the universe per rule.
-    private static readonly RegisteredNoun AnyLifetimeRegistered = new(null);
-
     private readonly ILookup<string, TypeNode> _byFullName;
-    private readonly Dictionary<(SelectionNoun, SelectionPosition), IReadOnlyList<TypeNode>> _byNoun = new();
-    private readonly Dictionary<(SelectionNoun, SelectionPosition), HashSet<TypeNode>> _admittedByNoun = new();
+    private readonly Dictionary<(object, SelectionPosition), IReadOnlyList<TypeNode>> _byNoun = new();
+    private readonly Dictionary<(object, SelectionPosition), HashSet<TypeNode>> _admittedByNoun = new();
     private readonly Dictionary<SelectionAdjective, Func<TypeNode, bool>> _keepers = new();
     private readonly CodebaseModel _model;
 
@@ -84,21 +80,18 @@ internal sealed class SelectionEvaluator
     /// <summary>Whether the operand is a pattern/glob selection (anything but a bare <c>typeof</c>).</summary>
     internal static bool IsPatternSelection(Selection selection)
     {
-        return selection.Adjectives.Count > 0 || selection.NounOrNull() is not TypeNoun;
+        return selection.Adjectives.Count > 0 || selection.Noun is not TypeNoun;
     }
 
     /// <summary>
     ///     The parts a compound selection resolves through, or null where it resolves by its own noun — a
-    ///     union's operands, a family's cells, a layer's definition (GRAMMAR §5.1, §4.1).
+    ///     union's operands, a family's cells, a layer's definition (GRAMMAR §5.1, §4.1). Every union is
+    ///     compound, so a selection this answers null for has a <see cref="Selection.Noun" />.
     /// </summary>
     /// <remarks>
     ///     The one answer to which selections are compound, so a compound shape added here reaches every walk
     ///     that asks, provenance in <see cref="SelectionAdmission.Collect" /> included, where a shape it did not
     ///     know about would fall through to the leaf and silently lose its parts' heads rather than fail.
-    ///     <para>
-    ///         The union arm comes first because a union has no single noun: reading
-    ///         <see cref="Selection.Noun" /> on one throws by design.
-    ///     </para>
     ///     <para>
     ///         Not memoized. Only the family arm computes anything, resolving a project family's cells through a
     ///         project selection that may carry a <c>Where</c> predicate, so a memo there would hold the answer of
@@ -111,7 +104,7 @@ internal sealed class SelectionEvaluator
 
         return selection.Noun switch
         {
-            EachNoun => Cells(selection),
+            EachNoun family => Cells(selection, family),
             // A layer is transparent to its definition: it names what the definition names, in the caller's
             // position, and the layer's own adjectives narrow that afterwards — which is the compound fold
             // over a single part.
@@ -126,7 +119,7 @@ internal sealed class SelectionEvaluator
     ///     glob is relative to a directory, and answering without one would select nothing and fail closed only
     ///     by accident.
     /// </summary>
-    internal IReadOnlyList<string>? RelativeSegments(string filePath)
+    private IReadOnlyList<string>? RelativeSegments(string filePath)
     {
         if (_root is null) throw NoRoot();
 
@@ -147,15 +140,28 @@ internal sealed class SelectionEvaluator
         if (_root is null) throw NoRoot();
 
         List<PathGlob> parsed = globs.Select(glob => new PathGlob(glob)).ToList();
-        return type =>
-        {
-            IReadOnlyList<string> paths = type.FilePaths;
-            for (var i = 0; i < paths.Count; i++)
-                if (RelativeSegments(paths[i]) is { } segments && MatchesAnyGlob(parsed, segments))
-                    return true;
+        return type => FirstDeclaredUnder(parsed, type) is not null;
+    }
 
-            return false;
-        };
+    /// <summary>
+    ///     The first of <paramref name="type" />'s declaring files below the run's root that one of
+    ///     <paramref name="globs" /> matches, in file order, as its segments and the index of the first glob that
+    ///     matches it; null where none does. Throws <see cref="RuleEvaluationException" /> where the run was given
+    ///     no root and the type has a declaring file.
+    /// </summary>
+    internal (IReadOnlyList<string> Segments, int Glob)? FirstDeclaredUnder(IReadOnlyList<PathGlob> globs, TypeNode type)
+    {
+        IReadOnlyList<string> paths = type.FilePaths;
+        for (var i = 0; i < paths.Count; i++)
+        {
+            if (RelativeSegments(paths[i]) is not { } segments) continue;
+
+            for (var g = 0; g < globs.Count; g++)
+                if (globs[g].Matches(segments))
+                    return (segments, g);
+        }
+
+        return null;
     }
 
     private static RuleEvaluationException NoRoot()
@@ -171,13 +177,15 @@ internal sealed class SelectionEvaluator
         // and the enclosing selection's own adjectives narrow the union.
         if (Composite(selection) is { } parts)
         {
+            if (parts.Count == 1) return Narrow(selection, Evaluate(parts[0], position));
+
             var members = new HashSet<TypeNode>();
             foreach (Selection part in parts) members.UnionWith(Evaluate(part, position));
 
             return Narrow(selection, members);
         }
 
-        return Narrow(selection, ByNoun(selection.Noun, position));
+        return Narrow(selection, ByNoun(selection.Noun!, position));
     }
 
     /// <summary>
@@ -194,7 +202,7 @@ internal sealed class SelectionEvaluator
         if (selection.Adjectives.Count == 0 && candidates is HashSet<TypeNode> owned) return owned;
 
         IEnumerable<TypeNode> current = candidates;
-        foreach (SelectionAdjective adjective in selection.Adjectives) current = current.Where(Keeper(adjective));
+        foreach (SelectionAdjective adjective in selection.Adjectives) current = current.Where(KeeperFor(adjective));
 
         // The constructor is the point: adjectives can yield the same node twice, and naming HashSet here
         // says the deduplication is deliberate where a spread would leave it to the return type.
@@ -219,7 +227,7 @@ internal sealed class SelectionEvaluator
     // same noun of type after type.
     private HashSet<TypeNode> Admitted(SelectionNoun noun, SelectionPosition position)
     {
-        (SelectionNoun noun, SelectionPosition position) key = (noun, position);
+        (object, SelectionPosition) key = (MemoKey(noun), position);
         if (_admittedByNoun.TryGetValue(key, out HashSet<TypeNode>? admitted)) return admitted;
 
         // The constructor says the memo's list becomes a set here, where a spread would leave it to the
@@ -236,15 +244,20 @@ internal sealed class SelectionEvaluator
     /// </summary>
     internal bool AdjectiveKeeps(SelectionAdjective adjective, TypeNode type)
     {
-        // One keeper per adjective rather than one per type asked about, so an arm's setup runs once however many
-        // types a trace asks it of. For an Except that setup resolves a whole selection.
+        return KeeperFor(adjective)(type);
+    }
+
+    // One keeper per adjective rather than one per type asked about, so an arm's setup runs once however many
+    // types a trace asks it of. For an Except that setup resolves a whole selection.
+    private Func<TypeNode, bool> KeeperFor(SelectionAdjective adjective)
+    {
         if (!_keepers.TryGetValue(adjective, out Func<TypeNode, bool>? keeps))
         {
             keeps = Keeper(adjective);
             _keepers[adjective] = keeps;
         }
 
-        return keeps(type);
+        return keeps;
     }
 
     // Never an iterator: TypeNounFullName must refuse a closed-generic noun eagerly, before any node is tested.
@@ -253,7 +266,7 @@ internal sealed class SelectionEvaluator
         // The memo's own probe, ahead of the switch: a memoized noun costs a lookup rather than a closure, a
         // delegate and a re-entered switch. Only the arms that go through Scanned ever store a key, so this
         // can hit for nothing else — the rest are computed on every call, as they must be.
-        if (_byNoun.TryGetValue((noun, position), out IReadOnlyList<TypeNode>? hit)) return hit;
+        if (_byNoun.TryGetValue((MemoKey(noun), position), out IReadOnlyList<TypeNode>? hit)) return hit;
 
         bool subject = position == SelectionPosition.Subject;
         IEnumerable<TypeNode> universe = subject ? _solutionDeclared : _model.Types;
@@ -267,7 +280,7 @@ internal sealed class SelectionEvaluator
                 return Scanned(noun, position, () =>
                 {
                     List<NamespacePattern> globs = layer.Globs.Select(g => new NamespacePattern(g)).ToList();
-                    return universe.Where(t => MatchesAnyGlob(globs, t.Namespace));
+                    return universe.Where(t => FirstMatchingGlob(globs, t.Namespace) >= 0);
                 });
             case NamespaceNoun ns:
                 return Scanned(noun, position, () =>
@@ -309,15 +322,13 @@ internal sealed class SelectionEvaluator
     ///     own owner, which is what makes <see cref="SelectionAdmission.Collect" /> stage its project head and
     ///     §4.1 attribution judge each instance at its declarer.
     /// </remarks>
-    internal IReadOnlyList<Selection> Cells(Selection family)
+    internal IReadOnlyList<Selection> Cells(Selection family, EachNoun noun)
     {
-        var noun = (EachNoun)family.Noun;
         if (noun.Layers is { } layers) return layers;
 
         IReadOnlyList<ProjectNode> projects = ProjectSelectionEvaluator.Resolve(noun.Projects!, _model.Projects);
         return projects
-            .Select(project => (Selection)new RefinedSelection(
-                family.Owner, new ProjectNoun(project.Name), Array.Empty<SelectionAdjective>()))
+            .Select(project => family.Owner.Project(project.Name))
             .ToList();
     }
 
@@ -334,32 +345,33 @@ internal sealed class SelectionEvaluator
     private IReadOnlyList<TypeNode> Scanned(
         SelectionNoun noun, SelectionPosition position, Func<IEnumerable<TypeNode>> scan)
     {
-        (SelectionNoun noun, SelectionPosition position) key = (noun, position);
-        if (_byNoun.TryGetValue(key, out IReadOnlyList<TypeNode>? cached)) return cached;
-
         List<TypeNode> scanned = scan().ToList();
-        _byNoun[key] = scanned;
+        _byNoun[(MemoKey(noun), position)] = scanned;
         return scanned;
     }
 
-    // An index walk rather than a LINQ Any, because it runs once per type in the universe over a list that is
+    // A noun whose payload is a plain value is keyed on it, so the same noun written inline in several rules is
+    // scanned once; every other noun is keyed on its instance.
+    private static object MemoKey(SelectionNoun noun)
+    {
+        return noun switch
+        {
+            NamespaceNoun ns => (typeof(NamespaceNoun), (object?)ns.Glob),
+            ProjectNoun project => (typeof(ProjectNoun), (object?)project.Name),
+            RegisteredNoun registered => (typeof(RegisteredNoun), (object?)registered.Lifetime),
+            _ => noun
+        };
+    }
+
+    // -1 where no glob matches. An index walk rather than a LINQ Any, because it runs once per type in the universe over a list that is
     // usually a single glob.
-    private static bool MatchesAnyGlob(IReadOnlyList<NamespacePattern> globs, string ns)
+    internal static int FirstMatchingGlob(IReadOnlyList<NamespacePattern> globs, string ns)
     {
         for (var i = 0; i < globs.Count; i++)
             if (globs[i].Matches(ns))
-                return true;
+                return i;
 
-        return false;
-    }
-
-    private static bool MatchesAnyGlob(IReadOnlyList<PathGlob> globs, IReadOnlyList<string> relativeSegments)
-    {
-        for (var i = 0; i < globs.Count; i++)
-            if (globs[i].Matches(relativeSegments))
-                return true;
-
-        return false;
+        return -1;
     }
 
     /// <summary>
@@ -374,7 +386,7 @@ internal sealed class SelectionEvaluator
     {
         // The memoized set, shared rather than copied: the verb only tests membership against it, and nothing may
         // mutate it.
-        return Admitted(AnyLifetimeRegistered, position);
+        return Admitted(new RegisteredNoun(null), position);
     }
 
     // The FQN membership set of arch.Registered(lifetime) (GRAMMAR §4.7); a null lifetime is every lifetime,

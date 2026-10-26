@@ -57,11 +57,11 @@ public sealed class CheckWarningTests
         IReadOnlyList<string> roles =
         [
             $"InertTarget {CheckWarning.InertTarget("m", hint: null).Role}",
-            $"InertTargetOperand {CheckWarning.InertTargetOperand("op", hint: null).Role}",
-            $"DeadAllowedOperand {CheckWarning.DeadAllowedOperand("op", hint: null).Role}",
-            $"DeadMembership {CheckWarning.DeadMembership("op", hint: null).Role}",
-            $"DeadAmongOperand {CheckWarning.DeadAmongOperand("op", hint: null).Role}",
-            $"ScopeTouched {CheckWarning.ScopeTouched(caution: true, "m", "f.cs").Role}",
+            $"DeadOperand(Target) {CheckWarning.DeadOperand(DeadOperandRole.Target, "op", hint: null).Role}",
+            $"DeadOperand(AllowList) {CheckWarning.DeadOperand(DeadOperandRole.AllowList, "op", hint: null).Role}",
+            $"DeadOperand(Membership) {CheckWarning.DeadOperand(DeadOperandRole.Membership, "op", hint: null).Role}",
+            $"DeadOperand(Among) {CheckWarning.DeadOperand(DeadOperandRole.Among, "op", hint: null).Role}",
+            $"ScopeTouched {CheckWarning.ScopeTouched(caution: true, "f.cs", "s", "r").Role}",
             $"OrphanedBaseline {CheckWarning.OrphanedBaseline("r", OneEntry, offerInit: true).Role}",
             $"DeadExemplar {CheckWarning.DeadExemplar("ref", hint: null).Role}",
             $"ExemplarFault {CheckWarning.ExemplarFault("ref", "fault").Role}"
@@ -70,10 +70,10 @@ public sealed class CheckWarningTests
         roles.ShouldBe(
         [
             "InertTarget None",
-            "InertTargetOperand Target",
-            "DeadAllowedOperand AllowList",
-            "DeadMembership Membership",
-            "DeadAmongOperand Among",
+            "DeadOperand(Target) Target",
+            "DeadOperand(AllowList) AllowList",
+            "DeadOperand(Membership) Membership",
+            "DeadOperand(Among) Among",
             "ScopeTouched None",
             "OrphanedBaseline None",
             "DeadExemplar None",

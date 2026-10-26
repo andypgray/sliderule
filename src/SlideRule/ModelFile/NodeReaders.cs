@@ -82,38 +82,10 @@ internal static class NodeReaders
         var map = new Dictionary<string, Func<ModelNodeReader, StrictJsonValue, SelectionNoun?>>(StringComparer.Ordinal);
 
         map.Add(Key<TypesNoun>(), (r, v) => r.OnlyKeys(v, NounWhere, "node") ? TypesNoun.Instance : null);
-
-        map.Add(Key<TypeNoun>(), (r, v) =>
-        {
-            if (!r.OnlyKeys(v, NounWhere, "node", "anchor")) return null;
-
-            TypeAnchor? anchor = r.RequiredAnchor(v, NounWhere, "anchor");
-            return anchor is null ? null : new TypeNoun(anchor);
-        });
-
-        map.Add(Key<NamespaceNoun>(), (r, v) =>
-        {
-            if (!r.OnlyKeys(v, NounWhere, "node", "glob")) return null;
-
-            string? glob = r.RequiredNamespaceGlob(v, NounWhere, "glob");
-            return glob is null ? null : new NamespaceNoun(glob);
-        });
-
-        map.Add(Key<ProjectNoun>(), (r, v) =>
-        {
-            if (!r.OnlyKeys(v, NounWhere, "node", "name")) return null;
-
-            string? name = r.RequiredText(v, NounWhere, "name");
-            return name is null ? null : new ProjectNoun(name);
-        });
-
-        map.Add(Key<LayerNoun>(), (r, v) =>
-        {
-            if (!r.OnlyKeys(v, NounWhere, "node", "name")) return null;
-
-            Layer? layer = r.RequiredLayer(v, NounWhere, "name");
-            return layer is null ? null : (LayerNoun)layer.Noun;
-        });
+        Field(map, NounWhere, "anchor", Anchor, anchor => new TypeNoun(anchor));
+        Field(map, NounWhere, "glob", NamespaceGlob, glob => new NamespaceNoun(glob));
+        Field(map, NounWhere, "name", Text, name => new ProjectNoun(name));
+        Field(map, NounWhere, "name", LayerAt, layer => (LayerNoun)layer.Noun);
 
         map.Add(Key<RegisteredNoun>(), (r, v) =>
         {
@@ -136,9 +108,7 @@ internal static class NodeReaders
         StrictJsonValue? projects = reader.Optional(value, "projects");
         if (layers is null == projects is null)
         {
-            reader.RefuseAt(value,
-                "an " + JsonText.Quote("each") + " noun takes exactly one of " + JsonText.Quote("layers")
-                + " and " + JsonText.Quote("projects") + ".");
+            reader.RefuseExactlyOneOf(value, "an " + JsonText.Quote("each") + " noun", "layers", "projects");
             return null;
         }
 
@@ -157,13 +127,7 @@ internal static class NodeReaders
         var map = new Dictionary<string, Func<ModelNodeReader, StrictJsonValue, SelectionAdjective?>>(
             StringComparer.Ordinal);
 
-        map.Add(Key<InNamespaceAdjective>(), (r, v) =>
-        {
-            if (!r.OnlyKeys(v, AdjectiveWhere, "node", "glob")) return null;
-
-            string? glob = r.RequiredNamespaceGlob(v, AdjectiveWhere, "glob");
-            return glob is null ? null : new InNamespaceAdjective(glob);
-        });
+        Field(map, AdjectiveWhere, "glob", NamespaceGlob, glob => new InNamespaceAdjective(glob));
 
         map.Add(Key<OfKindAdjective>(), (r, v) =>
         {
@@ -174,71 +138,15 @@ internal static class NodeReaders
                 : null;
         });
 
-        map.Add(Key<WithSuffixAdjective>(), (r, v) =>
-        {
-            if (!r.OnlyKeys(v, AdjectiveWhere, "node", "suffix")) return null;
-
-            string? suffix = r.RequiredText(v, AdjectiveWhere, "suffix");
-            return suffix is null ? null : new WithSuffixAdjective(suffix);
-        });
-
-        map.Add(Key<WithPrefixAdjective>(), (r, v) =>
-        {
-            if (!r.OnlyKeys(v, AdjectiveWhere, "node", "prefix")) return null;
-
-            string? prefix = r.RequiredText(v, AdjectiveWhere, "prefix");
-            return prefix is null ? null : new WithPrefixAdjective(prefix);
-        });
-
-        map.Add(Key<WithNameMatchingAdjective>(), (r, v) =>
-        {
-            if (!r.OnlyKeys(v, AdjectiveWhere, "node", "glob")) return null;
-
-            string? glob = r.RequiredTypeNameGlob(v, AdjectiveWhere, "glob");
-            return glob is null ? null : new WithNameMatchingAdjective(glob);
-        });
-
-        map.Add(Key<NamedAdjective>(), (r, v) =>
-        {
-            if (!r.OnlyKeys(v, AdjectiveWhere, "node", "names")) return null;
-
-            IReadOnlyList<string>? names = r.RequiredTexts(v, AdjectiveWhere, "names");
-            return names is null ? null : new NamedAdjective(names);
-        });
-
-        map.Add(Key<UnderAdjective>(), (r, v) =>
-        {
-            if (!r.OnlyKeys(v, AdjectiveWhere, "node", "globs")) return null;
-
-            IReadOnlyList<string>? globs = r.RequiredPathGlobs(v, AdjectiveWhere, "globs");
-            return globs is null ? null : new UnderAdjective(globs);
-        });
-
-        map.Add(Key<ImplementingAdjective>(), (r, v) =>
-        {
-            TypeAnchor? anchor = OneAnchor(r, v, AdjectiveWhere);
-            return anchor is null ? null : new ImplementingAdjective(anchor);
-        });
-
-        map.Add(Key<DerivedFromAdjective>(), (r, v) =>
-        {
-            TypeAnchor? anchor = OneAnchor(r, v, AdjectiveWhere);
-            return anchor is null ? null : new DerivedFromAdjective(anchor);
-        });
-
-        map.Add(Key<AttributedWithAdjective>(), (r, v) =>
-        {
-            TypeAnchor? anchor = OneAnchor(r, v, AdjectiveWhere);
-            return anchor is null ? null : new AttributedWithAdjective(anchor);
-        });
-
-        map.Add(Key<ExceptAdjective>(), (r, v) =>
-        {
-            if (!r.OnlyKeys(v, AdjectiveWhere, "node", "payload")) return null;
-
-            Selection? payload = r.RequiredSelection(v, AdjectiveWhere, "payload");
-            return payload is null ? null : new ExceptAdjective(payload);
-        });
+        Field(map, AdjectiveWhere, "suffix", Text, suffix => new WithSuffixAdjective(suffix));
+        Field(map, AdjectiveWhere, "prefix", Text, prefix => new WithPrefixAdjective(prefix));
+        Field(map, AdjectiveWhere, "glob", TypeNameGlob, glob => new WithNameMatchingAdjective(glob));
+        Field(map, AdjectiveWhere, "names", Texts, names => new NamedAdjective(names));
+        Field(map, AdjectiveWhere, "globs", PathGlobs, globs => new UnderAdjective(globs));
+        Field(map, AdjectiveWhere, "anchor", Anchor, anchor => new ImplementingAdjective(anchor));
+        Field(map, AdjectiveWhere, "anchor", Anchor, anchor => new DerivedFromAdjective(anchor));
+        Field(map, AdjectiveWhere, "anchor", Anchor, anchor => new AttributedWithAdjective(anchor));
+        Field(map, AdjectiveWhere, "payload", SelectionAt, payload => new ExceptAdjective(payload));
 
         map.Add(Key<AuthoredAdjective>(),
             (r, v) => r.OnlyKeys(v, AdjectiveWhere, "node") ? new AuthoredAdjective() : null);
@@ -261,63 +169,18 @@ internal static class NodeReaders
         var map = new Dictionary<string, Func<ModelNodeReader, StrictJsonValue, MemberAdjective?>>(
             StringComparer.Ordinal);
 
-        map.Add(Key<MemberWithSuffixAdjective>(), (r, v) =>
-        {
-            if (!r.OnlyKeys(v, MemberAdjectiveWhere, "node", "suffix")) return null;
-
-            string? suffix = r.RequiredText(v, MemberAdjectiveWhere, "suffix");
-            return suffix is null ? null : new MemberWithSuffixAdjective(suffix);
-        });
-
-        map.Add(Key<MemberWithPrefixAdjective>(), (r, v) =>
-        {
-            if (!r.OnlyKeys(v, MemberAdjectiveWhere, "node", "prefix")) return null;
-
-            string? prefix = r.RequiredText(v, MemberAdjectiveWhere, "prefix");
-            return prefix is null ? null : new MemberWithPrefixAdjective(prefix);
-        });
-
-        map.Add(Key<MemberWithNameMatchingAdjective>(), (r, v) =>
-        {
-            if (!r.OnlyKeys(v, MemberAdjectiveWhere, "node", "glob")) return null;
-
-            string? glob = r.RequiredTypeNameGlob(v, MemberAdjectiveWhere, "glob");
-            return glob is null ? null : new MemberWithNameMatchingAdjective(glob);
-        });
-
-        map.Add(Key<MemberNamedAdjective>(), (r, v) =>
-        {
-            if (!r.OnlyKeys(v, MemberAdjectiveWhere, "node", "names")) return null;
-
-            IReadOnlyList<string>? names = r.NonEmpty(r.RequiredTexts(v, MemberAdjectiveWhere, "names"), v, "names");
-            return names is null ? null : new MemberNamedAdjective(names);
-        });
-
-        map.Add(Key<ReturningAdjective>(), (r, v) =>
-        {
-            if (!r.OnlyKeys(v, MemberAdjectiveWhere, "node", "anchors")) return null;
-
-            IReadOnlyList<TypeAnchor>? anchors = r.RequiredAnchors(v, MemberAdjectiveWhere, "anchors");
-            return anchors is null ? null : new ReturningAdjective(anchors);
-        });
-
-        map.Add(Key<MemberAttributedWithAdjective>(), (r, v) =>
-        {
-            TypeAnchor? anchor = OneAnchor(r, v, MemberAdjectiveWhere);
-            return anchor is null ? null : new MemberAttributedWithAdjective(anchor);
-        });
+        Field(map, MemberAdjectiveWhere, "suffix", Text, suffix => new MemberWithSuffixAdjective(suffix));
+        Field(map, MemberAdjectiveWhere, "prefix", Text, prefix => new MemberWithPrefixAdjective(prefix));
+        Field(map, MemberAdjectiveWhere, "glob", TypeNameGlob, glob => new MemberWithNameMatchingAdjective(glob));
+        Field(map, MemberAdjectiveWhere, "names", NonEmptyTexts, names => new MemberNamedAdjective(names));
+        Field(map, MemberAdjectiveWhere, "anchors", Anchors, anchors => new ReturningAdjective(anchors));
+        Field(map, MemberAdjectiveWhere, "anchor", Anchor, anchor => new MemberAttributedWithAdjective(anchor));
 
         map.Add(Key<MemberThatAreStaticAdjective>(),
             (r, v) => r.OnlyKeys(v, MemberAdjectiveWhere, "node") ? new MemberThatAreStaticAdjective() : null);
 
-        map.Add(Key<MemberExceptAdjective>(), (r, v) =>
-        {
-            if (!r.OnlyKeys(v, MemberAdjectiveWhere, "node", "payloads")) return null;
-
-            IReadOnlyList<MemberSelection>? payloads =
-                r.NonEmpty(r.RequiredMemberSelections(v, MemberAdjectiveWhere, "payloads"), v, "payloads");
-            return payloads is null ? null : new MemberExceptAdjective(payloads);
-        });
+        Field(map, MemberAdjectiveWhere, "payloads", NonEmptyMemberSelections,
+            payloads => new MemberExceptAdjective(payloads));
 
         map.Add(Key<MemberAccessibilityAdjective>(), (r, v) =>
         {
@@ -337,32 +200,13 @@ internal static class NodeReaders
         var map = new Dictionary<string, Func<ModelNodeReader, StrictJsonValue, ProjectAdjective?>>(
             StringComparer.Ordinal);
 
-        map.Add(Key<ProjectNamedAdjective>(), (r, v) =>
-        {
-            if (!r.OnlyKeys(v, ProjectAdjectiveWhere, "node", "names")) return null;
-
-            IReadOnlyList<string>? names = r.NonEmpty(r.RequiredTexts(v, ProjectAdjectiveWhere, "names"), v, "names");
-            return names is null ? null : new ProjectNamedAdjective(names);
-        });
-
-        map.Add(Key<ProjectMatchingAdjective>(), (r, v) =>
-        {
-            if (!r.OnlyKeys(v, ProjectAdjectiveWhere, "node", "globs")) return null;
-
-            IReadOnlyList<string>? globs = r.NonEmpty(r.RequiredTexts(v, ProjectAdjectiveWhere, "globs"), v, "globs");
-            return globs is null ? null : new ProjectMatchingAdjective(globs);
-        });
+        Field(map, ProjectAdjectiveWhere, "names", NonEmptyTexts, names => new ProjectNamedAdjective(names));
+        Field(map, ProjectAdjectiveWhere, "globs", NonEmptyTexts, globs => new ProjectMatchingAdjective(globs));
 
         map.Add(Key<ProjectPackableAdjective>(),
             (r, v) => r.OnlyKeys(v, ProjectAdjectiveWhere, "node") ? new ProjectPackableAdjective() : null);
 
-        map.Add(Key<ProjectExceptAdjective>(), (r, v) =>
-        {
-            if (!r.OnlyKeys(v, ProjectAdjectiveWhere, "node", "payload")) return null;
-
-            ProjectSelection? payload = r.RequiredProjectSelection(v, ProjectAdjectiveWhere, "payload");
-            return payload is null ? null : new ProjectExceptAdjective(payload);
-        });
+        Field(map, ProjectAdjectiveWhere, "payload", ProjectSelectionAt, payload => new ProjectExceptAdjective(payload));
 
         return map;
     }
@@ -403,57 +247,18 @@ internal static class NodeReaders
         Operands<MustNotExposeConstraint>(map, (s, o) => new MustNotExposeConstraint(s, o));
         Operands<MustBelongToConstraint>(map, (s, o) => new MustBelongToConstraint(s, o));
 
-        SubjectAnchor<MustImplementConstraint>(map, (s, a) => new MustImplementConstraint(s, a));
-        SubjectAnchor<MustDeriveFromConstraint>(map, (s, a) => new MustDeriveFromConstraint(s, a));
-        SubjectAnchor<MustBeAttributedWithConstraint>(map, (s, a) => new MustBeAttributedWithConstraint(s, a));
-        SubjectAnchors<MustNotImplementConstraint>(map, (s, a) => new MustNotImplementConstraint(s, a));
-        SubjectAnchors<MustNotDeriveFromConstraint>(map, (s, a) => new MustNotDeriveFromConstraint(s, a));
-        SubjectAnchors<MustNotBeAttributedWithConstraint>(map, (s, a) => new MustNotBeAttributedWithConstraint(s, a));
+        SubjectField(map, "anchor", Anchor, (s, a) => new MustImplementConstraint(s, a));
+        SubjectField(map, "anchor", Anchor, (s, a) => new MustDeriveFromConstraint(s, a));
+        SubjectField(map, "anchor", Anchor, (s, a) => new MustBeAttributedWithConstraint(s, a));
+        SubjectField(map, "anchors", Anchors, (s, a) => new MustNotImplementConstraint(s, a));
+        SubjectField(map, "anchors", Anchors, (s, a) => new MustNotDeriveFromConstraint(s, a));
+        SubjectField(map, "anchors", Anchors, (s, a) => new MustNotBeAttributedWithConstraint(s, a));
 
-        map.Add(Key<MustResideInNamespaceConstraint>(), (r, v) =>
-        {
-            Selection? subject = SubjectWith(r, v, "glob");
-            if (subject is null) return null;
-
-            string? glob = r.RequiredNamespaceGlob(v, ConstraintWhere, "glob");
-            return glob is null ? null : new MustResideInNamespaceConstraint(subject, glob);
-        });
-
-        map.Add(Key<MustResideInProjectConstraint>(), (r, v) =>
-        {
-            Selection? subject = SubjectWith(r, v, "projectName");
-            if (subject is null) return null;
-
-            string? name = r.RequiredText(v, ConstraintWhere, "projectName");
-            return name is null ? null : new MustResideInProjectConstraint(subject, name);
-        });
-
-        map.Add(Key<MustHaveSuffixConstraint>(), (r, v) =>
-        {
-            Selection? subject = SubjectWith(r, v, "suffix");
-            if (subject is null) return null;
-
-            string? suffix = r.RequiredText(v, ConstraintWhere, "suffix");
-            return suffix is null ? null : new MustHaveSuffixConstraint(subject, suffix);
-        });
-
-        map.Add(Key<MustHavePrefixConstraint>(), (r, v) =>
-        {
-            Selection? subject = SubjectWith(r, v, "prefix");
-            if (subject is null) return null;
-
-            string? prefix = r.RequiredText(v, ConstraintWhere, "prefix");
-            return prefix is null ? null : new MustHavePrefixConstraint(subject, prefix);
-        });
-
-        map.Add(Key<MustHaveNameMatchingConstraint>(), (r, v) =>
-        {
-            Selection? subject = SubjectWith(r, v, "glob");
-            if (subject is null) return null;
-
-            string? glob = r.RequiredTypeNameGlob(v, ConstraintWhere, "glob");
-            return glob is null ? null : new MustHaveNameMatchingConstraint(subject, glob);
-        });
+        SubjectField(map, "glob", NamespaceGlob, (s, glob) => new MustResideInNamespaceConstraint(s, glob));
+        SubjectField(map, "projectName", Text, (s, name) => new MustResideInProjectConstraint(s, name));
+        SubjectField(map, "suffix", Text, (s, suffix) => new MustHaveSuffixConstraint(s, suffix));
+        SubjectField(map, "prefix", Text, (s, prefix) => new MustHavePrefixConstraint(s, prefix));
+        SubjectField(map, "glob", TypeNameGlob, (s, glob) => new MustHaveNameMatchingConstraint(s, glob));
 
         map.Add(Key<MustHaveExactlyOneCounterpartConstraint>(), (r, v) =>
         {
@@ -467,14 +272,7 @@ internal static class NodeReaders
             return template is null ? null : new MustHaveExactlyOneCounterpartConstraint(subject, among, template);
         });
 
-        map.Add(Key<MustNotUseConstraint>(), (r, v) =>
-        {
-            Selection? subject = SubjectWith(r, v, "members");
-            if (subject is null) return null;
-
-            IReadOnlyList<Member>? members = r.NonEmpty(r.RequiredMembers(v, ConstraintWhere), v, "members");
-            return members is null ? null : new MustNotUseConstraint(subject, members);
-        });
+        SubjectField(map, "members", NonEmptyMembers, (s, members) => new MustNotUseConstraint(s, members));
     }
 
     private static void AddMemberVerbs(Dictionary<string, Func<ModelNodeReader, StrictJsonValue, Constraint?>> map)
@@ -490,59 +288,12 @@ internal static class NodeReaders
         MemberSubject<MemberMustBeGetOnlyConstraint>(map, s => new MemberMustBeGetOnlyConstraint(s));
         MemberSubject<MemberMustBeReadonlyConstraint>(map, s => new MemberMustBeReadonlyConstraint(s));
 
-        map.Add(Key<MemberMustHaveSuffixConstraint>(), (r, v) =>
-        {
-            MemberSelection? subject = MemberSubjectWith(r, v, "suffix");
-            if (subject is null) return null;
-
-            string? suffix = r.RequiredText(v, ConstraintWhere, "suffix");
-            return suffix is null ? null : new MemberMustHaveSuffixConstraint(subject, suffix);
-        });
-
-        map.Add(Key<MemberMustHavePrefixConstraint>(), (r, v) =>
-        {
-            MemberSelection? subject = MemberSubjectWith(r, v, "prefix");
-            if (subject is null) return null;
-
-            string? prefix = r.RequiredText(v, ConstraintWhere, "prefix");
-            return prefix is null ? null : new MemberMustHavePrefixConstraint(subject, prefix);
-        });
-
-        map.Add(Key<MemberMustHaveNameMatchingConstraint>(), (r, v) =>
-        {
-            MemberSelection? subject = MemberSubjectWith(r, v, "glob");
-            if (subject is null) return null;
-
-            string? glob = r.RequiredTypeNameGlob(v, ConstraintWhere, "glob");
-            return glob is null ? null : new MemberMustHaveNameMatchingConstraint(subject, glob);
-        });
-
-        map.Add(Key<MemberMustBeAttributedWithConstraint>(), (r, v) =>
-        {
-            MemberSelection? subject = MemberSubjectWith(r, v, "anchor");
-            if (subject is null) return null;
-
-            TypeAnchor? anchor = r.RequiredAnchor(v, ConstraintWhere, "anchor");
-            return anchor is null ? null : new MemberMustBeAttributedWithConstraint(subject, anchor);
-        });
-
-        map.Add(Key<MemberMustAcceptParameterConstraint>(), (r, v) =>
-        {
-            MemberSelection? subject = MemberSubjectWith(r, v, "anchor");
-            if (subject is null) return null;
-
-            TypeAnchor? anchor = r.RequiredAnchor(v, ConstraintWhere, "anchor");
-            return anchor is null ? null : new MemberMustAcceptParameterConstraint(subject, anchor);
-        });
-
-        map.Add(Key<MemberMustNotBeAttributedWithConstraint>(), (r, v) =>
-        {
-            MemberSelection? subject = MemberSubjectWith(r, v, "anchors");
-            if (subject is null) return null;
-
-            IReadOnlyList<TypeAnchor>? anchors = r.RequiredAnchors(v, ConstraintWhere, "anchors");
-            return anchors is null ? null : new MemberMustNotBeAttributedWithConstraint(subject, anchors);
-        });
+        MemberSubjectField(map, "suffix", Text, (s, suffix) => new MemberMustHaveSuffixConstraint(s, suffix));
+        MemberSubjectField(map, "prefix", Text, (s, prefix) => new MemberMustHavePrefixConstraint(s, prefix));
+        MemberSubjectField(map, "glob", TypeNameGlob, (s, glob) => new MemberMustHaveNameMatchingConstraint(s, glob));
+        MemberSubjectField(map, "anchor", Anchor, (s, a) => new MemberMustBeAttributedWithConstraint(s, a));
+        MemberSubjectField(map, "anchor", Anchor, (s, a) => new MemberMustAcceptParameterConstraint(s, a));
+        MemberSubjectField(map, "anchors", Anchors, (s, a) => new MemberMustNotBeAttributedWithConstraint(s, a));
     }
 
     private static void AddProjectVerbs(Dictionary<string, Func<ModelNodeReader, StrictJsonValue, Constraint?>> map)
@@ -551,17 +302,10 @@ internal static class NodeReaders
         ProjectSubject<MustLockPackagesConstraint>(map, s => new MustLockPackagesConstraint(s));
         ProjectSubject<MustNotBePackableConstraint>(map, s => new MustNotBePackableConstraint(s));
 
-        ProjectTexts<MustOnlyTargetConstraint>(map, "frameworks", (s, frameworks) => new MustOnlyTargetConstraint(s, frameworks));
-        map.Add(Key<MustTargetConstraint>(), (r, v) =>
-        {
-            ProjectSelection? subject = ProjectSubjectWith(r, v, "framework");
-            if (subject is null) return null;
-
-            string? framework = r.RequiredText(v, ConstraintWhere, "framework");
-            return framework is null ? null : new MustTargetConstraint(subject, framework);
-        });
-        ProjectTexts<MustOnlyReferencePackagesConstraint>(map, "patterns", (s, patterns) => new MustOnlyReferencePackagesConstraint(s, patterns));
-        ProjectTexts<MustNotReferencePackagesConstraint>(map, "patterns", (s, patterns) => new MustNotReferencePackagesConstraint(s, patterns));
+        ProjectSubjectField(map, "frameworks", Texts, (s, frameworks) => new MustOnlyTargetConstraint(s, frameworks));
+        ProjectSubjectField(map, "framework", Text, (s, framework) => new MustTargetConstraint(s, framework));
+        ProjectSubjectField(map, "patterns", Texts, (s, patterns) => new MustOnlyReferencePackagesConstraint(s, patterns));
+        ProjectSubjectField(map, "patterns", Texts, (s, patterns) => new MustNotReferencePackagesConstraint(s, patterns));
         map.Add(Key<MustSetPropertyConstraint>(), (r, v) =>
         {
             ProjectSelection? subject = ProjectSubjectWith(r, v, "property", "value");
@@ -572,6 +316,23 @@ internal static class NodeReaders
 
             string? value = r.RequiredText(v, ConstraintWhere, "value");
             return value is null ? null : new MustSetPropertyConstraint(subject, name, value);
+        });
+    }
+
+    // The arm of a node with one field beside its discriminator.
+    private static void Field<TFamily, TNode, TValue>(
+        Dictionary<string, Func<ModelNodeReader, StrictJsonValue, TFamily?>> map, string where, string key,
+        Func<ModelNodeReader, StrictJsonValue, string, string, TValue?> read, Func<TValue, TNode> build)
+        where TFamily : class
+        where TNode : class, TFamily
+        where TValue : class
+    {
+        map.Add(Key<TNode>(), (r, v) =>
+        {
+            if (!r.OnlyKeys(v, where, "node", key)) return null;
+
+            TValue? value = read(r, v, where, key);
+            return value is null ? null : build(value);
         });
     }
 
@@ -603,33 +364,19 @@ internal static class NodeReaders
         });
     }
 
-    private static void SubjectAnchor<TConstraint>(
-        Dictionary<string, Func<ModelNodeReader, StrictJsonValue, Constraint?>> map,
-        Func<Selection, TypeAnchor, TConstraint> build)
+    private static void SubjectField<TConstraint, TValue>(
+        Dictionary<string, Func<ModelNodeReader, StrictJsonValue, Constraint?>> map, string key,
+        Func<ModelNodeReader, StrictJsonValue, string, string, TValue?> read, Func<Selection, TValue, TConstraint> build)
         where TConstraint : Constraint
+        where TValue : class
     {
         map.Add(Key<TConstraint>(), (r, v) =>
         {
-            Selection? subject = SubjectWith(r, v, "anchor");
+            Selection? subject = SubjectWith(r, v, key);
             if (subject is null) return null;
 
-            TypeAnchor? anchor = r.RequiredAnchor(v, ConstraintWhere, "anchor");
-            return anchor is null ? null : build(subject, anchor);
-        });
-    }
-
-    private static void SubjectAnchors<TConstraint>(
-        Dictionary<string, Func<ModelNodeReader, StrictJsonValue, Constraint?>> map,
-        Func<Selection, IReadOnlyList<TypeAnchor>, TConstraint> build)
-        where TConstraint : Constraint
-    {
-        map.Add(Key<TConstraint>(), (r, v) =>
-        {
-            Selection? subject = SubjectWith(r, v, "anchors");
-            if (subject is null) return null;
-
-            IReadOnlyList<TypeAnchor>? anchors = r.RequiredAnchors(v, ConstraintWhere, "anchors");
-            return anchors is null ? null : build(subject, anchors);
+            TValue? value = read(r, v, ConstraintWhere, key);
+            return value is null ? null : build(subject, value);
         });
     }
 
@@ -647,6 +394,23 @@ internal static class NodeReaders
         });
     }
 
+    private static void MemberSubjectField<TConstraint, TValue>(
+        Dictionary<string, Func<ModelNodeReader, StrictJsonValue, Constraint?>> map, string key,
+        Func<ModelNodeReader, StrictJsonValue, string, string, TValue?> read,
+        Func<MemberSelection, TValue, TConstraint> build)
+        where TConstraint : MemberConstraint
+        where TValue : class
+    {
+        map.Add(Key<TConstraint>(), (r, v) =>
+        {
+            MemberSelection? subject = MemberSubjectWith(r, v, key);
+            if (subject is null) return null;
+
+            TValue? value = read(r, v, ConstraintWhere, key);
+            return value is null ? null : build(subject, value);
+        });
+    }
+
     private static void ProjectSubject<TConstraint>(
         Dictionary<string, Func<ModelNodeReader, StrictJsonValue, Constraint?>> map,
         Func<ProjectSelection, TConstraint> build)
@@ -661,19 +425,20 @@ internal static class NodeReaders
         });
     }
 
-    private static void ProjectTexts<TConstraint>(
-        Dictionary<string, Func<ModelNodeReader, StrictJsonValue, Constraint?>> map,
-        string key,
-        Func<ProjectSelection, IReadOnlyList<string>, TConstraint> build)
+    private static void ProjectSubjectField<TConstraint, TValue>(
+        Dictionary<string, Func<ModelNodeReader, StrictJsonValue, Constraint?>> map, string key,
+        Func<ModelNodeReader, StrictJsonValue, string, string, TValue?> read,
+        Func<ProjectSelection, TValue, TConstraint> build)
         where TConstraint : ProjectConstraint
+        where TValue : class
     {
         map.Add(Key<TConstraint>(), (r, v) =>
         {
             ProjectSelection? subject = ProjectSubjectWith(r, v, key);
             if (subject is null) return null;
 
-            IReadOnlyList<string>? texts = r.RequiredTexts(v, ConstraintWhere, key);
-            return texts is null ? null : build(subject, texts);
+            TValue? value = read(r, v, ConstraintWhere, key);
+            return value is null ? null : build(subject, value);
         });
     }
 
@@ -700,11 +465,78 @@ internal static class NodeReaders
         return reader.RequiredProjectSelection(value, ConstraintWhere, "projectSubject");
     }
 
-    private static TypeAnchor? OneAnchor(ModelNodeReader reader, StrictJsonValue value, string where)
-    {
-        if (!reader.OnlyKeys(value, where, "node", "anchor")) return null;
+    // The field readers the one-field registrars take: each reads `key` of the node `v`, refusing as `where`.
+    // They are methods rather than delegate fields because the arm tables above are built by static field
+    // initialisers, which run before any delegate field declared below them is assigned.
 
-        return reader.RequiredAnchor(value, where, "anchor");
+    private static string? Text(ModelNodeReader r, StrictJsonValue v, string where, string key)
+    {
+        return r.RequiredText(v, where, key);
+    }
+
+    private static IReadOnlyList<string>? Texts(ModelNodeReader r, StrictJsonValue v, string where, string key)
+    {
+        return r.RequiredTexts(v, where, key);
+    }
+
+    private static IReadOnlyList<string>? NonEmptyTexts(ModelNodeReader r, StrictJsonValue v, string where, string key)
+    {
+        IReadOnlyList<string>? texts = r.RequiredTexts(v, where, key);
+        return r.NonEmpty(texts, v, key);
+    }
+
+    private static string? NamespaceGlob(ModelNodeReader r, StrictJsonValue v, string where, string key)
+    {
+        return r.RequiredNamespaceGlob(v, where, key);
+    }
+
+    private static string? TypeNameGlob(ModelNodeReader r, StrictJsonValue v, string where, string key)
+    {
+        return r.RequiredTypeNameGlob(v, where, key);
+    }
+
+    private static IReadOnlyList<string>? PathGlobs(ModelNodeReader r, StrictJsonValue v, string where, string key)
+    {
+        return r.RequiredPathGlobs(v, where, key);
+    }
+
+    private static TypeAnchor? Anchor(ModelNodeReader r, StrictJsonValue v, string where, string key)
+    {
+        return r.RequiredAnchor(v, where, key);
+    }
+
+    private static IReadOnlyList<TypeAnchor>? Anchors(ModelNodeReader r, StrictJsonValue v, string where, string key)
+    {
+        return r.RequiredAnchors(v, where, key);
+    }
+
+    private static Selection? SelectionAt(ModelNodeReader r, StrictJsonValue v, string where, string key)
+    {
+        return r.RequiredSelection(v, where, key);
+    }
+
+    private static ProjectSelection? ProjectSelectionAt(ModelNodeReader r, StrictJsonValue v, string where, string key)
+    {
+        return r.RequiredProjectSelection(v, where, key);
+    }
+
+    private static IReadOnlyList<MemberSelection>? NonEmptyMemberSelections(
+        ModelNodeReader r, StrictJsonValue v, string where, string key)
+    {
+        IReadOnlyList<MemberSelection>? selections = r.RequiredMemberSelections(v, where, key);
+        return r.NonEmpty(selections, v, key);
+    }
+
+    private static Layer? LayerAt(ModelNodeReader r, StrictJsonValue v, string where, string key)
+    {
+        return r.RequiredLayer(v, where, key);
+    }
+
+    // The member list's key is fixed by the reader, so `key` names it only for the emptiness refusal.
+    private static IReadOnlyList<Member>? NonEmptyMembers(ModelNodeReader r, StrictJsonValue v, string where, string key)
+    {
+        IReadOnlyList<Member>? members = r.RequiredMembers(v, where);
+        return r.NonEmpty(members, v, key);
     }
 
     private static string Key<TNode>()

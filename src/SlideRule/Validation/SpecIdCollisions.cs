@@ -1,3 +1,4 @@
+using SlideRule.Building;
 using Code = SlideRule.Validation.SpecValidationErrorCode;
 
 namespace SlideRule.Validation;
@@ -48,8 +49,8 @@ internal static class SpecIdCollisions
         // collide twice, on two IDs that appear nowhere in the source.
         foreach (IdDeclaration scope in scopes)
         {
-            postDesugar.Add((scope.Id + "/containment", scope.Tag));
-            postDesugar.Add((scope.Id + "/tripwire", scope.Tag));
+            postDesugar.Add((ScopeDesugarer.ContainmentId(scope.Id), scope.Tag));
+            postDesugar.Add((ScopeDesugarer.TripwireId(scope.Id), scope.Tag));
         }
 
         foreach (IGrouping<string, (string Id, int Tag)> group in postDesugar.GroupBy(entry => entry.Id, StringComparer.Ordinal))

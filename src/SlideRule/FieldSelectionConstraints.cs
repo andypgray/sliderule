@@ -1,4 +1,3 @@
-using SlideRule.Internal;
 using SlideRule.Model;
 
 namespace SlideRule;
@@ -22,6 +21,6 @@ public static class FieldSelectionConstraints
     /// </summary>
     public static Constraint MustBeReadonly(this FieldSelection subject)
     {
-        return new MemberMustBeReadonlyConstraint(Guard.NotNull(subject, nameof(subject)));
+        return new MemberMustBeReadonlyConstraint(subject);
     }
 }

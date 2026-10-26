@@ -47,7 +47,7 @@ internal static class BuildFindings
 
             foreach (Violation violation in result.Violations)
             {
-                IReadOnlyList<SourceLocation> placed = PlacedSites(violation);
+                IReadOnlyList<SourceLocation> placed = violation.PlacedSites();
                 List<SourceLocation> owned = placed
                     .Where(site => ownsFile(site.FilePath))
                     .ToList();
@@ -69,20 +69,5 @@ internal static class BuildFindings
     private static BuildFindingKind FindingKind(ArchRule rule)
     {
         return rule.Posture == Posture.Migrate ? BuildFindingKind.NewDebt : BuildFindingKind.BrokenRule;
-    }
-
-    // None for the kinds that are about the rule rather than about the code, which carry no site at all.
-    private static IReadOnlyList<SourceLocation> PlacedSites(Violation violation)
-    {
-        switch (violation.Kind)
-        {
-            case ViolationKind.Reference or ViolationKind.MemberUse or ViolationKind.Construction
-                or ViolationKind.Injection or ViolationKind.Catch or ViolationKind.Throw or ViolationKind.Expose:
-                return violation.Sites;
-            case ViolationKind.Shape or ViolationKind.MemberShape or ViolationKind.ProjectShape:
-                return violation.Sites.Count > 0 ? [violation.Sites[0]] : Array.Empty<SourceLocation>();
-            default:
-                return Array.Empty<SourceLocation>();
-        }
     }
 }

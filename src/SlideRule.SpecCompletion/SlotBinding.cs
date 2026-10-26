@@ -13,7 +13,9 @@ namespace SlideRule.SpecCompletion;
 ///         The guards are the spec-literal analyzer's, mirrored, each for the reason its comments there give:
 ///         the marker is read off the original definition's parameter, an argument the caller did not write is
 ///         skipped, and the two parameter lists must be the same length. Where the two readers disagreed, an
-///         author would be offered names for one slot and warned about another.
+///         author would be offered names for one slot and warned about another. The analyzer's one further
+///         guard, that the declaration sits in the marker's own assembly, changes no answer, because the marker
+///         is internal to that assembly; it only spares the analyzer an attribute read on every other call.
 ///     </para>
 ///     <para>
 ///         One operation is asked for, and it is the literal's. A params call expanded at the call site has no

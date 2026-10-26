@@ -9,8 +9,9 @@ namespace SlideRule.Cli.Rendering;
 /// </summary>
 /// <remarks>
 ///     The wording is <see cref="UnsupportedProjectsNotice" />'s, which the factory comes from; what lives here is
-///     the CLI's half. The entries come off <see cref="WorkspaceTrustStamp" /> rather than straight off the
-///     diagnostics, so this line and the verb's <c>--json</c> document spell each path and its reason alike.
+///     the CLI's half. This line and the verb's <c>--json</c> document spell each path and its reason alike,
+///     because both compose each entry through <see cref="UnsupportedProjectsNotice.Entry" /> and
+///     <see cref="UnsupportedProjectsNotice.Reason" /> over a solution-relative path.
 /// </remarks>
 internal static class UnsupportedProjectsNotices
 {
@@ -23,10 +24,8 @@ internal static class UnsupportedProjectsNotices
     {
         if (source.Diagnostics.UnsupportedProjects.Count == 0) return;
 
-        WorkspaceTrustStamp trust = WorkspaceTrustStamp.From(source.Diagnostics, source.SolutionDirectory);
-        IReadOnlyList<string> entries = (trust.UnsupportedProjects ?? [])
-            .Select(project => project.Describe())
-            .ToList();
+        IReadOnlyList<string> entries = UnsupportedProjectsNotice.Relative(
+            source.Diagnostics.UnsupportedProjects, source.SolutionDirectory);
 
         LineBlocks.WriteStamp(output, factory(entries));
     }

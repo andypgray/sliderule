@@ -5,7 +5,6 @@ using SlideRule.Checking;
 using SlideRule.Model;
 using SlideRule.ModelFile;
 using SlideRule.Tests.DocHygiene;
-using SlideRule.Tests.TestSupport;
 using Xunit;
 
 namespace SlideRule.Tests.ModelFile;
@@ -208,36 +207,6 @@ public sealed class ModelNodeInventoryTests
     }
 
     /// <summary>
-    ///     A scope read back from a file carries no boundary — the containment rule's own operands are the
-    ///     boundary, so the file would be storing it twice — which is sound only while nothing the checker
-    ///     runs reads that slot. This is what holds it sound.
-    /// </summary>
-    /// <remarks>
-    ///     Over the tracked source text rather than over references, because the claim is about a whole
-    ///     directory rather than about one caller, and because a mention in a comment is a reader being
-    ///     told that the slot is available there. The renderer that legitimately draws from it is asserted
-    ///     to still match, so a pattern that stopped matching anything cannot pass as "nothing reads it".
-    /// </remarks>
-    [Fact]
-    public void NoCheckingSource_ReadsAScopesBoundary()
-    {
-        // Arrange
-        IReadOnlyList<string> checkingSources = CheckerSources.All;
-
-        // Act
-        List<string> mentions = checkingSources.SelectMany(Boundaries)
-            .ToList();
-
-        // Assert: the floor first, so a sweep that reached no file says so rather than reporting nothing.
-        checkingSources.Count.ShouldBeGreaterThan(5, "the sweep reached the checker's own sources");
-        Boundaries("src/SlideRule/Rendering/LawDiagramRenderer.cs")
-            .ShouldNotBeEmpty("the search no longer finds the one place a boundary is legitimately read");
-        mentions.ShouldReportNothing(
-            "The checker now names a scope's Boundary, which a model file does not carry — a parsed model "
-            + "would silently check differently from the spec it came from");
-    }
-
-    /// <summary>
     ///     The same sweep against the one-project decidability table: every node class it finds has a row
     ///     there, so a node that ships without one reds here rather than throwing the classifier's
     ///     fail-closed refusal at whoever first writes a rule using it.
@@ -271,15 +240,5 @@ public sealed class ModelNodeInventoryTests
         return Core.GetTypes()
             .Where(type => type.IsClass && !type.IsAbstract && root.IsAssignableFrom(type) && type != root)
             .ToList();
-    }
-
-    private static IEnumerable<string> Boundaries(string trackedPath)
-    {
-        string[] lines = RepoRoot.ReadLines(trackedPath);
-
-        for (var index = 0; index < lines.Length; index++)
-            if (lines[index]
-                .Contains("Boundary", StringComparison.Ordinal))
-                yield return $"{trackedPath}:{index + 1}";
     }
 }

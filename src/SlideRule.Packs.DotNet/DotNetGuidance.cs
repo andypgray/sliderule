@@ -274,8 +274,7 @@ public static class DotNetGuidance
     {
         ArgumentNullException.ThrowIfNull(arch);
         ArgumentNullException.ThrowIfNull(posture);
-        Constraint constraint = subject.Authored().Methods
-            .Returning(typeof(Task), typeof(Task<>), typeof(ValueTask), typeof(ValueTask<>))
+        Constraint constraint = TaskReturningMethods(subject)
             .MustHaveSuffix("Async");
         IRuleBuilder rule = arch.Rule("naming/async-suffix");
 
@@ -347,8 +346,7 @@ public static class DotNetGuidance
     {
         ArgumentNullException.ThrowIfNull(arch);
         ArgumentNullException.ThrowIfNull(posture);
-        Constraint constraint = subject.Authored().Methods
-            .Returning(typeof(Task), typeof(Task<>), typeof(ValueTask), typeof(ValueTask<>))
+        Constraint constraint = TaskReturningMethods(subject)
             .MustAcceptParameter<CancellationToken>();
         IRuleBuilder rule = arch.Rule("async/accept-cancellation");
 
@@ -424,6 +422,13 @@ public static class DotNetGuidance
         NoGeneralCatch(arch, subject, topLevelHandler, posture);
         AcceptCancellation(arch, subject, posture);
         NoMappingAttributes(arch, subject, posture);
+    }
+
+    // The async methods both async rules govern: the authored ones returning a task or a value task.
+    private static MethodSelection TaskReturningMethods(Selection subject)
+    {
+        return subject.Authored().Methods
+            .Returning(typeof(Task), typeof(Task<>), typeof(ValueTask), typeof(ValueTask<>));
     }
 
     // The one place a posture becomes a chain. IEnforceRule and IMigrateRule are unrelated interfaces,

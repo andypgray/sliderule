@@ -130,7 +130,7 @@ public sealed class FragmentRoundTripTests
                            private void OnEvt() {}
                        }
                        """));
-        IReadOnlyList<CodebaseFragment> fragments = FragmentExtractor.ExtractAll([lib, app], artifactFacts: null, Ct);
+        IReadOnlyList<CodebaseFragment> fragments = FragmentExtractor.ExtractAll([lib, app], Ct);
 
         // Act
         CodebaseModel direct = FragmentMerger.Merge(fragments);
@@ -170,7 +170,7 @@ public sealed class FragmentRoundTripTests
                            private static void H() {}
                        }
                        """));
-        IReadOnlyList<CodebaseFragment> fragments = FragmentExtractor.ExtractAll([lib, app], artifactFacts: null, Ct);
+        IReadOnlyList<CodebaseFragment> fragments = FragmentExtractor.ExtractAll([lib, app], Ct);
 
         // Act
         CodebaseModel direct = FragmentMerger.Merge(fragments);
@@ -206,7 +206,7 @@ public sealed class FragmentRoundTripTests
                                                                                        }
                                                                                    }
                                                                                    """));
-        IReadOnlyList<CodebaseFragment> fragments = FragmentExtractor.ExtractAll([app], artifactFacts: null, Ct);
+        IReadOnlyList<CodebaseFragment> fragments = FragmentExtractor.ExtractAll([app], Ct);
 
         // Act
         CodebaseModel direct = FragmentMerger.Merge(fragments);
@@ -261,7 +261,7 @@ public sealed class FragmentRoundTripTests
                            }
                        }
                        """));
-        IReadOnlyList<CodebaseFragment> fragments = FragmentExtractor.ExtractAll([lib, app], artifactFacts: null, Ct);
+        IReadOnlyList<CodebaseFragment> fragments = FragmentExtractor.ExtractAll([lib, app], Ct);
 
         // Act
         CodebaseModel direct = FragmentMerger.Merge(fragments);
@@ -326,7 +326,7 @@ public sealed class FragmentRoundTripTests
                            public event N.Notify Ev;
                        }
                        """));
-        IReadOnlyList<CodebaseFragment> fragments = FragmentExtractor.ExtractAll([lib, app], artifactFacts: null, Ct);
+        IReadOnlyList<CodebaseFragment> fragments = FragmentExtractor.ExtractAll([lib, app], Ct);
 
         // Act
         CodebaseModel direct = FragmentMerger.Merge(fragments);
@@ -355,7 +355,7 @@ public sealed class FragmentRoundTripTests
         // fragment's identity the project name does not supply, so it has to survive the cache.
         CompilationInput modern = CompilationFactory.SharedWidgetFramework("net10.0");
         CompilationInput legacy = CompilationFactory.SharedWidgetFramework("netstandard2.0");
-        IReadOnlyList<CodebaseFragment> fragments = FragmentExtractor.ExtractAll([modern, legacy], artifactFacts: null, Ct);
+        IReadOnlyList<CodebaseFragment> fragments = FragmentExtractor.ExtractAll([modern, legacy], Ct);
 
         // Act
         IReadOnlyList<CodebaseFragment> roundTripped = fragments.Persisted();
@@ -392,7 +392,7 @@ public sealed class FragmentRoundTripTests
                                                                                           namespace Vendor;
                                                                                           public class Widget {}
                                                                                           """));
-        IReadOnlyList<CodebaseFragment> fragments = FragmentExtractor.ExtractAll([product, tests], artifactFacts: null, Ct);
+        IReadOnlyList<CodebaseFragment> fragments = FragmentExtractor.ExtractAll([product, tests], Ct);
 
         // Act
         IReadOnlyList<CodebaseFragment> roundTripped = fragments.Persisted();
@@ -433,7 +433,7 @@ public sealed class FragmentRoundTripTests
                                                                                      namespace Unread;
                                                                                      public class C {}
                                                                                      """));
-        IReadOnlyList<CodebaseFragment> fragments = FragmentExtractor.ExtractAll([member, passenger, unread], artifactFacts: null, Ct);
+        IReadOnlyList<CodebaseFragment> fragments = FragmentExtractor.ExtractAll([member, passenger, unread], Ct);
 
         // Act
         IReadOnlyList<CodebaseFragment> roundTripped = fragments.Persisted();
@@ -846,6 +846,6 @@ public sealed class FragmentRoundTripTests
         CompilationInput legacy = CompilationFactory.Compile("P", shared) with { ProjectReferences = ["Legacy"] };
         CompilationInput modern = CompilationFactory.Compile("P", shared) with { ProjectReferences = ["Modern"] };
 
-        return FragmentExtractor.ExtractAll([lib, app, legacy, modern], artifactFacts: null, Ct);
+        return FragmentExtractor.ExtractAll([lib, app, legacy, modern], Ct);
     }
 }

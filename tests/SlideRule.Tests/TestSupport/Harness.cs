@@ -21,7 +21,7 @@ internal static class Harness
     /// </summary>
     public static CodebaseModel Extract(IReadOnlyList<CompilationInput> inputs)
     {
-        return CodebaseModelBuilder.Build(inputs, null, Ct);
+        return CodebaseModelBuilder.Build(inputs, Ct);
     }
 
     /// <summary>Checks every rule with no baselines and no diff, so every violation fails and every tripwire skips.</summary>

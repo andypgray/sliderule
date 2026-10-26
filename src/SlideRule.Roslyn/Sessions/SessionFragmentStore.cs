@@ -4,6 +4,8 @@ using SlideRule.Extraction;
 using SlideRule.Extraction.Fragments;
 using SlideRule.Internal;
 using SlideRule.Roslyn.Caching;
+using SlideRule.Roslyn.Diagnostics;
+using SlideRule.Roslyn.Solutions;
 using SlideRule.Roslyn.Threading;
 
 namespace SlideRule.Roslyn.Sessions;
@@ -249,18 +251,12 @@ internal sealed class SessionFragmentStore : IDisposable
 
         HashSet<string> dirty = ExpandToDependents(seed, snapshot.Solution);
         dirty.UnionWith(walkAlone);
-        var remapped = new HashSet<string>(StringComparer.Ordinal);
-        var staged = new List<(string Name, List<CodebaseFragment> Moved)>();
 
         // A candidate the expansion pulled in through a dependent edge is re-walked instead and its remap
         // discarded: the walk answers for both reasons it is dirty, the remap for only one of them.
-        foreach ((string name, List<CodebaseFragment> moved) in candidates)
-        {
-            if (dirty.Contains(name)) continue;
-
-            staged.Add((name, moved));
-            remapped.Add(name);
-        }
+        HashSet<string> remapped = candidates.Keys
+            .Where(name => !dirty.Contains(name))
+            .ToHashSet(StringComparer.Ordinal);
 
         if (dirty.Count > 0)
         {
@@ -273,7 +269,7 @@ internal sealed class SessionFragmentStore : IDisposable
             Index(reExtracted);
         }
 
-        foreach ((string name, List<CodebaseFragment> moved) in staged) fragmentsByProject[name] = moved;
+        foreach (string name in remapped) fragmentsByProject[name] = candidates[name];
 
         if (dirty.Count > 0 || remapped.Count > 0) fragmentSetVersion++;
 
@@ -474,12 +470,10 @@ internal sealed class SessionFragmentStore : IDisposable
         var dependentsByName = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
         foreach (Project project in solution.Projects)
         {
-            if (project.Language != LanguageNames.CSharp) continue;
+            if (!ProjectLanguages.IsCSharp(project)) continue;
 
-            foreach (ProjectReference reference in project.ProjectReferences)
+            foreach (string referenced in solution.ReferencedProjectNames(project))
             {
-                if (solution.GetProject(reference.ProjectId)?.Name is not { } referenced) continue;
-
                 if (!dependentsByName.TryGetValue(referenced, out HashSet<string>? dependents))
                 {
                     dependents = new HashSet<string>(StringComparer.Ordinal);

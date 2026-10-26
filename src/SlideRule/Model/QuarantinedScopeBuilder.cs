@@ -8,7 +8,7 @@ internal sealed class QuarantinedScopeBuilder(ScopeRegistration registration) : 
 {
     public IQuarantinedScope BoundaryOnlyVia(Selection first, params Selection[] more)
     {
-        IReadOnlyList<Selection> facades = OperandList.OneOrMore(first, more, facade => facade);
+        IReadOnlyList<Selection> facades = OperandList.OneOrMore(first, more);
         registration.BoundaryOnlyViaCount++;
         registration.Boundary.AddRange(facades);
 

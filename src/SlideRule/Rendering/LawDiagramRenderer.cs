@@ -1,7 +1,11 @@
+using SlideRule.Building;
 using SlideRule.Hosting;
 using SlideRule.Internal;
 using SlideRule.Model;
+using SlideRule.Prose;
 using DrawableVerb = SlideRule.Rendering.LawPlaceClassifier.DrawableVerb;
+using LawEdge = (SlideRule.Rendering.LawPlace Source, SlideRule.Rendering.LawPlace Target,
+    SlideRule.Model.Posture Posture, SlideRule.Rendering.LawPlaceClassifier.DrawableVerb Verb);
 
 namespace SlideRule.Rendering;
 
@@ -73,7 +77,7 @@ internal static class LawDiagramRenderer
         Guard.NotNullOrWhiteSpace(specName, nameof(specName));
 
         var places = new LawPlaces(model.Layers);
-        var edges = new List<(LawPlace Source, LawPlace Target, Posture Posture, DrawableVerb Verb)>();
+        var edges = new List<LawEdge>();
         var unplaced = new List<ArchRule>();
 
         foreach (ArchRule rule in model.Rules) Walk(rule, places, edges, unplaced);
@@ -111,7 +115,7 @@ internal static class LawDiagramRenderer
     private static void Walk(
         ArchRule rule,
         LawPlaces places,
-        List<(LawPlace Source, LawPlace Target, Posture Posture, DrawableVerb Verb)> edges,
+        List<LawEdge> edges,
         List<ArchRule> unplaced)
     {
         // The quarantine arm runs BEFORE the verb triage. A containment rule is a MustOnlyBeReferencedBy,
@@ -193,7 +197,7 @@ internal static class LawDiagramRenderer
         // drawing cannot place draws no box, and the rule joins the list under the fence rather than
         // showing a sanctioned surface that is missing part of itself.
         var whole = true;
-        foreach (Selection facade in quarantine.Boundary)
+        foreach (Selection facade in ScopeDesugarer.BoundaryOf(rule))
             if (places.Facade(facade, scope) is null)
                 whole = false;
 
@@ -265,7 +269,7 @@ internal static class LawDiagramRenderer
     }
 
     private static List<string> EdgeLines(
-        IReadOnlyList<(LawPlace Source, LawPlace Target, Posture Posture, DrawableVerb Verb)> edges,
+        IReadOnlyList<LawEdge> edges,
         IReadOnlyDictionary<LawPlace, string> ids)
     {
         var lines = new List<string>();
@@ -287,7 +291,7 @@ internal static class LawDiagramRenderer
     // text composed from those two, so a respelled glyph cannot silently drop the row explaining it.
     private static List<string> LegendLines(
         LawPlaces places,
-        IReadOnlyList<(LawPlace Source, LawPlace Target, Posture Posture, DrawableVerb Verb)> edges)
+        IReadOnlyList<LawEdge> edges)
     {
         var rows = new List<(string Id, string Text)>();
         if (edges.Any(edge => edge.Posture != Posture.Migrate && edge.Verb.VerbWord is null)) rows.Add((BanRowId, BanRowText));
@@ -328,7 +332,7 @@ internal static class LawDiagramRenderer
     {
         if (rules.Count == 0) return string.Empty;
 
-        IEnumerable<string> entries = rules.Select(rule => $"`{rule.Id}`" + (rule.Posture == Posture.Enforce ? string.Empty : $" ({rule.Posture})"));
+        IEnumerable<string> entries = rules.Select(rule => ProseFormat.Backtick(rule.Id) + (rule.Posture == Posture.Enforce ? string.Empty : $" ({rule.Posture})"));
 
         return "Not drawn in full: " + string.Join(", ", entries) +
                ". Expand any of them with `sliderule explain <rule-id>`.";

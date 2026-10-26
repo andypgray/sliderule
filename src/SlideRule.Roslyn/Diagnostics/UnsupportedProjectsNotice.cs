@@ -1,4 +1,3 @@
-using SlideRule.Internal;
 using SlideRule.Rendering;
 
 namespace SlideRule.Roslyn.Diagnostics;
@@ -103,14 +102,10 @@ internal static class UnsupportedProjectsNotice
         return EvidenceBlock.Compose(lede, unsupportedProjects, tail);
     }
 
-    // The count as a clause every lede can take, in both numbers: the sentence a reader stops trusting is
-    // "1 projects ... were not surveyed". It states no cause, because each entry beneath it says its own, and
-    // "C# only" would be false about a shared project.
+    // It states no cause, because each entry beneath it says its own, and "C# only" would be false about a
+    // shared project.
     private static string Subject(int unsupportedProjectCount)
     {
-        string noun = Plurals.Noun(unsupportedProjectCount, "project");
-        string copula = Plurals.PastVerb(unsupportedProjectCount);
-
-        return $"{unsupportedProjectCount} {noun} the solution declares {copula} not surveyed";
+        return DeclaredProjectsClause.Subject(unsupportedProjectCount, "surveyed");
     }
 }

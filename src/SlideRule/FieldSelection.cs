@@ -21,7 +21,7 @@ public sealed class FieldSelection : MemberSelection
     {
     }
 
-    private protected override MemberSelection Rebuild(IReadOnlyList<MemberAdjective> adjectives)
+    internal override MemberSelection WithAdjectives(IReadOnlyList<MemberAdjective> adjectives)
     {
         return new FieldSelection(Source, adjectives);
     }

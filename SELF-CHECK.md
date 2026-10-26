@@ -46,7 +46,7 @@ FAIL cli/no-stdout — The Host layer must not use `Console.Out`, `Console.Write
   because: Stdout is a protocol channel here — the MCP server speaks JSON-RPC over it and CLI output flows through System.CommandLine's console — so a direct Console write corrupts the wire and is invisible to the in-process tests.
   citation: https://modelcontextprotocol.io/specification/2025-06-18/basic/transports#stdio
   fix: Write CLI output through the command's InvocationConfiguration console; route server diagnostics to the logger or Console.Error.
-  subject: 194 types, 1 generated
+  subject: 195 types, 1 generated
   src/SlideRule.Cli/Rendering/ProgressPrinter.cs:10 — SlideRule.Cli.Rendering.ProgressPrinter uses System.Console.WriteLine()
   src/SlideRule.Cli/Rendering/ProgressPrinter.cs:15 — SlideRule.Cli.Rendering.ProgressPrinter uses System.Console.WriteLine()
 ```
@@ -189,13 +189,13 @@ The same rule from `check --json`, the document `arch_check` returns over MCP, s
 `sliderule graph` surveys the codebase a spec is written against: projects and their references, namespaces and their sizes, and every external dependency by root. It needs no spec. It prints 27 project lines for this solution, one for every project the load reaches, so the projects that test fixtures reference are among them. These are the lines for its ten projects outside the tests and their fixtures:
 
 ```text
-  SlideRule — 379 types; targets netstandard2.0; references: (none); packages: (none); locks restore
+  SlideRule — 385 types; targets netstandard2.0; references: (none); packages: (none); locks restore
   SlideRule.Analyzers — 11 types; targets netstandard2.0; references: SlideRule, SlideRule.Extraction; packages: Microsoft.CodeAnalysis.Analyzers (private); locks restore
   SlideRule.Architecture — 1 type; targets net10.0; references: SlideRule, SlideRule.Packs.DotNet; packages: Microsoft.Build.Locator; does not pack
-  SlideRule.Cli — 193 types (1 generated); targets net10.0; references: SlideRule, SlideRule.Extraction, SlideRule.Roslyn; packages: Microsoft.Extensions.Hosting, ModelContextProtocol, Serilog.Extensions.Hosting, Serilog.Sinks.File, SlideRule.Analyzers (private), System.CommandLine; locks restore
-  SlideRule.Extraction — 53 types; targets netstandard2.0; references: SlideRule; packages: Microsoft.CodeAnalysis.CSharp; does not pack; locks restore
+  SlideRule.Cli — 194 types (1 generated); targets net10.0; references: SlideRule, SlideRule.Extraction, SlideRule.Roslyn; packages: Microsoft.Extensions.Hosting, ModelContextProtocol, Serilog.Extensions.Hosting, Serilog.Sinks.File, SlideRule.Analyzers (private), System.CommandLine; locks restore
+  SlideRule.Extraction — 54 types; targets netstandard2.0; references: SlideRule; packages: Microsoft.CodeAnalysis.CSharp; does not pack; locks restore
   SlideRule.Packs.DotNet — 2 types; targets net10.0; references: SlideRule; packages: Microsoft.Extensions.DependencyInjection, Microsoft.Extensions.DependencyInjection.Abstractions, SlideRule.Analyzers (private); does not pack; locks restore
-  SlideRule.Roslyn — 107 types (11 generated); targets net10.0; references: SlideRule, SlideRule.Extraction; packages: Basic.CompilerLog.Util, Microsoft.Build (private), Microsoft.Build.Framework (private), Microsoft.Build.Locator, Microsoft.Build.Tasks.Core (private), Microsoft.Build.Utilities.Core (private), Microsoft.CodeAnalysis, Microsoft.CodeAnalysis.CSharp.Workspaces, Microsoft.CodeAnalysis.Workspaces.MSBuild, Microsoft.NET.StringTools (private), SlideRule.Analyzers (private), System.Security.Cryptography.Xml (private); does not pack; locks restore
+  SlideRule.Roslyn — 108 types (11 generated); targets net10.0; references: SlideRule, SlideRule.Extraction; packages: Basic.CompilerLog.Util, Microsoft.Build (private), Microsoft.Build.Framework (private), Microsoft.Build.Locator, Microsoft.Build.Tasks.Core (private), Microsoft.Build.Utilities.Core (private), Microsoft.CodeAnalysis, Microsoft.CodeAnalysis.CSharp.Workspaces, Microsoft.CodeAnalysis.Workspaces.MSBuild, Microsoft.NET.StringTools (private), SlideRule.Analyzers (private), System.Security.Cryptography.Xml (private); does not pack; locks restore
   SlideRule.SpecAnalyzers — 5 types; targets netstandard2.0; references: SlideRule; packages: Microsoft.CodeAnalysis.Analyzers (private), Microsoft.CodeAnalysis.CSharp (private), SlideRule.Analyzers (private); does not pack; locks restore
   SlideRule.SpecCompletion — 13 types; targets netstandard2.0; references: (none); packages: Microsoft.CodeAnalysis.Analyzers (private), Microsoft.CodeAnalysis.CSharp (private), Microsoft.CodeAnalysis.Features (private), SlideRule.Analyzers (private); does not pack; locks restore
   SlideRule.Xunit — 3 types; targets net10.0; references: SlideRule, SlideRule.Roslyn; packages: Basic.CompilerLog.Util, Microsoft.Build.Framework (private), Microsoft.Build.Locator, Microsoft.Build.Utilities.Core (private), Microsoft.CodeAnalysis, Microsoft.CodeAnalysis.CSharp.Workspaces, Microsoft.CodeAnalysis.Workspaces.MSBuild, Microsoft.NET.StringTools (private), SlideRule.Analyzers (private), xunit.v3.assert, xunit.v3.extensibility.core; locks restore

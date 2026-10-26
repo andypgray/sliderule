@@ -126,10 +126,6 @@ public sealed class Member
     // (GRAMMAR §8 items 11–12).
     private static bool ResolveIsMethod(Type declaringType, string name)
     {
-        foreach (MemberInfo hit in DeclaredMember.Of(declaringType, name))
-            if (hit is MethodInfo)
-                return true;
-
-        return false;
+        return DeclaredMember.Of(declaringType, name).Any(hit => hit is MethodInfo);
     }
 }

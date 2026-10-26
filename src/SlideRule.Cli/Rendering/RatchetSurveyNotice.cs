@@ -16,8 +16,9 @@ namespace SlideRule.Cli.Rendering;
 /// </remarks>
 internal static class RatchetSurveyNotice
 {
-    public static IReadOnlyList<string> Lines(CheckReport report, bool anyRatchetedRule)
+    public static IReadOnlyList<string> Lines(CheckReport report)
     {
+        bool anyRatchetedRule = report.Results.Any(r => r.Rule.IsRatcheted);
         List<RuleResult> unratcheted = report.Results
             .Where(r => r is { Status: RuleStatus.Failed, Rule.IsRatcheted: false })
             .ToList();

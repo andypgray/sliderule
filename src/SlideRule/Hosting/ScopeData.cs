@@ -16,12 +16,9 @@ internal sealed class ScopeData
         Selection scoped)
         : this(role, SentenceRenderer.ReferenceFragments(boundary), baselinePath, dragons, dragonsDoc, scopeId, scoped)
     {
-        Boundary = boundary;
     }
 
-    // The same scope read back from a model file, where the surface arrives already rendered. Boundary is
-    // empty and stays empty: the containment rule's own operands are the boundary, so nothing is lost —
-    // but a drawing that reads Boundary directly draws fewer nodes for a parsed model than a built one.
+    // The same scope read back from a model file, where the surface arrives already rendered.
     internal ScopeData(
         ScopeRole role,
         IReadOnlyList<string> surface,
@@ -47,12 +44,6 @@ internal sealed class ScopeData
     ///     the containment desugaring subtracts the boundary), carried on every child.
     /// </summary>
     internal Selection Scoped { get; }
-
-    /// <summary>
-    ///     The sanctioned surface as the spec named it (empty for a hermetic quarantine or a tripwire). The
-    ///     rendered answer to "what is the sanctioned surface" is <see cref="Surface" />.
-    /// </summary>
-    internal IReadOnlyList<Selection> Boundary { get; } = Array.Empty<Selection>();
 
     /// <summary>
     ///     Gets the sanctioned surface ready to print, in the order the spec named it: one phrase per

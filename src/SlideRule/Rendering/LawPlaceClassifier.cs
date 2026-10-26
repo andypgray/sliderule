@@ -120,9 +120,7 @@ internal static class LawPlaceClassifier
 
     private static LawPlace? PlaceOf(Selection? selection, IReadOnlyList<LayerDefinition> layers, PlacePosition position)
     {
-        // A union carries no noun head at all, and reading one throws; the guard comes before every
-        // other question about the selection.
-        if (selection is null or UnionSelection) return null;
+        if (selection is null) return null;
 
         switch (selection.Noun)
         {
@@ -139,7 +137,7 @@ internal static class LawPlaceClassifier
         }
     }
 
-    private static LawPlace? NounPlace(SelectionNoun noun, IReadOnlyList<LayerDefinition> layers)
+    private static LawPlace? NounPlace(SelectionNoun? noun, IReadOnlyList<LayerDefinition> layers)
     {
         return noun switch
         {
@@ -207,12 +205,12 @@ internal static class LawPlaceClassifier
         LawPlace? parent = NounPlace(definition.Noun, layers);
         return parent is null
             ? null
-            : new LawPlace("layer:" + layer.Name, layer.Name, layer.Name, [], true) { Parent = parent };
+            : new LawPlace(LayerKey(layer), layer.Name, layer.Name, [], true) { Parent = parent };
     }
 
     private static LawPlace FromGlobs(LayerNoun layer)
     {
-        string key = layer.Globs.Count == 1 ? layer.Globs[0] : "layer:" + layer.Name;
+        string key = layer.Globs.Count == 1 ? layer.Globs[0] : LayerKey(layer);
         return new LawPlace(key, layer.Name, layer.Name, layer.Globs, true);
     }
 
@@ -233,7 +231,7 @@ internal static class LawPlaceClassifier
             children.Add(child);
         }
 
-        return new LawPlace("layer:" + layer.Name, layer.Name, layer.Name, [], true) { StructuralChildren = children };
+        return new LawPlace(LayerKey(layer), layer.Name, layer.Name, [], true) { StructuralChildren = children };
     }
 
     // The project twin of FromGlob's identity collapse: a layer defined as exactly this project IS the
@@ -265,6 +263,11 @@ internal static class LawPlaceClassifier
     private static string TypeKey(TypeAnchor anchor)
     {
         return "type:" + Display(anchor);
+    }
+
+    private static string LayerKey(LayerNoun layer)
+    {
+        return "layer:" + layer.Name;
     }
 
     // The extraction-format name where the type admits one; a pointer or an open construction has no

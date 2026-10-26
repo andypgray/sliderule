@@ -300,10 +300,9 @@ public sealed class LawPlaceClassifierTests
     }
 
     [Fact]
-    public void SubjectPlace_AUnion_IsNoPlaceAndNeverReadsTheNoun()
+    public void SubjectPlace_AUnion_IsNoPlace()
     {
-        // Arrange — UnionSelection.Noun throws by design; the guard runs before any question about the
-        // noun, so this returning null rather than throwing IS the pin.
+        // Arrange — a union has no single noun, so it is no place.
         ArchitectureModel model = Checker.Model(arch =>
             arch.Rule("r/one")
                 .Enforce(arch.AnyOf(arch.Namespace("A.*"), arch.Namespace("B.*"))

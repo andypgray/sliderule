@@ -11,18 +11,23 @@ internal static class SentenceRenderer
     /// <summary>The full law sentence: <c>{Subject} {verb phrase}.</c></summary>
     internal static string Sentence(Constraint constraint)
     {
+        (string subject, bool endsOpen) = SubjectOf(constraint);
+
+        // The verb is the junction after the subject, so the verb is what closes a subject-final Except.
+        return subject + (endsOpen ? ", " : " ") + constraint.VerbPhrase + ".";
+    }
+
+    internal static (string Subject, bool EndsOpen) SubjectOf(Constraint constraint)
+    {
         // One arm per subject stratum (GRAMMAR §4.6, §4.10, §6). Subject is null exactly for the project arm,
         // which is what makes the bare read in the last arm safe. The phrase and its openness come out of the
         // same arm, so the two cannot disagree about which stratum was read.
-        (string subject, bool endsOpen) = constraint switch
+        return constraint switch
         {
             MemberConstraint member => (MemberSubject(member.MemberSubject), EndsOpen(member.MemberSubject)),
             ProjectConstraint project => (ProjectSubject(project.ProjectSubject), EndsOpen(project.ProjectSubject)),
             _ => (Subject(constraint.Subject!), EndsOpen(constraint.Subject!))
         };
-
-        // The verb is the junction after the subject, so the verb is what closes a subject-final Except.
-        return subject + (endsOpen ? ", " : " ") + constraint.VerbPhrase + ".";
     }
 
     internal static string Subject(Selection selection)
@@ -75,7 +80,7 @@ internal static class SentenceRenderer
     private static bool ReadsAsItsNoun(Selection selection)
     {
         return selection.Adjectives.Count == 0
-               && selection.NounOrNull() is LayerNoun or EachNoun or TypeNoun;
+               && selection.Noun is LayerNoun or EachNoun or TypeNoun;
     }
 
     /// <summary>
@@ -119,9 +124,12 @@ internal static class SentenceRenderer
     /// <summary>How a selection reads in reference position (lowercase; joins union members).</summary>
     internal static string ReferenceProse(this Selection selection)
     {
-        if (selection is UnionSelection union) return UnionReference(union);
-
-        return selection.Adjectives.Count == 0 ? selection.Noun.ReferenceFragment : Phrase(selection);
+        return selection switch
+        {
+            UnionSelection union => UnionReference(union),
+            { Adjectives.Count: 0, Noun: { } noun } => noun.ReferenceFragment,
+            _ => Phrase(selection)
+        };
     }
 
     /// <summary>A dependency verb's target or source list (GRAMMAR §6).</summary>
@@ -223,7 +231,7 @@ internal static class SentenceRenderer
     {
         if (definition.Adjectives.Count > 0) return null;
 
-        string? locative = definition is UnionSelection union ? CollapsedLocativeOf(union) : definition.Noun.Locative;
+        string? locative = definition is UnionSelection union ? CollapsedLocativeOf(union) : definition.Noun?.Locative;
         const string head = " in ";
         return locative is not null && locative.StartsWith(head, StringComparison.Ordinal)
             ? locative.Substring(head.Length)
@@ -250,15 +258,14 @@ internal static class SentenceRenderer
     {
         if (selection is UnionSelection union) return UnionPhrase(union, headOverride, headPrefixOverride);
 
-        SelectionNoun noun = selection.Noun;
+        SelectionNoun noun = selection.Noun!;
         IReadOnlyList<SelectionAdjective> adjectives = selection.Adjectives;
 
         if (ReadsAsItsNoun(selection) && headOverride is null && headPrefixOverride is null)
             return noun.ReferenceFragment;
 
         (string? head, IReadOnlyList<string>? headPrefixes, string inline, string subjectFinal) = Placements(
-            adjectives.Select(adjective =>
-                (adjective.Placement, adjective.Fragment, adjective.OpensParenthetical)),
+            adjectives,
             headOverride ?? noun.SubjectHead,
             headPrefixOverride);
 
@@ -288,8 +295,7 @@ internal static class SentenceRenderer
         if (adjectives.Count == 0 && headOverride is null && headPrefixOverride is null) return UnionReference(union);
 
         (string? head, IReadOnlyList<string>? headPrefixes, string inline, string subjectFinal) = Placements(
-            adjectives.Select(adjective =>
-                (adjective.Placement, adjective.Fragment, adjective.OpensParenthetical)),
+            adjectives,
             headOverride,
             headPrefixOverride);
 
@@ -313,32 +319,30 @@ internal static class SentenceRenderer
     // keeps a variant of its own, which keeps a repeated prefix and splits its Wheres from its Excepts around
     // the reference.
     private static (string? Head, IReadOnlyList<string>? HeadPrefixes, string Inline, string SubjectFinal) Placements(
-        IEnumerable<(AdjectivePlacement Placement, string Fragment, bool OpensParenthetical)> adjectives,
-        string? head, IReadOnlyList<string>? headPrefixes)
+        IEnumerable<Adjective> adjectives, string? head, IReadOnlyList<string>? headPrefixes)
     {
         List<string>? prefixes = headPrefixes?.ToList();
         var inline = string.Empty;
-        var clauses = new List<(string Fragment, bool OpensParenthetical)>();
-        foreach ((AdjectivePlacement placement, string fragment, bool opensParenthetical) in adjectives)
-            switch (placement)
+        var clauses = new List<Adjective>();
+        foreach (Adjective adjective in adjectives)
+            switch (adjective.Placement)
             {
                 case AdjectivePlacement.Head:
-                    head = fragment;
+                    head = adjective.Fragment;
                     break;
                 case AdjectivePlacement.HeadPrefix:
                     prefixes ??= new List<string>();
-                    if (!prefixes.Contains(fragment)) prefixes.Add(fragment);
+                    if (!prefixes.Contains(adjective.Fragment)) prefixes.Add(adjective.Fragment);
                     break;
                 case AdjectivePlacement.Inline:
-                    inline += fragment;
+                    inline += adjective.Fragment;
                     break;
                 case AdjectivePlacement.SubjectFinal:
-                    clauses.Add((fragment, opensParenthetical));
+                    clauses.Add(adjective);
                     break;
             }
 
-        IEnumerable<(string Fragment, bool OpensParenthetical)> ordered =
-            SentenceFinalOrder(clauses, clause => clause.OpensParenthetical);
+        IEnumerable<Adjective> ordered = SentenceFinalOrder(clauses);
         string subjectFinal = string.Concat(ordered.Select(clause => clause.Fragment));
 
         return (head, prefixes, inline, subjectFinal);
@@ -353,12 +357,18 @@ internal static class SentenceRenderer
     // The sentence-final group in rendered order (GRAMMAR §6): every Where in authoring order, then every
     // Except in authoring order, so the parenthetical is the last thing before the junction that closes it.
     // OrderBy is stable, which is what keeps authoring order inside each half. Placements and the type and
-    // project EndsOpen twins all order by this, so a phrase and its openness cannot disagree. Generic over the
-    // clause type because the strata's adjective hierarchies share no base.
-    private static IEnumerable<TClause> SentenceFinalOrder<TClause>(
-        IEnumerable<TClause> clauses, Func<TClause, bool> opensParenthetical)
+    // project EndsOpen twins all order by this, so a phrase and its openness cannot disagree.
+    private static IEnumerable<Adjective> SentenceFinalOrder(IEnumerable<Adjective> clauses)
     {
-        return clauses.OrderBy(opensParenthetical);
+        return clauses.OrderBy(clause => clause.OpensParenthetical);
+    }
+
+    // The clause a phrase's sentence-final group ends on, in rendered order, or null when it has none.
+    private static Adjective? LastSentenceFinal(IEnumerable<Adjective> adjectives)
+    {
+        IEnumerable<Adjective> clauses = adjectives
+            .Where(adjective => adjective.Placement == AdjectivePlacement.SubjectFinal);
+        return SentenceFinalOrder(clauses).LastOrDefault();
     }
 
     // The operand nouns of a union that collapses to one head and locative, or null when it does not
@@ -370,10 +380,10 @@ internal static class SentenceRenderer
         var nouns = new List<SelectionNoun>(union.Parts.Count);
         foreach (Selection part in union.Parts)
         {
-            if (part is UnionSelection || part.Adjectives.Count > 0) return null;
-            if (nouns.Count > 0 && part.Noun.GetType() != nouns[0].GetType()) return null;
+            if (part.Adjectives.Count > 0 || part.Noun is not { } noun) return null;
+            if (nouns.Count > 0 && noun.GetType() != nouns[0].GetType()) return null;
 
-            nouns.Add(part.Noun);
+            nouns.Add(noun);
         }
 
         return nouns[0].CollapsedLocative(nouns) is null ? null : nouns;
@@ -385,10 +395,7 @@ internal static class SentenceRenderer
     // follows, because the fragment cannot know what follows it.
     private static bool EndsOpen(Selection selection)
     {
-        IEnumerable<SelectionAdjective> clauses = selection.Adjectives
-            .Where(adjective => adjective.Placement == AdjectivePlacement.SubjectFinal);
-        SelectionAdjective? lastClause = SentenceFinalOrder(clauses, adjective => adjective.OpensParenthetical)
-            .LastOrDefault();
+        Adjective? lastClause = LastSentenceFinal(selection.Adjectives);
         if (lastClause is not null) return lastClause.OpensParenthetical;
 
         bool endsWithInlineClause = selection.Adjectives
@@ -403,11 +410,7 @@ internal static class SentenceRenderer
     // The project stratum's twin: the project phrase has no union or bare-noun arm to fall through to.
     private static bool EndsOpen(ProjectSelection selection)
     {
-        IEnumerable<ProjectAdjective> clauses = selection.Adjectives
-            .Where(adjective => adjective.Placement == AdjectivePlacement.SubjectFinal);
-        ProjectAdjective? lastClause = SentenceFinalOrder(clauses, adjective => adjective.OpensParenthetical)
-            .LastOrDefault();
-        return lastClause is { OpensParenthetical: true };
+        return LastSentenceFinal(selection.Adjectives) is { OpensParenthetical: true };
     }
 
     // A member subject's Returning and Where clauses render BEFORE the reference and only its Excepts after
@@ -490,8 +493,7 @@ internal static class SentenceRenderer
     private static string ProjectPhrase(ProjectSelection selection)
     {
         (string? head, IReadOnlyList<string>? headPrefixes, string inline, string subjectFinal) = Placements(
-            selection.Adjectives.Select(adjective =>
-                (adjective.Placement, adjective.Fragment, adjective.OpensParenthetical)),
+            selection.Adjectives,
             "projects",
             null);
 
@@ -500,7 +502,7 @@ internal static class SentenceRenderer
 
     private static bool TryBareTypeAnchor(Selection selection, out TypeAnchor anchor)
     {
-        if (selection.Adjectives.Count == 0 && selection.NounOrNull() is TypeNoun typeNoun)
+        if (selection.Adjectives.Count == 0 && selection.Noun is TypeNoun typeNoun)
         {
             anchor = typeNoun.Anchor;
             return true;

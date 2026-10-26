@@ -9,13 +9,13 @@ namespace SlideRule.Cli.Replay;
 ///     replayed from an explicit <c>--binlog</c>.
 /// </summary>
 /// <remarks>
-///     Hands back a non-owning handle (<c>owned: null</c>): the gate owns the underlying
-///     <see cref="Roslyn.Replay.ReplayedSolution" /> and disposes it once the run completes.
+///     Hands back a non-owning handle (<c>owned: null</c>): whoever replayed the underlying
+///     <see cref="Roslyn.Replay.ReplayedSolution" /> owns it and disposes it once the run completes.
 /// </remarks>
 internal sealed class ReplayedSolutionSource(
     Solution replayedSolution,
     WorkspaceDiagnostics loadDiagnostics,
-    IReadOnlyDictionary<ProjectId, string>? targetFrameworks = null) : ISolutionSource
+    IReadOnlyDictionary<ProjectId, string> targetFrameworks) : ISolutionSource
 {
     /// <inheritdoc />
     public Task<SolutionHandle> AcquireAsync(string solutionPath, CancellationToken ct)

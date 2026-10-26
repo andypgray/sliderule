@@ -38,9 +38,7 @@ internal sealed class GraphRunner(
 {
     public async Task<int> RunAsync(GraphRequest request, CancellationToken ct)
     {
-        // This run's human channel. --json owns stdout, where the survey document is the only thing written,
-        // so under it the stamp below goes nowhere.
-        TextWriter human = request.Json ? TextWriter.Null : output;
+        TextWriter human = HumanChannel(request.Json, output);
 
         using var source = await CodebaseSource.CreateSpeclessAsync(
             SolutionSource, Environment, request.Solution, request.WorkingDirectory, request.NoCache, ct);
@@ -89,26 +87,15 @@ internal sealed class GraphRunner(
         return ExitCodes.Clean;
     }
 
-    // The JSON survey, degraded rather than cut (IResponseFitter). Each rung is re-composed from the summary
-    // already in hand, no second extraction, so it is byte-identical to what --grain naming it would write,
-    // and carries its terminator, so the fitter measures the text the MCP truncator measures after it.
+    // The JSON survey, each rung re-composed from the summary already in hand, no second extraction.
     // Degrading coarsens the grain and never touches the scope: every rung carries the same narrowing.
     private void WriteJson(
         GraphRequest request, GraphSummary scoped, string solutionName,
         IReadOnlyList<string> renderedDiagnostics, WorkspaceTrustStamp trust,
         IReadOnlyList<string> projectGlobs)
     {
-        IEnumerable<string> ladder = request.Grain.Ladder(Compose);
-        string document = Fitter.Fit(ladder);
-        output.Write(document);
-        return;
-
-        string Compose(DocumentGrain at)
-        {
-            string composed = GraphJsonRenderer.Document(
-                scoped, solutionName, renderedDiagnostics, trust, at, projectGlobs);
-            return SlideRuleJson.Terminated(composed);
-        }
+        WriteFitted(output, request.Grain, at => GraphJsonRenderer.Document(
+            scoped, solutionName, renderedDiagnostics, trust, at, projectGlobs));
     }
 
     // The human survey. The scope stamp is written here rather than by the formatter so an unscoped run writes

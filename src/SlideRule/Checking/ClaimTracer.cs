@@ -94,7 +94,7 @@ internal sealed class ClaimTracer(CodebaseModel model, SolutionRoot? root = null
     private List<ClaimStep>? PartSteps(
         Selection selection, IReadOnlyList<Selection> parts, SelectionPosition position, TypeNode type)
     {
-        if (selection.NounOrNull() is LayerNoun layer)
+        if (selection.Noun is LayerNoun layer)
         {
             ClaimTrace definition = Trace(parts[0], position, type);
             return definition.Verdict == ClaimVerdict.Claimed ? [new ClaimStep(LayerStep(layer.Name), definition.Steps)] : null;
@@ -119,7 +119,7 @@ internal sealed class ClaimTracer(CodebaseModel model, SolutionRoot? root = null
     // the adjectives carry the trace; bare, it is the whole reason.
     private List<ClaimStep>? NounSteps(Selection selection, SelectionPosition position, TypeNode type)
     {
-        SelectionNoun noun = selection.Noun;
+        SelectionNoun noun = selection.Noun!;
         if (!_evaluator.NounAdmits(noun, position, type)) return null;
         if (noun is TypesNoun && selection.Adjectives.Count > 0) return [];
 
@@ -127,7 +127,7 @@ internal sealed class ClaimTracer(CodebaseModel model, SolutionRoot? root = null
         {
             TypesNoun => new ClaimStep("every type the solution declares"),
             LayerNoun layer => new ClaimStep(LayerStep(layer.Name), [GlobStep(layer.Globs, type)]),
-            NamespaceNoun ns => new ClaimStep($"{NamespaceDisplay(type)} matches {ProseFormat.Backtick(ns.Glob)}"),
+            NamespaceNoun ns => NamespaceMatchStep(type, ns.Glob),
             ProjectNoun project => new ClaimStep($"declared by project {ProseFormat.Backtick(project.Name)}"),
             TypeNoun named => new ClaimStep($"it is the named type {named.ReferenceFragment}"),
             RegisteredNoun registered => RegistrationStep(registered.Lifetime, type),
@@ -145,7 +145,13 @@ internal sealed class ClaimTracer(CodebaseModel model, SolutionRoot? root = null
     // The first glob that matches, in declaration order: the noun admitted the type, so one does.
     private static ClaimStep GlobStep(IReadOnlyList<string> globs, TypeNode type)
     {
-        string glob = globs.First(candidate => new NamespacePattern(candidate).Matches(type.Namespace));
+        List<NamespacePattern> parsed = globs.Select(glob => new NamespacePattern(glob)).ToList();
+        int index = SelectionEvaluator.FirstMatchingGlob(parsed, type.Namespace);
+        return NamespaceMatchStep(type, globs[index]);
+    }
+
+    private static ClaimStep NamespaceMatchStep(TypeNode type, string glob)
+    {
         return new ClaimStep($"{NamespaceDisplay(type)} matches {ProseFormat.Backtick(glob)}");
     }
 
@@ -173,8 +179,7 @@ internal sealed class ClaimTracer(CodebaseModel model, SolutionRoot? root = null
     {
         return adjective switch
         {
-            InNamespaceAdjective inNamespace =>
-                new ClaimStep($"{NamespaceDisplay(type)} matches {ProseFormat.Backtick(inNamespace.Glob)}"),
+            InNamespaceAdjective inNamespace => NamespaceMatchStep(type, inNamespace.Glob),
             OfKindAdjective => new ClaimStep($"it is {KindPhrase(type.Kind)}"),
             WithSuffixAdjective suffix =>
                 new ClaimStep($"its name {ProseFormat.Backtick(type.Name)} ends with {ProseFormat.Backtick(suffix.Suffix)}"),
@@ -203,18 +208,11 @@ internal sealed class ClaimTracer(CodebaseModel model, SolutionRoot? root = null
     private ClaimStep UnderStep(UnderAdjective under, TypeNode type)
     {
         List<PathGlob> globs = under.Globs.Select(glob => new PathGlob(glob)).ToList();
-        foreach (string path in type.FilePaths)
+        if (_evaluator.FirstDeclaredUnder(globs, type) is { } hit)
         {
-            if (_evaluator.RelativeSegments(path) is not { } segments) continue;
-
-            for (var i = 0; i < globs.Count; i++)
-            {
-                if (!globs[i].Matches(segments)) continue;
-
-                string file = ProseFormat.Backtick(string.Join("/", segments));
-                string glob = ProseFormat.Backtick(under.Globs[i]);
-                return new ClaimStep($"it is declared in {file}, under {glob}");
-            }
+            string file = ProseFormat.Backtick(string.Join("/", hit.Segments));
+            string glob = ProseFormat.Backtick(under.Globs[hit.Glob]);
+            return new ClaimStep($"it is declared in {file}, under {glob}");
         }
 
         return new ClaimStep($"it passes \"{under.Fragment.Trim()}\"");

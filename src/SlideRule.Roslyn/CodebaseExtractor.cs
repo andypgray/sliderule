@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis;
 using SlideRule.Codebase;
 using SlideRule.Extraction;
 using SlideRule.Extraction.Fragments;
+using SlideRule.Roslyn.Diagnostics;
 using SlideRule.Roslyn.Solutions;
 
 namespace SlideRule.Roslyn;
@@ -36,7 +37,7 @@ internal static class CodebaseExtractor
         ExtractionInputs collected = await CollectInputsAsync(
             solution, p => excludeProjects is null || !excludeProjects.Contains(p.Name), targetFrameworks,
             declaredMembers, ct).ConfigureAwait(false);
-        return CodebaseModelBuilder.Build(collected.Inputs, collected.ArtifactFacts, ct);
+        return CodebaseModelBuilder.Build(collected.Inputs, ct);
     }
 
     /// <summary>
@@ -58,7 +59,7 @@ internal static class CodebaseExtractor
         ExtractionInputs collected = await CollectInputsAsync(
             solution, p => includeProjects is null || includeProjects.Contains(p.Name), targetFrameworks,
             declaredMembers, ct).ConfigureAwait(false);
-        return FragmentExtractor.ExtractAll(collected.Inputs, collected.ArtifactFacts, ct);
+        return FragmentExtractor.ExtractAll(collected.Inputs, ct);
     }
 
     // The one project enumeration behind both entry points, ordered by (name, target framework), so the
@@ -77,7 +78,7 @@ internal static class CodebaseExtractor
         CancellationToken ct)
     {
         List<Project> projects = solution.Projects
-            .Where(p => p.Language == LanguageNames.CSharp)
+            .Where(ProjectLanguages.IsCSharp)
             .Where(include)
             .OrderBy(p => p.Name, StringComparer.Ordinal)
             .ThenBy(p => TargetFrameworkOf(targetFrameworks, p) ?? "", StringComparer.Ordinal)
@@ -128,7 +129,6 @@ internal static class CodebaseExtractor
         Func<string, IEnumerable<string>> workspaceReach = WorkspaceReach(solution);
 
         List<CompilationInput> inputs = [];
-        List<ProjectArtifactFacts?> artifactFacts = [];
         for (var i = 0; i < projects.Count; i++)
         {
             if (compilations[i] is not { } compilation) continue;
@@ -137,7 +137,9 @@ internal static class CodebaseExtractor
             // Without an evaluation the workspace's own list is all there is, and that list carries the closure
             // the SDK adds, so it accounts for itself.
             Project project = projects[i];
-            IReadOnlyList<string> workspaceReferences = WorkspaceReferenceNames(solution, project);
+            IReadOnlyList<string> workspaceReferences = solution.ReferencedProjectNames(project)
+                .OrderBy(name => name, StringComparer.Ordinal)
+                .ToList();
             IReadOnlyList<string> projectReferences = evaluated[i] is { } facts
                 ? DeclaredProjectReferences.Names(
                     facts.ProjectReferencePaths, namesByProjectFile, canonicalProjectFiles.Resolve)
@@ -151,11 +153,11 @@ internal static class CodebaseExtractor
                 SpecExclusion.SolutionMembershipOf(
                     declaredMembers, project.FilePath, canonicalProjectFiles.Resolve(project.FilePath)),
                 generatedTrees[i],
-                undeclared));
-            artifactFacts.Add(evaluated[i]);
+                undeclared,
+                evaluated[i]));
         }
 
-        return new ExtractionInputs(inputs, artifactFacts);
+        return new ExtractionInputs(inputs);
     }
 
     // What each loaded project reaches through the workspace's own references, transitively, by project name: a
@@ -171,16 +173,6 @@ internal static class CodebaseExtractor
             .SelectMany(graph.GetProjectsThatThisProjectTransitivelyDependsOn)
             .Select(id => solution.GetProject(id)?.Name)
             .OfType<string>();
-    }
-
-    private static IReadOnlyList<string> WorkspaceReferenceNames(Solution solution, Project project)
-    {
-        return project.ProjectReferences
-            .Select(r => solution.GetProject(r.ProjectId)?.Name)
-            .Where(n => n is not null)
-            .Select(n => n!)
-            .OrderBy(n => n, StringComparer.Ordinal)
-            .ToList();
     }
 
     // The trees one project's source generators produced, by reference — the identity the extractor tests

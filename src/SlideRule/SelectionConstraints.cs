@@ -49,7 +49,7 @@ public static class SelectionConstraints
     /// </summary>
     public static Constraint MustNotReference(this Selection subject, Selection first, params Selection[] more)
     {
-        return new MustNotReferenceConstraint(subject, Selections(subject, first, more));
+        return new MustNotReferenceConstraint(subject, OperandList.OneOrMore(first, more));
     }
 
     /// <summary>
@@ -81,7 +81,7 @@ public static class SelectionConstraints
     /// </summary>
     public static Constraint MustOnlyReference(this Selection subject, Selection first, params Selection[] more)
     {
-        return new MustOnlyReferenceConstraint(subject, Selections(subject, first, more));
+        return new MustOnlyReferenceConstraint(subject, OperandList.OneOrMore(first, more));
     }
 
     /// <summary>
@@ -111,7 +111,7 @@ public static class SelectionConstraints
     /// </summary>
     public static Constraint MustOnlyReferenceItself(this Selection subject)
     {
-        return new MustOnlyReferenceItselfConstraint(Subject(subject));
+        return new MustOnlyReferenceItselfConstraint(subject);
     }
 
     /// <summary>
@@ -125,7 +125,7 @@ public static class SelectionConstraints
     /// </summary>
     public static Constraint MustNotBeReferencedBy(this Selection subject, Selection first, params Selection[] more)
     {
-        return new MustNotBeReferencedByConstraint(subject, Selections(subject, first, more));
+        return new MustNotBeReferencedByConstraint(subject, OperandList.OneOrMore(first, more));
     }
 
     /// <summary>
@@ -155,7 +155,7 @@ public static class SelectionConstraints
     /// </summary>
     public static Constraint MustOnlyBeReferencedBy(this Selection subject, Selection first, params Selection[] more)
     {
-        return new MustOnlyBeReferencedByConstraint(subject, Selections(subject, first, more));
+        return new MustOnlyBeReferencedByConstraint(subject, OperandList.OneOrMore(first, more));
     }
 
     /// <summary>
@@ -183,7 +183,7 @@ public static class SelectionConstraints
     /// </summary>
     public static Constraint MustOnlyBeReferencedByItself(this Selection subject)
     {
-        return new MustOnlyBeReferencedByItselfConstraint(Subject(subject));
+        return new MustOnlyBeReferencedByItselfConstraint(subject);
     }
 
     /// <summary>
@@ -199,7 +199,7 @@ public static class SelectionConstraints
     /// </summary>
     public static Constraint MustNotReferenceEachOther(this Selection subject)
     {
-        return new MustNotReferenceEachOtherConstraint(Subject(subject));
+        return new MustNotReferenceEachOtherConstraint(subject);
     }
 
     /// <summary>
@@ -215,7 +215,7 @@ public static class SelectionConstraints
     /// </summary>
     public static Constraint MustNotHaveCircularReferences(this Selection subject)
     {
-        return new MustNotHaveCircularReferencesConstraint(Subject(subject));
+        return new MustNotHaveCircularReferencesConstraint(subject);
     }
 
     /// <summary>
@@ -234,7 +234,7 @@ public static class SelectionConstraints
     /// </summary>
     public static Constraint MustNotUse(this Selection subject, Member first, params Member[] more)
     {
-        return new MustNotUseConstraint(subject, Members(subject, first, more));
+        return new MustNotUseConstraint(subject, OperandList.OneOrMore(first, more));
     }
 
     /// <summary>
@@ -250,7 +250,7 @@ public static class SelectionConstraints
     /// </summary>
     public static Constraint MustNotUse(this Selection subject, IEnumerable<Member> members)
     {
-        return new MustNotUseConstraint(subject, MemberList(subject, members));
+        return new MustNotUseConstraint(subject, OperandList.ZeroOrMore(members, nameof(members)));
     }
 
     /// <summary>
@@ -300,7 +300,7 @@ public static class SelectionConstraints
     /// </summary>
     public static Constraint MustNotConstruct(this Selection subject, Selection first, params Selection[] more)
     {
-        return new MustNotConstructConstraint(subject, Selections(subject, first, more));
+        return new MustNotConstructConstraint(subject, OperandList.OneOrMore(first, more));
     }
 
     /// <summary>
@@ -336,7 +336,7 @@ public static class SelectionConstraints
     /// </summary>
     public static Constraint MustNotInject(this Selection subject, Selection first, params Selection[] more)
     {
-        return new MustNotInjectConstraint(subject, Selections(subject, first, more));
+        return new MustNotInjectConstraint(subject, OperandList.OneOrMore(first, more));
     }
 
     /// <summary>
@@ -368,7 +368,7 @@ public static class SelectionConstraints
     /// </summary>
     public static Constraint MustNotCatch(this Selection subject, Selection first, params Selection[] more)
     {
-        return new MustNotCatchConstraint(subject, Selections(subject, first, more));
+        return new MustNotCatchConstraint(subject, OperandList.OneOrMore(first, more));
     }
 
     /// <summary>
@@ -401,7 +401,7 @@ public static class SelectionConstraints
     /// </summary>
     public static Constraint MustNotCatchUnfiltered(this Selection subject, Selection first, params Selection[] more)
     {
-        return new MustNotCatchUnfilteredConstraint(subject, Selections(subject, first, more));
+        return new MustNotCatchUnfilteredConstraint(subject, OperandList.OneOrMore(first, more));
     }
 
     /// <summary>
@@ -435,7 +435,7 @@ public static class SelectionConstraints
     /// </summary>
     public static Constraint MustNotSwallow(this Selection subject, Selection first, params Selection[] more)
     {
-        return new MustNotSwallowConstraint(subject, Selections(subject, first, more));
+        return new MustNotSwallowConstraint(subject, OperandList.OneOrMore(first, more));
     }
 
     /// <summary>
@@ -473,7 +473,7 @@ public static class SelectionConstraints
     /// </summary>
     public static Constraint MustNotExpose(this Selection subject, Selection first, params Selection[] more)
     {
-        return new MustNotExposeConstraint(subject, Selections(subject, first, more));
+        return new MustNotExposeConstraint(subject, OperandList.OneOrMore(first, more));
     }
 
     /// <summary>
@@ -510,7 +510,7 @@ public static class SelectionConstraints
     /// </summary>
     public static Constraint MustNotThrow(this Selection subject, Selection first, params Selection[] more)
     {
-        return new MustNotThrowConstraint(subject, Selections(subject, first, more));
+        return new MustNotThrowConstraint(subject, OperandList.OneOrMore(first, more));
     }
 
     /// <summary>
@@ -546,7 +546,7 @@ public static class SelectionConstraints
     /// </summary>
     public static Constraint MustOnlyThrow(this Selection subject, Selection first, params Selection[] more)
     {
-        return new MustOnlyThrowConstraint(subject, Selections(subject, first, more));
+        return new MustOnlyThrowConstraint(subject, OperandList.OneOrMore(first, more));
     }
 
     /// <summary>
@@ -583,7 +583,7 @@ public static class SelectionConstraints
     /// </summary>
     public static Constraint MustBelongTo(this Selection subject, Selection first, params Selection[] more)
     {
-        return new MustBelongToConstraint(subject, Selections(subject, first, more));
+        return new MustBelongToConstraint(subject, OperandList.OneOrMore(first, more));
     }
 
     /// <summary>
@@ -608,7 +608,7 @@ public static class SelectionConstraints
         this Selection subject, Selection among, [SpecSlot(nameof(SpecSlot.CounterpartTemplate))] string named)
     {
         return new MustHaveExactlyOneCounterpartConstraint(
-            Subject(subject), [NotNull(among, nameof(among))], NotNull(named, nameof(named)));
+            subject, [NotNull(among, nameof(among))], NotNull(named, nameof(named)));
     }
 
     /// <summary>
@@ -626,7 +626,7 @@ public static class SelectionConstraints
     public static Constraint MustResideInNamespace(
         this Selection subject, [SpecSlot(nameof(SpecSlot.NamespacePattern))] string glob)
     {
-        return new MustResideInNamespaceConstraint(Subject(subject), NotNull(glob, nameof(glob)));
+        return new MustResideInNamespaceConstraint(subject, NotNull(glob, nameof(glob)));
     }
 
     /// <summary>
@@ -641,7 +641,7 @@ public static class SelectionConstraints
     public static Constraint MustResideInProject(
         this Selection subject, [SpecSlot(nameof(SpecSlot.ProjectName))] string projectName)
     {
-        return new MustResideInProjectConstraint(Subject(subject), NotNull(projectName, nameof(projectName)));
+        return new MustResideInProjectConstraint(subject, NotNull(projectName, nameof(projectName)));
     }
 
     /// <summary>
@@ -654,7 +654,7 @@ public static class SelectionConstraints
     /// </summary>
     public static Constraint MustHaveSuffix(this Selection subject, [SpecSlot(nameof(SpecSlot.Suffix))] string suffix)
     {
-        return new MustHaveSuffixConstraint(Subject(subject), NotNull(suffix, nameof(suffix)));
+        return new MustHaveSuffixConstraint(subject, NotNull(suffix, nameof(suffix)));
     }
 
     /// <summary>
@@ -667,7 +667,7 @@ public static class SelectionConstraints
     /// </summary>
     public static Constraint MustHavePrefix(this Selection subject, [SpecSlot(nameof(SpecSlot.Prefix))] string prefix)
     {
-        return new MustHavePrefixConstraint(Subject(subject), NotNull(prefix, nameof(prefix)));
+        return new MustHavePrefixConstraint(subject, NotNull(prefix, nameof(prefix)));
     }
 
     /// <summary>
@@ -682,7 +682,7 @@ public static class SelectionConstraints
     public static Constraint MustHaveNameMatching(
         this Selection subject, [SpecSlot(nameof(SpecSlot.NamePattern))] string glob)
     {
-        return new MustHaveNameMatchingConstraint(Subject(subject), NotNull(glob, nameof(glob)));
+        return new MustHaveNameMatchingConstraint(subject, NotNull(glob, nameof(glob)));
     }
 
     /// <summary>
@@ -702,7 +702,7 @@ public static class SelectionConstraints
     public static Constraint MustImplement(this Selection subject, Type type)
     {
         TypeAnchor anchor = TypeAnchor.FromType(NotNull(type, nameof(type)));
-        return new MustImplementConstraint(Subject(subject), anchor);
+        return new MustImplementConstraint(subject, anchor);
     }
 
     /// <summary>
@@ -724,7 +724,7 @@ public static class SelectionConstraints
         this Selection subject, [SpecSlot(nameof(SpecSlot.InterfaceName))] string interfaceFullName)
     {
         TypeAnchor anchor = TypeAnchor.FromName(NotNull(interfaceFullName, nameof(interfaceFullName)));
-        return new MustImplementConstraint(Subject(subject), anchor);
+        return new MustImplementConstraint(subject, anchor);
     }
 
     /// <summary>
@@ -740,7 +740,7 @@ public static class SelectionConstraints
     public static Constraint MustDeriveFrom(this Selection subject, Type type)
     {
         TypeAnchor anchor = TypeAnchor.FromType(NotNull(type, nameof(type)));
-        return new MustDeriveFromConstraint(Subject(subject), anchor);
+        return new MustDeriveFromConstraint(subject, anchor);
     }
 
     /// <summary>
@@ -761,7 +761,7 @@ public static class SelectionConstraints
         this Selection subject, [SpecSlot(nameof(SpecSlot.BaseTypeName))] string baseTypeFullName)
     {
         TypeAnchor anchor = TypeAnchor.FromName(NotNull(baseTypeFullName, nameof(baseTypeFullName)));
-        return new MustDeriveFromConstraint(Subject(subject), anchor);
+        return new MustDeriveFromConstraint(subject, anchor);
     }
 
     /// <summary>
@@ -776,7 +776,7 @@ public static class SelectionConstraints
     public static Constraint MustBeAttributedWith(this Selection subject, Type type)
     {
         TypeAnchor anchor = TypeAnchor.FromType(NotNull(type, nameof(type)));
-        return new MustBeAttributedWithConstraint(Subject(subject), anchor);
+        return new MustBeAttributedWithConstraint(subject, anchor);
     }
 
     /// <summary>
@@ -796,7 +796,7 @@ public static class SelectionConstraints
         this Selection subject, [SpecSlot(nameof(SpecSlot.AttributeName))] string attributeFullName)
     {
         TypeAnchor anchor = TypeAnchor.FromName(NotNull(attributeFullName, nameof(attributeFullName)));
-        return new MustBeAttributedWithConstraint(Subject(subject), anchor);
+        return new MustBeAttributedWithConstraint(subject, anchor);
     }
 
     /// <summary>
@@ -855,7 +855,7 @@ public static class SelectionConstraints
     /// </summary>
     public static Constraint MustNotImplement(this Selection subject, Type first, params Type[] more)
     {
-        return new MustNotImplementConstraint(Subject(subject), TypeAnchor.FromTypes(first, more));
+        return new MustNotImplementConstraint(subject, TypeAnchor.FromTypes(first, more));
     }
 
     /// <summary>
@@ -878,7 +878,7 @@ public static class SelectionConstraints
         [SpecSlot(nameof(SpecSlot.InterfaceName))]
         params string[] more)
     {
-        return new MustNotImplementConstraint(Subject(subject), TypeAnchor.FromNames(first, more));
+        return new MustNotImplementConstraint(subject, TypeAnchor.FromNames(first, more));
     }
 
     /// <summary>
@@ -896,7 +896,7 @@ public static class SelectionConstraints
     /// </summary>
     public static Constraint MustNotDeriveFrom(this Selection subject, Type first, params Type[] more)
     {
-        return new MustNotDeriveFromConstraint(Subject(subject), TypeAnchor.FromTypes(first, more));
+        return new MustNotDeriveFromConstraint(subject, TypeAnchor.FromTypes(first, more));
     }
 
     /// <summary>
@@ -919,7 +919,7 @@ public static class SelectionConstraints
         [SpecSlot(nameof(SpecSlot.BaseTypeName))]
         params string[] more)
     {
-        return new MustNotDeriveFromConstraint(Subject(subject), TypeAnchor.FromNames(first, more));
+        return new MustNotDeriveFromConstraint(subject, TypeAnchor.FromNames(first, more));
     }
 
     /// <summary>
@@ -935,7 +935,7 @@ public static class SelectionConstraints
     /// </summary>
     public static Constraint MustNotBeAttributedWith(this Selection subject, Type first, params Type[] more)
     {
-        return new MustNotBeAttributedWithConstraint(Subject(subject), TypeAnchor.FromTypes(first, more));
+        return new MustNotBeAttributedWithConstraint(subject, TypeAnchor.FromTypes(first, more));
     }
 
     /// <summary>
@@ -958,7 +958,7 @@ public static class SelectionConstraints
         [SpecSlot(nameof(SpecSlot.AttributeName))]
         params string[] more)
     {
-        return new MustNotBeAttributedWithConstraint(Subject(subject), TypeAnchor.FromNames(first, more));
+        return new MustNotBeAttributedWithConstraint(subject, TypeAnchor.FromNames(first, more));
     }
 
     /// <summary>
@@ -1010,7 +1010,7 @@ public static class SelectionConstraints
     /// </summary>
     public static Constraint MustBeSealed(this Selection subject)
     {
-        return new MustBeSealedConstraint(Subject(subject));
+        return new MustBeSealedConstraint(subject);
     }
 
     /// <summary>
@@ -1018,7 +1018,7 @@ public static class SelectionConstraints
     /// </summary>
     public static Constraint MustBeStatic(this Selection subject)
     {
-        return new MustBeStaticConstraint(Subject(subject));
+        return new MustBeStaticConstraint(subject);
     }
 
     /// <summary>
@@ -1028,7 +1028,7 @@ public static class SelectionConstraints
     /// </summary>
     public static Constraint MustBeAbstract(this Selection subject)
     {
-        return new MustBeAbstractConstraint(Subject(subject));
+        return new MustBeAbstractConstraint(subject);
     }
 
     /// <summary>
@@ -1038,7 +1038,7 @@ public static class SelectionConstraints
     /// </summary>
     public static Constraint MustBePublic(this Selection subject)
     {
-        return new MustBePublicConstraint(Subject(subject));
+        return new MustBePublicConstraint(subject);
     }
 
     /// <summary>
@@ -1048,7 +1048,7 @@ public static class SelectionConstraints
     /// </summary>
     public static Constraint MustBeInternal(this Selection subject)
     {
-        return new MustBeInternalConstraint(Subject(subject));
+        return new MustBeInternalConstraint(subject);
     }
 
     /// <summary>
@@ -1064,7 +1064,7 @@ public static class SelectionConstraints
     /// </summary>
     public static Constraint MustBeRegistered(this Selection subject)
     {
-        return new MustBeRegisteredConstraint(Subject(subject));
+        return new MustBeRegisteredConstraint(subject);
     }
 
     /// <summary>
@@ -1086,31 +1086,12 @@ public static class SelectionConstraints
         [SpecSlot(nameof(SpecSlot.Description))]
         string description)
     {
-        return new MustConstraint(Subject(subject), NotNull(predicate, nameof(predicate)), NotNull(description, nameof(description)));
-    }
-
-    private static IReadOnlyList<Selection> Selections(Selection subject, Selection first, Selection[] more)
-    {
-        NotNull(subject, nameof(subject));
-        return OperandList.OneOrMore(first, more, selection => selection);
+        return new MustConstraint(subject, NotNull(predicate, nameof(predicate)), NotNull(description, nameof(description)));
     }
 
     private static IReadOnlyList<Selection> WrappedTypes(Selection subject, Type first, Type[] more)
     {
-        NotNull(subject, nameof(subject));
-        return OperandList.OneOrMore(first, more, type => Wrap(subject, type));
-    }
-
-    private static IReadOnlyList<Member> Members(Selection subject, Member first, Member[] more)
-    {
-        NotNull(subject, nameof(subject));
-        return OperandList.OneOrMore(first, more, member => member);
-    }
-
-    private static IReadOnlyList<Member> MemberList(Selection subject, IEnumerable<Member> members)
-    {
-        NotNull(subject, nameof(subject));
-        return OperandList.ZeroOrMore(members, member => member, nameof(members));
+        return NotNull(subject, nameof(subject)).Owner.TypeSelections(first, more);
     }
 
     // The static-form MustNotUse sugar: each lambda resolves against the subject's owner into the same Member
@@ -1122,15 +1103,5 @@ public static class SelectionConstraints
         NotNull(subject, nameof(subject));
         Arch owner = subject.Owner;
         return OperandList.OneOrMore(first, more, lambda => MemberExpressionResolver.Resolve(owner, lambda));
-    }
-
-    private static Selection Wrap(Selection subject, Type type)
-    {
-        return subject.Owner.Type(type);
-    }
-
-    private static Selection Subject(Selection subject)
-    {
-        return NotNull(subject, nameof(subject));
     }
 }

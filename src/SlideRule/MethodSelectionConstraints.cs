@@ -32,7 +32,7 @@ public static class MethodSelectionConstraints
     public static Constraint MustAcceptParameter(this MethodSelection subject, Type parameterType)
     {
         TypeAnchor anchor = TypeAnchor.FromType(Guard.NotNull(parameterType, nameof(parameterType)));
-        return new MemberMustAcceptParameterConstraint(Guard.NotNull(subject, nameof(subject)), anchor);
+        return new MemberMustAcceptParameterConstraint(subject, anchor);
     }
 
     /// <summary>
@@ -53,7 +53,7 @@ public static class MethodSelectionConstraints
         this MethodSelection subject, [SpecSlot(nameof(SpecSlot.ParameterTypeName))] string parameterTypeFullName)
     {
         TypeAnchor anchor = TypeAnchor.FromName(Guard.NotNull(parameterTypeFullName, nameof(parameterTypeFullName)));
-        return new MemberMustAcceptParameterConstraint(Guard.NotNull(subject, nameof(subject)), anchor);
+        return new MemberMustAcceptParameterConstraint(subject, anchor);
     }
 
     /// <summary>

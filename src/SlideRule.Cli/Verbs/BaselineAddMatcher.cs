@@ -12,9 +12,10 @@ namespace SlideRule.Cli.Verbs;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>What matches what.</b> Every name is compared ordinally with two spellings of its candidate,
-///         the readable full name and the stored symbol ID, such as <c>System.DateTime.Now</c> and
-///         <c>P:System.DateTime.Now</c> for a member, whose full name takes no parentheses. An edge's source
+///         <b>What matches what.</b> Every name is compared ordinally with the spellings of its candidate: the
+///         readable full name and the stored symbol ID, such as <c>System.DateTime.Now</c> and
+///         <c>P:System.DateTime.Now</c> for a member, whose full name takes no parentheses, and for a member also
+///         the display form the no-match listing prints, such as <c>App.Home.Save()</c>. An edge's source
 ///         and target must match the <em>same</em> violation, and a member full name naming an overloaded
 ///         method matches every overload, so the ambiguity error lists the distinct IDs to retry with
 ///         (GRAMMAR §4.5, §4.6).
@@ -63,16 +64,15 @@ internal static class BaselineAddMatcher
 
     private static bool MatchesMemberSubject(MemberNode member, string subject)
     {
-        return string.Equals($"{member.DeclaringType.FullName}.{member.Name}", subject, StringComparison.Ordinal)
-               || string.Equals(member.SymbolId, subject, StringComparison.Ordinal);
+        return NamedBy(subject, $"{member.DeclaringType.FullName}.{member.Name}", member.SymbolId)
+               || string.Equals(MemberDisplay.Of(member), subject, StringComparison.Ordinal);
     }
 
     // A project's bare name or its identity form (GRAMMAR §4.10). The key comes off the node, so this end and the
     // mint that writes the baseline entry cannot spell it apart.
     private static bool MatchesProjectSubject(ProjectNode project, string subject)
     {
-        return string.Equals(project.Name, subject, StringComparison.Ordinal)
-               || string.Equals(project.SymbolId, subject, StringComparison.Ordinal);
+        return NamedBy(subject, project.Name, project.SymbolId);
     }
 
     private static Violation Resolve(string ruleId, IReadOnlyList<Violation> violations, IReadOnlyList<Violation> candidates, string echo)
@@ -93,12 +93,7 @@ internal static class BaselineAddMatcher
     {
         return violation.Kind switch
         {
-            ViolationKind.Reference
-                or ViolationKind.Construction
-                or ViolationKind.Injection
-                or ViolationKind.Catch
-                or ViolationKind.Throw
-                or ViolationKind.Expose => Matches(violation.Source!, source) && Matches(violation.Target!, target),
+            _ when violation.Kind.IsTypeEdge() => Matches(violation.Source!, source) && Matches(violation.Target!, target),
             ViolationKind.MemberUse => Matches(violation.Source!, source) && MatchesMember(violation.Member!, target),
             ViolationKind.ProjectShape => violation.ProjectItem is { } item
                                           && MatchesProjectSubject(violation.SubjectProject!, source)
@@ -111,14 +106,13 @@ internal static class BaselineAddMatcher
     // property:Nullable@net8.0).
     private static bool MatchesProjectItem(string item, string itemName, string target)
     {
-        return string.Equals(itemName, target, StringComparison.Ordinal)
-               || string.Equals(item, target, StringComparison.Ordinal);
+        return NamedBy(target, itemName, item);
     }
 
     private static bool MatchesMember(MemberReference member, string target)
     {
-        return string.Equals($"{member.ContainingType.FullName}.{member.Name}", target, StringComparison.Ordinal)
-               || string.Equals(member.SymbolId, target, StringComparison.Ordinal);
+        return NamedBy(target, $"{member.ContainingType.FullName}.{member.Name}", member.SymbolId)
+               || string.Equals(MemberDisplay.Of(member), target, StringComparison.Ordinal);
     }
 
     private static string NoMatch(string ruleId, IReadOnlyList<Violation> violations, string echo)
@@ -165,7 +159,13 @@ internal static class BaselineAddMatcher
 
     private static bool Matches(TypeNode node, string name)
     {
-        return string.Equals(node.FullName, name, StringComparison.Ordinal)
-               || string.Equals(node.SymbolId, name, StringComparison.Ordinal);
+        return NamedBy(name, node.FullName, node.SymbolId);
+    }
+
+    // Whether `given` spells a candidate by its readable name or by its stored symbol ID.
+    private static bool NamedBy(string given, string readable, string symbolId)
+    {
+        return string.Equals(readable, given, StringComparison.Ordinal)
+               || string.Equals(symbolId, given, StringComparison.Ordinal);
     }
 }
