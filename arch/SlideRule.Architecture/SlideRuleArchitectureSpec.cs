@@ -780,12 +780,12 @@ public sealed class SlideRuleArchitectureSpec : IArchitectureSpec
         // (MsBuildBootstrap.LastSelection) is outside it. Leaving it out is a choice:
         // `.Properties.ThatAreStatic().MustBeGetOnly()` would reach it (GRAMMAR §11).
         //
-        // The seven exempted fields are named by declaring type and field name rather than by type alone,
+        // The exempted fields are named by declaring type and field name rather than by type alone,
         // because a second mutable static in one of these classes is what the law should still catch. By family:
         //   Interlocked and volatile locations, since a compare-and-swap needs a writable field:
         //     IdleTimeoutWatchdog.s_inFlightCount and s_lastActivityTicks, ServerShutdown.s_hasExited,
         //     WorkspaceLoader._loadCount
-        //   one-shot state written under a lock: ArchRuleTests.s_run, IdleTimeoutWatchdog.s_drainWaiter
+        //   one-shot state written under a lock: IdleTimeoutWatchdog.s_drainWaiter
         //   the clock seam, the only way to test an idle timeout without sleeping for it:
         //     IdleTimeoutWatchdog.s_timestampProvider
         arch.Rule("state/no-static-mutable")
@@ -796,8 +796,7 @@ public sealed class SlideRuleArchitectureSpec : IArchitectureSpec
                     arch.Types.Named("IdleTimeoutWatchdog")
                         .Fields.Named("s_inFlightCount", "s_lastActivityTicks", "s_drainWaiter", "s_timestampProvider"),
                     arch.Types.Named("ServerShutdown").Fields.Named("s_hasExited"),
-                    arch.Types.Named("WorkspaceLoader").Fields.Named("_loadCount"),
-                    arch.Types.Named("ArchRuleTests").Fields.Named("s_run"))
+                    arch.Types.Named("WorkspaceLoader").Fields.Named("_loadCount"))
                 .MustBeReadonly())
             .Because("A writable static is process-wide state in a library a long-lived MCP server calls " +
                      "concurrently and every spec project links: whoever wrote to it last decides what the " +

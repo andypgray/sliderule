@@ -30,7 +30,9 @@ resolving the path works too. A relative path resolves against the test process'
 directory, which can differ from the output directory `FindSolutionUp` starts from.
 
 The test explorer lists one case per rule ID. The workspace load, extraction, and check run once per
-spec type, and every rule case reads its verdict from that shared run. A scope's tripwire rule,
+spec type, solution and excluded project, and every rule case reads its verdict from that shared run.
+Two classes over one spec that point at different solutions, or exclude different projects, each
+check their own. A scope's tripwire rule,
 `Quarantine` or `Caution`, reports as skipped (a test run has no diff context). Everything else
 passes or fails like any other test. A spec that fails to build is listed as one case instead,
 `ArchitectureSpec: spec build failed` for the spec above. That case fails with the spec's own errors.

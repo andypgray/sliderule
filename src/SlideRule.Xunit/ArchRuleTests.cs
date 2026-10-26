@@ -93,10 +93,11 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
     ///     The row source behind <see cref="Rule_Holds" />: one row per rule in the spec, each carrying
     ///     the rule ID that becomes the test's display name. Runs at test discovery and builds the model
     ///     from the spec alone, so the test explorer can list the rules without loading a solution. The
-    ///     solution is then loaded and checked once for each spec type, when its first case executes, and
-    ///     every rule case of that type reads its verdict from that one run. A spec that
-    ///     fails to build collapses to a single row, which fails when the run reaches it and carries the
-    ///     spec's own errors. A test project that loaded a version of SlideRule other than the
+    ///     solution is then loaded and checked once for each spec type, solution and excluded project, when
+    ///     the first case naming that combination executes, and every rule case naming it reads its verdict
+    ///     from that one run, so two classes over one spec that name different solutions each check their
+    ///     own. A spec that fails to build collapses to a single row, which fails when the run reaches it
+    ///     and carries the spec's own errors. A test project that loaded a version of SlideRule other than the
     ///     adapter's own gets a single skipped row instead, whose reason names both versions. The test
     ///     framework calls this; there is nothing to override.
     /// </summary>
@@ -226,15 +227,22 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
         if (blocks.Count > 0) Assert.Skip(string.Join("\n", blocks));
     }
 
-    // Lazily start (and then share) the one check run for this closed TSpec, seeded by the first case's
-    // SolutionPath/ExcludeProjectName. A cached faulted task rethrows on every case (e.g. a spec-build or
+    // Lazily start (and then share) this TSpec's check run for one SolutionPath/ExcludeProjectName pair: classes
+    // over one spec that name the same pair share a run, and AllowWorkspaceDiagnostics, read per case, is the
+    // one hook that may differ between them. A cached faulted task rethrows on every case (e.g. a spec-build or
     // workspace failure surfaces identically on every rule).
     private Task<ArchCheckRun> GetRunAsync()
     {
-        if (s_run is not null) return s_run;
+        (string SolutionPath, string? ExcludeProjectName) key = (Path.GetFullPath(SolutionPath), ExcludeProjectName);
         lock (Gate)
         {
-            return s_run ??= RunPipelineAsync(SolutionPath, ExcludeProjectName);
+            if (!Runs.TryGetValue(key, out Task<ArchCheckRun>? run))
+            {
+                run = RunPipelineAsync(key.SolutionPath, key.ExcludeProjectName);
+                Runs.Add(key, run);
+            }
+
+            return run;
         }
     }
 
@@ -307,11 +315,11 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
         string SolutionPath,
         WorkspaceDiagnostics Diagnostics);
 
-    // Per-closed-generic statics are essential: each ArchRuleTests<TSpec> caches ITS spec's single check
-    // run (per-TSpec caching is the whole point of the design), so these must NOT be shared across TSpec.
+    // Per-closed-generic statics are essential: each ArchRuleTests<TSpec> caches its own spec's check runs, one
+    // per solution and excluded project, so these must not be shared across TSpec.
     // ReSharper disable StaticMemberInGenericType
     private static readonly Lock Gate = new();
 
-    private static Task<ArchCheckRun>? s_run;
+    private static readonly Dictionary<(string SolutionPath, string? ExcludeProjectName), Task<ArchCheckRun>> Runs = [];
     // ReSharper restore StaticMemberInGenericType
 }

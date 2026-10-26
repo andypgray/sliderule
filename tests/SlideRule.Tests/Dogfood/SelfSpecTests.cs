@@ -478,11 +478,11 @@ public sealed class SelfSpecTests
 
     /// <summary>
     ///     The sanctioned-mutable-static pin, the broad-catcher pin's twin over the other exemption list:
-    ///     <c>state/no-static-mutable</c> carves seven fields out of its own subject, each named by its
-    ///     declaring type and its own name rather than by type alone, so its list grows one field at a time.
+    ///     <c>state/no-static-mutable</c> carves fields out of its own subject, each named by its declaring
+    ///     type and its own name rather than by type alone, so its list grows one field at a time.
     /// </summary>
     [Fact]
-    public void SanctionedMutableStatics_AreExactlyTheSevenIntendedWrites()
+    public void SanctionedMutableStatics_AreExactlyTheIntendedWrites()
     {
         SelfModel.Rule("state/no-static-mutable")
             .Sentence
@@ -490,9 +490,8 @@ public sealed class SelfSpecTests
                 "Static fields of authored types in the Core, Extraction, Analyzers, SpecAnalyzers, SpecCompletion, " +
                 "Workspace, Host, Adapter or Pack layers, " +
                 "except `s_inFlightCount`, `s_lastActivityTicks`, `s_drainWaiter` or `s_timestampProvider` fields of " +
-                "types named `IdleTimeoutWatchdog`, `s_hasExited` fields of types named `ServerShutdown`, " +
-                "`_loadCount` fields of types named `WorkspaceLoader` or `s_run` fields of types named " +
-                "`ArchRuleTests`, must be readonly.",
+                "types named `IdleTimeoutWatchdog`, `s_hasExited` fields of types named `ServerShutdown` or " +
+                "`_loadCount` fields of types named `WorkspaceLoader`, must be readonly.",
                 customMessage: "a field added here leaves the static-mutability law; add it under its family in the " +
                                "comment on the rule (an Interlocked location, lock-guarded one-shot state, or the " +
                                "clock seam), or make the field readonly or const.");

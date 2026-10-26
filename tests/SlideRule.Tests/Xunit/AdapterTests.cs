@@ -227,6 +227,21 @@ public sealed class AdapterTests
     }
 
     [Fact]
+    public async Task TwoClassesOverOneSpec_EachCheckTheirOwnSolution()
+    {
+        // One rule, two solutions, two verdicts: MyApp holds the violation, and the filter drops the rule's
+        // subject. Sharing one run would hand the second class the first class's verdict, so the filtered
+        // class would fail where its own solution can only skip. The spec type is this test's alone, so no
+        // other test can have started a run for it first.
+        Exception? whole = await AdapterOutcome.CaughtAsync(() => new SharedSpecMyAppArchTests().Rule_Holds(SharedSpecRuleId));
+        Exception? filtered = await AdapterOutcome.CaughtAsync(() => new SharedSpecBillingOnlyArchTests().Rule_Holds(SharedSpecRuleId));
+
+        whole.ShouldBeOfType<FailException>();
+        var skip = filtered.ShouldBeOfType<SkipException>();
+        skip.Message.ShouldEndWith(NarrowedUniverseNotice.RuleSkipReason("BillingOnly.slnf", 2));
+    }
+
+    [Fact]
     public async Task PolyglotSolution_SkipsTheCompletenessClaimNamingWhatItCouldNotReach()
     {
         // check and status both stamp a polyglot solution's unsupported projects, and the adapter has to
@@ -396,6 +411,32 @@ public sealed class AdapterTests
     }
 
     private sealed class BillingOnlyArchTests : ArchRuleTests<BillingOnlyInlineSpec>
+    {
+        protected override string SolutionPath => BillingOnlyFilter;
+        protected override string? ExcludeProjectName => null;
+    }
+
+    private const string SharedSpecRuleId = "layering/domain-independent";
+
+    // Driven only by TwoClassesOverOneSpec_EachCheckTheirOwnSolution, whose two classes over it are the only
+    // runs it ever gets.
+    private sealed class SharedInlineSpec : IArchitectureSpec
+    {
+        public void Define(Arch arch)
+        {
+            arch.Rule(SharedSpecRuleId)
+                .Enforce(arch.Namespace("MyApp.Domain.*").MustNotReference(arch.Namespace("MyApp.Web.*")))
+                .Because("Domain is UI-agnostic; transaction boundaries live in services.");
+        }
+    }
+
+    private sealed class SharedSpecMyAppArchTests : ArchRuleTests<SharedInlineSpec>
+    {
+        protected override string SolutionPath => CliRunner.MyAppSolution;
+        protected override string? ExcludeProjectName => null;
+    }
+
+    private sealed class SharedSpecBillingOnlyArchTests : ArchRuleTests<SharedInlineSpec>
     {
         protected override string SolutionPath => BillingOnlyFilter;
         protected override string? ExcludeProjectName => null;

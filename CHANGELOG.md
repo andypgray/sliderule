@@ -28,6 +28,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A `git` process that SlideRule starts and that outlives its 30-second limit now ends the call with the
   timeout error, or with the caller's cancellation, even when part of its process tree cannot be killed.
   Before, the error from the partial kill replaced either one.
+- Two test classes deriving `ArchRuleTests<TSpec>` over one spec, with different `SolutionPath` or
+  `ExcludeProjectName` values, now each check their own solution. Before, every class over that spec got
+  the run of whichever class's test ran first, so a test could pass against the wrong solution.
 
 ## [0.2.0] - 2026-10-18
 
