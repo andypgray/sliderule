@@ -7,7 +7,8 @@ using Xunit;
 namespace SlideRule.Tests.Roslyn;
 
 /// <summary>
-///     The pieces of <see cref="WorkspaceLoader" /> that pin without loading a workspace.
+///     The text and bookkeeping of <see cref="WorkspaceLoader" />, pinned without a workspace wherever the subject
+///     allows one to be left out.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -27,6 +28,11 @@ namespace SlideRule.Tests.Roslyn;
 ///     <para>
 ///         The closure load's refusals: a subset the solution cannot express as a filter answers null, so the caller
 ///         loads the whole solution instead, and it answers before any workspace opens.
+///     </para>
+///     <para>
+///         The stripped-analyzer notice is the one pin here that loads a solution: an <c>Analyzer</c> item naming a
+///         file that does not exist is the route that leaves an unresolved reference for the load boundary to
+///         strip, and the workspace itself reports nothing about it.
 ///     </para>
 /// </remarks>
 public sealed class WorkspaceLoaderTests
@@ -77,6 +83,35 @@ public sealed class WorkspaceLoaderTests
         LoadedSolution? loaded = await WorkspaceLoader.LoadClosureAsync(solution, [temp.PathOf("A", "A.csproj")], ct: Ct);
 
         loaded.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task LoadAsync_AnAnalyzerItemNamingAMissingFile_LogsTheStrippedAnalyzerNotice()
+    {
+        using TempDirectory temp = TestTempRoot.Fresh("loader-stripped-analyzer");
+        temp.WriteFile(
+            ["App", "App.csproj"],
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+              <ItemGroup>
+                <Analyzer Include="analyzers/Missing.Analyzer.dll" />
+              </ItemGroup>
+            </Project>
+            """);
+        temp.WriteFile(["App", "Widget.cs"], "namespace App { public sealed class Widget { } }\n");
+        string solution = temp.WriteFile(["App.slnx"], "<Solution>\n  <Project Path=\"App/App.csproj\" />\n</Solution>\n");
+        var diagnostics = new List<string>();
+
+        using LoadedSolution loaded = await WorkspaceLoader.LoadAsync(solution, diagnostics.Add, Ct);
+
+        diagnostics.ShouldBe(
+        [
+            "Load stripped 1 unresolved analyzer reference; an analyzer or source generator the build names was "
+            + "missing from disk, so any code it generates is absent from the model."
+        ]);
     }
 
     private static async Task<long> ShouldFailLoadingOnceAsync(string missingSolution)

@@ -83,6 +83,11 @@ internal static class WorkspaceLoader
             Solution solution = await OpenAsync(workspace, solutionPath, ct).ConfigureAwait(false);
             SettledSolution settled = LoadBoundary.Settle(solution, solutionPath);
 
+            // Only the analyzer count can be nonzero here: Roslyn's MSBuild loader removes an unresolved metadata
+            // reference itself before the boundary sees it.
+            if (settled.StrippedAnalyzerReferences > 0)
+                diagnosticLog?.Invoke(StrippedAnalyzersMessage(settled.StrippedAnalyzerReferences));
+
             // A project whose restore failed loads completely, so nothing in the loaded structure says so and
             // only its assets file can.
             IReadOnlyList<string> restoreFailed = RestoreFailures.Detect(settled.Solution, settled.Report.Failed);
@@ -194,6 +199,17 @@ internal static class WorkspaceLoader
         return $"Could not read the solution filter '{filterPath}'.\n"
                + "A filter must be well-formed JSON whose 'solution' path resolves to a .sln or .slnx, and "
                + "every project it lists must be a member of that solution.";
+    }
+
+    /// <summary>
+    ///     The notice a load writes when it strips <paramref name="count" /> unresolved analyzer references, the
+    ///     files an analyzer or source generator would have loaded from.
+    /// </summary>
+    internal static string StrippedAnalyzersMessage(int count)
+    {
+        string references = Plurals.Counted(count, "unresolved analyzer reference");
+        return $"Load stripped {references}; an analyzer or source generator the build names was missing from "
+               + "disk, so any code it generates is absent from the model.";
     }
 
     // Roslyn's SolutionFilterReader signals every filter fault by throwing a bare Exception out of
