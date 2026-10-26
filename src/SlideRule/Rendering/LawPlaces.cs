@@ -50,13 +50,15 @@ internal sealed class LawPlaces(IReadOnlyList<LayerDefinition> layers)
 
     /// <summary>
     ///     A region named in facade position keeps its own place and gains the facade standing, so a namespace
-    ///     two rules name is still one node.
+    ///     two rules name is still one node. A facade that is the scope or covers it has no box inside the scope
+    ///     to draw, so it is unplaceable, and registers nothing.
     /// </summary>
     internal LawPlace? Facade(Selection? selection, LawPlace scope)
     {
-        LawPlace? place = Register(LawPlaceClassifier.FacadePlace(selection, layers));
-        if (place is null) return null;
+        LawPlace? candidate = LawPlaceClassifier.FacadePlace(selection, layers);
+        if (candidate is null || IsOrCovers(candidate, scope)) return null;
 
+        LawPlace place = Registered(candidate);
         place.IsFacade = true;
         place.Parent ??= scope;
         return place;
@@ -85,6 +87,13 @@ internal sealed class LawPlaces(IReadOnlyList<LayerDefinition> layers)
             // The most specific container is the one every other container also covers.
             place.Parent = containers.FirstOrDefault(candidate => containers.All(other => ReferenceEquals(other, candidate) || Contains(other, candidate)));
         }
+    }
+
+    private static bool IsOrCovers(LawPlace candidate, LawPlace place)
+    {
+        if (candidate.Key == place.Key) return true;
+
+        return candidate.Globs.Count > 0 && place.Globs.Count > 0 && Contains(candidate, place);
     }
 
     private static bool StrictlyContains(LawPlace outer, LawPlace inner)

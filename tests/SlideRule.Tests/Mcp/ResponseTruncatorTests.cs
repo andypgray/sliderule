@@ -37,6 +37,7 @@ public sealed class ResponseTruncatorTests
     }
 
     [Theory]
+    [InlineData("1", 0)]
     [InlineData("1000", 2_000)]
     [InlineData("1001", 2_000)]
     [InlineData("4000", 8_000)]
@@ -81,6 +82,17 @@ public sealed class ResponseTruncatorTests
         string result = ResponseTruncator.TruncateIfNeeded(text, null, 8);
 
         result.ShouldStartWith("abcdefgh\n\n--- RESPONSE TRUNCATED ---");
+    }
+
+    [Fact]
+    public void TruncateIfNeeded_ZeroLimit_KeepsNothingAndReportsTheLimit()
+    {
+        // A one-token budget is a zero-character limit, and every non-empty reply still has to come back.
+        string result = ResponseTruncator.TruncateIfNeeded("abc\ndef", null, 0);
+
+        result.ShouldBe(
+            "\n\n--- RESPONSE TRUNCATED ---\nOutput was 7 characters, limit is 0 (7 characters omitted).\n"
+            + "The results above are incomplete.");
     }
 
     [Fact]

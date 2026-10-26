@@ -40,8 +40,7 @@ internal static class GitChangedFiles
         // awaited in launch order because that order is the refusal precedence: a directory that is not a
         // repository still surfaces rev-parse's message, not whichever child failed first.
         Task<string> toplevelRun = RunGitAsync(solutionDirectory, ct, "rev-parse", "--show-toplevel");
-        Task<string> committedRun = RunGitAsync(
-            solutionDirectory, ct, "diff", "--name-only", "-z", baseRef, "HEAD", "--");
+        Task<string> committedRun = RunGitAsync(solutionDirectory, ct, CommittedArguments(baseRef, "HEAD"));
         Task<string> statusRun = RunGitAsync(solutionDirectory, ct, StatusArguments);
 
         string toplevelOutput = await toplevelRun;
@@ -51,7 +50,7 @@ internal static class GitChangedFiles
         string statusOutput = await statusRun;
 
         IReadOnlyList<string> committed = ParseZTerminated(committedOutput);
-        IEnumerable<string> uncommitted = ParseZTerminated(statusOutput).Select(StatusPath);
+        IEnumerable<string> uncommitted = StatusPaths(statusOutput);
 
         IReadOnlyList<string> files = ComposeAbsolute(toplevel, committed.Concat(uncommitted));
         return new DiffContext(solutionDirectory, files);
@@ -64,16 +63,32 @@ internal static class GitChangedFiles
     }
 
     /// <summary>
-    ///     The <c>git status</c> arguments both changed-file listings are read with, this one and the hook's snapshot:
-    ///     held once because <see cref="StatusPath" /> slices an entry correctly only under exactly these flags.
+    ///     The <c>git status</c> arguments both changed-file listings are read with, this one and the hook's snapshot.
+    ///     <see cref="StatusPaths" /> slices an entry correctly only under exactly these flags.
     /// </summary>
     internal static readonly string[] StatusArguments = ["status", "--porcelain=v1", "-uall", "-z", "--no-renames"];
 
     /// <summary>
-    ///     The path a <c>git status --porcelain=v1 -z --no-renames</c> entry names, relative to the repository root:
-    ///     everything after the two status letters and the space that follows them.
+    ///     The <c>git diff</c> arguments that list the paths differing between commits <paramref name="from" /> and
+    ///     <paramref name="to" />, for this listing and the hook's alike. With renames off a rename names both of its
+    ///     paths, so a file moved out of a directory is listed at the path it left.
     /// </summary>
-    internal static string StatusPath(string entry)
+    internal static string[] CommittedArguments(string from, string to)
+    {
+        return ["diff", "--name-only", "-z", "--no-renames", from, to, "--"];
+    }
+
+    /// <summary>
+    ///     The paths a <c>git status</c> listing read with <see cref="StatusArguments" /> names, relative to the
+    ///     repository root, in git's order.
+    /// </summary>
+    internal static IEnumerable<string> StatusPaths(string statusOutput)
+    {
+        return ParseZTerminated(statusOutput).Select(StatusPath);
+    }
+
+    // Everything after the two status letters and the space that follows them.
+    private static string StatusPath(string entry)
     {
         return entry[3..];
     }

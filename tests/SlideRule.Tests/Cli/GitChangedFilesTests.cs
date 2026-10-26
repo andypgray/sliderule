@@ -144,6 +144,29 @@ public sealed class GitChangedFilesTests
     }
 
     [Fact]
+    public async Task ResolveAsync_FileMovedOutOfADirectorySinceTheRef_ListsBothPaths()
+    {
+        // Arrange: identical content, so rename detection would pair the two paths and list only the new one.
+        using TempDirectory temp = TestTempRoot.Fresh("git-changed-files");
+        string dir = temp.Path;
+        Directory.CreateDirectory(Path.Combine(dir, "Legacy"));
+        string moved = CommitFile(dir, "Legacy/Probe.cs");
+        GitCommand.Run(dir, "tag", "base");
+        Directory.CreateDirectory(Path.Combine(dir, "Moved"));
+        GitCommand.Run(dir, "mv", "Legacy/Probe.cs", "Moved/Probe.cs");
+        GitCommand.Commit(dir, "-m", "move");
+
+        // Act
+        DiffContext context = await GitChangedFiles.ResolveAsync("base", dir, Ct);
+
+        // Assert
+        context.Contains(moved)
+            .ShouldBeTrue("A file moved out of a directory since the ref has changed at the path it left.");
+        context.Contains(Path.Combine(dir, "Moved", "Probe.cs"))
+            .ShouldBeTrue("A file moved since the ref has changed at the path it arrived at.");
+    }
+
+    [Fact]
     public async Task ResolveAsync_StagedAndUnstagedEdits_AreListed()
     {
         // Arrange

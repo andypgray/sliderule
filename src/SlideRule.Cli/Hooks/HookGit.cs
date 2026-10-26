@@ -115,7 +115,7 @@ internal static class HookGit
     public static async Task<IReadOnlyList<string>?> CommittedBetweenAsync(
         string directory, string from, string to, CancellationToken ct)
     {
-        string? output = await RunAsync(directory, ct, "diff", "--name-only", "-z", "--no-renames", from, to, "--");
+        string? output = await RunAsync(directory, ct, GitChangedFiles.CommittedArguments(from, to));
         return output is null ? null : GitChangedFiles.ParseZTerminated(output);
     }
 
@@ -209,9 +209,8 @@ internal sealed class TreeSnapshot
     /// </summary>
     internal static TreeSnapshot Of(string head, string topLevel, string status, Func<string, string> digestOf)
     {
-        List<string> kept = GitChangedFiles.ParseZTerminated(status)
+        List<string> kept = GitChangedFiles.StatusPaths(status)
             .Where(HookCodeFiles.IsCode)
-            .Select(GitChangedFiles.StatusPath)
             .ToList();
 
         // A POSIX name may hold a line break, which a record of one file per line cannot carry, and an unknown tree

@@ -248,6 +248,25 @@ public sealed class CliMcpParityTests
     }
 
     [Fact]
+    public async Task HarnessD_QuarantinedSpec_CheckEmptyDiffBase_AnswersAsIfNoneWasGiven()
+    {
+        // A client that fills every optional argument sends an empty diff base, which names no ref.
+        using var repo = new TempGitRepo();
+        repo.WriteQuarantineNote();
+
+        await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
+            McpServerBindings.For(repo.SolutionPath, CliRunner.QuarantinedSpecDll), Ct);
+
+        CallToolResult withoutDiffBase = await harness.Client.CallToolAsync(
+            "arch_check", new Dictionary<string, object?>(), cancellationToken: Ct);
+        CallToolResult emptyDiffBase = await harness.Client.CallToolAsync(
+            "arch_check", new Dictionary<string, object?> { ["diffBase"] = "" }, cancellationToken: Ct);
+
+        emptyDiffBase.ShouldHaveAnswered()
+            .ShouldBeTheSameTextAs(withoutDiffBase.ShouldHaveAnswered());
+    }
+
+    [Fact]
     public async Task HarnessE_LayerSpec_Context_InLayerCardAndOutOfScopePointer()
     {
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(

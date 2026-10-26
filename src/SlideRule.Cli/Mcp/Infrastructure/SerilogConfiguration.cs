@@ -80,6 +80,9 @@ internal static class SerilogConfiguration
     {
         if (string.IsNullOrWhiteSpace(envValue)) return LogEventLevel.Warning;
 
+        // Enum.TryParse ORs a comma list into one value, which can be a defined level nobody named.
+        if (envValue.Contains(',')) return LogEventLevel.Warning;
+
         // Enum.TryParse binds a numeric string ("99") to an undefined value; Enum.IsDefined keeps it on the fallback.
         if (Enum.TryParse(envValue, true, out LogLevel msLevel) && Enum.IsDefined(msLevel)) return LevelConvert.ToSerilogLevel(msLevel);
 

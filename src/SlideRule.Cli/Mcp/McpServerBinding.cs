@@ -53,7 +53,7 @@ internal sealed record McpServerBinding(string? Solution, string? Spec, string W
     internal CheckRequest CheckRequest(string? diffBase, string? rules, DocumentGrain grain)
     {
         return new CheckRequest(
-            Solution, Spec, AsJsonDocument, NoHookDocument, diffBase, WorkingDirectory, BypassPersistedCache,
+            Solution, Spec, AsJsonDocument, NoHookDocument, Given(diffBase), WorkingDirectory, BypassPersistedCache,
             NoBinlogReplay, ReportPartialModels, NoSarifFile, rules, grain);
     }
 
@@ -85,6 +85,10 @@ internal sealed record McpServerBinding(string? Solution, string? Spec, string W
 
     internal const string ExplainFormsRefusal = "Pass exactly one of ruleId, type and path.";
 
+    /// <summary>
+    ///     An optional string argument, with an empty string read as absent: some clients fill every optional
+    ///     argument with one.
+    /// </summary>
     private static string? Given(string? value)
     {
         return string.IsNullOrEmpty(value) ? null : value;

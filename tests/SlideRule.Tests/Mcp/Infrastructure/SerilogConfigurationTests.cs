@@ -79,10 +79,13 @@ public sealed class SerilogConfigurationTests
     [InlineData("-1")]
     [InlineData("Loud")]
     [InlineData("Warn")]
+    [InlineData("Error,Information")]
+    [InlineData("Debug, Error")]
     public void ParseLogLevel_UnrecognisedOrOutOfRange_FallsBackToWarning(string envValue)
     {
-        // Enum.TryParse binds any numeric string to an enum value, defined or not — "99" would otherwise
-        // become a level nothing is ever logged at, silencing the log file without saying so.
+        // Enum.TryParse binds any numeric string to an enum value, defined or not, and ORs a comma list into
+        // one — "99" or "Error,Information" would otherwise become a level nothing is ever logged at,
+        // silencing the log file without saying so.
         SerilogConfiguration.ParseLogLevel(envValue)
             .ShouldBe(LogEventLevel.Warning);
     }

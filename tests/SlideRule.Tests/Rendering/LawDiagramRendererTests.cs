@@ -338,6 +338,35 @@ public sealed class LawDiagramRendererTests
             "Expand any of them with `sliderule explain <rule-id>`.");
     }
 
+    [Theory]
+    [InlineData("Shop.Legacy.Pricing.*")]
+    [InlineData("Shop.Legacy.*")]
+    public void Block_AFacadeThatIsOrCoversItsScope_KeepsTheScopeBoxAndSendsItsRuleUnderTheFence(string boundary)
+    {
+        // Arrange — a box cannot be drawn inside itself or inside a box it sits in, so the sanctioned surface
+        // has no honest node, as a named facade has none.
+        ArchitectureModel model = Checker.Model(arch =>
+            arch.Scope("legacy/pricing")
+                .Quarantine(arch.Namespace("Shop.Legacy.Pricing.*"))
+                .BoundaryOnlyVia(arch.Namespace(boundary))
+                .Dragons("Rounding happens at line-item level.")
+                .Because("x"));
+
+        // Act
+        string block = LawDiagramRenderer.Block(model, SpecName);
+
+        // Assert
+        MermaidBlock.Diagram(block)
+            .ShouldBe([
+                "s_Shop_Legacy_Pricing[\"Quarantine: legacy/pricing\"]",
+                "",
+                .. Legend(LegendQuarantine)
+            ]);
+        block.ShouldEndWith(
+            "Not drawn in full: `legacy/pricing/containment` (Quarantine), `legacy/pricing/tripwire` (Quarantine). " +
+            "Expand any of them with `sliderule explain <rule-id>`.");
+    }
+
     [Fact]
     public void Block_AHermeticScope_IsARectangleCarryingTheSameLabel()
     {
