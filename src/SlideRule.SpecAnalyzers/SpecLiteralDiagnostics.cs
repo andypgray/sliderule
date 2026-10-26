@@ -421,7 +421,8 @@ internal static class SpecLiteralDiagnostics
     }
 
     // The first line alone, because a build surface shows a warning on one row; the trailing full stop
-    // comes off because the message format puts one after it.
+    // comes off because the message format puts one after it. Must agree with BuildTierDiagnostics' copy;
+    // CopiedMemberParityTests holds them identical.
     private static string Opening(string message)
     {
         int lineBreak = message.IndexOf('\n');

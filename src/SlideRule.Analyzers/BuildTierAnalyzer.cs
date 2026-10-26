@@ -151,6 +151,9 @@ internal sealed class BuildTierAnalyzer : DiagnosticAnalyzer
         context.RegisterCompilationStartAction(OnCompilationStart);
     }
 
+    // This member and ReleasedVersion must agree with their copies in SpecLiteralAnalyzer and the adapter's
+    // ContractVersion, since Core cannot hold code the version check runs; CopiedMemberParityTests holds them
+    // identical.
     internal static string? InformationalVersionOf(Assembly assembly)
     {
         return assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;

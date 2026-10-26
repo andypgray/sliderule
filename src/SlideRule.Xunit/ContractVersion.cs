@@ -9,8 +9,9 @@ namespace SlideRule.Xunit;
 ///     between them, with an error that names neither package.
 /// </summary>
 // Deliberately self-contained: it names one contract type, which every version carries, and nothing else of the
-// contract's, because every other member is exactly what a mismatched copy may not have. The analyzers make the
-// same check the same way (SR2093).
+// contract's, because every other member is exactly what a mismatched copy may not have. InformationalVersionOf
+// and ReleasedVersion must agree with BuildTierAnalyzer's copies, so the adapter and the analyzers call the same
+// pair one release; CopiedMemberParityTests holds them identical.
 internal static class ContractVersion
 {
     /// <summary>
@@ -29,8 +30,8 @@ internal static class ContractVersion
     /// </summary>
     internal static string? Mismatch(string? adapter, string? contract)
     {
-        string adapterVersion = Released(adapter);
-        string contractVersion = Released(contract);
+        string adapterVersion = ReleasedVersion(adapter);
+        string contractVersion = ReleasedVersion(contract);
         if (string.Equals(adapterVersion, contractVersion, StringComparison.Ordinal)) return null;
 
         return $"The SlideRule xUnit adapter checked nothing: it is version {Shown(adapterVersion)}, and the test "
@@ -41,18 +42,18 @@ internal static class ContractVersion
 
     private static string? InformationalVersionOf(Assembly assembly)
     {
-        return assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()
-            ?.InformationalVersion;
+        return assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
     }
 
     // Up to the first '+', which drops the commit a build appends; empty for a missing version, which no real
     // version equals.
-    private static string Released(string? informational)
+    private static string ReleasedVersion(string? informational)
     {
         if (informational is null) return string.Empty;
 
         int plus = informational.IndexOf('+');
-        return plus < 0 ? informational : informational[..plus];
+
+        return plus < 0 ? informational : informational.Substring(0, plus);
     }
 
     private static string Shown(string version)

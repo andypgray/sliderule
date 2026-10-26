@@ -103,6 +103,8 @@ internal sealed class SpecLiteralAnalyzer : DiagnosticAnalyzer
         context.RegisterCompilationStartAction(OnCompilationStart);
     }
 
+    // This member and ReleasedVersion must agree with BuildTierAnalyzer's; CopiedMemberParityTests holds
+    // them identical.
     internal static string? InformationalVersionOf(Assembly assembly)
     {
         return assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
@@ -343,7 +345,8 @@ internal sealed class SpecLiteralAnalyzer : DiagnosticAnalyzer
 
     // The marker as it sits in metadata: one attribute of the class this compilation resolved, carrying
     // one string. Compared by symbol rather than by rendered name, so a type of the same name from
-    // somewhere else is not read as the marker.
+    // somewhere else is not read as the marker. SpecCompletion's SlotBinding carries a copy, which
+    // CopiedMemberParityTests holds identical, as it does CarriesValuesThrough's.
     private static string? SlotNameOn(IParameterSymbol parameter, INamedTypeSymbol marker)
     {
         foreach (AttributeData attribute in parameter.GetAttributes())

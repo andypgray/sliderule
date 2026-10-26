@@ -13,7 +13,9 @@ namespace SlideRule.SpecCompletion;
 ///         The guards are the spec-literal analyzer's, mirrored, each for the reason its comments there give:
 ///         the marker is read off the original definition's parameter, an argument the caller did not write is
 ///         skipped, and the two parameter lists must be the same length. Where the two readers disagreed, an
-///         author would be offered names for one slot and warned about another. The analyzer's one further
+///         author would be offered names for one slot and warned about another, so <c>SlotNameOn</c> and
+///         <c>CarriesValuesThrough</c> are the analyzer's own members copied, which
+///         <c>CopiedMemberParityTests</c> holds identical. The analyzer's one further
 ///         guard, that the declaration sits in the marker's own assembly, changes no answer, because the marker
 ///         is internal to that assembly; it only spares the analyzer an attribute read on every other call.
 ///     </para>
@@ -37,7 +39,7 @@ internal static class SlotBinding
     ///     The operation kind a collection expression carries: the spec-literal analyzer's
     ///     <c>CollectionExpressionKind</c>, matched by number for the reason given there.
     /// </summary>
-    private const int CollectionExpressionOperationKind = 0x7F;
+    private const int CollectionExpressionKind = 0x7F;
 
     /// <summary>
     ///     The slot <paramref name="literal" /> fills, or <see cref="SlotKind.None" /> where nothing here can
@@ -90,7 +92,7 @@ internal static class SlotBinding
         if (operation is IArrayCreationOperation or IArrayInitializerOperation or IConversionOperation)
             return true;
 
-        return (int)operation.Kind == CollectionExpressionOperationKind;
+        return (int)operation.Kind == CollectionExpressionKind;
     }
 
     // Read as the spec-literal analyzer reads it, by symbol rather than by rendered name.
