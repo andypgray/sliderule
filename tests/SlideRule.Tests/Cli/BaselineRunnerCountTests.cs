@@ -315,7 +315,7 @@ public sealed class BaselineRunnerCountTests : IDisposable
 
         string echo = Init(report.Results);
 
-        echo.ShouldContain("data-access/ledger-behind-repository: already captured (1 entries) — unchanged.");
+        echo.ShouldContain("data-access/ledger-behind-repository: already captured (1 entry) — unchanged.");
         echo.ShouldContain($"unchanged {BaselineFile}");
         File.ReadAllBytes(path)
             .ShouldBe(before);

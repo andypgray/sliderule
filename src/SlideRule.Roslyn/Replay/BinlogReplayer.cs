@@ -100,9 +100,13 @@ internal static class BinlogReplayer
                 NormalizeProjects(solution);
             (Solution stripped, int analyzerCount, int metadataCount) = normalized.StripUnresolvedReferences();
             if (analyzerCount > 0 || metadataCount > 0)
+            {
+                string analyzers = Plurals.Counted(analyzerCount, "unresolved analyzer reference");
+                string metadata = Plurals.Counted(metadataCount, "unresolved metadata reference");
                 diagnosticSink?.Invoke(
-                    $"Replay stripped {analyzerCount} unresolved analyzer and {metadataCount} unresolved "
-                    + "metadata reference(s); a build artifact recorded in the binlog was missing from disk.");
+                    $"Replay stripped {analyzers} and {metadata}; a build artifact recorded in the binlog was missing "
+                    + "from disk.");
+            }
 
             // The same computation the MSBuild path's gate keys on; ReplayedSolution.FailedProjects says what it can
             // find on this path.

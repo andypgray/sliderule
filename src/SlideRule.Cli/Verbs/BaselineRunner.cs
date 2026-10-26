@@ -536,7 +536,7 @@ internal sealed class BaselineRunner(
     {
         if (existingEntries is { } captured)
         {
-            output.WriteLine($"{ruleId}: already captured ({captured.Count} entries) — unchanged.");
+            output.WriteLine($"{ruleId}: already captured ({Plurals.Counted(captured.Count, "entry")}) — unchanged.");
             return false;
         }
 
