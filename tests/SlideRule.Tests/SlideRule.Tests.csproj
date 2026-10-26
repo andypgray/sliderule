@@ -46,8 +46,8 @@
              xunit.v3.extensibility.core [4.0.0, 5.0.0) and still puts [Property] in the FsCheck.Xunit
              namespace. FsCheck itself is explicit rather than transitive so Dependabot tracks the version the
              one property suite (Internal/WildcardPropertyTests) is written against. -->
-        <PackageReference Include="FsCheck" Version="3.5.0" />
-        <PackageReference Include="FsCheck.Xunit.v3" Version="3.5.0" />
+        <PackageReference Include="FsCheck" Version="3.6.0" />
+        <PackageReference Include="FsCheck.Xunit.v3" Version="3.6.0" />
         <!-- The DI/Hosting abstractions the registration-recognition tests (CompilationFactory's DiReferences)
              bind against — promoted from transitive (via the MCP/Hosting stack) to explicit, so the versions
              the recognizer resolves are pinned here rather than floating on another package's closure. -->
