@@ -1,3 +1,4 @@
+using ModelContextProtocol;
 using ModelContextProtocol.Protocol;
 using Shouldly;
 using SlideRule.Cli.Mcp.Infrastructure;
@@ -12,7 +13,7 @@ namespace SlideRule.Tests.Mcp;
 /// <summary>
 ///     Drives a real MCP client against the server over in-memory pipes to lock down
 ///     <see cref="SlideRule.Cli.Mcp.Pipeline.GlobalCallToolFilter" />'s branches — silent user-error, logged
-///     unexpected-error, truncated success, unknown-parameter guard — end to end.
+///     unexpected-error, protocol-error pass-through, truncated success, unknown-parameter guard — end to end.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -286,7 +287,7 @@ public sealed class GlobalCallToolFilterTests
     }
 
     [Fact]
-    public async Task CallTool_WrongCaseToolName_IsLeftToTheSdk()
+    public async Task CallTool_WrongCaseToolName_IsAnsweredWithTheProtocolError()
     {
         // Arrange — the SDK dispatches by exact name, so "Arch_Context" matches no tool, and a parameter error
         // here would send the caller to fix a key on a tool the call can never reach.
@@ -294,11 +295,20 @@ public sealed class GlobalCallToolFilterTests
             McpServerBindings.MyAppWithViolatedSpec(), Ct);
 
         // Act
-        CallToolResult result = await harness.Client.CallToolAsync("Arch_Context", cancellationToken: Ct);
+        Task<CallToolResult> call = harness.Client.CallToolAsync("Arch_Context", cancellationToken: Ct)
+            .AsTask();
 
-        // Assert — the SDK's own answer, not the guard's.
-        result.ShouldHaveRefused()
-            .ShouldBe("Unknown tool: 'Arch_Context'");
+        // Assert — the SDK's JSON-RPC error, not a tool result and not the guard's answer.
+        var error = await Should.ThrowAsync<McpProtocolException>(call);
+        error.ErrorCode.ShouldBe(McpErrorCode.InvalidParams);
+        error.Message.ShouldContain("Unknown tool: 'Arch_Context'");
+        error.Message.ShouldNotContain("Unknown parameter");
+
+        // And the filter logs nothing: an unknown name is caller input. The one warning is the SDK's own, written
+        // by its session handler around every request that ends in a JSON-RPC error, outside this server's filter.
+        LogEntry warning = harness.Logs.Warnings.ShouldHaveSingleItem();
+        warning.Category.ShouldStartWith("ModelContextProtocol.");
+        warning.Exception.ShouldBeOfType<McpProtocolException>();
     }
 
     [Fact]

@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using ModelContextProtocol;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 using SlideRule.Cli.Mcp.Infrastructure;
@@ -8,7 +9,8 @@ using SlideRule.Roslyn;
 namespace SlideRule.Cli.Mcp.Pipeline;
 
 /// <summary>
-///     The single point where tool-call exceptions become error results and successful responses are truncated.
+///     The single point where tool-call exceptions become error results and successful responses are truncated;
+///     cancellation and the SDK's protocol errors pass through.
 ///     It also brackets every call with the idle watchdog's in-flight count so a long cold-solution load can never
 ///     self-trip the timeout.
 /// </summary>
@@ -42,15 +44,19 @@ internal static class GlobalCallToolFilter
                     try
                     {
                         // Reject unknown or missing argument keys before binding, against the tool the SDK matched;
-                        // a call that matched none is left to the SDK's own unknown-tool answer. The guard's message
-                        // is a UserErrorException, so it flows through the silent-user-error path below.
+                        // a call that matched none gets the SDK's protocol error, which passes through below. The
+                        // guard's message is a UserErrorException, so it flows through the silent-user-error path.
                         if (context.MatchedPrimitive is McpServerTool tool
                             && UnknownParameterGuard.Validate(tool.ProtocolTool, context.Params.Arguments) is { } parameterError)
                             throw new UserErrorException(parameterError);
 
                         result = await next(context, cancellationToken);
                     }
-                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    // An McpProtocolException is the SDK's own answer to a request it cannot serve, an unknown tool
+                    // name among them, and its handler sends it on as a JSON-RPC error, so it passes through
+                    // unshaped and unlogged, as cancellation does. The SDK builds every protocol error without an
+                    // inner exception, so none hides a user error the unwrap below would surface.
+                    catch (Exception ex) when (ex is not (OperationCanceledException or McpProtocolException))
                     {
                         // The first user-facing message in the chain surfaces silently, exactly as a directly
                         // thrown one would. Anything else is a bug: log one warning, then surface.

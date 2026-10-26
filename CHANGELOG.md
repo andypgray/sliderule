@@ -29,6 +29,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   refused with a message that names the missing parameter and lists the ones the tool takes, and the server
   logs nothing. Before, the call failed with the SDK's own binding message and was logged as an unexpected
   tool failure.
+- An MCP tool call that names a tool the server does not have, such as `Arch_Context` for `arch_context`,
+  now fails with the protocol's invalid-params error, `Unknown tool: 'Arch_Context'`. Before, the server
+  answered with a tool error result carrying the same text and logged the call as an unexpected tool
+  failure.
 - An `arch_check` or `arch_graph` reply within one or two characters of the client's response budget now
   comes back whole at a coarser grain. Before, the grain was chosen without counting the document's final
   line end, so the reply was then cut at the budget into JSON that would not parse.
