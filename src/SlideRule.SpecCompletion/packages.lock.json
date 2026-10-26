@@ -42,9 +42,9 @@
       },
       "SlideRule.Analyzers": {
         "type": "Direct",
-        "requested": "[0.2.0, )",
-        "resolved": "0.2.0",
-        "contentHash": "rBYeHtl1br1j0JK1GShcDtGhUW9EJhcikMAFH99LZprS0m193+L2CPB/9PBio/aF0iZzX0utslgnxWIY78iBag=="
+        "requested": "[0.2.1, )",
+        "resolved": "0.2.1",
+        "contentHash": "UFxnCYUIb1iwRUTEjHi+uvatNtDfS+y6GQ+RkjdnXUEfzXpfJq5BLi/2EAIkJHL+TK+6/jcf1UwlSEfyCc71qg=="
       },
       "Humanizer.Core": {
         "type": "Transitive",
