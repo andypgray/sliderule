@@ -6,7 +6,7 @@
       "tool": {
         "driver": {
           "name": "SlideRule",
-          "version": "0.2.0",
+          "version": "0.2.1",
           "informationUri": "https://github.com/andypgray/sliderule",
           "rules": [
             {

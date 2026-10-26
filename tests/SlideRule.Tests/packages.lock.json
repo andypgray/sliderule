@@ -909,8 +909,8 @@
         "type": "Project",
         "dependencies": {
           "Microsoft.Build.Locator": "[1.11.2, )",
-          "SlideRule": "[0.2.0, )",
-          "SlideRule.Packs.DotNet": "[0.2.0, )"
+          "SlideRule": "[0.2.1, )",
+          "SlideRule.Packs.DotNet": "[0.2.1, )"
         }
       },
       "sliderule.cli": {
@@ -920,9 +920,9 @@
           "ModelContextProtocol": "[2.3.0, )",
           "Serilog.Extensions.Hosting": "[10.0.0, )",
           "Serilog.Sinks.File": "[7.0.0, )",
-          "SlideRule": "[0.2.0, )",
-          "SlideRule.Extraction": "[0.2.0, )",
-          "SlideRule.Roslyn": "[0.2.0, )",
+          "SlideRule": "[0.2.1, )",
+          "SlideRule.Extraction": "[0.2.1, )",
+          "SlideRule.Roslyn": "[0.2.1, )",
           "System.CommandLine": "[2.0.13, )"
         }
       },
@@ -930,7 +930,7 @@
         "type": "Project",
         "dependencies": {
           "Microsoft.CodeAnalysis.CSharp": "[4.0.1, )",
-          "SlideRule": "[0.2.0, )"
+          "SlideRule": "[0.2.1, )"
         }
       },
       "sliderule.packs.dotnet": {
@@ -938,7 +938,7 @@
         "dependencies": {
           "Microsoft.Extensions.DependencyInjection": "[10.0.13, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.13, )",
-          "SlideRule": "[0.2.0, )"
+          "SlideRule": "[0.2.1, )"
         }
       },
       "sliderule.roslyn": {
@@ -949,14 +949,14 @@
           "Microsoft.CodeAnalysis": "[5.9.0, )",
           "Microsoft.CodeAnalysis.CSharp.Workspaces": "[5.9.0, )",
           "Microsoft.CodeAnalysis.Workspaces.MSBuild": "[5.9.0, )",
-          "SlideRule": "[0.2.0, )",
-          "SlideRule.Extraction": "[0.2.0, )"
+          "SlideRule": "[0.2.1, )",
+          "SlideRule.Extraction": "[0.2.1, )"
         }
       },
       "sliderule.specanalyzers": {
         "type": "Project",
         "dependencies": {
-          "SlideRule": "[0.2.0, )"
+          "SlideRule": "[0.2.1, )"
         }
       },
       "sliderule.speccompletion": {
@@ -970,7 +970,7 @@
           "Microsoft.CodeAnalysis": "[5.9.0, )",
           "Microsoft.CodeAnalysis.CSharp.Workspaces": "[5.9.0, )",
           "Microsoft.CodeAnalysis.Workspaces.MSBuild": "[5.9.0, )",
-          "SlideRule": "[0.2.0, )",
+          "SlideRule": "[0.2.1, )",
           "xunit.v3.assert": "[4.0.1, )",
           "xunit.v3.extensibility.core": "[4.0.1, )"
         }

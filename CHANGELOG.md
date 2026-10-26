@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-26
+
 ### Changed
 
 - The MCP server instructions open with one whole sentence, and so does the banner an unbound server puts
@@ -65,8 +67,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   such a context could deadlock.
 - Extracting a field or property initializer now takes time in proportion to its size. Before, each method
   call, object creation, `?.` call and type name in it, such as a type argument, a cast or a qualified name,
-  bound the whole initializer again, so an initializer of 400 rows took 28.8 s where it now takes 0.3 s. The build analyzer, the xUnit adapter and every command and MCP tool
-  that reads the code run this extraction, and what it extracts is unchanged.
+  bound the whole initializer again, so an initializer of 400 rows took 28.8 s where it now takes 0.3 s.
+  The build analyzer, the xUnit adapter and every command and MCP tool that reads the code run this
+  extraction, and what it extracts is unchanged.
 
 ## [0.2.0] - 2026-10-18
 
@@ -297,7 +300,8 @@ renders the same rules as context for coding agents.
 - **Self-hosting.** This repository's own spec governs its code. CI runs every read command against it,
   and `render` keeps fifteen committed artifacts here current.
 
-[Unreleased]: https://github.com/andypgray/sliderule/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/andypgray/sliderule/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/andypgray/sliderule/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/andypgray/sliderule/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/andypgray/sliderule/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/andypgray/sliderule/compare/v0.1.0...v0.1.1
