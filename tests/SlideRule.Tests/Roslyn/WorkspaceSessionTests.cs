@@ -59,7 +59,7 @@ public sealed class WorkspaceSessionTests(SharedWorkspaceSession shared) : IClas
     public async Task GetCurrentAsync_NoChange_ReturnsSameSnapshotAndReadsNothing()
     {
         // Arrange — a first load lets the design-time build write the generated sources it owns under obj/;
-        // then the whole tree, inputs and outputs alike, is stamped well outside the racy window, so the
+        // then the whole tree, inputs and outputs alike, is stamped just outside the racy window, so the
         // measured load writes nothing and every stat it takes is trusted from the first sweep: the steady
         // state, reached with no warmup sweep.
         using var fixture = new TempFixtureWorkspace();

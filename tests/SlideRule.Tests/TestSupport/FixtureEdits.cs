@@ -1,4 +1,5 @@
 using SlideRule.Roslyn;
+using SlideRule.Roslyn.Caching;
 
 namespace SlideRule.Tests.TestSupport;
 
@@ -21,10 +22,14 @@ namespace SlideRule.Tests.TestSupport;
 ///         "now" can land inside the same tick as the load and read as unchanged.
 ///     </para>
 ///     <para>
-///         <b>Backward, -1d.</b> Backdating puts every input comfortably outside the racy window, so the
-///         next capture stamps it promoted — the precondition for the stat fast path. Backdating is
-///         best-effort: a file that cannot be re-stamped stays racy and re-reads, which costs a read and no
-///         correctness.
+///         <b>Backward.</b> Backdating puts a file outside the racy window, so the next capture stamps it
+///         promoted — the precondition for the stat fast path. <see cref="BackdateAllDocuments" /> stamps the
+///         documents a day back, older than the build outputs a load wrote beside them.
+///         <see cref="BackdateTree" /> stamps a whole tree, outputs included, twice the window back and no
+///         further: a stamp older than an input outside the tree, such as the targets of an SDK installed
+///         minutes earlier, leaves the outputs out of date, and the next design-time build brings them up to
+///         date again with a stamp inside the window. Backdating is best-effort: a file that cannot be
+///         re-stamped stays racy and re-reads, which costs a read and no correctness.
 ///     </para>
 ///     <para>
 ///         <b>Git's index, -10s.</b> <see cref="MakeGitIndexStatStale" /> serves git's stat cache rather than the
@@ -93,13 +98,13 @@ internal static class FixtureEdits
     }
 
     /// <summary>
-    ///     Stamps every file under <paramref name="root" /> well into the past — the persisted-cache analog of
-    ///     <see cref="BackdateAllDocuments" />, over a directory tree rather than a loaded solution.
+    ///     Stamps every file under <paramref name="root" /> just past the racy window — the persisted-cache analog
+    ///     of <see cref="BackdateAllDocuments" />, over a directory tree rather than a loaded solution.
     /// </summary>
     internal static void BackdateTree(string root)
     {
-        DateTime wellPast = DateTime.UtcNow.AddDays(-1);
-        foreach (string file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories)) Backdate(file, wellPast);
+        DateTime pastRacyWindow = DateTime.UtcNow - FileFreshness.RacyWindow * 2;
+        foreach (string file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories)) Backdate(file, pastRacyWindow);
     }
 
     /// <summary>
