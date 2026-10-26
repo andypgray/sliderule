@@ -64,8 +64,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   synchronization context the test host installed. Before, a host that blocked on the adapter's work under
   such a context could deadlock.
 - Extracting a field or property initializer now takes time in proportion to its size. Before, each method
-  call or object creation in it bound the whole initializer again, so an initializer of 400 rows took
-  28.8 s where it now takes 0.3 s. The build analyzer, the xUnit adapter and every command and MCP tool
+  call, object creation, `?.` call and type name in it, such as a type argument, a cast or a qualified name,
+  bound the whole initializer again, so an initializer of 400 rows took 28.8 s where it now takes 0.3 s. The build analyzer, the xUnit adapter and every command and MCP tool
   that reads the code run this extraction, and what it extracts is unchanged.
 
 ## [0.2.0] - 2026-10-18

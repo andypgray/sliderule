@@ -135,6 +135,76 @@ public sealed class CodebaseExtractorEdgeTests
             .ShouldBe([4]);
     }
 
+    [Theory]
+    [InlineData("default(Target)", "N.Target")]
+    [InlineData("new Target[1]", "N.Target")]
+    [InlineData("(Target)null", "N.Target")]
+    [InlineData("new List<Target>()", "N.Target")]
+    [InlineData("Echo<Target>(null)", "N.Target")]
+    [InlineData("default(Target?)", "N.Target")]
+    [InlineData("default((Target, int))", "N.Target")]
+    [InlineData("(Func<Target, Target>)((Target t) => t)", "N.Target")]
+    [InlineData("new Outer.Inner()", "N.Outer")]
+    [InlineData("new Outer.Inner()", "N.Outer.Inner")]
+    [InlineData("default(Outer.Inner)", "N.Outer.Inner")]
+    [InlineData("new global::N.Outer.Inner[0]", "N.Outer.Inner")]
+    public void ExtractFromCompilations_TypeWrittenInAnInitializerExpression_ProducesEdge(string expression, string target)
+    {
+        CodebaseModel model = CompilationFactory.Extract($$"""
+                                                           #nullable enable
+                                                           using System; using System.Collections.Generic;
+                                                           namespace N;
+                                                           public class Target {}
+                                                           public static class Outer { public class Inner {} }
+                                                           public static class Holder
+                                                           {
+                                                               public static object? Value { get; } = {{expression}};
+                                                               private static T? Echo<T>(T? x) => x;
+                                                           }
+                                                           """);
+
+        model.Edge("N.Holder", target)
+            .Sites.Lines()
+            .ShouldBe([8]);
+    }
+
+    [Fact]
+    public void ExtractFromCompilations_ConstantAfterIs_ProducesMemberEdgeToTheConstant()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public static class Limits { public const int Max = 3; }
+                                                         public static class Holder
+                                                         {
+                                                             public static object Box = 3;
+                                                             public static bool Full { get; } = Box is Limits.Max;
+                                                         }
+                                                         """);
+
+        // `is Limits.Max` reads as a type but binds to the constant, so the name is asked as written.
+        model.MemberEdges("N.Holder")
+            .Select(e => e.Member.SymbolId)
+            .ShouldContain("F:N.Limits.Max");
+    }
+
+    [Fact]
+    public void ExtractFromCompilations_AttributeOnALambdaInAnInitializer_ProducesEdgeToAttributeClass()
+    {
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         using System;
+                                                         namespace N;
+                                                         public sealed class MarkerAttribute : Attribute {}
+                                                         public static class Holder
+                                                         {
+                                                             public static Func<int> Make { get; } = [Marker] () => 1;
+                                                         }
+                                                         """);
+
+        model.Edge("N.Holder", "N.MarkerAttribute")
+            .Sites.Lines()
+            .ShouldBe([6]);
+    }
+
     [Fact]
     public void ExtractFromCompilations_StaticMemberAccess_ProducesSingleDedupedSite()
     {

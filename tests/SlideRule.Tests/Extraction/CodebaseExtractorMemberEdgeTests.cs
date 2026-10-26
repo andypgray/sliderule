@@ -136,18 +136,19 @@ public sealed class CodebaseExtractorMemberEdgeTests
                                                              public static Action Ping = () => {};
                                                              public static Func<int> Count => () => 1;
                                                          }
+                                                         public sealed class Relay { public static Relay? Instance; public Action Pong = () => {}; }
                                                          public static class Caller
                                                          {
-                                                             public static object[] Calls { get; } = [Run(() => Hooks.Ping()), Hooks.Count()];
+                                                             public static object[] Calls { get; } = [Run(() => Hooks.Ping()), Hooks.Count(), Run(() => Relay.Instance?.Pong())];
                                                              private static object Run(Action a) => a;
                                                          }
                                                          """);
 
-        // The call binds the delegate's Invoke; the name it invokes is the field or property.
+        // The call binds the delegate's Invoke; the name it invokes, directly or after `?.`, is the field or property.
         model.MemberEdges("N.Caller")
             .Select(e => e.Member.SymbolId)
             .OrderBy(id => id, StringComparer.Ordinal)
-            .ShouldBe(["F:N.Hooks.Ping", "P:N.Hooks.Count"]);
+            .ShouldBe(["F:N.Hooks.Ping", "F:N.Relay.Instance", "F:N.Relay.Pong", "P:N.Hooks.Count"]);
     }
 
     [Fact]
