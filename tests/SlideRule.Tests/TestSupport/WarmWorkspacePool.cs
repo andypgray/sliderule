@@ -105,7 +105,7 @@ internal static class WarmWorkspacePool
             // lists, no warm-pool test could ever observe a failed project, a narrowed universe, or the
             // stamps and refusals keyed on either — the pool would silently answer "nothing to report".
             return new SolutionHandle(
-                snapshot.Solution, snapshot.LoadDiagnostics, null,
+                snapshot.Solution, snapshot.LoadDiagnostics, null, snapshot.ProjectFiles,
                 targetFrameworks: snapshot.TargetFrameworks);
         }
     }

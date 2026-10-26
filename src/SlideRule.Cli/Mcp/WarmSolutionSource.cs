@@ -39,11 +39,10 @@ internal sealed class WarmSolutionSource(
     {
         WorkspaceSnapshot snapshot = await session.GetCurrentAsync(solutionPath, ct);
         return new SolutionHandle(
-            snapshot.Solution, snapshot.LoadDiagnostics, null,
+            snapshot.Solution, snapshot.LoadDiagnostics, null, snapshot.ProjectFiles,
             (exclude, declaredMembers, token) => store.GetCodebaseAsync(snapshot, exclude, declaredMembers, token),
             (normalizedSpec, resolveFully) => resolutions.Resolve(normalizedSpec, snapshot.Generation, resolveFully),
             snapshot.TargetFrameworks,
-            snapshot.ProjectFiles,
             warmDeclaredMembers: () => DeclaredMembersFor(solutionPath, snapshot.Generation));
     }
 

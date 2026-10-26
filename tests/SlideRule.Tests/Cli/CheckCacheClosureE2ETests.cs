@@ -218,7 +218,7 @@ public sealed class CheckCacheClosureE2ETests
                 FailedProjects = [DiagnosticInjectingSolutionSource.SimulatedFailedProject]
             };
             return new SolutionHandle(
-                real.Solution, failed, real, targetFrameworks: real.TargetFrameworks,
+                real.Solution, failed, real, real.ProjectFiles, targetFrameworks: real.TargetFrameworks,
                 isClosure: real.IsClosure);
         }
     }

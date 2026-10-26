@@ -3,6 +3,7 @@ using Shouldly;
 using SlideRule.Cli.Pipeline;
 using SlideRule.Cli.Replay;
 using SlideRule.Roslyn.Diagnostics;
+using SlideRule.Roslyn.Solutions;
 using Xunit;
 
 namespace SlideRule.Tests.Cli;
@@ -58,7 +59,8 @@ public sealed class NoticingSolutionSourceTests
         private SolutionHandle Handle(bool isClosure)
         {
             return new SolutionHandle(
-                workspace.CurrentSolution, WorkspaceDiagnostics.None, null, isClosure: isClosure);
+                workspace.CurrentSolution, WorkspaceDiagnostics.None, null,
+                CanonicalProjectFiles.Of(workspace.CurrentSolution), isClosure: isClosure);
         }
     }
 }

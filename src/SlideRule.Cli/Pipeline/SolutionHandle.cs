@@ -15,10 +15,10 @@ internal sealed class SolutionHandle(
     Solution solution,
     WorkspaceDiagnostics loadDiagnostics,
     IDisposable? owned,
+    CanonicalProjectFiles projectFiles,
     Func<IReadOnlyCollection<string>, IReadOnlySet<string>?, CancellationToken, Task<SessionCodebase>>? warmCodebase = null,
     Func<string, Func<SessionSpecResolution>, SessionSpecResolution>? warmSpecResolution = null,
     IReadOnlyDictionary<ProjectId, string>? targetFrameworks = null,
-    CanonicalProjectFiles? projectFiles = null,
     bool isClosure = false,
     Func<IReadOnlySet<string>?>? warmDeclaredMembers = null) : IDisposable
 {
@@ -39,11 +39,8 @@ internal sealed class SolutionHandle(
     public IReadOnlyDictionary<ProjectId, string> TargetFrameworks { get; } =
         targetFrameworks ?? TargetFrameworkMaps.None;
 
-    /// <summary>
-    ///     Each loaded project's canonical <c>.csproj</c> path, as the load resolved it; resolved here when the
-    ///     source passed none.
-    /// </summary>
-    public CanonicalProjectFiles ProjectFiles { get; } = projectFiles ?? CanonicalProjectFiles.Of(solution);
+    /// <summary>Each loaded project's canonical <c>.csproj</c> path, as the load resolved it.</summary>
+    public CanonicalProjectFiles ProjectFiles { get; } = projectFiles;
 
     /// <summary>How well the workspace loaded. Its merge notes are empty: only extraction produces them.</summary>
     public WorkspaceDiagnostics LoadDiagnostics { get; } = loadDiagnostics;

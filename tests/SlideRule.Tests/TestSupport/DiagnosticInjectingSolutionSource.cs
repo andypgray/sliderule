@@ -18,8 +18,7 @@ namespace SlideRule.Tests.TestSupport;
 ///         and never gate at all. A caller that wants a refusal injects a failed or restore-failed project, a
 ///         caller that wants a rendered-but-harmless warning injects a diagnostic, a caller that wants a
 ///         narrowed universe injects an unchecked project, and a caller testing that they do not leak into
-///         each other injects one without the others — which is the shape both localized-message defects took
-///         in the field.
+///         each other injects one without the others.
 ///     </para>
 ///     <para>
 ///         <b>Why the restore cause is injected rather than restored.</b> A real broken restore costs a live
@@ -72,7 +71,7 @@ internal sealed class DiagnosticInjectingSolutionSource(
         // exercise today: this double re-wraps a real handle, so anything it drops silently sends the run
         // down the cold path and quietly changes what the gate is being tested against.
         return new SolutionHandle(
-            real.Solution, injected, real, real.WarmCodebase, real.WarmSpecResolution,
+            real.Solution, injected, real, real.ProjectFiles, real.WarmCodebase, real.WarmSpecResolution,
             real.TargetFrameworks, warmDeclaredMembers: real.WarmDeclaredMembers);
     }
 }
