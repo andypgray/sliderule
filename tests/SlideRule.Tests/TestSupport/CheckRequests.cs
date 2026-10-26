@@ -20,7 +20,7 @@ internal static class CheckRequests
     internal static CheckRequest For(string solution, string? spec, string workingDirectory)
     {
         return new CheckRequest(
-            solution, spec, Json: false, HookJson: false, DiffBase: null, workingDirectory, NoCache: false,
+            solution, spec, Json: false, DiffBase: null, workingDirectory, NoCache: false,
             Binlog: null, AllowWorkspaceDiagnostics: false, Sarif: null, Rules: null, DocumentGrain.Full);
     }
 }

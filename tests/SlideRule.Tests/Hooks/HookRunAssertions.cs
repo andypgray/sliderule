@@ -153,14 +153,14 @@ internal static class HookRunAssertions
     }
 
     /// <summary>
-    ///     The exit code, both output channels, every check with the tree and event it was for, and the two
+    ///     The exit code, both output channels, the tree of every check it ran, and the two
     ///     directories a run is pointed at: what the hook did, and where it was standing when it did it.
     /// </summary>
     private static string Describe(HookRun run)
     {
         string checks = run.Checks.Count == 0
             ? "no check"
-            : string.Join(", ", run.Checks.Select(static check => $"{check.HookEvent} in {check.WorkingDirectory}"));
+            : "checks in " + string.Join(", ", run.Checks.Select(static check => check.WorkingDirectory));
 
         return $"Started in {run.WorkingDirectory}, against the sandbox project directory {run.ProjectDirectory}, "
                + $"having run {checks}.{Environment.NewLine}{run.Result.Transcript()}";

@@ -1,4 +1,3 @@
-using System.Text.Json;
 using SlideRule.Cli.Diff;
 using SlideRule.Cli.Hooks;
 using SlideRule.Cli.Mcp.Infrastructure;
@@ -290,7 +289,7 @@ internal sealed class HookRunner(
     {
         var checks = new List<(TreeTurn Tree, HookCheckResult Result)>();
         foreach (TreeTurn tree in firing.Trees.Where(static turn => turn.Due))
-            checks.Add((tree, await RunCheckAsync(firing.Event, tree, request, ct)));
+            checks.Add((tree, await RunCheckAsync(tree, request, ct)));
 
         // Named when a tree other than the session's own was checked, so the agent can tell which tree a report
         // is about; a stop that checked only its own tree names none.
@@ -373,22 +372,21 @@ internal sealed class HookRunner(
     // Resolution and the check, each under the command handler, so whatever the CLI would refuse with exit 2 comes
     // back as a result with that code and its message: a malformed settings file, a solution that is not there, a
     // check that fails. The exit map then reports it as SlideRule's own error and ends the turn, as for any other.
-    private async Task<HookCheckResult> RunCheckAsync(
-        string hookEvent, TreeTurn tree, HookRequest request, CancellationToken ct)
+    private async Task<HookCheckResult> RunCheckAsync(TreeTurn tree, HookRequest request, CancellationToken ct)
     {
         var refusal = new StringWriter();
         (bool resolved, CheckRequest? checkRequest) = await CommandEntryPoint.TryRunAsync(
-            () => Task.FromResult(CheckRequestFor(hookEvent, tree, request)), refusal, ct);
+            () => Task.FromResult(CheckRequestFor(tree, request)), refusal, ct);
 
         return resolved
             ? await check.RunAsync(checkRequest!, ct)
             : new HookCheckResult(ExitCodes.Error, "", refusal.ToString());
     }
 
-    // The check this firing calls for, rendered for the hook, with the solution and spec resolved from the tree
-    // rather than from where the process started: relative paths are the tree's, and so is the settings file. Given
-    // the changed files, the check reads them rather than listing its own since the diff base.
-    private CheckRequest CheckRequestFor(string hookEvent, TreeTurn turn, HookRequest request)
+    // The check this firing calls for, with the solution and spec resolved from the tree rather than from where the
+    // process started: relative paths are the tree's, and so is the settings file. Given the changed files, the check
+    // reads them rather than listing its own since the diff base.
+    private CheckRequest CheckRequestFor(TreeTurn turn, HookRequest request)
     {
         string tree = Path.GetFullPath(turn.Tree);
         string? solution = FullPath(request.Solution, tree);
@@ -399,7 +397,6 @@ internal sealed class HookRunner(
             targets.Solution,
             targets.Spec,
             Json: false,
-            HookJson: true,
             turn.ChangedFiles is null ? request.DiffBase : null,
             tree,
             NoCache: false,
@@ -408,7 +405,6 @@ internal sealed class HookRunner(
             Sarif: null,
             Rules: null,
             DocumentGrain.Full,
-            hookEvent,
             turn.ChangedFiles);
     }
 
@@ -570,38 +566,16 @@ internal sealed class HookRunner(
         return string.Join("\n\n", reports);
     }
 
-    // The hook document for the clean checks, or "" when none had anything to say. A stop that is not `named`
-    // checked one tree, and passes its document through as the check wrote it. Otherwise each check's context goes
-    // under a line naming its tree, in one document.
+    // The hook document for the clean checks, naming the event that fired, or "" when none had anything to say. Each
+    // check's text goes under a line naming its tree when the stop is `named`, in one document.
     private static string Document(
         string hookEvent, IReadOnlyList<(TreeTurn Tree, HookCheckResult Result)> checks, bool named)
     {
-        if (!named) return checks[0].Result.Output.TrimEnd('\r', '\n');
-
-        List<string> contexts = checks.Select(check => (check.Tree, Context: ContextOf(check.Result.Output)))
+        List<string> contexts = checks.Select(check => (check.Tree, Context: check.Result.Output.TrimEnd('\r', '\n')))
             .Where(static check => check.Context.Length > 0)
-            .Select(static check => $"{TreeLine(check.Tree)}\n{check.Context}")
+            .Select(check => named ? $"{TreeLine(check.Tree)}\n{check.Context}" : check.Context)
             .ToList();
         return contexts.Count == 0 ? "" : HookReportRenderer.Document(string.Join("\n\n", contexts), hookEvent);
-    }
-
-    // The context a check's hook document carries, or the output itself should it not read as one.
-    private static string ContextOf(string output)
-    {
-        string trimmed = output.TrimEnd('\r', '\n');
-        if (trimmed.Length == 0) return "";
-
-        try
-        {
-            HookJson? document = JsonSerializer.Deserialize(trimmed, SlideRuleJson.Context.HookJson);
-            // A document without the object deserializes with it null, whatever the annotation says.
-            // ReSharper disable once ConditionalAccessQualifierIsNonNullableAccordingToAPIContract
-            return document?.HookSpecificOutput?.AdditionalContext ?? trimmed;
-        }
-        catch (JsonException)
-        {
-            return trimmed;
-        }
     }
 
     private static string TreeLine(TreeTurn tree)

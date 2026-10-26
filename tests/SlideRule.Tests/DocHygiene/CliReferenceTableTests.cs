@@ -174,7 +174,7 @@ public sealed class CliReferenceTableTests
 
         // Assert
         stated.ShouldBe(
-            HookReportRenderer.Events,
+            [HookReportRenderer.DefaultEvent, HookReportRenderer.StopEvent, HookReportRenderer.SubagentStopEvent],
             ignoreOrder: true,
             $"The event table under '## {DocumentsHeading}' states {string.Join(", ", stated)}.");
     }

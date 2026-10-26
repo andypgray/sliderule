@@ -363,7 +363,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
     }
 
     [Fact]
-    public async Task Check_HookJsonOnAViolatedSpec_FlushesTheAdvisoryAsOneGroupedLine()
+    public async Task CheckForTheHook_OnAViolatedSpec_FlushesTheAdvisoryAsOneGroupedLine()
     {
         // A red run hands the hook its whole composed report to block with, the warnings included — so eight
         // load lines for one advisory would reach the agent as eight copies of that message. It carries one.
@@ -371,7 +371,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         IReadOnlyList<string> lines = [.. Enumerable.Repeat(AuditDiagnostic, 4), .. Enumerable.Repeat(testsAdvisory, 4)];
 
         CliResult result = await RunWithInjectedDiagnosticAsync(
-            lines, CliRunner.ViolatedSpecDll, false, false, hookJson: true);
+            lines, CliRunner.ViolatedSpecDll, false, false, forTheHook: true);
 
         result.ShouldReportViolations();
         string grouped = "warning: " + new PackageAuditEntry(AuditMessage, ["App", "App.Tests"]).Describe();
@@ -381,12 +381,12 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
     }
 
     [Fact]
-    public async Task Check_HookJsonOnACleanSpecWithOnlyAdvisories_WritesNothing()
+    public async Task CheckForTheHook_OnACleanSpecWithOnlyAdvisories_WritesNothing()
     {
         // A clean run with nothing to say writes nothing, and an advisory is not something the hook says: it
         // raises no check warning, so the agent's turn ends without a word about it.
         CliResult result = await RunWithInjectedDiagnosticAsync(
-            [AuditDiagnostic], CliRunner.CleanSpecDll, false, false, hookJson: true);
+            [AuditDiagnostic], CliRunner.CleanSpecDll, false, false, forTheHook: true);
 
         result.ShouldSucceed();
         result.Out.ShouldBeEmpty();
@@ -669,7 +669,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         string? sarif = null, IReadOnlyList<string>? failedProjects = null,
         IReadOnlyList<string>? uncheckedProjects = null,
         IReadOnlyList<string>? restoreFailedProjects = null,
-        bool hookJson = false,
+        bool forTheHook = false,
         CancellationToken? cancellationToken = null)
     {
         string solution = CliRunner.MyAppSolution;
@@ -678,12 +678,16 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         CheckRequest request = CheckRequests.For(solution, spec, SolutionPaths.SolutionDirectoryOf(solution))
             with
             {
-                Json = json, HookJson = hookJson, NoCache = true, AllowWorkspaceDiagnostics = allowWorkspaceDiagnostics,
+                Json = json, NoCache = true, AllowWorkspaceDiagnostics = allowWorkspaceDiagnostics,
                 Sarif = sarif
             };
 
+        CancellationToken ct = cancellationToken ?? Ct;
         return await CliResult.CapturedAsync((output, error) =>
-            new CheckRunner(output, error, source, new FakeEnvironment()).RunAsync(request, cancellationToken ?? Ct));
+        {
+            var runner = new CheckRunner(output, error, source, new FakeEnvironment());
+            return forTheHook ? runner.RunForHookAsync(request, ct) : runner.RunAsync(request, ct);
+        });
     }
 
     // Declares Shared.Widget in two projects that do not reference each other (Domain → Web → Billing, so

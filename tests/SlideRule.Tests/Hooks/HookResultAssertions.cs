@@ -7,7 +7,7 @@ namespace SlideRule.Tests.Hooks;
 
 /// <summary>
 ///     The Shouldly surface over a <see cref="CliResult" /> from the <c>hook</c> verb: each assertion names the exit
-///     contract in Claude Code's terms (the stop stands, in silence or with the check's document passed through; the
+///     contract in Claude Code's terms (the stop stands, in silence or with the check's text handed on as context; the
 ///     stop is refused; SlideRule's own error is reported) rather than the integer that encodes it, and carries both
 ///     output channels into its failure message.
 /// </summary>
@@ -46,16 +46,16 @@ internal static class HookResultAssertions
     }
 
     /// <summary>
-    ///     Asserts the stop stood with the check's document passed through: exit 0, nothing on stderr, and every one
-    ///     of <paramref name="outFragments" /> on stdout.
+    ///     Asserts the stop stood with <paramref name="context" /> handed to the agent: exit 0, nothing on stderr, and
+    ///     stdout the one document naming <paramref name="hookEvent" /> and carrying exactly that context.
     /// </summary>
-    internal static CliResult ShouldProceedWith(this CliResult result, params string[] outFragments)
+    internal static CliResult ShouldProceedWithContext(this CliResult result, string hookEvent, string context)
     {
         string report = result.Transcript();
         result.Exit.ShouldBe(HookExitCodes.Proceed, report);
         result.Err.ShouldBeEmpty(report);
-        string output = result.Out;
-        foreach (string fragment in outFragments) output.ShouldContain(fragment, customMessage: report);
+        result.ShouldHaveHookAdditionalContext(hookEvent)
+            .ShouldBe(context, report);
 
         return result;
     }

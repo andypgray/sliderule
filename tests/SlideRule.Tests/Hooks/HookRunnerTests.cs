@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using Shouldly;
 using SlideRule.Cli.Hooks;
-using SlideRule.Cli.Rendering;
 using SlideRule.Cli.Verbs;
 using SlideRule.Tests.Cli;
 using SlideRule.Tests.Mcp.TestDoubles;
@@ -79,11 +78,10 @@ public sealed class HookRunnerTests
         switch (row.Outcome)
         {
             case HookOutcome.StopStands:
-                // On exit 0 the check writes the hook document and the hook passes it through: Claude Code parses an
-                // exit-0 hook's stdout, so what the check wrote has to arrive there verbatim, unprefixed and not
-                // diverted to stderr. The scripted check stands in for the real one, so what this row measures is the
-                // passthrough rather than the document.
-                run.Result.ShouldProceedWith(CannedReport);
+                // On exit 0 the check's text goes out as the context of the hook document: Claude Code parses an
+                // exit-0 hook's stdout, so the text has to arrive there whole, inside the one document, and not
+                // diverted to stderr. With no payload the hook answers for the per-edit event.
+                run.Result.ShouldProceedWithContext("PostToolUse", CannedReport);
                 break;
             case HookOutcome.StopRefused:
                 // 2 is how a Claude Code hook blocks, and the report on stderr is what the agent reads to correct
@@ -293,40 +291,37 @@ public sealed class HookRunnerTests
     }
 
     [Fact]
-    public async Task EditPayload_ChecksForThePerEditEvent()
+    public async Task EditPayload_AnswersForThePerEditEvent()
     {
         // Act: an event the hook has no branch for, carrying a code edit.
         HookRun run = await FireAsync(
             Arrange(), """{"hook_event_name":"PreToolUse","tool_input":{"file_path":"src/Probe.cs"}}""", ExitCodes.Clean);
 
-        // Assert: the per-edit path always asks for the PostToolUse document, the one per-edit event whose context
-        // reaches the agent, and it asks for hook mode over the diff base the command line named.
+        // Assert: the per-edit path always answers with the PostToolUse document, the one per-edit event whose
+        // context reaches the agent, and it asks for the human report over the diff base the command line named.
         CheckRequest check = run.ShouldHaveRunOneCheck();
         check.ShouldSatisfyAllConditions(
-            () => check.HookEvent.ShouldBe("PostToolUse"),
-            () => check.HookJson.ShouldBeTrue(),
             () => check.Json.ShouldBeFalse(),
             () => check.DiffBase.ShouldBe("HEAD"));
+        run.Result.ShouldProceedWithContext("PostToolUse", CannedReport);
     }
 
     [Fact]
-    public async Task StopPayload_ChecksForTheEventThatFired()
+    public async Task StopPayload_AnswersForTheEventThatFired()
     {
         // Arrange
         HookSandbox sandbox = ArrangeRepository();
 
         // Act: the worker stops in a session of its own, because in the first stop's session it would skip on that
         // stop's green verdict and ask for no check at all.
-        HookRun stop = await FireAsync(sandbox, StopPayload(sandbox), ExitCodes.Clean, quiet: true);
+        HookRun stop = await FireAsync(sandbox, StopPayload(sandbox), ExitCodes.Clean);
         HookRun worker = await FireAsync(
-            sandbox, StopPayload(sandbox, "s2", eventName: "SubagentStop"), ExitCodes.Clean, quiet: true);
+            sandbox, StopPayload(sandbox, "s2", eventName: "SubagentStop"), ExitCodes.Clean);
 
-        // Assert: Claude Code reads the context only from a document naming the event it fired, so each stop asks
-        // the check for its own event's document.
-        stop.ShouldHaveRunOneCheck()
-            .HookEvent.ShouldBe("Stop");
-        worker.ShouldHaveRunOneCheck()
-            .HookEvent.ShouldBe("SubagentStop");
+        // Assert: Claude Code reads the context only from a document naming the event it fired, so each stop's
+        // document names its own event.
+        stop.Result.ShouldProceedWithContext("Stop", CannedReport);
+        worker.Result.ShouldProceedWithContext("SubagentStop", CannedReport);
     }
 
     [Fact]
@@ -376,7 +371,7 @@ public sealed class HookRunnerTests
     }
 
     [Fact]
-    public async Task StopPayload_CleanRunWithWarnings_PassesTheDocumentThrough()
+    public async Task StopPayload_CleanRunWithWarnings_HandsTheTextOnAsContext()
     {
         // Arrange
         HookSandbox sandbox = ArrangeRepository();
@@ -386,7 +381,7 @@ public sealed class HookRunnerTests
 
         // Assert: a tripwire warning leaves the verdict green, but the agent still has to read it. Exit 0 with the
         // document on stdout is how Claude Code turns it into one continuation of the turn rather than a block.
-        run.Result.ShouldProceedWith(CannedReport);
+        run.Result.ShouldProceedWithContext("Stop", CannedReport);
         ShouldHaveState(sandbox, "verdict")
             .ShouldStartWith("green");
         // Counted like a block, because the cap bounds every continuation of the turn, whatever caused it.
@@ -690,21 +685,16 @@ public sealed class HookRunnerTests
             .ShouldStartWith("red", customMessage: "The worktree keeps the verdict its own check gave.");
     }
 
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public async Task StopPayload_WarningsInTwoTrees_GoOutInOneDocumentNamingEach(bool checkWritesADocument)
+    [Fact]
+    public async Task StopPayload_WarningsInTwoTrees_GoOutInOneDocumentNamingEach()
     {
-        // Arrange: the check writes the document hook mode writes for a clean run with warnings, or, in the second
-        // row, plain text that does not read as one, which is carried over as it stands.
+        // Arrange: each tree's check writes the report a clean run with warnings hands the hook.
         HookSandbox sandbox = ArrangeRepository();
         (_, string probe) = AddWrittenWorktree(sandbox);
         string transcript = SaveTranscript(sandbox, new HookTranscript().Wrote(probe));
-        string checkOutput = checkWritesADocument ? HookReportRenderer.Document(CannedReport, "Stop") : CannedReport;
 
         // Act
-        HookRun run = await FireAsync(
-            sandbox, StopPayload(sandbox, transcriptPath: transcript), ExitCodes.Clean, stdout: checkOutput + "\n");
+        HookRun run = await FireAsync(sandbox, StopPayload(sandbox, transcriptPath: transcript), ExitCodes.Clean);
 
         // Assert: Claude Code parses one document from stdout, so both trees' warnings ride in it, each under its tree.
         run.ShouldExitWith(HookExitCodes.Proceed);
@@ -887,7 +877,7 @@ public sealed class HookRunnerTests
         ArrangeStateThatKeepsNothing(sandbox);
 
         HookRun first = await FireAsync(sandbox, StopPayload(sandbox), ExitCodes.Clean, maxRounds: 1);
-        first.Result.ShouldProceedWith(CannedReport);
+        first.Result.ShouldProceedWithContext("Stop", CannedReport);
 
         // Act and assert: with no record of what was said, the said-once rule cannot hold the warnings back
         // either, so the round fallback is what stops the same document coming back at every stop.
@@ -1247,7 +1237,7 @@ public sealed class HookRunnerTests
         string probe = WriteProbe(sandbox);
         string payload = StopPayload(sandbox);
         (await FireAsync(sandbox, payload, ExitCodes.Clean))
-            .Result.ShouldProceedWith(CannedReport);
+            .Result.ShouldProceedWithContext("Stop", CannedReport);
         Rewrite(probe);
 
         // Act
@@ -1279,7 +1269,7 @@ public sealed class HookRunnerTests
 
         // Assert: not "never twice". A clean run with nothing to say in between means the warnings went away, and
         // a warning that comes back is news about a new edit.
-        returned.Result.ShouldProceedWith(CannedReport);
+        returned.Result.ShouldProceedWithContext("Stop", CannedReport);
     }
 
     [Fact]
@@ -1289,7 +1279,7 @@ public sealed class HookRunnerTests
         HookSandbox sandbox = ArrangeRepository();
         string probe = WriteProbe(sandbox);
         (await FireAsync(sandbox, StopPayload(sandbox, eventName: "SubagentStop", agentId: "a1"), ExitCodes.Clean))
-            .Result.ShouldProceedWith(CannedReport);
+            .Result.ShouldProceedWithContext("SubagentStop", CannedReport);
         Rewrite(probe);
 
         // Act
@@ -1297,7 +1287,7 @@ public sealed class HookRunnerTests
 
         // Assert: what a worker was told is in the worker's context, not the main agent's, so the record of what was
         // said is kept per agent and the main agent still gets the warnings once.
-        main.Result.ShouldProceedWith(CannedReport);
+        main.Result.ShouldProceedWithContext("Stop", CannedReport);
     }
 
     [Fact]

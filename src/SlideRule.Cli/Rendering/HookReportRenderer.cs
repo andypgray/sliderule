@@ -32,12 +32,6 @@ internal static class HookReportRenderer
     public const string SubagentStopEvent = "SubagentStop";
 
     /// <summary>
-    ///     The events <c>sliderule hook</c> answers, and so the only names this document may carry. Claude Code
-    ///     takes additional context on other events too, but nothing here is wired to them.
-    /// </summary>
-    public static readonly IReadOnlyList<string> Events = [DefaultEvent, StopEvent, SubagentStopEvent];
-
-    /// <summary>
     ///     The one-object document carrying <paramref name="report" /> as additional context for
     ///     <paramref name="hookEvent" />, with no trailing newline (the caller writes it through
     ///     <see cref="SlideRuleJson.Terminated" />). The context's line ends are LF on every OS, whatever the

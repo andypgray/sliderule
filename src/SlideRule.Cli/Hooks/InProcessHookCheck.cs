@@ -20,7 +20,7 @@ internal sealed class InProcessHookCheck(ISolutionSource hostSource, IEnvironmen
         // The handler every command runs under, reporting to the same writer the run does, so a refusal lands in
         // the buffer with the text and the exit code `sliderule check` would have given it.
         int code = await CommandEntryPoint.RunAsync(
-            () => MsBuildGate.RunCheckAsync(request, output, error, hostSource, environment, ct),
+            () => MsBuildGate.RunHookCheckAsync(request, output, error, hostSource, environment, ct),
             error,
             ct);
 

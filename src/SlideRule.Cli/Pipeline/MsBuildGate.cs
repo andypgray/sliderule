@@ -63,6 +63,18 @@ internal static class MsBuildGate
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
+    public static Task<int> RunHookCheckAsync(
+        CheckRequest request, TextWriter output, TextWriter error, ISolutionSource hostSource,
+        IEnvironment environment, CancellationToken ct)
+    {
+        return SelectSourceAndRunAsync(
+            request, error, hostSource, environment,
+            (solution, source) =>
+                InvokeHookCheckAsync(request with { Solution = solution }, output, error, source, environment, ct),
+            ct);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
     public static Task<int> RunStatusAsync(
         StatusRequest request, TextWriter output, TextWriter error, ISolutionSource hostSource,
         IEnvironment environment, CancellationToken ct)
@@ -272,6 +284,14 @@ internal static class MsBuildGate
         IEnvironment environment, CancellationToken ct)
     {
         return new CheckRunner(output, error, source, environment).RunAsync(request, ct);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static Task<int> InvokeHookCheckAsync(
+        CheckRequest request, TextWriter output, TextWriter error, ISolutionSource source,
+        IEnvironment environment, CancellationToken ct)
+    {
+        return new CheckRunner(output, error, source, environment).RunForHookAsync(request, ct);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]

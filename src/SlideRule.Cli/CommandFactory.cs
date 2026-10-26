@@ -133,7 +133,6 @@ internal static class CommandFactory
                 targets.Solution,
                 targets.Spec,
                 parseResult.GetValue(json),
-                HookJson: false,
                 parseResult.GetValue(diffBase),
                 Directory.GetCurrentDirectory(),
                 parseResult.GetValue(noCache),

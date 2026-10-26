@@ -40,12 +40,13 @@ public sealed class HookReportRendererTests
     }
 
     [Fact]
-    public void Events_AreTheThreeTheRunnerWillRenderFor()
+    public void EventNames_AreTheOnesClaudeCodeFires()
     {
-        // The renderer owns the set the runner refuses against, so the two cannot drift into a CLI that
-        // accepts an event this document may not name.
-        HookReportRenderer.Events.ShouldBe(["PostToolUse", "Stop", "SubagentStop"]);
+        // The hook dispatches on these names and puts them in the document, and Claude Code drops a document
+        // naming any event but the one it fired, so each must be Claude Code's own spelling.
         HookReportRenderer.DefaultEvent.ShouldBe("PostToolUse");
+        HookReportRenderer.StopEvent.ShouldBe("Stop");
+        HookReportRenderer.SubagentStopEvent.ShouldBe("SubagentStop");
     }
 
     [Fact]

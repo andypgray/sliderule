@@ -68,11 +68,11 @@ public sealed class TripwireDiffE2ETests
     private const string QuarantineDragons =
         "  dragons: Banker's rounding happens at line-item level, NOT invoice level. Do not normalize.";
 
-    // One untracked file in dragon territory, read on three channels and once more through a request naming a
+    // One untracked file in dragon territory, read on two channels and once more through a request naming a
     // different file. The rows differ only in the output they ask for and none of them mutates further, so the
-    // leased tree — and the wholesale workspace reload a new source file forces on it — is paid once for the four
+    // leased tree — and the wholesale workspace reload a new source file forces on it — is paid once for the three
     // rather than once per row.
-    private static readonly Lazy<Task<(CliResult Human, CliResult Hook, CliResult StopHook, CliResult GivenChangedFiles)>>
+    private static readonly Lazy<Task<(CliResult Human, CliResult Hook, CliResult GivenChangedFiles)>>
         Untracked = new(async () =>
         {
             using var repo = new TempGitRepo();
@@ -84,7 +84,6 @@ public sealed class TripwireDiffE2ETests
             return (
                 await CliRunner.InvokeAsync(args),
                 await CheckForTheHookAsync(repo),
-                await CheckForTheHookAsync(repo, "Stop"),
                 // A new file git would list as changed, and a request naming instead a tracked file nobody
                 // touched. The hook hands the check the files a turn changed, which it has already listed, so
                 // the check must take the list as given rather than ask git again.
@@ -198,61 +197,36 @@ public sealed class TripwireDiffE2ETests
     }
 
     [Fact]
-    public async Task CheckHookJson_CleanRunWithATripwireWarning_CarriesTheReportLessItsPassBlocks()
+    public async Task CheckForTheHook_CleanRunWithATripwireWarning_WritesTheReportLessItsPassBlocks()
     {
         // The agent reading the context holds the rule board already, and a pass block per rule is what grows
         // with the spec: enough of them push the context past the client's inline limit, and the preview the
-        // agent is left with then holds no warning at all. So the context is the plain run's report with
-        // exactly those blocks gone, the stamps, the warned block and the summary line all kept.
-        (CliResult human, CliResult hook, _, _) = await Untracked.Value;
+        // agent is left with then holds no warning at all. So the text is the plain run's report with exactly
+        // those blocks gone, the stamps, the warned block and the summary line all kept.
+        (CliResult human, CliResult hook, _) = await Untracked.Value;
         human.Err.ShouldBeEmpty("The plain run wrote diagnostics, which hook mode composes into the same text.");
         string expected = WithoutPassBlocks(human.Out);
-        expected.ShouldNotBe(
-            ReportText(human.Out),
-            "The plain run carried no pass block, so this row would prove nothing.");
+        expected.ShouldNotBe(human.Out, "The plain run carried no pass block, so this row would prove nothing.");
 
-        // Exit 0 exactly as outside hook mode — a warning never moves the verdict — and stdout is the one
-        // document, whole: the parse rejects trailing content, so a leaked report line cannot hide behind it.
-        // That purity is the whole contract, because the hook passes stdout through verbatim and Claude Code
-        // parses it.
+        // Exit 0 exactly as outside hook mode: a warning never moves the verdict.
         hook.ShouldSucceed();
-        string context = hook.ShouldHaveHookAdditionalContext("PostToolUse");
-
-        context.ShouldBe(expected);
+        hook.Out.ShouldBe(expected, hook.Transcript());
+        hook.Err.ShouldBeEmpty(hook.Transcript());
     }
 
     [Fact]
-    public async Task CheckHookJson_CleanRunWithACautionWarning_CarriesTheSameTextIntoAdditionalContext()
+    public async Task CheckForTheHook_CleanRunWithACautionWarning_WritesTheSameText()
     {
         // The caution's third channel, and the one it was built for: a rule that only ever warns has only
         // exit 0 to travel on, and an agent hook is exactly the reader the dragons are addressed to. Same
-        // two lines as the human run, inside the document the hook hands to Claude Code.
+        // two lines as the human run, in the text the hook hands to Claude Code.
         CliResult result = (await Caution.Value).Hook;
 
-        result.ShouldSucceed();
-        string context = result.ShouldHaveHookAdditionalContext("PostToolUse");
-        context.ShouldContain("warn domain/retry-budget/tripwire");
-        context.ShouldContain(CautionWarning);
-        context.ShouldContain(CautionDragons);
+        result.ShouldSucceed("warn domain/retry-budget/tripwire", CautionWarning, CautionDragons);
     }
 
     [Fact]
-    public async Task CheckHookJsonForStop_CarriesTheStopEventSoTheContextReachesTheAgent()
-    {
-        // The turn-end shape the hook is wired to. Everything about the run is the PostToolUse row's —
-        // same tree, same warning, same text — except the one field that decides whether any of it arrives:
-        // Claude Code reads additionalContext only from a document naming the event it fired, so a Stop hook
-        // handed a PostToolUse envelope reports its dragons to nobody.
-        CliResult result = (await Untracked.Value).StopHook;
-
-        result.ShouldSucceed();
-        string context = result.ShouldHaveHookAdditionalContext("Stop");
-        context.ShouldContain("warn legacy/billing/tripwire");
-        context.ShouldContain(QuarantineWarning);
-    }
-
-    [Fact]
-    public async Task CheckHookJson_CleanRunWithNoWarnings_WritesNothingAtAll()
+    public async Task CheckForTheHook_CleanRunWithNoWarnings_WritesNothingAtAll()
     {
         // The same repository untouched: the tripwire finds no changed file, and a hook with nothing to say
         // must say nothing rather than post an empty document. Silence is what keeps the channel bearable at
@@ -265,7 +239,7 @@ public sealed class TripwireDiffE2ETests
     }
 
     [Fact]
-    public async Task CheckHookJson_RedRule_WritesTheHumanReportItAlwaysWrote()
+    public async Task CheckForTheHook_RedRule_WritesTheHumanReportItAlwaysWrote()
     {
         // Hook mode shapes the exit-0 channel and nothing else: on a red rule the hook needs the report to
         // put on stderr and block with, so this run must be byte-identical to the same run outside hook mode.
@@ -307,21 +281,14 @@ public sealed class TripwireDiffE2ETests
         }
     }
 
-    // A report with LF line endings and no trailing newline, whichever newline the console capture wrote.
-    private static string ReportText(string report)
-    {
-        return report.ReplaceLineEndings("\n")
-            .TrimEnd('\n');
-    }
-
     // A human report with the blocks headed `pass` taken out, a block being its header line and the indented
-    // lines beneath it. Written against the rendered text on purpose: it states the context's contract in the
-    // terms its reader sees, so a rendering that reshaped anything else would red here.
+    // lines beneath it, every other byte kept. Written against the rendered text on purpose: it states the
+    // context's contract in the terms its reader sees, so a rendering that reshaped anything else would red here.
     private static string WithoutPassBlocks(string report)
     {
         var kept = new List<string>();
         var inPassBlock = false;
-        foreach (string line in ReportText(report).Split('\n'))
+        foreach (string line in report.Split('\n'))
         {
             if (!line.StartsWith("  ", StringComparison.Ordinal))
                 inPassBlock = line.StartsWith("pass ", StringComparison.Ordinal);
@@ -333,19 +300,21 @@ public sealed class TripwireDiffE2ETests
 
     // The check run in process from a request rather than a command line, for what only a caller sets: the changed
     // files, and the hook rendering the hook verb asks for.
-    private static Task<CliResult> CheckInProcessAsync(TempGitRepo repo, Func<CheckRequest, CheckRequest> shape)
+    private static Task<CliResult> CheckInProcessAsync(
+        TempGitRepo repo, Func<CheckRequest, CheckRequest> shape, bool forTheHook = false)
     {
         CheckRequest request = shape(CheckRequests.For(repo.SolutionPath, CliRunner.QuarantinedSpecDll, repo.Root));
 
         return CliResult.CapturedAsync((output, error) =>
-            new CheckRunner(output, error, WarmWorkspacePool.Source, new FakeEnvironment()).RunAsync(request, Ct));
+        {
+            var runner = new CheckRunner(output, error, WarmWorkspacePool.Source, new FakeEnvironment());
+            return forTheHook ? runner.RunForHookAsync(request, Ct) : runner.RunAsync(request, Ct);
+        });
     }
 
-    // The check the hook verb runs over the repository: changed files since HEAD, rendered for a hook firing on
-    // `hookEvent`, or on the per-edit event when none is named.
-    private static Task<CliResult> CheckForTheHookAsync(TempGitRepo repo, string? hookEvent = null)
+    // The check the hook verb runs over the repository: changed files since HEAD, rendered for the hook.
+    private static Task<CliResult> CheckForTheHookAsync(TempGitRepo repo)
     {
-        return CheckInProcessAsync(
-            repo, request => request with { HookJson = true, DiffBase = "HEAD", HookEvent = hookEvent });
+        return CheckInProcessAsync(repo, static request => request with { DiffBase = "HEAD" }, forTheHook: true);
     }
 }

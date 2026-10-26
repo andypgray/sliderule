@@ -22,13 +22,6 @@ internal sealed record McpServerBinding(string? Solution, string? Spec, string W
     private const bool AsJsonDocument = true;
 
     /// <summary>
-    ///     Never the hook document: that one shapes a command hook's stdout around an exit code, and a tool
-    ///     call has neither. A client that wants the warnings reads them from the document's own
-    ///     <c>warnings</c> arrays.
-    /// </summary>
-    private const bool NoHookDocument = false;
-
-    /// <summary>
     ///     A tool call never reads or writes <c>cache.json</c>: the warm session and the persisted cache keep
     ///     independent lifetimes, so they can never race on the file.
     /// </summary>
@@ -53,7 +46,7 @@ internal sealed record McpServerBinding(string? Solution, string? Spec, string W
     internal CheckRequest CheckRequest(string? diffBase, string? rules, DocumentGrain grain)
     {
         return new CheckRequest(
-            Solution, Spec, AsJsonDocument, NoHookDocument, Given(diffBase), WorkingDirectory, BypassPersistedCache,
+            Solution, Spec, AsJsonDocument, Given(diffBase), WorkingDirectory, BypassPersistedCache,
             NoBinlogReplay, ReportPartialModels, NoSarifFile, rules, grain);
     }
 
