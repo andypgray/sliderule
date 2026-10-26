@@ -1245,7 +1245,7 @@ properties it sets.
   forms. A package pattern is a glob, `*` matching any run of characters, dots included, and it
   is compared with the package identifier ignoring case, as NuGet compares identifiers.
 - **Declared references only.** The package facts are the project's own declarations — the
-  transitive graph is a different fact — and every package verb says so in its sentence (§5.8)
+  transitive graph is a different fact — and every package-reference verb says so in its sentence (§5.8)
   rather than in a doc a reader has to know to look up.
 - **Private references are not dependencies.** NuGet leaves a reference out of the package a
   project produces, and out of the restore of any project referencing it, when its
@@ -2240,7 +2240,7 @@ carries its sugar overload too, or the verb silently stops compiling after the s
     reference (`var b = arch.Rule(id); b.Enforce(...); b.Migrate(...);`) can call a posture verb
     twice, and the second silently overwrites the first — the model keeps only the last posture.
     This item catches that stored-reference re-call: the count rides on the registration
-    (`RuleRegistration.PostureCount` / `ScopeRegistration.PostureCount`) and a count > 1 is the error.
+    (`Registration.PostureCount`, on the base both builders share) and a count > 1 is the error.
 18. Unresolvable member-anchor expression (§4.5) — an `arch.Member<T>(x => ...)` /
     `arch.Member(() => ...)` lambda the resolver cannot reduce to a declared `(type, name)`. One
     code (`MemberExpressionUnresolvable`) carrying eight messages, each steering to the cure: a
