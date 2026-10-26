@@ -40,8 +40,7 @@ public sealed class LedeSyncTests
             findings.Add("The root command's description, the first line of sliderule --help, reads "
                          + $"\"{rootDescription}\". It should be the lede.");
 
-        string packageDescription = SolutionInventory.Properties(DocPaths.CliProject)
-            .GetValueOrDefault("Description") ?? string.Empty;
+        string packageDescription = PackageDescriptionTests.DescriptionOf(DocPaths.CliProject);
         if (!packageDescription.StartsWith(lede, StringComparison.Ordinal))
             findings.Add($"{DocPaths.CliProject}'s <Description> should open with the lede. It reads "
                          + $"\"{packageDescription}\".");
@@ -90,8 +89,6 @@ public sealed class LedeSyncTests
     {
         using JsonDocument manifest = JsonDocument.Parse(RepoRoot.ReadText(DocPaths.McpManifest));
 
-        return manifest.RootElement.TryGetProperty("description", out JsonElement description)
-            ? description.GetString() ?? string.Empty
-            : string.Empty;
+        return manifest.RootElement.StringOrDefault("description") ?? string.Empty;
     }
 }

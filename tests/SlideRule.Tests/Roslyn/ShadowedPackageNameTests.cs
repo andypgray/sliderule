@@ -25,7 +25,7 @@ public sealed class ShadowedPackageNameTests
     private const string Shadowed = "Microsoft.Extensions.DependencyInjection.ServiceDescriptor";
 
     private static readonly string SolutionPath =
-        Path.Combine(AppContext.BaseDirectory, "Fixtures", "TestSolutions", "ShadowedApp", "ShadowedApp.slnx");
+        Path.Combine(FixtureBeds.TestSolutionsRoot, "ShadowedApp", "ShadowedApp.slnx");
 
     private static Task<CodebaseModel> ShadowedCodebase => FixtureCodebase.Of(SolutionPath);
 

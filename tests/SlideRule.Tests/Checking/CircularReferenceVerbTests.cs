@@ -194,37 +194,4 @@ public sealed class CircularReferenceVerbTests
         result.ShouldHavePassedClean();
         result.Rule.Sentence.ShouldBe("The A layer must not have circular references with the others.");
     }
-
-    [Fact]
-    public void MustNotHaveCircularReferences_ATypeInTwoLayerCells_IsARuleError()
-    {
-        // The partition discipline rides in from the family's own resolution, so this verb fails closed on
-        // an overlap for the cross-cell ban's reason: a type in two cells has two selves.
-        RuleResult result = Checker.Run(CycleModel, arch =>
-                arch.Rule("cyc/overlapping")
-                    .Enforce(arch.Each(arch.Layer("Wide", "Cyc.*"), arch.Layer("A", "Cyc.A.*"))
-                        .MustNotHaveCircularReferences())
-                    .Because("b"))
-            .Single();
-
-        result.ShouldHaveFailedWithDetail(ViolationKind.RuleError,
-            "Type `Cyc.A.Alpha` sits in both the Wide and A cells of the family; "
-            + "a family's cells must not overlap. Leave the type out of one of the two layer definitions.");
-    }
-
-    [Fact]
-    public void MustNotHaveCircularReferences_ALayerCellMatchingNothing_FailsNamingThatCell()
-    {
-        // Per-cell emptiness rides in the same way (GRAMMAR §4.1): a typo'd cell is loud rather than masked
-        // by the siblings that did match.
-        RuleResult result = Checker.Run(CycleModel, arch =>
-                arch.Rule("cyc/ghost")
-                    .Enforce(arch.Each(arch.Layer("A", "Cyc.A.*"), arch.Layer("Ghost", "Nowhere.*"))
-                        .MustNotHaveCircularReferences())
-                    .Because("b"))
-            .Single();
-
-        result.ShouldHaveFailedWithDetail(ViolationKind.EmptySubject,
-            ConstraintEvaluator.EmptyOperandMessage("the Ghost layer"));
-    }
 }

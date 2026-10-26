@@ -34,23 +34,11 @@ internal static class RenderedArtifactCounts
         Cards
     }
 
-    /// <summary>The diagram half of the render — the second artifact this repository commits at its root.</summary>
-    private const string DiagramFileName = "ARCHITECTURE.md";
-
     /// <summary>
     ///     The blocks the example solutions' own specs write, gated by the examples job's
     ///     <c>render --check</c>.
     /// </summary>
     private const string ExampleRoot = "examples/";
-
-    /// <summary>
-    ///     The one doc whose counts are frozen. A release note states what a past version rendered ("Six
-    ///     per-directory cards are now committed where there was one"), and holding that to today's set
-    ///     would rewrite history every time a rule places a card. Every other tracked doc is swept, and
-    ///     <c>ReleaseHistory_IsSilencedByItsExemption_NotByTheScannerMissingIt</c> pins that this
-    ///     exemption, rather than a pattern that stopped matching, is what keeps the file quiet.
-    /// </summary>
-    private const string ReleaseHistory = "CHANGELOG.md";
 
     /// <summary>
     ///     A prose claim about how many artifacts the render writes. The number is captured as written —
@@ -111,7 +99,12 @@ internal static class RenderedArtifactCounts
     /// </summary>
     public static IReadOnlyList<RenderedArtifactCountClaim> Extract(string doc, string docText)
     {
-        if (string.Equals(doc, ReleaseHistory, StringComparison.Ordinal)) return [];
+        // The release history is the one doc whose counts are frozen. A release note states what a past version
+        // rendered ("Six per-directory cards are now committed where there was one"), and holding that to
+        // today's set would rewrite history every time a rule places a card. Every other tracked doc is swept,
+        // and ReleaseHistory_IsSilencedByItsExemption_NotByTheScannerMissingIt pins that this exemption, rather
+        // than a pattern that stopped matching, is what keeps the file quiet.
+        if (string.Equals(doc, DocPaths.Changelog, StringComparison.Ordinal)) return [];
 
         List<RenderedArtifactCountClaim> claims = new();
         string[] lines = docText.Split('\n');
@@ -151,7 +144,7 @@ internal static class RenderedArtifactCounts
     private static bool IsRenderTarget(string fileName)
     {
         return string.Equals(fileName, ContextFileComposer.FileName, StringComparison.Ordinal)
-               || string.Equals(fileName, DiagramFileName, StringComparison.Ordinal);
+               || string.Equals(fileName, DocPaths.Architecture, StringComparison.Ordinal);
     }
 
     private static bool CarriesAManagedBlock(string path)

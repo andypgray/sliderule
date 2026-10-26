@@ -1,8 +1,7 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
 using SlideRule.Roslyn.Caching;
 using Xunit;
+using static SlideRule.Tests.Caching.WidgetShapes;
 
 namespace SlideRule.Tests.Caching;
 
@@ -407,11 +406,5 @@ public sealed class SourceShapeTests
     private static string WithBlankLineAboveTheNamespace()
     {
         return Widget.Replace("namespace Shop;", "\nnamespace Shop;", StringComparison.Ordinal);
-    }
-
-    private static SourceShape ShapeOf(string text)
-    {
-        SyntaxTree tree = CSharpSyntaxTree.ParseText(text, path: "Widget.cs");
-        return SourceShape.Of(tree);
     }
 }

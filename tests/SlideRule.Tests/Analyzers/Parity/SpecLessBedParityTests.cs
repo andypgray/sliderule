@@ -1,5 +1,6 @@
 using Shouldly;
 using SlideRule.Tests.Checking;
+using SlideRule.Tests.TestSupport;
 using Xunit;
 
 namespace SlideRule.Tests.Analyzers.Parity;
@@ -440,7 +441,7 @@ public sealed class SpecLessBedParityTests
     }
 
     private static string BedDirectory =>
-        Path.Combine(AppContext.BaseDirectory, "Fixtures", "TestSolutions");
+        FixtureBeds.TestSolutionsRoot;
 
     private static Task<ParitySubject> LinkedAsync(string name, Action<Arch> define)
     {

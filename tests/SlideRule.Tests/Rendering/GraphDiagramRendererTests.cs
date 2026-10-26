@@ -23,7 +23,9 @@ public sealed class GraphDiagramRendererTests
     public void Block_ObservedAndDeclaredReferences_PinsTheWholeDiagram()
     {
         // Arrange — App touches Lib (an observed edge); Orphan declares the same reference and touches
-        // nothing (the dead-reference signal the text survey makes you compute by eye).
+        // nothing (the dead-reference signal the text survey makes you compute by eye). Membership is left
+        // unread, which is the fail-open contract: an unreadable solution file labels nothing, and a fence
+        // that treated unknown as "not a member" would answer with an empty drawing instead of the whole one.
         GraphSummary summary = ThreeProjectSummary();
 
         // Act
@@ -136,22 +138,6 @@ public sealed class GraphDiagramRendererTests
         // survives, because an edge is drawn only when both endpoints resolve to nodes.
         MermaidBlock.Diagram(block)
             .ShouldBe(["p_App[\"App\"]", "p_Orphan[\"Orphan\"]"]);
-    }
-
-    [Fact]
-    public void Block_UnreadMembership_DrawsEveryProject()
-    {
-        // The fail-open contract: an unreadable solution file labels nothing, and a fence that treated
-        // unknown as "not a member" would answer with an empty drawing instead of the whole one.
-        GraphSummary summary = ThreeProjectSummary();
-
-        string block = GraphDiagramRenderer.Block(summary, SolutionName);
-
-        MermaidBlock.Diagram(block)
-            .ShouldBe([
-                "p_App[\"App\"]", "p_Lib[\"Lib\"]", "p_Orphan[\"Orphan\"]", "",
-                "p_App --> p_Lib", "p_Orphan -.-> p_Lib"
-            ]);
     }
 
     [Fact]
@@ -277,6 +263,21 @@ public sealed class GraphDiagramRendererTests
     private static GraphSummary ThreeProjectSummary(
         bool? libMembership = null, bool? appMembership = null, bool? orphanMembership = null)
     {
+        return LibAppSummary(true, libMembership, appMembership, orphanMembership);
+    }
+
+    /// <summary>
+    ///     App referencing Lib and touching it, the smallest survey with an edge in it. Membership defaults to
+    ///     unread, which draws.
+    /// </summary>
+    internal static GraphSummary TwoProjectSummary(bool? libMembership = null, bool? appMembership = null)
+    {
+        return LibAppSummary(false, libMembership, appMembership, null);
+    }
+
+    private static GraphSummary LibAppSummary(
+        bool withOrphan, bool? libMembership, bool? appMembership, bool? orphanMembership)
+    {
         CompilationInput lib = CompilationFactory.Compile("Lib", ("Lib.cs", """
                                                                             namespace Lib;
                                                                             public class Service {}
@@ -291,15 +292,21 @@ public sealed class GraphDiagramRendererTests
         {
             SolutionMember = appMembership
         };
-        CompilationInput orphan = CompilationFactory.CompileReferencing("Orphan", lib.Compilation, "Lib", ("Orphan.cs", """
-                                                                                                                        namespace Orphan;
-                                                                                                                        public class Standalone {}
-                                                                                                                        """)) with
-        {
-            SolutionMember = orphanMembership
-        };
+        List<CompilationInput> inputs = [lib, app];
 
-        return GraphSummarizer.Summarize(CodebaseExtractor.ExtractFromCompilations([lib, app, orphan]));
+        if (withOrphan)
+        {
+            CompilationInput orphan = CompilationFactory.CompileReferencing("Orphan", lib.Compilation, "Lib", ("Orphan.cs", """
+                                                                                                                            namespace Orphan;
+                                                                                                                            public class Standalone {}
+                                                                                                                            """)) with
+            {
+                SolutionMember = orphanMembership
+            };
+            inputs.Add(orphan);
+        }
+
+        return GraphSummarizer.Summarize(CodebaseExtractor.ExtractFromCompilations(inputs));
     }
 
     // Three reference-free projects: two whose names differ only in a character the slug flattens, and a

@@ -72,25 +72,10 @@ public sealed class UnionSubjectTests(WorkspaceFixture fixture)
     }
 
     [Fact]
-    public void EmptyOperand_FailsTheRuleNamingThatOperand()
+    public void EmptyOperand_ReportsOnePerEmptyOperandInOperandOrder()
     {
         // GRAMMAR §4.1: a typo'd project name inside a union fails loudly rather than
         // quietly contributing nothing while its siblings carry the rule.
-        RuleResult result = Checker.Run(fixture.Model, arch =>
-                arch.Rule("naming/union")
-                    .Enforce(arch.AnyOf(arch.Project("MyApp.Domain"), arch.Project("MyApp.Domian"))
-                        .MustHaveNameMatching("*"))
-                    .Because("b"))
-            .Single();
-
-        result.ShouldHaveFailedWithDetail(
-            ViolationKind.EmptySubject,
-            "The subject selection operand \"types in project `MyApp.Domian`\" matched no solution-declared types.");
-    }
-
-    [Fact]
-    public void EmptyOperand_ReportsOnePerEmptyOperandInOperandOrder()
-    {
         RuleResult result = Checker.Run(fixture.Model, arch =>
                 arch.Rule("naming/union")
                     .Enforce(arch.AnyOf(arch.Project("MyApp.Nope"), arch.Project("MyApp.Domain"), arch.Namespace("MyApp.Nope.*"))
@@ -98,6 +83,8 @@ public sealed class UnionSubjectTests(WorkspaceFixture fixture)
                     .Because("b"))
             .Single();
 
+        result.ShouldHaveFailed();
+        result.Violations.ShouldAllBe(v => v.Kind == ViolationKind.EmptySubject);
         result.Violations.Select(v => v.Detail)
             .ShouldBe(
             [

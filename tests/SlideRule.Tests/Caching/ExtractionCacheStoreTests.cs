@@ -20,96 +20,14 @@ public sealed class ExtractionCacheStoreTests
     /// <summary>
     ///     The recorded schema version is the one thing a read can trust before it has deserialized
     ///     anything, so any version but the current one is a miss — whether it is ahead of this reader or
-    ///     behind it. Each case below names the wrong answer that version would give on a hit.
+    ///     behind it.
     /// </summary>
     [Theory]
     // Ahead: a cache written by a future schema version was written by a writer that knew fields this
     // reader does not.
     [InlineData(999)]
-    // A v13 cache predates the catch edge's swallowing-site subset (schema bumped 13→14): its catch edges
-    // carry no SwallowingSites, so every one would replay with a null subset and the rethrow fact would read
-    // wrong on a hit.
-    [InlineData(13)]
-    // A v16 cache predates FailedProjects (schema bumped 16→17): it records which diagnostics the load
-    // produced but not which projects failed, so a hit would deserialize an empty list and answer green on
-    // the one solution shape check exists to refuse. That is the single worst wrong answer this cache could
-    // give, so the version it was written under has to be enough to reject it.
-    [InlineData(16)]
-    // A v18 cache predates RestoreFailedProjects (schema bumped 18→19): it records which projects failed to
-    // load but not which projects' NuGet packages were missing, so a hit would deserialize an empty list and
-    // answer green on a model missing every package edge — the exact silent pass this field was added to
-    // close. The version it was written under has to be enough to reject it.
-    [InlineData(18)]
-    // A v24 cache predates the member mutability facts (schema bumped 24→25): its members carry no setter or
-    // field-writability flags, so on a hit every property would replay as get-only and every field as
-    // writable — a get-only rule would pass vacuously over a codebase full of settable properties, and a
-    // readonly rule would red every field it saw.
-    [InlineData(24)]
-    // A v25 cache predates the evaluated artifact facts (schema bumped 25→26): its fragments carry no
-    // declared frameworks, package references, packability or lock policy, so on a hit every project would
-    // replay as one nothing was evaluated for — a rule about what a project targets or ships would find no
-    // subject at all and pass over a solution it has never read.
-    [InlineData(25)]
-    // A v26 cache predates the shape on a document stamp (schema bumped 26→27). This one would in fact
-    // deserialize — the slot defaults to null, and every document would take the hash-only path until its
-    // next real change, which is slow rather than wrong. It is refused anyway, because the rule here is that
-    // a manifest is read only by the writer of its shape: a reader that starts reasoning about which slots a
-    // file predates is one bump away from reasoning wrongly.
-    [InlineData(26)]
-    // A v27 cache predates the private package references (schema bumped 27→28): every package it holds would
-    // replay as not private, so a rule forbidding packages would red on the analyzers and build tools a fresh
-    // extraction passes.
-    [InlineData(27)]
-    // A v28 cache predates the generated fact of another assembly's type being read from its attribute alone
-    // (schema bumped 28→29): an external whose declaring files open with the auto-generated banner would
-    // replay as generated wherever the reference arrived as the other project's source, so an Authored()
-    // selection would drop a type a fresh extraction keeps. It also predates the declared project references
-    // under the same bump: every project would replay the closure the SDK hands the compiler in place of the
-    // references its project file declares, and the survey would draw a dotted arrow for every inherited
-    // reference the project never uses.
-    [InlineData(28)]
-    // A v29 cache predates two extraction corrections (schema bumped 29→30): a registration whose typeof operand
-    // the compiler could only guess at replays as absent, and a top-level program replays the references its
-    // file's using directives and assembly attributes made, so a rule about either would answer from facts a
-    // fresh extraction no longer produces.
-    [InlineData(29)]
-    // A v30 cache predates the replayed-framework correction (schema bumped 30→31): a multi-targeting project
-    // whose output path leaves the framework out replays with its configuration directory recorded as every
-    // compilation's framework, where a fresh extraction records none.
-    [InlineData(30)]
-    // A v31 cache predates the generic registration correction (schema bumped 31→32): a generic registration
-    // whose type argument the compiler could not find at all replays under the name as written, where a fresh
-    // extraction records no such registration, so a rule about registrations would answer from a fact the code
-    // does not establish.
-    [InlineData(31)]
-    // A v32 cache predates the guessed-type correction on the catch, throw and construct channels (schema bumped
-    // 32→33): a catch, throw or construction of a type the compiler could only guess at, such as a name two
-    // imported namespaces both declare, replays with no edge of its channel, where a fresh extraction records the
-    // compiler's candidate.
-    [InlineData(32)]
-    // A v33 cache predates the declaration surface (schema bumped 33→34): its Merkle keys fold in every
-    // dependency's content key, so a body-only edit in a dependency would read as a change to every dependent
-    // whose stored key was taken that way, and its document shapes carry no surface hash to compare.
-    [InlineData(33)]
-    // A v34 cache predates evaluating project files under the solution's directory and the undeclared project
-    // references (schema bumped 34→35): a project that spells a reference with $(SolutionDir) replays with that
-    // reference missing from its declared list, where a fresh extraction resolves it against the solution the
-    // workspace loaded, and no fragment says which compiled-against projects its declarations do not reach.
-    [InlineData(34)]
-    // A v35 cache predates the evaluated properties (schema bumped 35→36): its fragments carry no properties
-    // slot, so every project replays as one nothing evaluated, and MustSetProperty would pass a property nobody
-    // set where a fresh extraction reds it.
-    [InlineData(35)]
-    // A v36 cache predates the override and sealed member facts (schema bumped 36→37): every member replays
-    // as neither, so MustBeOverridable would red every unsealed override a fresh extraction passes.
-    [InlineData(36)]
-    // A v37 cache predates one ownership test for sites (schema bumped 37→38): a framework list, packability,
-    // lock policy or package reference declared in a props file imported from a sibling directory replays sited
-    // at the project file, where a fresh extraction cites the props file's own line.
-    [InlineData(37)]
-    // A v38 cache predates leaving out a .NET install kept inside the solution (schema bumped 38→39): a repository
-    // with its own .dotnet/ replays the SDK's defaults among its projects' properties, so MustSetProperty would
-    // pass a value nobody in the repository set where a fresh extraction reds it.
+    // Behind: a cache written before a bump lacks what this reader expects, and a hit would replay facts a fresh
+    // extraction no longer produces. Every older version takes this one branch, so one row stands for them all.
     [InlineData(38)]
     public void ReadAndValidate_SchemaVersionOtherThanTheCurrentOne_ReturnsMiss(int schemaVersion)
     {
@@ -133,7 +51,7 @@ public sealed class ExtractionCacheStoreTests
     {
         // The suite cannot see a bump either way, because every run gets a fresh cache directory. So the
         // version is pinned here: a bump nobody meant to make would throw every cache in the wild away
-        // silently, and a meant one moves this pin and adds the version it retires to the theory above.
+        // silently, and a meant one moves this pin.
         FieldInfo? version = typeof(ExtractionCacheStore)
             .GetField("CurrentSchemaVersion", BindingFlags.NonPublic | BindingFlags.Static);
 

@@ -15,10 +15,12 @@ namespace SlideRule.Tests.Checking;
 /// <remarks>
 ///     The two pins the sibling <c>MustNotCatch</c> cannot carry are here — an edge whose
 ///     every site is filtered is <b>green</b>, and a mixed edge's evidence is the <b>unfiltered sites only</b>,
-///     so no reader is ever pointed at a site the rule considers good. The other rows repeat the sibling's
-///     rows under this verb. The kind is <see cref="ViolationKind.Catch" />, which names the fact family
-///     rather than the verb, so identity is the (source, caught) type pair keyed by
-///     <see cref="BaselineEntry.ForEdge" /> and the unfiltered sites are evidence, never identity.
+///     so no reader is ever pointed at a site the rule considers good. The rows the catch verbs share
+///     (FQN matching, a hierarchy operand, the absent typeof target, the ratchet, the JSON wire form) live in
+///     <c>MustNotCatchVerbTests</c>: the catch verbs run one walk and differ only in the sites they read. The kind is
+///     <see cref="ViolationKind.Catch" />, which names the fact family rather than the verb, so identity is the
+///     (source, caught) type pair keyed by <see cref="BaselineEntry.ForEdge" /> and the unfiltered sites are
+///     evidence, never identity.
 /// </remarks>
 public sealed class MustNotCatchUnfilteredVerbTests
 {
@@ -137,37 +139,6 @@ public sealed class MustNotCatchUnfilteredVerbTests
     }
 
     [Fact]
-    public void MustNotCatchUnfiltered_BansExceptionButCatchesNarrowerType_NarrowCatchNotFlagged()
-    {
-        // Matching is exact definition-level FQN, not hierarchy: banning typeof(Exception) flags the broad
-        // unfiltered `catch (System.Exception)` but NEVER the narrower `catch (IOException)`, filtered or not —
-        // the narrow catch is a good state in its own right. Broad's presence proves the ban is live.
-        RuleResult result = Checker.Run(Sources.CatchBroadVsNarrowModel, arch =>
-                arch.Rule("ex/filter-broad-catches")
-                    .Enforce(arch.Types.MustNotCatchUnfiltered(typeof(Exception)))
-                    .Because("b"))
-            .Single();
-
-        result.ShouldHaveFailedWithEdges(ViolationKind.Catch, ["App.Broad -> System.Exception"]);
-    }
-
-    [Fact]
-    public void MustNotCatchUnfiltered_DerivedFromOperand_MatchesSolutionExceptionNotExternal()
-    {
-        // A hierarchy-adjective operand (arch.Types.DerivedFrom) ranges over solution-declared types only —
-        // external types carry a shallow hierarchy. Worker catches its own N.AppError unfiltered (solution,
-        // derives from Exception → matched → red) and an external System.InvalidOperationException, also
-        // unfiltered but never matched by a DerivedFrom operand, so not flagged.
-        RuleResult result = Checker.Run(Sources.CatchDerivedFromModel, arch =>
-                arch.Rule("ex/filter-derived-catches")
-                    .Enforce(arch.Namespace("N.*").MustNotCatchUnfiltered(arch.Types.DerivedFrom(typeof(Exception))))
-                    .Because("b"))
-            .Single();
-
-        result.ShouldHaveFailedWithEdges(ViolationKind.Catch, ["N.Worker -> N.AppError"]);
-    }
-
-    [Fact]
     public void MustNotCatchUnfiltered_InertPatternTarget_WarnsAndStillPasses()
     {
         // The forbidden target (a namespace glob) matches no types, so the rule can never fire — inert. The
@@ -180,68 +151,5 @@ public sealed class MustNotCatchUnfilteredVerbTests
             .Single();
 
         result.ShouldHaveWarnedInertTarget();
-    }
-
-    [Fact]
-    public void MustNotCatchUnfiltered_AbsentTypeofTarget_IsSilentWinNoWarning()
-    {
-        // A bare typeof target absent from the codebase is the WIN condition, not an inert warning: nobody
-        // catches System.FormatException at all, so the ban resolves empty but — being a concrete typeof anchor,
-        // not a pattern — stays silent (the departure from the pattern-operand inert warning above).
-        RuleResult result = Checker.Run(SceneModel, arch =>
-                arch.Rule("ex/filter-format-catches")
-                    .Enforce(arch.Namespace("App.*").MustNotCatchUnfiltered(typeof(FormatException)))
-                    .Because("b"))
-            .Single();
-
-        result.ShouldHavePassedClean();
-    }
-
-    [Fact]
-    public void MustNotCatchUnfiltered_EmptySubject_FailsWithDefaultMessage()
-    {
-        // An empty subject fails the rule by default with the shared message (GRAMMAR §4.1), exactly as every
-        // other verb — the filter-aware catch verb takes the same subject gate.
-        RuleResult result = Checker.Run(
-                "namespace App { public class Foo {} }",
-                arch => arch.Rule("ex/empty")
-                    .Enforce(arch.Namespace("Nowhere.*").MustNotCatchUnfiltered(arch.Namespace("App.*")))
-                    .Because("b"))
-            .Single();
-
-        result.ShouldHaveFailedWithDetail(ViolationKind.EmptySubject, ConstraintEvaluator.EmptySubjectMessage);
-    }
-
-    [Fact]
-    public void MustNotCatchUnfiltered_GrandfatheredEdgePasses_NewCatchStaysRed()
-    {
-        // Identity is the (source, caught) type pair (GRAMMAR §4.3) — the unfiltered sites are evidence, not
-        // identity, so a baseline entry written for either catch verb keys the same edge. Handler is grandfathered
-        // for catching AErr; its NEW unfiltered `catch (BErr)` is a distinct identity → red.
-        BaselineIndex index = Checker.Baselines("ex/filter-catches", BaselineEntry.ForEdge("T:App.Handler", "T:Errors.AErr"));
-
-        RuleResult result = Checker.Run(Sources.CatchRatchetModel, index, arch =>
-                arch.Rule("ex/filter-catches")
-                    .Migrate("legacy unfiltered catches", arch.Namespace("App.*")
-                        .MustNotCatchUnfiltered(arch.Namespace("Errors.*")))
-                    .Because("name what a broad catch expects"))
-            .Single();
-
-        result.ShouldHaveFailedWithEdges(ViolationKind.Catch, ["App.Handler -> Errors.BErr"]);
-        result.ShouldHaveGrandfathered(1);
-    }
-
-    [Fact]
-    public void JsonReportRenderer_UnfilteredCatchViolation_EmitsCatchKindAndTargetAndOmitsMemberSlots()
-    {
-        // Kind reuse reaches the wire: the JSON kind string is "catch", the caught type rides the existing
-        // `target` field, and schemaVersion stays 3 — a new verb on a recorded fact family adds no vocabulary a
-        // hook would have to learn.
-        CheckReport report = Checker.Run(SceneModel, arch =>
-            arch.Rule("ex/filter-domain-catches")
-                .Enforce(arch.Namespace("App.*").MustNotCatchUnfiltered(arch.Namespace("Errors.*")))
-                .Because("b"));
-
-        report.ShouldRenderEdgeViolation("catch", "App.DataHandler", "Errors.DbError");
     }
 }

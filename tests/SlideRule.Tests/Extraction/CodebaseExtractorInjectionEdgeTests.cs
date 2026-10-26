@@ -11,44 +11,22 @@ namespace SlideRule.Tests.Extraction;
 /// </summary>
 public sealed class CodebaseExtractorInjectionEdgeTests
 {
-    [Fact]
-    public void ExtractFromCompilations_ExplicitConstructorOnClass_ProducesInjectionEdgeAtParameterLine()
+    // One row per constructor shape that injects: an explicit constructor on a class, a primary constructor on a
+    // class, and an explicit constructor on a record. Each mints the edge at the parameter's line.
+    [Theory]
+    [InlineData("public class Svc { public Svc(IDep d) {} }", "N.Svc")]
+    [InlineData("public class Svc(IDep d) { }", "N.Svc")]
+    [InlineData("public record Rec { public Rec(IDep d) {} }", "N.Rec")]
+    public void ExtractFromCompilations_ConstructorShape_ProducesInjectionEdgeAtParameterLine(
+        string declaration, string injector)
     {
-        CodebaseModel model = CompilationFactory.Extract("""
-                                                         namespace N;
-                                                         public interface IDep {}
-                                                         public class Svc { public Svc(IDep d) {} }
-                                                         """);
+        CodebaseModel model = CompilationFactory.Extract($$"""
+                                                           namespace N;
+                                                           public interface IDep {}
+                                                           {{declaration}}
+                                                           """);
 
-        model.InjectionEdge("N.Svc", "N.IDep")
-            .Sites.Lines()
-            .ShouldBe([3]);
-    }
-
-    [Fact]
-    public void ExtractFromCompilations_PrimaryConstructorOnClass_ProducesInjectionEdge()
-    {
-        CodebaseModel model = CompilationFactory.Extract("""
-                                                         namespace N;
-                                                         public interface IDep {}
-                                                         public class Svc(IDep d) { }
-                                                         """);
-
-        model.InjectionEdge("N.Svc", "N.IDep")
-            .Sites.Lines()
-            .ShouldBe([3]);
-    }
-
-    [Fact]
-    public void ExtractFromCompilations_ExplicitConstructorOnRecord_ProducesInjectionEdge()
-    {
-        CodebaseModel model = CompilationFactory.Extract("""
-                                                         namespace N;
-                                                         public interface IDep {}
-                                                         public record Rec { public Rec(IDep d) {} }
-                                                         """);
-
-        model.InjectionEdge("N.Rec", "N.IDep")
+        model.InjectionEdge(injector, "N.IDep")
             .Sites.Lines()
             .ShouldBe([3]);
     }
@@ -149,18 +127,6 @@ public sealed class CodebaseExtractorInjectionEdgeTests
                                                          """);
 
         model.InjectionEdges("N.WithStaticCtor")
-            .ShouldBeEmpty();
-    }
-
-    [Fact]
-    public void ExtractFromCompilations_ImplicitParameterlessConstructor_ProducesNoInjectionEdge()
-    {
-        CodebaseModel model = CompilationFactory.Extract("""
-                                                         namespace N;
-                                                         public class Bare {}
-                                                         """);
-
-        model.InjectionEdges("N.Bare")
             .ShouldBeEmpty();
     }
 

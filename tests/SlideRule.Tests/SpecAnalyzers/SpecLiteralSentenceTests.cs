@@ -10,9 +10,9 @@ namespace SlideRule.Tests.SpecAnalyzers;
 /// <remarks>
 ///     <para>
 ///         The wording belongs to the contract rather than to the analyzer, which carries <c>{0}</c> as its
-///         whole message format and hands the sentence through. This is the one place it is written down,
-///         so every expected message here is typed out rather than composed from the owners that produce
-///         it: a golden derived from its subject agrees with whatever that subject says today.
+///         whole message format and hands the sentence through. This table writes every one of them down,
+///         and types each expected message out rather than composing it from the owners that produce it: a
+///         golden derived from its subject agrees with whatever that subject says today.
 ///     </para>
 ///     <para>
 ///         One statement per row, so the table can be read straight through. Three of the sixteen need two

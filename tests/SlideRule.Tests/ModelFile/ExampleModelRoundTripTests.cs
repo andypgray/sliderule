@@ -48,14 +48,10 @@ public sealed class ExampleModelRoundTripTests
     public async Task EveryExample_ChecksIdenticallyThroughTheModelFileItCommits(string name)
     {
         // Arrange
-        ExampleSolution example = ShouldFind(name);
-        string specProject = example.SpecProjectDirectory
+        ExampleSolution example = ExampleSolutions.Named(name);
+        example.SpecProjectDirectory
             .ShouldNotBeNull($"{name} has no spec project, which the inventory below reports in full.");
-        string searched = ExampleBuilds.SpecOutputDirectory(specProject);
-        Assert.SkipUnless(
-            ExampleBuilds.IsBuilt(searched, specProject),
-            $"Nothing in this suite builds the example solutions, and this pin reads the spec assembly a "
-            + $"build of {name} produces. Build it and run this again. Looked in: {searched}");
+        ExampleBuilds.SkipUnlessBuilt(example, "this pin");
 
         SpecfulCodebase extracted = await SpecfulCodebase.ExtractAsync(
             example.SolutionPath, spec: null, example.SolutionDirectory, Ct);
@@ -104,20 +100,5 @@ public sealed class ExampleModelRoundTripTests
         unlocatable.ShouldReportNothing(
             $"Example solution(s) with no directory under {ExampleSolutions.ArchDirectory}/ whose name ends with "
             + $"'{ExampleSolutions.SpecProjectSuffix}', so this class cannot find their spec assembly and skips them forever");
-    }
-
-    /// <summary>
-    ///     The discovered example a row names.
-    /// </summary>
-    /// <remarks>
-    ///     Asserting, hence the name: a row whose solution left the tree between discovery and the run would
-    ///     otherwise arrive as a null reference in the arrange block.
-    /// </remarks>
-    private static ExampleSolution ShouldFind(string name)
-    {
-        ExampleSolution? found = ExampleSolutions.Discovered()
-            .FirstOrDefault(example => string.Equals(example.Name, name, StringComparison.Ordinal));
-
-        return found.ShouldNotBeNull($"No example solution named '{name}' is on disk.");
     }
 }

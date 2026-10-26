@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Text.RegularExpressions;
 using ModelContextProtocol.Server;
 using SlideRule.Cli.Mcp.Pipeline;
+using SlideRule.Tests.Mcp;
 using SlideRule.Tests.TestSupport;
 using Xunit;
 
@@ -123,8 +124,8 @@ public sealed class McpToolTableTests
     private static Dictionary<string, IReadOnlySet<string>> LiveSurface()
     {
         Dictionary<string, IReadOnlySet<string>> surface = new(StringComparer.Ordinal);
-        foreach ((string toolName, MethodInfo method) in ToolAttributeDiscovery.GetNamedToolMethods())
-            surface.Add(toolName, CellSpellings(method));
+        foreach ((string toolName, IReadOnlyList<ParameterInfo> parameters) in LiveToolParameters.ByTool())
+            surface.Add(toolName, parameters.Select(CellSpelling).ToHashSet(StringComparer.Ordinal));
 
         IEnumerable<MethodInfo> promptMethods = typeof(ToolAttributeDiscovery).Assembly
             .GetTypes()

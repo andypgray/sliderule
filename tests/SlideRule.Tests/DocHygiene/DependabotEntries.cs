@@ -110,6 +110,33 @@ internal static class DependabotEntries
         return ignores;
     }
 
+    /// <summary>
+    ///     One finding per nuget update entry whose <c>ignore:</c> list does not name one of
+    ///     <paramref name="packages" /> exactly, ending in <paramref name="consequence" />, what that entry's next
+    ///     update run does, or a single finding naming <paramref name="packagesName" /> where the configuration
+    ///     carries no nuget entry at all, so an unreadable configuration reports rather than passes.
+    /// </summary>
+    internal static IReadOnlyList<string> MissingIgnores(
+        IReadOnlyList<string> packages, string packagesName, string consequence)
+    {
+        IReadOnlyList<string[]> entries = NuGetEntries();
+        if (entries.Count == 0)
+            return [$"{ConfigPath} carries no nuget update entry, so nothing ignores {packagesName}."];
+
+        List<string> findings = new();
+        foreach (string[] entry in entries)
+        {
+            IReadOnlyList<string> ignored = IgnoredNames(entry);
+            string directories = string.Join(", ", Directories(entry));
+            findings.AddRange(packages
+                .Where(package => !ignored.Contains(package, StringComparer.Ordinal))
+                .Select(package => $"{ConfigPath}'s nuget entry for {directories} carries no 'ignore:' naming "
+                                   + $"{package}, so its next update run {consequence}."));
+        }
+
+        return findings;
+    }
+
     private static int IndentOf(string line)
     {
         return line.Length - line.TrimStart(' ').Length;

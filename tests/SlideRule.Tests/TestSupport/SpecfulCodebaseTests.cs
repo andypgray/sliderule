@@ -32,7 +32,7 @@ public sealed class SpecfulCodebaseTests
                                                """;
 
     private static readonly string SolutionPath =
-        Path.Combine(AppContext.BaseDirectory, "Fixtures", "TestSolutions", "MultiTfm", "MultiTfm.sln");
+        Path.Combine(FixtureBeds.TestSolutionsRoot, "MultiTfm", "MultiTfm.sln");
 
     /// <summary>
     ///     The framework map reaches the extraction. No project in this repository compiles for more than one

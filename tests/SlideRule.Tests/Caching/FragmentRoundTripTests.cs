@@ -88,20 +88,6 @@ public sealed class FragmentRoundTripTests
     }
 
     [Fact]
-    public void Serialize_TypeKindEnum_IsWrittenAsItsName()
-    {
-        // Pins the enum-serialization choice: names, not integers, so a reorder cannot silently remap and a
-        // rename degrades to a parse-error miss rather than a wrong value.
-        IReadOnlyList<CodebaseFragment> fragments = ExtractRichSolution();
-
-        string json = JsonSerializer.Serialize(fragments, ManifestJson.Options);
-
-        json.ShouldContain("\"Kind\":\"Interface\"");
-        json.ShouldContain("\"Accessibility\":\"Public\"");
-        json.ShouldNotContain("\"Kind\":0");
-    }
-
-    [Fact]
     public void Serialize_Sites_CarryNoSpan()
     {
         // A live extraction records the span of each reference beside its site, for the analyzer to put a

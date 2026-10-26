@@ -1,8 +1,7 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
 using SlideRule.Roslyn.Caching;
 using Xunit;
+using static SlideRule.Tests.Caching.WidgetShapes;
 
 namespace SlideRule.Tests.Caching;
 
@@ -223,11 +222,5 @@ public sealed class DeclarationSurfaceTests
         SourceShape afterShape = ShapeOf(after);
 
         afterShape.SurfaceHash.ShouldNotBe(beforeShape.SurfaceHash);
-    }
-
-    private static SourceShape ShapeOf(string text)
-    {
-        SyntaxTree tree = CSharpSyntaxTree.ParseText(text, path: "Widget.cs");
-        return SourceShape.Of(tree);
     }
 }

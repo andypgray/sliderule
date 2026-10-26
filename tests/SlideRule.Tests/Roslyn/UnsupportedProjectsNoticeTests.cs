@@ -29,24 +29,6 @@ public sealed class UnsupportedProjectsNoticeTests
     ];
 
     [Fact]
-    public void Reason_ASharedProject_DescribesItsShapeRatherThanItsLanguage()
-    {
-        // The extension cannot tell us the language of a shared project and does not need to: what a reader
-        // has to know is that nothing loads this file and its sources reach the model through the importers.
-        UnsupportedProjectsNotice.Reason(UnsupportedProjectKind.SharedProject)
-            .ShouldBe("a shared project, compiled into the projects that import it");
-    }
-
-    [Fact]
-    public void Reason_ANonCsharpProject_KeepsTheSentenceItAlwaysHad()
-    {
-        // This kind keeps its plain sentence, deliberately: the taxonomy exists because one kind needed
-        // different words, not because this one's were wrong.
-        UnsupportedProjectsNotice.Reason(UnsupportedProjectKind.NotCsharp)
-            .ShouldBe("not a C# project");
-    }
-
-    [Fact]
     public void Reason_EveryDeclaredKind_ReadsDifferentlyFromTheOthers()
     {
         // The guard on the switch's fallback arm, which is NotCsharp — the right default, and also the way a
@@ -70,17 +52,10 @@ public sealed class UnsupportedProjectsNoticeTests
     public void Reason_EveryDeclaredKind_CarriesNoEmDashOfItsOwn()
     {
         // Entry joins on an em dash, so a reason carrying a second would put two in one line. Over every kind
-        // rather than the two named above, because the next kind added is where it would happen.
+        // rather than the two the Relative row pins, because the next kind added is where it would happen.
         foreach (UnsupportedProjectKind kind in Enum.GetValues<UnsupportedProjectKind>())
             UnsupportedProjectsNotice.Reason(kind)
                 .ShouldNotContain("—", $"{kind}'s reason carries an em dash, and Entry already joins on one");
-    }
-
-    [Fact]
-    public void Entry_AProjectAndItsReason_JoinsThemTheOneWayEverySurfaceShowsThem()
-    {
-        UnsupportedProjectsNotice.Entry("Shared/Shared.shproj", "a shared project")
-            .ShouldBe("Shared/Shared.shproj — a shared project");
     }
 
     [Fact]
@@ -89,7 +64,10 @@ public sealed class UnsupportedProjectsNoticeTests
         // A machine path in a skip reason is a path no golden can pin and no reader can copy, so every
         // project is shown from the solution directory — including one above it, which a solution declaring a
         // project beside rather than under itself produces. The reason arrives already attached: a caller
-        // that had to add it would be a second author for this file's sentence.
+        // that had to add it would be a second author for this file's sentence. A shared project's reason
+        // describes its shape rather than its language: the extension cannot say what language it holds, and
+        // what a reader needs is that nothing loads the file and its sources reach the model through the
+        // importers.
         string solutionDirectory = Path.Combine(Path.GetTempPath(), "unsupported-projects-tests", "solution");
         UnsupportedProject[] projects =
         [

@@ -20,13 +20,11 @@ namespace SlideRule.Tests.Checking;
 /// </summary>
 public sealed class EvaluatorFailClosedTests
 {
-    private static readonly CodebaseModel EmptyCodebase = new([], [], [], [], [], [], [], [], [], [], [], []);
-
     [Fact]
     public void ByNoun_UnknownNoun_ThrowsNamingTheType()
     {
         var selection = new RefinedSelection(new Arch(), new UnknownNoun(), Array.Empty<SelectionAdjective>());
-        var evaluator = new SelectionEvaluator(EmptyCodebase);
+        var evaluator = new SelectionEvaluator(ProjectFacts.Solution());
 
         var ex = Should.Throw<InvalidOperationException>(() => evaluator.Evaluate(selection, SelectionPosition.Subject));
         ex.Message.ShouldBe("Unhandled selection noun 'UnknownNoun'.");
@@ -37,7 +35,7 @@ public sealed class EvaluatorFailClosedTests
     {
         var selection = new RefinedSelection(
             new Arch(), TypesNoun.Instance, [new UnknownAdjective()]);
-        var evaluator = new SelectionEvaluator(EmptyCodebase);
+        var evaluator = new SelectionEvaluator(ProjectFacts.Solution());
 
         var ex = Should.Throw<InvalidOperationException>(() => evaluator.Evaluate(selection, SelectionPosition.Subject));
         ex.Message.ShouldBe("Unhandled selection adjective 'UnknownAdjective'.");
@@ -49,7 +47,7 @@ public sealed class EvaluatorFailClosedTests
         var arch = new Arch();
         var memberSelection = new KindMemberSelection(
             arch.Types, MemberKindFilter.Any, [new UnknownMemberAdjective()]);
-        var selections = new SelectionEvaluator(EmptyCodebase);
+        var selections = new SelectionEvaluator(ProjectFacts.Solution());
         HashSet<TypeNode> sourceTypes = selections.Evaluate(memberSelection.Source, SelectionPosition.Subject);
 
         var ex = Should.Throw<InvalidOperationException>(() =>
@@ -61,16 +59,18 @@ public sealed class EvaluatorFailClosedTests
     public void UnknownAdjectiveInRule_IsContainedAsRuleErrorNotCrash()
     {
         // A real verb over a fake-adjective subject: the throw propagates out of ConstraintEvaluator and is
-        // contained by ArchChecker.Verdict as a per-rule RuleError (the run continues; the rule is Failed).
+        // contained by ArchChecker.Verdict as a per-rule RuleError (the run continues; the rule is Failed). The
+        // fault is not an evaluation refusal, so the detail carries the blanket arm's wording.
         var arch = new Arch();
         var selection = new RefinedSelection(arch, TypesNoun.Instance, [new UnknownAdjective()]);
         Constraint constraint = selection.MustHavePrefix("I");
         ArchitectureModel model = Checker.HandBuilt("area/rule", constraint);
 
-        RuleResult result = ArchChecker.Check(model, EmptyCodebase)
+        RuleResult result = ArchChecker.Check(model, ProjectFacts.Solution())
             .Results.Single();
 
-        result.ShouldHaveFailedWithDetailContaining(ViolationKind.RuleError, "Unhandled selection adjective 'UnknownAdjective'.");
+        result.ShouldHaveFailedWithDetailContaining(
+            ViolationKind.RuleError, "Rule evaluation failed: Unhandled selection adjective 'UnknownAdjective'.");
     }
 
     [Fact]
@@ -89,7 +89,7 @@ public sealed class EvaluatorFailClosedTests
         Constraint constraint = memberSelection.MustHaveSuffix("Async");
         ArchitectureModel model = Checker.HandBuilt("area/rule", constraint);
 
-        RuleResult result = ArchChecker.Check(model, EmptyCodebase)
+        RuleResult result = ArchChecker.Check(model, ProjectFacts.Solution())
             .Results.Single();
 
         result.ShouldHaveFailedWithDetailContaining(ViolationKind.RuleError, "Unhandled member adjective 'UnknownMemberAdjective'.");
@@ -100,7 +100,8 @@ public sealed class EvaluatorFailClosedTests
     {
         var selection = new RefinedProjectSelection(new Arch(), [new UnknownProjectAdjective()]);
 
-        var ex = Should.Throw<InvalidOperationException>(() => ProjectSelectionEvaluator.Resolve(selection, EmptyCodebase.Projects));
+        var ex = Should.Throw<InvalidOperationException>(() =>
+            ProjectSelectionEvaluator.Resolve(selection, ProjectFacts.Solution().Projects));
         ex.Message.ShouldBe("Unhandled project adjective 'UnknownProjectAdjective'.");
     }
 
@@ -118,7 +119,7 @@ public sealed class EvaluatorFailClosedTests
         Constraint constraint = selection.MustNotBePackable();
         ArchitectureModel model = Checker.HandBuilt("area/rule", constraint);
 
-        RuleResult result = ArchChecker.Check(model, EmptyCodebase)
+        RuleResult result = ArchChecker.Check(model, ProjectFacts.Solution())
             .Results.Single();
 
         result.ShouldHaveFailedWithDetailContaining(ViolationKind.RuleError, "Unhandled project adjective 'UnknownProjectAdjective'.");

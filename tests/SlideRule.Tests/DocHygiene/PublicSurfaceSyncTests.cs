@@ -32,13 +32,6 @@ namespace SlideRule.Tests.DocHygiene;
 /// </remarks>
 public sealed class PublicSurfaceSyncTests
 {
-    private const string PropsPath = "Directory.Build.props";
-
-    // Where the baseline version and strict mode are declared for every package that validates. A
-    // project's own declaration still wins over it, exactly as MSBuild evaluates the two, which is why the
-    // checks below read the csproj first and why one arm holds every csproj to declaring neither.
-    private const string ScopedProps = "src/Directory.Build.props";
-
     private const string BaselineProperty = "PackageValidationBaselineVersion";
 
     private const string StrictModeProperty = "EnableStrictModeForBaselineValidation";
@@ -46,8 +39,6 @@ public sealed class PublicSurfaceSyncTests
     private const string AnalyzerVersionProperty = "SlideRuleAnalyzersVersion";
 
     private const string CoreCsproj = "src/SlideRule/SlideRule.csproj";
-
-    private const string AnalyzersCsproj = "src/SlideRule.Analyzers/SlideRule.Analyzers.csproj";
 
     /// <summary>
     ///     The two assemblies a consumer writes code against: the contract package every spec project
@@ -103,7 +94,7 @@ public sealed class PublicSurfaceSyncTests
             "true",
             "a global tool: what it ships is the `sliderule` command, not an assembly anyone compiles "
             + "against"),
-        new(AnalyzersCsproj,
+        new(DocPaths.AnalyzersProject,
             "DevelopmentDependency",
             "true",
             "an analyzer: every type in it is internal and the package ships no lib/ folder, so there is "
@@ -241,15 +232,15 @@ public sealed class PublicSurfaceSyncTests
         // deliberately not a fifth site in the four-way version equality ManifestVersionTests holds. What
         // it can never be is ahead: a baseline nobody has pushed cannot be downloaded, and the pack-time
         // check then fails at release time with a restore error rather than an API one.
-        Version version = NumericPart(PropertyOf(PropsPath, "Version"));
+        Version version = NumericPart(PropertyOf(SolutionInventory.RootProps, "Version"));
         List<string> findings = new();
 
         // Act
         foreach ((string csproj, Assembly _) in PinnedPackages)
         {
-            Declaration declared = Effective(csproj, BaselineProperty)
-                                   ?? throw new InvalidOperationException(
-                                       $"Neither {csproj} nor {ScopedProps} declares <{BaselineProperty}>.");
+            PropertyDeclaration declared = SolutionInventory.Effective(csproj, BaselineProperty)
+                                           ?? throw new InvalidOperationException(
+                                               $"Neither {csproj} nor {SolutionInventory.SrcProps} declares <{BaselineProperty}>.");
 
             Version baseline = NumericPart(declared.Value);
             if (baseline <= version) continue;
@@ -279,12 +270,12 @@ public sealed class PublicSurfaceSyncTests
             overrides.AddRange(shared
                 .Where(own.ContainsKey)
                 .Select(property => $"{project.CsprojPath} declares <{property}> itself, which overrides "
-                                    + $"{ScopedProps} for this project alone."));
+                                    + $"{SolutionInventory.SrcProps} for this project alone."));
         }
 
         // Assert
         overrides.ShouldReportNothing(
-            $"The package-validation baseline and mode belong to {ScopedProps} alone, so a release moves them "
+            $"The package-validation baseline and mode belong to {SolutionInventory.SrcProps} alone, so a release moves them "
             + "for every validated package at once");
     }
 
@@ -295,14 +286,14 @@ public sealed class PublicSurfaceSyncTests
         // names the last released version too. Both move in the commit after a release indexes, so a
         // difference means one of them was left behind, and an analyzer that lags reads the committed model
         // with a reader two releases old.
-        string baseline = PropertyOf(ScopedProps, BaselineProperty);
+        string baseline = PropertyOf(SolutionInventory.SrcProps, BaselineProperty);
 
         // Act
-        string analyzer = PropertyOf(ScopedProps, AnalyzerVersionProperty);
+        string analyzer = PropertyOf(SolutionInventory.SrcProps, AnalyzerVersionProperty);
 
         // Assert
         analyzer.ShouldBe(baseline,
-            customMessage: $"{ScopedProps} runs build analyzer {analyzer} over src but validates against "
+            customMessage: $"{SolutionInventory.SrcProps} runs build analyzer {analyzer} over src but validates against "
                            + $"{baseline}. Both name the last published release; move them together.");
     }
 
@@ -367,30 +358,18 @@ public sealed class PublicSurfaceSyncTests
         ];
 
         List<string> missing = required
-            .Where(entry => Effective(csproj, entry.Property) is not { } declared
+            .Where(entry => SolutionInventory.Effective(csproj, entry.Property) is not { } declared
                             || !string.Equals(declared.Value, entry.Expected, StringComparison.OrdinalIgnoreCase))
             .Select(entry => $"{csproj} does not get <{entry.Property}>{entry.Expected} from itself or from "
-                             + $"{ScopedProps}, so nothing compares the package it builds against the one "
+                             + $"{SolutionInventory.SrcProps}, so nothing compares the package it builds against the one "
                              + "already published.")
             .ToList();
 
-        if (Effective(csproj, BaselineProperty) is null)
-            missing.Add($"{csproj} switches package validation on but neither it nor {ScopedProps} names a "
+        if (SolutionInventory.Effective(csproj, BaselineProperty) is null)
+            missing.Add($"{csproj} switches package validation on but neither it nor {SolutionInventory.SrcProps} names a "
                         + "baseline version, which silently compares it against nothing.");
 
         return missing;
-    }
-
-    // What a property evaluates to for one project, as far as the two files that may declare it can say:
-    // the project's own declaration wins, because MSBuild imports the scoped props before the project body.
-    private static Declaration? Effective(string csproj, string property)
-    {
-        IReadOnlyDictionary<string, string> own = SolutionInventory.Properties(csproj);
-        if (own.TryGetValue(property, out string? declared)) return new Declaration(declared, csproj);
-
-        IReadOnlyDictionary<string, string> scoped = SolutionInventory.Properties(ScopedProps);
-
-        return scoped.TryGetValue(property, out string? inherited) ? new Declaration(inherited, ScopedProps) : null;
     }
 
     private static string PropertyOf(string path, string property)
@@ -418,10 +397,4 @@ public sealed class PublicSurfaceSyncTests
     ///     exemption true, and the <paramref name="Reason" /> a reader of a failure needs.
     /// </summary>
     private sealed record Exemption(string Csproj, string Element, string Evidence, string Reason);
-
-    /// <summary>
-    ///     A property's <paramref name="Value" /> and the repository-relative <paramref name="File" /> that
-    ///     declared it.
-    /// </summary>
-    private sealed record Declaration(string Value, string File);
 }

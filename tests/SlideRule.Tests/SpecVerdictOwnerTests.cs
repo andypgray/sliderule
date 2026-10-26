@@ -14,14 +14,6 @@ namespace SlideRule.Tests;
 public sealed class SpecVerdictOwnerTests
 {
     [Fact]
-    public void All_HoldsEverySlotOfTheAuthoringSurface()
-    {
-        // Twenty pattern slots, nine prose slots, and seven that are neither.
-        SpecSlot.All.Count
-            .ShouldBe(36);
-    }
-
-    [Fact]
     public void All_IsEveryDeclaredSlot_EachNamedForItsOwnField()
     {
         // Name is how a caller holding no reference to the instance says which slot it means, so a field

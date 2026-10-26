@@ -155,21 +155,6 @@ public sealed class MustOnlyThrowVerbTests
     }
 
     [Fact]
-    public void MustOnlyThrow_EmptySubject_FailsWithDefaultMessage()
-    {
-        // An empty subject fails the rule by default with the shared message (GRAMMAR §4.1), exactly as every
-        // other verb — the throw verb takes the same subject gate.
-        RuleResult result = Checker.Run(
-                "namespace App { public class Foo {} }",
-                arch => arch.Rule("ex/empty")
-                    .Enforce(arch.Namespace("Nowhere.*").MustOnlyThrow(arch.Namespace("App.*")))
-                    .Because("b"))
-            .Single();
-
-        result.ShouldHaveFailedWithDetail(ViolationKind.EmptySubject, ConstraintEvaluator.EmptySubjectMessage);
-    }
-
-    [Fact]
     public void MustOnlyThrow_GrandfatheredThrowPasses_NewThrowStaysRed()
     {
         // The throw ratchet keys the (source, thrown) type pair (GRAMMAR §4.3): Worker is grandfathered for

@@ -1,4 +1,3 @@
-using Microsoft.CodeAnalysis;
 using Shouldly;
 using SlideRule.Baselines;
 using SlideRule.Checking;
@@ -137,7 +136,7 @@ public sealed class UnderAdjectiveTests
         // host that writes no generator output to disk does, so the generated type is under nothing, not even
         // `**`, while the authored type beside it is wherever its own file is.
         CodebaseModel codebase = CompilationFactory.ExtractConsoleAppWithGenerator(
-            new EmittingGenerator(),
+            new PostInitializationGenerator(("Emitted.g.cs", "namespace Gen { public sealed class Emitted { } }")),
             ("/repo/src/App/Program.cs", """
                                          System.Console.WriteLine();
 
@@ -158,14 +157,5 @@ public sealed class UnderAdjectiveTests
     private static IReadOnlyList<string> Selected(string first, params string[] more)
     {
         return Checker.Selects(Sources.FolderModel, Sources.FolderRoot, arch => arch.Types.Under(first, more));
-    }
-
-    private sealed class EmittingGenerator : IIncrementalGenerator
-    {
-        public void Initialize(IncrementalGeneratorInitializationContext context)
-        {
-            context.RegisterPostInitializationOutput(output =>
-                output.AddSource("Emitted.g.cs", "namespace Gen { public sealed class Emitted { } }"));
-        }
     }
 }

@@ -25,55 +25,31 @@ namespace SlideRule.Tests.SpecCompletion;
 /// </remarks>
 public sealed class CommittedTextTests(SpecCompletionFixture fixture) : IClassFixture<SpecCompletionFixture>
 {
-    [Fact]
-    public async Task ANamespaceStep_CommitsOnADotAndWritesItsOwnName()
+    // The commit and filter sets are spelled one character apiece, so a trailing space is the space.
+    [Theory]
+    // A namespace step commits on a dot and writes its own name: the dot commits the step and re-triggers
+    // the next segment, which is the whole of how a name is written one piece at a time.
+    [InlineData("""arch.Namespace("MyApp.$$");""", "Domain", "MyApp.Domain", ".", "*<, ")]
+    // A subtree form commits on nothing and writes its trailing star: a dot after it would mean nothing, so
+    // it neither commits it nor closes the list.
+    [InlineData("""arch.Namespace("MyApp.$$");""", "Domain.*", "MyApp.Domain.*", "", ".*<, ")]
+    // The lone star commits on nothing and writes just the star.
+    [InlineData("""arch.Namespace("MyApp.$$");""", "*", "MyApp.*", "", ".*")]
+    // A non-generic type commits on a dot, so a nested type can follow.
+    [InlineData("""arch.Types.Methods.Returning("MyApp.Domain.$$");""", "EntityBase", "MyApp.Domain.EntityBase", ".",
+        "*<, ")]
+    // A simple name commits on nothing, because a dot would make it match nothing.
+    [InlineData("""arch.Types.Named("$$");""", "Order", "Order", "", ".*<, ")]
+    public async Task ARow_WritesItsNameAndCommitsAndFiltersOnItsOwnCharacters(
+        string body, string name, string written, string commits, string filters)
     {
         // Arrange
-        OfferedList offered = await fixture.ShouldCompileAndOfferAsync("""arch.Namespace("MyApp.$$");""", Ct);
-
-        // Act, Assert: the dot commits the step and re-triggers the next segment, which is the whole of
-        // how a name is written one piece at a time.
-        await offered.ShouldInsertAsync("Domain", "MyApp.Domain", Ct);
-        offered.ShouldCommitOnly("Domain", '.');
-        offered.ShouldFilterOn("Domain", '*', '<', ',', ' ');
-    }
-
-    [Fact]
-    public async Task ASubtreeForm_CommitsOnNothingAndWritesItsTrailingStar()
-    {
-        // Arrange
-        OfferedList offered = await fixture.ShouldCompileAndOfferAsync("""arch.Namespace("MyApp.$$");""", Ct);
-
-        // Act, Assert: a dot after a subtree form would mean nothing, so it neither commits it nor closes
-        // the list.
-        await offered.ShouldInsertAsync("Domain.*", "MyApp.Domain.*", Ct);
-        offered.ShouldCommitOnly("Domain.*");
-        offered.ShouldFilterOn("Domain.*", '.', '*', '<', ',', ' ');
-    }
-
-    [Fact]
-    public async Task TheLoneStar_CommitsOnNothingAndWritesJustTheStar()
-    {
-        // Arrange
-        OfferedList offered = await fixture.ShouldCompileAndOfferAsync("""arch.Namespace("MyApp.$$");""", Ct);
+        OfferedList offered = await fixture.ShouldCompileAndOfferAsync(body, Ct);
 
         // Act, Assert
-        await offered.ShouldInsertAsync("*", "MyApp.*", Ct);
-        offered.ShouldCommitOnly("*");
-        offered.ShouldFilterOn("*", '.', '*');
-    }
-
-    [Fact]
-    public async Task ANonGenericType_CommitsOnADotSoANestedTypeCanFollow()
-    {
-        // Arrange
-        OfferedList offered = await fixture.ShouldCompileAndOfferAsync(
-            """arch.Types.Methods.Returning("MyApp.Domain.$$");""", Ct);
-
-        // Act, Assert
-        await offered.ShouldInsertAsync("EntityBase", "MyApp.Domain.EntityBase", Ct);
-        offered.ShouldCommitOnly("EntityBase", '.');
-        offered.ShouldFilterOn("EntityBase", '*', '<', ',', ' ');
+        await offered.ShouldInsertAsync(name, written, Ct);
+        offered.ShouldCommitOnly(name, commits.ToCharArray());
+        offered.ShouldFilterOn(name, filters.ToCharArray());
     }
 
     [Fact]
@@ -89,18 +65,6 @@ public sealed class CommittedTextTests(SpecCompletionFixture fixture) : IClassFi
         await offered.ShouldInsertAsync("IMap<TKey, TValue>", "MyApp.Domain.IMap<TKey, TValue>", Ct);
         offered.ShouldCommitOnly("IHandler<T>");
         offered.ShouldFilterOn("IHandler<T>", '.', '*', '<', '>', ',', ' ');
-    }
-
-    [Fact]
-    public async Task ASimpleName_CommitsOnNothingBecauseADotWouldMakeItMatchNothing()
-    {
-        // Arrange
-        OfferedList offered = await fixture.ShouldCompileAndOfferAsync("""arch.Types.Named("$$");""", Ct);
-
-        // Act, Assert
-        await offered.ShouldInsertAsync("Order", "Order", Ct);
-        offered.ShouldCommitOnly("Order");
-        offered.ShouldFilterOn("Order", '.', '*', '<', ',', ' ');
     }
 
     [Fact]

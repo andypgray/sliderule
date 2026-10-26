@@ -1,5 +1,4 @@
 using System.Text.RegularExpressions;
-using Shouldly;
 using SlideRule.Tests.TestSupport;
 using Xunit;
 
@@ -31,8 +30,6 @@ public sealed class AnalyzerEnablementTests
 {
     private const string Property = "EnableNETAnalyzers";
 
-    private const string ScopedProps = "src/Directory.Build.props";
-
     // The frameworks the SDK analyzes without being asked: net5.0 and up, never netstandard or net4x. A
     // framework this does not match counts as one the SDK leaves off, so an unreadable one asks for the
     // declaration rather than assuming it is unnecessary.
@@ -43,14 +40,17 @@ public sealed class AnalyzerEnablementTests
     {
         // Arrange
         IReadOnlyList<SolutionProject> projects = SolutionInventory.SrcProjects;
-        bool declaredAboveThem = DeclaredAboveThem();
+        List<string> unanalyzed = new();
 
-        // Act
-        List<string> unanalyzed = projects
-            .Where(project => !RunsTheAnalyzers(project, declaredAboveThem))
+        // Act: an empty list would make this pass by reading no project at all rather than by finding every
+        // one of them analyzed, so it is a finding.
+        if (projects.Count == 0) unanalyzed.Add("The solution file declares nothing under src/.");
+
+        IEnumerable<string> off = projects
+            .Where(static project => !RunsTheAnalyzers(project))
             .Select(static project => $"{project.Name} ({project.TargetFramework})")
-            .Order(StringComparer.Ordinal)
-            .ToList();
+            .Order(StringComparer.Ordinal);
+        unanalyzed.AddRange(off);
 
         // Assert
         unanalyzed.ShouldReportNothing(
@@ -58,30 +58,13 @@ public sealed class AnalyzerEnablementTests
             + "analyzers.globalconfig promotes is inert there — the SDK leaves them off below net5.0");
     }
 
-    [Fact]
-    public void SrcProjectList_IsNotEmpty()
-    {
-        // Assert: the arm above reports what a filter left behind, and an empty list would make it pass
-        // by reading no project at all rather than by finding every one of them analyzed.
-        SolutionInventory.SrcProjects.ShouldNotBeEmpty("The solution file declares nothing under src/.");
-    }
-
-    // A project's own declaration wins over the one above it, and both win over the SDK's default,
+    // A project's own declaration wins over the one above it, and either wins over the SDK's default,
     // exactly as MSBuild evaluates them.
-    private static bool RunsTheAnalyzers(SolutionProject project, bool declaredAboveThem)
+    private static bool RunsTheAnalyzers(SolutionProject project)
     {
-        IReadOnlyDictionary<string, string> own = SolutionInventory.Properties(project.CsprojPath);
+        PropertyDeclaration? declared = SolutionInventory.Effective(project.CsprojPath, Property);
 
-        if (own.TryGetValue(Property, out string? declared)) return IsTrue(declared);
-
-        return declaredAboveThem || AnalyzedByDefault.IsMatch(project.TargetFramework);
-    }
-
-    private static bool DeclaredAboveThem()
-    {
-        IReadOnlyDictionary<string, string> scoped = SolutionInventory.Properties(ScopedProps);
-
-        return scoped.TryGetValue(Property, out string? declared) && IsTrue(declared);
+        return declared is null ? AnalyzedByDefault.IsMatch(project.TargetFramework) : IsTrue(declared.Value);
     }
 
     private static bool IsTrue(string value)

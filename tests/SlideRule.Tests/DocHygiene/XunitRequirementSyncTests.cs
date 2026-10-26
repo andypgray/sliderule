@@ -80,8 +80,7 @@ public sealed class XunitRequirementSyncTests
     {
         // Arrange
         string pair = PairVersion();
-        string description = SolutionInventory.Properties(DocPaths.AdapterProject)
-            .GetValueOrDefault("Description") ?? string.Empty;
+        string description = PackageDescriptionTests.DescriptionOf(DocPaths.AdapterProject);
         List<string> findings = [];
 
         // Act
@@ -125,25 +124,12 @@ public sealed class XunitRequirementSyncTests
     [Fact]
     public void EveryUpdateEntry_IgnoresThePair()
     {
-        // Arrange: every entry rather than the one that lists the adapter, since a run bumps packages in
-        // whatever its projects reach. No entry at all is a finding rather than a pass.
-        IReadOnlyList<string[]> entries = DependabotEntries.NuGetEntries();
-        List<string> findings = new();
-
-        // Act
-        if (entries.Count == 0)
-            findings.Add($"{DependabotEntries.ConfigPath} carries no nuget update entry, so nothing ignores the pair.");
-
-        foreach (string[] entry in entries)
-        {
-            IReadOnlyList<string> ignored = DependabotEntries.IgnoredNames(entry);
-            string directories = string.Join(", ", DependabotEntries.Directories(entry));
-            findings.AddRange(AuthoringPair
-                .Where(package => !ignored.Contains(package, StringComparer.Ordinal))
-                .Select(package => $"{DependabotEntries.ConfigPath}'s nuget entry for {directories} carries no "
-                                   + $"'ignore:' naming {package}, so its next update run raises the adapter's "
-                                   + "xunit.v3 requirement."));
-        }
+        // Act: every entry rather than the one that lists the adapter, since a run bumps packages in whatever
+        // its projects reach.
+        IReadOnlyList<string> findings = DependabotEntries.MissingIgnores(
+            AuthoringPair,
+            "the pair",
+            "raises the adapter's xunit.v3 requirement");
 
         // Assert
         findings.ShouldReportNothing(Header);

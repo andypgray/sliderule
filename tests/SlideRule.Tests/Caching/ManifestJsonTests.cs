@@ -50,8 +50,9 @@ public sealed class ManifestJsonTests
         byte[] reflected = JsonSerializer.SerializeToUtf8Bytes(manifest, ReflectionResolvedOptions());
 
         // The non-vacuity guard, and the point of the closed converter list: every graph enum reaches the
-        // wire as its name. A missing registration writes the ordinal instead — which both resolvers would
-        // do identically, so the comparison below cannot catch it.
+        // wire as its name, so a reorder cannot silently remap and a rename degrades to a parse-error miss
+        // rather than a wrong value. A missing registration writes the ordinal instead — which both resolvers
+        // would do identically, so the comparison below cannot catch it.
         string json = generated.ShouldBeTheSameJsonAs(reflected);
         json.ShouldContain("\"Kind\":\"Interface\"");
         json.ShouldContain("\"Accessibility\":\"Internal\"");

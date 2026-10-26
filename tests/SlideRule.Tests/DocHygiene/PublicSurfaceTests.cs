@@ -21,7 +21,10 @@ public sealed class PublicSurfaceTests
     [Fact]
     public void Render_ListsTypesInOrdinalOrderAndEndsOnOneNewline()
     {
-        // Arrange: handed in an order that is neither the ordinal one nor the reverse of it.
+        // Arrange: handed in an order that is neither the ordinal one nor the reverse of it. The open generic
+        // also pins the spelling, because it is where the three differ most: ToString appends the type
+        // parameter list, AssemblyQualifiedName appends the assembly identity, and only FullName is the name a
+        // consumer would recognise.
         Type[] types = [typeof(Outer.Inner), typeof(Generic<>), typeof(Outer)];
 
         // Act
@@ -29,23 +32,6 @@ public sealed class PublicSurfaceTests
 
         // Assert
         rendered.ShouldBe($"{Prefix}Generic`1\n{Prefix}Outer\n{Prefix}Outer+Inner\n");
-    }
-
-    [Fact]
-    public void Render_NamesTypesByFullNameRatherThanByToStringOrAssemblyQualifiedName()
-    {
-        // Arrange: an open generic is where the three spellings differ most — ToString appends the type
-        // parameter list, AssemblyQualifiedName appends the assembly identity, and only FullName is the
-        // name a consumer would recognise.
-        Type[] types = [typeof(Generic<>)];
-
-        // Act
-        string rendered = PublicSurface.Render(types);
-
-        // Assert
-        rendered.ShouldBe($"{Prefix}Generic`1\n");
-        rendered.ShouldNotContain("[T]");
-        rendered.ShouldNotContain("Version=");
     }
 
     [Fact]

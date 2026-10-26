@@ -105,17 +105,10 @@ public sealed class ServerInstructionsTests
         int recovery = instructions.IndexOf(ServerInstructions.UnboundCallCoda, StringComparison.Ordinal);
         int configRemedies = instructions.IndexOf("`args`", StringComparison.Ordinal);
 
-        recovery.ShouldBeGreaterThanOrEqualTo(0);
-        configRemedies.ShouldBeGreaterThan(recovery);
-    }
-
-    [Fact]
-    public void For_UnboundServer_EmbedsTheCallCodaVerbatim()
-    {
         // Verbatim, not merely equivalent: the banner and every tool-call error carry the same constant, so
         // the handshake channel and the per-call channel cannot drift into describing different recoveries.
-        ServerInstructions.For("x")
-            .ShouldContain(ServerInstructions.UnboundCallCoda);
+        recovery.ShouldBeGreaterThanOrEqualTo(0);
+        configRemedies.ShouldBeGreaterThan(recovery);
     }
 
     [Fact]

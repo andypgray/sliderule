@@ -34,8 +34,6 @@ public sealed class TempFixtureWorkspaceTests
 
     [Theory]
     [InlineData("Order.cs")]
-    [InlineData("clean-baseline.json")]
-    [InlineData("README.md")]
     [InlineData("MyApp.sln.bak")]
     [InlineData("Makefile")]
     public void IsProjectFile_AFileNoRestoreDependsOn_IsNotRecognised(string fileName)

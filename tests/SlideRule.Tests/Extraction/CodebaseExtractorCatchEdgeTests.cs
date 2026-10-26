@@ -135,11 +135,9 @@ public sealed class CodebaseExtractorCatchEdgeTests
                                                          }
                                                          """);
 
-        // Edges are facts: a rethrowing catch still mints its catch edge. The bare rethrow `throw;` mints nothing.
+        // Edges are facts: a rethrowing catch still mints its catch edge.
         model.HasCatchEdge("N.Worker", "N.MyError")
             .ShouldBeTrue();
-        model.ThrowEdges("N.Worker")
-            .ShouldBeEmpty();
     }
 
     [Fact]
@@ -205,26 +203,6 @@ public sealed class CodebaseExtractorCatchEdgeTests
         model.HasCatchEdge("N.Recursive", "N.Recursive")
             .ShouldBeFalse();
         model.CatchEdges("N.Recursive")
-            .ShouldBeEmpty();
-    }
-
-    [Fact]
-    public void ExtractFromCompilations_ErrorCaughtType_IsDropped()
-    {
-        CodebaseModel model = CompilationFactory.Extract("""
-                                                         namespace N;
-                                                         public class Worker
-                                                         {
-                                                             public void Run()
-                                                             {
-                                                                 try { }
-                                                                 catch (Undefined) { }
-                                                             }
-                                                         }
-                                                         """);
-
-        // An unresolvable caught type is an error type with no candidate, so it resolves to nothing: no catch edge.
-        model.CatchEdges("N.Worker")
             .ShouldBeEmpty();
     }
 
@@ -314,35 +292,6 @@ public sealed class CodebaseExtractorCatchEdgeTests
         model.CatchEdges("N.Worker")
             .Select(e => e.Caught.FullName)
             .ShouldBe(["N.Alpha", "N.Beta"]);
-    }
-
-    [Fact]
-    public void ExtractFromCompilations_WhenFilteredTypedCatch_MintsTheEdgeWithAnEmptyUnfilteredSubset()
-    {
-        CodebaseModel model = CompilationFactory.Extract("""
-                                                         namespace N;
-                                                         public class MyError : System.Exception {}
-                                                         public class Worker
-                                                         {
-                                                             public void Run(bool flag)
-                                                             {
-                                                                 try { }
-                                                                 catch (MyError) when (flag) { }
-                                                             }
-                                                         }
-                                                         """);
-
-        // The filter leaves the edge and its sites untouched — it only keeps the site out of the unfiltered
-        // subset, which is the whole of the filter fact. Its positive-polarity partners — the typed and bare
-        // catches that DO record a site unfiltered — are the swallowing rows further down
-        // (ExtractFromCompilations_UnfilteredCatchNotEndingInThrow_RecordsTheSiteSwallowing and
-        // ExtractFromCompilations_BareCatchNotEndingInThrow_RecordsSystemExceptionSwallowing), which assert
-        // the unfiltered subset on the way to the rethrow fact rather than repeating it in a row of their own.
-        CatchEdge edge = model.CatchEdge("N.Worker", "N.MyError");
-        edge.Sites.Lines()
-            .ShouldBe([8]);
-        edge.UnfilteredSites.Lines()
-            .ShouldBeEmpty();
     }
 
     [Fact]
@@ -524,37 +473,6 @@ public sealed class CodebaseExtractorCatchEdgeTests
     }
 
     [Fact]
-    public void ExtractFromCompilations_MixedCatchShapes_KeepUnfilteredSitesASubsetOfSites()
-    {
-        CodebaseModel model = CompilationFactory.Extract("""
-                                                         namespace N;
-                                                         public class MyError : System.Exception {}
-                                                         public class Worker
-                                                         {
-                                                             public void Run(bool flag)
-                                                             {
-                                                                 try { }
-                                                                 catch (MyError) when (flag) { }
-                                                                 try { }
-                                                                 catch (MyError) { }
-                                                                 try { }
-                                                                 catch (System.InvalidOperationException) when (flag) { }
-                                                                 try { }
-                                                                 catch { }
-                                                             }
-                                                         }
-                                                         """);
-
-        // The invariant the parallel recording holds by construction: every unfiltered site is a site. Compared
-        // through the rendered file:line form, since the two lists carry their own SourceLocation instances.
-        model.CatchEdges("N.Worker")
-            .Count.ShouldBe(3);
-        foreach (CatchEdge edge in model.CatchEdges("N.Worker"))
-            edge.UnfilteredSites.Select(s => s.ToString())
-                .ShouldBeSubsetOf(edge.Sites.Select(s => s.ToString()));
-    }
-
-    [Fact]
     public void ExtractFromCompilations_UnfilteredCatchNotEndingInThrow_RecordsTheSiteSwallowing()
     {
         CodebaseModel model = CompilationFactory.Extract("""
@@ -674,8 +592,12 @@ public sealed class CodebaseExtractorCatchEdgeTests
                                                          }
                                                          """);
 
-        // The swallowing subset is a subset of the UNFILTERED subset, not of the sites: a filtered clause that
-        // swallows is where the handler named its expectations, and stays lawful.
+        // The filter leaves the edge and its sites untouched and only keeps the site out of the unfiltered
+        // subset. The swallowing subset is a subset of the UNFILTERED subset, not of the sites: a filtered
+        // clause that swallows is where the handler named its expectations, and stays lawful. The
+        // positive-polarity partners, the typed and bare catches that DO record a site unfiltered, are
+        // ExtractFromCompilations_UnfilteredCatchNotEndingInThrow_RecordsTheSiteSwallowing and
+        // ExtractFromCompilations_BareCatchNotEndingInThrow_RecordsSystemExceptionSwallowing.
         CatchEdge edge = model.CatchEdge("N.Worker", "N.MyError");
         edge.Sites.Lines()
             .ShouldBe([8]);

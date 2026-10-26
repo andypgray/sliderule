@@ -32,8 +32,6 @@ namespace SlideRule.Tests.DocHygiene;
 /// </remarks>
 public sealed class CheckoutCredentialPersistenceTests
 {
-    private const string WorkflowDirectory = ".github/workflows/";
-
     [Fact]
     public void CheckoutSteps_AcrossTheWorkflows_DoNotPersistCredentials()
     {
@@ -61,14 +59,13 @@ public sealed class CheckoutCredentialPersistenceTests
 
         // Assert: the arm above passes over a workflow it cannot read, so the steps are held non-empty
         // rather than trusted. A rewrite into a form this scan cannot follow fails here.
-        steps.ShouldNotBeEmpty($"No actions/checkout steps were found under {WorkflowDirectory}.");
+        steps.ShouldNotBeEmpty($"No actions/checkout steps were found under {TrackedFiles.WorkflowDirectory}.");
     }
 
     // Every use of the action across the tracked workflows, tagged with the file and line it sits on.
     private static IReadOnlyList<CheckoutStep> ReadCheckoutSteps()
     {
-        return TrackedFiles.All
-            .Where(static path => path.StartsWith(WorkflowDirectory, StringComparison.Ordinal))
+        return TrackedFiles.Workflows
             .SelectMany(StepsIn)
             .ToArray();
     }

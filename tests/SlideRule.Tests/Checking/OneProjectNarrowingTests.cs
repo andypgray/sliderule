@@ -16,10 +16,11 @@ namespace SlideRule.Tests.Checking;
 ///     and a subject nothing survives is a skip carrying the one-project reason.
 /// </summary>
 /// <remarks>
-///     The guards either side are the point. Under no narrowing, and under the solution-filter kind, the
-///     same spec over the same codebase reaches the verdict it always did: nothing is cut, and an empty
-///     part still empties the whole subject. The cut belongs to the checker, so the evaluator's gates keep
-///     reading an empty part as a spec defect for every universe but this one.
+///     The guards either side are the point. Under no narrowing, and under the solution-filter kind (its
+///     union row is in <see cref="NarrowedUniverseSkipTests" />), the same spec over the same codebase reaches
+///     the verdict it always did: nothing is cut, and an empty part still empties the whole subject. The cut
+///     belongs to the checker, so the evaluator's gates keep reading an empty part as a spec defect for every
+///     universe but this one.
 /// </remarks>
 public sealed class OneProjectNarrowingTests
 {
@@ -84,19 +85,6 @@ public sealed class OneProjectNarrowingTests
 
         result.ShouldHaveFailedWithDetail(
             ViolationKind.EmptySubject, ConstraintEvaluator.EmptyOperandMessage("types in `App.Nowhere.*`"));
-    }
-
-    [Fact]
-    public void Check_TheSameUnionUnderAFilterNarrowing_SkipsAsItAlwaysDid()
-    {
-        // The other guard: a solution filter cuts nothing. The empty operand still empties the whole
-        // subject, the verb still never runs, and the rule reaches the filter's skip rather than the
-        // finding the one-project kind reports over the very same codebase.
-        RuleResult result = Checker.Run(
-                WebAndDataModel, BaselineIndex.Empty, Checker.FilterNarrowing, UnionWithAnEmptyPart)
-            .Single();
-
-        result.ShouldHaveSkipped(Checker.FilterSkipReason);
     }
 
     [Fact]

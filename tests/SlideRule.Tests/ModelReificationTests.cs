@@ -232,16 +232,6 @@ public class ModelReificationTests
     }
 
     [Fact]
-    public void QuarantineScope_StillDesugarsIntoContainmentThenTripwire()
-    {
-        // The guard on the desugarer's fork: a quarantine mints both children, containment then tripwire,
-        // whatever the caution posture mints.
-        ArchModelBuilder.Build(DragonsDocScopeSpec)
-            .Rules.Select(rule => rule.Id)
-            .ShouldBe(["legacy/billing/containment", "legacy/billing/tripwire"]);
-    }
-
-    [Fact]
     public void CautionScope_DesugarsIntoTheTripwireAlone()
     {
         // One rule, not two with an inert half: a caution declares no containment law, so there is nothing
@@ -400,14 +390,7 @@ public class ModelReificationTests
         ArchRule rule = ArchModelBuilder.Build(CtorRuleSpec)
             .Rules.Single();
 
-        rule.Posture.ShouldBe(Posture.Enforce);
-        var constraint = rule.Constraint.ShouldBeOfType<MustNotConstructConstraint>();
-
-        // Targets in authoring order; Operands mirrors Targets (the dependency-verb walk hook, NOT MemberOperands).
-        constraint.Targets.ShouldHaveSingleItem();
-        constraint.Operands.ShouldBe(constraint.Targets);
-        constraint.Subject!.Noun.ShouldBeOfType<TypesNoun>();
-        constraint.Subject.Adjectives.ShouldBeEmpty();
+        rule.ShouldReifyToWalkableDependencyConstraint<MustNotConstructConstraint>(constraint => constraint.Targets);
     }
 
     [Fact]
@@ -415,11 +398,6 @@ public class ModelReificationTests
     {
         // The member-operands walk hook is empty for the dependency verbs (GRAMMAR §4.5, §8 items 11–13).
         Rule("layering/domain-independent")
-            .Constraint.ShouldNotBeNull()
-            .MemberOperands.ShouldBeEmpty();
-        // MustNotConstruct is a dependency-shape verb (overrides Operands, not MemberOperands) — its member hook is empty too.
-        ArchModelBuilder.Build(CtorRuleSpec)
-            .Rules.Single()
             .Constraint.ShouldNotBeNull()
             .MemberOperands.ShouldBeEmpty();
     }

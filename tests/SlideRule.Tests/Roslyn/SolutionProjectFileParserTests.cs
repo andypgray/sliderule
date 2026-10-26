@@ -80,7 +80,10 @@ public sealed class SolutionProjectFileParserTests
         DeclaredProjects declared = SolutionProjectFileParser.ParseDeclaredProjects(text, ".sln", SolutionDirectory);
 
         // Assert — both csprojs (either slash spelling resolves); the folder is not a project at all, so it
-        // lands in neither half rather than being reported as something this product could not read.
+        // lands in neither half rather than being reported as something this product could not read. A
+        // classic .sln puts a bare folder name in the field a project path occupies, so the extension is what
+        // keeps folders out; getting it wrong would name "Solution Items" as an unreadable project on every
+        // classic solution.
         declared.Csproj.ShouldBe([
             Path.GetFullPath(Path.Combine(SolutionDirectory, "Alpha", "Alpha.csproj")),
             Path.GetFullPath(Path.Combine(SolutionDirectory, "nested", "Beta", "Beta.csproj"))
@@ -166,27 +169,6 @@ public sealed class SolutionProjectFileParserTests
                 Path.GetFullPath(Path.Combine(SolutionDirectory, "Shared", "Shared.shproj")),
                 UnsupportedProjectKind.SharedProject)
         ]);
-    }
-
-    [Fact]
-    public void ParseDeclaredProjects_ClassicSlnSolutionFolder_IsNotReportedAsAProjectWeCannotRead()
-    {
-        // A classic .sln puts a bare folder name in the very field a project path occupies, so the one test
-        // that keeps folders out of the coverage statement is the extension. Pinned on its own because
-        // getting it wrong would name "Solution Items" as an unreadable project on every classic solution in
-        // existence — a false claim on the most common format there is.
-        const string text = """
-                            Microsoft Visual Studio Solution File, Format Version 12.00
-                            Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{33333333-3333-3333-3333-333333333333}"
-                            EndProject
-                            """;
-
-        // Act
-        DeclaredProjects declared = SolutionProjectFileParser.ParseDeclaredProjects(text, ".sln", SolutionDirectory);
-
-        // Assert
-        declared.Csproj.ShouldBeEmpty();
-        declared.Unsupported.ShouldBeEmpty();
     }
 
     [Fact]

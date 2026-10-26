@@ -100,7 +100,7 @@ public sealed class BaselineAddMatcherTests
         // A project has no DocumentationCommentId, so its identity is `project:{Name}` (GRAMMAR §4.10) —
         // and a --subject takes either that or the bare name, exactly as a type subject takes either its
         // full name or its T: id.
-        Violation shape = Violation.ProjectShape(Project("Zphil.Internal"), Array.Empty<SourceLocation>());
+        Violation shape = Violation.ProjectShape(ProjectFacts.Project("Zphil.Internal"), Array.Empty<SourceLocation>());
         Violation[] violations = [shape];
 
         Violation byName = BaselineAddMatcher.ResolveSubject("r", violations, "Zphil.Internal");
@@ -115,9 +115,11 @@ public sealed class BaselineAddMatcherTests
     {
         // Each package is keyed apart, from the project to the package, so a --subject naming the project
         // matches none of them, and the refusal lists each in the `Project -> package` form the edge flags take.
-        ProjectNode project = Project("Zphil.Domain");
-        Violation json = Violation.ProjectPackage(project, Package("Newtonsoft.Json"));
-        Violation serilog = Violation.ProjectPackage(project, Package("Serilog"));
+        ProjectNode project = ProjectFacts.Project("Zphil.Domain");
+        Violation json = Violation.ProjectPackage(
+            project, ProjectFacts.Package("Newtonsoft.Json", "Directory.Packages.props", 3));
+        Violation serilog = Violation.ProjectPackage(
+            project, ProjectFacts.Package("Serilog", "Directory.Packages.props", 3));
 
         ShouldRefuseListing(
             () => BaselineAddMatcher.ResolveSubject("r", [json, serilog], "Zphil.Domain"),
@@ -127,9 +129,11 @@ public sealed class BaselineAddMatcherTests
     [Fact]
     public void ResolveEdge_ProjectAndPackage_ByNameAndIdentityForm_ReturnsThatPackagesViolation()
     {
-        ProjectNode project = Project("Zphil.Domain");
-        Violation json = Violation.ProjectPackage(project, Package("Newtonsoft.Json"));
-        Violation serilog = Violation.ProjectPackage(project, Package("Serilog"));
+        ProjectNode project = ProjectFacts.Project("Zphil.Domain");
+        Violation json = Violation.ProjectPackage(
+            project, ProjectFacts.Package("Newtonsoft.Json", "Directory.Packages.props", 3));
+        Violation serilog = Violation.ProjectPackage(
+            project, ProjectFacts.Package("Serilog", "Directory.Packages.props", 3));
         Violation[] violations = [json, serilog];
 
         BaselineAddMatcher.ResolveEdge("r", violations, "Zphil.Domain", "Serilog").ShouldBeSameAs(serilog);
@@ -140,7 +144,7 @@ public sealed class BaselineAddMatcherTests
     [Fact]
     public void ResolveEdge_ProjectAndFramework_ByNameAndIdentityForm_ReturnsThatFrameworksViolation()
     {
-        ProjectNode project = Project("Zphil.Host");
+        ProjectNode project = ProjectFacts.Project("Zphil.Host");
         Violation net48 = Violation.ProjectFramework(project, "net48", Array.Empty<SourceLocation>());
         Violation net6 = Violation.ProjectFramework(project, "net6.0", Array.Empty<SourceLocation>());
         Violation[] violations = [net48, net6];
@@ -154,7 +158,7 @@ public sealed class BaselineAddMatcherTests
     {
         // The property item carries its framework, so `Nullable@net8.0` picks one build's violation where the
         // property alone would name two.
-        ProjectNode project = Project("Zphil.Host");
+        ProjectNode project = ProjectFacts.Project("Zphil.Host");
         Violation modern = Violation.ProjectProperty(
             project, "Nullable", ProjectFacts.Evaluation("net8.0", "Host.csproj"), found: null);
         Violation legacy = Violation.ProjectProperty(
@@ -169,16 +173,16 @@ public sealed class BaselineAddMatcherTests
     [Fact]
     public void ResolveSubject_ProjectNoMatch_ListsCandidatesInProjectArrowPackageForm()
     {
-        ProjectNode project = Project("Zphil.Domain");
-        Violation packageDebt = Violation.ProjectPackage(project, Package("Serilog"));
-        Violation packagingDebt = Violation.ProjectShape(Project("Zphil.Cli"), Array.Empty<SourceLocation>());
+        ProjectNode project = ProjectFacts.Project("Zphil.Domain");
+        Violation packageDebt = Violation.ProjectPackage(
+            project, ProjectFacts.Package("Serilog", "Directory.Packages.props", 3));
+        Violation packagingDebt = Violation.ProjectShape(ProjectFacts.Project("Zphil.Cli"), Array.Empty<SourceLocation>());
 
-        ShouldRefuseListing(
+        UserErrorException error = ShouldRefuseListing(
             () => BaselineAddMatcher.ResolveSubject("r", [packageDebt, packagingDebt], "Nope"),
             "Zphil.Domain -> Serilog");
 
-        ShouldRefuseListing(
-            () => BaselineAddMatcher.ResolveSubject("r", [packageDebt, packagingDebt], "Nope"), "Zphil.Cli");
+        error.Message.ShouldContain("  Zphil.Cli");
     }
 
     [Fact]
@@ -368,15 +372,5 @@ public sealed class BaselineAddMatcherTests
             ViolationKind.Throw => Violation.Throw(from, to, sites),
             _ => throw new ArgumentOutOfRangeException(nameof(kindName), kindName, "not a type-pair edge kind")
         };
-    }
-
-    private static ProjectNode Project(string name)
-    {
-        return new ProjectNode(name, projectReferences: []);
-    }
-
-    private static PackageReference Package(string name)
-    {
-        return new PackageReference(name, new SourceLocation("Directory.Packages.props", 3), isPrivate: false);
     }
 }

@@ -24,7 +24,8 @@ namespace SlideRule.Tests.SpecCompletion;
 public sealed class TriggerTests(SpecCompletionFixture fixture) : IClassFixture<SpecCompletionFixture>
 {
     [Theory]
-    // The two characters that open and continue a name, inside a literal.
+    // The two characters that open and continue a name, inside a literal. The dot is the case the whole
+    // segment-by-segment walk depends on.
     [InlineData("""arch.Namespace("$$");""", '"', true)]
     [InlineData("""arch.Namespace("MyApp.$$");""", '.', true)]
     [InlineData("""arch.Namespace(@"MyApp.$$");""", '.', true)]
@@ -50,21 +51,6 @@ public sealed class TriggerTests(SpecCompletionFixture fixture) : IClassFixture<
         // Assert
         triggers.ShouldBe(expected,
             $"Typing '{typed}' here:\n{SpecCompletionFixture.Compose(body)}");
-    }
-
-    [Fact]
-    public void ADotInsideALiteral_Triggers()
-    {
-        // Act, Assert: stated on its own as well as in the table, because it is the case the whole
-        // segment-by-segment walk depends on.
-        fixture.ShouldTriggerOn("""arch.Namespace("MyApp.$$");""", '.');
-    }
-
-    [Fact]
-    public void ALetterInsideALiteral_DoesNotTrigger()
-    {
-        // Act, Assert
-        fixture.ShouldNotTriggerOn("""arch.Namespace("MyAppD$$");""", 'D');
     }
 
     [Fact]

@@ -1,4 +1,3 @@
-using Shouldly;
 using SlideRule.Tests.TestSupport;
 using Xunit;
 
@@ -39,28 +38,21 @@ public sealed class RestoreLockSiteTests
     {
         // Arrange
         IReadOnlyList<string> projects = TrackedFiles.Projects;
+        List<string> undeclared = new();
 
-        // Act
-        List<string> undeclared = projects
+        // Act: an empty list would make this pass by reading no project at all rather than by finding every
+        // one of them declared, so it is a finding.
+        if (projects.Count == 0) undeclared.Add("No .csproj files were found among the tracked files.");
+
+        IEnumerable<string> missing = projects
             .Where(static path => !RepoRoot.ReadText(path)
                 .Contains(Declaration, StringComparison.Ordinal))
-            .Order(StringComparer.Ordinal)
-            .ToList();
+            .Order(StringComparer.Ordinal);
+        undeclared.AddRange(missing);
 
         // Assert
         undeclared.ShouldReportNothing(
             "Project(s) do not declare RestoreLockedMode, which scores every NuGet dependency in the "
             + "repository unpinned — Scorecard's Pinned-Dependencies check credits it all-or-nothing");
-    }
-
-    [Fact]
-    public void TrackedProjectList_IsNotEmpty()
-    {
-        // Act
-        IReadOnlyList<string> projects = TrackedFiles.Projects;
-
-        // Assert: the arm above reports what a filter left behind, and an empty list would make it pass by
-        // reading no project at all rather than by finding every one of them declared.
-        projects.ShouldNotBeEmpty("No .csproj files were found among the tracked files.");
     }
 }

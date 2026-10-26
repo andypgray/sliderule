@@ -38,18 +38,26 @@ public sealed class PolyglotSurveyE2ETests
 {
     private const string UnsupportedHeading = "Projects the solution declares that this survey does not cover:";
 
-    [Fact]
-    public async Task Graph_SolutionDeclaringAnFsproj_NamesItAndWhyFromTheDocumentAlone()
+    [Theory]
+    [InlineData("graph")]
+    [InlineData("check")]
+    [InlineData("status")]
+    public async Task Json_SolutionDeclaringAnFsproj_NamesItAndWhyFromTheDocumentAlone(string verb)
     {
-        // Arrange
+        // The whole content of the coverage statement, as data: which project, and why it is not in the
+        // document. A reader holding the survey alone can tell a two-project codebase from a survey that read
+        // one project of two. The spec's one rule holds over the C# project, so the check is clean, and that
+        // is the point there: no rule can be violated in a project that is not in the model, so only the
+        // report can say one is missing. And a project this product cannot read contributes no violations to
+        // burn down, so the status document's zero is a property of the tool rather than debt the team paid
+        // off.
         using var fixture = new TempFixtureWorkspace("TestSolutions/PolyglotApp", "PolyglotApp.slnx");
+        string[] arguments = verb == "graph"
+            ? [verb, fixture.SolutionPath, "--json"]
+            : [verb, fixture.SolutionPath, "--spec", CliRunner.PolyglotSpecDll, "--json"];
 
-        // Act
-        CliResult result = await CliRunner.InvokeAsync("graph", fixture.SolutionPath, "--json");
+        CliResult result = await CliRunner.InvokeAsync(arguments);
 
-        // Assert — the whole content of the coverage statement, as data: which project, and why it is not
-        // in the survey. A reader holding this document alone can tell a two-project codebase from a survey
-        // that read one project of two.
         result.ShouldSucceed();
         using JsonDocument document = result.ShouldHaveJsonStdout();
         JsonElement entry = document.RootElement.GetProperty("unsupportedProjects")
@@ -145,34 +153,6 @@ public sealed class PolyglotSurveyE2ETests
     }
 
     [Fact]
-    public async Task Check_CleanVerdictOverAPolyglotSolution_StillNamesWhatItNeverMeasured()
-    {
-        // Arrange — the spec's one rule holds over the C# project, so this report is clean. That is the
-        // point: a green check over a solution holding projects the model never contained must not read as a
-        // green over the solution, because no rule can be violated in a project that is not there, so only
-        // the report can say one is missing.
-        using var fixture = new TempFixtureWorkspace("TestSolutions/PolyglotApp", "PolyglotApp.slnx");
-
-        // Act
-        CliResult result = await CliRunner.InvokeAsync(
-            "check", fixture.SolutionPath, "--spec", CliRunner.PolyglotSpecDll, "--json");
-
-        // Assert
-        result.ShouldSucceed();
-        using JsonDocument document = result.ShouldHaveJsonStdout();
-        JsonElement entry = document.RootElement.GetProperty("unsupportedProjects")
-            .EnumerateArray()
-            .ShouldHaveSingleItem();
-
-        entry.GetProperty("project")
-            .GetString()
-            .ShouldBe("PolyglotApp.Fs/PolyglotApp.Fs.fsproj");
-        entry.GetProperty("reason")
-            .GetString()
-            .ShouldBe("not a C# project");
-    }
-
-    [Fact]
     public async Task Check_CleanVerdictOverAPolyglotSolution_DoesNotCallTheModelIncomplete()
     {
         // Arrange — the posture that separates this key from failedProjects/restoreFailedProjects. A
@@ -196,36 +176,9 @@ public sealed class PolyglotSurveyE2ETests
     }
 
     [Fact]
-    public async Task Status_OverAPolyglotSolution_NamesWhatItsBurndownCannotCount()
-    {
-        // Arrange — the third document, and the one whose silence reads most like progress: a project this
-        // product cannot read contributes no violations to burn down, so its zero is a property of the tool
-        // rather than debt the team paid off.
-        using var fixture = new TempFixtureWorkspace("TestSolutions/PolyglotApp", "PolyglotApp.slnx");
-
-        // Act
-        CliResult result = await CliRunner.InvokeAsync(
-            "status", fixture.SolutionPath, "--spec", CliRunner.PolyglotSpecDll, "--json");
-
-        // Assert
-        result.ShouldSucceed();
-        using JsonDocument document = result.ShouldHaveJsonStdout();
-        JsonElement entry = document.RootElement.GetProperty("unsupportedProjects")
-            .EnumerateArray()
-            .ShouldHaveSingleItem();
-
-        entry.GetProperty("project")
-            .GetString()
-            .ShouldBe("PolyglotApp.Fs/PolyglotApp.Fs.fsproj");
-        entry.GetProperty("reason")
-            .GetString()
-            .ShouldBe("not a C# project");
-    }
-
-    [Fact]
     public async Task StatusHumanChannel_OverAPolyglotSolution_StampsTheBurndownItCannotCover()
     {
-        // Arrange — the human twin of the slot above, on the verb whose whole output is counts.
+        // Arrange — the human twin of the status document's slot, on the verb whose whole output is counts.
         using var fixture = new TempFixtureWorkspace("TestSolutions/PolyglotApp", "PolyglotApp.slnx");
 
         // Act

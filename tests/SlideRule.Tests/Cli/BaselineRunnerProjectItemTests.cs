@@ -1,13 +1,13 @@
 using Shouldly;
 using SlideRule.Baselines;
 using SlideRule.Checking;
-using SlideRule.Cli.Verbs;
 using SlideRule.Codebase;
 using SlideRule.Hosting;
 using SlideRule.Roslyn.Baselines;
 using SlideRule.Tests.Checking;
 using SlideRule.Tests.TestSupport;
 using Xunit;
+using static SlideRule.Tests.TestSupport.TextNormalization;
 
 namespace SlideRule.Tests.Cli;
 
@@ -43,8 +43,10 @@ public sealed class BaselineRunnerProjectItemTests : IDisposable
         // The defect the per-package key closes: a capture written while the project took one package must
         // not bless the next one.
         string path = _temp.PathOf(BaselineFile);
-        Apply(BaselineRequests.Init(_temp.Path), Check(Core("Newtonsoft.Json"), BaselineIndex.Empty).Results);
-        Read(path).ShouldBe(BaselineComposer.Compose(RuleId, Json.WithSiteCount(1)));
+        IReadOnlyList<RuleResult> before = Check(Core("Newtonsoft.Json"), BaselineIndex.Empty).Results;
+        BaselineRequests.Init(_temp.Path)
+            .Apply(before, _temp.Path);
+        ReadNormalizedLines(path).ShouldBe(BaselineComposer.Compose(RuleId, Json.WithSiteCount(1)));
 
         BaselineIndex captured = BaselineStore.LoadForModel(Model, _temp.Path);
         RuleResult result = Check(Core("Newtonsoft.Json", "Serilog"), captured).Single();
@@ -59,15 +61,15 @@ public sealed class BaselineRunnerProjectItemTests : IDisposable
         string path = WriteBaseline(BaselineComposer.Compose(
             RuleId, BaselineEntry.ForSubject("project:Zphil.Core").WithBecause("INC-7")));
 
-        string echo = Apply(
-            BaselineRequests.AcceptReductions(_temp.Path),
-            Check(Core("Newtonsoft.Json", "Serilog"), BaselineIndex.Empty).Results);
+        IReadOnlyList<RuleResult> results = Check(Core("Newtonsoft.Json", "Serilog"), BaselineIndex.Empty).Results;
+        string echo = BaselineRequests.AcceptReductions(_temp.Path)
+            .Apply(results, _temp.Path);
 
         echo.ShouldContain(
             "dependencies/core-bcl-only: split 1 project-wide entry into 2 entries, one per package or framework.");
         echo.ShouldNotContain("refused");
         echo.ShouldNotContain("nothing to accept");
-        Read(path)
+        ReadNormalizedLines(path)
             .ShouldBe(BaselineComposer.Compose(
                 RuleId,
                 Json.WithSiteCount(1).WithBecause("INC-7"),
@@ -83,11 +85,11 @@ public sealed class BaselineRunnerProjectItemTests : IDisposable
             BaselineEntry.ForSubject("project:Zphil.Core"),
             Serilog.WithSiteCount(1).WithBecause("INC-9")));
 
-        Apply(
-            BaselineRequests.AcceptReductions(_temp.Path),
-            Check(Core("Newtonsoft.Json", "Serilog"), BaselineIndex.Empty).Results);
+        IReadOnlyList<RuleResult> results = Check(Core("Newtonsoft.Json", "Serilog"), BaselineIndex.Empty).Results;
+        BaselineRequests.AcceptReductions(_temp.Path)
+            .Apply(results, _temp.Path);
 
-        Read(path)
+        ReadNormalizedLines(path)
             .ShouldBe(BaselineComposer.Compose(RuleId, Json.WithSiteCount(1), Serilog.WithSiteCount(1).WithBecause("INC-9")));
     }
 
@@ -96,10 +98,12 @@ public sealed class BaselineRunnerProjectItemTests : IDisposable
     {
         string path = WriteBaseline(BaselineComposer.Compose(RuleId, BaselineEntry.ForSubject("project:Zphil.Core")));
 
-        string echo = Apply(BaselineRequests.AcceptReductions(_temp.Path), Check(Core(), BaselineIndex.Empty).Results);
+        IReadOnlyList<RuleResult> results = Check(Core(), BaselineIndex.Empty).Results;
+        string echo = BaselineRequests.AcceptReductions(_temp.Path)
+            .Apply(results, _temp.Path);
 
         echo.ShouldContain("dependencies/core-bcl-only: accepted 1 reduction.");
-        Read(path).ShouldBe(BaselineComposer.Compose(RuleId));
+        ReadNormalizedLines(path).ShouldBe(BaselineComposer.Compose(RuleId));
     }
 
     private static CodebaseModel Core(params string[] packages)
@@ -116,21 +120,8 @@ public sealed class BaselineRunnerProjectItemTests : IDisposable
         return ArchChecker.Check(Model, codebase, baselines);
     }
 
-    private string Apply(BaselineRequest request, IEnumerable<RuleResult> results)
-    {
-        var output = new StringWriter();
-        BaselineRunner.ApplyFiles(output, request, results, _temp.Path);
-        return output.ToString();
-    }
-
     private string WriteBaseline(string content)
     {
         return _temp.WriteFile([BaselineFile], content);
-    }
-
-    private static string Read(string path)
-    {
-        return File.ReadAllText(path)
-            .NormalizedLines();
     }
 }

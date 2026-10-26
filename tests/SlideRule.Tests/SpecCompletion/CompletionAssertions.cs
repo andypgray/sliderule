@@ -183,26 +183,6 @@ internal static class CompletionAssertions
             offered.Describe($"Expected '{name}' to filter on [{expected}] and it filters on [{filters}]"));
     }
 
-    /// <summary>Asserts typing this character at the caret opens a list.</summary>
-    /// <param name="fixture">The workspace the request is made in.</param>
-    /// <param name="body">The statements of <c>Define</c>, with <c>$$</c> where the caret is.</param>
-    /// <param name="typed">The character the author typed.</param>
-    internal static void ShouldTriggerOn(this SpecCompletionFixture fixture, string body, char typed)
-    {
-        SpecCompletionFixture.Triggers(body, typed)
-            .ShouldBeTrue($"Typing '{typed}' here has to open a list:\n{SpecCompletionFixture.Compose(body)}");
-    }
-
-    /// <summary>Asserts typing this character at the caret opens nothing.</summary>
-    /// <param name="fixture">The workspace the request is made in.</param>
-    /// <param name="body">The statements of <c>Define</c>, with <c>$$</c> where the caret is.</param>
-    /// <param name="typed">The character the author typed.</param>
-    internal static void ShouldNotTriggerOn(this SpecCompletionFixture fixture, string body, char typed)
-    {
-        SpecCompletionFixture.Triggers(body, typed)
-            .ShouldBeFalse($"Typing '{typed}' here must open nothing:\n{SpecCompletionFixture.Compose(body)}");
-    }
-
     // The one row carrying this name, or a failure naming every row there was.
     private static CompletionItem Pick(this OfferedList offered, string name)
     {

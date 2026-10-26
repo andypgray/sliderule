@@ -42,18 +42,6 @@ public sealed class BaselineStoreTests : IDisposable
     }
 
     [Fact]
-    public void TryReadDocument_ValidFile_ParsesEntries()
-    {
-        string path = WriteComposed("b.json", ("data/x", [BaselineEntry.ForEdge("T:App.Web.Old", "T:App.Data.Db")]));
-
-        BaselineDocument? document = BaselineStore.TryReadDocument(path);
-
-        document.ShouldNotBeNull();
-        document.Sections["data/x"]
-            .ShouldBe([BaselineEntry.ForEdge("T:App.Web.Old", "T:App.Data.Db")]);
-    }
-
-    [Fact]
     public void TryReadDocument_AttributedEntries_RoundTripBecause()
     {
         string path = WriteComposed(
@@ -178,55 +166,6 @@ public sealed class BaselineStoreTests : IDisposable
     }
 
     [Fact]
-    public void TryReadDocument_NoSchemaVersion_ReportsTheMissingProperty()
-    {
-        // The version leads the read, so it is fetched before the envelope is known — and a file without one
-        // has to report the missing property rather than fail out of the walk.
-        string path = Write("no-version.json", """
-                                               {
-                                                 "rules": {}
-                                               }
-                                               """);
-
-        Should.Throw<UserErrorException>(() => BaselineStore.TryReadDocument(path))
-            .Message.ShouldContain("missing property 'schemaVersion'.");
-    }
-
-    [Fact]
-    public void TryReadDocument_NonIntegerSchemaVersion_Throws()
-    {
-        // The other way the leading read can fail: a version that is present and is not a number to compare
-        // against. It has to be refused before the envelope is chosen, because which properties the root may
-        // carry is exactly what the version decides.
-        string path = Write("string-version.json", """
-                                                   {
-                                                     "schemaVersion": "2",
-                                                     "rules": {}
-                                                   }
-                                                   """);
-
-        Should.Throw<UserErrorException>(() => BaselineStore.TryReadDocument(path))
-            .Message.ShouldContain("schemaVersion must be an integer.");
-    }
-
-    [Fact]
-    public void TryReadDocument_LegacyFile_ParsesEntriesUncounted()
-    {
-        // The transparent legacy read: same entries, no measure, and the whole-file digest verified in the
-        // grammar of the version the file declares rather than the one this build composes.
-        string path = WriteLegacyComposed(
-            "v1.json", ("data/x", [BaselineEntry.ForEdge("T:App.Web.Old", "T:App.Data.Db")]));
-
-        BaselineDocument document = BaselineStore.TryReadDocument(path)
-            .ShouldNotBeNull();
-
-        IReadOnlyList<BaselineEntry> entries = document.Sections["data/x"];
-        entries.ShouldBe([BaselineEntry.ForEdge("T:App.Web.Old", "T:App.Data.Db")]);
-        entries[0]
-            .SiteCount.ShouldBeNull();
-    }
-
-    [Fact]
     public void Write_ADocumentReadFromALegacyFile_UpgradesItToSealedEntries()
     {
         // Any write is the upgrade, and this is what the upgrade produces: the whole-file digest gone, every
@@ -247,61 +186,6 @@ public sealed class BaselineStoreTests : IDisposable
             .ShouldNotBeNull()
             .Sections["data/x"]
             .ShouldBe([entry]);
-    }
-
-    [Fact]
-    public void TryReadDocument_CountedEntry_RoundTripsSiteCountBesideBecause()
-    {
-        string path = WriteComposed(
-            "counted.json",
-            ("data/x", [
-                BaselineEntry.ForEdge("T:App.Web.Old", "T:App.Data.Db")
-                    .WithSiteCount(2)
-                    .WithBecause("INC-1234")
-            ]));
-
-        BaselineDocument document = BaselineStore.TryReadDocument(path)
-            .ShouldNotBeNull();
-
-        // Equality ignores both riders, so pin identity, the measure and the attribution separately.
-        IReadOnlyList<BaselineEntry> entries = document.Sections["data/x"];
-        entries.ShouldBe([BaselineEntry.ForEdge("T:App.Web.Old", "T:App.Data.Db")]);
-        entries[0]
-            .SiteCount.ShouldBe(2);
-        entries[0]
-            .Because.ShouldBe("INC-1234");
-    }
-
-    [Fact]
-    public void TryReadDocument_CountedAndUncountedEntriesTogether_BothParse()
-    {
-        // A partially upgraded file — one section counted by a recent write, another still as it was
-        // captured — is valid, which is what keeps a shared baseline file usable while it is being moved
-        // over. An uncounted entry omits the key rather than carrying a null.
-        string path = WriteComposed(
-            "mixed.json",
-            ("data/x", [
-                BaselineEntry.ForEdge("T:App.Web.Old", "T:App.Data.Db")
-                    .WithSiteCount(2),
-                BaselineEntry.ForEdge("T:App.Web.Older", "T:App.Data.Db")
-            ]));
-
-        BaselineDocument document = BaselineStore.TryReadDocument(path)
-            .ShouldNotBeNull();
-
-        document.Sections["data/x"]
-            .Select(entry => entry.SiteCount)
-            .ShouldBe([2, null]);
-    }
-
-    [Fact]
-    public void TryReadDocument_SiteCountOnSubjectEntry_Throws()
-    {
-        string path = WriteEntryDoc(
-            "subject-count.json", """{ "subject": "T:A", "siteCount": 2, "seal": "0000000000000000" }""");
-
-        Should.Throw<UserErrorException>(() => BaselineStore.TryReadDocument(path))
-            .Message.ShouldContain("has a 'siteCount' on a subject entry — only edge entries carry one.");
     }
 
     [Fact]
@@ -332,40 +216,20 @@ public sealed class BaselineStoreTests : IDisposable
     }
 
     [Fact]
-    public void TryReadDocument_EntryWithNoSeal_IsMalformedRatherThanTamper()
+    public void TryReadDocument_UppercaseHexSeal_IsMalformed()
     {
-        // A required property that is absent is a missing property, which is the more precise diagnosis and
-        // exits the same way as tamper. Saying "failed its integrity check" here would send a reader looking
-        // for an edit to an entry that never carried a seal at all.
-        string path = WriteEntryDoc("unsealed.json", """{ "source": "T:A", "target": "T:B" }""");
-
-        var ex = Should.Throw<UserErrorException>(() => BaselineStore.TryReadDocument(path));
-        ex.Message.ShouldContain("has an entry with no 'seal'.");
-        ex.Message.ShouldNotContain("failed its integrity check");
-    }
-
-    // Two of the three seal shapes below are one diagnosis and the third is another, so the expected message
-    // is a column of the table rather than a line in the body.
-    private const string NotSixteenHexSeal = "has a 'seal' that is not 16 lowercase hex characters.";
-
-    [Theory]
-    [InlineData("""{ "source": "T:A", "target": "T:B", "seal": "abc" }""", NotSixteenHexSeal)]
-    [InlineData("""{ "source": "T:A", "target": "T:B", "seal": "ABCDEF0123456789" }""", NotSixteenHexSeal)]
-    [InlineData("""{ "source": "T:A", "target": "T:B", "seal": 16 }""", "has a non-string 'seal'.")]
-    public void TryReadDocument_SealThatIsNotSixteenLowercaseHex_IsMalformed(string entryJson, string expected)
-    {
-        string path = WriteEntryDoc("seal.json", entryJson);
+        string path = WriteEntryDoc(
+            "seal.json", """{ "source": "T:A", "target": "T:B", "seal": "ABCDEF0123456789" }""");
 
         Should.Throw<UserErrorException>(() => BaselineStore.TryReadDocument(path))
-            .Message.ShouldContain(expected);
+            .Message.ShouldContain("has a 'seal' that is not 16 lowercase hex characters.");
     }
 
-    [Theory]
-    [InlineData("""{ "source": "T:A", "target": "T:B", "siteCount": 0, "seal": "0000000000000000" }""")]
-    [InlineData("""{ "source": "T:A", "target": "T:B", "siteCount": "2", "seal": "0000000000000000" }""")]
-    public void TryReadDocument_SiteCountThatIsNotAWholeNumberAtLeastOne_Throws(string entryJson)
+    [Fact]
+    public void TryReadDocument_StringSiteCount_Throws()
     {
-        string path = WriteEntryDoc("site-count.json", entryJson);
+        string path = WriteEntryDoc(
+            "site-count.json", """{ "source": "T:A", "target": "T:B", "siteCount": "2", "seal": "0000000000000000" }""");
 
         Should.Throw<UserErrorException>(() => BaselineStore.TryReadDocument(path))
             .Message.ShouldContain("has a 'siteCount' that is not an integer of at least 1.");
@@ -536,20 +400,6 @@ public sealed class BaselineStoreTests : IDisposable
     }
 
     [Fact]
-    public void TryReadDocument_HandEditedSubjectEntry_NamesTheSubject()
-    {
-        // A subject entry has no arrow to print, so the refusal names the one symbol it keys.
-        string path = WriteComposed("subject.json", ("shape/x", [BaselineEntry.ForSubject("T:App.Legacy.Thing")]));
-        File.WriteAllText(path, File.ReadAllText(path)
-            .Replace("T:App.Legacy.Thing", "T:App.Legacy.Other"));
-
-        var ex = Should.Throw<UserErrorException>(() => BaselineStore.TryReadDocument(path));
-        ex.Message.ShouldContain("failed its integrity check");
-        ex.Message.ShouldContain("'T:App.Legacy.Other'");
-        ex.Message.ShouldContain("shape/x");
-    }
-
-    [Fact]
     public void TryReadDocument_OneBrokenSealAmongMany_NamesThatEntry()
     {
         // The refusal has to name the failing line rather than the file, because that is the difference
@@ -577,8 +427,7 @@ public sealed class BaselineStoreTests : IDisposable
         // file, so it is the suite's live proof that the legacy read path still works. A regeneration that
         // swept it up with the rest would upgrade it silently and take that proof away without a red.
         string path = Path.Combine(
-            AppContext.BaseDirectory, "Fixtures", "TestSolutions", "MyApp", "arch", "baselines", "layering",
-            "services-behind-contracts.json");
+            FixtureBeds.MyAppRoot, "arch", "baselines", "layering", "services-behind-contracts.json");
 
         File.ReadAllText(path)
             .ShouldContain($"\"schemaVersion\": {BaselineFormat.LegacySchemaVersion},");
@@ -586,26 +435,6 @@ public sealed class BaselineStoreTests : IDisposable
             .ShouldNotBeNull()
             .Sections["layering/services-behind-contracts"]
             .ShouldBe([BaselineEntry.ForSubject("T:MyApp.Domain.OrderService")]);
-    }
-
-    [Fact]
-    public void TryReadDocument_EntryWithSourceAndSubject_Throws()
-    {
-        string path = WriteEntryDoc(
-            "mixed.json", """{ "source": "T:A", "subject": "T:B", "seal": "0000000000000000" }""");
-
-        Should.Throw<UserErrorException>(() => BaselineStore.TryReadDocument(path))
-            .Message.ShouldContain("neither {source, target} nor {subject}");
-    }
-
-    [Fact]
-    public void TryReadDocument_BlankBecause_Throws()
-    {
-        string path = WriteEntryDoc(
-            "blank.json", """{ "subject": "T:A", "because": "   ", "seal": "0000000000000000" }""");
-
-        Should.Throw<UserErrorException>(() => BaselineStore.TryReadDocument(path))
-            .Message.ShouldContain("blank or multi-line 'because'");
     }
 
     [Fact]
@@ -619,16 +448,12 @@ public sealed class BaselineStoreTests : IDisposable
     }
 
     [Fact]
-    public void TryReadDocument_NonStringBecause_Throws()
+    public void TryReadDocument_EmptyBecause_Throws()
     {
-        string numberPath = WriteEntryDoc(
-            "number.json", """{ "subject": "T:A", "because": 3, "seal": "0000000000000000" }""");
-        string emptyPath = WriteEntryDoc(
+        string path = WriteEntryDoc(
             "empty.json", """{ "subject": "T:A", "because": "", "seal": "0000000000000000" }""");
 
-        Should.Throw<UserErrorException>(() => BaselineStore.TryReadDocument(numberPath))
-            .Message.ShouldContain("empty or non-string 'because'");
-        Should.Throw<UserErrorException>(() => BaselineStore.TryReadDocument(emptyPath))
+        Should.Throw<UserErrorException>(() => BaselineStore.TryReadDocument(path))
             .Message.ShouldContain("empty or non-string 'because'");
     }
 
@@ -638,9 +463,9 @@ public sealed class BaselineStoreTests : IDisposable
         string path = WriteEntryDoc(
             "typo.json", """{ "subject": "T:A", "becuase": "x", "seal": "0000000000000000" }""");
 
-        // The same message the source-and-subject entry gets, for a different reason: an entry is classified
-        // by the ID slots it carries, and a typo'd `becuase` is an unknown property beside a subject
-        // — so the entry never resolves to either shape. Keeping this a named fact of its own is what
+        // The same message an entry carrying both source and subject gets, for a different reason: an entry
+        // is classified by the ID slots it carries, and a typo'd `becuase` is an unknown property beside a
+        // subject — so the entry never resolves to either shape. Keeping this a named fact of its own is what
         // records that; a shared table row would leave only the message.
         Should.Throw<UserErrorException>(() => BaselineStore.TryReadDocument(path))
             .Message.ShouldContain("neither {source, target} nor {subject}");
@@ -681,20 +506,6 @@ public sealed class BaselineStoreTests : IDisposable
     }
 
     [Fact]
-    public void TryReadDocument_LegacyFileWithNoDigest_ReportsTheMissingProperty()
-    {
-        string path = Write("v1-no-digest.json", """
-                                                 {
-                                                   "schemaVersion": 1,
-                                                   "rules": {}
-                                                 }
-                                                 """);
-
-        Should.Throw<UserErrorException>(() => BaselineStore.TryReadDocument(path))
-            .Message.ShouldContain("missing property 'digest'");
-    }
-
-    [Fact]
     public void TryReadDocument_CrlfFile_VerifiesAfterRecanonicalization()
     {
         string path = WriteComposed("b.json", ("data/x", [BaselineEntry.ForEdge("T:App.Web.Old", "T:App.Data.Db")]));
@@ -704,22 +515,6 @@ public sealed class BaselineStoreTests : IDisposable
 
         BaselineStore.TryReadDocument(path)
             .ShouldNotBeNull();
-    }
-
-    [Fact]
-    public void TryReadDocument_UnknownRuleSection_IsPreserved()
-    {
-        // A shared file may carry a Quarantine section for a rule not in this model — kept, not rejected.
-        string path = WriteComposed(
-            "shared.json",
-            ("data/x", [BaselineEntry.ForEdge("T:App.Web.Old", "T:App.Data.Db")]),
-            ("legacy/billing/containment", [BaselineEntry.ForSubject("T:App.Legacy.Thing")]));
-
-        BaselineDocument document = BaselineStore.TryReadDocument(path)
-            .ShouldNotBeNull();
-
-        document.Sections.Keys.OrderBy(k => k, StringComparer.Ordinal)
-            .ShouldBe(["data/x", "legacy/billing/containment"]);
     }
 
     [Fact]

@@ -26,7 +26,6 @@ namespace SlideRule.Tests.DocHygiene;
 /// </remarks>
 public sealed class ManifestVersionTests
 {
-    private const string PropsPath = "Directory.Build.props";
     private const string SarifGoldenPath = "tests/SlideRule.Tests/Cli/Golden/violated-check.sarif";
 
     private const string ManifestTopSite = $"{DocPaths.McpManifest} .version";
@@ -59,7 +58,7 @@ public sealed class ManifestVersionTests
 
         return
         [
-            new VersionSite($"{PropsPath} <Version>", ShouldHaveSinglePropsVersion()),
+            new VersionSite($"{SolutionInventory.RootProps} <Version>", ShouldHaveSinglePropsVersion()),
             new VersionSite(ManifestTopSite, top),
             new VersionSite(ManifestPackageSite, package),
             new VersionSite(SarifDriverSite, SarifDriverVersion())
@@ -68,12 +67,12 @@ public sealed class ManifestVersionTests
 
     private static string ShouldHaveSinglePropsVersion()
     {
-        XDocument props = XDocument.Load(RepoRoot.Absolute(PropsPath));
+        XDocument props = XDocument.Load(RepoRoot.Absolute(SolutionInventory.RootProps));
 
         XElement[] declared = props.Descendants("Version")
             .ToArray();
         XElement version = declared.ShouldHaveSingleItem(
-            $"{PropsPath} declares the lockstep <Version> exactly once, for every lockstep package at "
+            $"{SolutionInventory.RootProps} declares the lockstep <Version> exactly once, for every lockstep package at "
             + $"once; this run found {declared.Length}.");
 
         return version.Value;

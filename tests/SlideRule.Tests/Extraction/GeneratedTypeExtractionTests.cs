@@ -1,4 +1,3 @@
-using Microsoft.CodeAnalysis;
 using Shouldly;
 using SlideRule.Checking;
 using SlideRule.Codebase;
@@ -19,7 +18,7 @@ public sealed class GeneratedTypeExtractionTests
     // Authored sources: top-level statements (so a synthesized Program rides along), one ordinary type, and
     // one partial class whose implementing part the generator supplies — the [GeneratedRegex] shape.
     private static readonly CodebaseModel Model = CompilationFactory.ExtractConsoleAppWithGenerator(
-        new EmittingGenerator(),
+        new PostInitializationGenerator(("Emitted.g.cs", EmittedSource)),
         ("Program.cs", """
                        using App;
 
@@ -190,45 +189,41 @@ public sealed class GeneratedTypeExtractionTests
         split.IsGenerated.ShouldBeTrue();
     }
 
-    // Emits both halves of the fixture in one post-initialization output: an attributed container with an
-    // attribute-free nested type, and the implementing part of the author's partial class with the
-    // attribute on the method (never the type).
-    private sealed class EmittingGenerator : IIncrementalGenerator
-    {
-        private const string EmittedSource = """
-                                             namespace Gen
+    // Both halves of the fixture in one generated file: an attributed container with an attribute-free nested
+    // type, and the implementing part of the author's partial class with the attribute on the method (never
+    // the type).
+    private const string EmittedSource = """
+                                         namespace Gen
+                                         {
+                                             [System.CodeDom.Compiler.GeneratedCode("Test", "1.0")]
+                                             public static class Emitted
+                                             {
+                                                 public sealed class Inner
+                                                 {
+                                                 }
+                                             }
+                                         }
+
+                                         namespace App
+                                         {
+                                             public partial class Holder
                                              {
                                                  [System.CodeDom.Compiler.GeneratedCode("Test", "1.0")]
-                                                 public static class Emitted
-                                                 {
-                                                     public sealed class Inner
-                                                     {
-                                                     }
-                                                 }
+                                                 public static partial string Emit() => "emitted";
                                              }
-
-                                             namespace App
-                                             {
-                                                 public partial class Holder
-                                                 {
-                                                     [System.CodeDom.Compiler.GeneratedCode("Test", "1.0")]
-                                                     public static partial string Emit() => "emitted";
-                                                 }
-                                             }
-                                             """;
-
-        public void Initialize(IncrementalGeneratorInitializationContext context)
-        {
-            context.RegisterPostInitializationOutput(ctx => ctx.AddSource("Emitted.g.cs", EmittedSource));
-        }
-    }
+                                         }
+                                         """;
 
     // One authored file beside the file-signal generator's four, so each model still has an authored
     // population to read the generated one against.
     private static CodebaseModel FileSignalModel(bool reportProvenance)
     {
         return CompilationFactory.ExtractConsoleAppWithGenerator(
-            new FileSignalGenerator(),
+            new PostInitializationGenerator(
+                ("Bannered.g.cs", BanneredSource),
+                ("Unmarked.g.cs", UnmarkedSource),
+                ("Split.First.g.cs", FirstSplitPart),
+                ("Split.Second.g.cs", SecondSplitPart)),
             reportProvenance,
             ("Program.cs", """
                            using App;
@@ -251,56 +246,42 @@ public sealed class GeneratedTypeExtractionTests
     // led by a banner the way a compiled Razor view is; the rest are marked nothing at all, which is the
     // shape only provenance can see. The last two are halves of one partial type — the case the all-parts
     // rule must answer generated, as against App.Holder above, whose author wrote one of its halves.
-    private sealed class FileSignalGenerator : IIncrementalGenerator
-    {
-        private const string BanneredSource = """
-                                              // <auto-generated/>
-                                              namespace Gen
+    private const string BanneredSource = """
+                                          // <auto-generated/>
+                                          namespace Gen
+                                          {
+                                              public sealed class Bannered
                                               {
-                                                  public sealed class Bannered
-                                                  {
-                                                  }
                                               }
-                                              """;
+                                          }
+                                          """;
 
-        private const string UnmarkedSource = """
-                                              namespace Gen
+    private const string UnmarkedSource = """
+                                          namespace Gen
+                                          {
+                                              public sealed class Unmarked
                                               {
-                                                  public sealed class Unmarked
-                                                  {
-                                                  }
                                               }
-                                              """;
+                                          }
+                                          """;
 
-        private const string FirstSplitPart = """
-                                              namespace Gen
+    private const string FirstSplitPart = """
+                                          namespace Gen
+                                          {
+                                              public sealed partial class Split
                                               {
-                                                  public sealed partial class Split
-                                                  {
-                                                      public int First { get; set; }
-                                                  }
+                                                  public int First { get; set; }
                                               }
-                                              """;
+                                          }
+                                          """;
 
-        private const string SecondSplitPart = """
-                                               namespace Gen
+    private const string SecondSplitPart = """
+                                           namespace Gen
+                                           {
+                                               public sealed partial class Split
                                                {
-                                                   public sealed partial class Split
-                                                   {
-                                                       public int Second { get; set; }
-                                                   }
+                                                   public int Second { get; set; }
                                                }
-                                               """;
-
-        public void Initialize(IncrementalGeneratorInitializationContext context)
-        {
-            context.RegisterPostInitializationOutput(ctx =>
-            {
-                ctx.AddSource("Bannered.g.cs", BanneredSource);
-                ctx.AddSource("Unmarked.g.cs", UnmarkedSource);
-                ctx.AddSource("Split.First.g.cs", FirstSplitPart);
-                ctx.AddSource("Split.Second.g.cs", SecondSplitPart);
-            });
-        }
-    }
+                                           }
+                                           """;
 }

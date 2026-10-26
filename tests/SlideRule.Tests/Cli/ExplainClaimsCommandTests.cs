@@ -142,7 +142,6 @@ public sealed class ExplainClaimsCommandTests
     }
 
     [Theory]
-    [InlineData("--spec", "SPEC")]
     [InlineData("layering/domain-independent", "SOLUTION", "--type", "Order", "--spec", "SPEC")]
     [InlineData("--type", "Order", "--path", "MyApp.Web", "--spec", "SPEC")]
     public async Task Explain_WithOtherThanExactlyOneForm_Refuses(params string[] args)

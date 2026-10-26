@@ -138,21 +138,6 @@ public sealed class MustNotCatchVerbTests
     }
 
     [Fact]
-    public void MustNotCatch_EmptySubject_FailsWithDefaultMessage()
-    {
-        // An empty subject fails the rule by default with the shared message (GRAMMAR §4.1), exactly as every
-        // other verb — the catch verb takes the same subject gate.
-        RuleResult result = Checker.Run(
-                "namespace App { public class Foo {} }",
-                arch => arch.Rule("ex/empty")
-                    .Enforce(arch.Namespace("Nowhere.*").MustNotCatch(arch.Namespace("App.*")))
-                    .Because("b"))
-            .Single();
-
-        result.ShouldHaveFailedWithDetail(ViolationKind.EmptySubject, ConstraintEvaluator.EmptySubjectMessage);
-    }
-
-    [Fact]
     public void MustNotCatch_GrandfatheredEdgePasses_NewCatchStaysRed()
     {
         // The catch ratchet keys the (source, caught) type pair (GRAMMAR §4.3): Handler is grandfathered for

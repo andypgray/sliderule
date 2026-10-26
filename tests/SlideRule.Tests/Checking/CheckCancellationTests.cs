@@ -2,7 +2,6 @@ using Shouldly;
 using SlideRule.Baselines;
 using SlideRule.Checking;
 using SlideRule.Hosting;
-using SlideRule.Model;
 using Xunit;
 
 namespace SlideRule.Tests.Checking;
@@ -102,36 +101,11 @@ public sealed class CheckCancellationTests
                 ViolationKind.RuleError, "the `Must` predicate threw InvalidOperationException", "boom");
     }
 
-    [Fact]
-    public void Check_FaultThatIsNotAnEvaluationRefusal_IsContainedUnderTheBlanketWording()
-    {
-        // The blanket arm's own wording, which no other row holds. A throwing delegate cannot reach it — the
-        // selection evaluator translates one into an evaluation refusal first — so the route is an unhandled
-        // vocabulary member, whose fail-closed throw arrives as the unexpected fault the arm is for.
-        var selection = new RefinedSelection(new Arch(), TypesNoun.Instance, [new UnhandledAdjective()]);
-        ArchitectureModel model = Checker.HandBuilt("area/unhandled", selection.MustHavePrefix("I"));
-
-        ArchChecker.Check(model, Sources.LayeredModel)
-            .Single()
-            .ShouldHaveFailedWithDetailContaining(
-                ViolationKind.RuleError, "Rule evaluation failed: Unhandled selection adjective 'UnhandledAdjective'.");
-    }
-
     // The eight-argument seam, spelled once: every row above is about the token, and the five arguments
     // between the codebase and it are what a whole-solution run over no baselines and no path globs passes.
     private static CheckReport Check(ArchitectureModel model, CancellationToken cancellationToken)
     {
         return ArchChecker.Check(
             model.Rules, Sources.LayeredModel, BaselineIndex.Empty, null, null, null, null, cancellationToken);
-    }
-
-    // An adjective no evaluator switch handles, so resolving the selection throws where the vocabulary runs
-    // out. Nested here rather than shared, because the fail-closed rows own the same shape for their own
-    // claim and a shared one would tie two unrelated pins together.
-    private sealed class UnhandledAdjective : SelectionAdjective
-    {
-        internal override AdjectivePlacement Placement => AdjectivePlacement.Inline;
-
-        internal override string Fragment => string.Empty;
     }
 }

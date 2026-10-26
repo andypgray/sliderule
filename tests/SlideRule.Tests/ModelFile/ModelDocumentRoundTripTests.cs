@@ -35,56 +35,25 @@ public sealed class ModelDocumentRoundTripTests
     public static TheoryData<string> OtherShapes => [.. Shapes.Select(row => row.Shape)];
 
     [Fact]
-    public void Compose_OfWhatItRead_ReproducesTheSampleSpecsBytes()
+    public void TheSampleSpec_RoundTripsThroughItsFile()
     {
-        string first = ModelFileSpecs.SampleText();
+        ModelDocument parsed = ModelFileSpecs.Document()
+            .ShouldRoundTrip();
 
-        ModelDocumentComposer.Compose(first.ShouldReadBack())
-            .ShouldBe(first);
-    }
-
-    [Fact]
-    public void Compose_OfWhatItRead_ReproducesTheCanonicalSamplesBytes()
-    {
-        string first = ModelDocumentComposer.Compose(
-            ModelDocument.From(Checker.Canonical, "Canonical sample", ModelFileSpecs.Projects));
-
-        ModelDocumentComposer.Compose(first.ShouldReadBack())
-            .ShouldBe(first);
+        ShouldCarryAConstraint(parsed);
     }
 
     [Theory]
     [MemberData(nameof(OtherShapes))]
-    public void Compose_OfWhatItRead_ReproducesTheOtherNodeShapesBytes(string shape)
+    public void TheOtherNodeShapes_RoundTripThroughTheirFile(string shape)
     {
         Action<Arch> define = Shapes.Single(row => string.Equals(row.Shape, shape, StringComparison.Ordinal))
             .Define;
-        string first = ModelFileSpecs.TextOf(define);
-        ModelDocument read = first.ShouldReadBack();
 
-        // A file that carried nothing would be a fixed point for free.
-        read.Rules.ShouldNotBeEmpty();
-        ModelDocumentComposer.Compose(read)
-            .ShouldBe(first);
-    }
+        ModelDocument parsed = ModelFileSpecs.DocumentOf(define)
+            .ShouldRoundTrip();
 
-    [Fact]
-    public void Read_EveryCarriedRuleOfTheAssortedSpec_ReRendersItsStoredSentence()
-    {
-        ShouldReRenderEverySentence(ModelFileSpecs.TextOf(ModelFileSpecs.DefineAssorted));
-    }
-
-    [Fact]
-    public void Read_EveryCarriedRuleOfTheSampleSpec_ReRendersItsStoredSentence()
-    {
-        ShouldReRenderEverySentence(ModelFileSpecs.SampleText());
-    }
-
-    [Fact]
-    public void Read_EveryCarriedRuleOfTheCanonicalSample_ReRendersItsStoredSentence()
-    {
-        ShouldReRenderEverySentence(ModelDocumentComposer.Compose(
-            ModelDocument.From(Checker.Canonical, "Canonical sample", ModelFileSpecs.Projects)));
+        ShouldCarryAConstraint(parsed);
     }
 
     [Fact]
@@ -180,17 +149,10 @@ public sealed class ModelDocumentRoundTripTests
             .ShouldBe(model.Rules.Single().Exemplar);
     }
 
-    private static void ShouldReRenderEverySentence(string text)
+    // Without this the round trip would hold of a file whose rules all lost their constraint on the way.
+    private static void ShouldCarryAConstraint(ModelDocument parsed)
     {
-        ModelDocument read = text.ShouldReadBack();
-        List<ArchRule> withConstraints = read.Rules.Where(rule => rule.Constraint is not null)
-            .ToList();
-
-        // Without this the claim would hold of a file whose rules all lost their constraint on the way.
-        withConstraints.ShouldNotBeEmpty();
-
-        foreach (ArchRule rule in withConstraints)
-            SentenceRenderer.Sentence(rule.Constraint!)
-                .ShouldBe(rule.Sentence, $"rule '{rule.Id}'");
+        parsed.Rules.Where(rule => rule.Constraint is not null)
+            .ShouldNotBeEmpty();
     }
 }

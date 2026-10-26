@@ -29,8 +29,8 @@ public sealed class WrittenPathSyncTests
     [
         // The adoption walkthrough captures both verbs: `baseline init` writing its baselines, then
         // `render` reporting the committed context files and model file unchanged.
-        ("examples/Meridian/ADOPTING.md", "examples/Meridian"),
-        ("examples/Meridian.Operations/README.md", "examples/Meridian.Operations")
+        (DocPaths.MeridianAdopting, ExampleRoots.Meridian),
+        (DocPaths.OperationsReadme, ExampleRoots.Operations)
     ];
 
     private static readonly DocGate<WrittenPath> Gate = new(

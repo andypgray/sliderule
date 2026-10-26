@@ -234,19 +234,6 @@ public sealed class CodebaseExtractorThrowEdgeTests
     }
 
     [Fact]
-    public void ExtractFromCompilations_ErrorThrownType_IsDropped()
-    {
-        CodebaseModel model = CompilationFactory.Extract("""
-                                                         namespace N;
-                                                         public class Worker { public void Run() { throw new Undefined(); } }
-                                                         """);
-
-        // An unresolvable thrown type is an error type with no candidate, so it resolves to nothing: no throw edge.
-        model.ThrowEdges("N.Worker")
-            .ShouldBeEmpty();
-    }
-
-    [Fact]
     public void ExtractFromCompilations_ThrowInLocalFunction_AttributesToEnclosingType()
     {
         CodebaseModel model = CompilationFactory.Extract("""

@@ -23,7 +23,7 @@ public sealed class ProjectArtifactFactsTests
     private const string Web = "MultiTfm.Web";
 
     private static readonly string SolutionPath =
-        Path.Combine(AppContext.BaseDirectory, "Fixtures", "TestSolutions", "MultiTfm", "MultiTfm.sln");
+        Path.Combine(FixtureBeds.TestSolutionsRoot, "MultiTfm", "MultiTfm.sln");
 
     private static Task<CodebaseModel> Codebase => FixtureCodebase.Of(SolutionPath);
 
@@ -521,7 +521,7 @@ public sealed class ProjectArtifactFactsTests
         // Arrange — four fixture project files, one of them requested for each of its two frameworks and then
         // once more, and one request with no file at all. Those five shard keys over three shards are a real
         // split, and the repeated request has something for its shard's dedup to answer.
-        string fixtures = Path.Combine(AppContext.BaseDirectory, "Fixtures", "TestSolutions");
+        string fixtures = FixtureBeds.TestSolutionsRoot;
         string core = Path.Combine(fixtures, "MultiTfm", "MultiTfm.Core", "MultiTfm.Core.csproj");
         ProjectEvaluationRequest[] requests =
         [
@@ -550,7 +550,7 @@ public sealed class ProjectArtifactFactsTests
     public void EvaluateAll_InSeveralShardsWithACancelledToken_LeavesAsTheCallersCancellation()
     {
         // Arrange — two files, so the batch really splits, and a token already cancelled.
-        string fixtures = Path.Combine(AppContext.BaseDirectory, "Fixtures", "TestSolutions");
+        string fixtures = FixtureBeds.TestSolutionsRoot;
         ProjectEvaluationRequest[] requests =
         [
             new(Path.Combine(fixtures, "MyApp", "MyApp.Domain", "MyApp.Domain.csproj"), null),

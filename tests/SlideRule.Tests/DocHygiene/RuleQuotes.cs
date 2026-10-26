@@ -59,7 +59,6 @@ internal static class RuleQuotes
 
     private const char EmDash = (char)0x2014;
 
-    private const string AgentsFileName = "AGENTS.md";
 
     /// <summary>
     ///     A rule-header line: the status verb, the rule id, an em dash, then the rendered sentence. The
@@ -154,7 +153,7 @@ internal static class RuleQuotes
     public static IReadOnlyList<string> RenderedCards(string exampleRoot, IEnumerable<string> trackedPaths)
     {
         return trackedPaths
-            .Where(path => path.EndsWith($"/{AgentsFileName}", StringComparison.Ordinal) || path == AgentsFileName)
+            .Where(path => path.EndsWith($"/{ContextFileComposer.FileName}", StringComparison.Ordinal) || path == ContextFileComposer.FileName)
             .Where(path => exampleRoot.Length == 0
                 ? !path.StartsWith("examples/", StringComparison.Ordinal)
                 : path.StartsWith($"{exampleRoot}/", StringComparison.Ordinal))

@@ -1,10 +1,9 @@
-using System.Reflection;
 using ArchUnitNET.Domain;
 using ArchUnitNET.Domain.Dependencies;
 using ArchUnitNET.Domain.Extensions;
 using ArchUnitNET.Fluent;
 using ArchUnitNET.Loader;
-using Shouldly;
+using SlideRule.Tests.TestSupport;
 using Assembly = System.Reflection.Assembly;
 
 namespace SlideRule.Tests.Oracle;
@@ -29,9 +28,9 @@ public sealed class OracleArchitecture
 
     public OracleArchitecture()
     {
-        string domainPath = ShouldHaveBakedPath("MyAppDomainPath");
-        string webPath = ShouldHaveBakedPath("MyAppWebPath");
-        string billingPath = ShouldHaveBakedPath("MyAppBillingPath");
+        string domainPath = FixtureBeds.BakedPath("MyAppDomainPath");
+        string webPath = FixtureBeds.BakedPath("MyAppWebPath");
+        string billingPath = FixtureBeds.BakedPath("MyAppBillingPath");
 
         Domain = Assembly.LoadFrom(domainPath);
         Web = Assembly.LoadFrom(webPath);
@@ -63,18 +62,6 @@ public sealed class OracleArchitecture
 
     /// <summary>The MyApp-declared types (the <c>!IsExternal</c> reference universe).</summary>
     private IReadOnlyList<IType> MyAppTypes { get; }
-
-    /// <summary>
-    ///     A fresh MyApp-declared-types universe filter (an <see cref="IObjectProvider{T}" /> ranging over
-    ///     only the three MyApp assemblies' declared types). A new instance per call — the fluent object
-    ///     carries rule-build state, so it is never shared between rules.
-    /// </summary>
-    public IObjectProvider<IType> DeclaredTypes()
-    {
-        return ArchRuleDefinition.Types()
-            .That()
-            .ResideInAssembly(Domain, Web, Billing);
-    }
 
     /// <summary>
     ///     The quarantined scope's interior: MyApp.Legacy.Billing types minus the two facade types
@@ -196,18 +183,5 @@ public sealed class OracleArchitecture
             .Select(member => member.DeclaringType.FullName)
             .Where(_declaredNames.Contains)
             .ToHashSet(StringComparer.Ordinal);
-    }
-
-    private static string ShouldHaveBakedPath(string key)
-    {
-        string? path = typeof(OracleArchitecture).Assembly
-            .GetCustomAttributes<AssemblyMetadataAttribute>()
-            .SingleOrDefault(attribute => attribute.Key == key)
-            ?.Value;
-
-        path.ShouldNotBeNullOrEmpty();
-        File.Exists(path)
-            .ShouldBeTrue($"MyApp fixture DLL for '{key}' should exist at the baked path '{path}'.");
-        return path;
     }
 }

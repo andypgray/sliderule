@@ -20,6 +20,8 @@ public class LayerDefinitionTests
         LayerDefinition domain = Checker.Canonical
             .Layers.Single(layer => layer.Name == "Domain");
 
+        // Prefix-preserving: the fragment a purposeless layer renders, then ". " and the purpose verbatim
+        // — the author writes its final period, exactly as Because prose is rendered.
         domain.DefinitionFragment.ShouldBe("**Domain** — `MyApp.Domain.*`. Domain holds the order and customer model.");
         domain.Globs.ShouldBe(["MyApp.Domain.*"]);
         domain.Purpose.ShouldBe("Domain holds the order and customer model.");
@@ -31,19 +33,6 @@ public class LayerDefinitionTests
         Checker.Canonical
             .Layers.Select(layer => layer.Name)
             .ShouldBe(["Domain", "Web"]);
-    }
-
-    [Fact]
-    public void DescribedLayer_RendersItsPurposeAfterTheDefinition()
-    {
-        // Prefix-preserving: the fragment a purposeless layer renders, then ". " and the sentence verbatim
-        // — the author writes its final period, exactly as Because prose is rendered.
-        LayerDefinition domain = Checker.Model(arch =>
-                arch.Layer("Domain", "MyApp.Domain.*").Purpose("The quote and rate-card model."))
-            .Layers.Single();
-
-        domain.DefinitionFragment.ShouldBe("**Domain** — `MyApp.Domain.*`. The quote and rate-card model.");
-        domain.Purpose.ShouldBe("The quote and rate-card model.");
     }
 
     [Fact]

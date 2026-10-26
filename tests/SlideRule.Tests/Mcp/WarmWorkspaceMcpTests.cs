@@ -507,7 +507,7 @@ public sealed class WarmWorkspaceMcpTests
         // csproj that resolution has to walk the workspace to answer (the dogfooded shape: this repo's own
         // .mcp.json binds --spec <csproj>). A --spec <dll> binding resolves with no workspace at all and
         // would exercise none of this.
-        using TempFixtureWorkspace workspace = BuiltLayoutCopy();
+        using TempFixtureWorkspace workspace = LayoutAppFixture.BuiltCopy();
         string specCsproj = workspace.PathOf(LayoutAppFixture.SpecProject, "LayoutApp.Spec.csproj");
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
             McpServerBindings.For(workspace.SolutionPath, specCsproj), Ct);
@@ -558,7 +558,7 @@ public sealed class WarmWorkspaceMcpTests
         // has to walk the workspace), warmed with a real arch_check so the resolution is cached.
         // ArchCheck_SpecDllDeletedMidSession_ReturnsSameErrorAsColdCli does NOT cover this: it binds a DLL
         // and warms through spec-free arch_graph, so no resolution is ever recorded to go stale.
-        using TempFixtureWorkspace workspace = BuiltLayoutCopy();
+        using TempFixtureWorkspace workspace = LayoutAppFixture.BuiltCopy();
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
             McpServerBindings.For(workspace.SolutionPath, null), Ct);
         var resolutions = harness.Services.GetRequiredService<SpecResolutionCache>();
@@ -621,30 +621,6 @@ public sealed class WarmWorkspaceMcpTests
         // Domain, its reverse-dependent, was never touched.
         store.LastReExtractedProjects.ShouldBeEmpty();
         store.LastRemappedProjects.ShouldBe([Web]);
-    }
-
-    // The output-layout fixture, copied, restored and really built under the default layout. Leased per
-    // class, and the lease's reset leaves bin/ alone — so the copy, the restore and the build are paid by
-    // whichever of the two spec-resolution cases runs first and the other reuses the output. The build is
-    // re-run only when the spec assembly is absent, which is the state the deleted-output case
-    // leaves behind.
-    private static TempFixtureWorkspace BuiltLayoutCopy()
-    {
-        var workspace = new TempFixtureWorkspace(
-            LayoutAppFixture.FixtureDirectory, LayoutAppFixture.SolutionFileName, restore: false);
-        LayoutAppFixture.WritePropsFile(workspace);
-
-        string specAssembly = workspace.PathOf(
-            LayoutAppFixture.SpecProject, "bin", "Debug", "net10.0", LayoutAppFixture.SpecAssembly);
-        if (File.Exists(specAssembly)) return workspace;
-
-        FixtureRestorer.Restore(workspace.SolutionPath);
-        // --disable-build-servers (plus DotnetCli's node/server env) keeps the drained child from leaving a
-        // persistent worker that would wedge the output pipe.
-        DotnetCli.Run(
-            $"build \"{workspace.SolutionPath}\" --disable-build-servers",
-            Path.GetDirectoryName(workspace.SolutionPath)!);
-        return workspace;
     }
 
     // Turns HomeController's tokenless Save into one accepting a CancellationToken — the compliant signature,

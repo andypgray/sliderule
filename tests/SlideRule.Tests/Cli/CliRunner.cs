@@ -1,5 +1,4 @@
 using System.CommandLine;
-using System.Reflection;
 using System.Runtime.CompilerServices;
 using SlideRule.Cli;
 using SlideRule.Cli.Mcp.Infrastructure;
@@ -58,52 +57,44 @@ internal sealed record CliResult(int Exit, string Out, string Err)
 /// </remarks>
 internal static class CliRunner
 {
-    public static string MyAppSolution =>
-        Path.Combine(AppContext.BaseDirectory, "Fixtures", "TestSolutions", "MyApp", "MyApp.sln");
+    public static string MyAppSolution => FixtureBeds.MyAppSolution;
 
-    public static string ViolatedSpecDll => Metadata("ViolatedSpecPath");
+    public static string ViolatedSpecDll => FixtureBeds.BakedPath("ViolatedSpecPath");
 
-    public static string CleanSpecDll => Metadata("CleanSpecPath");
+    public static string CleanSpecDll => FixtureBeds.BakedPath("CleanSpecPath");
 
-    public static string RenderSpecDll => Metadata("RenderSpecPath");
+    public static string RenderSpecDll => FixtureBeds.BakedPath("RenderSpecPath");
 
-    public static string LayerSpecDll => Metadata("LayerSpecPath");
+    public static string LayerSpecDll => FixtureBeds.BakedPath("LayerSpecPath");
 
-    public static string QuarantinedSpecDll => Metadata("QuarantinedSpecPath");
+    public static string QuarantinedSpecDll => FixtureBeds.BakedPath("QuarantinedSpecPath");
 
-    public static string DerivedSpecDll => Metadata("DerivedSpecPath");
+    public static string DerivedSpecDll => FixtureBeds.BakedPath("DerivedSpecPath");
 
     /// <summary>The spec that references Core alone — the one built outside <c>tests/Fixtures</c>' globs.</summary>
-    public static string SpecFixtureDll => Metadata("SpecFixturePath");
+    public static string SpecFixtureDll => FixtureBeds.BakedPath("SpecFixturePath");
 
     /// <summary>The spec for the polyglot bed, whose one rule holds — so its report is clean.</summary>
-    public static string PolyglotSpecDll => Metadata("PolyglotSpecPath");
+    public static string PolyglotSpecDll => FixtureBeds.BakedPath("PolyglotSpecPath");
 
     /// <summary>The net10 spec whose <c>Define()</c> anchors a type from a .NET shared framework.</summary>
-    public static string SharedFrameworkSpecDll => Metadata("SharedFrameworkSpecPath");
-
-    /// <summary>The net48 product assembly the legacy spec <c>typeof()</c>s.</summary>
-    public static string LegacyProductDll => Metadata("LegacyProductPath");
+    public static string SharedFrameworkSpecDll => FixtureBeds.BakedPath("SharedFrameworkSpecPath");
 
     /// <summary>The net48 spec DLL, built at the C# 7.3 default.</summary>
-    public static string LegacySpecDll => Metadata("LegacySpecPath");
+    public static string LegacySpecDll => FixtureBeds.BakedPath("LegacySpecPath");
 
     /// <summary>The net48 spec DLL whose <c>Define()</c> anchors a type that cannot load on .NET.</summary>
-    public static string LegacyBrokenSpecDll => Metadata("LegacyBrokenSpecPath");
+    public static string LegacyBrokenSpecDll => FixtureBeds.BakedPath("LegacyBrokenSpecPath");
 
     /// <summary>The net48 pattern-only spec that drives <c>check</c> against the ClassicApp solution.</summary>
-    public static string ClassicAppSpecDll => Metadata("ClassicAppSpecPath");
+    public static string ClassicAppSpecDll => FixtureBeds.BakedPath("ClassicAppSpecPath");
 
     /// <summary>The MyApp domain assembly — an ordinary product DLL, carrying no spec at all.</summary>
-    public static string MyAppDomainDll => Metadata("MyAppDomainPath");
+    public static string MyAppDomainDll => FixtureBeds.BakedPath("MyAppDomainPath");
 
     /// <summary>The non-SDK-style .NET Framework fixture solution, copied to the test output as content.</summary>
     public static string ClassicAppSolution =>
         Path.Combine(AppContext.BaseDirectory, "Fixtures", "LegacySolutions", "ClassicApp", "ClassicApp.sln");
-
-    /// <summary>The polyglot bed's solution, copied to the test output as content.</summary>
-    private static string PolyglotSolution =>
-        Path.Combine(AppContext.BaseDirectory, "Fixtures", "TestSolutions", "PolyglotApp", "PolyglotApp.slnx");
 
     /// <summary>
     ///     Every fixture spec that governs a bed of its own: the name its model file records, its DLL, and the
@@ -118,7 +109,7 @@ internal static class CliRunner
         ("MyAppQuarantinedSpec", QuarantinedSpecDll, MyAppSolution),
         ("MyAppDerivedSpec", DerivedSpecDll, MyAppSolution),
         ("ClassicAppSpec", ClassicAppSpecDll, ClassicAppSolution),
-        ("PolyglotAppSpec", PolyglotSpecDll, PolyglotSolution)
+        ("PolyglotAppSpec", PolyglotSpecDll, FixtureBeds.PolyglotAppSolution)
     ];
 
     /// <summary>Runs the CLI over the shared warm workspace pool — the default; see the type's remarks.</summary>
@@ -183,17 +174,5 @@ internal static class CliRunner
     {
         return CliResult.CapturedAsync((output, error) => CliEntry.InvokeAsync(
             args, new InvocationConfiguration { Output = output, Error = error }, hostSource, environment, input));
-    }
-
-    private static string Metadata(string key)
-    {
-        string? value = typeof(CliRunner).Assembly
-            .GetCustomAttributes<AssemblyMetadataAttribute>()
-            .SingleOrDefault(a => a.Key == key)
-            ?.Value;
-
-        if (string.IsNullOrEmpty(value)) throw new InvalidOperationException($"Assembly metadata '{key}' was not baked in by the build.");
-
-        return value;
     }
 }

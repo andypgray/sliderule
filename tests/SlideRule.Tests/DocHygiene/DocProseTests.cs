@@ -11,23 +11,6 @@ namespace SlideRule.Tests.DocHygiene;
 public sealed class DocProseTests
 {
     [Fact]
-    public void BlankFences_FencedBlock_EmptiesFenceAndKeepsSurroundingProse()
-    {
-        // Arrange
-        string[] lines = ["before one", "```", "inside fenced", "```", "after two"];
-        string text = string.Join("\n", lines);
-
-        // Act
-        string blanked = DocProse.BlankFences(text);
-
-        // Assert
-        blanked.ShouldContain("before");
-        blanked.ShouldContain("after");
-        blanked.ShouldNotContain("inside");
-        blanked.ShouldNotContain("fenced");
-    }
-
-    [Fact]
     public void BlankFences_TildeFence_Emptied()
     {
         // Arrange
@@ -92,27 +75,14 @@ public sealed class DocProseTests
         blanked.ShouldNotContain("dropped");
     }
 
-    [Fact]
-    public void BlankFences_CrlfInput_RecognizesFences()
+    [Theory]
+    [InlineData("```", "\n")]
+    [InlineData("```text", "\r\n")]
+    public void BlankFences_FencedBlock_EmptiesItsLinesAndKeepsEveryLineNumber(string opener, string newline)
     {
-        // Arrange
-        const string text = "before\r\n```\r\ninside x\r\n```\r\nafter";
-
-        // Act
-        string blanked = DocProse.BlankFences(text);
-
-        // Assert
-        blanked.ShouldContain("before");
-        blanked.ShouldContain("after");
-        blanked.ShouldNotContain("inside");
-    }
-
-    [Fact]
-    public void BlankFences_FencedBlock_EmptiesItsLinesAndKeepsEveryLineNumber()
-    {
-        // Arrange: CRLF input, so the result also shows the newlines coming back as "\n".
-        string[] lines = ["before", "```text", "inside", "```", "after"];
-        string text = string.Join("\r\n", lines);
+        // Arrange: the CRLF row also shows the newlines coming back as "\n".
+        string[] lines = ["before", opener, "inside", "```", "after"];
+        string text = string.Join(newline, lines);
 
         // Act
         string blanked = DocProse.BlankFences(text);

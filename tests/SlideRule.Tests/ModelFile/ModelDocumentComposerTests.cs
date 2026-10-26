@@ -214,16 +214,6 @@ public sealed class ModelDocumentComposerTests
     }
 
     [Fact]
-    public void Compose_AnyDocument_EndsWithExactlyOneNewlineAndCarriesNoCarriageReturn()
-    {
-        string composed = ModelDocumentComposer.Compose(ModelFileSpecs.Document());
-
-        composed.ShouldEndWith("}\n");
-        composed.ShouldNotEndWith("}\n\n");
-        composed.ShouldNotContain("\r");
-    }
-
-    [Fact]
     public void Compose_AModelWithNothingToCarry_WritesEveryRootKeyWithEmptyArrays()
     {
         var document = new ModelDocument("Nothing", [], [], [], []);

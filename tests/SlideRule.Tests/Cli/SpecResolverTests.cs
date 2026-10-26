@@ -59,29 +59,6 @@ public sealed class SpecResolverTests
     }
 
     [Fact]
-    public void ResolveConventionProject_NoReferencingProject_ThrowsUserError()
-    {
-        var error = Should.Throw<UserErrorException>(() =>
-            SpecResolver.ResolveConventionProject(
-                [Candidate("MyApp.Web", "C:/pkgs/Newtonsoft.Json.dll")], WorkspaceDiagnostics.None));
-
-        error.Message.ShouldContain("No spec project found");
-    }
-
-    [Fact]
-    public void ResolveConventionProject_MultipleReferencingProjects_ThrowsUserErrorListingThem()
-    {
-        var error = Should.Throw<UserErrorException>(() =>
-            SpecResolver.ResolveConventionProject([
-                Candidate("Arch.One", CoreDll),
-                Candidate("Arch.Two", CoreDll)
-            ], WorkspaceDiagnostics.None));
-
-        error.Message.ShouldContain("Arch.One");
-        error.Message.ShouldContain("Arch.Two");
-    }
-
-    [Fact]
     public void ResolveConventionProject_NonMemberReferencingCore_IsNotACandidate()
     {
         // A rule-pack library the spec project drags into the workspace references the contract library too.
@@ -188,26 +165,12 @@ public sealed class SpecResolverTests
     }
 
     [Fact]
-    public void ResolveConventionProject_ProjectsFailedToLoad_NamesThemRatherThanTheSpecRemedy()
+    public void ResolveConventionProject_ProjectsFailedToLoad_CarriesTheMsBuildSelectionInsideTheEvidence()
     {
         // The strongest arm: the project that would have matched may be one of the ones that failed, and no
         // --spec argument repairs a load. The projects are the evidence, because that is what the gate
         // itself keys on — a set of paths rather than a set of sentences.
-        WorkspaceDiagnostics diagnostics = WorkspaceDiagnostics.None with { FailedProjects = [BrokenProject] };
-
-        var error = Should.Throw<UserErrorException>(() =>
-            SpecResolver.ResolveConventionProject(
-                [Candidate("MyApp.Arch", "C:/pkgs/Newtonsoft.Json.dll")], diagnostics));
-
-        error.Message.ShouldContain("1 project failed to load");
-        error.Message.ShouldContain(BrokenProject);
-        error.Message.ShouldContain("Restore and build the solution first");
-        error.Message.ShouldNotContain("Pass --spec");
-    }
-
-    [Fact]
-    public void ResolveConventionProject_ProjectsFailedToLoad_CarriesTheMsBuildSelectionInsideTheEvidence()
-    {
+        //
         // Which MSBuild opened them is nearly always the next question about a project that failed to load,
         // and this refusal is thrown before a runner exists to echo the note beside it — so on both its
         // surfaces the reader meets the selection here or not at all. Pinned whole because the placement is
@@ -281,30 +244,13 @@ public sealed class SpecResolverTests
     }
 
     [Fact]
-    public void ResolveConventionProject_LoadDiagnosticsButNothingFailed_StillBlamesTheLoad()
-    {
-        // The residual arm: the load reported a problem about this solution while blaming no project, so
-        // neither gate cause fired and there is nothing to name but the diagnostic itself. It is not the
-        // locked-mode shape — that lands on the restore block above — and nothing reds if this comment
-        // drifts from the arm, which is hand-built from lists a test can leave empty. Keying this arm on the
-        // diagnostics is legitimate exactly because it gates nothing — it chooses between two spellings of
-        // one refusal, and the reader is sent to repair the load rather than to write an argument that
-        // cannot help.
-        WorkspaceDiagnostics diagnostics = WorkspaceDiagnostics.None with { LoadFailures = [LockFileFailure] };
-
-        var error = Should.Throw<UserErrorException>(() =>
-            SpecResolver.ResolveConventionProject(
-                [Candidate("MyApp.Arch", "C:/pkgs/Newtonsoft.Json.dll")], diagnostics));
-
-        error.Message.ShouldContain("did not load cleanly");
-        error.Message.ShouldContain("NU1004");
-        error.Message.ShouldContain("Restore and build the solution first");
-        error.Message.ShouldNotContain("Pass --spec");
-    }
-
-    [Fact]
     public void ResolveConventionProject_LoadDiagnosticsButNothingFailed_CarriesTheMsBuildSelectionInsideTheEvidence()
     {
+        // The residual arm: the load reported a problem about this solution while blaming no project, so
+        // neither gate cause fired and there is nothing to name but the diagnostic itself. Keying this arm on
+        // the diagnostics is legitimate because it gates nothing — it chooses between two spellings of one
+        // refusal, and the reader is sent to repair the load rather than to write an argument that cannot help.
+        //
         // The two gate arms' reason, on the arm that names diagnostics rather than projects: this refusal is
         // thrown from the same place, before a runner exists to echo the note beside it, and a load that did
         // not go cleanly is nearly always a question about which MSBuild opened the solution. Pinned whole

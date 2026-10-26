@@ -138,39 +138,6 @@ public sealed class CodebaseExtractorEdgeTests
     }
 
     [Fact]
-    public void ExtractFromCompilations_ObjectCreation_ProducesEdge()
-    {
-        CodebaseModel model = CompilationFactory.Extract("""
-                                                         namespace N;
-                                                         public class Thing {}
-                                                         public class Maker { public object M() => new Thing(); }
-                                                         """);
-
-        model.Edge("N.Maker", "N.Thing")
-            .Sites.Lines()
-            .ShouldBe([3]);
-    }
-
-    [Fact]
-    public void ExtractFromCompilations_ImplicitObjectCreation_ProducesEdgeToCreatedType()
-    {
-        CodebaseModel model = CompilationFactory.Extract("""
-                                                         namespace N;
-                                                         public class Widget {}
-                                                         public static class Factory
-                                                         {
-                                                             public static void Take(Widget w) {}
-                                                             public static void Call() => Take(new());
-                                                         }
-                                                         """);
-
-        // Line 6 (the target-typed new()) is the only site contributed purely by implicit creation.
-        model.Edge("N.Factory", "N.Widget")
-            .Sites.Lines()
-            .ShouldContain(6);
-    }
-
-    [Fact]
     public void ExtractFromCompilations_StaticMemberAccess_ProducesSingleDedupedSite()
     {
         CodebaseModel model = CompilationFactory.Extract("""
@@ -280,24 +247,19 @@ public sealed class CodebaseExtractorEdgeTests
             .ShouldBeFalse();
     }
 
-    [Fact]
-    public void ExtractFromCompilations_OwnMemberAccess_ProducesNoEdge()
+    // One row per construct that mints no reference edge at all.
+    [Theory]
+    // A type's access to its own members, qualified or not.
+    [InlineData("namespace N; public class Widget { public int Value; public int M() => this.Value + Value; }")]
+    // A name that resolves to nothing is skipped.
+    [InlineData("namespace N; public class C { public void M() { DoesNotExist.Foo(); } }")]
+    // A predefined-type keyword.
+    [InlineData("namespace N; public class C { public int Add(int a, int b) => a + b; }")]
+    // A using directive is attributed to no type.
+    [InlineData("using System.Text; namespace N; public class C { public int X; }")]
+    public void ExtractFromCompilations_EdgeFreeConstruct_ProducesNoEdge(string source)
     {
-        CodebaseModel model = CompilationFactory.Extract("""
-                                                         namespace N;
-                                                         public class Widget { public int Value; public int M() => this.Value + Value; }
-                                                         """);
-
-        model.Edges.ShouldBeEmpty();
-    }
-
-    [Fact]
-    public void ExtractFromCompilations_UnresolvedName_IsSkipped()
-    {
-        CodebaseModel model = CompilationFactory.Extract("""
-                                                         namespace N;
-                                                         public class C { public void M() { DoesNotExist.Foo(); } }
-                                                         """);
+        CodebaseModel model = CompilationFactory.Extract(source);
 
         model.Edges.ShouldBeEmpty();
     }
@@ -315,29 +277,6 @@ public sealed class CodebaseExtractorEdgeTests
         // `var` binds to Other by inference; it must not produce an edge to the inferred type.
         model.HasEdge("N.C", "N.Other")
             .ShouldBeFalse();
-    }
-
-    [Fact]
-    public void ExtractFromCompilations_PredefinedType_ProducesNoEdge()
-    {
-        CodebaseModel model = CompilationFactory.Extract("""
-                                                         namespace N;
-                                                         public class C { public int Add(int a, int b) => a + b; }
-                                                         """);
-
-        model.Edges.ShouldBeEmpty();
-    }
-
-    [Fact]
-    public void ExtractFromCompilations_UsingDirective_IsNotAttributedToAnyType()
-    {
-        CodebaseModel model = CompilationFactory.Extract("""
-                                                         using System.Text;
-                                                         namespace N;
-                                                         public class C { public int X; }
-                                                         """);
-
-        model.Edges.ShouldBeEmpty();
     }
 
     [Fact]

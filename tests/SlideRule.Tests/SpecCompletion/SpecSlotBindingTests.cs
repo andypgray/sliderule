@@ -15,16 +15,6 @@ namespace SlideRule.Tests.SpecCompletion;
 public sealed class SpecSlotBindingTests(SpecCompletionFixture fixture) : IClassFixture<SpecCompletionFixture>
 {
     [Fact]
-    public async Task ANamespaceSlot_OffersNamespaces()
-    {
-        // Act
-        OfferedList offered = await fixture.ShouldCompileAndOfferAsync("""arch.Namespace("MyApp.$$");""", Ct);
-
-        // Assert
-        offered.ShouldOffer("Domain", "Domain.*");
-    }
-
-    [Fact]
     public async Task AnExactNameSlot_OffersTheProductsSimpleNames()
     {
         // Act
@@ -39,11 +29,13 @@ public sealed class SpecSlotBindingTests(SpecCompletionFixture fixture) : IClass
     [Fact]
     public async Task AnInterfaceSlot_OffersInterfacesAndTheNamespacesBelowIt()
     {
-        // Act
+        // Act: a spec anchors on the internal types of the project it governs as readily as on the public
+        // ones, and hiding them would hide exactly the rules worth writing.
         OfferedList offered =
             await fixture.ShouldCompileAndOfferAsync("""arch.Types.Implementing("MyApp.Domain.$$");""", Ct);
 
-        // Assert
+        // Assert: a generic is spelled with its declared type parameters, separated by a comma and a space,
+        // which is what the extractor renders and therefore what a rule's anchor has to be spelled as.
         offered.ShouldOfferExactly(
             "Orders", "IHandler<T>", "IMap<TKey, TValue>", "IInternalRepository");
     }
@@ -96,35 +88,19 @@ public sealed class SpecSlotBindingTests(SpecCompletionFixture fixture) : IClass
         offered.ShouldOffer("Orders", "EntityBase", "InvoiceEntity", "IHandler<T>");
     }
 
-    [Fact]
-    public async Task ANamePatternSlot_OffersNothing()
-    {
-        // Act: a name glob is written over names that may not exist yet, so a list of the ones that do
-        // would be a list of the wrong answers.
-        OfferedList offered =
-            await fixture.ShouldCompileAndOfferAsync("""arch.Types.WithNameMatching("$$");""", Ct);
-
-        // Assert
-        offered.ShouldOfferNothing();
-    }
-
-    [Fact]
-    public async Task AProseSlot_OffersNothing()
+    [Theory]
+    // A name-pattern slot: a name glob is written over names that may not exist yet, so a list of the ones
+    // that do would be a list of the wrong answers.
+    [InlineData("""arch.Types.WithNameMatching("$$");""")]
+    // A prose slot.
+    [InlineData("""arch.Layer("Domain", "MyApp.Domain.*").Purpose("$$");""")]
+    // A parameter carrying no marker: a call that binds perfectly well and has nothing to do with the
+    // authoring surface.
+    [InlineData("""_ = string.IsNullOrEmpty("MyApp.$$");""")]
+    public async Task ASlotThatDoesNotComplete_OffersNothing(string body)
     {
         // Act
-        OfferedList offered = await fixture.ShouldCompileAndOfferAsync(
-            """arch.Layer("Domain", "MyApp.Domain.*").Purpose("$$");""", Ct);
-
-        // Assert
-        offered.ShouldOfferNothing();
-    }
-
-    [Fact]
-    public async Task AParameterCarryingNoMarker_OffersNothing()
-    {
-        // Act: a call that binds perfectly well and has nothing to do with the authoring surface.
-        OfferedList offered =
-            await fixture.ShouldCompileAndOfferAsync("""_ = string.IsNullOrEmpty("MyApp.$$");""", Ct);
+        OfferedList offered = await fixture.ShouldCompileAndOfferAsync(body, Ct);
 
         // Assert
         offered.ShouldOfferNothing();
@@ -161,46 +137,37 @@ public sealed class SpecSlotBindingTests(SpecCompletionFixture fixture) : IClass
         offered.ShouldOfferNothing();
     }
 
-    [Fact]
-    public async Task AnElementAfterTheFirstOfAParamsCall_OffersTheSameNames()
-    {
-        // Act: a params call expanded at the call site has no argument operation of its own per element,
-        // which is why the binding walks up from the literal's own operation, through the array the compiler
-        // gathers the elements into, to the one argument carrying them all.
-        OfferedList offered = await fixture.ShouldCompileAndOfferAsync(
-            """arch.Types.MustNotImplement("MyApp.Domain.IHandler<T>", "MyApp.Domain.$$");""", Ct);
-
-        // Assert
-        offered.ShouldOffer("IMap<TKey, TValue>");
-    }
-
-    [Fact]
-    public async Task AnElementOfAnExplicitArray_OffersTheSameNames()
+    [Theory]
+    // An element after the first of a params call: expanded at the call site, it has no argument operation
+    // of its own per element, which is why the binding walks up from the literal's own operation, through
+    // the array the compiler gathers the elements into, to the one argument carrying them all.
+    [InlineData("""arch.Types.MustNotImplement("MyApp.Domain.IHandler<T>", "MyApp.Domain.$$");""")]
+    // An element of an explicit array.
+    [InlineData("""arch.Types.MustNotImplement("MyApp.Domain.IHandler<T>", new[] { "MyApp.Domain.$$" });""")]
+    // An element of a collection expression.
+    [InlineData("""arch.Types.MustNotImplement("MyApp.Domain.IHandler<T>", ["MyApp.Domain.$$"]);""")]
+    public async Task AnElementOfAnArrayArgument_OffersTheSameNames(string body)
     {
         // Act
-        OfferedList offered = await fixture.ShouldCompileAndOfferAsync(
-            """arch.Types.MustNotImplement("MyApp.Domain.IHandler<T>", new[] { "MyApp.Domain.$$" });""", Ct);
+        OfferedList offered = await fixture.ShouldCompileAndOfferAsync(body, Ct);
 
         // Assert
         offered.ShouldOffer("IMap<TKey, TValue>");
     }
 
-    [Fact]
-    public async Task AnElementOfACollectionExpression_OffersTheSameNames()
+    [Theory]
+    // A named argument: the ordinal comes off the parameter the argument bound to, not off its position.
+    [InlineData("""arch.Namespace(glob: "MyApp.$$");""")]
+    // A literal in parentheses: parentheses have no operation of their own, so the literal inside them is
+    // the value the slot receives, which is where the spec-literal analyzer reads it too.
+    [InlineData("""arch.Namespace(("MyApp.$$"));""")]
+    // A null-forgiven literal: the null-forgiving operator has no operation of its own either, so the
+    // literal it follows is the value the slot receives.
+    [InlineData("""arch.Namespace("MyApp.$$"!);""")]
+    public async Task ANamedOrWrappedArgument_OffersTheSameNames(string body)
     {
         // Act
-        OfferedList offered = await fixture.ShouldCompileAndOfferAsync(
-            """arch.Types.MustNotImplement("MyApp.Domain.IHandler<T>", ["MyApp.Domain.$$"]);""", Ct);
-
-        // Assert
-        offered.ShouldOffer("IMap<TKey, TValue>");
-    }
-
-    [Fact]
-    public async Task ANamedArgument_OffersTheSameNames()
-    {
-        // Act: the ordinal comes off the parameter the argument bound to, not off its position.
-        OfferedList offered = await fixture.ShouldCompileAndOfferAsync("""arch.Namespace(glob: "MyApp.$$");""", Ct);
+        OfferedList offered = await fixture.ShouldCompileAndOfferAsync(body, Ct);
 
         // Assert
         offered.ShouldOffer("Domain", "Domain.*");
@@ -216,27 +183,5 @@ public sealed class SpecSlotBindingTests(SpecCompletionFixture fixture) : IClass
 
         // Assert
         offered.ShouldOffer("IHandler<T>", "IMap<TKey, TValue>");
-    }
-
-    [Fact]
-    public async Task ALiteralInParentheses_OffersTheSameNames()
-    {
-        // Act: parentheses have no operation of their own, so the literal inside them is the value the slot
-        // receives, which is where the spec-literal analyzer reads it too.
-        OfferedList offered = await fixture.ShouldCompileAndOfferAsync("""arch.Namespace(("MyApp.$$"));""", Ct);
-
-        // Assert
-        offered.ShouldOffer("Domain", "Domain.*");
-    }
-
-    [Fact]
-    public async Task ANullForgivenLiteral_OffersTheSameNames()
-    {
-        // Act: the null-forgiving operator has no operation of its own either, so the literal it follows is
-        // the value the slot receives.
-        OfferedList offered = await fixture.ShouldCompileAndOfferAsync("""arch.Namespace("MyApp.$$"!);""", Ct);
-
-        // Assert
-        offered.ShouldOffer("Domain", "Domain.*");
     }
 }

@@ -57,7 +57,7 @@ public sealed class McpLaunchScriptTests
 
         ChildProcess.ProcessResult result = lab.Launch("MyApp.sln", "--spec", "./Spec.dll");
 
-        result.ShouldHaveLaunchedSilently();
+        result.ShouldHaveExitedWith(0);
 
         string[] argv = lab.ExecutedArguments();
         argv.ShouldBe(["exec", lab.StagedServerDll(), "mcp", "MyApp.sln", "--spec", "./Spec.dll"]);
@@ -82,7 +82,7 @@ public sealed class McpLaunchScriptTests
 
         ChildProcess.ProcessResult result = lab.Launch("MyApp.sln");
 
-        result.ShouldHaveLaunchedSilently();
+        result.ShouldHaveExitedWith(0);
         lab.ExecedServerDll()
             .ShouldBe(first);
         string staged = lab.StagedDirectories()
@@ -102,7 +102,7 @@ public sealed class McpLaunchScriptTests
         lab.WriteBuildOutput("a rebuilt CLI, of a different size");
         ChildProcess.ProcessResult result = lab.Launch("MyApp.sln");
 
-        result.ShouldHaveLaunchedSilently();
+        result.ShouldHaveExitedWith(0);
         string afterRebuild = lab.ExecedServerDll();
         afterRebuild.ShouldNotBe(
             beforeRebuild, "a rebuild has to be picked up, or the client is served the previous build forever.");
@@ -123,7 +123,7 @@ public sealed class McpLaunchScriptTests
 
         ChildProcess.ProcessResult result = lab.Launch("MyApp.sln");
 
-        result.ShouldHaveLaunchedSilently(exitCode: 1);
+        result.ShouldHaveExitedWith(1);
         result.StandardError.ShouldContain("not-built/sliderule-cli.dll not found");
         lab.Executed.ShouldBeFalse("there was nothing to run, so nothing should have been execed.");
     }
@@ -142,7 +142,7 @@ public sealed class McpLaunchScriptTests
 
         ChildProcess.ProcessResult result = lab.Launch("MyApp.sln");
 
-        result.ShouldHaveLaunchedSilently();
+        result.ShouldHaveExitedWith(0);
         result.StandardError.ShouldContain("could not stage a copy");
         lab.ExecedServerDll()
             .ShouldBe($"{lab.BuildOutput}/{ServerDll}");
@@ -161,7 +161,7 @@ public sealed class McpLaunchScriptTests
         lab.WriteSiblingDll("a rebuilt dependency, of a different size");
         ChildProcess.ProcessResult result = lab.Launch("MyApp.sln");
 
-        result.ShouldHaveLaunchedSilently();
+        result.ShouldHaveExitedWith(0);
         string afterRebuild = lab.ExecedServerDll();
         afterRebuild.ShouldNotBe(
             beforeRebuild, "a copy keyed on the entry assembly alone goes on serving the dependency from before the rebuild.");
@@ -184,7 +184,7 @@ public sealed class McpLaunchScriptTests
 
         ChildProcess.ProcessResult result = lab.Launch("MyApp.sln");
 
-        result.ShouldHaveLaunchedSilently();
+        result.ShouldHaveExitedWith(0);
         lab.ExecedServerDll()
             .ShouldBe(
                 lab.StagedServerDll(),
@@ -201,7 +201,7 @@ public sealed class McpLaunchScriptTests
 
         ChildProcess.ProcessResult result = lab.Launch("MyApp.sln");
 
-        result.ShouldHaveLaunchedSilently();
+        result.ShouldHaveExitedWith(0);
         string published = lab.StagedDirectories()
             .ShouldHaveSingleItem("the copy taken while the build wrote must be discarded, not published beside the stable one.");
         lab.ExecedServerDll()
@@ -222,7 +222,7 @@ public sealed class McpLaunchScriptTests
 
         ChildProcess.ProcessResult result = lab.Launch("MyApp.sln");
 
-        result.ShouldHaveLaunchedSilently();
+        result.ShouldHaveExitedWith(0);
         lab.CopiesTaken.ShouldBe(
             2,
             "one copy the build wrote into and one once it held still: every copy taken while the build is still "
@@ -243,7 +243,7 @@ public sealed class McpLaunchScriptTests
 
         ChildProcess.ProcessResult result = lab.Launch("MyApp.sln");
 
-        result.ShouldHaveLaunchedSilently();
+        result.ShouldHaveExitedWith(0);
         result.StandardError.ShouldContain("kept changing");
         lab.CopiesTaken.ShouldBe(1, "a build that never holds still is waited on, not copied again at every look.");
         string unpublished = lab.StagedDirectories()
@@ -267,7 +267,7 @@ public sealed class McpLaunchScriptTests
 
         ChildProcess.ProcessResult result = lab.Launch("MyApp.sln");
 
-        result.ShouldHaveLaunchedSilently();
+        result.ShouldHaveExitedWith(0);
         result.StandardError.ShouldContain("could not stage a copy");
         lab.ExecedServerDll()
             .ShouldBe(
@@ -285,7 +285,7 @@ public sealed class McpLaunchScriptTests
 
         ChildProcess.ProcessResult result = lab.Launch("MyApp.sln");
 
-        result.ShouldHaveLaunchedSilently();
+        result.ShouldHaveExitedWith(0);
         result.StandardError.ShouldContain("could not stage a copy");
         lab.CopiesTaken.ShouldBe(1, "with nothing writing the build, a second copy fails the way the first did.");
         lab.ExecedServerDll()
@@ -314,7 +314,7 @@ public sealed class McpLaunchScriptTests
 
         ChildProcess.ProcessResult result = lab.Launch("MyApp.sln");
 
-        result.ShouldHaveLaunchedSilently();
+        result.ShouldHaveExitedWith(0);
         lab.ExecedServerDll()
             .ShouldBe(
                 ShellInterpreter.Posix(Path.Combine(copy, ServerDll)),
@@ -345,7 +345,7 @@ public sealed class McpLaunchScriptTests
 
         ChildProcess.ProcessResult result = lab.Launch("MyApp.sln");
 
-        result.ShouldHaveLaunchedSilently();
+        result.ShouldHaveExitedWith(0);
         Directory.Exists(aged)
             .ShouldBeFalse(
                 "a copy nothing has launched from in five days outlived the sweep, so copies of old builds pile up "
@@ -373,11 +373,10 @@ public sealed class McpLaunchScriptTests
         private readonly string _copiesFile;
         private readonly string _secondsWaitedFile;
         private readonly string _stubDirectory;
+        private readonly TempDirectory _temp = TestTempRoot.Fresh("mcp-launcher");
 
         internal Lab()
         {
-            Root = Path.Combine(TestTempRoot.For("mcp-launcher"), Guid.NewGuid()
-                .ToString("N"));
             ProjectDirectory = Path.Combine(Root, "project");
             RunRoot = Path.Combine(Root, "copies");
             _stubDirectory = Path.Combine(Root, "stub");
@@ -395,7 +394,7 @@ public sealed class McpLaunchScriptTests
             WriteBuildOutput("a built CLI");
         }
 
-        internal string Root { get; }
+        internal string Root => _temp.Path;
 
         private string ProjectDirectory { get; }
 
@@ -421,14 +420,7 @@ public sealed class McpLaunchScriptTests
 
         public void Dispose()
         {
-            try
-            {
-                Directory.Delete(Root, true);
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                // The run-scoped temp root is swept by a later run; a locked file here is not a test failure.
-            }
+            _temp.Dispose();
         }
 
         /// <summary>Writes the fake build output: the file the copy is keyed on, and one sibling beside it.</summary>

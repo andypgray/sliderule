@@ -75,19 +75,21 @@ public sealed class HierarchyConstructionTests
             .ShouldBe(["N.IApple", "N.IZebra"]);
     }
 
-    [Fact]
-    public void BaseTypeChain_ClassHierarchy_IsNearestFirstToObject()
+    // The chain is nearest first and ends at object for every kind that has one; an interface has none.
+    [Theory]
+    [InlineData("public class A {} public class B : A {} public class D : B {}", "N.D", "N.B", "N.A", "System.Object")]
+    [InlineData("public struct S {}", "N.S", "System.ValueType", "System.Object")]
+    [InlineData("public enum E { A, B }", "N.E", "System.Enum", "System.ValueType", "System.Object")]
+    [InlineData("public delegate void D();", "N.D", "System.MulticastDelegate", "System.Delegate", "System.Object")]
+    [InlineData("public interface I {}", "N.I")]
+    public void BaseTypeChain_EachKind_IsNearestFirstToObject(
+        string declarations, string fullName, params string[] expected)
     {
-        CodebaseModel model = CompilationFactory.Extract("""
-                                                         namespace N;
-                                                         public class A {}
-                                                         public class B : A {}
-                                                         public class D : B {}
-                                                         """);
+        CodebaseModel model = CompilationFactory.Extract($"namespace N;\n{declarations}");
 
-        model.Type("N.D")
+        model.Type(fullName)
             .BaseTypeChain.Select(c => c.FullName)
-            .ShouldBe(["N.B", "N.A", "System.Object"]);
+            .ShouldBe(expected);
     }
 
     [Fact]
@@ -104,57 +106,6 @@ public sealed class HierarchyConstructionTests
             .BaseTypeChain[0];
         nearest.Definition.FullName.ShouldBe("N.HandlerBase<T>");
         nearest.FullName.ShouldBe("N.HandlerBase<N.Order>");
-    }
-
-    [Fact]
-    public void BaseTypeChain_Struct_IsValueTypeThenObject()
-    {
-        CodebaseModel model = CompilationFactory.Extract("""
-                                                         namespace N;
-                                                         public struct S {}
-                                                         """);
-
-        model.Type("N.S")
-            .BaseTypeChain.Select(c => c.FullName)
-            .ShouldBe(["System.ValueType", "System.Object"]);
-    }
-
-    [Fact]
-    public void BaseTypeChain_Enum_IsEnumThenValueTypeThenObject()
-    {
-        CodebaseModel model = CompilationFactory.Extract("""
-                                                         namespace N;
-                                                         public enum E { A, B }
-                                                         """);
-
-        model.Type("N.E")
-            .BaseTypeChain.Select(c => c.FullName)
-            .ShouldBe(["System.Enum", "System.ValueType", "System.Object"]);
-    }
-
-    [Fact]
-    public void BaseTypeChain_Delegate_IsMulticastDelegateThenDelegateThenObject()
-    {
-        CodebaseModel model = CompilationFactory.Extract("""
-                                                         namespace N;
-                                                         public delegate void D();
-                                                         """);
-
-        model.Type("N.D")
-            .BaseTypeChain.Select(c => c.FullName)
-            .ShouldBe(["System.MulticastDelegate", "System.Delegate", "System.Object"]);
-    }
-
-    [Fact]
-    public void BaseTypeChain_Interface_IsEmpty()
-    {
-        CodebaseModel model = CompilationFactory.Extract("""
-                                                         namespace N;
-                                                         public interface I {}
-                                                         """);
-
-        model.Type("N.I")
-            .BaseTypeChain.ShouldBeEmpty();
     }
 
     [Fact]

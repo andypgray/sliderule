@@ -7,8 +7,8 @@ namespace SlideRule.Tests.Checking;
 
 /// <summary>
 ///     The checker over the real MyApp fixture, reusing the shared <see cref="WorkspaceFixture.Model" />
-///     (no extra MSBuild load): the <c>layering/domain-independent</c> rule fires with a locatable site, a
-///     clean rule passes, and the I-prefix naming rule holds.
+///     (no extra MSBuild load): the <c>layering/domain-independent</c> rule fires with a locatable site. The
+///     clean verdicts over the same fixture are the oracle's rows.
 /// </summary>
 public sealed class CheckerFixtureIntegrationTests(WorkspaceFixture fixture)
 {
@@ -33,27 +33,5 @@ public sealed class CheckerFixtureIntegrationTests(WorkspaceFixture fixture)
             .ShouldContain("MyApp.Domain/OrderService.cs");
         homeController.Sites.Select(s => s.Line)
             .ShouldContain(9);
-    }
-
-    [Fact]
-    public void BillingMustNotReferenceWeb_Passes()
-    {
-        Checker.Run(fixture.Model, arch =>
-                arch.Rule("layering/billing-independent")
-                    .Enforce(arch.Namespace("MyApp.Legacy.Billing.*").MustNotReference(arch.Namespace("MyApp.Web.*")))
-                    .Because("Billing must not reach up into the web layer."))
-            .Single()
-            .ShouldHavePassed();
-    }
-
-    [Fact]
-    public void InterfaceIPrefixNaming_Holds()
-    {
-        Checker.Run(fixture.Model, arch =>
-                arch.Rule("naming/interfaces")
-                    .Enforce(arch.Types.OfKind(TypeKind.Interface).InNamespace("MyApp.*").MustHavePrefix("I"))
-                    .Because("House naming convention; agents grep by I-prefix."))
-            .Single()
-            .ShouldHavePassed();
     }
 }

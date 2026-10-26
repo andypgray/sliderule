@@ -106,6 +106,18 @@ internal static class CompilationFactory
         return new CompilationInput(CreateCompilation(projectName, references, files), projectName, []);
     }
 
+    /// <summary>
+    ///     One framework's compilation of project <c>Shared</c>, declaring <c>Shared.Widget</c>. Two calls with
+    ///     different frameworks make a multi-targeted project whose frameworks share a type.
+    /// </summary>
+    public static CompilationInput SharedWidgetFramework(string targetFramework)
+    {
+        return Compile("Shared", ("Widget.cs", "namespace Shared { public class Widget {} }")) with
+        {
+            TargetFramework = targetFramework
+        };
+    }
+
     /// <summary>The runtime core library — the one metadata reference the MSBuild-free path needs.</summary>
     public static MetadataReference CoreLibrary { get; } = TrustedPlatform.At(typeof(object).Assembly.Location);
 

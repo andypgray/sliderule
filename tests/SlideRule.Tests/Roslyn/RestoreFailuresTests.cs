@@ -110,19 +110,6 @@ public sealed class RestoreFailuresTests
     }
 
     [Fact]
-    public void Detect_AssetsFileWithNoLogsKey_IsNotAFailure()
-    {
-        // The negative control, and the shape almost every project on disk has: a clean restore writes no
-        // logs key, so "no key" must read as success rather than as something missing.
-        using TempDirectory temp = TestTempRoot.Fresh("restore-clean");
-        string csproj = WriteAssets(temp, "Core", CleanAssets);
-        using var workspace = new AdhocWorkspace();
-
-        RestoreFailures.Detect(SolutionOf(workspace, csproj), [])
-            .ShouldBeEmpty();
-    }
-
-    [Fact]
     public void Detect_AssetsFileWithOnlyWarningLogs_IsNotAFailure()
     {
         // NU1510 is a pruning advisory that a solution whose rules all pass can carry. It is level Warning,
@@ -209,9 +196,10 @@ public sealed class RestoreFailuresTests
     [Fact]
     public void Detect_SdkStyleProjectWithACleanAssetsFile_IsNotAFailure()
     {
-        // The negative control the second arm needs, and the shape almost every SDK-style project on disk
-        // has: being SDK-style is only ever a reason to read the absence of an assets file, never a finding
-        // of its own. A file that is there decides on its own contents.
+        // The negative control for both arms, and the shape almost every SDK-style project on disk has. A
+        // clean restore writes no logs key, so "no key" must read as success rather than as something
+        // missing; and being SDK-style is only ever a reason to read the absence of an assets file, never a
+        // finding of its own. A file that is there decides on its own contents.
         using TempDirectory temp = TestTempRoot.Fresh("restore-sdk-clean");
         string csproj = WriteAssets(temp, "Core", CleanAssets);
         File.WriteAllText(csproj, SdkStyleProjectXml);

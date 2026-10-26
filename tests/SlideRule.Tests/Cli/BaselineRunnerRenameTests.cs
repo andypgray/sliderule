@@ -6,6 +6,7 @@ using SlideRule.Roslyn;
 using SlideRule.Tests.Checking;
 using SlideRule.Tests.TestSupport;
 using Xunit;
+using static SlideRule.Tests.TestSupport.TextNormalization;
 
 namespace SlideRule.Tests.Cli;
 
@@ -54,7 +55,7 @@ public sealed class BaselineRunnerRenameTests : IDisposable
             "data-access/no-inline-sql: renamed from data-access/inline-sql, moving 2 grandfathered entries.\n"
             + "wrote arch/baselines/data-access/no-inline-sql.json\n"
             + "deleted arch/baselines/data-access/inline-sql.json\n");
-        ReadText(destination).ShouldBe(BaselineComposer.Compose(To, Counted, Bare));
+        ReadNormalizedLines(destination).ShouldBe(BaselineComposer.Compose(To, Counted, Bare));
         File.Exists(source).ShouldBeFalse();
     }
 
@@ -74,7 +75,7 @@ public sealed class BaselineRunnerRenameTests : IDisposable
         output.ShouldBe(
             "data-access/no-inline-sql: renamed from data-access/inline-sql, moving 1 grandfathered entry.\n"
             + "wrote arch/shared.json\n");
-        ReadText(shared).ShouldBe(BaselineComposer.Compose((To, [Counted]), ("other/rule", [Bare])));
+        ReadNormalizedLines(shared).ShouldBe(BaselineComposer.Compose((To, [Counted]), ("other/rule", [Bare])));
     }
 
     [Fact]
@@ -96,8 +97,8 @@ public sealed class BaselineRunnerRenameTests : IDisposable
             "data-access/no-inline-sql: renamed from data-access/inline-sql, moving 1 grandfathered entry.\n"
             + "wrote arch/baselines/data-access/no-inline-sql.json\n"
             + "wrote arch/baselines/data-access/inline-sql.json\n");
-        ReadText(destination).ShouldBe(BaselineComposer.Compose(To, Counted));
-        ReadText(source).ShouldBe(BaselineComposer.Compose("legacy/kept", Bare));
+        ReadNormalizedLines(destination).ShouldBe(BaselineComposer.Compose(To, Counted));
+        ReadNormalizedLines(source).ShouldBe(BaselineComposer.Compose("legacy/kept", Bare));
     }
 
     [Fact]
@@ -118,7 +119,7 @@ public sealed class BaselineRunnerRenameTests : IDisposable
             "data-access/no-inline-sql: renamed from data-access/inline-sql, moving 2 grandfathered entries.\n"
             + "wrote arch/baselines/data-access/no-inline-sql.json\n"
             + "deleted arch/baselines/legacy.json\n");
-        ReadText(destination).ShouldBe(BaselineComposer.Compose(To, Counted, Bare));
+        ReadNormalizedLines(destination).ShouldBe(BaselineComposer.Compose(To, Counted, Bare));
         File.Exists(source).ShouldBeFalse();
     }
 
@@ -147,8 +148,8 @@ public sealed class BaselineRunnerRenameTests : IDisposable
             "data-access/no-inline-sql: renamed from data-access/inline-sql, moving 1 grandfathered entry.\n"
             + "wrote arch/baselines/data-access/no-inline-sql.json\n"
             + "wrote arch/shared.json\n");
-        ReadText(destination).ShouldBe(BaselineComposer.Compose(To, Counted));
-        ReadText(shared).ShouldBe(BaselineComposer.Compose("other/rule", Bare));
+        ReadNormalizedLines(destination).ShouldBe(BaselineComposer.Compose(To, Counted));
+        ReadNormalizedLines(shared).ShouldBe(BaselineComposer.Compose("other/rule", Bare));
     }
 
     [Fact]
@@ -166,8 +167,8 @@ public sealed class BaselineRunnerRenameTests : IDisposable
             "baseline sections for 'data-access/inline-sql' are filed in arch/baselines/data-access/inline-sql.json "
             + "and arch/baselines/legacy.json; nothing was renamed. Delete every copy but the one to keep, then run "
             + "the rename again.");
-        ReadText(conventional).ShouldBe(conventionalText);
-        ReadText(legacy).ShouldBe(legacyText);
+        ReadNormalizedLines(conventional).ShouldBe(conventionalText);
+        ReadNormalizedLines(legacy).ShouldBe(legacyText);
         File.Exists(_temp.PathOf("arch", "baselines", "data-access", "no-inline-sql.json")).ShouldBeFalse();
     }
 
@@ -185,8 +186,8 @@ public sealed class BaselineRunnerRenameTests : IDisposable
         ShouldRefuse(model).ShouldBe(
             "rule 'data-access/no-inline-sql' already has a baseline section in "
             + "arch/baselines/data-access/no-inline-sql.json; nothing was renamed.");
-        ReadText(source).ShouldBe(sourceText);
-        ReadText(destination).ShouldBe(destinationText);
+        ReadNormalizedLines(source).ShouldBe(sourceText);
+        ReadNormalizedLines(destination).ShouldBe(destinationText);
     }
 
     [Fact]
@@ -219,7 +220,7 @@ public sealed class BaselineRunnerRenameTests : IDisposable
         string refusal = ShouldRefuse(model);
         refusal.ShouldContain("failed its integrity check");
         refusal.ShouldContain("If that entry was edited by hand, restore its line from version control.");
-        ReadText(source).ShouldBe(tampered);
+        ReadNormalizedLines(source).ShouldBe(tampered);
         File.Exists(_temp.PathOf("arch", "baselines", "data-access", "no-inline-sql.json")).ShouldBeFalse();
     }
 
@@ -237,7 +238,7 @@ public sealed class BaselineRunnerRenameTests : IDisposable
 
         refusal.ShouldContain("failed its integrity check");
         refusal.ShouldContain("If that entry was edited by hand, restore its line from version control.");
-        ReadText(shared).ShouldBe(tampered);
+        ReadNormalizedLines(shared).ShouldBe(tampered);
     }
 
     [Fact]
@@ -353,11 +354,5 @@ public sealed class BaselineRunnerRenameTests : IDisposable
     private string WriteBaseline(string relativePath, string text)
     {
         return _temp.WriteFile(relativePath.Split('/'), text);
-    }
-
-    private static string ReadText(string path)
-    {
-        return File.ReadAllText(path)
-            .NormalizedLines();
     }
 }

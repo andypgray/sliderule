@@ -1062,36 +1062,6 @@ public sealed class FragmentMergeTests
     }
 
     [Fact]
-    public void ExtractFromCompilations_TwoFrameworksOfOneDeclarerMakingOneEdge_RecordOneInstance()
-    {
-        // Several frameworks of one project are one project: the edge both make is one instance, not two.
-        const string copy = "namespace Drift { public class Formatter { public Cells.Cell C; } } namespace Cells { public class Cell {} }";
-        CompilationInput older = CompilationFactory.Compile("Core", ("Core/Formatter.cs", copy)) with { TargetFramework = "net8.0" };
-        CompilationInput newer = CompilationFactory.Compile("Core", ("Core/Formatter.cs", copy)) with { TargetFramework = "net10.0" };
-        CompilationInput satellite = CompilationFactory.Compile("Satellite", ("Satellite/Formatter.cs", FormatterSource));
-
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([older, newer, satellite]);
-
-        ReferenceEdge reference = model.Edge("Drift.Formatter", "Cells.Cell");
-        InstancesOf(reference.Evidence.Instances)
-            .ShouldBe([("Core", "Core")]);
-    }
-
-    [Fact]
-    public void ExtractFromCompilations_FrameworkThatLeavesOutItsProjectsCopy_RecordsTheCopyThatFrameworkBound()
-    {
-        // One project, two frameworks: the older declares Formatter itself, as a #if-guarded polyfill would, and the
-        // newer leaves it out and binds Core's copy through a real reference. Each compilation reached a different
-        // copy, so the one edge both make is two instances, and asking the project whether it declares the name
-        // would have folded the newer framework's reference into the project's own copy.
-        CodebaseModel model = FrameworkWithoutItsProjectsCopy();
-
-        ReferenceEdge fromPage = model.Edge("App.Page", "Drift.Formatter");
-        InstancesOf(fromPage.Evidence.Instances)
-            .ShouldBe([("App", "App"), ("App", "Core")]);
-    }
-
-    [Fact]
     public void ExtractFromCompilations_EdgeBetweenNamesOneProjectEachDeclares_RecordsNoInstances()
     {
         // The degenerate case, beside a shared name so the merge is recording at all: an edge neither of whose
@@ -1223,7 +1193,10 @@ public sealed class FragmentMergeTests
     [Fact]
     public void ExtractFromCompilations_FrameworkThatLeavesOutItsProjectsCopy_ShareTheSiteBothFrameworksMade()
     {
-        // The same reference under two frameworks that bound DIFFERENT copies: two instances, and one site made
+        // One project, two frameworks: the older declares Formatter itself, as a #if-guarded polyfill would, and the
+        // newer leaves it out and binds Core's copy through a real reference. Each compilation reached a different
+        // copy, so the one edge both make is two instances, and asking the project whether it declares the name
+        // would have folded the newer framework's reference into the project's own copy. There is one site, made
         // from one line of one file by both compilations. Each instance holds that site — the same object, not
         // a copy — because the merge unions sites and never partitions them, which is the invariant the
         // checker's by-reference filter over several instances' evidence rests on.

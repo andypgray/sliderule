@@ -61,102 +61,30 @@ public sealed class HierarchyVerbTests
             .ShouldBe([$"{T}Tagged"]);
     }
 
-    [Fact]
-    public void MustImplement_HoldsForImplementer_FailsForNonImplementer()
+    // Each verb and its negative twin (GRAMMAR §5.3) over one anchor, spelled as a typeof and as the
+    // definition's full-name string (GRAMMAR §5.2): the green prefix passes and the red prefix's type is the
+    // one subject flagged. A twin reds where the positive matches the anchor and passes on the inverse.
+    [Theory]
+    [InlineData("MustImplement", typeof(IThing), "Widget", "Gizmo")]
+    [InlineData("MustImplement", T + "IThing", "Widget", "Gizmo")]
+    [InlineData("MustNotImplement", typeof(IThing), "Gizmo", "Widget")]
+    [InlineData("MustNotImplement", T + "IThing", "Gizmo", "Widget")]
+    [InlineData("MustDeriveFrom", typeof(ThingBase), "SubType", "FreeType")]
+    [InlineData("MustDeriveFrom", T + "ThingBase", "SubType", "FreeType")]
+    [InlineData("MustNotDeriveFrom", typeof(ThingBase), "FreeType", "SubType")]
+    [InlineData("MustNotDeriveFrom", T + "ThingBase", "FreeType", "SubType")]
+    [InlineData("MustBeAttributedWith", typeof(MarkAttribute), "Tagged", "Plain")]
+    [InlineData("MustBeAttributedWith", T + "MarkAttribute", "Tagged", "Plain")]
+    [InlineData("MustNotBeAttributedWith", typeof(MarkAttribute), "Plain", "Tagged")]
+    [InlineData("MustNotBeAttributedWith", T + "MarkAttribute", "Plain", "Tagged")]
+    public void HierarchyVerb_PassesTheGreenPrefix_FlagsTheRedPrefix(
+        string verb, object anchor, string green, string red)
     {
-        Checker.Run(Model, arch => arch.Rule("h/x")
-                .Enforce(arch.Types.WithPrefix("Widget").MustImplement(typeof(IThing)))
-                .Because("b"))
-            .Single()
+        Checker.Verdict(Model, arch => HierarchyVerb(arch.Types.WithPrefix(green), verb, anchor))
             .ShouldHavePassed();
 
-        RuleResult failing = Checker.Run(Model, arch => arch.Rule("h/x")
-                .Enforce(arch.Types.WithPrefix("Gizmo").MustImplement(typeof(IThing)))
-                .Because("b"))
-            .Single();
-        failing.ShouldHaveFailedWithSubjects([$"{T}Gizmo"]);
-    }
-
-    [Fact]
-    public void MustDeriveFrom_HoldsForDeriver_FailsForNonDeriver()
-    {
-        Checker.Run(Model, arch => arch.Rule("h/x")
-                .Enforce(arch.Types.WithPrefix("SubType").MustDeriveFrom(typeof(ThingBase)))
-                .Because("b"))
-            .Single()
-            .ShouldHavePassed();
-
-        Checker.Run(Model, arch => arch.Rule("h/x")
-                .Enforce(arch.Types.WithPrefix("FreeType").MustDeriveFrom(typeof(ThingBase)))
-                .Because("b"))
-            .Single()
-            .ShouldHaveFailedWithSubjects([$"{T}FreeType"]);
-    }
-
-    [Fact]
-    public void MustBeAttributedWith_HoldsForAttributed_FailsForBare()
-    {
-        Checker.Run(Model, arch => arch.Rule("h/x")
-                .Enforce(arch.Types.WithPrefix("Tagged").MustBeAttributedWith(typeof(MarkAttribute)))
-                .Because("b"))
-            .Single()
-            .ShouldHavePassed();
-
-        Checker.Run(Model, arch => arch.Rule("h/x")
-                .Enforce(arch.Types.WithPrefix("Plain").MustBeAttributedWith(typeof(MarkAttribute)))
-                .Because("b"))
-            .Single()
-            .ShouldHaveFailedWithSubjects([$"{T}Plain"]);
-    }
-
-    // ── negative twins: red where the positive matches an anchor, green on the inverse (GRAMMAR §5.3) ──
-
-    [Fact]
-    public void MustNotImplement_RedsImplementer_PassesForNonImplementer()
-    {
-        Checker.Run(Model, arch => arch.Rule("h/x")
-                .Enforce(arch.Types.WithPrefix("Widget").MustNotImplement(typeof(IThing)))
-                .Because("b"))
-            .Single()
-            .ShouldHaveFailedWithSubjects([$"{T}Widget"]);
-
-        Checker.Run(Model, arch => arch.Rule("h/x")
-                .Enforce(arch.Types.WithPrefix("Gizmo").MustNotImplement(typeof(IThing)))
-                .Because("b"))
-            .Single()
-            .ShouldHavePassed();
-    }
-
-    [Fact]
-    public void MustNotDeriveFrom_RedsDeriver_PassesForNonDeriver()
-    {
-        Checker.Run(Model, arch => arch.Rule("h/x")
-                .Enforce(arch.Types.WithPrefix("SubType").MustNotDeriveFrom(typeof(ThingBase)))
-                .Because("b"))
-            .Single()
-            .ShouldHaveFailedWithSubjects([$"{T}SubType"]);
-
-        Checker.Run(Model, arch => arch.Rule("h/x")
-                .Enforce(arch.Types.WithPrefix("FreeType").MustNotDeriveFrom(typeof(ThingBase)))
-                .Because("b"))
-            .Single()
-            .ShouldHavePassed();
-    }
-
-    [Fact]
-    public void MustNotBeAttributedWith_RedsAttributed_PassesForBare()
-    {
-        Checker.Run(Model, arch => arch.Rule("h/x")
-                .Enforce(arch.Types.WithPrefix("Tagged").MustNotBeAttributedWith(typeof(MarkAttribute)))
-                .Because("b"))
-            .Single()
-            .ShouldHaveFailedWithSubjects([$"{T}Tagged"]);
-
-        Checker.Run(Model, arch => arch.Rule("h/x")
-                .Enforce(arch.Types.WithPrefix("Plain").MustNotBeAttributedWith(typeof(MarkAttribute)))
-                .Because("b"))
-            .Single()
-            .ShouldHavePassed();
+        Checker.Verdict(Model, arch => HierarchyVerb(arch.Types.WithPrefix(red), verb, anchor))
+            .ShouldHaveFailedWithSubjects([$"{T}{red}"]);
     }
 
     // ── open-vs-closed generic anchors, negated (GRAMMAR §5.2) ──
@@ -250,38 +178,6 @@ public sealed class HierarchyVerbTests
         // MarkAttribute by FQN string picks out the identical subject.
         Checker.Selects(Model, arch => arch.Types.AttributedWith($"{T}MarkAttribute"))
             .ShouldBe([$"{T}Tagged"]);
-    }
-
-    [Fact]
-    public void MustBeAttributedWith_StringAnchor_HoldsForAttributed_FailsForBare()
-    {
-        Checker.Run(Model, arch => arch.Rule("h/x")
-                .Enforce(arch.Types.WithPrefix("Tagged").MustBeAttributedWith($"{T}MarkAttribute"))
-                .Because("b"))
-            .Single()
-            .ShouldHavePassed();
-
-        Checker.Run(Model, arch => arch.Rule("h/x")
-                .Enforce(arch.Types.WithPrefix("Plain").MustBeAttributedWith($"{T}MarkAttribute"))
-                .Because("b"))
-            .Single()
-            .ShouldHaveFailedWithSubjects([$"{T}Plain"]);
-    }
-
-    [Fact]
-    public void MustNotBeAttributedWith_StringAnchor_RedsAttributed_PassesForBare()
-    {
-        Checker.Run(Model, arch => arch.Rule("h/x")
-                .Enforce(arch.Types.WithPrefix("Tagged").MustNotBeAttributedWith($"{T}MarkAttribute"))
-                .Because("b"))
-            .Single()
-            .ShouldHaveFailedWithSubjects([$"{T}Tagged"]);
-
-        Checker.Run(Model, arch => arch.Rule("h/x")
-                .Enforce(arch.Types.WithPrefix("Plain").MustNotBeAttributedWith($"{T}MarkAttribute"))
-                .Because("b"))
-            .Single()
-            .ShouldHavePassed();
     }
 
     [Fact]
@@ -384,70 +280,6 @@ public sealed class HierarchyVerbTests
     }
 
     [Fact]
-    public void MustImplement_StringAnchor_HoldsForImplementer_FailsForNonImplementer()
-    {
-        Checker.Run(Model, arch => arch.Rule("h/x")
-                .Enforce(arch.Types.WithPrefix("Widget").MustImplement($"{T}IThing"))
-                .Because("b"))
-            .Single()
-            .ShouldHavePassed();
-
-        Checker.Run(Model, arch => arch.Rule("h/x")
-                .Enforce(arch.Types.WithPrefix("Gizmo").MustImplement($"{T}IThing"))
-                .Because("b"))
-            .Single()
-            .ShouldHaveFailedWithSubjects([$"{T}Gizmo"]);
-    }
-
-    [Fact]
-    public void MustNotImplement_StringAnchor_RedsImplementer_PassesForNonImplementer()
-    {
-        Checker.Run(Model, arch => arch.Rule("h/x")
-                .Enforce(arch.Types.WithPrefix("Widget").MustNotImplement($"{T}IThing"))
-                .Because("b"))
-            .Single()
-            .ShouldHaveFailedWithSubjects([$"{T}Widget"]);
-
-        Checker.Run(Model, arch => arch.Rule("h/x")
-                .Enforce(arch.Types.WithPrefix("Gizmo").MustNotImplement($"{T}IThing"))
-                .Because("b"))
-            .Single()
-            .ShouldHavePassed();
-    }
-
-    [Fact]
-    public void MustDeriveFrom_StringAnchor_HoldsForDeriver_FailsForNonDeriver()
-    {
-        Checker.Run(Model, arch => arch.Rule("h/x")
-                .Enforce(arch.Types.WithPrefix("SubType").MustDeriveFrom($"{T}ThingBase"))
-                .Because("b"))
-            .Single()
-            .ShouldHavePassed();
-
-        Checker.Run(Model, arch => arch.Rule("h/x")
-                .Enforce(arch.Types.WithPrefix("FreeType").MustDeriveFrom($"{T}ThingBase"))
-                .Because("b"))
-            .Single()
-            .ShouldHaveFailedWithSubjects([$"{T}FreeType"]);
-    }
-
-    [Fact]
-    public void MustNotDeriveFrom_StringAnchor_RedsDeriver_PassesForNonDeriver()
-    {
-        Checker.Run(Model, arch => arch.Rule("h/x")
-                .Enforce(arch.Types.WithPrefix("SubType").MustNotDeriveFrom($"{T}ThingBase"))
-                .Because("b"))
-            .Single()
-            .ShouldHaveFailedWithSubjects([$"{T}SubType"]);
-
-        Checker.Run(Model, arch => arch.Rule("h/x")
-                .Enforce(arch.Types.WithPrefix("FreeType").MustNotDeriveFrom($"{T}ThingBase"))
-                .Because("b"))
-            .Single()
-            .ShouldHavePassed();
-    }
-
-    [Fact]
     public void MustNotImplement_StringAnchorList_RedsOnAnyAnchor()
     {
         // None-of over a homogeneous string list: Widget implements only IThing, and the list reds it
@@ -525,5 +357,25 @@ public sealed class HierarchyVerbTests
         // Non-vacuous, and the selection is not merely the direct deriver: IndirectDeriver reaches the anchor
         // through System.ArgumentException, so both arms walked a chain of external constructions to get there.
         typed.ShouldBe([$"{T}DirectDeriver", $"{T}IndirectDeriver"]);
+    }
+
+    private static Constraint HierarchyVerb(Selection subject, string verb, object anchor)
+    {
+        return (verb, anchor) switch
+        {
+            ("MustImplement", Type type) => subject.MustImplement(type),
+            ("MustImplement", string name) => subject.MustImplement(name),
+            ("MustNotImplement", Type type) => subject.MustNotImplement(type),
+            ("MustNotImplement", string name) => subject.MustNotImplement(name),
+            ("MustDeriveFrom", Type type) => subject.MustDeriveFrom(type),
+            ("MustDeriveFrom", string name) => subject.MustDeriveFrom(name),
+            ("MustNotDeriveFrom", Type type) => subject.MustNotDeriveFrom(type),
+            ("MustNotDeriveFrom", string name) => subject.MustNotDeriveFrom(name),
+            ("MustBeAttributedWith", Type type) => subject.MustBeAttributedWith(type),
+            ("MustBeAttributedWith", string name) => subject.MustBeAttributedWith(name),
+            ("MustNotBeAttributedWith", Type type) => subject.MustNotBeAttributedWith(type),
+            ("MustNotBeAttributedWith", string name) => subject.MustNotBeAttributedWith(name),
+            _ => throw new ArgumentOutOfRangeException(nameof(verb), verb, "No hierarchy verb takes this anchor.")
+        };
     }
 }

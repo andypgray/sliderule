@@ -39,7 +39,7 @@ public sealed class PackageShadowedNameTests
     [Fact]
     public void ExtractFromCompilations_ProductBindsThePackage_ResolvesToTheAssemblyNotTheDeclaringProject()
     {
-        ReferenceEdge edge = Edge("Product.Service", "Vendor.Widget");
+        ReferenceEdge edge = Model.Edge("Product.Service", "Vendor.Widget");
 
         edge.Target.IsExternal.ShouldBeTrue();
         edge.Target.ProjectName.ShouldBe("Vendor");
@@ -62,7 +62,7 @@ public sealed class PackageShadowedNameTests
     {
         // The row that stops the cure degenerating into "re-point every edge into a shadowed name". The test
         // project compiles this type itself, so it has no external record for it and nothing is foreign.
-        ReferenceEdge edge = Edge("Product.Tests.WidgetTests", "Vendor.Widget");
+        ReferenceEdge edge = Model.Edge("Product.Tests.WidgetTests", "Vendor.Widget");
 
         edge.Target.IsExternal.ShouldBeFalse();
         edge.Target.ProjectName.ShouldBe("Product.Tests");
@@ -71,7 +71,7 @@ public sealed class PackageShadowedNameTests
     [Fact]
     public void ExtractFromCompilations_AnUnshadowedPackageType_IsOneExternalNodeAsBefore()
     {
-        ReferenceEdge edge = Edge("Product.Service", "Vendor.Gadget");
+        ReferenceEdge edge = Model.Edge("Product.Service", "Vendor.Gadget");
 
         edge.Target.IsExternal.ShouldBeTrue();
         Nodes("Vendor.Gadget")
@@ -84,7 +84,7 @@ public sealed class PackageShadowedNameTests
         // The regression guard on the whole mechanism. A project reference records an external too — of the
         // referenced project's assembly — so an assembly comparison that fired here would take out every
         // cross-project edge in the suite.
-        ReferenceEdge edge = Edge("Product.Service", "Core.Thing");
+        ReferenceEdge edge = Model.Edge("Product.Service", "Core.Thing");
 
         edge.Target.IsExternal.ShouldBeFalse();
         edge.Target.ProjectName.ShouldBe("Product.Core");
@@ -403,11 +403,6 @@ public sealed class PackageShadowedNameTests
                                                                                                  """));
 
         return CodebaseExtractor.ExtractFromCompilations([product, tests]);
-    }
-
-    private static ReferenceEdge Edge(string source, string target)
-    {
-        return Model.Edges.Single(edge => edge.Source.FullName == source && edge.Target.FullName == target);
     }
 
     private static IReadOnlyList<TypeNode> Nodes(string fullName)

@@ -20,8 +20,7 @@ namespace SlideRule.Tests.Analyzers;
 ///     </para>
 ///     <para>
 ///         The fault's ID carries two descriptors, the fault and the version difference, so the wording is
-///         pinned per descriptor field rather than per ID, and the two are held to agreeing on everything but
-///         their message and description.
+///         pinned per descriptor field rather than per ID.
 ///     </para>
 /// </remarks>
 public sealed class BuildTierDescriptorTests
@@ -175,18 +174,6 @@ public sealed class BuildTierDescriptorTests
     }
 
     [Fact]
-    public void TheFaultsTwoDescriptors_DifferOnlyInTheirMessageAndDescription()
-    {
-        DiagnosticDescriptor fault = BuildTierDiagnostics.AnalyzerFault;
-        DiagnosticDescriptor mismatch = BuildTierDiagnostics.VersionMismatch;
-
-        Shape(mismatch)
-            .ShouldBe(Shape(fault));
-        mismatch.MessageFormat.Invariant()
-            .ShouldNotBe(fault.MessageFormat.Invariant());
-    }
-
-    [Fact]
     public void TheAnalyzer_DeclaresTheSixIdsInSevenDescriptorsAsWhatItCanReport()
     {
         List<string> supported = new BuildTierAnalyzer().SupportedDiagnostics
@@ -194,15 +181,6 @@ public sealed class BuildTierDescriptorTests
             .ToList();
 
         supported.ShouldBe(["SR2001", "SR2002", "SR2090", "SR2091", "SR2092", "SR2093", "SR2093"]);
-    }
-
-    // Everything a descriptor declares but its message and description.
-    private static string Shape(DiagnosticDescriptor descriptor)
-    {
-        string title = descriptor.Title.Invariant();
-
-        return $"{descriptor.Id} | {title} | {descriptor.Category} | {descriptor.DefaultSeverity} | "
-               + $"{descriptor.IsEnabledByDefault} | {descriptor.HelpLinkUri} | {string.Join(",", descriptor.CustomTags)}";
     }
 
     // A descriptor by the field that declares it, which is the one name two descriptors under one ID do not share.

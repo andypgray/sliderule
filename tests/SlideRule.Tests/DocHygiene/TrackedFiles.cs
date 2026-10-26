@@ -31,6 +31,12 @@ internal static class TrackedFiles
     /// <summary>The file name a committed NuGet lock file carries, wherever it sits.</summary>
     internal const string LockFileName = "packages.lock.json";
 
+    /// <summary>The directory the GitHub Actions workflows sit in, with its trailing slash.</summary>
+    internal const string WorkflowDirectory = ".github/workflows/";
+
+    /// <summary>The CI workflow.</summary>
+    internal const string CiWorkflow = WorkflowDirectory + "ci.yml";
+
     // How much of a file the text/binary sniff reads — the same window `git grep -I` looks at.
     private const int SniffBytes = 8192;
 
@@ -51,6 +57,10 @@ internal static class TrackedFiles
 
     private static readonly Lazy<IReadOnlyList<string>> LazyLockFiles =
         new(() => LazyAll.Value.Where(IsLockFile)
+            .ToArray());
+
+    private static readonly Lazy<IReadOnlyList<string>> LazyWorkflows =
+        new(() => LazyAll.Value.Where(static path => path.StartsWith(WorkflowDirectory, StringComparison.Ordinal))
             .ToArray());
 
     private static readonly Lazy<IReadOnlyList<string>> LazyProjects =
@@ -77,6 +87,9 @@ internal static class TrackedFiles
 
     /// <summary>The committed NuGet lock files, at the root or in any directory below it.</summary>
     public static IReadOnlyList<string> LockFiles => LazyLockFiles.Value;
+
+    /// <summary>The tracked workflow files.</summary>
+    public static IReadOnlyList<string> Workflows => LazyWorkflows.Value;
 
     /// <summary>The tracked C# project files.</summary>
     public static IReadOnlyList<string> Projects => LazyProjects.Value;

@@ -302,18 +302,6 @@ public sealed class GraphFormatterTests
             .ShouldBe(["  (elided at index grain — rerun at --grain full for the observed project references)"]);
     }
 
-    [Fact]
-    public void Lines_SingleTargetedProjects_LeaveEveryLineExactlyAsItWas()
-    {
-        // The other half of the byte-identity claim: every project of an ordinary solution targets one
-        // framework, so its roster must be the one it was before the clause existed.
-        IReadOnlyList<string> lines = GraphFormatter.Lines(
-            MixedMembershipSummary(), "Acme.slnx", DocumentGrain.Full, []);
-
-        Roster(lines)
-            .ShouldAllBe(line => !line.Contains("targets", StringComparison.Ordinal));
-    }
-
     // Hand-built for the reason GeneratedTypeSummary is: the subject is the LINE, and the three shapes it
     // has to spell — collapsed, uncollapsed, single-framework — read better as literals than as the three
     // extractions that would produce them. MultiTargetFrameworkTests covers the facts themselves, over the

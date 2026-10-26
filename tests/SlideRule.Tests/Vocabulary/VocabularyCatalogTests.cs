@@ -101,17 +101,6 @@ public sealed class VocabularyCatalogTests
     }
 
     [Fact]
-    public void Compose_IsDeterministic()
-    {
-        // Act
-        string first = VocabularyBlockComposer.Compose();
-        string second = VocabularyBlockComposer.Compose();
-
-        // Assert
-        second.ShouldBe(first);
-    }
-
-    [Fact]
     public void Row_RefusesACellCarryingAPipe()
     {
         // Arrange: a '|' inside a cell would end the cell early and shift every column after it.

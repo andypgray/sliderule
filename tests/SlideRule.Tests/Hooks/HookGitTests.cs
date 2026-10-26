@@ -75,9 +75,8 @@ public sealed class HookGitTests
     public void Digest_SameBytes_SameDigest_AndAMissingFileIsAbsent()
     {
         // Arrange
-        string directory = Path.Combine(TestTempRoot.For("hook-digest"), Guid.NewGuid()
-            .ToString("N"));
-        Directory.CreateDirectory(directory);
+        using TempDirectory temp = TestTempRoot.Fresh("hook-digest");
+        string directory = temp.Path;
         string first = Path.Combine(directory, "First.cs");
         string second = Path.Combine(directory, "Second.cs");
         File.WriteAllText(first, "public sealed class Probe;\n");

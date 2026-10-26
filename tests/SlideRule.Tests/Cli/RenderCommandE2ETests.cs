@@ -9,6 +9,7 @@ using SlideRule.ModelFile;
 using SlideRule.Rendering;
 using SlideRule.Tests.Mcp.TestDoubles;
 using SlideRule.Tests.ModelFile;
+using SlideRule.Tests.Rendering;
 using SlideRule.Tests.TestSupport;
 using Xunit;
 
@@ -72,16 +73,9 @@ public sealed class RenderCommandE2ETests : IDisposable
 
     private const string BrokenProject = DiagnosticInjectingSolutionSource.SimulatedFailedProject;
 
-    private const string InstallNote =
-        "*If the `sliderule` command is missing (a configured MCP server dies without it), " +
-        "install the tool with `dotnet tool install -g SlideRule.Cli`, or run any command " +
-        "without installing: `dotnet dnx SlideRule.Cli --yes -- check <solution>`. " +
-        "Inside a repository whose `global.json` pins an SDK below 10, both commands fail, so run them " +
-        "from outside it and pass the solution's absolute path.*\n\n";
-
     private const string RootBody =
         RenderSpecProvenance +
-        InstallNote +
+        AgentContextRendererTests.InstallNote +
         "## Architecture (SlideRule)\n\n" +
         "reference = a source-level type reference. Expand any rule ID with `sliderule explain <rule-id>`.\n\n" +
         "### Layers\n" +
@@ -120,7 +114,7 @@ public sealed class RenderCommandE2ETests : IDisposable
     // are families over the Reporting and Billing cells, and their bullets land on both of their cards.
     private const string LayerRootBody =
         LayerSpecProvenance +
-        InstallNote +
+        AgentContextRendererTests.InstallNote +
         "## Architecture (SlideRule)\n\n" +
         "reference = a source-level type reference. Expand any rule ID with `sliderule explain <rule-id>`.\n\n" +
         "### Layers\n" +
@@ -272,6 +266,9 @@ public sealed class RenderCommandE2ETests : IDisposable
             .ShouldBe(Wrap(DomainCautionBody, "\n"));
         File.Exists(WebAgents)
             .ShouldBeFalse();
+        // Nobody gets a model file they never asked for, and the stream a team reads does not grow a line.
+        File.Exists(ModelFilePath)
+            .ShouldBeFalse();
     }
 
     [Fact]
@@ -296,26 +293,17 @@ public sealed class RenderCommandE2ETests : IDisposable
             .ShouldBe(cautionFirst);
     }
 
-    [Fact]
-    public async Task Render_PreservesHandContentAroundMarkers_Lf()
+    [Theory]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    public async Task Render_PreservesHandContentAroundMarkers(string newline)
     {
-        File.WriteAllText(RootAgents, Seeded("\n"));
+        File.WriteAllText(RootAgents, Seeded(newline));
 
         await CliRunner.InvokeAsync("render", _workspace.SolutionPath, "--spec", CliRunner.RenderSpecDll);
 
         File.ReadAllText(RootAgents)
-            .ShouldBe(SeededAfterRender("\n"));
-    }
-
-    [Fact]
-    public async Task Render_PreservesHandContentAroundMarkers_Crlf()
-    {
-        File.WriteAllText(RootAgents, Seeded("\r\n"));
-
-        await CliRunner.InvokeAsync("render", _workspace.SolutionPath, "--spec", CliRunner.RenderSpecDll);
-
-        File.ReadAllText(RootAgents)
-            .ShouldBe(SeededAfterRender("\r\n"));
+            .ShouldBe(SeededAfterRender(newline));
     }
 
     [Fact]
@@ -590,20 +578,6 @@ public sealed class RenderCommandE2ETests : IDisposable
                 + "unchanged MyApp.Domain/AGENTS.md\nunchanged sliderule.model.json");
         File.GetLastWriteTimeUtc(ModelFilePath)
             .ShouldBe(Stamped);
-    }
-
-    [Fact]
-    public async Task Render_NoFlagAndNoModelFile_WritesNoneAndReportsNothingAboutIt()
-    {
-        // Nobody gets a file they never asked for, and the stream a team already reads does not grow a line.
-        CliResult result = await CliRunner.InvokeAsync(
-            "render", _workspace.SolutionPath, "--spec", CliRunner.RenderSpecDll);
-
-        result.ShouldSucceed();
-        result.Out.NormalizedTrimmed()
-            .ShouldBe(RenderSpecCardsWritten);
-        File.Exists(ModelFilePath)
-            .ShouldBeFalse();
     }
 
     [Fact]

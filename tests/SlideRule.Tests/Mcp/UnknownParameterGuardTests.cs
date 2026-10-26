@@ -80,42 +80,6 @@ public sealed class UnknownParameterGuardTests
         message.ShouldBeNull();
     }
 
-    [Fact]
-    public void Validate_KnownKeysOnCheck_ReturnsNull()
-    {
-        // Act — arch_check's real optional parameters: the tripwire diff ref, the rule-ID filter, and the
-        // grain.
-        string? message = UnknownParameterGuard.Validate(
-            "arch_check",
-            new Dictionary<string, JsonElement>
-            {
-                ["diffBase"] = DummyValue,
-                ["rules"] = DummyValue,
-                ["grain"] = DummyValue
-            });
-
-        // Assert
-        message.ShouldBeNull();
-    }
-
-    [Fact]
-    public void Validate_KnownKeysOnGraph_ReturnsNull()
-    {
-        // Act — arch_graph's real optional parameters: the opt-out into surveying a partially-loaded model,
-        // and the two narrowing knobs (grain and subject).
-        string? message = UnknownParameterGuard.Validate(
-            "arch_graph",
-            new Dictionary<string, JsonElement>
-            {
-                ["allowWorkspaceDiagnostics"] = DummyValue,
-                ["grain"] = DummyValue,
-                ["projects"] = DummyValue
-            });
-
-        // Assert
-        message.ShouldBeNull();
-    }
-
     [Theory]
     [InlineData("arch_check")]
     [InlineData("arch_graph")]
@@ -162,24 +126,6 @@ public sealed class UnknownParameterGuardTests
     {
         UnknownParameterGuard.Validate("arch_check", new Dictionary<string, JsonElement>())
             .ShouldBeNull();
-    }
-
-    [Theory]
-    [InlineData("file")]
-    [InlineData("filePath")]
-    [InlineData("directory")]
-    public void Validate_HallucinatedKeyOnContext_ReturnsError(string hallucinatedKey)
-    {
-        // Act — the keys a model reaches for instead of arch_context's real "path" parameter.
-        string? message = UnknownParameterGuard.Validate(
-            "arch_context",
-            new Dictionary<string, JsonElement> { [hallucinatedKey] = DummyValue });
-
-        // Assert
-        message.ShouldNotBeNull();
-        message.ShouldContain($"\"{hallucinatedKey}\"");
-        message.ShouldContain("arch_context");
-        message.ShouldContain("path");
     }
 
     // Independent oracle for "is this a JSON-bound parameter": the only context-bound method-parameter

@@ -29,7 +29,7 @@ public class PackCompositionTests
     [Fact]
     public void DuplicateId_PackCallAuthoredFirst_ReportsThePackFile()
     {
-        SpecValidationError error = DuplicateIdError(new PackCallSpec(), new LocalCollidingSpec());
+        SpecValidationError error = ShouldFailWithOneDuplicateId(new PackCallSpec(), new LocalCollidingSpec());
 
         // Free provenance: the pack's methods let arch.Rule capture its own caller info, so the pack
         // file names itself without forwarding anything. Asserted by file name, never by line — pinning
@@ -40,25 +40,20 @@ public class PackCompositionTests
     [Fact]
     public void DuplicateId_LocalRuleAuthoredFirst_ReportsTheSpecFile()
     {
-        SpecValidationError error = DuplicateIdError(new LocalCollidingSpec(), new PackCallSpec());
+        SpecValidationError error = ShouldFailWithOneDuplicateId(new LocalCollidingSpec(), new PackCallSpec());
 
         // The collision is reported at the *first authored* occurrence, so swapping the spec order swaps
         // which file is named. Both directions are pinned because only the pair shows the rule.
         error.Location!.File.ShouldBe("PackCollisionSpecs.cs");
     }
 
-    [Fact]
-    public void DuplicateId_AcrossSpecClasses_IsReportedOnce()
-    {
-        var exception = Should.Throw<SpecValidationException>(() => ArchModelBuilder.Build(new PackCallSpec(), new LocalCollidingSpec()));
-
-        exception.Errors.ShouldContain(error => error.Code == SpecValidationErrorCode.DuplicateId, expectedCount: 1);
-    }
-
-    private static SpecValidationError DuplicateIdError(params IArchitectureSpec[] specs)
+    // Fails unless the build reports exactly one duplicate-ID error, and returns it.
+    private static SpecValidationError ShouldFailWithOneDuplicateId(params IArchitectureSpec[] specs)
     {
         var exception = Should.Throw<SpecValidationException>(() => ArchModelBuilder.Build(specs));
 
-        return exception.Errors.Single(error => error.Code == SpecValidationErrorCode.DuplicateId);
+        return exception.Errors
+            .Where(error => error.Code == SpecValidationErrorCode.DuplicateId)
+            .ShouldHaveSingleItem();
     }
 }

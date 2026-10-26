@@ -55,15 +55,6 @@ public sealed class AuthoringHintTests
     private const string NarrowedInertCure = "THE-NARROWED-INERT-CURE";
 
     [Fact]
-    public void NamespaceNoun_EarnsTheGlobSemantics()
-    {
-        var arch = new Arch();
-
-        AuthoringHints.ForSubject(arch.Namespace("App.Nowhere.*"), null)
-            .ShouldContain(NamespaceFragment);
-    }
-
-    [Fact]
     public void TypesNarrowedByOneInNamespace_EarnsTheGlobSemanticsToo()
     {
         // The same namespace region spelled the other way round: RegionOf reads it off arch.Types plus a
@@ -336,26 +327,10 @@ public sealed class AuthoringHintTests
     }
 
     [Fact]
-    public void AnEmptySubject_CarriesItsCureThroughTheChecker()
-    {
-        RuleResult result = Checker.Run(Sources.LayeredModel, arch =>
-                arch.Rule("empty/x")
-                    .Enforce(arch.Namespace("Nope.Nowhere.*").MustHaveSuffix("X"))
-                    .Because("b"))
-            .Single();
-
-        string? hint = result.Violations.Single()
-            .Hint;
-
-        hint.ShouldNotBeNull();
-        hint.ShouldContain(NamespaceFragment);
-    }
-
-    [Fact]
     public void AnEmptySubjectOfAnotherShape_CarriesThatShapesCure()
     {
-        // The wiring proves the point of the feature: two rules failing on the same kind get different
-        // cures, because the cure is read off the selection rather than off the kind.
+        // The wiring proves the point of the feature: this rule fails on the same kind as a namespace subject
+        // and gets a different cure, because the cure is read off the selection rather than off the kind.
         RuleResult result = Checker.Run(Sources.LayeredModel, arch =>
                 arch.Rule("empty/y")
                     .Enforce(arch.Types.WithSuffix("NoSuchSuffix").MustBeSealed())

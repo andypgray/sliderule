@@ -25,11 +25,6 @@ namespace SlideRule.Tests.Analyzers;
 /// </remarks>
 public sealed class BuildTierGuardTests
 {
-    private const string FaultMessage =
-        "The SlideRule analyzer failed in this project, so some or all of its findings are missing: "
-        + "InvalidOperationException: boom. This is a fault in the analyzer and says nothing about the code, "
-        + "and 'sliderule check' is unaffected. Report it at https://github.com/andypgray/sliderule/issues.";
-
     /// <summary>A point where the analyzer holds a fault of its own rather than let it out.</summary>
     public enum GuardedPoint
     {
@@ -93,10 +88,10 @@ public sealed class BuildTierGuardTests
     public async Task AFaultAtAGuardedPoint_IsOneSR2093CarryingIt(GuardedPoint point, string tier)
     {
         IReadOnlyList<Diagnostic> reported = await BuildTier.DiagnoseAsync(
-            ArmedAt(point, Boom), BuildTier.OwnCompilation(), FilesReaching(point), tier, Ct);
+            ArmedAt(point, BuildTier.Boom), BuildTier.OwnCompilation(), FilesReaching(point), tier, Ct);
 
         reported.ShouldBeTheOnly("SR2093")
-            .ShouldSay(FaultMessage);
+            .ShouldSay(BuildTier.FaultMessage);
     }
 
     [Theory]
@@ -105,7 +100,7 @@ public sealed class BuildTierGuardTests
     public async Task FaultsAtTwoPoints_AreStillOneSR2093(string tier)
     {
         var analyzer = new BuildTierAnalyzer(
-            beforeCheck: Boom,
+            beforeCheck: BuildTier.Boom,
             beforeBaselineRefusal: () => throw new InvalidOperationException("the other fault"));
 
         IReadOnlyList<Diagnostic> reported = await BuildTier.DiagnoseAsync(
@@ -180,11 +175,6 @@ public sealed class BuildTierGuardTests
     }
 
     // ── the shared arrangements ───────────────────────────────────────────────────────────────────────────
-
-    private static void Boom()
-    {
-        throw new InvalidOperationException("boom\nsecond line");
-    }
 
     private static BuildTierAnalyzer ArmedAt(GuardedPoint point, Action seam)
     {

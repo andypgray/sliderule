@@ -1,6 +1,5 @@
 using SlideRule.Checking;
 using SlideRule.Codebase;
-using SlideRule.Roslyn;
 using SlideRule.Tests.Checking;
 using SlideRule.Tests.TestSupport;
 using Xunit;
@@ -33,7 +32,7 @@ namespace SlideRule.Tests.Roslyn;
 ///         the red is reachable only if both selections are live over a model that really loaded.
 ///     </para>
 ///     <para>
-///         The bed is read in place through <see cref="WarmWorkspacePool" /> rather than leased through
+///         The bed is read in place through <see cref="FixtureCodebase" /> rather than leased through
 ///         <see cref="TempFixtureWorkspace" />: nothing here writes to the tree, and
 ///         <see cref="FixtureRestorer" />'s startup sweep has already restored every <c>TestSolutions</c>
 ///         bed in the output directory, so the projects load with their references resolved.
@@ -46,14 +45,14 @@ public sealed class LinkedSourceCheckTests
     private const string Client = "LinkedApp.Client";
 
     private static readonly string SolutionPath =
-        Path.Combine(AppContext.BaseDirectory, "Fixtures", "TestSolutions", "LinkedApp", "LinkedApp.slnx");
+        Path.Combine(FixtureBeds.TestSolutionsRoot, "LinkedApp", "LinkedApp.slnx");
 
-    private static readonly Lazy<Task<CodebaseModel>> LinkedCodebase = new(ExtractAsync);
+    private static Task<CodebaseModel> LinkedCodebase => FixtureCodebase.Of(SolutionPath);
 
     [Fact]
     public async Task Check_ToolMustNotReferenceCore_PassesOverTheRealWorkspace()
     {
-        CodebaseModel model = await LinkedCodebase.Value;
+        CodebaseModel model = await LinkedCodebase;
 
         // Tool's one outward reference is into the copy of Widget its own csproj compiles, so the edge is
         // intra-project and counts against Tool. A ban anchored on Core forbids Core's declaration, and
@@ -69,7 +68,7 @@ public sealed class LinkedSourceCheckTests
     [Fact]
     public async Task Check_ClientMustNotReferenceCore_FailsOnTheGenuineCrossProjectEdge()
     {
-        CodebaseModel model = await LinkedCodebase.Value;
+        CodebaseModel model = await LinkedCodebase;
 
         // The control the row above is measured against: the same verb and the same target operand, moved
         // to the project that compiles no copy of the linked file. Its field crosses a project boundary
@@ -81,14 +80,5 @@ public sealed class LinkedSourceCheckTests
             .Single()
             .ShouldHaveFailedWithSingleEdge(
                 ViolationKind.Reference, "LinkedApp.Client.Consumer", "LinkedApp.Core.CoreOnly");
-    }
-
-    // The shared read: the pool loads the fixture once for the whole class. It takes no test's cancellation
-    // token, because the task it produces outlives the test that first awaits it.
-    private static async Task<CodebaseModel> ExtractAsync()
-    {
-        WorkspaceSnapshot snapshot = await WarmWorkspacePool.GetCurrentAsync(SolutionPath, CancellationToken.None);
-        return await CodebaseExtractor.ExtractFromSolutionAsync(
-            snapshot.Solution, null, snapshot.TargetFrameworks, null, CancellationToken.None);
     }
 }

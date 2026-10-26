@@ -81,6 +81,16 @@ public class ContextFileComposerTests
             .Because("Every caller depends on the exact rounding.");
     }
 
+    private static IArchitectureSpec CoLocated(string posture)
+    {
+        return posture switch
+        {
+            "Quarantined" => CoLocatedSpec,
+            "Cautioned" => CoLocatedCautionSpec,
+            _ => throw new ArgumentOutOfRangeException(nameof(posture), posture, null)
+        };
+    }
+
     // Every scene composes inside the shared solution directory, which the scenes' codebases declare their files under.
     private static ContextComposition Compose(IArchitectureSpec spec, CodebaseModel? codebase)
     {
@@ -120,18 +130,23 @@ public class ContextFileComposerTests
             .Body.ShouldContain("## Layer `Web`");
     }
 
-    [Fact]
-    public void Compose_LayerAndScopeInOneDirectory_MergeIntoOneFileLayerCardFirst()
+    [Theory]
+    [InlineData("Quarantined")]
+    // The layer-cards-first ordering is a property of the composer, not of which scope posture it met.
+    [InlineData("Cautioned")]
+    public void Compose_LayerAndScopeInOneDirectory_MergeIntoOneFileLayerCardFirst(string posture)
     {
-        ContextComposition composition = Compose(CoLocatedSpec, BillingOnly);
+        var scopeHeading = $"## {posture} scope `legacy/billing`";
+
+        ContextComposition composition = Compose(CoLocated(posture), BillingOnly);
 
         // One file, not two: the second splice would clobber the first, so co-located units merge.
         composition.Files.Count.ShouldBe(2);
         string body = composition.Files[1].Body;
         body.ShouldContain("## Layer `Billing`");
-        body.ShouldContain("## Quarantined scope `legacy/billing`");
+        body.ShouldContain(scopeHeading);
         body.IndexOf("## Layer `Billing`", StringComparison.Ordinal)
-            .ShouldBeLessThan(body.IndexOf("## Quarantined scope `legacy/billing`", StringComparison.Ordinal));
+            .ShouldBeLessThan(body.IndexOf(scopeHeading, StringComparison.Ordinal));
 
         // And exactly one provenance line for the merged file, not one per card.
         body.Occurrences(AgentContextRenderer.ProvenanceLine(SpecName))
@@ -159,45 +174,24 @@ public class ContextFileComposerTests
         composition.Files.ShouldHaveSingleItem();
     }
 
-    [Fact]
-    public void HasAnythingToPlace_AnchoredLayer_True()
+    [Theory]
+    [InlineData("anchored layer")]
+    [InlineData("quarantined scope")]
+    // The gate reads the scope payload rather than the posture, so a caution earns the extraction cost
+    // exactly as a quarantine does — and it must, since its card is the only thing it renders.
+    [InlineData("cautioned scope")]
+    public void HasAnythingToPlace_ACardBearingDeclaration_True(string declared)
     {
-        ContextFileComposer.HasAnythingToPlace(ArchModelBuilder.Build(WebLayerSpec))
+        IArchitectureSpec spec = declared switch
+        {
+            "anchored layer" => WebLayerSpec,
+            "quarantined scope" => AbsentScopeSpec,
+            "cautioned scope" => AbsentCautionSpec,
+            _ => throw new ArgumentOutOfRangeException(nameof(declared), declared, null)
+        };
+
+        ContextFileComposer.HasAnythingToPlace(ArchModelBuilder.Build(spec))
             .ShouldBeTrue();
-    }
-
-    [Fact]
-    public void HasAnythingToPlace_QuarantinedScope_True()
-    {
-        ContextFileComposer.HasAnythingToPlace(ArchModelBuilder.Build(AbsentScopeSpec))
-            .ShouldBeTrue();
-    }
-
-    [Fact]
-    public void HasAnythingToPlace_CautionedScope_True()
-    {
-        // The gate reads the scope payload rather than the posture, so a caution earns the extraction cost
-        // exactly as a quarantine does — and it must, since its card is the only thing it renders.
-        ContextFileComposer.HasAnythingToPlace(ArchModelBuilder.Build(AbsentCautionSpec))
-            .ShouldBeTrue();
-    }
-
-    [Fact]
-    public void Compose_LayerAndCautionInOneDirectory_MergeIntoOneFileLayerCardFirst()
-    {
-        ContextComposition composition = Compose(CoLocatedCautionSpec, BillingOnly);
-
-        // The layer-cards-first ordering is a property of the composer, not of which scope posture it met.
-        composition.Files.Count.ShouldBe(2);
-        string body = composition.Files[1].Body;
-        body.ShouldContain("## Layer `Billing`");
-        body.ShouldContain("## Cautioned scope `legacy/billing`");
-        body.IndexOf("## Layer `Billing`", StringComparison.Ordinal)
-            .ShouldBeLessThan(body.IndexOf("## Cautioned scope `legacy/billing`", StringComparison.Ordinal));
-
-        // And exactly one provenance line for the merged file, not one per card.
-        body.Occurrences(AgentContextRenderer.ProvenanceLine(SpecName))
-            .ShouldBe(1);
     }
 
     [Fact]

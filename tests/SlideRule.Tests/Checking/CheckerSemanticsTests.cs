@@ -7,8 +7,7 @@ namespace SlideRule.Tests.Checking;
 
 /// <summary>
 ///     Checker semantics not tied to one verb: empty-subject failure, the inert-target warning scope,
-///     RuleError paths, the Quarantine containment formula evaluated as an Enforce rule, and
-///     deterministic violation ordering.
+///     RuleError paths, and deterministic violation ordering.
 /// </summary>
 public sealed class CheckerSemanticsTests
 {
@@ -445,37 +444,6 @@ public sealed class CheckerSemanticsTests
 
         result.ShouldHaveFailedWithDetail(
             ViolationKind.RuleError, "Type 'System.Int32*' has no source-level display form the checker can match against.");
-    }
-
-    [Fact]
-    public void ThrowingPredicate_IsRuleErrorNotCrash()
-    {
-        RuleResult result = Checker.Run(Sources.LayeredModel, arch =>
-                arch.Rule("throw/x")
-                    .Enforce(arch.Types.Must(_ => throw new InvalidOperationException("boom"), "explode"))
-                    .Because("b"))
-            .Single();
-
-        Violation violation = result.Violations.ShouldHaveSingleItem();
-        violation.Kind.ShouldBe(ViolationKind.RuleError);
-        violation.Detail!.ShouldContain("predicate threw");
-    }
-
-    [Fact]
-    public void ContainmentFormula_AsEnforceRule_RedForInteriorReferenceGreenForFacade()
-    {
-        // The Quarantine desugaring shape (sel.Except(facade).MustOnlyBeReferencedBy(sel ∪ facade)),
-        // hand-built as Enforce so the containment logic is exercised while Quarantine itself skips.
-        RuleResult result = Checker.Run(Sources.ContainmentModel, arch =>
-                arch.Rule("contain/x")
-                    .Enforce(arch.Namespace("App.Legacy.*").Except(arch.Types.WithSuffix("Facade"))
-                        .MustOnlyBeReferencedBy(arch.Namespace("App.Legacy.*")))
-                    .Because("b"))
-            .Single();
-
-        // Exhaustive, which is what carries the green half too: the facade edge is absent from a set that
-        // names every inbound reference the containment formula reports.
-        result.ShouldHaveFailedWithEdges(ViolationKind.Reference, ["App.Client.User -> App.Legacy.Internal"]);
     }
 
     [Fact]

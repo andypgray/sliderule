@@ -17,17 +17,6 @@ namespace SlideRule.Tests;
 public sealed class SequenceOverloadTests
 {
     [Fact]
-    public void AnyOf_SelectionSequence_BuildsTheParamsUnion()
-    {
-        var arch = new Arch();
-        Selection tracking = arch.Namespace("MyApp.Tracking.*");
-        Selection billing = arch.Namespace("MyApp.Billing.*");
-        List<Selection> parts = [tracking, billing];
-
-        ShouldBuildAlike(arch.AnyOf(parts).MustBeSealed(), arch.AnyOf(tracking, billing).MustBeSealed());
-    }
-
-    [Fact]
     public void AnyOf_LayerList_IsTakenAsASelectionSequence()
     {
         // IEnumerable<T> is covariant, so a List<Layer> a helper built binds the sequence overload as it is.
@@ -81,19 +70,6 @@ public sealed class SequenceOverloadTests
         ShouldBuildAlike(
             arch.Types.Methods.Named(names).MustBePublic(),
             arch.Types.Methods.Named("Main", "Run").MustBePublic());
-    }
-
-    [Fact]
-    public void MemberExcept_Sequence_BuildsTheParamsAdjective()
-    {
-        var arch = new Arch();
-        MemberSelection main = arch.Types.Named("Program").Methods.Named("Main");
-        MemberSelection worker = arch.Types.Named("Worker").Members;
-        List<MemberSelection> exclusions = [main, worker];
-
-        ShouldBuildAlike(
-            arch.Types.Methods.Except(exclusions).MustBePublic(),
-            arch.Types.Methods.Except(main, worker).MustBePublic());
     }
 
     [Fact]

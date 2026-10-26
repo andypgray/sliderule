@@ -81,33 +81,13 @@ public sealed class MustBeGetOnlyVerbTests
     public void MustBeGetOnly_GetOnlyProperties_PassClean()
     {
         // An auto get-only property on each of the two types: no setter accessor, so nothing to red.
-        Checker.Run(SceneModel, arch =>
-                arch.Rule("domain/values-immutable")
-                    .Enforce(arch.Namespace("App.Values.*").Properties.WithPrefix("Count").MustBeGetOnly())
-                    .Because("b"))
-            .Single()
+        Checker.Verdict(
+                SceneModel, arch => arch.Namespace("App.Values.*").Properties.WithPrefix("Count").MustBeGetOnly())
             .ShouldHavePassedClean();
 
-        Checker.Run(SceneModel, arch =>
-                arch.Rule("domain/values-immutable")
-                    .Enforce(arch.Namespace("App.Values.*").Properties.WithPrefix("Price").MustBeGetOnly())
-                    .Because("b"))
-            .Single()
+        Checker.Verdict(
+                SceneModel, arch => arch.Namespace("App.Values.*").Properties.WithPrefix("Price").MustBeGetOnly())
             .ShouldHavePassedClean();
-    }
-
-    [Fact]
-    public void MustBeGetOnly_EmptySubject_FailsWithMemberMessage()
-    {
-        // An empty member subject fails the rule with the member-flavored message (GRAMMAR §4.6), exactly as
-        // every other member verb — the mutability verbs take the same subject gate.
-        RuleResult result = Checker.Run(SceneModel, arch =>
-                arch.Rule("domain/empty")
-                    .Enforce(arch.Namespace("Nowhere.*").Properties.MustBeGetOnly())
-                    .Because("b"))
-            .Single();
-
-        result.ShouldHaveFailedWithDetail(ViolationKind.EmptySubject, ConstraintEvaluator.EmptyMemberSubjectMessage);
     }
 
     [Fact]
@@ -162,18 +142,12 @@ public sealed class MustBeGetOnlyVerbTests
     {
         // Neither an expression body nor a hand-written getter block declares a setter, so both green — the
         // fact is read off the symbol's SetMethod, not off the property's syntax.
-        Checker.Run(SceneModel, arch =>
-                arch.Rule("domain/values-immutable")
-                    .Enforce(arch.Namespace("App.Values.*").Properties.WithPrefix("Doubled").MustBeGetOnly())
-                    .Because("b"))
-            .Single()
+        Checker.Verdict(
+                SceneModel, arch => arch.Namespace("App.Values.*").Properties.WithPrefix("Doubled").MustBeGetOnly())
             .ShouldHavePassedClean();
 
-        Checker.Run(SceneModel, arch =>
-                arch.Rule("domain/values-immutable")
-                    .Enforce(arch.Namespace("App.Values.*").Properties.WithPrefix("Manual").MustBeGetOnly())
-                    .Because("b"))
-            .Single()
+        Checker.Verdict(
+                SceneModel, arch => arch.Namespace("App.Values.*").Properties.WithPrefix("Manual").MustBeGetOnly())
             .ShouldHavePassedClean();
     }
 
@@ -188,14 +162,9 @@ public sealed class MustBeGetOnlyVerbTests
             .ShouldBe(["P:App.Values.Order.Limit"]);
     }
 
-    // One rule over the shared scene, so the rows above differ by their subject alone — the id and the
-    // reason are written once here rather than at each call.
     private static IReadOnlyList<string> FailedMemberIds(Func<Arch, Constraint> constraint)
     {
-        return Checker.Run(SceneModel, arch => arch.Rule("domain/values-immutable")
-                .Enforce(constraint(arch))
-                .Because("b"))
-            .Single()
+        return Checker.Verdict(SceneModel, constraint)
             .MemberShapeSubjects();
     }
 }

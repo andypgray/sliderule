@@ -54,28 +54,6 @@ public sealed class RenderedCitationsTests
     }
 
     [Fact]
-    public void Extract_MigrateBulletWithCitation_CapturedFromMidBullet()
-    {
-        // Arrange: a Migrate rule renders the citation between the reason and the boy-scout policy, so a
-        // pattern anchored at the end of the bullet would drop every migration's page.
-        string doc = Card(
-            $"- `async/no-sync-over-async` {EmDash} Some existing code here still follows the OLD pattern: "
-            + "The adapter blocks on async work. That is grandfathered debt, not house style. "
-            + "New code must follow: Types must not use `Task.Wait()`. "
-            + $"Blocking a pooled thread deadlocks under load. See <{AsyncPage}>. "
-            + "If you are already editing a grandfathered site and the migration is small, migrate it; "
-            + "otherwise do not grow the debt.");
-
-        // Act
-        IReadOnlyList<RenderedCitation> citations = RenderedCitations.Extract("AGENTS.md", doc);
-
-        // Assert
-        RenderedCitation citation = citations.ShouldHaveSingleItem();
-        citation.RuleId.ShouldBe("async/no-sync-over-async");
-        citation.Url.ShouldBe(AsyncPage);
-    }
-
-    [Fact]
     public void Extract_AutolinkOutsideTheMarkers_Ignored()
     {
         // Arrange: hand-written prose beside a block cites pages too, and nothing re-renders it — holding
@@ -138,7 +116,8 @@ public sealed class RenderedCitationsTests
     public void Extract_RenderedMigrateRule_LiftsThePageItsCitationNamed()
     {
         // Arrange: the same round trip for the other posture, whose bullet continues past the citation
-        // into the boy-scout policy.
+        // into the boy-scout policy, so a pattern anchored at the end of the bullet would drop every
+        // migration's page.
         ArchitectureModel model = Checker.Model(arch =>
             arch.Rule("async/no-blocking-waits")
                 .Migrate("Handlers block on the task.", arch.Types.MustHaveSuffix("Handler"))
@@ -154,12 +133,5 @@ public sealed class RenderedCitationsTests
         RenderedCitation citation = citations.ShouldHaveSingleItem();
         citation.RuleId.ShouldBe("async/no-blocking-waits");
         citation.Url.ShouldBe(AsyncPage);
-    }
-
-    private static string Card(params string[] bodyLines)
-    {
-        return string.Join(
-            "\n",
-            [ManagedBlock.BeginMarker, .. bodyLines, ManagedBlock.EndMarker]);
     }
 }

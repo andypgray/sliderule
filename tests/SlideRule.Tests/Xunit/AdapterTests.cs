@@ -108,7 +108,7 @@ public sealed class AdapterTests
     {
         // The CLI human block for the same rule + same solution is the oracle.
         CliResult cli = await CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll);
-        string expectedBlock = ExtractBlock(cli.Out, "layering/domain-independent");
+        string expectedBlock = cli.ShouldHaveRuleBlock("layering/domain-independent");
 
         Exception? exception = await AdapterOutcome.CaughtAsync(() => new InlineViolatedArchTests().Rule_Holds("layering/domain-independent"));
 
@@ -268,24 +268,6 @@ public sealed class AdapterTests
     {
         var exception = Should.Throw<FileNotFoundException>(() => HelperAccessor.Call("no-such-file-f2.slnx"));
         exception.Message.ShouldBe($"Could not locate 'no-such-file-f2.slnx' walking up from '{AppContext.BaseDirectory}'.");
-    }
-
-    // The "FAIL <ruleId> …" block from the CLI human output: the header line plus its indented lines.
-    private static string ExtractBlock(string humanOutput, string ruleId)
-    {
-        string[] lines = humanOutput.NormalizedLines()
-            .Split('\n');
-        int start = Array.FindIndex(lines, line => line.StartsWith($"FAIL {ruleId}", StringComparison.Ordinal));
-        if (start < 0) throw new InvalidOperationException($"No FAIL block for '{ruleId}' in:\n{humanOutput}");
-
-        var block = new List<string> { lines[start] };
-        for (int i = start + 1;
-             i < lines.Length && lines[i]
-                 .StartsWith("  ", StringComparison.Ordinal);
-             i++)
-            block.Add(lines[i]);
-
-        return string.Join("\n", block);
     }
 
     // A verbatim inline copy of the fixture's layering/domain-independent rule, checked against the real
@@ -459,8 +441,7 @@ public sealed class AdapterTests
     // .csproj, beside one ordinary C# project. Read in place from the test output like the two drivers
     // above — FixtureRestorer restores every solution under TestSolutions/ at assembly startup, so the C#
     // project loads whole and the skip below is about coverage rather than a broken model.
-    private static string PolyglotSolution =>
-        Path.Combine(AppContext.BaseDirectory, "Fixtures", "TestSolutions", "PolyglotApp", "PolyglotApp.slnx");
+    private static string PolyglotSolution => FixtureBeds.PolyglotAppSolution;
 
     // A verbatim inline copy of the fixture spec's one rule, which holds over the C# project — so the rule
     // case below reaches a genuine verdict rather than an empty-subject pass, and the skip is provably about

@@ -75,24 +75,10 @@ public sealed class WrittenPathsTests
     }
 
     [Fact]
-    public void Extract_BareFileNameAtSolutionRoot_Captured()
-    {
-        // Arrange: the root card is reported with no directory at all, and the extension is what makes it
-        // a path rather than prose.
-        string doc = string.Join("\n", "```text", "unchanged AGENTS.md", "```");
-
-        // Act
-        IReadOnlyList<WrittenPath> written = WrittenPaths.Extract("d.md", doc);
-
-        // Assert
-        written.ShouldHaveSingleItem()
-            .Path.ShouldBe("AGENTS.md");
-    }
-
-    [Fact]
     public void Extract_MultipleFencedBlocks_AllPathsCaptured()
     {
-        // Arrange
+        // Arrange: the second block reports the root card with no directory at all, and the extension is what
+        // makes it a path rather than prose.
         string[] lines =
         [
             "```text",

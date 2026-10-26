@@ -89,33 +89,21 @@ public sealed class BuildTierBaselineTests
             .ShouldSay(expected);
     }
 
-    [Fact]
-    public async Task ARatchetedRuleWithNoBaselineFileHandedOver_NamesItselfUncheckedAndReportsNoViolation()
-    {
-        IReadOnlyList<Diagnostic> reported = await Diagnose(Checker.Model(BuildTier.MigrateRule));
+    /// <summary>Each way a ratcheted rule's baseline can fail to reach the build captured.</summary>
+    public static TheoryData<string> Uncaptured =>
+    [
+        "no baseline file handed over",
+        "a baseline file with no section for the rule",
+        "a baseline file that will not hand over its text"
+    ];
 
-        reported.ShouldBeTheOnly("SR2092")
-            .ShouldSay(UncheckedMessage);
-    }
-
-    [Fact]
-    public async Task ARatchetedRuleWhoseBaselineFileHoldsNoSectionForIt_NamesItselfUnchecked()
-    {
-        string other = BaselineComposer.Compose(
-            "some/other-rule", BaselineEntry.ForEdge(BuildTier.OwnTypeId, BuildTier.StoreId).WithSiteCount(1));
-
-        IReadOnlyList<Diagnostic> reported = await Diagnose(
-            Checker.Model(BuildTier.MigrateRule), (BuildTier.BaselineFilePath, other));
-
-        reported.ShouldBeTheOnly("SR2092")
-            .ShouldSay(UncheckedMessage);
-    }
-
-    [Fact]
-    public async Task ARatchetedRuleWhoseBaselineFileWillNotHandOverItsText_NamesItselfUnchecked()
+    [Theory]
+    [MemberData(nameof(Uncaptured))]
+    public async Task ARatchetedRuleWithNoCapturedBaseline_NamesItselfUncheckedAndReportsNoViolation(
+        string arrangement)
     {
         IReadOnlyList<Diagnostic> reported = await Diagnose(
-            Checker.Model(BuildTier.MigrateRule), (BuildTier.BaselineFilePath, null));
+            Checker.Model(BuildTier.MigrateRule), BaselinesFor(arrangement));
 
         reported.ShouldBeTheOnly("SR2092")
             .ShouldSay(UncheckedMessage);
@@ -222,5 +210,21 @@ public sealed class BuildTierBaselineTests
         ];
 
         return BuildTier.DiagnoseAsync(BuildTier.OwnCompilation(), files, cancellationToken: Ct);
+    }
+
+    private static (string Path, string? Text)[] BaselinesFor(string arrangement)
+    {
+        return arrangement switch
+        {
+            "no baseline file handed over" => [],
+            "a baseline file with no section for the rule" =>
+            [
+                (BuildTier.BaselineFilePath, BaselineComposer.Compose(
+                    "some/other-rule",
+                    BaselineEntry.ForEdge(BuildTier.OwnTypeId, BuildTier.StoreId).WithSiteCount(1)))
+            ],
+            "a baseline file that will not hand over its text" => [(BuildTier.BaselineFilePath, null)],
+            _ => throw new ArgumentOutOfRangeException(nameof(arrangement), arrangement, null)
+        };
     }
 }

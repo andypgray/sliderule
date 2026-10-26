@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using SlideRule.Rendering;
 using SlideRule.Tests.TestSupport;
 using Xunit;
 
@@ -30,7 +31,6 @@ public sealed class CitationLinkTests
     /// <summary>Set to a non-blank value to run the network probe. Unset (the default) skips it.</summary>
     private const string LinkCheckVariable = "SLIDERULE_LINK_CHECK";
 
-    private const string AgentsFileName = "AGENTS.md";
 
     private const string UserAgent = "sliderule-link-check";
 
@@ -145,7 +145,7 @@ public sealed class CitationLinkTests
     // commentary the quote gates already hold to the block it came from.
     private static IReadOnlyList<RenderedCitation> ExtractDoc(string doc)
     {
-        if (Path.GetFileName(doc) != AgentsFileName) return [];
+        if (Path.GetFileName(doc) != ContextFileComposer.FileName) return [];
 
         string text = RepoRoot.ReadText(doc);
 

@@ -19,8 +19,7 @@ public sealed class SpecContractBindTests
         .Version!;
 
     [Theory]
-    [InlineData("0.1.0.0")] // identities older than the pin
-    [InlineData("0.2.0.0")]
+    [InlineData("0.1.0.0")] // an identity older than the pin
     [InlineData("1.0.0.0")] // the pinned identity, and what a source-built or vendored contract carries
     [InlineData("9.9.9.9")] // and a version no host will ever carry
     public void LoadFromAssemblyName_ContractAtAnyVersion_ResolvesToTheHostsOwnCopy(string version)

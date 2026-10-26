@@ -5,8 +5,8 @@ using Shouldly;
 namespace SlideRule.Tests;
 
 /// <summary>
-///     The Shouldly surface both analyzers' tests share: which warnings came back, what each one says and
-///     carries as properties, and which descriptors an analyzer declares.
+///     The Shouldly surface both analyzers' tests share: which warnings came back, and what each one says and
+///     carries as properties.
 /// </summary>
 /// <remarks>
 ///     Every failure message carries the whole reported set — each warning's ID, position and message —
@@ -85,21 +85,6 @@ internal static class DiagnosticAssertions
             .ToList();
 
         carried.ShouldBe(expected);
-    }
-
-    /// <summary>
-    ///     Asserts exactly one of the <paramref name="declared" /> descriptors carries <paramref name="id" />,
-    ///     and returns it.
-    /// </summary>
-    internal static DiagnosticDescriptor ShouldDeclare(this IEnumerable<DiagnosticDescriptor> declared, string id)
-    {
-        List<DiagnosticDescriptor> all = declared.ToList();
-        List<DiagnosticDescriptor> matching = all
-            .Where(descriptor => descriptor.Id == id)
-            .ToList();
-        string ids = string.Join(", ", all.Select(descriptor => descriptor.Id));
-
-        return matching.ShouldHaveSingleItem($"Looking for descriptor '{id}'; the analyzer declares: {ids}.");
     }
 
     /// <summary>The value the warning carries as a property under <paramref name="key" />, or null if none.</summary>

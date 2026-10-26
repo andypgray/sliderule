@@ -89,6 +89,9 @@ internal static class DocPaths
     /// </summary>
     internal const string AdapterProject = "src/SlideRule.Xunit/SlideRule.Xunit.csproj";
 
+    /// <summary>The build analyzer's project, which ships the analyzer package.</summary>
+    internal const string AnalyzersProject = "src/SlideRule.Analyzers/SlideRule.Analyzers.csproj";
+
     /// <summary>The MCP registry manifest the tool's package carries.</summary>
     internal const string McpManifest = ".mcp/server.json";
 

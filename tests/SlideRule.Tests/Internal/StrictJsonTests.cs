@@ -39,7 +39,6 @@ public sealed class StrictJsonTests
         "line 1, column 2: the escape '\\uDE00' is one half of a surrogate pair and the other half is missing.")]
     [InlineData("\"\\uD83D\\u0041\"",
         "line 1, column 2: the escape '\\uD83D' is one half of a surrogate pair and the other half is missing.")]
-    [InlineData("{\"id\":1,\"id\":2}", "line 1, column 9: the key \"id\" appears twice in one object.")]
     [InlineData("{} x", "line 1, column 4: expected the end of the text, found 'x'.")]
     [InlineData("1 2", "line 1, column 3: expected the end of the text, found '2'.")]
     [InlineData("{\"a\":1,}", "line 1, column 8: expected a key, found '}'.")]

@@ -408,6 +408,7 @@ public sealed class FilteredSolutionE2ETests
         // so the baseline this would write lands in MyApp's own arch/ — beside the baseline a real team
         // committed, which is exactly what makes writing it unrecoverable.
         string[] before = FilesWhereAWriteWouldLand();
+        before.ShouldNotBeEmpty();
 
         CliResult result = await CliRunner.InvokeColdAsync(
             "baseline", "init", BillingOnlyFilter(), "--spec", CliRunner.CleanSpecDll);
@@ -425,6 +426,7 @@ public sealed class FilteredSolutionE2ETests
         // sits before extraction, so the mode never reaches the file it would have pruned. That is the point —
         // a project that stopped being checked looks exactly like a violation that stopped occurring.
         string[] before = FilesWhereAWriteWouldLand();
+        before.ShouldNotBeEmpty();
 
         CliResult result = await CliRunner.InvokeColdAsync(
             "baseline", "accept-reductions", BillingOnlyFilter(), "--spec", CliRunner.CleanSpecDll);
@@ -458,6 +460,7 @@ public sealed class FilteredSolutionE2ETests
         // from an unchecked project would be silently absent from a file a reader then trusts, and under the
         // referenced solution's anchor that file is the AGENTS.md beside MyApp's own solution.
         string[] before = FilesWhereAWriteWouldLand();
+        before.ShouldNotBeEmpty();
 
         CliResult result = await CliRunner.InvokeColdAsync(
             "render", BillingOnlyFilter(), "--spec", CliRunner.CleanSpecDll);
@@ -504,7 +507,7 @@ public sealed class FilteredSolutionE2ETests
         string solutionDirectory = Path.GetDirectoryName(workspace.SolutionPath)!;
         string[] targets = Directory
             .EnumerateFiles(solutionDirectory, "*.md", SearchOption.AllDirectories)
-            .Where(path => !TempFixtureWorkspace.IsBuildArtifact(path))
+            .Where(path => !TempFixtureWorkspace.IsBuildArtifact(Path.GetRelativePath(solutionDirectory, path)))
             .ToArray();
 
         foreach (string target in targets) File.Delete(target);
@@ -547,8 +550,8 @@ public sealed class FilteredSolutionE2ETests
     {
         string[] roots = [FilterDirectory, Path.GetDirectoryName(CliRunner.MyAppSolution)!];
         return roots
-            .SelectMany(root => Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
-            .Where(path => !TempFixtureWorkspace.IsBuildArtifact(path))
+            .SelectMany(root => Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories)
+                .Where(path => !TempFixtureWorkspace.IsBuildArtifact(Path.GetRelativePath(root, path))))
             .Select(Describe)
             .Order(StringComparer.Ordinal)
             .ToArray();

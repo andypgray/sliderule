@@ -111,20 +111,6 @@ public sealed class MustResideInProjectVerbTests
     }
 
     [Fact]
-    public void MustResideInProject_EmptySubject_FailsWithDefaultMessage()
-    {
-        // An empty subject fails the rule by default with the shared message (GRAMMAR §4.1), exactly as every
-        // other verb — the residence verb takes the same subject gate.
-        RuleResult result = Checker.Run(MultiplyDeclaredCodebase.Model, arch =>
-                arch.Rule("layering/empty")
-                    .Enforce(arch.Namespace("Nowhere.*").MustResideInProject("Core"))
-                    .Because("b"))
-            .Single();
-
-        result.ShouldHaveFailedWithDetail(ViolationKind.EmptySubject, ConstraintEvaluator.EmptySubjectMessage);
-    }
-
-    [Fact]
     public void MustResideInProject_GrandfatheredSubjectPasses_NewMisplacedTypeStaysRed()
     {
         // Identity is the subject symbol ID (GRAMMAR §4.3), one entry per misplaced type. Tool.Command is

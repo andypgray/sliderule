@@ -42,7 +42,9 @@ public sealed class IntermediateOutputTreeTests
 
     [Theory]
     // The default layout: the assets file sits three levels above the intermediate assembly, so the two
-    // pivot directories are stamped too — absent, and that is the point.
+    // pivot directories are stamped too — absent, and that is the point. The default location and the
+    // intermediate root are the same directory here, and the exact list holds it to one stamp: a duplicate
+    // would be a second stat and a second entry in every persisted manifest.
     [InlineData(
         "/r/P", "/r/P/bin/Debug/net10.0/A.dll", "/r/P/obj/Debug/net10.0/A.dll",
         "/r/P/obj/project.assets.json;/r/P/obj/Debug/net10.0/project.assets.json;/r/P/obj/Debug/project.assets.json")]
@@ -69,18 +71,5 @@ public sealed class IntermediateOutputTreeTests
 
         paths.ShouldBe(expected.Split(';')
             .Select(Path.GetFullPath));
-    }
-
-    [Fact]
-    public void AssetsPathsOf_DefaultLayout_NeverStampsOnePathTwice()
-    {
-        // The default location and the intermediate root are the same directory in the default layout, and a
-        // duplicated stamp would be a second stat and a second entry in every persisted manifest.
-        IReadOnlyList<string> paths = IntermediateOutputTree.AssetsPathsOf(
-            "/r/P", "/r/P/bin/Debug/net10.0/A.dll", "/r/P/obj/Debug/net10.0/A.dll");
-
-        paths.Distinct()
-            .Count()
-            .ShouldBe(paths.Count);
     }
 }

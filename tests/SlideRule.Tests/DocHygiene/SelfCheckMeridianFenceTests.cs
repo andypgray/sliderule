@@ -25,12 +25,6 @@ namespace SlideRule.Tests.DocHygiene;
 /// </remarks>
 public sealed class SelfCheckMeridianFenceTests
 {
-    private const string Workflow = ".github/workflows/ci.yml";
-
-    private const string MeridianSolution = "examples/Meridian/Meridian.slnx";
-
-    private const string MeridianSpecProject = "examples/Meridian/arch/Meridian.Architecture";
-
     /// <summary>
     ///     The filter the examples job runs the suite's example-gated classes through: each skips unless the
     ///     examples are built, and that job is the only place they are.
@@ -76,14 +70,14 @@ public sealed class SelfCheckMeridianFenceTests
     public void ExampleGatedTests_AreRunByTheExamplesWorkflow()
     {
         // Act
-        string workflow = RepoRoot.ReadText(Workflow);
+        string workflow = RepoRoot.ReadText(TrackedFiles.CiWorkflow);
 
         // Assert: the only place the examples are built before the suite runs, so the only place the two facts
         // above, the model-file round trips and the walkthrough replays run at all. This line going missing
         // turns them into skips everywhere, in silence.
         workflow.ShouldContain(
             $"--filter \"{ExamplesWorkflowFilter}\"",
-            customMessage: $"{Workflow} no longer runs the example-gated classes after building the examples, so "
+            customMessage: $"{TrackedFiles.CiWorkflow} no longer runs the example-gated classes after building the examples, so "
                            + "nothing re-runs the self-check page's two Meridian fences or the walkthroughs' output "
                            + "fences.");
     }
@@ -96,7 +90,7 @@ public sealed class SelfCheckMeridianFenceTests
         string sarifPath = temp.PathOf("meridian.sarif");
 
         CliResult result = await CliRunner.InvokeAsync(
-            "check", RepoRoot.Absolute(MeridianSolution), "--json", "--sarif", sarifPath, "--no-cache");
+            "check", Meridian().SolutionPath, "--json", "--sarif", sarifPath, "--no-cache");
         result.ShouldSucceed();
 
         JsonNode sarif = JsonNode.Parse(await File.ReadAllTextAsync(sarifPath))!;
@@ -107,13 +101,12 @@ public sealed class SelfCheckMeridianFenceTests
 
     private static void SkipUnlessMeridianIsBuilt()
     {
-        string specProject = RepoRoot.Absolute(MeridianSpecProject);
-        string searched = ExampleBuilds.SpecOutputDirectory(specProject);
+        ExampleBuilds.SkipUnlessBuilt(Meridian(), "the check these fences quote");
+    }
 
-        Assert.SkipUnless(
-            ExampleBuilds.IsBuilt(searched, specProject),
-            "Nothing in this suite builds the example solutions, and these fences quote a check over Meridian, "
-            + $"which reads the spec assembly a build of it produces. Build it and run this again. Looked in: {searched}");
+    private static ExampleSolution Meridian()
+    {
+        return ExampleSolutions.Named(WalkthroughScenarios.Meridian);
     }
 
     // The fence as the JSON object it quotes, or a red naming the line where it stopped being one.

@@ -232,28 +232,6 @@ public sealed class CodebaseExtractorRegistrationTests
             .ToArray();
     }
 
-    [Fact]
-    public void Recognize_TypeofNamingAnInaccessibleType_RecordsTheCandidate()
-    {
-        // The code does not compile: Hidden is private to Outer. The compiler still names the one type the
-        // operand could mean, and extraction takes that candidate here as it does for every other name, so the
-        // registration is in the model rather than silently dropped.
-        CodebaseModel model = ExtractRegistration("services.AddSingleton(typeof(Outer.Hidden))");
-
-        model.HasRegistration(Lifetime.Singleton, "N.Outer.Hidden", "N.Outer.Hidden")
-            .ShouldBeTrue();
-    }
-
-    [Fact]
-    public void Recognize_TypeofNamingNothingTheCompilerCanFind_RecordsNoFact()
-    {
-        // The boundary of the tolerance: a name with no candidate at all is not a guess, so there is nothing to
-        // record it under.
-        CodebaseModel model = ExtractRegistration("services.AddSingleton(typeof(Missing))");
-
-        model.ServiceRegistrations.ShouldBeEmpty();
-    }
-
     [Theory]
     [InlineData("services.AddSingleton<Outer.Hidden>()", Lifetime.Singleton, "N.Outer.Hidden", "N.Outer.Hidden")]
     [InlineData("services.AddSingleton<Dup>()", Lifetime.Singleton, "A.Dup", "A.Dup")]

@@ -1,3 +1,5 @@
+using Xunit;
+
 namespace SlideRule.Tests.TestSupport;
 
 /// <summary>
@@ -37,5 +39,22 @@ internal static class ExampleBuilds
         return Directory.Exists(outputDirectory)
                && Directory.EnumerateFiles(outputDirectory, fileName, SearchOption.AllDirectories)
                    .Any();
+    }
+
+    /// <summary>
+    ///     Skips the running test unless <paramref name="example" />'s spec assembly is built, with a reason that
+    ///     names <paramref name="whatReadsIt" />, the subject that reads that assembly, and where it looked.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The example has no spec project.</exception>
+    internal static void SkipUnlessBuilt(ExampleSolution example, string whatReadsIt)
+    {
+        string specProject = example.SpecProjectDirectory
+                             ?? throw new InvalidOperationException($"{example.Name} has no spec project.");
+        string searched = SpecOutputDirectory(specProject);
+
+        Assert.SkipUnless(
+            IsBuilt(searched, specProject),
+            $"Nothing in this suite builds the example solutions, and {whatReadsIt} reads the spec assembly a build "
+            + $"of {example.Name} produces. Build it and run this again. Looked in: {searched}");
     }
 }

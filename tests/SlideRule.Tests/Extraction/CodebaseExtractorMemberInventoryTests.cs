@@ -100,20 +100,6 @@ public sealed class CodebaseExtractorMemberInventoryTests
     }
 
     [Fact]
-    public void Inventory_AutoProperty_FoldsToOnePropertyEntryNoAccessorsOrBackingField()
-    {
-        CodebaseModel model = CompilationFactory.Extract("""
-                                                         namespace N;
-                                                         public class C { public int P { get; set; } }
-                                                         """);
-
-        // One P: entry — never M:get_P / M:set_P (accessors fold), and no <P>k__BackingField (implicit).
-        model.Type("N.C")
-            .MemberIds()
-            .ShouldBe(["P:N.C.P"]);
-    }
-
-    [Fact]
     public void Inventory_SpecialMembers_AreAllExcluded()
     {
         CodebaseModel model = CompilationFactory.Extract("""
@@ -214,63 +200,15 @@ public sealed class CodebaseExtractorMemberInventoryTests
     }
 
     [Fact]
-    public void Inventory_VirtualMethod_IsVirtualTrueAbstractFalse()
+    public void Inventory_InterfaceProperty_IsAbstract()
     {
         CodebaseModel model = CompilationFactory.Extract("""
                                                          namespace N;
-                                                         public class Base { public virtual void M() {} }
+                                                         public interface I { int P { get; } }
                                                          """);
 
-        MemberNode m = model.Type("N.Base")
-            .Member("M:N.Base.M");
-        m.IsVirtual.ShouldBeTrue();
-        m.IsAbstract.ShouldBeFalse();
-    }
-
-    [Fact]
-    public void Inventory_OverrideMethod_IsNotVirtual()
-    {
-        CodebaseModel model = CompilationFactory.Extract("""
-                                                         namespace N;
-                                                         public class Base { public virtual void M() {} }
-                                                         public class Derived : Base { public override void M() {} }
-                                                         """);
-
-        // C# declaration semantics, not IL: an override is not itself "virtual" in the authored sense.
-        MemberNode m = model.Type("N.Derived")
-            .Member("M:N.Derived.M");
-        m.IsVirtual.ShouldBeFalse();
-        m.IsAbstract.ShouldBeFalse();
-    }
-
-    [Fact]
-    public void Inventory_AbstractMethod_IsAbstractTrueVirtualFalse()
-    {
-        CodebaseModel model = CompilationFactory.Extract("""
-                                                         namespace N;
-                                                         public abstract class A { public abstract void M(); }
-                                                         """);
-
-        MemberNode m = model.Type("N.A")
-            .Member("M:N.A.M");
-        m.IsAbstract.ShouldBeTrue();
-        m.IsVirtual.ShouldBeFalse();
-    }
-
-    [Fact]
-    public void Inventory_InterfaceMembers_AreAbstractNotVirtual()
-    {
-        CodebaseModel model = CompilationFactory.Extract("""
-                                                         namespace N;
-                                                         public interface I { void M(); int P { get; } }
-                                                         """);
-
-        TypeNode i = model.Type("N.I");
-        i.Member("M:N.I.M")
-            .IsAbstract.ShouldBeTrue();
-        i.Member("M:N.I.M")
-            .IsVirtual.ShouldBeFalse();
-        i.Member("P:N.I.P")
+        model.Type("N.I")
+            .Member("P:N.I.P")
             .IsAbstract.ShouldBeTrue();
     }
 

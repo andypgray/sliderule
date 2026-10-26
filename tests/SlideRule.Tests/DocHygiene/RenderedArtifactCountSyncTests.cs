@@ -22,11 +22,10 @@ namespace SlideRule.Tests.DocHygiene;
 /// </remarks>
 public sealed class RenderedArtifactCountSyncTests
 {
-    private const string RootAgents = "AGENTS.md";
     private const string SourceRoot = "src/";
 
     /// <summary>The docs that claim a rendered-artifact count, in registration order.</summary>
-    private static readonly string[] CountDocs = [RootAgents, DocPaths.Contributing];
+    private static readonly string[] CountDocs = [ContextFileComposer.FileName, DocPaths.Contributing];
 
     private static readonly DocGate<RenderedArtifactCountClaim> Gate = new(
         CountDocs,
@@ -92,7 +91,7 @@ public sealed class RenderedArtifactCountSyncTests
             .Where(card => !card.StartsWith(SourceRoot, StringComparison.Ordinal))
             .ToList()
             .ShouldReportNothing(
-                $"These committed cards sit outside {SourceRoot}, which {DocPaths.Contributing} and {RootAgents} both "
+                $"These committed cards sit outside {SourceRoot}, which {DocPaths.Contributing} and {ContextFileComposer.FileName} both "
                 + "say is where every one of them lives — move the rule or reword the sentence");
     }
 
@@ -125,9 +124,9 @@ public sealed class RenderedArtifactCountSyncTests
     [Fact]
     public void ReleaseHistory_IsSilencedByItsExemption_NotByTheScannerMissingIt()
     {
-        string history = RepoRoot.ReadText("CHANGELOG.md");
+        string history = RepoRoot.ReadText(DocPaths.Changelog);
 
-        RenderedArtifactCounts.Extract("CHANGELOG.md", history)
+        RenderedArtifactCounts.Extract(DocPaths.Changelog, history)
             .ShouldBeEmpty("the release history records what past versions rendered; holding those numbers to "
                            + "today's set would rewrite history every time a rule places a card");
 

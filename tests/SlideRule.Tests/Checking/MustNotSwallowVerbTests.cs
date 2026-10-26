@@ -16,10 +16,12 @@ namespace SlideRule.Tests.Checking;
 ///     The pin neither sibling can carry is the differentiator: the two rethrowing handlers are red under
 ///     <c>MustNotCatchUnfiltered</c> and <b>green</b> here. Beside it the syntactic honesty boundary,
 ///     both ways: a terminal <c>throw</c> that is not on every path still reads as throwing, and a throw on some
-///     path that is not the last statement still reads as swallowing. The other rows repeat the siblings'
-///     rows under this verb. The kind is <see cref="ViolationKind.Catch" />, which names the fact family
-///     rather than the verb, so identity is the (source, caught) type pair keyed by
-///     <see cref="BaselineEntry.ForEdge" /> and the swallowing sites are evidence, never identity.
+///     path that is not the last statement still reads as swallowing. The rows the catch verbs share
+///     (FQN matching, a hierarchy operand, the absent typeof target, the ratchet, the JSON wire form) live in
+///     <c>MustNotCatchVerbTests</c>: the catch verbs run one walk and differ only in the sites they read. The kind is
+///     <see cref="ViolationKind.Catch" />, which names the fact family rather than the verb, so identity is the
+///     (source, caught) type pair keyed by <see cref="BaselineEntry.ForEdge" /> and the swallowing sites are
+///     evidence, never identity.
 /// </remarks>
 public sealed class MustNotSwallowVerbTests
 {
@@ -240,37 +242,6 @@ public sealed class MustNotSwallowVerbTests
     }
 
     [Fact]
-    public void MustNotSwallow_BansExceptionButSwallowsNarrowerType_NarrowCatchNotFlagged()
-    {
-        // Matching is exact definition-level FQN, not hierarchy: banning typeof(Exception) flags the broad
-        // swallowing `catch (System.Exception)` but NEVER the narrower `catch (IOException)`, swallowing or not —
-        // the narrow catch is a good state in its own right. Broad's presence proves the ban is live.
-        RuleResult result = Checker.Run(Sources.CatchBroadVsNarrowModel, arch =>
-                arch.Rule("ex/no-swallowed-broad-catches")
-                    .Enforce(arch.Types.MustNotSwallow(typeof(Exception)))
-                    .Because("b"))
-            .Single();
-
-        result.ShouldHaveFailedWithEdges(ViolationKind.Catch, ["App.Broad -> System.Exception"]);
-    }
-
-    [Fact]
-    public void MustNotSwallow_DerivedFromOperand_MatchesSolutionExceptionNotExternal()
-    {
-        // A hierarchy-adjective operand (arch.Types.DerivedFrom) ranges over solution-declared types only —
-        // external types carry a shallow hierarchy. Worker swallows its own N.AppError (solution, derives from
-        // Exception → matched → red) and an external System.InvalidOperationException, also swallowed but never
-        // matched by a DerivedFrom operand, so not flagged.
-        RuleResult result = Checker.Run(Sources.CatchDerivedFromModel, arch =>
-                arch.Rule("ex/no-swallowed-derived-errors")
-                    .Enforce(arch.Namespace("N.*").MustNotSwallow(arch.Types.DerivedFrom(typeof(Exception))))
-                    .Because("b"))
-            .Single();
-
-        result.ShouldHaveFailedWithEdges(ViolationKind.Catch, ["N.Worker -> N.AppError"]);
-    }
-
-    [Fact]
     public void MustNotSwallow_InertPatternTarget_WarnsAndStillPasses()
     {
         // The forbidden target (a namespace glob) matches no types, so the rule can never fire — inert. The
@@ -283,68 +254,5 @@ public sealed class MustNotSwallowVerbTests
             .Single();
 
         result.ShouldHaveWarnedInertTarget();
-    }
-
-    [Fact]
-    public void MustNotSwallow_AbsentTypeofTarget_IsSilentWinNoWarning()
-    {
-        // A bare typeof target absent from the codebase is the WIN condition, not an inert warning: nobody
-        // catches System.FormatException at all, so the ban resolves empty but — being a concrete typeof anchor,
-        // not a pattern — stays silent (the departure from the pattern-operand inert warning above).
-        RuleResult result = Checker.Run(SceneModel, arch =>
-                arch.Rule("ex/no-swallowed-format-errors")
-                    .Enforce(arch.Namespace("App.*").MustNotSwallow(typeof(FormatException)))
-                    .Because("b"))
-            .Single();
-
-        result.ShouldHavePassedClean();
-    }
-
-    [Fact]
-    public void MustNotSwallow_EmptySubject_FailsWithDefaultMessage()
-    {
-        // An empty subject fails the rule by default with the shared message (GRAMMAR §4.1), exactly as every
-        // other verb — the rethrow-aware catch verb takes the same subject gate.
-        RuleResult result = Checker.Run(
-                "namespace App { public class Foo {} }",
-                arch => arch.Rule("ex/empty")
-                    .Enforce(arch.Namespace("Nowhere.*").MustNotSwallow(arch.Namespace("App.*")))
-                    .Because("b"))
-            .Single();
-
-        result.ShouldHaveFailedWithDetail(ViolationKind.EmptySubject, ConstraintEvaluator.EmptySubjectMessage);
-    }
-
-    [Fact]
-    public void MustNotSwallow_GrandfatheredEdgePasses_NewSwallowStaysRed()
-    {
-        // Identity is the (source, caught) type pair (GRAMMAR §4.3) — the swallowing sites are evidence, not
-        // identity, so a baseline entry written for any of the three catch verbs keys the same edge. Handler is
-        // grandfathered for catching AErr; its NEW swallowed BErr is a distinct identity → red.
-        BaselineIndex index = Checker.Baselines("ex/no-swallowed-errors", BaselineEntry.ForEdge("T:App.Handler", "T:Errors.AErr"));
-
-        RuleResult result = Checker.Run(Sources.CatchRatchetModel, index, arch =>
-                arch.Rule("ex/no-swallowed-errors")
-                    .Migrate("legacy swallowed catches", arch.Namespace("App.*")
-                        .MustNotSwallow(arch.Namespace("Errors.*")))
-                    .Because("a handler that holds a failure and continues hides it"))
-            .Single();
-
-        result.ShouldHaveFailedWithEdges(ViolationKind.Catch, ["App.Handler -> Errors.BErr"]);
-        result.ShouldHaveGrandfathered(1);
-    }
-
-    [Fact]
-    public void JsonReportRenderer_SwallowViolation_EmitsCatchKindAndTargetAndOmitsMemberSlots()
-    {
-        // Kind reuse reaches the wire: the JSON kind string is "catch", the caught type rides the existing
-        // `target` field, and schemaVersion stays 3 — a third verb on a recorded fact family adds no vocabulary a
-        // hook would have to learn.
-        CheckReport report = Checker.Run(SceneModel, arch =>
-            arch.Rule("ex/no-swallowed-domain-errors")
-                .Enforce(arch.Namespace("App.*").MustNotSwallow(arch.Namespace("Errors.*")))
-                .Because("b"));
-
-        report.ShouldRenderEdgeViolation("catch", "App.Swallower", "Errors.DbError");
     }
 }

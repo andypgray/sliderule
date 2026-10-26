@@ -31,46 +31,19 @@ public sealed class ShapeFactExtractionTests
 
     private static readonly CodebaseModel Model = CompilationFactory.Extract(Modifiers);
 
-    [Fact]
-    public void SealedClass_ReportsSealedOnly()
+    // The static class row is THE normalization pin (source path): a static class is encoded abstract+sealed
+    // but reports neither, matching C# declaration semantics.
+    [Theory]
+    [InlineData("N.SealedClass", true, false, false)]
+    [InlineData("N.StaticClass", false, true, false)]
+    [InlineData("N.AbstractClass", false, false, true)]
+    [InlineData("N.PlainClass", false, false, false)]
+    public void ClassModifiers_ReportOnlyTheFlagsTheyDeclare(string fullName, bool isSealed, bool isStatic, bool isAbstract)
     {
-        TypeNode t = Model.Type("N.SealedClass");
-        t.IsSealed.ShouldBeTrue();
-        t.IsStatic.ShouldBeFalse();
-        t.IsAbstract.ShouldBeFalse();
-        t.IsRecord.ShouldBeFalse();
-    }
+        TypeNode t = Model.Type(fullName);
 
-    [Fact]
-    public void StaticClass_IsNeitherSealedNorAbstract()
-    {
-        // THE normalization pin (source path): a static class is encoded abstract+sealed but reports
-        // neither, matching C# declaration semantics.
-        TypeNode t = Model.Type("N.StaticClass");
-        t.IsStatic.ShouldBeTrue();
-        t.IsSealed.ShouldBeFalse();
-        t.IsAbstract.ShouldBeFalse();
-        t.IsRecord.ShouldBeFalse();
-    }
-
-    [Fact]
-    public void AbstractClass_ReportsAbstractOnly()
-    {
-        TypeNode t = Model.Type("N.AbstractClass");
-        t.IsAbstract.ShouldBeTrue();
-        t.IsSealed.ShouldBeFalse();
-        t.IsStatic.ShouldBeFalse();
-        t.IsRecord.ShouldBeFalse();
-    }
-
-    [Fact]
-    public void PlainClass_ReportsAllFlagsFalse()
-    {
-        TypeNode t = Model.Type("N.PlainClass");
-        t.IsSealed.ShouldBeFalse();
-        t.IsStatic.ShouldBeFalse();
-        t.IsAbstract.ShouldBeFalse();
-        t.IsRecord.ShouldBeFalse();
+        (t.IsSealed, t.IsStatic, t.IsAbstract, t.IsRecord)
+            .ShouldBe((isSealed, isStatic, isAbstract, false));
     }
 
     [Fact]

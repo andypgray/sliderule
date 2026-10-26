@@ -162,21 +162,6 @@ public sealed class MustNotExposeVerbTests
     }
 
     [Fact]
-    public void MustNotExpose_EmptySubject_FailsWithDefaultMessage()
-    {
-        // An empty subject fails the rule by default with the shared message (GRAMMAR §4.1), exactly as every
-        // other verb — the exposure verb takes the same subject gate.
-        RuleResult result = Checker.Run(
-                "namespace App { public class Foo {} }",
-                arch => arch.Rule("api/empty")
-                    .Enforce(arch.Namespace("Nowhere.*").MustNotExpose(arch.Namespace("App.*")))
-                    .Because("b"))
-            .Single();
-
-        result.ShouldHaveFailedWithDetail(ViolationKind.EmptySubject, ConstraintEvaluator.EmptySubjectMessage);
-    }
-
-    [Fact]
     public void MustNotExpose_GrandfatheredEdgePasses_NewExposureStaysRed()
     {
         // The exposure ratchet keys the (source, exposed) type pair (GRAMMAR §4.3): Facade is grandfathered for

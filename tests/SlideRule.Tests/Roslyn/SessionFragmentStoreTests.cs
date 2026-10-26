@@ -89,30 +89,8 @@ public sealed class SessionFragmentStoreTests(SessionFragmentStoreTests.Sessions
     [Fact]
     public async Task GetFragmentsAsync_SourceEditedInOneProject_ReExtractsDirtyPlusDependents()
     {
-        // Arrange — populate the store from the clean tree.
-        SharedWorkspaceSession fixture = sessions.MyApp;
-        using var store = new SessionFragmentStore();
-        WorkspaceSnapshot snap1 = await fixture.Session.GetCurrentAsync(fixture.SolutionPath, Ct);
-        await store.GetFragmentsAsync(snap1, null, Ct);
-
-        // Act — append a new type to a Web source file (a content edit the sweep folds in place), then re-get.
-        string webFile = fixture.PathOf(Web, "WebTextExtensions.cs");
-        EditOnDisk(webFile, content => content + "\npublic class WebIncrementalProbe { }\n");
-        WorkspaceSnapshot snap2 = await fixture.Session.GetCurrentAsync(fixture.SolutionPath, Ct);
-        SessionFragmentSet edited = await store.GetFragmentsAsync(snap2, null, Ct);
-
-        // Assert — re-extraction is EXACTLY Web (content-dirty) ∪ Domain (its only reverse-dependent); Billing,
-        // which Web references but which references nothing, stays clean and is reused. No new full walk.
-        edited.ReExtractedProjects.ShouldBe([Web, Domain], true);
-        store.LastReExtractedProjects.ShouldBe([Web, Domain], true);
-        store.FullWalkCount.ShouldBe(1);
-
-        // The merged model carries the new type and equals a fresh cold extraction of the edited tree.
-        CodebaseModel storeModel = FragmentMerger.Merge(edited.Fragments);
-        CodebaseModel coldModel = await CodebaseExtractor.ExtractFromSolutionAsync(snap2.Solution, ct: Ct);
-        storeModel.Dump()
-            .ShouldContain("MyApp.Web.WebIncrementalProbe");
-        storeModel.ShouldModelTheSameAs(coldModel);
+        // A new type is declaration surface, which a dependent can bind to.
+        await ShouldReWalkWebAndDomain(content => content + "\npublic class WebIncrementalProbe { }\n");
     }
 
     [Fact]
@@ -452,10 +430,10 @@ public sealed class SessionFragmentStoreTests(SessionFragmentStoreTests.Sessions
         await remapped.ShouldMergeToTheColdModelAsync(edited);
     }
 
-    // The scene three of the rows above share, differing only in the edit they make: populate the store from
-    // the clean tree, edit one Web source file, re-get. Three [Fact]s rather than a [Theory] because they are
-    // three distinct facts about what reaches a document's declaration surface, and theory data carrying
-    // source text lands in every display name.
+    // The scene the declaration-surface rows above share, differing only in the edit they make: populate the
+    // store from the clean tree, edit one Web source file, re-get. [Fact]s rather than a [Theory] because they
+    // are distinct facts about what reaches a document's declaration surface, and theory data carrying source
+    // text lands in every display name.
     private async Task ShouldReWalkWebAndDomain(Func<string, string> edit)
     {
         // Arrange
@@ -469,8 +447,9 @@ public sealed class SessionFragmentStoreTests(SessionFragmentStoreTests.Sessions
         WorkspaceSnapshot snap2 = await fixture.Session.GetCurrentAsync(fixture.SolutionPath, Ct);
         SessionFragmentSet edited = await store.GetFragmentsAsync(snap2, null, Ct);
 
-        // Assert — the declaration surface changed, so Web and its reverse-dependent Domain were re-walked,
-        // nothing was remapped, and no new full walk was needed.
+        // Assert — the declaration surface changed, so Web and its reverse-dependent Domain were re-walked;
+        // Billing, which Web references but which references nothing, stays clean and is reused. Nothing was
+        // remapped, and no new full walk was needed.
         edited.ReExtractedProjects.ShouldBe([Web, Domain], true);
         store.LastReExtractedProjects.ShouldBe([Web, Domain], true);
         store.LastRemappedProjects.ShouldBeEmpty();

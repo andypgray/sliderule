@@ -295,20 +295,6 @@ public sealed class MustHaveExactlyOneCounterpartVerbTests
     }
 
     [Fact]
-    public void MustHaveExactlyOneCounterpart_EmptySubject_FailsWithDefaultMessage()
-    {
-        // An empty subject fails the rule by default with the shared message (GRAMMAR §4.1), which is what
-        // keeps an empty among and an empty subject distinguishable outcomes rather than one blur.
-        Checker.Run(SceneModel, arch =>
-                arch.Rule("naming/empty")
-                    .Enforce(arch.Namespace("Nowhere.*")
-                        .MustHaveExactlyOneCounterpart(among: arch.Types.OfKind(TypeKind.Interface), named: "I{Name}"))
-                    .Because("b"))
-            .Single()
-            .ShouldHaveFailedWithDetail(ViolationKind.EmptySubject, ConstraintEvaluator.EmptySubjectMessage);
-    }
-
-    [Fact]
     public void MustHaveExactlyOneCounterpart_BlessedSubject_StaysGrandfatheredWhenTheArmFlips()
     {
         // Identity is the subject symbol ID on BOTH arms, so one entry blesses `App.Invoice` whether it has

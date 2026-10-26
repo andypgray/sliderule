@@ -32,7 +32,7 @@ public sealed class ExplainCacheE2ETests
     [Fact]
     public async Task Explain_OnASlotAnotherVerbFilled_AnswersWithNoWorkspaceAndIsByteIdentical()
     {
-        using TempFixtureWorkspace workspace = BuiltLayoutCopy();
+        using TempFixtureWorkspace workspace = LayoutAppFixture.BuiltCopy();
         using var cache = new TempCacheRoot("explain-cache");
 
         (CliResult cold, long coldLoads) = await ExplainAsync(workspace, cache.Root);
@@ -59,7 +59,7 @@ public sealed class ExplainCacheE2ETests
     [Fact]
     public async Task Explain_NoCache_StaysColdOverAFilledSlot()
     {
-        using TempFixtureWorkspace workspace = BuiltLayoutCopy();
+        using TempFixtureWorkspace workspace = LayoutAppFixture.BuiltCopy();
         using var cache = new TempCacheRoot("explain-cache");
 
         await RunAsync(cache.Root, "check", workspace.SolutionPath);
@@ -86,25 +86,5 @@ public sealed class ExplainCacheE2ETests
 
         CliResult result = await CliRunner.InvokeColdAsync(environment, args);
         return (result, result.Loads);
-    }
-
-    // The output-layout fixture, copied, restored and really built under the default layout. Leased per class
-    // and the lease's reset leaves bin/ alone, so the copy, the restore and the build are paid by whichever
-    // fact runs first and the other reuses the output.
-    private static TempFixtureWorkspace BuiltLayoutCopy()
-    {
-        var workspace = new TempFixtureWorkspace(
-            LayoutAppFixture.FixtureDirectory, LayoutAppFixture.SolutionFileName, restore: false);
-        LayoutAppFixture.WritePropsFile(workspace);
-
-        string specAssembly = workspace.PathOf(
-            LayoutAppFixture.SpecProject, "bin", "Debug", "net10.0", LayoutAppFixture.SpecAssembly);
-        if (File.Exists(specAssembly)) return workspace;
-
-        FixtureRestorer.Restore(workspace.SolutionPath);
-        DotnetCli.Run(
-            $"build \"{workspace.SolutionPath}\" --disable-build-servers",
-            Path.GetDirectoryName(workspace.SolutionPath)!);
-        return workspace;
     }
 }

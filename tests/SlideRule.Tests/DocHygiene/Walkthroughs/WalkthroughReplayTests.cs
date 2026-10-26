@@ -141,14 +141,6 @@ public sealed class WalkthroughReplayTests
 
     private static void SkipUnlessBuilt(string example)
     {
-        string specProject = ExampleSolutions.Named(example)
-                                 .SpecProjectDirectory
-                             ?? throw new InvalidOperationException($"{example} has no spec project.");
-        string searched = ExampleBuilds.SpecOutputDirectory(specProject);
-
-        Assert.SkipUnless(
-            ExampleBuilds.IsBuilt(searched, specProject),
-            $"Nothing in this suite builds the example solutions, and this replay reads the spec assembly a build of "
-            + $"{example} produces. Build it and run this again. Looked in: {searched}");
+        ExampleBuilds.SkipUnlessBuilt(ExampleSolutions.Named(example), "this replay");
     }
 }

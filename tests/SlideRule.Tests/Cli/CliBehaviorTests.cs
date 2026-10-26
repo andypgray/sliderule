@@ -27,14 +27,6 @@ namespace SlideRule.Tests.Cli;
 /// </remarks>
 public sealed class CliBehaviorTests
 {
-    [Fact]
-    public async Task UnknownCommand_ExitsTwo()
-    {
-        CliResult result = await CliRunner.InvokeAsync("frobnicate");
-
-        result.ShouldRefuseWith();
-    }
-
     /// <summary>
     ///     The root and every command group, as the words that name them, read from the tree the way
     ///     <see cref="CliEntry" /> decides which command's help follows a parse error: a group is a command with

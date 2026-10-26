@@ -166,14 +166,11 @@ public sealed class StringifiedArrayRefusalCoverageTests
     /// </summary>
     private static IEnumerable<(string Tool, ParameterInfo Parameter)> LiveStringParameters()
     {
-        foreach ((string toolName, MethodInfo method) in ToolAttributeDiscovery.GetNamedToolMethods())
-        {
-            IEnumerable<ParameterInfo> bound = method.GetParameters()
-                .Where(ToolAttributeDiscovery.IsJsonBoundParameter)
-                .Where(parameter => parameter.ParameterType == typeof(string));
-
-            foreach (ParameterInfo parameter in bound) yield return (toolName, parameter);
-        }
+        return LiveToolParameters.ByTool()
+            .SelectMany(
+                static tool => tool.Parameters,
+                static (tool, parameter) => (tool.Tool, Parameter: parameter))
+            .Where(static bound => bound.Parameter.ParameterType == typeof(string));
     }
 
     private static string Key(string tool, ParameterInfo parameter)

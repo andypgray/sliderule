@@ -38,8 +38,7 @@ public sealed class SourcePackageShimCheckTests
     private const string Json = "DriftedApp.Json";
     private const string Testing = "DriftedApp.Testing";
 
-    private static readonly string SolutionPath =
-        Path.Combine(AppContext.BaseDirectory, "Fixtures", "TestSolutions", "DriftedApp", "DriftedApp.slnx");
+    private static readonly string SolutionPath = FixtureBeds.DriftedAppSolution;
 
     private static Task<CodebaseModel> DriftedCodebase => FixtureCodebase.Of(SolutionPath);
 

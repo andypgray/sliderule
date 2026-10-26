@@ -60,9 +60,6 @@ public sealed class ModelDocumentReaderRefusalTests
     public void Read_ARootThatIsNotAnObject_RefusesNamingTheRoot()
     {
         // The one shape no edit of a valid file can reach, and the only place `the root` is the subject.
-        ModelFileSpecs.SampleText()
-            .ShouldReadBack();
-
         ModelReadResult result = ModelDocumentReader.Read("[]");
 
         result.Document.ShouldBeNull();

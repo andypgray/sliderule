@@ -63,7 +63,8 @@ public sealed class BaselineFormatTests
 
         // No whole-file digest in the envelope: an entry's integrity rides on the entry's own line. That is
         // what lets two branches reduce two rules of one file and merge with nothing in common to conflict
-        // on, and what leaves a conflict over one rule resolvable by keeping whole lines.
+        // on, and what leaves a conflict over one rule resolvable by keeping whole lines. The exact text also
+        // pins the file's bytes: LF line ends, no BOM, and a trailing newline.
         composed.ShouldBe(
             "{\n" +
             "  \"schemaVersion\": 2,\n" +
@@ -117,20 +118,6 @@ public sealed class BaselineFormatTests
         string composed = BaselineFormat.ComposeFile(BaselineComposer.Rules(("data-access/no-inline-sql", [])));
 
         composed.ShouldContain("      \"entries\": []\n");
-    }
-
-    [Fact]
-    public void ComposeFile_Always_LfNoBomTrailingNewline()
-    {
-        string composed = BaselineFormat.ComposeFile(BaselineComposer.Rules((
-            "r/x", [BaselineEntry.ForEdge("T:A", "T:B")])));
-        byte[] bytes = Encoding.UTF8.GetBytes(composed);
-
-        bytes.Take(3)
-            .ShouldNotBe([0xEF, 0xBB, 0xBF]); // no UTF-8 BOM
-        composed.ShouldNotContain("\r");
-        composed.EndsWith("\n", StringComparison.Ordinal)
-            .ShouldBeTrue();
     }
 
     [Fact]
@@ -398,7 +385,7 @@ public sealed class BaselineFormatTests
 
     private static string ReadFixture(params string[] relativeParts)
     {
-        var segments = new List<string> { AppContext.BaseDirectory, "Fixtures", "TestSolutions", "MyApp" };
+        var segments = new List<string> { FixtureBeds.MyAppRoot };
         segments.AddRange(relativeParts);
         return File.ReadAllText(Path.Combine(segments.ToArray()));
     }

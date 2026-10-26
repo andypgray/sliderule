@@ -45,6 +45,9 @@ internal sealed record SolutionProject(
     bool IsTool,
     bool IncludeBuildOutput);
 
+/// <summary>A property's <paramref name="Value" /> and the repository-relative <paramref name="File" /> that declared it.</summary>
+internal sealed record PropertyDeclaration(string Value, string File);
+
 /// <summary>
 ///     What the solution file declares, project by project: the one source the gates over this
 ///     repository's hand-written project lists and prose counts read their expected answer from.
@@ -58,6 +61,12 @@ internal sealed record SolutionProject(
 /// </remarks>
 internal static class SolutionInventory
 {
+    /// <summary>The root props file, which carries the lockstep version and the shared package metadata.</summary>
+    public const string RootProps = "Directory.Build.props";
+
+    /// <summary>The props file every project under <c>src/</c> imports.</summary>
+    public const string SrcProps = "src/Directory.Build.props";
+
     /// <summary>The solution folder holding what this repository ships.</summary>
     private const string SrcFolder = "/src/";
 
@@ -123,6 +132,40 @@ internal static class SolutionInventory
                 StringComparer.Ordinal);
     }
 
+    /// <summary>
+    ///     What <paramref name="property" /> evaluates to for the project at <paramref name="csproj" />, as far as
+    ///     the project file and <see cref="SrcProps" /> can say, or null where neither declares it. The project's
+    ///     own declaration wins, because MSBuild imports the props file before the project body.
+    /// </summary>
+    public static PropertyDeclaration? Effective(string csproj, string property)
+    {
+        IReadOnlyDictionary<string, string> own = Properties(csproj);
+        if (own.TryGetValue(property, out string? declared)) return new PropertyDeclaration(declared, csproj);
+
+        IReadOnlyDictionary<string, string> scoped = Properties(SrcProps);
+
+        return scoped.TryGetValue(property, out string? inherited) ? new PropertyDeclaration(inherited, SrcProps) : null;
+    }
+
+    /// <summary>
+    ///     The projects the <c>.slnx</c> at <paramref name="solutionRelativePath" /> declares, in declaration order,
+    ///     as repository-relative paths with forward slashes. A declared path is resolved against the solution's
+    ///     own directory, because it is relative to the file that declares it.
+    /// </summary>
+    public static IReadOnlyList<string> DeclaredProjectPaths(string solutionRelativePath)
+    {
+        string solutionPath = RepoRoot.Absolute(solutionRelativePath);
+        string solutionDirectory = Path.GetDirectoryName(solutionPath)!;
+
+        return XDocument.Load(solutionPath)
+            .Descendants("Project")
+            .Where(static element => element.Attribute("Path") is not null)
+            .Select(DeclaredPath)
+            .Select(path => Path.Combine(solutionDirectory, path))
+            .Select(RepoRoot.Relative)
+            .ToList();
+    }
+
     // What ships, then the rest of src/, then everything else — the reading order the diagram arguments
     // are written in. Three ranks rather than a folder comparison because the distinction the order makes
     // is what a project is for, and the rule pack sits in src/ beside the packages without shipping.
@@ -152,8 +195,7 @@ internal static class SolutionInventory
 
     private static SolutionProject Declared(XElement declaration)
     {
-        string path = declaration.Attribute("Path")!
-            .Value.Replace('\\', '/');
+        string path = DeclaredPath(declaration);
         string name = Path.GetFileNameWithoutExtension(path);
         IReadOnlyDictionary<string, string> properties = Properties(path);
         string assemblyName = Declares(properties, "AssemblyName") ?? name;
@@ -168,6 +210,13 @@ internal static class SolutionInventory
             !IsSet(properties, "IsPackable", "false"),
             IsSet(properties, "PackAsTool", "true"),
             !IsSet(properties, "IncludeBuildOutput", "false"));
+    }
+
+    // A project element's Path attribute in forward slashes, the spelling every path here is compared in.
+    private static string DeclaredPath(XElement declaration)
+    {
+        return declaration.Attribute("Path")!
+            .Value.Replace('\\', '/');
     }
 
     // The nearest enclosing solution folder, or "/" for a project the solution declares at its root.

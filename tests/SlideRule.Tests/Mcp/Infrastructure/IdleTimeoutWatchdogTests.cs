@@ -32,27 +32,28 @@ public sealed class IdleTimeoutWatchdogTests : IDisposable
         return (long)(seconds * Stopwatch.Frequency);
     }
 
-    [Fact]
-    public void Start_TimeoutZero_DoesNotLoopOrExit()
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void Start_ATimeoutOfZeroOrLess_AttachesNothing(int minutes)
     {
-        // Arrange / Act / Assert — timeout <= 0 short-circuits before any task; the
-        // throwing exit delegate proves onIdleTimeout is never invoked.
-        Should.NotThrow(() => IdleTimeoutWatchdog.Start(
-            TimeSpan.Zero,
-            TimeSpan.FromMilliseconds(1),
-            () => 0L,
-            () => throw new InvalidOperationException("watchdog must not exit when disabled")));
-    }
+        // Arrange: a clock an hour further on at every read, so an attached watchdog would stamp its baseline
+        // past the probe below and fire at its first poll.
+        long reads = 0;
+        using var fired = new ManualResetEventSlim();
 
-    [Fact]
-    public void Start_NegativeTimeout_Disabled()
-    {
-        // Arrange / Act / Assert — a negative timeout is treated identically to zero.
-        Should.NotThrow(() => IdleTimeoutWatchdog.Start(
-            TimeSpan.FromMinutes(-1),
+        // Act
+        IdleTimeoutWatchdog.Start(
+            TimeSpan.FromMinutes(minutes),
             TimeSpan.FromMilliseconds(1),
-            () => 0L,
-            () => throw new InvalidOperationException("watchdog must not exit when disabled")));
+            () => Ticks(3600 * Interlocked.Increment(ref reads)),
+            fired.Set);
+
+        // Assert: the baseline is still the reset's timestamp 0, and no poll loop runs.
+        IdleTimeoutWatchdog.IsIdleExpired(TimeSpan.FromMinutes(1), Ticks(120))
+            .ShouldBeTrue();
+        fired.Wait(TimeSpan.FromMilliseconds(200), Ct)
+            .ShouldBeFalse();
     }
 
     [Theory]

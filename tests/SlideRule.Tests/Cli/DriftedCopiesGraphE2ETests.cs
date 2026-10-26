@@ -36,8 +36,7 @@ public sealed class DriftedCopiesGraphE2ETests
 {
     // Read in place rather than leased: graph writes nothing into the tree, and the startup sweep has already
     // restored every TestSolutions bed in the output directory.
-    private static readonly string SolutionPath =
-        Path.Combine(AppContext.BaseDirectory, "Fixtures", "TestSolutions", "DriftedApp", "DriftedApp.slnx");
+    private static readonly string SolutionPath = FixtureBeds.DriftedAppSolution;
 
     [Fact]
     public async Task Graph_DriftedCopiesOfOneName_RenderTheDeclaredEdgesAndStillStateTheSharedName()

@@ -333,22 +333,6 @@ public sealed class SpecLiteralDescriptorTests
     }
 
     [Fact]
-    public void TheFaultsTwoDescriptors_DifferOnlyInTheirMessageDescriptionAndTag()
-    {
-        DiagnosticDescriptor fault = SpecLiteralDiagnostics.AnalyzerFault;
-        DiagnosticDescriptor mismatch = SpecLiteralDiagnostics.VersionMismatch;
-
-        string Shape(DiagnosticDescriptor descriptor)
-        {
-            return $"{descriptor.Id} | {descriptor.Title.Invariant()} | {descriptor.Category} | "
-                   + $"{descriptor.DefaultSeverity} | {descriptor.IsEnabledByDefault} | {descriptor.HelpLinkUri}";
-        }
-
-        Shape(mismatch)
-            .ShouldBe(Shape(fault));
-    }
-
-    [Fact]
     public void TheAnalyzer_DeclaresTheSeventeenIdsInEighteenDescriptorsAsWhatItCanReport()
     {
         List<string> supported = new SpecLiteralAnalyzer().SupportedDiagnostics

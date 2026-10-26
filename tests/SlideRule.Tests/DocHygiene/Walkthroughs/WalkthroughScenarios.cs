@@ -23,9 +23,14 @@ internal static class WalkthroughScenarios
     /// <summary>The preview the module-isolation walkthrough adds to Dispatch.</summary>
     internal const string InvoicePreviewPath = "src/Meridian.Operations/Dispatch/InvoicePreview.cs";
 
-    private const string BookingsController = "src/Meridian.Web/Controllers/BookingsController.cs";
+    /// <summary>The controller the Meridian walkthroughs edit.</summary>
+    internal const string BookingsController = "src/Meridian.Web/Controllers/BookingsController.cs";
+
     private const string ContainerNumberValidator = "src/Meridian.Clearance/ContainerNumberValidator.cs";
-    private const string RequestQuoteHandler = "src/Meridian.Quoting.Application/Handlers/RequestQuoteHandler.cs";
+
+    /// <summary>The handler the clean-architecture walkthrough edits.</summary>
+    internal const string RequestQuoteHandler = "src/Meridian.Quoting.Application/Handlers/RequestQuoteHandler.cs";
+
     private const string CarrierClient = "src/Meridian.Interchange/Partners/CarrierClient.cs";
     private const string CustomsFilingClient = "src/Meridian.Interchange/Partners/CustomsFilingClient.cs";
     private const string TerminalClient = "src/Meridian.Interchange/Partners/TerminalClient.cs";

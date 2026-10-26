@@ -1,31 +1,14 @@
 using System.Text.RegularExpressions;
-using SlideRule.Tests.TestSupport;
 using Xunit;
 
 namespace SlideRule.Tests.DocHygiene;
 
 /// <summary>
-///     The documentation gates over this repository's own published docs. The docs listed below name no
-///     internal working references, and every tracked root-level doc is a held page or is named with the reason
-///     it is not.
+///     The reference catalogs the hygiene gates scan the published tree with, and the gate that every tracked
+///     root-level doc is a held page or is named with the reason it is not.
 /// </summary>
 public sealed class DocHygieneTests
 {
-    private static readonly string[] InternalReferenceFreeDocs =
-    [
-        "GRAMMAR.md",
-        "README.md",
-        "SELF-CHECK.md",
-        "GETTING-STARTED.md",
-        "CODING-AGENTS.md",
-        "CLI.md",
-        "WRITING-SPECS.md",
-        "OPERATING.md",
-        "ARCHITECTURE.md",
-        "CHANGELOG.md",
-        "AGENTS.md"
-    ];
-
     /// <summary>
     ///     References the published tree must never contain: the project's internal working-document
     ///     filenames, its working-notes directory, the labels its build was coordinated by, and the
@@ -104,22 +87,6 @@ public sealed class DocHygieneTests
         new(@"resharper|jetbrains|inspectcode|cleanupcode|\bjb\b|cleanup profile|dotsettings",
             RegexOptions.IgnoreCase)
     ];
-
-    public static TheoryData<string> InternalReferenceFreeDocsCases => [.. InternalReferenceFreeDocs];
-
-    [Theory]
-    [MemberData(nameof(InternalReferenceFreeDocsCases))]
-    public void PublishedDoc_HasNoInternalWorkingReferences(string relativePath)
-    {
-        // Arrange
-        string content = RepoRoot.ReadText(relativePath);
-
-        // Act
-        IReadOnlyList<string> hits = DocProse.FindForbidden(content, InternalReferencePatterns);
-
-        // Assert
-        hits.ShouldReportNothing($"{relativePath} names internal working references");
-    }
 
     /// <summary>
     ///     Pins that every doc git tracks beside the landing page is a held page, every fence of which must be

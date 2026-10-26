@@ -43,8 +43,7 @@ public sealed class DriftedCopiesCheckTests
     private const string Client = "DriftedApp.Client";
     private const string Markup = "DriftedApp.Markup";
 
-    private static readonly string SolutionPath =
-        Path.Combine(AppContext.BaseDirectory, "Fixtures", "TestSolutions", "DriftedApp", "DriftedApp.slnx");
+    private static readonly string SolutionPath = FixtureBeds.DriftedAppSolution;
 
     private static readonly string FixtureRoot = Path.GetDirectoryName(SolutionPath)!;
 

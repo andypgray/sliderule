@@ -446,7 +446,7 @@ file static class PartialLoadRefusalAssertions
         this CliResult result, string loadLede, string restoreLede)
     {
         string channel = result.Err;
-        string report = Describe(result);
+        string report = result.Transcript();
 
         channel.ShouldContain(loadLede, report);
         channel.ShouldContain(restoreLede, report);
@@ -456,14 +456,5 @@ file static class PartialLoadRefusalAssertions
             .ShouldBeLessThan(
                 channel.IndexOf(restoreLede, StringComparison.Ordinal),
                 $"The restore block should follow the load block.{Environment.NewLine}{report}");
-    }
-
-    /// <summary>
-    ///     The exit code and stderr — the channel this assertion reads, and the whole of what the refusal said.
-    /// </summary>
-    private static string Describe(CliResult result)
-    {
-        return $"The CLI exited {result.Exit}.{Environment.NewLine}"
-               + $"stderr:{Environment.NewLine}{result.Err.TrimEnd()}";
     }
 }

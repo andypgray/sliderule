@@ -25,7 +25,8 @@ public sealed class CheckCacheClosureE2ETests
     {
         using var workspace = new TempFixtureWorkspace();
         using var cache = new TempCacheRoot("check-closure");
-        await RunCheckAsync(workspace.SolutionPath, cache.Root);
+        CacheRun cold = await RunCheckAsync(workspace.SolutionPath, cache.Root);
+        cold.Outcome.ShouldBe(CodebaseSourceOutcome.Miss);
         EditWebBody(workspace);
 
         CacheRun partial = await RunCheckAsync(workspace.SolutionPath, cache.Root);
@@ -38,6 +39,7 @@ public sealed class CheckCacheClosureE2ETests
             .ShouldBe([workspace.PathOf(Web, $"{Web}.csproj")]);
         partial.ShouldHaveLoadedOnly(true, Web, Billing);
         partial.Result.ShouldMatchTheOutputOf(noCache.Result);
+        partial.Result.Out.ShouldNotBe(cold.Result.Out); // the edit's new red site was seen
 
         // And what the closure run wrote back validates whole: the next run is a hit with the same answer.
         CacheRun hit = await RunCheckAsync(workspace.SolutionPath, cache.Root);

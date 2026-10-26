@@ -1,3 +1,5 @@
+using System.Runtime.CompilerServices;
+
 namespace SlideRule.Tests.TestSupport;
 
 /// <summary>
@@ -73,5 +75,33 @@ internal static class LayoutAppFixture
     internal static void WritePropsFile(TempFixtureWorkspace workspace, params string[] extraProperties)
     {
         File.WriteAllText(workspace.PathOf("Directory.Build.props"), PropsFile(extraProperties));
+    }
+
+    /// <summary>
+    ///     A copy of the fixture, restored and built under the default layout. The copy is leased to the calling
+    ///     test class and the lease's reset leaves bin/ alone, so whichever of its facts runs first pays for the
+    ///     restore and the build and the rest reuse the output; the build runs again only when the spec assembly
+    ///     is absent.
+    /// </summary>
+    /// <remarks>
+    ///     The caller's file path is forwarded because it is the lease key: taken here instead, every class would
+    ///     contend for one lease and all but the holder would build a private copy each time.
+    /// </remarks>
+    internal static TempFixtureWorkspace BuiltCopy([CallerFilePath] string callerFilePath = "")
+    {
+        var workspace = new TempFixtureWorkspace(
+            FixtureDirectory, SolutionFileName, restore: false, callerFilePath: callerFilePath);
+        WritePropsFile(workspace);
+
+        string specAssembly = workspace.PathOf(SpecProject, "bin", "Debug", "net10.0", SpecAssembly);
+        if (File.Exists(specAssembly)) return workspace;
+
+        FixtureRestorer.Restore(workspace.SolutionPath);
+        // --disable-build-servers (plus DotnetCli's node/server env) keeps the drained child from leaving a
+        // persistent worker that would wedge the output pipe.
+        DotnetCli.Run(
+            $"build \"{workspace.SolutionPath}\" --disable-build-servers",
+            Path.GetDirectoryName(workspace.SolutionPath)!);
+        return workspace;
     }
 }

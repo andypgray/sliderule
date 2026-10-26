@@ -134,7 +134,7 @@ public sealed class NarrowingGateOrderE2ETests
         // the order is visible rather than inferred from which message won.
         using var workspace = new TempFixtureWorkspace();
         var output = new StringWriter();
-        string solutionDirectory = Path.GetDirectoryName(Path.GetFullPath(workspace.SolutionPath))!;
+        string solutionDirectory = SolutionPaths.SolutionDirectoryOf(workspace.SolutionPath);
         var source = new DiagnosticInjectingSolutionSource([], [BrokenProject], [SkippedProject(workspace)]);
 
         int exit = await new ContextRunner(output, source, new SystemEnvironment()).RunAsync(
@@ -157,11 +157,8 @@ public sealed class NarrowingGateOrderE2ETests
         using var workspace = new TempFixtureWorkspace();
         var source = new DiagnosticInjectingSolutionSource(
             [], [BrokenProject], [SkippedProject(workspace)], [UnrestoredProject]);
-        var request = new RenderRequest(
-            workspace.SolutionPath, CliRunner.CleanSpecDll,
-            SolutionPaths.SolutionDirectoryOf(workspace.SolutionPath), true, false);
 
-        CliResult render = await CliResult.CapturedAsync((output, error) => new RenderRunner(output, error, source, new SystemEnvironment()).RunAsync(request, Ct));
+        CliResult render = await RunRenderAsync(workspace, allowWorkspaceDiagnostics: false, source);
 
         render.ShouldRefuseWith(RenderGateLede, BrokenProject, RenderRestoreGateLede, UnrestoredProject);
         render.Err.IndexOf(RenderRestoreGateLede, StringComparison.Ordinal)
@@ -179,7 +176,7 @@ public sealed class NarrowingGateOrderE2ETests
     // unchecked project spelled anywhere else would render as a machine-specific climb out of a temp root.
     private static string SkippedProject(TempFixtureWorkspace workspace)
     {
-        string solutionDirectory = Path.GetDirectoryName(Path.GetFullPath(workspace.SolutionPath))!;
+        string solutionDirectory = SolutionPaths.SolutionDirectoryOf(workspace.SolutionPath);
         return Path.Combine(solutionDirectory, "MyApp.Skipped", "MyApp.Skipped.csproj");
     }
 
@@ -199,14 +196,17 @@ public sealed class NarrowingGateOrderE2ETests
         return CliResult.CapturedAsync((output, error) => new BaselineRunner(output, error, source, new SystemEnvironment()).RunAsync(request, Ct));
     }
 
+    // A null source injects one failed project and one unchecked project.
     private static Task<CliResult> RunRenderAsync(
-        TempFixtureWorkspace workspace, bool allowWorkspaceDiagnostics)
+        TempFixtureWorkspace workspace, bool allowWorkspaceDiagnostics,
+        DiagnosticInjectingSolutionSource? source = null)
     {
-        var source = new DiagnosticInjectingSolutionSource([], [BrokenProject], [SkippedProject(workspace)]);
+        DiagnosticInjectingSolutionSource injected =
+            source ?? new DiagnosticInjectingSolutionSource([], [BrokenProject], [SkippedProject(workspace)]);
         var request = new RenderRequest(
             workspace.SolutionPath, CliRunner.CleanSpecDll,
             SolutionPaths.SolutionDirectoryOf(workspace.SolutionPath), true, allowWorkspaceDiagnostics);
 
-        return CliResult.CapturedAsync((output, error) => new RenderRunner(output, error, source, new SystemEnvironment()).RunAsync(request, Ct));
+        return CliResult.CapturedAsync((output, error) => new RenderRunner(output, error, injected, new SystemEnvironment()).RunAsync(request, Ct));
     }
 }

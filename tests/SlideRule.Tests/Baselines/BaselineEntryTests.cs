@@ -26,6 +26,8 @@ public sealed class BaselineEntryTests
         a.ShouldBe(b);
         a.GetHashCode()
             .ShouldBe(b.GetHashCode());
+        new HashSet<BaselineEntry> { a }.Contains(b)
+            .ShouldBeTrue();
     }
 
     [Fact]
@@ -46,47 +48,30 @@ public sealed class BaselineEntryTests
             .ShouldNotBe(BaselineEntry.ForEdge("T:N.Other", "T:N.Tgt"));
     }
 
-    [Fact]
-    public void ForEdge_ConstructionViolationIdentity_IsAnOrdinaryEdgeEntry()
+    [Theory]
+    [InlineData(nameof(Violation.Construction), "N.Factory", "N.Widget")]
+    [InlineData(nameof(Violation.Injection), "N.Svc", "N.Dep")]
+    public void ForEdge_ConstructionOrInjectionViolationIdentity_IsAnOrdinaryEdgeEntry(
+        string factory, string source, string target)
     {
-        // A construction violation's identity is a plain (source, constructed) ForEdge entry (GRAMMAR §4.3) —
-        // the very shape a reference uses — so grandfathering construction needs zero new baseline format: the
-        // identity is value-equal to, hash-equal to, and set-dedupes with a hand-built ForEdge and its twin.
-        BaselineEntry identity = Violation
-            .Construction(
-                SyntheticNodes.Type("N.Factory"), SyntheticNodes.Type("N.Widget"), Array.Empty<SourceLocation>())
-            .BaselineIdentity()!;
+        // A construction or injection violation's identity is a plain (source, target) ForEdge entry
+        // (GRAMMAR §4.3), the shape a reference uses, so grandfathering either needs no new baseline format:
+        // the identity is value-equal to, hash-equal to, and set-dedupes with a hand-built ForEdge and its
+        // attributed twin.
+        TypeNode sourceNode = SyntheticNodes.Type(source);
+        TypeNode targetNode = SyntheticNodes.Type(target);
+        Violation violation = factory == nameof(Violation.Construction)
+            ? Violation.Construction(sourceNode, targetNode, Array.Empty<SourceLocation>())
+            : Violation.Injection(sourceNode, targetNode, Array.Empty<SourceLocation>());
+        BaselineEntry identity = violation.BaselineIdentity()!;
+        BaselineEntry expected = BaselineEntry.ForEdge($"T:{source}", $"T:{target}");
 
-        identity.ShouldBe(BaselineEntry.ForEdge("T:N.Factory", "T:N.Widget"));
+        identity.ShouldBe(expected);
         identity.GetHashCode()
-            .ShouldBe(BaselineEntry.ForEdge("T:N.Factory", "T:N.Widget")
-                .GetHashCode());
+            .ShouldBe(expected.GetHashCode());
         identity.Subject.ShouldBeNull();
         new HashSet<BaselineEntry> { identity }
-            .Contains(BaselineEntry.ForEdge("T:N.Factory", "T:N.Widget")
-                .WithBecause("INC-1"))
-            .ShouldBeTrue();
-    }
-
-    [Fact]
-    public void ForEdge_InjectionViolationIdentity_IsAnOrdinaryEdgeEntry()
-    {
-        // An injection violation's identity is a plain (source, injected) ForEdge entry (GRAMMAR §4.3) — the
-        // same shape a reference or construction uses — so grandfathering a captive injection needs zero new
-        // baseline format: the identity is value-equal to, hash-equal to, and set-dedupes with a hand-built
-        // ForEdge and its attributed twin.
-        BaselineEntry identity = Violation
-            .Injection(SyntheticNodes.Type("N.Svc"), SyntheticNodes.Type("N.Dep"), Array.Empty<SourceLocation>())
-            .BaselineIdentity()!;
-
-        identity.ShouldBe(BaselineEntry.ForEdge("T:N.Svc", "T:N.Dep"));
-        identity.GetHashCode()
-            .ShouldBe(BaselineEntry.ForEdge("T:N.Svc", "T:N.Dep")
-                .GetHashCode());
-        identity.Subject.ShouldBeNull();
-        new HashSet<BaselineEntry> { identity }
-            .Contains(BaselineEntry.ForEdge("T:N.Svc", "T:N.Dep")
-                .WithBecause("INC-1"))
+            .Contains(expected.WithBecause("INC-1"))
             .ShouldBeTrue();
     }
 
@@ -117,17 +102,6 @@ public sealed class BaselineEntryTests
     }
 
     [Fact]
-    public void HashSet_UsesValueEquality()
-    {
-        var set = new HashSet<BaselineEntry> { BaselineEntry.ForEdge("T:N.Src", "T:N.Tgt") };
-
-        set.Contains(BaselineEntry.ForEdge("T:N.Src", "T:N.Tgt"))
-            .ShouldBeTrue();
-        set.Contains(BaselineEntry.ForEdge("T:N.Src", "T:N.Other"))
-            .ShouldBeFalse();
-    }
-
-    [Fact]
     public void WithBecause_SameIdentity_AreEqualAndShareHashCode()
     {
         BaselineEntry plain = BaselineEntry.ForEdge("T:N.Src", "T:N.Tgt");
@@ -137,17 +111,7 @@ public sealed class BaselineEntryTests
         attributed.ShouldBe(plain);
         attributed.GetHashCode()
             .ShouldBe(plain.GetHashCode());
-    }
-
-    [Fact]
-    public void WithBecause_InHashSet_DedupesAgainstUnattributedTwin()
-    {
-        BaselineEntry plain = BaselineEntry.ForEdge("T:N.Src", "T:N.Tgt");
-        BaselineEntry attributed = plain.WithBecause("INC-1234");
-
         new HashSet<BaselineEntry> { plain }.Contains(attributed)
-            .ShouldBeTrue();
-        new HashSet<BaselineEntry> { attributed }.Contains(plain)
             .ShouldBeTrue();
     }
 

@@ -11,7 +11,7 @@ namespace SlideRule.Tests.TestSupport;
 public sealed class FixtureRestorerTests
 {
     private static string TestSolutionsDirectory =>
-        Path.Combine(AppContext.BaseDirectory, "Fixtures", "TestSolutions");
+        FixtureBeds.TestSolutionsRoot;
 
     [Theory]
     [InlineData("MyApp.sln")]
@@ -25,7 +25,6 @@ public sealed class FixtureRestorerTests
 
     [Theory]
     [InlineData("BillingOnly.slnf")]
-    [InlineData("Malformed.slnf")]
     [InlineData("MyApp.Domain.csproj")]
     [InlineData("Directory.Build.props")]
     [InlineData("Order.cs")]

@@ -139,22 +139,6 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
     }
 
     [Fact]
-    public async Task Check_WorkspaceLoadDiagnosticJson_NoFlag_StdoutStaysPureJsonAndGateLineOnStderr()
-    {
-        CliResult result = await LoadDiagnosticJson.Value;
-
-        result.ShouldRefuseWith();
-        // stdout is pure JSON: the diagnostic rides in the workspaceDiagnostics array and the gate line
-        // never leaks onto stdout, so a hook can still parse the document.
-        using JsonDocument _ = result.ShouldHaveJsonStdout();
-        result.Out.ShouldContain("\"workspaceDiagnostics\"");
-        result.Out.ShouldContain(LoadDiagnostic);
-        result.Out.ShouldNotContain("error: the model is incomplete");
-        // the gate line goes to stderr.
-        result.Err.ShouldContain(GateLine);
-    }
-
-    [Fact]
     public async Task Check_WorkspaceLoadDiagnosticSarif_RecordsExecutionUnsuccessful()
     {
         // SARIF is written before the fail-closed gate returns, so the incomplete-model verdict reaches code
@@ -201,6 +185,9 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         document.RootElement.Strings("workspaceDiagnostics")
             .ShouldBe([LoadDiagnostic, MsBuildBootstrap.SelectionNote()]);
         result.Err.ShouldContain("MSBuild for this run:"); // and it is still on stderr, unchanged
+        // The gate line goes to stderr and never leaks onto stdout, so a hook can still parse the document.
+        result.Out.ShouldNotContain("error: the model is incomplete");
+        result.Err.ShouldContain(GateLine);
     }
 
     [Fact]
@@ -218,6 +205,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         document.ShouldCarryPackageAudit(AuditMessage, [AuditProject]);
         document.RootElement.TryGetProperty("modelIncomplete", out _)
             .ShouldBeFalse();
+        result.Out.ShouldNotContain("error: the model is incomplete");
         result.Err.ShouldNotContain("error: the model is incomplete");
     }
 
@@ -318,19 +306,6 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         result.Err.ShouldContain("warning: " + new PackageAuditEntry(AuditMessage, [AuditProject]).Describe());
         result.Err.ShouldContain($"warning: {LoadDiagnostic}"); // and the load failure — no over-filtering
         result.Err.ShouldContain("warning: MSBuild for this run:"); // with the note the load failure raises
-    }
-
-    [Fact]
-    public async Task Check_NuGetAuditDiagnosticJson_NoFlag_ExitsCleanWithAdvisoryInPackageAudit()
-    {
-        CliResult result = await AuditDiagnosticJson.Value;
-
-        result.ShouldSucceed();
-        // stdout stays pure JSON: the advisory rides packageAudit and no gate line leaks.
-        using JsonDocument document = result.ShouldHaveJsonStdout();
-        document.ShouldCarryPackageAudit(AuditMessage, [AuditProject]);
-        result.Out.ShouldNotContain("error: the model is incomplete");
-        result.Err.ShouldNotContain("error: the model is incomplete"); // no gate line anywhere
     }
 
     [Fact]

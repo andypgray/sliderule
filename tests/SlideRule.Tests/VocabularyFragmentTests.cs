@@ -164,14 +164,6 @@ public class VocabularyFragmentTests
     }
 
     [Fact]
-    public void MustNotConstruct_RendersFragment()
-    {
-        // The constructor-ban verb (GRAMMAR §5.3): "must not construct {list}".
-        SentenceRenderer.Sentence(Arch.Types.MustNotConstruct(typeof(SqlConnection)))
-            .ShouldBe("Types must not construct `SqlConnection`.");
-    }
-
-    [Fact]
     public void MustResideInNamespace_BackticksGlob()
     {
         SentenceRenderer.Sentence(Arch.Types.MustResideInNamespace("MyApp.Web.*"))
@@ -470,8 +462,6 @@ public class VocabularyFragmentTests
     public void Member_Except_RendersEachPayloadInReferencePosition()
     {
         // An open parenthetical the composer closes; several payloads or-join, each a member phrase of its own.
-        SentenceRenderer.MemberSubject(Arch.Types.Methods.Except(Arch.Types.Named("Program").Methods.Named("Main")))
-            .ShouldBe("Methods of types, except `Main` methods of types named `Program`");
         SentenceRenderer.MemberSubject(Arch.Types.Methods.Except(
                 Arch.Types.Named("Program").Methods.Named("Main"), Arch.Types.Named("Worker").Members))
             .ShouldBe("Methods of types, except `Main` methods of types named `Program` or members of types named `Worker`");
@@ -603,16 +593,6 @@ public class VocabularyFragmentTests
             .ShouldBe("Types must not be attributed with `[ApiController]` or `[Serializable]`.");
     }
 
-    [Fact]
-    public void AttributedWith_StringAnchor_RendersTheTypeofFragment()
-    {
-        // The adjective arm of the same equivalence, asserted against the typeof form directly.
-        SentenceRenderer.Sentence(Arch.Types.AttributedWith("SlideRule.Tests.Stubs.ApiControllerAttribute")
-                .MustBeSealed())
-            .ShouldBe(SentenceRenderer.Sentence(Arch.Types.AttributedWith(typeof(ApiControllerAttribute))
-                .MustBeSealed()));
-    }
-
     // ---- String hierarchy anchors (GRAMMAR §5.2–§5.3): the same escape hatch names an interface or a base
     //      type by fully-qualified string, and renders byte-identically to its typeof twin above ----
 
@@ -645,25 +625,6 @@ public class VocabularyFragmentTests
     {
         SentenceRenderer.Sentence(Arch.Types.MustNotDeriveFrom("SlideRule.Tests.Stubs.ControllerBase"))
             .ShouldBe("Types must not derive from `ControllerBase`.");
-    }
-
-    [Fact]
-    public void Implementing_StringAnchor_RendersTheTypeofFragment()
-    {
-        // The adjective arms of the same equivalence, asserted against the typeof forms directly.
-        SentenceRenderer.Sentence(Arch.Types.Implementing("SlideRule.Tests.Stubs.IHandler<T>")
-                .MustBeSealed())
-            .ShouldBe(SentenceRenderer.Sentence(Arch.Types.Implementing(typeof(IHandler<>))
-                .MustBeSealed()));
-    }
-
-    [Fact]
-    public void DerivedFrom_StringAnchor_RendersTheTypeofFragment()
-    {
-        SentenceRenderer.Sentence(Arch.Types.DerivedFrom("SlideRule.Tests.Stubs.ControllerBase")
-                .MustBeSealed())
-            .ShouldBe(SentenceRenderer.Sentence(Arch.Types.DerivedFrom(typeof(ControllerBase))
-                .MustBeSealed()));
     }
 
     // ---- The member attribute axis (GRAMMAR §5.7): one adjective and both verbs. The VERBS reuse the

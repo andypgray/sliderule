@@ -83,16 +83,11 @@ public sealed class CoercerCoverageTests
     /// </summary>
     private static IEnumerable<(string Where, Type Type)> LiveJsonBoundParameters()
     {
-        foreach ((string toolName, MethodInfo method) in ToolAttributeDiscovery.GetNamedToolMethods())
+        foreach ((string toolName, IReadOnlyList<ParameterInfo> bound) in LiveToolParameters.ByTool())
+        foreach (ParameterInfo parameter in bound)
         {
-            IEnumerable<ParameterInfo> bound = method.GetParameters()
-                .Where(ToolAttributeDiscovery.IsJsonBoundParameter);
-
-            foreach (ParameterInfo parameter in bound)
-            {
-                Type type = Nullable.GetUnderlyingType(parameter.ParameterType) ?? parameter.ParameterType;
-                yield return ($"{toolName}.{parameter.Name}", type);
-            }
+            Type type = Nullable.GetUnderlyingType(parameter.ParameterType) ?? parameter.ParameterType;
+            yield return ($"{toolName}.{parameter.Name}", type);
         }
     }
 }

@@ -141,7 +141,7 @@ public sealed class MemberUseVerbTests
                     .Enforce(arch.Namespace("App.*").MustNotUse(arch.Member(typeof(Gauge), nameof(Gauge.Read))))
                     .Because("b"))
             .Single();
-        MemberIds(concrete)
+        concrete.MemberUseTargets()
             .ShouldBe([$"M:{T}Gauge.Read"]);
 
         // A ban on the interface member catches only the interface-typed call.
@@ -150,20 +150,8 @@ public sealed class MemberUseVerbTests
                     .Enforce(arch.Namespace("App.*").MustNotUse(arch.Member(typeof(IGauge), nameof(IGauge.Read))))
                     .Because("b"))
             .Single();
-        MemberIds(iface)
+        iface.MemberUseTargets()
             .ShouldBe([$"M:{T}IGauge.Read"]);
-    }
-
-    [Fact]
-    public void MustNotUse_EmptySubject_FailsWithSharedEmptySubjectMessage()
-    {
-        RuleResult result = Checker.Run(SceneModel, arch =>
-                arch.Rule("member/x")
-                    .Enforce(arch.Namespace("Nowhere.*").MustNotUse(arch.Member(typeof(Clock), nameof(Clock.Ticks))))
-                    .Because("b"))
-            .Single();
-
-        result.ShouldHaveFailedWithDetail(ViolationKind.EmptySubject, ConstraintEvaluator.EmptySubjectMessage);
     }
 
     [Fact]
@@ -198,7 +186,7 @@ public sealed class MemberUseVerbTests
 
         result.ShouldHaveFailed();
         // The Ticks read plus both Advance overloads — the ban spans both named members.
-        MemberIds(result)
+        result.MemberUseTargets()
             .OrderBy(id => id, StringComparer.Ordinal)
             .ShouldBe(
             [
@@ -331,7 +319,7 @@ public sealed class MemberUseVerbTests
             })
             .Single();
 
-        MemberIds(iface)
+        iface.MemberUseTargets()
             .ShouldBe([$"M:{T}IGauge.Read"]);
     }
 
@@ -358,14 +346,6 @@ public sealed class MemberUseVerbTests
         Violation violation = result.Violations.ShouldHaveSingleItem();
         violation.Kind.ShouldBe(ViolationKind.MemberUse);
         violation.Member!.SymbolId.ShouldBe("P:System.DateTime.Now");
-    }
-
-    private static IReadOnlyList<string> MemberIds(RuleResult result)
-    {
-        return result.Violations
-            .Where(v => v.Kind == ViolationKind.MemberUse)
-            .Select(v => v.Member!.SymbolId)
-            .ToList();
     }
 
     private static string WaitSource(string call)

@@ -23,29 +23,20 @@ namespace SlideRule.Tests.DocHygiene;
 /// </remarks>
 public sealed class RuleQuoteSyncTests
 {
-    private const string MeridianAdopting = "examples/Meridian/ADOPTING.md";
-
-    /// <summary>
-    ///     This repository's own root, the bullet base for docs quoting a check over this solution rather
-    ///     than over an example. Empty because its <c>AGENTS.md</c> files are the ones outside
-    ///     <c>examples/</c>.
-    /// </summary>
-    private const string SelfRoot = "";
-
     /// <summary>The rule-quoting docs, each paired with the example root whose rendered bullets it quotes.</summary>
     private static readonly (string Doc, string ExampleRoot)[] QuoteDocs =
     [
-        ("examples/Meridian/README.md", "examples/Meridian"),
-        (MeridianAdopting, "examples/Meridian"),
-        ("examples/Meridian/hooks/storyboard.md", "examples/Meridian"),
-        ("examples/Meridian.Quoting/README.md", "examples/Meridian.Quoting"),
-        ("examples/Meridian.Operations/README.md", "examples/Meridian.Operations"),
-        ("examples/Meridian.Interchange/README.md", "examples/Meridian.Interchange"),
+        (DocPaths.MeridianReadme, ExampleRoots.Meridian),
+        (DocPaths.MeridianAdopting, ExampleRoots.Meridian),
+        (DocPaths.MeridianStoryboard, ExampleRoots.Meridian),
+        (DocPaths.QuotingReadme, ExampleRoots.Quoting),
+        (DocPaths.OperationsReadme, ExampleRoots.Operations),
+        (DocPaths.InterchangeReadme, ExampleRoots.Interchange),
         // The self-check page quotes a check over this solution; the landing page repeats one of its
         // stanzas and adds the Framework one the narrative pin below covers. Both pages' sentences come
         // from this repository's own rendered block and scoped cards rather than an example's.
-        (DocPaths.RootReadme, SelfRoot),
-        (DocPaths.SelfCheck, SelfRoot)
+        (DocPaths.RootReadme, ExampleRoots.Self),
+        (DocPaths.SelfCheck, ExampleRoots.Self)
     ];
 
     /// <summary>
@@ -61,7 +52,7 @@ public sealed class RuleQuoteSyncTests
         // `.Except(SystemClock)` carve-out, so this is the draft's output, not the committed spec's; the
         // draft it is cut from is quoted in the same doc. The finished rule's sentence is quoted later in
         // the same walkthrough and is held by the gate.
-        (MeridianAdopting,
+        (DocPaths.MeridianAdopting,
             "time/inject-clock",
             "The Web layer must not use `DateTime.Now` or `DateTime.UtcNow`."),
 

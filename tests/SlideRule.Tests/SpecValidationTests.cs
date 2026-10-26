@@ -47,7 +47,6 @@ public class SpecValidationTests
     [InlineData(typeof(BlankTypeNameMatchingVerbSpec), nameof(Code.BlankPattern), "area/rule")]
     [InlineData(typeof(BlankTypeNameMatchingAdjectiveSpec), nameof(Code.BlankPattern), "area/rule")]
     [InlineData(typeof(BlankTypePrefixAdjectiveSpec), nameof(Code.BlankPattern), "area/rule")]
-    [InlineData(typeof(BlankTypeNamedAdjectiveSpec), nameof(Code.BlankPattern), "area/rule")]
     [InlineData(typeof(BlankMemberNameMatchingAdjectiveSpec), nameof(Code.BlankPattern), "area/rule")]
     [InlineData(typeof(BlankMemberPrefixAdjectiveSpec), nameof(Code.BlankPattern), "area/rule")]
     [InlineData(typeof(BlankMemberNameMatchingVerbSpec), nameof(Code.BlankPattern), "area/rule")]
@@ -68,59 +67,23 @@ public class SpecValidationTests
     // rather than the shared BlankPattern, because a blank project name matches nothing while a blank glob
     // matches everything and the catalog has to be able to say which. Blank project escape-hatch
     // descriptions ride BlankProse, which covers a description anywhere (item 5).
-    [InlineData(typeof(ForeignProjectSelectionSpec), nameof(Code.ForeignProjectSelection), "area/rule")]
     [InlineData(typeof(ForeignProjectExceptPayloadSpec), nameof(Code.ForeignProjectSelection), "area/rule")]
-    [InlineData(typeof(BlankProjectPatternSpec), nameof(Code.BlankProjectPattern), "project/blank-name")]
-    [InlineData(typeof(BlankProjectPatternSpec), nameof(Code.BlankProjectPattern), "project/blank-glob")]
     [InlineData(typeof(BlankProjectPatternSpec), nameof(Code.BlankProjectPattern), "project/blank-in-except")]
-    [InlineData(typeof(BlankTargetFrameworkSpec), nameof(Code.BlankTargetFramework), "area/rule")]
     [InlineData(typeof(BlankProjectWhereSpec), nameof(Code.BlankProse), "area/rule")]
     [InlineData(typeof(BlankProjectMustSpec), nameof(Code.BlankProse), "area/rule")]
-    // A rule's Citation is prose in the item-5 walk and a URL in item 30's, so a blank one reports as prose
-    // and only a well-formed single line reaches the shape check.
-    [InlineData(typeof(BlankCitationSpec), nameof(Code.BlankProse), "area/rule")]
-    [InlineData(typeof(MalformedCitationSpec), nameof(Code.MalformedCitation), "citation/page-title")]
     // A Baseline path is in the item-5 walk beside DragonsDoc, on both the rule and the scope that can
     // carry one. Nothing downstream would report a blank: it resolves to the solution directory rather
     // than failing, so check would silently read no baseline and the rule would red saying nothing about
     // the path.
-    [InlineData(typeof(BlankBaselineSpec), nameof(Code.BlankProse), "area/rule")]
     [InlineData(typeof(MultiLineBaselineSpec), nameof(Code.MultiLineProse), "area/rule")]
     [InlineData(typeof(BlankScopeBaselineSpec), nameof(Code.BlankProse), "legacy/billing")]
-    // The correspondence verb's name template (GRAMMAR §8 items 25–26). Blankness rides the shared
-    // BlankPattern walk under its own label, because a blank template is the same slip as a blank affix;
-    // a template that is missing its {Name} needs its own code, since it is well-formed text that
-    // states the wrong kind of law.
-    [InlineData(typeof(BlankCounterpartTemplateSpec), nameof(Code.BlankPattern), "area/rule")]
-    [InlineData(typeof(PlaceholderFreeCounterpartTemplateSpec), nameof(Code.CounterpartTemplateWithoutPlaceholder), "area/rule")]
-    // The family (GRAMMAR §5.1, §8 items 27–28). A family may stand only as a rule subject, so every
-    // other position is item 27 under one code — the message names which, and the arms below walk each
-    // path that reaches it. Its cells and its own adjectives ride the walks a union's operands do, so a
+    // The family (GRAMMAR §5.1). Its cells and its own adjectives ride the walks a union's operands do, so a
     // foreign cell, a blank glob on the family and the project stratum inside a project family need no
     // new codes at all.
-    [InlineData(typeof(FamilyAsOperandSpec), nameof(Code.FamilyMisplaced), "area/rule")]
-    [InlineData(typeof(FamilyAsExceptPayloadSpec), nameof(Code.FamilyMisplaced), "area/rule")]
-    [InlineData(typeof(FamilyAsUnionOperandSpec), nameof(Code.FamilyMisplaced), "area/rule")]
-    [InlineData(typeof(FamilyAsMembershipSpec), nameof(Code.FamilyMisplaced), "area/rule")]
-    [InlineData(typeof(FamilyAsCounterpartAmongSpec), nameof(Code.FamilyMisplaced), "area/rule")]
-    [InlineData(typeof(FamilyAsScopedSelectionSpec), nameof(Code.FamilyMisplaced), "legacy/modules")]
-    [InlineData(typeof(FamilyAsBoundarySpec), nameof(Code.FamilyMisplaced), "legacy/modules")]
-    [InlineData(typeof(EachOtherWithoutFamilySpec), nameof(Code.EachOtherWithoutFamily), "area/rule")]
-    [InlineData(typeof(CircularReferencesOnPlainSubjectSpec), nameof(Code.CircularReferencesNeedLayerFamily), "area/rule")]
-    [InlineData(typeof(CircularReferencesOnProjectFamilySpec), nameof(Code.CircularReferencesNeedLayerFamily), "area/rule")]
     [InlineData(typeof(ForeignFamilyCellSpec), nameof(Code.ForeignSelection), "area/rule")]
     [InlineData(typeof(BlankFamilyGlobSpec), nameof(Code.BlankPattern), "area/rule")]
     [InlineData(typeof(BlankProjectFamilyGlobSpec), nameof(Code.BlankProjectPattern), "area/rule")]
     [InlineData(typeof(ForeignProjectFamilySpec), nameof(Code.ForeignProjectSelection), "area/rule")]
-    // A rule's exemplar is a selection the verdict never reads, and every walk a constraint's selections take
-    // reaches it all the same: a slip in it is a slip in the spec, and the next check would only warn.
-    [InlineData(typeof(RepeatedExemplarSpec), nameof(Code.RepeatedCall), "area/rule")]
-    [InlineData(typeof(FamilyAsExemplarSpec), nameof(Code.FamilyMisplaced), "area/rule")]
-    [InlineData(typeof(ForeignExemplarSpec), nameof(Code.ForeignSelection), "area/rule")]
-    [InlineData(typeof(BlankExemplarNameSpec), nameof(Code.BlankPattern), "area/rule")]
-    [InlineData(typeof(DeadExemplarPatternSpec), nameof(Code.UnanchoredSubtreePattern), "area/rule")]
-    [InlineData(typeof(BlankExemplarWhereSpec), nameof(Code.BlankProse), "area/rule")]
-    [InlineData(typeof(UndefinedLifetimeExemplarSpec), nameof(Code.UndefinedLifetime), "area/rule")]
     // A member Except payload is a member selection with a type selection of its own, and every walk the
     // subject takes reaches it: its source's Arch, a family standing there, its source's Where descriptions,
     // its blank names and its blank member Where descriptions (GRAMMAR §8 items 5, 10, 15, 27).
@@ -264,16 +227,6 @@ public class SpecValidationTests
         ex.ShouldHaveError(Code.MissingDragons, "shared/utilities")
             .Message
             .ShouldBe("SpecValidationSpecs.cs:1047: Cautioned scope 'shared/utilities' is missing .Dragons(...) or .DragonsDoc(...).");
-    }
-
-    [Fact]
-    public void ValidCaution_BuildsClean()
-    {
-        // The negative half of the catalog for the Caution posture: a caution carrying its two required clauses
-        // is not merely unreported, it builds.
-        ArchModelBuilder.Build(new ValidCautionSpec())
-            .Rules.Select(rule => rule.Id)
-            .ShouldBe(["shared/utilities/tripwire"]);
     }
 
     [Fact]

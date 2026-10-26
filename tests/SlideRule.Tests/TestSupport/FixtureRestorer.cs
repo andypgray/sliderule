@@ -26,7 +26,7 @@ internal static class FixtureRestorer
 
     private static bool RestoreAll()
     {
-        string testSolutionsDir = Path.Combine(AppContext.BaseDirectory, "Fixtures", "TestSolutions");
+        string testSolutionsDir = FixtureBeds.TestSolutionsRoot;
         if (!Directory.Exists(testSolutionsDir)) return true;
 
         // Every project kind, not just *.csproj. A bed holding a project in another language restores the

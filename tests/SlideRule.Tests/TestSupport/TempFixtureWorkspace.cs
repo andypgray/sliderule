@@ -306,9 +306,10 @@ internal sealed class TempFixtureWorkspace : IDisposable
     }
 
     /// <summary>
-    ///     Whether <paramref name="path" /> lies under a <c>bin/</c> or <c>obj/</c> directory. Takes an
-    ///     absolute path or one relative to any root, with or without a leading separator: the leading one is
-    ///     supplied here, so a path whose own first segment is <c>bin/</c> is caught like every other.
+    ///     Whether <paramref name="path" /> lies under a <c>bin/</c> or <c>obj/</c> directory. Pass the path
+    ///     relative to the root being walked, with or without a leading separator: the leading one is supplied
+    ///     here, so a path whose own first segment is <c>bin/</c> is caught like every other. An absolute path
+    ///     reads the root's ancestors too, so under the test output's own <c>bin/</c> every file would match.
     /// </summary>
     internal static bool IsBuildArtifact(string path)
     {

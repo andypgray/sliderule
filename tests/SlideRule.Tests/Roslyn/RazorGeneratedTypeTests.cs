@@ -29,14 +29,14 @@ public sealed class RazorGeneratedTypeTests
     private const string GeneratedNamespace = "AspNetCoreGeneratedDocument";
 
     private static readonly string SolutionPath =
-        Path.Combine(AppContext.BaseDirectory, "Fixtures", "TestSolutions", "RazorApp", "RazorApp.slnx");
+        Path.Combine(FixtureBeds.TestSolutionsRoot, "RazorApp", "RazorApp.slnx");
 
-    private static readonly Lazy<Task<CodebaseModel>> RazorCodebase = new(ExtractAsync);
+    private static Task<CodebaseModel> RazorCodebase => FixtureCodebase.Of(SolutionPath);
 
     [Fact]
     public async Task ExtractFromSolutionAsync_TheCompiledViews_AreDeclaredTypesOfTheWebProject()
     {
-        CodebaseModel model = await RazorCodebase.Value;
+        CodebaseModel model = await RazorCodebase;
 
         // The guard, asserted before the flag: an empty set here means the Razor generator never ran, which
         // must not read as "the views were not generated" — the two are opposite findings and a bare
@@ -50,7 +50,7 @@ public sealed class RazorGeneratedTypeTests
     [Fact]
     public async Task ExtractFacts_TheCompiledViews_AreGeneratedWithoutCarryingTheAttribute()
     {
-        CodebaseModel model = await RazorCodebase.Value;
+        CodebaseModel model = await RazorCodebase;
 
         // Both halves in one assertion, because either alone would pass for the wrong reason: the views
         // report generated, AND none of them wears either attribute a detector might have leaned on. What
@@ -73,7 +73,7 @@ public sealed class RazorGeneratedTypeTests
     [Fact]
     public async Task ExtractFacts_TheHandWrittenTypes_StayAuthored()
     {
-        CodebaseModel model = await RazorCodebase.Value;
+        CodebaseModel model = await RazorCodebase;
 
         // The contrast arm, inside the same solution: an explicit entry point and a controller in the Web
         // project — which is where a widened signal would do its damage — and the plain project beside it.
@@ -88,7 +88,7 @@ public sealed class RazorGeneratedTypeTests
     [Fact]
     public async Task ApplyAdjective_AuthoredOnTheWebProject_DropsTheViewsAndKeepsTheRest()
     {
-        CodebaseModel model = await RazorCodebase.Value;
+        CodebaseModel model = await RazorCodebase;
 
         var arch = new Arch();
         var evaluator = new SelectionEvaluator(model);
@@ -140,14 +140,5 @@ public sealed class RazorGeneratedTypeTests
         return model.Types
             .Where(type => type.Namespace == GeneratedNamespace)
             .ToList();
-    }
-
-    // The shared read: the pool loads the fixture once for the whole class. It takes no test's cancellation
-    // token, because the task it produces outlives the test that first awaits it.
-    private static async Task<CodebaseModel> ExtractAsync()
-    {
-        WorkspaceSnapshot snapshot = await WarmWorkspacePool.GetCurrentAsync(SolutionPath, CancellationToken.None);
-        return await CodebaseExtractor.ExtractFromSolutionAsync(
-            snapshot.Solution, null, snapshot.TargetFrameworks, null, CancellationToken.None);
     }
 }

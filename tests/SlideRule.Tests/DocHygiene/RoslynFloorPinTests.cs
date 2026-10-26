@@ -38,8 +38,6 @@ public sealed class RoslynFloorPinTests
 {
     private const string ExtractionCsproj = "src/SlideRule.Extraction/SlideRule.Extraction.csproj";
 
-    private const string AnalyzerCsproj = "src/SlideRule.Analyzers/SlideRule.Analyzers.csproj";
-
     private const string AnalyzerLockFile = "src/SlideRule.Analyzers/packages.lock.json";
 
     private const string SpecAnalyzerCsproj =
@@ -171,26 +169,12 @@ public sealed class RoslynFloorPinTests
     [Fact]
     public void EveryUpdateEntry_IgnoresTheFloorPackages()
     {
-        // Arrange: every entry rather than the one that lists a floor project, since a run bumps packages in
-        // whatever its projects reach. No entry at all is a finding rather than a pass, so this arm needs no
-        // separate is-readable tripwire.
-        IReadOnlyList<string[]> entries = DependabotEntries.NuGetEntries();
-        List<string> findings = new();
-
-        // Act
-        if (entries.Count == 0)
-            findings.Add($"{DependabotConfig} carries no nuget update entry, so nothing ignores the floor packages.");
-
-        foreach (string[] entry in entries)
-        {
-            IReadOnlyList<string> ignored = DependabotEntries.IgnoredNames(entry);
-            string directories = string.Join(", ", DependabotEntries.Directories(entry));
-            findings.AddRange(FloorPackages
-                .Where(package => !ignored.Contains(package, StringComparer.Ordinal))
-                .Select(package => $"{DependabotConfig}'s nuget entry for {directories} carries no 'ignore:' "
-                                   + $"naming {package}, so its next update run raises the floor in every "
-                                   + "project that states it and that its projects reach."));
-        }
+        // Act: every entry rather than the one that lists a floor project, since a run bumps packages in
+        // whatever its projects reach.
+        IReadOnlyList<string> findings = DependabotEntries.MissingIgnores(
+            FloorPackages,
+            "the floor packages",
+            "raises the floor in every project that states it and that its projects reach");
 
         // Assert
         findings.ShouldReportNothing(Header);
@@ -235,8 +219,8 @@ public sealed class RoslynFloorPinTests
         List<string> findings = new();
 
         // Act
-        findings.AddRange(CompilerApiReferences(AnalyzerCsproj)
-            .Select(line => $"{AnalyzerCsproj} declares {line}, which is a second place the floor is "
+        findings.AddRange(CompilerApiReferences(DocPaths.AnalyzersProject)
+            .Select(line => $"{DocPaths.AnalyzersProject} declares {line}, which is a second place the floor is "
                             + "stated and a second place it can move."));
 
         foreach (string package in CompilerApiPackages)

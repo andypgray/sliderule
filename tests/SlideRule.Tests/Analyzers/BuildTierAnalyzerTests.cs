@@ -37,11 +37,6 @@ public sealed class BuildTierAnalyzerTests
         "No sliderule.model.json was found above this project, so this build checked no architecture rule. "
         + "Run 'sliderule render --model' in the solution directory and commit the file it writes.";
 
-    private const string FaultMessage =
-        "The SlideRule analyzer failed in this project, so some or all of its findings are missing: "
-        + "InvalidOperationException: boom. This is a fault in the analyzer and says nothing about the code, "
-        + "and 'sliderule check' is unaffected. Report it at https://github.com/andypgray/sliderule/issues.";
-
     // The pragma sits around the first of the two declarations that reach the store, so one site of one
     // violation is suppressed and the other is not.
     private const string PragmaSource =
@@ -219,16 +214,6 @@ public sealed class BuildTierAnalyzerTests
         """;
 
     [Fact]
-    public async Task NoModelFile_AmongTheFilesTheBuildHandedOver_IsTheOneWarningReported()
-    {
-        IReadOnlyList<Diagnostic> reported = await BuildTier.DiagnoseAsync(
-            BuildTier.OwnCompilation(), [], cancellationToken: Ct);
-
-        reported.ShouldBeTheOnly("SR2090")
-            .ShouldSay(NoModelMessage);
-    }
-
-    [Fact]
     public async Task AModelFileWhoseTextWillNotCome_ReadsAsNoModelFileAtAll()
     {
         IReadOnlyList<Diagnostic> reported = await BuildTier.DiagnoseAsync(
@@ -351,26 +336,19 @@ public sealed class BuildTierAnalyzerTests
     }
 
     [Theory]
+    // A project that declares no tier at all.
+    [InlineData(null)]
     [InlineData("build")]
     [InlineData("live")]
     [InlineData("")]
     [InlineData("true")]
     [InlineData("false")]
-    public async Task TheTierAtAnyOtherValue_LeavesTheAnalyzerOn(string declared)
+    public async Task TheTierAtAnyOtherValue_LeavesTheAnalyzerOn(string? declared)
     {
         // 'false' reads as an off value and is not one. Under the tier property it is an unrecognised value,
         // and an unrecognised value fails towards checking.
         IReadOnlyList<Diagnostic> reported = await BuildTier.DiagnoseAsync(
             BuildTier.OwnCompilation(), [], tier: declared, cancellationToken: Ct);
-
-        reported.ShouldBeTheOnly("SR2090");
-    }
-
-    [Fact]
-    public async Task TheTierUndeclared_LeavesTheAnalyzerOn()
-    {
-        IReadOnlyList<Diagnostic> reported = await BuildTier.DiagnoseAsync(
-            BuildTier.OwnCompilation(), [], cancellationToken: Ct);
 
         reported.ShouldBeTheOnly("SR2090");
     }
@@ -532,25 +510,18 @@ public sealed class BuildTierAnalyzerTests
                 "target=T:Data.Store");
     }
 
-    [Fact]
-    public async Task AFaultInsideTheGuardedRegion_IsOneWarningOfItsOwnAndNeverTheCompilersAD0001()
+    [Theory]
+    [InlineData(null)]
+    // The build tier faults inside its own guarded region rather than inside a document's, and the two
+    // regions end at one place: what a reader is told must not depend on which tier built the project.
+    [InlineData("build")]
+    public async Task AFaultInsideTheGuardedRegion_IsOneWarningOfItsOwnAndNeverTheCompilersAD0001(string? tier)
     {
-        IReadOnlyList<Diagnostic> reported = await EnforcedAsync(BuildTier.OwnCompilation(), beforeCheck: Boom);
-
-        reported.ShouldBeTheOnly("SR2093")
-            .ShouldSay(FaultMessage);
-    }
-
-    [Fact]
-    public async Task AFaultUnderTheBuildTier_IsOneSR2093WithTheSameWording()
-    {
-        // The build tier faults inside its own guarded region rather than inside a document's, and the two
-        // regions end at one place: what a reader is told must not depend on which tier built the project.
         IReadOnlyList<Diagnostic> reported = await EnforcedAsync(
-            BuildTier.OwnCompilation(), tier: "build", beforeCheck: Boom);
+            BuildTier.OwnCompilation(), tier, beforeCheck: BuildTier.Boom);
 
         reported.ShouldBeTheOnly("SR2093")
-            .ShouldSay(FaultMessage);
+            .ShouldSay(BuildTier.FaultMessage);
     }
 
     [Fact]
@@ -648,12 +619,12 @@ public sealed class BuildTierAnalyzerTests
     {
         // A fault is about the analyzer rather than about any one document, so it is named once for the
         // compilation — and a diagnostic with no location reaches no per-document result at all.
-        IReadOnlyList<Diagnostic> reported = await EnforcedAsync(TwoDocuments(), beforeCheck: Boom);
+        IReadOnlyList<Diagnostic> reported = await EnforcedAsync(TwoDocuments(), beforeCheck: BuildTier.Boom);
         IReadOnlyDictionary<string, IReadOnlyList<Diagnostic>> perDocument =
-            await EnforcedPerDocumentAsync(TwoDocuments(), beforeCheck: Boom);
+            await EnforcedPerDocumentAsync(TwoDocuments(), beforeCheck: BuildTier.Boom);
 
         reported.ShouldBeTheOnly("SR2093")
-            .ShouldSay(FaultMessage);
+            .ShouldSay(BuildTier.FaultMessage);
         perDocument["Web.cs"]
             .ShouldBeSilent();
         perDocument["Other.cs"]
@@ -826,7 +797,7 @@ public sealed class BuildTierAnalyzerTests
         var reads = 0;
         var analyzer = new BuildTierAnalyzer(beforeModelRead: () =>
         {
-            if (Interlocked.Increment(ref reads) == 1) Boom();
+            if (Interlocked.Increment(ref reads) == 1) BuildTier.Boom();
         });
         string text = BuildTier.ModelText(BuildTier.EnforceRule);
 
@@ -849,7 +820,7 @@ public sealed class BuildTierAnalyzerTests
         var reads = 0;
         var analyzer = new BuildTierAnalyzer(beforeModelRead: () =>
         {
-            if (Interlocked.Increment(ref reads) == 1) Boom();
+            if (Interlocked.Increment(ref reads) == 1) BuildTier.Boom();
         });
         AdditionalText modelFile = BuildTier.ModelFile(BuildTier.ModelText(BuildTier.EnforceRule));
 
@@ -925,11 +896,6 @@ public sealed class BuildTierAnalyzerTests
                      public Data.Store Store;
                  }
                  """;
-    }
-
-    private static void Boom()
-    {
-        throw new InvalidOperationException("boom\nsecond line");
     }
 
     // The rules a pair of rows shares, so the two arms of each differ only in the source they read.

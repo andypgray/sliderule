@@ -21,9 +21,11 @@ public class AgentContextRendererTests
         "Inside a repository whose `global.json` pins an SDK below 10, both commands fail, so run them " +
         "from outside it and pass the solution's absolute path.";
 
-    // The recovery line every rendered root block carries, spelled once so the two goldens below cannot
-    // drift apart on it. Sibling RenderCommandE2ETests holds the same paragraph for its own goldens.
-    private const string InstallNote =
+    /// <summary>
+    ///     The recovery line every rendered root block carries, spelled once so no two goldens that carry it
+    ///     can drift apart on it.
+    /// </summary>
+    internal const string InstallNote =
         "*If the `sliderule` command is missing (a configured MCP server dies without it), " +
         "install the tool with `dotnet tool install -g SlideRule.Cli`, or run any command " +
         "without installing: `dotnet dnx SlideRule.Cli --yes -- check <solution>`. " +
@@ -39,8 +41,7 @@ public class AgentContextRendererTests
             .Fix("Depend on the Codebase model types in Core; keep Microsoft.CodeAnalysis behind " +
                  "SlideRule.Roslyn."));
 
-    // Built once: the model is immutable and the four gates below only render from it — three of them to
-    // prove a glossary clause stays off, which is the same block read four ways.
+    // Built once: the model is immutable and the facts below only render from it.
     private static readonly ArchitectureModel DogfoodShapeModel = ArchModelBuilder.Build(DogfoodShapeSpec);
 
     // A single Migrate-rule spec — no layers, no Enforce rules — for the Migrations-section pins.
@@ -634,16 +635,6 @@ public class AgentContextRendererTests
     }
 
     [Fact]
-    public void RootBlock_WithoutInjectOrRegistered_OmitsBothGlossaryAdditions()
-    {
-        // A reference-only spec carries neither a MustNotInject verb nor a Registered noun, so the block
-        // carries neither addition (GRAMMAR §4.7/§10 gate discipline).
-        string block = AgentContextRenderer.RootBlock(DogfoodShapeModel, "SlideRule.Architecture");
-        block.ShouldNotContain("inject = a source-level constructor-parameter dependency");
-        block.ShouldNotContain("registered = named in a source-level container registration");
-    }
-
-    [Fact]
     public void RootBlock_WithCaptiveDependencyRule_ComposesInjectClauseRegisteredLineAndTrueSubject()
     {
         // The captive-dependency flagship — both gates fire, and the qualified subject head survives.
@@ -739,16 +730,6 @@ public class AgentContextRendererTests
     }
 
     [Fact]
-    public void RootBlock_WithoutCatchOrThrow_OmitsBothGlossaryClauses()
-    {
-        // A reference-only spec carries neither exception verb, so both clauses stay off (GRAMMAR §10 gate
-        // discipline).
-        string block = AgentContextRenderer.RootBlock(DogfoodShapeModel, "SlideRule.Architecture");
-        block.ShouldNotContain("catch = a source-level `catch`");
-        block.ShouldNotContain("throw = a source-level `throw`");
-    }
-
-    [Fact]
     public void RootBlock_WithExposeRule_ExtendsGlossaryWithExposeClause()
     {
         // A MustNotExpose verb over a type — triggers the expose glossary clause but no other axis.
@@ -767,10 +748,16 @@ public class AgentContextRendererTests
     }
 
     [Fact]
-    public void RootBlock_WithoutExposeRule_OmitsExposeGlossaryClause()
+    public void RootBlock_ReferenceOnlySpec_OmitsEveryGatedGlossaryAddition()
     {
-        // A spec without a MustNotExpose verb leaves the expose clause off (GRAMMAR §10 gate discipline).
+        // A reference-only spec carries no MustNotInject verb, no Registered noun, neither exception verb and
+        // no MustNotExpose verb, so every addition each of those gates stays off (GRAMMAR §4.7/§10 gate
+        // discipline).
         string block = AgentContextRenderer.RootBlock(DogfoodShapeModel, "SlideRule.Architecture");
+        block.ShouldNotContain("inject = a source-level constructor-parameter dependency");
+        block.ShouldNotContain("registered = named in a source-level container registration");
+        block.ShouldNotContain("catch = a source-level `catch`");
+        block.ShouldNotContain("throw = a source-level `throw`");
         block.ShouldNotContain("expose = a public signature position");
     }
 }

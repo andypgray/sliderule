@@ -33,8 +33,6 @@ namespace SlideRule.Tests.DocHygiene;
 /// </remarks>
 public sealed class CodeQlActionPinTests
 {
-    private const string WorkflowDirectory = ".github/workflows/";
-
     // A pinned use of the action: the path under it, the revision, and the version comment that
     // trails the pin. Only the revision is asserted on — it is what actually runs — but the comment
     // is what makes a failure readable. The comment is matched without crossing a line ending, so a
@@ -72,7 +70,7 @@ public sealed class CodeQlActionPinTests
 
         // Assert: the arm above passes over a workflow it cannot read, so the pins are held non-empty
         // rather than trusted. A rewrite into a form this scan cannot follow fails here.
-        pins.ShouldNotBeEmpty($"No pinned github/codeql-action steps were found under {WorkflowDirectory}.");
+        pins.ShouldNotBeEmpty($"No pinned github/codeql-action steps were found under {TrackedFiles.WorkflowDirectory}.");
     }
 
     private static string Describe(IGrouping<string, Pin> workflow)
@@ -87,8 +85,7 @@ public sealed class CodeQlActionPinTests
     // Every pinned use of the action across the tracked workflows, tagged with the file it sits in.
     private static IReadOnlyList<Pin> ReadPins()
     {
-        return TrackedFiles.All
-            .Where(static path => path.StartsWith(WorkflowDirectory, StringComparison.Ordinal))
+        return TrackedFiles.Workflows
             .SelectMany(PinsIn)
             .ToArray();
     }

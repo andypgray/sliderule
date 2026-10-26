@@ -20,19 +20,21 @@ namespace SlideRule.Tests.Hooks;
 internal static class McpLaunchAssertions
 {
     /// <summary>
-    ///     Asserts the launcher exited <paramref name="exitCode" /> with nothing on stdout — the channel the
-    ///     client speaks JSON-RPC over, where one stray line is a protocol error before the handshake.
+    ///     Asserts the launcher exited <paramref name="exitCode" />. Its silence on stdout is asserted by the
+    ///     launch itself, on every run, so it holds here already.
     /// </summary>
-    internal static ChildProcess.ProcessResult ShouldHaveLaunchedSilently(
-        this ChildProcess.ProcessResult result, int exitCode = 0)
+    internal static ChildProcess.ProcessResult ShouldHaveExitedWith(
+        this ChildProcess.ProcessResult result, int exitCode)
     {
         result.ExitCode.ShouldBe(exitCode, Describe(result));
-        result.ShouldHaveLeftStdoutEmpty();
 
         return result;
     }
 
-    /// <summary>Asserts the launcher left stdout empty, whatever it exited with.</summary>
+    /// <summary>
+    ///     Asserts the launcher left stdout empty, whatever it exited with: stdout is the channel the client
+    ///     speaks JSON-RPC over, where one stray line is a protocol error before the handshake.
+    /// </summary>
     internal static ChildProcess.ProcessResult ShouldHaveLeftStdoutEmpty(this ChildProcess.ProcessResult result)
     {
         result.StandardOutput.ShouldBeEmpty("stdout is the JSON-RPC channel and the launcher must leave it alone.");

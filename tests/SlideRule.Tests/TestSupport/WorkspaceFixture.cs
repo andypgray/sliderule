@@ -12,8 +12,7 @@ namespace SlideRule.Tests.TestSupport;
 public sealed class WorkspaceFixture : IAsyncLifetime
 {
     /// <summary>Absolute path to the fixture solution in the test output directory.</summary>
-    public string SolutionPath { get; } =
-        Path.Combine(AppContext.BaseDirectory, "Fixtures", "TestSolutions", "MyApp", "MyApp.sln");
+    public string SolutionPath { get; } = FixtureBeds.MyAppSolution;
 
     /// <summary>The extracted model. Set during <see cref="InitializeAsync" />.</summary>
     internal CodebaseModel Model { get; private set; } = null!;

@@ -97,15 +97,6 @@ public class GenericSugarTests
     //      keeping its own kind-only verbs reachable after the sugar ----
 
     [Fact]
-    public void MemberAttributedWith_Generic_ReifiesIdenticallyToTypeof()
-    {
-        Checker.Sentence(arch => arch.Types.Properties.AttributedWith<SugarAttribute>()
-                .MustBePublic())
-            .ShouldBe(Checker.Sentence(arch => arch.Types.Properties.AttributedWith(typeof(SugarAttribute))
-                .MustBePublic()));
-    }
-
-    [Fact]
     public void MemberAttributedWith_GenericOnMethodSelection_KeepsReturningReachable()
     {
         // The MethodSelection overload returns a MethodSelection, so `.Returning` chains off the sugar —

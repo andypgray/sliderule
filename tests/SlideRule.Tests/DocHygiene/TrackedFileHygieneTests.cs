@@ -43,7 +43,7 @@ public sealed class TrackedFileHygieneTests
     private static readonly (string Path, string Token)[] NonSourceExemptions =
     [
         (".gitignore", "docs/"),
-        ("src/SlideRule.Cli/Mcp/Prompts/derive-spec.md", "docs/")
+        (DocPaths.DeriveSpecPrompt, "docs/")
     ];
 
     /// <summary>

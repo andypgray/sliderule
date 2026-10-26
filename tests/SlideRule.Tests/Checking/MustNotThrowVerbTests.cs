@@ -173,21 +173,6 @@ public sealed class MustNotThrowVerbTests
     }
 
     [Fact]
-    public void MustNotThrow_EmptySubject_FailsWithDefaultMessage()
-    {
-        // An empty subject fails the rule by default with the shared message (GRAMMAR §4.1), exactly as every
-        // other verb — the throw-ban verb takes the same subject gate.
-        RuleResult result = Checker.Run(
-                "namespace App { public class Foo {} }",
-                arch => arch.Rule("ex/empty")
-                    .Enforce(arch.Namespace("Nowhere.*").MustNotThrow(arch.Namespace("App.*")))
-                    .Because("b"))
-            .Single();
-
-        result.ShouldHaveFailedWithDetail(ViolationKind.EmptySubject, ConstraintEvaluator.EmptySubjectMessage);
-    }
-
-    [Fact]
     public void MustNotThrow_GrandfatheredEdgePasses_NewThrowStaysRed()
     {
         // The throw ratchet keys the (source, thrown) type pair (GRAMMAR §4.3): Worker is grandfathered for
@@ -217,19 +202,5 @@ public sealed class MustNotThrowVerbTests
 
         result.ShouldHaveFailedWithEdges(ViolationKind.Throw, ["N.Worker -> N.Beta"]);
         result.ShouldHaveGrandfathered(1);
-    }
-
-    [Fact]
-    public void JsonReportRenderer_ForbiddenThrowViolation_EmitsThrowKindAndTargetAndOmitsMemberSlots()
-    {
-        // Kind reuse reaches the wire: the JSON kind string is "throw", the thrown type rides the existing
-        // `target` field, and schemaVersion stays 3 — the ban polarity adds no vocabulary a hook would have to
-        // learn beside the allow-list's.
-        CheckReport report = Checker.Run(SceneModel, arch =>
-            arch.Rule("ex/no-infra-throws")
-                .Enforce(arch.Namespace("App.*").MustNotThrow(arch.Namespace("Errors.*").WithSuffix("InfraError")))
-                .Because("b"));
-
-        report.ShouldRenderEdgeViolation("throw", "App.Service", "Errors.InfraError");
     }
 }

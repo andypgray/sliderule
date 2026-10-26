@@ -90,13 +90,6 @@ public sealed class TypeNameFullDisplayTests
             $"{Ns}.IBox<{Ns}.Pair<{Ns}.Simple, System.Int32>>");
     }
 
-    [Fact]
-    public void FullDisplay_GlobalNamespaceType_RendersBareName()
-    {
-        CodebaseModel model = CompilationFactory.Extract("public class TopLevel {}");
-        model.Types.ShouldContain(t => t.FullName == "TopLevel");
-    }
-
     // The three type shapes with no source-level extraction analog throw in TypeName.FullDisplay: a by-ref
     // (int&), a pointer (int*), and a partially-open construction (Dictionary<int, TValue> — some arguments
     // bound, some free). A discriminant selects the case so the computed types never

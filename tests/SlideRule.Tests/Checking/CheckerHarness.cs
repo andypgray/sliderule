@@ -162,12 +162,6 @@ internal static class Checker
             define, codebase, rules => ArchChecker.Check(rules, codebase, baselines, null, narrowing, null, root));
     }
 
-    /// <summary>The same partial-model run, extracting <paramref name="source" /> first.</summary>
-    public static CheckReport Run(string source, IncompleteModel? incompleteModel, Action<Arch> define)
-    {
-        return Run(CompilationFactory.Extract(source), incompleteModel, define);
-    }
-
     /// <summary>The reified model of a one-off spec — for the tests whose subject is the model, not the check.</summary>
     public static ArchitectureModel Model(Action<Arch> define)
     {
@@ -219,6 +213,19 @@ internal static class Checker
         return constraint.MemberOperands
             .Select(member => $"{member.DeclaringType.FullName}.{member.Name} (method: {member.IsMethod})")
             .ToList();
+    }
+
+    /// <summary>
+    ///     The one result of a one-rule spec carrying <paramref name="constraint" />, checked over
+    ///     <paramref name="codebase" /> — for the rows that differ by their constraint alone, whose rule id and
+    ///     reason nothing reads.
+    /// </summary>
+    public static RuleResult Verdict(CodebaseModel codebase, Func<Arch, Constraint> constraint)
+    {
+        return Run(codebase, arch => arch.Rule("area/rule")
+                .Enforce(constraint(arch))
+                .Because("b"))
+            .Single();
     }
 
     /// <summary>
@@ -354,36 +361,6 @@ internal static class Checker
         return result.Violators(ViolationKind.Reference, Pair);
     }
 
-    /// <summary>Construction violations rendered as <c>Source -&gt; Constructed</c>, in report order (§4.5).</summary>
-    public static IReadOnlyList<string> ConstructionPairs(this RuleResult result)
-    {
-        return result.Violators(ViolationKind.Construction, Pair);
-    }
-
-    /// <summary>Injection violations rendered as <c>Source -&gt; Injected</c>, in report order (§4.7).</summary>
-    public static IReadOnlyList<string> InjectionPairs(this RuleResult result)
-    {
-        return result.Violators(ViolationKind.Injection, Pair);
-    }
-
-    /// <summary>Catch violations rendered as <c>Source -&gt; Caught</c>, in report order (§4.8).</summary>
-    public static IReadOnlyList<string> CatchPairs(this RuleResult result)
-    {
-        return result.Violators(ViolationKind.Catch, Pair);
-    }
-
-    /// <summary>Throw violations rendered as <c>Source -&gt; Thrown</c>, in report order (§4.8).</summary>
-    public static IReadOnlyList<string> ThrowPairs(this RuleResult result)
-    {
-        return result.Violators(ViolationKind.Throw, Pair);
-    }
-
-    /// <summary>Exposure violations rendered as <c>Source -&gt; Exposed</c>, in report order (§4.9).</summary>
-    public static IReadOnlyList<string> ExposurePairs(this RuleResult result)
-    {
-        return result.Violators(ViolationKind.Expose, Pair);
-    }
-
     /// <summary>Shape-violation subject FullNames, in report order.</summary>
     public static IReadOnlyList<string> ShapeSubjects(this RuleResult result)
     {
@@ -394,6 +371,12 @@ internal static class Checker
     public static IReadOnlyList<string> MemberShapeSubjects(this RuleResult result)
     {
         return result.Violators(ViolationKind.MemberShape, v => v.SubjectMember!.SymbolId);
+    }
+
+    /// <summary>Member-use violation target SymbolIds (the member used), in report order.</summary>
+    public static IReadOnlyList<string> MemberUseTargets(this RuleResult result)
+    {
+        return result.Violators(ViolationKind.MemberUse, v => v.Member!.SymbolId);
     }
 
     /// <summary>Project-shape violation subject names, in report order (§4.10).</summary>

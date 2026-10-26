@@ -143,11 +143,10 @@
                           OutputItemType="SharedFrameworkSpecAssembly"
                           Private="false" />
         <!-- The net48 legacy trio, same discipline. LegacyProduct is the Framework product assembly the
-             legacy spec typeof()s; the tests need its path to assert which load context resolved it.
+             legacy spec typeof()s; the tests reach it by name, so it carries no path item.
              These are why NU1702 is suppressed above. -->
         <ProjectReference Include="..\Fixtures\SlideRule.LegacyProduct\SlideRule.LegacyProduct.csproj"
                           ReferenceOutputAssembly="false"
-                          OutputItemType="LegacyProductAssembly"
                           Private="false" />
         <ProjectReference Include="..\Fixtures\SlideRule.LegacySpec\SlideRule.LegacySpec.csproj"
                           ReferenceOutputAssembly="false"
@@ -229,11 +228,7 @@
                 <_Parameter1>SharedFrameworkSpecPath</_Parameter1>
                 <_Parameter2>@(SharedFrameworkSpecAssembly->'%(FullPath)')</_Parameter2>
             </AssemblyAttribute>
-            <!-- The net48 legacy trio's DLL paths. -->
-            <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
-                <_Parameter1>LegacyProductPath</_Parameter1>
-                <_Parameter2>@(LegacyProductAssembly->'%(FullPath)')</_Parameter2>
-            </AssemblyAttribute>
+            <!-- The net48 legacy specs' DLL paths. -->
             <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
                 <_Parameter1>LegacySpecPath</_Parameter1>
                 <_Parameter2>@(LegacySpecAssembly->'%(FullPath)')</_Parameter2>

@@ -229,7 +229,7 @@ internal static class SourceAnchors
         IReadOnlyDictionary<AnchorKey, Landmark> landmarks,
         Func<string, IReadOnlyList<string>?> readLines)
     {
-        string repoRelativeFile = RepoRelative(exampleRoot, anchor.File);
+        string repoRelativeFile = ExampleRoots.RepoRelative(exampleRoot, anchor.File);
         IReadOnlyList<string>? lines = readLines(repoRelativeFile);
         if (lines is null) return Unresolved(anchor, $"source file not found at {repoRelativeFile}");
 
@@ -284,18 +284,6 @@ internal static class SourceAnchors
 
             return lines;
         };
-    }
-
-    /// <summary>
-    ///     Composes the repository-relative path an anchor resolves against. An empty
-    ///     <paramref name="exampleRoot" /> means the anchoring doc quotes this repository's own sources, so
-    ///     the anchor's path is already repository-relative and is returned unchanged: prefixing a separator
-    ///     would yield a rooted path, which <see cref="Path.Combine(string,string)" /> resolves outside the
-    ///     repository and would silently take every such anchor out of the gate's reach.
-    /// </summary>
-    private static string RepoRelative(string exampleRoot, string file)
-    {
-        return exampleRoot.Length == 0 ? file : $"{exampleRoot}/{file}";
     }
 
     private static AnchorResult Unresolved(SourceAnchor anchor, string reason)

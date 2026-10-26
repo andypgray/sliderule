@@ -1,4 +1,3 @@
-using System.Text.Json;
 using ModelContextProtocol.Protocol;
 using Shouldly;
 using SlideRule.Cli.Mcp.Infrastructure;
@@ -228,31 +227,6 @@ public sealed class GlobalCallToolFilterTests
     }
 
     [Fact]
-    public async Task CallTool_GraphOverBudgetButFittingAtACoarserGrain_ReturnsAWholeDocument()
-    {
-        // Arrange — the case the ladder exists for, driven end to end through the real pipeline rather than
-        // against the runner alone. A budget between the skeleton's size and the full survey's comes back cut
-        // if the runner steps only once, to overview, because the filter then truncates that document at the
-        // same number it was just measured against.
-        await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
-            McpServerBindings.MyAppWithViolatedSpec(), Ct);
-        harness.Environment.SetVariable(SlideRuleEnvVars.MaxMcpOutputTokens, "750"); // 1500-char cap
-
-        // Act
-        CallToolResult result = await harness.Client.CallToolAsync("arch_graph", cancellationToken: Ct);
-
-        // Assert — a whole, parseable survey, stamped with the grain it landed on.
-        result.IsError.ShouldNotBe(true);
-        string text = result.ShouldHaveTextContent();
-        text.ShouldNotContain("--- RESPONSE TRUNCATED ---");
-        using JsonDocument document = JsonDocument.Parse(text);
-        document.RootElement.GetProperty("grain")
-            .GetString()
-            .ShouldBe("skeleton");
-        harness.Logs.Warnings.ShouldBeEmpty();
-    }
-
-    [Fact]
     public async Task CallTool_UnparseableBool_ReturnsCoercerErrorAndLogsNothing()
     {
         // Arrange — "yes" for a flag is the mis-spelling BoolCoercerFactory exists for. Web defaults read
@@ -272,27 +246,6 @@ public sealed class GlobalCallToolFilterTests
         result.IsError.ShouldBe(true);
         result.ShouldHaveTextContent()
             .ShouldContain("Expected true or false");
-        harness.Logs.Warnings.ShouldBeEmpty();
-    }
-
-    [Fact]
-    public async Task CallTool_UnknownParameterKey_ReturnsGuardErrorAndLogsNothing()
-    {
-        // Arrange — "rule" is the classic typo of the "ruleId" parameter; the guard fires pre-dispatch.
-        await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
-            McpServerBindings.MyAppWithViolatedSpec(), Ct);
-
-        // Act
-        CallToolResult result = await harness.Client.CallToolAsync(
-            "arch_explain",
-            new Dictionary<string, object?> { ["rule"] = "layering/domain-independent" },
-            cancellationToken: Ct);
-
-        // Assert — the guard's actionable message surfaces as an error, unlogged.
-        result.IsError.ShouldBe(true);
-        string text = result.ShouldHaveTextContent();
-        text.ShouldContain("\"rule\"");
-        text.ShouldContain("arch_explain");
         harness.Logs.Warnings.ShouldBeEmpty();
     }
 

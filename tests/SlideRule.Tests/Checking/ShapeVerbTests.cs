@@ -267,94 +267,20 @@ public sealed class ShapeVerbTests
             .ShouldHavePassed();
     }
 
-    [Fact]
-    public void MustBeSealed_HoldsAndFlagsUnsealed()
+    [Theory]
+    [InlineData("MustBeSealed", "Sealed", "Open", "App.Shape.OpenThing")]
+    [InlineData("MustBeStatic", "Static", "Open", "App.Shape.OpenThing")]
+    [InlineData("MustBeAbstract", "Abstract", "Sealed", "App.Shape.SealedThing")]
+    [InlineData("MustBePublic", "Public", "Internal", "App.Shape.InternalThing")]
+    [InlineData("MustBeInternal", "Internal", "Public", "App.Shape.PublicThing")]
+    public void ShapeVerb_HoldsForTheGreenPrefix_FlagsTheRedPrefix(
+        string verb, string green, string red, string flagged)
     {
-        Checker.Run(ShapeModel, arch =>
-                arch.Rule("shape/sealed")
-                    .Enforce(arch.Types.WithPrefix("Sealed").MustBeSealed())
-                    .Because("b"))
-            .Single()
+        Checker.Verdict(ShapeModel, arch => ShapeVerb(arch.Types.WithPrefix(green), verb))
             .ShouldHavePassed();
 
-        Checker.Run(ShapeModel, arch =>
-                arch.Rule("shape/sealed")
-                    .Enforce(arch.Types.WithPrefix("Open").MustBeSealed())
-                    .Because("b"))
-            .Single()
-            .ShouldHaveFailedWithSubjects(["App.Shape.OpenThing"]);
-    }
-
-    [Fact]
-    public void MustBeStatic_HoldsAndFlagsNonStatic()
-    {
-        Checker.Run(ShapeModel, arch =>
-                arch.Rule("shape/static")
-                    .Enforce(arch.Types.WithPrefix("Static").MustBeStatic())
-                    .Because("b"))
-            .Single()
-            .ShouldHavePassed();
-
-        Checker.Run(ShapeModel, arch =>
-                arch.Rule("shape/static")
-                    .Enforce(arch.Types.WithPrefix("Open").MustBeStatic())
-                    .Because("b"))
-            .Single()
-            .ShouldHaveFailedWithSubjects(["App.Shape.OpenThing"]);
-    }
-
-    [Fact]
-    public void MustBeAbstract_HoldsAndFlagsConcrete()
-    {
-        Checker.Run(ShapeModel, arch =>
-                arch.Rule("shape/abstract")
-                    .Enforce(arch.Types.WithPrefix("Abstract").MustBeAbstract())
-                    .Because("b"))
-            .Single()
-            .ShouldHavePassed();
-
-        Checker.Run(ShapeModel, arch =>
-                arch.Rule("shape/abstract")
-                    .Enforce(arch.Types.WithPrefix("Sealed").MustBeAbstract())
-                    .Because("b"))
-            .Single()
-            .ShouldHaveFailedWithSubjects(["App.Shape.SealedThing"]);
-    }
-
-    [Fact]
-    public void MustBePublic_HoldsAndFlagsInternal()
-    {
-        Checker.Run(ShapeModel, arch =>
-                arch.Rule("shape/public")
-                    .Enforce(arch.Types.WithPrefix("Public").MustBePublic())
-                    .Because("b"))
-            .Single()
-            .ShouldHavePassed();
-
-        Checker.Run(ShapeModel, arch =>
-                arch.Rule("shape/public")
-                    .Enforce(arch.Types.WithPrefix("Internal").MustBePublic())
-                    .Because("b"))
-            .Single()
-            .ShouldHaveFailedWithSubjects(["App.Shape.InternalThing"]);
-    }
-
-    [Fact]
-    public void MustBeInternal_HoldsAndFlagsPublic()
-    {
-        Checker.Run(ShapeModel, arch =>
-                arch.Rule("shape/internal")
-                    .Enforce(arch.Types.WithPrefix("Internal").MustBeInternal())
-                    .Because("b"))
-            .Single()
-            .ShouldHavePassed();
-
-        Checker.Run(ShapeModel, arch =>
-                arch.Rule("shape/internal")
-                    .Enforce(arch.Types.WithPrefix("Public").MustBeInternal())
-                    .Because("b"))
-            .Single()
-            .ShouldHaveFailedWithSubjects(["App.Shape.PublicThing"]);
+        Checker.Verdict(ShapeModel, arch => ShapeVerb(arch.Types.WithPrefix(red), verb))
+            .ShouldHaveFailedWithSubjects([flagged]);
     }
 
     [Fact]
@@ -431,5 +357,18 @@ public sealed class ShapeVerbTests
 
         result.ShouldHaveFailedWithDetailContaining(
             ViolationKind.RuleError, "the `Where` predicate threw Exception", "boom");
+    }
+
+    private static Constraint ShapeVerb(Selection subject, string verb)
+    {
+        return verb switch
+        {
+            "MustBeSealed" => subject.MustBeSealed(),
+            "MustBeStatic" => subject.MustBeStatic(),
+            "MustBeAbstract" => subject.MustBeAbstract(),
+            "MustBePublic" => subject.MustBePublic(),
+            "MustBeInternal" => subject.MustBeInternal(),
+            _ => throw new ArgumentOutOfRangeException(nameof(verb), verb, "No shape verb has this name.")
+        };
     }
 }

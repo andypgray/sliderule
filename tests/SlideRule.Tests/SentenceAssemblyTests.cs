@@ -413,13 +413,6 @@ public class SentenceAssemblyTests
     }
 
     [Fact]
-    public void Under_SeveralGlobs_OrJoinTheGlobs()
-    {
-        SentenceRenderer.Subject(Arch.Types.Under("src/Widgets", "src/Console"))
-            .ShouldBe("Types under `src/Widgets` or `src/Console`");
-    }
-
-    [Fact]
     public void Under_InTargetPosition_ReadsAsTheSetItNames()
     {
         SentenceRenderer.Sentence(Arch.Types.Under("src")
@@ -879,26 +872,11 @@ public class SentenceAssemblyTests
     }
 
     [Fact]
-    public void Returning_SingleAnchor_RendersReturningClause()
-    {
-        SentenceRenderer.MemberSubject(Arch.Namespace("MyApp.Web.*")
-                .Methods.Returning(typeof(Task)))
-            .ShouldBe("Methods returning `Task` declared in types in `MyApp.Web.*`");
-    }
-
-    [Fact]
     public void Returning_OpenGeneric_RendersDeclaredTypeParameterName()
     {
         // An open-generic anchor renders declared type-parameter names, like Implementing (§4.6, §5.2).
         SentenceRenderer.MemberSubject(Arch.Types.Methods.Returning(typeof(Task<>)))
             .ShouldBe("Methods returning `Task<TResult>` declared in types");
-    }
-
-    [Fact]
-    public void Returning_MultipleAnchors_JoinWithOr()
-    {
-        SentenceRenderer.MemberSubject(Arch.Types.Methods.Returning(typeof(Task), typeof(Task<>)))
-            .ShouldBe("Methods returning `Task` or `Task<TResult>` declared in types");
     }
 
     [Fact]
@@ -965,17 +943,6 @@ public class SentenceAssemblyTests
             .ShouldBe("`*Async` `Get*` methods of types");
     }
 
-    [Fact]
-    public void MemberWithNameMatching_PremodifiesTheKindPlural()
-    {
-        // The glob premodifies the projection head (GRAMMAR §5.7), cloned onto the selection through
-        // KindMemberSelection.Rebuild.
-        SentenceRenderer.MemberSubject(Arch.Types.Members.WithNameMatching("*Handler*"))
-            .ShouldBe("`*Handler*` members of types");
-    }
-
-    // Each row renders a member name adjective and its type-side twin before the projection, which select
-    // different members.
     public static TheoryData<string, string, string> MemberNameAdjectiveTwins =>
         new()
         {

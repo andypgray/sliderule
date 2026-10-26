@@ -387,29 +387,38 @@ public sealed class OracleCaseTableTests(WorkspaceFixture workspace, OracleArchi
         slideRule.ShouldBe(archUnit, true);
     }
 
+    // A reader keeps one violation kind, so without this guard a rule that failed as an empty subject or a
+    // rule error would leave its set empty and read as clean agreement.
+    private RuleResult ShouldReachAVerdict(Action<Arch> define)
+    {
+        RuleResult result = Checker.Run(workspace.Model, define)
+            .Single();
+
+        result.Violations.ShouldNotContain(violation =>
+            violation.Kind == ViolationKind.EmptySubject || violation.Kind == ViolationKind.RuleError);
+        return result;
+    }
+
     // The four readers below stay raw rather than stating their sets through the RuleResult outcome verbs:
     // each projects a slot of its own choosing — a source rather than an edge, a declaring type rather than the
     // member — and the value has to survive as a set for AssertOracleAgreement to compare it three ways.
     private IReadOnlySet<string> SlideRuleReferenceViolators(Action<Arch> define)
     {
-        return Checker.Run(workspace.Model, define)
-            .Single()
+        return ShouldReachAVerdict(define)
             .Violators(ViolationKind.Reference, violation => violation.Source!.FullName)
             .ToHashSet(StringComparer.Ordinal);
     }
 
     private IReadOnlySet<string> SlideRuleShapeViolators(Action<Arch> define)
     {
-        return Checker.Run(workspace.Model, define)
-            .Single()
+        return ShouldReachAVerdict(define)
             .ShapeSubjects()
             .ToHashSet(StringComparer.Ordinal);
     }
 
     private IReadOnlySet<string> SlideRuleMemberUseViolators(Action<Arch> define)
     {
-        return Checker.Run(workspace.Model, define)
-            .Single()
+        return ShouldReachAVerdict(define)
             .Violators(ViolationKind.MemberUse, violation => violation.Source!.FullName)
             .ToHashSet(StringComparer.Ordinal);
     }
@@ -420,8 +429,7 @@ public sealed class OracleCaseTableTests(WorkspaceFixture workspace, OracleArchi
     // clock.
     private IReadOnlySet<string> SlideRuleMemberShapeViolators(Action<Arch> define)
     {
-        return Checker.Run(workspace.Model, define)
-            .Single()
+        return ShouldReachAVerdict(define)
             .Violators(ViolationKind.MemberShape, violation => ((TypeNode)violation.SubjectMember!.DeclaringType).FullName)
             .ToHashSet(StringComparer.Ordinal);
     }

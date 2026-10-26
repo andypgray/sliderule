@@ -148,7 +148,6 @@ public sealed class NarrowedUniverseNoticeTests
             "'BillingOnly.slnf' narrowed this run: 2 projects the solution declares were not checked, and "
             + "this rule's subject matched no type in the projects that loaded — so it was not measured, and "
             + "this is not a clean result for it.");
-        reason.ShouldNotContain("\n");
     }
 
     [Fact]
@@ -172,7 +171,6 @@ public sealed class NarrowedUniverseNoticeTests
             "'BillingOnly.slnf' narrowed this run: 2 projects the solution declares were not checked, so this "
             + "rule's target may match types outside the projects that loaded; check the rule against the "
             + "solution the filter references before deciding whether to keep it.");
-        hint.ShouldNotContain("\n");
     }
 
     [Fact]

@@ -87,19 +87,6 @@ public sealed class DeriveSpecVocabularyTests
     }
 
     [Fact]
-    public void TheVerbGate_NamesTheVerbTheRecipeLost()
-    {
-        // Negative control: with every mention of one verb cut, the gate must red on that verb and on
-        // nothing else, so that its failure message names the verb the recipe lost.
-        string body = Prose()
-            .Replace("MustNotReferenceEachOther", string.Empty, StringComparison.Ordinal);
-
-        List<string> missing = UntaughtNames(body, ShippedVocabulary.VerbNames, WithheldVerbs, VerbAppearsIn);
-
-        missing.ShouldBe(["MustNotReferenceEachOther"]);
-    }
-
-    [Fact]
     public void EveryShippedAdjective_IsTaughtByTheRecipe_OrExplicitlyWithheld()
     {
         string body = Prose();
@@ -151,19 +138,6 @@ public sealed class DeriveSpecVocabularyTests
     }
 
     [Fact]
-    public void TheAdjectiveGate_NamesTheAdjectiveTheRecipeLost()
-    {
-        // Negative control: the recipe calls .Packable once, and with that call cut the gate must red on
-        // Packable and on nothing else.
-        string body = Prose()
-            .Replace(".Packable", string.Empty, StringComparison.Ordinal);
-
-        List<string> missing = UntaughtNames(body, ShippedVocabulary.AdjectiveNames, WithheldAdjectives, AdjectiveAppearsIn);
-
-        missing.ShouldBe(["Packable"]);
-    }
-
-    [Fact]
     public void BothGates_ReadTheProse_AndIgnoreTheTable()
     {
         // Negative control: the table names every verb and adjective by construction, so with both names cut
@@ -194,7 +168,7 @@ public sealed class DeriveSpecVocabularyTests
     }
 
     // The committed recipe's table body, which VocabularyBlockSyncTests holds equal to the composed one.
-    private static string CommittedBlock()
+    internal static string CommittedBlock()
     {
         return ManagedBlock.ExtractBody(RepoRoot.ReadText(DocPaths.DeriveSpecPrompt))
                ?? throw new InvalidOperationException($"{DocPaths.DeriveSpecPrompt} carries no managed-block markers.");

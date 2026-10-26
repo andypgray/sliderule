@@ -231,17 +231,6 @@ public sealed class SpecExclusionTests : IDisposable
     }
 
     [Fact]
-    public void TryReadDeclaredMembers_MalformedSlnx_ReturnsNull()
-    {
-        // Unparseable XML is unreadable membership, not zero membership.
-        string solutionPath = _temp.PathOf("Broken.slnx");
-        File.WriteAllText(solutionPath, "<Solution><Project Path=\"a.csproj\">");
-
-        SpecExclusion.TryReadDeclaredMembers(solutionPath)
-            .ShouldBeNull();
-    }
-
-    [Fact]
     public void IsDeclaredMember_UnreadableMembershipOrUnknownPath_IsTrue()
     {
         SpecExclusion.IsDeclaredMember(null, "/repo/src/App.csproj")
@@ -280,6 +269,7 @@ public sealed class SpecExclusionTests : IDisposable
     {
         // Both disk-side fallbacks reach this method as a null set, so the chain from a bad solution file
         // through to an unlabeled project is pinned end to end rather than as two halves nothing joins.
+        // Unparseable XML is unreadable membership, not zero membership: an empty set would answer false.
         string unowned = _temp.PathOf("MyApp.csproj");
         File.WriteAllText(unowned, "<Project />");
         string malformed = _temp.PathOf("Unparseable.slnx");

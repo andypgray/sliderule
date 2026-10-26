@@ -1,3 +1,4 @@
+using SlideRule.Checking;
 using SlideRule.Cli.Verbs;
 
 namespace SlideRule.Tests.TestSupport;
@@ -38,6 +39,19 @@ internal static class BaselineRequests
     internal static BaselineRequest Rename(string from, string to, string workingDirectory)
     {
         return Request(BaselineMode.Rename, workingDirectory) with { Rename = new BaselineRename(from, to) };
+    }
+
+    /// <summary>
+    ///     Runs <paramref name="request" /> through <see cref="BaselineRunner.ApplyFiles" /> over
+    ///     <paramref name="results" />, resolving baseline paths against <paramref name="solutionDirectory" />,
+    ///     and returns what the runner wrote. The exit code is dropped.
+    /// </summary>
+    internal static string Apply(
+        this BaselineRequest request, IEnumerable<RuleResult> results, string solutionDirectory)
+    {
+        var output = new StringWriter();
+        BaselineRunner.ApplyFiles(output, request, results, solutionDirectory);
+        return output.ToString();
     }
 
     private static BaselineRequest Request(

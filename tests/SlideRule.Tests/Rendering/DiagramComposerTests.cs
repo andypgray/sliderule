@@ -1,11 +1,8 @@
 using Shouldly;
 using SlideRule.Codebase;
-using SlideRule.Extraction;
 using SlideRule.Hosting;
 using SlideRule.Rendering;
-using SlideRule.Roslyn;
 using SlideRule.Tests.Checking;
-using SlideRule.Tests.Extraction;
 using Xunit;
 
 namespace SlideRule.Tests.Rendering;
@@ -26,7 +23,7 @@ public sealed class DiagramComposerTests
     public void Compose_ASurveyAndALaw_IsTwoFencesEachWithItsOwnCaption()
     {
         // Arrange
-        GraphSummary summary = TwoProjectSummary();
+        GraphSummary summary = GraphDiagramRendererTests.TwoProjectSummary();
         ArchitectureModel model = LawModel();
 
         // Act
@@ -46,7 +43,7 @@ public sealed class DiagramComposerTests
     public void Compose_TheSurveyHalf_IsByteIdenticalToTheSurveyRenderedAlone()
     {
         // Arrange
-        GraphSummary summary = TwoProjectSummary();
+        GraphSummary summary = GraphDiagramRendererTests.TwoProjectSummary();
         ArchitectureModel model = LawModel();
 
         // Act
@@ -64,7 +61,7 @@ public sealed class DiagramComposerTests
     public void Compose_AScope_NarrowsTheSurveyAndLeavesTheLawWhole()
     {
         // Arrange
-        GraphSummary summary = TwoProjectSummary();
+        GraphSummary summary = GraphDiagramRendererTests.TwoProjectSummary();
         ArchitectureModel model = LawModel();
 
         // Act
@@ -83,7 +80,7 @@ public sealed class DiagramComposerTests
     {
         // Arrange — the same independence as the scoped case, on the fence's own default rather than a
         // flag: Lib is a passenger, and the law is written about Lib.
-        GraphSummary summary = TwoProjectSummary(libMembership: false, appMembership: true);
+        GraphSummary summary = GraphDiagramRendererTests.TwoProjectSummary(libMembership: false, appMembership: true);
         ArchitectureModel model = LawModel();
 
         // Act — no scope argument at all.
@@ -94,28 +91,6 @@ public sealed class DiagramComposerTests
         body.ShouldNotContain("p_Lib[");
         body.ShouldContain("p_App[\"App\"]");
         body.ShouldEndWith(LawDiagramRenderer.Block(model, SpecName));
-    }
-
-    // App references Lib and touches it — the smallest survey with an edge in it. Membership defaults to
-    // unread, which draws, so a case that leaves it unset is unaffected by the declared-members fence.
-    private static GraphSummary TwoProjectSummary(bool? libMembership = null, bool? appMembership = null)
-    {
-        CompilationInput lib = CompilationFactory.Compile("Lib", ("Lib.cs", """
-                                                                            namespace Lib;
-                                                                            public class Service {}
-                                                                            """)) with
-        {
-            SolutionMember = libMembership
-        };
-        CompilationInput app = CompilationFactory.CompileReferencing("App", lib.Compilation, "Lib", ("App.cs", """
-                                                                                                               namespace App;
-                                                                                                               public class Client { public Lib.Service S; }
-                                                                                                               """)) with
-        {
-            SolutionMember = appMembership
-        };
-
-        return GraphSummarizer.Summarize(CodebaseExtractor.ExtractFromCompilations([lib, app]));
     }
 
     // A law naming a place the scoped survey drops, so the two halves are visibly independent.

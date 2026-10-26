@@ -79,24 +79,13 @@ internal static class WrittenPaths
     }
 
     /// <summary>
-    ///     Composes the repository-relative path a quoted write report resolves against. The verbs report
-    ///     paths relative to the solution directory, so an example's walkthrough hangs its paths off that
-    ///     example's root; an empty <paramref name="exampleRoot" /> means the doc quotes a run over this
-    ///     repository's own solution and the path is already repository-relative.
-    /// </summary>
-    public static string RepoRelative(string exampleRoot, string path)
-    {
-        return exampleRoot.Length == 0 ? path : $"{exampleRoot}/{path}";
-    }
-
-    /// <summary>
     ///     Decides whether <paramref name="written" /> still names a published file: matched when the
     ///     repository-relative path is in <paramref name="trackedPaths" />, untracked otherwise, with a
     ///     failure naming the doc, the line and the path that was looked for.
     /// </summary>
     public static PathResult Classify(WrittenPath written, string exampleRoot, IReadOnlySet<string> trackedPaths)
     {
-        string repoRelative = RepoRelative(exampleRoot, written.Path);
+        string repoRelative = ExampleRoots.RepoRelative(exampleRoot, written.Path);
         if (trackedPaths.Contains(repoRelative)) return new PathResult(PathBucket.Matched, null);
 
         return new PathResult(

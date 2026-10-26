@@ -521,16 +521,6 @@ public sealed class MemberSubjectVerbTests
     }
 
     [Fact]
-    public void Returning_MultipleAnchors_UnionTheReturnTypes()
-    {
-        // typeof(Task) or typeof(Task<>) selects Save, SaveAsync, and Load; SaveAsync passes, the other two fail.
-        FailedMemberIds(AsyncModel, arch => arch.Namespace("App.Async.*")
-                .Methods.Returning(typeof(Task), typeof(Task<>))
-                .MustHaveSuffix("Async"))
-            .ShouldBe(["M:App.Async.HomeController.Load", "M:App.Async.HomeController.Save"]);
-    }
-
-    [Fact]
     public void Returning_StringArm_SelectsExactlyWhatTheTypeofArmSelects()
     {
         // Both arms in ONE model, asserted against EACH OTHER rather than against their own literals: a
@@ -560,7 +550,8 @@ public sealed class MemberSubjectVerbTests
 
         stringed.ShouldBe(typed);
 
-        // Non-vacuous: the union of both anchors, one of them matched through an open definition.
+        // Non-vacuous: the union of both anchors, one of them matched through an open definition. typeof(Task) or
+        // typeof(Task<>) selects Save, SaveAsync and Load; SaveAsync passes and the other two fail.
         typed.ShouldBe(["M:App.Async.HomeController.Load", "M:App.Async.HomeController.Save"]);
     }
 
@@ -614,59 +605,32 @@ public sealed class MemberSubjectVerbTests
     }
 
     [Fact]
-    public void MustAcceptParameter_BareMethodsSubject_HoldsAndFlagsMismatch()
+    public void MustAcceptParameter_BareMethodsSubject_RedsExactlyTheMethodsWithoutTheAnchor()
     {
-        // The bare .Methods.MustAcceptParameter form (no .Returning narrowing): a method that accepts a token
-        // behind another parameter passes (any position counts), a tokenless one reds.
-        Pass(ParametersModel, arch => arch.Namespace("App.Parameters.*").Methods.WithPrefix("FetchWithToken")
-            .MustAcceptParameter(typeof(CancellationToken)));
-
+        // The bare .Methods.MustAcceptParameter form (no .Returning narrowing), over the whole fixture:
+        // - a token behind another parameter counts (any position), so FetchWithToken passes;
+        // - a `CancellationToken cancellationToken = default` parameter counts, the most common compliant
+        //   signature: extraction reads the declared symbol, so a default value never drops the parameter;
+        // - definition-level honesty (GRAMMAR §4.6): a CancellationToken? parameter records System.Nullable<T>'s
+        //   definition and a params CancellationToken[] records the array type, and NEITHER equals the
+        //   System.Threading.CancellationToken anchor, so both red over real extracted facts;
+        // - a tokenless method reds.
         FailedMemberIds(ParametersModel, arch => arch.Namespace("App.Parameters.*").Methods
-                .WithPrefix("PollWithoutToken")
                 .MustAcceptParameter(typeof(CancellationToken)))
-            .ShouldBe(["M:App.Parameters.Handlers.PollWithoutToken"]);
-    }
+            .ShouldBe([
+                "M:App.Parameters.Handlers.NullableTokenOnly(System.Nullable{System.Threading.CancellationToken})",
+                "M:App.Parameters.Handlers.ParamsTokensOnly(System.Threading.CancellationToken[])",
+                "M:App.Parameters.Handlers.PollWithoutToken",
+                "M:App.Parameters.Handlers.ReportProgress(System.IProgress{System.Int32})"
+            ]);
 
-    [Fact]
-    public void MustAcceptParameter_OpenGenericAnchor_MatchesAnyConstruction()
-    {
         // typeof(IProgress<>) matches a method accepting IProgress<int> at the definition level (any
-        // construction on the definition name, GRAMMAR §4.6) — the parameter analog of .Returning(typeof(Task<>)).
-        Pass(ParametersModel, arch => arch.Namespace("App.Parameters.*").Methods.WithPrefix("ReportProgress")
-            .MustAcceptParameter(typeof(IProgress<>)));
-
-        // …and reds a method accepting no IProgress construction.
-        FailedMemberIds(ParametersModel, arch => arch.Namespace("App.Parameters.*").Methods
-                .WithPrefix("PollWithoutToken")
-                .MustAcceptParameter(typeof(IProgress<>)))
-            .ShouldBe(["M:App.Parameters.Handlers.PollWithoutToken"]);
-    }
-
-    [Fact]
-    public void MustAcceptParameter_DefaultValuedParameter_Counts()
-    {
-        // A `CancellationToken cancellationToken = default` parameter counts — the most common compliant
-        // signature. Extraction reads the declared symbol, so a default value never drops the parameter.
-        Pass(ParametersModel, arch => arch.Namespace("App.Parameters.*").Methods.WithPrefix("DefaultedToken")
-            .MustAcceptParameter(typeof(CancellationToken)));
-    }
-
-    [Fact]
-    public void MustAcceptParameter_DefinitionLevelHonesty_NullableAndParamsArrayRed()
-    {
-        // Definition-level honesty (GRAMMAR §4.6): a CancellationToken? parameter records System.Nullable<T>'s
-        // definition, and a params CancellationToken[] records the array type — NEITHER equals the
-        // System.Threading.CancellationToken anchor, so both red. Asserted through the real evaluator over
-        // real extracted facts, not by faking a parameter list.
-        FailedMemberIds(ParametersModel, arch => arch.Namespace("App.Parameters.*").Methods
-                .WithPrefix("NullableTokenOnly")
-                .MustAcceptParameter(typeof(CancellationToken)))
-            .ShouldBe(["M:App.Parameters.Handlers.NullableTokenOnly(System.Nullable{System.Threading.CancellationToken})"]);
-
-        FailedMemberIds(ParametersModel, arch => arch.Namespace("App.Parameters.*").Methods
-                .WithPrefix("ParamsTokensOnly")
-                .MustAcceptParameter(typeof(CancellationToken)))
-            .ShouldBe(["M:App.Parameters.Handlers.ParamsTokensOnly(System.Threading.CancellationToken[])"]);
+        // construction on the definition name, GRAMMAR §4.6), the parameter analog of .Returning(typeof(Task<>)),
+        // and reds a method accepting no IProgress construction.
+        IReadOnlyList<string> progress = FailedMemberIds(ParametersModel, arch => arch.Namespace("App.Parameters.*")
+            .Methods.MustAcceptParameter(typeof(IProgress<>)));
+        progress.ShouldContain("M:App.Parameters.Handlers.PollWithoutToken");
+        progress.ShouldNotContain("M:App.Parameters.Handlers.ReportProgress(System.IProgress{System.Int32})");
     }
 
     [Fact]
@@ -704,15 +668,11 @@ public sealed class MemberSubjectVerbTests
         tokenStringed.ShouldBe(tokenTyped);
         progressStringed.ShouldBe(progressTyped);
 
-        // Non-vacuous, and the two anchors disagree about the fixture — so neither pin is the other's.
-        tokenTyped.ShouldBe([
-            "M:App.Parameters.Handlers.NullableTokenOnly(System.Nullable{System.Threading.CancellationToken})",
-            "M:App.Parameters.Handlers.ParamsTokensOnly(System.Threading.CancellationToken[])",
-            "M:App.Parameters.Handlers.PollWithoutToken",
-            "M:App.Parameters.Handlers.ReportProgress(System.IProgress{System.Int32})"
-        ]);
-        progressTyped.ShouldContain("M:App.Parameters.Handlers.PollWithoutToken");
-        progressTyped.ShouldNotContain("M:App.Parameters.Handlers.ReportProgress(System.IProgress{System.Int32})");
+        // Non-vacuous, and the two anchors disagree about the fixture, so neither comparison stands in for the
+        // other. The exact red sets are the bare-subject row's.
+        tokenTyped.ShouldNotBeEmpty();
+        progressTyped.ShouldNotBeEmpty();
+        progressTyped.ShouldNotBe(tokenTyped);
     }
 
     [Fact]
@@ -1164,29 +1124,21 @@ public sealed class MemberSubjectVerbTests
 
     // ── helpers ───────────────────────────────────────────────────────────────────────────────────────
 
-    private static RuleResult Checked(CodebaseModel codebase, Func<Arch, Constraint> constraint)
-    {
-        return Checker.Run(codebase, arch => arch.Rule("member/x")
-                .Enforce(constraint(arch))
-                .Because("b"))
-            .Single();
-    }
-
     private static void Pass(CodebaseModel codebase, Func<Arch, Constraint> constraint)
     {
-        Checked(codebase, constraint)
+        Checker.Verdict(codebase, constraint)
             .ShouldHavePassed();
     }
 
     private static IReadOnlyList<string> FailedMemberIds(CodebaseModel codebase, Func<Arch, Constraint> constraint)
     {
-        return Checked(codebase, constraint)
+        return Checker.Verdict(codebase, constraint)
             .MemberShapeSubjects();
     }
 
     private static void ShouldFailOnTheEmptyMemberSubject(CodebaseModel codebase, Func<Arch, Constraint> constraint)
     {
-        Checked(codebase, constraint)
+        Checker.Verdict(codebase, constraint)
             .ShouldHaveFailedWithDetail(ViolationKind.EmptySubject, ConstraintEvaluator.EmptyMemberSubjectMessage);
     }
 }

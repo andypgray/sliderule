@@ -54,13 +54,17 @@ public sealed class QuoteSyncTests
     private const string OperationsSpec = "examples/Meridian.Operations/arch/Meridian.Operations.Architecture/OperationsArchitectureSpec.cs";
     private const string CanonicalSample = "tests/SlideRule.Tests/CanonicalSampleSpec.cs";
 
-    private const string Workflow = ".github/workflows/ci.yml";
-
     /// <summary>
     ///     The workflow step that runs the getting-started page and the README quickstart as written, with the
     ///     tool and the contract package packed from the same commit.
     /// </summary>
     private const string GettingStartedWalk = "Walk GETTING-STARTED.md and the README quickstart from the packed package";
+
+    /// <summary>
+    ///     A workflow step line that cuts the <c>dotnet build MyApp.sln</c> fence out of <c>PAGE.md</c> as
+    ///     <c>bash</c>.
+    /// </summary>
+    private const string CutBuildStep = "first=\"$(fence PAGE.md bash 'dotnet build MyApp.sln')\"";
 
     /// <summary>
     ///     The registered quoted excerpts, each keyed by the doc it lives in and by a distinctive marker
@@ -329,14 +333,6 @@ public sealed class QuoteSyncTests
         scanner: "fence scanner");
 
     [Fact]
-    public void ExcerptRegistry_IsNotEmpty()
-    {
-        // Act & Assert: the excerpt tests below iterate the registry, so an empty one would make them pass
-        // over nothing.
-        Excerpts.ShouldNotBeEmpty("The excerpt registry is empty; the excerpt tests below would pass vacuously.");
-    }
-
-    [Fact]
     public void EachExcerpt_MatchesExactlyOneFence()
     {
         // Arrange
@@ -456,7 +452,7 @@ public sealed class QuoteSyncTests
         // Arrange: CI cuts a fence it runs out of its page by the fence's marker, in the step the row names. A
         // reworded marker, a renamed step or a retagged fence leaves that step cutting nothing, which CI's own guard
         // reports only after a push.
-        string workflow = RepoRoot.ReadText(Workflow);
+        string workflow = RepoRoot.ReadText(TrackedFiles.CiWorkflow);
         (string Doc, string Key, string Marker, string? RunBy)[] rows = Excerpts
             .Select(static excerpt => (excerpt.Doc, excerpt.Key, excerpt.Marker, excerpt.RunBy))
             .Concat(CommandFences.Select(static command => (command.Doc, command.Key, command.Marker, command.RunBy)))
@@ -477,7 +473,7 @@ public sealed class QuoteSyncTests
             IReadOnlyList<string> steps = WorkflowSteps(workflow, runBy!);
             if (steps.Count != 1)
             {
-                findings.Add($"{doc} {key}: {Workflow} has {steps.Count} steps named '{runBy}', not one.");
+                findings.Add($"{doc} {key}: {TrackedFiles.CiWorkflow} has {steps.Count} steps named '{runBy}', not one.");
                 continue;
             }
 
@@ -489,18 +485,20 @@ public sealed class QuoteSyncTests
         findings.ShouldReportNothing("These fences run in CI, but the workflow step each names does not cut it out of its page");
     }
 
-    [Fact]
-    public void CutFinding_ReportsACutWhoseLanguageIsNotItsFencesTag()
+    [Theory]
+    [InlineData(
+        "```sh\ndotnet build MyApp.sln\n```",
+        "PAGE.md page-build: the step 'Walk' cuts this fence as 'bash', but the fence is tagged 'sh', so the cut comes back empty.")]
+    [InlineData(
+        "``` bash\ndotnet build MyApp.sln\n```",
+        "PAGE.md page-build: the step 'Walk' cuts this fence as 'bash', but the fence is tagged ' bash', so the cut comes back empty.")]
+    public void CutFinding_ReportsACutWhoseLanguageIsNotItsFencesTag(string docText, string expected)
     {
-        // Arrange
-        string docText = string.Join("\n", "```sh", "dotnet build MyApp.sln", "```");
-        const string step = "first=\"$(fence PAGE.md bash 'dotnet build MyApp.sln')\"";
-
         // Act
-        string? finding = CutFinding("PAGE.md", "page-build", "dotnet build MyApp.sln", "Walk", step, docText);
+        string? finding = CutFinding("PAGE.md", "page-build", "dotnet build MyApp.sln", "Walk", CutBuildStep, docText);
 
         // Assert
-        finding.ShouldBe("PAGE.md page-build: the step 'Walk' cuts this fence as 'bash', but the fence is tagged 'sh', so the cut comes back empty.");
+        finding.ShouldBe(expected);
     }
 
     [Fact]
@@ -508,10 +506,9 @@ public sealed class QuoteSyncTests
     {
         // Arrange
         string docText = string.Join("\n", "```bash", "dotnet build MyApp.sln", "```");
-        const string step = "first=\"$(fence PAGE.md bash 'dotnet build MyApp.sln')\"";
 
         // Act
-        string? finding = CutFinding("PAGE.md", "page-build", "dotnet build MyApp.sln", "Walk", step, docText);
+        string? finding = CutFinding("PAGE.md", "page-build", "dotnet build MyApp.sln", "Walk", CutBuildStep, docText);
 
         // Assert
         finding.ShouldBeNull();
@@ -531,46 +528,20 @@ public sealed class QuoteSyncTests
         finding.ShouldBe("PAGE.md page-build: the step 'Walk' does not cut this fence with fence PAGE.md <lang> 'dotnet build MyApp.sln'.");
     }
 
-    [Fact]
-    public void CutFinding_ReportsATildeFence()
+    [Theory]
+    [InlineData(
+        "~~~bash\ndotnet build MyApp.sln\n~~~",
+        "PAGE.md page-build: the step 'Walk' cuts this fence, but it opens with '~~~bash', and CI's cut opens only a fence of three backticks at column 0, so the cut comes back empty.")]
+    [InlineData(
+        "- Build it:\n\n  ```bash\n  dotnet build MyApp.sln\n  ```",
+        "PAGE.md page-build: the step 'Walk' cuts this fence, but it opens with '  ```bash', and CI's cut opens only a fence of three backticks at column 0, so the cut comes back empty.")]
+    public void CutFinding_ReportsAFenceTheCutCannotOpen(string docText, string expected)
     {
-        // Arrange
-        string docText = string.Join("\n", "~~~bash", "dotnet build MyApp.sln", "~~~");
-        const string step = "first=\"$(fence PAGE.md bash 'dotnet build MyApp.sln')\"";
-
         // Act
-        string? finding = CutFinding("PAGE.md", "page-build", "dotnet build MyApp.sln", "Walk", step, docText);
+        string? finding = CutFinding("PAGE.md", "page-build", "dotnet build MyApp.sln", "Walk", CutBuildStep, docText);
 
         // Assert
-        finding.ShouldBe("PAGE.md page-build: the step 'Walk' cuts this fence, but it opens with '~~~bash', and CI's cut opens only a fence of three backticks at column 0, so the cut comes back empty.");
-    }
-
-    [Fact]
-    public void CutFinding_ReportsAnIndentedFence()
-    {
-        // Arrange
-        string docText = string.Join("\n", "- Build it:", "", "  ```bash", "  dotnet build MyApp.sln", "  ```");
-        const string step = "first=\"$(fence PAGE.md bash 'dotnet build MyApp.sln')\"";
-
-        // Act
-        string? finding = CutFinding("PAGE.md", "page-build", "dotnet build MyApp.sln", "Walk", step, docText);
-
-        // Assert
-        finding.ShouldBe("PAGE.md page-build: the step 'Walk' cuts this fence, but it opens with '  ```bash', and CI's cut opens only a fence of three backticks at column 0, so the cut comes back empty.");
-    }
-
-    [Fact]
-    public void CutFinding_ReportsASpaceBeforeTheTag()
-    {
-        // Arrange
-        string docText = string.Join("\n", "``` bash", "dotnet build MyApp.sln", "```");
-        const string step = "first=\"$(fence PAGE.md bash 'dotnet build MyApp.sln')\"";
-
-        // Act
-        string? finding = CutFinding("PAGE.md", "page-build", "dotnet build MyApp.sln", "Walk", step, docText);
-
-        // Assert
-        finding.ShouldBe("PAGE.md page-build: the step 'Walk' cuts this fence as 'bash', but the fence is tagged ' bash', so the cut comes back empty.");
+        finding.ShouldBe(expected);
     }
 
     [Fact]

@@ -148,20 +148,6 @@ public sealed class MustBeRegisteredVerbTests
     }
 
     [Fact]
-    public void MustBeRegistered_EmptySubject_FailsWithDefaultMessage()
-    {
-        // An empty subject fails the rule by default with the shared message (GRAMMAR §4.1), exactly as every
-        // other verb — the completeness verb takes the same subject gate.
-        RuleResult result = Checker.Run(SceneModel, arch =>
-                arch.Rule("di/empty")
-                    .Enforce(arch.Namespace("Nowhere.*").MustBeRegistered())
-                    .Because("b"))
-            .Single();
-
-        result.ShouldHaveFailedWithDetail(ViolationKind.EmptySubject, ConstraintEvaluator.EmptySubjectMessage);
-    }
-
-    [Fact]
     public void MustBeRegistered_GrandfatheredUnregisteredTypePasses_NewOneStaysRed()
     {
         // Identity is the subject symbol ID (GRAMMAR §4.3), one entry per unregistered type. App.Orphan is

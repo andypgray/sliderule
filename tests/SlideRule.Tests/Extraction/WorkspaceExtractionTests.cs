@@ -360,13 +360,6 @@ public sealed class WorkspaceExtractionTests(WorkspaceFixture fixture)
     }
 
     [Fact]
-    public void ExtractFromSolutionAsync_GenericAndNestedFullNames_RenderPinnedForms()
-    {
-        fixture.Model.Types.ShouldContain(t => t.FullName == "MyApp.Web.IHandler<T>");
-        fixture.Model.Types.ShouldContain(t => t.FullName == "MyApp.Domain.Order.Line");
-    }
-
-    [Fact]
     public void ExtractFromSolutionAsync_ShapeFacts_SurviveTheRealWorkspace()
     {
         TypeNode ext = fixture.Model.Type("MyApp.Web.WebTextExtensions");
@@ -450,8 +443,7 @@ public sealed class WorkspaceExtractionTests(WorkspaceFixture fixture)
     [Fact]
     public void ExtractFromCompilations_BillingSources_MatchWorkspaceExtractionExactly()
     {
-        string billingDir = Path.Combine(
-            AppContext.BaseDirectory, "Fixtures", "TestSolutions", "MyApp", "MyApp.Legacy.Billing");
+        string billingDir = Path.Combine(FixtureBeds.MyAppRoot, "MyApp.Legacy.Billing");
         (string Path, string Source)[] files = Directory.EnumerateFiles(billingDir, "*.cs")
             .Select(f => ($"MyApp.Legacy.Billing/{Path.GetFileName(f)}", File.ReadAllText(f)))
             .ToArray();

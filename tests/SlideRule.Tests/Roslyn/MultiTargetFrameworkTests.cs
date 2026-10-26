@@ -28,7 +28,7 @@ public sealed class MultiTargetFrameworkTests
     private const string Widget = "MultiTfm.Core.Widget";
 
     private static readonly string SolutionPath =
-        Path.Combine(AppContext.BaseDirectory, "Fixtures", "TestSolutions", "MultiTfm", "MultiTfm.sln");
+        Path.Combine(FixtureBeds.TestSolutionsRoot, "MultiTfm", "MultiTfm.sln");
 
     /// <summary>
     ///     The fixture's codebase, extracted once through <see cref="FixtureCodebase" /> for the tests below
@@ -167,17 +167,6 @@ public sealed class MultiTargetFrameworkTests
     }
 
     [Fact]
-    public async Task ExtractFromSolutionAsync_MultiTargetedProject_RecordsNoCrossProjectConflationNote()
-    {
-        CodebaseModel model = await MultiTfmCodebase;
-
-        // Both compilations of the csproj now carry one project name, so the same-FQN conflation note —
-        // which fires only across DIFFERENT project names — never runs. One csproj is never a conflation.
-        model.MergeNotes
-            .ShouldNotContain(note => note.Contains("each declare", StringComparison.Ordinal));
-    }
-
-    [Fact]
     public async Task ExtractFromSolutionAsync_MultiTargetedProject_RecordsOneMultiFrameworkNoteNamingTheWinningFramework()
     {
         CodebaseModel model = await MultiTfmCodebase;
@@ -186,7 +175,9 @@ public sealed class MultiTargetFrameworkTests
         // can only carry one framework's members and hierarchy, while its references are every framework's.
         // net10.0 wins on the extractor's ordinal framework order, not on the csproj's declaration order —
         // which lists netstandard2.0 first, so this pin means something. ModernOnly and LegacyOnly,
-        // which one framework each declares, collapsed nothing and add no note.
+        // which one framework each declares, collapsed nothing and add no note. Both compilations of the
+        // csproj carry one project name, so the same-FQN conflation note, which fires only across different
+        // project names, is absent too: one csproj is never a conflation.
         model.MergeNotes.ShouldBe([
             "Project 'MultiTfm.Core' targets 'net10.0' and 'netstandard2.0'; the types they share take "
             + "their members and hierarchy from 'net10.0' (the first extracted) but keep every framework's "

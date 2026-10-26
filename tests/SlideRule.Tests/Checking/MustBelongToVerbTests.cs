@@ -237,21 +237,6 @@ public sealed class MustBelongToVerbTests
     }
 
     [Fact]
-    public void MustBelongTo_EmptySubject_FailsWithDefaultMessage()
-    {
-        // An empty subject fails the rule by default with the shared message (GRAMMAR §4.1) — the coverage
-        // verb takes the same subject gate, which is what keeps an empty membership and an empty subject
-        // distinguishable outcomes.
-        RuleResult result = Checker.Run(SceneModel, arch =>
-                arch.Rule("layering/empty")
-                    .Enforce(arch.Namespace("Nowhere.*").MustBelongTo(arch.Namespace("Domain.*")))
-                    .Because("b"))
-            .Single();
-
-        result.ShouldHaveFailedWithDetail(ViolationKind.EmptySubject, ConstraintEvaluator.EmptySubjectMessage);
-    }
-
-    [Fact]
     public void MustBelongTo_GrandfatheredStrayPasses_NewStrayStaysRed()
     {
         // Identity is the subject symbol ID (GRAMMAR §4.3), one entry per uncovered type. Legacy.Ledger is

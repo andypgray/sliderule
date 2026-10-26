@@ -37,18 +37,13 @@ public sealed class SpecLiteralVersionCheckTests
         mismatch.Location.ShouldBe(Location.None);
     }
 
-    [Fact]
-    public async Task OneVersion_ReportsTheVerdictAsUsual()
+    [Theory]
+    [InlineData("0.9.0", "0.9.0")]
+    // The commit after the plus is not part of the version.
+    [InlineData("0.9.0+aaa", "0.9.0+bbb")]
+    public async Task OneVersion_ReportsTheVerdictAsUsual(string analyzer, string contract)
     {
-        IReadOnlyList<Diagnostic> reported = await DiagnoseAsync(MalformedId, ("0.9.0", "0.9.0"));
-
-        reported.ShouldBeTheOnly("SR1008");
-    }
-
-    [Fact]
-    public async Task TheCommitAfterThePlus_IsNotPartOfTheVersion()
-    {
-        IReadOnlyList<Diagnostic> reported = await DiagnoseAsync(MalformedId, ("0.9.0+aaa", "0.9.0+bbb"));
+        IReadOnlyList<Diagnostic> reported = await DiagnoseAsync(MalformedId, (analyzer, contract));
 
         reported.ShouldBeTheOnly("SR1008");
     }

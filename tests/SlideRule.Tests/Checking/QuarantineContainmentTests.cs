@@ -3,6 +3,7 @@ using Shouldly;
 using SlideRule.Baselines;
 using SlideRule.Checking;
 using SlideRule.Codebase;
+using SlideRule.Tests.Extraction;
 using Xunit;
 
 namespace SlideRule.Tests.Checking;
@@ -52,12 +53,6 @@ public sealed class QuarantineContainmentTests
             .Because("Replacement scheduled.");
     }
 
-    private static string SymbolId(string fullName)
-    {
-        return Codebase.Types.Single(t => t.FullName == fullName)
-            .SymbolId;
-    }
-
     private static RuleResult RegionContainment(Action<Arch> scope)
     {
         return Checker.Run(Sources.ContainmentRegionModel, BaselineIndex.Empty, scope)
@@ -89,7 +84,9 @@ public sealed class QuarantineContainmentTests
     [Fact]
     public void GrandfatheredInboundEdge_Passes()
     {
-        BaselineIndex baselines = Index(BaselineEntry.ForEdge(SymbolId("App.Client.User"), SymbolId("App.Legacy.Internal")));
+        BaselineIndex baselines = Index(
+            BaselineEntry.ForEdge(
+                Codebase.Type("App.Client.User").SymbolId, Codebase.Type("App.Legacy.Internal").SymbolId));
 
         RuleResult containment = Containment(baselines, BoundaryScope);
 
@@ -104,7 +101,9 @@ public sealed class QuarantineContainmentTests
     {
         // Hermetic: User → {IFacade, Internal} are both violations. Grandfather only User → Internal;
         // the User → IFacade edge is a distinct (source, target) pair and stays red (GRAMMAR §4.3).
-        BaselineIndex baselines = Index(BaselineEntry.ForEdge(SymbolId("App.Client.User"), SymbolId("App.Legacy.Internal")));
+        BaselineIndex baselines = Index(
+            BaselineEntry.ForEdge(
+                Codebase.Type("App.Client.User").SymbolId, Codebase.Type("App.Legacy.Internal").SymbolId));
 
         RuleResult containment = Containment(baselines, Sources.HermeticContainment);
 
@@ -118,8 +117,10 @@ public sealed class QuarantineContainmentTests
         // Boundary variant → the only violation is User → Internal (grandfathered). The second entry
         // (User → Impl) matches no current violation, so it is stale but the rule still passes.
         BaselineIndex baselines = Index(
-            BaselineEntry.ForEdge(SymbolId("App.Client.User"), SymbolId("App.Legacy.Internal")),
-            BaselineEntry.ForEdge(SymbolId("App.Client.User"), SymbolId("App.Legacy.Impl")));
+            BaselineEntry.ForEdge(
+                Codebase.Type("App.Client.User").SymbolId, Codebase.Type("App.Legacy.Internal").SymbolId),
+            BaselineEntry.ForEdge(
+                Codebase.Type("App.Client.User").SymbolId, Codebase.Type("App.Legacy.Impl").SymbolId));
 
         RuleResult containment = Containment(baselines, BoundaryScope);
 

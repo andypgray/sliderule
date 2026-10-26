@@ -31,22 +31,16 @@ public sealed class NuGetAuditDiagnosticsTests
     // Captured verbatim: a NU1902 advisory as it arrives after Roslyn drops the code.
     [InlineData(Wrapper + CapturedAuditLines.CryptographyXmlAdvisory)]
     // The same advisory escalated by TreatWarningsAsErrors, which only adds a prefix.
-    [InlineData(
-        Wrapper + "Warning As Error: Package 'System.Drawing.Common' 4.7.0 has a known critical severity "
-                + "vulnerability, https://github.com/advisories/GHSA-rxg9-xrhp-64gj")]
+    [InlineData(Wrapper + CapturedAuditLines.EscalatedAdvisory)]
     // The shape from a user's report.
     [InlineData(
         Wrapper + "Package 'KubernetesClient' 15.0.1 has a known moderate severity vulnerability, "
                 + "https://github.com/advisories/GHSA-w7r3-mgwf-4mqq")]
     // NU1900, the audit fetch itself failing — an offline or unreachable-source run.
-    [InlineData(
-        Wrapper + "Error occurred while getting package vulnerability data: Unable to load the service index "
-                + "for source https://nuget.example.com/v3/index.json.")]
+    [InlineData(Wrapper + CapturedAuditLines.AuditFetchFailure)]
     [InlineData("NU1900: Error communicating with the package source while running a security audit.")]
     // And the code-bearing shapes, for any path that still preserves one.
-    [InlineData(
-        "NU1903: Package 'System.Security.Cryptography.Xml' 4.7.0 has a known high severity vulnerability, "
-        + "https://github.com/advisories/GHSA-7h4f-3q2m-9xrv")]
+    [InlineData(CapturedAuditLines.CodedLine)]
     [InlineData("NU1901: Package 'Contoso.Widgets' 1.2.0 has a known low severity vulnerability")]
     [InlineData("Restore surfaced advisory code NU1999")]
     public void IsAudit_AuditAdvisory_ReturnsTrue(string diagnostic)

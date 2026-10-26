@@ -38,7 +38,7 @@ public sealed class PackageDescriptionTests
         if (packages.Count == 0) findings.Add("The solution declares no project that packs, so no description was read.");
 
         IEnumerable<string> undescribed = packages
-            .Where(static package => DescriptionOf(package).Length == 0)
+            .Where(static package => DescriptionOf(package.CsprojPath).Length == 0)
             .Select(static package => $"{package.CsprojPath} declares no <Description>.");
         findings.AddRange(undescribed);
 
@@ -68,7 +68,7 @@ public sealed class PackageDescriptionTests
             }
 
             string lede = FirstSentence(readme);
-            string description = DescriptionOf(library);
+            string description = DescriptionOf(library.CsprojPath);
             if (!description.StartsWith(lede, StringComparison.Ordinal))
                 findings.Add($"{library.CsprojPath}'s <Description> should open with the first sentence of {readme}, "
                              + $"\"{lede}\". It reads \"{description}\".");
@@ -78,9 +78,10 @@ public sealed class PackageDescriptionTests
         findings.ShouldReportNothing(LedeHeader);
     }
 
-    internal static string DescriptionOf(SolutionProject package)
+    /// <summary>The <c>Description</c> the project file at <paramref name="csprojPath" /> declares, or empty.</summary>
+    internal static string DescriptionOf(string csprojPath)
     {
-        return SolutionInventory.Properties(package.CsprojPath)
+        return SolutionInventory.Properties(csprojPath)
             .GetValueOrDefault("Description") ?? string.Empty;
     }
 

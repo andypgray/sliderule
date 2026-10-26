@@ -1,4 +1,3 @@
-using System.Xml.Linq;
 using Shouldly;
 using SlideRule.Tests.TestSupport;
 using Xunit;
@@ -20,8 +19,6 @@ public sealed class ExampleProjectMembershipTests
 {
     private const string AdapterProject =
         "examples/Meridian.Quoting/tests/Meridian.Quoting.ArchTests/Meridian.Quoting.ArchTests.csproj";
-
-    private const string Workflow = ".github/workflows/ci.yml";
 
     // Every project path any tracked solution declares, repository-relative. Built once: the arms
     // below ask about it for each of the example projects, and the answer cannot change mid-run.
@@ -54,7 +51,7 @@ public sealed class ExampleProjectMembershipTests
         // Act: ignoring case, the other way from the inventory arm, since a declaration in any spelling makes
         // the project a member wherever the file system ignores case, and one member anywhere is the refusal.
         List<string> declaring = TrackedSolutions()
-            .Where(static solution => DeclaredBy(solution)
+            .Where(static solution => SolutionInventory.DeclaredProjectPaths(solution)
                 .Contains(AdapterProject, StringComparer.OrdinalIgnoreCase))
             .ToList();
 
@@ -70,13 +67,13 @@ public sealed class ExampleProjectMembershipTests
     public void TheAdapterProject_IsBuiltAndRunByTheExamplesWorkflow()
     {
         // Act
-        string workflow = RepoRoot.ReadText(Workflow);
+        string workflow = RepoRoot.ReadText(TrackedFiles.CiWorkflow);
 
         // Assert: the coverage that makes membership of no solution safe. Nothing else in CI compiles
         // this project, so this line going missing removes it from the build entirely, in silence.
         workflow.ShouldContain(
             $"dotnet test {AdapterProject}",
-            $"{Workflow} no longer runs the xUnit adapter test project. It is a member of no solution, "
+            $"{TrackedFiles.CiWorkflow} no longer runs the xUnit adapter test project. It is a member of no solution, "
             + "so this line is the only thing that builds it — without it the project is compiled by "
             + "nothing and its rule tests run nowhere, with no other gate saying so.");
     }
@@ -101,23 +98,7 @@ public sealed class ExampleProjectMembershipTests
     private static IReadOnlySet<string> DeclaredProjects()
     {
         return TrackedSolutions()
-            .SelectMany(DeclaredBy)
+            .SelectMany(SolutionInventory.DeclaredProjectPaths)
             .ToHashSet(StringComparer.Ordinal);
-    }
-
-    // The projects one solution declares, as repository-relative paths — resolved against the
-    // solution's own directory, because a declared path is relative to the file that declares it.
-    private static IReadOnlyList<string> DeclaredBy(string solutionRelativePath)
-    {
-        string solutionPath = RepoRoot.Absolute(solutionRelativePath);
-        string solutionDirectory = Path.GetDirectoryName(solutionPath)!;
-
-        return XDocument.Load(solutionPath)
-            .Descendants("Project")
-            .Select(static element => (string?)element.Attribute("Path"))
-            .Where(static path => path is not null)
-            .Select(path => Path.Combine(solutionDirectory, path!.Replace('\\', '/')))
-            .Select(RepoRoot.Relative)
-            .ToList();
     }
 }

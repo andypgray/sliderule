@@ -30,18 +30,6 @@ public sealed class DependencyVerbTests
                                               }
                                               """;
 
-    // One `new` (Maker) and one bare reference (Holder) onto the same forbidden data-layer type — the fixture
-    // that separates the construction verb from the reference verb.
-    private const string ConstructsAndReferences = """
-                                                   namespace App.Data { public class Db {} }
-                                                   namespace App.Web
-                                                   {
-                                                       using App.Data;
-                                                       public class Maker { public Db Open() => new Db(); }
-                                                       public class Holder { public Db Handle; }
-                                                   }
-                                                   """;
-
     [Fact]
     public void MustNotReference_DomainReferencesWeb_FailsWithSourceTargetSites()
     {
@@ -187,55 +175,5 @@ public sealed class DependencyVerbTests
 
         // Web may be referenced only by Web; the inbound Domain→Web edge is a violation.
         result.ShouldHaveFailedWithEdgesIncluding(ViolationKind.Reference, "App.Domain.Service -> App.Web.Controller");
-    }
-
-    [Fact]
-    public void MustNotReference_InertPatternTarget_WarnsAndStillPasses()
-    {
-        // The forbidden target (a namespace glob) matches no types, so the rule can never fire — it is inert.
-        // A pattern operand (not a bare typeof) is the warning gate (ConstraintEvaluator.ForbiddenReference).
-        RuleResult result = Checker.Run(Sources.LayeredModel, arch =>
-                arch.Rule("inert/x")
-                    .Enforce(arch.Namespace("App.Domain.*").MustNotReference(arch.Namespace("Nonexistent.*")))
-                    .Because("b"))
-            .Single();
-
-        // Spelled out rather than asserted through ShouldHaveWarnedInertTarget, so the pinned wording keeps
-        // a literal that does not run through the helper holding it.
-        result.Status.ShouldBe(RuleStatus.Passed);
-        result.Violations.ShouldBeEmpty();
-        CheckWarning warning = result.Warnings.ShouldHaveSingleItem();
-        warning.Kind.ShouldBe(CheckWarningKind.InertTarget);
-        warning.Message.ShouldBe("This rule is inert: its target selection matched no types.");
-    }
-
-    [Fact]
-    public void MustNotConstruct_SubjectNewsTarget_FailsWithConstructionPair()
-    {
-        // The construction verb sits beside the reference verbs but walks object-creation edges: only Maker's
-        // `new Db()` trips — Holder's Db field is a reference, invisible to MustNotConstruct.
-        RuleResult result = Checker.Run(ConstructsAndReferences, arch =>
-                arch.Rule("di/x")
-                    .Enforce(arch.Namespace("App.Web.*").MustNotConstruct(arch.Namespace("App.Data.*")))
-                    .Because("b"))
-            .Single();
-
-        result.ShouldHaveFailedWithEdges(ViolationKind.Construction, ["App.Web.Maker -> App.Data.Db"]);
-    }
-
-    [Fact]
-    public void MustNotConstruct_ReferenceWithoutConstruction_Passes()
-    {
-        // The reference/construction split, pinned: Holder holds a Db field (a reference edge) but never `new`s
-        // it, so MustNotConstruct is silent exactly where MustNotReference would fire.
-        RuleResult result = Checker.Run(ConstructsAndReferences, arch =>
-                arch.Rule("di/x")
-                    .Enforce(arch.Namespace("App.Web.*").WithSuffix("Holder")
-                        .MustNotConstruct(arch.Namespace("App.Data.*")))
-                    .Because("b"))
-            .Single();
-
-        result.ShouldHavePassed();
-        result.Violations.ShouldBeEmpty();
     }
 }

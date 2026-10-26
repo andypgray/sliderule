@@ -28,10 +28,8 @@ namespace SlideRule.Tests.DocHygiene;
 /// </remarks>
 public sealed class DiagramScopeSyncTests
 {
-    private const string Workflow = ".github/workflows/ci.yml";
-
     /// <summary>The files that passed the drawing's scope by hand before the settings file held it.</summary>
-    private static readonly string[] FormerSites = [Workflow, DocPaths.Architecture];
+    private static readonly string[] FormerSites = [TrackedFiles.CiWorkflow, DocPaths.Architecture];
 
     /// <summary>
     ///     A scoping flag given an argument on a <c>render</c> command line: double-quoted (the form both former

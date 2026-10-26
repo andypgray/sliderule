@@ -271,11 +271,17 @@ public sealed class FragmentSiteRemapperTests
         properties.ProjectFile.ShouldBe(projectFile);
     }
 
-    [Fact]
-    public void TryRemap_MapForAnotherFileOnly_ReturnsTheSameFragment()
+    // The spanned row is the one a pass that dropped spans in unmapped files too would red: the same instance
+    // back is what keeps the span.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void TryRemap_MapForAnotherFileOnly_ReturnsTheSameFragment(bool spanned)
     {
         // Arrange
-        CodebaseFragment fragment = EdgeFragmentAt(3, 4);
+        CodebaseFragment fragment = spanned
+            ? EdgeFragmentOf(new FragmentSite("Pair.cs", 3) { Start = 40, Length = 5 })
+            : EdgeFragmentAt(3, 4);
         var maps = new Dictionary<string, LineMap>(PathComparison.Comparer)
         {
             ["Elsewhere.cs"] = MapBetween(PairBefore, PairJoined)
@@ -342,26 +348,6 @@ public sealed class FragmentSiteRemapperTests
             .Sites.ShouldHaveSingleItem();
         site.Line.ShouldBe(3);
         site.Length.ShouldBe(0);
-    }
-
-    [Fact]
-    public void TryRemap_SpannedSiteInAnUnmappedFile_KeepsItsSpan()
-    {
-        // Arrange
-        CodebaseFragment fragment = EdgeFragmentOf(new FragmentSite("Pair.cs", 3) { Start = 40, Length = 5 });
-        var maps = new Dictionary<string, LineMap>(PathComparison.Comparer)
-        {
-            ["Elsewhere.cs"] = MapBetween(PairBefore, PairJoined)
-        };
-
-        // Act
-        CodebaseFragment? remapped = FragmentSiteRemapper.TryRemap(fragment, maps);
-
-        // Assert
-        remapped.ShouldBeSameAs(fragment);
-        fragment.Edges.ShouldHaveSingleItem()
-            .Sites.ShouldHaveSingleItem()
-            .Length.ShouldBe(5);
     }
 
     [Fact]

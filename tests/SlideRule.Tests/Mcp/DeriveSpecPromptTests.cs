@@ -381,7 +381,8 @@ public sealed class DeriveSpecPromptTests
         text.ShouldContain("run from outside any `global.json` that pins an SDK below 10");
 
         // The substitution is a plain replace over the whole recipe, and the product's own repository URL
-        // carries the package's name too. This is what keeps it from being rewritten into a dead link.
+        // carries the package's name too. This is what keeps it from being rewritten into a dead link, and
+        // the link is where an agent mid-derive finds the vocabulary past the recipe's condensed subset.
         text.ShouldContain("https://github.com/andypgray/sliderule/blob/main/GRAMMAR.md");
     }
 
@@ -453,26 +454,6 @@ public sealed class DeriveSpecPromptTests
     }
 
     [Fact]
-    public async Task GetPrompt_DeriveSpec_RoutesToTheGrammar()
-    {
-        string text = await ServedRecipeAsync();
-
-        // Assert — the authoring reference is a condensed subset of the published grammar; the recipe
-        // must say where the full vocabulary lives, or an agent mid-derive has nowhere to go past the
-        // subset but improvisation.
-        text.ShouldContain("https://github.com/andypgray/sliderule/blob/main/GRAMMAR.md");
-    }
-
-    [Fact]
-    public void DeriveSpec_LoadsEmbeddedRecipe_NonTrivial()
-    {
-        // A rename of the .md or its manifest id would otherwise surface only when a client calls
-        // prompts/get; this load-time assertion turns manifest-id drift into a test failure instead.
-        ArchPrompts.DeriveSpec()
-            .Length.ShouldBeGreaterThan(500);
-    }
-
-    [Fact]
     public void DeriveSpec_StaysUnderTheServedBodyCeiling()
     {
         // The failure this catches is the free append: a paragraph added because it seemed worth saying,
@@ -486,7 +467,7 @@ public sealed class DeriveSpecPromptTests
     public void DeriveSpec_ServesTheVocabularyTableWithoutItsMarkers()
     {
         // Arrange: the committed recipe's table, which the vocabulary sync gate holds to the shipped API.
-        string block = ManagedBlock.ExtractBody(RepoRoot.ReadText(DocPaths.DeriveSpecPrompt))!;
+        string block = DeriveSpecVocabularyTests.CommittedBlock();
         block.ShouldNotBeEmpty("derive-spec.md carries no vocabulary table between its markers.");
 
         // Act

@@ -47,46 +47,23 @@ public sealed class CodebaseExtractorExposureEdgeTests
             .ShouldBe([3]);
     }
 
-    [Fact]
-    public void ExtractFromCompilations_PropertyType_MintsExposureEdge()
+    // One row per non-method signature position: a property's, a field's and an event's type.
+    [Theory]
+    [InlineData("public Gadget Thing { get; set; }", "N.Gadget")]
+    [InlineData("public Gadget Field;", "N.Gadget")]
+    [InlineData("public event Notify Ev;", "N.Notify")]
+    public void ExtractFromCompilations_MemberType_MintsExposureEdge(string member, string exposed)
     {
-        CodebaseModel model = CompilationFactory.Extract("""
-                                                         namespace N;
-                                                         public class Gadget {}
-                                                         public class C { public Gadget Thing { get; set; } }
-                                                         """);
+        CodebaseModel model = CompilationFactory.Extract($$"""
+                                                           namespace N;
+                                                           public class Gadget {}
+                                                           public delegate void Notify();
+                                                           public class C { {{member}} }
+                                                           """);
 
-        model.ExposureEdge("N.C", "N.Gadget")
+        model.ExposureEdge("N.C", exposed)
             .Sites.Lines()
-            .ShouldBe([3]);
-    }
-
-    [Fact]
-    public void ExtractFromCompilations_FieldType_MintsExposureEdge()
-    {
-        CodebaseModel model = CompilationFactory.Extract("""
-                                                         namespace N;
-                                                         public class Gadget {}
-                                                         public class C { public Gadget Field; }
-                                                         """);
-
-        model.ExposureEdge("N.C", "N.Gadget")
-            .Sites.Lines()
-            .ShouldBe([3]);
-    }
-
-    [Fact]
-    public void ExtractFromCompilations_EventType_MintsExposureEdge()
-    {
-        CodebaseModel model = CompilationFactory.Extract("""
-                                                         namespace N;
-                                                         public delegate void Notify();
-                                                         public class C { public event Notify Ev; }
-                                                         """);
-
-        model.ExposureEdge("N.C", "N.Notify")
-            .Sites.Lines()
-            .ShouldBe([3]);
+            .ShouldBe([4]);
     }
 
     [Fact]
@@ -175,7 +152,7 @@ public sealed class CodebaseExtractorExposureEdgeTests
         // Reference-edge twins (§4.9's textually-names split): NEITHER endpoint has an ordinary §4.1
         // reference-edge twin — `int?` names neither System.Nullable (the wrapper is synthesized by DecomposeType)
         // nor System.Int32 (a predefined-type keyword mints no type edge; see
-        // CodebaseExtractorEdgeTests.ExtractFromCompilations_PredefinedType_ProducesNoEdge). Both exposure
+        // CodebaseExtractorEdgeTests.ExtractFromCompilations_EdgeFreeConstruct_ProducesNoEdge). Both exposure
         // endpoints stand alone by design.
         model.HasEdge("N.C", "System.Nullable<T>")
             .ShouldBeFalse();

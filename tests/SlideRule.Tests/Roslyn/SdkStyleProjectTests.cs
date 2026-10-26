@@ -154,6 +154,8 @@ public sealed class SdkStyleProjectTests
     // undetected, which is no worse than having no gate, while a false positive refuses a healthy solution.
     [InlineData("""<Project Sdk="Microsoft.NET.Sdk">""", false)]
     [InlineData("not xml at all", false)]
+    // A truncated write leaves an empty file, and an empty document has no root at all.
+    [InlineData("", false)]
     // A DOCTYPE is refused rather than parsed, whether or not it declares an entity the root then uses, so a
     // project file carrying one answers false like any other file this cannot read.
     [InlineData("""<!DOCTYPE Project [ <!ENTITY sdk "Microsoft.NET.Sdk"> ]><Project Sdk="&sdk;" />""", false)]
@@ -166,18 +168,6 @@ public sealed class SdkStyleProjectTests
 
         SdkStyleProject.IsSdkStyle(projectPath)
             .ShouldBe(expected, projectXml);
-    }
-
-    [Fact]
-    public void IsSdkStyle_AnEmptyFile_IsNotSdkStyle()
-    {
-        // A truncated write leaves this, and an empty document has no root at all.
-        using TempDirectory temp = TestTempRoot.Fresh("sdk-style-empty");
-        string projectPath = Path.Combine(temp.Path, "Empty.csproj");
-        File.WriteAllText(projectPath, "");
-
-        SdkStyleProject.IsSdkStyle(projectPath)
-            .ShouldBeFalse();
     }
 
     [Fact]

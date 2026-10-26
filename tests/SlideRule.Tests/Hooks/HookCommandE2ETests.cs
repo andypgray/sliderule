@@ -1,6 +1,5 @@
 using Shouldly;
 using SlideRule.Cli.Hooks;
-using SlideRule.Roslyn.Hosting;
 using SlideRule.Tests.Cli;
 using SlideRule.Tests.Mcp.TestDoubles;
 using SlideRule.Tests.TestSupport;
@@ -74,7 +73,7 @@ public sealed class HookCommandE2ETests
 
         // Act
         CliResult result = await CliRunner.InvokeWithInputAsync(
-            HookPayloads.Stop(repo.Root), EnvironmentWith(state.Path, repo.Root),
+            HookPayloads.Stop(repo.Root), HookEnvironment.With(state.Path, repo.Root),
             "hook", repo.SolutionPath, "--spec", CliRunner.QuarantinedSpecDll);
 
         // Assert: exit 0 with the one document on stdout, naming the event that fired, because Claude Code reads
@@ -93,7 +92,7 @@ public sealed class HookCommandE2ETests
 
         // Act: nothing piped in and no project directory, as at a terminal outside Claude Code.
         CliResult result = await CliRunner.InvokeWithInputAsync(
-            "", EnvironmentWith(state.Path), "hook", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll);
+            "", HookEnvironment.With(state.Path), "hook", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll);
 
         // Assert: the per-edit path, which checks, and blocks on a red rule in Claude Code's terms.
         result.ShouldBlockWith("FAIL layering/domain-independent");
@@ -140,21 +139,12 @@ public sealed class HookCommandE2ETests
         result.ShouldReportConfigError("--max-rounds must be at least 1.");
     }
 
-    // The state directory is the row's own, and the project directory is whatever the row names or nothing at all,
-    // never the real one a test process inherits from a Claude Code session.
-    private static FakeEnvironment EnvironmentWith(string stateDirectory, string? projectDirectory = null)
-    {
-        return new FakeEnvironment()
-            .SetVariable(SlideRuleEnvVars.HookStateDirectory, stateDirectory)
-            .SetVariable(SlideRuleEnvVars.ClaudeProjectDirectory, projectDirectory);
-    }
-
     // A Stop fired from a project directory of the row's own, which is also the session's cwd and CLAUDE_PROJECT_DIR,
     // with its state inside it: outside every repository, so git discovery cannot hand the row the enclosing checkout.
     private static Task<CliResult> HookInProjectAsync(TempDirectory project, params string[] args)
     {
         string payload = HookPayloads.Stop(project.Path);
-        FakeEnvironment environment = EnvironmentWith(project.PathOf("state"), project.Path);
+        FakeEnvironment environment = HookEnvironment.With(project.PathOf("state"), project.Path);
 
         return CliRunner.InvokeWithInputAsync(payload, environment, ["hook", .. args]);
     }

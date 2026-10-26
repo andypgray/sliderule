@@ -267,8 +267,8 @@ public sealed class OneProjectExtractionTests
         // Arrange — a base in the sibling's own assembly, an interface from a third one, a generic base and
         // a nested type. A hierarchy name with no home is not a wrong answer but a thrown
         // KeyNotFoundException out of the merge, so the assertion is that the merge happens at all.
-        CSharpCompilation contracts = Compilation("Contracts", [CompilationFactory.CoreLibrary], ("Contracts.cs", ContractsSource));
-        CSharpCompilation domain = Compilation(
+        CSharpCompilation contracts = CompilationFactory.CreateCompilation("Contracts", [CompilationFactory.CoreLibrary], ("Contracts.cs", ContractsSource));
+        CSharpCompilation domain = CompilationFactory.CreateCompilation(
             SiblingAssemblyName, [CompilationFactory.CoreLibrary, CompilationFactory.Reference(contracts, asImage)], ("Domain.cs",
                 """
                 namespace Domain;
@@ -322,7 +322,7 @@ public sealed class OneProjectExtractionTests
         // the sibling's assembly beside Web's own declaration, which the merge reads as one name meaning two
         // types and says so in a note.
         const string sharedSource = "namespace Shared { public class Widget {} }";
-        CSharpCompilation domain = Compilation(
+        CSharpCompilation domain = CompilationFactory.CreateCompilation(
             SiblingAssemblyName, [CompilationFactory.CoreLibrary], ("Shared.cs", sharedSource), ("Domain.cs",
                 """
                 namespace Domain;
@@ -414,7 +414,7 @@ public sealed class OneProjectExtractionTests
         // Arrange — a name nothing supplies, reached where an unresolvable name can still be reached: a
         // declared type's base. The reference walker already refuses to mint an edge to an unmappable kind,
         // so this holds twice over; what it pins is that the view never hands the checker such a target.
-        CSharpCompilation domain = Compilation(SiblingAssemblyName, [CompilationFactory.CoreLibrary], ("Domain.cs", DomainSource));
+        CSharpCompilation domain = CompilationFactory.CreateCompilation(SiblingAssemblyName, [CompilationFactory.CoreLibrary], ("Domain.cs", DomainSource));
         CompilationInput own = Input(
             [CompilationFactory.CoreLibrary, CompilationFactory.Reference(domain, asImage)],
             ("Web.cs",
@@ -449,7 +449,7 @@ public sealed class OneProjectExtractionTests
         // Arrange — an assembly the map cannot attribute to one project. Which project's types a reference
         // into it reached is unanswerable from here, so the types are dropped rather than attributed to
         // either.
-        CSharpCompilation shared = Compilation(
+        CSharpCompilation shared = CompilationFactory.CreateCompilation(
             "Shared.Impl", [CompilationFactory.CoreLibrary], ("Shared.cs",
                 """
                 namespace Shared;
@@ -643,11 +643,11 @@ public sealed class OneProjectExtractionTests
         // Alpha's two arrive Mid.Two before Mid.One; ordered, the project key moves Zeta last and the
         // assembly key swaps Alpha's pair back. A merge reads the order as declaration precedence, so it is
         // a fact about the model rather than about presentation.
-        CSharpCompilation zeta = Compilation(
+        CSharpCompilation zeta = CompilationFactory.CreateCompilation(
             "Alpha.Core", [CompilationFactory.CoreLibrary], ("Zeta.cs", "namespace Aaa { public class One {} }"));
-        CSharpCompilation second = Compilation(
+        CSharpCompilation second = CompilationFactory.CreateCompilation(
             "Mid.Two", [CompilationFactory.CoreLibrary], ("Second.cs", "namespace Bbb { public class Two {} }"));
-        CSharpCompilation first = Compilation(
+        CSharpCompilation first = CompilationFactory.CreateCompilation(
             "Mid.One", [CompilationFactory.CoreLibrary], ("First.cs", "namespace Ccc { public class Three {} }"));
         CompilationInput own = Input(
             [
@@ -693,7 +693,7 @@ public sealed class OneProjectExtractionTests
         // however Roslyn happened to order the list, and both have to carry what the sibling's own
         // extraction carries: a facts-only sibling that sorted differently, or dropped the interface only
         // its base supplies, would feed a rule a different hierarchy from the whole-solution run.
-        CSharpCompilation domain = Compilation(
+        CSharpCompilation domain = CompilationFactory.CreateCompilation(
             SiblingAssemblyName, [CompilationFactory.CoreLibrary], ("Domain.cs", DomainUnsortedSource));
         CompilationInput own = Input(
             [CompilationFactory.CoreLibrary, CompilationFactory.Reference(domain, asImage)],
@@ -845,14 +845,14 @@ public sealed class OneProjectExtractionTests
 
     private static CSharpCompilation DomainCompilation()
     {
-        return Compilation(SiblingAssemblyName, [CompilationFactory.CoreLibrary], ("Domain.cs", DomainSource));
+        return CompilationFactory.CreateCompilation(SiblingAssemblyName, [CompilationFactory.CoreLibrary], ("Domain.cs", DomainSource));
     }
 
     // Domain with one type generated by each signal: Emitted by its file's banner alone, Stamped by the
     // attribute alone.
     private static CSharpCompilation GeneratedDomainCompilation()
     {
-        return Compilation(
+        return CompilationFactory.CreateCompilation(
             SiblingAssemblyName, [CompilationFactory.CoreLibrary], ("Emitted.cs",
                 """
                 // <auto-generated/>
@@ -890,8 +890,8 @@ public sealed class OneProjectExtractionTests
     private static IReadOnlyList<CodebaseFragment> OverContracts(
         string domainSource, string webSource, bool asImage, bool ownReferencesContracts)
     {
-        CSharpCompilation contracts = Compilation("Contracts", [CompilationFactory.CoreLibrary], ("Contracts.cs", ContractsSource));
-        CSharpCompilation domain = Compilation(
+        CSharpCompilation contracts = CompilationFactory.CreateCompilation("Contracts", [CompilationFactory.CoreLibrary], ("Contracts.cs", ContractsSource));
+        CSharpCompilation domain = CompilationFactory.CreateCompilation(
             SiblingAssemblyName,
             [CompilationFactory.CoreLibrary, CompilationFactory.Reference(contracts, asImage)],
             ("Domain.cs", domainSource));
@@ -944,12 +944,6 @@ public sealed class OneProjectExtractionTests
     {
         return constructions.Select(construction => construction.ConstructedName)
             .ToList();
-    }
-
-    private static CSharpCompilation Compilation(
-        string assemblyName, IReadOnlyList<MetadataReference> references, params (string Path, string Source)[] files)
-    {
-        return CompilationFactory.CreateCompilation(assemblyName, references, files);
     }
 
     private static CompilationInput Input(IReadOnlyList<MetadataReference> references, params (string Path, string Source)[] files)

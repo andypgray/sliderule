@@ -75,11 +75,9 @@ public sealed class TripwireSemanticsTests
     [Fact]
     public void NoDiffContext_TripwireSkipsWithPinnedReason()
     {
-        RuleResult tripwire = Tripwire(null);
-
-        tripwire.Status.ShouldBe(RuleStatus.Skipped);
-        tripwire.SkipReason.ShouldBe(
-            "Tripwire: no diff context — run 'sliderule check --diff-base <ref>' to check changed files against this quarantined scope.");
+        Tripwire(null)
+            .ShouldHaveSkipped(
+                "Tripwire: no diff context — run 'sliderule check --diff-base <ref>' to check changed files against this quarantined scope.");
     }
 
     [Fact]
@@ -158,14 +156,6 @@ public sealed class TripwireSemanticsTests
         // A caution has no second rule, so this is the whole run: the posture with no red state cannot
         // produce one however loudly its tripwire fires.
         report.HasViolations.ShouldBeFalse();
-    }
-
-    [Fact]
-    public void ChangedFileOutsideCautionedScope_YieldsNoWarnings()
-    {
-        RuleResult tripwire = CautionTripwire(new DiffContext("/repo", ["App.Client/User.cs"]));
-
-        tripwire.ShouldHavePassedClean();
     }
 
     [Fact]

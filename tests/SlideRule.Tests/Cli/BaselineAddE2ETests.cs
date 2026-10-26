@@ -203,7 +203,6 @@ public sealed class BaselineAddE2ETests
         // section turns both reads red again on a captured rule — the state the valve exists for.
         string clockPath = workspace.PathOf(ClockBaselineFile);
         File.WriteAllText(clockPath, BaselineComposer.Compose((ClockRule, [])));
-        string beforeText = File.ReadAllText(clockPath);
 
         // The valve, member flavor: a full-name --target (no P: prefix) resolves the member violation.
         CliResult add = await CliRunner.InvokeAsync(
@@ -216,17 +215,14 @@ public sealed class BaselineAddE2ETests
         add.Out.ShouldContain("wrote");
 
         // Composer as oracle: exactly one appended entry line keying the P: member DocId, and nothing else moves.
-        string afterText = File.ReadAllText(clockPath);
-        afterText.NormalizedLines()
+        File.ReadAllText(clockPath)
+            .NormalizedLines()
             .ShouldBe(BaselineComposer.Compose(
                 (ClockRule, [
                     BaselineEntry.ForEdge(HomeId, NowMemberId)
                         .WithSiteCount(1)
                         .WithBecause("INC-1234")
                 ])));
-        afterText.ShouldNotBe(beforeText);
-        LineSet(afterText)
-            .ShouldContain(line => line.Contains("\"source\":"), expectedCount: 1);
 
         // The bystander pin: the OTHER clock read (UtcNow) is still red; only Now is grandfathered.
         CliResult check = await CliRunner.InvokeAsync(
@@ -287,8 +283,6 @@ public sealed class BaselineAddE2ETests
                     BaselineEntry.ForSubject(SaveMemberId)
                         .WithBecause("INC-1234")
                 ])));
-        LineSet(File.ReadAllText(asyncPath))
-            .ShouldContain(line => line.Contains("\"subject\":"), expectedCount: 1);
 
         // The bystander pin: the OTHER Task method (Load) is still red; only Save is grandfathered.
         CliResult check = await CliRunner.InvokeAsync(
@@ -340,8 +334,6 @@ public sealed class BaselineAddE2ETests
                         .WithSiteCount(1)
                         .WithBecause("INC-1234")
                 ])));
-        LineSet(File.ReadAllText(diPath))
-            .ShouldContain(line => line.Contains("\"source\":"), expectedCount: 1);
 
         // The bystander pin: the OTHER construction (HomeController) is still red; only InvoiceService is grandfathered.
         CliResult check = await CliRunner.InvokeAsync(
@@ -401,8 +393,6 @@ public sealed class BaselineAddE2ETests
                         .WithSiteCount(1)
                         .WithBecause("INC-1234")
                 ])));
-        LineSet(File.ReadAllText(captivePath))
-            .ShouldContain(line => line.Contains("\"source\":"), expectedCount: 1);
 
         // The bystander pin: the OTHER captive edge (IOrderFormatter) is still red; only IOrderFeed is grandfathered.
         CliResult check = await CliRunner.InvokeAsync(
@@ -468,8 +458,6 @@ public sealed class BaselineAddE2ETests
                         .WithSiteCount(1)
                         .WithBecause("INC-1234")
                 ])));
-        LineSet(File.ReadAllText(catchPath))
-            .ShouldContain(line => line.Contains("\"source\":"), expectedCount: 1);
 
         // The added swallow now passes, and two bystanders stay red: the in-rule one — ReportPublisher's catch of
         // the very same System.Exception, a distinct (source, caught) identity — and the cross-rule one, the
@@ -541,8 +529,6 @@ public sealed class BaselineAddE2ETests
                         .WithSiteCount(1)
                         .WithBecause("INC-1234")
                 ])));
-        LineSet(File.ReadAllText(exposePath))
-            .ShouldContain(line => line.Contains("\"source\":"), expectedCount: 1);
 
         // The bystander pin: the OTHER surfaced DataTable (InvoiceController) is still red; only HomeController is
         // grandfathered.
@@ -609,21 +595,10 @@ public sealed class BaselineAddE2ETests
             "--rule", MigrateRule,
             "--source", "MyApp.Web.HomeController", "--target", "System.Data.DataTable", "--because", "keep");
         add.ShouldSucceed();
-        byte[] snapshot = File.ReadAllBytes(migratePath);
 
-        // Both entries are still observed, so accept-reductions removes nothing and preserves the attribution.
-        CliResult accept = await CliRunner.InvokeAsync(
-            "baseline", "accept-reductions", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll);
-        accept.ShouldSucceed();
-        File.ReadAllBytes(migratePath)
-            .ShouldBe(snapshot);
-
-        // The Migrate rule is already captured, so init leaves the attributed entry byte-identical, seal and all.
-        CliResult init = await CliRunner.InvokeAsync(
-            "baseline", "init", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll);
-        init.ShouldSucceed();
-        File.ReadAllBytes(migratePath)
-            .ShouldBe(snapshot);
+        // Both entries are still observed and the Migrate rule is already captured, so neither writing verb
+        // moves the attributed entry.
+        await ShouldRoundTripByteIdenticalAsync(workspace, migratePath);
     }
 
     [Fact]

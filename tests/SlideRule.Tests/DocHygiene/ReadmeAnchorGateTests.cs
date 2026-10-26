@@ -19,37 +19,26 @@ namespace SlideRule.Tests.DocHygiene;
 /// </summary>
 public sealed class ReadmeAnchorGateTests
 {
-    private const string BookingsController = "src/Meridian.Web/Controllers/BookingsController.cs";
+    private const string BookingsController = WalkthroughScenarios.BookingsController;
     private const string CustomsController = "src/Meridian.Web/Controllers/CustomsController.cs";
     private const string ExpireQuotesHandler = WalkthroughScenarios.ExpireQuotesHandlerPath;
     private const string InvoicePreview = WalkthroughScenarios.InvoicePreviewPath;
-    private const string RequestQuoteHandler = "src/Meridian.Quoting.Application/Handlers/RequestQuoteHandler.cs";
+    private const string RequestQuoteHandler = WalkthroughScenarios.RequestQuoteHandler;
     private const string ProgressPrinter = HookReportFenceTests.ProgressPrinterPath;
-
-    private const string MeridianRoot = "examples/Meridian";
-    private const string QuotingRoot = "examples/Meridian.Quoting";
-    private const string OperationsRoot = "examples/Meridian.Operations";
-    private const string InterchangeRoot = "examples/Meridian.Interchange";
-
-    /// <summary>
-    ///     This repository's own root, the anchor base for docs that quote its own sources rather than an
-    ///     example's. Empty because such anchors are already repository-relative.
-    /// </summary>
-    private const string SelfRoot = "";
 
     /// <summary>The anchor-bearing docs, each paired with the root its anchors resolve against.</summary>
     private static readonly (string Doc, string ExampleRoot)[] AnchorDocs =
     [
-        (DocPaths.MeridianReadme, MeridianRoot),
-        (DocPaths.MeridianAdopting, MeridianRoot),
-        (DocPaths.MeridianStoryboard, MeridianRoot),
-        (DocPaths.QuotingReadme, QuotingRoot),
-        (DocPaths.OperationsReadme, OperationsRoot),
-        (DocPaths.InterchangeReadme, InterchangeRoot),
+        (DocPaths.MeridianReadme, ExampleRoots.Meridian),
+        (DocPaths.MeridianAdopting, ExampleRoots.Meridian),
+        (DocPaths.MeridianStoryboard, ExampleRoots.Meridian),
+        (DocPaths.QuotingReadme, ExampleRoots.Quoting),
+        (DocPaths.OperationsReadme, ExampleRoots.Operations),
+        (DocPaths.InterchangeReadme, ExampleRoots.Interchange),
         // The self-check page quotes a self-check over this solution, and the landing page repeats one of
         // its stanzas, so both pages' anchors name this repository's own paths rather than an example's.
-        (DocPaths.RootReadme, SelfRoot),
-        (DocPaths.SelfCheck, SelfRoot)
+        (DocPaths.RootReadme, ExampleRoots.Self),
+        (DocPaths.SelfCheck, ExampleRoots.Self)
     ];
 
     private static readonly DocGate<SourceAnchor> Gate = new(
@@ -68,43 +57,43 @@ public sealed class ReadmeAnchorGateTests
     {
         // http/reuse-httpclient inserts `using var probe = new HttpClient();` as the first statement of
         // CarrierClient.SendAsync; committed line 15 is the statement that insertion lands in front of.
-        [new SourceAnchors.AnchorKey(InterchangeRoot, "src/Meridian.Interchange/Partners/CarrierClient.cs", 15)] = new SourceAnchors.Landmark(15, "StringContent content"),
+        [new SourceAnchors.AnchorKey(ExampleRoots.Interchange, "src/Meridian.Interchange/Partners/CarrierClient.cs", 15)] = new SourceAnchors.Landmark(15, "StringContent content"),
 
         // di/hosted-services-scope-their-work swaps this constructor parameter to IOptionsSnapshot; the
         // primary-constructor declaration is committed line 14.
-        [new SourceAnchors.AnchorKey(InterchangeRoot, "src/Meridian.Interchange/Dispatch/OutboxDispatcher.cs", 14)] = new SourceAnchors.Landmark(14, "IOptions<InterchangeOptions> options"),
+        [new SourceAnchors.AnchorKey(ExampleRoots.Interchange, "src/Meridian.Interchange/Dispatch/OutboxDispatcher.cs", 14)] = new SourceAnchors.Landmark(14, "IOptions<InterchangeOptions> options"),
 
         // di/no-captive-dependencies swaps the first constructor parameter to IOutboxStore, adding a
         // using that shifts the declaration down; the primary-constructor declaration is committed line 14.
-        [new SourceAnchors.AnchorKey(InterchangeRoot, "src/Meridian.Interchange/Dispatch/OutboxDispatcher.cs", 15)] = new SourceAnchors.Landmark(14, "OutboxDispatcher(ScopedDispatchRunner runner"),
+        [new SourceAnchors.AnchorKey(ExampleRoots.Interchange, "src/Meridian.Interchange/Dispatch/OutboxDispatcher.cs", 15)] = new SourceAnchors.Landmark(14, "OutboxDispatcher(ScopedDispatchRunner runner"),
 
         // The same edit reads the outbox in the poll loop in place of the runner call, one line down for the
         // added using; the call it replaces is committed line 24.
-        [new SourceAnchors.AnchorKey(InterchangeRoot, "src/Meridian.Interchange/Dispatch/OutboxDispatcher.cs", 25)] = new SourceAnchors.Landmark(24, "await runner.RunPendingAsync(stoppingToken)"),
+        [new SourceAnchors.AnchorKey(ExampleRoots.Interchange, "src/Meridian.Interchange/Dispatch/OutboxDispatcher.cs", 25)] = new SourceAnchors.Landmark(24, "await runner.RunPendingAsync(stoppingToken)"),
 
         // exceptions/no-general-catch wraps the per-message loop body in a catch-all; the inserted catch
         // is keyed to the committed loop at line 24.
-        [new SourceAnchors.AnchorKey(InterchangeRoot, "src/Meridian.Interchange/Processing/OutboxProcessor.cs", 32)] = new SourceAnchors.Landmark(24, "foreach (OutboxMessage message in pending)"),
+        [new SourceAnchors.AnchorKey(ExampleRoots.Interchange, "src/Meridian.Interchange/Processing/OutboxProcessor.cs", 32)] = new SourceAnchors.Landmark(24, "foreach (OutboxMessage message in pending)"),
 
         // persistence/no-mapping-attributes adds a using and a [Table] attribute above the record; the
         // committed record declaration is line 7.
-        [new SourceAnchors.AnchorKey(InterchangeRoot, "src/Meridian.Interchange/Outbox/OutboxMessage.cs", 10)] = new SourceAnchors.Landmark(7, "public sealed record OutboxMessage"),
+        [new SourceAnchors.AnchorKey(ExampleRoots.Interchange, "src/Meridian.Interchange/Outbox/OutboxMessage.cs", 10)] = new SourceAnchors.Landmark(7, "public sealed record OutboxMessage"),
 
         // contracts/no-entity-exposure changes the contract to take OutboxMessage, adding a using that
         // shifts this signature down; the committed signature is line 13.
-        [new SourceAnchors.AnchorKey(InterchangeRoot, "src/Meridian.Interchange/Partners/IPartnerClient.cs", 15)] = new SourceAnchors.Landmark(13, "Task SendAsync(PartnerEnvelope envelope"),
+        [new SourceAnchors.AnchorKey(ExampleRoots.Interchange, "src/Meridian.Interchange/Partners/IPartnerClient.cs", 15)] = new SourceAnchors.Landmark(13, "Task SendAsync(PartnerEnvelope envelope"),
 
         // The derive-time evidence pass reports these references at member-access lines, where
         // the type name is on the local's declaration rather than the reported line; the committed lines
         // are pinned directly.
-        [new SourceAnchors.AnchorKey(MeridianRoot, CustomsController, 28)] = new SourceAnchors.Landmark(28, "command.Parameters.AddWithValue"),
-        [new SourceAnchors.AnchorKey(MeridianRoot, CustomsController, 29)] = new SourceAnchors.Landmark(29, "connection.Open()"),
-        [new SourceAnchors.AnchorKey(MeridianRoot, CustomsController, 32)] = new SourceAnchors.Landmark(32, "command.ExecuteReader()"),
-        [new SourceAnchors.AnchorKey(MeridianRoot, CustomsController, 53)] = new SourceAnchors.Landmark(53, "validator.IsValid(number)"),
+        [new SourceAnchors.AnchorKey(ExampleRoots.Meridian, CustomsController, 28)] = new SourceAnchors.Landmark(28, "command.Parameters.AddWithValue"),
+        [new SourceAnchors.AnchorKey(ExampleRoots.Meridian, CustomsController, 29)] = new SourceAnchors.Landmark(29, "connection.Open()"),
+        [new SourceAnchors.AnchorKey(ExampleRoots.Meridian, CustomsController, 32)] = new SourceAnchors.Landmark(32, "command.ExecuteReader()"),
+        [new SourceAnchors.AnchorKey(ExampleRoots.Meridian, CustomsController, 53)] = new SourceAnchors.Landmark(53, "validator.IsValid(number)"),
 
         // handlers/transactional deletes the [Transactional] attribute on committed line 13, shifting the
         // class declaration up to the reported line; the committed declaration is line 14.
-        [new SourceAnchors.AnchorKey(QuotingRoot, RequestQuoteHandler, 13)] = new SourceAnchors.Landmark(14, "public sealed class RequestQuoteHandler")
+        [new SourceAnchors.AnchorKey(ExampleRoots.Quoting, RequestQuoteHandler, 13)] = new SourceAnchors.Landmark(14, "public sealed class RequestQuoteHandler")
     };
 
     /// <summary>

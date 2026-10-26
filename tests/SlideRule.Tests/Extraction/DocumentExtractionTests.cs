@@ -600,7 +600,7 @@ public sealed class DocumentExtractionTests
     // top-level-statements Program, over the sibling in whichever form the row asks for.
     private static CompilationInput OwnProject(bool asImage)
     {
-        CSharpCompilation domain = Compilation(SiblingAssemblyName, [CompilationFactory.CoreLibrary], ("Data.cs", DomainSource));
+        CSharpCompilation domain = CompilationFactory.CreateCompilation(SiblingAssemblyName, [CompilationFactory.CoreLibrary], ("Data.cs", DomainSource));
 
         CSharpCompilation web = CompilationFactory.CreateCompilation(
             OwnAssemblyName,
@@ -618,7 +618,7 @@ public sealed class DocumentExtractionTests
 
     private static CompilationInput LinkedFileProject(bool asImage, string sharedSource, string sharedType)
     {
-        CSharpCompilation domain = Compilation(
+        CSharpCompilation domain = CompilationFactory.CreateCompilation(
             SiblingAssemblyName, [CompilationFactory.CoreLibrary], ("Shared.cs", sharedSource), ("Domain.cs",
                 $$"""
                   namespace Domain;
@@ -645,12 +645,6 @@ public sealed class DocumentExtractionTests
     {
         return new SiblingProjects(
             [(SiblingProjectName, [SiblingAssemblyName]), (OwnProjectName, [OwnAssemblyName])], OwnProjectName);
-    }
-
-    private static CSharpCompilation Compilation(
-        string assemblyName, IReadOnlyList<MetadataReference> references, params (string Path, string Source)[] files)
-    {
-        return CompilationFactory.CreateCompilation(assemblyName, references, files);
     }
 
     private static CompilationInput Input(IReadOnlyList<MetadataReference> references, params (string Path, string Source)[] files)

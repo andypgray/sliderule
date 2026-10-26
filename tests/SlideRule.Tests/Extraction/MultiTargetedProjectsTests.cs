@@ -24,7 +24,9 @@ public sealed class MultiTargetedProjectsTests
     {
         // Arrange — one project name, two compilations, both declaring the same type: the collapse the slot
         // exists to state, and the one case the merge also raises a note for.
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([Framework("net10.0"), Framework("netstandard2.0")]);
+        CompilationInput modern = CompilationFactory.SharedWidgetFramework("net10.0");
+        CompilationInput legacy = CompilationFactory.SharedWidgetFramework("netstandard2.0");
+        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([modern, legacy]);
 
         // Act
         IReadOnlyList<MultiTargetedProject> projects = MultiTargetedProjects.Of(model);
@@ -77,15 +79,5 @@ public sealed class MultiTargetedProjectsTests
 
         MultiTargetedProjects.Of(model)
             .ShouldBeEmpty();
-    }
-
-    private static CompilationInput Framework(string targetFramework)
-    {
-        return CompilationFactory.Compile("Shared", ("Widget.cs", """
-                                                                  namespace Shared { public class Widget {} }
-                                                                  """)) with
-        {
-            TargetFramework = targetFramework
-        };
     }
 }

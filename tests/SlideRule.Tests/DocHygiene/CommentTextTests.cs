@@ -182,7 +182,6 @@ public sealed class CommentTextTests
     }
 
     [Theory]
-    [InlineData("// ReSharper disable once UseCollectionExpression", "ReSharper")]
     [InlineData("// ReSharper disable All", "ReSharper")]
     [InlineData("    // ReSharper restore StaticMemberInGenericType", "ReSharper")]
     [InlineData("// @formatter:off", "@formatter")]

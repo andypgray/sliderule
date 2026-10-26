@@ -1,7 +1,8 @@
 // Reflectable mirror types for the FullDisplay ⇄ extraction correspondence pin
 // (TypeNameFullDisplayTests). Each shape declared here is declared again as source in
 // that test and extracted through Roslyn; the two independent renderings must agree. Keep the two
-// copies in lockstep — that lockstep IS the pin.
+// copies in lockstep — that lockstep IS the pin. The source copy also declares the Uses* carrier types,
+// which the test reads only from the extracted model, so they have no mirror here.
 // The parameters are never used because arity, not the body, is the shape under test.
 // ReSharper disable UnusedTypeParameter
 
@@ -21,15 +22,3 @@ public class Outer
 public interface IBox<T>;
 
 public class Pair<TFirst, TSecond>;
-
-public class UsesSimple : IBox<Simple>;
-
-public class UsesInt : IBox<int>;
-
-public class UsesNested : IBox<Outer.Inner>;
-
-public class UsesArray : IBox<Simple[]>;
-
-public class UsesRank2Array : IBox<Simple[,]>;
-
-public class UsesGenericInGeneric : IBox<Pair<Simple, int>>;

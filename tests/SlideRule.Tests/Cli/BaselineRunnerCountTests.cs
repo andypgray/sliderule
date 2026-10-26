@@ -7,6 +7,7 @@ using SlideRule.Tests.Checking;
 using SlideRule.Tests.Extraction;
 using SlideRule.Tests.TestSupport;
 using Xunit;
+using static SlideRule.Tests.TestSupport.TextNormalization;
 
 namespace SlideRule.Tests.Cli;
 
@@ -139,7 +140,7 @@ public sealed class BaselineRunnerCountTests : IDisposable
         exit.ShouldBe(0);
         // The valve grandfathers a pair AND says how much of it: both of the controller's mentions ride the
         // one entry, and the entry records that it is two rather than any.
-        Read(path)
+        ReadNormalizedLines(path)
             .ShouldBe(BaselineComposer.Compose(
                 RuleId,
                 Pair.WithSiteCount(2)
@@ -156,7 +157,7 @@ public sealed class BaselineRunnerCountTests : IDisposable
         AddEntry("INC-2", report)
             .ShouldContain(
                 "data-access/ledger-behind-repository: entry already baselined — attribution updated and site count re-recorded (uncounted → 2).");
-        Read(path)
+        ReadNormalizedLines(path)
             .ShouldBe(BaselineComposer.Compose(
                 RuleId,
                 Pair.WithSiteCount(2)
@@ -177,7 +178,7 @@ public sealed class BaselineRunnerCountTests : IDisposable
         AddEntry("INC-2", report)
             .ShouldContain(
                 "data-access/ledger-behind-repository: entry already baselined — attribution updated and site count re-recorded (2 → 3).");
-        Read(path)
+        ReadNormalizedLines(path)
             .ShouldBe(BaselineComposer.Compose(
                 RuleId,
                 Pair.WithSiteCount(3)
@@ -195,7 +196,7 @@ public sealed class BaselineRunnerCountTests : IDisposable
         string echo = AcceptReductions(report.Results);
 
         echo.ShouldContain("data-access/ledger-behind-repository: recorded the site count on 1 entry.");
-        Read(path)
+        ReadNormalizedLines(path)
             .ShouldBe(BaselineComposer.Compose(
                 RuleId,
                 Pair.WithSiteCount(2)
@@ -213,7 +214,7 @@ public sealed class BaselineRunnerCountTests : IDisposable
         string echo = AcceptReductions(report.Results);
 
         echo.ShouldContain("data-access/ledger-behind-repository: recorded the site count on 2 entries.");
-        Read(path)
+        ReadNormalizedLines(path)
             .ShouldBe(BaselineComposer.Compose(
                 RuleId,
                 ExportPair.WithSiteCount(2),
@@ -231,7 +232,7 @@ public sealed class BaselineRunnerCountTests : IDisposable
         string echo = AcceptReductions(report.Results);
 
         echo.ShouldContain("data-access/ledger-behind-repository: lowered the site count on 1 entry.");
-        Read(path)
+        ReadNormalizedLines(path)
             .ShouldBe(BaselineComposer.Compose(RuleId, Pair.WithSiteCount(2)));
     }
 
@@ -248,7 +249,7 @@ public sealed class BaselineRunnerCountTests : IDisposable
         echo.ShouldContain("data-access/ledger-behind-repository: nothing to accept.");
         echo.ShouldContain(
             "data-access/ledger-behind-repository: refused site growth on 1 entry — a grandfathered pair grows only via 'sliderule baseline add', one attributed entry at a time.");
-        Read(path)
+        ReadNormalizedLines(path)
             .ShouldBe(BaselineComposer.Compose(RuleId, Pair.WithSiteCount(2)));
     }
 
@@ -265,7 +266,7 @@ public sealed class BaselineRunnerCountTests : IDisposable
         string echo = AcceptReductions([ObservedResult(observed: [0])]);
 
         echo.ShouldContain("data-access/ledger-behind-repository: nothing to accept.");
-        Read(path)
+        ReadNormalizedLines(path)
             .ShouldBe(content);
     }
 
@@ -300,7 +301,7 @@ public sealed class BaselineRunnerCountTests : IDisposable
         // One line, not two — and the allowance covers the larger of the two, because anything less would
         // red the very state the capture was taken from.
         echo.ShouldContain("data-access/ledger-behind-repository: captured 1 grandfathered violation.");
-        Read(_temp.PathOf(BaselineFile))
+        ReadNormalizedLines(_temp.PathOf(BaselineFile))
             .ShouldBe(BaselineComposer.Compose(RuleId, Pair.WithSiteCount(3)));
     }
 
@@ -319,7 +320,7 @@ public sealed class BaselineRunnerCountTests : IDisposable
         echo.ShouldContain($"unchanged {BaselineFile}");
         File.ReadAllBytes(path)
             .ShouldBe(before);
-        Read(path)
+        ReadNormalizedLines(path)
             .ShouldContain($"\"schemaVersion\": {BaselineFormat.LegacySchemaVersion},");
     }
 
@@ -391,7 +392,7 @@ public sealed class BaselineRunnerCountTests : IDisposable
                 + "this run measured no debt for it; skipped. Fix the rule's selection, then re-run."),
             () => echo.ShouldNotContain("reduction"),
             () => echo.ShouldNotContain("wrote"));
-        Read(path)
+        ReadNormalizedLines(path)
             .ShouldBe(before);
     }
 
@@ -461,7 +462,7 @@ public sealed class BaselineRunnerCountTests : IDisposable
         string echo = AcceptReductions(report.Results);
 
         echo.ShouldContain("data-access/ledger-behind-repository: accepted 1 reduction");
-        Read(path)
+        ReadNormalizedLines(path)
             .ShouldBe(BaselineComposer.Compose(RuleId, Pair.WithSiteCount(2)));
     }
 
@@ -585,23 +586,18 @@ public sealed class BaselineRunnerCountTests : IDisposable
     // init and accept-reductions through the one seam they share, handing back what the runner said.
     private string Init(IEnumerable<RuleResult> results)
     {
-        return Apply(BaselineRequests.Init(_temp.Path), results);
+        return BaselineRequests.Init(_temp.Path)
+            .Apply(results, _temp.Path);
     }
 
     private string AcceptReductions(IEnumerable<RuleResult> results)
     {
-        return Apply(BaselineRequests.AcceptReductions(_temp.Path), results);
-    }
-
-    private string Apply(BaselineRequest request, IEnumerable<RuleResult> results)
-    {
-        var output = new StringWriter();
-        BaselineRunner.ApplyFiles(output, request, results, _temp.Path);
-        return output.ToString();
+        return BaselineRequests.AcceptReductions(_temp.Path)
+            .Apply(results, _temp.Path);
     }
 
     // add through its own seam, handing back what the runner said — the exit code is dropped here as it
-    // is in Apply; the one row that claims it keeps its own writer.
+    // is in BaselineRequests.Apply; the one row that claims it keeps its own writer.
     private string AddEntry(string because, CheckReport report)
     {
         var output = new StringWriter();
@@ -612,11 +608,5 @@ public sealed class BaselineRunnerCountTests : IDisposable
     private string WriteBaseline(string content)
     {
         return _temp.WriteFile([BaselineFile], content);
-    }
-
-    private static string Read(string path)
-    {
-        return File.ReadAllText(path)
-            .NormalizedLines();
     }
 }

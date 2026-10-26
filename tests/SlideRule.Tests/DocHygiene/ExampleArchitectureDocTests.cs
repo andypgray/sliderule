@@ -1,4 +1,3 @@
-using System.Xml.Linq;
 using Shouldly;
 using SlideRule.Rendering;
 using SlideRule.Tests.TestSupport;
@@ -101,12 +100,13 @@ public sealed class ExampleArchitectureDocTests
         string relativePath, string solutionFileName, string specName)
     {
         // Arrange
-        string absolutePath = RepoRoot.Absolute(relativePath);
-        string body = ManagedBlock.ExtractBody(File.ReadAllText(absolutePath))!;
-        string solutionPath = Path.Combine(Path.GetDirectoryName(absolutePath)!, solutionFileName);
+        string body = ManagedBlock.ExtractBody(RepoRoot.ReadText(relativePath))!;
+        string solution = relativePath[..(relativePath.LastIndexOf('/') + 1)] + solutionFileName;
 
-        // Act
-        List<string> missing = DeclaredProjectNames(solutionPath)
+        // Act: a survey labels a node with the csproj's base name, and the names are read from the solution
+        // rather than listed here, so a new project in an example reds this rather than going silently undrawn.
+        List<string> missing = SolutionInventory.DeclaredProjectPaths(solution)
+            .Select(static path => Path.GetFileNameWithoutExtension(path))
             .Where(name => !body.Contains($"[\"{name}\"]", StringComparison.Ordinal))
             .ToList();
 
@@ -140,19 +140,6 @@ public sealed class ExampleArchitectureDocTests
 
         // Assert
         uncovered.ShouldReportNothing("Example drawing(s) outside the pinned set");
-    }
-
-    // The project names an .slnx declares, by csproj basename, which is what the survey labels a node
-    // with. Read from the solution rather than listed here, so a new project in an example reds this
-    // rather than going silently undrawn.
-    private static IReadOnlyList<string> DeclaredProjectNames(string solutionPath)
-    {
-        return XDocument.Load(solutionPath)
-            .Descendants("Project")
-            .Select(static element => (string?)element.Attribute("Path"))
-            .Where(static path => path is not null)
-            .Select(static path => Path.GetFileNameWithoutExtension(path!.Replace('\\', '/')))
-            .ToList();
     }
 
     // Everything outside the managed block: the hand-written preamble and the trailing prose.

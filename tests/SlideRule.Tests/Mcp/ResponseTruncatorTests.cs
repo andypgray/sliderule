@@ -23,20 +23,14 @@ public sealed class ResponseTruncatorTests
         + "rules: \"<rule-id globs>\" checks part of the spec and is the knob left — and arch_explain "
         + "returns one rule whole. On the CLI, sliderule check --rules <globs> --json.";
 
-    [Fact]
-    public void ComputeMaxChars_NullValue_ReturnsDefault()
-    {
-        ResponseTruncator.ComputeMaxChars(null)
-            .ShouldBe(50_000);
-    }
-
     [Theory]
+    [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
     [InlineData("not-a-number")]
     [InlineData("0")]
     [InlineData("-100")]
-    public void ComputeMaxChars_BlankUnparseableOrNonPositive_ReturnsDefault(string value)
+    public void ComputeMaxChars_NullBlankUnparseableOrNonPositive_ReturnsDefault(string? value)
     {
         ResponseTruncator.ComputeMaxChars(value)
             .ShouldBe(50_000);
@@ -108,7 +102,7 @@ public sealed class ResponseTruncatorTests
     }
 
     [Fact]
-    public void TruncateIfNeeded_TextExceedsLimit_FooterReportsSizeAndOmittedCountAndTheToolHint()
+    public void TruncateIfNeeded_TextExceedsLimit_FooterReportsSizeAndOmittedCount()
     {
         string text = new('x', 50);
 
@@ -118,24 +112,17 @@ public sealed class ResponseTruncatorTests
         result.ShouldContain("Output was 50 characters, limit is 20");
         result.ShouldContain("30 characters omitted");
         result.ShouldContain("The results above are incomplete.");
+    }
+
+    [Theory]
+    [InlineData("arch_graph", GraphHint)]
+    [InlineData("arch_check", CheckHint)]
+    public void TruncateIfNeeded_ToolWithANarrowingKnob_FooterEndsWithItsHint(string toolName, string hint)
+    {
         // The narrowing hint is the last thing a reader sees, because it is the only actionable line here.
-        result.ShouldEndWith(CheckHint);
-    }
+        string result = ResponseTruncator.TruncateIfNeeded(new string('x', 50), toolName, 20);
 
-    [Fact]
-    public void TruncateIfNeeded_GraphTool_FooterNamesBothKnobsAndTheirCliTwins()
-    {
-        string result = ResponseTruncator.TruncateIfNeeded(new string('x', 50), "arch_graph", 20);
-
-        result.ShouldEndWith($"The results above are incomplete.\n{GraphHint}");
-    }
-
-    [Fact]
-    public void TruncateIfNeeded_CheckTool_FooterNamesTheRulesKnobAndTheSingleRuleTool()
-    {
-        string result = ResponseTruncator.TruncateIfNeeded(new string('x', 50), "arch_check", 20);
-
-        result.ShouldEndWith($"The results above are incomplete.\n{CheckHint}");
+        result.ShouldEndWith($"The results above are incomplete.\n{hint}");
     }
 
     [Theory]
@@ -175,18 +162,12 @@ public sealed class ResponseTruncatorTests
     [InlineData("arch_status")]
     [InlineData("arch_explain")]
     [InlineData("arch_context")]
+    [InlineData("some_other_tool")]
     public void TruncateIfNeeded_ToolWithNoNarrowingKnob_FooterEndsWithoutAHint(string toolName)
     {
-        // Nothing to name: these three take no filter, so the footer stops at the incompleteness itself.
+        // Nothing to name: these three take no filter and an unknown name has none, so the footer stops at the
+        // incompleteness itself.
         string result = ResponseTruncator.TruncateIfNeeded(new string('x', 50), toolName, 20);
-
-        result.ShouldEndWith("The results above are incomplete.");
-    }
-
-    [Fact]
-    public void TruncateIfNeeded_UnknownToolName_FooterEndsWithoutAHint()
-    {
-        string result = ResponseTruncator.TruncateIfNeeded(new string('x', 50), "some_other_tool", 20);
 
         result.ShouldEndWith("The results above are incomplete.");
     }

@@ -90,20 +90,6 @@ public sealed class MustBeReadonlyVerbTests
     }
 
     [Fact]
-    public void MustBeReadonly_EmptySubject_FailsWithMemberMessage()
-    {
-        // An empty member subject fails the rule with the member-flavored message (GRAMMAR §4.6), exactly as
-        // every other member verb — the mutability verbs take the same subject gate.
-        RuleResult result = Checker.Run(SceneModel, arch =>
-                arch.Rule("state/empty")
-                    .Enforce(arch.Namespace("Nowhere.*").Fields.MustBeReadonly())
-                    .Because("b"))
-            .Single();
-
-        result.ShouldHaveFailedWithDetail(ViolationKind.EmptySubject, ConstraintEvaluator.EmptyMemberSubjectMessage);
-    }
-
-    [Fact]
     public void MustBeReadonly_GrandfatheredWritableField_NewOneStaysRed()
     {
         // Identity is the member's own DocId (GRAMMAR §4.3, §4.6), one entry per writable field.
@@ -151,14 +137,9 @@ public sealed class MustBeReadonlyVerbTests
             .ShouldBe(["F:App.State.Ledger.RenderCount"]);
     }
 
-    // One rule over the shared scene, so the rows above differ by their subject alone — the id and the
-    // reason are written once here rather than at each call.
     private static IReadOnlyList<string> FailedMemberIds(Func<Arch, Constraint> constraint)
     {
-        return Checker.Run(SceneModel, arch => arch.Rule("state/no-static-mutable")
-                .Enforce(constraint(arch))
-                .Because("b"))
-            .Single()
+        return Checker.Verdict(SceneModel, constraint)
             .MemberShapeSubjects();
     }
 }

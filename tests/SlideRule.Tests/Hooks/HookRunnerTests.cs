@@ -4,7 +4,6 @@ using Shouldly;
 using SlideRule.Cli.Hooks;
 using SlideRule.Cli.Rendering;
 using SlideRule.Cli.Verbs;
-using SlideRule.Roslyn.Hosting;
 using SlideRule.Tests.Cli;
 using SlideRule.Tests.Mcp.TestDoubles;
 using SlideRule.Tests.TestSupport;
@@ -426,12 +425,16 @@ public sealed class HookRunnerTests
             "A second stop over an unchanged tree with a green verdict must not spend a check at all.");
     }
 
-    [Fact]
-    public async Task StopPayload_EditedTree_ChecksAgain()
+    [Theory]
+    [InlineData("Probe.cs")]
+    // A name git would quote and escape in its line-oriented listing: it must still resolve to that file, or its
+    // re-edit is read as a deletion and the stop takes the skip.
+    [InlineData("Caf\u00e9.cs")]
+    public async Task StopPayload_EditedTree_ChecksAgain(string fileName)
     {
         // Arrange
         HookSandbox sandbox = ArrangeRepository();
-        string probe = WriteProbe(sandbox);
+        string probe = WriteProbe(sandbox, fileName);
         string payload = StopPayload(sandbox);
         await FireAsync(sandbox, payload, ExitCodes.Clean, quiet: true);
         // An edit to a file already in the listing is invisible to the listing: untracked before, untracked after.
@@ -444,28 +447,8 @@ public sealed class HookRunnerTests
         // Assert
         second.ShouldHaveRunTheCheckIn(
             sandbox.ProjectDirectory,
-            "A file the verdict covered holds new bytes, so the verdict no longer speaks for the tree and the check "
-            + "has to run again.");
-    }
-
-    [Fact]
-    public async Task StopPayload_EditedFileWithANonAsciiName_ChecksAgain()
-    {
-        // Arrange: a name git would quote and escape in its line-oriented listing.
-        HookSandbox sandbox = ArrangeRepository();
-        string probe = WriteProbe(sandbox, "Caf\u00e9.cs");
-        string payload = StopPayload(sandbox);
-        await FireAsync(sandbox, payload, ExitCodes.Clean, quiet: true);
-        Rewrite(probe);
-
-        // Act
-        HookRun second = await FireAsync(sandbox, payload, ExitCodes.Clean, quiet: true);
-
-        // Assert
-        second.ShouldHaveRunTheCheckIn(
-            sandbox.ProjectDirectory,
-            "A file whose name git would quote must still resolve to that file, or its re-edit is read as a "
-            + "deletion and the stop takes the skip.");
+            $"'{fileName}', a file the verdict covered, holds new bytes, so the verdict no longer speaks for the "
+            + "tree and the check has to run again.");
     }
 
     [Fact]
@@ -778,7 +761,7 @@ public sealed class HookRunnerTests
         // worktree between turns, as another session or a shell would write it.
         HookSandbox sandbox = ArrangeRepository();
         (string worktree, string probe, string payload) = await ArrangeCheckedWorktreeAsync(sandbox);
-        WriteOther(worktree, "Other.cs");
+        WriteCodeFile(worktree, "Other.cs");
 
         // Act
         await FireAsync(sandbox, PromptPayload(sandbox), ExitCodes.Clean);
@@ -958,7 +941,7 @@ public sealed class HookRunnerTests
         WriteProbe(sandbox);
         await FireAsync(sandbox, PromptPayload(sandbox), ExitCodes.Clean);
         string first = ReadState(sandbox, "baseline");
-        File.WriteAllText(Path.Combine(sandbox.ProjectDirectory, "src", "Second.cs"), "public sealed class Second;\n");
+        WriteCodeFile(sandbox.ProjectDirectory, "Second.cs");
 
         // Act
         await FireAsync(sandbox, PromptPayload(sandbox), ExitCodes.Clean);
@@ -1082,7 +1065,7 @@ public sealed class HookRunnerTests
         HookSandbox sandbox = ArrangeRepository();
         WriteProbe(sandbox);
         await FireAsync(sandbox, PromptPayload(sandbox), ExitCodes.Clean);
-        WriteOther(sandbox.ProjectDirectory, "Concurrent.cs");
+        WriteCodeFile(sandbox.ProjectDirectory, "Concurrent.cs");
 
         // Act
         HookRun stop = await FireAsync(sandbox, StopPayload(sandbox), ExitCodes.Clean);
@@ -1120,7 +1103,7 @@ public sealed class HookRunnerTests
         // Arrange: a clean tree at the prompt, then a commit that adds code, as an integration into this checkout does.
         HookSandbox sandbox = ArrangeRepository();
         await FireAsync(sandbox, PromptPayload(sandbox), ExitCodes.Clean);
-        WriteOther(sandbox.ProjectDirectory, "Brought.cs");
+        WriteCodeFile(sandbox.ProjectDirectory, "Brought.cs");
         GitCommand.Run(sandbox.ProjectDirectory, "add", "src/Brought.cs");
         GitCommand.Commit(sandbox.ProjectDirectory, "-m", "brought");
 
@@ -1144,7 +1127,7 @@ public sealed class HookRunnerTests
 
         // Act
         HookRun idle = await FireAsync(sandbox, worker, ExitCodes.Violations);
-        WriteOther(sandbox.ProjectDirectory, "Late.cs");
+        WriteCodeFile(sandbox.ProjectDirectory, "Late.cs");
         HookRun wrote = await FireAsync(sandbox, worker, ExitCodes.Clean);
 
         // Assert: the turn's stop left its tree as the baseline, so a subagent that stops later has something to be
@@ -1163,7 +1146,7 @@ public sealed class HookRunnerTests
         WriteProbe(sandbox);
         await FireAsync(sandbox, PromptPayload(sandbox), ExitCodes.Clean);
         await FireAsync(sandbox, StopPayload(sandbox), ExitCodes.Clean);
-        string second = WriteOther(sandbox.ProjectDirectory, "Second.cs");
+        string second = WriteCodeFile(sandbox.ProjectDirectory, "Second.cs");
 
         // Act
         await FireAsync(sandbox, PromptPayload(sandbox), ExitCodes.Clean);
@@ -1180,7 +1163,7 @@ public sealed class HookRunnerTests
         // Arrange: a hook wired without the prompt entry, so the first stop has no baseline to compare with.
         HookSandbox sandbox = ArrangeRepository();
         WriteProbe(sandbox);
-        WriteOther(sandbox.ProjectDirectory, "Other.cs");
+        WriteCodeFile(sandbox.ProjectDirectory, "Other.cs");
         File.WriteAllText(Path.Combine(sandbox.ProjectDirectory, "notes.md"), "not code\n");
 
         // Act
@@ -1372,9 +1355,8 @@ public sealed class HookRunnerTests
         string launchDirectory = workingDirectory ?? sandbox.Root;
         string checkOutput = stdout ?? (quiet ? "" : CannedReport + Environment.NewLine);
         var check = new ScriptedHookCheck(checkExit, checkOutput, redTree);
-        FakeEnvironment environment = new FakeEnvironment()
-            .SetVariable(SlideRuleEnvVars.HookStateDirectory, stateDirectory ?? sandbox.StateDirectory)
-            .SetVariable(SlideRuleEnvVars.ClaudeProjectDirectory, withProjectDirectory ? sandbox.ProjectDirectory : null);
+        FakeEnvironment environment = HookEnvironment.With(
+            stateDirectory ?? sandbox.StateDirectory, withProjectDirectory ? sandbox.ProjectDirectory : null);
         var request = new HookRequest(solution, spec, "HEAD", maxRounds, launchDirectory);
 
         CliResult result = await CliResult.CapturedAsync((output, error) =>
@@ -1389,8 +1371,7 @@ public sealed class HookRunnerTests
     /// </summary>
     private static HookSandbox Arrange()
     {
-        string root = Path.Combine(TestTempRoot.For("hook-verb"), Guid.NewGuid()
-            .ToString("N"));
+        string root = TestTempRoot.Fresh("hook-verb").Path;
         string projectDirectory = Path.Combine(root, "project");
         string stateDirectory = Path.Combine(root, "state");
         Directory.CreateDirectory(projectDirectory);
@@ -1483,9 +1464,7 @@ public sealed class HookRunnerTests
     private static (string Worktree, string Probe) AddWrittenWorktree(HookSandbox sandbox)
     {
         string worktree = AddLinkedWorktree(sandbox);
-        string probe = Path.Combine(worktree, "src", "Probe.cs");
-        Directory.CreateDirectory(Path.GetDirectoryName(probe)!);
-        File.WriteAllText(probe, "public sealed class Probe;\n");
+        string probe = WriteCodeFile(worktree, "Probe.cs");
 
         return (worktree, probe);
     }
@@ -1521,10 +1500,10 @@ public sealed class HookRunnerTests
     }
 
     /// <summary>
-    ///     A second code file, <c>src/<paramref name="name" /></c>, written into the working tree at
-    ///     <paramref name="tree" /> as another session, a subagent or a shell would write it.
+    ///     A code file, <c>src/<paramref name="name" /></c>, written into the working tree at
+    ///     <paramref name="tree" /> as an agent, another session, a subagent or a shell would write it.
     /// </summary>
-    private static string WriteOther(string tree, string name)
+    private static string WriteCodeFile(string tree, string name)
     {
         string file = Path.Combine(tree, "src", name);
         Directory.CreateDirectory(Path.GetDirectoryName(file)!);
@@ -1587,11 +1566,7 @@ public sealed class HookRunnerTests
     /// </summary>
     private static string WriteProbe(HookSandbox sandbox, string name = "Probe.cs")
     {
-        string probe = Path.Combine(sandbox.ProjectDirectory, "src", name);
-        Directory.CreateDirectory(Path.GetDirectoryName(probe)!);
-        File.WriteAllText(probe, "public sealed class Probe;\n");
-
-        return probe;
+        return WriteCodeFile(sandbox.ProjectDirectory, name);
     }
 
     /// <summary>Writes <c>src/Probe.cs</c> and commits it, for the rows that need a tracked code file.</summary>

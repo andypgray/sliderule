@@ -26,51 +26,6 @@ public sealed class LiteralSurfaceTests(SpecCompletionFixture fixture) : IClassF
     }
 
     [Fact]
-    public async Task InAnInterpolatedLiteral_OffersNothing()
-    {
-        // Act: an interpolated string with no holes is a constant and reaches the slot, but its token is
-        // not a string literal and its parts are not at the offsets a segment walk assumes.
-        OfferedList offered = await fixture.ShouldCompileAndOfferAsync("""arch.Namespace($"MyApp.$$");""", Ct);
-
-        // Assert
-        offered.ShouldOfferNothing();
-    }
-
-    [Fact]
-    public async Task InARawLiteral_OffersNothing()
-    {
-        // Act
-        OfferedList offered =
-            await fixture.ShouldCompileAndOfferAsync(""""arch.Namespace("""MyApp.$$""");"""", Ct);
-
-        // Assert
-        offered.ShouldOfferNothing();
-    }
-
-    [Fact]
-    public async Task InOneHalfOfAConcatenation_OffersNothing()
-    {
-        // Act: what reaches the slot there is a computed value, and completing one half would offer names
-        // for a string the author is building rather than for the whole one the slot receives.
-        OfferedList offered =
-            await fixture.ShouldCompileAndOfferAsync("""arch.Namespace("MyApp." + "$$");""", Ct);
-
-        // Assert
-        offered.ShouldOfferNothing();
-    }
-
-    [Fact]
-    public async Task PastTheClosingQuote_OffersNothing()
-    {
-        // Act
-        OfferedList offered =
-            await fixture.ShouldCompileAndOfferAsync("""arch.Namespace("MyApp.Domain"$$);""", Ct);
-
-        // Assert
-        offered.ShouldOfferNothing();
-    }
-
-    [Fact]
     public async Task InAnUnterminatedLiteral_OffersTheSameNames()
     {
         // Act: deliberately not held to compiling — this is the shape the caret is in the moment the
@@ -81,13 +36,24 @@ public sealed class LiteralSurfaceTests(SpecCompletionFixture fixture) : IClassF
         offered.ShouldOffer("Domain", "Domain.*");
     }
 
-    [Fact]
-    public async Task InALiteralCarryingABackslash_OffersNothing()
+    [Theory]
+    // An interpolated literal: one with no holes is a constant and reaches the slot, but its token is not a
+    // string literal and its parts are not at the offsets a segment walk assumes.
+    [InlineData("""arch.Namespace($"MyApp.$$");""")]
+    // A raw literal.
+    [InlineData(""""arch.Namespace("""MyApp.$$""");"""")]
+    // One half of a concatenation: what reaches the slot there is a computed value, and completing one half
+    // would offer names for a string the author is building rather than for the whole one the slot receives.
+    [InlineData("""arch.Namespace("MyApp." + "$$");""")]
+    // Past the closing quote.
+    [InlineData("""arch.Namespace("MyApp.Domain"$$);""")]
+    // A literal carrying a backslash: an escape is where the content stops agreeing character for character
+    // with the source, so every span after it would be computed one place off.
+    [InlineData("""arch.Namespace("MyApp\\.$$");""")]
+    public async Task ARefusedShape_OffersNothing(string body)
     {
-        // Act: an escape is where the content stops agreeing character for character with the source, so
-        // every span after it would be computed one place off.
-        OfferedList offered =
-            await fixture.ShouldCompileAndOfferAsync("""arch.Namespace("MyApp\\.$$");""", Ct);
+        // Act
+        OfferedList offered = await fixture.ShouldCompileAndOfferAsync(body, Ct);
 
         // Assert
         offered.ShouldOfferNothing();

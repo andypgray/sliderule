@@ -31,7 +31,8 @@ public sealed class SegmentWalkTests(SpecCompletionFixture fixture) : IClassFixt
         // Act
         OfferedList offered = await fixture.ShouldCompileAndOfferAsync("""arch.Namespace("MyApp.$$");""", Ct);
 
-        // Assert
+        // Assert: the whole list, so the spec project's own MyApp.Architecture, which holds nothing a rule
+        // could anchor on, is not in it.
         offered.ShouldOfferExactly("Domain", "Domain.*", "Web", "Web.*", "*");
     }
 
@@ -114,18 +115,6 @@ public sealed class SegmentWalkTests(SpecCompletionFixture fixture) : IClassFixt
 
         // Assert
         offered.ShouldOfferExactly("Entry");
-    }
-
-    [Fact]
-    public async Task AGenericType_IsSpelledWithItsDeclaredTypeParameters()
-    {
-        // Act
-        OfferedList offered =
-            await fixture.ShouldCompileAndOfferAsync("""arch.Types.Implementing("MyApp.Domain.$$");""", Ct);
-
-        // Assert: the separator is a comma and a space, which is what the extractor renders and therefore
-        // what a rule's anchor has to be spelled as.
-        offered.ShouldOffer("IHandler<T>", "IMap<TKey, TValue>");
     }
 
     [Fact]

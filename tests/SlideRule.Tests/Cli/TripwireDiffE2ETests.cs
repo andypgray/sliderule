@@ -193,22 +193,6 @@ public sealed class TripwireDiffE2ETests
     }
 
     [Fact]
-    public async Task CheckHookJson_CleanRunWithATripwireWarning_WritesTheHookDocumentAndNothingElse()
-    {
-        CliResult result = (await Untracked.Value).Hook;
-
-        // Exit 0 exactly as outside hook mode — a warning never moves the verdict — and stdout is the one
-        // document, whole: the parse below rejects trailing content, so a leaked report line cannot hide
-        // behind it. That purity is the whole contract, because the hook passes stdout through verbatim
-        // and Claude Code parses it.
-        result.ShouldSucceed();
-        string context = result.ShouldHaveHookAdditionalContext("PostToolUse");
-        context.ShouldContain("warn legacy/billing/tripwire");
-        context.ShouldContain(QuarantineWarning);
-        context.ShouldContain(QuarantineDragons);
-    }
-
-    [Fact]
     public async Task CheckHookJson_CleanRunWithATripwireWarning_CarriesTheReportLessItsPassBlocks()
     {
         // The agent reading the context holds the rule board already, and a pass block per rule is what grows
@@ -222,6 +206,11 @@ public sealed class TripwireDiffE2ETests
             human.Out.ReplaceLineEndings("\n").TrimEnd('\n'),
             "The plain run carried no pass block, so this row would prove nothing.");
 
+        // Exit 0 exactly as outside hook mode — a warning never moves the verdict — and stdout is the one
+        // document, whole: the parse rejects trailing content, so a leaked report line cannot hide behind it.
+        // That purity is the whole contract, because the hook passes stdout through verbatim and Claude Code
+        // parses it.
+        hook.ShouldSucceed();
         string context = hook.ShouldHaveHookAdditionalContext("PostToolUse");
 
         context.ReplaceLineEndings("\n")

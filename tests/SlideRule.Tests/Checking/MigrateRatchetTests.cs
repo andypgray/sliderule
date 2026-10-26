@@ -2,6 +2,7 @@ using Shouldly;
 using SlideRule.Baselines;
 using SlideRule.Checking;
 using SlideRule.Codebase;
+using SlideRule.Hosting;
 using SlideRule.Tests.Checking.Targets;
 using SlideRule.Tests.Extraction;
 using SlideRule.Tests.TestSupport;
@@ -169,19 +170,6 @@ public sealed class MigrateRatchetTests
     }
 
     [Fact]
-    public void Check_MigrateShapeViolation_GrandfathersBySubjectId()
-    {
-        BaselineIndex index = Checker.Baselines("naming/x", BaselineEntry.ForSubject("T:App.BadThing"));
-
-        RuleResult result = Checker.Run(MixedNames, index, HandlerNaming)
-            .Single();
-
-        result.ShouldHavePassed();
-        result.ShouldHaveGrandfathered(1);
-        result.Violations.ShouldBeEmpty();
-    }
-
-    [Fact]
     public void Check_MoreSitesThanTheEntryRecords_IsRedAsGrowth()
     {
         // The hole the measure closes: without a recorded count, a second old-pattern site inside an
@@ -288,6 +276,7 @@ public sealed class MigrateRatchetTests
             .Single();
 
         result.ShouldHavePassed();
+        result.Violations.ShouldBeEmpty();
         result.ShouldHaveGrandfathered(1);
         result.ShouldHaveGrown(0);
         result.ShouldHaveUncounted(0);
@@ -396,19 +385,6 @@ public sealed class MigrateRatchetTests
     }
 
     [Fact]
-    public void Check_MigrateEmptySubject_IsRedNeverBaselinable()
-    {
-        RuleResult result = Checker.Run(
-                "namespace App { public class X {} }", Checker.Baselines("data/x"), NoDataAccessFromNowhere)
-            .Single();
-
-        result.ShouldHaveFailed();
-        result.Violations.ShouldHaveSingleItem()
-            .Kind.ShouldBe(ViolationKind.EmptySubject);
-        result.Grandfathered.ShouldBeEmpty();
-    }
-
-    [Fact]
     public void Check_MigrateEmptySubjectUnderNarrowing_SkipsWithoutStalingTheSection()
     {
         // The ratchet's half of the narrowing skip. Ratchet would match nothing against the captured
@@ -443,7 +419,6 @@ public sealed class MigrateRatchetTests
         result.ShouldHaveFailed();
         result.Violations.ShouldHaveSingleItem()
             .Kind.ShouldBe(ViolationKind.RuleError);
-        result.Grandfathered.ShouldBeEmpty();
     }
 
     [Fact]
@@ -590,9 +565,13 @@ public sealed class MigrateRatchetTests
     }
 
     [Fact]
-    public void Check_TwoArgOverload_TreatsBaselinesAsEmpty()
+    public void Check_ModelOverload_TreatsBaselinesAsEmpty()
     {
-        RuleResult result = Checker.Run(Sources.OneControllerModel, Sources.NoDataAccess)
+        // The two-argument entry point takes no baselines, so a Migrate rule checked through it is uncaptured
+        // and its violation stays red.
+        ArchitectureModel model = Checker.Model(Sources.NoDataAccess);
+
+        RuleResult result = ArchChecker.Check(model, Sources.OneControllerModel)
             .Single();
 
         result.ShouldHaveFailed();

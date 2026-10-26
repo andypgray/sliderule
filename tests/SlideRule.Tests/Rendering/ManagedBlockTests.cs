@@ -23,17 +23,12 @@ public class ManagedBlockTests
             .ShouldBe("<!-- sliderule:begin -->\nline one\nline two\n<!-- sliderule:end -->\n");
     }
 
-    [Fact]
-    public void Splice_EmptyFile_IsTreatedAsAbsent()
+    [Theory]
+    [InlineData("")]
+    [InlineData("   \n\t\n")]
+    public void Splice_EmptyOrWhitespaceOnlyFile_IsTreatedAsAbsent(string existing)
     {
-        ManagedBlock.Splice(string.Empty, Body)
-            .ShouldBe(ManagedBlock.Splice(null, Body));
-    }
-
-    [Fact]
-    public void Splice_WhitespaceOnlyFile_IsTreatedAsAbsent()
-    {
-        ManagedBlock.Splice("   \n\t\n", Body)
+        ManagedBlock.Splice(existing, Body)
             .ShouldBe(ManagedBlock.Splice(null, Body));
     }
 
@@ -59,18 +54,14 @@ public class ManagedBlockTests
                 "<!-- sliderule:begin -->\r\nline one\r\nline two\r\n<!-- sliderule:end -->\r\n");
     }
 
-    [Fact]
-    public void Splice_AppendIntoFileWithoutTrailingNewline_NormalizesToOneBlankLine()
+    [Theory]
+    // No trailing newline at all.
+    [InlineData("# Title")]
+    // Extra trailing newlines, which collapse.
+    [InlineData("# Title\n\n\n\n")]
+    public void Splice_AppendNormalizesTheGapToOneBlankLine(string existing)
     {
-        ManagedBlock.Splice("# Title", Body)
-            .ShouldBe(
-                "# Title\n\n<!-- sliderule:begin -->\nline one\nline two\n<!-- sliderule:end -->\n");
-    }
-
-    [Fact]
-    public void Splice_AppendCollapsesExtraTrailingNewlinesToOneBlankLine()
-    {
-        ManagedBlock.Splice("# Title\n\n\n\n", Body)
+        ManagedBlock.Splice(existing, Body)
             .ShouldBe(
                 "# Title\n\n<!-- sliderule:begin -->\nline one\nline two\n<!-- sliderule:end -->\n");
     }
@@ -113,20 +104,11 @@ public class ManagedBlockTests
             .ShouldBe(once);
     }
 
-    [Fact]
-    public void Splice_IsIdempotent_OnFileWithHandContent_Lf()
+    [Theory]
+    [InlineData("# Title\nAbove.\n\nBelow.\n")]
+    [InlineData("# Title\r\nAbove.\r\n\r\nBelow.\r\n")]
+    public void Splice_IsIdempotent_OnFileWithHandContent(string existing)
     {
-        const string existing = "# Title\nAbove.\n\nBelow.\n";
-        string once = ManagedBlock.Splice(existing, Body);
-
-        ManagedBlock.Splice(once, Body)
-            .ShouldBe(once);
-    }
-
-    [Fact]
-    public void Splice_IsIdempotent_OnFileWithHandContent_Crlf()
-    {
-        const string existing = "# Title\r\nAbove.\r\n\r\nBelow.\r\n";
         string once = ManagedBlock.Splice(existing, Body);
 
         ManagedBlock.Splice(once, Body)
@@ -166,21 +148,14 @@ public class ManagedBlockTests
 
     // The duplicate-marker pins assert the whole message rather than a fragment, because the stray-marker
     // guidance sentence is part of it: the marker text must not appear anywhere else in the file.
-    [Fact]
-    public void Splice_DuplicateBeginMarker_ThrowsWithStrayMarkerGuidance()
+    [Theory]
+    [InlineData("<!-- sliderule:begin -->\na\n<!-- sliderule:begin -->\nb\n<!-- sliderule:end -->\n", Begin)]
+    [InlineData("<!-- sliderule:begin -->\na\n<!-- sliderule:end -->\nb\n<!-- sliderule:end -->\n", End)]
+    public void Splice_DuplicateMarker_ThrowsWithStrayMarkerGuidance(string existing, string duplicated)
     {
-        var exception = Should.Throw<MalformedManagedBlockException>(() => ManagedBlock.Splice("<!-- sliderule:begin -->\na\n<!-- sliderule:begin -->\nb\n<!-- sliderule:end -->\n", Body));
+        var exception = Should.Throw<MalformedManagedBlockException>(() => ManagedBlock.Splice(existing, Body));
         exception.Message.ShouldBe(
-            "Malformed managed block: 2 '<!-- sliderule:begin -->' markers (expected exactly one). "
-            + "The marker text must not appear anywhere else in the file, including in examples.");
-    }
-
-    [Fact]
-    public void Splice_DuplicateEndMarker_ThrowsWithStrayMarkerGuidance()
-    {
-        var exception = Should.Throw<MalformedManagedBlockException>(() => ManagedBlock.Splice("<!-- sliderule:begin -->\na\n<!-- sliderule:end -->\nb\n<!-- sliderule:end -->\n", Body));
-        exception.Message.ShouldBe(
-            "Malformed managed block: 2 '<!-- sliderule:end -->' markers (expected exactly one). "
+            $"Malformed managed block: 2 '{duplicated}' markers (expected exactly one). "
             + "The marker text must not appear anywhere else in the file, including in examples.");
     }
 

@@ -17,11 +17,6 @@ namespace SlideRule.Tests.Analyzers;
 /// </remarks>
 public sealed class BuildTierVersionCheckTests
 {
-    private const string FaultMessage =
-        "The SlideRule analyzer failed in this project, so some or all of its findings are missing: "
-        + "InvalidOperationException: boom. This is a fault in the analyzer and says nothing about the code, "
-        + "and 'sliderule check' is unaffected. Report it at https://github.com/andypgray/sliderule/issues.";
-
     /// <summary>Each arrangement's files, and what it reports when the two versions agree.</summary>
     public static TheoryData<string> Arrangements => ["findings", "no model file", "unchecked rule", "refused model"];
 
@@ -99,13 +94,17 @@ public sealed class BuildTierVersionCheckTests
     [Fact]
     public async Task AFaultInTheCheck_IsTheOrdinaryFaultOnce()
     {
-        var analyzer = new BuildTierAnalyzer(versions: () => throw new InvalidOperationException("boom\nsecond line"));
+        var analyzer = new BuildTierAnalyzer(versions: () =>
+        {
+            BuildTier.Boom();
+            return (null, null);
+        });
 
         IReadOnlyList<Diagnostic> reported = await BuildTier.DiagnoseAsync(
             analyzer, BuildTier.OwnCompilation(), FilesFor("findings"), cancellationToken: Ct);
 
         reported.ShouldBeTheOnly("SR2093")
-            .ShouldSay(FaultMessage);
+            .ShouldSay(BuildTier.FaultMessage);
     }
 
     [Fact]

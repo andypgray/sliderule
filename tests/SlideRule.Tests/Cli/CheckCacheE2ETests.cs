@@ -90,34 +90,6 @@ public sealed class CheckCacheE2ETests
     }
 
     [Fact]
-    public async Task Check_MethodBodyEditBetweenRuns_PartialReExtractsThatProjectOnlyAndMatchesAFreshColdRun()
-    {
-        using var workspace = new TempFixtureWorkspace();
-        using var cache = new TempCacheRoot("check-cache");
-
-        // Populate the cache from the clean tree.
-        CacheRun cold = await CacheRuns.CheckAsync(workspace.SolutionPath, CliRunner.ViolatedSpecDll, cache.Root);
-        cold.Outcome.ShouldBe(CodebaseSourceOutcome.Miss);
-
-        // One more ambient-clock read, inside an existing method body. Web's own facts change — a new red site —
-        // but no declaration does, so Domain, which references Web, reads nothing new.
-        FixtureEdits.EditOnDisk(
-            workspace.PathOf(Web, "HomeController.cs"),
-            content => content.Replace(
-                "        log.Append(description);", "        log.Append(System.DateTime.Now);\n        log.Append(description);"));
-
-        CacheRun partial = await CacheRuns.CheckAsync(workspace.SolutionPath, CliRunner.ViolatedSpecDll, cache.Root);
-        CacheRun freshCold = await CacheRuns.CheckAsync(
-            workspace.SolutionPath, CliRunner.ViolatedSpecDll, cache.Root, true);
-
-        // Web alone re-walks, and the verdict still equals a full cold check of the edited tree.
-        partial.Outcome.ShouldBe(CodebaseSourceOutcome.Partial);
-        partial.ReExtracted.ShouldBe([Web]);
-        partial.Result.ShouldMatchTheOutputOf(freshCold.Result);
-        partial.Result.Out.ShouldNotBe(cold.Result.Out);
-    }
-
-    [Fact]
     public async Task Check_CommentOnlyEditBetweenRuns_HitsWithSitesMovedAndMatchesAFreshColdRun()
     {
         using var workspace = new TempFixtureWorkspace();

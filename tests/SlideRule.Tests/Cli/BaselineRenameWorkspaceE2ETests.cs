@@ -33,25 +33,29 @@ public sealed class BaselineRenameWorkspaceE2ETests
     {
         using var cache = new TempCacheRoot("baseline-rename");
         var source = new DiagnosticInjectingSolutionSource([LoadDiagnostic], [FailedProject]);
-        var output = new StringWriter();
-        var error = new StringWriter();
-        var runner = new BaselineRunner(output, error, source, FakeEnvironment.WithCacheRoot(cache.Root));
+        FakeEnvironment environment = FakeEnvironment.WithCacheRoot(cache.Root);
         BaselineRequest request = BaselineRequests.Rename("x/old", "cli/no-stdout", RepoRoot.Directory)
             with
             {
                 Solution = RepoRoot.Solution,
                 Spec = RepoRoot.ArchitectureSpecCsproj
             };
+        BaselineRunner? runner = null;
 
-        int exit = await CommandEntryPoint.RunAsync(() => runner.RunAsync(request, Ct), error, Ct);
+        CliResult result = await CliResult.CapturedAsync((output, error) =>
+        {
+            var created = new BaselineRunner(output, error, source, environment);
+            runner = created;
+            return CommandEntryPoint.RunAsync(() => created.RunAsync(request, Ct), error, Ct);
+        });
 
-        var result = new CliResult(exit, output.ToString(), error.ToString());
         result.ShouldRefuseWith(
             $"warning: {LoadDiagnostic}",
             "rule 'cli/no-stdout' is not ratcheted — only Migrate and Quarantine containment rules carry baselines.");
         result.Err.ShouldNotContain("error: the model is incomplete", result.Transcript());
         result.Out.ShouldBeEmpty(result.Transcript());
-        runner.LastExtractionCount.ShouldBe(0);
+        runner.ShouldNotBeNull()
+            .LastExtractionCount.ShouldBe(0);
     }
 
     [Fact]

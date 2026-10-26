@@ -70,12 +70,21 @@ public sealed class MustNotReferencePackagesVerbTests
     {
         // `*` counts every declared reference, private ones included, where MustReferenceNoPackages passes the
         // private one.
-        Checker.Run(Scene, arch => arch.Rule("packaging/bare")
+        RuleResult result = Checker.Run(Scene, arch => arch.Rule("packaging/bare")
                 .Enforce(arch.Projects.Named("Bus").MustNotReferencePackages("*"))
                 .Because("b"))
-            .Single()
-            .ShouldHaveFailedWithProjectSubjects(
-                ["Bus -> greenpipes", "Bus -> Microsoft.Extensions.Logging", "Bus -> StyleCop.Analyzers"]);
+            .Single();
+
+        result.ShouldHaveFailedWithProjectSubjects(
+            ["Bus -> greenpipes", "Bus -> Microsoft.Extensions.Logging", "Bus -> StyleCop.Analyzers"]);
+
+        // Each violation keys an edge from the project to its package, in report order.
+        result.ShouldHaveBaselineIdentities(
+        [
+            BaselineEntry.ForEdge("project:Bus", "package:Microsoft.Extensions.Logging"),
+            BaselineEntry.ForEdge("project:Bus", "package:StyleCop.Analyzers"),
+            BaselineEntry.ForEdge("project:Bus", "package:greenpipes")
+        ]);
     }
 
     [Fact]
@@ -87,21 +96,5 @@ public sealed class MustNotReferencePackagesVerbTests
                 .Because("b"))
             .Single()
             .ShouldHavePassedClean();
-    }
-
-    [Fact]
-    public void MustNotReferencePackages_EachViolation_KeysAnEdgeFromTheProjectToItsPackage()
-    {
-        RuleResult result = Checker.Run(Scene, arch => arch.Rule("packaging/bare")
-                .Enforce(arch.Projects.Named("Bus").MustNotReferencePackages("*"))
-                .Because("b"))
-            .Single();
-
-        result.ShouldHaveBaselineIdentities(
-        [
-            BaselineEntry.ForEdge("project:Bus", "package:Microsoft.Extensions.Logging"),
-            BaselineEntry.ForEdge("project:Bus", "package:StyleCop.Analyzers"),
-            BaselineEntry.ForEdge("project:Bus", "package:greenpipes")
-        ]);
     }
 }

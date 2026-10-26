@@ -83,6 +83,9 @@ public sealed class ProjectRatchetTests
     public void Migrate_PackageIdentity_IsAnEdgeFromTheProjectToThePackage()
     {
         // The pinned per-item form: the project's identity, then the package tagged the way the project is.
+        // The list is in report order, which is deterministic across the project and package slots: the
+        // project name is the primary key and the package name stands where a Target would, so one project's
+        // packages sort among themselves.
         RuleResult result = Checker.Run(PackageScene, BaselineIndex.Empty, PackageRule).Single();
 
         result.ShouldHaveBaselineIdentities(
@@ -262,17 +265,6 @@ public sealed class ProjectRatchetTests
         ]);
         result.ShouldHaveUncounted(1);
         result.ShouldHaveStale(0);
-    }
-
-    [Fact]
-    public void Migrate_ViolationOrder_IsProjectThenPackage()
-    {
-        // Deterministic report order across the project and package slots: the project name is the primary
-        // key and the package name stands where a Target would, so one project's packages sort among themselves.
-        RuleResult result = Checker.Run(PackageScene, BaselineIndex.Empty, PackageRule).Single();
-
-        result.Violations.Select(violation => $"{violation.SubjectProject!.Name} -> {violation.Package!.Name}")
-            .ShouldBe(["Zphil.Domain -> Newtonsoft.Json", "Zphil.Domain -> Serilog", "Zphil.Web -> Serilog"]);
     }
 
     [Fact]

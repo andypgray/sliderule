@@ -30,16 +30,27 @@ namespace SlideRule.Tests.Cli;
 /// </remarks>
 public sealed class CheckCommandE2ETests
 {
-    // The violated-spec report, run once for the whole class. A dozen facts below assert different slices
-    // of one report from a byte-identical command line, over paths that are run-stable statics and a fixture
-    // tree no fact here mutates — so re-running the check per fact would buy a dozen identical extractions
-    // and no isolation. The Lazy defers the run until the first fact that needs it and shares the fault if it
-    // throws; every other fact (clean spec, --sarif, --rules, missing spec) still runs its own command line.
+    // The violated-spec report, run once for the whole class at each grain a fact reads. A dozen facts
+    // below assert different slices of one report from a byte-identical command line, over paths that are
+    // run-stable statics and a fixture tree no fact here mutates — so re-running the check per fact would
+    // buy a dozen identical extractions and no isolation. Each Lazy defers its run until the first fact that
+    // needs it and shares the fault if it throws; every other fact (clean spec, --sarif, --rules, missing
+    // spec) still runs its own command line.
     private static readonly Lazy<Task<CliResult>> ViolatedHuman = new(() =>
         CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll));
 
     private static readonly Lazy<Task<CliResult>> ViolatedJson = new(() =>
         CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json"));
+
+    private static readonly Lazy<Task<CliResult>> ViolatedOverviewJson = new(() => ViolatedJsonAt("overview"));
+
+    private static readonly Lazy<Task<CliResult>> ViolatedSkeletonJson = new(() => ViolatedJsonAt("skeleton"));
+
+    private static Task<CliResult> ViolatedJsonAt(string grain)
+    {
+        return CliRunner.InvokeAsync(
+            "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json", "--grain", grain);
+    }
 
     [Fact]
     public async Task Check_ViolatedSpec_ExitsOneWithAllFourComponents()
@@ -329,8 +340,7 @@ public sealed class CheckCommandE2ETests
     public async Task Check_ViolatedSpecOverviewJson_MatchesGolden()
     {
         // Act
-        CliResult result = await CliRunner.InvokeAsync(
-            "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json", "--grain", "overview");
+        CliResult result = await ViolatedOverviewJson.Value;
 
         // Assert — the whole report at coarser grain: every rule and every violation still here with its
         // prose and its edge, each violation's sites elided down to the siteCount that rides every grain,
@@ -343,8 +353,7 @@ public sealed class CheckCommandE2ETests
     public async Task Check_ViolatedSpecSkeletonJson_MatchesGolden()
     {
         // Act
-        CliResult result = await CliRunner.InvokeAsync(
-            "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json", "--grain", "skeleton");
+        CliResult result = await ViolatedSkeletonJson.Value;
 
         // Assert — the verdict alone: every rule with its prose, status, baseline and warnings, its
         // violations elided down to the violationCount that rides every grain. Still a verdict, which is
@@ -413,8 +422,7 @@ public sealed class CheckCommandE2ETests
         // Arrange — an elided array must not read as an empty one, and the case that proves it is the rule
         // with nothing to elide: a passing rule renders violationCount 0, so "not rendered at this grain"
         // and "none found" stay distinguishable at the one place they would otherwise collapse.
-        CliResult result = await CliRunner.InvokeAsync(
-            "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json", "--grain", "skeleton");
+        CliResult result = await ViolatedSkeletonJson.Value;
 
         // Act
         using JsonDocument document = result.ShouldHaveJsonStdout();
@@ -479,8 +487,7 @@ public sealed class CheckCommandE2ETests
         // The same sweep at the coarse grain: the elision drops the array and only the array. Together with
         // the full-grain sweep above this pins the per-rule key set at both ends of the ladder, so no
         // future grain change can drop the count silently from either.
-        CliResult result = await CliRunner.InvokeAsync(
-            "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json", "--grain", "skeleton");
+        CliResult result = await ViolatedSkeletonJson.Value;
 
         result.ShouldReportViolations();
         using JsonDocument document = result.ShouldHaveJsonStdout();
@@ -506,11 +513,15 @@ public sealed class CheckCommandE2ETests
         // A consumer scripting the Python idiom rule.get('violationCount', 0) reads 0 for a failed rule whose
         // count key is missing. Absent-means-zero is the ordinary defensive read, so the count must be present
         // and non-zero for every failed rule at every grain — that is what makes the read safe.
-        string[] arguments = grain is null
-            ? ["check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json"]
-            : ["check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json", "--grain", grain];
+        Lazy<Task<CliResult>> run = grain switch
+        {
+            null => ViolatedJson,
+            "overview" => ViolatedOverviewJson,
+            "skeleton" => ViolatedSkeletonJson,
+            _ => throw new ArgumentOutOfRangeException(nameof(grain), grain, "no shared run at this grain")
+        };
 
-        CliResult result = await CliRunner.InvokeAsync(arguments);
+        CliResult result = await run.Value;
 
         result.ShouldReportViolations();
         result.Out.ShouldReportViolationCount("layering/domain-independent", 2);

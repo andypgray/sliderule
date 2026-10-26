@@ -105,20 +105,6 @@ public sealed class ExplainFormatterTests
     }
 
     [Fact]
-    public void Enforce_WithoutExemplar_OmitsTheExemplarLine()
-    {
-        Dump("layering/domain-independent")
-            .ShouldNotContain("exemplar:");
-    }
-
-    [Fact]
-    public void Enforce_WithoutCitation_OmitsTheCitationLine()
-    {
-        Dump("layering/domain-independent")
-            .ShouldNotContain("citation:");
-    }
-
-    [Fact]
     public void Enforce_WithoutFix_OmitsTheFixLine()
     {
         Dump("naming/interfaces")

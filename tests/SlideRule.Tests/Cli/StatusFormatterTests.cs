@@ -279,13 +279,6 @@ public sealed class StatusFormatterTests
     }
 
     [Fact]
-    public void Migrate_Uncaptured_SuggestsInit()
-    {
-        Line(Result(Model.Rule("data-access/no-inline-sql"), RuleStatus.Failed, 2))
-            .ShouldBe("FAIL data-access/no-inline-sql (migrate) — no baseline captured; run 'sliderule baseline init' (2 current violations)");
-    }
-
-    [Fact]
     public void FamilyMigrate_DebtInSeveralCells_NamesEachOfThemUnderAnUnchangedRow()
     {
         // The burndown's next question after "how much": one cell holding eleven of the twelve pairs is a

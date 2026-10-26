@@ -36,7 +36,6 @@ public sealed class SerilogConfigurationTests
     [InlineData("Trace", LogEventLevel.Verbose)]
     [InlineData("Debug", LogEventLevel.Debug)]
     [InlineData("Information", LogEventLevel.Information)]
-    [InlineData("Warning", LogEventLevel.Warning)]
     [InlineData("Error", LogEventLevel.Error)]
     [InlineData("Critical", LogEventLevel.Fatal)]
     public void ParseLogLevel_MicrosoftLevelName_MapsToItsSerilogEquivalent(string envValue, LogEventLevel expected)
@@ -56,13 +55,15 @@ public sealed class SerilogConfigurationTests
     }
 
     [Theory]
-    [InlineData("warning")]
-    [InlineData("WARNING")]
-    [InlineData("wArNiNg")]
-    public void ParseLogLevel_IsCaseInsensitive(string envValue)
+    [InlineData("error", LogEventLevel.Error)]
+    [InlineData("ERROR", LogEventLevel.Error)]
+    [InlineData("eRrOr", LogEventLevel.Error)]
+    [InlineData("fatal", LogEventLevel.Fatal)]
+    public void ParseLogLevel_IsCaseInsensitive(string envValue, LogEventLevel expected)
     {
+        // Neither level is the fallback, and "fatal" has only the Serilog spelling, so both parses are held.
         SerilogConfiguration.ParseLogLevel(envValue)
-            .ShouldBe(LogEventLevel.Warning);
+            .ShouldBe(expected);
     }
 
     [Fact]

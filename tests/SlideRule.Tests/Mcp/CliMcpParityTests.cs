@@ -463,6 +463,9 @@ public sealed class CliMcpParityTests
             text.NormalizedTrimmed()
                 .ShouldBe(documents[step].Out.NormalizedTrimmed());
         }
+
+        // A degrade is the server's own decision, not a failure, so nothing on the way down is logged.
+        harness.Logs.Warnings.ShouldBeEmpty();
     }
 
     /// <summary>

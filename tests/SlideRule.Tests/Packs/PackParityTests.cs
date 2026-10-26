@@ -20,20 +20,6 @@ public class PackParityTests
     private static readonly ArchitectureModel Packed = ArchModelBuilder.Build(new PackedNineSpec());
     private static readonly ArchitectureModel Inline = ArchModelBuilder.Build(new InlineNineSpec());
 
-    /// <summary>The nine pack rule IDs, in the order the pack declares them.</summary>
-    public static TheoryData<string> PackRuleIds =>
-    [
-        "http/reuse-httpclient",
-        "di/no-service-locator",
-        "di/no-buildserviceprovider",
-        "async/no-sync-over-async",
-        "di/no-captive-dependencies",
-        "naming/async-suffix",
-        "exceptions/no-general-catch",
-        "async/accept-cancellation",
-        "persistence/no-mapping-attributes"
-    ];
-
     [Fact]
     public void RootBlock_PackedAndInline_AreByteIdentical()
     {
@@ -60,7 +46,7 @@ public class PackParityTests
     }
 
     [Theory]
-    [MemberData(nameof(PackRuleIds))]
+    [MemberData(nameof(DotNetGuidanceTests.PackRuleIds), MemberType = typeof(DotNetGuidanceTests))]
     public void Rule_PackedAndInline_AgreeFieldByField(string id)
     {
         ArchRule packed = Packed.Rule(id);
@@ -77,7 +63,7 @@ public class PackParityTests
     }
 
     [Theory]
-    [MemberData(nameof(PackRuleIds))]
+    [MemberData(nameof(DotNetGuidanceTests.PackRuleIds), MemberType = typeof(DotNetGuidanceTests))]
     public void MemberOperands_PackedAndInline_Agree(string id)
     {
         // The pack's typeof + nameof anchors against the inline spec's expression anchors: an expression

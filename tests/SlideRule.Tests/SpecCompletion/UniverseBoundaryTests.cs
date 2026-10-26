@@ -16,16 +16,6 @@ namespace SlideRule.Tests.SpecCompletion;
 public sealed class UniverseBoundaryTests(SpecCompletionFixture fixture) : IClassFixture<SpecCompletionFixture>
 {
     [Fact]
-    public async Task TheSpecProjectsOwnNamespaces_AreNotOffered()
-    {
-        // Act
-        OfferedList offered = await fixture.ShouldCompileAndOfferAsync("""arch.Namespace("MyApp.$$");""", Ct);
-
-        // Assert: the spec declares MyApp.Architecture and nothing a rule could anchor on inside it.
-        offered.ShouldNotOffer("Architecture", "Architecture.*");
-    }
-
-    [Fact]
     public async Task TheContractsOwnNamespace_IsNotOffered()
     {
         // Act
@@ -48,37 +38,14 @@ public sealed class UniverseBoundaryTests(SpecCompletionFixture fixture) : IClas
     }
 
     [Fact]
-    public async Task TheProductsNames_ComeBeforeTheFrameworks()
-    {
-        // Act
-        OfferedList offered = await fixture.ShouldCompileAndOfferAsync("""arch.Namespace("$$");""", Ct);
-
-        // Assert
-        offered.ShouldOfferInThisOrder("MyApp", "System");
-    }
-
-    [Fact]
     public async Task ANamespaceTheSpecAlsoDeclares_IsStillOfferedAndStillRanksAsProduct()
     {
         // Act: MyApp is one namespace built from two assemblies — the product's and the spec's own. One
         // excluded half must not take the whole name out of the list, nor drop it behind the framework.
         OfferedList offered = await fixture.ShouldCompileAndOfferAsync("""arch.Namespace("$$");""", Ct);
 
-        // Assert
-        offered.ShouldOffer("MyApp");
+        // Assert: the product's names come before the framework's.
         offered.ShouldOfferInThisOrder("MyApp", "System");
-    }
-
-    [Fact]
-    public async Task AnInternalProductInterface_IsOffered()
-    {
-        // Act: a spec anchors on the internal types of the project it governs as readily as on the public
-        // ones, and hiding them would hide exactly the rules worth writing.
-        OfferedList offered =
-            await fixture.ShouldCompileAndOfferAsync("""arch.Types.Implementing("MyApp.Domain.$$");""", Ct);
-
-        // Assert
-        offered.ShouldOffer("IInternalRepository");
     }
 
     [Fact]

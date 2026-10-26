@@ -176,6 +176,18 @@ internal static class BuildTier
     /// <summary>The fix the rule carries, which its warning repeats.</summary>
     internal const string Fix = "Take the value from a domain service and let that service own the store.";
 
+    /// <summary>What <c>SR2093</c> says for the fault <see cref="Boom" /> throws: its first line only.</summary>
+    internal const string FaultMessage =
+        "The SlideRule analyzer failed in this project, so some or all of its findings are missing: "
+        + "InvalidOperationException: boom. This is a fault in the analyzer and says nothing about the code, "
+        + "and 'sliderule check' is unaffected. Report it at https://github.com/andypgray/sliderule/issues.";
+
+    /// <summary>The fault a seam throws to stand for any fault in the analyzer, with a second line to drop.</summary>
+    internal static void Boom()
+    {
+        throw new InvalidOperationException("boom\nsecond line");
+    }
+
     /// <summary>The whole message a rule warning says, for the own type reaching <paramref name="target" />.</summary>
     /// <remarks>
     ///     The law sentence and the exemplar's phrase are read off the built rule so the model stays their one

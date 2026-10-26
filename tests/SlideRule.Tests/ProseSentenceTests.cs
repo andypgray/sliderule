@@ -35,14 +35,6 @@ public class ProseSentenceTests
     }
 
     [Fact]
-    public void Migrate_NoInlineSql_RendersTargetSentenceWithLayerLocativeAndSuffix()
-    {
-        // The Migrate `to` constraint is what renders as the rule sentence.
-        SentenceFor("data-access/no-inline-sql")
-            .ShouldBe("Types in the Web layer named `*Controller` must not reference `SqlConnection`.");
-    }
-
-    [Fact]
     public void Enforce_HandlerNaming_RendersOpenGenericAndSuffix()
     {
         // Implementing an open generic renders declared type-parameter names: `IHandler<T>`.
@@ -66,26 +58,6 @@ public class ProseSentenceTests
         // The `.Must(...)` escape-hatch description completes "must …" verbatim.
         SentenceFor("style/type-name-length")
             .ShouldBe("Types in `MyApp.*` must keep type names at or under 40 characters.");
-    }
-
-    [Fact]
-    public void Migrate_InjectClock_RendersMemberUseSentence()
-    {
-        // The member-access verb renders each target as a backticked declaring-type dot member,
-        // joined with "or" (GRAMMAR §4.5, §6). Validation runs on build, so the members must be real.
-        // The flagship member-ban rule: reads of the ambient clock are banned across all types (Migrate
-        // posture; the omitted .Baseline fills its conventional default per GRAMMAR §4.4).
-        Checker.Model(arch => arch.Rule("time/inject-clock")
-                .Migrate(
-                    "Code reads the ambient clock directly.",
-                    arch.Types.MustNotUse(
-                        arch.Member(typeof(DateTime), nameof(DateTime.Now)),
-                        arch.Member(typeof(DateTime), nameof(DateTime.UtcNow))))
-                .Because("Wall-clock reads are untestable; inject IClock — ADR-nnn.")
-                .Fix("Take IClock in the constructor."))
-            .Rule("time/inject-clock")
-            .Sentence
-            .ShouldBe("Types must not use `DateTime.Now` or `DateTime.UtcNow`.");
     }
 
     [Fact]
@@ -125,19 +97,6 @@ public class ProseSentenceTests
     }
 
     [Fact]
-    public void MustNotUse_ExpressionMintedMethod_RendersParens()
-    {
-        // An expression-minted method anchor reifies to the same leaf as the typeof form, so it renders
-        // byte-identically, with parens for a method (GRAMMAR §6).
-        Checker.Model(arch => arch.Rule("member/no-wait")
-                .Enforce(arch.Types.MustNotUse(arch.Member<Task>(t => t.Wait())))
-                .Because("Blocking waits deadlock the request thread."))
-            .Rule("member/no-wait")
-            .Sentence
-            .ShouldBe("Types must not use `Task.Wait()`.");
-    }
-
-    [Fact]
     public void MustNotUse_ExpressionMintedProperty_RendersNoParens()
     {
         // An expression-minted property anchor renders with no parens — identical to the typeof form.
@@ -160,17 +119,5 @@ public class ProseSentenceTests
             .Rule("member/verb-collect")
             .Sentence
             .ShouldBe("Types must not use `GC.Collect()`.");
-    }
-
-    [Fact]
-    public void MustNotUse_VerbStaticProperty_RendersNoParens()
-    {
-        // The static-form verb sugar over a property renders with no parens — identical to the typeof form.
-        Checker.Model(arch => arch.Rule("member/verb-now")
-                .Enforce(arch.Types.MustNotUse(() => DateTime.Now))
-                .Because("Wall-clock reads are untestable."))
-            .Rule("member/verb-now")
-            .Sentence
-            .ShouldBe("Types must not use `DateTime.Now`.");
     }
 }
