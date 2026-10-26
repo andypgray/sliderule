@@ -306,7 +306,7 @@ internal sealed class HookRunner(
         // text reaches only the debug log, rather than into the document Claude Code parses.
         foreach ((_, HookCheckResult result) in checks)
             if (result.Error.Length > 0)
-                await error.WriteAsync(result.Error);
+                await error.WriteAsync(result.Error.Replace("\r\n", "\n"));
 
         string document = Document(firing.Event, checks, named);
         if (document.Length == 0)
@@ -337,14 +337,14 @@ internal sealed class HookRunner(
         if (firing.AtCap)
         {
             // The user reads it and the turn ends: a rule the agent cannot satisfy stops being a loop.
-            await error.WriteLineAsync($"sliderule: still red after {maxRounds} rounds; not blocking again.");
-            await error.WriteLineAsync(report);
+            await WriteLineAsync(error, $"sliderule: still red after {maxRounds} rounds; not blocking again.");
+            await WriteLineAsync(error, report);
             return EndTurn(firing, HookExitCodes.Report);
         }
 
         if (!MayContinue(firing)) return EndTurn(firing);
 
-        await error.WriteLineAsync(report);
+        await WriteLineAsync(error, report);
         return HookExitCodes.Block;
     }
 
@@ -503,9 +503,16 @@ internal sealed class HookRunner(
     // and the non-blocking code.
     internal static async Task<int> ReportConfigErrorAsync(TextWriter error, string report)
     {
-        await error.WriteLineAsync(ConfigErrorLine);
-        await error.WriteLineAsync(report.TrimEnd('\r', '\n'));
+        await WriteLineAsync(error, ConfigErrorLine);
+        await WriteLineAsync(error, report.TrimEnd('\r', '\n'));
         return HookExitCodes.Report;
+    }
+
+    // A line of the hook's own text, ended with LF on every OS as its JSON is: the reports it relays carry the
+    // platform's line ends, and the tree lines it puts between them carry LF.
+    private static Task WriteLineAsync(TextWriter writer, string text)
+    {
+        return writer.WriteAsync(text.Replace("\r\n", "\n") + "\n");
     }
 
     // Both channels, stderr first: under hook mode the report is flushed at the end of the run, so anything on

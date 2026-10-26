@@ -40,11 +40,12 @@ internal static class HookReportRenderer
     /// <summary>
     ///     The one-object document carrying <paramref name="report" /> as additional context for
     ///     <paramref name="hookEvent" />, with no trailing newline (the caller writes it through
-    ///     <see cref="SlideRuleJson.Terminated" />).
+    ///     <see cref="SlideRuleJson.Terminated" />). The context's line ends are LF on every OS, whatever the
+    ///     report was written with.
     /// </summary>
     public static string Document(string report, string hookEvent)
     {
-        var payload = new HookJson(new HookSpecificOutputJson(hookEvent, report));
+        var payload = new HookJson(new HookSpecificOutputJson(hookEvent, report.Replace("\r\n", "\n")));
         return JsonSerializer.Serialize(payload, SlideRuleJson.Context.HookJson);
     }
 }

@@ -113,6 +113,20 @@ public sealed class HookRunnerTests
     }
 
     [Fact]
+    public async Task CleanCheckThatWroteANotice_RelaysItOnStderrWithLfLineEnds()
+    {
+        // Act: a clean check's notice goes to stderr, where an exit-0 hook's text reaches only the debug log, and
+        // never into the document on stdout. It arrives with the platform's line ends and leaves with LF.
+        HookRun run = await FireAsync(
+            Arrange(), payload: "", ExitCodes.Clean, quiet: true, stderr: "warning: the capture is stale\r\n");
+
+        // Assert
+        run.ShouldExitWith(HookExitCodes.Proceed);
+        run.Result.Out.ShouldBeEmpty(run.Result.Transcript());
+        run.Result.Err.ShouldBe("warning: the capture is stale\n", run.Result.Transcript());
+    }
+
+    [Fact]
     public async Task NonCodePayload_SkipsTheCheckEntirely()
     {
         // Act
@@ -502,12 +516,10 @@ public sealed class HookRunnerTests
         HookRun capped = await FireAsync(sandbox, payload, ExitCodes.Violations, maxRounds: maxRounds);
 
         // Assert: a rule the agent cannot satisfy would otherwise be a loop the user watches. At the cap the hook
-        // says so on stderr and exits 1, which is not a block: the user reads it and the turn ends.
+        // says so on stderr and exits 1, which is not a block: the user reads it and the turn ends. Stderr is
+        // compared whole, because the hook ends its lines with LF on every OS.
         capped.ShouldExitWith(HookExitCodes.Report);
-        capped.Result.Err.NormalizedLines()
-            .ShouldStartWith(standDownLine);
-        capped.Result.Err.NormalizedLines()
-            .ShouldContain(CannedReport);
+        capped.Result.Err.ShouldBe($"{standDownLine}\n{CannedReport}\n");
 
         HookRun nextPrompt = await FireAsync(
             sandbox, StopPayload(sandbox, promptId: "p2"), ExitCodes.Violations, maxRounds: maxRounds);
@@ -1344,11 +1356,12 @@ public sealed class HookRunnerTests
         string? solution = null,
         string? spec = null,
         string? redTree = null,
-        string? stdout = null)
+        string? stdout = null,
+        string stderr = "")
     {
         string launchDirectory = workingDirectory ?? sandbox.Root;
         string checkOutput = stdout ?? (quiet ? "" : CannedReport + Environment.NewLine);
-        var check = new ScriptedHookCheck(checkExit, checkOutput, redTree);
+        var check = new ScriptedHookCheck(checkExit, checkOutput, redTree, stderr);
         FakeEnvironment environment = HookEnvironment.With(
             stateDirectory ?? sandbox.StateDirectory, withProjectDirectory ? sandbox.ProjectDirectory : null);
         var request = new HookRequest(solution, spec, "HEAD", maxRounds, launchDirectory);

@@ -218,8 +218,7 @@ public sealed class TripwireDiffE2ETests
         hook.ShouldSucceed();
         string context = hook.ShouldHaveHookAdditionalContext("PostToolUse");
 
-        context.ReplaceLineEndings("\n")
-            .ShouldBe(expected);
+        context.ShouldBe(expected);
     }
 
     [Fact]

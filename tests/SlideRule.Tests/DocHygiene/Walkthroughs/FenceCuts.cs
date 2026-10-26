@@ -102,8 +102,7 @@ internal static class FenceCuts
         edges.RemoveAll(edge => edge is not null
                                 && !kept.Contains((edge["source"]!.GetValue<string>(), edge["targetNamespaceRoot"]!.GetValue<string>())));
 
-        return survey.ToJsonString(SlideRuleJson.Options)
-            .NormalizedLines();
+        return survey.ToJsonString(SlideRuleJson.Options);
     }
 
     /// <summary>
@@ -111,14 +110,14 @@ internal static class FenceCuts
     ///     at the <c> …</c> the fence's context ends with, after as many characters as the fence keeps.
     /// </summary>
     /// <remarks>
-    ///     The context is compared with its line endings folded, because the run writes the platform's own and a
-    ///     capture keeps whichever platform it was taken on. What the fence keeps must be the run's own prefix;
+    ///     The quoted context is read with its line endings folded, because a page can be checked out with CRLF;
+    ///     the run's context is LF on every OS. What the fence keeps must be the run's own prefix;
     ///     where it is not, the run cut at the same length is what the red prints. With no fence to read the cut
     ///     from, the document comes back whole.
     /// </remarks>
     internal static string ContextCutAsQuoted(string document, IReadOnlyList<string> fence)
     {
-        if (fence.Count == 0) return document.NormalizedLines();
+        if (fence.Count == 0) return document;
 
         string quoted = AdditionalContext(JsonNode.Parse(string.Join("\n", fence))!)
             .NormalizedLines();
@@ -126,23 +125,20 @@ internal static class FenceCuts
             throw new InvalidOperationException($"The quoted hook document's context does not end with '{Ellipsis}', which is where it declares its cut.");
 
         JsonNode run = JsonNode.Parse(document)!;
-        string context = AdditionalContext(run)
-            .NormalizedLines();
+        string context = AdditionalContext(run);
         int kept = Math.Min(quoted.Length - Ellipsis.Length, context.Length);
 
         run["hookSpecificOutput"]!["additionalContext"] = context[..kept] + Ellipsis;
-        return run.ToJsonString(SlideRuleJson.Options)
-            .NormalizedLines();
+        return run.ToJsonString(SlideRuleJson.Options);
     }
 
     /// <summary>
-    ///     <paramref name="text" /> with CRLF folded to LF, both as written and as a JSON string escapes it, so a
-    ///     capture taken on Windows compares equal to a run on any platform.
+    ///     <paramref name="text" /> with CRLF folded to LF, so a page checked out with CRLF compares equal to a
+    ///     run on any platform.
     /// </summary>
     internal static string Folded(string text)
     {
-        return text.NormalizedLines()
-            .Replace(@"\r\n", @"\n", StringComparison.Ordinal);
+        return text.NormalizedLines();
     }
 
     private static string AdditionalContext(JsonNode document)

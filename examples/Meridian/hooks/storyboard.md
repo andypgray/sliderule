@@ -170,7 +170,7 @@ as the one exit-0 object Claude Code reads, naming the event that fired. The obj
 {
   "hookSpecificOutput": {
     "hookEventName": "Stop",
-    "additionalContext": "warn clearance/engine/tripwire\r\n  warning: Changed file 'src/Meridian.Clearance/ContainerNumberValidator.cs' …"
+    "additionalContext": "warn clearance/engine/tripwire\n  warning: Changed file 'src/Meridian.Clearance/ContainerNumberValidator.cs' …"
   }
 }
 ```

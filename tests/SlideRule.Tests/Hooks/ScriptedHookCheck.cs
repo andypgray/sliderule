@@ -11,7 +11,9 @@ namespace SlideRule.Tests.Hooks;
 /// <param name="exitCode">The code every check exits with, one of the CLI's own.</param>
 /// <param name="output">What every check writes to stdout; empty for a clean check with nothing to say.</param>
 /// <param name="redTree">A tree whose check reports violations whatever the others do, or null for none.</param>
-internal sealed class ScriptedHookCheck(int exitCode, string output, string? redTree = null) : IHookCheck
+/// <param name="error">What every check writes to stderr; empty for none.</param>
+internal sealed class ScriptedHookCheck(int exitCode, string output, string? redTree = null, string error = "")
+    : IHookCheck
 {
     private readonly List<CheckRequest> _requests = [];
 
@@ -23,6 +25,6 @@ internal sealed class ScriptedHookCheck(int exitCode, string output, string? red
     {
         _requests.Add(request);
         bool red = redTree is not null && HookRunAssertions.SameDirectory(request.WorkingDirectory, redTree);
-        return Task.FromResult(new HookCheckResult(red ? ExitCodes.Violations : exitCode, output, ""));
+        return Task.FromResult(new HookCheckResult(red ? ExitCodes.Violations : exitCode, output, error));
     }
 }

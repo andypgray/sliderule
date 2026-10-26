@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that violations are data, that an over-budget document coarsens its own grain, and that a partial or
   filtered model is stamped on the answer. A client puts the instructions into every session that registers
   the server, and they are now a quarter shorter.
+- Every JSON document the CLI writes, and every MCP reply built from one, now uses LF line ends on Windows
+  as it already did elsewhere, so a run writes the same bytes on every operating system. The hook's report
+  on stderr and its `additionalContext` use LF too. A JSON reader sees no difference; a tool comparing raw
+  bytes on Windows sees each CRLF become LF.
 
 ### Fixed
 

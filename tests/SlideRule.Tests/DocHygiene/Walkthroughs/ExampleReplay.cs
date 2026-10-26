@@ -177,7 +177,7 @@ internal static class ExampleReplay
 
         (IReadOnlyList<string> initLines, IReadOnlyDictionary<string, byte[]> baselineFiles) = CaptureBaselines(model, governed);
 
-        return new AdoptionRun(survey.NormalizedLines(), draftReport, initLines, baselineFiles);
+        return new AdoptionRun(survey, draftReport, initLines, baselineFiles);
     }
 
     // The draft the walkthrough's step 3 prints, compiled exactly as the page quotes it — with the spec project's
@@ -410,8 +410,7 @@ internal sealed record ScenarioRun(CheckReport Plain, CheckReport Diff, string S
     internal string DiffWithoutPasses => Rendered(Diff, SolutionDirectory, HumanReportRenderer.RenderWithoutPasses);
 
     /// <summary>The document a <c>Stop</c> hook writes when the diff-aware run passes with something to say.</summary>
-    internal string StopHookDocument => HookReportRenderer.Document(DiffWithoutPasses, HookReportRenderer.StopEvent)
-        .NormalizedLines();
+    internal string StopHookDocument => HookReportRenderer.Document(DiffWithoutPasses, HookReportRenderer.StopEvent);
 
     /// <summary>The board <c>status</c> prints.</summary>
     internal IReadOnlyList<string> StatusLines => StatusFormatter.Lines(Plain);

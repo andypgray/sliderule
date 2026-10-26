@@ -189,7 +189,7 @@ public sealed class CheckCommandTests
         // Act — the runner degrades against the budget, then the truncator sees what it produced.
         await Runner(output, FixedResponseBudget.Fitter(budget))
             .RunAsync(Request(), Ct);
-        string document = output.ToString();
+        var document = output.ToString();
         string afterTruncation = ResponseTruncator.TruncateIfNeeded(document, ArchToolNames.Check, budget);
 
         // Assert — the truncator is a no-op here, and what the caller holds is a whole document.
@@ -210,7 +210,7 @@ public sealed class CheckCommandTests
         // Act
         await Runner(output, FixedResponseBudget.Fitter(belowSkeleton))
             .RunAsync(Request(), Ct);
-        string document = output.ToString();
+        var document = output.ToString();
         string afterTruncation = ResponseTruncator.TruncateIfNeeded(document, ArchToolNames.Check, belowSkeleton);
 
         // Assert — a whole report at the floor rung, untouched by the truncator behind it.
@@ -234,7 +234,7 @@ public sealed class CheckCommandTests
         // Act
         await Runner(output, FixedResponseBudget.Fitter(belowIndex))
             .RunAsync(Request(), Ct);
-        string document = output.ToString();
+        var document = output.ToString();
         string afterTruncation = ResponseTruncator.TruncateIfNeeded(document, ArchToolNames.Check, belowIndex);
 
         // Assert — cut, and the hint names the one knob still worth reaching for. Naming a grain here would

@@ -560,6 +560,8 @@ Every JSON document a command writes has a `schemaVersion` at its top, except th
 
 A version moves when a key is removed, renamed or given a new meaning, which a reader written for the old shape would misread. A key added for something new does not move it, except in the model file, whose reader rejects a key it does not know. A key appears only when it has something to report, so a document with no new facts is byte for byte what it was. The human-readable reports have no version and can gain lines in any release. A baseline reader still accepts the version before the current one, and any write upgrades the file.
 
+Every document is written with LF line ends and ends with one, on every operating system, so a run on Windows writes the same bytes as the same run on Linux. The hook's report on stderr and the `additionalContext` it puts in the hook document use LF too.
+
 The check report, the status burndown and the graph survey also list the NuGet audit advisories the load raised, under `packageAudit`. Each advisory is one entry, with NuGet's message and the projects that reported it. An advisory is about a package's published record, so it never marks the model incomplete.
 
 The hook document is the `hookSpecificOutput` object Claude Code reads from a hook's stdout. `hook` writes it when a clean check warned, with the report as `additionalContext`, and names the event it answers:

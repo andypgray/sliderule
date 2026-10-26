@@ -8,13 +8,17 @@ namespace SlideRule.Cli.Rendering;
 
 /// <summary>
 ///     The single <see cref="JsonSerializerOptions" /> every CLI JSON renderer shares: camelCase property
-///     names, camelCase enum values, indented, null-omitting, and the relaxed encoder so backticks and
-///     em-dashes in rule sentences ride literally — this is CLI output for hooks, not HTML, so they are
-///     emitted verbatim rather than as <c>\u</c> escapes. One instance so the documents cannot drift in
-///     escaping or casing; the JSON goldens prove the resulting byte-identity.
+///     names, camelCase enum values, indented with LF on every OS, null-omitting, and the relaxed encoder so
+///     backticks and em-dashes in rule sentences ride literally — this is CLI output for hooks, not HTML, so
+///     they are emitted verbatim rather than as <c>\u</c> escapes. One instance so the documents cannot drift
+///     in escaping, casing or line ends; the JSON goldens prove the resulting byte-identity.
 /// </summary>
 internal static class SlideRuleJson
 {
+    // A document's line end inside and after it, LF on every OS, so a document is byte-identical wherever it
+    // was written.
+    private const string NewLine = "\n";
+
     /// <summary>The shared serializer options for every CLI JSON document.</summary>
     /// <remarks>
     ///     The enum converters are the value half of the casing contract this class exists to own.
@@ -28,6 +32,7 @@ internal static class SlideRuleJson
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         WriteIndented = true,
+        NewLine = NewLine,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
         Converters =
@@ -51,7 +56,7 @@ internal static class SlideRuleJson
     /// </summary>
     public static string Terminated(string document)
     {
-        return document + Environment.NewLine;
+        return document + NewLine;
     }
 
     /// <summary>

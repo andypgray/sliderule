@@ -122,15 +122,20 @@ internal static class CliResultAssertions
     }
 
     /// <summary>
-    ///     Asserts stdout is one parseable JSON document and hands it back. The caller owns the
-    ///     <see cref="JsonDocument" />.
+    ///     Asserts stdout is one parseable JSON document, written with LF line ends, and hands it back. The caller
+    ///     owns the <see cref="JsonDocument" />.
     /// </summary>
     /// <remarks>
     ///     Parsing rather than sniffing the first character: a truncated report still starts with
-    ///     <c>{</c>, and a report cut in half is exactly the failure a stdout-purity guard exists to catch.
+    ///     <c>{</c>, and a report cut in half is exactly the failure a stdout-purity guard exists to catch. The
+    ///     line ends are checked here because every document is LF on every OS, so a consumer comparing bytes
+    ///     sees the same document wherever it was written.
     /// </remarks>
     internal static JsonDocument ShouldHaveJsonStdout(this CliResult result)
     {
+        result.Out.ShouldNotContain(
+            "\r", customMessage: "stdout should have been written with LF line ends" + Environment.NewLine + result.Transcript());
+
         try
         {
             return JsonDocument.Parse(result.Out);
