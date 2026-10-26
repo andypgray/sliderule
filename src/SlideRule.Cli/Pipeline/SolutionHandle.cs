@@ -19,7 +19,8 @@ internal sealed class SolutionHandle(
     Func<string, Func<SessionSpecResolution>, SessionSpecResolution>? warmSpecResolution = null,
     IReadOnlyDictionary<ProjectId, string>? targetFrameworks = null,
     CanonicalProjectFiles? projectFiles = null,
-    bool isClosure = false) : IDisposable
+    bool isClosure = false,
+    Func<IReadOnlySet<string>?>? warmDeclaredMembers = null) : IDisposable
 {
     /// <summary>
     ///     Whether <see cref="Solution" /> holds only the projects a caller asked
@@ -62,6 +63,12 @@ internal sealed class SolutionHandle(
     /// </summary>
     public Func<string, Func<SessionSpecResolution>, SessionSpecResolution>? WarmSpecResolution { get; } =
         warmSpecResolution;
+
+    /// <summary>
+    ///     The warm session's declared solution membership under this call's generation, read once per generation;
+    ///     null on the cold/one-shot path, which reads the solution file itself.
+    /// </summary>
+    public Func<IReadOnlySet<string>?>? WarmDeclaredMembers { get; } = warmDeclaredMembers;
 
     /// <summary>
     ///     Disposes the owned workspace on the cold path; a no-op when the source owns nothing — a warm

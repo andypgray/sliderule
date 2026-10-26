@@ -73,6 +73,6 @@ internal sealed class DiagnosticInjectingSolutionSource(
         // down the cold path and quietly changes what the gate is being tested against.
         return new SolutionHandle(
             real.Solution, injected, real, real.WarmCodebase, real.WarmSpecResolution,
-            real.TargetFrameworks);
+            real.TargetFrameworks, warmDeclaredMembers: real.WarmDeclaredMembers);
     }
 }

@@ -1,6 +1,9 @@
+using System.Text.Json;
+using System.Text.RegularExpressions;
 using Microsoft.Extensions.DependencyInjection;
 using ModelContextProtocol.Protocol;
 using Shouldly;
+using SlideRule.Cli.Mcp;
 using SlideRule.Cli.Mcp.Infrastructure;
 using SlideRule.Cli.Pipeline;
 using SlideRule.Cli.SpecLoading;
@@ -50,6 +53,7 @@ public sealed class WarmWorkspaceMcpTests
 {
     private const string Domain = "MyApp.Domain";
     private const string Web = "MyApp.Web";
+    private const string Billing = "MyApp.Legacy.Billing";
 
     // The Web layer's broad catcher, and the rule that reds it — the two values the pair of catch cases
     // below name over and over, which is what earns them a const each where a rule id used twice stays a
@@ -455,6 +459,39 @@ public sealed class WarmWorkspaceMcpTests
     }
 
     [Fact]
+    public async Task DeclaredMembership_ReadOncePerLoad_AndAgainWhenTheSolutionDropsAProject()
+    {
+        // Arrange — a warm server over a private copy, bound to a prebuilt spec DLL: arch_graph and a DLL-bound
+        // arch_check are the two calls that read the solution's declared membership.
+        using var fixture = new TempFixtureWorkspace();
+        await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
+            McpServerBindings.For(fixture.SolutionPath, CliRunner.CleanSpecDll), Ct);
+        var source = harness.Services.GetRequiredService<ISolutionSource>()
+            .ShouldBeOfType<WarmSolutionSource>();
+
+        // Act/Assert — four calls over one load read membership once, and every project is declared.
+        string first = (await harness.Client.CallToolAsync("arch_graph", cancellationToken: Ct)).ShouldHaveAnswered();
+        (await harness.Client.CallToolAsync("arch_graph", cancellationToken: Ct)).ShouldHaveAnswered();
+        await ShouldAnswerArchCheckAsync(harness);
+        await ShouldAnswerArchCheckAsync(harness);
+
+        source.MembershipReads.ShouldBe(1);
+        DeclaredMembershipIn(first)
+            .ShouldBe(new Dictionary<string, bool> { [Domain] = true, [Web] = true, [Billing] = true }, true);
+
+        // Act — drop Billing from the solution file. Web still references it, so the reload loads it anyway.
+        FixtureEdits.EditOnDisk(
+            fixture.SolutionPath,
+            solution => Regex.Replace(solution, @"Project\([^\n]*""MyApp\.Legacy\.Billing"",[^\n]*\n\s*EndProject\r?\n", ""));
+        string afterEdit = (await harness.Client.CallToolAsync("arch_graph", cancellationToken: Ct)).ShouldHaveAnswered();
+
+        // Assert — the reload read membership again, and the survey says Billing is no longer declared.
+        source.MembershipReads.ShouldBe(2);
+        DeclaredMembershipIn(afterEdit)
+            .ShouldBe(new Dictionary<string, bool> { [Domain] = true, [Web] = true, [Billing] = false }, true);
+    }
+
+    [Fact]
     public async Task ArchCheck_SpecOutputDeletedAfterWarming_RefusesExactlyAsTheColdCliDoes()
     {
         // Arrange — the same declared-spec fixture, resolved by convention this time (the other branch that
@@ -530,6 +567,18 @@ public sealed class WarmWorkspaceMcpTests
             "check", fixture.SolutionPath, "--spec", specDll, "--json");
 
         return new WarmRecheck(before, after, cold.Out, store.LastReExtractedProjects, store.LastRemappedProjects);
+    }
+
+    // Each project of an arch_graph document by name, with whether the solution declares it.
+    private static Dictionary<string, bool> DeclaredMembershipIn(string graphJson)
+    {
+        using JsonDocument document = JsonDocument.Parse(graphJson);
+        return document.RootElement.GetProperty("projects")
+            .EnumerateArray()
+            .ToDictionary(
+                project => project.GetProperty("name").GetString()!,
+                project => project.GetProperty("solutionMember").GetBoolean(),
+                StringComparer.Ordinal);
     }
 
     private static async Task<string> ShouldAnswerArchCheckAsync(McpPipelineHarness harness)

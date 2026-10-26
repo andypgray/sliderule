@@ -101,7 +101,7 @@ internal sealed class CodebaseSource : IDisposable
         SolutionName = Path.GetFileName(solutionPath);
         SolutionDirectory = SolutionProjectFileParser.AnchorDirectory(solutionPath);
         this.declaredMembers = declaredMembers
-                               ?? new Lazy<IReadOnlySet<string>?>(() => SpecExclusion.TryReadDeclaredMembers(solutionPath));
+                               ?? new Lazy<IReadOnlySet<string>?>(() => DeclaredMembersOf(handle, solutionPath));
         this.loadDiagnostics = loadDiagnostics;
         Diagnostics = loadDiagnostics;
         this.model = model;
@@ -412,7 +412,7 @@ internal sealed class CodebaseSource : IDisposable
         SolutionHandle handle, string solutionPath, string? spec, string normalizedSpec)
     {
         if (SpecResolver.TryResolveWithoutSolution(spec) is { } dllResolution)
-            return new SessionSpecResolution(dllResolution, SpecExclusion.TryReadDeclaredMembers(solutionPath));
+            return new SessionSpecResolution(dllResolution, DeclaredMembersOf(handle, solutionPath));
 
         return handle.WarmSpecResolution is { } warm
             ? warm(normalizedSpec, ResolveFully)
@@ -422,11 +422,19 @@ internal sealed class CodebaseSource : IDisposable
         // halves need the same set, so it is read once here and travels out with the resolution.
         SessionSpecResolution ResolveFully()
         {
-            IReadOnlySet<string>? declaredMembers = SpecExclusion.TryReadDeclaredMembers(solutionPath);
+            IReadOnlySet<string>? declaredMembers = DeclaredMembersOf(handle, solutionPath);
             SpecResolution resolution = SpecResolver.Resolve(
                 handle.Solution, handle.ProjectFiles, declaredMembers, spec, handle.LoadDiagnostics);
             return new SessionSpecResolution(resolution, declaredMembers);
         }
+    }
+
+    // The warm session's per-generation read where the handle carries one, a read of the solution file otherwise.
+    private static IReadOnlySet<string>? DeclaredMembersOf(SolutionHandle? handle, string solutionPath)
+    {
+        return handle?.WarmDeclaredMembers is { } warm
+            ? warm()
+            : SpecExclusion.TryReadDeclaredMembers(solutionPath);
     }
 
     private static async Task<CodebaseSource> CreateColdSpeclessAsync(
