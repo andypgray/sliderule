@@ -22,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `derive_spec` recipe's step 3 now asks each `candidate:` line for the rules the finished spec keeps,
   or for the evidence behind a `none:` answer. A `none:` reading "not evaluated" leaves the question
   unanswered. The example receipt no longer lists a dropped rule on a candidate line.
+- A command line that does not parse now gets System.CommandLine's "Did you mean" suggestions for a mistyped
+  command or option, on stderr. Stdout stays empty and the exit code stays 2.
 
 ### Fixed
 
@@ -49,6 +51,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Two test classes deriving `ArchRuleTests<TSpec>` over one spec, with different `SolutionPath` or
   `ExcludeProjectName` values, now each check their own solution. Before, every class over that spec got
   the run of whichever class's test ran first, so a test could pass against the wrong solution.
+- An error raised outside every command's own handling now exits 2 with SlideRule's error message, or under
+  `hook` is reported as the hook's non-blocking error. Before, it printed a stack trace and exited 1, the
+  code `check` uses for a red rule.
+- A cancelled `check` or `baseline` run now stops before its next rule, and a cancelled CLI run, MCP tool
+  call or xUnit adapter run stops extracting. Before, the checker evaluated every remaining rule and
+  extraction went on to the last project. A cancelled MCP call also leaves the server's warm session as it
+  was. Before, the next call could move the cancelled walk's sites a second time.
+- A workspace load that fails before it returns, such as a cancelled load or an unreadable `.slnf` filter,
+  now shuts down the out-of-process build host it started. Before, the build host outlived the call.
+- The workspace code the xUnit adapter runs in a test process no longer resumes its awaits on a
+  synchronization context the test host installed. Before, a host that blocked on the adapter's work under
+  such a context could deadlock.
 - Extracting a field or property initializer now takes time in proportion to its size. Before, each method
   call or object creation in it bound the whole initializer again, so an initializer of 400 rows took
   28.8 s where it now takes 0.3 s. The build analyzer, the xUnit adapter and every command and MCP tool
