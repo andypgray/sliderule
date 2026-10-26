@@ -17,7 +17,7 @@ internal sealed class ColdSolutionSource : ISolutionSource
         LoadedSolution loaded = await WorkspaceLoader.LoadAsync(solutionPath, diagnostics.Add, ct);
         return new SolutionHandle(
             loaded.Solution, loaded.LoadDiagnosticsWith(diagnostics), loaded,
-            targetFrameworks: loaded.TargetFrameworks);
+            targetFrameworks: loaded.TargetFrameworks, projectFiles: loaded.ProjectFiles);
     }
 
     /// <inheritdoc />
@@ -34,6 +34,6 @@ internal sealed class ColdSolutionSource : ISolutionSource
 
         return new SolutionHandle(
             loaded.Solution, loaded.LoadDiagnosticsWith(diagnostics), loaded,
-            targetFrameworks: loaded.TargetFrameworks, isClosure: true);
+            targetFrameworks: loaded.TargetFrameworks, projectFiles: loaded.ProjectFiles, isClosure: true);
     }
 }

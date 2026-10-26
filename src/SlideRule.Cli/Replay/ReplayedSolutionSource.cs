@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis;
 using SlideRule.Cli.Pipeline;
 using SlideRule.Roslyn.Diagnostics;
+using SlideRule.Roslyn.Solutions;
 
 namespace SlideRule.Cli.Replay;
 
@@ -15,12 +16,14 @@ namespace SlideRule.Cli.Replay;
 internal sealed class ReplayedSolutionSource(
     Solution replayedSolution,
     WorkspaceDiagnostics loadDiagnostics,
-    IReadOnlyDictionary<ProjectId, string> targetFrameworks) : ISolutionSource
+    IReadOnlyDictionary<ProjectId, string> targetFrameworks,
+    CanonicalProjectFiles projectFiles) : ISolutionSource
 {
     /// <inheritdoc />
     public Task<SolutionHandle> AcquireAsync(string solutionPath, CancellationToken ct)
     {
         return Task.FromResult(new SolutionHandle(
-            replayedSolution, loadDiagnostics, null, targetFrameworks: targetFrameworks));
+            replayedSolution, loadDiagnostics, null, targetFrameworks: targetFrameworks,
+            projectFiles: projectFiles));
     }
 }

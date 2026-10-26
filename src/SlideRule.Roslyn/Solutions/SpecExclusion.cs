@@ -10,8 +10,10 @@ namespace SlideRule.Roslyn.Solutions;
 ///     workspace and no disk.
 /// </summary>
 /// <remarks>
-///     <see cref="CanonicalFilePath" /> is <see cref="FilePath" /> already canonicalized, for a producer that
-///     resolved it anyway; it is defaulted and trailing so a synthetic graph need not spell it.
+///     <see cref="CanonicalFilePath" /> is <see cref="FilePath" /> as the load's <see cref="CanonicalProjectFiles" />
+///     holds it, which only the overload of
+///     <see cref="SpecExclusion.Compute(Solution, CanonicalProjectFiles, IReadOnlySet{string}, string)" />
+///     taking a solution fills; a synthetic graph leaves it null and has <see cref="FilePath" /> resolved instead.
 /// </remarks>
 internal sealed record SpecExclusionProject(
     string Name,
@@ -50,21 +52,21 @@ internal sealed record SpecExclusionProject(
 internal static class SpecExclusion
 {
     /// <summary>
-    ///     The exclusion set for <paramref name="specProjectName" /> over a loaded
-    ///     <paramref name="solution" />, against an already-read <paramref name="declaredMembers" /> set
-    ///     (null when membership is unreadable, which falls back to <c>{spec project}</c>), for a caller with no
-    ///     canonical view of the solution's project files.
+    ///     The exclusion set for <paramref name="specProjectName" /> over a loaded <paramref name="solution" />,
+    ///     whose project files <paramref name="projectFiles" /> holds, against an already-read
+    ///     <paramref name="declaredMembers" /> set (null when membership is unreadable, which falls back to
+    ///     <c>{spec project}</c>).
     /// </summary>
     internal static IReadOnlyCollection<string> Compute(
-        Solution solution, IReadOnlySet<string>? declaredMembers, string specProjectName)
+        Solution solution, CanonicalProjectFiles projectFiles, IReadOnlySet<string>? declaredMembers,
+        string specProjectName)
     {
-        var canonicalProjectFiles = new ProjectFileCanonicalizer();
         List<SpecExclusionProject> projects = solution.Projects
             .Select(project => new SpecExclusionProject(
                 project.Name,
                 project.FilePath,
                 solution.ReferencedProjectNames(project).ToList(),
-                canonicalProjectFiles.Resolve(project.FilePath)))
+                projectFiles.PathOf(project)))
             .ToList();
 
         return Compute(projects, declaredMembers, specProjectName);
@@ -92,8 +94,9 @@ internal static class SpecExclusion
             // A multi-targeted project arrives once per framework, under the one name the load boundary
             // normalized its Projects to; declared by any entry is declared, and its reference edges union.
             declaredByName[project.Name] = declaredByName.GetValueOrDefault(project.Name)
-                                           || IsDeclaredMember(
-                                               declaredMembers, project.FilePath, project.CanonicalFilePath);
+                                           || IsMember(
+                                               declaredMembers, project.FilePath,
+                                               project.CanonicalFilePath ?? ResolveOrNull(project.FilePath));
         }
 
         var excluded = new SortedSet<string>(StringComparer.Ordinal) { specProjectName };
@@ -150,25 +153,16 @@ internal static class SpecExclusion
     }
 
     /// <summary>
-    ///     Whether <paramref name="projectFilePath" /> is one of <paramref name="declaredMembers" />.
-    ///     Unreadable membership and an unknown project path both answer <see langword="true" />: neither
-    ///     disproves membership, and a false negative would silently shrink the checked universe. A caller
-    ///     holding the canonical spelling already passes it as <paramref name="canonicalProjectFilePath" />
-    ///     rather than have it derived a second time.
+    ///     Whether <paramref name="project" /> is one of <paramref name="declaredMembers" />, compared by the
+    ///     canonical path <paramref name="projectFiles" /> holds for it. Unreadable membership and an unknown
+    ///     project path both answer <see langword="true" />: neither disproves membership, and a false negative
+    ///     would silently shrink the checked universe.
     /// </summary>
-    /// <remarks>
-    ///     The canonical slot is a caller-honoured guarantee and is never validated, because re-resolving to
-    ///     compare would pay the filesystem-probing walk the slot exists to avoid on every warm call. Pass what
-    ///     <see cref="PathCanonicalizer.Resolve(string)" /> would return for the same path, or nothing: a spelling the
-    ///     solution file never declared answers "not a member", the silent-shrink direction, so only a caller that
-    ///     resolved the path itself fills the slot.
-    /// </remarks>
     internal static bool IsDeclaredMember(
-        IReadOnlySet<string>? declaredMembers, string? projectFilePath, string? canonicalProjectFilePath = null)
+        IReadOnlySet<string>? declaredMembers, CanonicalProjectFiles projectFiles, Project project)
     {
-        if (declaredMembers is null || string.IsNullOrEmpty(projectFilePath)) return true;
-
-        return declaredMembers.Contains(canonicalProjectFilePath ?? PathCanonicalizer.Resolve(projectFilePath));
+        return IsMember(
+            declaredMembers, project.FilePath, projectFiles.PathOf(project) ?? ResolveOrNull(project.FilePath));
     }
 
     /// <summary>
@@ -181,10 +175,25 @@ internal static class SpecExclusion
     ///     solution file was ever read for would be an asserted fact with nothing behind it.
     /// </remarks>
     internal static bool? SolutionMembershipOf(
-        IReadOnlySet<string>? declaredMembers, string? projectFilePath, string? canonicalProjectFilePath = null)
+        IReadOnlySet<string>? declaredMembers, CanonicalProjectFiles projectFiles, Project project)
     {
-        if (declaredMembers is null || string.IsNullOrEmpty(projectFilePath)) return null;
+        if (declaredMembers is null || string.IsNullOrEmpty(project.FilePath)) return null;
 
-        return IsDeclaredMember(declaredMembers, projectFilePath, canonicalProjectFilePath);
+        return IsDeclaredMember(declaredMembers, projectFiles, project);
+    }
+
+    // The declared set is canonical, so a project is compared in its canonical spelling, never in the one the
+    // load reported; the canonical path is null exactly when the project file path is empty.
+    private static bool IsMember(
+        IReadOnlySet<string>? declaredMembers, string? projectFilePath, string? canonicalProjectFilePath)
+    {
+        if (declaredMembers is null || string.IsNullOrEmpty(projectFilePath)) return true;
+
+        return declaredMembers.Contains(canonicalProjectFilePath!);
+    }
+
+    private static string? ResolveOrNull(string? projectFilePath)
+    {
+        return string.IsNullOrEmpty(projectFilePath) ? null : PathCanonicalizer.Resolve(projectFilePath);
     }
 }

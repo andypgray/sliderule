@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.MSBuild;
 using SlideRule.Roslyn.Diagnostics;
+using SlideRule.Roslyn.Solutions;
 
 namespace SlideRule.Roslyn;
 
@@ -20,12 +21,14 @@ internal sealed class LoadedSolution : IDisposable
     internal LoadedSolution(
         MSBuildWorkspace workspace, Solution solution,
         IReadOnlyDictionary<ProjectId, string> targetFrameworks,
+        CanonicalProjectFiles projectFiles,
         ProjectLoadReport report,
         IReadOnlyList<string> restoreFailedProjects)
     {
         _workspace = workspace;
         Solution = solution;
         TargetFrameworks = targetFrameworks;
+        ProjectFiles = projectFiles;
         _loadVerdict = WorkspaceDiagnostics.OfLoad(
             loadFailures: [],
             failedProjects: report.Failed,
@@ -46,6 +49,9 @@ internal sealed class LoadedSolution : IDisposable
     ///     <see cref="ProjectId" />; empty when every project targets one framework.
     /// </summary>
     public IReadOnlyDictionary<ProjectId, string> TargetFrameworks { get; }
+
+    /// <summary>Each loaded project's canonical <c>.csproj</c> path, resolved once for the load.</summary>
+    public CanonicalProjectFiles ProjectFiles { get; }
 
     /// <summary>
     ///     This load's verdict as the one value every surface reads. <paramref name="loadFailures" /> are the

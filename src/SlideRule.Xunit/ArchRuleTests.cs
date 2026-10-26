@@ -279,9 +279,9 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
                     IReadOnlySet<string>? declaredMembers = SpecExclusion.TryReadDeclaredMembers(fullSolutionPath);
                     IReadOnlyCollection<string>? exclude = excludeProjectName is null
                         ? null
-                        : SpecExclusion.Compute(loaded.Solution, declaredMembers, excludeProjectName);
+                        : SpecExclusion.Compute(loaded.Solution, loaded.ProjectFiles, declaredMembers, excludeProjectName);
                     CodebaseModel codebase = await CodebaseExtractor.ExtractFromSolutionAsync(
-                        loaded.Solution, exclude, loaded.TargetFrameworks, declaredMembers, ct);
+                        loaded.Solution, exclude, loaded.TargetFrameworks, declaredMembers, loaded.ProjectFiles, ct);
                     WorkspaceDiagnostics composed = loaded.LoadDiagnosticsWith(diagnostics).WithModel(codebase);
                     loadDiagnostics = composed;
                     return new ExtractedCodebase(codebase, composed);

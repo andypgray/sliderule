@@ -1,3 +1,4 @@
+using Microsoft.CodeAnalysis;
 using Shouldly;
 using SlideRule.Roslyn.Solutions;
 using SlideRule.Tests.TestSupport;
@@ -230,11 +231,14 @@ public sealed class SpecExclusionTests : IDisposable
     [Fact]
     public void IsDeclaredMember_UnreadableMembershipOrUnknownPath_IsTrue()
     {
-        SpecExclusion.IsDeclaredMember(null, "/repo/src/App.csproj")
+        (CanonicalProjectFiles files, Project app) = LoadedAt("/repo/src/App.csproj");
+        (CanonicalProjectFiles pathlessFiles, Project pathless) = LoadedAt(null);
+
+        SpecExclusion.IsDeclaredMember(null, files, app)
             .ShouldBeTrue();
-        SpecExclusion.IsDeclaredMember(SpecExclusion.CanonicalMemberSet([]), null)
+        SpecExclusion.IsDeclaredMember(SpecExclusion.CanonicalMemberSet([]), pathlessFiles, pathless)
             .ShouldBeTrue();
-        SpecExclusion.IsDeclaredMember(SpecExclusion.CanonicalMemberSet([]), "/repo/src/App.csproj")
+        SpecExclusion.IsDeclaredMember(SpecExclusion.CanonicalMemberSet([]), files, app)
             .ShouldBeFalse();
     }
 
@@ -242,10 +246,12 @@ public sealed class SpecExclusionTests : IDisposable
     public void SolutionMembershipOf_ReadMembership_SeparatesDeclaredMembersFromPassengers()
     {
         IReadOnlySet<string> declared = Declared("/repo/src/App.csproj");
+        (CanonicalProjectFiles appFiles, Project app) = LoadedAt("/repo/src/App.csproj");
+        (CanonicalProjectFiles coreFiles, Project core) = LoadedAt("/elsewhere/Core.csproj");
 
-        SpecExclusion.SolutionMembershipOf(declared, "/repo/src/App.csproj")
+        SpecExclusion.SolutionMembershipOf(declared, appFiles, app)
             .ShouldBe(true);
-        SpecExclusion.SolutionMembershipOf(declared, "/elsewhere/Core.csproj")
+        SpecExclusion.SolutionMembershipOf(declared, coreFiles, core)
             .ShouldBe(false);
     }
 
@@ -255,9 +261,12 @@ public sealed class SpecExclusionTests : IDisposable
         // The inversion this method exists for, asserted against its sibling on the same inputs: true is the
         // safe answer when the question is what to exclude, and an invented fact when the question is what
         // to report.
-        SpecExclusion.SolutionMembershipOf(null, "/repo/src/App.csproj")
+        (CanonicalProjectFiles files, Project app) = LoadedAt("/repo/src/App.csproj");
+        (CanonicalProjectFiles pathlessFiles, Project pathless) = LoadedAt(null);
+
+        SpecExclusion.SolutionMembershipOf(null, files, app)
             .ShouldBeNull();
-        SpecExclusion.SolutionMembershipOf(Declared("/repo/src/App.csproj"), null)
+        SpecExclusion.SolutionMembershipOf(Declared("/repo/src/App.csproj"), pathlessFiles, pathless)
             .ShouldBeNull();
     }
 
@@ -269,11 +278,25 @@ public sealed class SpecExclusionTests : IDisposable
         // Unparseable XML is unreadable membership, not zero membership: an empty set would answer false.
         string unowned = _temp.WriteFile(["MyApp.csproj"], "<Project />");
         string malformed = _temp.WriteFile(["Unparseable.slnx"], "<Solution><Project Path=\"a.csproj\">");
+        (CanonicalProjectFiles files, Project app) = LoadedAt("/repo/src/App.csproj");
 
-        SpecExclusion.SolutionMembershipOf(SpecExclusion.TryReadDeclaredMembers(unowned), "/repo/src/App.csproj")
+        SpecExclusion.SolutionMembershipOf(SpecExclusion.TryReadDeclaredMembers(unowned), files, app)
             .ShouldBeNull();
-        SpecExclusion.SolutionMembershipOf(SpecExclusion.TryReadDeclaredMembers(malformed), "/repo/src/App.csproj")
+        SpecExclusion.SolutionMembershipOf(SpecExclusion.TryReadDeclaredMembers(malformed), files, app)
             .ShouldBeNull();
+    }
+
+    // One loaded project at projectFilePath, or with no project file when it is null, beside the canonical
+    // project files its load resolved.
+    private static (CanonicalProjectFiles Files, Project Project) LoadedAt(string? projectFilePath)
+    {
+        using var workspace = new AdhocWorkspace();
+        ProjectInfo project = projectFilePath is null
+            ? ProjectInfo.Create(ProjectId.CreateNewId(), VersionStamp.Default, "App", "App", LanguageNames.CSharp)
+            : AdhocSolution.Loaded("App", projectFilePath);
+        Solution solution = workspace.WithProjects(project);
+
+        return (CanonicalProjectFiles.Of(solution), solution.Projects.Single());
     }
 
     private static IReadOnlySet<string> Declared(params string[] csprojPaths)

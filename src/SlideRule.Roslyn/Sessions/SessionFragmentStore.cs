@@ -204,7 +204,8 @@ internal sealed class SessionFragmentStore : IDisposable
         WorkspaceSnapshot snapshot, IReadOnlySet<string>? declaredMembers, CancellationToken ct)
     {
         IReadOnlyList<CodebaseFragment> fragments = await CodebaseExtractor
-            .ExtractFragmentsAsync(snapshot.Solution, null, snapshot.TargetFrameworks, declaredMembers, ct)
+            .ExtractFragmentsAsync(
+                snapshot.Solution, null, snapshot.TargetFrameworks, snapshot.ProjectFiles, declaredMembers, ct)
             .ConfigureAwait(false);
 
         fragmentsByProject.Clear();
@@ -261,7 +262,8 @@ internal sealed class SessionFragmentStore : IDisposable
         if (dirty.Count > 0)
         {
             IReadOnlyList<CodebaseFragment> reExtracted = await CodebaseExtractor
-                .ExtractFragmentsAsync(snapshot.Solution, dirty, snapshot.TargetFrameworks, declaredMembers, ct)
+                .ExtractFragmentsAsync(
+                    snapshot.Solution, dirty, snapshot.TargetFrameworks, snapshot.ProjectFiles, declaredMembers, ct)
                 .ConfigureAwait(false);
 
             // Replace only the re-extracted names' lists; the clean projects' fragments ride through untouched.

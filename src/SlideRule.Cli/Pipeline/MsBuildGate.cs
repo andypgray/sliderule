@@ -178,7 +178,8 @@ internal static class MsBuildGate
         }
 
         var source = new ReplayedSolutionSource(
-            replayed.Solution, replayed.LoadDiagnosticsWith(diagnostics), replayed.TargetFrameworks);
+            replayed.Solution, replayed.LoadDiagnosticsWith(diagnostics), replayed.TargetFrameworks,
+            replayed.ProjectFiles);
         return await invokeRunner(solutionPath, source);
     }
 

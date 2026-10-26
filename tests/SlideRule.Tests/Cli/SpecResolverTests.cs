@@ -485,12 +485,13 @@ public sealed class SpecResolverTests
     // and SpecProjectCandidate makes that a spelled-out argument rather than a default nobody reads.
     private static SpecProjectCandidate Candidate(string name, string referencePath, bool isDeclaredMember = true)
     {
-        return new SpecProjectCandidate(name, [referencePath], $"C:/out/{name}.dll", FilePath: null, isDeclaredMember);
+        return new SpecProjectCandidate(
+            name, [referencePath], $"C:/out/{name}.dll", FilePath: null, CanonicalFilePath: null, isDeclaredMember);
     }
 
     // A candidate that knows its own csproj — the shape every real (workspace-derived) candidate has.
     private static SpecProjectCandidate CandidateAt(string name, string filePath, string outputFilePath)
     {
-        return new SpecProjectCandidate(name, [CoreDll], outputFilePath, filePath);
+        return new SpecProjectCandidate(name, [CoreDll], outputFilePath, filePath, PathCanonicalizer.Resolve(filePath));
     }
 }

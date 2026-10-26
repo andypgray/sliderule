@@ -311,7 +311,7 @@ internal sealed class CodebaseSource : IDisposable
             // one walk serve two exclusion sets. reExtractedProjects stays empty on this cold disabled run:
             // the field says which projects a cache, persisted or session, made this run re-extract.
             return await CodebaseExtractor.ExtractFragmentsAsync(
-                solution, null, handle.TargetFrameworks, declaredMembers.Value, ct);
+                solution, null, handle.TargetFrameworks, handle.ProjectFiles, declaredMembers.Value, ct);
 
         // Fingerprint before extraction so a mid-run edit is caught by the store's re-stat at write time.
         CacheFingerprint? fingerprint = TryCaptureFingerprint(solution, ct);
@@ -345,7 +345,8 @@ internal sealed class CodebaseSource : IDisposable
         if (Outcome == CodebaseSourceOutcome.Partial)
         {
             IReadOnlyList<CodebaseFragment> reExtracted = await CodebaseExtractor.ExtractFragmentsAsync(
-                solution, cacheRead.DirtyProjects, handle!.TargetFrameworks, declaredMembers.Value, ct);
+                solution, cacheRead.DirtyProjects, handle!.TargetFrameworks, handle.ProjectFiles,
+                declaredMembers.Value, ct);
             reExtractedProjects = new HashSet<string>(cacheRead.DirtyProjects, StringComparer.Ordinal);
             return cacheRead.ReusableFragments
                 .Concat(reExtracted)
@@ -356,7 +357,7 @@ internal sealed class CodebaseSource : IDisposable
         List<CodebaseFragment> all =
         [
             .. await CodebaseExtractor.ExtractFragmentsAsync(
-                solution, null, handle!.TargetFrameworks, declaredMembers.Value, ct)
+                solution, null, handle!.TargetFrameworks, handle.ProjectFiles, declaredMembers.Value, ct)
         ];
         reExtractedProjects = all.Select(f => f.ProjectName).ToHashSet(StringComparer.Ordinal);
         return all;
@@ -423,7 +424,7 @@ internal sealed class CodebaseSource : IDisposable
         {
             IReadOnlySet<string>? declaredMembers = SpecExclusion.TryReadDeclaredMembers(solutionPath);
             SpecResolution resolution = SpecResolver.Resolve(
-                handle.Solution, declaredMembers, spec, handle.LoadDiagnostics);
+                handle.Solution, handle.ProjectFiles, declaredMembers, spec, handle.LoadDiagnostics);
             return new SessionSpecResolution(resolution, declaredMembers);
         }
     }

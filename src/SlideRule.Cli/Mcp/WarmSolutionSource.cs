@@ -31,7 +31,8 @@ internal sealed class WarmSolutionSource(
             snapshot.Solution, snapshot.LoadDiagnostics, null,
             (exclude, declaredMembers, token) => store.GetCodebaseAsync(snapshot, exclude, declaredMembers, token),
             (normalizedSpec, resolveFully) => resolutions.Resolve(normalizedSpec, snapshot.Generation, resolveFully),
-            snapshot.TargetFrameworks);
+            snapshot.TargetFrameworks,
+            snapshot.ProjectFiles);
     }
 
     /// <inheritdoc />

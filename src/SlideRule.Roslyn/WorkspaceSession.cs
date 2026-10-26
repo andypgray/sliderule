@@ -89,6 +89,9 @@ internal sealed class WorkspaceSession : IAsyncDisposable
 
     private IReadOnlyDictionary<ProjectId, string> targetFrameworks = TargetFrameworkMaps.None;
 
+    // Set with every load, and read only through a snapshot, which is minted after one.
+    private CanonicalProjectFiles? projectFiles;
+
     /// <summary>
     ///     Creates a session with nothing loaded. <paramref name="diagnosticSink" /> receives the session's own
     ///     commentary (why a call reloaded, a file the reconcile could not read), never the load's failures, which
@@ -173,6 +176,7 @@ internal sealed class WorkspaceSession : IAsyncDisposable
         snapshot = null;
         loadVerdict = WorkspaceDiagnostics.None;
         targetFrameworks = TargetFrameworkMaps.None;
+        projectFiles = null;
         documentFingerprints.Clear();
         documentIds.Clear();
         structuralFingerprints.Clear();
@@ -204,6 +208,7 @@ internal sealed class WorkspaceSession : IAsyncDisposable
         loadedSolutionPath = solutionPath;
         loadVerdict = freshlyLoaded.LoadDiagnosticsWith(collected);
         targetFrameworks = freshlyLoaded.TargetFrameworks;
+        projectFiles = freshlyLoaded.ProjectFiles;
         generation++;
         SeedEditVersions(materialized);
         RecordAllFingerprints(solutionPath, materialized);
@@ -333,7 +338,8 @@ internal sealed class WorkspaceSession : IAsyncDisposable
         {
             Generation = generation,
             ProjectEditVersions = new Dictionary<string, int>(projectEditVersions, StringComparer.Ordinal),
-            TargetFrameworks = targetFrameworks
+            TargetFrameworks = targetFrameworks,
+            ProjectFiles = projectFiles!
         };
     }
 

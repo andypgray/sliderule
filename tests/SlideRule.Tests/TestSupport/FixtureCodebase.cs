@@ -41,6 +41,6 @@ internal static class FixtureCodebase
     {
         WorkspaceSnapshot snapshot = await WarmWorkspacePool.GetCurrentAsync(solutionPath, CancellationToken.None);
         return await CodebaseExtractor.ExtractFromSolutionAsync(
-            snapshot.Solution, null, snapshot.TargetFrameworks, null, CancellationToken.None);
+            snapshot.Solution, null, snapshot.TargetFrameworks, null, snapshot.ProjectFiles, CancellationToken.None);
     }
 }

@@ -1,6 +1,7 @@
 using Basic.CompilerLog.Util;
 using Microsoft.CodeAnalysis;
 using SlideRule.Roslyn.Diagnostics;
+using SlideRule.Roslyn.Solutions;
 
 namespace SlideRule.Roslyn.Replay;
 
@@ -33,6 +34,7 @@ internal sealed class ReplayedSolution : IDisposable
     internal ReplayedSolution(
         AdhocWorkspace workspace, SolutionReader reader, Solution solution,
         IReadOnlyDictionary<ProjectId, string> targetFrameworks,
+        CanonicalProjectFiles projectFiles,
         IReadOnlyList<string> failedProjects,
         IReadOnlyList<string> uncheckedProjects,
         IReadOnlyList<UnsupportedProject> unsupportedProjects)
@@ -41,6 +43,7 @@ internal sealed class ReplayedSolution : IDisposable
         _reader = reader;
         Solution = solution;
         TargetFrameworks = targetFrameworks;
+        ProjectFiles = projectFiles;
         FailedProjects = failedProjects;
         UncheckedProjects = uncheckedProjects;
         _loadVerdict = WorkspaceDiagnostics.OfLoad(
@@ -65,6 +68,9 @@ internal sealed class ReplayedSolution : IDisposable
     ///     suppresses the framework segment of its output path.
     /// </summary>
     public IReadOnlyDictionary<ProjectId, string> TargetFrameworks { get; }
+
+    /// <summary>Each replayed project's canonical <c>.csproj</c> path, resolved once for the replay.</summary>
+    public CanonicalProjectFiles ProjectFiles { get; }
 
     /// <summary>The <c>.csproj</c> paths of the projects that failed to load.</summary>
     /// <remarks>

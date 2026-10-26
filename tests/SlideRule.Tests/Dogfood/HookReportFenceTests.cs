@@ -171,9 +171,11 @@ public sealed class HookReportFenceTests
         IReadOnlySet<string>? declaredMembers = SpecExclusion.TryReadDeclaredMembers(RepoRoot.Solution);
 
         CodebaseModel committed = await CodebaseExtractor.ExtractFromSolutionAsync(
-            snapshot.Solution, others, snapshot.TargetFrameworks, declaredMembers, CancellationToken.None);
+            snapshot.Solution, others, snapshot.TargetFrameworks, declaredMembers, snapshot.ProjectFiles,
+            CancellationToken.None);
         CodebaseModel withImaginedFile = await CodebaseExtractor.ExtractFromSolutionAsync(
-            imagined, others, snapshot.TargetFrameworks, declaredMembers, CancellationToken.None);
+            imagined, others, snapshot.TargetFrameworks, declaredMembers, snapshot.ProjectFiles,
+            CancellationToken.None);
 
         return new CliModels(committed, withImaginedFile);
     }

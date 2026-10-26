@@ -51,7 +51,8 @@ internal sealed class LazyCaptureReplaySource(string binlogCopyPath) : ISolution
 
         _replayed = replayed;
         var source = new ReplayedSolutionSource(
-            replayed.Solution, replayed.LoadDiagnosticsWith(diagnostics), replayed.TargetFrameworks);
+            replayed.Solution, replayed.LoadDiagnosticsWith(diagnostics), replayed.TargetFrameworks,
+            replayed.ProjectFiles);
         return source.AcquireAsync(solutionPath, ct);
     }
 }

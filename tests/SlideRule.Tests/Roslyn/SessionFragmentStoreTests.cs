@@ -132,7 +132,7 @@ public sealed class SessionFragmentStoreTests(SessionFragmentStoreTests.Sessions
             .ToList();
         CodebaseModel mergedExcluded = FragmentMerger.Merge(retained);
         CodebaseModel coldExcluded = await CodebaseExtractor.ExtractFromSolutionAsync(
-            snapshot.Solution, [Billing], snapshot.TargetFrameworks, null, Ct);
+            snapshot.Solution, [Billing], snapshot.TargetFrameworks, null, snapshot.ProjectFiles, Ct);
 
         // Assert — dropping a referenced project at merge time (Billing survives as an external of Web) matches
         // never extracting it, so one store serves every tool whatever project each excludes.
@@ -646,7 +646,7 @@ file static class SessionFragmentStoreAssertions
     internal static async Task ShouldMergeToTheColdModelAsync(this SessionFragmentSet set, WorkspaceSnapshot snapshot)
     {
         CodebaseModel coldModel = await CodebaseExtractor.ExtractFromSolutionAsync(
-            snapshot.Solution, null, snapshot.TargetFrameworks, null, Ct);
+            snapshot.Solution, null, snapshot.TargetFrameworks, null, snapshot.ProjectFiles, Ct);
         FragmentMerger.Merge(set.Fragments)
             .ShouldModelTheSameAs(coldModel);
     }

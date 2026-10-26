@@ -118,8 +118,8 @@ internal static class BinlogReplayer
                 .ToList();
 
             return new ReplayedSolution(
-                workspace, reader, settled.Solution, settled.TargetFrameworks, settled.Report.Failed,
-                settled.Report.Unchecked, unsupported);
+                workspace, reader, settled.Solution, settled.TargetFrameworks, settled.ProjectFiles,
+                settled.Report.Failed, settled.Report.Unchecked, unsupported);
         }
         catch
         {

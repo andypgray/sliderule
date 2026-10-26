@@ -5,12 +5,13 @@ namespace SlideRule.Roslyn.Solutions;
 
 /// <summary>
 ///     A loaded solution as <see cref="LoadBoundary.Settle" /> leaves it: what its readers see, the framework each
-///     multi-targeted project was loaded for, what the load produced against the solution file, and how many
-///     unresolved references were stripped.
+///     multi-targeted project was loaded for, each project's canonical file, what the load produced against the
+///     solution file, and how many unresolved references were stripped.
 /// </summary>
 internal sealed record SettledSolution(
     Solution Solution,
     IReadOnlyDictionary<ProjectId, string> TargetFrameworks,
+    CanonicalProjectFiles ProjectFiles,
     ProjectLoadReport Report,
     int StrippedAnalyzerReferences,
     int StrippedMetadataReferences);
@@ -27,14 +28,17 @@ internal static class LoadBoundary
     ///     over, or null when none is known.
     /// </summary>
     // The three steps read and write disjoint facts (references; names; file and output paths), so the order
-    // decides nothing; it is fixed here so that both paths run one sequence.
+    // decides nothing; it is fixed here so that both paths run one sequence. The project files are resolved once,
+    // here, for the steps that compare them and for every reader of the load after them.
     internal static SettledSolution Settle(Solution solution, string? solutionPath)
     {
         (Solution stripped, int analyzerCount, int metadataCount) = solution.StripUnresolvedReferences();
+        CanonicalProjectFiles projectFiles = CanonicalProjectFiles.Of(stripped);
         (Solution normalized, IReadOnlyDictionary<ProjectId, string> targetFrameworks) =
-            stripped.NormalizeProjectNames();
-        ProjectLoadReport report = ProjectLoadFailures.Detect(normalized, solutionPath);
+            stripped.NormalizeProjectNames(projectFiles);
+        ProjectLoadReport report = ProjectLoadFailures.Detect(normalized, projectFiles, solutionPath);
 
-        return new SettledSolution(normalized, targetFrameworks, report, analyzerCount, metadataCount);
+        return new SettledSolution(
+            normalized, targetFrameworks, projectFiles, report, analyzerCount, metadataCount);
     }
 }

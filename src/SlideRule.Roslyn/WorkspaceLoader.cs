@@ -88,7 +88,8 @@ internal static class WorkspaceLoader
             IReadOnlyList<string> restoreFailed = RestoreFailures.Detect(settled.Solution, settled.Report.Failed);
 
             return new LoadedSolution(
-                workspace, settled.Solution, settled.TargetFrameworks, settled.Report, restoreFailed);
+                workspace, settled.Solution, settled.TargetFrameworks, settled.ProjectFiles, settled.Report,
+                restoreFailed);
         }
         catch
         {

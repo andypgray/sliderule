@@ -22,7 +22,8 @@ internal static class CodebaseExtractor
     ///     <paramref name="declaredMembers" />, the absolute symlink-resolved <c>.csproj</c> paths the solution file
     ///     declares, sets <see cref="ProjectNode.SolutionMember" />, so a project the workspace loaded only because
     ///     a <c>ProjectReference</c> named it can be told from one the solution claims; null, which an unreadable
-    ///     solution file degrades to, leaves every project unlabeled.
+    ///     solution file degrades to, leaves every project unlabeled. <paramref name="projectFiles" /> is the load's
+    ///     <see cref="LoadedSolution.ProjectFiles" />; null resolves the project files here.
     /// </remarks>
     // MethodImplOptions.NoInlining keeps the JIT from resolving Roslyn types before MSBuildLocator
     // registration in non-test hosts.
@@ -32,11 +33,12 @@ internal static class CodebaseExtractor
         IReadOnlyCollection<string>? excludeProjects = null,
         IReadOnlyDictionary<ProjectId, string>? targetFrameworks = null,
         IReadOnlySet<string>? declaredMembers = null,
+        CanonicalProjectFiles? projectFiles = null,
         CancellationToken ct = default)
     {
         ExtractionInputs collected = await CollectInputsAsync(
             solution, p => excludeProjects is null || !excludeProjects.Contains(p.Name), targetFrameworks,
-            declaredMembers, ct).ConfigureAwait(false);
+            projectFiles ?? CanonicalProjectFiles.Of(solution), declaredMembers, ct).ConfigureAwait(false);
         return CodebaseModelBuilder.Build(collected.Inputs, ct);
     }
 
@@ -52,13 +54,14 @@ internal static class CodebaseExtractor
     internal static async Task<IReadOnlyList<CodebaseFragment>> ExtractFragmentsAsync(
         Solution solution,
         IReadOnlyCollection<string>? includeProjects,
-        IReadOnlyDictionary<ProjectId, string>? targetFrameworks = null,
-        IReadOnlySet<string>? declaredMembers = null,
-        CancellationToken ct = default)
+        IReadOnlyDictionary<ProjectId, string>? targetFrameworks,
+        CanonicalProjectFiles projectFiles,
+        IReadOnlySet<string>? declaredMembers,
+        CancellationToken ct)
     {
         ExtractionInputs collected = await CollectInputsAsync(
             solution, p => includeProjects is null || includeProjects.Contains(p.Name), targetFrameworks,
-            declaredMembers, ct).ConfigureAwait(false);
+            projectFiles, declaredMembers, ct).ConfigureAwait(false);
         return FragmentExtractor.ExtractAll(collected.Inputs, ct);
     }
 
@@ -74,6 +77,7 @@ internal static class CodebaseExtractor
         Solution solution,
         Func<Project, bool> include,
         IReadOnlyDictionary<ProjectId, string>? targetFrameworks,
+        CanonicalProjectFiles projectFiles,
         IReadOnlySet<string>? declaredMembers,
         CancellationToken ct)
     {
@@ -114,18 +118,19 @@ internal static class CodebaseExtractor
             projects.Select(project => GeneratedTreesOfAsync(project, ct));
         IReadOnlySet<SyntaxTree>[] generatedTrees = await Task.WhenAll(generatedTreeTasks).ConfigureAwait(false);
 
-        // One canonicalizer for the whole enumeration: every project's membership is tested against a
-        // canonicalized path, and the projects of one solution share nearly all of their ancestors.
-        var canonicalProjectFiles = new ProjectFileCanonicalizer();
+        // The declared references are paths read out of the project files, not the load's own project files, so
+        // they are resolved here, through one canonicalizer for the whole enumeration.
+        var canonicalReferences = new ProjectFileCanonicalizer();
 
         IReadOnlyList<ProjectArtifactFacts?> evaluated = await artifactFactsTask.ConfigureAwait(false);
 
         // Every loaded project, whatever its language and whether or not this call extracts it, because a
         // declared reference may name any project of the workspace, and the filter above can hold as few as
         // the one project that changed.
-        IEnumerable<(string? FilePath, string Name)> loadedProjects = solution.Projects.Select(p => (p.FilePath, p.Name));
+        IEnumerable<(string? FilePath, string Name)> loadedProjects =
+            solution.Projects.Select(p => (projectFiles.PathOf(p), p.Name));
         IReadOnlyDictionary<string, string> namesByProjectFile =
-            DeclaredProjectReferences.NamesByProjectFile(loadedProjects, canonicalProjectFiles.Resolve);
+            DeclaredProjectReferences.NamesByProjectFile(loadedProjects, canonical => canonical);
         Func<string, IEnumerable<string>> workspaceReach = WorkspaceReach(solution);
 
         List<CompilationInput> inputs = [];
@@ -142,7 +147,7 @@ internal static class CodebaseExtractor
                 .ToList();
             IReadOnlyList<string> projectReferences = evaluated[i] is { } facts
                 ? DeclaredProjectReferences.Names(
-                    facts.ProjectReferencePaths, namesByProjectFile, canonicalProjectFiles.Resolve)
+                    facts.ProjectReferencePaths, namesByProjectFile, canonicalReferences.Resolve)
                 : workspaceReferences;
             IReadOnlyList<string> undeclared = evaluated[i] is null
                 ? []
@@ -150,8 +155,7 @@ internal static class CodebaseExtractor
 
             inputs.Add(new CompilationInput(
                 compilation, project.Name, projectReferences, TargetFrameworkOf(targetFrameworks, project),
-                SpecExclusion.SolutionMembershipOf(
-                    declaredMembers, project.FilePath, canonicalProjectFiles.Resolve(project.FilePath)),
+                SpecExclusion.SolutionMembershipOf(declaredMembers, projectFiles, project),
                 generatedTrees[i],
                 undeclared,
                 evaluated[i]));

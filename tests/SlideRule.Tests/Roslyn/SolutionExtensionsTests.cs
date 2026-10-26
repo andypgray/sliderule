@@ -52,7 +52,7 @@ public sealed class SolutionExtensionsTests
             Replayed(projectFile, temp.PathOf("obj", "Debug", "netstandard2.0", "Core.dll")));
 
         // Act
-        (_, IReadOnlyDictionary<ProjectId, string> frameworks) = solution.NormalizeProjectNames();
+        (_, IReadOnlyDictionary<ProjectId, string> frameworks) = solution.NormalizeProjectNames(CanonicalProjectFiles.Of(solution));
 
         // Assert
         frameworks.Values
@@ -73,7 +73,7 @@ public sealed class SolutionExtensionsTests
             Replayed(projectFile, sharedOutput), Replayed(projectFile, sharedOutput));
 
         // Act
-        (_, IReadOnlyDictionary<ProjectId, string> frameworks) = solution.NormalizeProjectNames();
+        (_, IReadOnlyDictionary<ProjectId, string> frameworks) = solution.NormalizeProjectNames(CanonicalProjectFiles.Of(solution));
 
         // Assert
         frameworks.ShouldBeEmpty();

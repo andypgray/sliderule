@@ -251,7 +251,8 @@ internal static class ExampleReplay
         internal Task<CodebaseModel> ExtractAsync(Solution solution)
         {
             return CodebaseExtractor.ExtractFromSolutionAsync(
-                solution, exclude, snapshot.TargetFrameworks, declaredMembers, CancellationToken.None);
+                solution, exclude, snapshot.TargetFrameworks, declaredMembers, snapshot.ProjectFiles,
+                CancellationToken.None);
         }
 
         /// <summary>The scenario's edited codebase, and the absolute paths of the files it changed.</summary>

@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Shouldly;
 using SlideRule.Roslyn.Diagnostics;
+using SlideRule.Roslyn.Solutions;
 using SlideRule.Tests.TestSupport;
 using Xunit;
 
@@ -37,7 +38,7 @@ public sealed class ProjectLoadFailuresTests
         string csproj = ProjectPath("P", "P.csproj");
         Solution solution = workspace.WithProjects(AdhocSolution.Loaded("P", csproj));
 
-        ProjectLoadFailures.Detect(solution, null)
+        ProjectLoadFailures.Detect(solution, CanonicalProjectFiles.Of(solution), null)
             .ShouldHaveLoadedEverything();
     }
 
@@ -51,7 +52,7 @@ public sealed class ProjectLoadFailuresTests
         string csproj = ProjectPath("P", "P.csproj");
         Solution solution = workspace.WithProjects(AdhocSolution.Empty("P", csproj));
 
-        ProjectLoadFailures.Detect(solution, null)
+        ProjectLoadFailures.Detect(solution, CanonicalProjectFiles.Of(solution), null)
             .ShouldHaveFailed(csproj);
     }
 
@@ -67,7 +68,7 @@ public sealed class ProjectLoadFailuresTests
         Solution solution = workspace.WithProjects(
             AdhocSolution.Empty("HasOutput", csproj).WithOutputFilePath(outputPath));
 
-        ProjectLoadFailures.Detect(solution, null)
+        ProjectLoadFailures.Detect(solution, CanonicalProjectFiles.Of(solution), null)
             .ShouldHaveLoadedEverything();
     }
 
@@ -82,7 +83,7 @@ public sealed class ProjectLoadFailuresTests
             AdhocSolution.Empty("P(net10.0)", csproj),
             AdhocSolution.Empty("P(netstandard2.0)", csproj));
 
-        ProjectLoadFailures.Detect(solution, null)
+        ProjectLoadFailures.Detect(solution, CanonicalProjectFiles.Of(solution), null)
             .ShouldHaveFailed(csproj);
     }
 
@@ -96,7 +97,7 @@ public sealed class ProjectLoadFailuresTests
         using var workspace = new AdhocWorkspace();
         Solution solution = workspace.WithProjects(AdhocSolution.Loaded("Present", temp.PathOf("Present", "Present.csproj")));
 
-        ProjectLoadFailures.Detect(solution, solutionPath)
+        ProjectLoadFailures.Detect(solution, CanonicalProjectFiles.Of(solution), solutionPath)
             .ShouldHaveFailed(temp.PathOf("Absent", "Absent.csproj"));
     }
 
@@ -110,7 +111,7 @@ public sealed class ProjectLoadFailuresTests
             AdhocSolution.Loaded("One", temp.PathOf("One", "One.csproj")),
             AdhocSolution.Loaded("Two", temp.PathOf("Two", "Two.csproj")));
 
-        ProjectLoadFailures.Detect(solution, solutionPath)
+        ProjectLoadFailures.Detect(solution, CanonicalProjectFiles.Of(solution), solutionPath)
             .ShouldHaveLoadedEverything();
     }
 
@@ -124,7 +125,7 @@ public sealed class ProjectLoadFailuresTests
         using var workspace = new AdhocWorkspace();
         Solution solution = workspace.WithProjects(AdhocSolution.Loaded("Kept", temp.PathOf("Kept", "Kept.csproj")));
 
-        ProjectLoadFailures.Detect(solution, filterPath)
+        ProjectLoadFailures.Detect(solution, CanonicalProjectFiles.Of(solution), filterPath)
             .ShouldHaveLeftUnchecked(temp.PathOf("Dropped", "Dropped.csproj"));
     }
 
@@ -139,7 +140,7 @@ public sealed class ProjectLoadFailuresTests
         using var workspace = new AdhocWorkspace();
         Solution solution = workspace.CurrentSolution;
 
-        ProjectLoadReport report = ProjectLoadFailures.Detect(solution, filterPath);
+        ProjectLoadReport report = ProjectLoadFailures.Detect(solution, CanonicalProjectFiles.Of(solution), filterPath);
 
         report.Failed.ShouldBe([temp.PathOf("Kept", "Kept.csproj")]);
         report.Unchecked.ShouldBe([temp.PathOf("Dropped", "Dropped.csproj")]);
@@ -158,7 +159,7 @@ public sealed class ProjectLoadFailuresTests
             AdhocSolution.Loaded("One", temp.PathOf("One", "One.csproj")),
             AdhocSolution.Loaded("Two", temp.PathOf("Two", "Two.csproj")));
 
-        ProjectLoadFailures.Detect(solution, filterPath)
+        ProjectLoadFailures.Detect(solution, CanonicalProjectFiles.Of(solution), filterPath)
             .ShouldHaveLoadedEverything();
     }
 
@@ -176,7 +177,7 @@ public sealed class ProjectLoadFailuresTests
             AdhocSolution.Loaded("Kept", temp.PathOf("Kept", "Kept.csproj")),
             AdhocSolution.Loaded("Pulled", temp.PathOf("Pulled", "Pulled.csproj")));
 
-        ProjectLoadFailures.Detect(solution, filterPath)
+        ProjectLoadFailures.Detect(solution, CanonicalProjectFiles.Of(solution), filterPath)
             .ShouldHaveLoadedEverything();
     }
 
@@ -190,7 +191,7 @@ public sealed class ProjectLoadFailuresTests
         using var workspace = new AdhocWorkspace();
         Solution solution = workspace.WithProjects(AdhocSolution.Empty("Zed", temp.PathOf("Zed", "Zed.csproj")));
 
-        ProjectLoadFailures.Detect(solution, solutionPath)
+        ProjectLoadFailures.Detect(solution, CanonicalProjectFiles.Of(solution), solutionPath)
             .ShouldHaveFailed(temp.PathOf("Absent", "Absent.csproj"), temp.PathOf("Zed", "Zed.csproj"));
     }
 
@@ -209,7 +210,7 @@ public sealed class ProjectLoadFailuresTests
         using var workspace = new AdhocWorkspace();
         Solution solution = workspace.WithProjects(AdhocSolution.Loaded("Present", real.PathOf("Present", "Present.csproj")));
 
-        ProjectLoadFailures.Detect(solution, Path.Combine(via, "Solution.sln"))
+        ProjectLoadFailures.Detect(solution, CanonicalProjectFiles.Of(solution), Path.Combine(via, "Solution.sln"))
             .ShouldHaveFailed(Path.Combine(via, "Absent", "Absent.csproj"));
     }
 

@@ -48,9 +48,11 @@ internal static class ProjectLoadFailures
     /// <remarks>
     ///     <paramref name="solutionPath" /> is the solution file the load came from, or the one a replayed build was
     ///     run over, or null when none is known; arm 1 needs one in a format the parser owns and is skipped without
-    ///     it, and arm 2 runs either way.
+    ///     it, and arm 2 runs either way. <paramref name="projectFiles" /> holds the loaded projects' canonical
+    ///     paths, which arm 1 compares the solution's declared paths against.
     /// </remarks>
-    internal static ProjectLoadReport Detect(Solution solution, string? solutionPath)
+    internal static ProjectLoadReport Detect(
+        Solution solution, CanonicalProjectFiles projectFiles, string? solutionPath)
     {
         var failed = new HashSet<string>(PathComparison.Comparer);
 
@@ -74,7 +76,7 @@ internal static class ProjectLoadFailures
             // and a mismatch here would blame a member that loaded. The reports keep the solution's spelling.
             var canonicalizer = new ProjectFileCanonicalizer();
             HashSet<string> loadedFiles = solution.Projects
-                .Select(project => canonicalizer.Resolve(project.FilePath))
+                .Select(projectFiles.PathOf)
                 .OfType<string>()
                 .ToHashSet(PathComparison.Comparer);
 

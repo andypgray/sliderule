@@ -47,4 +47,7 @@ internal sealed record WorkspaceSnapshot(Solution Solution, WorkspaceDiagnostics
     ///     <c>Solution.WithDocumentText</c>, so the map holds across the generation's edits.
     /// </summary>
     internal IReadOnlyDictionary<ProjectId, string> TargetFrameworks { get; init; } = TargetFrameworkMaps.None;
+
+    /// <summary>Each loaded project's canonical <c>.csproj</c> path, resolved once for <see cref="Generation" />.</summary>
+    internal required CanonicalProjectFiles ProjectFiles { get; init; }
 }

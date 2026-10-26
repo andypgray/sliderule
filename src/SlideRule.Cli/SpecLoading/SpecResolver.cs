@@ -13,16 +13,18 @@ namespace SlideRule.Cli.SpecLoading;
 /// </summary>
 /// <remarks>
 ///     <see cref="ReferencePaths" /> carries the project's PE metadata reference paths <em>plus</em> the output
-///     paths of its direct project references. <see cref="FilePath" /> is the candidate's own <c>.csproj</c>, which
-///     the convention counts by; it carries no default on purpose, so a caller with no project file in hand has to
-///     say so out loud. <see cref="IsDeclaredMember" /> says whether the solution file declares this project, and
-///     <see cref="IntermediateAssemblyPath" /> is its <c>obj</c>-side assembly.
+///     paths of its direct project references. <see cref="FilePath" /> is the candidate's own <c>.csproj</c> and
+///     <see cref="CanonicalFilePath" /> its canonical spelling, which the convention counts by; neither carries a
+///     default, so a caller with no project file in hand has to say so out loud. <see cref="IsDeclaredMember" />
+///     says whether the solution file declares this project, and <see cref="IntermediateAssemblyPath" /> is its
+///     <c>obj</c>-side assembly.
 /// </remarks>
 internal sealed record SpecProjectCandidate(
     string Name,
     IReadOnlyList<string> ReferencePaths,
     string? OutputFilePath,
     string? FilePath,
+    string? CanonicalFilePath,
     bool IsDeclaredMember = true,
     string? IntermediateAssemblyPath = null);
 
@@ -62,6 +64,7 @@ internal static class SpecResolver
 
     /// <summary>Resolves the spec against a loaded solution.</summary>
     /// <remarks>
+    ///     <paramref name="projectFiles" /> is the load's canonical project files.
     ///     <paramref name="declaredMembers" /> is null when membership could not be read.
     ///     <paramref name="diagnostics" /> is deliberately not defaulted: whether the workspace loaded cleanly
     ///     decides what zero convention candidates mean (<see cref="ResolveConventionProject" />), and every caller
@@ -69,12 +72,12 @@ internal static class SpecResolver
     ///     <c>default(WorkspaceDiagnostics)</c> carries null lists.
     /// </remarks>
     internal static SpecResolution Resolve(
-        Solution solution, IReadOnlySet<string>? declaredMembers, string? specArgument,
-        WorkspaceDiagnostics diagnostics)
+        Solution solution, CanonicalProjectFiles projectFiles, IReadOnlySet<string>? declaredMembers,
+        string? specArgument, WorkspaceDiagnostics diagnostics)
     {
         return string.IsNullOrWhiteSpace(specArgument)
-            ? ResolveByConvention(solution, declaredMembers, diagnostics)
-            : ResolveExplicit(solution, declaredMembers, specArgument);
+            ? ResolveByConvention(solution, projectFiles, declaredMembers, diagnostics)
+            : ResolveExplicit(solution, projectFiles, declaredMembers, specArgument);
     }
 
     /// <summary>
@@ -99,12 +102,13 @@ internal static class SpecResolver
     }
 
     private static SpecResolution ResolveExplicit(
-        Solution solution, IReadOnlySet<string>? declaredMembers, string specArgument)
+        Solution solution, CanonicalProjectFiles projectFiles, IReadOnlySet<string>? declaredMembers,
+        string specArgument)
     {
         if (specArgument.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase))
         {
             string canonicalPath = PathCanonicalizer.Resolve(Path.GetFullPath(specArgument));
-            List<CanonicalProject> projects = CanonicalProjectsOf(solution);
+            List<CanonicalProject> projects = CanonicalProjectsOf(solution, projectFiles);
             List<CanonicalProject> sharingProjects = ProjectsSharingFile(projects, canonicalPath);
             if (sharingProjects.Count == 0)
                 throw new UserErrorException(
@@ -112,7 +116,7 @@ internal static class SpecResolver
                     "Pass a built spec DLL or a csproj that is a member of the target solution.");
 
             BuiltOutputInputs built = BuiltOutputsOf(sharingProjects);
-            return MemberResolution(solution, projects, declaredMembers, sharingProjects[0].Project.Name, built);
+            return MemberResolution(solution, projectFiles, declaredMembers, sharingProjects[0].Project.Name, built);
         }
 
         // A DLL path — the branch that needs no solution.
@@ -120,9 +124,10 @@ internal static class SpecResolver
     }
 
     private static SpecResolution ResolveByConvention(
-        Solution solution, IReadOnlySet<string>? declaredMembers, WorkspaceDiagnostics diagnostics)
+        Solution solution, CanonicalProjectFiles projectFiles, IReadOnlySet<string>? declaredMembers,
+        WorkspaceDiagnostics diagnostics)
     {
-        List<CanonicalProject> projects = CanonicalProjectsOf(solution);
+        List<CanonicalProject> projects = CanonicalProjectsOf(solution, projectFiles);
 
         List<SpecProjectCandidate> candidates = projects
             .Where(entry => ProjectLanguages.IsCSharp(entry.Project))
@@ -131,20 +136,21 @@ internal static class SpecResolver
                 ReferencePathsOf(entry.Project, solution),
                 entry.Project.OutputFilePath,
                 entry.Project.FilePath,
-                SpecExclusion.IsDeclaredMember(declaredMembers, entry.Project.FilePath, entry.CanonicalFilePath),
+                entry.CanonicalFilePath,
+                SpecExclusion.IsDeclaredMember(declaredMembers, projectFiles, entry.Project),
                 entry.Project.CompilationOutputInfo.AssemblyPath))
             .ToList();
 
         SpecProjectCandidate chosen = ResolveConventionProject(candidates, diagnostics);
         BuiltOutputInputs built = BuiltOutputsOfProjectFile(
-            projects, chosen.FilePath, chosen.OutputFilePath, chosen.IntermediateAssemblyPath);
-        return MemberResolution(solution, projects, declaredMembers, chosen.Name, built);
+            projects, chosen.CanonicalFilePath, chosen.OutputFilePath, chosen.IntermediateAssemblyPath);
+        return MemberResolution(solution, projectFiles, declaredMembers, chosen.Name, built);
     }
 
     // A null declaredMembers is the unreadable case, which SpecExclusion degrades to just the spec project.
     private static SpecResolution MemberResolution(
         Solution solution,
-        IReadOnlyList<CanonicalProject> projects,
+        CanonicalProjectFiles projectFiles,
         IReadOnlySet<string>? declaredMembers,
         string specProjectName,
         BuiltOutputInputs built)
@@ -154,41 +160,22 @@ internal static class SpecResolver
         return new SpecResolution(
             RequireBuiltOutput(specProjectName, evaluatedPaths, built.IntermediateAssemblyPath),
             specProjectName,
-            SpecExclusion.Compute(ExclusionProjectsOf(solution, projects), declaredMembers, specProjectName),
+            SpecExclusion.Compute(solution, projectFiles, declaredMembers, specProjectName),
             evaluatedPaths,
             built.IntermediateAssemblyPath);
     }
 
-    // The exclusion walk's view of the solution, projected off this resolution's own canonical view rather
-    // than re-derived from the workspace: the walk's membership test canonicalizes each project file, and
-    // every one of those paths is already resolved here. Calling the pure core directly is what carries the
-    // canonical spelling in — the workspace-taking overload has no view to carry.
-    private static List<SpecExclusionProject> ExclusionProjectsOf(
-        Solution solution, IReadOnlyList<CanonicalProject> projects)
-    {
-        return projects
-            .Select(entry => new SpecExclusionProject(
-                entry.Project.Name,
-                entry.Project.FilePath,
-                solution.ReferencedProjectNames(entry.Project).ToList(),
-                entry.CanonicalFilePath))
-            .ToList();
-    }
-
-    // Both sides of the scan are canonicalized exactly once: canonicalizing probes the filesystem for a
-    // reparse point per path segment, so re-resolving the needle per candidate — or the haystack per scan —
-    // costs one such walk per project in the solution, on every warm tool call.
+    // Both sides of the scan arrive canonical from the load, so the scan probes the filesystem for no project.
     private static BuiltOutputInputs BuiltOutputsOfProjectFile(
         IReadOnlyList<CanonicalProject> projects,
-        string? projectFilePath,
+        string? canonicalProjectFilePath,
         string? evaluatedOutputFilePath,
         string? evaluatedIntermediatePath)
     {
-        if (string.IsNullOrEmpty(projectFilePath))
+        if (string.IsNullOrEmpty(canonicalProjectFilePath))
             return new BuiltOutputInputs([evaluatedOutputFilePath], evaluatedIntermediatePath);
 
-        string canonicalPath = PathCanonicalizer.Resolve(projectFilePath);
-        List<CanonicalProject> sharingProjects = ProjectsSharingFile(projects, canonicalPath);
+        List<CanonicalProject> sharingProjects = ProjectsSharingFile(projects, canonicalProjectFilePath);
         return BuiltOutputsOf(sharingProjects);
     }
 
@@ -213,13 +200,12 @@ internal static class SpecResolver
         return new BuiltOutputInputs(outputFilePaths, intermediateAssemblyPath);
     }
 
-    // Every project the solution carries, beside the canonicalized spelling of its own .csproj, resolved once for
-    // the whole resolution, so every scan a resolution runs asks its question against this one view.
-    private static List<CanonicalProject> CanonicalProjectsOf(Solution solution)
+    // Every project the solution carries, beside the canonical spelling of its own .csproj the load resolved, so
+    // every scan a resolution runs asks its question against this one view.
+    private static List<CanonicalProject> CanonicalProjectsOf(Solution solution, CanonicalProjectFiles projectFiles)
     {
-        var canonicalizer = new ProjectFileCanonicalizer();
         return solution.Projects
-            .Select(project => new CanonicalProject(project, canonicalizer.Resolve(project.FilePath)))
+            .Select(project => new CanonicalProject(project, projectFiles.PathOf(project)))
             .ToList();
     }
 
@@ -335,9 +321,9 @@ internal static class SpecResolver
     // would turn genuine ambiguity green, and '\0' cannot occur in a path so the sentinel cannot collide.
     private static string GroupKey(SpecProjectCandidate candidate, int index)
     {
-        return string.IsNullOrEmpty(candidate.FilePath)
+        return string.IsNullOrEmpty(candidate.CanonicalFilePath)
             ? $"\0{index}"
-            : PathComparison.Fold(PathCanonicalizer.Resolve(candidate.FilePath));
+            : PathComparison.Fold(candidate.CanonicalFilePath);
     }
 
     // One line of the ambiguity error. The project file is what the reader has to pass to --spec, so it is

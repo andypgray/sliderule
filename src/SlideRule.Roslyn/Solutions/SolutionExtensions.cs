@@ -85,16 +85,15 @@ internal static class SolutionExtensions
     ///     </para>
     /// </remarks>
     public static (Solution Solution, IReadOnlyDictionary<ProjectId, string> TargetFrameworks)
-        NormalizeProjectNames(this Solution solution)
+        NormalizeProjectNames(this Solution solution, CanonicalProjectFiles projectFiles)
     {
-        var canonicalProjectFiles = new ProjectFileCanonicalizer();
         var byProjectFile = new Dictionary<string, List<Project>>(StringComparer.Ordinal);
         foreach (Project project in solution.Projects)
         {
             // A project with no file path cannot be grouped with anything: folding the unknown-path projects
             // together would decorate unrelated projects, and '\0' cannot occur in a path so the
             // per-project sentinel cannot collide with a real key.
-            string key = canonicalProjectFiles.Resolve(project.FilePath) is { } canonicalFile
+            string key = projectFiles.PathOf(project) is { } canonicalFile
                 ? PathComparison.Fold(canonicalFile)
                 : $"\0{project.Id.Id}";
 

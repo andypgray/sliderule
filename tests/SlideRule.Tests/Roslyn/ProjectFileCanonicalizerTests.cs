@@ -7,9 +7,10 @@ using Xunit;
 namespace SlideRule.Tests.Roslyn;
 
 /// <summary>
-///     <see cref="ProjectFileCanonicalizer" /> answers every path exactly as <see cref="PathCanonicalizer.Resolve(string)" />
-///     does, whatever its memo already holds. The tree needs a directory link and a file link, so the test skips on
-///     hosts that cannot create one (Windows without Developer Mode or elevation).
+///     <see cref="ProjectFileCanonicalizer" /> answers every path exactly as
+///     <see cref="PathCanonicalizer.Resolve(string)" /> does, whatever its memo already holds. The tree needs a
+///     directory link and a file link, so the test skips on hosts that cannot create one (Windows without Developer
+///     Mode or elevation).
 /// </summary>
 public sealed class ProjectFileCanonicalizerTests
 {
