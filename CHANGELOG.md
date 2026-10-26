@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   as it already did elsewhere, so a run writes the same bytes on every operating system. The hook's report
   on stderr and its `additionalContext` use LF too. A JSON reader sees no difference; a tool comparing raw
   bytes on Windows sees each CRLF become LF.
+- The `derive_spec` recipe's step 3 now asks each `candidate:` line for the rules the finished spec keeps,
+  or for the evidence behind a `none:` answer. A `none:` reading "not evaluated" leaves the question
+  unanswered. The example receipt no longer lists a dropped rule on a candidate line.
 
 ### Fixed
 

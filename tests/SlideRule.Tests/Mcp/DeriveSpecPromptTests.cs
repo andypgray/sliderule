@@ -71,6 +71,8 @@ public sealed class DeriveSpecPromptTests
     private static readonly Regex CandidateLine = new(
         @"^candidate: (?<label>[a-z]+) -> \S", RegexOptions.CultureInvariant);
 
+    private static readonly Regex RuleId = new(@"[a-z0-9-]+(/[a-z0-9-]+)+", RegexOptions.CultureInvariant);
+
     // A prompt call never resolves the binding (prompts read no solution/spec), so any working directory
     // serves; a real one keeps StartAsync's host build honest.
     private static McpServerBinding Binding => McpServerBindings.For(null, null);
@@ -281,6 +283,11 @@ public sealed class DeriveSpecPromptTests
         text.ShouldContain("a transcription, never a recount");
         text.ShouldContain("counts its `rules[]` by `posture`");
         text.ShouldContain("is every entry with `posture: enforce` and `status: failed`");
+
+        // A candidate line answers its question with a rule the spec keeps or the evidence that answers no. A
+        // `none:` that says the question was not looked at leaves it open.
+        text.ShouldContain("`<label> -> <kept rule IDs>`");
+        text.ShouldContain("never \"not evaluated\"");
     }
 
     [Fact]
@@ -346,10 +353,21 @@ public sealed class DeriveSpecPromptTests
             .Where(static match => match.Success)
             .Select(static match => match.Groups["label"].Value)
             .ToList();
+        HashSet<string> droppedRules = fence.Lines
+            .Where(static line => line.StartsWith("dropped: ", StringComparison.Ordinal))
+            .Select(static line => line["dropped: ".Length..].Split(':')[0])
+            .ToHashSet(StringComparer.Ordinal);
+        List<string> droppedButAnswered = fence.Lines
+            .Where(static line => CandidateLine.IsMatch(line))
+            .SelectMany(static line => RuleId.Matches(line))
+            .Select(static match => match.Value)
+            .Where(droppedRules.Contains)
+            .ToList();
 
         // Assert
         questionLabels.ShouldNotBeEmpty("step 3 should label its questions");
         answeredLabels.ShouldBe(questionLabels, "the receipt example should answer step 3's questions in order, each once");
+        droppedButAnswered.ShouldBeEmpty("a candidate line should name only rules the spec keeps, and the example drops these");
     }
 
     [Fact]

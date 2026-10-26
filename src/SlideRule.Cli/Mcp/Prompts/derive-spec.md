@@ -166,7 +166,7 @@ Then draft one candidate for each question the codebase answers yes to, and answ
 
 Build the spec. Spec-build validation reports **every** error at once (missing `Because`, malformed IDs, dangling rules, blank prose) — fix them in one pass.
 
-**Done when** the draft spec builds, every hypothesis and every stated-intent line carries a rule ID or a note saying why none, and every question above has its `candidate:` line: the rule IDs it produced, or `none:` with the survey count or statement that answers no. A spec of layering rules alone is not done while another question has no line.
+**Done when** the draft spec builds, every hypothesis and every stated-intent line carries a rule ID or a note saying why none, and every question above has its `candidate:` line: the rule IDs the spec keeps, or `none:` with the survey count or statement that answers no, never "not evaluated". A spec of layering rules alone is not done while another question has no line.
 
 ## 4. Check = the evidence pass
 
@@ -285,9 +285,9 @@ Close with a receipt in exactly this shape, one key per line, so a reader — or
 statedIntent: CONTRIBUTING.md: "Controllers never open a connection" -> data-access/no-inline-sql
 statedIntent: https://docs.example.org/developer/architecture: "the model knows nothing of the web tier" -> layering/domain-independent
 statedIntent: unread: https://wiki.example.org/design (site refused; no source repository)
-candidate: layering -> layering/domain-independent, layering/no-ghost
+candidate: layering -> layering/no-ghost
 candidate: externals -> data-access/no-inline-sql, data/legacy-sql
-candidate: naming -> naming/handlers
+candidate: naming -> none: 9 of 31 handler types end in Handler
 candidate: async -> naming/async-suffix
 candidate: cancellation -> none: 3 of 212 Task-returning methods take a CancellationToken
 candidate: members -> time/no-wall-clock
@@ -317,7 +317,7 @@ render: not run (human)
 - `leftRed:` is every entry with `posture: enforce` and `status: failed`, with its `violationCount`: the reds no baseline can hold. Each is work the team has said it is doing now, or an `undecided` rule; any other sends you back to step 5.
 - `evidencePass` reads `incomplete (failedProjects: …; restoreFailedProjects: …)` whenever that document was stamped `modelIncomplete`.
 - `statedIntent:` is the step-0 list, `<source>: "<statement>" -> <rule ID, or why none>`. Every developer-docs link appears on at least one line: as a source, as `read: <url> (no architecture stated)`, or as `unread: <url> (<why>)`.
-- `candidate:` is step 3's answers, one line per question label, every label once: `<label> -> <rule IDs>`, or `<label> -> none: <what answers no>`.
+- `candidate:` is step 3's answers, every label once: `<label> -> <kept rule IDs>`, or `<label> -> none: <the evidence>`.
 - `statedIntent`, `leftRed`, `dropped` and `undecided` repeat their key once per entry, `dropped` with the reason (opening `contested:` for a contested statement), and read `none` when there is nothing to list.
 
 The receipt keeps three claims apart — that the spec builds, that the evidence pass ran on a complete model, and that a human curated — and none implies another, so the last three lines stay as written: you stop at the gate and cannot witness your own curation, and the two write commands are the human's. Beside the receipt, list each Migrate rule's current violation count and the dragons you documented.
