@@ -73,12 +73,11 @@ public sealed class MultiTfmCheckE2ETests
     public async Task Check_MultiTargetedProject_IsStampedWithItsFrameworksAndTheWinningOne()
     {
         // Arrange
-        using var fixture = new TempFixtureWorkspace("TestSolutions/MultiTfm", "MultiTfm.sln");
         string specDll = SpecAssemblyCompiler.EmitSpecDllToFreshTemp("multi-tfm", "CoreIndependent", CoreIndependentSpec);
 
         // Act
         CliResult result = await CliRunner.InvokeAsync(
-            "check", fixture.SolutionPath, "--spec", specDll, "--json");
+            "check", FixtureBeds.MultiTfmSolution, "--spec", specDll, "--json");
 
         // Assert — the rule passed, and the stamp says what that pass covers. Both are read off the one
         // document, because the point of the stamp is that it qualifies this verdict.
@@ -87,7 +86,7 @@ public sealed class MultiTfmCheckE2ETests
 
         using JsonDocument document = result.ShouldHaveJsonStdout();
         JsonElement stamped = Stamps(document)
-            .Single();
+            .ShouldHaveSingleItem();
 
         stamped.GetProperty("project")
             .GetString()
@@ -103,20 +102,18 @@ public sealed class MultiTfmCheckE2ETests
     public async Task Check_MultiTargetedProject_LeavesTheVerdictWhole()
     {
         // Arrange
-        using var fixture = new TempFixtureWorkspace("TestSolutions/MultiTfm", "MultiTfm.sln");
         string specDll = SpecAssemblyCompiler.EmitSpecDllToFreshTemp("multi-tfm", "CoreIndependentWhole", CoreIndependentSpec);
 
         // Act
         CliResult result = await CliRunner.InvokeAsync(
-            "check", fixture.SolutionPath, "--spec", specDll, "--json");
+            "check", FixtureBeds.MultiTfmSolution, "--spec", specDll, "--json");
 
         // Assert — the stamp scopes the verdict, it never invalidates it: the model is complete, every rule
         // ran and answered, and nothing here is a load failure. Stamping modelIncomplete would tell a client
         // to distrust an answer that is entirely trustworthy about the framework it was measured against.
         using JsonDocument document = result.ShouldHaveJsonStdout();
 
-        document.RootElement.TryGetProperty("modelIncomplete", out _)
-            .ShouldBeFalse();
+        document.ShouldNotBeStampedIncomplete();
         document.RootElement.GetProperty("summary")
             .GetProperty("rulesChecked")
             .GetInt32()
@@ -144,12 +141,11 @@ public sealed class MultiTfmCheckE2ETests
     public async Task Check_BanOnAReferenceOnlyTheLosingFrameworkMakes_RedsWithTheSiteInTheSharedFile()
     {
         // Arrange
-        using var fixture = new TempFixtureWorkspace("TestSolutions/MultiTfm", "MultiTfm.sln");
         string specDll = SpecAssemblyCompiler.EmitSpecDllToFreshTemp("multi-tfm", "NoLegacy", NoLegacySpec);
 
         // Act
         CliResult result = await CliRunner.InvokeAsync(
-            "check", fixture.SolutionPath, "--spec", specDll, "--json");
+            "check", FixtureBeds.MultiTfmSolution, "--spec", specDll, "--json");
 
         // Assert — the half of the stamp a clean verdict cannot show. Widget's field of LegacyOnly is
         // netstandard2.0's alone and never reaches the model, because members follow net10.0; the reference
@@ -159,10 +155,10 @@ public sealed class MultiTfmCheckE2ETests
         result.Out.ShouldHaveSingleViolationOnEdge(NoLegacyRuleId, "reference", Widget, LegacyOnly);
 
         JsonElement site = CheckJson.Violations(result.Out, NoLegacyRuleId)
-            .Single()
+            .ShouldHaveSingleItem()
             .GetProperty("sites")
             .EnumerateArray()
-            .First();
+            .ShouldHaveSingleItem();
         site.GetProperty("file")
             .GetString()
             .ShouldNotBeNull()

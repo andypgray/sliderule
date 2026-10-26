@@ -57,10 +57,10 @@ public sealed class CheckCommandE2ETests
     {
         CliResult result = await ViolatedHuman.Value;
 
-        result.ShouldReportViolations("FAIL layering/domain-independent");
-        result.Out.ShouldContain("because: Domain is UI-agnostic; transaction boundaries live in services.");
-        result.Out.ShouldContain("fix: Define an abstraction in Domain and implement it in Web.");
-        result.Out.ShouldContain(
+        result.ShouldReportViolations(
+            "FAIL layering/domain-independent",
+            "because: Domain is UI-agnostic; transaction boundaries live in services.",
+            "fix: Define an abstraction in Domain and implement it in Web.",
             "MyApp.Domain/OrderService.cs:9 — MyApp.Domain.OrderService references MyApp.Web.HomeController");
     }
 
@@ -73,14 +73,11 @@ public sealed class CheckCommandE2ETests
         // project pair: the sentence names the family, and the edges are every reference that leaves a
         // cell for another — in both directions the solution's references actually run.
         result.ShouldReportViolations(
-            "FAIL layering/projects-independent — Each of the projects matching `MyApp.*` must not reference the others.");
-        result.Out.ShouldContain(
-            "MyApp.Domain/OrderService.cs:9 — MyApp.Domain.OrderService references MyApp.Web.HomeController");
-        result.Out.ShouldContain(
-            "MyApp.Web/InvoiceController.cs:10 — MyApp.Web.InvoiceController references MyApp.Legacy.Billing.RoundingMode");
-        // The facade path is sanctioned by the quarantine and still crosses a project boundary, so this
-        // rule reds on it — two laws over one edge, asking different questions (GRAMMAR §4.3).
-        result.Out.ShouldContain(
+            "FAIL layering/projects-independent — Each of the projects matching `MyApp.*` must not reference the others.",
+            "MyApp.Domain/OrderService.cs:9 — MyApp.Domain.OrderService references MyApp.Web.HomeController",
+            "MyApp.Web/InvoiceController.cs:10 — MyApp.Web.InvoiceController references MyApp.Legacy.Billing.RoundingMode",
+            // The facade path is sanctioned by the quarantine and still crosses a project boundary, so this
+            // rule reds on it — two laws over one edge, asking different questions (GRAMMAR §4.3).
             "MyApp.Web/HomeController.cs:17 — MyApp.Web.HomeController references MyApp.Legacy.Billing.IBillingFacade");
     }
 
@@ -93,10 +90,8 @@ public sealed class CheckCommandE2ETests
         // cross-cell ban could not say this law — only the circle is forbidden, and both its arrows are red
         // under one ID because the verb knows a circle exists and not which way it should have run.
         result.ShouldReportViolations(
-            "FAIL layering/web-cuts-not-circular — Each of the Reporting and Invoicing layers must not have circular references with the others.");
-        result.Out.ShouldContain(
-            "MyApp.Web/InvoiceCreatedHandler.cs:10 — MyApp.Web.InvoiceCreatedHandler references MyApp.Web.ReportEndpoint");
-        result.Out.ShouldContain(
+            "FAIL layering/web-cuts-not-circular — Each of the Reporting and Invoicing layers must not have circular references with the others.",
+            "MyApp.Web/InvoiceCreatedHandler.cs:10 — MyApp.Web.InvoiceCreatedHandler references MyApp.Web.ReportEndpoint",
             "MyApp.Web/ReportEndpoint.cs:23 — MyApp.Web.ReportEndpoint references MyApp.Web.InvoiceService");
     }
 
@@ -119,11 +114,11 @@ public sealed class CheckCommandE2ETests
     {
         CliResult result = await ViolatedHuman.Value;
 
-        result.ShouldReportViolations();
-        // HomeController's DataTable is new code in the old pattern — red.
-        result.Out.ShouldContain("FAIL data-access/no-inline-sql");
-        result.Out.ShouldContain("MyApp.Web/HomeController.cs:24 — MyApp.Web.HomeController references System.Data.DataTable");
-        result.Out.ShouldContain("grandfathered: 1 (baselined; run 'sliderule status' for burndown)");
+        result.ShouldReportViolations(
+            // HomeController's DataTable is new code in the old pattern — red.
+            "FAIL data-access/no-inline-sql",
+            "MyApp.Web/HomeController.cs:24 — MyApp.Web.HomeController references System.Data.DataTable",
+            "grandfathered: 1 (baselined; run 'sliderule status' for burndown)");
         // InvoiceController's DataTable is grandfathered by the conventional baseline — suppressed, not red.
         result.Out.ShouldNotContain("MyApp.Web.InvoiceController references System.Data.DataTable");
     }
@@ -133,13 +128,12 @@ public sealed class CheckCommandE2ETests
     {
         CliResult result = await ViolatedHuman.Value;
 
-        result.ShouldReportViolations();
-        // The member-use half of the report (GRAMMAR §4.5): the layer-voice sentence, a 'uses' line per banned
-        // read at its file:line, and — uncaptured member-level Migrate — the same init hint as any ratcheted rule.
-        result.Out.ShouldContain("FAIL time/inject-clock — The Web layer must not use `DateTime.Now` or `DateTime.UtcNow`.");
-        result.Out.ShouldContain("MyApp.Web/HomeController.cs:32 — MyApp.Web.HomeController uses System.DateTime.Now");
-        result.Out.ShouldContain("MyApp.Web/HomeController.cs:37 — MyApp.Web.HomeController uses System.DateTime.UtcNow");
-        result.Out.ShouldContain(
+        result.ShouldReportViolations(
+            // The member-use half of the report (GRAMMAR §4.5): the layer-voice sentence, a 'uses' line per banned
+            // read at its file:line, and — uncaptured member-level Migrate — the same init hint as any ratcheted rule.
+            "FAIL time/inject-clock — The Web layer must not use `DateTime.Now` or `DateTime.UtcNow`.",
+            "MyApp.Web/HomeController.cs:32 — MyApp.Web.HomeController uses System.DateTime.Now",
+            "MyApp.Web/HomeController.cs:37 — MyApp.Web.HomeController uses System.DateTime.UtcNow",
             "hint: no baseline captured for this rule; run 'sliderule baseline init' to grandfather existing violations");
     }
 
@@ -148,24 +142,21 @@ public sealed class CheckCommandE2ETests
     {
         CliResult result = await ViolatedHuman.Value;
 
-        result.ShouldReportViolations();
-        // Uncaptured containment (its baseline path is deliberately uncommitted) → interior refs are hard red.
-        result.Out.ShouldContain("FAIL legacy/billing/containment");
-        result.Out.ShouldContain(
-            "MyApp.Web/InvoiceController.cs:9 — MyApp.Web.InvoiceController references MyApp.Legacy.Billing.BillingCalculator");
-        result.Out.ShouldContain("fix: use `IBillingFacade`");
-        result.Out.ShouldContain(
-            "hint: no baseline captured for this rule; run 'sliderule baseline init' to grandfather existing violations");
+        result.ShouldReportViolations(
+            // Uncaptured containment (its baseline path is deliberately uncommitted) → interior refs are hard red.
+            "FAIL legacy/billing/containment",
+            "MyApp.Web/InvoiceController.cs:9 — MyApp.Web.InvoiceController references MyApp.Legacy.Billing.BillingCalculator",
+            "fix: use `IBillingFacade`",
+            "hint: no baseline captured for this rule; run 'sliderule baseline init' to grandfather existing violations",
+            // The tripwire skips without a --diff-base.
+            "skip legacy/billing/tripwire",
+            "skipped: Tripwire: no diff context — run 'sliderule check --diff-base <ref>' to check changed files against this quarantined scope.");
         // The facade path (HomeController → IBillingFacade) is the sanctioned surface, so it is absent from
         // THIS rule's violations — read off the document rather than off the whole report, because
         // layering/projects-independent reds on the very same edge asking a different question (GRAMMAR §4.3).
         CliResult json = await ViolatedJson.Value;
         json.Out.ShouldHaveFailedWith("legacy/billing/containment", "target",
             ["MyApp.Legacy.Billing.BillingCalculator", "MyApp.Legacy.Billing.RoundingMode"]);
-        // The tripwire skips without a --diff-base.
-        result.Out.ShouldContain("skip legacy/billing/tripwire");
-        result.Out.ShouldContain(
-            "skipped: Tripwire: no diff context — run 'sliderule check --diff-base <ref>' to check changed files against this quarantined scope.");
     }
 
     [Fact]
@@ -192,13 +183,11 @@ public sealed class CheckCommandE2ETests
     {
         CliResult result = await ViolatedHuman.Value;
 
-        result.ShouldReportViolations();
-        // The catch half of the report (GRAMMAR §4.8): the caught-type sentence, a 'catches' line at the
-        // catch site's file:line, and — uncaptured catch-level Migrate — the same init hint as any ratcheted rule.
-        result.Out.ShouldContain("FAIL exceptions/no-general-catch — The Web layer must not catch `Exception`.");
-        result.Out.ShouldContain(
-            "MyApp.Web/ReportEndpoint.cs:15 — MyApp.Web.ReportEndpoint catches System.Exception");
-        result.Out.ShouldContain(
+        result.ShouldReportViolations(
+            // The catch half of the report (GRAMMAR §4.8): the caught-type sentence, a 'catches' line at the
+            // catch site's file:line, and — uncaptured catch-level Migrate — the same init hint as any ratcheted rule.
+            "FAIL exceptions/no-general-catch — The Web layer must not catch `Exception`.",
+            "MyApp.Web/ReportEndpoint.cs:15 — MyApp.Web.ReportEndpoint catches System.Exception",
             "hint: no baseline captured for this rule; run 'sliderule baseline init' to grandfather existing violations");
     }
 
@@ -207,11 +196,10 @@ public sealed class CheckCommandE2ETests
     {
         CliResult result = await ViolatedHuman.Value;
 
-        result.ShouldReportViolations();
-        // The throw half of the report (GRAMMAR §4.8): a strict Enforce allow-list. OrderApproval's BCL throw
-        // is red at its site; its sanctioned OrderRuleViolation throw is green — allowed, so never listed.
-        result.Out.ShouldContain("FAIL exceptions/domain-throws-domain — The Domain layer must throw only `OrderRuleViolation`.");
-        result.Out.ShouldContain(
+        result.ShouldReportViolations(
+            // The throw half of the report (GRAMMAR §4.8): a strict Enforce allow-list. OrderApproval's BCL throw
+            // is red at its site; its sanctioned OrderRuleViolation throw is green — allowed, so never listed.
+            "FAIL exceptions/domain-throws-domain — The Domain layer must throw only `OrderRuleViolation`.",
             "MyApp.Domain/OrderApproval.cs:17 — MyApp.Domain.OrderApproval throws System.InvalidOperationException");
         result.Out.ShouldNotContain("throws MyApp.Domain.OrderRuleViolation");
     }
@@ -221,16 +209,13 @@ public sealed class CheckCommandE2ETests
     {
         CliResult result = await ViolatedHuman.Value;
 
-        result.ShouldReportViolations();
-        // The filter-aware catch half of the report (GRAMMAR §4.8): a union subject speaks in union voice, and
-        // the rule reads the sites extraction recorded as unfiltered. ReportEndpoint's and ReportPublisher's
-        // blanket catches spell no `when` filter, so both are red at the very sites exceptions/no-general-catch
-        // reds — a second rule over the same two edges, each with its own identity.
-        result.Out.ShouldContain(
-            "FAIL exceptions/no-unfiltered-catch — The Web or Domain layers must not catch `Exception` without a `when` filter.");
-        result.Out.ShouldContain(
-            "MyApp.Web/ReportEndpoint.cs:15 — MyApp.Web.ReportEndpoint catches System.Exception");
-        result.Out.ShouldContain(
+        result.ShouldReportViolations(
+            // The filter-aware catch half of the report (GRAMMAR §4.8): a union subject speaks in union voice, and
+            // the rule reads the sites extraction recorded as unfiltered. ReportEndpoint's and ReportPublisher's
+            // blanket catches spell no `when` filter, so both are red at the very sites exceptions/no-general-catch
+            // reds — a second rule over the same two edges, each with its own identity.
+            "FAIL exceptions/no-unfiltered-catch — The Web or Domain layers must not catch `Exception` without a `when` filter.",
+            "MyApp.Web/ReportEndpoint.cs:15 — MyApp.Web.ReportEndpoint catches System.Exception",
             "MyApp.Web/ReportPublisher.cs:22 — MyApp.Web.ReportPublisher catches System.Exception");
         // The green half, stated as an absence: RetryPolicy catches the identical type under the identical
         // subject, and its `when` filter keeps it out of the evidence entirely — no site line, no mention.
@@ -258,17 +243,14 @@ public sealed class CheckCommandE2ETests
     {
         CliResult result = await ViolatedHuman.Value;
 
-        result.ShouldReportViolations();
-        // The ban polarity beside the allow-list (GRAMMAR §4.8): two rules red at the SAME throw site, each with
-        // its own identity. The 'throws' evidence line is shared text with exceptions/domain-throws-domain, so
-        // what tells the two blocks apart is the prose — this rule names the one type it bans, not the set it
-        // permits — and those are the pins.
-        result.Out.ShouldContain(
-            "FAIL exceptions/no-bare-bcl-throw — The Domain layer must not throw `InvalidOperationException`.");
-        result.Out.ShouldContain(
-            "because: InvalidOperationException tells a caller nothing it can dispatch on; the domain has its own exception for rule failures.");
-        result.Out.ShouldContain("fix: Throw OrderRuleViolation instead of System.InvalidOperationException.");
-        result.Out.ShouldContain(
+        result.ShouldReportViolations(
+            // The ban polarity beside the allow-list (GRAMMAR §4.8): two rules red at the SAME throw site, each with
+            // its own identity. The 'throws' evidence line is shared text with exceptions/domain-throws-domain, so
+            // what tells the two blocks apart is the prose — this rule names the one type it bans, not the set it
+            // permits — and those are the pins.
+            "FAIL exceptions/no-bare-bcl-throw — The Domain layer must not throw `InvalidOperationException`.",
+            "because: InvalidOperationException tells a caller nothing it can dispatch on; the domain has its own exception for rule failures.",
+            "fix: Throw OrderRuleViolation instead of System.InvalidOperationException.",
             "MyApp.Domain/OrderApproval.cs:17 — MyApp.Domain.OrderApproval throws System.InvalidOperationException");
     }
 
@@ -277,17 +259,14 @@ public sealed class CheckCommandE2ETests
     {
         CliResult result = await ViolatedHuman.Value;
 
-        result.ShouldReportViolations();
-        // The exposure half of the report (GRAMMAR §4.9): the layer-voice sentence, an 'exposes' line per public
-        // signature that surfaces the banned type, and — uncaptured Migrate — the same init hint as any ratcheted
-        // rule. Both controllers red: InvoiceController is grandfathered for its DataTable *reference* under
-        // data-access/no-inline-sql, but baselines are per-rule, so the byte-identical exposure edge reds here.
-        result.Out.ShouldContain("FAIL api/return-dtos — The Web layer must not expose `DataTable`.");
-        result.Out.ShouldContain(
-            "MyApp.Web/HomeController.cs:24 — MyApp.Web.HomeController exposes System.Data.DataTable");
-        result.Out.ShouldContain(
-            "MyApp.Web/InvoiceController.cs:14 — MyApp.Web.InvoiceController exposes System.Data.DataTable");
-        result.Out.ShouldContain(
+        result.ShouldReportViolations(
+            // The exposure half of the report (GRAMMAR §4.9): the layer-voice sentence, an 'exposes' line per public
+            // signature that surfaces the banned type, and — uncaptured Migrate — the same init hint as any ratcheted
+            // rule. Both controllers red: InvoiceController is grandfathered for its DataTable *reference* under
+            // data-access/no-inline-sql, but baselines are per-rule, so the byte-identical exposure edge reds here.
+            "FAIL api/return-dtos — The Web layer must not expose `DataTable`.",
+            "MyApp.Web/HomeController.cs:24 — MyApp.Web.HomeController exposes System.Data.DataTable",
+            "MyApp.Web/InvoiceController.cs:14 — MyApp.Web.InvoiceController exposes System.Data.DataTable",
             "hint: no baseline captured for this rule; run 'sliderule baseline init' to grandfather existing violations");
     }
 
@@ -426,12 +405,12 @@ public sealed class CheckCommandE2ETests
 
         // Act
         using JsonDocument document = result.ShouldHaveJsonStdout();
-        JsonElement passing = document.RootElement.GetProperty("rules")
-            .EnumerateArray()
-            .First(rule => rule.GetProperty("status")
-                .GetString() == "passed");
+        JsonElement passing = CheckJson.Rule(document, "layering/billing-independent");
 
         // Assert
+        passing.GetProperty("status")
+            .GetString()
+            .ShouldBe("passed");
         passing.TryGetProperty("violations", out _)
             .ShouldBeFalse();
         passing.GetProperty("violationCount")
@@ -557,8 +536,7 @@ public sealed class CheckCommandE2ETests
 
         // Assert
         skeleton.ShouldReportViolations();
-        skeleton.Out.NormalizedTrimmed()
-            .ShouldBe(plain.Out.NormalizedTrimmed());
+        skeleton.ShouldPrint(plain.Out);
     }
 
     [Fact]

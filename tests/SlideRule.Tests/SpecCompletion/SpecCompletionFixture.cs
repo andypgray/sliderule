@@ -149,14 +149,14 @@ public sealed class SpecCompletionFixture : IDisposable
         .ToArray();
 
     /// <summary>What a spec project compiles against: the test host's own set, plus the contract.</summary>
-    private static readonly ImmutableArray<MetadataReference> References = SpecSnippet.Less(BuiltHere);
+    private static readonly ImmutableArray<MetadataReference> References = TrustedPlatform.Less(BuiltHere);
 
     /// <summary>
     ///     The same set with the contract taken out, which is every project in an estate that has no spec in
     ///     it.
     /// </summary>
     private static readonly ImmutableArray<MetadataReference> WithoutTheContract =
-        SpecSnippet.Less([.. BuiltHere, ContractFile]);
+        TrustedPlatform.Less([.. BuiltHere, ContractFile]);
 
     private static readonly HostServices Host =
         MefHostServices.Create(MefHostServices.DefaultAssemblies.Add(typeof(SpecSlotCompletionProvider).Assembly));

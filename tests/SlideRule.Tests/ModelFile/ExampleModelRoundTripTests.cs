@@ -32,16 +32,7 @@ namespace SlideRule.Tests.ModelFile;
 public sealed class ExampleModelRoundTripTests
 {
     /// <summary>Every example solution on disk, one row each.</summary>
-    public static TheoryData<string> Examples
-    {
-        get
-        {
-            TheoryData<string> data = new();
-            foreach (ExampleSolution example in ExampleSolutions.Discovered()) data.Add(example.Name);
-
-            return data;
-        }
-    }
+    public static TheoryData<string> Examples => [.. ExampleSolutions.Discovered().Select(example => example.Name)];
 
     [Theory]
     [MemberData(nameof(Examples))]
@@ -53,8 +44,7 @@ public sealed class ExampleModelRoundTripTests
             .ShouldNotBeNull($"{name} has no spec project, which the inventory below reports in full.");
         ExampleBuilds.SkipUnlessBuilt(example, "this pin");
 
-        SpecfulCodebase extracted = await SpecfulCodebase.ExtractAsync(
-            example.SolutionPath, spec: null, example.SolutionDirectory, Ct);
+        SpecfulCodebase extracted = await ExampleCodebase.Of(example);
 
         ArchitectureModel model = extracted.Model;
         BaselineIndex baselines = BaselineStore.LoadForModel(model, example.SolutionDirectory);

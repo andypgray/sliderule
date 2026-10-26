@@ -1,4 +1,5 @@
 using Shouldly;
+using SlideRule.Baselines;
 using SlideRule.Checking;
 using SlideRule.Tests.Cli;
 using SlideRule.Tests.Extraction;
@@ -29,7 +30,8 @@ public sealed class WalkthroughReplayTests
     public static TheoryData<string> Scenarios => new(WalkthroughScenarios.All.Select(static scenario => scenario.Key));
 
     /// <summary>Every example, one row each.</summary>
-    public static TheoryData<string> Examples => new(WalkthroughScenarios.Examples);
+    public static TheoryData<string> Examples => new(ExampleSolutions.Discovered()
+        .Select(static example => example.Name));
 
     [Theory]
     [MemberData(nameof(ReplayedFences))]
@@ -80,22 +82,16 @@ public sealed class WalkthroughReplayTests
     {
         // Arrange
         SkipUnlessBuilt(example);
-        ExampleRun run = await ExampleReplay.RunOf(example);
-        string solution = ExampleSolutions.Named(example)
-            .SolutionPath;
 
         // Act
-        CliResult check = await CliRunner.InvokeAsync("check", solution, "--no-cache");
-        CliResult status = await CliRunner.InvokeAsync("status", solution, "--no-cache");
+        ExampleRun run = await ExampleReplay.RunOf(example);
 
         // Assert — the replay extracts the committed tree as the verbs do.
         run.Committed.ShouldModelTheSameAs(run.Governed);
-        check.ShouldSucceed();
-        check.Out.NormalizedLines()
-            .ShouldBe($"{run.Tree.Report}\n");
-        status.ShouldSucceed();
-        status.Out.NormalizedLines()
-            .ShouldBe($"{string.Join("\n", run.Tree.StatusLines)}\n");
+        run.CheckVerb.ShouldSucceed()
+            .ShouldPrintVerbatim($"{run.Tree.Report}\n");
+        run.StatusVerb.ShouldSucceed()
+            .ShouldPrintVerbatim($"{string.Join("\n", run.Tree.StatusLines)}\n");
     }
 
     /// <summary>
@@ -109,7 +105,7 @@ public sealed class WalkthroughReplayTests
         // Arrange
         SkipUnlessBuilt(WalkthroughScenarios.Meridian);
         ExampleRun run = await ExampleReplay.RunOf(WalkthroughScenarios.Meridian);
-        string baselines = Path.Combine(run.SolutionDirectory, ExampleSolutions.ArchDirectory, "baselines");
+        string baselines = Path.Combine([run.SolutionDirectory, .. BaselineConventions.ConventionalRoot.Split('/')]);
 
         // Act
         Dictionary<string, byte[]> committed = Directory.EnumerateFiles(baselines, "*", SearchOption.AllDirectories)

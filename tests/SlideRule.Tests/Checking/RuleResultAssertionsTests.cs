@@ -109,6 +109,13 @@ public sealed class RuleResultAssertionsTests
     [InlineData("subjects")]
     [InlineData("including")]
     [InlineData("edgesAtSites")]
+    [InlineData("detailedEdges")]
+    [InlineData("projectSubjects")]
+    [InlineData("memberSubjects")]
+    [InlineData("baselineIdentities")]
+    [InlineData("grandfatheredEntries")]
+    [InlineData("partlyInertOperands")]
+    [InlineData("deadExemplars")]
     public void EveryCollectionVerb_EmptyExpectation_Reds(string verb)
     {
         // An empty expectation is a silent total pass — a rule red on some other kind satisfies both the
@@ -119,8 +126,16 @@ public sealed class RuleResultAssertionsTests
         {
             "edges" => () => result.ShouldHaveFailedWithEdges(ViolationKind.Catch, []),
             "subjects" => () => result.ShouldHaveFailedWithSubjects([]),
+            "including" => () => result.ShouldHaveFailedWithEdgesIncluding(ViolationKind.Catch),
             "edgesAtSites" => () => result.ShouldHaveFailedWithEdgesAtSites(ViolationKind.Catch, []),
-            _ => () => result.ShouldHaveFailedWithEdgesIncluding(ViolationKind.Catch)
+            "detailedEdges" => () => result.ShouldHaveFailedWithDetailedEdges(ViolationKind.Catch, []),
+            "projectSubjects" => () => result.ShouldHaveFailedWithProjectSubjects([]),
+            "memberSubjects" => () => result.ShouldHaveFailedWithMemberSubjects([]),
+            "baselineIdentities" => () => result.ShouldHaveBaselineIdentities([]),
+            "grandfatheredEntries" => () => result.ShouldHaveGrandfatheredEntries([]),
+            "partlyInertOperands" => () => result.ShouldHaveWarnedPartlyInertOnOperands([]),
+            "deadExemplars" => () => result.ShouldHaveWarnedDeadExemplars(),
+            _ => throw new ArgumentOutOfRangeException(nameof(verb), verb, "No collection verb has this name.")
         };
 
         Should.Throw<ShouldAssertException>(assertion);
@@ -205,9 +220,6 @@ public sealed class RuleResultAssertionsTests
 
     private static RuleResult Caught(CodebaseModel codebase)
     {
-        return Checker.Run(codebase, arch => arch.Rule("ex/no-catch")
-                .Enforce(arch.Namespace("App.*").MustNotCatch(arch.Namespace("Errors.*")))
-                .Because("b"))
-            .Single();
+        return Checker.Verdict(codebase, arch => arch.Namespace("App.*").MustNotCatch(arch.Namespace("Errors.*")));
     }
 }

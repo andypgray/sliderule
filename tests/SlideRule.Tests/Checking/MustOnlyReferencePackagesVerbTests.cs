@@ -40,21 +40,16 @@ public sealed class MustOnlyReferencePackagesVerbTests
     {
         // The backports match, one of them only ignoring case, and the analyzer is private: the one package the
         // rule objects to is the one on line 11.
-        Checker.Run(Scene, arch => arch.Rule("packaging/backports-only")
-                .Enforce(arch.Projects.Named("Console").MustOnlyReferencePackages("Microsoft.Bcl.*", "System.Memory"))
-                .Because("b"))
-            .Single()
+        Checker.Verdict(Scene, arch => arch.Projects.Named("Console")
+                .MustOnlyReferencePackages("Microsoft.Bcl.*", "System.Memory"))
             .ShouldHaveFailedWithProjectAtSites("Console -> Wcwidth", ["src/Console/Console.csproj:11"]);
     }
 
     [Fact]
     public void MustOnlyReferencePackages_EveryPackageListedOrPrivate_PassesClean()
     {
-        Checker.Run(Scene, arch => arch.Rule("packaging/console-deps")
-                .Enforce(arch.Projects.Named("Console")
-                    .MustOnlyReferencePackages("Microsoft.Bcl.*", "System.Memory", "Wcwidth"))
-                .Because("b"))
-            .Single()
+        Checker.Verdict(Scene, arch => arch.Projects.Named("Console")
+                .MustOnlyReferencePackages("Microsoft.Bcl.*", "System.Memory", "Wcwidth"))
             .ShouldHavePassedClean();
     }
 
@@ -63,20 +58,14 @@ public sealed class MustOnlyReferencePackagesVerbTests
     {
         // A pattern that matches nothing the project declares is not a finding: the private build tool passes,
         // and nothing reports that no backport is referenced at all.
-        Checker.Run(Scene, arch => arch.Rule("packaging/backports-only")
-                .Enforce(arch.Projects.Named("Contract").MustOnlyReferencePackages("Microsoft.Bcl.*"))
-                .Because("b"))
-            .Single()
+        Checker.Verdict(Scene, arch => arch.Projects.Named("Contract").MustOnlyReferencePackages("Microsoft.Bcl.*"))
             .ShouldHavePassedClean();
     }
 
     [Fact]
     public void MustOnlyReferencePackages_ProjectNothingEvaluated_PassesClean()
     {
-        Checker.Run(Scene, arch => arch.Rule("packaging/backports-only")
-                .Enforce(arch.Projects.Named("Unevaluated").MustOnlyReferencePackages("Microsoft.Bcl.*"))
-                .Because("b"))
-            .Single()
+        Checker.Verdict(Scene, arch => arch.Projects.Named("Unevaluated").MustOnlyReferencePackages("Microsoft.Bcl.*"))
             .ShouldHavePassedClean();
     }
 
@@ -85,10 +74,8 @@ public sealed class MustOnlyReferencePackagesVerbTests
     {
         // The identifier is keyed as the project declares it, so a captured baseline blesses the packages it saw;
         // the report orders them ordinally, which puts the lower-case spelling last.
-        RuleResult result = Checker.Run(Scene, arch => arch.Rule("packaging/memory-only")
-                .Enforce(arch.Projects.Named("Console").MustOnlyReferencePackages("System.Memory"))
-                .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(Scene, arch => arch.Projects.Named("Console")
+            .MustOnlyReferencePackages("System.Memory"));
 
         result.ShouldHaveBaselineIdentities(
         [
@@ -101,10 +88,8 @@ public sealed class MustOnlyReferencePackagesVerbTests
     public void MustOnlyReferencePackages_PatternWithoutAWildcard_MatchesTheWholeIdentifierOnly()
     {
         // A literal pattern is an identifier, not a prefix: `System` does not permit `System.Memory`.
-        Checker.Run(Scene, arch => arch.Rule("packaging/system-only")
-                .Enforce(arch.Projects.Named("Console").MustOnlyReferencePackages("System", "Microsoft.Bcl.*", "Wcwidth"))
-                .Because("b"))
-            .Single()
+        Checker.Verdict(Scene, arch => arch.Projects.Named("Console")
+                .MustOnlyReferencePackages("System", "Microsoft.Bcl.*", "Wcwidth"))
             .ShouldHaveFailedWithProjectAtSites("Console -> System.Memory", ["src/Console/Console.csproj:10"]);
     }
 }

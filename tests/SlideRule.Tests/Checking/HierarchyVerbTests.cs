@@ -38,11 +38,8 @@ public sealed class HierarchyVerbTests
     [Fact]
     public void Implementing_NonGenericInterface_SelectsImplementer()
     {
-        RuleResult result = Checker.Run(Model, arch =>
-                arch.Rule("h/x")
-                    .Enforce(arch.Types.Implementing(typeof(IThing)).MustHavePrefix("Widget"))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(Model, arch => arch.Types.Implementing(typeof(IThing))
+            .MustHavePrefix("Widget"));
 
         result.ShouldHavePassed();
     }
@@ -93,16 +90,10 @@ public sealed class HierarchyVerbTests
     public void MustNotImplement_ClosedGenericAnchor_RedsOnlyThatConstruction()
     {
         // typeof(IHandler<Order>) reds OrderHandler (that construction) but not TextHandler (IHandler<string>).
-        Checker.Run(Model, arch => arch.Rule("h/x")
-                .Enforce(arch.Types.WithPrefix("OrderHandler").MustNotImplement(typeof(IHandler<Order>)))
-                .Because("b"))
-            .Single()
+        Checker.Verdict(Model, arch => arch.Types.WithPrefix("OrderHandler").MustNotImplement(typeof(IHandler<Order>)))
             .ShouldHaveFailedWithSubjects([$"{T}OrderHandler"]);
 
-        Checker.Run(Model, arch => arch.Rule("h/x")
-                .Enforce(arch.Types.WithPrefix("TextHandler").MustNotImplement(typeof(IHandler<Order>)))
-                .Because("b"))
-            .Single()
+        Checker.Verdict(Model, arch => arch.Types.WithPrefix("TextHandler").MustNotImplement(typeof(IHandler<Order>)))
             .ShouldHavePassed();
     }
 
@@ -110,16 +101,10 @@ public sealed class HierarchyVerbTests
     public void MustNotImplement_OpenGenericAnchor_RedsEveryConstruction()
     {
         // typeof(IHandler<>) reds every construction — both OrderHandler and TextHandler.
-        Checker.Run(Model, arch => arch.Rule("h/x")
-                .Enforce(arch.Types.WithPrefix("OrderHandler").MustNotImplement(typeof(IHandler<>)))
-                .Because("b"))
-            .Single()
+        Checker.Verdict(Model, arch => arch.Types.WithPrefix("OrderHandler").MustNotImplement(typeof(IHandler<>)))
             .ShouldHaveFailedWithSubjects([$"{T}OrderHandler"]);
 
-        Checker.Run(Model, arch => arch.Rule("h/x")
-                .Enforce(arch.Types.WithPrefix("TextHandler").MustNotImplement(typeof(IHandler<>)))
-                .Because("b"))
-            .Single()
+        Checker.Verdict(Model, arch => arch.Types.WithPrefix("TextHandler").MustNotImplement(typeof(IHandler<>)))
             .ShouldHaveFailedWithSubjects([$"{T}TextHandler"]);
     }
 
@@ -130,10 +115,7 @@ public sealed class HierarchyVerbTests
     {
         // WidgetChild : Widget : IThing — an interface reached through a base class still reds the ban (the
         // negative reads the full interface closure, exactly like the positive matcher).
-        Checker.Run(TransitiveModel, arch => arch.Rule("h/x")
-                .Enforce(arch.Types.WithPrefix("WidgetChild").MustNotImplement(typeof(IThing)))
-                .Because("b"))
-            .Single()
+        Checker.Verdict(TransitiveModel, arch => arch.Types.WithPrefix("WidgetChild").MustNotImplement(typeof(IThing)))
             .ShouldHaveFailedWithSubjects([$"{T}WidgetChild"]);
     }
 
@@ -142,10 +124,8 @@ public sealed class HierarchyVerbTests
     {
         // SubstHandler : HandlerBase<Order> where HandlerBase<T> : IHandler<T> — the substituted IHandler<Order>
         // reds MustNotImplement(typeof(IHandler<Order>)) (the §5.2 substitution example, negated).
-        Checker.Run(TransitiveModel, arch => arch.Rule("h/x")
-                .Enforce(arch.Types.WithPrefix("SubstHandler").MustNotImplement(typeof(IHandler<Order>)))
-                .Because("b"))
-            .Single()
+        Checker.Verdict(TransitiveModel, arch => arch.Types.WithPrefix("SubstHandler")
+                .MustNotImplement(typeof(IHandler<Order>)))
             .ShouldHaveFailedWithSubjects([$"{T}SubstHandler"]);
     }
 
@@ -154,16 +134,12 @@ public sealed class HierarchyVerbTests
     {
         // Attributes are declared-only (§5.2): [Mark] on AttrBase reds it, but AttrDerived : AttrBase does not
         // inherit the attribute, so the ban silently passes for the derived type.
-        Checker.Run(TransitiveModel, arch => arch.Rule("h/x")
-                .Enforce(arch.Types.WithPrefix("AttrBase").MustNotBeAttributedWith(typeof(MarkAttribute)))
-                .Because("b"))
-            .Single()
+        Checker.Verdict(TransitiveModel, arch => arch.Types.WithPrefix("AttrBase")
+                .MustNotBeAttributedWith(typeof(MarkAttribute)))
             .ShouldHaveFailedWithSubjects([$"{T}AttrBase"]);
 
-        Checker.Run(TransitiveModel, arch => arch.Rule("h/x")
-                .Enforce(arch.Types.WithPrefix("AttrDerived").MustNotBeAttributedWith(typeof(MarkAttribute)))
-                .Because("b"))
-            .Single()
+        Checker.Verdict(TransitiveModel, arch => arch.Types.WithPrefix("AttrDerived")
+                .MustNotBeAttributedWith(typeof(MarkAttribute)))
             .ShouldHavePassed();
     }
 
@@ -194,14 +170,9 @@ public sealed class HierarchyVerbTests
     {
         // The stated honesty boundary: a constructed spelling names no definition, so it matches nothing —
         // and the empty subject fails the rule loudly (GRAMMAR §4.1) rather than passing vacuously.
-        RuleResult result = Checker.Run(GenericAttributeModel, arch =>
-                arch.Rule("h/x")
-                    .Enforce(arch.Types.AttributedWith($"{T}MarkAttribute<System.Int32>").MustHavePrefix("ZZZ"))
-                    .Because("b"))
-            .Single();
-
-        result.Violations.ShouldHaveSingleItem()
-            .Kind.ShouldBe(ViolationKind.EmptySubject);
+        Checker.Verdict(GenericAttributeModel, arch => arch.Types.AttributedWith($"{T}MarkAttribute<System.Int32>")
+                .MustHavePrefix("ZZZ"))
+            .ShouldHaveFailedWithDetail(ViolationKind.EmptySubject, ConstraintEvaluator.EmptySubjectMessage);
     }
 
     [Fact]
@@ -209,16 +180,12 @@ public sealed class HierarchyVerbTests
     {
         // Definition string vs constructed spelling on one subject: the first reds TaggedInt, the second —
         // naming a construction rather than a definition — silently passes.
-        Checker.Run(GenericAttributeModel, arch => arch.Rule("h/x")
-                .Enforce(arch.Types.WithPrefix("TaggedInt").MustNotBeAttributedWith($"{T}MarkAttribute<T>"))
-                .Because("b"))
-            .Single()
+        Checker.Verdict(GenericAttributeModel, arch => arch.Types.WithPrefix("TaggedInt")
+                .MustNotBeAttributedWith($"{T}MarkAttribute<T>"))
             .ShouldHaveFailedWithSubjects([$"{T}TaggedInt"]);
 
-        Checker.Run(GenericAttributeModel, arch => arch.Rule("h/x")
-                .Enforce(arch.Types.WithPrefix("TaggedInt").MustNotBeAttributedWith($"{T}MarkAttribute<System.Int32>"))
-                .Because("b"))
-            .Single()
+        Checker.Verdict(GenericAttributeModel, arch => arch.Types.WithPrefix("TaggedInt")
+                .MustNotBeAttributedWith($"{T}MarkAttribute<System.Int32>"))
             .ShouldHavePassed();
     }
 
@@ -227,18 +194,12 @@ public sealed class HierarchyVerbTests
     {
         // None-of over a homogeneous string list: TaggedPlain carries only [Plain], and the list reds it
         // through the second anchor.
-        Checker.Run(GenericAttributeModel, arch => arch.Rule("h/x")
-                .Enforce(arch.Types.WithPrefix("TaggedPlain")
-                    .MustNotBeAttributedWith($"{T}MarkAttribute<T>", $"{T}PlainAttribute"))
-                .Because("b"))
-            .Single()
+        Checker.Verdict(GenericAttributeModel, arch => arch.Types.WithPrefix("TaggedPlain")
+                .MustNotBeAttributedWith($"{T}MarkAttribute<T>", $"{T}PlainAttribute"))
             .ShouldHaveFailedWithSubjects([$"{T}TaggedPlain"]);
 
-        Checker.Run(GenericAttributeModel, arch => arch.Rule("h/x")
-                .Enforce(arch.Types.WithPrefix("Untagged")
-                    .MustNotBeAttributedWith($"{T}MarkAttribute<T>", $"{T}PlainAttribute"))
-                .Because("b"))
-            .Single()
+        Checker.Verdict(GenericAttributeModel, arch => arch.Types.WithPrefix("Untagged")
+                .MustNotBeAttributedWith($"{T}MarkAttribute<T>", $"{T}PlainAttribute"))
             .ShouldHavePassed();
     }
 
@@ -262,14 +223,8 @@ public sealed class HierarchyVerbTests
         // The stated honesty boundary, in interface position: a constructed spelling names no definition, so
         // it matches nothing — and the empty subject fails the rule loudly (GRAMMAR §4.1). This is the one
         // place the string form is deliberately WEAKER than its typeof twin, which can name a construction.
-        RuleResult result = Checker.Run(Model, arch =>
-                arch.Rule("h/x")
-                    .Enforce(arch.Types.Implementing($"{T}IHandler<{T}Order>").MustHavePrefix("ZZZ"))
-                    .Because("b"))
-            .Single();
-
-        result.Violations.ShouldHaveSingleItem()
-            .Kind.ShouldBe(ViolationKind.EmptySubject);
+        Checker.Verdict(Model, arch => arch.Types.Implementing($"{T}IHandler<{T}Order>").MustHavePrefix("ZZZ"))
+            .ShouldHaveFailedWithDetail(ViolationKind.EmptySubject, ConstraintEvaluator.EmptySubjectMessage);
     }
 
     [Fact]
@@ -284,22 +239,15 @@ public sealed class HierarchyVerbTests
     {
         // None-of over a homogeneous string list: Widget implements only IThing, and the list reds it
         // through the first anchor; OrderHandler through the second.
-        Checker.Run(Model, arch => arch.Rule("h/x")
-                .Enforce(arch.Types.WithPrefix("Widget").MustNotImplement($"{T}IThing", $"{T}IHandler<T>"))
-                .Because("b"))
-            .Single()
+        Checker.Verdict(Model, arch => arch.Types.WithPrefix("Widget")
+                .MustNotImplement($"{T}IThing", $"{T}IHandler<T>"))
             .ShouldHaveFailedWithSubjects([$"{T}Widget"]);
 
-        Checker.Run(Model, arch => arch.Rule("h/x")
-                .Enforce(arch.Types.WithPrefix("OrderHandler").MustNotImplement($"{T}IThing", $"{T}IHandler<T>"))
-                .Because("b"))
-            .Single()
+        Checker.Verdict(Model, arch => arch.Types.WithPrefix("OrderHandler")
+                .MustNotImplement($"{T}IThing", $"{T}IHandler<T>"))
             .ShouldHaveFailedWithSubjects([$"{T}OrderHandler"]);
 
-        Checker.Run(Model, arch => arch.Rule("h/x")
-                .Enforce(arch.Types.WithPrefix("Gizmo").MustNotImplement($"{T}IThing", $"{T}IHandler<T>"))
-                .Because("b"))
-            .Single()
+        Checker.Verdict(Model, arch => arch.Types.WithPrefix("Gizmo").MustNotImplement($"{T}IThing", $"{T}IHandler<T>"))
             .ShouldHavePassed();
     }
 
@@ -310,16 +258,11 @@ public sealed class HierarchyVerbTests
         // for it too: an interface reached through a base class (WidgetChild : Widget : IThing), and a
         // type-argument substitution (SubstHandler : HandlerBase<Order> where HandlerBase<T> : IHandler<T>),
         // which the definition-level anchor reaches because every construction matches its definition.
-        Checker.Run(TransitiveModel, arch => arch.Rule("h/x")
-                .Enforce(arch.Types.WithPrefix("WidgetChild").MustNotImplement($"{T}IThing"))
-                .Because("b"))
-            .Single()
+        Checker.Verdict(TransitiveModel, arch => arch.Types.WithPrefix("WidgetChild").MustNotImplement($"{T}IThing"))
             .ShouldHaveFailedWithSubjects([$"{T}WidgetChild"]);
 
-        Checker.Run(TransitiveModel, arch => arch.Rule("h/x")
-                .Enforce(arch.Types.WithPrefix("SubstHandler").MustNotImplement($"{T}IHandler<T>"))
-                .Because("b"))
-            .Single()
+        Checker.Verdict(TransitiveModel, arch => arch.Types.WithPrefix("SubstHandler")
+                .MustNotImplement($"{T}IHandler<T>"))
             .ShouldHaveFailedWithSubjects([$"{T}SubstHandler"]);
     }
 

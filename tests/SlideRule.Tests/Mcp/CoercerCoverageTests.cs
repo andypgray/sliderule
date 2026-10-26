@@ -36,22 +36,19 @@ public sealed class CoercerCoverageTests
     public void EveryJsonBoundParameterType_HasARegisteredCoercer()
     {
         // The drift guard. A new parameter of an uncovered type reds here until a coercer covers it.
-        List<string> uncovered = [];
-        List<string> checkedParameters = [];
-
-        foreach ((string where, Type type) in LiveJsonBoundParameters())
-        {
-            checkedParameters.Add(where);
-            bool covered = RegisteredConverters.Any(converter => converter.CanConvert(type));
-            if (!covered) uncovered.Add($"{where} ({type.Name})");
-        }
+        List<(string Where, Type Type)> parameters = LiveJsonBoundParameters()
+            .ToList();
+        List<string> uncovered = parameters
+            .Where(parameter => !RegisteredConverters.Any(converter => converter.CanConvert(parameter.Type)))
+            .Select(parameter => $"{parameter.Where} ({parameter.Type.Name})")
+            .ToList();
 
         // Shouldly prints the offenders itself; the message says what to do about them.
         uncovered.ShouldBeEmpty(
             "each of these binds through the SDK default, where a mis-spelled argument comes back as a "
             + "byte-position error the CLI's error mapper reads as a bug — write a coercer for the type");
         // Otherwise a reflection slip that found no parameters at all would read as a pass.
-        checkedParameters.ShouldNotBeEmpty("the live arch_* tools declare no JSON-bound parameters to check");
+        parameters.ShouldNotBeEmpty("the live arch_* tools declare no JSON-bound parameters to check");
     }
 
     [Fact]

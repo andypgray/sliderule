@@ -43,9 +43,11 @@ namespace SlideRule.Tests.Mcp;
 ///     </para>
 ///     <para>
 ///         The CLI side of every row runs <see cref="CliRunner.InvokeColdAsync(string[])" />, not the warm-by-default
-///         <see cref="CliRunner.InvokeAsync(string[])" />. The harness these rows compare against is warm, so this is
-///         the suite's warm-against-cold net; serving both sides from one pooled workspace would make it
-///         compare the warm path with itself.
+///         <see cref="CliRunner.InvokeAsync(string[])" />, so the reference side never reads the warm session the
+///         harness holds. The harness these rows compare against is warm, so this is the suite's warm-against-cold
+///         net; serving both sides from one pooled workspace would make it compare the warm path with itself. The
+///         cold side is fronted by the run's persisted cache, so a leg may answer as a hit or a closure partial over
+///         fragments an earlier cold leg wrote for the same path, a path the golden suite holds to a fresh load.
 ///     </para>
 /// </remarks>
 public sealed class CliMcpParityTests
@@ -53,8 +55,9 @@ public sealed class CliMcpParityTests
     // The four cold graph documents this suite measures against — one per rung of the grain ladder — each
     // produced once. Several rows want more than one of them, and the solution behind them is never mutated
     // here — the diff-base row edits its own TempGitRepo copy — so the same document answers every row.
-    // Memoizing the task does not warm anything: the run underneath is still CliRunner.InvokeColdAsync,
-    // freshly loaded, which is what the remarks above require; it is awaited more than once instead of re-run.
+    // Memoizing the task does not warm anything: the run underneath is still CliRunner.InvokeColdAsync, which
+    // never reads the harness's warm session, as the remarks above require; it is awaited more than once instead
+    // of re-run.
     private static readonly Lazy<Task<CliResult>> ColdGraph =
         new(() => CliRunner.InvokeColdAsync("graph", CliRunner.MyAppSolution, "--json"));
 
@@ -98,25 +101,21 @@ public sealed class CliMcpParityTests
         CliResult cliCheck = await ColdCheckFull.Value;
         cliCheck.ShouldReportViolations();
         CallToolResult mcpCheck = await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct);
-        mcpCheck.IsError.ShouldNotBe(true);
-        mcpCheck.ShouldHaveTextContent()
-            .NormalizedTrimmed()
-            .ShouldBe(cliCheck.Out.NormalizedTrimmed());
+        mcpCheck.ShouldHaveAnswered()
+            .ShouldBeTheSameTextAs(cliCheck.Out);
 
         // arch_status ≡ status --json.
         CliResult cliStatus = await CliRunner.InvokeColdAsync(
             "status", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json");
         CallToolResult mcpStatus = await harness.Client.CallToolAsync("arch_status", cancellationToken: Ct);
         mcpStatus.ShouldHaveTextContent()
-            .NormalizedTrimmed()
-            .ShouldBe(cliStatus.Out.NormalizedTrimmed());
+            .ShouldBeTheSameTextAs(cliStatus.Out);
 
         // arch_graph ≡ graph --json (spec-independent; the survey ignores the bound spec, and graph takes no --spec).
         CliResult cliGraph = await ColdGraph.Value;
         CallToolResult mcpGraph = await harness.Client.CallToolAsync("arch_graph", cancellationToken: Ct);
         mcpGraph.ShouldHaveTextContent()
-            .NormalizedTrimmed()
-            .ShouldBe(cliGraph.Out.NormalizedTrimmed());
+            .ShouldBeTheSameTextAs(cliGraph.Out);
 
         // arch_explain <known> ≡ explain <known> stdout.
         CliResult cliExplain = await CliRunner.InvokeColdAsync(
@@ -124,8 +123,7 @@ public sealed class CliMcpParityTests
         CallToolResult mcpExplain = await harness.Client.CallToolAsync(
             "arch_explain", new Dictionary<string, object?> { ["ruleId"] = "layering/domain-independent" }, cancellationToken: Ct);
         mcpExplain.ShouldHaveTextContent()
-            .NormalizedTrimmed()
-            .ShouldBe(cliExplain.Out.NormalizedTrimmed());
+            .ShouldBeTheSameTextAs(cliExplain.Out);
 
         // arch_explain <unknown> IsError text ≡ explain <unknown> stderr (CLI exit 2).
         CliResult cliUnknown = await CliRunner.InvokeColdAsync(
@@ -133,10 +131,8 @@ public sealed class CliMcpParityTests
         cliUnknown.ShouldRefuseWith();
         CallToolResult mcpUnknown = await harness.Client.CallToolAsync(
             "arch_explain", new Dictionary<string, object?> { ["ruleId"] = "unknown/id" }, cancellationToken: Ct);
-        mcpUnknown.IsError.ShouldBe(true);
-        mcpUnknown.ShouldHaveTextContent()
-            .NormalizedTrimmed()
-            .ShouldBe(cliUnknown.Err.NormalizedTrimmed());
+        mcpUnknown.ShouldHaveRefused()
+            .ShouldBeTheSameTextAs(cliUnknown.Err);
 
         // arch_explain type ≡ explain --type, and path ≡ explain --path: the claims answer, byte for byte.
         CliResult cliType = await CliRunner.InvokeColdAsync(
@@ -145,8 +141,7 @@ public sealed class CliMcpParityTests
         CallToolResult mcpType = await harness.Client.CallToolAsync(
             "arch_explain", new Dictionary<string, object?> { ["type"] = "OrderService" }, cancellationToken: Ct);
         mcpType.ShouldHaveTextContent()
-            .NormalizedTrimmed()
-            .ShouldBe(cliType.Out.NormalizedTrimmed());
+            .ShouldBeTheSameTextAs(cliType.Out);
 
         CliResult cliPath = await CliRunner.InvokeColdAsync(
             "explain", "--path", "MyApp.Legacy.Billing", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll);
@@ -154,8 +149,7 @@ public sealed class CliMcpParityTests
         CallToolResult mcpPath = await harness.Client.CallToolAsync(
             "arch_explain", new Dictionary<string, object?> { ["path"] = "MyApp.Legacy.Billing" }, cancellationToken: Ct);
         mcpPath.ShouldHaveTextContent()
-            .NormalizedTrimmed()
-            .ShouldBe(cliPath.Out.NormalizedTrimmed());
+            .ShouldBeTheSameTextAs(cliPath.Out);
 
         // An unknown type is the same refusal on both surfaces.
         CliResult cliUnknownType = await CliRunner.InvokeColdAsync(
@@ -163,10 +157,8 @@ public sealed class CliMcpParityTests
         cliUnknownType.ShouldRefuseWith("Unknown type 'OrderServ'");
         CallToolResult mcpUnknownType = await harness.Client.CallToolAsync(
             "arch_explain", new Dictionary<string, object?> { ["type"] = "OrderServ" }, cancellationToken: Ct);
-        mcpUnknownType.IsError.ShouldBe(true);
-        mcpUnknownType.ShouldHaveTextContent()
-            .NormalizedTrimmed()
-            .ShouldBe(cliUnknownType.Err.NormalizedTrimmed());
+        mcpUnknownType.ShouldHaveRefused()
+            .ShouldBeTheSameTextAs(cliUnknownType.Err);
     }
 
     [Fact]
@@ -184,11 +176,9 @@ public sealed class CliMcpParityTests
 
         // The CLI's refusal names its own spellings (a positional and two options), so the tool states the
         // same rule in its parameters' names rather than quoting the CLI.
-        none.IsError.ShouldBe(true);
-        none.ShouldHaveTextContent()
+        none.ShouldHaveRefused()
             .ShouldBe("Pass exactly one of ruleId, type and path.");
-        two.IsError.ShouldBe(true);
-        two.ShouldHaveTextContent()
+        two.ShouldHaveRefused()
             .ShouldBe(McpServerBinding.ExplainFormsRefusal);
     }
 
@@ -204,8 +194,7 @@ public sealed class CliMcpParityTests
         CallToolResult mcpCheck = await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct);
 
         mcpCheck.ShouldHaveTextContent()
-            .NormalizedTrimmed()
-            .ShouldBe(cliCheck.Out.NormalizedTrimmed());
+            .ShouldBeTheSameTextAs(cliCheck.Out);
     }
 
     [Fact]
@@ -218,8 +207,7 @@ public sealed class CliMcpParityTests
         CallToolResult inScope = await harness.Client.CallToolAsync(
             "arch_context", new Dictionary<string, object?> { ["path"] = "MyApp.Legacy.Billing/BillingCalculator.cs" }, cancellationToken: Ct);
         inScope.ShouldHaveTextContent()
-            .NormalizedTrimmed()
-            .ShouldBe(RenderedLawText.BillingScopeCard);
+            .ShouldBeTheSameTextAs(RenderedLawText.BillingScopeCard);
 
         // A path inside the cautioned scope → that scope's card body. Same tool, same spec, the other scope
         // posture: what an agent reads before editing dragon territory does not depend on whether the
@@ -227,16 +215,14 @@ public sealed class CliMcpParityTests
         CallToolResult inCaution = await harness.Client.CallToolAsync(
             "arch_context", new Dictionary<string, object?> { ["path"] = "MyApp.Domain/RetryPolicy.cs" }, cancellationToken: Ct);
         inCaution.ShouldHaveTextContent()
-            .NormalizedTrimmed()
-            .ShouldBe(RenderedLawText.DomainCautionCard);
+            .ShouldBeTheSameTextAs(RenderedLawText.DomainCautionCard);
 
         // A path no scope covers → the pinned pointer line (echoing the query path). The RenderSpec's
         // Domain/Web layers carry no anchored rules, so no layer card competes here.
         CallToolResult outScope = await harness.Client.CallToolAsync(
             "arch_context", new Dictionary<string, object?> { ["path"] = "MyApp.Web/HomeController.cs" }, cancellationToken: Ct);
         outScope.ShouldHaveTextContent()
-            .NormalizedTrimmed()
-            .ShouldBe(
+            .ShouldBeTheSameTextAs(
                 "No architecture scope covers 'MyApp.Web/HomeController.cs'. Architecture context for this solution lives in " +
                 "the root AGENTS.md managed block; expand any rule with 'sliderule explain <rule-id>'.");
     }
@@ -257,8 +243,7 @@ public sealed class CliMcpParityTests
             "arch_check", new Dictionary<string, object?> { ["diffBase"] = "HEAD" }, cancellationToken: Ct);
 
         string mcpText = mcpCheck.ShouldHaveTextContent()
-            .NormalizedTrimmed();
-        mcpText.ShouldBe(cliCheck.Out.NormalizedTrimmed());
+            .ShouldBeTheSameTextAs(cliCheck.Out);
         mcpText.ShouldContain("quarantinedScopeTouched");
     }
 
@@ -272,15 +257,13 @@ public sealed class CliMcpParityTests
         CallToolResult inLayer = await harness.Client.CallToolAsync(
             "arch_context", new Dictionary<string, object?> { ["path"] = "MyApp.Web/HomeController.cs" }, cancellationToken: Ct);
         inLayer.ShouldHaveTextContent()
-            .NormalizedTrimmed()
-            .ShouldBe(RenderedLawText.WebLayerCards);
+            .ShouldBeTheSameTextAs(RenderedLawText.WebLayerCards);
 
         // A path no layer or quarantined scope covers → the pointer line (echoing the query path).
         CallToolResult outScope = await harness.Client.CallToolAsync(
             "arch_context", new Dictionary<string, object?> { ["path"] = "MyApp.Domain/Order.cs" }, cancellationToken: Ct);
         outScope.ShouldHaveTextContent()
-            .NormalizedTrimmed()
-            .ShouldBe(
+            .ShouldBeTheSameTextAs(
                 "No architecture scope covers 'MyApp.Domain/Order.cs'. Architecture context for this solution lives in " +
                 "the root AGENTS.md managed block; expand any rule with 'sliderule explain <rule-id>'.");
     }
@@ -296,40 +279,33 @@ public sealed class CliMcpParityTests
         CallToolResult mcpOverview = await harness.Client.CallToolAsync(
             "arch_graph", new Dictionary<string, object?> { ["grain"] = "overview" }, cancellationToken: Ct);
         mcpOverview.ShouldHaveTextContent()
-            .NormalizedTrimmed()
-            .ShouldBe(cliOverview.Out.NormalizedTrimmed());
+            .ShouldBeTheSameTextAs(cliOverview.Out);
 
         // arch_graph skeleton ≡ graph --grain skeleton --json: the structural spine, external rows as a count.
         CliResult cliSkeleton = await ColdGraphSkeleton.Value;
         CallToolResult mcpSkeleton = await harness.Client.CallToolAsync(
             "arch_graph", new Dictionary<string, object?> { ["grain"] = "skeleton" }, cancellationToken: Ct);
         mcpSkeleton.ShouldHaveTextContent()
-            .NormalizedTrimmed()
-            .ShouldBe(cliSkeleton.Out.NormalizedTrimmed());
+            .ShouldBeTheSameTextAs(cliSkeleton.Out);
 
         // A rung written in another case is that rung on both surfaces: the document is the lowercase flag's.
         CliResult cliCased = await CliRunner.InvokeColdAsync(
             "graph", CliRunner.MyAppSolution, "--json", "--grain", "Skeleton");
         cliCased.ShouldSucceed();
-        cliCased.Out.NormalizedTrimmed()
-            .ShouldBe(cliSkeleton.Out.NormalizedTrimmed());
+        cliCased.ShouldPrint(cliSkeleton.Out);
         CallToolResult mcpCased = await harness.Client.CallToolAsync(
             "arch_graph", new Dictionary<string, object?> { ["grain"] = "Skeleton" }, cancellationToken: Ct);
         mcpCased.ShouldHaveTextContent()
-            .NormalizedTrimmed()
-            .ShouldBe(cliSkeleton.Out.NormalizedTrimmed());
+            .ShouldBeTheSameTextAs(cliSkeleton.Out);
 
         // A word off the ladder is refused with one text on both surfaces, before either loads a workspace.
         const string refusal = "Unknown grain 'coarse'; use full, overview, skeleton or index.";
         CliResult cliOff = await CliRunner.InvokeColdAsync(
             "graph", CliRunner.MyAppSolution, "--json", "--grain", "coarse");
-        cliOff.ShouldRefuseWith(refusal);
-        cliOff.Err.NormalizedTrimmed()
-            .ShouldBe(refusal);
+        cliOff.ShouldRefuseWithExactly(refusal);
         CallToolResult mcpOff = await harness.Client.CallToolAsync(
             "arch_graph", new Dictionary<string, object?> { ["grain"] = "coarse" }, cancellationToken: Ct);
-        mcpOff.IsError.ShouldBe(true);
-        mcpOff.ShouldHaveTextContent()
+        mcpOff.ShouldHaveRefused()
             .ShouldBe(refusal);
 
         // arch_graph projects ≡ graph --projects --json: the same survey over fewer projects.
@@ -338,8 +314,7 @@ public sealed class CliMcpParityTests
         CallToolResult mcpScoped = await harness.Client.CallToolAsync(
             "arch_graph", new Dictionary<string, object?> { ["projects"] = "MyApp.Web" }, cancellationToken: Ct);
         mcpScoped.ShouldHaveTextContent()
-            .NormalizedTrimmed()
-            .ShouldBe(cliScoped.Out.NormalizedTrimmed());
+            .ShouldBeTheSameTextAs(cliScoped.Out);
 
         // arch_check rules ≡ check --rules --json (CLI exits 1 on the subset's violations; the tool never
         // reports IsError). Same parse, same selection, same document — including rulesFilter.
@@ -348,10 +323,8 @@ public sealed class CliMcpParityTests
         cliRules.ShouldReportViolations();
         CallToolResult mcpRules = await harness.Client.CallToolAsync(
             "arch_check", new Dictionary<string, object?> { ["rules"] = "exceptions/*" }, cancellationToken: Ct);
-        mcpRules.IsError.ShouldNotBe(true);
-        mcpRules.ShouldHaveTextContent()
-            .NormalizedTrimmed()
-            .ShouldBe(cliRules.Out.NormalizedTrimmed());
+        mcpRules.ShouldHaveAnswered()
+            .ShouldBeTheSameTextAs(cliRules.Out);
 
         // arch_check overview ≡ check --grain overview --json: the whole report with each violation's sites as a
         // count.
@@ -359,16 +332,14 @@ public sealed class CliMcpParityTests
         CallToolResult mcpCheckOverview = await harness.Client.CallToolAsync(
             "arch_check", new Dictionary<string, object?> { ["grain"] = "overview" }, cancellationToken: Ct);
         mcpCheckOverview.ShouldHaveTextContent()
-            .NormalizedTrimmed()
-            .ShouldBe(cliCheckOverview.Out.NormalizedTrimmed());
+            .ShouldBeTheSameTextAs(cliCheckOverview.Out);
 
         // arch_check skeleton ≡ check --grain skeleton --json: the verdict alone, violations as a count.
         CliResult cliCheckSkeleton = await ColdCheckSkeleton.Value;
         CallToolResult mcpCheckSkeleton = await harness.Client.CallToolAsync(
             "arch_check", new Dictionary<string, object?> { ["grain"] = "skeleton" }, cancellationToken: Ct);
         mcpCheckSkeleton.ShouldHaveTextContent()
-            .NormalizedTrimmed()
-            .ShouldBe(cliCheckSkeleton.Out.NormalizedTrimmed());
+            .ShouldBeTheSameTextAs(cliCheckSkeleton.Out);
 
         // The floor rung is a caller's flag on both surfaces, not a degrade-only state. It has to be: a rung
         // the server can drop a caller onto but the caller cannot ask for is one no CLI reader can reproduce,
@@ -379,16 +350,14 @@ public sealed class CliMcpParityTests
         CallToolResult mcpGraphIndex = await harness.Client.CallToolAsync(
             "arch_graph", new Dictionary<string, object?> { ["grain"] = "index" }, cancellationToken: Ct);
         mcpGraphIndex.ShouldHaveTextContent()
-            .NormalizedTrimmed()
-            .ShouldBe(cliGraphIndex.Out.NormalizedTrimmed());
+            .ShouldBeTheSameTextAs(cliGraphIndex.Out);
 
         // arch_check index ≡ check --grain index --json: a verdict per rule ID, the prose gone.
         CliResult cliCheckIndex = await ColdCheckIndex.Value;
         CallToolResult mcpCheckIndex = await harness.Client.CallToolAsync(
             "arch_check", new Dictionary<string, object?> { ["grain"] = "index" }, cancellationToken: Ct);
         mcpCheckIndex.ShouldHaveTextContent()
-            .NormalizedTrimmed()
-            .ShouldBe(cliCheckIndex.Out.NormalizedTrimmed());
+            .ShouldBeTheSameTextAs(cliCheckIndex.Out);
     }
 
     [Fact]
@@ -460,8 +429,7 @@ public sealed class CliMcpParityTests
 
             string text = degraded.ShouldHaveTextContent();
             text.ShouldNotContain("--- RESPONSE TRUNCATED ---");
-            text.NormalizedTrimmed()
-                .ShouldBe(documents[step].Out.NormalizedTrimmed());
+            text.ShouldBeTheSameTextAs(documents[step].Out);
         }
 
         // A degrade is the server's own decision, not a failure, so nothing on the way down is logged.

@@ -48,6 +48,12 @@ public sealed class SharedWorkspaceSession : IAsyncDisposable
     /// <summary>The copied solution the session is bound to.</summary>
     public string SolutionPath => _fixture.SolutionPath;
 
+    /// <summary>The session's current snapshot of the copy it is bound to.</summary>
+    internal Task<WorkspaceSnapshot> GetCurrentAsync(CancellationToken ct)
+    {
+        return Session.GetCurrentAsync(SolutionPath, ct);
+    }
+
     /// <summary>Disposes the session first, so the copy is unheld when it is deleted.</summary>
     public async ValueTask DisposeAsync()
     {

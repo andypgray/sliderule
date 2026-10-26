@@ -40,10 +40,10 @@ public sealed class HostEvaluatedFactsTests
         IReadOnlyList<string> set;
         using (new ScopedEnvironmentVariable(Variable, "true"))
         {
-            set = PackageNames(projectFile);
+            set = ShouldEvaluatePackageNames(projectFile);
         }
 
-        IReadOnlyList<string> unset = PackageNames(projectFile);
+        IReadOnlyList<string> unset = ShouldEvaluatePackageNames(projectFile);
 
         // Assert
         set.ShouldBe(["Windows.Only"]);
@@ -67,17 +67,17 @@ public sealed class HostEvaluatedFactsTests
                                                                    """);
 
         // Act
-        IReadOnlyList<string> declared = PackageNames(projectFile);
+        IReadOnlyList<string> declared = ShouldEvaluatePackageNames(projectFile);
 
         // Assert — one verdict on a Windows leg and the other everywhere else, from one project file.
         declared.ShouldBe(OperatingSystem.IsWindows() ? ["Windows.Only"] : []);
     }
 
-    private static IReadOnlyList<string> PackageNames(string projectFile)
+    private static IReadOnlyList<string> ShouldEvaluatePackageNames(string projectFile)
     {
         ProjectArtifactFacts facts = ProjectFactsEvaluator
             .EvaluateAll([new ProjectEvaluationRequest(projectFile, null)], solutionFile: null, Ct)
-            .Single()
+            .ShouldHaveSingleItem()
             .ShouldNotBeNull();
 
         return facts.PackageReferences.Select(package => package.Name)

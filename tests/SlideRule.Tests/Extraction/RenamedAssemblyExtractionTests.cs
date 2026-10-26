@@ -28,7 +28,7 @@ public sealed class RenamedAssemblyExtractionTests
     {
         CodebaseModel codebase = await SelfSpecTests.WholeCodebase.Value;
 
-        ProjectNode cli = codebase.Projects.Single(project => project.Name == "SlideRule.Cli");
+        ProjectNode cli = codebase.Project("SlideRule.Cli");
 
         cli.AssemblyNames.ShouldBe(["sliderule-cli"]);
     }

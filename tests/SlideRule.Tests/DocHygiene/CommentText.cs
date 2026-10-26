@@ -38,7 +38,7 @@ internal static class CommentText
     // Both directive forms sit on one line, and neither alternative can cross one, so a replacement
     // never swallows a newline and never shifts the lines beneath it.
     private static readonly Regex Directives =
-        new(@"//\s*ReSharper\s+(?:disable|restore)\b[^\n\r]*|@formatter:(?:off|on)");
+        new(@"//[^\S\r\n]*ReSharper[^\S\r\n]+(?:disable|restore)\b[^\n\r]*|@formatter:(?:off|on)");
 
     /// <summary>
     ///     Returns <paramref name="source" /> with everything outside comment trivia replaced by

@@ -26,22 +26,14 @@ public sealed class MustResideInProjectVerbTests
     {
         // A shape violation has no edge to cite, so the file:line an agent jumps to is where the offending
         // type is declared — the subject's own declaration sites, carried as evidence.
-        Checker.Run(MultiplyDeclaredCodebase.Model, arch =>
-                arch.Rule("layering/tool-in-core")
-                    .Enforce(arch.Namespace("Tool.*").MustResideInProject("Core"))
-                    .Because("b"))
-            .Single()
+        Checker.Verdict(MultiplyDeclaredCodebase.Model, arch => arch.Namespace("Tool.*").MustResideInProject("Core"))
             .ShouldHaveFailedWithSubjectAtSites("Tool.Command", ["Command.cs:3"]);
     }
 
     [Fact]
     public void MustResideInProject_EverySubjectDeclaredByTheNamedProject_PassesClean()
     {
-        Checker.Run(MultiplyDeclaredCodebase.Model, arch =>
-                arch.Rule("layering/core-in-core")
-                    .Enforce(arch.Namespace("Core.*").MustResideInProject("Core"))
-                    .Because("b"))
-            .Single()
+        Checker.Verdict(MultiplyDeclaredCodebase.Model, arch => arch.Namespace("Core.*").MustResideInProject("Core"))
             .ShouldHavePassedClean();
     }
 
@@ -51,20 +43,13 @@ public sealed class MustResideInProjectVerbTests
         // The shared types are one node each, whose facts follow Core, the first declarer. Naming Tool — a
         // project that compiles its own copy — satisfies the verb all the same, because residence is the
         // declarer roster and not the single ProjectName the node carries.
-        Checker.Run(MultiplyDeclaredCodebase.Model, arch =>
-                arch.Rule("layering/shared-in-tool")
-                    .Enforce(arch.Namespace("Shared.*").MustResideInProject("Tool"))
-                    .Because("b"))
-            .Single()
+        Checker.Verdict(MultiplyDeclaredCodebase.Model, arch => arch.Namespace("Shared.*").MustResideInProject("Tool"))
             .ShouldHavePassedClean();
 
         // The negative half over a project that exists: Client references the declaration rather than
         // compiling it, so it is on no roster and both shared types red.
-        Checker.Run(MultiplyDeclaredCodebase.Model, arch =>
-                arch.Rule("layering/shared-in-client")
-                    .Enforce(arch.Namespace("Shared.*").MustResideInProject("Client"))
-                    .Because("b"))
-            .Single()
+        Checker.Verdict(MultiplyDeclaredCodebase.Model, arch => arch.Namespace("Shared.*")
+                .MustResideInProject("Client"))
             .ShouldHaveFailedWithSubjects(["Shared.Widget", "Shared.WidgetPart"]);
     }
 
@@ -75,11 +60,8 @@ public sealed class MustResideInProjectVerbTests
         // not a gap: the name is never held against the codebase at build time (validation runs before any
         // workspace exists), so a loud red at check time is how the typo surfaces, and the stricter-than-written
         // warning is what names the name as the cause.
-        RuleResult result = Checker.Run(MultiplyDeclaredCodebase.Model, arch =>
-                arch.Rule("layering/typo")
-                    .Enforce(arch.Types.MustResideInProject("Cor"))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(MultiplyDeclaredCodebase.Model, arch => arch.Types
+            .MustResideInProject("Cor"));
 
         result.ShouldHaveFailedWithSubjects(
         [
@@ -93,17 +75,11 @@ public sealed class MustResideInProjectVerbTests
     public void MustResideInProject_UnknownProjectName_WarnsExactlyAsItsMustBelongToForm()
     {
         // The pair is MustBelongTo with one membership, so its warning is that form's in every slot a host reads.
-        CheckWarning reside = Checker.Run(MultiplyDeclaredCodebase.Model, arch =>
-                arch.Rule("layering/typo")
-                    .Enforce(arch.Types.MustResideInProject("Cor"))
-                    .Because("b"))
-            .Single()
+        CheckWarning reside = Checker.Verdict(MultiplyDeclaredCodebase.Model, arch => arch.Types
+                .MustResideInProject("Cor"))
             .Warnings.ShouldHaveSingleItem();
-        CheckWarning belong = Checker.Run(MultiplyDeclaredCodebase.Model, arch =>
-                arch.Rule("layering/typo")
-                    .Enforce(arch.Types.MustBelongTo(arch.Project("Cor")))
-                    .Because("b"))
-            .Single()
+        CheckWarning belong = Checker.Verdict(MultiplyDeclaredCodebase.Model, arch => arch.Types
+                .MustBelongTo(arch.Project("Cor")))
             .Warnings.ShouldHaveSingleItem();
 
         $"{reside.Kind} {reside.Key}: {reside.Message} | {reside.Hint}"

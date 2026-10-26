@@ -122,8 +122,7 @@ public sealed class GraphCommandTests
 
         // Assert
         result.ShouldSucceed();
-        result.Out.NormalizedTrimmed()
-            .ShouldBe(ExpectedHuman.NormalizedTrimmed());
+        result.ShouldPrint(ExpectedHuman);
     }
 
     [Fact]
@@ -131,7 +130,7 @@ public sealed class GraphCommandTests
     {
         // Arrange — any argument beats SLIDERULE_SOLUTION_PATH, a directory to search as much as a file. The
         // variable names a file that does not exist, so a run that consulted it would refuse instead of surveying.
-        string directory = Path.GetDirectoryName(CliRunner.MyAppSolution)!;
+        string directory = FixtureBeds.MyAppRoot;
         FakeEnvironment environment = new FakeEnvironment()
             .SetVariable(SlideRuleEnvVars.SolutionPath, Path.Combine(directory, "Other.sln"));
 
@@ -201,8 +200,7 @@ public sealed class GraphCommandTests
 
         // Assert — the knobs compose: grain and scope are independent, and neither swallows the other.
         result.ShouldSucceed();
-        result.Out.NormalizedTrimmed()
-            .ShouldBe(ExpectedScopedOverviewHuman.NormalizedTrimmed());
+        result.ShouldPrint(ExpectedScopedOverviewHuman);
     }
 
     [Fact]
@@ -222,19 +220,10 @@ public sealed class GraphCommandTests
             .ShouldBe("overview");
         root.Strings("projectsScope")
             .ShouldBe(["MyApp.We*"]);
-        root.GetProperty("projects")
-            .EnumerateArray()
-            .Select(project => project.GetProperty("name")
-                .GetString())
+        document.ProjectNames()
             .ShouldBe(["MyApp.Web"]);
-
-        List<string> projectFields = root.GetProperty("projects")
-            .EnumerateArray()
-            .SelectMany(project => project.EnumerateObject()
-                .Select(field => field.Name))
-            .Distinct()
-            .ToList();
-        projectFields.ShouldNotContain("namespaces");
+        ProjectRowKeys(document)
+            .ShouldNotContain("namespaces");
     }
 
     [Fact]
@@ -515,8 +504,8 @@ public sealed class GraphCommandTests
         using JsonDocument indexDocument = JsonDocument.Parse(index.ToString());
         using JsonDocument fullDocument = JsonDocument.Parse(full.ToString());
 
-        ProjectNames(indexDocument)
-            .ShouldBe(ProjectNames(fullDocument));
+        indexDocument.ProjectNames()
+            .ShouldBe(fullDocument.ProjectNames());
         indexDocument.RootElement.GetProperty("projectEdgeCount")
             .GetInt32()
             .ShouldBe(
@@ -568,15 +557,6 @@ public sealed class GraphCommandTests
         document.RootElement.GetProperty("grain")
             .GetString()
             .ShouldBe("index");
-    }
-
-    private static IReadOnlyList<string?> ProjectNames(JsonDocument document)
-    {
-        return document.RootElement.GetProperty("projects")
-            .EnumerateArray()
-            .Select(project => project.GetProperty("name")
-                .GetString())
-            .ToList();
     }
 
     private static IReadOnlyList<string> ProjectRowKeys(JsonDocument document)

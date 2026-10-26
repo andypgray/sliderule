@@ -373,19 +373,11 @@ public sealed class SolutionProjectFileParserTests
     // above describe. Only the anchor rows need this: resolving a filter means reading it.
     private static string WriteFilter(TempDirectory temp, string filterText)
     {
-        string directory = temp.PathOf("filters");
-        Directory.CreateDirectory(directory);
-        string path = Path.Combine(directory, "Selected.slnf");
-        File.WriteAllText(path, filterText);
-        return path;
+        return temp.WriteFile(["filters", "Selected.slnf"], filterText);
     }
 
     private static string WriteReferencedSolution(TempDirectory temp)
     {
-        string directory = temp.PathOf("solutions");
-        Directory.CreateDirectory(directory);
-        string path = Path.Combine(directory, "App.sln");
-        File.WriteAllText(path, "Microsoft Visual Studio Solution File, Format Version 12.00\n");
-        return path;
+        return temp.WriteFile(["solutions", "App.sln"], "Microsoft Visual Studio Solution File, Format Version 12.00\n");
     }
 }

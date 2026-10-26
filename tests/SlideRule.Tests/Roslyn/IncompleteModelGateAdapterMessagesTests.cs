@@ -1,5 +1,6 @@
 using Shouldly;
 using SlideRule.Roslyn.Diagnostics;
+using SlideRule.Tests.TestSupport;
 using Xunit;
 
 namespace SlideRule.Tests.Roslyn;
@@ -66,8 +67,7 @@ public sealed class IncompleteModelGateAdapterMessagesTests
         refusal.ShouldStartWith("the model is incomplete — 1 project failed to load");
         refusal.ShouldContain(BrokenProject);
         refusal.ShouldContain(UnrestoredProject);
-        refusal.IndexOf("NuGet packages did not resolve for 1 project", StringComparison.Ordinal)
-            .ShouldBeGreaterThan(refusal.IndexOf("1 project failed to load", StringComparison.Ordinal));
+        refusal.ShouldContainInOrder("1 project failed to load", "NuGet packages did not resolve for 1 project");
     }
 
     [Fact]

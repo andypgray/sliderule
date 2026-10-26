@@ -19,8 +19,7 @@ public sealed class DeriveFlowE2ETests
     {
         using var workspace = new TempFixtureWorkspace();
         // Virgin estate: drop the fixture's committed baselines so the derived rules meet the code raw.
-        string archDir = workspace.PathOf("arch");
-        if (Directory.Exists(archDir)) Directory.Delete(archDir, true);
+        ReadOnlyTolerant.DeleteTree(workspace.PathOf("arch"));
 
         // Check the derived proposal: red, with the survey's debt surfacing as evidence. 4 rules fail
         // (2 layering-migrate edges, 2 inline-SQL edges, 1 handler-naming shape, 2 containment edges = 7
@@ -29,10 +28,11 @@ public sealed class DeriveFlowE2ETests
         CliResult checkRed = await CliRunner.InvokeAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.DerivedSpecDll, "--json");
 
-        checkRed.ShouldReportViolations("\"rulesFailed\": 4");
-        checkRed.Out.ShouldContain("\"rulesPassed\": 2");
-        checkRed.Out.ShouldContain("\"rulesSkipped\": 1");
-        checkRed.Out.ShouldContain("\"violations\": 7");
+        checkRed.ShouldReportViolations(
+            "\"rulesFailed\": 4",
+            "\"rulesPassed\": 2",
+            "\"rulesSkipped\": 1",
+            "\"violations\": 7");
 
         // The human baselines the remainder: init grandfathers every current violation into the
         // conventional default path per failing rule (one per Migrate rule + the Quarantine containment).
@@ -55,8 +55,7 @@ public sealed class DeriveFlowE2ETests
         CliResult checkGreen = await CliRunner.InvokeAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.DerivedSpecDll, "--json");
 
-        checkGreen.ShouldSucceed("\"rulesFailed\": 0");
-        checkGreen.Out.ShouldContain("\"violations\": 0");
+        checkGreen.ShouldSucceed("\"rulesFailed\": 0", "\"violations\": 0");
 
         // Render the agent context: the root managed block and the quarantined-scope card for legacy/billing.
         CliResult render = await CliRunner.InvokeAsync(

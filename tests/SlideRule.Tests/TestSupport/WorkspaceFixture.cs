@@ -1,13 +1,13 @@
 using SlideRule.Codebase;
-using SlideRule.Roslyn;
 using Xunit;
 
 namespace SlideRule.Tests.TestSupport;
 
 /// <summary>
-///     Assembly-shared fixture: loads the checked-in <c>MyApp</c> fixture solution once through a
-///     real <see cref="Microsoft.CodeAnalysis.MSBuild.MSBuildWorkspace" /> and extracts the codebase
-///     model once. Tests only read <see cref="Model" />, so a single shared instance is safe.
+///     A class fixture over the run's one model of the checked-in <c>MyApp</c> fixture solution: the first
+///     consumer class to start pays the load and the extraction through <see cref="FixtureCodebase" />, and
+///     every later one awaits the same task. Tests only read <see cref="Model" />, so one shared instance is
+///     safe.
 /// </summary>
 public sealed class WorkspaceFixture : IAsyncLifetime
 {
@@ -18,15 +18,9 @@ public sealed class WorkspaceFixture : IAsyncLifetime
     internal CodebaseModel Model { get; private set; } = null!;
 
     /// <summary>Opens the fixture solution and extracts <see cref="Model" /> from it.</summary>
-    /// <remarks>
-    ///     Loads through the shared <see cref="WarmWorkspacePool" /> rather than owning a workspace of its
-    ///     own, so the load is shared with anything else reading this solution and the workspace stays
-    ///     bounded by the pool's lifetime instead of being pinned for the whole run.
-    /// </remarks>
     public async ValueTask InitializeAsync()
     {
-        WorkspaceSnapshot snapshot = await WarmWorkspacePool.GetCurrentAsync(SolutionPath, CancellationToken.None);
-        Model = await CodebaseExtractor.ExtractFromSolutionAsync(snapshot.Solution);
+        Model = await FixtureCodebase.Of(SolutionPath);
     }
 
     /// <inheritdoc />
@@ -38,7 +32,13 @@ public sealed class WorkspaceFixture : IAsyncLifetime
     /// <summary>Solution-relative, forward-slash rendering of a location's file path.</summary>
     internal string RelativePath(SourceLocation location)
     {
-        return Path.GetRelativePath(Path.GetDirectoryName(SolutionPath)!, location.FilePath)
+        return RelativePath(location.FilePath);
+    }
+
+    /// <summary>Solution-relative, forward-slash rendering of a file path.</summary>
+    internal string RelativePath(string filePath)
+    {
+        return Path.GetRelativePath(Path.GetDirectoryName(SolutionPath)!, filePath)
             .Replace('\\', '/');
     }
 

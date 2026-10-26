@@ -17,8 +17,7 @@ public sealed class QuarantineContainmentE2ETests
     {
         CliResult result = await CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", CliRunner.QuarantinedSpecDll);
 
-        result.ShouldSucceed("pass legacy/billing/containment");
-        result.Out.ShouldContain("grandfathered: 2");
+        result.ShouldSucceed("pass legacy/billing/containment", "grandfathered: 2");
         // The facade path (HomeController → IBillingFacade) is the sanctioned surface — never a red edge.
         result.Out.ShouldNotContain("MyApp.Web.HomeController references MyApp.Legacy.Billing.IBillingFacade");
     }
@@ -33,9 +32,10 @@ public sealed class QuarantineContainmentE2ETests
 
         CliResult result = await CliRunner.InvokeAsync("check", workspace.SolutionPath, "--spec", CliRunner.QuarantinedSpecDll);
 
-        result.ShouldReportViolations("FAIL legacy/billing/containment");
-        result.Out.ShouldContain("MyApp.Web/HomeController.cs:");
-        result.Out.ShouldContain("MyApp.Web.HomeController references MyApp.Legacy.Billing.BillingCalculator");
+        result.ShouldReportViolations(
+            "FAIL legacy/billing/containment",
+            "MyApp.Web/HomeController.cs:",
+            "MyApp.Web.HomeController references MyApp.Legacy.Billing.BillingCalculator");
         // The grandfathered InvoiceController edges stay green — not red-listed.
         result.Out.ShouldNotContain("MyApp.Web.InvoiceController references MyApp.Legacy.Billing.BillingCalculator");
     }

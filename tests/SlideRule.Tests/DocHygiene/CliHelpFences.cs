@@ -141,7 +141,7 @@ internal static class CliHelpFences
     private static IEnumerable<(IReadOnlyList<(string Text, int Number)> Block, CliHelpFence Row)> HelpBlocks(
         string page)
     {
-        foreach (IReadOnlyList<(string Text, int Number)> block in SourceAnchors.FencedBlocks(page))
+        foreach (IReadOnlyList<(string Text, int Number)> block in DocFences.FencedBlocks(page))
         {
             List<CliHelpFence> carried = Rows
                 .Where(fence => block.Any(line => line.Text.Contains(fence.Marker, StringComparison.Ordinal)))

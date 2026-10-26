@@ -9,7 +9,6 @@ using SlideRule.ModelFile;
 using SlideRule.Rendering;
 using SlideRule.Tests.Mcp.TestDoubles;
 using SlideRule.Tests.ModelFile;
-using SlideRule.Tests.Rendering;
 using SlideRule.Tests.TestSupport;
 using Xunit;
 
@@ -75,7 +74,7 @@ public sealed class RenderCommandE2ETests : IDisposable
 
     private const string RootBody =
         RenderSpecProvenance +
-        AgentContextRendererTests.InstallNote +
+        RenderedLawText.InstallNote +
         "## Architecture (SlideRule)\n\n" +
         "reference = a source-level type reference. Expand any rule ID with `sliderule explain <rule-id>`.\n\n" +
         "### Layers\n" +
@@ -114,7 +113,7 @@ public sealed class RenderCommandE2ETests : IDisposable
     // are families over the Reporting and Billing cells, and their bullets land on both of their cards.
     private const string LayerRootBody =
         LayerSpecProvenance +
-        AgentContextRendererTests.InstallNote +
+        RenderedLawText.InstallNote +
         "## Architecture (SlideRule)\n\n" +
         "reference = a source-level type reference. Expand any rule ID with `sliderule explain <rule-id>`.\n\n" +
         "### Layers\n" +
@@ -256,8 +255,7 @@ public sealed class RenderCommandE2ETests : IDisposable
         CliResult result = await CliRunner.InvokeAsync("render", _workspace.SolutionPath, "--spec", CliRunner.RenderSpecDll);
 
         result.ShouldSucceed();
-        result.Out.NormalizedTrimmed()
-            .ShouldBe(RenderSpecCardsWritten);
+        result.ShouldPrint(RenderSpecCardsWritten);
         File.ReadAllText(RootAgents)
             .ShouldBe(Wrap(RootBody, "\n"));
         File.ReadAllText(ScopeAgents)
@@ -282,9 +280,8 @@ public sealed class RenderCommandE2ETests : IDisposable
         CliResult second = await CliRunner.InvokeAsync("render", _workspace.SolutionPath, "--spec", CliRunner.RenderSpecDll);
 
         second.ShouldSucceed();
-        second.Out.NormalizedTrimmed()
-            .ShouldBe(
-                "unchanged AGENTS.md\nunchanged MyApp.Legacy.Billing/AGENTS.md\nunchanged MyApp.Domain/AGENTS.md");
+        second.ShouldPrint(
+            "unchanged AGENTS.md\nunchanged MyApp.Legacy.Billing/AGENTS.md\nunchanged MyApp.Domain/AGENTS.md");
         File.ReadAllBytes(RootAgents)
             .ShouldBe(rootFirst);
         File.ReadAllBytes(ScopeAgents)
@@ -298,12 +295,12 @@ public sealed class RenderCommandE2ETests : IDisposable
     [InlineData("\r\n")]
     public async Task Render_PreservesHandContentAroundMarkers(string newline)
     {
-        File.WriteAllText(RootAgents, Seeded(newline));
+        File.WriteAllText(RootAgents, Seeded("OLD BODY", newline));
 
         await CliRunner.InvokeAsync("render", _workspace.SolutionPath, "--spec", CliRunner.RenderSpecDll);
 
         File.ReadAllText(RootAgents)
-            .ShouldBe(SeededAfterRender(newline));
+            .ShouldBe(Seeded(RootBody, newline));
     }
 
     [Fact]
@@ -312,8 +309,7 @@ public sealed class RenderCommandE2ETests : IDisposable
         CliResult result = await CliRunner.InvokeAsync("render", _workspace.SolutionPath, "--spec", CliRunner.CleanSpecDll);
 
         result.ShouldSucceed();
-        result.Out.NormalizedTrimmed()
-            .ShouldBe("wrote AGENTS.md");
+        result.ShouldPrint("wrote AGENTS.md");
         File.Exists(ScopeAgents)
             .ShouldBeFalse();
     }
@@ -326,9 +322,8 @@ public sealed class RenderCommandE2ETests : IDisposable
         result.ShouldSucceed();
         // Root first, then the layer files (declaration order: Web before Billing), then the Billing
         // directory whose layer + quarantine units merged into one wrote-line.
-        result.Out.NormalizedTrimmed()
-            .ShouldBe(
-                "wrote AGENTS.md\nwrote MyApp.Web/AGENTS.md\nwrote MyApp.Legacy.Billing/AGENTS.md");
+        result.ShouldPrint(
+            "wrote AGENTS.md\nwrote MyApp.Web/AGENTS.md\nwrote MyApp.Legacy.Billing/AGENTS.md");
         File.ReadAllText(RootAgents)
             .ShouldBe(Wrap(LayerRootBody, "\n"));
         File.ReadAllText(WebAgents)
@@ -343,10 +338,9 @@ public sealed class RenderCommandE2ETests : IDisposable
         CliResult result = await CliRunner.InvokeAsync("render", _workspace.SolutionPath, "--spec", CliRunner.QuarantinedSpecDll);
 
         result.ShouldSucceed();
-        result.Out.NormalizedTrimmed()
-            .ShouldBe(
-                "wrote AGENTS.md\nwrote MyApp.Legacy.Billing/AGENTS.md\nwrote MyApp.Web/AGENTS.md\n" +
-                "wrote MyApp.Domain/AGENTS.md");
+        result.ShouldPrint(
+            "wrote AGENTS.md\nwrote MyApp.Legacy.Billing/AGENTS.md\nwrote MyApp.Web/AGENTS.md\n" +
+            "wrote MyApp.Domain/AGENTS.md");
         File.ReadAllText(WebAgents)
             .ShouldBe(Wrap(WebShellScopeBody, "\n"));
     }
@@ -377,9 +371,8 @@ public sealed class RenderCommandE2ETests : IDisposable
         CliResult second = await CliRunner.InvokeAsync("render", _workspace.SolutionPath, "--spec", CliRunner.LayerSpecDll);
 
         second.ShouldSucceed();
-        second.Out.NormalizedTrimmed()
-            .ShouldBe(
-                "unchanged AGENTS.md\nunchanged MyApp.Web/AGENTS.md\nunchanged MyApp.Legacy.Billing/AGENTS.md");
+        second.ShouldPrint(
+            "unchanged AGENTS.md\nunchanged MyApp.Web/AGENTS.md\nunchanged MyApp.Legacy.Billing/AGENTS.md");
     }
 
     [Fact]
@@ -391,8 +384,7 @@ public sealed class RenderCommandE2ETests : IDisposable
             "render", _workspace.SolutionPath, "--spec", CliRunner.RenderSpecDll, "--diagram", Architecture);
 
         first.ShouldSucceed();
-        first.Out.NormalizedTrimmed()
-            .ShouldBe(RenderSpecCardsWritten + "\nwrote ARCHITECTURE.md");
+        first.ShouldPrint(RenderSpecCardsWritten + "\nwrote ARCHITECTURE.md");
         File.ReadAllText(Architecture)
             .ShouldMatchGolden("diagram.md");
 
@@ -400,10 +392,9 @@ public sealed class RenderCommandE2ETests : IDisposable
             "render", _workspace.SolutionPath, "--spec", CliRunner.RenderSpecDll, "--diagram", Architecture);
 
         second.ShouldSucceed();
-        second.Out.NormalizedTrimmed()
-            .ShouldBe(
-                "unchanged AGENTS.md\nunchanged MyApp.Legacy.Billing/AGENTS.md\n" +
-                "unchanged MyApp.Domain/AGENTS.md\nunchanged ARCHITECTURE.md");
+        second.ShouldPrint(
+            "unchanged AGENTS.md\nunchanged MyApp.Legacy.Billing/AGENTS.md\n" +
+            "unchanged MyApp.Domain/AGENTS.md\nunchanged ARCHITECTURE.md");
     }
 
     [Fact]
@@ -425,18 +416,19 @@ public sealed class RenderCommandE2ETests : IDisposable
     {
         using var cache = new TempCacheRoot("render-cache");
 
-        // Prime the target files under --no-cache, so the slot stays empty and both runs below report
-        // `unchanged`. What is compared is then a cold render against a cached one, rather than a first
-        // render against a second.
-        await RenderAsync(cache.Root, "--no-cache");
+        // Prime the target files through the warm path, whose persisted cache is the run's rather than this
+        // slot, so the slot stays empty and both runs below report `unchanged`. What is compared is then a cold
+        // render against a cached one, rather than a first render against a second.
+        (await CliRunner.InvokeAsync("render", _workspace.SolutionPath, "--spec", CliRunner.RenderSpecDll))
+            .ShouldSucceed();
 
-        (CliResult cold, long coldLoads) = await RenderAsync(cache.Root);
-        (CliResult cached, long cachedLoads) = await RenderAsync(cache.Root);
+        CliResult cold = await RenderAsync(cache.Root);
+        CliResult cached = await RenderAsync(cache.Root);
 
         // The cold run does the design-time build and writes the slot; the second answers from it, and
         // "answers from it" means no MSBuild at all — the whole of what render pays on a large solution.
-        coldLoads.ShouldBe(1);
-        cachedLoads.ShouldBe(0);
+        cold.Loads.ShouldBe(1);
+        cached.Loads.ShouldBe(0);
 
         // Byte-identical on every channel: a cached render is not a cheaper answer, it is the same answer.
         cached.ShouldMatchTheOutputOf(cold);
@@ -444,19 +436,23 @@ public sealed class RenderCommandE2ETests : IDisposable
     }
 
     [Fact]
-    public async Task Render_NoCache_KeepsBothRunsColdAndWritesNothingBack()
+    public async Task Render_NoCache_OverAFilledSlot_StaysColdAndLeavesTheSlotAlone()
     {
         using var cache = new TempCacheRoot("render-cache");
 
-        (CliResult first, long firstLoads) = await RenderAsync(cache.Root, "--no-cache");
-        (CliResult second, long secondLoads) = await RenderAsync(cache.Root, "--no-cache");
-
-        firstLoads.ShouldBe(1);
-        secondLoads.ShouldBe(1); // no read
+        CliResult filled = await RenderAsync(cache.Root);
         cache.HasCacheFile()
-            .ShouldBeFalse(); // and no write: nothing under the root to go stale
-        first.ShouldSucceed();
-        second.ShouldSucceed();
+            .ShouldBeTrue();
+        string[] slot = WriteFootprint.Of(cache.Root);
+
+        CliResult noCache = await RenderAsync(cache.Root, "--no-cache");
+
+        filled.Loads.ShouldBe(1);
+        noCache.Loads.ShouldBe(1); // no read of the filled slot
+        WriteFootprint.Of(cache.Root)
+            .ShouldBe(slot); // and no write: every file under the root is as the cache-on run left it
+        filled.ShouldSucceed();
+        noCache.ShouldSucceed();
     }
 
     // ── one walk per run, whatever exclusion sets it asks for ────────────────────────────────────────────
@@ -466,7 +462,7 @@ public sealed class RenderCommandE2ETests : IDisposable
     {
         using var cache = new TempCacheRoot("render-cache");
 
-        CacheRun cold = await RenderRunAsync(cache.Root, noCache: true, Architecture);
+        CacheRun cold = await RenderDiagramRunAsync(cache.Root, noCache: true);
 
         // This run asks its source for two models — the cards respect the spec's exclusions, the survey fence
         // draws every declared project — and one walk of the solution serves both: the second model is a merge
@@ -474,8 +470,7 @@ public sealed class RenderCommandE2ETests : IDisposable
         cold.ExtractionCount.ShouldBe(1);
         cold.AcquireCount.ShouldBe(1);
         cold.Result.ShouldSucceed();
-        cold.Result.Out.NormalizedTrimmed()
-            .ShouldBe(RenderSpecCardsWritten + "\nwrote ARCHITECTURE.md");
+        cold.Result.ShouldPrint(RenderSpecCardsWritten + "\nwrote ARCHITECTURE.md");
     }
 
     [Fact]
@@ -483,8 +478,8 @@ public sealed class RenderCommandE2ETests : IDisposable
     {
         using var cache = new TempCacheRoot("render-cache");
 
-        CacheRun cold = await RenderRunAsync(cache.Root, false, Architecture);
-        CacheRun cached = await RenderRunAsync(cache.Root, false, Architecture);
+        CacheRun cold = await RenderDiagramRunAsync(cache.Root, false);
+        CacheRun cached = await RenderDiagramRunAsync(cache.Root, false);
 
         // The fingerprint and the write-back live on the one-walk path, so the walk count is what says the
         // slot was filled once: a second walk would have re-fingerprinted and re-written it.
@@ -496,36 +491,35 @@ public sealed class RenderCommandE2ETests : IDisposable
         cached.Outcome.ShouldBe(CodebaseSourceOutcome.Hit);
         cached.ExtractionCount.ShouldBe(0); // a hit takes the stored fragments whole and walks nothing
         cached.AcquireCount.ShouldBe(0);
-        cached.Result.Out.NormalizedTrimmed()
-            .ShouldBe(
-                "unchanged AGENTS.md\nunchanged MyApp.Legacy.Billing/AGENTS.md\n" +
-                "unchanged MyApp.Domain/AGENTS.md\nunchanged ARCHITECTURE.md");
+        cached.Result.ShouldPrint(
+            "unchanged AGENTS.md\nunchanged MyApp.Legacy.Billing/AGENTS.md\n" +
+            "unchanged MyApp.Domain/AGENTS.md\nunchanged ARCHITECTURE.md");
     }
 
     // Renders cold — every invocation opens (or declines to open) its own workspace, which is what makes the
     // load count mean "did this run reach MSBuild" — with the persisted cache isolated at a private root.
-    private async Task<(CliResult Result, long Loads)> RenderAsync(string cacheRoot, params string[] extra)
+    private Task<CliResult> RenderAsync(string cacheRoot, params string[] extra)
     {
         FakeEnvironment environment = FakeEnvironment.WithCacheRoot(cacheRoot);
         string[] args =
             ["render", _workspace.SolutionPath, "--spec", CliRunner.RenderSpecDll, .. extra];
 
-        CliResult result = await CliRunner.InvokeColdAsync(environment, args);
-        return (result, result.Loads);
+        return CliRunner.InvokeColdAsync(environment, args);
     }
 
     // The runner directly rather than the command tree, because the walk count is a runner observable the
     // command line has no way to surface — output is byte-identical whichever path a run takes, which is the
     // whole claim.
-    private Task<CacheRun> RenderRunAsync(string cacheRoot, bool noCache, string? diagram = null)
+    private Task<CacheRun> RenderDiagramRunAsync(string cacheRoot, bool noCache)
     {
         var request = new RenderRequest(
-            _workspace.SolutionPath, CliRunner.RenderSpecDll, SolutionDirectory, noCache, false, diagram);
+            _workspace.SolutionPath, CliRunner.RenderSpecDll, SolutionDirectory, noCache, false, Architecture);
 
         return CacheRuns.RunAsync(
             cacheRoot,
             static (output, error, counting, environment) => new RenderRunner(output, error, counting, environment),
-            runner => runner.RunAsync(request, Ct));
+            runner => runner.RunAsync(request, Ct),
+            CountingSolutionSource.OverWarmPool());
     }
 
     // ── the model file ───────────────────────────────────────────────────────────────────────────────────
@@ -541,8 +535,7 @@ public sealed class RenderCommandE2ETests : IDisposable
             "render", _workspace.SolutionPath, "--spec", CliRunner.RenderSpecDll, "--model");
 
         result.ShouldSucceed();
-        result.Out.NormalizedTrimmed()
-            .ShouldBe(RenderSpecModelWritten);
+        result.ShouldPrint(RenderSpecModelWritten);
 
         string written = File.ReadAllText(ModelFilePath);
         written.ShouldEndWith("\n");
@@ -572,10 +565,9 @@ public sealed class RenderCommandE2ETests : IDisposable
             "render", _workspace.SolutionPath, "--spec", CliRunner.RenderSpecDll);
 
         second.ShouldSucceed();
-        second.Out.NormalizedTrimmed()
-            .ShouldBe(
-                "unchanged AGENTS.md\nunchanged MyApp.Legacy.Billing/AGENTS.md\n"
-                + "unchanged MyApp.Domain/AGENTS.md\nunchanged sliderule.model.json");
+        second.ShouldPrint(
+            "unchanged AGENTS.md\nunchanged MyApp.Legacy.Billing/AGENTS.md\n"
+            + "unchanged MyApp.Domain/AGENTS.md\nunchanged sliderule.model.json");
         File.GetLastWriteTimeUtc(ModelFilePath)
             .ShouldBe(Stamped);
     }
@@ -591,8 +583,7 @@ public sealed class RenderCommandE2ETests : IDisposable
             "render", _workspace.SolutionPath, "--spec", CliRunner.RenderSpecDll);
 
         result.ShouldSucceed();
-        result.Out.NormalizedTrimmed()
-            .ShouldBe(RenderSpecModelWritten);
+        result.ShouldPrint(RenderSpecModelWritten);
     }
 
     [Fact]
@@ -604,17 +595,15 @@ public sealed class RenderCommandE2ETests : IDisposable
         // beside a model file the run refused to write.
         CliResult result = await RenderWithFailedProjectAsync(model: true);
 
-        result.ShouldRefuseWith();
+        result.ShouldRefuseWith(
+            "error: the model is incomplete — 1 project failed to load, so --model was refused and "
+            + "nothing was rendered: the model file names every project the spec governs, and one "
+            + "written now would leave out exactly the projects that failed:\n"
+            + $"  {BrokenProject}\n"
+            + "See the warnings above for why, then restore and build the solution (dotnet build). "
+            + "--allow-workspace-diagnostics renders the block and the cards from the partial model, but "
+            + "never the model file; drop --model to do that.");
         result.Out.ShouldBeEmpty();
-        result.Err.NormalizedLines()
-            .ShouldContain(
-                "error: the model is incomplete — 1 project failed to load, so --model was refused and "
-                + "nothing was rendered: the model file names every project the spec governs, and one "
-                + "written now would leave out exactly the projects that failed:\n"
-                + $"  {BrokenProject}\n"
-                + "See the warnings above for why, then restore and build the solution (dotnet build). "
-                + "--allow-workspace-diagnostics renders the block and the cards from the partial model, but "
-                + "never the model file; drop --model to do that.");
         File.Exists(ModelFilePath)
             .ShouldBeFalse();
         File.Exists(RootAgents)
@@ -634,13 +623,11 @@ public sealed class RenderCommandE2ETests : IDisposable
         CliResult result = await RenderWithFailedProjectAsync(model: false);
 
         result.ShouldSucceed();
-        result.Out.NormalizedTrimmed()
-            .ShouldBe(RenderSpecCardsWritten);
-        result.Err.NormalizedLines()
-            .ShouldContain(
-                "warning: sliderule.model.json was not refreshed — 1 project failed to load, and a model "
-                + "file written now would leave out exactly those projects. Build the solution "
-                + "(dotnet build), then render again.");
+        result.ShouldPrint(RenderSpecCardsWritten);
+        result.Err.ShouldContain(
+            "warning: sliderule.model.json was not refreshed — 1 project failed to load, and a model "
+            + "file written now would leave out exactly those projects. Build the solution "
+            + "(dotnet build), then render again.");
         File.ReadAllBytes(ModelFilePath)
             .ShouldBe(Encoding.UTF8.GetBytes(StaleModelFile));
         File.GetLastWriteTimeUtc(ModelFilePath)
@@ -670,12 +657,10 @@ public sealed class RenderCommandE2ETests : IDisposable
         CliResult result = await CliRunner.InvokeAsync("render", _workspace.SolutionPath, "--spec", CliRunner.RenderSpecDll);
 
         result.ShouldSucceed();
-        result.Out.NormalizedTrimmed()
-            .ShouldBe(RenderSpecCardsWritten);
-        result.Err.NormalizedLines()
-            .ShouldContain(
-                "warning: by default Claude Code reads CLAUDE.md instead of AGENTS.md, so its sessions miss the "
-                + "managed block; add the line @AGENTS.md to CLAUDE.md.");
+        result.ShouldPrint(RenderSpecCardsWritten);
+        result.Err.ShouldContain(
+            "warning: by default Claude Code reads CLAUDE.md instead of AGENTS.md, so its sessions miss the "
+            + "managed block; add the line @AGENTS.md to CLAUDE.md.");
     }
 
     [Fact]
@@ -686,8 +671,7 @@ public sealed class RenderCommandE2ETests : IDisposable
         CliResult result = await CliRunner.InvokeAsync("render", _workspace.SolutionPath, "--spec", CliRunner.RenderSpecDll);
 
         result.ShouldSucceed();
-        result.Out.NormalizedTrimmed()
-            .ShouldBe(RenderSpecCardsWritten);
+        result.ShouldPrint(RenderSpecCardsWritten);
         result.Err.ShouldNotContain("Claude Code");
     }
 
@@ -700,12 +684,10 @@ public sealed class RenderCommandE2ETests : IDisposable
         CliResult result = await CliRunner.InvokeAsync("render", _workspace.SolutionPath, "--spec", CliRunner.RenderSpecDll);
 
         result.ShouldSucceed();
-        result.Out.NormalizedTrimmed()
-            .ShouldBe(RenderSpecCardsWritten);
-        result.Err.NormalizedLines()
-            .ShouldContain(
-                "warning: by default Claude Code reads CLAUDE.local.md instead of AGENTS.md, so its sessions miss "
-                + "the managed block; add a CLAUDE.md beside AGENTS.md holding the line @AGENTS.md.");
+        result.ShouldPrint(RenderSpecCardsWritten);
+        result.Err.ShouldContain(
+            "warning: by default Claude Code reads CLAUDE.local.md instead of AGENTS.md, so its sessions miss "
+            + "the managed block; add a CLAUDE.md beside AGENTS.md holding the line @AGENTS.md.");
     }
 
     [Fact]
@@ -716,8 +698,7 @@ public sealed class RenderCommandE2ETests : IDisposable
         CliResult result = await CliRunner.InvokeAsync("render", _workspace.SolutionPath, "--spec", CliRunner.RenderSpecDll);
 
         result.ShouldSucceed();
-        result.Out.NormalizedTrimmed()
-            .ShouldBe(RenderSpecCardsWritten);
+        result.ShouldPrint(RenderSpecCardsWritten);
         result.Err.ShouldNotContain("Claude Code");
     }
 
@@ -785,11 +766,9 @@ public sealed class RenderCommandE2ETests : IDisposable
         // Assert — a card whose file does not exist yet is stale too, which is what lets the check stand in
         // for a render followed by an unscoped diff.
         result.ShouldReportViolations();
-        result.Out.NormalizedTrimmed()
-            .ShouldBe(
-                "stale AGENTS.md\nstale MyApp.Legacy.Billing/AGENTS.md\nstale MyApp.Domain/AGENTS.md\n"
-                + $"render --check: 3 files of 3 would change; run 'sliderule render' {CheckVerdictTail}",
-                result.Transcript());
+        result.ShouldPrint(
+            "stale AGENTS.md\nstale MyApp.Legacy.Billing/AGENTS.md\nstale MyApp.Domain/AGENTS.md\n"
+            + $"render --check: 3 files of 3 would change; run 'sliderule render' {CheckVerdictTail}");
         File.Exists(RootAgents)
             .ShouldBeFalse();
     }
@@ -806,11 +785,9 @@ public sealed class RenderCommandE2ETests : IDisposable
 
         // Assert
         result.ShouldSucceed();
-        result.Out.NormalizedTrimmed()
-            .ShouldBe(
-                "current AGENTS.md\ncurrent MyApp.Legacy.Billing/AGENTS.md\ncurrent MyApp.Domain/AGENTS.md\n"
-                + "current sliderule.model.json\ncurrent ARCHITECTURE.md",
-                result.Transcript());
+        result.ShouldPrint(
+            "current AGENTS.md\ncurrent MyApp.Legacy.Billing/AGENTS.md\ncurrent MyApp.Domain/AGENTS.md\n"
+            + "current sliderule.model.json\ncurrent ARCHITECTURE.md");
     }
 
     [Fact]
@@ -838,18 +815,9 @@ public sealed class RenderCommandE2ETests : IDisposable
         return $"<!-- sliderule:begin -->{nl}{body.Replace("\n", nl)}{nl}<!-- sliderule:end -->{nl}";
     }
 
-    // A hand-authored file with prose above and below the managed block.
-    private static string Seeded(string nl)
+    // A hand-authored file with prose above and below a managed block holding body.
+    private static string Seeded(string body, string nl)
     {
-        return $"# My Project{nl}Hand-written intro.{nl}{nl}" +
-               $"<!-- sliderule:begin -->{nl}OLD BODY{nl}<!-- sliderule:end -->{nl}{nl}" +
-               $"Footer stays put.{nl}";
-    }
-
-    private static string SeededAfterRender(string nl)
-    {
-        return $"# My Project{nl}Hand-written intro.{nl}{nl}" +
-               $"<!-- sliderule:begin -->{nl}{RootBody.Replace("\n", nl)}{nl}<!-- sliderule:end -->{nl}{nl}" +
-               $"Footer stays put.{nl}";
+        return $"# My Project{nl}Hand-written intro.{nl}{nl}" + Wrap(body, nl) + $"{nl}Footer stays put.{nl}";
     }
 }

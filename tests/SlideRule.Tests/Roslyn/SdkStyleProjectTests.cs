@@ -163,8 +163,7 @@ public sealed class SdkStyleProjectTests
     public void IsSdkStyle_OverTheShapesAProjectFileCanTake_ClassifiesEachOne(string projectXml, bool expected)
     {
         using TempDirectory temp = TestTempRoot.Fresh("sdk-style-shapes");
-        string projectPath = Path.Combine(temp.Path, "Shape.csproj");
-        File.WriteAllText(projectPath, projectXml);
+        string projectPath = temp.WriteFile(["Shape.csproj"], projectXml);
 
         SdkStyleProject.IsSdkStyle(projectPath)
             .ShouldBe(expected, projectXml);
@@ -177,7 +176,7 @@ public sealed class SdkStyleProjectTests
         // blames that project, and this must not answer a second time — nor throw where nothing is caught.
         using TempDirectory temp = TestTempRoot.Fresh("sdk-style-absent");
 
-        SdkStyleProject.IsSdkStyle(Path.Combine(temp.Path, "Gone.csproj"))
+        SdkStyleProject.IsSdkStyle(temp.PathOf("Gone.csproj"))
             .ShouldBeFalse();
     }
 
@@ -210,7 +209,7 @@ public sealed class SdkStyleProjectTests
         // the one project in the corpus that is not SDK-style is the one the restore gate must never blame,
         // because it was never going to write the file whose absence is being read.
         string classicBilling = Path.Combine(
-            FixturesRoot, "LegacySolutions", "ClassicApp", "Classic.Billing", "Classic.Billing.csproj");
+            FixtureBeds.FixturesRoot, "LegacySolutions", "ClassicApp", "Classic.Billing", "Classic.Billing.csproj");
         using var workspace = new AdhocWorkspace();
         Solution solution = workspace.WithProjects(AdhocSolution.Loaded("Classic.Billing", classicBilling));
 
@@ -218,15 +217,13 @@ public sealed class SdkStyleProjectTests
             .ShouldBeEmpty();
     }
 
-    private static string FixturesRoot => Path.Combine(AppContext.BaseDirectory, "Fixtures");
-
     // Every project file the corpus covers: the fixture trees as the test output holds them (which is what
     // FixtureRestorer restores, so the assets column reads the same files the suite runs against), plus this
     // repo's own shipping and dogfood projects. These three roots are the whole scan — nothing under
     // tests/Fixtures/ or examples/ is read, which the class remarks state as a limit rather than an omission.
     private static IEnumerable<string> RealProjectFiles()
     {
-        string[] roots = [FixturesRoot, RepoRoot.Absolute("src"), RepoRoot.Absolute("arch")];
+        string[] roots = [FixtureBeds.FixturesRoot, RepoRoot.Absolute("src"), RepoRoot.Absolute("arch")];
 
         return roots
             .Where(Directory.Exists)

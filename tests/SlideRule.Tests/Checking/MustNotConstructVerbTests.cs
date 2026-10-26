@@ -44,11 +44,8 @@ public sealed class MustNotConstructVerbTests
     [Fact]
     public void MustNotConstruct_SubjectConstructsBannedType_FailsWithSourceTargetSitesAndHumanLine()
     {
-        RuleResult result = Checker.Run(SceneModel, arch =>
-                arch.Rule("di/no-new-widget")
-                    .Enforce(arch.Namespace("App.*").MustNotConstruct(arch.Namespace("Widgets.*")))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(SceneModel, arch => arch.Namespace("App.*")
+            .MustNotConstruct(arch.Namespace("Widgets.*")));
 
         result.ShouldHaveFailedWithSingleEdge(ViolationKind.Construction, "App.WidgetFactory", "Widgets.Widget");
 
@@ -63,12 +60,8 @@ public sealed class MustNotConstructVerbTests
         // WidgetConsumer takes Widget as a ctor param, holds it as a field, and returns it — reference edges
         // all — but never `new`s it. "You may use it; you may not create it": construction is silent here even
         // though MustNotReference on the same subject would fire. The target resolves, so this is not inert.
-        RuleResult result = Checker.Run(SceneModel, arch =>
-                arch.Rule("di/no-new-widget")
-                    .Enforce(arch.Namespace("App.*").WithSuffix("Consumer")
-                        .MustNotConstruct(arch.Namespace("Widgets.*")))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(SceneModel, arch => arch.Namespace("App.*").WithSuffix("Consumer")
+            .MustNotConstruct(arch.Namespace("Widgets.*")));
 
         result.ShouldHavePassedClean();
     }
@@ -91,11 +84,8 @@ public sealed class MustNotConstructVerbTests
                               }
                               """;
 
-        RuleResult result = Checker.Run(source, arch =>
-                arch.Rule("di/no-new-widget")
-                    .Enforce(arch.Namespace("App.*").MustNotConstruct(arch.Namespace("Widgets.*")))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(source, arch => arch.Namespace("App.*")
+            .MustNotConstruct(arch.Namespace("Widgets.*")));
 
         result.ShouldHaveFailedWithSingleEdge(ViolationKind.Construction, "App.Factory", "Widgets.Widget");
     }
@@ -112,12 +102,9 @@ public sealed class MustNotConstructVerbTests
                               namespace App.Composition { public class Root { public Widgets.Widget Compose() => new Widgets.Widget(); } }
                               """;
 
-        RuleResult result = Checker.Run(source, arch =>
-                arch.Rule("di/no-new-widget")
-                    .Enforce(arch.Namespace("App.*").Except(arch.Namespace("App.Composition.*"))
-                        .MustNotConstruct(arch.Namespace("Widgets.*")))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(source, arch => arch.Namespace("App.*")
+            .Except(arch.Namespace("App.Composition.*"))
+            .MustNotConstruct(arch.Namespace("Widgets.*")));
 
         result.ShouldHaveFailedWithEdges(ViolationKind.Construction, ["App.WidgetFactory -> Widgets.Widget"]);
     }
@@ -157,11 +144,8 @@ public sealed class MustNotConstructVerbTests
     {
         // The forbidden target (a namespace glob) matches no types, so the rule can never fire — inert. The
         // pattern operand is the warning gate, exactly as MustNotReference's inert-target semantics (§4.1).
-        RuleResult result = Checker.Run(SceneModel, arch =>
-                arch.Rule("di/inert")
-                    .Enforce(arch.Namespace("App.*").MustNotConstruct(arch.Namespace("Nonexistent.*")))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(SceneModel, arch => arch.Namespace("App.*")
+            .MustNotConstruct(arch.Namespace("Nonexistent.*")));
 
         result.ShouldHaveWarnedInertTarget();
     }

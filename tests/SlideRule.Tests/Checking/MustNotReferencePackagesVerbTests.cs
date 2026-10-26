@@ -35,10 +35,8 @@ public sealed class MustNotReferencePackagesVerbTests
     [Fact]
     public void MustNotReferencePackages_BannedPackage_FailsAtItsOwnDeclaration_IgnoringCase()
     {
-        Checker.Run(Scene, arch => arch.Rule("packaging/no-v7-packages")
-                .Enforce(arch.Projects.Matching("*").MustNotReferencePackages("GreenPipes", "MassTransit.Host"))
-                .Because("b"))
-            .Single()
+        Checker.Verdict(Scene, arch => arch.Projects.Matching("*")
+                .MustNotReferencePackages("GreenPipes", "MassTransit.Host"))
             .ShouldHaveFailedWithProjectAtSites("Bus -> greenpipes", ["src/Bus/Bus.csproj:9"]);
     }
 
@@ -46,10 +44,7 @@ public sealed class MustNotReferencePackagesVerbTests
     public void MustNotReferencePackages_PrivateReference_StillCounts()
     {
         // The difference from the other two package verbs: privacy exempts nothing from a ban.
-        Checker.Run(Scene, arch => arch.Rule("packaging/no-stylecop")
-                .Enforce(arch.Projects.Named("Bus").MustNotReferencePackages("StyleCop.*"))
-                .Because("b"))
-            .Single()
+        Checker.Verdict(Scene, arch => arch.Projects.Named("Bus").MustNotReferencePackages("StyleCop.*"))
             .ShouldHaveFailedWithProjectAtSites("Bus -> StyleCop.Analyzers", ["Directory.Build.props:6"]);
     }
 
@@ -58,10 +53,7 @@ public sealed class MustNotReferencePackagesVerbTests
     {
         // The retired package nobody references any more is the case the ban exists for, and it is green with no
         // warning about the pattern.
-        Checker.Run(Scene, arch => arch.Rule("packaging/no-v7-packages")
-                .Enforce(arch.Projects.Matching("*").MustNotReferencePackages("MassTransit.Host"))
-                .Because("b"))
-            .Single()
+        Checker.Verdict(Scene, arch => arch.Projects.Matching("*").MustNotReferencePackages("MassTransit.Host"))
             .ShouldHavePassedClean();
     }
 
@@ -70,10 +62,7 @@ public sealed class MustNotReferencePackagesVerbTests
     {
         // `*` counts every declared reference, private ones included, where MustReferenceNoPackages passes the
         // private one.
-        RuleResult result = Checker.Run(Scene, arch => arch.Rule("packaging/bare")
-                .Enforce(arch.Projects.Named("Bus").MustNotReferencePackages("*"))
-                .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(Scene, arch => arch.Projects.Named("Bus").MustNotReferencePackages("*"));
 
         result.ShouldHaveFailedWithProjectSubjects(
             ["Bus -> greenpipes", "Bus -> Microsoft.Extensions.Logging", "Bus -> StyleCop.Analyzers"]);
@@ -91,10 +80,7 @@ public sealed class MustNotReferencePackagesVerbTests
     public void MustNotReferencePackages_ProjectDeclaringNothing_PassesClean()
     {
         // Declared-none and never-evaluated are one state here, and both pass.
-        Checker.Run(Scene, arch => arch.Rule("packaging/bare")
-                .Enforce(arch.Projects.Named("Contract").MustNotReferencePackages("*"))
-                .Because("b"))
-            .Single()
+        Checker.Verdict(Scene, arch => arch.Projects.Named("Contract").MustNotReferencePackages("*"))
             .ShouldHavePassedClean();
     }
 }

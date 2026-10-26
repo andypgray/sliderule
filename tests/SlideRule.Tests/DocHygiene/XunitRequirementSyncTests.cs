@@ -128,7 +128,6 @@ public sealed class XunitRequirementSyncTests
         // its projects reach.
         IReadOnlyList<string> findings = DependabotEntries.MissingIgnores(
             AuthoringPair,
-            "the pair",
             "raises the adapter's xunit.v3 requirement");
 
         // Assert

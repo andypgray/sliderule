@@ -243,12 +243,9 @@ public sealed class ProjectLoadFailuresTests
         WriteSolution(temp, members);
 
         IEnumerable<string> entries = selected.Select(name => $"\"{name}\\\\{name}.csproj\"");
-        string filterPath = temp.PathOf("Filter.slnf");
-        File.WriteAllText(
-            filterPath,
+        return temp.WriteFile(
+            ["Filter.slnf"],
             $"{{\"solution\":{{\"path\":\"Solution.sln\",\"projects\":[{string.Join(",", entries)}]}}}}");
-
-        return filterPath;
     }
 
     // A fabricated path, rooted for the OS running the test. Detect reports every path through

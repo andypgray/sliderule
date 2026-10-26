@@ -97,14 +97,14 @@ public sealed class RenderContainmentE2ETests
     public async Task Render_ProjectCompilingAPackageFile_WritesOnlyInsideTheSolution()
     {
         using TempFixtureWorkspace workspace = TempFixtureWorkspace.Dedicated(FixtureDirectory, SolutionFile, false);
-        using ScopedEnvironmentVariable scopedPackages = RestoreWithTheShimPackage(workspace);
+        using var scopedPackages = new ScopedEnvironmentVariable("NUGET_PACKAGES", PackagesRoot(workspace));
+        ShouldRestoreWithTheShimPackage(workspace);
         string specDll = WriteSpec(workspace, ProjectLayerSpec, "ProjectLayerSpec");
 
         CliResult result = await Render(workspace.SolutionPath, specDll);
 
         result.ShouldSucceed();
-        result.Out.NormalizedTrimmed()
-            .ShouldBe("wrote AGENTS.md\nwrote Extensions/Acme.Json/AGENTS.md", result.Transcript());
+        result.ShouldPrint("wrote AGENTS.md\nwrote Extensions/Acme.Json/AGENTS.md");
         AgentsFilesUnder(workspace)
             .ShouldBe(["b/repo/src/AGENTS.md", "b/repo/src/Extensions/Acme.Json/AGENTS.md"]);
     }
@@ -113,14 +113,14 @@ public sealed class RenderContainmentE2ETests
     public async Task Render_LayerOfOnlyPackageFiles_WarnsAndWritesNothingUnderThePackages()
     {
         using TempFixtureWorkspace workspace = TempFixtureWorkspace.Dedicated(FixtureDirectory, SolutionFile, false);
-        using ScopedEnvironmentVariable scopedPackages = RestoreWithTheShimPackage(workspace);
+        using var scopedPackages = new ScopedEnvironmentVariable("NUGET_PACKAGES", PackagesRoot(workspace));
+        ShouldRestoreWithTheShimPackage(workspace);
         string specDll = WriteSpec(workspace, ShimLayerSpec, "ShimLayerSpec");
 
         CliResult result = await Render(workspace.SolutionPath, specDll);
 
         result.ShouldSucceed();
-        result.Out.NormalizedTrimmed()
-            .ShouldBe("wrote AGENTS.md", result.Transcript());
+        result.ShouldPrint("wrote AGENTS.md");
         result.Err.ShouldContain(
             "warning: layer 'Shims' matched only types declared outside the solution directory; no scoped context emitted",
             customMessage: result.Transcript());
@@ -137,7 +137,8 @@ public sealed class RenderContainmentE2ETests
         string linkedTree = workspace.PathOf("linked");
         SymlinkSupport.CreateDirectorySymlink(linkedTree, workspace.PathOf("b"));
 
-        using ScopedEnvironmentVariable scopedPackages = RestoreWithTheShimPackage(workspace);
+        using var scopedPackages = new ScopedEnvironmentVariable("NUGET_PACKAGES", PackagesRoot(workspace));
+        ShouldRestoreWithTheShimPackage(workspace);
         string specDll = WriteSpec(workspace, ProjectLayerSpec, "ProjectLayerSpec");
         string linkedSolution = Path.Combine(linkedTree, "repo", "src", SolutionFileName);
 
@@ -146,8 +147,7 @@ public sealed class RenderContainmentE2ETests
         // The declaration sites the model records are resolved through links, so a solution directory spelled
         // through one would hold none of them and every card would be skipped.
         result.ShouldSucceed();
-        result.Out.NormalizedTrimmed()
-            .ShouldBe("wrote AGENTS.md\nwrote Extensions/Acme.Json/AGENTS.md", result.Transcript());
+        result.ShouldPrint("wrote AGENTS.md\nwrote Extensions/Acme.Json/AGENTS.md");
     }
 
     [Fact]
@@ -155,7 +155,8 @@ public sealed class RenderContainmentE2ETests
     {
         using TempFixtureWorkspace workspace = TempFixtureWorkspace.Dedicated(FixtureDirectory, SolutionFile, false);
         File.WriteAllText(workspace.PathOf("b", "repo", "CLAUDE.md"), "# Repository rules\n");
-        using ScopedEnvironmentVariable scopedPackages = RestoreWithTheShimPackage(workspace);
+        using var scopedPackages = new ScopedEnvironmentVariable("NUGET_PACKAGES", PackagesRoot(workspace));
+        ShouldRestoreWithTheShimPackage(workspace);
         string specDll = WriteSpec(workspace, ProjectLayerSpec, "ProjectLayerSpec");
 
         CliResult result = await Render(workspace.SolutionPath, specDll);
@@ -163,8 +164,7 @@ public sealed class RenderContainmentE2ETests
         // Claude Code counts a CLAUDE.md in any directory above the one it starts in, and the path reads from the
         // solution directory like every other path render prints.
         result.ShouldSucceed();
-        result.Out.NormalizedTrimmed()
-            .ShouldBe("wrote AGENTS.md\nwrote Extensions/Acme.Json/AGENTS.md", result.Transcript());
+        result.ShouldPrint("wrote AGENTS.md\nwrote Extensions/Acme.Json/AGENTS.md");
         result.Err.ShouldContain(
             "warning: by default Claude Code reads ../CLAUDE.md instead of AGENTS.md, so its sessions miss the "
             + "managed block; add a CLAUDE.md beside AGENTS.md holding the line @AGENTS.md.",
@@ -182,12 +182,11 @@ public sealed class RenderContainmentE2ETests
 
     // The feed, then a cold restore against it, then the two facts every assertion above rests on: the package
     // file was extracted, and the restore handed it to the project to compile. Asserted here so that a failure
-    // below them can only be about where render placed a card. The scope over NUGET_PACKAGES comes back for
-    // the caller to hold, because the render the fact runs next must read the same package folder.
-    private static ScopedEnvironmentVariable RestoreWithTheShimPackage(TempFixtureWorkspace workspace)
+    // below them can only be about where render placed a card. The caller holds the NUGET_PACKAGES scope around
+    // this call and the render after it, because both must read the same package folder.
+    private static void ShouldRestoreWithTheShimPackage(TempFixtureWorkspace workspace)
     {
         string packagesRoot = PackagesRoot(workspace);
-        var scopedPackages = new ScopedEnvironmentVariable("NUGET_PACKAGES", packagesRoot);
         string feedDirectory = workspace.PathOf("feed");
         ManufacturedPackage.Publish(feedDirectory, PackageId, PackageVersion, PackageImage.Value);
 
@@ -199,8 +198,6 @@ public sealed class RenderContainmentE2ETests
         string assetsFile = workspace.PathOf("b", "repo", "src", "Extensions", "Acme.Json", "obj", "project.assets.json");
         File.ReadAllText(assetsFile)
             .ShouldContain(ShimEntry);
-
-        return scopedPackages;
     }
 
     // Cold and uncached: the tree is the whole subject, and a pooled session or a cache hit could answer from

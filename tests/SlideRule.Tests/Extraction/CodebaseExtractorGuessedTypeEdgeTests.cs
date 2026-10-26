@@ -48,7 +48,7 @@ public sealed class CodebaseExtractorGuessedTypeEdgeTests
         {
             model.Edges
                 .Where(static edge => edge.Source.FullName == "N.Worker")
-                .Select(static edge => edge.Target.FullName)
+                .TargetNames()
                 .ShouldNotContain(static target => target == "Missing" || target.EndsWith(".Missing", StringComparison.Ordinal),
                     "the reference channel records no candidate for a name with none");
             return;
@@ -69,7 +69,7 @@ public sealed class CodebaseExtractorGuessedTypeEdgeTests
         CodebaseModel model = ExtractWorker(member);
 
         model.CatchEdges("N.Worker")
-            .Select(edge => edge.Caught.FullName)
+            .TargetNames()
             .ShouldBe(Expected(candidate));
         ShouldAgreeWithTheReferenceEdge(model, candidate);
     }
@@ -86,7 +86,7 @@ public sealed class CodebaseExtractorGuessedTypeEdgeTests
         CodebaseModel model = ExtractWorker(member);
 
         model.ThrowEdges("N.Worker")
-            .Select(edge => edge.Thrown.FullName)
+            .TargetNames()
             .ShouldBe(Expected(candidate));
         ShouldAgreeWithTheReferenceEdge(model, candidate);
     }
@@ -103,7 +103,7 @@ public sealed class CodebaseExtractorGuessedTypeEdgeTests
         CodebaseModel model = ExtractWorker(member);
 
         model.ConstructorEdges("N.Worker")
-            .Select(edge => edge.Constructed.FullName)
+            .TargetNames()
             .ShouldBe(Expected(candidate));
         ShouldAgreeWithTheReferenceEdge(model, candidate);
     }

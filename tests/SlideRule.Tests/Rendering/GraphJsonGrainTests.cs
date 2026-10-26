@@ -44,8 +44,7 @@ public sealed class GraphJsonGrainTests
         // survey of a troubled load inside a channel. It is the last thing the floor drops.
         string index = Render(DocumentGrain.Index, [Diagnostic, Diagnostic]);
 
-        index.ShouldNotContain("\"workspaceDiagnostics\"");
-        index.ShouldContain("\"workspaceDiagnosticCount\": 2");
+        index.ShouldElideDiagnosticStreamTo(2);
     }
 
     [Fact]
@@ -70,8 +69,7 @@ public sealed class GraphJsonGrainTests
         {
             string document = Render(grain, [Diagnostic]);
 
-            document.ShouldContain("\"workspaceDiagnostics\"");
-            document.ShouldNotContain("\"workspaceDiagnosticCount\"");
+            document.ShouldKeepDiagnosticStreamWhole();
         }
     }
 
@@ -82,7 +80,7 @@ public sealed class GraphJsonGrainTests
         // an elision reports what it dropped, so dropping nothing reports nothing.
         string index = Render(DocumentGrain.Index, []);
 
-        index.ShouldNotContain("\"workspaceDiagnostic");
+        index.ShouldCarryNoDiagnosticStream();
         index.ShouldCarryNoPackageAudit();
     }
 
@@ -112,7 +110,7 @@ public sealed class GraphJsonGrainTests
         // empty stream rather than writing a bare array beside the entry.
         string full = Render(DocumentGrain.Full, [], [AuditFetchFailure]);
 
-        full.ShouldNotContain("\"workspaceDiagnostic");
+        full.ShouldCarryNoDiagnosticStream();
         full.ShouldCarryPackageAudit(CapturedAuditLines.AuditFetchFailure, ["Acme.App"]);
     }
 
@@ -254,16 +252,12 @@ public sealed class GraphJsonGrainTests
             undeclaredProjectReferences: undeclaredProjectReferences);
         GraphSummary summary = new([project], [], [], [], []);
 
-        // Named, because five of the seven slots are IReadOnlyList<string> and this test's whole subject
-        // is which of them survive the floor rung.
-        var diagnostics = new WorkspaceDiagnostics(
-            LoadFailures: loadFailures ?? [],
-            MergeNotes: [],
-            FailedProjects: ["Acme.App/Acme.App.csproj"],
-            UncheckedProjects: [],
-            RestoreFailedProjects: ["Acme.Core/Acme.Core.csproj"],
-            UnsupportedProjects: [],
-            MultiTargetedProjects: []);
+        WorkspaceDiagnostics diagnostics = WorkspaceDiagnostics.None with
+        {
+            LoadFailures = loadFailures ?? [],
+            FailedProjects = ["Acme.App/Acme.App.csproj"],
+            RestoreFailedProjects = ["Acme.Core/Acme.Core.csproj"]
+        };
 
         return GraphJsonRenderer.Document(
             summary,

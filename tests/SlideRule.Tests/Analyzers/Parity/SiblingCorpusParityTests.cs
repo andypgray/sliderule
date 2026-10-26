@@ -80,7 +80,7 @@ public sealed class SiblingCorpusParityTests
             key => key.Rule == "hierarchy/web-holds-no-root");
 
         subject.Expectation.Keys.Describe()
-            .Count.ShouldBe(1, "the whole-solution check sees the sibling's whole hierarchy");
+            .ShouldHaveSingleItem("the whole-solution check sees the sibling's whole hierarchy");
 
         await subject.ShouldHoldOnBothLegsAsync(Ct, gap);
     }
@@ -93,7 +93,7 @@ public sealed class SiblingCorpusParityTests
         ParitySubject subject = SiblingCorpus.ErrorHierarchy(vouched: true);
 
         subject.Expectation.Keys.Describe()
-            .Count.ShouldBe(1, "the whole-solution check sees the sibling's whole hierarchy");
+            .ShouldHaveSingleItem("the whole-solution check sees the sibling's whole hierarchy");
 
         await subject.ShouldHoldOnBothLegsAsync(Ct);
     }
@@ -322,20 +322,17 @@ public sealed class SiblingCorpusParityTests
                 "one crossing per part of the controller, in the file that part writes");
 
         ParityReport perDocument = await PerDocumentAsync(subject);
-        IReadOnlyList<ParityKey> inWeb = perDocument.KeysIn("Web.cs");
-        IReadOnlyList<ParityKey> inAudit = perDocument.KeysIn("Web.Audit.cs");
-
-        inWeb.Count.ShouldBe(1, "the part in Web.cs reaches the store once and the other part's site is not its");
-        inWeb.Describe()
+        perDocument.KeysIn("Web.cs")
+            .ShouldHaveSingleItem("the part in Web.cs reaches the store once and the other part's site is not its")
+            .Describe()
             .ShouldBe(
-                ["partial/web-not-through-data [Reference] T:Web.OrderController -> T:Data.Store at Web.cs:5"],
+                "partial/web-not-through-data [Reference] T:Web.OrderController -> T:Data.Store at Web.cs:5",
                 "the store is held by the part Web.cs writes");
-        inAudit.Count.ShouldBe(1, "the part in Web.Audit.cs reaches the ledger once");
-        inAudit.Describe()
+        perDocument.KeysIn("Web.Audit.cs")
+            .ShouldHaveSingleItem("the part in Web.Audit.cs reaches the ledger once")
+            .Describe()
             .ShouldBe(
-                [
-                    "partial/web-not-through-data [Reference] T:Web.OrderController -> T:Data.Ledger at Web.Audit.cs:5"
-                ],
+                "partial/web-not-through-data [Reference] T:Web.OrderController -> T:Data.Ledger at Web.Audit.cs:5",
                 "the ledger is held by the part Web.Audit.cs writes");
 
         await subject.ShouldHoldOnBothLegsAsync(Ct);
@@ -352,12 +349,11 @@ public sealed class SiblingCorpusParityTests
                 "the declaration that sorts first is where a shape violation is placed");
 
         ParityReport perDocument = await PerDocumentAsync(subject);
-        IReadOnlyList<ParityKey> inA = perDocument.KeysIn("A.cs");
-
-        inA.Count.ShouldBe(1, "the document holding the placed site reports it once");
-        inA.Describe()
+        perDocument.KeysIn("A.cs")
+            .ShouldHaveSingleItem("the document holding the placed site reports it once")
+            .Describe()
             .ShouldBe(
-                ["shapes/controllers-are-sealed [Shape] T:Web.OrderController at A.cs:3"],
+                "shapes/controllers-are-sealed [Shape] T:Web.OrderController at A.cs:3",
                 "the document holding the placed site is the one that reports the violation");
         perDocument.KeysIn("B.cs")
             .ShouldBeEmpty("the other part does not hold the site the violation was placed at");
@@ -394,9 +390,9 @@ public sealed class SiblingCorpusParityTests
 
         // Assert
         perDocument.KeysIn("Web.cs")
-            .Count.ShouldBe(1, "the site Web.cs holds");
+            .ShouldHaveSingleItem("the site Web.cs holds");
         perDocument.KeysIn("Web.More.cs")
-            .Count.ShouldBe(1, "the site Web.More.cs holds");
+            .ShouldHaveSingleItem("the site Web.More.cs holds");
         Ids(perDocument)
             .ShouldBe(["SR2002", "SR2002"], "debt a captured baseline does not hold is new debt, at either site");
         ParityHarness.DescribeWithMessages(perDocument)
@@ -453,7 +449,7 @@ public sealed class SiblingCorpusParityTests
         perDocument.KeysIn("Empty.cs")
             .ShouldBeEmpty("a document that declares no type has nothing any rule here could be broken by");
         perDocument.KeysIn("Web.cs")
-            .Count.ShouldBe(1, "the document that does declare a type is still reported on");
+            .ShouldHaveSingleItem("the document that does declare a type is still reported on");
 
         await subject.ShouldHoldOnBothLegsAsync(Ct);
     }
@@ -538,7 +534,7 @@ public sealed class SiblingCorpusParityTests
         ParityReport perDocument = await PerDocumentAsync(subject);
 
         // Assert
-        batch.Keys.Count.ShouldBe(1, "one warning per site of the first tree, not one per tree under the path");
+        batch.Keys.ShouldHaveSingleItem("one warning per site of the first tree, not one per tree under the path");
         perDocument.Placed.Count.ShouldBe(
             batch.Keys.Count, "the second tree under the path is not its declarer and reports nothing");
 

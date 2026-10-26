@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using SlideRule.Rendering;
-using SlideRule.Tests.TestSupport;
 using Xunit;
 
 namespace SlideRule.Tests.DocHygiene;
@@ -143,11 +142,9 @@ public sealed class CitationLinkTests
     // included, inside a fence, and two marker pairs are a malformed block rather than a doc with no
     // citations. Only a generated context file is vouched for, and a README's copy of a bullet is
     // commentary the quote gates already hold to the block it came from.
-    private static IReadOnlyList<RenderedCitation> ExtractDoc(string doc)
+    private static IReadOnlyList<RenderedCitation> ExtractDoc(string doc, string text)
     {
         if (Path.GetFileName(doc) != ContextFileComposer.FileName) return [];
-
-        string text = RepoRoot.ReadText(doc);
 
         return RenderedCitations.Extract(doc, text);
     }

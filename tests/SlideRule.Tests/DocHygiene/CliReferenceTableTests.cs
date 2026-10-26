@@ -57,7 +57,7 @@ public sealed class CliReferenceTableTests
             .ToList();
 
         // Act
-        List<string> stated = Rows(ExitCodesHeading, "Code")
+        List<string> stated = ShouldHaveRows(ExitCodesHeading, "Code")
             .Select(static row => Unticked(row[0]))
             .ToList();
 
@@ -73,7 +73,7 @@ public sealed class CliReferenceTableTests
     public void DocumentsTable_StatesEachSchemaVersion()
     {
         // Arrange
-        List<string[]> rows = Rows(DocumentsHeading, "Document");
+        List<string[]> rows = ShouldHaveRows(DocumentsHeading, "Document");
 
         // Act
         List<string> drift = rows
@@ -121,7 +121,7 @@ public sealed class CliReferenceTableTests
     {
         // Arrange
         IReadOnlyList<string> declared = DeclaredConstants.Of<string>(typeof(SlideRuleEnvVars));
-        List<string[]> rows = Rows(EnvironmentHeading, "Variable");
+        List<string[]> rows = ShouldHaveRows(EnvironmentHeading, "Variable");
         var idleDefault = $"{IdleTimeoutWatchdog.DefaultTimeoutMinutes} by default";
 
         // Act: the product's own variables are the ones the user sets, and every other one names its host.
@@ -154,7 +154,7 @@ public sealed class CliReferenceTableTests
     public void GrainTable_StatesTheRungsInOrder()
     {
         // Act
-        List<string> stated = Rows(GrainsHeading, "Grain")
+        List<string> stated = ShouldHaveRows(GrainsHeading, "Grain")
             .Select(static row => Unticked(row[0]))
             .ToList();
 
@@ -168,7 +168,7 @@ public sealed class CliReferenceTableTests
     public void HookEventTable_StatesTheEventsTheHookDocumentNames()
     {
         // Act
-        List<string> stated = Rows(DocumentsHeading, "Event")
+        List<string> stated = ShouldHaveRows(DocumentsHeading, "Event")
             .Select(static row => Unticked(row[0]))
             .ToList();
 
@@ -187,9 +187,9 @@ public sealed class CliReferenceTableTests
     // The body rows of the table under "## heading" whose header row opens with firstHeaderCell, each split into its
     // trimmed cells. The page's prose alone is read, so a line of help that happens to start with a pipe is never
     // a row.
-    private static List<string[]> Rows(string heading, string firstHeaderCell)
+    private static List<string[]> ShouldHaveRows(string heading, string firstHeaderCell)
     {
-        IReadOnlyList<(string Text, int Number)> prose = SourceAnchors.ProseLines(RepoRoot.ReadText(DocPaths.Cli));
+        IReadOnlyList<(string Text, int Number)> prose = DocFences.ProseLines(RepoRoot.ReadText(DocPaths.Cli));
         List<string> section = prose
             .Select(static line => line.Text)
             .SkipWhile(line => line != $"## {heading}")

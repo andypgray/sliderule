@@ -99,11 +99,8 @@ public sealed class MustNotSwallowVerbTests
     [Fact]
     public void MustNotSwallow_SubjectSwallowsBannedType_FailsWithSourceTargetSitesAndHumanLine()
     {
-        RuleResult result = Checker.Run(SceneModel, arch =>
-                arch.Rule("ex/no-swallowed-domain-errors")
-                    .Enforce(arch.Namespace("App.*").MustNotSwallow(arch.Namespace("Errors.*")))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(SceneModel, arch => arch.Namespace("App.*")
+            .MustNotSwallow(arch.Namespace("Errors.*")));
 
         // The subject covers all four handlers, and the single-item claim below is the verb's whole point:
         // only the handler that holds the failure is in the report.
@@ -121,11 +118,8 @@ public sealed class MustNotSwallowVerbTests
         // unfiltered handlers red, including the two that suppress nothing, which is the cost this verb removes.
         // Under MustNotSwallow only the handler that holds the failure and continues reds, and the filtered
         // handler is green under both.
-        RuleResult unfiltered = Checker.Run(SceneModel, arch =>
-                arch.Rule("ex/unfiltered")
-                    .Enforce(arch.Namespace("App.*").MustNotCatchUnfiltered(arch.Namespace("Errors.*")))
-                    .Because("b"))
-            .Single();
+        RuleResult unfiltered = Checker.Verdict(SceneModel, arch => arch.Namespace("App.*")
+            .MustNotCatchUnfiltered(arch.Namespace("Errors.*")));
 
         unfiltered.ShouldHaveFailedWithEdges(
             ViolationKind.Catch,
@@ -135,11 +129,8 @@ public sealed class MustNotSwallowVerbTests
                 "App.Translator -> Errors.DbError"
             ]);
 
-        RuleResult swallow = Checker.Run(SceneModel, arch =>
-                arch.Rule("ex/swallow")
-                    .Enforce(arch.Namespace("App.*").MustNotSwallow(arch.Namespace("Errors.*")))
-                    .Because("b"))
-            .Single();
+        RuleResult swallow = Checker.Verdict(SceneModel, arch => arch.Namespace("App.*")
+            .MustNotSwallow(arch.Namespace("Errors.*")));
 
         swallow.ShouldHaveFailedWithEdges(ViolationKind.Catch, ["App.Swallower -> Errors.DbError"]);
     }
@@ -151,11 +142,8 @@ public sealed class MustNotSwallowVerbTests
         // exists, and MustNotCatchUnfiltered would red it — but its clause ends in a throw, so the swallowing
         // subset is empty and the rule passes. The forbidden target resolves (Errors.DbError exists), so this is
         // a real pass, not an inert one.
-        RuleResult result = Checker.Run(SceneModel, arch =>
-                arch.Rule("ex/no-swallowed-domain-errors")
-                    .Enforce(arch.Namespace("App.*").WithSuffix("Rethrower").MustNotSwallow(arch.Namespace("Errors.*")))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(SceneModel, arch => arch.Namespace("App.*").WithSuffix("Rethrower")
+            .MustNotSwallow(arch.Namespace("Errors.*")));
 
         result.ShouldHavePassedClean();
     }
@@ -165,12 +153,8 @@ public sealed class MustNotSwallowVerbTests
     {
         // A filtered swallow stays lawful: the filter is where the handler named its expectations, so the house
         // form the sibling verb rewards keeps passing under the refinement.
-        RuleResult result = Checker.Run(SceneModel, arch =>
-                arch.Rule("ex/no-swallowed-domain-errors")
-                    .Enforce(arch.Namespace("App.*").WithSuffix("FilteredHandler")
-                        .MustNotSwallow(arch.Namespace("Errors.*")))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(SceneModel, arch => arch.Namespace("App.*").WithSuffix("FilteredHandler")
+            .MustNotSwallow(arch.Namespace("Errors.*")));
 
         result.ShouldHavePassedClean();
     }
@@ -187,16 +171,11 @@ public sealed class MustNotSwallowVerbTests
             .UnfilteredSites.Lines()
             .ShouldBe([9, 11]);
 
-        RuleResult result = Checker.Run(MixedModel, arch =>
-                arch.Rule("ex/no-swallowed-domain-errors")
-                    .Enforce(arch.Namespace("App.*").MustNotSwallow(arch.Namespace("Errors.*")))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(MixedModel, arch => arch.Namespace("App.*")
+            .MustNotSwallow(arch.Namespace("Errors.*")));
 
-        result.ShouldHaveFailed();
-        Violation violation = result.Violations.ShouldHaveSingleItem();
-        violation.Sites.Select(site => site.Line)
-            .ShouldBe([11]);
+        result.ShouldHaveFailedWithEdgeAtSites(
+            ViolationKind.Catch, "App.MixedHandler", "Errors.DbError", ["Test.cs:11"]);
 
         string block = result.HumanBlock();
         block.ShouldContain("Test.cs:11 — App.MixedHandler catches Errors.DbError");
@@ -232,11 +211,8 @@ public sealed class MustNotSwallowVerbTests
                               }
                               """;
 
-        RuleResult result = Checker.Run(source, arch =>
-                arch.Rule("ex/no-swallowed-domain-errors")
-                    .Enforce(arch.Namespace("App.*").MustNotSwallow(arch.Namespace("Errors.*")))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(source, arch => arch.Namespace("App.*")
+            .MustNotSwallow(arch.Namespace("Errors.*")));
 
         result.ShouldHaveFailedWithEdges(ViolationKind.Catch, ["App.NotLast -> Errors.DbError"]);
     }
@@ -247,11 +223,8 @@ public sealed class MustNotSwallowVerbTests
         // The forbidden target (a namespace glob) matches no types, so the rule can never fire — inert. The
         // pattern operand is the warning gate: the verb joins the forbidden-set inert-warn family (§4.1) exactly
         // as its siblings do.
-        RuleResult result = Checker.Run(SceneModel, arch =>
-                arch.Rule("ex/inert")
-                    .Enforce(arch.Namespace("App.*").MustNotSwallow(arch.Namespace("Nonexistent.*")))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(SceneModel, arch => arch.Namespace("App.*")
+            .MustNotSwallow(arch.Namespace("Nonexistent.*")));
 
         result.ShouldHaveWarnedInertTarget();
     }

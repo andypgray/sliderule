@@ -1,8 +1,8 @@
 using Shouldly;
-using SlideRule.Baselines;
 using SlideRule.Checking;
 using SlideRule.Codebase;
 using SlideRule.Tests.Extraction;
+using SlideRule.Tests.TestSupport;
 using Xunit;
 
 namespace SlideRule.Tests.Checking;
@@ -19,9 +19,6 @@ namespace SlideRule.Tests.Checking;
 /// </remarks>
 public sealed class TripwireSemanticsTests
 {
-    // Match case sensitivity follows the OS file system (the shared PathComparison rule).
-    private static readonly bool CaseInsensitiveFileSystem = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS();
-
     // Alpha and Beta live in the quarantined scope; User is outside it and references nothing (so the
     // sibling containment rule stays green and the run's exit signal is tripwire-independent).
     private static readonly CodebaseModel Codebase = CompilationFactory.Extract(
@@ -46,7 +43,7 @@ public sealed class TripwireSemanticsTests
 
     private static RuleResult Tripwire(DiffContext? diff)
     {
-        return Checker.Run(Codebase, BaselineIndex.Empty, diff, QuarantinedScope)
+        return Checker.Run(Codebase, QuarantinedScope, diff: diff)
             .ForRule("legacy/quarantined/tripwire");
     }
 
@@ -68,7 +65,7 @@ public sealed class TripwireSemanticsTests
 
     private static RuleResult CautionTripwire(DiffContext? diff)
     {
-        return Checker.Run(Codebase, BaselineIndex.Empty, diff, CautionedScope)
+        return Checker.Run(Codebase, CautionedScope, diff: diff)
             .ForRule("legacy/cautioned/tripwire");
     }
 
@@ -84,7 +81,7 @@ public sealed class TripwireSemanticsTests
     public void ChangedFileInsideScope_WarnsAndPassesWithoutGating()
     {
         var diff = new DiffContext("/repo", ["App.Legacy/Alpha.cs"]);
-        CheckReport report = Checker.Run(Codebase, BaselineIndex.Empty, diff, QuarantinedScope);
+        CheckReport report = Checker.Run(Codebase, QuarantinedScope, diff: diff);
         RuleResult tripwire = report.ForRule("legacy/quarantined/tripwire");
 
         // The same path the message names, carried structurally: a renderer that needs a location — SARIF
@@ -110,29 +107,29 @@ public sealed class TripwireSemanticsTests
         // the warning uses the codebase path.
         RuleResult tripwire = Tripwire(new DiffContext("/repo", [@"App.Legacy\Alpha.cs"]));
 
-        tripwire.Warnings.Single()
-            .Message.ShouldBe(ExpectedWarning("App.Legacy/Alpha.cs"));
+        tripwire.ShouldHaveWarnedOnce(
+            CheckWarningKind.QuarantinedScopeTouched, ExpectedWarning("App.Legacy/Alpha.cs"), "App.Legacy/Alpha.cs");
     }
 
     [Fact]
     public void ChangedFileMatch_OnCaseInsensitiveFileSystem_IgnoresCase()
     {
         // A differently-cased diff path matches only where the OS file system is case-insensitive.
-        Assert.SkipUnless(CaseInsensitiveFileSystem, "Case-insensitive path matching is Windows/macOS behavior.");
+        FileNameCase.SkipUnlessIgnored();
         RuleResult tripwire = Tripwire(new DiffContext("/repo", [@"app.legacy\ALPHA.cs"]));
 
-        tripwire.Warnings.Single()
-            .Message.ShouldBe(ExpectedWarning("App.Legacy/Alpha.cs"));
+        tripwire.ShouldHaveWarnedOnce(
+            CheckWarningKind.QuarantinedScopeTouched, ExpectedWarning("App.Legacy/Alpha.cs"), "App.Legacy/Alpha.cs");
     }
 
     [Fact]
     public void ChangedFileMatch_OnCaseSensitiveFileSystem_DoesNotMatchCaseVariant()
     {
         // On Linux a case-variant path is a different file, so the tripwire must not fire on it.
-        Assert.SkipWhen(CaseInsensitiveFileSystem, "Case-sensitive path matching is Linux behavior.");
+        FileNameCase.SkipUnlessCompared();
         RuleResult tripwire = Tripwire(new DiffContext("/repo", [@"app.legacy\ALPHA.cs"]));
 
-        tripwire.Warnings.ShouldBeEmpty();
+        tripwire.ShouldHavePassedClean();
     }
 
     [Fact]
@@ -147,7 +144,7 @@ public sealed class TripwireSemanticsTests
     public void ChangedFileInsideCautionedScope_WarnsInItsOwnVoiceAndPasses()
     {
         var diff = new DiffContext("/repo", ["App.Legacy/Alpha.cs"]);
-        CheckReport report = Checker.Run(Codebase, BaselineIndex.Empty, diff, CautionedScope);
+        CheckReport report = Checker.Run(Codebase, CautionedScope, diff: diff);
         RuleResult tripwire = report.ForRule("legacy/cautioned/tripwire");
 
         tripwire.ShouldHaveWarnedOnce(
@@ -166,10 +163,10 @@ public sealed class TripwireSemanticsTests
         // convenient and entirely unproven until something reads the document back, which is this row.
         var diff = new DiffContext("/repo", ["App.Legacy/Alpha.cs"]);
 
-        Checker.Run(Codebase, BaselineIndex.Empty, diff, QuarantinedScope)
+        Checker.Run(Codebase, QuarantinedScope, diff: diff)
             .JsonReport()
             .ShouldContain("\"quarantinedScopeTouched\"");
-        Checker.Run(Codebase, BaselineIndex.Empty, diff, CautionedScope)
+        Checker.Run(Codebase, CautionedScope, diff: diff)
             .JsonReport()
             .ShouldContain("\"cautionedScopeTouched\"");
     }

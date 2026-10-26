@@ -15,7 +15,9 @@ namespace SlideRule.Tests.Cli;
 ///     counting <see cref="ISolutionSource" /> and a <see cref="FakeEnvironment" /> pointing the cache root
 ///     at a private temp directory, so a run's <see cref="CodebaseSource" /> outcome, the set of projects it
 ///     re-extracted, and whether it opened a workspace at all are all observable — while stdout/stderr/exit
-///     stay byte-identical to a cold run in every mode.
+///     stay byte-identical to a full extraction in every mode. A run that fills a slot reads the warm pool,
+///     since all it pins is the acquisition count; the <c>--no-cache</c> runs a cached answer is held to stay
+///     cold.
 /// </summary>
 public sealed class CheckCacheE2ETests
 {
@@ -29,7 +31,8 @@ public sealed class CheckCacheE2ETests
     {
         using var cache = new TempCacheRoot("check-cache");
 
-        CacheRun cold = await CacheRuns.CheckAsync(CliRunner.MyAppSolution, CliRunner.ViolatedSpecDll, cache.Root);
+        CacheRun cold = await CacheRuns.CheckAsync(
+            CliRunner.MyAppSolution, CliRunner.ViolatedSpecDll, cache.Root, source: CountingSolutionSource.OverWarmPool());
         CacheRun warm = await CacheRuns.CheckAsync(CliRunner.MyAppSolution, CliRunner.ViolatedSpecDll, cache.Root);
 
         // The first run had to open the workspace and extract; the second reused the cache with none of that.
@@ -43,23 +46,28 @@ public sealed class CheckCacheE2ETests
     }
 
     [Fact]
-    public async Task Check_NoCacheBothRuns_DisabledAndWritesNoCacheFile()
+    public async Task Check_NoCache_OverAFilledSlot_IsDisabledAndLeavesTheSlotAlone()
     {
         using var cache = new TempCacheRoot("check-cache");
 
-        CacheRun first = await CacheRuns.CheckAsync(CliRunner.MyAppSolution, CliRunner.CleanSpecDll, cache.Root, true);
-        CacheRun second = await CacheRuns.CheckAsync(CliRunner.MyAppSolution, CliRunner.CleanSpecDll, cache.Root, true);
-
-        first.Outcome.ShouldBe(CodebaseSourceOutcome.Disabled);
-        second.Outcome.ShouldBe(CodebaseSourceOutcome.Disabled);
-        first.AcquireCount.ShouldBe(1); // both runs still load a workspace — that is what "disabled" means
-        second.AcquireCount.ShouldBe(1);
-
-        // --no-cache never writes: no cache.json exists anywhere under the root.
+        CacheRun filled = await CacheRuns.CheckAsync(
+            CliRunner.MyAppSolution, CliRunner.CleanSpecDll, cache.Root, source: CountingSolutionSource.OverWarmPool());
         cache.HasCacheFile()
-            .ShouldBeFalse();
+            .ShouldBeTrue();
+        string[] slot = WriteFootprint.Of(cache.Root);
 
-        second.Result.ShouldMatchTheOutputOf(first.Result);
+        CacheRun noCache = await CacheRuns.CheckAsync(CliRunner.MyAppSolution, CliRunner.CleanSpecDll, cache.Root, true);
+
+        filled.Outcome.ShouldBe(CodebaseSourceOutcome.Miss);
+        filled.AcquireCount.ShouldBe(1);
+        noCache.Outcome.ShouldBe(CodebaseSourceOutcome.Disabled);
+        noCache.AcquireCount.ShouldBe(1); // the run still loads a workspace — that is what "disabled" means
+
+        // --no-cache never writes: every file under the root is as the cache-on run left it.
+        WriteFootprint.Of(cache.Root)
+            .ShouldBe(slot);
+
+        noCache.Result.ShouldMatchTheOutputOf(filled.Result);
     }
 
     [Fact]
@@ -69,7 +77,8 @@ public sealed class CheckCacheE2ETests
         using var cache = new TempCacheRoot("check-cache");
 
         // Populate the cache from the clean tree.
-        CacheRun cold = await CacheRuns.GraphAsync(workspace.SolutionPath, cache.Root);
+        CacheRun cold = await CacheRuns.GraphAsync(
+            workspace.SolutionPath, cache.Root, source: CountingSolutionSource.OverWarmPool());
         cold.Outcome.ShouldBe(CodebaseSourceOutcome.Miss);
 
         // Add a new type to the Web project (an SDK-glob add the cone scan catches). Web is content-dirty;
@@ -101,7 +110,8 @@ public sealed class CheckCacheE2ETests
 
         // Populate the cache from the clean tree.
         CacheRun cold = await CacheRuns.CheckAsync(
-            workspace.SolutionPath, CliRunner.ViolatedSpecDll, cache.Root, sarif: coldSarif);
+            workspace.SolutionPath, CliRunner.ViolatedSpecDll, cache.Root, sarif: coldSarif,
+            source: CountingSolutionSource.OverWarmPool());
         cold.Outcome.ShouldBe(CodebaseSourceOutcome.Miss);
 
         // Two comment lines above each controller — the red one and the grandfathered one. Every fact the
@@ -131,10 +141,10 @@ public sealed class CheckCacheE2ETests
         // above them, and no site was gained or lost on the way.
         string coldLog = File.ReadAllText(coldSarif);
         string warmLog = File.ReadAllText(warmSarif);
-        InlineSqlSiteLines(warmLog, "note")
-            .ShouldBe(MovedDownByTwo(InlineSqlSiteLines(coldLog, "note")));
-        InlineSqlSiteLines(warmLog, "error")
-            .ShouldBe(MovedDownByTwo(InlineSqlSiteLines(coldLog, "error")));
+        ShouldHaveInlineSqlSiteLines(warmLog, "note")
+            .ShouldBe(MovedDownByTwo(ShouldHaveInlineSqlSiteLines(coldLog, "note")));
+        ShouldHaveInlineSqlSiteLines(warmLog, "error")
+            .ShouldBe(MovedDownByTwo(ShouldHaveInlineSqlSiteLines(coldLog, "error")));
     }
 
     [Fact]
@@ -143,7 +153,8 @@ public sealed class CheckCacheE2ETests
         using var cache = new TempCacheRoot("check-cache");
 
         // graph extracts every project (no spec, no exclusion) and writes them all.
-        CacheRun graph = await CacheRuns.GraphAsync(CliRunner.MyAppSolution, cache.Root);
+        CacheRun graph = await CacheRuns.GraphAsync(
+            CliRunner.MyAppSolution, cache.Root, source: CountingSolutionSource.OverWarmPool());
         graph.Outcome.ShouldBe(CodebaseSourceOutcome.Miss);
 
         // check reuses those very fragments: the external DLL spec resolves with no workspace, so it is a hit.
@@ -302,7 +313,7 @@ public sealed class CheckCacheE2ETests
     }
 
     // The inline-SQL rule's result lines at one SARIF level, in render order.
-    private static IReadOnlyList<int> InlineSqlSiteLines(string sarif, string level)
+    private static IReadOnlyList<int> ShouldHaveInlineSqlSiteLines(string sarif, string level)
     {
         IReadOnlyList<int> lines = sarif.SarifResults()
             .Where(result => result.GetProperty("ruleId")

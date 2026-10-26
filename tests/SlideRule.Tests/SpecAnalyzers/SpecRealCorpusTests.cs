@@ -60,7 +60,7 @@ public sealed class SpecRealCorpusTests
         List<(string Path, string Source)> sources = Under(SelfSpecDirectory);
 
         // Act
-        (IReadOnlyList<Diagnostic> reported, int reached) = await AnalyzeAsync(sources, SelfSpecAssembly);
+        (IReadOnlyList<Diagnostic> reported, int reached) = await ShouldAnalyzeAsync(sources, SelfSpecAssembly);
 
         // Assert
         reported.ShouldBeSilent();
@@ -74,7 +74,7 @@ public sealed class SpecRealCorpusTests
         List<(string Path, string Source)> sources = [Read(CanonicalSample), .. Under(StubDirectory)];
 
         // Act
-        (IReadOnlyList<Diagnostic> reported, int reached) = await AnalyzeAsync(sources, SpecSnippet.Suite);
+        (IReadOnlyList<Diagnostic> reported, int reached) = await ShouldAnalyzeAsync(sources, SpecSnippet.Suite);
 
         // Assert
         reported.ShouldBeSilent();
@@ -89,7 +89,7 @@ public sealed class SpecRealCorpusTests
         List<(string Path, string Source)> sources = Under(RulePackDirectory);
 
         // Act
-        (IReadOnlyList<Diagnostic> reported, int reached) = await AnalyzeAsync(sources, RulePackAssembly);
+        (IReadOnlyList<Diagnostic> reported, int reached) = await ShouldAnalyzeAsync(sources, RulePackAssembly);
 
         // Assert
         reported.ShouldBeSilent();
@@ -115,7 +115,7 @@ public sealed class SpecRealCorpusTests
     // that assembly's own metadata, so the source is what binds and the friend access it really has is the
     // friend access it gets here. The literals that reached the contract are counted through the seam the
     // analyzer carries; the analysis runs concurrently, so the increment is interlocked.
-    private static async Task<(IReadOnlyList<Diagnostic> Reported, int Reached)> AnalyzeAsync(
+    private static async Task<(IReadOnlyList<Diagnostic> Reported, int Reached)> ShouldAnalyzeAsync(
         IReadOnlyList<(string Path, string Source)> sources, string assemblyName)
     {
         var reached = 0;

@@ -99,15 +99,13 @@ public sealed class MsBuildLinePinTests
     [Fact]
     public void EveryUpdateEntry_IgnoresTheNextLineOfEveryLinePackage()
     {
-        // Arrange
-        IReadOnlyList<string[]> entries = DependabotEntries.NuGetEntries();
-        List<string> findings = new();
-
         // Act
-        if (entries.Count == 0)
-            findings.Add($"{DependabotConfig} carries no nuget update entry, so nothing holds the MSBuild line.");
+        List<string> findings =
+        [
+            .. DependabotEntries.MissingIgnores(LinePackages, $"moves it to the {NextLine} line")
+        ];
 
-        foreach (string[] entry in entries)
+        foreach (string[] entry in DependabotEntries.NuGetEntries())
         {
             // Every ignore of a package is compared, not the first: Dependabot applies them all, so a second
             // ignore with other versions moves what the package is held to.
@@ -115,16 +113,10 @@ public sealed class MsBuildLinePinTests
                 .ToLookup(static ignore => ignore.Name, static ignore => ignore.Versions, StringComparer.Ordinal);
             string directories = string.Join(", ", DependabotEntries.Directories(entry));
             foreach (string package in LinePackages)
-            {
-                if (!ignored.Contains(package))
-                    findings.Add($"{DependabotConfig}'s nuget entry for {directories} carries no 'ignore:' naming "
-                                 + $"{package}, so its next update run moves it to the {NextLine} line.");
-
                 findings.AddRange(ignored[package]
                     .Where(static versions => versions != IgnoredVersions)
                     .Select(versions => $"{DependabotConfig}'s nuget entry for {directories} ignores {package} with "
                                         + $"versions {versions ?? "(none, so every version)"}, not {IgnoredVersions}."));
-            }
         }
 
         // Assert

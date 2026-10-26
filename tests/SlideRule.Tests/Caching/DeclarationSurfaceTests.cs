@@ -198,6 +198,7 @@ public sealed class DeclarationSurfaceTests
     public void Of_CommentAddedInsideABody_KeepsTheSurfaceAndTheShape()
     {
         string commented = Widget.Replace("return _size + by;", "// grows\n        return _size + by;", StringComparison.Ordinal);
+        commented.ShouldNotBe(Widget, customMessage: "the edit must change the text");
 
         SourceShape before = ShapeOf(Widget);
         SourceShape after = ShapeOf(commented);

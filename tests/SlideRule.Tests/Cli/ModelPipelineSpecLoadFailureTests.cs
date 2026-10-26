@@ -112,13 +112,8 @@ public sealed class ModelPipelineSpecLoadFailureTests
     [Fact]
     public void LoadModel_SpecAnchoringASharedFrameworkType_NamesTheFrameworkAndWithholdsThePackagingRemedy()
     {
-        // Arrange: the fixture exactly as built, CopyLocalLockFileAssemblies already on. Guard the
-        // precondition first — on a host that happened to carry ASP.NET Core the anchor would resolve and
-        // this fixture would prove nothing, so say that rather than leave a bare "expected an exception".
-        Should.Throw<FileNotFoundException>(
-            () => Assembly.Load(new AssemblyName("Microsoft.AspNetCore.Mvc.Core")),
-            "This test host can load Microsoft.AspNetCore.Mvc.Core itself, so the fixture's anchor would "
-            + "resolve through the default context and could not reproduce the failure it exists for.");
+        // Arrange: the fixture exactly as built, CopyLocalLockFileAssemblies already on.
+        CliRunner.ShouldNotLoadTheSharedFrameworkAnchor();
 
         // Act
         var thrown = Should.Throw<UserErrorException>(() => ModelPipeline.LoadModel(CliRunner.SharedFrameworkSpecDll));

@@ -160,18 +160,12 @@ public sealed class SpecFixtureCorpus : IAsyncLifetime
     }
 
     /// <summary>One fixture class of the corpus, on both sides at once.</summary>
-    /// <param name="name">The name the file declares it under.</param>
-    /// <param name="span">The declaration's own span, which every warning about it falls inside.</param>
-    /// <param name="type">The type in this assembly that the name resolved to.</param>
-    public sealed class FixtureClass(string name, TextSpan span, Type type)
-    {
-        /// <summary>The name the file declares it under.</summary>
-        public string Name { get; } = name;
-
-        /// <summary>The declaration's own span in the fixture file.</summary>
-        public TextSpan Span { get; } = span;
-
-        /// <summary>The spec type the name resolved to, which is what the validator is driven over.</summary>
-        public Type Type { get; } = type;
-    }
+    /// <param name="Name">The name the file declares it under.</param>
+    /// <param name="Span">
+    ///     The declaration's own span in the fixture file, which every warning about it falls inside.
+    /// </param>
+    /// <param name="Type">
+    ///     The spec type the name resolved to in this assembly, which is what the validator is driven over.
+    /// </param>
+    public sealed record FixtureClass(string Name, TextSpan Span, Type Type);
 }

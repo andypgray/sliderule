@@ -50,21 +50,21 @@ public sealed class ShapeFactExtractionTests
     public void Interface_ReportsKindImpliedAbstract()
     {
         TypeNode t = Model.Type("N.IFace");
-        t.IsAbstract.ShouldBeTrue();
-        t.IsSealed.ShouldBeFalse();
-        t.IsStatic.ShouldBeFalse();
+
+        (t.IsSealed, t.IsStatic, t.IsAbstract)
+            .ShouldBe((false, false, true));
     }
 
-    [Fact]
-    public void StructEnumDelegate_ReportKindImpliedSealed()
+    [Theory]
+    [InlineData("N.PlainStruct")]
+    [InlineData("N.E")]
+    [InlineData("N.D")]
+    public void StructEnumDelegate_ReportKindImpliedSealed(string fullName)
     {
-        foreach (string fqn in new[] { "N.PlainStruct", "N.E", "N.D" })
-        {
-            TypeNode t = Model.Type(fqn);
-            t.IsSealed.ShouldBeTrue();
-            t.IsAbstract.ShouldBeFalse();
-            t.IsStatic.ShouldBeFalse();
-        }
+        TypeNode t = Model.Type(fullName);
+
+        (t.IsSealed, t.IsStatic, t.IsAbstract)
+            .ShouldBe((true, false, false));
     }
 
     [Fact]

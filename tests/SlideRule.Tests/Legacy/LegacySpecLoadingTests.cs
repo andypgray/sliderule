@@ -30,7 +30,7 @@ public sealed class LegacySpecLoadingTests
         using var context = new SpecLoadContext(specPath);
 
         // Act
-        Assembly spec = context.LoadFromAssemblyPath(specPath);
+        Assembly spec = context.LoadWithoutLocking(specPath);
         IReadOnlyList<IArchitectureSpec> specs = SpecDiscovery.FindSpecs(spec);
         ArchitectureModel model = ArchModelBuilder.Build(specs);
 
@@ -38,9 +38,9 @@ public sealed class LegacySpecLoadingTests
         spec.GetCustomAttribute<TargetFrameworkAttribute>()!.FrameworkName
             .ShouldBe(".NETFramework,Version=v4.8");
 
-        // Type identity holds across the ALC boundary — the shared-contract-to-Default delegation.
-        specs.ShouldHaveSingleItem()
-            .ShouldBeAssignableTo<IArchitectureSpec>();
+        // Type identity holds across the ALC boundary — the shared-contract-to-Default delegation — or
+        // discovery would have found no spec.
+        specs.ShouldHaveSingleItem();
 
         // The model builds, and the second sentence comes from a typeof() anchor on a net48 product type.
         model.Rule("legacy/interfaces")
@@ -57,7 +57,7 @@ public sealed class LegacySpecLoadingTests
             .ShouldBeFalse();
         File.Exists(Path.Combine(Path.GetDirectoryName(specPath)!, $"{ProductAssemblyName}.dll"))
             .ShouldBeTrue();
-        Assembly product = context.Assemblies.Single(loaded => loaded.GetName()
+        Assembly product = context.Assemblies.ShouldHaveSingle(loaded => loaded.GetName()
             .Name == ProductAssemblyName);
         AssemblyLoadContext.Default.Assemblies
             .Select(loaded => loaded.GetName()
@@ -82,7 +82,7 @@ public sealed class LegacySpecLoadingTests
         using var context = new SpecLoadContext(specPath);
         string productBesideSpec = Path.Combine(
             Path.GetDirectoryName(specPath)!, $"{ProductAssemblyName}.dll");
-        Assembly product = context.LoadFromAssemblyPath(productBesideSpec);
+        Assembly product = context.LoadWithoutLocking(productBesideSpec);
 
         // Act
         var thrown = Should.Throw<TypeLoadException>(() => product.GetType("Legacy.Product.LegacyHandler", true));

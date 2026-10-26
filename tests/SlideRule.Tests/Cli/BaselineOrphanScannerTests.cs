@@ -75,7 +75,7 @@ public sealed class BaselineOrphanScannerTests : IDisposable
         string path = _temp.WriteFile(["arch", "baselines", "locked.json"], BaselineComposer.Compose("legacy/old", Edge));
 
         BaselineOrphanScan scan;
-        using (new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+        using (FileHold.Exclusive(path))
         {
             scan = BaselineOrphanScanner.Scan(ConventionalModel, _temp.Path);
         }

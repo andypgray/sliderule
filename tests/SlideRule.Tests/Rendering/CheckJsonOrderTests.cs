@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Shouldly;
 using SlideRule.Baselines;
 using SlideRule.Checking;
@@ -6,6 +7,8 @@ using SlideRule.Roslyn.Diagnostics;
 using SlideRule.Tests.Checking;
 using SlideRule.Tests.TestSupport;
 using Xunit;
+// The suite's reader over a check document, not the CLI renderer of the same name that this file also imports.
+using CheckJson = SlideRule.Tests.TestSupport.CheckJson;
 
 namespace SlideRule.Tests.Rendering;
 
@@ -95,9 +98,10 @@ public sealed class CheckJsonOrderTests
     {
         // Inside a rule rather than at document level: the pair qualifies THIS rule's subject, so it sits
         // with the rule's own framing — id, verdict, prose, baseline — above the violation list that scales
-        // with the codebase and is the first thing a truncating reader loses. Scoped to the rules block,
+        // with the codebase and is the first thing a truncating reader loses. Read off the rule's own object,
         // because `violations` also names a roll-up count in the summary above it.
-        RulesBlock(StampedDocument).ShouldSerializeBefore(key, "violations");
+        CheckJson.Rule(StampedDocument, "layer/no-data")
+            .ShouldSerializeBefore(key, "violations");
     }
 
     [Fact]
@@ -105,7 +109,8 @@ public sealed class CheckJsonOrderTests
     {
         // "2 types, 1 generated" reads in that order for the same reason it is written in that order: the
         // count comes before the qualifier that narrows it.
-        RulesBlock(StampedDocument).ShouldSerializeBefore("subjectTypes", "subjectGeneratedTypes");
+        CheckJson.Rule(StampedDocument, "layer/no-data")
+            .ShouldSerializeBefore("subjectTypes", "subjectGeneratedTypes");
     }
 
     [Fact]
@@ -113,10 +118,11 @@ public sealed class CheckJsonOrderTests
     {
         // Diagnosis then cure, on the wire exactly as on two consecutive lines of the report — and ahead of
         // the evidence group, whose counts and sites are about the code rather than about the rule.
-        string rules = RulesBlock(Hinted(DocumentGrain.Full));
+        JsonElement violation = CheckJson.Violations(Hinted(DocumentGrain.Full), "empty/subject")
+            .ShouldHaveSingleItem();
 
-        rules.ShouldSerializeBefore("detail", "hint");
-        rules.ShouldSerializeBefore("hint", "siteCount");
+        violation.ShouldSerializeBefore("detail", "hint");
+        violation.ShouldSerializeBefore("hint", "siteCount");
     }
 
     [Fact]
@@ -124,7 +130,7 @@ public sealed class CheckJsonOrderTests
     {
         string document = Hinted(DocumentGrain.Full);
 
-        ShouldHaveWarningOfKind(document, "inertTarget")
+        ShouldHaveWarningOfKind(document, "inert/target", "inertTarget")
             .ShouldSerializeBefore("message", "hint");
     }
 
@@ -142,7 +148,7 @@ public sealed class CheckJsonOrderTests
 
         string document = report.JsonReport();
 
-        ShouldHaveWarningOfKind(document, "deadOperand")
+        ShouldHaveWarningOfKind(document, "inert/operand", "deadOperand")
             .ShouldSerializeBefore("message", "hint");
     }
 
@@ -159,7 +165,7 @@ public sealed class CheckJsonOrderTests
 
         string document = report.JsonReport();
 
-        ShouldHaveWarningOfKind(document, "orphanedBaseline")
+        ShouldHaveWarningOfKind(document, "layer/no-data", "orphanedBaseline")
             .ShouldSerializeBefore("message", "hint");
     }
 
@@ -194,9 +200,9 @@ public sealed class CheckJsonOrderTests
         string skeleton = Hinted(DocumentGrain.Skeleton);
 
         skeleton.ShouldSatisfyAllConditions(
-            () => RulesBlock(skeleton)
+            () => ShouldHaveRulesBlock(skeleton)
                 .ShouldNotContain("\"violations\":"),
-            () => RulesBlock(skeleton)
+            () => ShouldHaveRulesBlock(skeleton)
                 .ShouldContain("\"violationCount\":"),
             () => skeleton.ShouldContain("passes forever, so decide before keeping it"));
     }
@@ -219,8 +225,7 @@ public sealed class CheckJsonOrderTests
         // actionable half is keyed above it.
         string index = Render(DocumentGrain.Index);
 
-        index.ShouldNotContain("\"workspaceDiagnostics\"");
-        index.ShouldContain("\"workspaceDiagnosticCount\": 1");
+        index.ShouldElideDiagnosticStreamTo(1);
         foreach (string stamp in
                  new[]
                  {
@@ -240,8 +245,7 @@ public sealed class CheckJsonOrderTests
         {
             string document = Render(grain);
 
-            document.ShouldContain("\"workspaceDiagnostics\"");
-            document.ShouldNotContain("\"workspaceDiagnosticCount\"");
+            document.ShouldKeepDiagnosticStreamWhole();
         }
     }
 
@@ -327,23 +331,21 @@ public sealed class CheckJsonOrderTests
             grain: grain);
     }
 
-    // The document from `rules` onward. Several key names appear both in the roll-up summary and inside a
-    // rule, and ShouldHaveKeyAt reads the first occurrence — so an ordering claim about two keys of one rule
-    // has to be made where only the rules are.
-    private static string RulesBlock(string document)
+    // The document from `rules` onward.
+    private static string ShouldHaveRulesBlock(string document)
     {
         int at = document.ShouldHaveKeyAt("rules");
         return document.Substring(at);
     }
 
-    // Anchored on the warning's own kind rather than on the `warnings` array: the `message` and `hint` keys the
-    // callers order also appear earlier in the document, and ShouldHaveKeyAt reads the first occurrence of each.
-    private static string ShouldHaveWarningOfKind(string document, string kind)
+    // The one warning of a rule with the given kind.
+    private static JsonElement ShouldHaveWarningOfKind(string document, string ruleId, string kind)
     {
-        int at = document.IndexOf($"\"kind\": \"{kind}\"", StringComparison.Ordinal);
-
-        at.ShouldBeGreaterThanOrEqualTo(0, document);
-
-        return document[at..];
+        return CheckJson.Rule(document, ruleId)
+            .GetProperty("warnings")
+            .EnumerateArray()
+            .Where(warning => warning.GetProperty("kind")
+                .GetString() == kind)
+            .ShouldHaveSingleItem(document);
     }
 }

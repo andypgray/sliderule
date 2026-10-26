@@ -29,8 +29,8 @@ namespace SlideRule.Tests.Cli;
 ///         so the suppression is measured against an edge that must survive it.
 ///     </para>
 ///     <para>
-///         The fixture is leased through <see cref="TempFixtureWorkspace" /> rather than read in place
-///         because it is restored per class like every other <c>TestSolutions</c> bed;
+///         The fixture is read in place rather than leased: nothing here writes into the tree, and the startup
+///         sweep has already restored every <c>TestSolutions</c> bed in the output directory.
 ///         <see cref="GraphCommandTests" /> pins the document's shape against MyApp, and this pins the two
 ///         things MyApp has no example of.
 ///     </para>
@@ -42,11 +42,8 @@ public sealed class LinkedSourceGraphE2ETests
     [Fact]
     public async Task Graph_ProjectSharingASourceFileWithAnother_RendersNoEdgeBetweenThem()
     {
-        // Arrange
-        using var fixture = new TempFixtureWorkspace("TestSolutions/LinkedApp", "LinkedApp.slnx");
-
         // Act
-        CliResult result = await CliRunner.InvokeAsync("graph", fixture.SolutionPath, "--json");
+        CliResult result = await CliRunner.InvokeAsync("graph", FixtureBeds.LinkedAppSolution, "--json");
 
         // Assert — the genuine edge and only the genuine edge. Tool declares no reference to Core and
         // reaches nothing outside itself, so any Tool→Core row here is the phantom.
@@ -59,11 +56,8 @@ public sealed class LinkedSourceGraphE2ETests
     [Fact]
     public async Task Graph_MultiplyDeclaredType_IsReadableFromTheDocumentAlone()
     {
-        // Arrange
-        using var fixture = new TempFixtureWorkspace("TestSolutions/LinkedApp", "LinkedApp.slnx");
-
         // Act
-        CliResult result = await CliRunner.InvokeAsync("graph", fixture.SolutionPath, "--json");
+        CliResult result = await CliRunner.InvokeAsync("graph", FixtureBeds.LinkedAppSolution, "--json");
 
         // Assert — the whole content of the check-side note, as data: the type, every project declaring it,
         // and which one's facts an arch.Project selection follows. A reader holding this document alone can
@@ -87,13 +81,13 @@ public sealed class LinkedSourceGraphE2ETests
     [Fact]
     public async Task Graph_SkeletonGrain_ReportsTheElidedCoverageStatementAsACount()
     {
-        // Arrange — the coverage statement scales with the codebase, so it rides the same rung as the
+        // The coverage statement scales with the codebase, so it rides the same rung as the
         // external rows. An elided section must not read as an absent one, which for this key would say the
         // opposite of the truth.
-        using var fixture = new TempFixtureWorkspace("TestSolutions/LinkedApp", "LinkedApp.slnx");
 
         // Act
-        CliResult result = await CliRunner.InvokeAsync("graph", fixture.SolutionPath, "--json", "--grain", "skeleton");
+        CliResult result = await CliRunner.InvokeAsync(
+            "graph", FixtureBeds.LinkedAppSolution, "--json", "--grain", "skeleton");
 
         // Assert
         result.ShouldSucceed();
@@ -108,22 +102,18 @@ public sealed class LinkedSourceGraphE2ETests
     [Fact]
     public async Task Graph_ScopedToTheLosingProject_KeepsTheEntryThatExplainsWhatItWillMiss()
     {
-        // Arrange — the scope names LinkedApp.Tool, whose copy of Widget lost the attribution. Keying the
+        // The scope names LinkedApp.Tool, whose copy of Widget lost the attribution. Keying the
         // narrowing on the winner alone would drop the entry from exactly the scope whose author needs it.
-        using var fixture = new TempFixtureWorkspace("TestSolutions/LinkedApp", "LinkedApp.slnx");
 
         // Act
         CliResult result = await CliRunner.InvokeAsync(
-            "graph", fixture.SolutionPath, "--json", "--projects", "LinkedApp.Tool");
+            "graph", FixtureBeds.LinkedAppSolution, "--json", "--projects", "LinkedApp.Tool");
 
         // Assert — the roster narrows to one project; the entry survives and still names the declarer
         // outside it, which is the half that explains why the type is missing.
         result.ShouldSucceed();
         using JsonDocument document = result.ShouldHaveJsonStdout();
-        document.RootElement.GetProperty("projects")
-            .EnumerateArray()
-            .Select(project => project.GetProperty("name")
-                .GetString())
+        document.ProjectNames()
             .ShouldBe(["LinkedApp.Tool"]);
         document.RootElement.GetProperty("multiplyDeclaredTypes")
             .EnumerateArray()
@@ -135,11 +125,8 @@ public sealed class LinkedSourceGraphE2ETests
     [Fact]
     public async Task Graph_HumanSurvey_CarriesTheMultiplyDeclaredSectionBetweenTheEdgesAndTheNamespaces()
     {
-        // Arrange
-        using var fixture = new TempFixtureWorkspace("TestSolutions/LinkedApp", "LinkedApp.slnx");
-
         // Act
-        CliResult result = await CliRunner.InvokeAsync("graph", fixture.SolutionPath);
+        CliResult result = await CliRunner.InvokeAsync("graph", FixtureBeds.LinkedAppSolution);
 
         // Assert — one line per type, naming every declarer and the winner, so the terminal reader gets the
         // same fact the document carries rather than having to reach for --json.
@@ -154,11 +141,8 @@ public sealed class LinkedSourceGraphE2ETests
     [Fact]
     public async Task Graph_HumanSurveyAtSkeletonGrain_ElidesTheSectionRatherThanDroppingIt()
     {
-        // Arrange
-        using var fixture = new TempFixtureWorkspace("TestSolutions/LinkedApp", "LinkedApp.slnx");
-
         // Act
-        CliResult result = await CliRunner.InvokeAsync("graph", fixture.SolutionPath, "--grain", "skeleton");
+        CliResult result = await CliRunner.InvokeAsync("graph", FixtureBeds.LinkedAppSolution, "--grain", "skeleton");
 
         // Assert — the formatter's standing rule: no section ever disappears, and a coarser grain says what
         // it left out and how to get it back.

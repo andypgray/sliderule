@@ -21,6 +21,8 @@ namespace SlideRule.Tests.TestSupport;
 /// </remarks>
 public sealed class BinlogFixtureWorkspace : IDisposable
 {
+    private const string UnbuiltName = "MyApp.Unbuilt";
+
     private readonly TempFixtureWorkspace _copy;
 
     /// <summary>Copies, restores and builds the fixture with the binary logger.</summary>
@@ -31,10 +33,8 @@ public sealed class BinlogFixtureWorkspace : IDisposable
         // tests the way a leased copy is.
         _copy = TempFixtureWorkspace.Dedicated();
 
-        // --disable-build-servers (plus DotnetCli's node/server env) keeps the drained child from leaving a
-        // persistent worker that would wedge the output pipe.
         DotnetCli.Run(
-            $"build \"{_copy.SolutionPath}\" -bl:LogFile=\"{BinlogPath}\" --disable-build-servers",
+            $"build \"{_copy.SolutionPath}\" -bl:LogFile=\"{BinlogPath}\"",
             Path.GetDirectoryName(_copy.SolutionPath)!);
     }
 
@@ -57,19 +57,24 @@ public sealed class BinlogFixtureWorkspace : IDisposable
     }
 
     /// <summary>
-    ///     Writes a second solution file beside <see cref="SolutionPath" /> declaring its members plus
-    ///     <c>{projectName}\{projectName}.csproj</c>, a project with no file on disk that the binlog therefore
-    ///     never built, and returns it as a scope that deletes it on dispose. It carries the original's write
-    ///     time, so a capture's ingest reads it as no newer than the build rather than refusing the binlog as
-    ///     stale.
+    ///     The project <see cref="WriteSolutionWithUnbuiltMember" />'s wider solution declares and the binlog never
+    ///     built, <c>MyApp.Unbuilt\MyApp.Unbuilt.csproj</c>, as an absolute path; no file exists there.
     /// </summary>
-    internal ScopedFile WriteSolutionWithUnbuiltMember(string projectName)
+    internal string UnbuiltProject => PathOf(UnbuiltName, $"{UnbuiltName}.csproj");
+
+    /// <summary>
+    ///     Writes a second solution file beside <see cref="SolutionPath" /> declaring its members plus
+    ///     <see cref="UnbuiltProject" />, a project with no file on disk that the binlog therefore never built,
+    ///     and returns it as a scope that deletes it on dispose. It carries the original's write time, so a
+    ///     capture's ingest reads it as no newer than the build rather than refusing the binlog as stale.
+    /// </summary>
+    internal ScopedFile WriteSolutionWithUnbuiltMember()
     {
         string declared = File.ReadAllText(SolutionPath);
         int global = declared.IndexOf("Global", StringComparison.Ordinal);
         string member =
-            $"Project(\"{{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}}\") = \"{projectName}\", "
-            + $"\"{projectName}\\{projectName}.csproj\", \"{{44444444-4444-4444-4444-444444444444}}\"{Environment.NewLine}"
+            $"Project(\"{{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}}\") = \"{UnbuiltName}\", "
+            + $"\"{UnbuiltName}\\{UnbuiltName}.csproj\", \"{{44444444-4444-4444-4444-444444444444}}\"{Environment.NewLine}"
             + $"EndProject{Environment.NewLine}";
 
         string widerPath = PathOf("MyApp.Wider.sln");

@@ -18,6 +18,10 @@ namespace SlideRule.Tests.Cli;
 ///         directly reaches the same transcript rather than spelling one of its own.
 ///     </para>
 ///     <para>
+///         The exit assertions match their fragments against the channel with CRLF folded to LF, so a pinned
+///         multi-line block matches as written whichever line ending the platform writes.
+///     </para>
+///     <para>
 ///         Deliberately <em>not</em> attributed <c>[ShouldlyMethods]</c>, for the reason given on
 ///         <see cref="SlideRule.Tests.Checking.RuleResultAssertions" />.
 ///     </para>
@@ -46,6 +50,53 @@ internal static class CliResultAssertions
     internal static CliResult ShouldRefuseWith(this CliResult result, params string[] errFragments)
     {
         return ShouldExitWith(result, 2, result.Err, errFragments);
+    }
+
+    /// <summary>
+    ///     Asserts the CLI refused the run — exit 2 — and that stderr is <paramref name="message" /> and nothing
+    ///     else, line endings and the whitespace around the whole aside.
+    /// </summary>
+    internal static CliResult ShouldRefuseWithExactly(this CliResult result, string message)
+    {
+        string report = result.Transcript();
+        result.Exit.ShouldBe(2, report);
+        result.Err.NormalizedTrimmed()
+            .ShouldBe(message.NormalizedTrimmed(), report);
+
+        return result;
+    }
+
+    /// <summary>
+    ///     Asserts stdout is exactly <paramref name="expected" />, line endings and the whitespace around the whole
+    ///     aside.
+    /// </summary>
+    internal static CliResult ShouldPrint(this CliResult result, string expected)
+    {
+        result.Out.NormalizedTrimmed()
+            .ShouldBe(expected.NormalizedTrimmed(), result.Transcript());
+
+        return result;
+    }
+
+    /// <summary>Asserts stdout opens with <paramref name="expected" />, line endings aside.</summary>
+    internal static CliResult ShouldOpenWith(this CliResult result, string expected)
+    {
+        result.Out.NormalizedLines()
+            .ShouldStartWith(expected, customMessage: result.Transcript());
+
+        return result;
+    }
+
+    /// <summary>
+    ///     Asserts stdout is <paramref name="expected" /> verbatim, line endings aside. Unlike <see cref="ShouldPrint" />,
+    ///     nothing is trimmed: the whitespace around the whole counts, the trailing newline included.
+    /// </summary>
+    internal static CliResult ShouldPrintVerbatim(this CliResult result, string expected)
+    {
+        result.Out.NormalizedLines()
+            .ShouldBe(expected, result.Transcript());
+
+        return result;
     }
 
     /// <summary>
@@ -186,8 +237,9 @@ internal static class CliResultAssertions
         string report = result.Transcript();
         result.Exit.ShouldBe(exit, report);
 
+        string text = channel.NormalizedLines();
         Action[] checks = fragments
-            .Select<string, Action>(fragment => () => channel.ShouldContain(fragment, customMessage: report))
+            .Select<string, Action>(fragment => () => text.ShouldContain(fragment, customMessage: report))
             .ToArray();
         result.ShouldSatisfyAllConditions(checks);
 

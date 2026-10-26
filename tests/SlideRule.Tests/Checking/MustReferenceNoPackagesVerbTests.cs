@@ -1,4 +1,3 @@
-using Shouldly;
 using SlideRule.Baselines;
 using SlideRule.Checking;
 using SlideRule.Codebase;
@@ -52,15 +51,12 @@ public sealed class MustReferenceNoPackagesVerbTests
     [Fact]
     public void MustReferenceNoPackages_DeclaredPackages_FailOncePerReferenceAtItsOwnSite()
     {
-        RuleResult result = Checker.Run(Scene, arch => arch.Rule("packaging/domain-pure")
-                .Enforce(arch.Projects.Named("Domain").MustReferenceNoPackages())
-                .Because("b"))
-            .Single();
-
-        result.ShouldHaveFailedWithProjectSubjects(["Domain -> Newtonsoft.Json", "Domain -> Serilog"]);
-        result.Violations.Select(violation => violation.Sites.Single()
-                .ToString())
-            .ShouldBe(["src/Domain/Domain.csproj:9", "Directory.Packages.props:4"], ignoreOrder: true);
+        Checker.Verdict(Scene, arch => arch.Projects.Named("Domain").MustReferenceNoPackages())
+            .ShouldHaveFailedWithEdgesAtSites(ViolationKind.ProjectShape,
+            [
+                ("Domain -> Newtonsoft.Json", ["src/Domain/Domain.csproj:9"]),
+                ("Domain -> Serilog", ["Directory.Packages.props:4"])
+            ]);
     }
 
     [Fact]
@@ -68,10 +64,7 @@ public sealed class MustReferenceNoPackagesVerbTests
     {
         // This verb's identity shape: one edge per package, so a captured baseline blesses the packages it saw
         // and no others.
-        RuleResult result = Checker.Run(Scene, arch => arch.Rule("packaging/domain-pure")
-                .Enforce(arch.Projects.Named("Domain").MustReferenceNoPackages())
-                .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(Scene, arch => arch.Projects.Named("Domain").MustReferenceNoPackages());
 
         result.ShouldHaveBaselineIdentities(
         [
@@ -85,10 +78,7 @@ public sealed class MustReferenceNoPackagesVerbTests
     {
         // Declared-none and never-evaluated are one state here, and both are green: the model holds what a
         // project declares, so an empty list is the only honest reading of either.
-        Checker.Run(Scene, arch => arch.Rule("packaging/contract-pure")
-                .Enforce(arch.Projects.Named("Contract").MustReferenceNoPackages())
-                .Because("b"))
-            .Single()
+        Checker.Verdict(Scene, arch => arch.Projects.Named("Contract").MustReferenceNoPackages())
             .ShouldHavePassedClean();
     }
 
@@ -97,10 +87,7 @@ public sealed class MustReferenceNoPackagesVerbTests
     {
         // The subject is a set, so the walk is per project and then per package inside it — a rule over
         // both projects reports the two packages of the one that declares any, and nothing for the other.
-        Checker.Run(Scene, arch => arch.Rule("packaging/all-pure")
-                .Enforce(arch.Projects.Matching("*").MustReferenceNoPackages())
-                .Because("b"))
-            .Single()
+        Checker.Verdict(Scene, arch => arch.Projects.Matching("*").MustReferenceNoPackages())
             .ShouldHaveFailedWithProjectSubjects(["Domain -> Newtonsoft.Json", "Domain -> Serilog"]);
     }
 
@@ -109,10 +96,8 @@ public sealed class MustReferenceNoPackagesVerbTests
     {
         // The analyzer reaches neither the project's own package nor a project referencing it, so it is
         // nobody's dependency; the shipped package declared on the line above it still reds, at that line.
-        RuleResult result = Checker.Run(PrivateScene, arch => arch.Rule("packaging/domain-pure")
-                .Enforce(arch.Projects.Named("Domain").MustReferenceNoPackages())
-                .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(PrivateScene, arch => arch.Projects.Named("Domain")
+            .MustReferenceNoPackages());
 
         result.ShouldHaveFailedWithProjectAtSites("Domain -> Newtonsoft.Json", ["src/Domain/Domain.csproj:9"]);
     }
@@ -120,10 +105,7 @@ public sealed class MustReferenceNoPackagesVerbTests
     [Fact]
     public void MustReferenceNoPackages_OnlyPrivateReferences_PassesClean()
     {
-        Checker.Run(PrivateScene, arch => arch.Rule("packaging/contract-pure")
-                .Enforce(arch.Projects.Named("Contract").MustReferenceNoPackages())
-                .Because("b"))
-            .Single()
+        Checker.Verdict(PrivateScene, arch => arch.Projects.Named("Contract").MustReferenceNoPackages())
             .ShouldHavePassedClean();
     }
 
@@ -132,11 +114,9 @@ public sealed class MustReferenceNoPackagesVerbTests
     {
         // The law that counts private references too, stated as a predicate over the full list: one finding for
         // the project the verb passes, where MustNotReferencePackages("*") would report each package.
-        Checker.Run(PrivateScene, arch => arch.Rule("packaging/contract-bare")
-                .Enforce(arch.Projects.Named("Contract")
-                    .Must(project => project.PackageReferences.Count == 0, description: "declare no package references at all"))
-                .Because("b"))
-            .Single()
+        Checker.Verdict(PrivateScene, arch => arch.Projects.Named("Contract")
+                .Must(project => project.PackageReferences.Count == 0,
+                    description: "declare no package references at all"))
             .ShouldHaveFailedWithProjectSubjects(["Contract"]);
     }
 }

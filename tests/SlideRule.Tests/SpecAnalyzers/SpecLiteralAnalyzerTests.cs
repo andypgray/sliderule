@@ -234,19 +234,9 @@ public sealed class SpecLiteralAnalyzerTests
         // The receiver is a string constant sitting directly under an array-typed invocation. The second
         // line is the one that bites: a blank receiver is exactly what the slot reports, so reading it
         // would warn about a value the call splits rather than passes.
-        const string source =
-            """
-            using SlideRule;
-
-            public sealed class Spec
-            {
-                public void Define(Arch arch)
-                {
-                    arch.Types.Named("A", "Order, Invoice".Split(','));
-                    arch.Types.Named("A", " ".Split(','));
-                }
-            }
-            """;
+        string source = SpecSnippet.Around(
+            """arch.Types.Named("A", "Order, Invoice".Split(','));""",
+            """arch.Types.Named("A", " ".Split(','));""");
 
         IReadOnlyList<Diagnostic> reported = await SpecSnippet.ShouldCompileAndDiagnoseAsync(source, cancellationToken: Ct);
 
@@ -362,18 +352,7 @@ public sealed class SpecLiteralAnalyzerTests
     [Fact]
     public async Task ANameofAsAMemberName_IsTheConstantItFoldsToAndDrawsNothing()
     {
-        const string source =
-            """
-            using SlideRule;
-
-            public sealed class Spec
-            {
-                public void Define(Arch arch)
-                {
-                    arch.Member(typeof(string), nameof(string.Length));
-                }
-            }
-            """;
+        string source = SpecSnippet.Around("""arch.Member(typeof(string), nameof(string.Length));""");
 
         IReadOnlyList<Diagnostic> reported = await SpecSnippet.ShouldCompileAndDiagnoseAsync(source, cancellationToken: Ct);
 
@@ -383,18 +362,7 @@ public sealed class SpecLiteralAnalyzerTests
     [Fact]
     public async Task ANullArgument_IsAConstantThatIsNotAStringAndIsSkipped()
     {
-        const string source =
-            """
-            using SlideRule;
-
-            public sealed class Spec
-            {
-                public void Define(Arch arch)
-                {
-                    arch.Namespace(null!);
-                }
-            }
-            """;
+        string source = SpecSnippet.Around("""arch.Namespace(null!);""");
 
         IReadOnlyList<Diagnostic> reported = await SpecSnippet.ShouldCompileAndDiagnoseAsync(source, cancellationToken: Ct);
 
@@ -656,7 +624,7 @@ public sealed class SpecLiteralAnalyzerTests
             """;
 
         IReadOnlyList<Diagnostic> reported = await SpecSnippet.ShouldCompileAndDiagnoseAsync(
-            [(SpecSnippet.FilePath, source)], SpecSnippet.WithoutTheContract, cancellationToken: Ct);
+            source, cancellationToken: Ct, references: SpecSnippet.WithoutTheContract);
 
         reported.ShouldBeSilent();
     }

@@ -2,7 +2,6 @@ using Shouldly;
 using SlideRule.Cli;
 using SlideRule.Roslyn;
 using SlideRule.Tests.Checking;
-using SlideRule.Tests.TestSupport;
 using SlideRule.Validation;
 using Xunit;
 
@@ -78,20 +77,19 @@ public sealed class CliErrorMapperTests
     }
 
     // The MCP GlobalCallToolFilter renders UserFacingMessage; the CLI renders Write. This pins them to
-    // the identical multi-line body (after newline normalization) so the two surfaces stay in parity —
-    // for a multi-line UserErrorException (the unknown-rule listing) and for spec validation.
+    // the identical multi-line body so the two surfaces stay in parity, for a multi-line UserErrorException
+    // (the unknown-rule listing) and for spec validation. Write ends each line with its writer's newline, so a
+    // writer whose newline is LF makes the comparison exact on every platform.
     [Fact]
     public void Write_MatchesUserFacingMessage_ForMultilineUserError()
     {
         var exception = new UserErrorException("Unknown rule ID 'x'. Available rule IDs:\n  a/one\n  b/two");
-        var error = new StringWriter();
+        var error = new StringWriter { NewLine = "\n" };
 
         CliErrorMapper.Write(exception, error);
 
         error.ToString()
-            .NormalizedLines()
-            .TrimEnd('\n')
-            .ShouldBe(CliErrorMapper.UserFacingMessage(exception));
+            .ShouldBe(CliErrorMapper.UserFacingMessage(exception) + "\n");
     }
 
     [Fact]
@@ -105,13 +103,11 @@ public sealed class CliErrorMapperTests
                 arch.Rule("area/two")
                     .Enforce(arch.Types.MustHaveSuffix("Y"));
             }));
-        var error = new StringWriter();
+        var error = new StringWriter { NewLine = "\n" };
 
         CliErrorMapper.Write(validation, error);
 
         error.ToString()
-            .NormalizedLines()
-            .TrimEnd('\n')
-            .ShouldBe(CliErrorMapper.UserFacingMessage(validation));
+            .ShouldBe(CliErrorMapper.UserFacingMessage(validation) + "\n");
     }
 }

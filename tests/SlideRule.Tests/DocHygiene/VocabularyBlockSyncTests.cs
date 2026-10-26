@@ -27,9 +27,8 @@ public sealed class VocabularyBlockSyncTests
     {
         // Arrange
         string committed = RepoRoot.ReadText(path);
-        ManagedBlocks.MarkerPairCount(committed)
-            .ShouldBe(1, $"{path} must carry exactly one pair of managed-block markers around its vocabulary table.");
-        string committedBody = ManagedBlock.ExtractBody(committed)!;
+        string committedBody = committed.ShouldCarryOneManagedBlock(
+            $"{path} must carry exactly one pair of managed-block markers around its vocabulary table.");
         string composedBody = VocabularyBlockComposer.Compose();
         List<string> drift = new();
 
@@ -80,8 +79,7 @@ public sealed class VocabularyBlockSyncTests
     // under two subjects), so the diff counts copies; a set diff cannot see a verb lose one of its twin rows.
     private static IReadOnlyList<string> RowDrift(string committed, string composed)
     {
-        // A checkout that rewrote the file to CRLF would otherwise report every row as both added and removed.
-        string[] before = committed.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
+        string[] before = committed.Split('\n');
         string[] after = composed.Split('\n');
 
         List<string> drift = [.. Surplus(after, before, '+'), .. Surplus(before, after, '-')];

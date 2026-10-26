@@ -28,7 +28,7 @@ public sealed class CliHelpFenceTests
         // Arrange
         CliHelpFence row = CliHelpFences.Row(commandLine);
         QuotedFence fence = CliHelpFences.Captured
-            .Single(captured => captured.Key == row.Key)
+            .ShouldHaveSingle(captured => captured.Key == row.Key, captured => captured.Key)
             .ShouldFindFence();
 
         // Act
@@ -68,19 +68,15 @@ public sealed class CliHelpFenceTests
     public void Render_IgnoresTheUICulture()
     {
         // Arrange: System.CommandLine translates its headings, and German is one of its satellites.
-        string german;
-        string english;
+        static string RenderUnder(string culture)
+        {
+            using ScopedUICulture scope = new(CultureInfo.GetCultureInfo(culture));
+            return CliHelpFences.Render("sliderule check");
+        }
 
         // Act
-        using (new ScopedUICulture(CultureInfo.GetCultureInfo("de-DE")))
-        {
-            german = CliHelpFences.Render("sliderule check");
-        }
-
-        using (new ScopedUICulture(CultureInfo.GetCultureInfo("en-US")))
-        {
-            english = CliHelpFences.Render("sliderule check");
-        }
+        string german = RenderUnder("de-DE");
+        string english = RenderUnder("en-US");
 
         // Assert
         german.ShouldBe(english);

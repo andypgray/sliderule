@@ -31,20 +31,14 @@ public sealed class MustOnlyTargetVerbTests
     {
         // The site is the props file, not the project: the property a rule is about is very often set
         // somewhere else, and the file:line an agent jumps to has to be where the winning declaration sits.
-        Checker.Run(Scene, arch => arch.Rule("packaging/contract-tfm")
-                .Enforce(arch.Projects.Named("Host").MustOnlyTarget("net8.0"))
-                .Because("b"))
-            .Single()
+        Checker.Verdict(Scene, arch => arch.Projects.Named("Host").MustOnlyTarget("net8.0"))
             .ShouldHaveFailedWithProjectAtSites("Host -> net48", ["Directory.Build.props:3"]);
     }
 
     [Fact]
     public void MustOnlyTarget_EveryDeclaredFrameworkPermitted_PassesClean()
     {
-        Checker.Run(Scene, arch => arch.Rule("packaging/contract-tfm")
-                .Enforce(arch.Projects.Named("Contract").MustOnlyTarget("netstandard2.0"))
-                .Because("b"))
-            .Single()
+        Checker.Verdict(Scene, arch => arch.Projects.Named("Contract").MustOnlyTarget("netstandard2.0"))
             .ShouldHavePassedClean();
     }
 
@@ -53,10 +47,7 @@ public sealed class MustOnlyTargetVerbTests
     {
         // The allow-list is over the whole declared set, so a multi-targeted project passes only when every
         // one of its frameworks is listed — never on the strength of the first.
-        Checker.Run(Scene, arch => arch.Rule("packaging/host-tfm")
-                .Enforce(arch.Projects.Named("Host").MustOnlyTarget("net8.0", "net48"))
-                .Because("b"))
-            .Single()
+        Checker.Verdict(Scene, arch => arch.Projects.Named("Host").MustOnlyTarget("net8.0", "net48"))
             .ShouldHavePassedClean();
     }
 
@@ -65,10 +56,7 @@ public sealed class MustOnlyTargetVerbTests
     {
         // The absent-fact row: unknown never reds. A project with no declared framework has nothing outside
         // the list, which is the honest reading of a fact the load never measured.
-        Checker.Run(Scene, arch => arch.Rule("packaging/contract-tfm")
-                .Enforce(arch.Projects.Named("Unevaluated").MustOnlyTarget("netstandard2.0"))
-                .Because("b"))
-            .Single()
+        Checker.Verdict(Scene, arch => arch.Projects.Named("Unevaluated").MustOnlyTarget("netstandard2.0"))
             .ShouldHavePassedClean();
     }
 
@@ -80,10 +68,7 @@ public sealed class MustOnlyTargetVerbTests
         // made-up location.
         CodebaseModel siteless = ProjectFacts.Solution(ProjectFacts.Project("Legacy", ["net48"]));
 
-        Checker.Run(siteless, arch => arch.Rule("packaging/modern-only")
-                .Enforce(arch.Projects.Named("Legacy").MustOnlyTarget("net8.0"))
-                .Because("b"))
-            .Single()
+        Checker.Verdict(siteless, arch => arch.Projects.Named("Legacy").MustOnlyTarget("net8.0"))
             .ShouldHaveFailedWithProjectAtSites("Legacy -> net48", []);
     }
 
@@ -92,10 +77,7 @@ public sealed class MustOnlyTargetVerbTests
     {
         // A project declaring two forbidden frameworks is two findings, each keyed by its own framework, so a
         // migrated rule grandfathers the frameworks it saw and reds on the next one (GRAMMAR §4.3, §4.10).
-        Checker.Run(Scene, arch => arch.Rule("packaging/netstandard-only")
-                .Enforce(arch.Projects.Matching("*").MustOnlyTarget("netstandard2.0"))
-                .Because("b"))
-            .Single()
+        Checker.Verdict(Scene, arch => arch.Projects.Matching("*").MustOnlyTarget("netstandard2.0"))
             .ShouldHaveFailedWithProjectSubjects(["Host -> net48", "Host -> net8.0"]);
     }
 }

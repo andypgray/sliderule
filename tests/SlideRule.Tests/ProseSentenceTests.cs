@@ -100,11 +100,7 @@ public class ProseSentenceTests
     public void MustNotUse_ExpressionMintedProperty_RendersNoParens()
     {
         // An expression-minted property anchor renders with no parens — identical to the typeof form.
-        Checker.Model(arch => arch.Rule("member/no-now")
-                .Enforce(arch.Types.MustNotUse(arch.Member(() => DateTime.Now)))
-                .Because("Wall-clock reads are untestable."))
-            .Rule("member/no-now")
-            .Sentence
+        Checker.Sentence(arch => arch.Types.MustNotUse(arch.Member(() => DateTime.Now)))
             .ShouldBe("Types must not use `DateTime.Now`.");
     }
 
@@ -113,11 +109,7 @@ public class ProseSentenceTests
     {
         // The static-form verb sugar: a bare () => GC.Collect() lambda desugars through
         // arch.Member(() => …) to the same method leaf, so the sentence is byte-identical — parens for a method.
-        Checker.Model(arch => arch.Rule("member/verb-collect")
-                .Enforce(arch.Types.MustNotUse(() => GC.Collect()))
-                .Because("Forced GCs stall the process."))
-            .Rule("member/verb-collect")
-            .Sentence
+        Checker.Sentence(arch => arch.Types.MustNotUse(() => GC.Collect()))
             .ShouldBe("Types must not use `GC.Collect()`.");
     }
 }

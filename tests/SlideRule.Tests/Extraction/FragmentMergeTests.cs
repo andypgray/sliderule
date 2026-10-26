@@ -21,6 +21,12 @@ public sealed class FragmentMergeTests
         public class Dup {}
         """;
 
+    private const string ClassASource =
+        """
+        namespace P;
+        public class A {}
+        """;
+
     // The name two projects each compile a copy of, in every drifted-copy bed below.
     private const string FormatterSource = "namespace Drift { public class Formatter {} }";
 
@@ -52,14 +58,8 @@ public sealed class FragmentMergeTests
     public void ExtractFromCompilations_DuplicateFqnInTwoInputs_UnionsDeclarationSitesAcrossInputs()
     {
         // Partial-across-projects shape: one FQN declared by two inputs unions its declaration sites.
-        CompilationInput first = CompilationFactory.Compile("Aproj", ("A.cs", """
-                                                                              namespace N;
-                                                                              public class Dup {}
-                                                                              """));
-        CompilationInput second = CompilationFactory.Compile("Bproj", ("B.cs", """
-                                                                               namespace N;
-                                                                               public class Dup {}
-                                                                               """));
+        CompilationInput first = CompilationFactory.Compile("Aproj", ("A.cs", DupSource));
+        CompilationInput second = CompilationFactory.Compile("Bproj", ("B.cs", DupSource));
 
         CodebaseModel model = Harness.Extract([first, second]);
 
@@ -164,23 +164,12 @@ public sealed class FragmentMergeTests
     {
         // The construction's Definition must be the very TypeNode instance held by Types (the
         // documented reference-equality contract), even when definition and user cross inputs.
-        CompilationInput lib = CompilationFactory.Compile("Aproj", ("Lib.cs", """
-                                                                              namespace N;
-                                                                              public interface IHandler<T> {}
-                                                                              public class Msg {}
-                                                                              """));
-        CompilationInput app = CompilationFactory.CompileReferencing(
-            "Bproj", lib.Compilation, "Aproj", ("App.cs", """
-                                                          namespace N2;
-                                                          public class Handler : N.IHandler<N.Msg> {}
-                                                          """));
-
-        CodebaseModel model = Harness.Extract([lib, app]);
+        CodebaseModel model = HandlerImplementedAcrossInputs();
 
         TypeNode handlerDef = model.Type("N.IHandler<T>");
         TypeConstruction construction = model.Type("N2.Handler")
             .AllInterfaces
-            .Single(c => c.Definition.FullName == "N.IHandler<T>");
+            .ShouldHaveSingle(c => c.Definition.FullName == "N.IHandler<T>", c => c.FullName);
         construction.Definition.ShouldBeSameAs(handlerDef);
         construction.FullName.ShouldBe("N.IHandler<N.Msg>");
     }
@@ -189,18 +178,7 @@ public sealed class FragmentMergeTests
     public void ExtractFromCompilations_CrossInputEdges_ReferenceSameNodeInstancesAsTypes()
     {
         // Edge Source/Target are the same instances as Types (reference equality, not name equality).
-        CompilationInput lib = CompilationFactory.Compile("Aproj", ("Lib.cs", """
-                                                                              namespace N;
-                                                                              public interface IHandler<T> {}
-                                                                              public class Msg {}
-                                                                              """));
-        CompilationInput app = CompilationFactory.CompileReferencing(
-            "Bproj", lib.Compilation, "Aproj", ("App.cs", """
-                                                          namespace N2;
-                                                          public class Handler : N.IHandler<N.Msg> {}
-                                                          """));
-
-        CodebaseModel model = Harness.Extract([lib, app]);
+        CodebaseModel model = HandlerImplementedAcrossInputs();
 
         TypeNode handler = model.Type("N2.Handler");
         TypeNode handlerDef = model.Type("N.IHandler<T>");
@@ -218,17 +196,14 @@ public sealed class FragmentMergeTests
     {
         // Two compilations sharing a project name model one project's two TFMs; BuildProjects collapses
         // them to one node whose references are the ordinal union of both TFMs' references.
-        var file = ("P.cs", """
-                            namespace P;
-                            public class A {}
-                            """);
+        (string, string ClassASource) file = ("P.cs", ClassASource);
         CompilationInput first = CompilationFactory.Compile("P", file) with { ProjectReferences = ["Legacy"] };
         CompilationInput second = CompilationFactory.Compile("P", file) with { ProjectReferences = ["Modern"] };
 
         CodebaseModel model = Harness.Extract([first, second]);
 
         model.Projects.ShouldContain(p => p.Name == "P", expectedCount: 1);
-        model.Projects.Single(p => p.Name == "P")
+        model.Project("P")
             .ProjectReferences.ShouldBe(["Legacy", "Modern"]);
     }
 
@@ -379,14 +354,8 @@ public sealed class FragmentMergeTests
     {
         // Both Aproj and Bproj declare N.Dup. Aproj wins the facts (input order) while arch.Project("Bproj")
         // still selects the type — the merge records one advisory note naming winner, loser, and consequence.
-        CompilationInput first = CompilationFactory.Compile("Aproj", ("A.cs", """
-                                                                              namespace N;
-                                                                              public class Dup {}
-                                                                              """));
-        CompilationInput second = CompilationFactory.Compile("Bproj", ("B.cs", """
-                                                                               namespace N;
-                                                                               public class Dup {}
-                                                                               """));
+        CompilationInput first = CompilationFactory.Compile("Aproj", ("A.cs", DupSource));
+        CompilationInput second = CompilationFactory.Compile("Bproj", ("B.cs", DupSource));
 
         CodebaseModel model = Harness.Extract([first, second]);
 
@@ -402,10 +371,7 @@ public sealed class FragmentMergeTests
     {
         // One project's two target frameworks declare the same FQN under the same name — the legitimate
         // multi-TFM union, not a conflation. It must stay silent.
-        var file = ("P.cs", """
-                            namespace P;
-                            public class A {}
-                            """);
+        (string, string ClassASource) file = ("P.cs", ClassASource);
         CompilationInput first = CompilationFactory.Compile("P", file) with { ProjectReferences = ["Legacy"] };
         CompilationInput second = CompilationFactory.Compile("P", file) with { ProjectReferences = ["Modern"] };
 
@@ -437,22 +403,9 @@ public sealed class FragmentMergeTests
     {
         // Winner Aproj declares N.Dup once; loser Bproj declares it in two frameworks. The loser set
         // collapses the loser's two declarations to a single entry, and so to a single note.
-        CompilationInput winner = CompilationFactory.Compile("Aproj", ("A.cs", """
-                                                                               namespace N;
-                                                                               public class Dup {}
-                                                                               """));
-        var loserFirst = new CompilationInput(
-            CompilationFactory.Compile("Bproj", ("B.cs", """
-                                                         namespace N;
-                                                         public class Dup {}
-                                                         """))
-                .Compilation, "Bproj", ["Legacy"]);
-        var loserSecond = new CompilationInput(
-            CompilationFactory.Compile("Bproj", ("B.cs", """
-                                                         namespace N;
-                                                         public class Dup {}
-                                                         """))
-                .Compilation, "Bproj", ["Modern"]);
+        CompilationInput winner = CompilationFactory.Compile("Aproj", ("A.cs", DupSource));
+        CompilationInput loserFirst = CompilationFactory.Compile("Bproj", ("B.cs", DupSource)) with { ProjectReferences = ["Legacy"] };
+        CompilationInput loserSecond = CompilationFactory.Compile("Bproj", ("B.cs", DupSource)) with { ProjectReferences = ["Modern"] };
 
         CodebaseModel model = Harness.Extract([winner, loserFirst, loserSecond]);
 
@@ -469,21 +422,8 @@ public sealed class FragmentMergeTests
         // real solution with stubbed anchors reports, so it stays pinned here. Grouping by
         // declarer set keeps it to one line naming every loser rather than a line per loser: nothing dropped,
         // and the channel stays legible enough that a reader still notices a line arriving.
-        CompilationInput winner = CompilationFactory.Compile("App.Web", ("W.cs", """
-                                                                                 namespace N;
-                                                                                 public class Dup {}
-                                                                                 """));
-        CompilationInput stubB = CompilationFactory.Compile("Spec.B", ("B.cs", """
-                                                                               namespace N;
-                                                                               public class Dup {}
-                                                                               """));
-        CompilationInput stubA = CompilationFactory.Compile("Spec.A", ("A.cs", """
-                                                                               namespace N;
-                                                                               public class Dup {}
-                                                                               """));
-
         // Losers arrive out of order; the note orders them ordinal so the line is stable across runs.
-        CodebaseModel model = Harness.Extract([winner, stubB, stubA]);
+        CodebaseModel model = DupDeclaredByThreeProjects();
 
         model.MergeNotes.ShouldBe([
             "Projects 'App.Web', 'Spec.A' and 'Spec.B' each declare 'N.Dup'; its facts and project "
@@ -588,16 +528,10 @@ public sealed class FragmentMergeTests
         // raised: the project-level framework note first, the declarer-set note after it. P's two frameworks
         // share P.A — one project, so a collapse rather than a conflation — and Q declares P.A as well, which
         // is a conflation P wins.
-        var file = ("P.cs", """
-                            namespace P;
-                            public class A {}
-                            """);
+        (string, string ClassASource) file = ("P.cs", ClassASource);
         CompilationInput modern = CompilationFactory.Compile("P", file) with { TargetFramework = "net10.0" };
         CompilationInput legacy = CompilationFactory.Compile("P", file) with { TargetFramework = "netstandard2.0" };
-        CompilationInput other = CompilationFactory.Compile("Q", ("Q.cs", """
-                                                                          namespace P;
-                                                                          public class A {}
-                                                                          """));
+        CompilationInput other = CompilationFactory.Compile("Q", ("Q.cs", ClassASource));
 
         CodebaseModel model = Harness.Extract([modern, legacy, other]);
 
@@ -618,21 +552,8 @@ public sealed class FragmentMergeTests
         // The same conflation as the note above, kept as a fact rather than only as a sentence: the survey
         // has to suppress an edge on it, and no consumer can act on prose. Losers only — ProjectName is the
         // winner, so repeating it here would make the node say the same thing twice.
-        CompilationInput winner = CompilationFactory.Compile("App.Web", ("W.cs", """
-                                                                                 namespace N;
-                                                                                 public class Dup {}
-                                                                                 """));
-        CompilationInput stubB = CompilationFactory.Compile("Spec.B", ("B.cs", """
-                                                                               namespace N;
-                                                                               public class Dup {}
-                                                                               """));
-        CompilationInput stubA = CompilationFactory.Compile("Spec.A", ("A.cs", """
-                                                                               namespace N;
-                                                                               public class Dup {}
-                                                                               """));
-
         // Losers arrive out of order; the list orders them ordinal like the note that reads the same table.
-        CodebaseModel model = Harness.Extract([winner, stubB, stubA]);
+        CodebaseModel model = DupDeclaredByThreeProjects();
 
         TypeNode dup = model.Type("N.Dup");
         dup.ProjectName.ShouldBe("App.Web");
@@ -645,10 +566,7 @@ public sealed class FragmentMergeTests
         // The overwhelming common case, and what keeps the survey's coverage statement absent rather than
         // empty: an ordinary type says nothing, and so does one whose own project declared it twice under
         // two target frameworks — one project is never a conflation.
-        var file = ("P.cs", """
-                            namespace P;
-                            public class A {}
-                            """);
+        (string, string ClassASource) file = ("P.cs", ClassASource);
         CompilationInput modern = CompilationFactory.Compile("P", file) with { TargetFramework = "net10.0" };
         CompilationInput legacy = CompilationFactory.Compile("P", file) with { TargetFramework = "netstandard2.0" };
         CompilationInput other = CompilationFactory.Compile("Q", ("Q.cs", """
@@ -672,10 +590,7 @@ public sealed class FragmentMergeTests
         // One project file's two frameworks both declare P.A, so the type carries the first-extracted
         // framework's facts and only its facts. That is not a conflation — the project is one project — but
         // it is not free either, so it gets a note of its own naming both frameworks and the winner.
-        var file = ("P.cs", """
-                            namespace P;
-                            public class A {}
-                            """);
+        (string, string ClassASource) file = ("P.cs", ClassASource);
         CompilationInput modern = CompilationFactory.Compile("P", file) with { TargetFramework = "net10.0" };
         CompilationInput legacy = CompilationFactory.Compile("P", file) with { TargetFramework = "netstandard2.0" };
 
@@ -695,18 +610,20 @@ public sealed class FragmentMergeTests
         // The gate, and it is a correctness matter rather than an economy: a type only ONE framework
         // declares (a #if-guarded class, a framework-conditional <Compile>) keeps its own framework's facts.
         // Nothing collapsed, so a note saying the facts came from the other framework would be false.
-        var modern = new CompilationInput(
-            CompilationFactory.Compile("P", ("Modern.cs", """
-                                                          namespace P;
-                                                          public class Modern {}
-                                                          """))
-                .Compilation, "P", [], "net10.0");
-        var legacy = new CompilationInput(
-            CompilationFactory.Compile("P", ("Legacy.cs", """
-                                                          namespace P;
-                                                          public class Legacy {}
-                                                          """))
-                .Compilation, "P", [], "netstandard2.0");
+        CompilationInput modern = CompilationFactory.Compile("P", ("Modern.cs", """
+                                                                                namespace P;
+                                                                                public class Modern {}
+                                                                                """)) with
+        {
+            TargetFramework = "net10.0"
+        };
+        CompilationInput legacy = CompilationFactory.Compile("P", ("Legacy.cs", """
+                                                                                namespace P;
+                                                                                public class Legacy {}
+                                                                                """)) with
+        {
+            TargetFramework = "netstandard2.0"
+        };
 
         CodebaseModel model = Harness.Extract([modern, legacy]);
 
@@ -719,17 +636,14 @@ public sealed class FragmentMergeTests
         // Two compilations under one project name and one framework, which is how two project files sharing a
         // file name and a framework arrive here. Nothing collapsed across frameworks, so a note would name the
         // framework as winning over itself, and FactsFollow would name a framework nothing followed.
-        var file = ("P.cs", """
-                            namespace P;
-                            public class A {}
-                            """);
+        (string, string ClassASource) file = ("P.cs", ClassASource);
         CompilationInput first = CompilationFactory.Compile("P", file) with { TargetFramework = "net10.0" };
         CompilationInput second = CompilationFactory.Compile("P", file) with { TargetFramework = "net10.0" };
 
         CodebaseModel model = Harness.Extract([first, second]);
 
         model.MergeNotes.ShouldBeEmpty();
-        model.Projects.Single(project => project.Name == "P")
+        model.Project("P")
             .FactsFollow.ShouldBeNull();
     }
 
@@ -737,14 +651,8 @@ public sealed class FragmentMergeTests
     public void ExtractFromCompilations_TwoProjectFilesSharingANameAndNoFramework_MergeAsOneProjectWithNoNote()
     {
         // The remark on NormalizeProjectNames states this: nothing downstream discloses the shared name.
-        CompilationInput first = CompilationFactory.Compile("P", ("First/A.cs", """
-                                                                                namespace P;
-                                                                                public class A {}
-                                                                                """));
-        CompilationInput second = CompilationFactory.Compile("P", ("Second/A.cs", """
-                                                                                  namespace P;
-                                                                                  public class A {}
-                                                                                  """));
+        CompilationInput first = CompilationFactory.Compile("P", ("First/A.cs", ClassASource));
+        CompilationInput second = CompilationFactory.Compile("P", ("Second/A.cs", ClassASource));
 
         CodebaseModel model = Harness.Extract([first, second]);
 
@@ -787,19 +695,21 @@ public sealed class FragmentMergeTests
         // is empty — and the reference the dropped field made survives anyway, because every edge unions
         // whichever framework's compilation observed it. The note stays a single line: P.Legacy is declared
         // by one framework alone, so it collapsed nothing and must add nothing.
-        var modern = new CompilationInput(
-            CompilationFactory.Compile("P", ("Modern.cs", """
-                                                          namespace P;
-                                                          public class A {}
-                                                          """))
-                .Compilation, "P", [], "net10.0");
-        var legacy = new CompilationInput(
-            CompilationFactory.Compile("P", ("Legacy.cs", """
-                                                          namespace P;
-                                                          public class A { public Legacy Field; }
-                                                          public class Legacy {}
-                                                          """))
-                .Compilation, "P", [], "netstandard2.0");
+        CompilationInput modern = CompilationFactory.Compile("P", ("Modern.cs", """
+                                                                                namespace P;
+                                                                                public class A {}
+                                                                                """)) with
+        {
+            TargetFramework = "net10.0"
+        };
+        CompilationInput legacy = CompilationFactory.Compile("P", ("Legacy.cs", """
+                                                                                namespace P;
+                                                                                public class A { public Legacy Field; }
+                                                                                public class Legacy {}
+                                                                                """)) with
+        {
+            TargetFramework = "netstandard2.0"
+        };
 
         CodebaseModel model = Harness.Extract([modern, legacy]);
 
@@ -855,7 +765,7 @@ public sealed class FragmentMergeTests
             + "references, so a rule about its members or hierarchy is checked against that framework alone and a "
             + "rule about what it references sees every framework."
         ]);
-        model.Projects.Single(project => project.Name == "P")
+        model.Project("P")
             .FactsFollow.ShouldBe("net48");
         model.Type("P.Alpha")
             .MemberIds()
@@ -876,10 +786,7 @@ public sealed class FragmentMergeTests
     {
         // Three frameworks are not enough to change the note: every shared type here is one the first framework
         // declares, so one framework won them all and the note says so in the sentence two frameworks get.
-        var file = ("P.cs", """
-                            namespace P;
-                            public class A {}
-                            """);
+        (string, string ClassASource) file = ("P.cs", ClassASource);
         CompilationInput legacy = CompilationFactory.Compile("P", file) with { TargetFramework = "net48" };
         CompilationInput modern = CompilationFactory.Compile("P", file) with { TargetFramework = "net6.0" };
         CompilationInput latest = CompilationFactory.Compile("P", file) with { TargetFramework = "net8.0" };
@@ -910,10 +817,7 @@ public sealed class FragmentMergeTests
         // One project file, several compilations, one ProjectNode — so the label has to union like the
         // reference edges do. Declared by either wins; unknown never overrides a fragment that actually read
         // the solution, and only an all-unknown project stays unlabeled.
-        var file = ("P.cs", """
-                            namespace P;
-                            public class A {}
-                            """);
+        (string, string ClassASource) file = ("P.cs", ClassASource);
         CompilationInput modern = CompilationFactory.Compile("P", file)
             with
             {
@@ -927,7 +831,7 @@ public sealed class FragmentMergeTests
 
         CodebaseModel model = Harness.Extract([modern, legacy]);
 
-        model.Projects.Single()
+        model.Projects.ShouldHaveSingleItem()
             .SolutionMember.ShouldBe(expected);
     }
 
@@ -990,22 +894,22 @@ public sealed class FragmentMergeTests
         ExposureEdge exposure = model.ExposureEdge("Drift.Formatter", "Cells.Cell");
 
         (string, string)[] coreOnly = [("Core", "Core")];
-        InstancesOf(reference.Evidence.Instances)
+        ShouldHaveInstances(reference.Evidence.Instances)
             .ShouldBe(coreOnly);
-        InstancesOf(construction.Evidence.Instances)
+        ShouldHaveInstances(construction.Evidence.Instances)
             .ShouldBe(coreOnly);
-        InstancesOf(injection.Evidence.Instances)
+        ShouldHaveInstances(injection.Evidence.Instances)
             .ShouldBe(coreOnly);
-        InstancesOf(caught.Evidence.Instances)
+        ShouldHaveInstances(caught.Evidence.Instances)
             .ShouldBe(coreOnly);
-        InstancesOf(thrown.Evidence.Instances)
+        ShouldHaveInstances(thrown.Evidence.Instances)
             .ShouldBe(coreOnly);
-        InstancesOf(exposure.Evidence.Instances)
+        ShouldHaveInstances(exposure.Evidence.Instances)
             .ShouldBe(coreOnly);
 
         // The string is an external node, so the reach is the supplying assembly's name, and the maker is Satellite.
         ExposureEdge exposesString = model.ExposureEdge("Drift.Formatter", "System.String");
-        InstancesOf(exposesString.Evidence.Instances)
+        ShouldHaveInstances(exposesString.Evidence.Instances)
             .ShouldBe([("Satellite", exposesString.Exposed.ProjectName)]);
     }
 
@@ -1016,7 +920,7 @@ public sealed class FragmentMergeTests
         CodebaseModel model = LinkedFileInTwoProjects();
 
         ReferenceEdge part = model.Edge("Shared.Widget", "Shared.WidgetPart");
-        InstancesOf(part.Evidence.Instances)
+        ShouldHaveInstances(part.Evidence.Instances)
             .ShouldBe([("Core", "Core"), ("Tool", "Tool")]);
     }
 
@@ -1036,9 +940,9 @@ public sealed class FragmentMergeTests
 
         ReferenceEdge fromClient = model.Edge("Client.View", "Drift.Formatter");
         ReferenceEdge fromReader = model.Edge("Reader.Page", "Drift.Formatter");
-        InstancesOf(fromClient.Evidence.Instances)
+        ShouldHaveInstances(fromClient.Evidence.Instances)
             .ShouldBe([("Client", "Core")]);
-        InstancesOf(fromReader.Evidence.Instances)
+        ShouldHaveInstances(fromReader.Evidence.Instances)
             .ShouldBe([("Reader", "Satellite")]);
     }
 
@@ -1057,7 +961,7 @@ public sealed class FragmentMergeTests
         CodebaseModel model = Harness.Extract([core, reader, satellite]);
 
         ReferenceEdge fromReader = model.Edge("Reader.Page", "Drift.Formatter");
-        InstancesOf(fromReader.Evidence.Instances)
+        ShouldHaveInstances(fromReader.Evidence.Instances)
             .ShouldBe([("Reader", "Core")]);
     }
 
@@ -1110,13 +1014,13 @@ public sealed class FragmentMergeTests
 
         ReferenceEdge reference = model.Edge("Drift.Formatter", "Cells.Cell");
         IReadOnlyList<EdgeInstance> instances = reference.Evidence.Instances.ShouldNotBeNull();
-        InstancesOf(reference.Evidence.Instances)
+        ShouldHaveInstances(reference.Evidence.Instances)
             .ShouldBe([("Core", "Cells"), ("Satellite", "Cells")]);
-        Rendered(reference.Sites)
+        reference.Sites.Rendered()
             .ShouldBe(["Core/Formatter.cs:5", "Satellite/Formatter.cs:6", "Satellite/Formatter.cs:7"]);
-        Rendered(instances[0].Sites)
+        instances[0].Sites.Rendered()
             .ShouldBe(["Core/Formatter.cs:5"]);
-        Rendered(instances[1].Sites)
+        instances[1].Sites.Rendered()
             .ShouldBe(["Satellite/Formatter.cs:6", "Satellite/Formatter.cs:7"]);
 
         ShouldBeTheEdgesOwnSiteObjects(instances[0].Sites, reference.Sites);
@@ -1133,7 +1037,7 @@ public sealed class FragmentMergeTests
 
         ReferenceEdge part = model.Edge("Shared.Widget", "Shared.WidgetPart");
         IReadOnlyList<EdgeInstance> instances = part.Evidence.Instances.ShouldNotBeNull();
-        Rendered(part.Sites)
+        part.Sites.Rendered()
             .ShouldBe(["Shared/Widget.cs:1"]);
         instances[0].Sites.ShouldBeSameAs(part.Sites);
         instances[1].Sites.ShouldBeSameAs(part.Sites);
@@ -1183,9 +1087,9 @@ public sealed class FragmentMergeTests
 
         ReferenceEdge reference = model.Edge("Drift.Formatter", "Cells.Cell");
         IReadOnlyList<EdgeInstance> instances = reference.Evidence.Instances.ShouldNotBeNull();
-        InstancesOf(reference.Evidence.Instances)
+        ShouldHaveInstances(reference.Evidence.Instances)
             .ShouldBe([("Core", "Core")]);
-        Rendered(instances[0].Sites)
+        instances[0].Sites.Rendered()
             .ShouldBe(["Core/Formatter.cs:5", "Core/Formatter.cs:6"]);
         instances[0].Sites.ShouldBeSameAs(reference.Sites);
     }
@@ -1204,9 +1108,9 @@ public sealed class FragmentMergeTests
 
         ReferenceEdge fromPage = model.Edge("App.Page", "Drift.Formatter");
         IReadOnlyList<EdgeInstance> instances = fromPage.Evidence.Instances.ShouldNotBeNull();
-        InstancesOf(fromPage.Evidence.Instances)
+        ShouldHaveInstances(fromPage.Evidence.Instances)
             .ShouldBe([("App", "App"), ("App", "Core")]);
-        Rendered(fromPage.Sites)
+        fromPage.Sites.Rendered()
             .ShouldBe(["App/Page.cs:1"]);
         instances[0].Sites[0].ShouldBeSameAs(fromPage.Sites[0]);
         instances[1].Sites[0].ShouldBeSameAs(fromPage.Sites[0]);
@@ -1277,24 +1181,24 @@ public sealed class FragmentMergeTests
 
         CatchEdge caught = model.CatchEdge("Drift.Formatter", "Cells.CellException");
         (string, string)[] bothCopies = [("Core", "Cells"), ("Satellite", "Cells")];
-        InstancesOf(caught.Evidence.Instances)
+        ShouldHaveInstances(caught.Evidence.Instances)
             .ShouldBe(bothCopies);
-        InstancesOf(caught.UnfilteredEvidence.Instances)
+        ShouldHaveInstances(caught.UnfilteredEvidence.Instances)
             .ShouldBe(bothCopies);
-        InstancesOf(caught.SwallowingEvidence.Instances)
+        ShouldHaveInstances(caught.SwallowingEvidence.Instances)
             .ShouldBe(bothCopies);
 
         IReadOnlyList<EdgeInstance> unfiltered = caught.UnfilteredEvidence.Instances.ShouldNotBeNull();
         IReadOnlyList<EdgeInstance> swallowing = caught.SwallowingEvidence.Instances.ShouldNotBeNull();
-        Rendered(caught.Sites)
+        caught.Sites.Rendered()
             .ShouldBe(["Core/Formatter.cs:8", "Core/Formatter.cs:14", "Satellite/Formatter.cs:8"]);
-        Rendered(unfiltered[0].Sites)
+        unfiltered[0].Sites.Rendered()
             .ShouldBe(["Core/Formatter.cs:8", "Core/Formatter.cs:14"]);
-        Rendered(unfiltered[1].Sites)
+        unfiltered[1].Sites.Rendered()
             .ShouldBeEmpty();
-        Rendered(swallowing[0].Sites)
+        swallowing[0].Sites.Rendered()
             .ShouldBe(["Core/Formatter.cs:14"]);
-        Rendered(swallowing[1].Sites)
+        swallowing[1].Sites.Rendered()
             .ShouldBeEmpty();
 
         // Each narrowing's shares are subsequences of that narrowing's OWN list, never of the main one.
@@ -1310,6 +1214,34 @@ public sealed class FragmentMergeTests
         CompilationInput tool = CompilationFactory.Compile("Tool", ("Shared/Widget.cs", LinkedWidgetSource));
 
         return Harness.Extract([core, tool]);
+    }
+
+    // Aproj declares a generic interface and its type argument, and Bproj implements the constructed interface
+    // across the input boundary.
+    private static CodebaseModel HandlerImplementedAcrossInputs()
+    {
+        CompilationInput lib = CompilationFactory.Compile("Aproj", ("Lib.cs", """
+                                                                              namespace N;
+                                                                              public interface IHandler<T> {}
+                                                                              public class Msg {}
+                                                                              """));
+        CompilationInput app = CompilationFactory.CompileReferencing(
+            "Bproj", lib.Compilation, "Aproj", ("App.cs", """
+                                                          namespace N2;
+                                                          public class Handler : N.IHandler<N.Msg> {}
+                                                          """));
+
+        return Harness.Extract([lib, app]);
+    }
+
+    // App.Web declares N.Dup first, and Spec.B and Spec.A declare it after it, out of ordinal order.
+    private static CodebaseModel DupDeclaredByThreeProjects()
+    {
+        CompilationInput winner = CompilationFactory.Compile("App.Web", ("W.cs", DupSource));
+        CompilationInput stubB = CompilationFactory.Compile("Spec.B", ("B.cs", DupSource));
+        CompilationInput stubA = CompilationFactory.Compile("Spec.A", ("A.cs", DupSource));
+
+        return Harness.Extract([winner, stubB, stubA]);
     }
 
     // One project under two frameworks, the older declaring Formatter itself as a #if-guarded polyfill would and
@@ -1346,20 +1278,13 @@ public sealed class FragmentMergeTests
         return Harness.Extract([core, satellite]);
     }
 
-    // A site list as file:line strings, the shape every per-instance site pin in this class reads.
-    private static List<string> Rendered(IReadOnlyList<SourceLocation> sites)
-    {
-        return sites.Select(site => site.ToString())
-            .ToList();
-    }
-
     // Each of a share's sites against the element of the edge-level list it renders the same as. The invariant
     // is BY REFERENCE — a share is a subsequence of that list, not an equal copy of one — so asserting
     // containment by value would pass over a rebuilt list and say nothing.
     private static void ShouldBeTheEdgesOwnSiteObjects(
         IReadOnlyList<SourceLocation> share, IReadOnlyList<SourceLocation> all)
     {
-        List<string> rendered = Rendered(all);
+        List<string> rendered = all.Rendered().ToList();
         foreach (SourceLocation site in share)
         {
             int at = rendered.IndexOf(site.ToString());
@@ -1377,7 +1302,8 @@ public sealed class FragmentMergeTests
     }
 
     // A recorded instance list as (maker, reached) pairs, the shape every instance pin in this class reads.
-    private static List<(string SourceProject, string TargetProject)> InstancesOf(IReadOnlyList<EdgeInstance>? instances)
+    private static List<(string SourceProject, string TargetProject)> ShouldHaveInstances(
+        IReadOnlyList<EdgeInstance>? instances)
     {
         return instances.ShouldNotBeNull()
             .Select(instance => (instance.SourceProject, instance.TargetProject))

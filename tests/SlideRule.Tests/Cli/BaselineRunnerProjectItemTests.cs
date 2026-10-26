@@ -7,7 +7,6 @@ using SlideRule.Roslyn.Baselines;
 using SlideRule.Tests.Checking;
 using SlideRule.Tests.TestSupport;
 using Xunit;
-using static SlideRule.Tests.TestSupport.TextNormalization;
 
 namespace SlideRule.Tests.Cli;
 
@@ -45,8 +44,8 @@ public sealed class BaselineRunnerProjectItemTests : IDisposable
         string path = _temp.PathOf(BaselineFile);
         IReadOnlyList<RuleResult> before = Check(Core("Newtonsoft.Json"), BaselineIndex.Empty).Results;
         BaselineRequests.Init(_temp.Path)
-            .Apply(before, _temp.Path);
-        ReadNormalizedLines(path).ShouldBe(BaselineComposer.Compose(RuleId, Json.WithSiteCount(1)));
+            .Apply(before);
+        File.ReadAllText(path).ShouldBe(BaselineComposer.Compose(RuleId, Json.WithSiteCount(1)));
 
         BaselineIndex captured = BaselineStore.LoadForModel(Model, _temp.Path);
         RuleResult result = Check(Core("Newtonsoft.Json", "Serilog"), captured).Single();
@@ -63,13 +62,13 @@ public sealed class BaselineRunnerProjectItemTests : IDisposable
 
         IReadOnlyList<RuleResult> results = Check(Core("Newtonsoft.Json", "Serilog"), BaselineIndex.Empty).Results;
         string echo = BaselineRequests.AcceptReductions(_temp.Path)
-            .Apply(results, _temp.Path);
+            .Apply(results);
 
         echo.ShouldContain(
             "dependencies/core-bcl-only: split 1 project-wide entry into 2 entries, one per package or framework.");
         echo.ShouldNotContain("refused");
         echo.ShouldNotContain("nothing to accept");
-        ReadNormalizedLines(path)
+        File.ReadAllText(path)
             .ShouldBe(BaselineComposer.Compose(
                 RuleId,
                 Json.WithSiteCount(1).WithBecause("INC-7"),
@@ -87,9 +86,9 @@ public sealed class BaselineRunnerProjectItemTests : IDisposable
 
         IReadOnlyList<RuleResult> results = Check(Core("Newtonsoft.Json", "Serilog"), BaselineIndex.Empty).Results;
         BaselineRequests.AcceptReductions(_temp.Path)
-            .Apply(results, _temp.Path);
+            .Apply(results);
 
-        ReadNormalizedLines(path)
+        File.ReadAllText(path)
             .ShouldBe(BaselineComposer.Compose(RuleId, Json.WithSiteCount(1), Serilog.WithSiteCount(1).WithBecause("INC-9")));
     }
 
@@ -100,10 +99,10 @@ public sealed class BaselineRunnerProjectItemTests : IDisposable
 
         IReadOnlyList<RuleResult> results = Check(Core(), BaselineIndex.Empty).Results;
         string echo = BaselineRequests.AcceptReductions(_temp.Path)
-            .Apply(results, _temp.Path);
+            .Apply(results);
 
         echo.ShouldContain("dependencies/core-bcl-only: accepted 1 reduction.");
-        ReadNormalizedLines(path).ShouldBe(BaselineComposer.Compose(RuleId));
+        File.ReadAllText(path).ShouldBe(BaselineComposer.Compose(RuleId));
     }
 
     private static CodebaseModel Core(params string[] packages)

@@ -29,8 +29,7 @@ public sealed class FrameworkBinlogReplayTests
     [Fact]
     public async Task Check_FrameworkProducedBinlog_ReplaysByteIdenticallyWithoutOpeningAWorkspace()
     {
-        Assert.SkipUnless(
-            OperatingSystem.IsWindows(), "Framework MSBuild.exe and the non-SDK project shape are Windows-only.");
+        CliRunner.SkipUnlessLoadable(CliRunner.ClassicAppSolution);
         string? msBuildExe = FindFrameworkMsBuild();
         // The skip reason carries the selection, not just its absence: "no Framework MSBuild was found" and
         // "MSBuild resolved to the MSBuildLocator default because vswhere found no Visual Studio" are the

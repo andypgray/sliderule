@@ -44,9 +44,8 @@ public sealed class CodebaseExtractorCatchEdgeTests
             .Sites.Lines()
             .ShouldBe([8]);
         model.CatchEdges("N.Worker")
+            .TargetNames()
             .ShouldHaveSingleItem();
-        model.HasEdge("N.Worker", "N.MyError")
-            .ShouldBeTrue();
         model.Edge("N.Worker", "N.MyError")
             .Sites.Lines()
             .ShouldBe([8]);
@@ -90,6 +89,7 @@ public sealed class CodebaseExtractorCatchEdgeTests
                                                                                       """));
 
         model.CatchEdges("N.IWorker")
+            .TargetNames()
             .ShouldBeEmpty();
     }
 
@@ -113,8 +113,7 @@ public sealed class CodebaseExtractorCatchEdgeTests
         model.CatchEdge("N.Worker", "N.MyError")
             .Sites.Lines()
             .ShouldBe([9]);
-        model.HasEdge("N.Worker", "N.Guard")
-            .ShouldBeTrue();
+        model.ShouldHaveEdge("N.Worker", "N.Guard");
         model.MemberEdges("N.Worker")
             .ShouldContain(e => e.Member.Name == "Ok");
     }
@@ -136,8 +135,7 @@ public sealed class CodebaseExtractorCatchEdgeTests
                                                          """);
 
         // Edges are facts: a rethrowing catch still mints its catch edge.
-        model.HasCatchEdge("N.Worker", "N.MyError")
-            .ShouldBeTrue();
+        model.ShouldHaveCatchEdge("N.Worker", "N.MyError");
     }
 
     [Fact]
@@ -157,6 +155,7 @@ public sealed class CodebaseExtractorCatchEdgeTests
 
         // A type-parameter caught type is not a named type, so it mints nothing (the reference-universe gate).
         model.CatchEdges("N.Worker")
+            .TargetNames()
             .ShouldBeEmpty();
     }
 
@@ -177,8 +176,6 @@ public sealed class CodebaseExtractorCatchEdgeTests
                                                          """);
 
         // catch (Boom<int>) records the OPEN definition N.Boom<T> (§4.1), like every other edge target.
-        model.HasCatchEdge("N.Worker", "N.Boom<T>")
-            .ShouldBeTrue();
         model.CatchEdge("N.Worker", "N.Boom<T>")
             .Sites.Lines()
             .ShouldBe([8]);
@@ -203,6 +200,7 @@ public sealed class CodebaseExtractorCatchEdgeTests
         model.HasCatchEdge("N.Recursive", "N.Recursive")
             .ShouldBeFalse();
         model.CatchEdges("N.Recursive")
+            .TargetNames()
             .ShouldBeEmpty();
     }
 
@@ -226,8 +224,7 @@ public sealed class CodebaseExtractorCatchEdgeTests
                                                          }
                                                          """);
 
-        model.HasCatchEdge("N.Worker", "N.MyError")
-            .ShouldBeTrue();
+        model.ShouldHaveCatchEdge("N.Worker", "N.MyError");
     }
 
     [Fact]
@@ -250,8 +247,7 @@ public sealed class CodebaseExtractorCatchEdgeTests
                                                          }
                                                          """);
 
-        model.HasCatchEdge("N.Worker", "N.MyError")
-            .ShouldBeTrue();
+        model.ShouldHaveCatchEdge("N.Worker", "N.MyError");
     }
 
     [Fact]
@@ -290,7 +286,7 @@ public sealed class CodebaseExtractorCatchEdgeTests
                                                          """);
 
         model.CatchEdges("N.Worker")
-            .Select(e => e.Caught.FullName)
+            .TargetNames()
             .ShouldBe(["N.Alpha", "N.Beta"]);
     }
 
@@ -425,9 +421,9 @@ public sealed class CodebaseExtractorCatchEdgeTests
 
         // Both lists union per (source, caught), each staying (file, line) ordered.
         CatchEdge edge = model.CatchEdge("N.Worker", "N.MyError");
-        edge.Sites.Select(s => s.ToString())
+        edge.Sites.Rendered()
             .ShouldBe(["A.cs:8", "B.cs:8"]);
-        edge.UnfilteredSites.Select(s => s.ToString())
+        edge.UnfilteredSites.Rendered()
             .ShouldBe(["B.cs:8"]);
     }
 
@@ -466,9 +462,9 @@ public sealed class CodebaseExtractorCatchEdgeTests
         CodebaseModel model = Harness.Extract([filtered, unfiltered]);
 
         CatchEdge edge = model.CatchEdge("N.Worker", "N.MyError");
-        edge.Sites.Select(s => s.ToString())
+        edge.Sites.Rendered()
             .ShouldBe(["Worker.cs:8"]);
-        edge.UnfilteredSites.Select(s => s.ToString())
+        edge.UnfilteredSites.Rendered()
             .ShouldBe(["Worker.cs:8"]);
     }
 
@@ -750,11 +746,11 @@ public sealed class CodebaseExtractorCatchEdgeTests
         CodebaseModel model = Harness.Extract([rethrowing, swallowing]);
 
         CatchEdge edge = model.CatchEdge("N.Worker", "N.MyError");
-        edge.Sites.Select(s => s.ToString())
+        edge.Sites.Rendered()
             .ShouldBe(["Worker.cs:8"]);
-        edge.UnfilteredSites.Select(s => s.ToString())
+        edge.UnfilteredSites.Rendered()
             .ShouldBe(["Worker.cs:8"]);
-        edge.SwallowingSites.Select(s => s.ToString())
+        edge.SwallowingSites.Rendered()
             .ShouldBe(["Worker.cs:8"]);
     }
 
@@ -786,10 +782,10 @@ public sealed class CodebaseExtractorCatchEdgeTests
             .Count.ShouldBe(3);
         foreach (CatchEdge edge in model.CatchEdges("N.Worker"))
         {
-            edge.UnfilteredSites.Select(s => s.ToString())
-                .ShouldBeSubsetOf(edge.Sites.Select(s => s.ToString()));
-            edge.SwallowingSites.Select(s => s.ToString())
-                .ShouldBeSubsetOf(edge.UnfilteredSites.Select(s => s.ToString()));
+            edge.UnfilteredSites.Rendered()
+                .ShouldBeSubsetOf(edge.Sites.Rendered());
+            edge.SwallowingSites.Rendered()
+                .ShouldBeSubsetOf(edge.UnfilteredSites.Rendered());
         }
     }
 }

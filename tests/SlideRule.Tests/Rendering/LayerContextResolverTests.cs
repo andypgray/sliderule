@@ -32,99 +32,99 @@ public class LayerContextResolverTests
         (ContextFixtures.Site("src", "MyApp.Legacy.Billing", "BillingCalculator.cs"),
             "namespace MyApp.Legacy.Billing; public class BillingCalculator {}"));
 
-    private static readonly IArchitectureSpec WebLayerSpec = ContextFixtures.WebLayer();
+    private static readonly Action<Arch> WebLayerSpec = ContextFixtures.WebLayer();
 
-    private static readonly IArchitectureSpec DescribedWebLayerSpec =
+    private static readonly Action<Arch> DescribedWebLayerSpec =
         ContextFixtures.WebLayer("The HTTP surface: controllers and the views they serve.");
 
     // A Web layer whose only rule has a web.Except(...) subject — a refinement that preserves the noun head.
-    private static readonly IArchitectureSpec ExceptRefinedSpec = new InlineSpec(arch =>
+    private static readonly Action<Arch> ExceptRefinedSpec = arch =>
     {
         Layer web = arch.Layer("Web", "MyApp.Web.*");
         arch.Rule("layering/web-core-not-legacy")
             .Enforce(web.Except(arch.Namespace("MyApp.Web.Internal.*"))
                 .MustNotReference(arch.Namespace("MyApp.Legacy.*")))
             .Because("Public web must not touch legacy.");
-    });
+    };
 
     // A Web layer whose only rule ranges over MyApp.Web.* through a NamespaceNoun subject, not the layer.
-    private static readonly IArchitectureSpec NamespaceSubjectSpec = new InlineSpec(arch =>
+    private static readonly Action<Arch> NamespaceSubjectSpec = arch =>
     {
         arch.Layer("Web", "MyApp.Web.*");
         arch.Rule("layering/web-namespace")
             .Enforce(arch.Namespace("MyApp.Web.*").MustNotReference(arch.Namespace("MyApp.Legacy.*")))
             .Because("A namespace-subject rule, deliberately not layer-anchored.");
-    });
+    };
 
     // A Web layer whose only rule has a union subject the layer is an operand of — the union owns the
     // subject, so nothing anchors on the layer.
-    private static readonly IArchitectureSpec UnionSubjectSpec = new InlineSpec(arch =>
+    private static readonly Action<Arch> UnionSubjectSpec = arch =>
     {
         Layer web = arch.Layer("Web", "MyApp.Web.*");
         arch.Rule("layering/web-or-domain-not-legacy")
             .Enforce(arch.AnyOf(web, arch.Namespace("MyApp.Domain.*"))
                 .MustNotReference(arch.Namespace("MyApp.Legacy.*")))
             .Because("Neither the web layer nor the domain touches legacy.");
-    });
+    };
 
     // Two layers under one family rule and nothing else: the rule anchors on each cell, and each card
     // lands at its own cell's directory rather than at the subject's head.
-    private static readonly IArchitectureSpec FamilySubjectSpec = new InlineSpec(arch =>
+    private static readonly Action<Arch> FamilySubjectSpec = arch =>
     {
         Layer web = arch.Layer("Web", "MyApp.Web.*");
         Layer billing = arch.Layer("Billing", "MyApp.Legacy.Billing.*");
         arch.Rule("layering/leaves-independent")
             .Enforce(arch.Each(web, billing).MustNotReferenceEachOther())
             .Because("Neither leaf may grow a dependency on the other.");
-    });
+    };
 
     // The same family narrowed by an adjective — a refinement keeps the noun head, family or not.
-    private static readonly IArchitectureSpec RefinedFamilySubjectSpec = new InlineSpec(arch =>
+    private static readonly Action<Arch> RefinedFamilySubjectSpec = arch =>
     {
         Layer web = arch.Layer("Web", "MyApp.Web.*");
         Layer billing = arch.Layer("Billing", "MyApp.Legacy.Billing.*");
         arch.Rule("layering/leaves-independent")
             .Enforce(arch.Each(web, billing).Except(arch.Types.Named("Shared")).MustNotReferenceEachOther())
             .Because("Neither leaf may grow a dependency on the other.");
-    });
+    };
 
     // The project form of the same law: it names no layer, so it anchors no card at all.
-    private static readonly IArchitectureSpec ProjectFamilySubjectSpec = new InlineSpec(arch =>
+    private static readonly Action<Arch> ProjectFamilySubjectSpec = arch =>
     {
         arch.Layer("Web", "MyApp.Web.*");
         arch.Rule("layering/projects-independent")
             .Enforce(arch.Each(arch.Projects.Matching("MyApp.*")).MustNotReferenceEachOther())
             .Because("Each project is its own deployable unit.");
-    });
+    };
 
     // A Billing layer with one anchored rule — used to place against a codebase that has no billing types.
-    private static readonly IArchitectureSpec BillingLayerSpec = new InlineSpec(ContextFixtures.BillingLayer);
+    private static readonly Action<Arch> BillingLayerSpec = ContextFixtures.BillingLayer;
 
     // A hermetically quarantined Billing layer with no other rule — its only layer-anchored subject is the
     // Quarantine containment, which the resolver excludes.
-    private static readonly IArchitectureSpec QuarantinedLayerSpec = new InlineSpec(arch =>
+    private static readonly Action<Arch> QuarantinedLayerSpec = arch =>
     {
         Layer billing = arch.Layer("Billing", "MyApp.Legacy.Billing.*");
         arch.Scope("legacy/billing")
             .Quarantine(billing)
             .Dragons("Banker's rounding is structural.")
             .Because("Replacement scheduled; not worth stabilizing.");
-    });
+    };
 
     // A cautioned Billing layer with no other rule. Its one child is a tripwire, which carries no constraint
     // at all — so it anchors nothing whether or not the posture filter were to let it through.
-    private static readonly IArchitectureSpec CautionedLayerSpec = new InlineSpec(arch =>
+    private static readonly Action<Arch> CautionedLayerSpec = arch =>
     {
         Layer billing = arch.Layer("Billing", "MyApp.Legacy.Billing.*");
         arch.Scope("legacy/billing")
             .Caution(billing)
             .Dragons("Banker's rounding is structural.")
             .Because("Every caller depends on the exact rounding.");
-    });
+    };
 
-    private static IReadOnlyList<LayerPlacement> Resolve(IArchitectureSpec spec, CodebaseModel codebase)
+    private static IReadOnlyList<LayerPlacement> Resolve(Action<Arch> spec, CodebaseModel codebase)
     {
-        return Resolve(ArchModelBuilder.Build(spec), codebase);
+        return Resolve(Checker.Model(spec), codebase);
     }
 
     // Every scene resolves inside the shared solution directory, which the scenes' codebases declare their files under.
@@ -240,7 +240,7 @@ public class LayerContextResolverTests
     {
         // The project form names no layer, so there is no card to place — a bare project noun earns none
         // either, and a family of them is the same answer.
-        ArchitectureModel model = ArchModelBuilder.Build(ProjectFamilySubjectSpec);
+        ArchitectureModel model = Checker.Model(ProjectFamilySubjectSpec);
 
         Resolve(model, ContextFixtures.WebCodebase)
             .ShouldBeEmpty();
@@ -254,7 +254,7 @@ public class LayerContextResolverTests
         // A union has no single home directory even when a Layer is one of its operands, so it anchors no
         // scoped card and the rule renders into the root block only (GRAMMAR §6). A union also carries no
         // noun, so anchoring must never be decided by reading one.
-        ArchitectureModel model = ArchModelBuilder.Build(UnionSubjectSpec);
+        ArchitectureModel model = Checker.Model(UnionSubjectSpec);
 
         Resolve(model, ContextFixtures.WebCodebase)
             .ShouldBeEmpty();
@@ -265,14 +265,14 @@ public class LayerContextResolverTests
     [Fact]
     public void HasAnchoredLayers_LayerButNoAnchoringRule_False()
     {
-        LayerContextResolver.HasAnchoredLayers(ArchModelBuilder.Build(NamespaceSubjectSpec))
+        LayerContextResolver.HasAnchoredLayers(Checker.Model(NamespaceSubjectSpec))
             .ShouldBeFalse();
     }
 
     [Fact]
     public void HasAnchoredLayers_AnchoredRule_True()
     {
-        LayerContextResolver.HasAnchoredLayers(ArchModelBuilder.Build(WebLayerSpec))
+        LayerContextResolver.HasAnchoredLayers(Checker.Model(WebLayerSpec))
             .ShouldBeTrue();
     }
 }

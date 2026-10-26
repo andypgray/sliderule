@@ -1,10 +1,8 @@
-using System.Text.Json;
 using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
 using SlideRule.Codebase;
 using SlideRule.Extraction;
 using SlideRule.Extraction.Fragments;
-using SlideRule.Roslyn.Caching;
 using SlideRule.Tests.Extraction;
 using Xunit;
 
@@ -34,8 +32,7 @@ public sealed class FragmentRoundTripTests
         // Act
         CodebaseModel direct = FragmentMerger.Merge(fragments);
 
-        string json = JsonSerializer.Serialize(fragments, ManifestJson.Options);
-        var roundTripped = JsonSerializer.Deserialize<IReadOnlyList<CodebaseFragment>>(json, ManifestJson.Options)!;
+        IReadOnlyList<CodebaseFragment> roundTripped = fragments.Persisted();
         CodebaseModel fromCache = FragmentMerger.Merge(roundTripped);
 
         // Assert — the member-attribute fact is non-vacuous here: without a member that actually carries one,
@@ -96,7 +93,7 @@ public sealed class FragmentRoundTripTests
         // site's public surface, the serializer never sees it, and the manifest carries no span.
         IReadOnlyList<CodebaseFragment> fragments = ExtractRichSolution();
 
-        string json = JsonSerializer.Serialize(fragments, ManifestJson.Options);
+        string json = fragments.Serialized();
 
         json.ShouldNotContain("\"Start\"", "a site's span is not persisted");
         json.ShouldNotContain("\"Length\"", "a site's span is not persisted");
@@ -133,13 +130,12 @@ public sealed class FragmentRoundTripTests
                            private void OnEvt() {}
                        }
                        """));
-        IReadOnlyList<CodebaseFragment> fragments = new[] { lib, app }.Select(input => FragmentExtractor.Extract(input, Ct))
-            .ToList();
+        IReadOnlyList<CodebaseFragment> fragments = FragmentExtractor.ExtractAll([lib, app], artifactFacts: null, Ct);
 
         // Act
         CodebaseModel direct = FragmentMerger.Merge(fragments);
-        string json = JsonSerializer.Serialize(fragments, ManifestJson.Options);
-        var roundTripped = JsonSerializer.Deserialize<IReadOnlyList<CodebaseFragment>>(json, ManifestJson.Options)!;
+        string json = fragments.Serialized();
+        IReadOnlyList<CodebaseFragment> roundTripped = fragments.Persisted();
         CodebaseModel fromCache = FragmentMerger.Merge(roundTripped);
 
         // Assert — the member kinds serialize as names, the edges are present, and the round-trip is invisible.
@@ -174,13 +170,11 @@ public sealed class FragmentRoundTripTests
                            private static void H() {}
                        }
                        """));
-        IReadOnlyList<CodebaseFragment> fragments = new[] { lib, app }.Select(input => FragmentExtractor.Extract(input, Ct))
-            .ToList();
+        IReadOnlyList<CodebaseFragment> fragments = FragmentExtractor.ExtractAll([lib, app], artifactFacts: null, Ct);
 
         // Act
         CodebaseModel direct = FragmentMerger.Merge(fragments);
-        string json = JsonSerializer.Serialize(fragments, ManifestJson.Options);
-        var roundTripped = JsonSerializer.Deserialize<IReadOnlyList<CodebaseFragment>>(json, ManifestJson.Options)!;
+        IReadOnlyList<CodebaseFragment> roundTripped = fragments.Persisted();
         CodebaseModel fromCache = FragmentMerger.Merge(roundTripped);
 
         // Assert — the ctor edges are present (explicit+target-typed union to Widget, generic normalized to the
@@ -212,13 +206,12 @@ public sealed class FragmentRoundTripTests
                                                                                        }
                                                                                    }
                                                                                    """));
-        IReadOnlyList<CodebaseFragment> fragments = new[] { app }.Select(input => FragmentExtractor.Extract(input, Ct))
-            .ToList();
+        IReadOnlyList<CodebaseFragment> fragments = FragmentExtractor.ExtractAll([app], artifactFacts: null, Ct);
 
         // Act
         CodebaseModel direct = FragmentMerger.Merge(fragments);
-        string json = JsonSerializer.Serialize(fragments, ManifestJson.Options);
-        var roundTripped = JsonSerializer.Deserialize<IReadOnlyList<CodebaseFragment>>(json, ManifestJson.Options)!;
+        string json = fragments.Serialized();
+        IReadOnlyList<CodebaseFragment> roundTripped = fragments.Persisted();
         CodebaseModel fromCache = FragmentMerger.Merge(roundTripped);
 
         // Assert — the lifetime enum serializes as a name, both fact families are present, and the round-trip
@@ -268,13 +261,11 @@ public sealed class FragmentRoundTripTests
                            }
                        }
                        """));
-        IReadOnlyList<CodebaseFragment> fragments = new[] { lib, app }.Select(input => FragmentExtractor.Extract(input, Ct))
-            .ToList();
+        IReadOnlyList<CodebaseFragment> fragments = FragmentExtractor.ExtractAll([lib, app], artifactFacts: null, Ct);
 
         // Act
         CodebaseModel direct = FragmentMerger.Merge(fragments);
-        string json = JsonSerializer.Serialize(fragments, ManifestJson.Options);
-        var roundTripped = JsonSerializer.Deserialize<IReadOnlyList<CodebaseFragment>>(json, ManifestJson.Options)!;
+        IReadOnlyList<CodebaseFragment> roundTripped = fragments.Persisted();
         CodebaseModel fromCache = FragmentMerger.Merge(roundTripped);
 
         // Assert — both families present (declared + external endpoints, bare catch → System.Exception), the
@@ -335,13 +326,11 @@ public sealed class FragmentRoundTripTests
                            public event N.Notify Ev;
                        }
                        """));
-        IReadOnlyList<CodebaseFragment> fragments = new[] { lib, app }.Select(input => FragmentExtractor.Extract(input, Ct))
-            .ToList();
+        IReadOnlyList<CodebaseFragment> fragments = FragmentExtractor.ExtractAll([lib, app], artifactFacts: null, Ct);
 
         // Act
         CodebaseModel direct = FragmentMerger.Merge(fragments);
-        string json = JsonSerializer.Serialize(fragments, ManifestJson.Options);
-        var roundTripped = JsonSerializer.Deserialize<IReadOnlyList<CodebaseFragment>>(json, ManifestJson.Options)!;
+        IReadOnlyList<CodebaseFragment> roundTripped = fragments.Persisted();
         CodebaseModel fromCache = FragmentMerger.Merge(roundTripped);
 
         // Assert — every signature position surfaced (the constructed generic split to open definition + argument,
@@ -362,34 +351,24 @@ public sealed class FragmentRoundTripTests
     [Fact]
     public void RoundTrip_MultiFrameworkFragments_PreserveTheirTargetFramework()
     {
-        // Arrange — one project's two frameworks, both declaring P.Widget. The framework is the half of a
+        // Arrange — one project's two frameworks, both declaring Shared.Widget. The framework is the half of a
         // fragment's identity the project name does not supply, so it has to survive the cache.
-        (string Path, string Source) shared = ("Widget.cs", """
-                                                            namespace P;
-                                                            public class Widget {}
-                                                            """);
-        var modern = new CompilationInput(CompilationFactory.Compile("P", shared)
-            .Compilation, "P", [], "net10.0");
-        var legacy = new CompilationInput(CompilationFactory.Compile("P", shared)
-            .Compilation, "P", [], "netstandard2.0");
-        IReadOnlyList<CodebaseFragment> fragments = new[] { modern, legacy }
-            .Select(input => FragmentExtractor.Extract(input, Ct))
-            .ToList();
+        CompilationInput modern = CompilationFactory.SharedWidgetFramework("net10.0");
+        CompilationInput legacy = CompilationFactory.SharedWidgetFramework("netstandard2.0");
+        IReadOnlyList<CodebaseFragment> fragments = FragmentExtractor.ExtractAll([modern, legacy], artifactFacts: null, Ct);
 
         // Act
-        string json = JsonSerializer.Serialize(fragments, ManifestJson.Options);
-        var roundTripped = JsonSerializer.Deserialize<IReadOnlyList<CodebaseFragment>>(json, ManifestJson.Options)!;
+        IReadOnlyList<CodebaseFragment> roundTripped = fragments.Persisted();
 
         // Assert — the field itself, and then the observable that depends on it. The merge's
         // multi-framework note is a pure function of the fragments' frameworks, so a dropped field would
-        // replay as silence on a cache hit while the cold run spoke — which no dump comparison would catch,
-        // since ModelDump does not render the notes.
+        // replay as silence on a cache hit while the cold run spoke, which the dump comparison's notes section
+        // sees; the premise keeps that comparison from passing over two empty lists.
         roundTripped.Select(fragment => fragment.TargetFramework)
             .ShouldBe(["net10.0", "netstandard2.0"]);
         CodebaseModel direct = FragmentMerger.Merge(fragments);
         CodebaseModel fromCache = FragmentMerger.Merge(roundTripped);
         direct.MergeNotes.ShouldNotBeEmpty();
-        fromCache.MergeNotes.ShouldBe(direct.MergeNotes);
         fromCache.ShouldModelTheSameAs(direct);
     }
 
@@ -404,35 +383,29 @@ public sealed class FragmentRoundTripTests
                                                                       namespace Vendor;
                                                                       public class Widget {}
                                                                       """));
-        var product = new CompilationInput(
-            CompilationFactory.CreateCompilation(
-                "Product", [CompilationFactory.CoreLibrary, vendor.ToMetadataReference()], ("Service.cs", """
-                                                                                                          namespace Product;
-                                                                                                          public class Service { private Vendor.Widget widget; }
-                                                                                                          """)),
-            "Product", []);
+        CompilationInput product = CompilationFactory.CompileAgainstPackages(
+            "Product", [vendor], ("Service.cs", """
+                                                namespace Product;
+                                                public class Service { private Vendor.Widget widget; }
+                                                """));
         CompilationInput tests = CompilationFactory.Compile("Product.Tests", ("Mocks.cs", """
                                                                                           namespace Vendor;
                                                                                           public class Widget {}
                                                                                           """));
-        IReadOnlyList<CodebaseFragment> fragments = new[] { product, tests }
-            .Select(input => FragmentExtractor.Extract(input, Ct))
-            .ToList();
+        IReadOnlyList<CodebaseFragment> fragments = FragmentExtractor.ExtractAll([product, tests], artifactFacts: null, Ct);
 
         // Act
-        string json = JsonSerializer.Serialize(fragments, ManifestJson.Options);
-        var roundTripped = JsonSerializer.Deserialize<IReadOnlyList<CodebaseFragment>>(json, ManifestJson.Options)!;
+        IReadOnlyList<CodebaseFragment> roundTripped = fragments.Persisted();
 
-        // Assert — the field itself, then the two observables that depend on it. The merge note is a pure
-        // function of the assembly names and ModelDump does not render notes, so a dropped field would
-        // replay as silence on a hit while the cold run spoke; the dump comparison catches the other half,
-        // the edge that would land on the declaring project instead of the assembly.
+        // Assert — the field itself, then the two observables that depend on it, both read by the dump
+        // comparison: the merge note, a pure function of the assembly names that a dropped field would replay
+        // as silence on a hit while the cold run spoke, and the edge that would land on the declaring project
+        // instead of the assembly.
         roundTripped.Select(fragment => fragment.AssemblyName)
             .ShouldBe(["Product", "Product.Tests"]);
         CodebaseModel direct = FragmentMerger.Merge(fragments);
         CodebaseModel fromCache = FragmentMerger.Merge(roundTripped);
         direct.MergeNotes.ShouldNotBeEmpty();
-        fromCache.MergeNotes.ShouldBe(direct.MergeNotes);
         fromCache.ShouldModelTheSameAs(direct);
     }
 
@@ -460,13 +433,10 @@ public sealed class FragmentRoundTripTests
                                                                                      namespace Unread;
                                                                                      public class C {}
                                                                                      """));
-        IReadOnlyList<CodebaseFragment> fragments = new[] { member, passenger, unread }
-            .Select(input => FragmentExtractor.Extract(input, Ct))
-            .ToList();
+        IReadOnlyList<CodebaseFragment> fragments = FragmentExtractor.ExtractAll([member, passenger, unread], artifactFacts: null, Ct);
 
         // Act
-        string json = JsonSerializer.Serialize(fragments, ManifestJson.Options);
-        var roundTripped = JsonSerializer.Deserialize<IReadOnlyList<CodebaseFragment>>(json, ManifestJson.Options)!;
+        IReadOnlyList<CodebaseFragment> roundTripped = fragments.Persisted();
 
         // Assert — the field, then the model it lands on, since the fragment is only a carrier.
         roundTripped.Select(fragment => fragment.SolutionMember)
@@ -503,12 +473,12 @@ public sealed class FragmentRoundTripTests
         };
 
         // Act
-        string json = JsonSerializer.Serialize<IReadOnlyList<CodebaseFragment>>([fragment], ManifestJson.Options);
-        var roundTripped = JsonSerializer.Deserialize<IReadOnlyList<CodebaseFragment>>(json, ManifestJson.Options)!;
+        IReadOnlyList<CodebaseFragment> fragments = [fragment];
+        IReadOnlyList<CodebaseFragment> roundTripped = fragments.Persisted();
 
         // Assert — the model the fragment is only a carrier for.
         ProjectNode project = FragmentMerger.Merge(roundTripped)
-            .Projects.Single();
+            .Projects.ShouldHaveSingleItem();
         project.TargetFrameworks.ShouldBe(["net10.0", "netstandard2.0"]);
         project.TargetFrameworksSite.ShouldNotBeNull()
             .ToString()
@@ -540,12 +510,12 @@ public sealed class FragmentRoundTripTests
                                                                                                              """)), Ct);
 
         // Act
-        string json = JsonSerializer.Serialize<IReadOnlyList<CodebaseFragment>>([fragment], ManifestJson.Options);
-        var roundTripped = JsonSerializer.Deserialize<IReadOnlyList<CodebaseFragment>>(json, ManifestJson.Options)!;
+        IReadOnlyList<CodebaseFragment> fragments = [fragment];
+        IReadOnlyList<CodebaseFragment> roundTripped = fragments.Persisted();
 
         // Assert
         ProjectNode project = FragmentMerger.Merge(roundTripped)
-            .Projects.Single();
+            .Projects.ShouldHaveSingleItem();
         project.TargetFrameworks.ShouldBeEmpty();
         project.TargetFrameworksSite.ShouldBeNull();
         project.PackageReferences.ShouldBeEmpty();
@@ -579,7 +549,7 @@ public sealed class FragmentRoundTripTests
 
         // Act
         ProjectNode project = FragmentMerger.Merge([modern, legacy])
-            .Projects.Single();
+            .Projects.ShouldHaveSingleItem();
 
         // Assert — packable because one framework ships a package, unlocked because one framework's restore
         // writes no lock file, and both packages because either framework declaring one is the project
@@ -606,7 +576,7 @@ public sealed class FragmentRoundTripTests
 
         // Act
         ProjectNode project = FragmentMerger.Merge([modern, legacy])
-            .Projects.Single();
+            .Projects.ShouldHaveSingleItem();
 
         // Assert — one framework ships the package, so the project does, at the declaration that ships it.
         project.PackageReferences.Select(Describe)
@@ -623,7 +593,7 @@ public sealed class FragmentRoundTripTests
 
         // Act
         ProjectNode project = FragmentMerger.Merge([modern, legacy])
-            .Projects.Single();
+            .Projects.ShouldHaveSingleItem();
 
         // Assert
         project.PackageReferences.Select(Describe)
@@ -644,9 +614,9 @@ public sealed class FragmentRoundTripTests
 
         // Act
         ProjectNode once = FragmentMerger.Merge([duplicated])
-            .Projects.Single();
+            .Projects.ShouldHaveSingleItem();
         ProjectNode split = FragmentMerger.Merge([modern, legacy])
-            .Projects.Single();
+            .Projects.ShouldHaveSingleItem();
 
         // Assert
         once.PackageReferences.Select(Describe)
@@ -663,7 +633,7 @@ public sealed class FragmentRoundTripTests
 
         // Act
         ProjectNode project = FragmentMerger.Merge(fragments)
-            .Projects.Single();
+            .Projects.ShouldHaveSingleItem();
 
         // Assert — the frameworks union beside the name-keyed privacy fold, ordinally.
         project.PackageReferences.Select(DescribeFrameworks)
@@ -685,9 +655,9 @@ public sealed class FragmentRoundTripTests
 
         // Act
         ProjectNode attributed = FragmentMerger.Merge([single])
-            .Projects.Single();
+            .Projects.ShouldHaveSingleItem();
         ProjectNode unknown = FragmentMerger.Merge([undiscriminated])
-            .Projects.Single();
+            .Projects.ShouldHaveSingleItem();
 
         // Assert
         attributed.PackageReferences.Select(DescribeFrameworks)
@@ -704,8 +674,7 @@ public sealed class FragmentRoundTripTests
         IReadOnlyList<CodebaseFragment> fragments = PackageForOneFrameworkOnly();
 
         // Act
-        string json = JsonSerializer.Serialize(fragments, ManifestJson.Options);
-        var roundTripped = JsonSerializer.Deserialize<IReadOnlyList<CodebaseFragment>>(json, ManifestJson.Options)!;
+        IReadOnlyList<CodebaseFragment> roundTripped = fragments.Persisted();
 
         // Assert
         CodebaseModel direct = FragmentMerger.Merge(fragments);
@@ -721,7 +690,7 @@ public sealed class FragmentRoundTripTests
 
         // Act
         ProjectNode project = FragmentMerger.Merge(fragments)
-            .Projects.Single();
+            .Projects.ShouldHaveSingleItem();
 
         // Assert
         project.Evaluations.Select(DescribeEvaluation)
@@ -736,7 +705,7 @@ public sealed class FragmentRoundTripTests
         // No properties slot at all means no evaluation ran, which is a different fact from one that found
         // nothing set, and only the second can red a rule about a missing property.
         ProjectNode project = FragmentMerger.Merge([WidgetFragment("net10.0") with { Properties = null }])
-            .Projects.Single();
+            .Projects.ShouldHaveSingleItem();
 
         project.Evaluations.ShouldBeEmpty();
         project.Properties.ShouldBeEmpty();
@@ -749,8 +718,7 @@ public sealed class FragmentRoundTripTests
         IReadOnlyList<CodebaseFragment> fragments = PropertyForOneFrameworkOnly();
 
         // Act
-        string json = JsonSerializer.Serialize(fragments, ManifestJson.Options);
-        var roundTripped = JsonSerializer.Deserialize<IReadOnlyList<CodebaseFragment>>(json, ManifestJson.Options)!;
+        IReadOnlyList<CodebaseFragment> roundTripped = fragments.Persisted();
 
         // Assert
         CodebaseModel direct = FragmentMerger.Merge(fragments);
@@ -875,13 +843,9 @@ public sealed class FragmentRoundTripTests
                                                             namespace P;
                                                             public class Widget {}
                                                             """);
-        var legacy = new CompilationInput(CompilationFactory.Compile("P", shared)
-            .Compilation, "P", ["Legacy"]);
-        var modern = new CompilationInput(CompilationFactory.Compile("P", shared)
-            .Compilation, "P", ["Modern"]);
+        CompilationInput legacy = CompilationFactory.Compile("P", shared) with { ProjectReferences = ["Legacy"] };
+        CompilationInput modern = CompilationFactory.Compile("P", shared) with { ProjectReferences = ["Modern"] };
 
-        return new[] { lib, app, legacy, modern }
-            .Select(input => FragmentExtractor.Extract(input, Ct))
-            .ToList();
+        return FragmentExtractor.ExtractAll([lib, app, legacy, modern], artifactFacts: null, Ct);
     }
 }

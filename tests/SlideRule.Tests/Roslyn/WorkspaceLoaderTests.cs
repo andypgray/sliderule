@@ -48,7 +48,8 @@ public sealed class WorkspaceLoaderTests
         string missingSolution = Path.Combine(TestTempRoot.For("loader-flow"), "Missing.sln");
         StrongBox<long> outer = WorkspaceLoader.CountLoadsOnThisFlow();
 
-        long[] inner = await Task.WhenAll(LoadOnceAsync(missingSolution), LoadOnceAsync(missingSolution));
+        long[] inner = await Task.WhenAll(
+            ShouldFailLoadingOnceAsync(missingSolution), ShouldFailLoadingOnceAsync(missingSolution));
 
         inner.ShouldBe([1L, 1L]);
         outer.Value.ShouldBe(2);
@@ -78,7 +79,7 @@ public sealed class WorkspaceLoaderTests
         loaded.ShouldBeNull();
     }
 
-    private static async Task<long> LoadOnceAsync(string missingSolution)
+    private static async Task<long> ShouldFailLoadingOnceAsync(string missingSolution)
     {
         StrongBox<long> inner = WorkspaceLoader.CountLoadsOnThisFlow();
 

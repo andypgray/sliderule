@@ -13,11 +13,6 @@ namespace SlideRule.Tests.Cli;
 ///     the two documents a reader actually holds, because a key that is computed correctly and rendered
 ///     nowhere is not a statement.
 /// </summary>
-/// <remarks>
-///     One class for both statements because the fixture lease is keyed by the calling source file: a second
-///     file over this fixture would take a copy, a restore and a cold extraction of its own to ask the same
-///     <c>graph --json</c> question.
-/// </remarks>
 public sealed class ShadowedTypeGraphE2ETests
 {
     private const string ShadowedHeading = "Type names a referenced assembly also supplies:";
@@ -27,11 +22,8 @@ public sealed class ShadowedTypeGraphE2ETests
     [Fact]
     public async Task Graph_ShadowedType_IsReadableFromTheDocumentAlone()
     {
-        // Arrange
-        using var fixture = new TempFixtureWorkspace("TestSolutions/ShadowedApp", "ShadowedApp.slnx");
-
         // Act
-        CliResult result = await CliRunner.InvokeAsync("graph", fixture.SolutionPath, "--json");
+        CliResult result = await CliRunner.InvokeAsync("graph", FixtureBeds.ShadowedAppSolution, "--json");
 
         // Assert — everything a rule author needs before writing a rule about the name, without reaching for
         // the source: that it means two types, which project wrote one, which assembly supplies the other,
@@ -58,11 +50,9 @@ public sealed class ShadowedTypeGraphE2ETests
     [Fact]
     public async Task Graph_ShadowedType_ElidesToACountAtSkeletonGrain()
     {
-        // Arrange
-        using var fixture = new TempFixtureWorkspace("TestSolutions/ShadowedApp", "ShadowedApp.slnx");
-
         // Act
-        CliResult result = await CliRunner.InvokeAsync("graph", fixture.SolutionPath, "--json", "--grain", "skeleton");
+        CliResult result = await CliRunner.InvokeAsync(
+            "graph", FixtureBeds.ShadowedAppSolution, "--json", "--grain", "skeleton");
 
         // Assert — the count is what tells elision from absence. A section that vanished at the
         // coarsest grain would read as the good state, which for a coverage statement is the opposite of
@@ -79,11 +69,8 @@ public sealed class ShadowedTypeGraphE2ETests
     [Fact]
     public async Task Graph_HumanSurvey_CarriesTheShadowedSectionBesideTheMultiplyDeclaredOne()
     {
-        // Arrange
-        using var fixture = new TempFixtureWorkspace("TestSolutions/ShadowedApp", "ShadowedApp.slnx");
-
         // Act
-        CliResult result = await CliRunner.InvokeAsync("graph", fixture.SolutionPath);
+        CliResult result = await CliRunner.InvokeAsync("graph", FixtureBeds.ShadowedAppSolution);
 
         // Assert — one line per name, carrying the same fact the document does, so a terminal reader is not
         // sent to --json for it.
@@ -98,11 +85,8 @@ public sealed class ShadowedTypeGraphE2ETests
     [Fact]
     public async Task Graph_PrivateAssetsReference_IsNamedInBothKeysOnTheProductRowAlone()
     {
-        // Arrange
-        using var fixture = new TempFixtureWorkspace("TestSolutions/ShadowedApp", "ShadowedApp.slnx");
-
         // Act
-        CliResult result = await CliRunner.InvokeAsync("graph", fixture.SolutionPath, "--json");
+        CliResult result = await CliRunner.InvokeAsync("graph", FixtureBeds.ShadowedAppSolution, "--json");
 
         // Assert — the product's row lists the reference among what it declares and names it again as
         // private; the test project's row, which declares nothing, carries no private key rather than an

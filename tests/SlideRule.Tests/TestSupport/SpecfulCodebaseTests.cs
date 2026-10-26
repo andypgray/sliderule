@@ -1,5 +1,6 @@
 using Shouldly;
 using SlideRule.Codebase;
+using SlideRule.Tests.Extraction;
 using Xunit;
 
 namespace SlideRule.Tests.TestSupport;
@@ -31,8 +32,7 @@ public sealed class SpecfulCodebaseTests
                                                }
                                                """;
 
-    private static readonly string SolutionPath =
-        Path.Combine(FixtureBeds.TestSolutionsRoot, "MultiTfm", "MultiTfm.sln");
+    private static readonly string SolutionPath = FixtureBeds.MultiTfmSolution;
 
     /// <summary>
     ///     The framework map reaches the extraction. No project in this repository compiles for more than one
@@ -49,11 +49,11 @@ public sealed class SpecfulCodebaseTests
 
         // Act
         SpecfulCodebase extracted = await SpecfulCodebase.ExtractAsync(
-            SolutionPath, specDll, Path.GetDirectoryName(SolutionPath)!, Ct);
+            SolutionPath, specDll, FixtureBeds.MultiTfmRoot, Ct);
 
         // Assert: the winner rather than the project's framework list, because MSBuild evaluation fills the
         // list whether or not the extraction was handed the map, and only the winner needs it.
-        ProjectNode core = extracted.Survey.Projects.Single(project => project.Name == Core);
+        ProjectNode core = extracted.Survey.Project(Core);
         core.FactsFollow.ShouldBe("net10.0");
 
         // The same fact as prose, whose whole sentence MultiTargetFrameworkTests pins. Here it only has to

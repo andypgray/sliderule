@@ -76,12 +76,12 @@ public sealed class CodebaseExtractorRegistrationTests
                                                                           }
                                                                           """));
 
-        model.HasRegistration(Lifetime.Singleton, "N.IFoo", "N.Foo")
-            .ShouldBeTrue();
-        model.HasRegistration(Lifetime.Scoped, "N.IBar", "N.Bar")
-            .ShouldBeTrue();
-        model.HasRegistration(Lifetime.Transient, "N.IBaz", "N.Baz")
-            .ShouldBeTrue();
+        Registrations(model)
+            .ShouldContain((Lifetime.Singleton, "N.IFoo", "N.Foo"));
+        Registrations(model)
+            .ShouldContain((Lifetime.Scoped, "N.IBar", "N.Bar"));
+        Registrations(model)
+            .ShouldContain((Lifetime.Transient, "N.IBaz", "N.Baz"));
     }
 
     [Fact]
@@ -97,8 +97,8 @@ public sealed class CodebaseExtractorRegistrationTests
                                                                           }
                                                                           """));
 
-        model.HasRegistration(Lifetime.Singleton, "N.Foo", "N.Foo")
-            .ShouldBeTrue();
+        Registrations(model)
+            .ShouldContain((Lifetime.Singleton, "N.Foo", "N.Foo"));
     }
 
     [Fact]
@@ -115,10 +115,10 @@ public sealed class CodebaseExtractorRegistrationTests
                                                                           """));
 
         // A factory registration names no implementation type — (Foo, null), not (Foo, Foo).
-        model.HasRegistration(Lifetime.Singleton, "N.Foo", null)
-            .ShouldBeTrue();
-        model.HasRegistration(Lifetime.Singleton, "N.Foo", "N.Foo")
-            .ShouldBeFalse();
+        Registrations(model)
+            .ShouldContain((Lifetime.Singleton, "N.Foo", null));
+        Registrations(model)
+            .ShouldNotContain((Lifetime.Singleton, "N.Foo", "N.Foo"));
     }
 
     // ── Add{...} — typeof forms ───────────────────────────────────────────────────────────────────────────
@@ -137,8 +137,8 @@ public sealed class CodebaseExtractorRegistrationTests
                                                                           }
                                                                           """));
 
-        model.HasRegistration(Lifetime.Singleton, "N.IFoo", "N.Foo")
-            .ShouldBeTrue();
+        Registrations(model)
+            .ShouldContain((Lifetime.Singleton, "N.IFoo", "N.Foo"));
     }
 
     [Fact]
@@ -154,8 +154,8 @@ public sealed class CodebaseExtractorRegistrationTests
                                                                           }
                                                                           """));
 
-        model.HasRegistration(Lifetime.Scoped, "N.Bar", "N.Bar")
-            .ShouldBeTrue();
+        Registrations(model)
+            .ShouldContain((Lifetime.Scoped, "N.Bar", "N.Bar"));
     }
 
     [Fact]
@@ -172,8 +172,8 @@ public sealed class CodebaseExtractorRegistrationTests
                                                                           }
                                                                           """));
 
-        model.HasRegistration(Lifetime.Singleton, "N.IFoo", null)
-            .ShouldBeTrue();
+        Registrations(model)
+            .ShouldContain((Lifetime.Singleton, "N.IFoo", null));
     }
 
     [Fact]
@@ -190,8 +190,8 @@ public sealed class CodebaseExtractorRegistrationTests
                                                                           }
                                                                           """));
 
-        model.HasRegistration(Lifetime.Singleton, "N.IRepo<T>", "N.Repo<T>")
-            .ShouldBeTrue();
+        Registrations(model)
+            .ShouldContain((Lifetime.Singleton, "N.IRepo<T>", "N.Repo<T>"));
     }
 
     // ── Type arguments the compiler could not bind exactly ────────────────────────────────────────────────
@@ -337,10 +337,10 @@ public sealed class CodebaseExtractorRegistrationTests
                                                                           }
                                                                           """));
 
-        model.HasRegistration(Lifetime.Singleton, "N.IFoo", "N.Foo")
-            .ShouldBeTrue();
-        model.HasRegistration(Lifetime.Scoped, "N.IBar", "N.Bar")
-            .ShouldBeTrue();
+        Registrations(model)
+            .ShouldContain((Lifetime.Singleton, "N.IFoo", "N.Foo"));
+        Registrations(model)
+            .ShouldContain((Lifetime.Scoped, "N.IBar", "N.Bar"));
     }
 
     // ── AddHostedService ──────────────────────────────────────────────────────────────────────────────────
@@ -365,8 +365,8 @@ public sealed class CodebaseExtractorRegistrationTests
                                                                           }
                                                                           """));
 
-        model.HasRegistration(Lifetime.Singleton, "Microsoft.Extensions.Hosting.IHostedService", "N.Worker")
-            .ShouldBeTrue();
+        Registrations(model)
+            .ShouldContain((Lifetime.Singleton, "Microsoft.Extensions.Hosting.IHostedService", "N.Worker"));
     }
 
     [Fact]
@@ -395,8 +395,8 @@ public sealed class CodebaseExtractorRegistrationTests
                                                                                    }
                                                                                    """));
 
-        model.HasRegistration(Lifetime.Singleton, "N.Worker", null)
-            .ShouldBeTrue();
+        Registrations(model)
+            .ShouldContain((Lifetime.Singleton, "N.Worker", null));
     }
 
     [Fact]
@@ -414,8 +414,8 @@ public sealed class CodebaseExtractorRegistrationTests
                        }
                        """));
 
-        model.HasRegistration(Lifetime.Scoped, "N.MyContext", "N.MyContext")
-            .ShouldBeTrue();
+        Registrations(model)
+            .ShouldContain((Lifetime.Scoped, "N.MyContext", "N.MyContext"));
     }
 
     [Fact]
@@ -434,10 +434,10 @@ public sealed class CodebaseExtractorRegistrationTests
                        }
                        """));
 
-        model.HasRegistration(Lifetime.Singleton, "N.MyContext", "N.MyContext")
-            .ShouldBeTrue();
-        model.HasRegistration(Lifetime.Scoped, "N.MyContext", "N.MyContext")
-            .ShouldBeFalse();
+        Registrations(model)
+            .ShouldContain((Lifetime.Singleton, "N.MyContext", "N.MyContext"));
+        Registrations(model)
+            .ShouldNotContain((Lifetime.Scoped, "N.MyContext", "N.MyContext"));
     }
 
     [Fact]
@@ -457,8 +457,8 @@ public sealed class CodebaseExtractorRegistrationTests
                        }
                        """));
 
-        model.ServiceRegistrations.Any(r => r.ServiceFullName == "N.MyContext")
-            .ShouldBeFalse();
+        Registrations(model)
+            .ShouldNotContain(registration => registration.Service == "N.MyContext");
     }
 
     [Fact]
@@ -476,8 +476,8 @@ public sealed class CodebaseExtractorRegistrationTests
                        }
                        """));
 
-        model.HasRegistration(Lifetime.Scoped, "N.MyContext", "N.MyContext")
-            .ShouldBeTrue();
+        Registrations(model)
+            .ShouldContain((Lifetime.Scoped, "N.MyContext", "N.MyContext"));
     }
 
     [Fact]
@@ -495,8 +495,8 @@ public sealed class CodebaseExtractorRegistrationTests
                        }
                        """));
 
-        model.HasRegistration(Lifetime.Transient, "N.Client", "N.Client")
-            .ShouldBeTrue();
+        Registrations(model)
+            .ShouldContain((Lifetime.Transient, "N.Client", "N.Client"));
     }
 
     [Fact]
@@ -515,8 +515,8 @@ public sealed class CodebaseExtractorRegistrationTests
                        }
                        """));
 
-        model.HasRegistration(Lifetime.Transient, "N.IClient", "N.Client")
-            .ShouldBeTrue();
+        Registrations(model)
+            .ShouldContain((Lifetime.Transient, "N.IClient", "N.Client"));
     }
 
     [Fact]
@@ -533,7 +533,8 @@ public sealed class CodebaseExtractorRegistrationTests
                        }
                        """));
 
-        model.ServiceRegistrations.ShouldBeEmpty();
+        Registrations(model)
+            .ShouldBeEmpty();
     }
 
     // ── Gate negatives ────────────────────────────────────────────────────────────────────────────────────
@@ -564,7 +565,8 @@ public sealed class CodebaseExtractorRegistrationTests
                                                                           }
                                                                           """));
 
-        model.ServiceRegistrations.ShouldBeEmpty();
+        Registrations(model)
+            .ShouldBeEmpty();
     }
 
     [Fact]
@@ -595,7 +597,8 @@ public sealed class CodebaseExtractorRegistrationTests
                                                                           }
                                                                           """));
 
-        model.ServiceRegistrations.ShouldBeEmpty();
+        Registrations(model)
+            .ShouldBeEmpty();
     }
 
     // ── Wrapper body seen ─────────────────────────────────────────────────────────────────────────────────
@@ -624,9 +627,8 @@ public sealed class CodebaseExtractorRegistrationTests
                                                                           }
                                                                           """));
 
-        model.HasRegistration(Lifetime.Singleton, "N.IFoo", "N.Foo")
-            .ShouldBeTrue();
-        model.ServiceRegistrations.ShouldHaveSingleItem(); // only the inner real call; AddMyServices is not recognized
+        Registrations(model)
+            .ShouldBe([(Lifetime.Singleton, "N.IFoo", "N.Foo")]); // only the inner real call; AddMyServices is not recognized
     }
 
     // ── Honesty boundary ──────────────────────────────────────────────────────────────────────────────────
@@ -646,7 +648,8 @@ public sealed class CodebaseExtractorRegistrationTests
                                                                           }
                                                                           """));
 
-        model.ServiceRegistrations.ShouldBeEmpty();
+        Registrations(model)
+            .ShouldBeEmpty();
     }
 
     [Fact]
@@ -663,7 +666,8 @@ public sealed class CodebaseExtractorRegistrationTests
                                                                           }
                                                                           """));
 
-        model.ServiceRegistrations.ShouldBeEmpty();
+        Registrations(model)
+            .ShouldBeEmpty();
     }
 
     [Fact]
@@ -682,7 +686,8 @@ public sealed class CodebaseExtractorRegistrationTests
                                                                           }
                                                                           """));
 
-        model.ServiceRegistrations.ShouldBeEmpty();
+        Registrations(model)
+            .ShouldBeEmpty();
     }
 
     // ── Whole-compilation reach (top-level Program) ───────────────────────────────────────────────────────
@@ -704,8 +709,8 @@ public sealed class CodebaseExtractorRegistrationTests
                                                                                         }
                                                                                         """));
 
-        model.HasRegistration(Lifetime.Singleton, "N.IFoo", "N.Foo")
-            .ShouldBeTrue();
+        Registrations(model)
+            .ShouldContain((Lifetime.Singleton, "N.IFoo", "N.Foo"));
     }
 
     // ── Sites ─────────────────────────────────────────────────────────────────────────────────────────────

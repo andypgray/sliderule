@@ -20,10 +20,7 @@ public sealed class ClassicProjectCheckTests
     [Fact]
     public async Task Check_NonSdkFrameworkSolution_ExitsOneWithTheDesignedVerdictsAndFileLine()
     {
-        Assert.SkipUnless(
-            OperatingSystem.IsWindows(),
-            "A non-SDK-style .NET Framework project loads through the net472 build host, which needs "
-            + "Windows with Visual Studio or Build Tools MSBuild.");
+        CliRunner.SkipUnlessLoadable(CliRunner.ClassicAppSolution);
 
         // Act: --no-cache so the run is a real workspace load every time, never a fragment-cache hit.
         CliResult result = await CliRunner.InvokeAsync(

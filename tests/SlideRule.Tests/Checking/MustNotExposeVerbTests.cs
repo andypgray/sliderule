@@ -46,11 +46,8 @@ public sealed class MustNotExposeVerbTests
     [Fact]
     public void MustNotExpose_SubjectExposesBannedType_FailsWithSourceTargetSitesAndHumanLine()
     {
-        RuleResult result = Checker.Run(SceneModel, arch =>
-                arch.Rule("api/no-expose-secret")
-                    .Enforce(arch.Namespace("App.*").MustNotExpose(arch.Namespace("Secrets.*")))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(SceneModel, arch => arch.Namespace("App.*")
+            .MustNotExpose(arch.Namespace("Secrets.*")));
 
         result.ShouldHaveFailedWithSingleEdge(ViolationKind.Expose, "App.Facade", "Secrets.Secret");
 
@@ -65,12 +62,8 @@ public sealed class MustNotExposeVerbTests
         // CleanService constructs and references Secrets.Secret inside a method body but never names it in a
         // public signature position, so no exposure edge is minted — reference≠exposure, the crux of the verb.
         // The forbidden target resolves (Secrets.Secret exists), so this is a real pass, not an inert one.
-        RuleResult result = Checker.Run(SceneModel, arch =>
-                arch.Rule("api/no-expose-secret")
-                    .Enforce(arch.Namespace("App.*").WithSuffix("CleanService")
-                        .MustNotExpose(arch.Namespace("Secrets.*")))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(SceneModel, arch => arch.Namespace("App.*").WithSuffix("CleanService")
+            .MustNotExpose(arch.Namespace("Secrets.*")));
 
         result.ShouldHavePassedClean();
     }
@@ -95,11 +88,7 @@ public sealed class MustNotExposeVerbTests
                               }
                               """;
 
-        RuleResult result = Checker.Run(source, arch =>
-                arch.Rule("api/no-expose-all")
-                    .Enforce(arch.Types.MustNotExpose(typeof(Exception)))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(source, arch => arch.Types.MustNotExpose(typeof(Exception)));
 
         result.ShouldHaveFailedWithEdges(ViolationKind.Expose, ["App.Wide -> System.Exception"]);
     }
@@ -123,11 +112,8 @@ public sealed class MustNotExposeVerbTests
                               }
                               """;
 
-        RuleResult result = Checker.Run(source, arch =>
-                arch.Rule("api/no-expose-derived")
-                    .Enforce(arch.Namespace("N.*").MustNotExpose(arch.Types.DerivedFrom(typeof(Exception))))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(source, arch => arch.Namespace("N.*")
+            .MustNotExpose(arch.Types.DerivedFrom(typeof(Exception))));
 
         result.ShouldHaveFailedWithEdges(ViolationKind.Expose, ["N.Gateway -> N.AppError"]);
     }
@@ -137,11 +123,8 @@ public sealed class MustNotExposeVerbTests
     {
         // The forbidden target (a namespace glob) matches no types, so the rule can never fire — inert. The
         // pattern operand is the warning gate, exactly as MustNotCatch's inert-target semantics (§4.1).
-        RuleResult result = Checker.Run(SceneModel, arch =>
-                arch.Rule("api/inert")
-                    .Enforce(arch.Namespace("App.*").MustNotExpose(arch.Namespace("Nonexistent.*")))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(SceneModel, arch => arch.Namespace("App.*")
+            .MustNotExpose(arch.Namespace("Nonexistent.*")));
 
         result.ShouldHaveWarnedInertTarget();
     }
@@ -152,11 +135,8 @@ public sealed class MustNotExposeVerbTests
         // A bare typeof target absent from the codebase is the WIN condition, not an inert warning: nobody
         // exposes System.FormatException, so the ban resolves empty but — being a concrete typeof anchor, not a
         // pattern — stays silent (the departure from the pattern-operand inert warning above).
-        RuleResult result = Checker.Run(SceneModel, arch =>
-                arch.Rule("api/no-expose-format")
-                    .Enforce(arch.Namespace("App.*").MustNotExpose(typeof(FormatException)))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(SceneModel, arch => arch.Namespace("App.*")
+            .MustNotExpose(typeof(FormatException)));
 
         result.ShouldHavePassedClean();
     }

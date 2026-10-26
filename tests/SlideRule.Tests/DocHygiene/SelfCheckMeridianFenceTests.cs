@@ -26,15 +26,21 @@ namespace SlideRule.Tests.DocHygiene;
 public sealed class SelfCheckMeridianFenceTests
 {
     /// <summary>
-    ///     The filter the examples job runs the suite's example-gated classes through: each skips unless the
-    ///     examples are built, and that job is the only place they are.
+    ///     The suite's example-gated classes: each skips unless the examples are built, and the examples job is the
+    ///     only place they are.
     /// </summary>
-    private const string ExamplesWorkflowFilter =
-        $"FullyQualifiedName~{nameof(ExampleModelRoundTripTests)}"
-        + $"|FullyQualifiedName~{nameof(SelfCheckMeridianFenceTests)}"
-        + $"|FullyQualifiedName~{nameof(WalkthroughReplayTests)}";
+    private static readonly string[] ExampleGatedClasses =
+    [
+        nameof(ExampleModelRoundTripTests),
+        nameof(SelfCheckMeridianFenceTests),
+        nameof(WalkthroughReplayTests)
+    ];
 
-    private static readonly Lazy<Task<MeridianRun>> Run = new(CheckAsync);
+    /// <summary>The filter the examples job runs <see cref="ExampleGatedClasses" /> through.</summary>
+    private static string ExamplesWorkflowFilter =>
+        string.Join("|", ExampleGatedClasses.Select(static name => $"FullyQualifiedName~{name}"));
+
+    private static readonly Lazy<Task<MeridianRun>> Run = new(ShouldCheckMeridianAsync);
 
     [Fact]
     public async Task SarifResultFence_IsTheResultAFreshCheckWrites()
@@ -82,9 +88,32 @@ public sealed class SelfCheckMeridianFenceTests
                            + "fences.");
     }
 
+    [Fact]
+    public void ExampleGatedClasses_AreEveryClassThatSkipsOnAnUnbuiltExample()
+    {
+        // Arrange: a class is example-gated when its file calls the skip, and a test file is named for its class.
+        const string skip = "ExampleBuilds.SkipUnlessBuilt(";
+        const string skipHome = "tests/SlideRule.Tests/TestSupport/ExampleBuilds.cs";
+
+        // Act
+        List<string> gated = TrackedFiles.CSharp
+            .Where(static path => path.StartsWith("tests/", StringComparison.Ordinal) && path != skipHome)
+            .Where(static path => RepoRoot.ReadText(path)
+                .Contains(skip, StringComparison.Ordinal))
+            .Select(static path => Path.GetFileNameWithoutExtension(path))
+            .ToList();
+
+        // Assert
+        gated.ShouldBe(
+            ExampleGatedClasses,
+            ignoreOrder: true,
+            $"Every class that skips on an unbuilt example must be in the filter {TrackedFiles.CiWorkflow}'s examples "
+            + "job runs; one left out skips in every job with nothing red.");
+    }
+
     // One check writes both documents: the check document on stdout and the SARIF file beside it, the cache
     // left alone so the run is a fresh one.
-    private static async Task<MeridianRun> CheckAsync()
+    private static async Task<MeridianRun> ShouldCheckMeridianAsync()
     {
         using TempDirectory temp = TestTempRoot.Fresh("self-check-meridian");
         string sarifPath = temp.PathOf("meridian.sarif");

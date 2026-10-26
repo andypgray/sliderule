@@ -65,7 +65,7 @@ public sealed class DriftedCopiesGraphE2ETests
             ]);
         document.RootElement.GetProperty("multiplyDeclaredTypes")
             .EnumerateArray()
-            .Single(entry => entry.GetProperty("type")
+            .ShouldHaveSingle(entry => entry.GetProperty("type")
                 .GetString() == "DriftedApp.StringExtensions")
             .GetProperty("factsFollow")
             .GetString()

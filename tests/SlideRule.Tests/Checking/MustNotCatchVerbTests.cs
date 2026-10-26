@@ -48,11 +48,8 @@ public sealed class MustNotCatchVerbTests
     [Fact]
     public void MustNotCatch_SubjectCatchesBannedType_FailsWithSourceTargetSitesAndHumanLine()
     {
-        RuleResult result = Checker.Run(SceneModel, arch =>
-                arch.Rule("ex/no-catch-domain")
-                    .Enforce(arch.Namespace("App.*").MustNotCatch(arch.Namespace("Errors.*")))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(SceneModel, arch => arch.Namespace("App.*")
+            .MustNotCatch(arch.Namespace("Errors.*")));
 
         result.ShouldHaveFailedWithSingleEdge(ViolationKind.Catch, "App.DataHandler", "Errors.DbError");
 
@@ -67,12 +64,8 @@ public sealed class MustNotCatchVerbTests
         // CleanHandler catches an external OperationCanceledException — a catch, but outside the banned
         // Errors.* namespace, so the ban is silent. The forbidden target resolves (Errors.DbError exists), so
         // this is a real pass, not an inert one.
-        RuleResult result = Checker.Run(SceneModel, arch =>
-                arch.Rule("ex/no-catch-domain")
-                    .Enforce(arch.Namespace("App.*").WithSuffix("CleanHandler")
-                        .MustNotCatch(arch.Namespace("Errors.*")))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(SceneModel, arch => arch.Namespace("App.*").WithSuffix("CleanHandler")
+            .MustNotCatch(arch.Namespace("Errors.*")));
 
         result.ShouldHavePassedClean();
     }
@@ -83,11 +76,21 @@ public sealed class MustNotCatchVerbTests
         // Matching is exact definition-level FQN, not hierarchy: MustNotCatch(typeof(Exception)) flags the broad
         // `catch (System.Exception)` but NEVER the narrower `catch (IOException)` — the narrow catch is the good
         // state the verb rewards. Broad's presence proves the ban is live, not vacuously empty.
-        RuleResult result = Checker.Run(Sources.CatchBroadVsNarrowModel, arch =>
-                arch.Rule("ex/no-catch-all")
-                    .Enforce(arch.Types.MustNotCatch(typeof(Exception)))
-                    .Because("b"))
-            .Single();
+        const string source = """
+                              namespace App
+                              {
+                                  public class Broad
+                                  {
+                                      public void Run() { try { } catch (System.Exception) { } }
+                                  }
+                                  public class Narrow
+                                  {
+                                      public void Run() { try { } catch (System.IO.IOException) { } }
+                                  }
+                              }
+                              """;
+
+        RuleResult result = Checker.Verdict(source, arch => arch.Types.MustNotCatch(typeof(Exception)));
 
         result.ShouldHaveFailedWithEdges(ViolationKind.Catch, ["App.Broad -> System.Exception"]);
     }
@@ -99,11 +102,23 @@ public sealed class MustNotCatchVerbTests
         // external types carry a shallow hierarchy. Worker catches its own N.AppError (solution, derives from
         // Exception → matched → red) and an external System.InvalidOperationException (never matched by a
         // DerivedFrom operand, so not flagged), pinning that the adjective matches solution types but not externals.
-        RuleResult result = Checker.Run(Sources.CatchDerivedFromModel, arch =>
-                arch.Rule("ex/no-catch-derived")
-                    .Enforce(arch.Namespace("N.*").MustNotCatch(arch.Types.DerivedFrom(typeof(Exception))))
-                    .Because("b"))
-            .Single();
+        const string source = """
+                              namespace N
+                              {
+                                  public class AppError : System.Exception {}
+                                  public class Worker
+                                  {
+                                      public void Run()
+                                      {
+                                          try { } catch (N.AppError) { }
+                                          try { } catch (System.InvalidOperationException) { }
+                                      }
+                                  }
+                              }
+                              """;
+
+        RuleResult result = Checker.Verdict(source, arch => arch.Namespace("N.*")
+            .MustNotCatch(arch.Types.DerivedFrom(typeof(Exception))));
 
         result.ShouldHaveFailedWithEdges(ViolationKind.Catch, ["N.Worker -> N.AppError"]);
     }
@@ -113,11 +128,8 @@ public sealed class MustNotCatchVerbTests
     {
         // The forbidden target (a namespace glob) matches no types, so the rule can never fire — inert. The
         // pattern operand is the warning gate, exactly as MustNotConstruct's inert-target semantics (§4.1).
-        RuleResult result = Checker.Run(SceneModel, arch =>
-                arch.Rule("ex/inert")
-                    .Enforce(arch.Namespace("App.*").MustNotCatch(arch.Namespace("Nonexistent.*")))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(SceneModel, arch => arch.Namespace("App.*")
+            .MustNotCatch(arch.Namespace("Nonexistent.*")));
 
         result.ShouldHaveWarnedInertTarget();
     }
@@ -128,11 +140,8 @@ public sealed class MustNotCatchVerbTests
         // A bare typeof target absent from the codebase is the WIN condition, not an inert warning: nobody
         // catches System.FormatException, so the ban resolves empty but — being a concrete typeof anchor, not a
         // pattern — stays silent (the departure from the pattern-operand inert warning above).
-        RuleResult result = Checker.Run(SceneModel, arch =>
-                arch.Rule("ex/no-catch-format")
-                    .Enforce(arch.Namespace("App.*").MustNotCatch(typeof(FormatException)))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(SceneModel, arch => arch.Namespace("App.*")
+            .MustNotCatch(typeof(FormatException)));
 
         result.ShouldHavePassedClean();
     }
@@ -142,9 +151,23 @@ public sealed class MustNotCatchVerbTests
     {
         // The catch ratchet keys the (source, caught) type pair (GRAMMAR §4.3): Handler is grandfathered for
         // catching AErr, but its NEW `catch (BErr)` is a distinct identity → red.
+        const string source = """
+                              namespace Errors { public class AErr : System.Exception {} public class BErr : System.Exception {} }
+                              namespace App
+                              {
+                                  public class Handler
+                                  {
+                                      public void Run()
+                                      {
+                                          try { } catch (Errors.AErr) { }
+                                          try { } catch (Errors.BErr) { }
+                                      }
+                                  }
+                              }
+                              """;
         BaselineIndex index = Checker.Baselines("ex/no-catch", BaselineEntry.ForEdge("T:App.Handler", "T:Errors.AErr"));
 
-        RuleResult result = Checker.Run(Sources.CatchRatchetModel, index, arch =>
+        RuleResult result = Checker.Run(source, index, arch =>
                 arch.Rule("ex/no-catch")
                     .Migrate("legacy broad catches", arch.Namespace("App.*").MustNotCatch(arch.Namespace("Errors.*")))
                     .Because("catch specific exceptions"))

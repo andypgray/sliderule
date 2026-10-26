@@ -59,7 +59,8 @@ public sealed class VsWhereLocatorTests
         "vswhere listed 2 instances, none with a readable installationPath and installationVersion")]
     public void Interpret_NoUsableInstance_SaysWhy(string standardOutput, string expected)
     {
-        // Read as plain objects: the theory asks only that nothing was listed, so it names no instance type.
+        // Read as plain objects: the theory asks only that nothing was listed, and a VsInstance named here would
+        // be a reference into the roslyn/msbuild-bootstrap quarantine past the sites its baseline grandfathers.
         (IReadOnlyCollection<object> instances, string? whyNone) = VsWhereLocator.Interpret(0, standardOutput, string.Empty);
 
         instances.ShouldBeEmpty();
@@ -74,7 +75,8 @@ public sealed class VsWhereLocatorTests
         // A failed run is not trusted for a partial listing, even one that parses.
         const string listing = """[{ "installationPath": "C:\\VS\\Good", "installationVersion": "17.14.0" }]""";
 
-        // Read as plain objects: the theory asks only that nothing was listed, so it names no instance type.
+        // Read as plain objects: the theory asks only that nothing was listed, and a VsInstance named here would
+        // be a reference into the roslyn/msbuild-bootstrap quarantine past the sites its baseline grandfathers.
         (IReadOnlyCollection<object> instances, string? whyNone) = VsWhereLocator.Interpret(exitCode, listing, standardError);
 
         instances.ShouldBeEmpty();

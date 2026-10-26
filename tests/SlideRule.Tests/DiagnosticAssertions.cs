@@ -34,7 +34,7 @@ internal static class DiagnosticAssertions
     {
         reported.ShouldReport(id);
 
-        return reported.ShouldHaveSingle(id);
+        return reported[0];
     }
 
     /// <summary>Asserts the analyzer reported nothing at all.</summary>

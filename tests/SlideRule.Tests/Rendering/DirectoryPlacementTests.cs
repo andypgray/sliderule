@@ -1,5 +1,6 @@
 using Shouldly;
 using SlideRule.Rendering;
+using SlideRule.Tests.TestSupport;
 using Xunit;
 
 namespace SlideRule.Tests.Rendering;
@@ -56,7 +57,7 @@ public sealed class DirectoryPlacementTests
     [Fact]
     public void DeepestCommonDirectory_TwoCasings_MergeWhereThePlatformIgnoresCase()
     {
-        Assert.SkipUnless(OperatingSystem.IsWindows() || OperatingSystem.IsMacOS(), "Compares file names by case.");
+        FileNameCase.SkipUnlessIgnored();
 
         DirectoryPlacement.DeepestCommonDirectory(["/Repo/Src/One.cs", "/repo/src/Two.cs"])
             .ShouldBe("/Repo/Src");
@@ -65,7 +66,7 @@ public sealed class DirectoryPlacementTests
     [Fact]
     public void DeepestCommonDirectory_TwoCasings_StayApartWhereThePlatformComparesCase()
     {
-        Assert.SkipWhen(OperatingSystem.IsWindows() || OperatingSystem.IsMacOS(), "Ignores case in file names.");
+        FileNameCase.SkipUnlessCompared();
 
         DirectoryPlacement.DeepestCommonDirectory(["/Repo/Src/One.cs", "/repo/src/Two.cs"])
             .ShouldBe("/");

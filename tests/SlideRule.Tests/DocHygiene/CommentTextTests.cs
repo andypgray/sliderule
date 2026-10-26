@@ -145,10 +145,8 @@ public sealed class CommentTextTests
 
         // Assert
         masked.Length.ShouldBe(source.Length);
-        for (var index = 0; index < source.Length; index++)
-            if (source[index] is '\n' or '\r')
-                masked[index]
-                    .ShouldBe(source[index]);
+        string expected = LineBreaksOf(source);
+        LineBreaksOf(masked).ShouldBe(expected);
     }
 
     [Fact]
@@ -234,6 +232,22 @@ public sealed class CommentTextTests
     }
 
     [Fact]
+    public void WithoutSuppressionDirectives_DirectiveWordsSplitByALineBreak_AreLeftInPlace()
+    {
+        // Arrange: inside a block comment a line can end on "//" and the next open with a directive's words. That
+        // is prose rather than a directive, and blanking it would take the line break with it, moving every line
+        // below.
+        const string source = "/* see //\n   ReSharper disable X */\nvar a = 1;";
+        string masked = CommentText.Mask(source);
+
+        // Act
+        string stripped = CommentText.WithoutSuppressionDirectives(masked);
+
+        // Assert
+        stripped.ShouldBe(masked);
+    }
+
+    [Fact]
     public void WithoutSuppressionDirectives_AnySource_PreservesLengthAndNewlinePositions()
     {
         // Arrange
@@ -244,9 +258,18 @@ public sealed class CommentTextTests
 
         // Assert
         stripped.Length.ShouldBe(source.Length);
-        for (var index = 0; index < source.Length; index++)
-            if (source[index] is '\n' or '\r')
-                stripped[index]
-                    .ShouldBe(source[index]);
+        string expected = LineBreaksOf(source);
+        LineBreaksOf(stripped).ShouldBe(expected);
+    }
+
+    // The text with every character but a line break replaced by a dot, so a red's string difference names the
+    // offset and the character of every break that moved.
+    private static string LineBreaksOf(string text)
+    {
+        char[] breaks = text
+            .Select(static character => character is '\n' or '\r' ? character : '.')
+            .ToArray();
+
+        return new string(breaks);
     }
 }

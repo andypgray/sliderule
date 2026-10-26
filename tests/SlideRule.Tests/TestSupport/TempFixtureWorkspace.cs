@@ -7,7 +7,7 @@ namespace SlideRule.Tests.TestSupport;
 ///     A private copy of a fixture solution — the substrate for the mutation tests
 ///     (<c>baseline init</c>/<c>accept-reductions</c>, tamper, file move) and for any test that needs to
 ///     build a fixture rather than only read it. The shared <see cref="WorkspaceFixture" /> output tree is
-///     read-only and shared across the assembly, so a test that edits fixture files or baselines must run
+///     read-only and shared across the run, so a test that edits fixture files or baselines must run
 ///     against its own copy.
 /// </summary>
 /// <remarks>
@@ -158,16 +158,12 @@ internal sealed class TempFixtureWorkspace : IDisposable
     /// <summary>Absolute path to a file or directory inside the copy, from solution-relative segments.</summary>
     public string PathOf(params string[] relativeSegments)
     {
-        var segments = new List<string> { _root };
-        segments.AddRange(relativeSegments);
-        return Path.Combine(segments.ToArray());
+        return Path.Combine([_root, .. relativeSegments]);
     }
 
     private static string SourceDirectory(string fixtureDirectory)
     {
-        var segments = new List<string> { AppContext.BaseDirectory, "Fixtures" };
-        segments.AddRange(fixtureDirectory.Split('/'));
-        return Path.Combine(segments.ToArray());
+        return Path.Combine([FixtureBeds.FixturesRoot, .. fixtureDirectory.Split('/')]);
     }
 
     private static bool TryAcquire(string key)
@@ -211,12 +207,7 @@ internal sealed class TempFixtureWorkspace : IDisposable
             projectsChanged = SyncTree(source, destination);
             return true;
         }
-        catch (IOException)
-        {
-            projectsChanged = false;
-            return false;
-        }
-        catch (UnauthorizedAccessException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             projectsChanged = false;
             return false;

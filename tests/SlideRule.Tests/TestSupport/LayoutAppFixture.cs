@@ -55,18 +55,17 @@ internal static class LayoutAppFixture
     ///     property element). Written rather than committed because a committed file could not name this
     ///     assembly's output directory.
     /// </summary>
-    internal static string PropsFile(IEnumerable<string> extraProperties)
+    private static string PropsFile(IEnumerable<string> extraProperties)
     {
-        var lines = new List<string>
-        {
+        string[] lines =
+        [
             "<Project>",
             "    <PropertyGroup>",
-            $"        <SlideRuleContractPath>{ContractPath}</SlideRuleContractPath>"
-        };
-        IEnumerable<string> indented = extraProperties.Select(property => "        " + property);
-        lines.AddRange(indented);
-        lines.Add("    </PropertyGroup>");
-        lines.Add("</Project>");
+            $"        <SlideRuleContractPath>{ContractPath}</SlideRuleContractPath>",
+            .. extraProperties.Select(property => "        " + property),
+            "    </PropertyGroup>",
+            "</Project>"
+        ];
 
         return string.Join(Environment.NewLine, lines) + Environment.NewLine;
     }
@@ -96,12 +95,7 @@ internal static class LayoutAppFixture
         string specAssembly = workspace.PathOf(SpecProject, "bin", "Debug", "net10.0", SpecAssembly);
         if (File.Exists(specAssembly)) return workspace;
 
-        FixtureRestorer.Restore(workspace.SolutionPath);
-        // --disable-build-servers (plus DotnetCli's node/server env) keeps the drained child from leaving a
-        // persistent worker that would wedge the output pipe.
-        DotnetCli.Run(
-            $"build \"{workspace.SolutionPath}\" --disable-build-servers",
-            Path.GetDirectoryName(workspace.SolutionPath)!);
+        DotnetCli.Run($"build \"{workspace.SolutionPath}\"", Path.GetDirectoryName(workspace.SolutionPath)!);
         return workspace;
     }
 }

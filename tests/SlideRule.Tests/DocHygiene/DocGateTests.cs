@@ -120,7 +120,7 @@ public sealed class DocGateTests
         ConcurrentDictionary<string, int> reads = new(StringComparer.Ordinal);
         DocGate<int> gate = new(
             [TrackedDoc],
-            doc =>
+            (doc, _) =>
             {
                 reads.AddOrUpdate(doc, 1, static (_, count) => count + 1);
                 return [1];
@@ -186,7 +186,7 @@ public sealed class DocGateTests
     {
         return new DocGate<int>(
             registeredDocs,
-            doc => Enumerable.Range(0, countFor(doc))
+            (doc, _) => Enumerable.Range(0, countFor(doc))
                 .ToArray(),
             quotes,
             docs,

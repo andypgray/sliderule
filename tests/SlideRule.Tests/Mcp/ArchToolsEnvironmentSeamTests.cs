@@ -35,7 +35,7 @@ public sealed class ArchToolsEnvironmentSeamTests : IDisposable
 
         string document = await Tools(environment).CheckAsync(cancellationToken: Ct);
 
-        using JsonDocument report = JsonDocument.Parse(document);
+        using JsonDocument report = CheckJsonAssertions.ShouldParseAsJson(document);
         report.RootElement.GetProperty("rules").GetArrayLength().ShouldBeGreaterThan(0);
     }
 

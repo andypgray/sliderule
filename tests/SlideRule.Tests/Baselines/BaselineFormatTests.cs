@@ -87,13 +87,9 @@ public sealed class BaselineFormatTests
             ("a/rule", [BaselineEntry.ForEdge("T:N.Src2", "T:N.Tgt"), BaselineEntry.ForEdge("T:N.Src1", "T:N.Tgt")])));
 
         // Rules ascend (a/rule before z/rule); within each, entries ascend by ((source|subject), target).
-        int aRule = composed.IndexOf("a/rule", StringComparison.Ordinal);
-        int zRule = composed.IndexOf("z/rule", StringComparison.Ordinal);
-        aRule.ShouldBeLessThan(zRule);
-        composed.IndexOf("T:N.Src1", StringComparison.Ordinal)
-            .ShouldBeLessThan(composed.IndexOf("T:N.Src2", StringComparison.Ordinal));
-        composed.IndexOf("T:N.Alpha", StringComparison.Ordinal)
-            .ShouldBeLessThan(composed.IndexOf("T:N.Beta", StringComparison.Ordinal));
+        composed.ShouldContainInOrder("a/rule", "z/rule");
+        composed.ShouldContainInOrder("T:N.Src1", "T:N.Src2");
+        composed.ShouldContainInOrder("T:N.Alpha", "T:N.Beta");
     }
 
     [Fact]
@@ -235,9 +231,8 @@ public sealed class BaselineFormatTests
         BaselineEntry entry = BaselineEntry.ForEdge("T:N.Src", "T:N.Tgt")
             .WithSiteCount(2);
 
-        using var sha = SHA256.Create();
-        byte[] hash = sha.ComputeHash(Encoding.UTF8.GetBytes(BaselineFormat.SealInput("a/one", entry)));
-        string independent = string.Concat(hash.Select(b => b.ToString("x2")));
+        byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes(BaselineFormat.SealInput("a/one", entry)));
+        string independent = Convert.ToHexStringLower(hash);
 
         string seal = sealer.Seal("a/one", entry);
         // Length pinned literally and the value against the untruncated hash: together those say "the first
@@ -357,8 +352,7 @@ public sealed class BaselineFormatTests
                 BaselineEntry.ForEdge("T:MyApp.Web.InvoiceController", "T:System.Data.DataTable")
                     .WithSiteCount(2)
             ])));
-        ReadFixture("arch", "baselines", "data-access", "no-inline-sql.json")
-            .NormalizedLines()
+        ReadNormalizedFixture("arch", "baselines", "data-access", "no-inline-sql.json")
             .ShouldBe(violated);
 
         string clean = BaselineFormat.ComposeFile(BaselineComposer.Rules((
@@ -369,8 +363,7 @@ public sealed class BaselineFormatTests
                 BaselineEntry.ForEdge("T:MyApp.Web.InvoiceController", "T:System.Data.DataTable")
                     .WithSiteCount(2)
             ])));
-        ReadFixture("arch", "clean-baseline.json")
-            .NormalizedLines()
+        ReadNormalizedFixture("arch", "clean-baseline.json")
             .ShouldBe(clean);
 
         // The third v2 fixture, read by the Quarantine containment rows rather than composed by them.
@@ -382,15 +375,12 @@ public sealed class BaselineFormatTests
                 BaselineEntry.ForEdge("T:MyApp.Web.InvoiceController", "T:MyApp.Legacy.Billing.RoundingMode")
                     .WithSiteCount(1)
             ])));
-        ReadFixture("arch", "baselines", "legacy", "billing", "containment.json")
-            .NormalizedLines()
+        ReadNormalizedFixture("arch", "baselines", "legacy", "billing", "containment.json")
             .ShouldBe(quarantined);
     }
 
-    private static string ReadFixture(params string[] relativeParts)
+    private static string ReadNormalizedFixture(params string[] relativeParts)
     {
-        var segments = new List<string> { FixtureBeds.MyAppRoot };
-        segments.AddRange(relativeParts);
-        return File.ReadAllText(Path.Combine(segments.ToArray()));
+        return TextNormalization.ReadNormalizedLines(Path.Combine([FixtureBeds.MyAppRoot, .. relativeParts]));
     }
 }

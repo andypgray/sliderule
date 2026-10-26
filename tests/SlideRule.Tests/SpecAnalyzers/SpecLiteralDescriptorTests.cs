@@ -333,7 +333,7 @@ public sealed class SpecLiteralDescriptorTests
     }
 
     [Fact]
-    public void TheAnalyzer_DeclaresTheSeventeenIdsInEighteenDescriptorsAsWhatItCanReport()
+    public void TheAnalyzer_DeclaresEveryVerdictIdOnceAndTheFaultIdTwiceAsWhatItCanReport()
     {
         List<string> supported = new SpecLiteralAnalyzer().SupportedDiagnostics
             .Select(descriptor => descriptor.Id)

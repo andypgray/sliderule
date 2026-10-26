@@ -20,17 +20,16 @@ public sealed class ExampleProjectMembershipTests
     private const string AdapterProject =
         "examples/Meridian.Quoting/tests/Meridian.Quoting.ArchTests/Meridian.Quoting.ArchTests.csproj";
 
-    // Every project path any tracked solution declares, repository-relative. Built once: the arms
-    // below ask about it for each of the example projects, and the answer cannot change mid-run.
-    private static readonly Lazy<IReadOnlySet<string>> LazyDeclaredProjects = new(DeclaredProjects);
-
     [Fact]
     public void EveryExampleProject_IsDeclaredByASolution_ExceptTheAdapter()
     {
+        // Arrange
+        IReadOnlySet<string> declared = DeclaredProjects();
+
         // Act
         List<string> undeclared = ExampleProjects()
             .Where(static path => path != AdapterProject)
-            .Where(static path => !LazyDeclaredProjects.Value.Contains(path))
+            .Where(path => !declared.Contains(path))
             .ToList();
 
         // Assert: an example project no solution declares is built by nothing, checked by nothing and

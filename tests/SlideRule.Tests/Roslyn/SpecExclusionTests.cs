@@ -174,12 +174,11 @@ public sealed class SpecExclusionTests : IDisposable
     [Fact]
     public void TryReadDeclaredMembers_Slnx_ReturnsCanonicalizedDeclaredMembers()
     {
-        string solutionPath = _temp.PathOf("App.slnx");
-        File.WriteAllText(solutionPath, """
-                                        <Solution>
-                                          <Project Path="src/App/App.csproj" />
-                                        </Solution>
-                                        """);
+        string solutionPath = _temp.WriteFile(["App.slnx"], """
+                                                            <Solution>
+                                                              <Project Path="src/App/App.csproj" />
+                                                            </Solution>
+                                                            """);
 
         IReadOnlySet<string>? members = SpecExclusion.TryReadDeclaredMembers(solutionPath);
 
@@ -193,15 +192,14 @@ public sealed class SpecExclusionTests : IDisposable
         // A filter resolves to the solution it points at — and to that solution's WHOLE membership, not the
         // filter's selection: a member left out of the selection is still solution material, so excluding it
         // would silently shrink the codebase under law.
-        File.WriteAllText(_temp.PathOf("App.slnx"), """
-                                                    <Solution>
-                                                      <Project Path="src/App/App.csproj" />
-                                                      <Project Path="src/Unselected/Unselected.csproj" />
-                                                    </Solution>
-                                                    """);
-        string solutionPath = _temp.PathOf("Filtered.slnf");
-        File.WriteAllText(
-            solutionPath,
+        _temp.WriteFile(["App.slnx"], """
+                                      <Solution>
+                                        <Project Path="src/App/App.csproj" />
+                                        <Project Path="src/Unselected/Unselected.csproj" />
+                                      </Solution>
+                                      """);
+        string solutionPath = _temp.WriteFile(
+            ["Filtered.slnf"],
             """{ "solution": { "path": "App.slnx", "projects": [ "src/App/App.csproj" ] } }""");
 
         IReadOnlySet<string>? members = SpecExclusion.TryReadDeclaredMembers(solutionPath);
@@ -216,8 +214,7 @@ public sealed class SpecExclusionTests : IDisposable
     {
         // The "never fail open" pin, at the one site that can reach it. Reporting "nothing
         // is declared" for an unreadable filter would subtract the spec's whole closure; null is the fallback.
-        string solutionPath = _temp.PathOf("Malformed.slnf");
-        File.WriteAllText(solutionPath, "{ this is not json");
+        string solutionPath = _temp.WriteFile(["Malformed.slnf"], "{ this is not json");
 
         SpecExclusion.TryReadDeclaredMembers(solutionPath)
             .ShouldBeNull();
@@ -270,10 +267,8 @@ public sealed class SpecExclusionTests : IDisposable
         // Both disk-side fallbacks reach this method as a null set, so the chain from a bad solution file
         // through to an unlabeled project is pinned end to end rather than as two halves nothing joins.
         // Unparseable XML is unreadable membership, not zero membership: an empty set would answer false.
-        string unowned = _temp.PathOf("MyApp.csproj");
-        File.WriteAllText(unowned, "<Project />");
-        string malformed = _temp.PathOf("Unparseable.slnx");
-        File.WriteAllText(malformed, "<Solution><Project Path=\"a.csproj\">");
+        string unowned = _temp.WriteFile(["MyApp.csproj"], "<Project />");
+        string malformed = _temp.WriteFile(["Unparseable.slnx"], "<Solution><Project Path=\"a.csproj\">");
 
         SpecExclusion.SolutionMembershipOf(SpecExclusion.TryReadDeclaredMembers(unowned), "/repo/src/App.csproj")
             .ShouldBeNull();

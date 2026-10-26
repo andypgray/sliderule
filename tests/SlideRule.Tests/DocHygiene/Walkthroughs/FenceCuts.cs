@@ -99,10 +99,8 @@ internal static class FenceCuts
     {
         JsonNode survey = JsonNode.Parse(document)!;
         JsonArray edges = survey["externalEdges"]!.AsArray();
-        List<JsonNode> dropped = edges.OfType<JsonNode>()
-            .Where(edge => !kept.Contains((edge["source"]!.GetValue<string>(), edge["targetNamespaceRoot"]!.GetValue<string>())))
-            .ToList();
-        foreach (JsonNode edge in dropped) edges.Remove(edge);
+        edges.RemoveAll(edge => edge is not null
+                                && !kept.Contains((edge["source"]!.GetValue<string>(), edge["targetNamespaceRoot"]!.GetValue<string>())));
 
         return survey.ToJsonString(SlideRuleJson.Options)
             .NormalizedLines();

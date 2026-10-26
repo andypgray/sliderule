@@ -15,14 +15,26 @@ internal static class CheckJson
         return Rule(document, ruleId);
     }
 
-    /// <summary>The same, over a document a caller already holds for its other reads.</summary>
+    /// <summary>
+    ///     The same, over a document a caller already holds for its other reads. Throws like LINQ's
+    ///     <c>Single</c> when the report does not carry the rule exactly once, naming the rule asked for and
+    ///     every rule the report carries.
+    /// </summary>
     internal static JsonElement Rule(JsonDocument document, string ruleId)
     {
-        return document.RootElement.GetProperty("rules")
+        List<JsonElement> rules = document.RootElement.GetProperty("rules")
             .EnumerateArray()
-            .Single(rule => rule.GetProperty("id")
+            .ToList();
+        List<JsonElement> matching = rules
+            .Where(rule => rule.GetProperty("id")
                 .GetString() == ruleId)
-            .Clone();
+            .ToList();
+        if (matching.Count == 1) return matching[0].Clone();
+
+        string carries = matching.Count == 0 ? "no rule" : $"{matching.Count} rules";
+        string present = string.Join(", ", rules.Select(rule => rule.GetProperty("id")
+            .GetString()));
+        throw new InvalidOperationException($"the report carries {carries} '{ruleId}'. It reported: {present}");
     }
 
     /// <summary>One rule's violations, in report order, each cloned so it outlives the parse.</summary>

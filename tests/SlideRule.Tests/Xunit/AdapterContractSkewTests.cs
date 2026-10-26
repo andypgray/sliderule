@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Runtime.Loader;
 using Shouldly;
+using SlideRule.Cli.SpecLoading;
 using SlideRule.Extraction;
 using SlideRule.Roslyn;
 using SlideRule.Tests.TestSupport;
@@ -25,8 +26,6 @@ namespace SlideRule.Tests.Xunit;
 /// </remarks>
 public sealed class AdapterContractSkewTests
 {
-    private const string ContractAssemblyName = "SlideRule";
-
     private const string ProbeAssemblyName = "SlideRule.AdapterSkewProbe";
 
     private const string ProbeTestsTypeName = "AdapterSkewProbe.ProbeTests";
@@ -152,7 +151,7 @@ public sealed class AdapterContractSkewTests
 
         Assembly contract = context.Assemblies
             .Where(loaded => loaded.GetName()
-                .Name == ContractAssemblyName)
+                .Name == SpecLoadContext.ContractAssemblyName)
             .ShouldHaveSingleItem();
         contract.GetName()
             .Version
@@ -203,7 +202,7 @@ public sealed class AdapterContractSkewTests
 
         private static byte[]? ImageOf(string name)
         {
-            if (name == ContractAssemblyName) return SkewedContract.Image(NewerContract);
+            if (name == SpecLoadContext.ContractAssemblyName) return SkewedContract.Image(NewerContract);
 
             return CarriedPaths.TryGetValue(name, out string? path) ? File.ReadAllBytes(path) : null;
         }

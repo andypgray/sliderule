@@ -24,136 +24,116 @@ public sealed class ManagedBlockFileTests
     [Fact]
     public void Splice_NewFile_WritesUtf8WithoutBom()
     {
-        WithTempDir(dir =>
-        {
-            string path = Path.Combine(dir, "AGENTS.md");
+        using TempDirectory temp = TestTempRoot.Fresh("managed-block");
+        string path = temp.PathOf("AGENTS.md");
 
-            WriteOutcome outcome = ManagedBlockFile.Splice(path, Body);
+        WriteOutcome outcome = ManagedBlockFile.Splice(path, Body);
 
-            outcome.ShouldBe(WriteOutcome.Wrote);
-            byte[] bytes = File.ReadAllBytes(path);
-            StartsWithBom(bytes)
-                .ShouldBeFalse();
-            Encoding.UTF8.GetString(bytes)
-                .ShouldBe("<!-- sliderule:begin -->\nline one\nline two\n<!-- sliderule:end -->\n");
-        });
+        outcome.ShouldBe(WriteOutcome.Wrote);
+        byte[] bytes = File.ReadAllBytes(path);
+        StartsWithBom(bytes)
+            .ShouldBeFalse();
+        Encoding.UTF8.GetString(bytes)
+            .ShouldBe("<!-- sliderule:begin -->\nline one\nline two\n<!-- sliderule:end -->\n");
     }
 
     [Fact]
     public void Splice_ExistingBomFile_PreservesTheBom()
     {
-        WithTempDir(dir =>
-        {
-            string path = Path.Combine(dir, "AGENTS.md");
-            byte[] seeded = [.. Utf8Bom, .. "# Title\n"u8];
-            File.WriteAllBytes(path, seeded);
+        using TempDirectory temp = TestTempRoot.Fresh("managed-block");
+        string path = temp.PathOf("AGENTS.md");
+        byte[] seeded = [.. Utf8Bom, .. "# Title\n"u8];
+        File.WriteAllBytes(path, seeded);
 
-            ManagedBlockFile.Splice(path, Body);
+        ManagedBlockFile.Splice(path, Body);
 
-            byte[] bytes = File.ReadAllBytes(path);
-            StartsWithBom(bytes)
-                .ShouldBeTrue();
-            // The BOM never enters the spliced text: the '# Title' heading is preserved once, un-mangled.
-            string text = Encoding.UTF8.GetString(bytes, Utf8Bom.Length, bytes.Length - Utf8Bom.Length);
-            text.ShouldStartWith("# Title\n\n<!-- sliderule:begin -->");
-        });
+        byte[] bytes = File.ReadAllBytes(path);
+        StartsWithBom(bytes)
+            .ShouldBeTrue();
+        // The BOM never enters the spliced text: the '# Title' heading is preserved once, un-mangled.
+        string text = Encoding.UTF8.GetString(bytes, Utf8Bom.Length, bytes.Length - Utf8Bom.Length);
+        text.ShouldStartWith("# Title\n\n<!-- sliderule:begin -->");
     }
 
     [Fact]
     public void Splice_ExistingNoBomFile_StaysWithoutBom()
     {
-        WithTempDir(dir =>
-        {
-            string path = Path.Combine(dir, "AGENTS.md");
-            File.WriteAllBytes(path, "# Title\n"u8);
+        using TempDirectory temp = TestTempRoot.Fresh("managed-block");
+        string path = temp.PathOf("AGENTS.md");
+        File.WriteAllBytes(path, "# Title\n"u8);
 
-            ManagedBlockFile.Splice(path, Body);
+        ManagedBlockFile.Splice(path, Body);
 
-            StartsWithBom(File.ReadAllBytes(path))
-                .ShouldBeFalse();
-        });
+        StartsWithBom(File.ReadAllBytes(path))
+            .ShouldBeFalse();
     }
 
     [Fact]
     public void Splice_UnchangedResplice_ReportsUnchangedAndKeepsBytesIdentical()
     {
-        WithTempDir(dir =>
-        {
-            string path = Path.Combine(dir, "AGENTS.md");
-            ManagedBlockFile.Splice(path, Body);
-            byte[] afterFirst = File.ReadAllBytes(path);
+        using TempDirectory temp = TestTempRoot.Fresh("managed-block");
+        string path = temp.PathOf("AGENTS.md");
+        ManagedBlockFile.Splice(path, Body);
+        byte[] afterFirst = File.ReadAllBytes(path);
 
-            WriteOutcome second = ManagedBlockFile.Splice(path, Body);
+        WriteOutcome second = ManagedBlockFile.Splice(path, Body);
 
-            second.ShouldBe(WriteOutcome.Unchanged);
-            File.ReadAllBytes(path)
-                .ShouldBe(afterFirst);
-        });
+        second.ShouldBe(WriteOutcome.Unchanged);
+        File.ReadAllBytes(path)
+            .ShouldBe(afterFirst);
     }
 
     [Fact]
     public void Splice_MalformedMarkers_ThrowsUserErrorNamingTheFile()
     {
-        WithTempDir(dir =>
-        {
-            string path = Path.Combine(dir, "AGENTS.md");
-            File.WriteAllText(path, "<!-- sliderule:begin -->\nno end marker\n");
+        using TempDirectory temp = TestTempRoot.Fresh("managed-block");
+        string path = temp.WriteFile(["AGENTS.md"], "<!-- sliderule:begin -->\nno end marker\n");
 
-            var error = Should.Throw<UserErrorException>(() => ManagedBlockFile.Splice(path, Body));
-            error.Message.ShouldContain(path);
-        });
+        var error = Should.Throw<UserErrorException>(() => ManagedBlockFile.Splice(path, Body));
+        error.Message.ShouldContain(path);
     }
 
     [Fact]
     public void Splice_InvalidUtf8File_RefusesAndLeavesFileUntouched()
     {
-        WithTempDir(dir =>
-        {
-            string path = Path.Combine(dir, "AGENTS.md");
-            // A lone 0x80 continuation byte with no lead byte — invalid UTF-8 that a lenient decoder would
-            // silently turn into U+FFFD and then write back, destroying the file.
-            byte[] invalid = [0x41, 0x80, 0x42];
-            File.WriteAllBytes(path, invalid);
+        using TempDirectory temp = TestTempRoot.Fresh("managed-block");
+        string path = temp.PathOf("AGENTS.md");
+        // A lone 0x80 continuation byte with no lead byte — invalid UTF-8 that a lenient decoder would
+        // silently turn into U+FFFD and then write back, destroying the file.
+        byte[] invalid = [0x41, 0x80, 0x42];
+        File.WriteAllBytes(path, invalid);
 
-            var error = Should.Throw<UserErrorException>(() => ManagedBlockFile.Splice(path, Body));
+        var error = Should.Throw<UserErrorException>(() => ManagedBlockFile.Splice(path, Body));
 
-            error.Message.ShouldBe(
-                $"{path}: not valid UTF-8. SlideRule manages a UTF-8 AGENTS.md block and refuses a file it "
-                + "cannot decode rather than rewriting it with replacement characters; convert it to UTF-8 and re-render.");
-            File.ReadAllBytes(path)
-                .ShouldBe(invalid); // refused, not rewritten
-        });
+        error.Message.ShouldBe(
+            $"{path}: not valid UTF-8. SlideRule manages a UTF-8 AGENTS.md block and refuses a file it "
+            + "cannot decode rather than rewriting it with replacement characters; convert it to UTF-8 and re-render.");
+        File.ReadAllBytes(path)
+            .ShouldBe(invalid); // refused, not rewritten
     }
 
     [Fact]
     public void Splice_Utf16LeBomFile_RefusesFlaggingUtf16()
     {
-        WithTempDir(dir =>
-        {
-            string path = Path.Combine(dir, "AGENTS.md");
-            // A UTF-16 LE file: the FF FE BOM then "# Title" as UTF-16. A generic "invalid UTF-8" message
-            // would be true but unhelpful; the adapter names the encoding so the fix is obvious.
-            byte[] utf16 = [0xFF, 0xFE, .. Encoding.Unicode.GetBytes("# Title")];
-            File.WriteAllBytes(path, utf16);
+        using TempDirectory temp = TestTempRoot.Fresh("managed-block");
+        string path = temp.PathOf("AGENTS.md");
+        // A UTF-16 LE file: the FF FE BOM then "# Title" as UTF-16. A generic "invalid UTF-8" message
+        // would be true but unhelpful; the adapter names the encoding so the fix is obvious.
+        byte[] utf16 = [0xFF, 0xFE, .. Encoding.Unicode.GetBytes("# Title")];
+        File.WriteAllBytes(path, utf16);
 
-            var error = Should.Throw<UserErrorException>(() => ManagedBlockFile.Splice(path, Body));
+        var error = Should.Throw<UserErrorException>(() => ManagedBlockFile.Splice(path, Body));
 
-            error.Message.ShouldBe(
-                $"{path}: looks like UTF-16 (a leading byte-order mark). SlideRule manages UTF-8 files only; "
-                + "convert it to UTF-8 and re-render.");
-            File.ReadAllBytes(path)
-                .ShouldBe(utf16); // refused, not rewritten
-        });
+        error.Message.ShouldBe(
+            $"{path}: looks like UTF-16 (a leading byte-order mark). SlideRule manages UTF-8 files only; "
+            + "convert it to UTF-8 and re-render.");
+        File.ReadAllBytes(path)
+            .ShouldBe(utf16); // refused, not rewritten
     }
 
     private static bool StartsWithBom(byte[] bytes)
     {
-        return bytes.Length >= 3 && bytes[0] == Utf8Bom[0] && bytes[1] == Utf8Bom[1] && bytes[2] == Utf8Bom[2];
-    }
-
-    private static void WithTempDir(Action<string> body)
-    {
-        using TempDirectory temp = TestTempRoot.Fresh("managed-block");
-        body(temp.Path);
+        return bytes.AsSpan()
+            .StartsWith(Utf8Bom);
     }
 }

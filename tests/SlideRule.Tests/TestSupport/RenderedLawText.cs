@@ -2,8 +2,9 @@ namespace SlideRule.Tests.TestSupport;
 
 /// <summary>
 ///     Rendered agent-context text that more than one suite is pinned against — a family rule's bullet,
-///     which appears on both of its cells' cards, and the whole cards the MCP surface returns and the
-///     render verb splices into a file. Spelled once because two copies of a string would let one drift:
+///     which appears on both of its cells' cards; the whole cards the MCP surface returns and the render
+///     verb splices into a file; and the recovery paragraph every root block carries. Spelled once because two copies of a
+///     string would let one drift:
 ///     the CLI-versus-MCP parity rows and the end-to-end render goldens only mean the same thing while
 ///     the text they compare is literally the same text.
 /// </summary>
@@ -13,6 +14,24 @@ namespace SlideRule.Tests.TestSupport;
 /// </remarks>
 internal static class RenderedLawText
 {
+    /// <summary>
+    ///     The sentence inside <see cref="InstallNote" /> a row asserts on its own, spelled apart so the claim and the
+    ///     goldens carrying it cannot drift apart.
+    /// </summary>
+    internal const string SdkPinSentence =
+        "Inside a repository whose `global.json` pins an SDK below 10, both commands fail, so run them " +
+        "from outside it and pass the solution's absolute path.";
+
+    /// <summary>
+    ///     The recovery line every rendered root block carries, spelled once so no two goldens that carry it can drift
+    ///     apart on it.
+    /// </summary>
+    internal const string InstallNote =
+        "*If the `sliderule` command is missing (a configured MCP server dies without it), " +
+        "install the tool with `dotnet tool install -g SlideRule.Cli`, or run any command " +
+        "without installing: `dotnet dnx SlideRule.Cli --yes -- check <solution>`. " +
+        SdkPinSentence + "*\n\n";
+
     internal const string LeavesBullet =
         "- `layering/leaves-independent` — Each of the Reporting and Billing layers must not reference " +
         "the others. Reporting and billing are the two leaves of this solution; neither may grow a " +

@@ -38,16 +38,7 @@ public sealed class ExampleArchitectureDocTests
         ("examples/Meridian.Interchange/ARCHITECTURE.md", "Meridian.Interchange.slnx", "Meridian.Interchange.Architecture")
     ];
 
-    public static TheoryData<string, string, string> ExampleDocs
-    {
-        get
-        {
-            TheoryData<string, string, string> data = new();
-            foreach ((string path, string solution, string spec) in Pinned) data.Add(path, solution, spec);
-
-            return data;
-        }
-    }
+    public static TheoryData<string, string, string> ExampleDocs => [.. Pinned];
 
     [Theory]
     [MemberData(nameof(ExampleDocs))]
@@ -58,12 +49,9 @@ public sealed class ExampleArchitectureDocTests
         string committed = RepoRoot.ReadText(relativePath);
 
         // Act
-        string? body = ManagedBlock.ExtractBody(committed);
+        string body = committed.ShouldCarryOneManagedBlock($"{relativePath} must carry exactly one managed block.");
 
         // Assert
-        ManagedBlocks.MarkerPairCount(committed)
-            .ShouldBe(1, $"{relativePath} must carry exactly one managed block.");
-        body.ShouldNotBeNull($"{relativePath} carries no managed block.");
         body.Occurrences("```mermaid")
             .ShouldBe(2, $"{relativePath} must carry both drawings.");
         body.ShouldContain(

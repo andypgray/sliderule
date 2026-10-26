@@ -33,10 +33,12 @@ internal static class TextNormalization
 
     /// <summary>
     ///     How many times <paramref name="needle" /> occurs in <paramref name="haystack" />, ordinally and
-    ///     without overlaps — for the gates that count a marker rather than assert one is present.
+    ///     without overlaps — for the gates that count a marker rather than assert one is present. An empty
+    ///     needle throws, since it would match at every index.
     /// </summary>
     internal static int Occurrences(this string haystack, string needle)
     {
+        ArgumentException.ThrowIfNullOrEmpty(needle);
         var count = 0;
         for (int index = haystack.IndexOf(needle, StringComparison.Ordinal);
              index >= 0;

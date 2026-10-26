@@ -48,19 +48,12 @@ public sealed class ProseQuotedOutputTests
     ];
 
     /// <summary>
-    ///     Captures that are permanently unreproducible, with the reason. Each is held to its fence still
-    ///     existing and still carrying what makes it unreproducible, so the entry dies loudly rather than
-    ///     outliving the block it excuses. The fence is found by the marker its walkthrough registration
-    ///     gives it, so the two cannot name different fences.
+    ///     Captures that are permanently unreproducible. Each is held to its fence still existing and still
+    ///     carrying what makes it unreproducible, so the entry dies loudly rather than outliving the block it
+    ///     excuses. Each entry is the fence's walkthrough registration, which records why it is a capture, so the
+    ///     two cannot name different fences.
     /// </summary>
-    private static readonly (string Doc, string Marker, string Reason)[] TimedCaptures =
-    [
-        (WalkthroughFences.QuotingAdapterRun.Doc,
-            WalkthroughFences.QuotingAdapterRun.Marker,
-            "The adapter's `dotnet test` capture bakes wall-clock timings — the workspace load billed to "
-            + "whichever case runs first, and the run's duration — which no two runs reproduce and which are the "
-            + "point of the paragraph beneath it.")
-    ];
+    private static readonly IllustrativeFence[] TimedCaptures = [WalkthroughFences.QuotingAdapterRun];
 
     [Fact]
     public void ProseQuotedSummaries_StillReadAsRegistered()
@@ -87,7 +80,7 @@ public sealed class ProseQuotedOutputTests
         // Act: the inverted guard. These are registered because a fence scanner cannot see them; the day
         // one is fenced, the fenced gates cover it and this entry should go.
         foreach ((string doc, string summary) in ProseSummaries)
-            if (SourceAnchors.Fences(RepoRoot.ReadText(doc))
+            if (DocFences.Fences(RepoRoot.ReadText(doc))
                 .Any(fence => fence.Any(line => line.Contains(summary, StringComparison.Ordinal))))
                 fenced.Add($"{doc} now quotes '{summary}' inside a fence; remove the exemption and let the fenced gates hold it.");
 
@@ -104,7 +97,7 @@ public sealed class ProseQuotedOutputTests
 
         // Act
         foreach (string doc in TrackedFiles.Markdown)
-        foreach ((string line, int number) in SourceAnchors.UnfencedLines(RepoRoot.ReadText(doc)))
+        foreach ((string line, int number) in DocFences.UnfencedLines(RepoRoot.ReadText(doc)))
         {
             if (!SummaryLine.IsMatch(line)) continue;
 
@@ -148,9 +141,9 @@ public sealed class ProseQuotedOutputTests
         // Act: an exemption is only honest while the thing it excuses is still there. A marker matching
         // no fence means the block went away; a fence with no timing token means it is reproducible now
         // and should be held like every other capture.
-        foreach ((string doc, string marker, string _) in TimedCaptures)
+        foreach ((string doc, _, string marker, _, _) in TimedCaptures)
         {
-            IReadOnlyList<string>[] fences = SourceAnchors.Fences(RepoRoot.ReadText(doc))
+            IReadOnlyList<string>[] fences = DocFences.Fences(RepoRoot.ReadText(doc))
                 .Where(fence => fence.Any(line => line.Contains(marker, StringComparison.Ordinal)))
                 .ToArray();
             if (fences.Length != 1)

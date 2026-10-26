@@ -184,10 +184,8 @@ public sealed class RestoreFailureSilentEdgeE2ETests
         CliResult never = await Check(workspace, WriteSpec(workspace), "--json");
 
         never.ShouldRefuseWith();
-        using JsonDocument document = JsonDocument.Parse(never.Out);
-        document.RootElement.GetProperty("modelIncomplete")
-            .GetBoolean()
-            .ShouldBeTrue();
+        using JsonDocument document = never.ShouldHaveJsonStdout();
+        document.ShouldBeStampedIncomplete();
         document.RootElement.TryGetProperty("failedProjects", out _)
             .ShouldBeFalse(never.Transcript());
         document.RootElement.Strings("restoreFailedProjects")
@@ -216,10 +214,8 @@ public sealed class RestoreFailureSilentEdgeE2ETests
         CliResult broken = await Check(workspace, specDll, "--json");
 
         broken.ShouldRefuseWith();
-        using JsonDocument document = JsonDocument.Parse(broken.Out);
-        document.RootElement.GetProperty("modelIncomplete")
-            .GetBoolean()
-            .ShouldBeTrue();
+        using JsonDocument document = broken.ShouldHaveJsonStdout();
+        document.ShouldBeStampedIncomplete();
         document.RootElement.TryGetProperty("failedProjects", out _)
             .ShouldBeFalse(broken.Transcript());
         document.RootElement.Strings("restoreFailedProjects")
@@ -227,10 +223,7 @@ public sealed class RestoreFailureSilentEdgeE2ETests
         // The same fact the stamp above carries, reaching the rule that reported itself inert: the warning's
         // own cure names the partial model rather than the selection's shape, so a client reading one rule's
         // warning does not have to correlate it with a document-level flag to know what it means.
-        document.RootElement.GetProperty("rules")
-            .EnumerateArray()
-            .Single(rule => rule.GetProperty("id")
-                .GetString() == RuleId)
+        CheckJson.Rule(document, RuleId)
             .GetProperty("warnings")[0]
             .GetProperty("hint")
             .GetString()
@@ -248,7 +241,7 @@ public sealed class RestoreFailureSilentEdgeE2ETests
     // all, which is also the CI shape this models.
     private static ChildProcess.ProcessResult RestoreFromCold(TempFixtureWorkspace workspace, string packagesRoot)
     {
-        if (Directory.Exists(packagesRoot)) ReadOnlyTolerant.DeleteTree(packagesRoot);
+        ReadOnlyTolerant.DeleteTree(packagesRoot);
 
         ProcessStartInfo startInfo = new("dotnet", "restore FieldMini.sln")
         {

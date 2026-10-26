@@ -173,7 +173,6 @@ public sealed class RoslynFloorPinTests
         // whatever its projects reach.
         IReadOnlyList<string> findings = DependabotEntries.MissingIgnores(
             FloorPackages,
-            "the floor packages",
             "raises the floor in every project that states it and that its projects reach");
 
         // Assert

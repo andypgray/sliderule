@@ -19,10 +19,9 @@ public sealed class SpecResolverTests
 
     // The load failure field testing found: a --locked-mode restore whose lock file no longer matches
     // the project, which leaves the spec project's reference to the contract library unresolved.
-    private const string LockFileFailure =
-        CapturedAuditLines.FramePrefix + "C:/repo/src/MyApp.Arch/MyApp.Arch.csproj"
-                                       + CapturedAuditLines.FrameSeparator
-                                       + "NU1004: The packages lock file is inconsistent with the project dependencies.";
+    private static readonly string LockFileFailure = CapturedAuditLines.Framed(
+        "C:/repo/src/MyApp.Arch/MyApp.Arch.csproj",
+        "NU1004: The packages lock file is inconsistent with the project dependencies.");
 
     // A NuGetAudit advisory in the shape NuGet really emits: no code in the text, the GHSA link and the
     // severity phrasing NuGetAuditDiagnostics matches on.
@@ -177,11 +176,9 @@ public sealed class SpecResolverTests
         // the claim: the note belongs inside the indented run, under the projects and above the remedy.
         WorkspaceDiagnostics diagnostics = WorkspaceDiagnostics.None with { FailedProjects = [BrokenProject] };
 
-        var error = Should.Throw<UserErrorException>(() =>
-            SpecResolver.ResolveConventionProject(
-                [Candidate("MyApp.Arch", "C:/pkgs/Newtonsoft.Json.dll")], diagnostics));
+        string message = ShouldRefuseResolution(diagnostics);
 
-        error.Message.ShouldBe(
+        message.ShouldBe(
             "No spec project found: 1 project failed to load, so a project that references "
             + "SlideRule.dll may be among them:\n"
             + $"  {BrokenProject}\n"
@@ -200,15 +197,13 @@ public sealed class SpecResolverTests
         // list reds here rather than on a bed.
         WorkspaceDiagnostics diagnostics = WorkspaceDiagnostics.None with { RestoreFailedProjects = [BrokenProject] };
 
-        var error = Should.Throw<UserErrorException>(() =>
-            SpecResolver.ResolveConventionProject(
-                [Candidate("MyApp.Arch", "C:/pkgs/Newtonsoft.Json.dll")], diagnostics));
+        string message = ShouldRefuseResolution(diagnostics);
 
-        error.Message.ShouldContain("NuGet packages did not resolve for 1 project");
-        error.Message.ShouldContain("may have failed to resolve it:\n  " + BrokenProject);
-        error.Message.ShouldContain("Restore the solution first (dotnet restore), then retry.");
-        error.Message.ShouldNotContain("failed to load");
-        error.Message.ShouldNotContain("Pass --spec");
+        message.ShouldContain("NuGet packages did not resolve for 1 project");
+        message.ShouldContain("may have failed to resolve it:\n  " + BrokenProject);
+        message.ShouldContain("Restore the solution first (dotnet restore), then retry.");
+        message.ShouldNotContain("failed to load");
+        message.ShouldNotContain("Pass --spec");
     }
 
     [Fact]
@@ -232,15 +227,12 @@ public sealed class SpecResolverTests
             RestoreFailedProjects = [unrestoredProject]
         };
 
-        var error = Should.Throw<UserErrorException>(() =>
-            SpecResolver.ResolveConventionProject(
-                [Candidate("MyApp.Arch", "C:/pkgs/Newtonsoft.Json.dll")], diagnostics));
+        string message = ShouldRefuseResolution(diagnostics);
 
         string selectionNote = MsBuildBootstrap.SelectionNote();
-        error.Message.ShouldContain(loadLede + "\n  " + BrokenProject + "\n  " + selectionNote);
-        error.Message.ShouldContain(restoreLede + "\n  " + unrestoredProject + "\n  " + selectionNote);
-        error.Message.IndexOf(loadLede, StringComparison.Ordinal)
-            .ShouldBeLessThan(error.Message.IndexOf(restoreLede, StringComparison.Ordinal), error.Message);
+        message.ShouldContain(loadLede + "\n  " + BrokenProject + "\n  " + selectionNote);
+        message.ShouldContain(restoreLede + "\n  " + unrestoredProject + "\n  " + selectionNote);
+        message.ShouldContainInOrder(loadLede, restoreLede);
     }
 
     [Fact]
@@ -257,11 +249,9 @@ public sealed class SpecResolverTests
         // because the placement is the claim: inside the indented run, under the diagnostics, above the remedy.
         WorkspaceDiagnostics diagnostics = WorkspaceDiagnostics.None with { LoadFailures = [LockFileFailure] };
 
-        var error = Should.Throw<UserErrorException>(() =>
-            SpecResolver.ResolveConventionProject(
-                [Candidate("MyApp.Arch", "C:/pkgs/Newtonsoft.Json.dll")], diagnostics));
+        string message = ShouldRefuseResolution(diagnostics);
 
-        error.Message.ShouldBe(
+        message.ShouldBe(
             "No spec project found: the workspace did not load cleanly, so a project that references "
             + "SlideRule.dll may have failed to resolve it:\n"
             + $"  {LockFileFailure}\n"
@@ -277,13 +267,11 @@ public sealed class SpecResolverTests
         // classifier decides no verdict here: it only chooses which spelling of the refusal the reader gets.
         WorkspaceDiagnostics diagnostics = WorkspaceDiagnostics.None with { LoadFailures = [Advisory] };
 
-        var error = Should.Throw<UserErrorException>(() =>
-            SpecResolver.ResolveConventionProject(
-                [Candidate("MyApp.Web", "C:/pkgs/Newtonsoft.Json.dll")], diagnostics));
+        string message = ShouldRefuseResolution(diagnostics, "MyApp.Web");
 
-        error.Message.ShouldStartWith(
+        message.ShouldStartWith(
             "No spec project found: no solution project references SlideRule.dll. Pass --spec to name one.");
-        error.Message.ShouldNotContain("did not load cleanly");
+        message.ShouldNotContain("did not load cleanly");
     }
 
     [Fact]
@@ -313,17 +301,15 @@ public sealed class SpecResolverTests
             LoadFailures = ["failure one", "failure two", "failure three", "failure four", "failure five"]
         };
 
-        var error = Should.Throw<UserErrorException>(() =>
-            SpecResolver.ResolveConventionProject(
-                [Candidate("MyApp.Web", "C:/pkgs/Newtonsoft.Json.dll")], diagnostics));
+        string message = ShouldRefuseResolution(diagnostics, "MyApp.Web");
 
-        error.Message.ShouldContain("  failure one");
-        error.Message.ShouldContain("  failure three");
-        error.Message.ShouldNotContain("failure four");
-        error.Message.ShouldContain("... and 2 more.");
+        message.ShouldContain("  failure one");
+        message.ShouldContain("  failure three");
+        message.ShouldNotContain("failure four");
+        message.ShouldContain("... and 2 more.");
         // The MSBuild selection closes the indented run below the elision line, not above it: what was left
         // out is more evidence, and the selection is the one answer that covers all of it.
-        error.Message.ShouldContain("  ... and 2 more.\n  " + MsBuildBootstrap.SelectionNote());
+        message.ShouldContain("  ... and 2 more.\n  " + MsBuildBootstrap.SelectionNote());
     }
 
     [Fact]
@@ -339,14 +325,12 @@ public sealed class SpecResolverTests
             FailedProjects = ["C:/repo/one.csproj", "C:/repo/two.csproj", "C:/repo/three.csproj", "C:/repo/four.csproj"]
         };
 
-        var error = Should.Throw<UserErrorException>(() =>
-            SpecResolver.ResolveConventionProject(
-                [Candidate("MyApp.Web", "C:/pkgs/Newtonsoft.Json.dll")], diagnostics));
+        string message = ShouldRefuseResolution(diagnostics, "MyApp.Web");
 
-        error.Message.ShouldContain("4 projects failed to load");
-        error.Message.ShouldContain("  C:/repo/one.csproj");
-        error.Message.ShouldContain("  C:/repo/four.csproj");
-        error.Message.ShouldNotContain("more.");
+        message.ShouldContain("4 projects failed to load");
+        message.ShouldContain("  C:/repo/one.csproj");
+        message.ShouldContain("  C:/repo/four.csproj");
+        message.ShouldNotContain("more.");
     }
 
     [Fact]
@@ -360,13 +344,11 @@ public sealed class SpecResolverTests
             LoadFailures = [Advisory, Advisory, Advisory, LockFileFailure]
         };
 
-        var error = Should.Throw<UserErrorException>(() =>
-            SpecResolver.ResolveConventionProject(
-                [Candidate("MyApp.Arch", "C:/pkgs/Newtonsoft.Json.dll")], diagnostics));
+        string message = ShouldRefuseResolution(diagnostics);
 
-        error.Message.ShouldContain("NU1004");
-        error.Message.ShouldNotContain("GHSA");
-        error.Message.ShouldNotContain("more.");
+        message.ShouldContain("NU1004");
+        message.ShouldNotContain("GHSA");
+        message.ShouldNotContain("more.");
     }
 
     [Fact]
@@ -380,12 +362,10 @@ public sealed class SpecResolverTests
             FailedProjects = [BrokenProject]
         };
 
-        var error = Should.Throw<UserErrorException>(() =>
-            SpecResolver.ResolveConventionProject(
-                [Candidate("MyApp.Arch", "C:/pkgs/Newtonsoft.Json.dll")], diagnostics));
+        string message = ShouldRefuseResolution(diagnostics);
 
-        error.Message.ShouldContain(BrokenProject);
-        error.Message.ShouldNotContain("NU1004");
+        message.ShouldContain(BrokenProject);
+        message.ShouldNotContain("NU1004");
     }
 
     [Fact]
@@ -490,6 +470,15 @@ public sealed class SpecResolverTests
             SpecResolver.RequireBuiltOutput("MyApp.Arch", [recordedIntermediate]));
 
         error.Message.ShouldContain("Build the solution first (dotnet build).");
+    }
+
+    // The convention's refusal when its one candidate references no contract library, under whatever the load
+    // reported: the rows here are about what that refusal cites.
+    private static string ShouldRefuseResolution(WorkspaceDiagnostics diagnostics, string candidate = "MyApp.Arch")
+    {
+        return Should.Throw<UserErrorException>(() => SpecResolver.ResolveConventionProject(
+                [Candidate(candidate, "C:/pkgs/Newtonsoft.Json.dll")], diagnostics))
+            .Message;
     }
 
     // No project file on purpose: the convention has to keep treating unknown-path candidates as distinct,

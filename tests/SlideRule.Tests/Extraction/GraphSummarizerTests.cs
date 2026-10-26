@@ -67,7 +67,7 @@ public sealed class GraphSummarizerTests
         GraphSummary summary = GraphSummarizer.Summarize(model);
 
         // Assert — the declared reference is visible, but no observed edge backs it (the dead-reference signal).
-        summary.Projects.Single(p => p.Name == "App")
+        summary.Projects.ShouldHaveSingle(p => p.Name == "App", p => p.Name)
             .ProjectReferences.ShouldBe(["Lib"]);
         summary.ProjectEdges.ShouldBeEmpty();
     }
@@ -117,7 +117,7 @@ public sealed class GraphSummarizerTests
         GraphSummary summary = GraphSummarizer.Summarize(model);
 
         // Assert — 4 declared types; the empty namespace renders (global) and sorts first (ordinal).
-        ProjectSummary multi = summary.Projects.Single();
+        ProjectSummary multi = summary.Projects.ShouldHaveSingleItem();
         multi.Types.ShouldBe(4);
         multi.Namespaces.Select(n => (n.Namespace, n.Types))
             .ShouldBe([("(global)", 1), ("Multi.A", 2), ("Multi.B", 1)]);
@@ -135,7 +135,7 @@ public sealed class GraphSummarizerTests
         GraphSummary summary = GraphSummarizer.Summarize(model);
 
         // Assert
-        ProjectSummary plain = summary.Projects.Single();
+        ProjectSummary plain = summary.Projects.ShouldHaveSingleItem();
         plain.Generated.ShouldBe(0);
         plain.Namespaces.ShouldAllBe(n => n.Generated == 0);
     }
@@ -157,7 +157,7 @@ public sealed class GraphSummarizerTests
 
         // Assert — the project count is the sum of the namespace counts, because a generated type is a
         // subset of the project's types rather than a population beside them.
-        ProjectSummary project = summary.Projects.Single();
+        ProjectSummary project = summary.Projects.ShouldHaveSingleItem();
         project.Types.ShouldBe(5);
         project.Generated.ShouldBe(3);
         project.Namespaces.Select(n => (n.Namespace, n.Types, n.Generated))
@@ -179,7 +179,7 @@ public sealed class GraphSummarizerTests
         GraphSummary summary = GraphSummarizer.Summarize(model);
 
         // Assert — both frameworks, and the one whose facts the shared Widget carries.
-        ProjectSummary shared = summary.Projects.Single();
+        ProjectSummary shared = summary.Projects.ShouldHaveSingleItem();
         shared.TargetFrameworks.ShouldBe(["net10.0", "netstandard2.0"]);
         shared.FactsFollow.ShouldBe("net10.0");
     }
@@ -197,7 +197,7 @@ public sealed class GraphSummarizerTests
         GraphSummary summary = GraphSummarizer.Summarize(model);
 
         // Assert
-        ProjectSummary plain = summary.Projects.Single();
+        ProjectSummary plain = summary.Projects.ShouldHaveSingleItem();
         plain.TargetFrameworks.ShouldBeEmpty();
         plain.FactsFollow.ShouldBeNull();
     }
@@ -226,7 +226,7 @@ public sealed class GraphSummarizerTests
         GraphSummary summary = GraphSummarizer.Summarize(model);
 
         // Assert
-        ProjectSummary shared = summary.Projects.Single();
+        ProjectSummary shared = summary.Projects.ShouldHaveSingleItem();
         shared.TargetFrameworks.ShouldBe(["net10.0", "netstandard2.0"]);
         shared.FactsFollow.ShouldBeNull();
     }
@@ -286,7 +286,7 @@ public sealed class GraphSummarizerTests
         GraphSummary summary = GraphSummarizer.Summarize(model);
 
         // Assert — the list names every declared package, private ones included, each with its own privacy.
-        ProjectSummary domain = summary.Projects.Single(project => project.Name == "Acme.Domain");
+        ProjectSummary domain = summary.Projects.ShouldHaveSingle(project => project.Name == "Acme.Domain", project => project.Name);
         domain.PackageReferences
             .Select(package => (package.Name, package.IsPrivate))
             .ShouldBe([
@@ -294,7 +294,7 @@ public sealed class GraphSummarizerTests
                 ("Newtonsoft.Json", false),
                 ("StyleCop.Analyzers", true)
             ]);
-        summary.Projects.Single(project => project.Name == "Acme.Web")
+        summary.Projects.ShouldHaveSingle(project => project.Name == "Acme.Web", project => project.Name)
             .PackageReferences
             .Select(package => (package.Name, package.IsPrivate))
             .ShouldBe([("Serilog", false)]);
@@ -385,7 +385,7 @@ public sealed class GraphSummarizerTests
             .ShouldBe(["Acme.App"]);
         scoped.ProjectEdges.Select(e => (e.Source, e.Target))
             .ShouldBe([("Acme.App", "Acme.Lib"), ("Contoso.Web", "Acme.App")]);
-        scoped.Projects.Single()
+        scoped.Projects.ShouldHaveSingleItem()
             .ProjectReferences.ShouldBe(["Acme.Lib"]);
     }
 

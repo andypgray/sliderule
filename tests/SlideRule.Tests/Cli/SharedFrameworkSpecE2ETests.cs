@@ -1,5 +1,3 @@
-using System.Reflection;
-using Shouldly;
 using Xunit;
 
 namespace SlideRule.Tests.Cli;
@@ -29,12 +27,8 @@ public sealed class SharedFrameworkSpecE2ETests
     [Fact]
     public async Task Explain_OverASharedFrameworkSpec_RefusesWithTheFrameworkNamedAndTheStringHatchOffered()
     {
-        // Arrange: guard the precondition rather than leave a bare "expected exit 2" — on a host that
-        // happened to carry ASP.NET Core the anchor would resolve and this fixture would prove nothing.
-        Should.Throw<FileNotFoundException>(
-            () => Assembly.Load(new AssemblyName("Microsoft.AspNetCore.Mvc.Core")),
-            "This test host can load Microsoft.AspNetCore.Mvc.Core itself, so the fixture's anchor would "
-            + "resolve through the default context and could not reproduce the failure it exists for.");
+        // Arrange: guard the precondition rather than leave a bare "expected exit 2".
+        CliRunner.ShouldNotLoadTheSharedFrameworkAnchor();
 
         // Act
         CliResult result = await CliRunner.InvokeAsync("explain", RuleId, "--spec", CliRunner.SharedFrameworkSpecDll);

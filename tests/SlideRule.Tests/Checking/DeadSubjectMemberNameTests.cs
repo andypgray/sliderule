@@ -1,5 +1,4 @@
 using Shouldly;
-using SlideRule.Baselines;
 using SlideRule.Checking;
 using SlideRule.Codebase;
 using SlideRule.Tests.Extraction;
@@ -93,8 +92,7 @@ public sealed class DeadSubjectMemberNameTests
                         .MustBeStatic())
                     .Because("b"))
             .Single()
-            .MemberShapeSubjects()
-            .ShouldBe(["M:App.Program.Helper", "M:App.Worker.Run"]);
+            .ShouldHaveFailedWithMemberSubjects(["M:App.Program.Helper", "M:App.Worker.Run"]);
     }
 
     [Fact]
@@ -106,8 +104,7 @@ public sealed class DeadSubjectMemberNameTests
                     .Enforce(arch.Namespace("App.*").Methods.Named("Run", "Helper").MustBeStatic())
                     .Because("b"))
             .Single()
-            .MemberShapeSubjects()
-            .ShouldBe(["M:App.Program.Helper", "M:App.Worker.Run"]);
+            .ShouldHaveFailedWithMemberSubjects(["M:App.Program.Helper", "M:App.Worker.Run"]);
     }
 
     [Fact]
@@ -115,7 +112,7 @@ public sealed class DeadSubjectMemberNameTests
     {
         IncompleteModel partial = Checker.PartialModel;
 
-        RuleResult result = Checker.Run(Model, partial, arch =>
+        RuleResult result = Checker.Run(Model, incompleteModel: partial, define: arch =>
                 arch.Rule("members/named")
                     .Enforce(arch.Types.Named("Program").Methods.Named("Main", "Ghost").MustBeStatic())
                     .Because("b"))
@@ -131,7 +128,7 @@ public sealed class DeadSubjectMemberNameTests
     {
         // A name only another project's members carry is not one compilation's to judge, so the live name is
         // measured as written: Main is static and the rule passes rather than failing on Ghost.
-        Checker.Run(Model, BaselineIndex.Empty, NarrowedUniverse.OneProject, arch =>
+        Checker.Run(Model, narrowing: NarrowedUniverse.OneProject, define: arch =>
                 arch.Rule("members/named")
                     .Enforce(arch.Types.Named("Program").Methods.Named("Main", "Ghost").MustBeStatic())
                     .Because("b"))

@@ -92,11 +92,10 @@ public sealed class McpNameMarkerTests
         string json = RepoRoot.ReadText(DocPaths.McpManifest);
 
         using JsonDocument manifest = JsonDocument.Parse(json);
-        bool found = manifest.RootElement.TryGetProperty("name", out JsonElement name);
-        found.ShouldBeTrue($"{DocPaths.McpManifest} has no name, so there is nothing for the marker to agree with.");
 
-        return name.GetString()
-            .ShouldNotBeNull($"{DocPaths.McpManifest} carries no name string.");
+        return manifest.RootElement.StringOrDefault("name")
+            .ShouldNotBeNull(
+                $"{DocPaths.McpManifest} carries no name string, so there is nothing for the marker to agree with.");
     }
 
     // The repo-relative path an item's Include resolves to from the project's directory. MSBuild accepts

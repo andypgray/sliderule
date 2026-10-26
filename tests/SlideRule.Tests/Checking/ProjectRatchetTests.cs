@@ -132,7 +132,7 @@ public sealed class ProjectRatchetTests
         CodebaseModel captured = ProjectFacts.Solution(
             Targeting("Zphil.Domain", "net48"),
             Targeting("Zphil.Web", "net48", "net8.0"));
-        BaselineIndex index = Capture(captured, FloorRule);
+        BaselineIndex index = ShouldCapture(captured, FloorRule);
 
         RuleResult result = Checker.Run(FloorScene, index, FloorRule).Single();
 
@@ -148,7 +148,7 @@ public sealed class ProjectRatchetTests
         CodebaseModel captured = ProjectFacts.Solution(
             ProjectFacts.Project(
                 "Zphil.Domain", packageReferences: [ProjectFacts.Package("Newtonsoft.Json", "src/Domain/Domain.csproj", 9)]));
-        BaselineIndex index = Capture(captured, PackageRule);
+        BaselineIndex index = ShouldCapture(captured, PackageRule);
 
         RuleResult result = Checker.Run(PackageScene, index, PackageRule).Single();
 
@@ -165,7 +165,7 @@ public sealed class ProjectRatchetTests
         CodebaseModel captured = ProjectFacts.Solution(
             ProjectFacts.Project(
                 "Zphil.Domain", packageReferences: [ProjectFacts.Package("Newtonsoft.Json", "src/Domain/Domain.csproj", 9)]));
-        BaselineIndex index = Capture(captured, AllowListRule);
+        BaselineIndex index = ShouldCapture(captured, AllowListRule);
 
         RuleResult result = Checker.Run(PackageScene, index, AllowListRule).Single();
 
@@ -179,7 +179,7 @@ public sealed class ProjectRatchetTests
         CodebaseModel captured = ProjectFacts.Solution(
             ProjectFacts.Project(
                 "Zphil.Domain", packageReferences: [ProjectFacts.Package("Serilog", "src/Domain/Domain.csproj", 10)]));
-        BaselineIndex index = Capture(captured, BanRule);
+        BaselineIndex index = ShouldCapture(captured, BanRule);
 
         RuleResult result = Checker.Run(PackageScene, index, BanRule).Single();
 
@@ -208,7 +208,7 @@ public sealed class ProjectRatchetTests
                     ProjectFacts.Evaluation("net48", "src/Domain/Domain.csproj"),
                     ProjectFacts.Evaluation("net8.0", "src/Domain/Domain.csproj")
                 ]));
-        BaselineIndex index = Capture(captured, PropertyRule);
+        BaselineIndex index = ShouldCapture(captured, PropertyRule);
 
         RuleResult result = Checker.Run(later, index, PropertyRule).Single();
 
@@ -221,7 +221,7 @@ public sealed class ProjectRatchetTests
     {
         CodebaseModel captured = ProjectFacts.Solution(Targeting("Zphil.Domain", "net48", "net8.0"));
         CodebaseModel later = ProjectFacts.Solution(Targeting("Zphil.Domain", "net472", "net48", "net8.0"));
-        BaselineIndex index = Capture(captured, FrameworkRule);
+        BaselineIndex index = ShouldCapture(captured, FrameworkRule);
 
         RuleResult result = Checker.Run(later, index, FrameworkRule).Single();
 
@@ -337,7 +337,7 @@ public sealed class ProjectRatchetTests
 
     // What a capture records, read off a first run with no baseline: each violation's identity with the sites it
     // was seen at, which is the shape baseline init writes.
-    private static BaselineIndex Capture(CodebaseModel scene, Action<Arch> spec)
+    private static BaselineIndex ShouldCapture(CodebaseModel scene, Action<Arch> spec)
     {
         RuleResult first = Checker.Run(scene, BaselineIndex.Empty, spec).Single();
         IReadOnlyList<BaselineEntry> entries = BaselineRunner.CapturedEntries(first).ShouldNotBeNull();

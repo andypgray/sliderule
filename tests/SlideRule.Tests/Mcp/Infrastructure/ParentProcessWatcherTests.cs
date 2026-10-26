@@ -15,51 +15,62 @@ public sealed class ParentProcessWatcherTests
     [Fact]
     public void Start_Disabled_DoesNotInvokeOnExit()
     {
-        // Arrange / Act / Assert — disabled flag short-circuits before parent lookup.
-        ParentProcessWatcher.Start(
+        Assert.SkipUnless(
+            OperatingSystem.IsWindows(),
+            "The watcher stands down on any OS but Windows before it asks for the parent, so only Windows can "
+            + "show the disabled flag stops it first.");
+
+        // The disabled flag short-circuits before the parent lookup, so neither throwing delegate runs.
+        Should.NotThrow(() => ParentProcessWatcher.Start(
             () => throw new InvalidOperationException("lookup must not run when disabled"),
             () => throw new InvalidOperationException("onExit must not run when disabled"),
-            true);
+            true));
     }
 
     [Fact]
     public void Start_ParentLookupReturnsNull_DoesNotInvokeOnExit()
     {
-        // Arrange / Act / Assert — null PID resolution is treated as "skip", not "exit immediately".
-        ParentProcessWatcher.Start(
+        Assert.SkipUnless(
+            OperatingSystem.IsWindows(),
+            "The watcher stands down on any OS but Windows before it asks for the parent, so a null answer is "
+            + "reached only there.");
+
+        // A parent that cannot be resolved means stand down, never exit at once, so the throwing delegate never runs.
+        Should.NotThrow(() => ParentProcessWatcher.Start(
             () => null,
             () => throw new InvalidOperationException("onExit must not run when PID is null"),
-            false);
+            false));
     }
 
     [Fact]
     public void Start_ParentAlreadyExited_InvokesOnExitImmediately()
     {
-        // The watcher bails on OperatingSystem.IsWindows() before reaching the synchronous
-        // already-exited branch, so this scenario is only reachable on Windows.
-        if (!OperatingSystem.IsWindows()) return;
+        Assert.SkipUnless(
+            OperatingSystem.IsWindows(),
+            "The watcher stands down on any OS but Windows before it reaches the already-exited branch, so this "
+            + "scenario exists only there.");
 
-        // Arrange — spawn a short-lived helper, wait for it to die, then point the watcher at its
-        // dead PID. Process.GetProcessById should throw ArgumentException, triggering the
-        // synchronous onParentExited path.
-        int deadPid = SpawnAndWaitForExit();
-        ManualResetEventSlim exited = new();
+        // A parent already gone when the watcher starts is reported before Start returns, so a server whose client
+        // died first exits during startup rather than after it begins serving. The helper has exited, so
+        // Process.GetProcessById throws for its PID and the watcher takes that branch.
+        int deadPid = ShouldSpawnAndExit();
+        var exited = false;
 
-        // Act
         ParentProcessWatcher.Start(
             () => deadPid,
-            exited.Set,
+            () => exited = true,
             false);
 
-        // Assert — synchronous: should already be set, but allow tiny slack.
-        exited.Wait(TimeSpan.FromSeconds(2), Ct)
-            .ShouldBeTrue();
+        exited.ShouldBeTrue("Start should report a parent that had already exited before it returns");
     }
 
     [Fact]
     public void Start_ParentExitsLater_InvokesOnExitWithinTimeout()
     {
-        if (!OperatingSystem.IsWindows()) return;
+        Assert.SkipUnless(
+            OperatingSystem.IsWindows(),
+            "The watcher stands down on any OS but Windows before it attaches to a live parent, so this scenario "
+            + "exists only there.");
 
         // Arrange — spawn a helper that lives ~1 second, point watcher at its live PID.
         using Process helper = SpawnLiveHelper();
@@ -80,7 +91,9 @@ public sealed class ParentProcessWatcherTests
     [Fact]
     public void GetParentProcessId_OnWindows_ReturnsNonNull()
     {
-        if (!OperatingSystem.IsWindows()) return;
+        Assert.SkipUnless(
+            OperatingSystem.IsWindows(),
+            "GetParentProcessId reads the parent through a Windows API and answers null on any other OS.");
 
         // The test process is a child of whatever launched it, so a parent always exists. A non-null
         // result confirms the P/Invoke shape compiles and dispatches.
@@ -91,9 +104,10 @@ public sealed class ParentProcessWatcherTests
     }
 
     /// <summary>
-    ///     Spawns <c>cmd /c exit 0</c>, waits for it to terminate, returns its (now-dead) PID.
+    ///     Spawns <c>cmd /c exit 0</c> and returns its PID once it has exited, failing the test when it has not
+    ///     exited within five seconds.
     /// </summary>
-    private static int SpawnAndWaitForExit()
+    private static int ShouldSpawnAndExit()
     {
         ProcessStartInfo psi = new("cmd.exe", "/c exit 0")
         {

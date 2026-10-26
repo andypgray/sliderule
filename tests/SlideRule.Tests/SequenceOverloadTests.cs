@@ -1,6 +1,4 @@
-using Shouldly;
-using SlideRule.ModelFile;
-using SlideRule.Prose;
+using SlideRule.Tests.Checking;
 using Xunit;
 
 namespace SlideRule.Tests;
@@ -10,10 +8,6 @@ namespace SlideRule.Tests;
 ///     operands: the same rendered sentence and the same model text, so a spec that computes its list in a
 ///     helper method reads and checks exactly as one that writes the operands out.
 /// </summary>
-/// <remarks>
-///     The model text is the model file's own writer over the constraint, which spells every node and
-///     field the checker reads; two constraints that write the same text are the same model.
-/// </remarks>
 public sealed class SequenceOverloadTests
 {
     [Fact]
@@ -25,7 +19,7 @@ public sealed class SequenceOverloadTests
         Layer api = arch.Layer("Api", "MyApp.Api.*");
         List<Layer> layers = [web, api];
 
-        ShouldBuildAlike(arch.AnyOf(layers).MustBeSealed(), arch.AnyOf(web, api).MustBeSealed());
+        Checker.ShouldReifyAlike(arch.AnyOf(layers).MustBeSealed(), arch.AnyOf(web, api).MustBeSealed());
     }
 
     [Fact]
@@ -34,7 +28,7 @@ public sealed class SequenceOverloadTests
         var arch = new Arch();
         List<Type> types = [typeof(Uri), typeof(Version)];
 
-        ShouldBuildAlike(
+        Checker.ShouldReifyAlike(
             arch.Types.MustNotReference(arch.AnyOf(types)),
             arch.Types.MustNotReference(arch.AnyOf(typeof(Uri), typeof(Version))));
     }
@@ -45,7 +39,7 @@ public sealed class SequenceOverloadTests
         var arch = new Arch();
         List<string> names = ["MyApp.Web", "MyApp.Api"];
 
-        ShouldBuildAlike(
+        Checker.ShouldReifyAlike(
             arch.Projects.Named(names).MustNotBePackable(),
             arch.Projects.Named("MyApp.Web", "MyApp.Api").MustNotBePackable());
     }
@@ -56,7 +50,7 @@ public sealed class SequenceOverloadTests
         var arch = new Arch();
         List<string> globs = ["MyApp.*", "Shared.*"];
 
-        ShouldBuildAlike(
+        Checker.ShouldReifyAlike(
             arch.Projects.Matching(globs).MustLockPackages(),
             arch.Projects.Matching("MyApp.*", "Shared.*").MustLockPackages());
     }
@@ -67,7 +61,7 @@ public sealed class SequenceOverloadTests
         var arch = new Arch();
         List<string> names = ["Main", "Run"];
 
-        ShouldBuildAlike(
+        Checker.ShouldReifyAlike(
             arch.Types.Methods.Named(names).MustBePublic(),
             arch.Types.Methods.Named("Main", "Run").MustBePublic());
     }
@@ -81,7 +75,7 @@ public sealed class SequenceOverloadTests
         MethodSelection run = arch.Types.Named("Worker").Methods.Named("Run");
         List<MethodSelection> exclusions = [main, run];
 
-        ShouldBuildAlike(
+        Checker.ShouldReifyAlike(
             arch.Types.Methods.Except(exclusions).MustBePublic(),
             arch.Types.Methods.Except(main, run).MustBePublic());
     }
@@ -94,23 +88,6 @@ public sealed class SequenceOverloadTests
         Member utcNow = arch.Member(typeof(DateTime), nameof(DateTime.UtcNow));
         List<Member> members = [now, utcNow];
 
-        ShouldBuildAlike(arch.Types.MustNotUse(members), arch.Types.MustNotUse(now, utcNow));
-    }
-
-    private static void ShouldBuildAlike(Constraint fromSequence, Constraint fromParams)
-    {
-        SentenceRenderer.Sentence(fromSequence)
-            .ShouldBe(SentenceRenderer.Sentence(fromParams));
-        ModelText(fromSequence)
-            .ShouldBe(ModelText(fromParams));
-    }
-
-    // A refused write is compared by its reason, so two constraints refused for different reasons still differ.
-    private static string ModelText(Constraint constraint)
-    {
-        var writer = new NodeWriter(new Dictionary<string, string>());
-        writer.WriteConstraint(constraint);
-
-        return writer.Refusal ?? writer.Text;
+        Checker.ShouldReifyAlike(arch.Types.MustNotUse(members), arch.Types.MustNotUse(now, utcNow));
     }
 }

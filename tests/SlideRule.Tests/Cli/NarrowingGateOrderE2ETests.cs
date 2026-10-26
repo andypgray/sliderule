@@ -54,7 +54,7 @@ public sealed class NarrowingGateOrderE2ETests
         + "project failed to load cannot be placed and would be dropped from the committed files, and "
         + "--diagram would draw a survey missing whole projects:";
 
-    private const string UnrestoredProject = "C:/repo/MyApp.Unrestored/MyApp.Unrestored.csproj";
+    private const string UnrestoredProject = DiagnosticInjectingSolutionSource.SimulatedRestoreFailedProject;
 
     private const string RenderRestoreGateLede =
         "error: the model is incomplete — NuGet packages did not resolve for 1 project, so nothing was "
@@ -133,22 +133,21 @@ public sealed class NarrowingGateOrderE2ETests
         // Context refuses nothing, so it is the one verb that prints both — which makes it the only place
         // the order is visible rather than inferred from which message won.
         using var workspace = new TempFixtureWorkspace();
-        var output = new StringWriter();
         string solutionDirectory = SolutionPaths.SolutionDirectoryOf(workspace.SolutionPath);
         var source = new DiagnosticInjectingSolutionSource([], [BrokenProject], [SkippedProject(workspace)]);
+        var request = new ContextRequest(
+            "MyApp.Legacy.Billing", workspace.SolutionPath, CliRunner.CleanSpecDll, solutionDirectory);
 
-        int exit = await new ContextRunner(output, source, new SystemEnvironment()).RunAsync(
-            new ContextRequest(
-                "MyApp.Legacy.Billing", workspace.SolutionPath, CliRunner.CleanSpecDll, solutionDirectory),
-            Ct);
+        CliResult result = await CliResult.CapturedAsync((output, _) =>
+            new ContextRunner(output, source, new SystemEnvironment()).RunAsync(request, Ct));
 
-        exit.ShouldBe(0); // a lookup, whatever else is true of the run
-        var answer = output.ToString();
+        // A lookup, whatever else is true of the run.
+        result.ShouldSucceed(
+            "'MyApp.sln' narrowed this run: 1 project the solution declares was not checked.",
+            "  MyApp.Skipped/MyApp.Skipped.csproj");
+        string answer = result.Out;
         answer.ShouldStartWith("caveat: the model is incomplete");
-        answer.ShouldContain("'MyApp.sln' narrowed this run: 1 project the solution declares was not checked.");
-        answer.ShouldContain("  MyApp.Skipped/MyApp.Skipped.csproj");
-        answer.IndexOf(AnyNarrowing, StringComparison.Ordinal)
-            .ShouldBeGreaterThan(answer.IndexOf(BrokenProject, StringComparison.Ordinal));
+        answer.ShouldContainInOrder(BrokenProject, AnyNarrowing);
     }
 
     [Fact]
@@ -161,8 +160,7 @@ public sealed class NarrowingGateOrderE2ETests
         CliResult render = await RunRenderAsync(workspace, allowWorkspaceDiagnostics: false, source);
 
         render.ShouldRefuseWith(RenderGateLede, BrokenProject, RenderRestoreGateLede, UnrestoredProject);
-        render.Err.IndexOf(RenderRestoreGateLede, StringComparison.Ordinal)
-            .ShouldBeGreaterThan(render.Err.IndexOf(RenderGateLede, StringComparison.Ordinal));
+        render.Err.ShouldContainInOrder(RenderGateLede, RenderRestoreGateLede);
         render.Err.ShouldNotContain(AnyNarrowing);
         render.Out.ShouldBeEmpty();
     }
@@ -176,8 +174,7 @@ public sealed class NarrowingGateOrderE2ETests
     // unchecked project spelled anywhere else would render as a machine-specific climb out of a temp root.
     private static string SkippedProject(TempFixtureWorkspace workspace)
     {
-        string solutionDirectory = SolutionPaths.SolutionDirectoryOf(workspace.SolutionPath);
-        return Path.Combine(solutionDirectory, "MyApp.Skipped", "MyApp.Skipped.csproj");
+        return workspace.PathOf("MyApp.Skipped", "MyApp.Skipped.csproj");
     }
 
     private static Task<CliResult> RunBaselineAsync(

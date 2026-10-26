@@ -29,7 +29,7 @@ public sealed class RenderedArtifactCountSyncTests
 
     private static readonly DocGate<RenderedArtifactCountClaim> Gate = new(
         CountDocs,
-        static doc => RenderedArtifactCounts.Extract(doc, RepoRoot.ReadText(doc)),
+        ScanDoc,
         quotes: "rendered-artifact counts");
 
     /// <summary>
@@ -117,21 +117,21 @@ public sealed class RenderedArtifactCountSyncTests
     }
 
     /// <summary>
-    ///     The release history is quiet because it is exempt, not because the scanner stopped seeing it.
-    ///     Reading the same bytes under any other name yields the claims its release notes froze, so a
-    ///     reworded note turns this red rather than leaving a dead exemption behind.
+    ///     The release history is quiet because it is exempt, not because the scanner stopped seeing it. Scanning the
+    ///     same bytes yields the claims its release notes froze, so a reworded note turns this red rather than
+    ///     leaving a dead exemption behind.
     /// </summary>
     [Fact]
     public void ReleaseHistory_IsSilencedByItsExemption_NotByTheScannerMissingIt()
     {
         string history = RepoRoot.ReadText(DocPaths.Changelog);
 
-        RenderedArtifactCounts.Extract(DocPaths.Changelog, history)
+        Gate.Scan(DocPaths.Changelog)
             .ShouldBeEmpty("the release history records what past versions rendered; holding those numbers to "
                            + "today's set would rewrite history every time a rule places a card");
 
-        RenderedArtifactCounts.Extract("probe.md", history)
-            .ShouldNotBeEmpty("the same bytes under an unexempt name yielded nothing, so the exemption is dead "
+        RenderedArtifactCounts.Extract(DocPaths.Changelog, history)
+            .ShouldNotBeEmpty("the scanner found nothing in the release history's bytes, so the exemption is dead "
                               + "weight and the scanner has stopped seeing the counts it was written for");
     }
 
@@ -141,7 +141,7 @@ public sealed class RenderedArtifactCountSyncTests
         string noun,
         string header)
     {
-        string expected = GrandfatheredCounts.Spell(committed, GrandfatheredCounts.CountStyle.WordToTen);
+        string expected = CountSpelling.Spell(committed, CountStyle.WordToTen);
 
         List<string> drift = CountDocs
             .SelectMany(Gate.Scan)
@@ -153,5 +153,15 @@ public sealed class RenderedArtifactCountSyncTests
             .ToList();
 
         drift.ShouldReportNothing(header);
+    }
+
+    // The release history is the one doc whose counts are frozen. A release note states what a past version
+    // rendered ("Six per-directory cards are now committed where there was one"), and holding that to today's set
+    // would rewrite history every time a rule places a card. Every other tracked doc is swept, and
+    // ReleaseHistory_IsSilencedByItsExemption_NotByTheScannerMissingIt pins that this exemption, rather than a
+    // pattern that stopped matching, is what keeps the file quiet.
+    private static IReadOnlyList<RenderedArtifactCountClaim> ScanDoc(string doc, string text)
+    {
+        return doc == DocPaths.Changelog ? [] : RenderedArtifactCounts.Extract(doc, text);
     }
 }

@@ -2,6 +2,7 @@ using Shouldly;
 using SlideRule.Checking;
 using SlideRule.Codebase;
 using SlideRule.Tests.Checking;
+using SlideRule.Tests.Extraction;
 using SlideRule.Tests.TestSupport;
 using Xunit;
 
@@ -24,8 +25,7 @@ public sealed class ShadowedPackageNameTests
     private const string Tests = "ShadowedApp.Product.Tests";
     private const string Shadowed = "Microsoft.Extensions.DependencyInjection.ServiceDescriptor";
 
-    private static readonly string SolutionPath =
-        Path.Combine(FixtureBeds.TestSolutionsRoot, "ShadowedApp", "ShadowedApp.slnx");
+    private static readonly string SolutionPath = FixtureBeds.ShadowedAppSolution;
 
     private static Task<CodebaseModel> ShadowedCodebase => FixtureCodebase.Of(SolutionPath);
 
@@ -58,9 +58,7 @@ public sealed class ShadowedPackageNameTests
     {
         CodebaseModel model = await ShadowedCodebase;
 
-        model.Edges
-            .Single(edge => edge.Source.FullName == "ShadowedApp.Product.Tests.RegistryTests"
-                            && edge.Target.FullName == Shadowed)
+        model.Edge("ShadowedApp.Product.Tests.RegistryTests", Shadowed)
             .Target.ProjectName.ShouldBe(Tests);
     }
 
@@ -71,9 +69,7 @@ public sealed class ShadowedPackageNameTests
 
         // The control the fixture's csproj comment names. A project reference records an external too, of the
         // referenced project's assembly, so a split decided on the wrong comparison would take this out.
-        model.Edges
-            .Single(edge => edge.Source.FullName == "ShadowedApp.Product.Tests.RegistryTests"
-                            && edge.Target.FullName == "ShadowedApp.Product.Registry")
+        model.Edge("ShadowedApp.Product.Tests.RegistryTests", "ShadowedApp.Product.Registry")
             .Target.ProjectName.ShouldBe(Product);
     }
 
@@ -136,8 +132,7 @@ public sealed class ShadowedPackageNameTests
 
         // The same PrivateAssets that keeps the package out of the test project keeps it out of the product's
         // own package, so the evaluated reference reads private, sited in the product's project file.
-        PackageReference package = model.Projects
-            .Single(project => project.Name == Product)
+        PackageReference package = model.Project(Product)
             .PackageReferences.ShouldHaveSingleItem();
 
         package.ShouldSatisfyAllConditions(

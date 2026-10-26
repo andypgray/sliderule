@@ -89,11 +89,8 @@ public sealed class ProjectSubjectVerbTests
     [Fact]
     public void Must_PredicateHolds_PassesClean()
     {
-        Checker.Run(Scene, arch => arch.Rule("packaging/described")
-                .Enforce(arch.Projects.Named("Zphil.Contract")
-                    .Must(project => project.IsPackable == true, description: "produce a package"))
-                .Because("b"))
-            .Single()
+        Checker.Verdict(Scene, arch => arch.Projects.Named("Zphil.Contract")
+                .Must(project => project.IsPackable == true, description: "produce a package"))
             .ShouldHavePassedClean();
     }
 
@@ -102,11 +99,8 @@ public sealed class ProjectSubjectVerbTests
     {
         // A predicate is a claim about the whole project, and no single declaration in it is the one that
         // failed — so the violation carries no site rather than an invented one.
-        Checker.Run(Scene, arch => arch.Rule("packaging/described")
-                .Enforce(arch.Projects.Named("Zphil.Internal")
-                    .Must(project => project.IsPackable == true, description: "produce a package"))
-                .Because("b"))
-            .Single()
+        Checker.Verdict(Scene, arch => arch.Projects.Named("Zphil.Internal")
+                .Must(project => project.IsPackable == true, description: "produce a package"))
             .ShouldHaveFailedWithProjectAtSites("Zphil.Internal", []);
     }
 
@@ -126,16 +120,13 @@ public sealed class ProjectSubjectVerbTests
                     ProjectFacts.Package("System.Memory", "src/Console/Console.csproj", 10, frameworks: ["net8.0", "netstandard2.0"])
                 ]));
 
-        Checker.Run(scene, arch => arch.Rule("packaging/backports-stay-on-netstandard")
-                .Enforce(arch.Projects.Named("Console")
-                    .Must(
-                        project => project.PackageReferences
-                            .Where(package => package.Name.StartsWith("Microsoft.Bcl.", StringComparison.Ordinal)
-                                              || package.Name == "System.Memory")
-                            .All(package => package.Frameworks.SequenceEqual(["netstandard2.0"])),
-                        description: "take the BCL backports for netstandard2.0 alone"))
-                .Because("b"))
-            .Single()
+        Checker.Verdict(scene, arch => arch.Projects.Named("Console")
+                .Must(
+                    project => project.PackageReferences
+                        .Where(package => package.Name.StartsWith("Microsoft.Bcl.", StringComparison.Ordinal)
+                                          || package.Name == "System.Memory")
+                        .All(package => package.Frameworks.SequenceEqual(["netstandard2.0"])),
+                    description: "take the BCL backports for netstandard2.0 alone"))
             .ShouldHaveFailedWithProjectSubjects(["Console"]);
     }
 
@@ -158,16 +149,13 @@ public sealed class ProjectSubjectVerbTests
                     ProjectFacts.Evaluation("net8.0", "src/Core/Core.csproj", ("Nullable", "enable", "Directory.Build.props", 3))
                 ]));
 
-        Checker.Run(scene, arch => arch.Rule("build/nullable-set-centrally")
-                .Enforce(arch.Projects.Matching("*")
-                    .Must(
-                        project => project.Properties
-                            .Where(property => property.Name == "Nullable")
-                            .All(property => property.FilePath.EndsWith("Directory.Build.props", StringComparison.Ordinal)
-                                             && property.Line > 0),
-                        description: "take Nullable from Directory.Build.props"))
-                .Because("b"))
-            .Single()
+        Checker.Verdict(scene, arch => arch.Projects.Matching("*")
+                .Must(
+                    project => project.Properties
+                        .Where(property => property.Name == "Nullable")
+                        .All(property => property.FilePath.EndsWith("Directory.Build.props", StringComparison.Ordinal)
+                                         && property.Line > 0),
+                    description: "take Nullable from Directory.Build.props"))
             .ShouldHaveFailedWithProjectSubjects(["Bus"]);
     }
 
@@ -176,11 +164,8 @@ public sealed class ProjectSubjectVerbTests
     {
         // The guarded invoke: a throwing hatch is a rule error naming the project it threw on, never an
         // aborted run.
-        Checker.Run(Scene, arch => arch.Rule("packaging/described")
-                .Enforce(arch.Projects.Named("Zphil.Contract")
-                    .Must(_ => throw new InvalidOperationException("boom"), description: "explode"))
-                .Because("b"))
-            .Single()
+        Checker.Verdict(Scene, arch => arch.Projects.Named("Zphil.Contract")
+                .Must(_ => throw new InvalidOperationException("boom"), description: "explode"))
             .ShouldHaveFailedWithDetailContaining(
                 ViolationKind.RuleError, "`Must` predicate threw InvalidOperationException on `Zphil.Contract`", "boom");
     }
@@ -188,11 +173,9 @@ public sealed class ProjectSubjectVerbTests
     [Fact]
     public void Where_ThrowingPredicate_BecomesARuleErrorToo()
     {
-        Checker.Run(Scene, arch => arch.Rule("packaging/described")
-                .Enforce(arch.Projects.Where(_ => throw new InvalidOperationException("boom"), description: "that explode")
+        Checker.Verdict(Scene, arch =>
+                arch.Projects.Where(_ => throw new InvalidOperationException("boom"), description: "that explode")
                     .MustNotBePackable())
-                .Because("b"))
-            .Single()
             .ShouldHaveFailedWithDetailContaining(ViolationKind.RuleError, "`Where` predicate threw InvalidOperationException");
     }
 
@@ -201,10 +184,7 @@ public sealed class ProjectSubjectVerbTests
     {
         // The project analog of the empty type and member subjects (GRAMMAR §4.1, §4.6): a subject that
         // matched nothing fails the rule by default, and says so in project terms.
-        Checker.Run(Scene, arch => arch.Rule("packaging/nowhere")
-                .Enforce(arch.Projects.Named("Nope").MustNotBePackable())
-                .Because("b"))
-            .Single()
+        Checker.Verdict(Scene, arch => arch.Projects.Named("Nope").MustNotBePackable())
             .ShouldHaveFailedWithDetail(ViolationKind.EmptySubject, ConstraintEvaluator.EmptyProjectSubjectMessage);
     }
 

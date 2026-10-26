@@ -28,8 +28,7 @@ public sealed class RazorGeneratedTypeTests
     private const string Web = "RazorApp.Web";
     private const string GeneratedNamespace = "AspNetCoreGeneratedDocument";
 
-    private static readonly string SolutionPath =
-        Path.Combine(FixtureBeds.TestSolutionsRoot, "RazorApp", "RazorApp.slnx");
+    private static readonly string SolutionPath = FixtureBeds.RazorAppSolution;
 
     private static Task<CodebaseModel> RazorCodebase => FixtureCodebase.Of(SolutionPath);
 
@@ -106,8 +105,7 @@ public sealed class RazorGeneratedTypeTests
         declared.Except(authored)
             .ShouldAllBe(name => name.StartsWith(GeneratedNamespace + ".", StringComparison.Ordinal));
         declared.Except(authored)
-            .Count()
-            .ShouldBe(2);
+            .ShouldBe(ViewsOf(model).Select(type => type.FullName), ignoreOrder: true);
         authored.ShouldBe(["RazorApp.Web.HomeController", "RazorApp.Web.Program"], ignoreOrder: true);
     }
 

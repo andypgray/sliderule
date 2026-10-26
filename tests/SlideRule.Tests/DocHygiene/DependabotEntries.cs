@@ -24,7 +24,8 @@ internal static class DependabotEntries
 
     /// <summary>
     ///     The lines of each nuget update entry in file order, from its own <c>- package-ecosystem:</c> line
-    ///     to the line before the next entry of any ecosystem, or an empty list where there is none.
+    ///     to the line before the next entry of any ecosystem, and throws where the configuration carries none, so
+    ///     no gate that reads it can pass over nothing.
     /// </summary>
     internal static IReadOnlyList<string[]> NuGetEntries()
     {
@@ -38,6 +39,10 @@ internal static class DependabotEntries
             int end = next < 0 ? lines.Length : next;
             entries.Add(lines[index..end]);
         }
+
+        if (entries.Count == 0)
+            throw new InvalidOperationException(
+                $"{ConfigPath} carries no nuget update entry, so nothing keeps the pinned package versions current.");
 
         return entries;
     }
@@ -113,18 +118,12 @@ internal static class DependabotEntries
     /// <summary>
     ///     One finding per nuget update entry whose <c>ignore:</c> list does not name one of
     ///     <paramref name="packages" /> exactly, ending in <paramref name="consequence" />, what that entry's next
-    ///     update run does, or a single finding naming <paramref name="packagesName" /> where the configuration
-    ///     carries no nuget entry at all, so an unreadable configuration reports rather than passes.
+    ///     update run does.
     /// </summary>
-    internal static IReadOnlyList<string> MissingIgnores(
-        IReadOnlyList<string> packages, string packagesName, string consequence)
+    internal static IReadOnlyList<string> MissingIgnores(IReadOnlyList<string> packages, string consequence)
     {
-        IReadOnlyList<string[]> entries = NuGetEntries();
-        if (entries.Count == 0)
-            return [$"{ConfigPath} carries no nuget update entry, so nothing ignores {packagesName}."];
-
         List<string> findings = new();
-        foreach (string[] entry in entries)
+        foreach (string[] entry in NuGetEntries())
         {
             IReadOnlyList<string> ignored = IgnoredNames(entry);
             string directories = string.Join(", ", Directories(entry));

@@ -62,10 +62,7 @@ public sealed class MigrateE2ETests
         // sites. Appending a method inside the class puts a third at :19, under the same symbol ID, so
         // nothing about the pair's identity moves — only its measure.
         string controller = workspace.PathOf("MyApp.Web", "InvoiceController.cs");
-        string original = await File.ReadAllTextAsync(controller, Ct);
-        int classClose = original.LastIndexOf('}');
-        await File.WriteAllTextAsync(
-            controller, original[..classClose] + ThirdSite + original[classClose..], Ct);
+        FixtureEdits.InsertMember(controller, ThirdSite);
 
         CliResult check = await CliRunner.InvokeAsync("check", workspace.SolutionPath, "--spec", CliRunner.CleanSpecDll);
 

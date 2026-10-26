@@ -44,8 +44,7 @@ public sealed class LinkedSourceCheckTests
     private const string Tool = "LinkedApp.Tool";
     private const string Client = "LinkedApp.Client";
 
-    private static readonly string SolutionPath =
-        Path.Combine(FixtureBeds.TestSolutionsRoot, "LinkedApp", "LinkedApp.slnx");
+    private static readonly string SolutionPath = FixtureBeds.LinkedAppSolution;
 
     private static Task<CodebaseModel> LinkedCodebase => FixtureCodebase.Of(SolutionPath);
 

@@ -64,7 +64,7 @@ public sealed class BaselineRenameWorkspaceE2ETests
         using var cache = new TempCacheRoot("baseline-rename");
         var counting = new CountingSolutionSource();
         FakeEnvironment environment = FakeEnvironment.WithCacheRoot(cache.Root);
-        string solutionDirectory = Path.GetDirectoryName(CliRunner.MyAppSolution)!;
+        string solutionDirectory = SolutionPaths.SolutionDirectoryOf(CliRunner.MyAppSolution);
         BaselineRequest request = BaselineRequests.Rename("x/old", "data-access/no-inline-sql", solutionDirectory)
             with
             {

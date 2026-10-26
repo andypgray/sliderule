@@ -52,11 +52,8 @@ public sealed class MustNotInjectVerbTests
     [Fact]
     public void MustNotInject_SingletonInjectsScoped_FailsWithSourceTargetSitesAndHumanLine()
     {
-        RuleResult result = Checker.Run(SceneModel, arch =>
-                arch.Rule("di/no-captive")
-                    .Enforce(arch.Registered(Lifetime.Singleton).MustNotInject(arch.Registered(Lifetime.Scoped)))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(SceneModel, arch => arch.Registered(Lifetime.Singleton)
+            .MustNotInject(arch.Registered(Lifetime.Scoped)));
 
         result.ShouldHaveFailedWithSingleEdge(ViolationKind.Injection, "App.CaptiveSingleton", "App.IScopedDep");
 
@@ -71,12 +68,9 @@ public sealed class MustNotInjectVerbTests
         // ReferencingSingleton mentions IScopedDep only in a method signature (a reference edge) — it takes no
         // constructor parameter of it, so MustNotInject is silent exactly where MustNotReference would fire.
         // The scoped operand resolves (IScopedDep/ScopedDep exist), so this is a real pass, not an inert one.
-        RuleResult result = Checker.Run(SceneModel, arch =>
-                arch.Rule("di/no-captive")
-                    .Enforce(arch.Registered(Lifetime.Singleton).WithPrefix("Referencing")
-                        .MustNotInject(arch.Registered(Lifetime.Scoped)))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(
+            SceneModel, arch => arch.Registered(Lifetime.Singleton).WithPrefix("Referencing")
+                .MustNotInject(arch.Registered(Lifetime.Scoped)));
 
         result.ShouldHavePassedClean();
     }
@@ -108,11 +102,9 @@ public sealed class MustNotInjectVerbTests
                               }
                               """;
 
-        RuleResult result = Checker.Run(CompilationFactory.ExtractWithDi(("Scene.cs", source)), arch =>
-                arch.Rule("di/no-captive")
-                    .Enforce(arch.Registered(Lifetime.Singleton).MustNotInject(arch.Registered(Lifetime.Scoped)))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(
+            CompilationFactory.ExtractWithDi(("Scene.cs", source)), arch => arch.Registered(Lifetime.Singleton)
+                .MustNotInject(arch.Registered(Lifetime.Scoped)));
 
         result.ShouldHavePassedClean();
     }
@@ -149,12 +141,9 @@ public sealed class MustNotInjectVerbTests
                               }
                               """;
 
-        RuleResult result = Checker.Run(CompilationFactory.ExtractWithDi(("Scene.cs", source)), arch =>
-                arch.Rule("di/no-captive")
-                    .Enforce(arch.Registered(Lifetime.Singleton).Except(arch.Namespace("App.Composition.*"))
-                        .MustNotInject(arch.Registered(Lifetime.Scoped)))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(CompilationFactory.ExtractWithDi(("Scene.cs", source)), arch =>
+            arch.Registered(Lifetime.Singleton).Except(arch.Namespace("App.Composition.*"))
+                .MustNotInject(arch.Registered(Lifetime.Scoped)));
 
         result.ShouldHaveFailedWithEdges(ViolationKind.Injection, ["App.OrdinarySingleton -> App.IScopedDep"]);
     }
@@ -217,11 +206,9 @@ public sealed class MustNotInjectVerbTests
                               }
                               """;
 
-        RuleResult result = Checker.Run(CompilationFactory.ExtractWithDi(("Scene.cs", source)), arch =>
-                arch.Rule("di/no-captive")
-                    .Enforce(arch.Registered(Lifetime.Singleton).MustNotInject(arch.Registered(Lifetime.Scoped)))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(
+            CompilationFactory.ExtractWithDi(("Scene.cs", source)), arch => arch.Registered(Lifetime.Singleton)
+                .MustNotInject(arch.Registered(Lifetime.Scoped)));
 
         result.ShouldHavePassedClean();
     }

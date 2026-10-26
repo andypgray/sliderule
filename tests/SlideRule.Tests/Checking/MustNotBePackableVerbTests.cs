@@ -27,20 +27,14 @@ public sealed class MustNotBePackableVerbTests
     [Fact]
     public void MustNotBePackable_PackableProject_FailsAtTheDeclaringSite()
     {
-        Checker.Run(Scene, arch => arch.Rule("packaging/internal-not-shipped")
-                .Enforce(arch.Projects.Named("Contract").MustNotBePackable())
-                .Because("b"))
-            .Single()
+        Checker.Verdict(Scene, arch => arch.Projects.Named("Contract").MustNotBePackable())
             .ShouldHaveFailedWithProjectAtSites("Contract", ["src/Contract/Contract.csproj:4"]);
     }
 
     [Fact]
     public void MustNotBePackable_OptedOutProject_PassesClean()
     {
-        Checker.Run(Scene, arch => arch.Rule("packaging/internal-not-shipped")
-                .Enforce(arch.Projects.Named("Internal").MustNotBePackable())
-                .Because("b"))
-            .Single()
+        Checker.Verdict(Scene, arch => arch.Projects.Named("Internal").MustNotBePackable())
             .ShouldHavePassedClean();
     }
 
@@ -48,10 +42,7 @@ public sealed class MustNotBePackableVerbTests
     public void MustNotBePackable_ProjectNothingEvaluated_PassesClean()
     {
         // The absent-fact row: unknown never reds, even though the SDK's own default is on.
-        Checker.Run(Scene, arch => arch.Rule("packaging/internal-not-shipped")
-                .Enforce(arch.Projects.Named("Unevaluated").MustNotBePackable())
-                .Because("b"))
-            .Single()
+        Checker.Verdict(Scene, arch => arch.Projects.Named("Unevaluated").MustNotBePackable())
             .ShouldHavePassedClean();
     }
 
@@ -70,10 +61,7 @@ public sealed class MustNotBePackableVerbTests
     {
         // The composed shape a real spec writes — "packable projects must not be packable" is deliberately
         // circular here, and that is what makes it a pure test of the adjective's reach.
-        Checker.Run(Scene, arch => arch.Rule("packaging/nothing-ships")
-                .Enforce(arch.Projects.Packable().MustNotBePackable())
-                .Because("b"))
-            .Single()
+        Checker.Verdict(Scene, arch => arch.Projects.Packable().MustNotBePackable())
             .ShouldHaveFailedWithProjectSubjects(["Contract"]);
     }
 }

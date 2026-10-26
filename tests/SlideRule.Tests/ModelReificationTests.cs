@@ -2,6 +2,7 @@ using Shouldly;
 using SlideRule.Fluent;
 using SlideRule.Hosting;
 using SlideRule.Model;
+using SlideRule.Prose;
 using SlideRule.Tests.Checking;
 using SlideRule.Tests.Stubs;
 using Xunit;
@@ -50,12 +51,6 @@ public class ModelReificationTests
             .Citation("https://learn.microsoft.com/dotnet/csharp/asynchronous-programming/async-scenarios");
     });
 
-    // A single MustNotConstruct-rule spec, reused for the dependency-verb reification + empty-member-hook pins.
-    private static readonly IArchitectureSpec CtorRuleSpec = new InlineSpec(arch =>
-        arch.Rule("di/no-new-services")
-            .Enforce(arch.Types.MustNotConstruct(typeof(SqlConnection)))
-            .Because("Services are DI-resolved; direct construction bypasses the container."));
-
     private static ArchRule Rule(string id)
     {
         return Checker.Canonical
@@ -65,17 +60,15 @@ public class ModelReificationTests
     // The containment child of a one-scope spec whose sanctioned surface the caller spells.
     private static ArchRule BoundedContainment(Func<Arch, IQuarantinedScope, IQuarantinedScope> boundary)
     {
-        var spec = new InlineSpec(arch =>
-        {
-            IQuarantinedScope scope = arch.Scope("legacy/billing")
-                .Quarantine(arch.Namespace("MyApp.Legacy.Billing.*"));
+        return Checker.Model(arch =>
+            {
+                IQuarantinedScope scope = arch.Scope("legacy/billing")
+                    .Quarantine(arch.Namespace("MyApp.Legacy.Billing.*"));
 
-            boundary(arch, scope)
-                .Dragons(DragonsProse)
-                .Because("Replacement scheduled.");
-        });
-
-        return ArchModelBuilder.Build(spec)
+                boundary(arch, scope)
+                    .Dragons(DragonsProse)
+                    .Because("Replacement scheduled.");
+            })
             .Rule("legacy/billing/containment");
     }
 
@@ -186,7 +179,7 @@ public class ModelReificationTests
                         web.WithSuffix("Controller").MustNotReference(typeof(SqlConnection)))
                     .Because("Repository pattern for testability.");
             })
-            .Rules.Single();
+            .Rules.ShouldHaveSingleItem();
 
         rule.Posture.ShouldBe(Posture.Migrate);
         MigrateData migrate = rule.Migrate.ShouldNotBeNull();
@@ -302,6 +295,7 @@ public class ModelReificationTests
         sugar.Fix.ShouldBe(spelled.Fix);
         sugar.Scope.ShouldNotBeNull()
             .Surface.ShouldBe(spelled.Scope.ShouldNotBeNull().Surface);
+        Checker.ShouldReifyAlike(sugar.Constraint!, spelled.Constraint!);
     }
 
     [Fact]
@@ -371,15 +365,8 @@ public class ModelReificationTests
         var constraint = rule.Constraint.ShouldBeOfType<MustNotUseConstraint>();
 
         // Members in authoring order, each with its authored declaring type + name (GRAMMAR §4.5).
-        constraint.MemberOperands.Count.ShouldBe(2);
-        constraint.MemberOperands[0]
-            .DeclaringType.ShouldBe(typeof(DateTime));
-        constraint.MemberOperands[0]
-            .Name.ShouldBe("Now");
-        constraint.MemberOperands[1]
-            .DeclaringType.ShouldBe(typeof(DateTime));
-        constraint.MemberOperands[1]
-            .Name.ShouldBe("UtcNow");
+        constraint.MemberOperands.Select(member => (member.DeclaringType, member.Name))
+            .ShouldBe([(typeof(DateTime), "Now"), (typeof(DateTime), "UtcNow")]);
         constraint.Subject!.Noun.ShouldBeOfType<TypesNoun>();
         constraint.Subject.Adjectives.ShouldBeEmpty();
     }
@@ -387,8 +374,7 @@ public class ModelReificationTests
     [Fact]
     public void MustNotConstructRule_ReifiesToWalkableConstructConstraint()
     {
-        ArchRule rule = ArchModelBuilder.Build(CtorRuleSpec)
-            .Rules.Single();
+        ArchRule rule = Checker.OneRule(arch => arch.Types.MustNotConstruct(typeof(SqlConnection)));
 
         rule.ShouldReifyToWalkableDependencyConstraint<MustNotConstructConstraint>(constraint => constraint.Targets);
     }
@@ -406,14 +392,8 @@ public class ModelReificationTests
     public void MemberSubjectRule_ReifiesToWalkableMemberConstraint()
     {
         // The flagship member-subject rule, for the walkable-model pins (GRAMMAR §4.6).
-        ArchRule rule = Checker.Model(arch =>
-            {
-                Selection web = arch.Namespace("MyApp.Web.*");
-                arch.Rule("naming/async-suffix")
-                    .Enforce(web.Methods.Returning(typeof(Task)).MustHaveSuffix("Async"))
-                    .Because("Async methods are discovered by suffix.");
-            })
-            .Rule("naming/async-suffix");
+        ArchRule rule = Checker.OneRule(arch => arch.Namespace("MyApp.Web.*").Methods.Returning(typeof(Task))
+            .MustHaveSuffix("Async"));
 
         rule.Posture.ShouldBe(Posture.Enforce);
         var constraint = rule.Constraint.ShouldBeOfType<MemberMustHaveSuffixConstraint>();
@@ -619,21 +599,16 @@ public class ModelReificationTests
     [Fact]
     public void MustNotInject_TypeSugar_ReifiesIdenticallyToWrappedSelection()
     {
-        ShouldReifyTypeSugarLikeWrappedSelection<MustNotInjectConstraint>(
+        Checker.ShouldReifyAlike(
             arch => arch.Types.MustNotInject(typeof(SqlConnection)),
-            arch => arch.Types.MustNotInject(arch.Type(typeof(SqlConnection))),
-            constraint => constraint.Targets,
-            typeof(SqlConnection));
+            arch => arch.Types.MustNotInject(arch.Type(typeof(SqlConnection))));
     }
 
     [Fact]
     public void MustNotCatchRule_ReifiesToWalkableCatchConstraint()
     {
         // A single MustNotCatch-rule spec, for the dependency-verb reification + empty-member-hook pins.
-        ArchRule rule = Checker.Model(arch => arch.Rule("errors/no-catch-ioe")
-                .Enforce(arch.Types.MustNotCatch(typeof(InvalidOperationException)))
-                .Because("Swallowing invalid-operation signals hides real defects."))
-            .Rules.Single();
+        ArchRule rule = Checker.OneRule(arch => arch.Types.MustNotCatch(typeof(InvalidOperationException)));
 
         rule.ShouldReifyToWalkableDependencyConstraint<MustNotCatchConstraint>(constraint => constraint.Targets);
     }
@@ -644,10 +619,7 @@ public class ModelReificationTests
         // A single MustNotCatchUnfiltered-rule spec, for the dependency-verb reification + empty-member-hook
         // pins. The filter condition lives in the verb, so the node's shape is the plain catch verb's — no extra
         // operand carries it, and the member hook stays empty.
-        ArchRule rule = Checker.Model(arch => arch.Rule("errors/filter-broad-catches")
-                .Enforce(arch.Types.MustNotCatchUnfiltered(typeof(Exception)))
-                .Because("A broad catch names what it expects in a `when` filter."))
-            .Rules.Single();
+        ArchRule rule = Checker.OneRule(arch => arch.Types.MustNotCatchUnfiltered(typeof(Exception)));
 
         rule.ShouldReifyToWalkableDependencyConstraint<MustNotCatchUnfilteredConstraint>(constraint => constraint.Targets);
     }
@@ -658,10 +630,7 @@ public class ModelReificationTests
         // A single MustNotSwallow-rule spec, for the dependency-verb reification + empty-member-hook pins. Both
         // the filter condition and the rethrow condition live in the verb, so the node's shape is the plain catch
         // verb's — no extra operand carries either, and the member hook stays empty.
-        ArchRule rule = Checker.Model(arch => arch.Rule("errors/no-swallowed-broad-catches")
-                .Enforce(arch.Types.MustNotSwallow(typeof(Exception)))
-                .Because("A handler that holds a failure and continues hides it."))
-            .Rules.Single();
+        ArchRule rule = Checker.OneRule(arch => arch.Types.MustNotSwallow(typeof(Exception)));
 
         rule.ShouldReifyToWalkableDependencyConstraint<MustNotSwallowConstraint>(constraint => constraint.Targets);
     }
@@ -670,10 +639,7 @@ public class ModelReificationTests
     public void MustNotThrowRule_ReifiesToWalkableThrowConstraint()
     {
         // A single MustNotThrow-rule spec, for the dependency-verb reification + empty-member-hook pins.
-        ArchRule rule = Checker.Model(arch => arch.Rule("errors/no-bare-bcl-throws")
-                .Enforce(arch.Types.MustNotThrow(typeof(Exception)))
-                .Because("Bare BCL exception types carry no meaning a caller can dispatch on."))
-            .Rules.Single();
+        ArchRule rule = Checker.OneRule(arch => arch.Types.MustNotThrow(typeof(Exception)));
 
         rule.ShouldReifyToWalkableDependencyConstraint<MustNotThrowConstraint>(constraint => constraint.Targets);
     }
@@ -682,10 +648,7 @@ public class ModelReificationTests
     public void MustOnlyThrowRule_ReifiesToWalkableThrowConstraint()
     {
         // A single MustOnlyThrow-rule spec, for the dependency-verb reification + empty-member-hook pins.
-        ArchRule rule = Checker.Model(arch => arch.Rule("errors/throw-domain-only")
-                .Enforce(arch.Types.MustOnlyThrow(typeof(InvalidOperationException)))
-                .Because("Domain code must surface only sanctioned exception types."))
-            .Rules.Single();
+        ArchRule rule = Checker.OneRule(arch => arch.Types.MustOnlyThrow(typeof(InvalidOperationException)));
 
         rule.ShouldReifyToWalkableDependencyConstraint<MustOnlyThrowConstraint>(constraint => constraint.Targets);
     }
@@ -693,61 +656,48 @@ public class ModelReificationTests
     [Fact]
     public void MustNotCatch_TypeSugar_ReifiesIdenticallyToWrappedSelection()
     {
-        ShouldReifyTypeSugarLikeWrappedSelection<MustNotCatchConstraint>(
+        Checker.ShouldReifyAlike(
             arch => arch.Types.MustNotCatch(typeof(InvalidOperationException)),
-            arch => arch.Types.MustNotCatch(arch.Type(typeof(InvalidOperationException))),
-            constraint => constraint.Targets,
-            typeof(InvalidOperationException));
+            arch => arch.Types.MustNotCatch(arch.Type(typeof(InvalidOperationException))));
     }
 
     [Fact]
     public void MustNotCatchUnfiltered_TypeSugar_ReifiesIdenticallyToWrappedSelection()
     {
-        ShouldReifyTypeSugarLikeWrappedSelection<MustNotCatchUnfilteredConstraint>(
+        Checker.ShouldReifyAlike(
             arch => arch.Types.MustNotCatchUnfiltered(typeof(Exception)),
-            arch => arch.Types.MustNotCatchUnfiltered(arch.Type(typeof(Exception))),
-            constraint => constraint.Targets,
-            typeof(Exception));
+            arch => arch.Types.MustNotCatchUnfiltered(arch.Type(typeof(Exception))));
     }
 
     [Fact]
     public void MustNotSwallow_TypeSugar_ReifiesIdenticallyToWrappedSelection()
     {
-        ShouldReifyTypeSugarLikeWrappedSelection<MustNotSwallowConstraint>(
+        Checker.ShouldReifyAlike(
             arch => arch.Types.MustNotSwallow(typeof(Exception)),
-            arch => arch.Types.MustNotSwallow(arch.Type(typeof(Exception))),
-            constraint => constraint.Targets,
-            typeof(Exception));
+            arch => arch.Types.MustNotSwallow(arch.Type(typeof(Exception))));
     }
 
     [Fact]
     public void MustNotThrow_TypeSugar_ReifiesIdenticallyToWrappedSelection()
     {
-        ShouldReifyTypeSugarLikeWrappedSelection<MustNotThrowConstraint>(
+        Checker.ShouldReifyAlike(
             arch => arch.Types.MustNotThrow(typeof(Exception)),
-            arch => arch.Types.MustNotThrow(arch.Type(typeof(Exception))),
-            constraint => constraint.Targets,
-            typeof(Exception));
+            arch => arch.Types.MustNotThrow(arch.Type(typeof(Exception))));
     }
 
     [Fact]
     public void MustOnlyThrow_TypeSugar_ReifiesIdenticallyToWrappedSelection()
     {
-        ShouldReifyTypeSugarLikeWrappedSelection<MustOnlyThrowConstraint>(
+        Checker.ShouldReifyAlike(
             arch => arch.Types.MustOnlyThrow(typeof(InvalidOperationException)),
-            arch => arch.Types.MustOnlyThrow(arch.Type(typeof(InvalidOperationException))),
-            constraint => constraint.Targets,
-            typeof(InvalidOperationException));
+            arch => arch.Types.MustOnlyThrow(arch.Type(typeof(InvalidOperationException))));
     }
 
     [Fact]
     public void MustNotExposeRule_ReifiesToWalkableExposeConstraint()
     {
         // A single MustNotExpose-rule spec, for the dependency-verb reification + empty-member-hook pins.
-        ArchRule rule = Checker.Model(arch => arch.Rule("api/no-leaky-surface")
-                .Enforce(arch.Types.MustNotExpose(typeof(SqlConnection)))
-                .Because("Public signatures must not leak infrastructure types."))
-            .Rules.Single();
+        ArchRule rule = Checker.OneRule(arch => arch.Types.MustNotExpose(typeof(SqlConnection)));
 
         rule.ShouldReifyToWalkableDependencyConstraint<MustNotExposeConstraint>(constraint => constraint.Targets);
     }
@@ -755,11 +705,9 @@ public class ModelReificationTests
     [Fact]
     public void MustNotExpose_TypeSugar_ReifiesIdenticallyToWrappedSelection()
     {
-        ShouldReifyTypeSugarLikeWrappedSelection<MustNotExposeConstraint>(
+        Checker.ShouldReifyAlike(
             arch => arch.Types.MustNotExpose(typeof(SqlConnection)),
-            arch => arch.Types.MustNotExpose(arch.Type(typeof(SqlConnection))),
-            constraint => constraint.Targets,
-            typeof(SqlConnection));
+            arch => arch.Types.MustNotExpose(arch.Type(typeof(SqlConnection))));
     }
 
     // ---- Membership and coverage verbs (GRAMMAR §5.3, §4.1, §4.7): one operand-carrying node, one
@@ -771,10 +719,7 @@ public class ModelReificationTests
         // The coverage verb stores its memberships on the shared operand list, so the generic walks reach
         // them with no special-casing, and Memberships is a domain-named alias over that one list rather
         // than a second copy — which is what asserting Operands against it holds.
-        ArchRule rule = Checker.Model(arch => arch.Rule("layering/no-ungoverned-types")
-                .Enforce(arch.Types.MustBelongTo(arch.Namespace("MyApp.Domain.*")))
-                .Because("A type in no declared layer is governed by nothing."))
-            .Rules.Single();
+        ArchRule rule = Checker.OneRule(arch => arch.Types.MustBelongTo(arch.Namespace("MyApp.Domain.*")));
 
         rule.ShouldReifyToWalkableDependencyConstraint<MustBelongToConstraint>(constraint => constraint.Memberships);
     }
@@ -805,11 +750,8 @@ public class ModelReificationTests
         // The correspondence verb stores its one among selection on the shared operand list, exactly as the
         // coverage verb stores its memberships — so the generic walks (foreign-Arch validation, the pattern
         // walk, Quarantine desugaring) reach it with no arm of their own, and the template rides the node.
-        ArchRule rule = Checker.Model(arch => arch.Rule("naming/one-interface-per-service")
-                .Enforce(arch.Types.MustHaveExactlyOneCounterpart(
-                    among: arch.Namespace("MyApp.Contracts.*"), named: "I{Name}"))
-                .Because("A service with no interface cannot be substituted in a test."))
-            .Rules.Single();
+        ArchRule rule = Checker.OneRule(arch => arch.Types.MustHaveExactlyOneCounterpart(
+            among: arch.Namespace("MyApp.Contracts.*"), named: "I{Name}"));
 
         rule.ShouldReifyToWalkableDependencyConstraint<MustHaveExactlyOneCounterpartConstraint>(constraint => constraint.Among);
     }
@@ -835,10 +777,7 @@ public class ModelReificationTests
     {
         // A string-carrying shape verb: the project name rides on the node itself, so the rule names no
         // selection beyond its subject and both walk hooks stay empty.
-        ArchRule rule = Checker.Model(arch => arch.Rule("layering/services-in-web")
-                .Enforce(arch.Types.MustResideInProject("MyApp.Web"))
-                .Because("A service type belongs to the project that hosts it."))
-            .Rules.Single();
+        ArchRule rule = Checker.OneRule(arch => arch.Types.MustResideInProject("MyApp.Web"));
 
         rule.Posture.ShouldBe(Posture.Enforce);
         var constraint = rule.Constraint.ShouldBeOfType<MustResideInProjectConstraint>();
@@ -856,10 +795,7 @@ public class ModelReificationTests
         // The nullary shape verb: its membership is an extracted fact rather than an authored operand, so
         // there is nothing on the node for a walk to reach and the subject is the only selection the rule
         // names — the node's whole payload is which verb it is.
-        ArchRule rule = Checker.Model(arch => arch.Rule("di/handlers-registered")
-                .Enforce(arch.Types.MustBeRegistered())
-                .Because("A type the container never sees cannot be resolved."))
-            .Rules.Single();
+        ArchRule rule = Checker.OneRule(arch => arch.Types.MustBeRegistered());
 
         rule.Posture.ShouldBe(Posture.Enforce);
         var constraint = rule.Constraint.ShouldBeOfType<MustBeRegisteredConstraint>();
@@ -945,6 +881,20 @@ public class ModelReificationTests
     }
 
     [Fact]
+    public void Authored_Repeated_RendersOnceButReifiesTwice()
+    {
+        // The sentence reads a repeated adjective once while the model keeps both, so ShouldReifyAlike reds on the
+        // model text alone.
+        var arch = new Arch();
+        Constraint once = arch.Types.InNamespace("MyApp.*").Authored().MustBeSealed();
+        Constraint twice = arch.Types.InNamespace("MyApp.*").Authored().Authored().MustBeSealed();
+
+        SentenceRenderer.Sentence(twice)
+            .ShouldBe(SentenceRenderer.Sentence(once));
+        Should.Throw<ShouldAssertException>(() => Checker.ShouldReifyAlike(twice, once));
+    }
+
+    [Fact]
     public void AnyOf_SingleOperand_StaysAUnionInTheModel()
     {
         // Legal and an identity (§2 principle 5): a loop that yields one operand must not become an error,
@@ -1014,45 +964,11 @@ public class ModelReificationTests
         named.Names.ShouldBe(["A", "B", "C"]);
     }
 
-    /// <summary>
-    ///     Asserts a verb's bare-<c>Type</c> sugar overload reifies to exactly what the <c>arch.Type(…)</c>
-    ///     spelling does (GRAMMAR §3.3). The sugar wraps each bare type as a single-type selection, so both
-    ///     spellings carry one bare <see cref="TypeNoun" /> operand for <paramref name="expected" />, and it
-    ///     carries no adjectives.
-    /// </summary>
-    private static void ShouldReifyTypeSugarLikeWrappedSelection<TConstraint>(
-        Func<Arch, Constraint> sugar,
-        Func<Arch, Constraint> wrapped,
-        Func<TConstraint, IReadOnlyList<Selection>> targets,
-        Type expected)
-        where TConstraint : OperandConstraint
-    {
-        var sugared = ShouldReifyTo<TConstraint>(sugar);
-        var handWritten = ShouldReifyTo<TConstraint>(wrapped);
-        IReadOnlyList<Selection> sugaredTargets = targets(sugared);
-        IReadOnlyList<Selection> handWrittenTargets = targets(handWritten);
-
-        Type? sugarType = sugaredTargets.ShouldHaveSingleItem()
-            .Noun.ShouldBeOfType<TypeNoun>()
-            .Anchor.Type;
-        Type? wrappedType = handWrittenTargets[0]
-            .Noun.ShouldBeOfType<TypeNoun>()
-            .Anchor.Type;
-        sugarType.ShouldBe(expected);
-        wrappedType.ShouldBe(sugarType);
-        sugaredTargets[0]
-            .Adjectives.ShouldBeEmpty();
-    }
-
-    // The constraint a one-rule spec enforcing `constraint` reifies to, held to being a TConstraint. The rule's ID
-    // and reason are placeholders: no row reads either.
+    // The constraint a one-rule spec enforcing `constraint` reifies to, held to being a TConstraint.
     private static TConstraint ShouldReifyTo<TConstraint>(Func<Arch, Constraint> constraint)
         where TConstraint : Constraint
     {
-        return Checker.Model(arch => arch.Rule("area/rule")
-                .Enforce(constraint(arch))
-                .Because("Reason."))
-            .Rules.Single()
+        return Checker.OneRule(constraint)
             .Constraint
             .ShouldBeOfType<TConstraint>();
     }

@@ -4,8 +4,8 @@ using Xunit;
 namespace SlideRule.Tests.SpecAnalyzers;
 
 /// <summary>
-///     The sentence each of the sixteen verdicts reads as at the literal: one spec statement, one warning,
-///     one expected message written out whole.
+///     The sentence each verdict reads as at the literal: one spec statement, one warning, one expected
+///     message written out whole.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -15,7 +15,7 @@ namespace SlideRule.Tests.SpecAnalyzers;
 ///         golden derived from its subject agrees with whatever that subject says today.
 ///     </para>
 ///     <para>
-///         One statement per row, so the table can be read straight through. Three of the sixteen need two
+///         One statement per row, so the table can be read straight through. Three of the verdicts need two
 ///         declarations rather than one, because a collision is what two literals decide between them.
 ///     </para>
 /// </remarks>

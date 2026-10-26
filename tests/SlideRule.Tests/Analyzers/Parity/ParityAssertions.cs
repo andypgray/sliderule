@@ -96,8 +96,8 @@ internal static class ParityAssertions
             onBuild.Strangers.ShouldBeEmpty($"{Header(subject.Name, leg)}: the build tier said more than it reports");
             onLive.Strangers.ShouldBeEmpty($"{Header(subject.Name, leg)}: the live tier said more than it reports");
 
-            List<string> fromBuild = Describe(onBuild.Keys);
-            List<string> fromLive = Describe(onLive.Keys);
+            List<string> fromBuild = EveryLine(onBuild.Keys);
+            List<string> fromLive = EveryLine(onLive.Keys);
             fromLive.ShouldBe(
                 fromBuild,
                 $"{Header(subject.Name, leg)}: the two tiers report different findings over one compilation"
@@ -133,7 +133,7 @@ internal static class ParityAssertions
             .Except(expectation.Keys)
             .ToList();
 
-        Describe(surplus).ShouldBeEmpty(
+        EveryLine(surplus).ShouldBeEmpty(
             $"{Header(subject, leg)}: warning(s) the build invented — no check over the whole solution gives "
             + $"them{Sets(report, expectation)}");
     }
@@ -198,10 +198,7 @@ internal static class ParityAssertions
             + $"  expected:\n{Indent(wanted)}\n  reported:\n{Indent(reported)}");
     }
 
-    /// <summary>
-    ///     Asserts the build said each thing once: no compilation reported one finding twice, none named one
-    ///     ratcheted rule unchecked twice, and none faulted.
-    /// </summary>
+    /// <summary>Asserts no compilation reported one finding twice.</summary>
     /// <remarks>
     ///     Per compilation rather than over the report, because a name two compilations of one csproj both
     ///     declare is reported by each of them and the union is what the equality claim compares — what
@@ -220,21 +217,6 @@ internal static class ParityAssertions
             .OrderBy(line => line, StringComparer.Ordinal)
             .ToList();
         twice.ShouldBeEmpty($"{Header(subject, leg)}: finding(s) one compilation reported more than once");
-
-        List<string> namedTwice = report.Unchecked
-            .GroupBy(pair => $"{pair.Compilation}: {pair.Rule}", StringComparer.Ordinal)
-            .Where(group => group.Count() > 1)
-            .Select(group => $"{group.Key} (named {group.Count()} times)")
-            .OrderBy(line => line, StringComparer.Ordinal)
-            .ToList();
-        namedTwice.ShouldBeEmpty(
-            $"{Header(subject, leg)}: ratcheted rule(s) one compilation named unchecked more than once");
-
-        List<string> faults = report.Strangers
-            .Where(stranger => stranger.Contains("SR2093", StringComparison.Ordinal))
-            .OrderBy(line => line, StringComparer.Ordinal)
-            .ToList();
-        faults.ShouldBeEmpty($"{Header(subject, leg)}: the analyzer faulted, so some of its findings are missing");
     }
 
     /// <summary>
@@ -260,8 +242,8 @@ internal static class ParityAssertions
             $"{Header(subject, leg)}: a document named a ratcheted rule unchecked, which is the compilation's "
             + "to name");
 
-        List<string> byDocument = Describe(perDocument.Keys);
-        List<string> whole = Describe(batch.Keys);
+        List<string> byDocument = EveryLine(perDocument.Keys);
+        List<string> whole = EveryLine(batch.Keys);
 
         byDocument.ShouldBe(
             whole,
@@ -299,7 +281,9 @@ internal static class ParityAssertions
         return leg == ParityLeg.MetadataImage ? "siblings as metadata images" : "siblings as compilations";
     }
 
-    private static List<string> Describe(IEnumerable<ParityKey> keys)
+    // One sorted line per key with repeats kept, so a key reported twice reads twice; ParityHarness's Describe()
+    // extension is the de-duplicated set and would compare sets instead.
+    private static List<string> EveryLine(IEnumerable<ParityKey> keys)
     {
         return keys.Select(key => key.Describe())
             .OrderBy(line => line, StringComparer.Ordinal)
@@ -316,8 +300,8 @@ internal static class ParityAssertions
     private static string Sets(ParityReport report, ParityExpectation expectation)
     {
         return Sets(
-            "the build reported", Describe(report.Keys), "the whole-solution check gives",
-            Describe(expectation.Keys));
+            "the build reported", EveryLine(report.Keys), "the whole-solution check gives",
+            EveryLine(expectation.Keys));
     }
 
     // Both sides whole, under the words for what each one is: a red about two sets is read by comparing

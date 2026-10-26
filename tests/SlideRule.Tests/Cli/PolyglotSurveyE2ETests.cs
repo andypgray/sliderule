@@ -29,9 +29,10 @@ namespace SlideRule.Tests.Cli;
 ///         second heavyweight bed.
 ///     </para>
 ///     <para>
-///         The fixture is leased through <see cref="TempFixtureWorkspace" /> like every other
-///         <c>TestSolutions</c> bed. <see cref="GraphCommandTests" /> pins the survey document's shape
-///         against MyApp, which is all C# and so carries none of these keys.
+///         The fixture is read in place rather than leased: nothing here writes into the tree, and the startup
+///         sweep has already restored every <c>TestSolutions</c> bed in the output directory.
+///         <see cref="GraphCommandTests" /> pins the survey document's shape against MyApp, which is all C# and
+///         so carries none of these keys.
 ///     </para>
 /// </remarks>
 public sealed class PolyglotSurveyE2ETests
@@ -51,10 +52,9 @@ public sealed class PolyglotSurveyE2ETests
         // report can say one is missing. And a project this product cannot read contributes no violations to
         // burn down, so the status document's zero is a property of the tool rather than debt the team paid
         // off.
-        using var fixture = new TempFixtureWorkspace("TestSolutions/PolyglotApp", "PolyglotApp.slnx");
         string[] arguments = verb == "graph"
-            ? [verb, fixture.SolutionPath, "--json"]
-            : [verb, fixture.SolutionPath, "--spec", CliRunner.PolyglotSpecDll, "--json"];
+            ? [verb, FixtureBeds.PolyglotAppSolution, "--json"]
+            : [verb, FixtureBeds.PolyglotAppSolution, "--spec", CliRunner.PolyglotSpecDll, "--json"];
 
         CliResult result = await CliRunner.InvokeAsync(arguments);
 
@@ -75,34 +75,30 @@ public sealed class PolyglotSurveyE2ETests
     [Fact]
     public async Task Graph_SolutionDeclaringAnFsproj_SurveysTheCsharpProjectAndOnlyIt()
     {
-        // Arrange — the control beside the coverage statement. Naming what was not read is only half the
+        // The control beside the coverage statement. Naming what was not read is only half the
         // fix; the other half is that what WAS read is unchanged, so the key is an addition to a correct
         // survey rather than a repair to a broken one.
-        using var fixture = new TempFixtureWorkspace("TestSolutions/PolyglotApp", "PolyglotApp.slnx");
 
         // Act
-        CliResult result = await CliRunner.InvokeAsync("graph", fixture.SolutionPath, "--json");
+        CliResult result = await CliRunner.InvokeAsync("graph", FixtureBeds.PolyglotAppSolution, "--json");
 
         // Assert
         result.ShouldSucceed();
         using JsonDocument document = result.ShouldHaveJsonStdout();
-        document.RootElement.GetProperty("projects")
-            .EnumerateArray()
-            .Select(project => project.GetProperty("name")
-                .GetString())
+        document.ProjectNames()
             .ShouldBe(["PolyglotApp.Core"]);
     }
 
     [Fact]
     public async Task Graph_SkeletonGrain_KeepsTheCoverageStatementWhole()
     {
-        // Arrange — unlike the survey's other two coverage keys this one is NOT elided at any grain: its
+        // Unlike the survey's other two coverage keys this one is NOT elided at any grain: its
         // length scales with the solution rather than the codebase, and the coarser the document the more a
         // reader needs to know it describes part of the solution.
-        using var fixture = new TempFixtureWorkspace("TestSolutions/PolyglotApp", "PolyglotApp.slnx");
 
         // Act
-        CliResult result = await CliRunner.InvokeAsync("graph", fixture.SolutionPath, "--json", "--grain", "skeleton");
+        CliResult result = await CliRunner.InvokeAsync(
+            "graph", FixtureBeds.PolyglotAppSolution, "--json", "--grain", "skeleton");
 
         // Assert — the entries themselves, not a count standing in for them.
         result.ShouldSucceed();
@@ -117,14 +113,13 @@ public sealed class PolyglotSurveyE2ETests
     [Fact]
     public async Task Graph_ScopedToTheCsharpProject_KeepsTheStatementThatBoundsTheSubject()
     {
-        // Arrange — --projects scopes the survey's roster. The coverage statement is a fact about the load
+        // --projects scopes the survey's roster. The coverage statement is a fact about the load
         // rather than about the roster, so scoping must not silence it: a scoped survey is still not a
         // survey of the whole solution, and its three trust-stamp neighbours do not scope either.
-        using var fixture = new TempFixtureWorkspace("TestSolutions/PolyglotApp", "PolyglotApp.slnx");
 
         // Act
         CliResult result = await CliRunner.InvokeAsync(
-            "graph", fixture.SolutionPath, "--json", "--projects", "PolyglotApp.Core");
+            "graph", FixtureBeds.PolyglotAppSolution, "--json", "--projects", "PolyglotApp.Core");
 
         // Assert
         result.ShouldSucceed();
@@ -139,11 +134,8 @@ public sealed class PolyglotSurveyE2ETests
     [Fact]
     public async Task Graph_HumanSurvey_CarriesTheSectionUnderTheRosterItQualifies()
     {
-        // Arrange
-        using var fixture = new TempFixtureWorkspace("TestSolutions/PolyglotApp", "PolyglotApp.slnx");
-
         // Act
-        CliResult result = await CliRunner.InvokeAsync("graph", fixture.SolutionPath);
+        CliResult result = await CliRunner.InvokeAsync("graph", FixtureBeds.PolyglotAppSolution);
 
         // Assert — one line per project, naming the reason, so the terminal reader gets the same fact the
         // document carries rather than having to reach for --json.
@@ -155,20 +147,18 @@ public sealed class PolyglotSurveyE2ETests
     [Fact]
     public async Task Check_CleanVerdictOverAPolyglotSolution_DoesNotCallTheModelIncomplete()
     {
-        // Arrange — the posture that separates this key from failedProjects/restoreFailedProjects. A
+        // The posture that separates this key from failedProjects/restoreFailedProjects. A
         // project this product cannot read makes the universe smaller, never wrong, so it must not gate:
         // it takes uncheckedProjects' posture, and the run exits on the verdict alone.
-        using var fixture = new TempFixtureWorkspace("TestSolutions/PolyglotApp", "PolyglotApp.slnx");
 
         // Act
         CliResult result = await CliRunner.InvokeAsync(
-            "check", fixture.SolutionPath, "--spec", CliRunner.PolyglotSpecDll, "--json");
+            "check", FixtureBeds.PolyglotAppSolution, "--spec", CliRunner.PolyglotSpecDll, "--json");
 
         // Assert — exit 0, and no incompleteness stamp anywhere near it.
         result.ShouldSucceed();
         using JsonDocument document = result.ShouldHaveJsonStdout();
-        document.RootElement.TryGetProperty("modelIncomplete", out _)
-            .ShouldBeFalse();
+        document.ShouldNotBeStampedIncomplete();
         document.RootElement.TryGetProperty("failedProjects", out _)
             .ShouldBeFalse();
         document.RootElement.TryGetProperty("restoreFailedProjects", out _)
@@ -178,12 +168,11 @@ public sealed class PolyglotSurveyE2ETests
     [Fact]
     public async Task StatusHumanChannel_OverAPolyglotSolution_StampsTheBurndownItCannotCover()
     {
-        // Arrange — the human twin of the status document's slot, on the verb whose whole output is counts.
-        using var fixture = new TempFixtureWorkspace("TestSolutions/PolyglotApp", "PolyglotApp.slnx");
+        // The human twin of the status document's slot, on the verb whose whole output is counts.
 
         // Act
         CliResult result = await CliRunner.InvokeAsync(
-            "status", fixture.SolutionPath, "--spec", CliRunner.PolyglotSpecDll);
+            "status", FixtureBeds.PolyglotAppSolution, "--spec", CliRunner.PolyglotSpecDll);
 
         // Assert — the whole stamp: the counted lede, the evidence line, and the tail that denies the
         // reading a bare zero invites.
@@ -199,13 +188,12 @@ public sealed class PolyglotSurveyE2ETests
     [Fact]
     public async Task CheckHumanChannel_OverAPolyglotSolution_StampsTheVerdictItCannotCover()
     {
-        // Arrange — the same stamp on check, whose tail denies the other dangerous reading: that a clean
+        // The same stamp on check, whose tail denies the other dangerous reading: that a clean
         // verdict over this solution is a clean solution.
-        using var fixture = new TempFixtureWorkspace("TestSolutions/PolyglotApp", "PolyglotApp.slnx");
 
         // Act
         CliResult result = await CliRunner.InvokeAsync(
-            "check", fixture.SolutionPath, "--spec", CliRunner.PolyglotSpecDll);
+            "check", FixtureBeds.PolyglotAppSolution, "--spec", CliRunner.PolyglotSpecDll);
 
         // Assert
         result.ShouldSucceed();
@@ -224,13 +212,12 @@ public sealed class PolyglotSurveyE2ETests
         // scanning reads the log and nothing else, so a clean SARIF over this solution closes every alert
         // the unreadable project would have raised, with nothing in the document saying it was never
         // scanned. The same silence the two channels above deny, on the surface that cannot be re-read.
-        using var fixture = new TempFixtureWorkspace("TestSolutions/PolyglotApp", "PolyglotApp.slnx");
         using TempDirectory temp = TestTempRoot.Fresh("polyglot-sarif");
         string sarifPath = temp.PathOf("polyglot.sarif");
 
         // Act
         CliResult result = await CliRunner.InvokeAsync(
-            "check", fixture.SolutionPath, "--spec", CliRunner.PolyglotSpecDll, "--sarif", sarifPath);
+            "check", FixtureBeds.PolyglotAppSolution, "--spec", CliRunner.PolyglotSpecDll, "--sarif", sarifPath);
 
         // Assert — one notification and no other, so a clean polyglot run is pinned to say exactly this
         // much. The level is read off that notification rather than the log text because it carries the

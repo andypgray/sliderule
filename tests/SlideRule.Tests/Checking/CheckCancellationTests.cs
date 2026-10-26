@@ -31,7 +31,7 @@ public sealed class CheckCancellationTests
 
         // The guard on the claim below: an unchanged count has to mean "the rule was not evaluated", and
         // over a bed whose types this subject did not select it would mean "there was nothing to evaluate".
-        Check(model, CancellationToken.None);
+        Check(model, Ct);
         int evaluatedByAWholeRun = evaluations;
         evaluatedByAWholeRun.ShouldBeGreaterThan(0);
 

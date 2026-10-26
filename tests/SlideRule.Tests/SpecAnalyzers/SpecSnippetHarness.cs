@@ -31,7 +31,7 @@ namespace SlideRule.Tests.SpecAnalyzers;
 internal static class SpecSnippet
 {
     /// <summary>The path a single-file snippet is parsed under.</summary>
-    internal const string FilePath = "Spec.cs";
+    private const string FilePath = "Spec.cs";
 
     /// <summary>
     ///     The language version every source here is parsed at, named rather than left to the compiler's
@@ -91,23 +91,7 @@ internal static class SpecSnippet
     internal static ImmutableArray<MetadataReference> WithTheContract { get; } = TrustedPlatform.References;
 
     /// <summary>The same set less the contract, which is a project with no spec in it.</summary>
-    internal static ImmutableArray<MetadataReference> WithoutTheContract { get; } =
-        TrustedPlatform.Without(typeof(Arch).Assembly.Location);
-
-    /// <summary>
-    ///     <see cref="WithTheContract" /> less the assemblies named, each by file name.
-    /// </summary>
-    /// <remarks>
-    ///     What a compilation built from an assembly's own sources needs: with that assembly still
-    ///     referenced its types arrive from metadata as well as from source, and a source file left out by
-    ///     mistake would bind against the compiled copy instead of failing. Taking it out makes the
-    ///     zero-errors assertion the guard that every source the compilation needs is actually in it.
-    /// </remarks>
-    /// <param name="assemblyFileNames">The file names to leave out, such as <c>Some.Assembly.dll</c>.</param>
-    internal static ImmutableArray<MetadataReference> Less(params string[] assemblyFileNames)
-    {
-        return TrustedPlatform.Less(assemblyFileNames);
-    }
+    internal static ImmutableArray<MetadataReference> WithoutTheContract { get; } = TrustedPlatform.WithoutContract;
 
     /// <summary>
     ///     Compiles <paramref name="source" /> as one file and returns what the analyzer reported over it,
@@ -116,11 +100,20 @@ internal static class SpecSnippet
     /// <param name="source">The spec as it is written.</param>
     /// <param name="beforeDecide">The fault seam, invoked at the top of every call into the contract.</param>
     /// <param name="cancellationToken">The token the compilation and the analysis run under.</param>
+    /// <param name="references">The references to compile against; the contract's set by default.</param>
+    /// <param name="versions">
+    ///     The version seam, which hands the version check the two informational versions it compares in place
+    ///     of the two assemblies' own.
+    /// </param>
     internal static Task<IReadOnlyList<Diagnostic>> ShouldCompileAndDiagnoseAsync(
-        string source, Action? beforeDecide = null, CancellationToken cancellationToken = default)
+        string source,
+        Action? beforeDecide = null,
+        CancellationToken cancellationToken = default,
+        IReadOnlyList<MetadataReference>? references = null,
+        Func<(string? Analyzer, string? Core)>? versions = null)
     {
-        return ShouldCompileAndDiagnoseAsync([(FilePath, source)], beforeDecide: beforeDecide,
-            cancellationToken: cancellationToken);
+        return ShouldCompileAndDiagnoseAsync(
+            [(FilePath, source)], references, beforeDecide, cancellationToken, versions: versions);
     }
 
     /// <summary>
@@ -177,6 +170,12 @@ internal static class SpecSnippet
     ///     Compiles an assembly's own <paramref name="sources" /> under its own name and less its own
     ///     metadata, with the implicit usings beside them, and returns what the analyzer reported.
     /// </summary>
+    /// <remarks>
+    ///     With that assembly still referenced, its types arrive from metadata as well as from source, and a
+    ///     source file left out by mistake would bind against the compiled copy instead of failing. Taking it
+    ///     out makes the zero-errors assertion the guard that every source the compilation needs is actually
+    ///     in it.
+    /// </remarks>
     /// <param name="sources">The assembly's sources, each with the path it is parsed under.</param>
     /// <param name="assemblyName">The assembly the sources belong to, whose identity the compilation takes.</param>
     /// <param name="beforeDecide">The fault seam, invoked at the top of every call into the contract.</param>
@@ -188,7 +187,7 @@ internal static class SpecSnippet
         CancellationToken cancellationToken = default)
     {
         List<(string Path, string Source)> files = [.. sources, ImplicitUsings];
-        ImmutableArray<MetadataReference> references = Less($"{assemblyName}.dll");
+        ImmutableArray<MetadataReference> references = TrustedPlatform.Less($"{assemblyName}.dll");
 
         return ShouldCompileAndDiagnoseAsync(
             files, references, beforeDecide: beforeDecide, cancellationToken: cancellationToken,

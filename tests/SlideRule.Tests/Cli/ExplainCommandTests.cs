@@ -1,4 +1,3 @@
-using Shouldly;
 using SlideRule.Tests.TestSupport;
 using Xunit;
 
@@ -20,12 +19,11 @@ public sealed class ExplainCommandTests
             "explain", "layering/domain-independent", "--spec", CliRunner.ViolatedSpecDll);
 
         result.ShouldSucceed();
-        result.Out.NormalizedTrimmed()
-            .ShouldBe(
-                ("layering/domain-independent (enforce)\n" +
-                 "  sentence: The Domain layer must not reference the Web layer.\n" +
-                 "  because: Domain is UI-agnostic; transaction boundaries live in services.\n" +
-                 "  fix: Define an abstraction in Domain and implement it in Web.").NormalizedTrimmed());
+        result.ShouldPrint(
+            "layering/domain-independent (enforce)\n" +
+            "  sentence: The Domain layer must not reference the Web layer.\n" +
+            "  because: Domain is UI-agnostic; transaction boundaries live in services.\n" +
+            "  fix: Define an abstraction in Domain and implement it in Web.");
     }
 
     [Fact]
@@ -36,16 +34,15 @@ public sealed class ExplainCommandTests
 
         // Explain reads the spec alone, so the exemplar is the phrase the spec composes, with no file or line.
         result.ShouldSucceed();
-        result.Out.NormalizedTrimmed()
-            .ShouldBe(
-                ("time/inject-clock (migrate)\n" +
-                 "  sentence: The Web layer must not use `DateTime.Now` or `DateTime.UtcNow`.\n" +
-                 "  because: Wall-clock reads are untestable; inject IClock.\n" +
-                 "  fix: Take IClock in the constructor.\n" +
-                 "  exemplar: `OrderService`\n" +
-                 "  from: Code reads the ambient clock directly.\n" +
-                 "  policy: MigrateIfSmall\n" +
-                 "  baseline: arch/baselines/time/inject-clock.json").NormalizedTrimmed());
+        result.ShouldPrint(
+            "time/inject-clock (migrate)\n" +
+            "  sentence: The Web layer must not use `DateTime.Now` or `DateTime.UtcNow`.\n" +
+            "  because: Wall-clock reads are untestable; inject IClock.\n" +
+            "  fix: Take IClock in the constructor.\n" +
+            "  exemplar: `OrderService`\n" +
+            "  from: Code reads the ambient clock directly.\n" +
+            "  policy: MigrateIfSmall\n" +
+            "  baseline: arch/baselines/time/inject-clock.json");
     }
 
     [Fact]
@@ -71,15 +68,14 @@ public sealed class ExplainCommandTests
         // sanctioned surface and nothing to grandfather, so what needs proving end-to-end is that these four
         // lines are all of them — the posture's field set is what the reader learns here.
         result.ShouldSucceed();
-        result.Out.NormalizedTrimmed()
-            .ShouldBe(
-                ("domain/retry-budget/tripwire (caution/tripwire)\n" +
-                 "  because: The retry budget is the one place the domain sanctions a broad catch, and every " +
-                 "caller relies on the filter.\n" +
-                 "  scope: domain/retry-budget\n" +
-                 "  dragons: RetryPolicy's broad catch is filtered on purpose: the `when` clause is what keeps " +
-                 "it green under the unfiltered-catch rule, and it is the fixture's one sanctioned broad " +
-                 "handler. Keep the filter; add cases beside it, never inside it.").NormalizedTrimmed());
+        result.ShouldPrint(
+            "domain/retry-budget/tripwire (caution/tripwire)\n" +
+            "  because: The retry budget is the one place the domain sanctions a broad catch, and every " +
+            "caller relies on the filter.\n" +
+            "  scope: domain/retry-budget\n" +
+            "  dragons: RetryPolicy's broad catch is filtered on purpose: the `when` clause is what keeps " +
+            "it green under the unfiltered-catch rule, and it is the fixture's one sanctioned broad " +
+            "handler. Keep the filter; add cases beside it, never inside it.");
     }
 
     [Fact]

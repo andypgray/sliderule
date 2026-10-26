@@ -1,4 +1,3 @@
-using SlideRule.Internal;
 using SlideRule.Roslyn;
 
 namespace SlideRule.Tests.TestSupport;
@@ -40,38 +39,38 @@ internal static class FixtureEdits
     {
         string content = File.ReadAllText(path);
         File.WriteAllText(path, transform(content));
+        StampForward(path);
+    }
+
+    /// <summary>Stamps <paramref name="path" />'s write time forward, leaving its bytes as they are.</summary>
+    internal static void StampForward(string path)
+    {
         // A future mtime guarantees the reconcile sweep sees a delta against the load-time fingerprint.
         File.SetLastWriteTimeUtc(path, DateTime.UtcNow.AddSeconds(2));
     }
 
     /// <summary>
     ///     Splices <paramref name="member" /> into the (single) class in a source file, just before its
-    ///     closing brace, leaving everything after that brace as it was — line-ending agnostic (it only
-    ///     anchors on the final <c>}</c>), so a CRLF or LF fixture checkout both work. The member carries
-    ///     its own surrounding newlines.
+    ///     closing brace, leaving everything after that brace as it was, and stamps the edit forward —
+    ///     line-ending agnostic (it only anchors on the final <c>}</c>), so a CRLF or LF fixture checkout both
+    ///     work. The member carries its own surrounding newlines.
     /// </summary>
     internal static void InsertMember(string path, string member)
     {
-        string original = File.ReadAllText(path);
-        int lastBrace = original.LastIndexOf('}');
-        File.WriteAllText(path, original[..lastBrace] + member + original[lastBrace..]);
+        EditOnDisk(path, source => source.Insert(source.LastIndexOf('}'), member));
     }
 
     /// <summary>
     ///     Appends <paramref name="member" /> as its own line before a class's final closing brace, then
-    ///     re-closes the class — so the member needs no newlines of its own and any trailing text after the
-    ///     brace is replaced.
+    ///     re-closes the class and stamps the edit forward — so the member needs no newlines of its own and
+    ///     any trailing text after the brace is replaced.
     /// </summary>
     internal static void AppendMemberLine(string path, string member)
     {
-        File.WriteAllText(path, SpliceMemberLine(File.ReadAllText(path), member));
+        EditOnDisk(path, source => SpliceMemberLine(source, member));
     }
 
-    /// <summary>
-    ///     <see cref="AppendMemberLine" /> as a source transform, for handing to <see cref="EditOnDisk" />
-    ///     where the edit must also be stamped forward.
-    /// </summary>
-    internal static string SpliceMemberLine(string source, string member)
+    private static string SpliceMemberLine(string source, string member)
     {
         int lastBrace = source.LastIndexOf('}');
         return source[..lastBrace] + member + "\n}\n";
@@ -96,17 +95,11 @@ internal static class FixtureEdits
     /// <summary>
     ///     Stamps every file under <paramref name="root" /> well into the past — the persisted-cache analog of
     ///     <see cref="BackdateAllDocuments" />, over a directory tree rather than a loaded solution.
-    ///     <paramref name="excluding" /> skips a path prefix, which is how a cache directory living inside the
-    ///     tree keeps its real write times.
     /// </summary>
-    internal static void BackdateTree(string root, string? excluding = null)
+    internal static void BackdateTree(string root)
     {
         DateTime wellPast = DateTime.UtcNow.AddDays(-1);
-        foreach (string file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
-        {
-            if (excluding is not null && file.StartsWith(excluding, PathComparison.Comparison)) continue;
-            Backdate(file, wellPast);
-        }
+        foreach (string file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories)) Backdate(file, wellPast);
     }
 
     /// <summary>

@@ -41,7 +41,7 @@ internal static class SpecRuleCounts
     ///     of it rounded to.
     /// </summary>
     private static readonly Regex ClaimPattern = new(
-        $@"\b{GrandfatheredCounts.CountToken} rules over this repository's real code\b",
+        $@"\b{CountSpelling.CountToken} rules over this repository's real code\b",
         RegexOptions.CultureInvariant);
 
     /// <summary>
@@ -79,7 +79,7 @@ internal static class SpecRuleCounts
                 // "rules" is the qualifier rather than the number, and the claim is a fact about one past
                 // release rather than about the spec today. Requiring a number there is what tells a total
                 // from a delta, and it is why the CHANGELOG needs no exemption entry.
-                if (!GrandfatheredCounts.IsCountWord(written)) continue;
+                if (!CountSpelling.IsCountWord(written)) continue;
 
                 claims.Add(new SpecRuleCountClaim(doc, index + 1, written));
             }

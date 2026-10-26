@@ -96,15 +96,15 @@ public sealed class BaselineAddE2ETests
             "--source", "MyApp.Web.HomeController", "--target", "System.Data.DataTable", "--because", "INC-1234");
 
         add.ShouldSucceed(
-            "data-access/no-inline-sql: added 1 grandfathered entry — MyApp.Web.HomeController -> System.Data.DataTable (because: INC-1234).");
-        add.Out.ShouldContain("wrote");
+            "data-access/no-inline-sql: added 1 grandfathered entry — MyApp.Web.HomeController -> System.Data.DataTable (because: INC-1234).",
+            "wrote");
 
         // Composer as oracle: the new entry renders measured then attributed (siteCount, then because last) AND
         // the foreign section is byte-identical. HomeController declares the DataTable on two lines, so the valve
         // records two sites; the pre-written InvoiceController neighbour is not the entry being added and stays
         // uncounted, which is the mixed shape a partially upgraded file has.
         string afterText = File.ReadAllText(migratePath);
-        afterText.NormalizedLines()
+        afterText
             .ShouldBe(BaselineComposer.Compose(
                 (MigrateRule,
                 [
@@ -132,8 +132,8 @@ public sealed class BaselineAddE2ETests
         // The bystanders are untouched: the same-rule DataSet red and the other-rule uncaptured containment
         // reds both still fail check.
         CliResult check = await CliRunner.InvokeAsync("check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll);
-        check.ShouldReportViolations("MyApp.Web.HomeController references System.Data.DataSet");
-        check.Out.ShouldContain("FAIL legacy/billing/containment");
+        check.ShouldReportViolations(
+            "MyApp.Web.HomeController references System.Data.DataSet", "FAIL legacy/billing/containment");
     }
 
     [Fact]
@@ -157,7 +157,6 @@ public sealed class BaselineAddE2ETests
             "legacy/billing/containment: added 1 grandfathered entry — MyApp.Web.HomeController -> MyApp.Legacy.Billing.BillingCalculator (because: hotfix INC-42).");
 
         File.ReadAllText(workspace.PathOf(QuarantineBaselineFile))
-            .NormalizedLines()
             .ShouldBe(BaselineComposer.Compose(
                 (ContainmentRule,
                 [
@@ -211,12 +210,11 @@ public sealed class BaselineAddE2ETests
             "--source", "MyApp.Web.HomeController", "--target", "System.DateTime.Now", "--because", "INC-1234");
 
         add.ShouldSucceed(
-            "time/inject-clock: added 1 grandfathered entry — MyApp.Web.HomeController -> System.DateTime.Now (because: INC-1234).");
-        add.Out.ShouldContain("wrote");
+            "time/inject-clock: added 1 grandfathered entry — MyApp.Web.HomeController -> System.DateTime.Now (because: INC-1234).",
+            "wrote");
 
         // Composer as oracle: exactly one appended entry line keying the P: member DocId, and nothing else moves.
         File.ReadAllText(clockPath)
-            .NormalizedLines()
             .ShouldBe(BaselineComposer.Compose(
                 (ClockRule, [
                     BaselineEntry.ForEdge(HomeId, NowMemberId)
@@ -272,12 +270,11 @@ public sealed class BaselineAddE2ETests
             "--subject", "MyApp.Web.HomeController.Save", "--because", "INC-1234");
 
         add.ShouldSucceed(
-            "naming/async-suffix: added 1 grandfathered entry — MyApp.Web.HomeController.Save() (because: INC-1234).");
-        add.Out.ShouldContain("wrote");
+            "naming/async-suffix: added 1 grandfathered entry — MyApp.Web.HomeController.Save() (because: INC-1234).",
+            "wrote");
 
         // Composer as oracle: exactly one appended entry keying the M: member DocId via ForSubject, and nothing else.
         File.ReadAllText(asyncPath)
-            .NormalizedLines()
             .ShouldBe(BaselineComposer.Compose(
                 (AsyncRule, [
                     BaselineEntry.ForSubject(SaveMemberId)
@@ -322,12 +319,11 @@ public sealed class BaselineAddE2ETests
             "--source", "MyApp.Web.InvoiceService", "--target", "MyApp.Web.InvoiceCreatedHandler", "--because", "INC-1234");
 
         add.ShouldSucceed(
-            "di/handlers-via-registry: added 1 grandfathered entry — MyApp.Web.InvoiceService -> MyApp.Web.InvoiceCreatedHandler (because: INC-1234).");
-        add.Out.ShouldContain("wrote");
+            "di/handlers-via-registry: added 1 grandfathered entry — MyApp.Web.InvoiceService -> MyApp.Web.InvoiceCreatedHandler (because: INC-1234).",
+            "wrote");
 
         // Composer as oracle: exactly one appended entry keying the (source, constructed) type pair via ForEdge.
         File.ReadAllText(diPath)
-            .NormalizedLines()
             .ShouldBe(BaselineComposer.Compose(
                 (ConstructionRule, [
                     BaselineEntry.ForEdge(InvoiceServiceId, InvoiceCreatedHandlerId)
@@ -381,12 +377,11 @@ public sealed class BaselineAddE2ETests
             "--source", "MyApp.Web.ReportScheduler", "--target", "MyApp.Web.IOrderFeed", "--because", "INC-1234");
 
         add.ShouldSucceed(
-            "di/no-captive-dependencies: added 1 grandfathered entry — MyApp.Web.ReportScheduler -> MyApp.Web.IOrderFeed (because: INC-1234).");
-        add.Out.ShouldContain("wrote");
+            "di/no-captive-dependencies: added 1 grandfathered entry — MyApp.Web.ReportScheduler -> MyApp.Web.IOrderFeed (because: INC-1234).",
+            "wrote");
 
         // Composer as oracle: exactly one appended entry keying the (source, injected) type pair via ForEdge.
         File.ReadAllText(captivePath)
-            .NormalizedLines()
             .ShouldBe(BaselineComposer.Compose(
                 (CaptiveRule, [
                     BaselineEntry.ForEdge(ReportSchedulerId, OrderFeedInterfaceId)
@@ -445,13 +440,12 @@ public sealed class BaselineAddE2ETests
             "--source", "MyApp.Web.ReportEndpoint", "--target", "System.Exception", "--because", "INC-1234");
 
         add.ShouldSucceed(
-            "exceptions/no-general-catch: added 1 grandfathered entry — MyApp.Web.ReportEndpoint -> System.Exception (because: INC-1234).");
-        add.Out.ShouldContain("wrote");
+            "exceptions/no-general-catch: added 1 grandfathered entry — MyApp.Web.ReportEndpoint -> System.Exception (because: INC-1234).",
+            "wrote");
 
         // Composer as oracle: exactly one appended entry keying the (source, caught) type pair via ForEdge —
         // ReportPublisher's identical caught type is a distinct source, so it is not swept in.
         File.ReadAllText(catchPath)
-            .NormalizedLines()
             .ShouldBe(BaselineComposer.Compose(
                 (CatchRule, [
                     BaselineEntry.ForEdge(ReportEndpointId, SystemExceptionId)
@@ -517,12 +511,11 @@ public sealed class BaselineAddE2ETests
             "--source", "MyApp.Web.HomeController", "--target", "System.Data.DataTable", "--because", "INC-1234");
 
         add.ShouldSucceed(
-            "api/return-dtos: added 1 grandfathered entry — MyApp.Web.HomeController -> System.Data.DataTable (because: INC-1234).");
-        add.Out.ShouldContain("wrote");
+            "api/return-dtos: added 1 grandfathered entry — MyApp.Web.HomeController -> System.Data.DataTable (because: INC-1234).",
+            "wrote");
 
         // Composer as oracle: exactly one appended entry keying the (source, exposed) type pair via ForEdge.
         File.ReadAllText(exposePath)
-            .NormalizedLines()
             .ShouldBe(BaselineComposer.Compose(
                 (ExposeRule, [
                     BaselineEntry.ForEdge(HomeId, DataTableId)
@@ -568,10 +561,10 @@ public sealed class BaselineAddE2ETests
         // The echo names the measure as well as the attribution, and names both ends of it even where the two
         // agree: add is the only verb that may raise a site count, so what it recorded is never left implied.
         second.ShouldSucceed(
-            "data-access/no-inline-sql: entry already baselined — attribution updated and site count re-recorded (2 → 2).");
-        second.Out.ShouldContain("wrote");
+            "data-access/no-inline-sql: entry already baselined — attribution updated and site count re-recorded (2 → 2).",
+            "wrote");
         // No second entry — the count is unchanged and only the attribution (and the entry's own seal) moved.
-        afterSecond.NormalizedLines()
+        afterSecond
             .ShouldBe(BaselineComposer.Compose(
                 (MigrateRule,
                 [
@@ -634,9 +627,9 @@ public sealed class BaselineAddE2ETests
             "no baseline section for 'legacy/billing/containment' — run 'sliderule baseline init' first.");
 
         noMatch.ShouldRefuseWith(
-            "no current violation of 'data-access/no-inline-sql' matches --source 'MyApp.Web.HomeController' --target 'System.Data.DataSet'");
-        noMatch.Err.ShouldContain("the baseline records observed reality");
-        noMatch.Err.ShouldContain("MyApp.Web.HomeController -> System.Data.DataTable");
+            "no current violation of 'data-access/no-inline-sql' matches --source 'MyApp.Web.HomeController' --target 'System.Data.DataSet'",
+            "the baseline records observed reality",
+            "MyApp.Web.HomeController -> System.Data.DataTable");
     }
 
     [Fact]

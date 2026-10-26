@@ -46,31 +46,20 @@ namespace SlideRule.Tests.Mcp;
 /// </remarks>
 public sealed class McpChildServerRepoHandleTests
 {
-    /// <summary>The five read tools, in call order, each with the JSON-RPC id its response carries.</summary>
-    private static readonly (string Name, int Id, string Frame)[] ReadToolCalls =
+    /// <summary>The five read tools, in call order, each with the arguments it is called with.</summary>
+    private static readonly (string Tool, string Arguments)[] ReadToolCalls =
     [
-        ("arch_check", 2,
-            """{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"arch_check","arguments":{"diffBase":"HEAD"}}}"""),
-        ("arch_status", 3,
-            """{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"arch_status","arguments":{}}}"""),
-        ("arch_graph", 4,
-            """{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"arch_graph","arguments":{}}}"""),
-        ("arch_explain", 5,
-            """{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"arch_explain","arguments":{"ruleId":"legacy/billing/containment"}}}"""),
-        ("arch_context", 6,
-            """{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"arch_context","arguments":{"path":"MyApp.Legacy.Billing"}}}""")
+        ("arch_check", """{"diffBase":"HEAD"}"""),
+        ("arch_status", "{}"),
+        ("arch_graph", "{}"),
+        ("arch_explain", """{"ruleId":"legacy/billing/containment"}"""),
+        ("arch_context", """{"path":"MyApp.Legacy.Billing"}""")
     ];
-
-    /// <summary>
-    ///     How long the footprint may take to settle. A clean server passes on the first scan and pays none
-    ///     of this; the budget exists so a file still closing behind the last tool call is not read as a leak.
-    /// </summary>
-    private static readonly TimeSpan FootprintBudget = TimeSpan.FromSeconds(15);
 
     [Fact]
     public async Task StagedServer_AfterEveryReadTool_HoldsNothingUnderTheRepository()
     {
-        Assert.SkipUnless(ProcessFileFootprint.IsSupported, "The footprint scan is Windows-x64 only.");
+        ProcessFileFootprint.SkipUnlessSupported();
 
         string stagedServer = Path.Combine(TestTempRoot.For("staged-server"), "cli");
         McpChildHarness.StageDirectory(Path.GetDirectoryName(SourceTreeCliDll())!, stagedServer);
@@ -100,13 +89,12 @@ public sealed class McpChildServerRepoHandleTests
             startInfo,
             ReadToolCalls,
             whileComplete: server =>
-                server.ShouldEventuallyHoldNoPathsUnder(
-                    RepoRoot.Directory, FootprintBudget, inherited, injected));
+                server.ShouldEventuallyHoldNoPathsUnder(RepoRoot.Directory, inherited, injected));
 
         conversation.Handshake.ShouldNotBeNull(
             $"the staged MCP server never answered `initialize`.\nstderr:\n{conversation.Diagnostics}");
 
-        foreach (string name in ReadToolCalls.Select(call => call.Name))
+        foreach (string name in ReadToolCalls.Select(call => call.Tool))
         {
             string? answer = conversation.Answers.GetValueOrDefault(name);
             answer.ShouldNotBeNull($"the {name} response never arrived.\nstderr:\n{conversation.Diagnostics}")
@@ -127,7 +115,7 @@ public sealed class McpChildServerRepoHandleTests
     [Fact]
     public async Task InRepoServer_MapsAndHoldsPathsUnderTheRepository()
     {
-        Assert.SkipUnless(ProcessFileFootprint.IsSupported, "The footprint scan is Windows-x64 only.");
+        ProcessFileFootprint.SkipUnlessSupported();
 
         // The in-repo launch, deliberately: the server dll beside the test assembly, and a working
         // directory inside the repository. No tool call — a child's own images are mapped at startup, which

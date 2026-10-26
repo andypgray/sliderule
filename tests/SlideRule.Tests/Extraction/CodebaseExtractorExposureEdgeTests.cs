@@ -25,8 +25,7 @@ public sealed class CodebaseExtractorExposureEdgeTests
         model.ExposureEdge("N.C", "N.Gadget")
             .Sites.Lines()
             .ShouldBe([3]);
-        model.HasEdge("N.C", "N.Gadget")
-            .ShouldBeTrue();
+        model.ShouldHaveEdge("N.C", "N.Gadget");
     }
 
     [Fact]
@@ -40,7 +39,7 @@ public sealed class CodebaseExtractorExposureEdgeTests
 
         // The void return is skipped; the parameter type surfaces at the member's declaration line.
         model.ExposureEdges("N.C")
-            .Select(e => e.Exposed.FullName)
+            .TargetNames()
             .ShouldBe(["N.Gadget"]);
         model.ExposureEdge("N.C", "N.Gadget")
             .Sites.Lines()
@@ -76,10 +75,6 @@ public sealed class CodebaseExtractorExposureEdgeTests
                                                          """);
 
         // Task<Order> decomposes to the open definition AND the type argument, both at the member's line.
-        model.HasExposureEdge("N.C", "System.Threading.Tasks.Task<TResult>")
-            .ShouldBeTrue();
-        model.HasExposureEdge("N.C", "N.Order")
-            .ShouldBeTrue();
         model.ExposureEdge("N.C", "System.Threading.Tasks.Task<TResult>")
             .Sites.Lines()
             .ShouldBe([3]);
@@ -99,7 +94,7 @@ public sealed class CodebaseExtractorExposureEdgeTests
 
         // The element type is the endpoint; the array type itself is not a node.
         model.ExposureEdges("N.C")
-            .Select(e => e.Exposed.FullName)
+            .TargetNames()
             .ShouldBe(["N.Gadget"]);
     }
 
@@ -118,7 +113,7 @@ public sealed class CodebaseExtractorExposureEdgeTests
         // C# tuple syntax `(T1, T2)` — Roslyn's default display formats even the unbound ValueTuple`2 tuple-style,
         // so that (not `System.ValueTuple<T1, T2>`) is the endpoint's FullName in the model.
         model.ExposureEdges("N.C")
-            .Select(e => e.Exposed.FullName)
+            .TargetNames()
             .ShouldBe(
                 ["(T1, T2)", "N.Order", "N.Widget"]);
 
@@ -126,10 +121,8 @@ public sealed class CodebaseExtractorExposureEdgeTests
         // reference-edge twin (their names appear verbatim in the source), but the synthesized ValueTuple wrapper
         // `(T1, T2)` does NOT — nothing in the tuple syntax `(Order, Widget)` textually names ValueTuple, so no
         // name-driven type edge is minted for it and the exposure endpoint stands alone by design.
-        model.HasEdge("N.C", "N.Order")
-            .ShouldBeTrue();
-        model.HasEdge("N.C", "N.Widget")
-            .ShouldBeTrue();
+        model.ShouldHaveEdge("N.C", "N.Order");
+        model.ShouldHaveEdge("N.C", "N.Widget");
         model.HasEdge("N.C", "(T1, T2)")
             .ShouldBeFalse();
     }
@@ -145,7 +138,7 @@ public sealed class CodebaseExtractorExposureEdgeTests
         // A nullable value type decomposes to the open System.Nullable<T> definition PLUS its Int32 argument (the
         // same definition form a T? parameter records on the member axis, §4.6).
         model.ExposureEdges("N.C")
-            .Select(e => e.Exposed.FullName)
+            .TargetNames()
             .ShouldBe(
                 ["System.Int32", "System.Nullable<T>"]);
 
@@ -171,6 +164,7 @@ public sealed class CodebaseExtractorExposureEdgeTests
         // A method's own type parameter is not a named type, so return T and parameter T mint nothing (and the
         // decomposition never crashes on the type-parameter symbols).
         model.ExposureEdges("N.C")
+            .TargetNames()
             .ShouldBeEmpty();
     }
 
@@ -184,6 +178,7 @@ public sealed class CodebaseExtractorExposureEdgeTests
 
         // System.Void is skipped and there are no parameters, so a void no-arg method surfaces nothing.
         model.ExposureEdges("N.C")
+            .TargetNames()
             .ShouldBeEmpty();
     }
 
@@ -200,9 +195,9 @@ public sealed class CodebaseExtractorExposureEdgeTests
         model.HasExposureEdge("N.C", "N.Gadget")
             .ShouldBeFalse();
         model.ExposureEdges("N.C")
+            .TargetNames()
             .ShouldBeEmpty();
-        model.HasInjectionEdge("N.C", "N.Gadget")
-            .ShouldBeTrue();
+        model.ShouldHaveInjectionEdge("N.C", "N.Gadget");
     }
 
     [Fact]
@@ -216,12 +211,13 @@ public sealed class CodebaseExtractorExposureEdgeTests
                                                          """);
 
         // Base types and implemented interfaces are inheritance (§5.2), not members — no exposure edge.
-        model.ExposureEdges("N.C")
-            .ShouldBeEmpty();
         model.HasExposureEdge("N.C", "N.Base")
             .ShouldBeFalse();
         model.HasExposureEdge("N.C", "N.IFoo")
             .ShouldBeFalse();
+        model.ExposureEdges("N.C")
+            .TargetNames()
+            .ShouldBeEmpty();
     }
 
     [Fact]
@@ -235,6 +231,7 @@ public sealed class CodebaseExtractorExposureEdgeTests
 
         // A public member of an internal type is not surface — the internal type has no external contract.
         model.ExposureEdges("N.Svc")
+            .TargetNames()
             .ShouldBeEmpty();
     }
 
@@ -258,7 +255,7 @@ public sealed class CodebaseExtractorExposureEdgeTests
 
         // Only the public member surfaces; private/protected/internal members are not part of the contract.
         model.ExposureEdges("N.Svc")
-            .Select(e => e.Exposed.FullName)
+            .TargetNames()
             .ShouldBe(["N.Delta"]);
         model.ExposureEdge("N.Svc", "N.Delta")
             .Sites.Lines()
@@ -280,6 +277,7 @@ public sealed class CodebaseExtractorExposureEdgeTests
         // The effective-visibility pin: Inner is public but its containing Outer is internal, so Inner's public
         // member is not effectively public and surfaces nothing.
         model.ExposureEdges("N.Outer.Inner")
+            .TargetNames()
             .ShouldBeEmpty();
     }
 
@@ -295,9 +293,9 @@ public sealed class CodebaseExtractorExposureEdgeTests
 
         // The interface's own public member exposes Gadget; the explicit implementation is private, so the
         // implementing class exposes nothing.
-        model.HasExposureEdge("N.IFoo", "N.Gadget")
-            .ShouldBeTrue();
+        model.ShouldHaveExposureEdge("N.IFoo", "N.Gadget");
         model.ExposureEdges("N.Foo")
+            .TargetNames()
             .ShouldBeEmpty();
     }
 
@@ -312,10 +310,8 @@ public sealed class CodebaseExtractorExposureEdgeTests
         // Only the positional property surfaces; the synthesized equality/clone/deconstruct surface is
         // implicitly declared and excluded, so no System.Object/Boolean/Int32 leaks in.
         model.ExposureEdges("N.Money")
-            .Select(e => e.Exposed.FullName)
+            .TargetNames()
             .ShouldBe(["System.Decimal"]);
-        model.HasExposureEdge("N.Money", "System.Object")
-            .ShouldBeFalse();
     }
 
     [Fact]
@@ -330,6 +326,7 @@ public sealed class CodebaseExtractorExposureEdgeTests
         model.HasExposureEdge("N.Node", "N.Node")
             .ShouldBeFalse();
         model.ExposureEdges("N.Node")
+            .TargetNames()
             .ShouldBeEmpty();
     }
 
@@ -343,6 +340,7 @@ public sealed class CodebaseExtractorExposureEdgeTests
 
         // An enum's value fields are typed as the enum itself — a self-edge — so the self-drop clears them.
         model.ExposureEdges("N.Color")
+            .TargetNames()
             .ShouldBeEmpty();
     }
 
@@ -363,6 +361,7 @@ public sealed class CodebaseExtractorExposureEdgeTests
         // The two parts each contribute one exposing member, unioned under the one (source, exposed) edge with
         // two deduped sites.
         model.ExposureEdges("N.C")
+            .TargetNames()
             .ShouldHaveSingleItem();
         model.ExposureEdge("N.C", "N.Gadget")
             .Sites.Count.ShouldBe(2);

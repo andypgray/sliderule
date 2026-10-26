@@ -30,16 +30,6 @@ namespace SlideRule.Tests.DocHygiene;
 /// </remarks>
 internal static class WrittenPaths
 {
-    /// <summary>Whether a quoted write-report path still names a file this repository publishes.</summary>
-    public enum PathBucket
-    {
-        /// <summary>The path resolves to a tracked file under the doc's example root.</summary>
-        Matched,
-
-        /// <summary>Nothing git tracks sits at the path, so the quoted line names a file that is gone.</summary>
-        Untracked
-    }
-
     /// <summary>
     ///     A write-report line: the verb, a single space, then the solution-relative path. The path is a
     ///     whitespace-free token running to the end of the line, which is what
@@ -50,7 +40,7 @@ internal static class WrittenPaths
 
     /// <summary>
     ///     Extracts every write-report line from the fenced code blocks of <paramref name="docText" />.
-    ///     Fence state is tracked by <see cref="SourceAnchors.FencedLines" />, so the same words in running
+    ///     Fence state is tracked by <see cref="DocFences.FencedLines" />, so the same words in running
     ///     prose are ignored: prose restates the captured output and is commentary rather than the quote.
     ///     Line numbers are 1-based positions in the doc, so a failure names the exact line.
     /// </summary>
@@ -58,7 +48,7 @@ internal static class WrittenPaths
     {
         List<WrittenPath> written = new();
 
-        foreach ((string line, int number) in SourceAnchors.FencedLines(docText))
+        foreach ((string line, int number) in DocFences.FencedLines(docText))
         {
             Match match = ReportLine.Match(line);
             if (!match.Success) continue;
@@ -79,18 +69,15 @@ internal static class WrittenPaths
     }
 
     /// <summary>
-    ///     Decides whether <paramref name="written" /> still names a published file: matched when the
-    ///     repository-relative path is in <paramref name="trackedPaths" />, untracked otherwise, with a
-    ///     failure naming the doc, the line and the path that was looked for.
+    ///     The failure for <paramref name="written" />, naming the doc, the line and the path that was looked for, or
+    ///     <see langword="null" /> when its repository-relative path is in <paramref name="trackedPaths" />.
     /// </summary>
-    public static PathResult Classify(WrittenPath written, string exampleRoot, IReadOnlySet<string> trackedPaths)
+    public static string? Classify(WrittenPath written, string exampleRoot, IReadOnlySet<string> trackedPaths)
     {
         string repoRelative = ExampleRoots.RepoRelative(exampleRoot, written.Path);
-        if (trackedPaths.Contains(repoRelative)) return new PathResult(PathBucket.Matched, null);
+        if (trackedPaths.Contains(repoRelative)) return null;
 
-        return new PathResult(
-            PathBucket.Untracked,
-            $"{written.Doc}:{written.DocLine} reports '{written.Label} {written.Path}' -> {repoRelative}, which git does not track.");
+        return $"{written.Doc}:{written.DocLine} reports '{written.Label} {written.Path}' -> {repoRelative}, which git does not track.";
     }
 
     /// <summary>
@@ -107,10 +94,4 @@ internal static class WrittenPaths
     {
         return token.Contains('.', StringComparison.Ordinal) || token.Contains('/', StringComparison.Ordinal);
     }
-
-    /// <summary>
-    ///     The outcome of classifying one quoted path: the bucket it fell in, and — when that bucket is
-    ///     not <see cref="PathBucket.Matched" /> — the human-readable failure describing what was missing.
-    /// </summary>
-    public sealed record PathResult(PathBucket Bucket, string? Failure);
 }

@@ -36,13 +36,10 @@ public sealed class UnsupportedProjectsNoticeTests
         // exists to retire. The compiler cannot catch it: dropping the arm to make a missing member a warning
         // makes every unnamed value one instead, permanently. So the omission is caught here, by the
         // collision it produces.
-        UnsupportedProjectKind[] kinds = Enum.GetValues<UnsupportedProjectKind>();
-
-        kinds.Select(UnsupportedProjectsNotice.Reason)
-            .Distinct(StringComparer.Ordinal)
-            .Count()
-            .ShouldBe(
-                kinds.Length,
+        Enum.GetValues<UnsupportedProjectKind>()
+            .Select(UnsupportedProjectsNotice.Reason)
+            .ShouldBeUnique(
+                StringComparer.Ordinal,
                 "two UnsupportedProjectKinds read the same, which means one of them fell through Reason's "
                 + "fallback arm and is being described as another kind of project on every surface. Give the "
                 + "new kind its own sentence in UnsupportedProjectsNotice.Reason.");

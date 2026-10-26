@@ -44,8 +44,7 @@ public sealed class CheckerSemanticsTests
                     .Because("b"))
             .Single();
 
-        result.ShouldHavePassed();
-        result.Warnings.ShouldBeEmpty();
+        result.ShouldHavePassedClean();
     }
 
     [Fact]
@@ -414,8 +413,7 @@ public sealed class CheckerSemanticsTests
                     .Because("b"))
             .Single();
 
-        result.Violations.ShouldHaveSingleItem()
-            .Kind.ShouldBe(ViolationKind.RuleError);
+        result.ShouldHaveFailedWithSingle(ViolationKind.RuleError);
     }
 
     [Fact]
@@ -427,8 +425,7 @@ public sealed class CheckerSemanticsTests
                     .Because("b"))
             .Single();
 
-        result.Violations.ShouldHaveSingleItem()
-            .Kind.ShouldBe(ViolationKind.RuleError);
+        result.ShouldHaveFailedWithSingle(ViolationKind.RuleError);
     }
 
     [Fact]

@@ -58,12 +58,8 @@ public sealed class MustOnlyThrowVerbTests
     {
         // Service throws DomainError (allowed → silent) and InfraError (not allowed → red): the strict allow-list
         // flags only the unlisted throw, and the allowed one passing proves the allow-set is live.
-        RuleResult result = Checker.Run(SceneModel, arch =>
-                arch.Rule("ex/only-domain")
-                    .Enforce(arch.Namespace("App.*")
-                        .MustOnlyThrow(arch.Namespace("Errors.*").WithSuffix("DomainError")))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(SceneModel, arch => arch.Namespace("App.*")
+            .MustOnlyThrow(arch.Namespace("Errors.*").WithSuffix("DomainError")));
 
         result.ShouldHaveFailedWithSingleEdge(ViolationKind.Throw, "App.Service", "Errors.InfraError");
 
@@ -89,12 +85,8 @@ public sealed class MustOnlyThrowVerbTests
                               }
                               """;
 
-        RuleResult result = Checker.Run(source, arch =>
-                arch.Rule("ex/only-domain")
-                    .Enforce(arch.Namespace("App.*").WithSuffix("Service")
-                        .MustOnlyThrow(arch.Types.WithSuffix("Error")))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(source, arch => arch.Namespace("App.*").WithSuffix("Service")
+            .MustOnlyThrow(arch.Types.WithSuffix("Error")));
 
         result.ShouldHaveFailedWithEdges(ViolationKind.Throw, ["App.Service -> System.InvalidOperationException"]);
     }
@@ -115,11 +107,8 @@ public sealed class MustOnlyThrowVerbTests
                               }
                               """;
 
-        RuleResult result = Checker.Run(source, arch =>
-                arch.Rule("ex/only-timeout")
-                    .Enforce(arch.Namespace("App.*").MustOnlyThrow(typeof(TimeoutException)))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(source, arch => arch.Namespace("App.*")
+            .MustOnlyThrow(typeof(TimeoutException)));
 
         result.ShouldHavePassedClean();
     }
@@ -129,11 +118,8 @@ public sealed class MustOnlyThrowVerbTests
     {
         // An allowed type nobody references (System.DivideByZeroException) resolves to an empty allow-set —
         // harmlessly, with no crash — so it allows nothing: Service's Errors.MyError throw is red.
-        RuleResult result = Checker.Run(OneThrowModel, arch =>
-                arch.Rule("ex/only-absent")
-                    .Enforce(arch.Namespace("App.*").MustOnlyThrow(typeof(DivideByZeroException)))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(OneThrowModel, arch => arch.Namespace("App.*")
+            .MustOnlyThrow(typeof(DivideByZeroException)));
 
         result.ShouldHaveFailedWithEdges(ViolationKind.Throw, ["App.Service -> Errors.MyError"]);
     }
@@ -144,11 +130,8 @@ public sealed class MustOnlyThrowVerbTests
         // The allow-set (a namespace glob) resolves empty, which for MustNotCatch raises the whole-target inert
         // warning. MustOnlyThrow never does — an empty allow-set is loud on its own (every throw is red) — so the
         // result carries the violations and names the dead pattern as the stricter-than-written warning alone.
-        RuleResult result = Checker.Run(OneThrowModel, arch =>
-                arch.Rule("ex/only-nowhere")
-                    .Enforce(arch.Namespace("App.*").MustOnlyThrow(arch.Namespace("Nonexistent.*")))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(OneThrowModel, arch => arch.Namespace("App.*")
+            .MustOnlyThrow(arch.Namespace("Nonexistent.*")));
 
         result.ShouldHaveFailedWithEdges(ViolationKind.Throw, ["App.Service -> Errors.MyError"]);
         result.ShouldHaveWarnedStricterOnOperand("types in `Nonexistent.*`");

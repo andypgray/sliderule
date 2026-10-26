@@ -25,7 +25,7 @@ public sealed class SpecCountSyncTests
 
     private static readonly DocGate<SpecRuleCountClaim> Gate = new(
         CountDocs,
-        static doc => SpecRuleCounts.Extract(doc, RepoRoot.ReadText(doc)),
+        SpecRuleCounts.Extract,
         quotes: "self-spec rule counts");
 
     /// <summary>
@@ -37,7 +37,7 @@ public sealed class SpecCountSyncTests
     public void EveryClaimedRuleCount_MatchesTheRenderedBoard()
     {
         int rendered = SpecRuleCounts.RenderedRuleCount(File.ReadAllText(RepoRoot.AgentsMd));
-        string expected = GrandfatheredCounts.Spell(rendered, GrandfatheredCounts.CountStyle.WordToTen);
+        string expected = CountSpelling.Spell(rendered, CountStyle.WordToTen);
 
         List<string> drift = CountDocs
             .SelectMany(Gate.Scan)

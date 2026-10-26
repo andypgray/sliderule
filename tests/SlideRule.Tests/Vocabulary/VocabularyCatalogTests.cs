@@ -51,10 +51,9 @@ public sealed class VocabularyCatalogTests
         List<string> thin = new();
 
         // Act
-        AddFloor(thin, "verb", Count(VocabularyCatalog.Rows, PartOfSpeech.Verb), 50);
-        AddFloor(thin, "adjective", Count(VocabularyCatalog.Rows, PartOfSpeech.Adjective), 20);
-        AddFloor(thin, "noun and projection",
-            Count(VocabularyCatalog.Rows, PartOfSpeech.Noun) + Count(VocabularyCatalog.Rows, PartOfSpeech.Projection), 12);
+        AddFloor(thin, "verb", Count(PartOfSpeech.Verb), 50);
+        AddFloor(thin, "adjective", Count(PartOfSpeech.Adjective), 20);
+        AddFloor(thin, "noun and projection", Count(PartOfSpeech.Noun) + Count(PartOfSpeech.Projection), 12);
 
         // Assert
         thin.ShouldReportNothing("The vocabulary catalog is thinner than the shipped vocabulary can be");
@@ -142,9 +141,9 @@ public sealed class VocabularyCatalogTests
         return [.. missing, .. extra, .. duplicated];
     }
 
-    private static int Count(IEnumerable<VocabularyRow> rows, PartOfSpeech partOfSpeech)
+    private static int Count(PartOfSpeech partOfSpeech)
     {
-        return rows.Count(row => row.PartOfSpeech == partOfSpeech);
+        return VocabularyCatalog.Rows.Count(row => row.PartOfSpeech == partOfSpeech);
     }
 
     private static void AddFloor(List<string> thin, string kind, int count, int floor)

@@ -93,7 +93,7 @@ public sealed class CheckJsonExemplarTests
             .ShouldBeFalse();
         rule.GetProperty("warnings")
             .EnumerateArray()
-            .Single()
+            .ShouldHaveSingleItem()
             .GetProperty("kind")
             .GetString()
             .ShouldBe("deadExemplar");

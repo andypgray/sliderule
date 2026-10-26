@@ -55,7 +55,7 @@ public sealed class BaselineWorkspaceDiagnosticsGateE2ETests
         "error: the model is incomplete — 1 project failed to load, so check cannot pass:";
 
     // The project the gate is told restored badly. It loaded completely, so only its assets file says so.
-    private const string UnrestoredProject = "C:/repo/MyApp.Unrestored/MyApp.Unrestored.csproj";
+    private const string UnrestoredProject = DiagnosticInjectingSolutionSource.SimulatedRestoreFailedProject;
 
     private const string RestoreGateLine =
         "error: the model is incomplete — NuGet packages did not resolve for 1 project, so no baseline was "
@@ -78,8 +78,10 @@ public sealed class BaselineWorkspaceDiagnosticsGateE2ETests
         CliResult init = await RunBaselineAsync(
             workspace, [LoadDiagnostic], BaselineRequests.Init, false, [BrokenProject]);
 
-        init.ShouldRefuseWith(GateLine, BrokenProject);
-        init.Err.ShouldContain($"warning: {LoadDiagnostic}"); // the load failure still prints as a warning
+        init.ShouldRefuseWith(
+            GateLine,
+            BrokenProject,
+            $"warning: {LoadDiagnostic}"); // the load failure still prints as a warning
         init.Out.ShouldBeEmpty(); // it refused before the ratchet survey, so it reported no per-rule outcome
         File.Exists(baselineFile)
             .ShouldBeFalse(); // and above all, wrote nothing
@@ -96,10 +98,9 @@ public sealed class BaselineWorkspaceDiagnosticsGateE2ETests
 
         CliResult init = await RunBaselineAsync(workspace, [LoadDiagnostic], BaselineRequests.Init, true);
 
-        init.ShouldSucceed();
+        init.ShouldSucceed("wrote");
         init.Err.ShouldContain($"warning: {LoadDiagnostic}");
         init.Err.ShouldNotContain("error: the model is incomplete");
-        init.Out.ShouldContain("wrote");
         File.Exists(baselineFile)
             .ShouldBeTrue();
     }
@@ -170,9 +171,7 @@ public sealed class BaselineWorkspaceDiagnosticsGateE2ETests
         CliResult init = await RunBaselineAsync(
             workspace, [AuditDiagnostic, LoadDiagnostic], BaselineRequests.Init, false, [BrokenProject]);
 
-        init.ShouldRefuseWith(GateLine, BrokenProject);
-        init.Err.ShouldContain(AuditWarning);
-        init.Err.ShouldContain($"warning: {LoadDiagnostic}");
+        init.ShouldRefuseWith(GateLine, BrokenProject, AuditWarning, $"warning: {LoadDiagnostic}");
         File.Exists(baselineFile)
             .ShouldBeFalse();
     }

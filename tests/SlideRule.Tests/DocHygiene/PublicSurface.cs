@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Reflection;
+using SlideRule.Tests.TestSupport;
 
 namespace SlideRule.Tests.DocHygiene;
 
@@ -90,7 +91,7 @@ internal static class PublicSurface
         // Line endings are somebody else's gate. A checkout that rewrote the pin to CRLF would otherwise
         // report every line as both added and removed, which reads like the surface changed and is the
         // one message a reader must not be given wrongly.
-        pinned = pinned.Replace("\r\n", "\n", StringComparison.Ordinal);
+        pinned = pinned.NormalizedLines();
 
         string[] before = Qualified(pinned);
         string[] after = Qualified(rendered);

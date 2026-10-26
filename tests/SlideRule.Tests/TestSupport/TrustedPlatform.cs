@@ -16,15 +16,9 @@ internal static class TrustedPlatform
     /// <summary>Every assembly the host resolves against, with exactly one copy of the contract among them.</summary>
     internal static ImmutableArray<MetadataReference> References { get; } = ReferencesOf(Entries);
 
-    /// <summary>The whole set less the one assembly at <paramref name="path" />, compared as a full path.</summary>
-    /// <param name="path">The full path of the assembly to leave out.</param>
-    internal static ImmutableArray<MetadataReference> Without(string path)
-    {
-        IEnumerable<(string Path, MetadataReference Reference)> kept =
-            Entries.Where(entry => !string.Equals(entry.Path, path, StringComparison.OrdinalIgnoreCase));
-
-        return ReferencesOf(kept);
-    }
+    /// <summary>The whole set less the contract: what a compilation that brings its own contract builds against.</summary>
+    internal static ImmutableArray<MetadataReference> WithoutContract { get; } =
+        ReferencesOf(Entries.Where(entry => !IsContract(entry.Path)));
 
     /// <summary>The whole set less the assemblies named, each by file name.</summary>
     /// <param name="fileNames">The file names to leave out, such as <c>Some.Assembly.dll</c>.</param>
@@ -41,10 +35,8 @@ internal static class TrustedPlatform
     /// <param name="path">The full path of the assembly.</param>
     internal static MetadataReference At(string path)
     {
-        // The first entry rather than the only one: measured on .NET 10, the host lists
-        // System.Private.CoreLib twice at the same path.
         (string Path, MetadataReference Reference) entry =
-            Entries.First(candidate => string.Equals(candidate.Path, path, StringComparison.OrdinalIgnoreCase));
+            Entries.Single(candidate => string.Equals(candidate.Path, path, StringComparison.OrdinalIgnoreCase));
 
         return entry.Reference;
     }
@@ -57,6 +49,7 @@ internal static class TrustedPlatform
         List<string> paths = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
             .Split(Path.PathSeparator)
             .Where(path => path.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
         if (!paths.Any(IsContract)) paths.Add(ContractPath);

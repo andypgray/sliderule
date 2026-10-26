@@ -7,7 +7,6 @@ using SlideRule.Tests.Checking;
 using SlideRule.Tests.Extraction;
 using SlideRule.Tests.TestSupport;
 using Xunit;
-using static SlideRule.Tests.TestSupport.TextNormalization;
 
 namespace SlideRule.Tests.Cli;
 
@@ -140,7 +139,7 @@ public sealed class BaselineRunnerCountTests : IDisposable
         exit.ShouldBe(0);
         // The valve grandfathers a pair AND says how much of it: both of the controller's mentions ride the
         // one entry, and the entry records that it is two rather than any.
-        ReadNormalizedLines(path)
+        File.ReadAllText(path)
             .ShouldBe(BaselineComposer.Compose(
                 RuleId,
                 Pair.WithSiteCount(2)
@@ -157,7 +156,7 @@ public sealed class BaselineRunnerCountTests : IDisposable
         AddEntry("INC-2", report)
             .ShouldContain(
                 "data-access/ledger-behind-repository: entry already baselined — attribution updated and site count re-recorded (uncounted → 2).");
-        ReadNormalizedLines(path)
+        File.ReadAllText(path)
             .ShouldBe(BaselineComposer.Compose(
                 RuleId,
                 Pair.WithSiteCount(2)
@@ -178,7 +177,7 @@ public sealed class BaselineRunnerCountTests : IDisposable
         AddEntry("INC-2", report)
             .ShouldContain(
                 "data-access/ledger-behind-repository: entry already baselined — attribution updated and site count re-recorded (2 → 3).");
-        ReadNormalizedLines(path)
+        File.ReadAllText(path)
             .ShouldBe(BaselineComposer.Compose(
                 RuleId,
                 Pair.WithSiteCount(3)
@@ -196,7 +195,7 @@ public sealed class BaselineRunnerCountTests : IDisposable
         string echo = AcceptReductions(report.Results);
 
         echo.ShouldContain("data-access/ledger-behind-repository: recorded the site count on 1 entry.");
-        ReadNormalizedLines(path)
+        File.ReadAllText(path)
             .ShouldBe(BaselineComposer.Compose(
                 RuleId,
                 Pair.WithSiteCount(2)
@@ -214,7 +213,7 @@ public sealed class BaselineRunnerCountTests : IDisposable
         string echo = AcceptReductions(report.Results);
 
         echo.ShouldContain("data-access/ledger-behind-repository: recorded the site count on 2 entries.");
-        ReadNormalizedLines(path)
+        File.ReadAllText(path)
             .ShouldBe(BaselineComposer.Compose(
                 RuleId,
                 ExportPair.WithSiteCount(2),
@@ -232,7 +231,7 @@ public sealed class BaselineRunnerCountTests : IDisposable
         string echo = AcceptReductions(report.Results);
 
         echo.ShouldContain("data-access/ledger-behind-repository: lowered the site count on 1 entry.");
-        ReadNormalizedLines(path)
+        File.ReadAllText(path)
             .ShouldBe(BaselineComposer.Compose(RuleId, Pair.WithSiteCount(2)));
     }
 
@@ -249,7 +248,7 @@ public sealed class BaselineRunnerCountTests : IDisposable
         echo.ShouldContain("data-access/ledger-behind-repository: nothing to accept.");
         echo.ShouldContain(
             "data-access/ledger-behind-repository: refused site growth on 1 entry — a grandfathered pair grows only via 'sliderule baseline add', one attributed entry at a time.");
-        ReadNormalizedLines(path)
+        File.ReadAllText(path)
             .ShouldBe(BaselineComposer.Compose(RuleId, Pair.WithSiteCount(2)));
     }
 
@@ -266,7 +265,7 @@ public sealed class BaselineRunnerCountTests : IDisposable
         string echo = AcceptReductions([ObservedResult(observed: [0])]);
 
         echo.ShouldContain("data-access/ledger-behind-repository: nothing to accept.");
-        ReadNormalizedLines(path)
+        File.ReadAllText(path)
             .ShouldBe(content);
     }
 
@@ -301,7 +300,7 @@ public sealed class BaselineRunnerCountTests : IDisposable
         // One line, not two — and the allowance covers the larger of the two, because anything less would
         // red the very state the capture was taken from.
         echo.ShouldContain("data-access/ledger-behind-repository: captured 1 grandfathered violation.");
-        ReadNormalizedLines(_temp.PathOf(BaselineFile))
+        File.ReadAllText(_temp.PathOf(BaselineFile))
             .ShouldBe(BaselineComposer.Compose(RuleId, Pair.WithSiteCount(3)));
     }
 
@@ -320,7 +319,7 @@ public sealed class BaselineRunnerCountTests : IDisposable
         echo.ShouldContain($"unchanged {BaselineFile}");
         File.ReadAllBytes(path)
             .ShouldBe(before);
-        ReadNormalizedLines(path)
+        File.ReadAllText(path)
             .ShouldContain($"\"schemaVersion\": {BaselineFormat.LegacySchemaVersion},");
     }
 
@@ -392,7 +391,7 @@ public sealed class BaselineRunnerCountTests : IDisposable
                 + "this run measured no debt for it; skipped. Fix the rule's selection, then re-run."),
             () => echo.ShouldNotContain("reduction"),
             () => echo.ShouldNotContain("wrote"));
-        ReadNormalizedLines(path)
+        File.ReadAllText(path)
             .ShouldBe(before);
     }
 
@@ -462,7 +461,7 @@ public sealed class BaselineRunnerCountTests : IDisposable
         string echo = AcceptReductions(report.Results);
 
         echo.ShouldContain("data-access/ledger-behind-repository: accepted 1 reduction");
-        ReadNormalizedLines(path)
+        File.ReadAllText(path)
             .ShouldBe(BaselineComposer.Compose(RuleId, Pair.WithSiteCount(2)));
     }
 
@@ -521,39 +520,25 @@ public sealed class BaselineRunnerCountTests : IDisposable
 
     private static ArchitectureModel Model()
     {
-        return Checker.Model(arch => arch.Rule(RuleId)
-            .Migrate(
-                "the web layer reaches the ledger directly",
-                arch.Namespace("App.Web.*").MustNotReference(arch.Namespace("App.Data.*")))
-            .Baseline(BaselineFile)
-            .Because("b"));
+        return ModelOf(arch => arch.Namespace("App.Web.*").MustNotReference(arch.Namespace("App.Data.*")));
     }
 
     // The same rule with a second target pattern that names nothing: App.Data.* still bites and App.Ghost.* has
     // gone dead, so the rule measures only part of what it names.
     private static ArchitectureModel PartlyInertModel()
     {
-        return Checker.Model(arch => arch.Rule(RuleId)
-            .Migrate(
-                "the web layer reaches the ledger directly",
-                arch.Namespace("App.Web.*").MustNotReference(arch.Namespace("App.Data.*"), arch.Namespace("App.Ghost.*")))
-            .Baseline(BaselineFile)
-            .Because("b"));
+        return ModelOf(arch => arch.Namespace("App.Web.*")
+            .MustNotReference(arch.Namespace("App.Data.*"), arch.Namespace("App.Ghost.*")));
     }
 
     // The same pair through an allow-list whose one pattern names nothing, so the web layer may reference
     // nothing and the ledger pair reds: the rule is stricter than written.
     private static ArchitectureModel StricterModel()
     {
-        return Checker.Model(arch => arch.Rule(RuleId)
-            .Migrate(
-                "the web layer reaches the ledger directly",
-                arch.Namespace("App.Web.*").MustOnlyReference(arch.Namespace("App.Ghost.*")))
-            .Baseline(BaselineFile)
-            .Because("b"));
+        return ModelOf(arch => arch.Namespace("App.Web.*").MustOnlyReference(arch.Namespace("App.Ghost.*")));
     }
 
-    // The rule under any constraint, for the rows that vary the verb the dead operand sits in.
+    // The rule every model here declares, under the constraint the caller names.
     private static ArchitectureModel ModelOf(Func<Arch, Constraint> constraint)
     {
         return Checker.Model(arch => arch.Rule(RuleId)
@@ -587,13 +572,13 @@ public sealed class BaselineRunnerCountTests : IDisposable
     private string Init(IEnumerable<RuleResult> results)
     {
         return BaselineRequests.Init(_temp.Path)
-            .Apply(results, _temp.Path);
+            .Apply(results);
     }
 
     private string AcceptReductions(IEnumerable<RuleResult> results)
     {
         return BaselineRequests.AcceptReductions(_temp.Path)
-            .Apply(results, _temp.Path);
+            .Apply(results);
     }
 
     // add through its own seam, handing back what the runner said — the exit code is dropped here as it

@@ -15,12 +15,15 @@ namespace SlideRule.Tests.TestSupport;
 internal static class DotnetCli
 {
     /// <summary>
-    ///     Runs <c>dotnet <paramref name="arguments" /></c> in <paramref name="workingDirectory" />,
-    ///     throwing <see cref="InvalidOperationException" /> (carrying stdout + stderr) on a non-zero exit.
+    ///     Runs <c>dotnet <paramref name="arguments" /> --disable-build-servers</c> in
+    ///     <paramref name="workingDirectory" />, throwing <see cref="InvalidOperationException" /> (carrying
+    ///     stdout + stderr) on a non-zero exit. Every command it runs builds or restores, and the switch keeps the
+    ///     command from leaving a compiler or Razor server running after it exits.
     /// </summary>
     internal static void Run(string arguments, string workingDirectory)
     {
-        ProcessStartInfo startInfo = new("dotnet", arguments)
+        var commandLine = $"{arguments} --disable-build-servers";
+        ProcessStartInfo startInfo = new("dotnet", commandLine)
         {
             WorkingDirectory = workingDirectory
         };
@@ -29,7 +32,7 @@ internal static class DotnetCli
         ChildProcess.ProcessResult result = ChildProcess.Run(startInfo);
         if (result.ExitCode != 0)
             throw new InvalidOperationException(
-                $"'dotnet {arguments}' failed with exit code {result.ExitCode}."
+                $"'dotnet {commandLine}' failed with exit code {result.ExitCode}."
                 + $"{Environment.NewLine}{result.StandardOutput}{Environment.NewLine}{result.StandardError}");
     }
 
@@ -41,8 +44,7 @@ internal static class DotnetCli
     ///     Node-reuse + MSBuild-server off: otherwise a reused worker node (or, on newer SDKs, an MSBuild
     ///     server) lingers after the command exits, inherits the child's redirected stdout write-handle, and
     ///     the pipe never reaches EOF — the <see cref="ChildProcess" /> drain would then unblock only once
-    ///     its ceiling elapsed and it killed the tree. (Build callers additionally pass
-    ///     <c>--disable-build-servers</c> for the same reason.) The
+    ///     its ceiling elapsed and it killed the tree. The
     ///     stripped vars matter because the test process has Visual Studio's MSBuild registered (MSBuildLocator
     ///     + <c>MsBuildBootstrap</c> set MSBUILD_EXE_PATH / VSINSTALLDIR / VSCMD_VER process-wide for the
     ///     Roslyn BuildHost); a child inheriting those resolves the wrong MSBuild and fails immediately.

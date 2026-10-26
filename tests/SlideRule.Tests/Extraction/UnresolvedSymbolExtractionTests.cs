@@ -26,13 +26,13 @@ public sealed class UnresolvedSymbolExtractionTests
         // PopulateHierarchy resolves the base type, which is an error symbol.
         CodebaseModel model = CompilationFactory.Extract("namespace App;\npublic class Widget : Ghost.Base { }\n");
 
-        TypeNode external = model.Types.Single(t => t.FullName == "Ghost.Base");
+        TypeNode external = model.Type("Ghost.Base");
 
         // Public is the deliberate fallback: an unresolved external is never a rule subject, its accessibility
         // is informational, and a type reached across an assembly boundary is visibly-public surface.
         external.Accessibility.ShouldBe(Accessibility.Public);
         external.IsExternal.ShouldBeTrue();
-        model.Types.Single(t => t.FullName == "App.Widget")
+        model.Type("App.Widget")
             .BaseType!.FullName()
             .ShouldBe("Ghost.Base");
     }
@@ -47,9 +47,9 @@ public sealed class UnresolvedSymbolExtractionTests
         CodebaseModel model = CompilationFactory.Extract(
             "namespace App;\npublic interface IReal { }\npublic class Cache : IReal, Ghost.ICache { }\n");
 
-        model.Types.Single(t => t.FullName == "Ghost.ICache")
+        model.Type("Ghost.ICache")
             .Accessibility.ShouldBe(Accessibility.Public);
-        model.Types.Single(t => t.FullName == "App.Cache")
+        model.Type("App.Cache")
             .Interfaces.Select(i => i.FullName())
             .ShouldContain("Ghost.ICache");
     }
@@ -61,7 +61,8 @@ public sealed class UnresolvedSymbolExtractionTests
         // depends on which of the two candidate spellings Roslyn kept, so the assertion keys on the prefix.
         CodebaseModel model = CompilationFactory.Extract("namespace App;\n[Ghost.Marker]\npublic class Tagged { }\n");
 
-        TypeNode external = model.Types.Single(t => t.FullName.StartsWith("Ghost.Marker", StringComparison.Ordinal));
+        TypeNode external = model.Types.ShouldHaveSingle(
+            t => t.FullName.StartsWith("Ghost.Marker", StringComparison.Ordinal), t => t.FullName);
         external.Accessibility.ShouldBe(Accessibility.Public);
         external.IsExternal.ShouldBeTrue();
     }
@@ -75,7 +76,7 @@ public sealed class UnresolvedSymbolExtractionTests
         // stable and deterministic — the extractor's unresolved:{fqn} form is for symbols with no ID at all.
         CodebaseModel model = CompilationFactory.Extract("namespace App;\npublic class Widget : Ghost.Base { }\n");
 
-        TypeNode external = model.Types.Single(t => t.FullName == "Ghost.Base");
+        TypeNode external = model.Type("Ghost.Base");
         external.SymbolId.ShouldBe("!:Ghost.Base");
         external.Kind.ShouldBe(TypeKind.Class);
     }
@@ -88,7 +89,7 @@ public sealed class UnresolvedSymbolExtractionTests
         // to test. An all-files test over nothing is true, so the length guard is what keeps it authored.
         CodebaseModel model = CompilationFactory.Extract("namespace App;\npublic class Widget : Ghost.Base { }\n");
 
-        model.Types.Single(t => t.FullName == "Ghost.Base")
+        model.Type("Ghost.Base")
             .IsGenerated.ShouldBeFalse();
     }
 }

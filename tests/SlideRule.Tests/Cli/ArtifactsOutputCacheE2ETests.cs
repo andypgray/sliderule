@@ -48,12 +48,12 @@ public sealed class ArtifactsOutputCacheE2ETests
         File.Exists(workspace.PathOf(Web, "obj", "project.assets.json"))
             .ShouldBeFalse();
 
-        await RunGraphAsync(workspace, cache.Root);
-        (await RunGraphAsync(workspace, cache.Root)).ShouldBe(CodebaseSourceOutcome.Hit);
+        await ShouldRunGraphAsync(workspace, cache.Root);
+        (await ShouldRunGraphAsync(workspace, cache.Root)).ShouldBe(CodebaseSourceOutcome.Hit);
 
         await File.AppendAllTextAsync(assets, "\n", Ct);
 
-        (await RunGraphAsync(workspace, cache.Root)).ShouldNotBe(CodebaseSourceOutcome.Hit);
+        (await ShouldRunGraphAsync(workspace, cache.Root)).ShouldNotBe(CodebaseSourceOutcome.Hit);
     }
 
     [Fact]
@@ -66,12 +66,12 @@ public sealed class ArtifactsOutputCacheE2ETests
         File.Exists(assets)
             .ShouldBeTrue();
 
-        await RunGraphAsync(workspace, cache.Root);
-        (await RunGraphAsync(workspace, cache.Root)).ShouldBe(CodebaseSourceOutcome.Hit);
+        await ShouldRunGraphAsync(workspace, cache.Root);
+        (await ShouldRunGraphAsync(workspace, cache.Root)).ShouldBe(CodebaseSourceOutcome.Hit);
 
         await File.AppendAllTextAsync(assets, "\n", Ct);
 
-        (await RunGraphAsync(workspace, cache.Root)).ShouldNotBe(CodebaseSourceOutcome.Hit);
+        (await ShouldRunGraphAsync(workspace, cache.Root)).ShouldNotBe(CodebaseSourceOutcome.Hit);
     }
 
     // A private fixture copy, restored under the requested layout. UseArtifactsOutput is only honoured from
@@ -89,7 +89,8 @@ public sealed class ArtifactsOutputCacheE2ETests
         return workspace;
     }
 
-    private static async Task<CodebaseSourceOutcome?> RunGraphAsync(TempFixtureWorkspace workspace, string cacheRoot)
+    private static async Task<CodebaseSourceOutcome?> ShouldRunGraphAsync(
+        TempFixtureWorkspace workspace, string cacheRoot)
     {
         CacheRun run = await CacheRuns.GraphAsync(workspace.SolutionPath, cacheRoot);
 

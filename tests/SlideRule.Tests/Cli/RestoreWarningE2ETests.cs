@@ -37,7 +37,7 @@ public sealed class RestoreWarningE2ETests
     [Fact]
     public async Task Check_SolutionRaisingAPruningRestoreWarning_RendersItAndPassesTheRule()
     {
-        using var workspace = new TempFixtureWorkspace();
+        using var workspace = new TempFixtureWorkspace(restore: false);
         AddPrunablePackageReference(workspace);
 
         CliResult check = await CliRunner.InvokeColdAsync(
@@ -55,7 +55,7 @@ public sealed class RestoreWarningE2ETests
     [Fact]
     public async Task CheckJson_SolutionRaisingAPruningRestoreWarning_CarriesItWithoutStampingIncomplete()
     {
-        using var workspace = new TempFixtureWorkspace();
+        using var workspace = new TempFixtureWorkspace(restore: false);
         AddPrunablePackageReference(workspace);
 
         CliResult check = await CliRunner.InvokeColdAsync(
@@ -63,8 +63,7 @@ public sealed class RestoreWarningE2ETests
 
         // The MCP-facing half: a client reading modelIncomplete must not be told the answer is untrustworthy
         // because a package could stand to be removed from a csproj.
-        check.ShouldSucceed("\"workspaceDiagnostics\"");
-        check.Out.ShouldContain("will not be pruned");
+        check.ShouldSucceed("\"workspaceDiagnostics\"", "will not be pruned");
         check.Out.ShouldNotContain("\"modelIncomplete\"");
         check.Out.ShouldNotContain("\"failedProjects\"");
     }

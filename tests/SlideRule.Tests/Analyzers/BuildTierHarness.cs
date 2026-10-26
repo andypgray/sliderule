@@ -15,18 +15,15 @@ using SlideRule.Tests.TestSupport;
 namespace SlideRule.Tests.Analyzers;
 
 /// <summary>An additional file the build hands over, held in memory; a null text is a file that would not read.</summary>
-internal sealed class InMemoryAdditionalText(string path, SourceText? text) : AdditionalText
+internal sealed class InMemoryAdditionalText(string path, string? content) : AdditionalText
 {
-    internal InMemoryAdditionalText(string path, string? content)
-        : this(path, content is null ? null : SourceText.From(content))
-    {
-    }
+    private readonly SourceText? _text = content is null ? null : SourceText.From(content);
 
     public override string Path { get; } = path;
 
     public override SourceText? GetText(CancellationToken cancellationToken = default)
     {
-        return text;
+        return _text;
     }
 }
 
@@ -409,11 +406,8 @@ internal static class BuildTier
         IReadOnlyList<(SyntaxTree Tree, IReadOnlyList<Diagnostic> Reported)> documents =
             await DiagnoseEachDocumentAsync(compilation, additionalFiles, tier, beforeCheck, cancellationToken);
 
-        var byPath = new Dictionary<string, IReadOnlyList<Diagnostic>>(StringComparer.Ordinal);
-        foreach ((SyntaxTree tree, IReadOnlyList<Diagnostic> reported) in documents)
-            byPath.Add(tree.FilePath, reported);
-
-        return byPath;
+        return documents.ToDictionary(
+            document => document.Tree.FilePath, document => document.Reported, StringComparer.Ordinal);
     }
 
     /// <summary>

@@ -116,8 +116,8 @@ public sealed class CodebaseExtractorTypeTests
                                                          """);
 
         model.Type("N.Decorated")
-            .DeclarationSites.Single()
-            .Line.ShouldBe(5);
+            .DeclarationSites.Lines()
+            .ShouldBe([5]);
     }
 
     [Fact]
@@ -141,8 +141,7 @@ public sealed class CodebaseExtractorTypeTests
         model.Type("N.Derived")
             .BaseType!.FullName()
             .ShouldBe("N.Base");
-        model.HasEdge("N.Derived", "N.Base")
-            .ShouldBeTrue();
+        model.ShouldHaveEdge("N.Derived", "N.Base");
     }
 
     [Fact]

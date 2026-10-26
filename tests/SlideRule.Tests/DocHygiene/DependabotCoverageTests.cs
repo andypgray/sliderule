@@ -35,10 +35,8 @@ public sealed class DependabotCoverageTests
     public void DependabotNuGetList_CoversEveryCommittedLockFile()
     {
         // Arrange
-        HashSet<string> listed = ReadNuGetDirectories()
-            .ToHashSet(StringComparer.Ordinal);
-        HashSet<string> committed = CommittedLockFileDirectories()
-            .ToHashSet(StringComparer.Ordinal);
+        IReadOnlySet<string> listed = ReadNuGetDirectories();
+        IReadOnlySet<string> committed = CommittedLockFileDirectories();
 
         // Act
         List<string> unlisted = committed.Except(listed)
@@ -57,7 +55,7 @@ public sealed class DependabotCoverageTests
     public void DependabotNuGetList_IsReadable()
     {
         // Act
-        IReadOnlyList<string> listed = ReadNuGetDirectories();
+        IReadOnlySet<string> listed = ReadNuGetDirectories();
 
         // Assert: the arm above compares two sets, and an empty parse would make it pass by reading
         // nothing rather than by finding agreement.
@@ -66,12 +64,11 @@ public sealed class DependabotCoverageTests
 
     // Every tracked lock file's directory, in the leading-slash repository-relative form the update
     // entry lists, so the two sets are comparable as they stand.
-    private static IReadOnlyList<string> CommittedLockFileDirectories()
+    private static IReadOnlySet<string> CommittedLockFileDirectories()
     {
         return TrackedFiles.LockFiles
             .Select(DirectoryOf)
-            .Order(StringComparer.Ordinal)
-            .ToArray();
+            .ToHashSet(StringComparer.Ordinal);
     }
 
     // A lock file at the repository root maps to "/", which is the form a root update entry takes.
@@ -83,18 +80,11 @@ public sealed class DependabotCoverageTests
     }
 
     // Every directory any nuget update entry lists. Reading the union rather than the first entry keeps a
-    // project in this gate's sight whichever entry lists it. No entry at all is a failure rather than an
-    // empty result: nothing would be keeping the pinned versions current.
-    private static IReadOnlyList<string> ReadNuGetDirectories()
+    // project in this gate's sight whichever entry lists it.
+    private static IReadOnlySet<string> ReadNuGetDirectories()
     {
-        IReadOnlyList<string[]> entries = DependabotEntries.NuGetEntries();
-        if (entries.Count == 0)
-            throw new InvalidOperationException(
-                $"{DependabotConfig} carries no nuget update entry, so nothing keeps the pinned package versions current.");
-
-        return entries.SelectMany(DependabotEntries.Directories)
-            .Distinct(StringComparer.Ordinal)
-            .Order(StringComparer.Ordinal)
-            .ToArray();
+        return DependabotEntries.NuGetEntries()
+            .SelectMany(DependabotEntries.Directories)
+            .ToHashSet(StringComparer.Ordinal);
     }
 }

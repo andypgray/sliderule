@@ -177,9 +177,7 @@ public sealed class SpecCompletionParityTests(SpecCompletionFixture fixture)
         // read exactly like a surface both readers understood.
         marked.ShouldNotBeEmpty("The authoring-surface walk found no marked parameters at all.");
         Completing.Values
-            .Distinct()
-            .Count()
-            .ShouldBe(7, "Seven slots complete, and each of them has to be a kind of its own.");
+            .ShouldBeUnique("Seven slots complete, and each of them has to be a kind of its own.");
         marked.Values
             .Where(slot => Completing.ContainsKey(slot))
             .Distinct(StringComparer.Ordinal)

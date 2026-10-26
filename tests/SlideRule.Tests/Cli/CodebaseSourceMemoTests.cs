@@ -33,7 +33,7 @@ public sealed class CodebaseSourceMemoTests
     public async Task ExtractAsync_WithSeveralDifferentExclusions_WalksOnceAndEachModelMatchesItsColdExtraction()
     {
         using var fixture = new TempFixtureWorkspace();
-        var counting = new CountingSolutionSource();
+        CountingSolutionSource counting = CountingSolutionSource.OverWarmPool();
         using var source = await CodebaseSource.CreateSpeclessAsync(
             counting, EnvironmentFor(), fixture.SolutionPath,
             SolutionPaths.SolutionDirectoryOf(fixture.SolutionPath), true, Ct);
@@ -65,7 +65,7 @@ public sealed class CodebaseSourceMemoTests
     public async Task ExtractAsync_TwiceWithTheSameExclusion_HandsBackTheModelItAlreadyBuilt()
     {
         using var fixture = new TempFixtureWorkspace();
-        var counting = new CountingSolutionSource();
+        CountingSolutionSource counting = CountingSolutionSource.OverWarmPool();
         using var source = await CodebaseSource.CreateSpeclessAsync(
             counting, EnvironmentFor(), fixture.SolutionPath,
             SolutionPaths.SolutionDirectoryOf(fixture.SolutionPath), true, Ct);
@@ -88,7 +88,7 @@ public sealed class CodebaseSourceMemoTests
     {
         using var fixture = new TempFixtureWorkspace();
         using var cache = new TempCacheRoot("codebase-source-memo");
-        var counting = new CountingSolutionSource();
+        CountingSolutionSource counting = CountingSolutionSource.OverWarmPool();
         using var source = await CodebaseSource.CreateSpeclessAsync(
             counting, EnvironmentFor(cache.Root), fixture.SolutionPath,
             SolutionPaths.SolutionDirectoryOf(fixture.SolutionPath), false, Ct);
@@ -117,7 +117,7 @@ public sealed class CodebaseSourceMemoTests
     }
 
     // The cache root only matters where a fact turns the cache on; elsewhere the run is disabled and reads
-    // nothing, so an environment with no override is all it needs.
+    // nothing, so the double's own run-scoped root is all it needs.
     private static FakeEnvironment EnvironmentFor(string? cacheRoot = null)
     {
         return cacheRoot is null ? new FakeEnvironment() : FakeEnvironment.WithCacheRoot(cacheRoot);

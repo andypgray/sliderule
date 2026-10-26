@@ -48,8 +48,8 @@ public sealed class BuildTierVersionCheckTests
             new BuildTierAnalyzer(), BuildTier.OwnCompilation(), FilesFor(arrangement), cancellationToken: Ct);
 
         agreed.ShouldNotReport("SR2093");
-        agreed.Select(diagnostic => diagnostic.Id)
-            .ShouldBe(unarmed.Select(diagnostic => diagnostic.Id));
+        string[] unarmedIds = [.. unarmed.Select(diagnostic => diagnostic.Id)];
+        agreed.ShouldReport(unarmedIds);
         agreed.ShouldNotBeEmpty("the arrangement should report something for the check to have let through");
     }
 
@@ -58,8 +58,7 @@ public sealed class BuildTierVersionCheckTests
     {
         IReadOnlyList<Diagnostic> reported = await DiagnoseAsync(("0.9.0+aaa", "0.9.0+bbb"), "findings");
 
-        reported.ShouldAllBe("SR2001")
-            .Count.ShouldBe(3, "the two versions are one version, so the rule is checked as usual");
+        reported.ShouldAllBe("SR2001", 3, "the two versions are one version, so the rule is checked as usual");
     }
 
     [Theory]

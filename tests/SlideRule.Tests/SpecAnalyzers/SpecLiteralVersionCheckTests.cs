@@ -28,9 +28,9 @@ public sealed class SpecLiteralVersionCheckTests
         """;
 
     [Fact]
-    public async Task TwoVersions_AreOneLB1093NamingBothAndNoLiteralWarning()
+    public async Task TwoVersions_AreOneSR1093NamingBothAndNoLiteralWarning()
     {
-        IReadOnlyList<Diagnostic> reported = await DiagnoseAsync(MalformedId, ("0.9.0+abc123", "0.8.0+def456"));
+        IReadOnlyList<Diagnostic> reported = await ShouldDiagnoseAsync(MalformedId, ("0.9.0+abc123", "0.8.0+def456"));
 
         Diagnostic mismatch = reported.ShouldBeTheOnly("SR1093");
         mismatch.ShouldSay(Mismatch("0.9.0", "0.8.0"));
@@ -43,7 +43,7 @@ public sealed class SpecLiteralVersionCheckTests
     [InlineData("0.9.0+aaa", "0.9.0+bbb")]
     public async Task OneVersion_ReportsTheVerdictAsUsual(string analyzer, string contract)
     {
-        IReadOnlyList<Diagnostic> reported = await DiagnoseAsync(MalformedId, (analyzer, contract));
+        IReadOnlyList<Diagnostic> reported = await ShouldDiagnoseAsync(MalformedId, (analyzer, contract));
 
         reported.ShouldBeTheOnly("SR1008");
     }
@@ -54,7 +54,7 @@ public sealed class SpecLiteralVersionCheckTests
     public async Task AMissingVersion_NeverMatchesARealOne(
         string? analyzer, string? contract, string shownAnalyzer, string shownContract)
     {
-        IReadOnlyList<Diagnostic> reported = await DiagnoseAsync(MalformedId, (analyzer, contract));
+        IReadOnlyList<Diagnostic> reported = await ShouldDiagnoseAsync(MalformedId, (analyzer, contract));
 
         reported.ShouldBeTheOnly("SR1093")
             .ShouldSay(Mismatch(shownAnalyzer, shownContract));
@@ -66,9 +66,9 @@ public sealed class SpecLiteralVersionCheckTests
         var reached = false;
 
         IReadOnlyList<Diagnostic> reported = await SpecSnippet.ShouldCompileAndDiagnoseAsync(
-            [(SpecSnippet.FilePath, NoSpec)],
-            SpecSnippet.WithoutTheContract,
+            NoSpec,
             cancellationToken: Ct,
+            references: SpecSnippet.WithoutTheContract,
             versions: () =>
             {
                 reached = true;
@@ -83,7 +83,7 @@ public sealed class SpecLiteralVersionCheckTests
     public async Task AFaultInTheCheck_IsTheOrdinaryFaultOnceAndPlacedNowhere()
     {
         IReadOnlyList<Diagnostic> reported = await SpecSnippet.ShouldCompileAndDiagnoseAsync(
-            [(SpecSnippet.FilePath, MalformedId)],
+            MalformedId,
             cancellationToken: Ct,
             versions: () => throw new InvalidOperationException("The contract went missing.\nA second line."));
 
@@ -131,10 +131,9 @@ public sealed class SpecLiteralVersionCheckTests
                + "it is loaded.";
     }
 
-    private static Task<IReadOnlyList<Diagnostic>> DiagnoseAsync(
+    private static Task<IReadOnlyList<Diagnostic>> ShouldDiagnoseAsync(
         string source, (string? Analyzer, string? Core) versions)
     {
-        return SpecSnippet.ShouldCompileAndDiagnoseAsync(
-            [(SpecSnippet.FilePath, source)], cancellationToken: Ct, versions: () => versions);
+        return SpecSnippet.ShouldCompileAndDiagnoseAsync(source, cancellationToken: Ct, versions: () => versions);
     }
 }

@@ -10,7 +10,7 @@ namespace SlideRule.Tests.Checking;
 ///     (no extra MSBuild load): the <c>layering/domain-independent</c> rule fires with a locatable site. The
 ///     clean verdicts over the same fixture are the oracle's rows.
 /// </summary>
-public sealed class CheckerFixtureIntegrationTests(WorkspaceFixture fixture)
+public sealed class CheckerFixtureIntegrationTests(WorkspaceFixture fixture) : IClassFixture<WorkspaceFixture>
 {
     [Fact]
     public void DomainMustNotReferenceWeb_FiresOnOrderServiceWithLocation()
@@ -27,11 +27,10 @@ public sealed class CheckerFixtureIntegrationTests(WorkspaceFixture fixture)
             "MyApp.Domain.OrderService -> MyApp.Web.HomeController",
             "MyApp.Domain.OrderService -> MyApp.Web.WebTextExtensions");
 
-        Violation homeController = result.Violations.Single(v =>
-            v.Source!.FullName == "MyApp.Domain.OrderService" && v.Target!.FullName == "MyApp.Web.HomeController");
-        homeController.Sites.Select(fixture.RelativePath)
-            .ShouldContain("MyApp.Domain/OrderService.cs");
-        homeController.Sites.Select(s => s.Line)
-            .ShouldContain(9);
+        Violation homeController = result.Violations.ShouldHaveSingle(
+            v => v.Source!.FullName == "MyApp.Domain.OrderService" && v.Target!.FullName == "MyApp.Web.HomeController",
+            v => $"{v.Source?.FullName} -> {v.Target?.FullName}");
+        homeController.Sites.Select(site => $"{fixture.RelativePath(site)}:{site.Line}")
+            .ShouldContain("MyApp.Domain/OrderService.cs:9");
     }
 }

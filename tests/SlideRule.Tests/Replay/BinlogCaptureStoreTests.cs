@@ -60,7 +60,7 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
     {
         // Arrange — the headline pin: replay reads text from current disk, so a content edit never
         // invalidates a structure-only capture.
-        BinlogCaptureStore store = IngestFullCapture();
+        BinlogCaptureStore store = ShouldIngestFullCapture();
         string source = Fixture.PathOf("MyApp.Domain", "Money.cs");
         using ScopedFile held = ScopedFile.Hold(source);
         File.AppendAllText(source, $"{Environment.NewLine}public sealed class CaptureContentEditProbe {{ }}{Environment.NewLine}");
@@ -76,7 +76,7 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
     public void Validate_BareCsprojTouch_RehashesOnceThenStatFastPath()
     {
         // Arrange
-        BinlogCaptureStore store = IngestFullCapture();
+        BinlogCaptureStore store = ShouldIngestFullCapture();
         string csproj = Fixture.PathOf("MyApp.Domain", "MyApp.Domain.csproj");
         using ScopedFile held = ScopedFile.Hold(csproj);
 
@@ -116,9 +116,8 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
 
         string csproj = CsprojPathOf(replayed.Solution, "MyApp.Domain");
         using ScopedFile held = ScopedFile.Hold(csproj);
-        string edited = File.ReadAllText(csproj)
-            .Replace("</Project>", "  <!-- capture stale probe -->\n</Project>");
-        File.WriteAllText(csproj, edited);
+        FixtureEdits.EditOnDisk(
+            csproj, content => content.Replace("</Project>", "  <!-- capture stale probe -->\n</Project>"));
 
         // Act
         CaptureValidation validation = store.Validate(Ct);
@@ -132,7 +131,7 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
     public void Validate_NewSourceFileInCone_InvalidNamingFile()
     {
         // Arrange
-        BinlogCaptureStore store = IngestFullCapture();
+        BinlogCaptureStore store = ShouldIngestFullCapture();
         string added = Fixture.PathOf("MyApp.Domain", "CaptureConeAddProbe.cs");
         using ScopedFile held = ScopedFile.Hold(added);
         File.WriteAllText(added, "namespace MyApp.Domain; public sealed class CaptureConeAddProbe { }\n");
@@ -149,7 +148,7 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
     public void Validate_NewFileUnderObj_StaysUsable()
     {
         // Arrange
-        BinlogCaptureStore store = IngestFullCapture();
+        BinlogCaptureStore store = ShouldIngestFullCapture();
         string objProbe = Fixture.PathOf("MyApp.Domain", "obj", "CaptureObjProbe.cs");
         using ScopedFile held = ScopedFile.Hold(objProbe);
         File.WriteAllText(objProbe, "namespace MyApp.Domain; public sealed class CaptureObjProbe { }\n");
@@ -166,7 +165,7 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
         // disk but is not a compiled document, so it is absent from the capture's DocumentPaths. The ConeFiles
         // snapshot recorded at ingest covers it; without that, the cone scan would read it as an add and
         // invalidate the capture on every run. This static-fixture stray needs no revert.
-        BinlogCaptureStore store = IngestFullCapture();
+        BinlogCaptureStore store = ShouldIngestFullCapture();
         File.Exists(Fixture.PathOf("MyApp.Domain", "Snippets", "ExcludedScratch.cs"))
             .ShouldBeTrue();
 
@@ -205,7 +204,7 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
     public void Validate_GarbledManifest_InvalidUnreadable()
     {
         // Arrange
-        BinlogCaptureStore store = IngestFullCapture();
+        BinlogCaptureStore store = ShouldIngestFullCapture();
         File.WriteAllText(CaptureFiles.Manifest(Fixture.SolutionPath, _cacheRoot.Path), "{ not: valid json ]");
 
         // Act
@@ -220,7 +219,7 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
     public void Validate_DeletedBinlogCopy_InvalidUnreadable()
     {
         // Arrange
-        BinlogCaptureStore store = IngestFullCapture();
+        BinlogCaptureStore store = ShouldIngestFullCapture();
         File.Delete(CaptureFiles.Binlog(Fixture.SolutionPath, _cacheRoot.Path));
 
         // Act
@@ -235,7 +234,7 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
     public void Validate_ToolVersionMismatch_InvalidVersion()
     {
         // Arrange
-        BinlogCaptureStore store = IngestFullCapture();
+        BinlogCaptureStore store = ShouldIngestFullCapture();
         MutateManifest(root => root["ToolVersion"] = "0.0.0-not-this-build");
 
         // Act
@@ -250,7 +249,7 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
     public void Validate_SchemaVersionMismatch_InvalidUnreadable()
     {
         // Arrange
-        BinlogCaptureStore store = IngestFullCapture();
+        BinlogCaptureStore store = ShouldIngestFullCapture();
         MutateManifest(root => root["SchemaVersion"] = 999);
 
         // Act
@@ -301,7 +300,7 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
         string leafCsproj = Fixture.PathOf("MyApp.Legacy.Billing", "MyApp.Legacy.Billing.csproj");
         string leafBinlog = _cacheRoot.PathOf("billing-only.binlog");
         DotnetCli.Run(
-            $"build \"{leafCsproj}\" -bl:LogFile=\"{leafBinlog}\" --no-incremental --disable-build-servers",
+            $"build \"{leafCsproj}\" -bl:LogFile=\"{leafBinlog}\" --no-incremental",
             Fixture.PathOf());
 
         using ReplayedSolution replayed = BinlogReplayer.Replay(leafBinlog, Fixture.SolutionPath, ct: Ct);
@@ -404,7 +403,7 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
     // ── helpers ──────────────────────────────────────────────────────────────────────────────────────────
 
     // Replays the shared full binlog and ingests it against the full solution — the common Arrange.
-    private BinlogCaptureStore IngestFullCapture()
+    private BinlogCaptureStore ShouldIngestFullCapture()
     {
         using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath, Fixture.SolutionPath, ct: Ct);
         var store = new BinlogCaptureStore(Fixture.SolutionPath, _cacheRoot.Path);

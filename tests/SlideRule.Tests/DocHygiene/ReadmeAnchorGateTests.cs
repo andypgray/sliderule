@@ -44,7 +44,7 @@ public sealed class ReadmeAnchorGateTests
     private static readonly DocGate<SourceAnchor> Gate = new(
         AnchorDocs.Select(static entry => entry.Doc)
             .ToArray(),
-        ExtractDoc,
+        SourceAnchors.Extract,
         quotes: "anchors",
         docs: "anchor docs");
 
@@ -140,7 +140,7 @@ public sealed class ReadmeAnchorGateTests
     public void CommittedSourceAnchors_MatchTheirCommittedLine()
     {
         // Arrange
-        Func<string, IReadOnlyList<string>?> reader = SourceAnchors.DiskReader(RepoRoot.Directory);
+        Func<string, IReadOnlyList<string>?> reader = RepoRoot.LineReader();
         List<string> drift = new();
 
         // Act: every anchor that is not a documented demonstration must resolve against committed source.
@@ -161,7 +161,7 @@ public sealed class ReadmeAnchorGateTests
     public void DemonstrationAnchors_DoNotResolveAgainstCommittedSource()
     {
         // Arrange
-        Func<string, IReadOnlyList<string>?> reader = SourceAnchors.DiskReader(RepoRoot.Directory);
+        Func<string, IReadOnlyList<string>?> reader = RepoRoot.LineReader();
         List<string> promoted = new();
 
         // Act: a demonstration anchor quotes a hypothetical edit's output, so it must not match committed
@@ -257,11 +257,5 @@ public sealed class ReadmeAnchorGateTests
 
         // Assert
         dead.ShouldReportNothing("These pin entries no longer correspond to any anchor and should be removed");
-    }
-
-    private static IReadOnlyList<SourceAnchor> ExtractDoc(string doc)
-    {
-        string text = RepoRoot.ReadText(doc);
-        return SourceAnchors.Extract(doc, text);
     }
 }

@@ -101,9 +101,6 @@ internal static class WalkthroughFences
     private const string MeridianCheckCut = "cut to the rule that went red";
     private const string InterchangeCut = "cut to the rules that went red";
 
-    private const string QuotingAdapterRunMarker = "Test run summary: Passed!";
-    private const string QuotingAdapterRunDeclaration = "captured from a real run";
-
     private const string InterchangeLocalInlined =
         "Spells arch.Types.InNamespace(\"Meridian.Interchange.*\") where the spec uses its interchange local, so no "
         + "line is a line of the spec.";
@@ -226,10 +223,11 @@ internal static class WalkthroughFences
     ///     run reproduces.
     /// </summary>
     internal static readonly IllustrativeFence QuotingAdapterRun = new(
-        DocPaths.QuotingReadme, "quoting-adapter-run", QuotingAdapterRunMarker,
-        "The test runner's own layout and wall-clock timings, captured from a real run of the adapter project; the "
-        + "timings are the point of the paragraph under it, and no two runs print the same ones.",
-        QuotingAdapterRunDeclaration);
+        DocPaths.QuotingReadme, "quoting-adapter-run", "Test run summary: Passed!",
+        "The test runner's own layout and wall-clock timings, captured from a real run of the adapter project: the "
+        + "workspace load billed to whichever case runs first, and the run's duration. The timings are the point of "
+        + "the paragraph under it, and no two runs print the same ones.",
+        "captured from a real run");
 
     /// <summary>Every fence quoting what another tool printed, each declared as a capture on its page.</summary>
     internal static readonly IReadOnlyList<IllustrativeFence> Illustrative =

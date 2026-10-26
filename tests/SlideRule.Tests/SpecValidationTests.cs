@@ -13,7 +13,7 @@ namespace SlideRule.Tests;
 /// </summary>
 public class SpecValidationTests
 {
-    private static SpecValidationException BuildExpectingFailure(params IArchitectureSpec[] specs)
+    private static SpecValidationException ShouldFailToBuild(params IArchitectureSpec[] specs)
     {
         return Should.Throw<SpecValidationException>(() => ArchModelBuilder.Build(specs));
     }
@@ -99,7 +99,7 @@ public class SpecValidationTests
 
         var spec = (IArchitectureSpec)Activator.CreateInstance(specType)!;
 
-        SpecValidationException ex = BuildExpectingFailure(spec);
+        SpecValidationException ex = ShouldFailToBuild(spec);
 
         ex.ShouldHaveError(code, ruleId);
     }
@@ -107,7 +107,7 @@ public class SpecValidationTests
     [Fact]
     public void DuplicateId_AcrossTwoSpecClasses_IsReported()
     {
-        SpecValidationException ex = BuildExpectingFailure(new DuplicateIdSpecA(), new DuplicateIdSpecB());
+        SpecValidationException ex = ShouldFailToBuild(new DuplicateIdSpecA(), new DuplicateIdSpecB());
 
         ex.ShouldHaveError(Code.DuplicateId, "area/rule")
             .Message.ShouldBe("SpecValidationSpecs.cs:18: Duplicate rule ID 'area/rule'.");
@@ -116,7 +116,7 @@ public class SpecValidationTests
     [Fact]
     public void DuplicateId_TwoRulesInOneMethod_IsReportedAtTheFirstDeclaration()
     {
-        SpecValidationException ex = BuildExpectingFailure(new DuplicateRuleIdInOneMethodSpec());
+        SpecValidationException ex = ShouldFailToBuild(new DuplicateRuleIdInOneMethodSpec());
 
         ex.ShouldHaveError(Code.DuplicateId, "area/twice")
             .Message.ShouldBe("SpecValidationSpecs.cs:1408: Duplicate rule ID 'area/twice'.");
@@ -128,7 +128,7 @@ public class SpecValidationTests
         // A scope reserves both of the rules it could contribute whatever its posture, so one scope ID
         // declared twice collides twice — under two IDs that appear nowhere in the source, both rendered at
         // the first declaration.
-        SpecValidationException ex = BuildExpectingFailure(new DuplicateScopeIdInOneMethodSpec());
+        SpecValidationException ex = ShouldFailToBuild(new DuplicateScopeIdInOneMethodSpec());
 
         ex.ShouldHaveError(Code.DuplicateId, "legacy/twice/containment")
             .Message.ShouldBe("SpecValidationSpecs.cs:1421: Duplicate rule ID 'legacy/twice/containment'.");
@@ -139,7 +139,7 @@ public class SpecValidationTests
     [Fact]
     public void IdExtendsScope_ReservedNamespace_IsReported()
     {
-        SpecValidationException ex = BuildExpectingFailure(new IdExtendsScopeSpec());
+        SpecValidationException ex = ShouldFailToBuild(new IdExtendsScopeSpec());
 
         ex.ShouldHaveError(Code.IdExtendsScope, "legacy/billing/foo")
             .Message.ShouldContain("extends scope 'legacy/billing'");
@@ -148,7 +148,7 @@ public class SpecValidationTests
     [Fact]
     public void MissingBecause_OnRule_IsReported()
     {
-        SpecValidationException ex = BuildExpectingFailure(new MissingBecauseRuleSpec());
+        SpecValidationException ex = ShouldFailToBuild(new MissingBecauseRuleSpec());
 
         ex.ShouldHaveError(Code.MissingBecause, "area/rule")
             .Message.ShouldBe("SpecValidationSpecs.cs:52: 'area/rule' is missing a required .Because(...).");
@@ -157,7 +157,7 @@ public class SpecValidationTests
     [Fact]
     public void RepeatedCall_BecauseTwice_IsReported()
     {
-        SpecValidationException ex = BuildExpectingFailure(new RepeatedBecauseSpec());
+        SpecValidationException ex = ShouldFailToBuild(new RepeatedBecauseSpec());
 
         ex.ShouldHaveError(Code.RepeatedCall, "area/rule")
             .Message.ShouldBe("SpecValidationSpecs.cs:92: Repeated .Because(...) on 'area/rule'.");
@@ -166,7 +166,7 @@ public class SpecValidationTests
     [Fact]
     public void RepeatedPosture_PostureVerbTwiceViaStoredRuleBuilder_IsReported()
     {
-        SpecValidationException ex = BuildExpectingFailure(new DoublePostureRuleSpec());
+        SpecValidationException ex = ShouldFailToBuild(new DoublePostureRuleSpec());
 
         ex.ShouldHaveError(Code.RepeatedPosture, "area/rule")
             .Message
@@ -176,7 +176,7 @@ public class SpecValidationTests
     [Fact]
     public void RepeatedPosture_QuarantineTwiceViaStoredScopeBuilder_IsReported()
     {
-        SpecValidationException ex = BuildExpectingFailure(new DoubleQuarantineScopeSpec());
+        SpecValidationException ex = ShouldFailToBuild(new DoubleQuarantineScopeSpec());
 
         ex.ShouldHaveError(Code.RepeatedPosture, "legacy/billing")
             .Message
@@ -186,7 +186,7 @@ public class SpecValidationTests
     [Fact]
     public void RepeatedPosture_CautionTwiceViaStoredScopeBuilder_IsReported()
     {
-        SpecValidationException ex = BuildExpectingFailure(new DoubleCautionScopeSpec());
+        SpecValidationException ex = ShouldFailToBuild(new DoubleCautionScopeSpec());
 
         ex.ShouldHaveError(Code.RepeatedPosture, "shared/utilities")
             .Message
@@ -198,7 +198,7 @@ public class SpecValidationTests
     {
         // Two different verbs, not two of one: the count is what the check reads, so mixing them is the
         // same overwrite and reports the same way.
-        SpecValidationException ex = BuildExpectingFailure(new MixedPostureScopeSpec());
+        SpecValidationException ex = ShouldFailToBuild(new MixedPostureScopeSpec());
 
         ex.ShouldHaveError(Code.RepeatedPosture, "shared/utilities")
             .Message
@@ -210,7 +210,7 @@ public class SpecValidationTests
     {
         // The dangling report reads the posture field rather than the selection, because a caution sets
         // both and "no posture" is the thing the author has to fix.
-        SpecValidationException ex = BuildExpectingFailure(new MultipleProblemsSpec());
+        SpecValidationException ex = ShouldFailToBuild(new MultipleProblemsSpec());
 
         ex.ShouldHaveError(Code.MissingPosture, "other/scope")
             .Message
@@ -222,7 +222,7 @@ public class SpecValidationTests
     {
         // The message names the posture the scope was declared under, because the author's next move is to
         // find that verb in the spec and add the clause beneath it.
-        SpecValidationException ex = BuildExpectingFailure(new MissingDragonsCautionSpec());
+        SpecValidationException ex = ShouldFailToBuild(new MissingDragonsCautionSpec());
 
         ex.ShouldHaveError(Code.MissingDragons, "shared/utilities")
             .Message
@@ -235,7 +235,7 @@ public class SpecValidationTests
         // That EmptyBoundarySpec compiles at all is half the pin: BoundaryOnlyVia() binds uniquely to the
         // Type overload because the Selection form takes (first, params more). Flatten that form to plain
         // params and the call is ambiguous under CS0121, taking this hint out of reach (GRAMMAR §7).
-        SpecValidationException ex = BuildExpectingFailure(new EmptyBoundarySpec());
+        SpecValidationException ex = ShouldFailToBuild(new EmptyBoundarySpec());
 
         ex.ShouldHaveError(Code.EmptyBoundary, "legacy/billing")
             .Message.ShouldContain("omit the call for a hermetic quarantine");
@@ -244,7 +244,7 @@ public class SpecValidationTests
     [Fact]
     public void DuplicateLayerName_IsReportedSpecWide()
     {
-        SpecValidationException ex = BuildExpectingFailure(new DuplicateLayerSpec());
+        SpecValidationException ex = ShouldFailToBuild(new DuplicateLayerSpec());
 
         SpecValidationError error = ex.ShouldHaveError(Code.DuplicateLayerName);
         error.RuleId.ShouldBeNull();
@@ -264,7 +264,7 @@ public class SpecValidationTests
         // the family, and where it stands is the whole of what they need told (GRAMMAR §8 item 27).
         var spec = (IArchitectureSpec)Activator.CreateInstance(specType)!;
 
-        SpecValidationException ex = BuildExpectingFailure(spec);
+        SpecValidationException ex = ShouldFailToBuild(spec);
 
         ex.ShouldHaveError(Code.FamilyMisplaced, "area/rule")
             .Message.ShouldEndWith(
@@ -278,7 +278,7 @@ public class SpecValidationTests
     {
         var spec = (IArchitectureSpec)Activator.CreateInstance(specType)!;
 
-        SpecValidationException ex = BuildExpectingFailure(spec);
+        SpecValidationException ex = ShouldFailToBuild(spec);
 
         ex.ShouldHaveError(Code.FamilyMisplaced, "legacy/modules")
             .Message.ShouldEndWith(
@@ -291,7 +291,7 @@ public class SpecValidationTests
     {
         // A definition is use-independent, so its error is the layer's: null ID, no location, named by
         // layer — the same terms every other layer error reports on.
-        SpecValidationException ex = BuildExpectingFailure(new FamilyAsLayerDefinitionSpec());
+        SpecValidationException ex = ShouldFailToBuild(new FamilyAsLayerDefinitionSpec());
 
         SpecValidationError error = ex.ShouldHaveError(Code.FamilyMisplaced);
         error.RuleId.ShouldBeNull();
@@ -305,7 +305,7 @@ public class SpecValidationTests
     {
         // The cross-cell ban's targets are the subject's own cells, so a cell-free subject names nothing
         // to forbid — and the plain-selection verb has a name (GRAMMAR §8 item 28).
-        SpecValidationException ex = BuildExpectingFailure(new EachOtherWithoutFamilySpec());
+        SpecValidationException ex = ShouldFailToBuild(new EachOtherWithoutFamilySpec());
 
         ex.ShouldHaveError(Code.EachOtherWithoutFamily, "area/rule")
             .Message.ShouldEndWith(
@@ -318,7 +318,7 @@ public class SpecValidationTests
     {
         // The cycle gate's nodes are the subject's own cells, so a cell-free subject has no graph at all
         // (GRAMMAR §8 item 29).
-        SpecValidationException ex = BuildExpectingFailure(new CircularReferencesOnPlainSubjectSpec());
+        SpecValidationException ex = ShouldFailToBuild(new CircularReferencesOnPlainSubjectSpec());
 
         ex.ShouldHaveError(Code.CircularReferencesNeedLayerFamily, "area/rule")
             .Message.ShouldEndWith(
@@ -332,7 +332,7 @@ public class SpecValidationTests
         // The build forbids circular project references, so over a family of projects the law holds by
         // construction — a rule that cannot red is a false promise, and the two verbs that can say
         // something are named (GRAMMAR §8 item 29).
-        SpecValidationException ex = BuildExpectingFailure(new CircularReferencesOnProjectFamilySpec());
+        SpecValidationException ex = ShouldFailToBuild(new CircularReferencesOnProjectFamilySpec());
 
         ex.ShouldHaveError(Code.CircularReferencesNeedLayerFamily, "area/rule")
             .Message.ShouldEndWith(
@@ -344,12 +344,8 @@ public class SpecValidationTests
     [Fact]
     public void AllErrors_AreReportedInOnePass()
     {
-        SpecValidationException ex = BuildExpectingFailure(new MultipleProblemsSpec());
+        SpecValidationException ex = ShouldFailToBuild(new MultipleProblemsSpec());
 
-        ex.Errors.Select(e => e.Code)
-            .Distinct()
-            .Count()
-            .ShouldBeGreaterThanOrEqualTo(3);
         ex.ShouldHaveError(Code.MalformedId);
         ex.ShouldHaveError(Code.MissingBecause);
         ex.ShouldHaveError(Code.MissingPosture);
@@ -358,7 +354,7 @@ public class SpecValidationTests
     [Fact]
     public void BlankMemberName_OnMustNotUse_IsReported()
     {
-        SpecValidationException ex = BuildExpectingFailure(new BlankMemberNameSpec());
+        SpecValidationException ex = ShouldFailToBuild(new BlankMemberNameSpec());
 
         ex.ShouldHaveError(Code.BlankMemberName, "area/rule")
             .Message
@@ -368,7 +364,7 @@ public class SpecValidationTests
     [Fact]
     public void MemberNotDeclared_TypoName_IsReported()
     {
-        SpecValidationException ex = BuildExpectingFailure(new TypoMemberSpec());
+        SpecValidationException ex = ShouldFailToBuild(new TypoMemberSpec());
 
         ex.ShouldHaveError(Code.MemberNotDeclared, "area/rule")
             .Message
@@ -378,7 +374,7 @@ public class SpecValidationTests
     [Fact]
     public void MemberNotDeclared_MemberOnBaseType_NamesBaseAndTypeof()
     {
-        SpecValidationException ex = BuildExpectingFailure(new BaseTypeMemberSpec());
+        SpecValidationException ex = ShouldFailToBuild(new BaseTypeMemberSpec());
 
         ex.ShouldHaveError(Code.MemberNotDeclared, "area/rule")
             .Message
@@ -389,7 +385,7 @@ public class SpecValidationTests
     [Fact]
     public void ForeignMember_MemberFromAnotherArch_IsReported()
     {
-        SpecValidationException ex = BuildExpectingFailure(new ForeignMemberSpec());
+        SpecValidationException ex = ShouldFailToBuild(new ForeignMemberSpec());
 
         ex.ShouldHaveError(Code.ForeignMember, "area/rule")
             .Message
@@ -401,7 +397,7 @@ public class SpecValidationTests
     {
         // Named as a PROJECT selection rather than folded into the type-side message: an author whose rule
         // mixes strata needs the report to say which one was foreign to find it.
-        SpecValidationException ex = BuildExpectingFailure(new ForeignProjectSelectionSpec());
+        SpecValidationException ex = ShouldFailToBuild(new ForeignProjectSelectionSpec());
 
         ex.ShouldHaveError(Code.ForeignProjectSelection, "area/rule")
             .Message
@@ -413,7 +409,7 @@ public class SpecValidationTests
     {
         // One code, two labels: the message names which operand was left empty, because a blank name
         // matches nothing while a blank glob matches everything.
-        SpecValidationException ex = BuildExpectingFailure(new BlankProjectPatternSpec());
+        SpecValidationException ex = ShouldFailToBuild(new BlankProjectPatternSpec());
 
         ex.ShouldHaveError(Code.BlankProjectPattern, "project/blank-name")
             .Message.ShouldBe("SpecValidationSpecs.cs:903: Blank project name on 'project/blank-name'.");
@@ -424,7 +420,7 @@ public class SpecValidationTests
     [Fact]
     public void BlankTargetFramework_OnMustOnlyTarget_IsReported()
     {
-        SpecValidationException ex = BuildExpectingFailure(new BlankTargetFrameworkSpec());
+        SpecValidationException ex = ShouldFailToBuild(new BlankTargetFrameworkSpec());
 
         ex.ShouldHaveError(Code.BlankTargetFramework, "area/rule")
             .Message.ShouldBe("SpecValidationSpecs.cs:915: Blank target framework on 'area/rule'.");
@@ -435,7 +431,7 @@ public class SpecValidationTests
     {
         // The floor's one moniker rides the ceiling's slot: a blank one would require a framework no project
         // targets, and red every evaluated project.
-        SpecValidationException ex = BuildExpectingFailure(new BlankRequiredTargetFrameworkSpec());
+        SpecValidationException ex = ShouldFailToBuild(new BlankRequiredTargetFrameworkSpec());
 
         ex.ShouldHaveError(Code.BlankTargetFramework, "area/rule")
             .Message.ShouldBe("SpecValidationSpecs.cs:1521: Blank target framework on 'area/rule'.");
@@ -445,7 +441,7 @@ public class SpecValidationTests
     public void BlankPackagePattern_OnEitherPackageVerb_IsReported()
     {
         // A blank glob matches no package: it narrows an allow-list and empties a ban, so both verbs report it.
-        SpecValidationException ex = BuildExpectingFailure(new BlankPackagePatternSpec());
+        SpecValidationException ex = ShouldFailToBuild(new BlankPackagePatternSpec());
 
         ex.ShouldHaveError(Code.BlankPackagePattern, "area/allow")
             .Message.ShouldBe("SpecValidationSpecs.cs:1529: Blank package pattern on 'area/allow'.");
@@ -458,7 +454,7 @@ public class SpecValidationTests
     {
         // One code for both strings, since either blank asks for a property no project can declare, and the
         // label says which was left out.
-        SpecValidationException ex = BuildExpectingFailure(new BlankPropertySpec());
+        SpecValidationException ex = ShouldFailToBuild(new BlankPropertySpec());
 
         ex.ShouldHaveError(Code.BlankProperty, "area/name")
             .Message.ShouldBe("SpecValidationSpecs.cs:1538: Blank property name on 'area/name'.");
@@ -475,7 +471,7 @@ public class SpecValidationTests
     [Fact]
     public void MemberReturningClosedGeneric_ClosedAnchor_IsReported()
     {
-        SpecValidationException ex = BuildExpectingFailure(new ClosedGenericReturningSpec());
+        SpecValidationException ex = ShouldFailToBuild(new ClosedGenericReturningSpec());
 
         ex.ShouldHaveError(Code.MemberReturningClosedGeneric, "area/rule")
             .Message
@@ -493,7 +489,7 @@ public class SpecValidationTests
     [Fact]
     public void BlankPattern_BlankNamespaceGlob_IsReported()
     {
-        SpecValidationException ex = BuildExpectingFailure(new BlankNamespaceGlobSpec());
+        SpecValidationException ex = ShouldFailToBuild(new BlankNamespaceGlobSpec());
 
         ex.ShouldHaveError(Code.BlankPattern, "area/rule")
             .Message.ShouldBe("SpecValidationSpecs.cs:251: Blank namespace pattern on 'area/rule'.");
@@ -502,7 +498,7 @@ public class SpecValidationTests
     [Fact]
     public void BlankPattern_BlankSuffix_IsReported()
     {
-        SpecValidationException ex = BuildExpectingFailure(new BlankSuffixSpec());
+        SpecValidationException ex = ShouldFailToBuild(new BlankSuffixSpec());
 
         ex.ShouldHaveError(Code.BlankPattern, "area/rule")
             .Message.ShouldBe("SpecValidationSpecs.cs:259: Blank suffix on 'area/rule'.");
@@ -513,7 +509,7 @@ public class SpecValidationTests
     {
         // The exact-name adjective carries a list, so the walk yields one pattern per name and the blank one
         // reports under its own label. Blankness is the whole check: a name carries no structure to check.
-        SpecValidationException ex = BuildExpectingFailure(new BlankTypeNamedAdjectiveSpec());
+        SpecValidationException ex = ShouldFailToBuild(new BlankTypeNamedAdjectiveSpec());
 
         ex.ShouldHaveError(Code.BlankPattern, "area/rule")
             .Message.ShouldBe("SpecValidationSpecs.cs:963: Blank type name on 'area/rule'.");
@@ -524,7 +520,7 @@ public class SpecValidationTests
     {
         // The member-subject adjective walk (parallel to the member prose/Returning walks) reaches a
         // blank member .WithSuffix (GRAMMAR §8 item 15, §4.6).
-        SpecValidationException ex = BuildExpectingFailure(new BlankMemberSuffixSpec());
+        SpecValidationException ex = ShouldFailToBuild(new BlankMemberSuffixSpec());
 
         ex.ShouldHaveError(Code.BlankPattern, "area/rule")
             .Message.ShouldBe("SpecValidationSpecs.cs:267: Blank member suffix on 'area/rule'.");
@@ -535,7 +531,7 @@ public class SpecValidationTests
     {
         // GRAMMAR §8 item 34: no member is both a field and a method, so the exclusion removes nothing; the
         // message names both kinds and the two projections that would make it mean something.
-        SpecValidationException ex = BuildExpectingFailure(new MemberExceptKindClashSpec());
+        SpecValidationException ex = ShouldFailToBuild(new MemberExceptKindClashSpec());
 
         ex.ShouldHaveError(Code.MemberExceptKindDisjoint, "area/rule")
             .Message.ShouldBe(
@@ -547,7 +543,7 @@ public class SpecValidationTests
     public void BlankPattern_BlankPathGlob_IsReported()
     {
         // A path glob rides the type-side selection walk under its own label (GRAMMAR §8 item 15).
-        SpecValidationException ex = BuildExpectingFailure(new BlankPathGlobSpec());
+        SpecValidationException ex = ShouldFailToBuild(new BlankPathGlobSpec());
 
         ex.ShouldHaveError(Code.BlankPattern, "area/rule")
             .Message.ShouldBe("SpecValidationSpecs.cs:1604: Blank path glob on 'area/rule'.");
@@ -558,7 +554,7 @@ public class SpecValidationTests
     {
         // GRAMMAR §8 item 35: refused, never normalized, so the model carries what the author wrote. The reason is
         // the matcher's own, so what it refuses and what the catalog reports cannot drift.
-        SpecValidationException ex = BuildExpectingFailure(new MalformedPathGlobSpec());
+        SpecValidationException ex = ShouldFailToBuild(new MalformedPathGlobSpec());
 
         ex.ShouldHaveError(Code.MalformedPathGlob, "area/rooted")
             .Message.ShouldBe(
@@ -579,7 +575,7 @@ public class SpecValidationTests
     {
         // A member Named list's names ride the same member-subject adjective walk (GRAMMAR §8 item 15), under
         // the "member name" label that item 11 reports under a code of its own.
-        SpecValidationException ex = BuildExpectingFailure(new BlankMemberNamedSpec());
+        SpecValidationException ex = ShouldFailToBuild(new BlankMemberNamedSpec());
 
         ex.ShouldHaveError(Code.BlankPattern, "area/rule")
             .Message.ShouldBe("SpecValidationSpecs.cs:1547: Blank member name on 'area/rule'.");
@@ -590,7 +586,7 @@ public class SpecValidationTests
     {
         // The layer flavor of §8 item 15: like the dead-subtree layer case below, layer globs are
         // validated at their declaration (spec-wide, null rule ID, named by layer), used or not.
-        SpecValidationException ex = BuildExpectingFailure(new BlankLayerGlobSpec());
+        SpecValidationException ex = ShouldFailToBuild(new BlankLayerGlobSpec());
 
         SpecValidationError error = ex.ShouldHaveError(Code.BlankPattern);
         error.RuleId.ShouldBeNull();
@@ -602,7 +598,7 @@ public class SpecValidationTests
     {
         // A layer purpose is prose like any other (§8 item 5), reported on the layer-glob terms above:
         // spec-wide, null rule ID, named by layer, and with no file:line prefix because there is no anchor.
-        SpecValidationException ex = BuildExpectingFailure(new BlankLayerPurposeSpec());
+        SpecValidationException ex = ShouldFailToBuild(new BlankLayerPurposeSpec());
 
         SpecValidationError error = ex.ShouldHaveError(Code.BlankProse);
         error.RuleId.ShouldBeNull();
@@ -612,7 +608,7 @@ public class SpecValidationTests
     [Fact]
     public void MultiLineProse_MultiLineLayerPurpose_IsReportedSpecWide()
     {
-        SpecValidationException ex = BuildExpectingFailure(new MultiLineLayerPurposeSpec());
+        SpecValidationException ex = ShouldFailToBuild(new MultiLineLayerPurposeSpec());
 
         SpecValidationError error = ex.ShouldHaveError(Code.MultiLineProse);
         error.RuleId.ShouldBeNull();
@@ -622,7 +618,7 @@ public class SpecValidationTests
     [Fact]
     public void RepeatedCall_RepeatedLayerPurpose_IsReportedSpecWide()
     {
-        SpecValidationException ex = BuildExpectingFailure(new RepeatedLayerPurposeSpec());
+        SpecValidationException ex = ShouldFailToBuild(new RepeatedLayerPurposeSpec());
 
         SpecValidationError error = ex.ShouldHaveError(Code.RepeatedCall);
         error.RuleId.ShouldBeNull();
@@ -635,7 +631,7 @@ public class SpecValidationTests
         // The one layer error that cannot name its layer, because the name is what is missing. It is
         // reported on the same spec-wide terms as the globs and purposes above, and it takes the layer out
         // of the duplicate-name set: a second unnamed layer is a second instance of this, not a collision.
-        SpecValidationException ex = BuildExpectingFailure(new BlankLayerNameSpec());
+        SpecValidationException ex = ShouldFailToBuild(new BlankLayerNameSpec());
 
         SpecValidationError error = ex.ShouldHaveError(Code.BlankLayerName);
         error.RuleId.ShouldBeNull();
@@ -647,7 +643,7 @@ public class SpecValidationTests
     {
         // A Baseline path is walked as prose, DragonsDoc's precedent for a path in that walk, and it is
         // rule-anchored rather than spec-wide, so it lands at a file:line the author can jump to.
-        SpecValidationException ex = BuildExpectingFailure(new BlankBaselineSpec());
+        SpecValidationException ex = ShouldFailToBuild(new BlankBaselineSpec());
 
         ex.ShouldHaveError(Code.BlankProse, "area/rule")
             .Message.ShouldBe("SpecValidationSpecs.cs:1370: Blank Baseline on 'area/rule'.");
@@ -656,7 +652,7 @@ public class SpecValidationTests
     [Fact]
     public void UnanchoredSubtreePattern_WildcardInSubtreePrefix_IsReported()
     {
-        SpecValidationException ex = BuildExpectingFailure(new DeadSubtreeGlobSpec());
+        SpecValidationException ex = ShouldFailToBuild(new DeadSubtreeGlobSpec());
 
         ex.ShouldHaveError(Code.UnanchoredSubtreePattern, "area/rule")
             .Message
@@ -667,7 +663,7 @@ public class SpecValidationTests
     [Fact]
     public void UnanchoredSubtreePattern_OnLayerGlob_IsReportedSpecWide()
     {
-        SpecValidationException ex = BuildExpectingFailure(new DeadSubtreeLayerSpec());
+        SpecValidationException ex = ShouldFailToBuild(new DeadSubtreeLayerSpec());
 
         SpecValidationError error = ex.ShouldHaveError(Code.UnanchoredSubtreePattern);
         error.RuleId.ShouldBeNull();
@@ -681,7 +677,7 @@ public class SpecValidationTests
     {
         // A definition is validated where the layer is declared, on the layer-glob terms: spec-wide, null
         // rule ID, named by layer, and found whether or not any rule ever names the layer (§8 item 10).
-        SpecValidationException ex = BuildExpectingFailure(new ForeignLayerDefinitionSpec());
+        SpecValidationException ex = ShouldFailToBuild(new ForeignLayerDefinitionSpec());
 
         SpecValidationError error = ex.ShouldHaveError(Code.ForeignSelection);
         error.RuleId.ShouldBeNull();
@@ -694,7 +690,7 @@ public class SpecValidationTests
     {
         // The definition takes the same blank-operand walk a rule's selections take (§8 item 15), under the
         // noun the type-side walk names it by.
-        SpecValidationException ex = BuildExpectingFailure(new BlankProjectNameLayerDefinitionSpec());
+        SpecValidationException ex = ShouldFailToBuild(new BlankProjectNameLayerDefinitionSpec());
 
         SpecValidationError error = ex.ShouldHaveError(Code.BlankPattern);
         error.RuleId.ShouldBeNull();
@@ -704,7 +700,7 @@ public class SpecValidationTests
     [Fact]
     public void UndefinedLifetime_InALayerDefinition_IsReportedSpecWide()
     {
-        SpecValidationException ex = BuildExpectingFailure(new UndefinedLifetimeLayerDefinitionSpec());
+        SpecValidationException ex = ShouldFailToBuild(new UndefinedLifetimeLayerDefinitionSpec());
 
         SpecValidationError error = ex.ShouldHaveError(Code.UndefinedLifetime);
         error.RuleId.ShouldBeNull();
@@ -717,7 +713,7 @@ public class SpecValidationTests
     {
         // The walk reaches a definition's nesting, not just its head: an Except payload is where a
         // definition hides a second selection.
-        SpecValidationException ex = BuildExpectingFailure(new DeadSubtreeLayerDefinitionSpec());
+        SpecValidationException ex = ShouldFailToBuild(new DeadSubtreeLayerDefinitionSpec());
 
         ex.ShouldHaveError(Code.UnanchoredSubtreePattern)
             .Message
@@ -735,17 +731,17 @@ public class SpecValidationTests
     [Fact]
     public void AllErrors_ThreeBadPatterns_AreReportedInOnePass()
     {
-        SpecValidationException ex = BuildExpectingFailure(new ThreeBadPatternsSpec());
+        SpecValidationException ex = ShouldFailToBuild(new ThreeBadPatternsSpec());
 
         // Two dead subtree globs (the subject noun and the verb) plus one blank affix, reported together.
-        ex.Errors.ShouldContain(e => e.Code == Code.UnanchoredSubtreePattern, expectedCount: 2);
-        ex.Errors.ShouldContain(e => e.Code == Code.BlankPattern, expectedCount: 1);
+        ex.ShouldHaveErrors(Code.UnanchoredSubtreePattern, 2);
+        ex.ShouldHaveErrors(Code.BlankPattern, 1);
     }
 
     [Fact]
     public void MemberExpression_NonMemberBody_IsReported()
     {
-        SpecValidationException ex = BuildExpectingFailure(new NonMemberBodySpec());
+        SpecValidationException ex = ShouldFailToBuild(new NonMemberBodySpec());
 
         ex.ShouldHaveError(Code.MemberExpressionUnresolvable, "area/rule")
             .Message
@@ -759,7 +755,7 @@ public class SpecValidationTests
         // A method-group anchor `w => w.Reset` compiles (converting the method group to object, warning
         // CS8974 — suppressed in the spec) and lowers to a CreateDelegate tree the resolver detects, so the
         // mistake reaches spec build. Steers to the invocation form.
-        SpecValidationException ex = BuildExpectingFailure(new MethodGroupBodySpec());
+        SpecValidationException ex = ShouldFailToBuild(new MethodGroupBodySpec());
 
         ex.ShouldHaveError(Code.MemberExpressionUnresolvable, "area/rule")
             .Message
@@ -771,7 +767,7 @@ public class SpecValidationTests
     [Fact]
     public void MemberExpression_ChainedReceiver_IsReported()
     {
-        SpecValidationException ex = BuildExpectingFailure(new ChainedReceiverSpec());
+        SpecValidationException ex = ShouldFailToBuild(new ChainedReceiverSpec());
 
         ex.ShouldHaveError(Code.MemberExpressionUnresolvable, "area/rule")
             .Message
@@ -783,7 +779,7 @@ public class SpecValidationTests
     [Fact]
     public void MemberExpression_StaticMemberInInstanceForm_IsReported()
     {
-        SpecValidationException ex = BuildExpectingFailure(new StaticInInstanceFormSpec());
+        SpecValidationException ex = ShouldFailToBuild(new StaticInInstanceFormSpec());
 
         ex.ShouldHaveError(Code.MemberExpressionUnresolvable, "area/rule")
             .Message
@@ -794,7 +790,7 @@ public class SpecValidationTests
     [Fact]
     public void MemberExpression_InstanceMemberInStaticForm_IsReported()
     {
-        SpecValidationException ex = BuildExpectingFailure(new InstanceInStaticFormSpec());
+        SpecValidationException ex = ShouldFailToBuild(new InstanceInStaticFormSpec());
 
         ex.ShouldHaveError(Code.MemberExpressionUnresolvable, "area/rule")
             .Message
@@ -806,7 +802,7 @@ public class SpecValidationTests
     [Fact]
     public void MemberExpression_IndexerBody_IsReported()
     {
-        SpecValidationException ex = BuildExpectingFailure(new IndexerBodySpec());
+        SpecValidationException ex = ShouldFailToBuild(new IndexerBodySpec());
 
         ex.ShouldHaveError(Code.MemberExpressionUnresolvable, "area/rule")
             .Message
@@ -822,7 +818,7 @@ public class SpecValidationTests
         // CS8974 — suppressed in the spec) and lowers to a CreateDelegate tree carrying the MethodInfo as a
         // compiler-emitted constant. Doubles as the regression oracle for that static lowering; steers to
         // the invocation form like the instance case.
-        SpecValidationException ex = BuildExpectingFailure(new StaticMethodGroupBodySpec());
+        SpecValidationException ex = ShouldFailToBuild(new StaticMethodGroupBodySpec());
 
         ex.ShouldHaveError(Code.MemberExpressionUnresolvable, "area/rule")
             .Message
@@ -837,7 +833,7 @@ public class SpecValidationTests
         // ((AnchorFahrenheit)c).Value reaches its member through a user-defined conversion — following it
         // would silently anchor the post-conversion type, so it is reported (identity casts are the only
         // receiver peel).
-        SpecValidationException ex = BuildExpectingFailure(new UserOpConversionReceiverSpec());
+        SpecValidationException ex = ShouldFailToBuild(new UserOpConversionReceiverSpec());
 
         ex.ShouldHaveError(Code.MemberExpressionUnresolvable, "area/rule")
             .Message
@@ -851,7 +847,7 @@ public class SpecValidationTests
     {
         // () => DayOfWeek.Monday inlines the enum member to its value (Convert(Constant(...), object)), so
         // Unwrap peels to a ConstantExpression with no member left to anchor.
-        SpecValidationException ex = BuildExpectingFailure(new CompileTimeConstantBodySpec());
+        SpecValidationException ex = ShouldFailToBuild(new CompileTimeConstantBodySpec());
 
         ex.ShouldHaveError(Code.MemberExpressionUnresolvable, "area/rule")
             .Message
@@ -863,10 +859,10 @@ public class SpecValidationTests
     [Fact]
     public void MemberExpressions_MultiplePoisoned_AreReportedInOnePass()
     {
-        SpecValidationException ex = BuildExpectingFailure(new MultiplePoisonedMembersSpec());
+        SpecValidationException ex = ShouldFailToBuild(new MultiplePoisonedMembersSpec());
 
         // Two poisoned member anchors on one rule → two errors in one pass (the §8 all-at-once contract).
-        ex.Errors.ShouldContain(e => e.Code == Code.MemberExpressionUnresolvable, expectedCount: 2);
+        ex.ShouldHaveErrors(Code.MemberExpressionUnresolvable, 2);
     }
 
     [Fact]
@@ -883,7 +879,7 @@ public class SpecValidationTests
     [Fact]
     public void MemberExpression_VerbNonMemberBody_IsReported()
     {
-        SpecValidationException ex = BuildExpectingFailure(new VerbNonMemberBodySpec());
+        SpecValidationException ex = ShouldFailToBuild(new VerbNonMemberBodySpec());
 
         ex.ShouldHaveError(Code.MemberExpressionUnresolvable, "area/rule")
             .Message
@@ -894,7 +890,7 @@ public class SpecValidationTests
     [Fact]
     public void MemberExpression_VerbStaticMethodGroupBody_IsReported()
     {
-        SpecValidationException ex = BuildExpectingFailure(new VerbStaticMethodGroupBodySpec());
+        SpecValidationException ex = ShouldFailToBuild(new VerbStaticMethodGroupBodySpec());
 
         ex.ShouldHaveError(Code.MemberExpressionUnresolvable, "area/rule")
             .Message
@@ -906,7 +902,7 @@ public class SpecValidationTests
     [Fact]
     public void MemberExpression_VerbInstanceMemberInStaticForm_IsReported()
     {
-        SpecValidationException ex = BuildExpectingFailure(new VerbInstanceInStaticFormSpec());
+        SpecValidationException ex = ShouldFailToBuild(new VerbInstanceInStaticFormSpec());
 
         ex.ShouldHaveError(Code.MemberExpressionUnresolvable, "area/rule")
             .Message
@@ -918,7 +914,7 @@ public class SpecValidationTests
     [Fact]
     public void MemberExpression_VerbIndexerBody_IsReported()
     {
-        SpecValidationException ex = BuildExpectingFailure(new VerbIndexerBodySpec());
+        SpecValidationException ex = ShouldFailToBuild(new VerbIndexerBodySpec());
 
         ex.ShouldHaveError(Code.MemberExpressionUnresolvable, "area/rule")
             .Message
@@ -930,7 +926,7 @@ public class SpecValidationTests
     [Fact]
     public void MemberExpression_VerbCompileTimeConstantBody_IsReported()
     {
-        SpecValidationException ex = BuildExpectingFailure(new VerbCompileTimeConstantBodySpec());
+        SpecValidationException ex = ShouldFailToBuild(new VerbCompileTimeConstantBodySpec());
 
         ex.ShouldHaveError(Code.MemberExpressionUnresolvable, "area/rule")
             .Message
@@ -942,10 +938,10 @@ public class SpecValidationTests
     [Fact]
     public void MemberExpressions_VerbMultiplePoisoned_AreReportedInOnePass()
     {
-        SpecValidationException ex = BuildExpectingFailure(new VerbMultiplePoisonedMembersSpec());
+        SpecValidationException ex = ShouldFailToBuild(new VerbMultiplePoisonedMembersSpec());
 
         // Two poisoned verb-position anchors on one rule → two errors in one pass (the §8 all-at-once contract).
-        ex.Errors.ShouldContain(e => e.Code == Code.MemberExpressionUnresolvable, expectedCount: 2);
+        ex.ShouldHaveErrors(Code.MemberExpressionUnresolvable, 2);
     }
 
     [Fact]
@@ -972,7 +968,7 @@ public class SpecValidationTests
     [Fact]
     public void SpecValidationError_Location_IsFileNameOnlyAndLineCaptured()
     {
-        SpecValidationException ex = BuildExpectingFailure(new MissingBecauseRuleSpec());
+        SpecValidationException ex = ShouldFailToBuild(new MissingBecauseRuleSpec());
         SpecValidationError error = ex.ShouldHaveError(Code.MissingBecause);
 
         SpecSourceLocation location = error.Location.ShouldNotBeNull();
@@ -986,21 +982,20 @@ public class SpecValidationTests
     [Fact]
     public void AllErrors_MultiErrorSpec_EachRendersItsAnchorLocation()
     {
-        SpecValidationException ex = BuildExpectingFailure(new MultipleProblemsSpec());
+        SpecValidationException ex = ShouldFailToBuild(new MultipleProblemsSpec());
 
         // Every error in the one-pass batch lands at its own anchor's file:line — the rule's malformed ID and
         // missing Because on one line, the dangling scope on the next (two distinct anchor lines).
         ex.Errors.ShouldAllBe(e => e.Location != null && e.Location.File == "SpecValidationSpecs.cs");
         ex.Errors.Select(e => e.Location!.Line)
             .Distinct()
-            .Count()
-            .ShouldBe(2);
+            .ShouldBe([508, 509]);
     }
 
     [Fact]
     public void MemberPoison_AnchorsToMemberCallSite_RuleErrorAnchorsToRuleAnchor()
     {
-        SpecValidationException ex = BuildExpectingFailure(new MemberPoisonBelowRuleSpec());
+        SpecValidationException ex = ShouldFailToBuild(new MemberPoisonBelowRuleSpec());
         SpecValidationError ruleError = ex.ShouldHaveError(Code.MissingBecause);
         SpecValidationError memberError = ex.ShouldHaveError(Code.MemberExpressionUnresolvable);
 
@@ -1017,7 +1012,7 @@ public class SpecValidationTests
     [Fact]
     public void UndefinedLifetime_CastToUndefinedValue_IsReported()
     {
-        SpecValidationException ex = BuildExpectingFailure(new UndefinedLifetimeSpec());
+        SpecValidationException ex = ShouldFailToBuild(new UndefinedLifetimeSpec());
 
         ex.ShouldHaveError(Code.UndefinedLifetime, "di/lifetimes")
             .Message
@@ -1031,7 +1026,7 @@ public class SpecValidationTests
     [Fact]
     public void MemberAcceptParameterClosedGeneric_ClosedAnchor_IsReported()
     {
-        SpecValidationException ex = BuildExpectingFailure(new ClosedGenericAcceptParameterSpec());
+        SpecValidationException ex = ShouldFailToBuild(new ClosedGenericAcceptParameterSpec());
 
         ex.ShouldHaveError(Code.MemberAcceptParameterClosedGeneric, "area/rule")
             .Message
@@ -1042,7 +1037,7 @@ public class SpecValidationTests
     [Fact]
     public void MemberAcceptParameterClosedGeneric_BesideAnotherError_AreReportedInOnePass()
     {
-        SpecValidationException ex = BuildExpectingFailure(new AcceptParameterAllAtOnceSpec());
+        SpecValidationException ex = ShouldFailToBuild(new AcceptParameterAllAtOnceSpec());
 
         // The closed-generic parameter anchor and the rule's missing Because report together (the §8
         // all-at-once contract).
@@ -1064,7 +1059,7 @@ public class SpecValidationTests
     [Fact]
     public void HierarchyAnchorWrongCategory_NonInterfaceOnMustNotImplement_IsReported()
     {
-        SpecValidationException ex = BuildExpectingFailure(new NonInterfaceImplementAnchorSpec());
+        SpecValidationException ex = ShouldFailToBuild(new NonInterfaceImplementAnchorSpec());
 
         ex.ShouldHaveError(Code.HierarchyAnchorWrongCategory, "area/rule")
             .Message
@@ -1075,7 +1070,7 @@ public class SpecValidationTests
     [Fact]
     public void HierarchyAnchorWrongCategory_InterfaceOnMustDeriveFrom_IsReported()
     {
-        SpecValidationException ex = BuildExpectingFailure(new InterfaceDeriveFromAnchorSpec());
+        SpecValidationException ex = ShouldFailToBuild(new InterfaceDeriveFromAnchorSpec());
 
         ex.ShouldHaveError(Code.HierarchyAnchorWrongCategory, "area/rule")
             .Message
@@ -1086,7 +1081,7 @@ public class SpecValidationTests
     [Fact]
     public void HierarchyAnchorWrongCategory_NonAttributeOnMustNotBeAttributedWith_IsReported()
     {
-        SpecValidationException ex = BuildExpectingFailure(new NonAttributeAttributedAnchorSpec());
+        SpecValidationException ex = ShouldFailToBuild(new NonAttributeAttributedAnchorSpec());
 
         ex.ShouldHaveError(Code.HierarchyAnchorWrongCategory, "area/rule")
             .Message
@@ -1097,7 +1092,7 @@ public class SpecValidationTests
     [Fact]
     public void HierarchyAnchorWrongCategory_InvalidAnchorInNegativeList_BesideMissingBecause_AreReportedInOnePass()
     {
-        SpecValidationException ex = BuildExpectingFailure(new HierarchyAllAtOnceSpec());
+        SpecValidationException ex = ShouldFailToBuild(new HierarchyAllAtOnceSpec());
 
         // The invalid anchor is the SECOND in the negative's list (the first is a valid interface), and the
         // rule omits .Because — the category error and the missing Because report together (the §8 all-at-once
@@ -1122,7 +1117,7 @@ public class SpecValidationTests
     [Fact]
     public void BlankPattern_BlankAttributeNameOnAdjective_IsReported()
     {
-        SpecValidationException ex = BuildExpectingFailure(new BlankAttributeAdjectiveSpec());
+        SpecValidationException ex = ShouldFailToBuild(new BlankAttributeAdjectiveSpec());
 
         ex.ShouldHaveError(Code.BlankPattern, "area/rule")
             .Message
@@ -1132,7 +1127,7 @@ public class SpecValidationTests
     [Fact]
     public void BlankPattern_BlankAttributeNameOnMustBeAttributedWith_IsReported()
     {
-        SpecValidationException ex = BuildExpectingFailure(new BlankAttributeVerbSpec());
+        SpecValidationException ex = ShouldFailToBuild(new BlankAttributeVerbSpec());
 
         ex.ShouldHaveError(Code.BlankPattern, "area/rule")
             .Message
@@ -1143,7 +1138,7 @@ public class SpecValidationTests
     public void BlankPattern_BlankAttributeNameOnMustNotBeAttributedWith_IsReported()
     {
         // The blank is the SECOND anchor in the negative's list — proof the walk covers every anchor.
-        SpecValidationException ex = BuildExpectingFailure(new BlankAttributeNegativeVerbSpec());
+        SpecValidationException ex = ShouldFailToBuild(new BlankAttributeNegativeVerbSpec());
 
         ex.ShouldHaveError(Code.BlankPattern, "area/rule")
             .Message
@@ -1153,9 +1148,9 @@ public class SpecValidationTests
     [Fact]
     public void BlankPattern_BlankAttributeNamesAcrossAdjectiveAndVerb_BesideMissingBecause_AreReportedInOnePass()
     {
-        SpecValidationException ex = BuildExpectingFailure(new BlankAttributeAllAtOnceSpec());
+        SpecValidationException ex = ShouldFailToBuild(new BlankAttributeAllAtOnceSpec());
 
-        ex.Errors.ShouldContain(e => e.Code == Code.BlankPattern, expectedCount: 2);
+        ex.ShouldHaveErrors(Code.BlankPattern, 2);
         ex.ShouldHaveError(Code.MissingBecause, "area/rule");
     }
 
@@ -1176,7 +1171,7 @@ public class SpecValidationTests
     [Fact]
     public void HierarchyAnchorWrongCategory_NonAttributeOnMemberMustBeAttributedWith_IsReported()
     {
-        SpecValidationException ex = BuildExpectingFailure(new MemberNonAttributeAnchorSpec());
+        SpecValidationException ex = ShouldFailToBuild(new MemberNonAttributeAnchorSpec());
 
         ex.ShouldHaveError(Code.HierarchyAnchorWrongCategory, "area/rule")
             .Message
@@ -1187,7 +1182,7 @@ public class SpecValidationTests
     [Fact]
     public void HierarchyAnchorWrongCategory_AttributeItselfOnMemberMustNotBeAttributedWith_IsReported()
     {
-        SpecValidationException ex = BuildExpectingFailure(new MemberAttributeItselfAnchorSpec());
+        SpecValidationException ex = ShouldFailToBuild(new MemberAttributeItselfAnchorSpec());
 
         ex.ShouldHaveError(Code.HierarchyAnchorWrongCategory, "area/rule")
             .Message
@@ -1208,9 +1203,9 @@ public class SpecValidationTests
     {
         // One blank per member node — the adjective, the positive verb, and the SECOND anchor of a negative's
         // list — all three reported together under the shared "attribute name" label.
-        SpecValidationException ex = BuildExpectingFailure(new BlankMemberAttributeNameSpec());
+        SpecValidationException ex = ShouldFailToBuild(new BlankMemberAttributeNameSpec());
 
-        ex.Errors.ShouldContain(e => e.Code == Code.BlankPattern, expectedCount: 3);
+        ex.ShouldHaveErrors(Code.BlankPattern, 3);
         ex.ShouldHaveError(Code.BlankPattern)
             .Message
             .ShouldBe("SpecValidationSpecs.cs:830: Blank attribute name on 'member/adjective'.");
@@ -1226,11 +1221,9 @@ public class SpecValidationTests
     {
         // Six blanks across both families and all three positions each — adjective, positive verb, and the
         // SECOND anchor of a negative's list — under two labels that name which kind of anchor was left empty.
-        SpecValidationException ex = BuildExpectingFailure(new BlankHierarchyNameSpec());
+        SpecValidationException ex = ShouldFailToBuild(new BlankHierarchyNameSpec());
 
-        List<SpecValidationError> blanks = ex.Errors.Where(e => e.Code == Code.BlankPattern)
-            .ToList();
-        blanks.Count.ShouldBe(6);
+        IReadOnlyList<SpecValidationError> blanks = ex.ShouldHaveErrors(Code.BlankPattern, 6);
         blanks.ShouldContain(e => e.Message.Contains("Blank interface name"), expectedCount: 3);
         blanks.ShouldContain(e => e.Message.Contains("Blank base type name"), expectedCount: 3);
         blanks[0]
@@ -1255,7 +1248,7 @@ public class SpecValidationTests
     [Fact]
     public void BlankPattern_BlankReturnTypeName_IsReported()
     {
-        SpecValidationException ex = BuildExpectingFailure(new BlankReturnTypeNameSpec());
+        SpecValidationException ex = ShouldFailToBuild(new BlankReturnTypeNameSpec());
 
         ex.ShouldHaveError(Code.BlankPattern, "area/rule")
             .Message
@@ -1265,7 +1258,7 @@ public class SpecValidationTests
     [Fact]
     public void BlankPattern_BlankParameterTypeName_IsReported()
     {
-        SpecValidationException ex = BuildExpectingFailure(new BlankParameterTypeNameSpec());
+        SpecValidationException ex = ShouldFailToBuild(new BlankParameterTypeNameSpec());
 
         ex.ShouldHaveError(Code.BlankPattern, "area/rule")
             .Message
@@ -1291,9 +1284,9 @@ public class SpecValidationTests
     {
         // One blank per position — the noun as a subject, the noun as a target operand, and the verb's own
         // name — all three reported together, each steered to the rule that spells it.
-        SpecValidationException ex = BuildExpectingFailure(new BlankProjectNameSpec());
+        SpecValidationException ex = ShouldFailToBuild(new BlankProjectNameSpec());
 
-        ex.Errors.ShouldContain(e => e.Code == Code.BlankPattern, expectedCount: 3);
+        ex.ShouldHaveErrors(Code.BlankPattern, 3);
         ex.ShouldHaveError(Code.BlankPattern, "project/noun-subject")
             .Message
             .ShouldBe("SpecValidationSpecs.cs:864: Blank project name on 'project/noun-subject'.");
@@ -1314,7 +1307,7 @@ public class SpecValidationTests
     {
         // Blankness is the slot's first verdict and draws the blank sentence every slot shares, so the
         // label is the only thing that says which operand was left empty.
-        SpecValidationException ex = BuildExpectingFailure(new BlankCounterpartTemplateSpec());
+        SpecValidationException ex = ShouldFailToBuild(new BlankCounterpartTemplateSpec());
 
         ex.ShouldHaveError(Code.BlankPattern, "area/rule")
             .Message.ShouldBe("SpecValidationSpecs.cs:943: Blank counterpart name template on 'area/rule'.");
@@ -1327,7 +1320,7 @@ public class SpecValidationTests
         // one IService exist" rather than "does each subject have its own counterpart" — green or red for the
         // whole subject set at once. The message names the template, says what the rule would actually mean,
         // and shows the spelling — which is also how a '{name}' typo is found, the match being ordinal.
-        SpecValidationException ex = BuildExpectingFailure(new PlaceholderFreeCounterpartTemplateSpec());
+        SpecValidationException ex = ShouldFailToBuild(new PlaceholderFreeCounterpartTemplateSpec());
 
         ex.ShouldHaveError(Code.CounterpartTemplateWithoutPlaceholder, "area/rule")
             .Message
@@ -1341,7 +1334,7 @@ public class SpecValidationTests
     [Fact]
     public void RepeatedCall_CitationTwice_IsReported()
     {
-        SpecValidationException ex = BuildExpectingFailure(new RepeatedCitationSpec());
+        SpecValidationException ex = ShouldFailToBuild(new RepeatedCitationSpec());
 
         ex.ShouldHaveError(Code.RepeatedCall, "area/rule")
             .Message.ShouldBe("SpecValidationSpecs.cs:1319: Repeated .Citation(...) on 'area/rule'.");
@@ -1352,11 +1345,11 @@ public class SpecValidationTests
     {
         // A whitespace citation is an empty authored field, which item 5 already names; reporting it a second
         // time as a malformed URL would say the same slip twice in different words.
-        SpecValidationException ex = BuildExpectingFailure(new BlankCitationSpec());
+        SpecValidationException ex = ShouldFailToBuild(new BlankCitationSpec());
 
         ex.ShouldHaveError(Code.BlankProse, "area/rule")
             .Message.ShouldBe("SpecValidationSpecs.cs:1331: Blank Citation on 'area/rule'.");
-        ex.Errors.ShouldNotContain(error => error.Code == Code.MalformedCitation);
+        ex.ShouldHaveErrors(Code.MalformedCitation, 0);
     }
 
     [Theory]
@@ -1368,7 +1361,7 @@ public class SpecValidationTests
         // The three shapes a hand-written citation actually takes when it is wrong: the page's title pasted
         // instead of its address, a path into the repository, and a well-formed URI on a scheme no consuming
         // surface can follow. Each names the offending value, because the fix is to replace that text.
-        SpecValidationException ex = BuildExpectingFailure(new MalformedCitationSpec());
+        SpecValidationException ex = ShouldFailToBuild(new MalformedCitationSpec());
 
         ex.ShouldHaveError(Code.MalformedCitation, ruleId)
             .Message
@@ -1391,7 +1384,7 @@ public class SpecValidationTests
     public void RepeatedCall_ExemplarTwice_IsReported()
     {
         // Several types to copy go through one union, so a second call is a slip rather than a list.
-        SpecValidationException ex = BuildExpectingFailure(new RepeatedExemplarSpec());
+        SpecValidationException ex = ShouldFailToBuild(new RepeatedExemplarSpec());
 
         ex.ShouldHaveError(Code.RepeatedCall, "area/rule")
             .Message.ShouldBe("SpecValidationSpecs.cs:1440: Repeated .Exemplar(...) on 'area/rule'.");
@@ -1400,7 +1393,7 @@ public class SpecValidationTests
     [Fact]
     public void ForeignSelection_InAnExemplar_IsReported()
     {
-        SpecValidationException ex = BuildExpectingFailure(new ForeignExemplarSpec());
+        SpecValidationException ex = ShouldFailToBuild(new ForeignExemplarSpec());
 
         ex.ShouldHaveError(Code.ForeignSelection, "area/rule")
             .Message.ShouldBe(
@@ -1411,7 +1404,7 @@ public class SpecValidationTests
     [Fact]
     public void BlankPattern_BlankNameInAnExemplar_IsReported()
     {
-        SpecValidationException ex = BuildExpectingFailure(new BlankExemplarNameSpec());
+        SpecValidationException ex = ShouldFailToBuild(new BlankExemplarNameSpec());
 
         ex.ShouldHaveError(Code.BlankPattern, "area/rule")
             .Message.ShouldBe("SpecValidationSpecs.cs:1477: Blank type name on 'area/rule'.");
@@ -1423,7 +1416,7 @@ public class SpecValidationTests
         // A glob that can never match would leave the exemplar dead from the first check onwards, and the
         // warning it raised would be the only sign; the spec refuses it where the same glob anywhere else
         // would be refused.
-        SpecValidationException ex = BuildExpectingFailure(new DeadExemplarPatternSpec());
+        SpecValidationException ex = ShouldFailToBuild(new DeadExemplarPatternSpec());
 
         ex.ShouldHaveError(Code.UnanchoredSubtreePattern, "area/rule")
             .Message
@@ -1436,7 +1429,7 @@ public class SpecValidationTests
     public void BlankProse_BlankWhereDescriptionInAnExemplar_IsReported()
     {
         // The exemplar is printed as written, so a Where description in it is prose a reader sees.
-        SpecValidationException ex = BuildExpectingFailure(new BlankExemplarWhereSpec());
+        SpecValidationException ex = ShouldFailToBuild(new BlankExemplarWhereSpec());
 
         ex.ShouldHaveError(Code.BlankProse, "area/rule")
             .Message.ShouldBe("SpecValidationSpecs.cs:1499: Blank description on 'area/rule'.");
@@ -1445,7 +1438,7 @@ public class SpecValidationTests
     [Fact]
     public void UndefinedLifetime_RegisteredNounInAnExemplar_IsReported()
     {
-        SpecValidationException ex = BuildExpectingFailure(new UndefinedLifetimeExemplarSpec());
+        SpecValidationException ex = ShouldFailToBuild(new UndefinedLifetimeExemplarSpec());
 
         ex.ShouldHaveError(Code.UndefinedLifetime, "area/rule")
             .Message.ShouldBe("SpecValidationSpecs.cs:1510: '(Lifetime)7' is not a defined Lifetime — " +
@@ -1459,7 +1452,7 @@ public class SpecValidationTests
     {
         // One error per rule, each naming the call and what an empty one does: "empty" alone does not say why
         // the spec is wrong, and the six calls fail in different ways.
-        SpecValidationException ex = BuildExpectingFailure(new EmptyOperandListSpec());
+        SpecValidationException ex = ShouldFailToBuild(new EmptyOperandListSpec());
 
         ex.Errors.Select(error => error.Code)
             .ShouldBe(Enumerable.Repeat(Code.EmptyOperandList, 7));
@@ -1498,7 +1491,7 @@ public class SpecValidationTests
     {
         // Every walk the other checks take reaches an empty list too: a union nested in another, a type Except
         // payload, an exemplar, a member Except payload's own adjectives, the projects of a family, a scope.
-        SpecValidationException ex = BuildExpectingFailure(new EmptyOperandListPositionsSpec());
+        SpecValidationException ex = ShouldFailToBuild(new EmptyOperandListPositionsSpec());
 
         ex.Errors.Select(error => error.RuleId)
             .ShouldBe([
@@ -1524,7 +1517,7 @@ public class SpecValidationTests
     {
         // A layer's definition is validated at its declaration, used or not, on the spec-wide terms every layer
         // error takes: no rule ID, no location, the layer named outright.
-        SpecValidationException ex = BuildExpectingFailure(new EmptyUnionLayerSpec());
+        SpecValidationException ex = ShouldFailToBuild(new EmptyUnionLayerSpec());
 
         SpecValidationError error = ex.ShouldHaveError(Code.EmptyOperandList);
         error.RuleId.ShouldBeNull();
@@ -1536,7 +1529,7 @@ public class SpecValidationTests
     public void BlankName_InASequenceOverload_IsReportedAsAtItsParamsSibling()
     {
         // A list a helper built rides the walk a params list rides, under the same labels and codes.
-        SpecValidationException ex = BuildExpectingFailure(new BlankNameInSequenceSpec());
+        SpecValidationException ex = ShouldFailToBuild(new BlankNameInSequenceSpec());
 
         ex.ShouldHaveError(Code.BlankProjectPattern, "area/project-names")
             .Message.ShouldBe("SpecValidationSpecs.cs:1668: Blank project name on 'area/project-names'.");

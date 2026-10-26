@@ -5,6 +5,7 @@ using SlideRule.Extraction;
 using SlideRule.Extraction.Fragments;
 using SlideRule.Roslyn;
 using SlideRule.Roslyn.Solutions;
+using SlideRule.Tests.Extraction;
 using SlideRule.Tests.TestSupport;
 using Xunit;
 
@@ -22,8 +23,7 @@ public sealed class ProjectArtifactFactsTests
     private const string Core = "MultiTfm.Core";
     private const string Web = "MultiTfm.Web";
 
-    private static readonly string SolutionPath =
-        Path.Combine(FixtureBeds.TestSolutionsRoot, "MultiTfm", "MultiTfm.sln");
+    private static readonly string SolutionPath = FixtureBeds.MultiTfmSolution;
 
     private static Task<CodebaseModel> Codebase => FixtureCodebase.Of(SolutionPath);
 
@@ -34,7 +34,7 @@ public sealed class ProjectArtifactFactsTests
 
         // Ordinal order, never the csproj's — which declares netstandard2.0 first — so the first entry stays
         // the one a shared type's facts fall to.
-        ProjectNode core = model.Projects.Single(project => project.Name == Core);
+        ProjectNode core = model.Project(Core);
         core.TargetFrameworks.ShouldBe(["net10.0", "netstandard2.0"]);
         core.TargetFrameworksSite.ShouldNotBeNull()
             .FilePath.ShouldEndWith("MultiTfm.Core.csproj");
@@ -48,7 +48,7 @@ public sealed class ProjectArtifactFactsTests
         // The SDK default nobody wrote, which is the whole reason these facts are evaluated: the project
         // file says nothing about packability, and the answer is still yes. The site degrades to the project
         // rather than naming a file inside whichever SDK ran.
-        ProjectNode web = model.Projects.Single(project => project.Name == Web);
+        ProjectNode web = model.Project(Web);
         web.IsPackable.ShouldBe(true);
         web.IsPackableSite.ShouldNotBeNull()
             .FilePath.ShouldEndWith("MultiTfm.Web.csproj");
@@ -61,28 +61,25 @@ public sealed class ProjectArtifactFactsTests
     {
         // The case that makes evaluation the only honest reader: nothing in the project file mentions the
         // lock policy, and the answer — and the line a violation would have to cite — is two directories up.
-        string root = TestTempRoot.For("artifact-facts-props");
-        string projectDirectory = Path.Combine(root, "src", "Widget");
-        Directory.CreateDirectory(projectDirectory);
-        File.WriteAllText(Path.Combine(root, "src", "Directory.Build.props"), """
-                                                                              <Project>
-                                                                                  <PropertyGroup>
-                                                                                      <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
-                                                                                  </PropertyGroup>
-                                                                              </Project>
-                                                                              """);
-        string projectFile = Path.Combine(projectDirectory, "Widget.csproj");
-        File.WriteAllText(projectFile, """
-                                       <Project Sdk="Microsoft.NET.Sdk">
-                                           <PropertyGroup>
-                                               <TargetFramework>net10.0</TargetFramework>
-                                               <IsPackable>false</IsPackable>
-                                           </PropertyGroup>
-                                           <ItemGroup>
-                                               <PackageReference Include="Shouldly" Version="4.3.0" />
-                                           </ItemGroup>
-                                       </Project>
-                                       """);
+        using TempDirectory temp = TestTempRoot.Fresh("artifact-facts-props");
+        temp.WriteFile(["src", "Directory.Build.props"], """
+                                                         <Project>
+                                                             <PropertyGroup>
+                                                                 <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+                                                             </PropertyGroup>
+                                                         </Project>
+                                                         """);
+        string projectFile = temp.WriteFile(["src", "Widget", "Widget.csproj"], """
+                                                                                <Project Sdk="Microsoft.NET.Sdk">
+                                                                                    <PropertyGroup>
+                                                                                        <TargetFramework>net10.0</TargetFramework>
+                                                                                        <IsPackable>false</IsPackable>
+                                                                                    </PropertyGroup>
+                                                                                    <ItemGroup>
+                                                                                        <PackageReference Include="Shouldly" Version="4.3.0" />
+                                                                                    </ItemGroup>
+                                                                                </Project>
+                                                                                """);
 
         // Act
         ProjectArtifactFacts facts = EvaluatedFacts(projectFile).ShouldNotBeNull();
@@ -104,18 +101,16 @@ public sealed class ProjectArtifactFactsTests
     {
         // A 2003-namespace project states an identifier and a version where an SDK project states a
         // moniker. Nothing downstream should have to know that, so the two spellings meet here.
-        string projectDirectory = TestTempRoot.For("artifact-facts-classic");
-        Directory.CreateDirectory(projectDirectory);
-        string projectFile = Path.Combine(projectDirectory, "Classic.csproj");
-        File.WriteAllText(projectFile, """
-                                       <?xml version="1.0" encoding="utf-8"?>
-                                       <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-                                           <PropertyGroup>
-                                               <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
-                                               <OutputType>Library</OutputType>
-                                           </PropertyGroup>
-                                       </Project>
-                                       """);
+        using TempDirectory temp = TestTempRoot.Fresh("artifact-facts-classic");
+        string projectFile = temp.WriteFile(["Classic.csproj"], """
+                                                                <?xml version="1.0" encoding="utf-8"?>
+                                                                <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+                                                                    <PropertyGroup>
+                                                                        <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
+                                                                        <OutputType>Library</OutputType>
+                                                                    </PropertyGroup>
+                                                                </Project>
+                                                                """);
 
         // Act
         ProjectArtifactFacts facts = EvaluatedFacts(projectFile).ShouldNotBeNull();
@@ -521,15 +516,14 @@ public sealed class ProjectArtifactFactsTests
         // Arrange — four fixture project files, one of them requested for each of its two frameworks and then
         // once more, and one request with no file at all. Those five shard keys over three shards are a real
         // split, and the repeated request has something for its shard's dedup to answer.
-        string fixtures = FixtureBeds.TestSolutionsRoot;
-        string core = Path.Combine(fixtures, "MultiTfm", "MultiTfm.Core", "MultiTfm.Core.csproj");
+        string core = Path.Combine(FixtureBeds.MultiTfmRoot, "MultiTfm.Core", "MultiTfm.Core.csproj");
         ProjectEvaluationRequest[] requests =
         [
             new(core, "net10.0"),
-            new(Path.Combine(fixtures, "MyApp", "MyApp.Domain", "MyApp.Domain.csproj"), null),
+            new(Path.Combine(FixtureBeds.MyAppRoot, "MyApp.Domain", "MyApp.Domain.csproj"), null),
             new(core, "netstandard2.0"),
-            new(Path.Combine(fixtures, "MyApp", "MyApp.Web", "MyApp.Web.csproj"), null),
-            new(Path.Combine(fixtures, "MultiTfm", "MultiTfm.Web", "MultiTfm.Web.csproj"), null),
+            new(Path.Combine(FixtureBeds.MyAppRoot, "MyApp.Web", "MyApp.Web.csproj"), null),
+            new(Path.Combine(FixtureBeds.MultiTfmRoot, "MultiTfm.Web", "MultiTfm.Web.csproj"), null),
             new(core, "net10.0"),
             new(null, null)
         ];
@@ -550,11 +544,10 @@ public sealed class ProjectArtifactFactsTests
     public void EvaluateAll_InSeveralShardsWithACancelledToken_LeavesAsTheCallersCancellation()
     {
         // Arrange — two files, so the batch really splits, and a token already cancelled.
-        string fixtures = FixtureBeds.TestSolutionsRoot;
         ProjectEvaluationRequest[] requests =
         [
-            new(Path.Combine(fixtures, "MyApp", "MyApp.Domain", "MyApp.Domain.csproj"), null),
-            new(Path.Combine(fixtures, "MyApp", "MyApp.Web", "MyApp.Web.csproj"), null)
+            new(Path.Combine(FixtureBeds.MyAppRoot, "MyApp.Domain", "MyApp.Domain.csproj"), null),
+            new(Path.Combine(FixtureBeds.MyAppRoot, "MyApp.Web", "MyApp.Web.csproj"), null)
         ];
         using var cancelled = new CancellationTokenSource();
         cancelled.Cancel();
@@ -580,7 +573,7 @@ public sealed class ProjectArtifactFactsTests
         CodebaseModel model = await CodebaseExtractor.ExtractFromSolutionAsync(solution, ct: Ct);
 
         // Assert — and the workspace's list accounts for itself, so nothing reads as undeclared.
-        ProjectNode node = model.Projects.Single(project => project.Name == "App");
+        ProjectNode node = model.Project("App");
         node.ProjectReferences.ShouldBe(["Library"]);
         node.UndeclaredProjectReferences.ShouldBeEmpty();
     }
@@ -604,7 +597,7 @@ public sealed class ProjectArtifactFactsTests
         CodebaseModel model = await CodebaseExtractor.ExtractFromSolutionAsync(solution, ct: Ct);
 
         // Assert
-        ProjectNode node = model.Projects.Single(project => project.Name == "App");
+        ProjectNode node = model.Project("App");
         node.ProjectReferences.ShouldBeEmpty();
         node.UndeclaredProjectReferences.ShouldBe(["Library"]);
     }
@@ -640,7 +633,7 @@ public sealed class ProjectArtifactFactsTests
         CodebaseModel model = await CodebaseExtractor.ExtractFromSolutionAsync(solution, ct: Ct);
 
         // Assert
-        ProjectNode node = model.Projects.Single(project => project.Name == "App");
+        ProjectNode node = model.Project("App");
         node.ProjectReferences.ShouldBe(["Legacy"]);
         node.UndeclaredProjectReferences.ShouldBeEmpty();
     }
@@ -664,7 +657,7 @@ public sealed class ProjectArtifactFactsTests
         CodebaseModel model = await CodebaseExtractor.ExtractFromSolutionAsync(solution, ct: Ct);
 
         // Assert
-        model.Projects.Single(project => project.Name == "App")
+        model.Project("App")
             .ProjectReferences.ShouldBe(["Library"]);
     }
 

@@ -1,4 +1,6 @@
 using System.Reflection;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.Extensions.Hosting;
 using Shouldly;
 using SlideRule.Hosting;
@@ -96,7 +98,7 @@ public class DotNetGuidanceTests
         // The reason ends as a sentence and the page rides beside it, so no consuming surface has to read
         // the URL back out of prose.
         ArchRule rule = Checker.Model(arch => DeclareOne(arch, "http/reuse-httpclient", PackPosture.Enforce))
-            .Rules.Single();
+            .Rules.ShouldHaveSingleItem();
 
         rule.Because.ShouldBe(
             "A new HttpClient per call exhausts sockets under load; IHttpClientFactory pools handlers.");
@@ -123,20 +125,18 @@ public class DotNetGuidanceTests
     [Fact]
     public void ExemplarArgument_ReachesTheRule_AndNoneIsDeclaredWithoutIt()
     {
-        ArchitectureModel defaulted = Checker.Model(arch => DeclareOne(arch, "di/no-service-locator", PackPosture.Enforce));
-        ArchitectureModel named = Checker.Model(arch =>
-            DotNetGuidance.NoServiceLocator(arch, arch.Types.InNamespace(SubjectNamespace), arch.Namespace("Sample.Host.*"),
-                PackPosture.Enforce, exemplar: arch.Types.Named("PartnerClient")));
+        ArchRule defaulted = Checker.Model(arch => DeclareOne(arch, "di/no-service-locator", PackPosture.Enforce))
+            .Rules.ShouldHaveSingleItem();
+        ArchRule named = Checker.Model(arch =>
+                DotNetGuidance.NoServiceLocator(arch, arch.Types.InNamespace(SubjectNamespace), arch.Namespace("Sample.Host.*"),
+                    PackPosture.Enforce, exemplar: arch.Types.Named("PartnerClient")))
+            .Rules.ShouldHaveSingleItem();
 
-        named.Rules.Single()
-            .Exemplar.ShouldBe("types named `PartnerClient`");
-        defaulted.Rules.Single()
-            .Exemplar.ShouldBeNull();
+        named.Exemplar.ShouldBe("types named `PartnerClient`");
+        defaulted.Exemplar.ShouldBeNull();
 
         // Naming an exemplar leaves the pack's own hint in place: the two arguments are independent.
-        named.Rules.Single()
-            .Fix.ShouldBe(defaulted.Rules.Single()
-                .Fix);
+        named.Fix.ShouldBe(defaulted.Fix);
     }
 
     [Fact]
@@ -144,71 +144,60 @@ public class DotNetGuidanceTests
     {
         const string overridden = "Take IPartnerClient in the constructor; MeridianHost owns the wiring.";
 
-        ArchitectureModel defaulted = Checker.Model(arch => DeclareOne(arch, "di/no-service-locator", PackPosture.Enforce));
-        ArchitectureModel overrode = Checker.Model(arch =>
-            DotNetGuidance.NoServiceLocator(arch, arch.Types.InNamespace(SubjectNamespace), arch.Namespace("Sample.Host.*"),
-                PackPosture.Enforce, overridden));
+        ArchRule defaulted = Checker.Model(arch => DeclareOne(arch, "di/no-service-locator", PackPosture.Enforce))
+            .Rules.ShouldHaveSingleItem();
+        ArchRule overrode = Checker.Model(arch =>
+                DotNetGuidance.NoServiceLocator(arch, arch.Types.InNamespace(SubjectNamespace), arch.Namespace("Sample.Host.*"),
+                    PackPosture.Enforce, overridden))
+            .Rules.ShouldHaveSingleItem();
 
-        overrode.Rules.Single()
-            .Fix.ShouldBe(overridden);
-        defaulted.Rules.Single()
-            .Fix.ShouldNotBe(overridden);
+        overrode.Fix.ShouldBe(overridden);
+        defaulted.Fix.ShouldNotBe(overridden);
 
         // A repeated Fix is a spec-build error (a rule carries at most one), so the model building at
         // all is the proof that the override replaced the default rather than being appended to it.
-        overrode.Rules.Single()
-            .Because.ShouldBe(defaulted.Rules.Single()
-                .Because);
+        overrode.Because.ShouldBe(defaulted.Because);
     }
 
     [Fact]
     public void SameRule_EnforceInOneSpecAndMigrateInAnother_IsTheConsumersChoice()
     {
-        ArchitectureModel enforced = Checker.Model(arch => DeclareOne(arch, "naming/async-suffix", PackPosture.Enforce));
-        ArchitectureModel migrated = Checker.Model(arch =>
-            DeclareOne(arch, "naming/async-suffix", PackPosture.Migrate("Task-returning methods here are bare-named.")));
+        ArchRule enforced = Checker.Model(arch => DeclareOne(arch, "naming/async-suffix", PackPosture.Enforce))
+            .Rules.ShouldHaveSingleItem();
+        ArchRule migrated = Checker.Model(arch =>
+                DeclareOne(arch, "naming/async-suffix", PackPosture.Migrate("Task-returning methods here are bare-named.")))
+            .Rules.ShouldHaveSingleItem();
 
-        enforced.Rules.Single()
-            .Posture.ShouldBe(Posture.Enforce);
-        migrated.Rules.Single()
-            .Posture.ShouldBe(Posture.Migrate);
+        enforced.Posture.ShouldBe(Posture.Enforce);
+        migrated.Posture.ShouldBe(Posture.Migrate);
 
         // Posture belongs to the consumer; the reason the rule exists — and the page that reason rests on —
         // belongs to the pack, so both ride either posture.
-        migrated.Rules.Single()
-            .Because.ShouldBe(enforced.Rules.Single()
-                .Because);
-        migrated.Rules.Single()
-            .Citation.ShouldBe(enforced.Rules.Single()
-                .Citation);
-        migrated.Rules.Single()
-            .Sentence.ShouldBe(enforced.Rules.Single()
-                .Sentence);
+        migrated.Because.ShouldBe(enforced.Because);
+        migrated.Citation.ShouldBe(enforced.Citation);
+        migrated.Sentence.ShouldBe(enforced.Sentence);
     }
 
     [Fact]
     public void PackSource_UsesNoExpressionMemberAnchors()
     {
-        // The anchor doctrine, pinned in the cheapest way that survives a reformat: an expression anchor
-        // in the pack would be real syntax minting a use edge attributed to the pack's own type, which
-        // sits inside the cone this repo's spec governs. nameof operands mint nothing. Phrased over every
-        // tracked source in the pack rather than over the one file the doctrine was written for, so a
+        // The anchor doctrine: an expression anchor in the pack would be real syntax minting a use edge
+        // attributed to the pack's own type, which sits inside the cone this repo's spec governs. nameof
+        // operands mint nothing. Held over the syntax rather than over a spelling: every expression anchor
+        // is a lambda, whether handed to arch.Member, to arch.Member<T> or straight to MustNotUse, and the
+        // pack's sources hold none, so any lambda is reported however it is written or wrapped. Phrased over
+        // every tracked source in the pack rather than over the one file the doctrine was written for, so a
         // second pack file cannot land outside it.
         IReadOnlyList<string> sources = PackSources();
-        List<string> expressive = new();
-        foreach (string path in sources)
-        {
-            string source = RepoRoot.ReadText(path);
-            if (source.Contains("arch.Member<", StringComparison.Ordinal)
-                || source.Contains("arch.Member(()", StringComparison.Ordinal))
-                expressive.Add(path);
-        }
+        List<string> lambdas = sources
+            .SelectMany(LambdaSitesIn)
+            .ToList();
 
         // The sweep is held non-empty rather than trusted: a glob that matches nothing passes silently.
         sources.ShouldNotBeEmpty("No tracked C# source was found in the pack project; the arm below swept nothing.");
-        expressive.ShouldReportNothing(
-            "Pack source(s) writing an expression member anchor, which is real syntax minting a use edge "
-            + "attributed to the pack's own type inside the cone this repository's spec governs");
+        lambdas.ShouldReportNothing(
+            "Lambda(s) in the pack's source: an expression member anchor is one, and is real syntax minting a use "
+            + "edge attributed to the pack's own type inside the cone this repository's spec governs");
     }
 
     // Every tracked C# source in the rule pack, repository-relative.
@@ -217,6 +206,16 @@ public class DotNetGuidanceTests
         return TrackedFiles.CSharp
             .Where(static path => path.StartsWith("src/SlideRule.Packs.DotNet/", StringComparison.Ordinal))
             .ToList();
+    }
+
+    // Every lambda in the pack source at `path`, as path:line.
+    private static IEnumerable<string> LambdaSitesIn(string path)
+    {
+        return CSharpSyntaxTree.ParseText(RepoRoot.ReadText(path))
+            .GetRoot()
+            .DescendantNodes()
+            .OfType<LambdaExpressionSyntax>()
+            .Select(lambda => $"{path}:{lambda.GetLocation().GetLineSpan().StartLinePosition.Line + 1}");
     }
 
     private static void ApplyAll(Arch arch, PackPosture posture)

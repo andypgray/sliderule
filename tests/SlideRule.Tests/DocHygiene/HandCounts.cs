@@ -1,6 +1,4 @@
-using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
-using SlideRule.Tests.TestSupport;
 
 namespace SlideRule.Tests.DocHygiene;
 
@@ -31,10 +29,6 @@ internal static class HandCounts
     /// <summary>Where a registered fragment marks the number it claims.</summary>
     private const string CountPlaceholder = "{count}";
 
-    // One collapse per doc rather than one per claim: several docs carry more than one registered
-    // sentence, and collapsing walks the whole file.
-    private static readonly ConcurrentDictionary<string, GrandfatheredCounts.CollapsedText> Collapsed = new();
-
     /// <summary>
     ///     Every way <paramref name="doc" /> disagrees with <paramref name="authority" /> about
     ///     <paramref name="subject" />: the registered <paramref name="claim" /> matching other than once,
@@ -46,12 +40,12 @@ internal static class HandCounts
         string claim,
         string subject,
         int authority,
-        GrandfatheredCounts.CountStyle style)
+        CountStyle style)
     {
-        GrandfatheredCounts.CollapsedText collapsed = CollapsedText(doc);
+        CollapsedText collapsed = CollapsedText.Of(doc);
         List<Match> claimed = PatternFor(claim)
             .Matches(collapsed.Text)
-            .Where(static match => GrandfatheredCounts.IsCountWord(Written(match)))
+            .Where(static match => CountSpelling.IsCountWord(Written(match)))
             .ToList();
 
         if (claimed.Count != 1)
@@ -63,7 +57,7 @@ internal static class HandCounts
 
         Match only = claimed[0];
         string written = Written(only);
-        string expected = GrandfatheredCounts.Spell(authority, style);
+        string expected = CountSpelling.Spell(authority, style);
         if (string.Equals(written, expected, StringComparison.Ordinal)) return [];
 
         return
@@ -71,12 +65,6 @@ internal static class HandCounts
             $"{doc}:{collapsed.LineAt(only.Index)} writes {subject} as '{written}', but it is {authority} "
             + $"('{expected}')."
         ];
-    }
-
-    /// <summary><paramref name="doc" />'s whitespace-collapsed text, read and collapsed once per run.</summary>
-    internal static GrandfatheredCounts.CollapsedText CollapsedText(string doc)
-    {
-        return Collapsed.GetOrAdd(doc, static path => GrandfatheredCounts.Collapse(RepoRoot.ReadText(path)));
     }
 
     // The registered fragment as a pattern: its literal halves escaped, the placeholder replaced by the
@@ -92,7 +80,7 @@ internal static class HandCounts
         string before = Regex.Escape(claim[..placeholder]);
         string after = Regex.Escape(claim[(placeholder + CountPlaceholder.Length)..]);
 
-        return new Regex(before + GrandfatheredCounts.CountToken + after, RegexOptions.CultureInvariant);
+        return new Regex(before + CountSpelling.CountToken + after, RegexOptions.CultureInvariant);
     }
 
     private static string Written(Match match)

@@ -80,6 +80,35 @@ internal static class SarifAssertions
             .ShouldBe(new PackageAuditEntry(message, projects).Describe(), sarif);
     }
 
+    /// <summary>
+    ///     Asserts <paramref name="sarif" /> carries exactly one tool-execution notification whose message contains
+    ///     <paramref name="lede" />, at <paramref name="level" />, and hands it back for any further read.
+    /// </summary>
+    internal static JsonElement ShouldCarryNotification(this string sarif, string level, string lede)
+    {
+        JsonElement notification = sarif.SarifNotifications()
+            .Where(candidate => candidate.SarifMessageText()
+                .Contains(lede, StringComparison.Ordinal))
+            .ShouldHaveSingleItem(sarif);
+        notification.GetProperty("level")
+            .GetString()
+            .ShouldBe(level, sarif);
+
+        return notification;
+    }
+
+    /// <summary>
+    ///     Whether the run's one invocation recorded success: the verdict code scanning reads in place of an exit
+    ///     code.
+    /// </summary>
+    internal static bool SarifExecutionSuccessful(this string sarif)
+    {
+        return Run(sarif)
+            .GetProperty("invocations")[0]
+            .GetProperty("executionSuccessful")
+            .GetBoolean();
+    }
+
     /// <summary>The run's results, in render order — one per violation site.</summary>
     internal static IReadOnlyList<JsonElement> SarifResults(this string sarif)
     {

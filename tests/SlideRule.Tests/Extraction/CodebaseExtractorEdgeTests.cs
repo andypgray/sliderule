@@ -102,10 +102,8 @@ public sealed class CodebaseExtractorEdgeTests
                                                          public class Holder { public List<Item> Items = null; }
                                                          """);
 
-        model.HasEdge("N.Holder", "System.Collections.Generic.List<T>")
-            .ShouldBeTrue();
-        model.HasEdge("N.Holder", "N.Item")
-            .ShouldBeTrue();
+        model.ShouldHaveEdge("N.Holder", "System.Collections.Generic.List<T>");
+        model.ShouldHaveEdge("N.Holder", "N.Item");
     }
 
     [Fact]
@@ -294,8 +292,7 @@ public sealed class CodebaseExtractorEdgeTests
                                                          }
                                                          """);
 
-        model.HasEdge("N.Outer.Inner", "N.Dep")
-            .ShouldBeTrue();
+        model.ShouldHaveEdge("N.Outer.Inner", "N.Dep");
         model.HasEdge("N.Outer", "N.Dep")
             .ShouldBeFalse();
     }

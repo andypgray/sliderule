@@ -63,19 +63,11 @@ public sealed class MemberUseVerbTests
     [Fact]
     public void MustNotUse_SubjectUsesBannedMember_FailsWithSourceMemberSitesAndHumanLine()
     {
-        RuleResult result = Checker.Run(SceneModel, arch =>
-                arch.Rule("member/no-clock-read")
-                    .Enforce(arch.Namespace("App.*").MustNotUse(arch.Member(typeof(Clock), nameof(Clock.Ticks))))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(SceneModel, arch => arch.Namespace("App.*")
+            .MustNotUse(arch.Member(typeof(Clock), nameof(Clock.Ticks))));
 
-        result.ShouldHaveFailed();
-        Violation violation = result.Violations.ShouldHaveSingleItem();
-        violation.Kind.ShouldBe(ViolationKind.MemberUse);
-        violation.Source!.FullName.ShouldBe("App.Dashboard");
-        violation.Member!.SymbolId.ShouldBe($"P:{T}Clock.Ticks");
-        violation.Member.ContainingType.FullName.ShouldBe($"{T}Clock");
-        violation.Sites.ShouldNotBeEmpty();
+        result.ShouldHaveFailedWithMemberUseAtSites("App.Dashboard", $"{T}Clock.Ticks", ["Test.cs:21"])
+            .Member!.SymbolId.ShouldBe($"P:{T}Clock.Ticks");
 
         string block = result.HumanBlock();
         block.ShouldContain($"App.Dashboard uses {T}Clock.Ticks");
@@ -85,17 +77,13 @@ public sealed class MemberUseVerbTests
     [Fact]
     public void MustNotUse_HumanLine_AppendsParensForMethodNotForProperty()
     {
-        string methodBlock = Checker.Run(SceneModel, arch => arch.Rule("member/no-advance")
-                .Enforce(arch.Namespace("App.*").MustNotUse(arch.Member(typeof(Clock), nameof(Clock.Advance))))
-                .Because("b"))
-            .Single()
+        string methodBlock = Checker.Verdict(SceneModel, arch => arch.Namespace("App.*")
+                .MustNotUse(arch.Member(typeof(Clock), nameof(Clock.Advance))))
             .HumanBlock();
         methodBlock.ShouldContain($"uses {T}Clock.Advance()");
 
-        string propertyBlock = Checker.Run(SceneModel, arch => arch.Rule("member/no-ticks")
-                .Enforce(arch.Namespace("App.*").MustNotUse(arch.Member(typeof(Clock), nameof(Clock.Ticks))))
-                .Because("b"))
-            .Single()
+        string propertyBlock = Checker.Verdict(SceneModel, arch => arch.Namespace("App.*")
+                .MustNotUse(arch.Member(typeof(Clock), nameof(Clock.Ticks))))
             .HumanBlock();
         propertyBlock.ShouldContain($"uses {T}Clock.Ticks");
         propertyBlock.ShouldNotContain("Ticks()");
@@ -106,11 +94,8 @@ public sealed class MemberUseVerbTests
     {
         // A banned member the codebase never uses is the win condition: MustNotUse never warns (no pattern
         // form exists), exactly like a bare typeof target (GRAMMAR §4.5).
-        RuleResult result = Checker.Run(SceneModel, arch =>
-                arch.Rule("member/no-now")
-                    .Enforce(arch.Types.MustNotUse(arch.Member(typeof(DateTime), nameof(DateTime.Now))))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(SceneModel, arch => arch.Types
+            .MustNotUse(arch.Member(typeof(DateTime), nameof(DateTime.Now))));
 
         result.ShouldHavePassedClean();
     }
@@ -118,11 +103,8 @@ public sealed class MemberUseVerbTests
     [Fact]
     public void MustNotUse_OverloadedMethodBannedByName_ProducesOneViolationPerOverload()
     {
-        RuleResult result = Checker.Run(SceneModel, arch =>
-                arch.Rule("member/no-advance")
-                    .Enforce(arch.Namespace("App.*").MustNotUse(arch.Member(typeof(Clock), nameof(Clock.Advance))))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(SceneModel, arch => arch.Namespace("App.*")
+            .MustNotUse(arch.Member(typeof(Clock), nameof(Clock.Advance))));
 
         // One ban on (Clock, Advance) covers both overloads; each resolved overload is a distinct identity
         // (GRAMMAR §4.3), so a grandfathered Advance() and Advance(int) ratchet independently.
@@ -136,20 +118,14 @@ public sealed class MemberUseVerbTests
     {
         // A ban on the concrete member catches only the concrete-typed call (member bans are
         // source-visibility bans, not runtime-dispatch bans — GRAMMAR §4.5).
-        RuleResult concrete = Checker.Run(SceneModel, arch =>
-                arch.Rule("member/no-concrete")
-                    .Enforce(arch.Namespace("App.*").MustNotUse(arch.Member(typeof(Gauge), nameof(Gauge.Read))))
-                    .Because("b"))
-            .Single();
+        RuleResult concrete = Checker.Verdict(SceneModel, arch => arch.Namespace("App.*")
+            .MustNotUse(arch.Member(typeof(Gauge), nameof(Gauge.Read))));
         concrete.MemberUseTargets()
             .ShouldBe([$"M:{T}Gauge.Read"]);
 
         // A ban on the interface member catches only the interface-typed call.
-        RuleResult iface = Checker.Run(SceneModel, arch =>
-                arch.Rule("member/no-iface")
-                    .Enforce(arch.Namespace("App.*").MustNotUse(arch.Member(typeof(IGauge), nameof(IGauge.Read))))
-                    .Because("b"))
-            .Single();
+        RuleResult iface = Checker.Verdict(SceneModel, arch => arch.Namespace("App.*")
+            .MustNotUse(arch.Member(typeof(IGauge), nameof(IGauge.Read))));
         iface.MemberUseTargets()
             .ShouldBe([$"M:{T}IGauge.Read"]);
     }
@@ -160,11 +136,8 @@ public sealed class MemberUseVerbTests
         // The spec-build typo guard normalizes typeof(Task<int>) to the definition and passes, so the
         // closed construction legitimately reaches the checker, which refuses it (member edges are
         // definition-level, GRAMMAR §4.5).
-        RuleResult result = Checker.Run(SceneModel, arch =>
-                arch.Rule("member/closed")
-                    .Enforce(arch.Types.MustNotUse(arch.Member(typeof(Task<int>), "Result")))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(SceneModel, arch => arch.Types
+            .MustNotUse(arch.Member(typeof(Task<int>), "Result")));
 
         result.ShouldHaveFailedWithDetail(
             ViolationKind.RuleError,
@@ -175,14 +148,10 @@ public sealed class MemberUseVerbTests
     [Fact]
     public void MustNotUse_MultipleMembers_ViolatesAcrossEveryBannedMember()
     {
-        RuleResult result = Checker.Run(SceneModel, arch =>
-                arch.Rule("member/no-clock")
-                    .Enforce(arch.Namespace("App.*")
-                        .MustNotUse(
-                            arch.Member(typeof(Clock), nameof(Clock.Ticks)),
-                            arch.Member(typeof(Clock), nameof(Clock.Advance))))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(SceneModel, arch => arch.Namespace("App.*")
+            .MustNotUse(
+                arch.Member(typeof(Clock), nameof(Clock.Ticks)),
+                arch.Member(typeof(Clock), nameof(Clock.Advance))));
 
         result.ShouldHaveFailed();
         // The Ticks read plus both Advance overloads — the ban spans both named members.
@@ -205,16 +174,11 @@ public sealed class MemberUseVerbTests
                                                          public class Calc { public double Go() => Sqrt(2); }
                                                          """);
 
-        RuleResult result = Checker.Run(model, arch =>
-                arch.Rule("member/no-sqrt")
-                    .Enforce(arch.Types.MustNotUse(arch.Member(typeof(Math), nameof(Math.Sqrt))))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(model, arch => arch.Types
+            .MustNotUse(arch.Member(typeof(Math), nameof(Math.Sqrt))));
 
-        result.ShouldHaveFailed();
-        Violation violation = result.Violations.ShouldHaveSingleItem();
-        violation.Source!.FullName.ShouldBe("App.Calc");
-        violation.Member!.SymbolId.ShouldBe("M:System.Math.Sqrt(System.Double)");
+        result.ShouldHaveFailedWithMemberUseAtSites("App.Calc", "System.Math.Sqrt", ["Test.cs:3"])
+            .Member!.SymbolId.ShouldBe("M:System.Math.Sqrt(System.Double)");
     }
 
     [Fact]
@@ -254,10 +218,8 @@ public sealed class MemberUseVerbTests
         CodebaseModel after = CompilationFactory.Extract(WaitSource("t.Wait(System.TimeSpan.Zero);"));
         RuleResult regressed = Harness.Check(model, after, loaded)
             .Single();
-        regressed.ShouldHaveFailed();
-        regressed.Violations.Single(v => v.Kind == ViolationKind.MemberUse)
-            .Member!.SymbolId
-            .ShouldBe("M:System.Threading.Tasks.Task.Wait(System.TimeSpan)");
+        regressed.ShouldHaveFailedWithMemberUseAtSites("N.Waiter", "System.Threading.Tasks.Task.Wait", ["Test.cs:3"])
+            .Member!.SymbolId.ShouldBe("M:System.Threading.Tasks.Task.Wait(System.TimeSpan)");
 
         // Hand-edit the member entry's target line without rebuilding its seal → tamper refusal,
         // proving the seal is computed over member ids too (prefix-agnostic).
@@ -289,16 +251,11 @@ public sealed class MemberUseVerbTests
     {
         // An expression-minted anchor arch.Member<Clock>(c => c.Ticks) reifies to the same (declaring type,
         // name), so it yields the identical member SymbolId — and the identical violation — as the typeof form.
-        RuleResult result = Checker.Run(SceneModel, arch =>
-                arch.Rule("member/no-ticks")
-                    .Enforce(arch.Namespace("App.*").MustNotUse(arch.Member<Clock>(c => c.Ticks)))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(SceneModel, arch => arch.Namespace("App.*")
+            .MustNotUse(arch.Member<Clock>(c => c.Ticks)));
 
-        result.ShouldHaveFailed();
-        Violation violation = result.Violations.ShouldHaveSingleItem();
-        violation.Kind.ShouldBe(ViolationKind.MemberUse);
-        violation.Member!.SymbolId.ShouldBe($"P:{T}Clock.Ticks");
+        result.ShouldHaveFailedWithMemberUseAtSites("App.Dashboard", $"{T}Clock.Ticks", ["Test.cs:21"])
+            .Member!.SymbolId.ShouldBe($"P:{T}Clock.Ticks");
     }
 
     [Fact]
@@ -307,17 +264,14 @@ public sealed class MemberUseVerbTests
         // arch.Member<Gauge>(g => ((IGauge)g).Read()) anchors the interface member: the receiver-side Convert
         // is peeled to recognise the parameter, but the resolved method is IGauge.Read, so the ban catches
         // only the interface-typed call — the same dispatch boundary as the typeof(IGauge) ban (GRAMMAR §4.5).
-        RuleResult iface = Checker.Run(SceneModel, arch =>
-            {
-                // The (IGauge) cast is required: it moves the statically-resolved method the expression tree
-                // records from the concrete Gauge.Read to IGauge.Read, so it must survive cleanup's cast strip.
-                // ReSharper disable once RedundantCast
-                Member ifaceRead = arch.Member<Gauge>(g => ((IGauge)g).Read());
-                arch.Rule("member/no-iface")
-                    .Enforce(arch.Namespace("App.*").MustNotUse(ifaceRead))
-                    .Because("b");
-            })
-            .Single();
+        RuleResult iface = Checker.Verdict(SceneModel, arch =>
+        {
+            // The (IGauge) cast is required: it moves the statically-resolved method the expression tree
+            // records from the concrete Gauge.Read to IGauge.Read, so it must survive cleanup's cast strip.
+            // ReSharper disable once RedundantCast
+            Member ifaceRead = arch.Member<Gauge>(g => ((IGauge)g).Read());
+            return arch.Namespace("App.*").MustNotUse(ifaceRead);
+        });
 
         iface.MemberUseTargets()
             .ShouldBe([$"M:{T}IGauge.Read"]);
@@ -336,16 +290,10 @@ public sealed class MemberUseVerbTests
                                                          public class Home { public DateTime Go() => DateTime.Now; }
                                                          """);
 
-        RuleResult result = Checker.Run(model, arch =>
-                arch.Rule("member/no-now")
-                    .Enforce(arch.Namespace("App.*").MustNotUse(() => DateTime.Now))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(model, arch => arch.Namespace("App.*").MustNotUse(() => DateTime.Now));
 
-        result.ShouldHaveFailed();
-        Violation violation = result.Violations.ShouldHaveSingleItem();
-        violation.Kind.ShouldBe(ViolationKind.MemberUse);
-        violation.Member!.SymbolId.ShouldBe("P:System.DateTime.Now");
+        result.ShouldHaveFailedWithMemberUseAtSites("App.Home", "System.DateTime.Now", ["Test.cs:3"])
+            .Member!.SymbolId.ShouldBe("P:System.DateTime.Now");
     }
 
     private static string WaitSource(string call)

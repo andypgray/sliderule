@@ -14,15 +14,15 @@ namespace SlideRule.Tests.TestSupport;
 /// </remarks>
 internal static class ProcessFileFootprintAssertions
 {
-    private static readonly TimeSpan DefaultBudget = TimeSpan.FromSeconds(15);
+    private static readonly TimeSpan Budget = TimeSpan.FromSeconds(15);
     private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(500);
 
     /// <summary>
     ///     Asserts that <paramref name="process" /> holds nothing under <paramref name="root" /> — no mapped
-    ///     view, no open handle — polling until it is true or the budget expires. Pass
-    ///     <paramref name="inheritedHandles" /> (the launcher's own handles, taken before the process
-    ///     started) and <paramref name="injectedProfilerDirectory" /> (where a profiler was loaded from, if
-    ///     one is attached) to exclude what the process was given rather than acquired.
+    ///     view, no open handle — polling until it is true or the budget expires.
+    ///     <paramref name="inheritedHandles" /> (the launcher's own handles, taken before the process started)
+    ///     and <paramref name="injectedProfilerDirectory" /> (where a profiler was loaded from, or null when
+    ///     nothing is profiling) are excluded, because the process was given them rather than acquired them.
     /// </summary>
     /// <remarks>
     ///     Polling rather than a single shot because the subject is a live server: a tool call that has just
@@ -38,11 +38,9 @@ internal static class ProcessFileFootprintAssertions
     internal static void ShouldEventuallyHoldNoPathsUnder(
         this Process process,
         string root,
-        TimeSpan? budget = null,
-        IReadOnlyCollection<RetainedPath>? inheritedHandles = null,
-        string? injectedProfilerDirectory = null)
+        IReadOnlyCollection<RetainedPath> inheritedHandles,
+        string? injectedProfilerDirectory)
     {
-        TimeSpan ceiling = budget ?? DefaultBudget;
         long start = Stopwatch.GetTimestamp();
 
         while (true)
@@ -52,15 +50,14 @@ internal static class ProcessFileFootprintAssertions
 
             if (retained.Count == 0) return;
 
-            if (Stopwatch.GetElapsedTime(start) >= ceiling)
-                throw new ShouldAssertException(Describe(process, root, retained, ceiling));
+            if (Stopwatch.GetElapsedTime(start) >= Budget)
+                throw new ShouldAssertException(Describe(process, root, retained));
 
             Thread.Sleep(PollInterval);
         }
     }
 
-    private static string Describe(
-        Process process, string root, IReadOnlyList<RetainedPath> retained, TimeSpan ceiling)
+    private static string Describe(Process process, string root, IReadOnlyList<RetainedPath> retained)
     {
         IEnumerable<string> lines = retained
             .OrderBy(path => path.Scan)
@@ -68,7 +65,7 @@ internal static class ProcessFileFootprintAssertions
             .Select(path => $"    [{path.Scan}] {path.ResolvedPath}{Environment.NewLine}        raw: {path.RawPath}");
 
         return $"PID {process.Id} still held {retained.Count} path(s) under '{root}' after "
-               + $"{ceiling.TotalSeconds:0.#}s:{Environment.NewLine}"
+               + $"{Budget.TotalSeconds:0.#}s:{Environment.NewLine}"
                + string.Join(Environment.NewLine, lines);
     }
 }

@@ -8,6 +8,7 @@ using SlideRule.Hosting;
 using SlideRule.Internal;
 using SlideRule.Model;
 using SlideRule.ModelFile;
+using SlideRule.Prose;
 using SlideRule.Rendering;
 using SlideRule.Roslyn.Diagnostics;
 using SlideRule.Tests.Extraction;
@@ -32,14 +33,25 @@ internal static class Checker
     // and none of these runs is about what the file says it came from.
     private const string RoundTripSpecName = "Spec";
 
-    public static CheckReport Run(CodebaseModel codebase, Action<Arch> define)
+    /// <summary>
+    ///     Checks over a run given any of the conditions a host hands the checker, each defaulting to the whole,
+    ///     unconditioned run: the baselines, a diff, a filter's narrowing, a partial model, the solution root.
+    /// </summary>
+    public static CheckReport Run(
+        CodebaseModel codebase, Action<Arch> define, BaselineIndex? baselines = null, DiffContext? diff = null,
+        NarrowedUniverse? narrowing = null, IncompleteModel? incompleteModel = null, SolutionRoot? root = null)
     {
-        return Pinned(define, codebase, rules => Harness.Check(rules, codebase, BaselineIndex.Empty, null));
+        BaselineIndex index = baselines ?? BaselineIndex.Empty;
+        return Pinned(
+            define, codebase,
+            rules => Harness.Check(rules, codebase, index, diff, narrowing, incompleteModel, root));
     }
 
-    public static CheckReport Run(string source, Action<Arch> define)
+    /// <summary>The same run, extracting <paramref name="source" /> first.</summary>
+    public static CheckReport Run(
+        string source, Action<Arch> define, BaselineIndex? baselines = null, NarrowedUniverse? narrowing = null)
     {
-        return Run(CompilationFactory.Extract(source), define);
+        return Run(CompilationFactory.Extract(source), define, baselines, narrowing: narrowing);
     }
 
     public static CheckReport Run(CodebaseModel codebase, BaselineIndex baselines, Action<Arch> define)
@@ -52,11 +64,6 @@ internal static class Checker
         return Run(CompilationFactory.Extract(source), baselines, define);
     }
 
-    public static CheckReport Run(CodebaseModel codebase, BaselineIndex baselines, DiffContext? diff, Action<Arch> define)
-    {
-        return Pinned(define, codebase, rules => Harness.Check(rules, codebase, baselines, diff));
-    }
-
     /// <summary>The line a rule reports when <see cref="FilterNarrowing" /> emptied its subject.</summary>
     /// <remarks>
     ///     A stand-in for the sentence a filtered run composes, deliberately not the real wording: the filter
@@ -65,13 +72,14 @@ internal static class Checker
     /// </remarks>
     internal const string FilterSkipReason = "'Leaf.slnf' narrowed this run: 2 projects were not checked.";
 
-    /// <summary>The narrowing a filtered run hands the checker — the kind that cuts nothing.</summary>
+    /// <summary>The cure an inert target reports under <see cref="FilterNarrowing" />.</summary>
     /// <remarks>
-    ///     Its inert-target cure is a stand-in for the same reason. No row raises an inert target under it, so
-    ///     it only has to be there.
+    ///     A stand-in for the sentence a filtered run composes, for <see cref="FilterSkipReason" />'s reason.
     /// </remarks>
-    internal static NarrowedUniverse FilterNarrowing { get; } =
-        new(FilterSkipReason, "'Leaf.slnf' narrowed this run; check the whole solution.");
+    internal const string FilterInertCure = "'Leaf.slnf' narrowed this run; check the whole solution.";
+
+    /// <summary>The narrowing a filtered run hands the checker — the kind that cuts nothing.</summary>
+    internal static NarrowedUniverse FilterNarrowing { get; } = new(FilterSkipReason, FilterInertCure);
 
     /// <summary>
     ///     The cure a rule reports when <see cref="PartialModel" /> stood behind a selection that matched nothing.
@@ -83,36 +91,6 @@ internal static class Checker
 
     /// <summary>The partial-model fact handed to the checker by a run part of whose model never loaded.</summary>
     internal static IncompleteModel PartialModel { get; } = new(PartialModelCure);
-
-    /// <summary>
-    ///     Checks over a run a solution filter narrowed — the same internal overload a narrowed production
-    ///     run takes — so a test can put a rule's empty subject in front of a universe that is smaller than
-    ///     the solution.
-    /// </summary>
-    public static CheckReport Run(
-        CodebaseModel codebase, BaselineIndex baselines, NarrowedUniverse? narrowing, Action<Arch> define)
-    {
-        return Pinned(define, codebase, rules => Harness.Check(rules, codebase, baselines, null, narrowing, null));
-    }
-
-    /// <summary>The same narrowed run, extracting <paramref name="source" /> first.</summary>
-    public static CheckReport Run(
-        string source, BaselineIndex baselines, NarrowedUniverse? narrowing, Action<Arch> define)
-    {
-        return Run(CompilationFactory.Extract(source), baselines, narrowing, define);
-    }
-
-    /// <summary>
-    ///     Checks over a run part of whose model never loaded — the sibling of the narrowed overload above,
-    ///     through the same internal seam, so a test can put a selection that matched nothing in front of a
-    ///     model that is smaller than the codebase rather than in front of a spec defect.
-    /// </summary>
-    public static CheckReport Run(CodebaseModel codebase, IncompleteModel? incompleteModel, Action<Arch> define)
-    {
-        return Pinned(
-            define, codebase,
-            rules => Harness.Check(rules, codebase, BaselineIndex.Empty, null, null, incompleteModel));
-    }
 
     /// <summary>
     ///     The report <paramref name="check" /> gives over the model <paramref name="define" /> builds, having
@@ -145,24 +123,6 @@ internal static class Checker
         return report;
     }
 
-    /// <summary>
-    ///     Checks over a run given the directory path globs read against — the seam every host that loads a
-    ///     solution takes — so a test can put an <c>Under</c> rule in front of files at known paths.
-    /// </summary>
-    public static CheckReport Run(CodebaseModel codebase, SolutionRoot root, Action<Arch> define)
-    {
-        return Run(codebase, BaselineIndex.Empty, null, root, define);
-    }
-
-    /// <summary>The same run with a root, narrowed as a host would narrow it.</summary>
-    public static CheckReport Run(
-        CodebaseModel codebase, BaselineIndex baselines, NarrowedUniverse? narrowing, SolutionRoot root,
-        Action<Arch> define)
-    {
-        return Pinned(
-            define, codebase, rules => Harness.Check(rules, codebase, baselines, null, narrowing, null, root));
-    }
-
     /// <summary>The reified model of a one-off spec — for the tests whose subject is the model, not the check.</summary>
     public static ArchitectureModel Model(Action<Arch> define)
     {
@@ -180,23 +140,15 @@ internal static class Checker
     /// </summary>
     public static ArchRule Tripwire(Action<Arch> define)
     {
-        return Model(define)
-            .Rules.Single(rule => rule.Scope is { Role: ScopeRole.Tripwire });
+        return SingleMatch(
+            Model(define).Rules, rule => rule.Scope is { Role: ScopeRole.Tripwire }, rule => rule.Id,
+            "the scope's tripwire");
     }
 
     /// <summary>The rule <paramref name="id" /> names, for the tests that reach into a multi-rule model.</summary>
-    /// <remarks>
-    ///     A raw <c>Rules.Single(rule =&gt; rule.Id == id)</c> reds "Sequence contains no matching element",
-    ///     which names neither the id that was wanted nor what the model does carry — the two things that
-    ///     settle whether the spec moved or the test's expectation did.
-    /// </remarks>
     public static ArchRule Rule(this ArchitectureModel model, string id)
     {
-        List<ArchRule> matching = model.Rules.Where(rule => rule.Id == id)
-            .ToList();
-        string declared = string.Join(", ", model.Rules.Select(rule => rule.Id));
-
-        return matching.ShouldHaveSingleItem($"Looking for rule '{id}'; the model declares: {declared}.");
+        return SingleMatch(model.Rules, rule => rule.Id == id, rule => rule.Id, $"rule '{id}'");
     }
 
     /// <summary>
@@ -223,23 +175,82 @@ internal static class Checker
     /// </summary>
     public static RuleResult Verdict(CodebaseModel codebase, Func<Arch, Constraint> constraint)
     {
-        return Run(codebase, arch => arch.Rule("area/rule")
-                .Enforce(constraint(arch))
-                .Because("b"))
+        return Run(codebase, OneRuleSpec(constraint))
             .Single();
     }
 
+    /// <summary>The same verdict, extracting <paramref name="source" /> first.</summary>
+    public static RuleResult Verdict(string source, Func<Arch, Constraint> constraint)
+    {
+        return Verdict(CompilationFactory.Extract(source), constraint);
+    }
+
     /// <summary>
-    ///     The rendered sentence of a one-rule spec carrying <paramref name="constraint" /> — the model is
-    ///     the sole source of prose, so two spellings that render one sentence reified to one thing.
+    ///     The one rule of a one-rule spec enforcing <paramref name="constraint" />, for the rows whose rule id
+    ///     and reason nothing reads.
     /// </summary>
+    public static ArchRule OneRule(Func<Arch, Constraint> constraint)
+    {
+        return Model(OneRuleSpec(constraint))
+            .Rules.Single();
+    }
+
+    // One enforced rule whose id and reason are placeholders nothing reads.
+    private static Action<Arch> OneRuleSpec(Func<Arch, Constraint> constraint)
+    {
+        return arch => arch.Rule("area/rule")
+            .Enforce(constraint(arch))
+            .Because("b");
+    }
+
+    /// <summary>
+    ///     The rendered sentence of a one-rule spec carrying <paramref name="constraint" />, for the rows that pin
+    ///     one.
+    /// </summary>
+    /// <remarks>
+    ///     Two constraints that render one sentence need not reify alike;
+    ///     <see cref="ShouldReifyAlike(Func{Arch, Constraint}, Func{Arch, Constraint})" /> compares the model as well.
+    /// </remarks>
     public static string Sentence(Func<Arch, Constraint> constraint)
     {
-        return Model(arch => arch.Rule("area/rule")
-                .Enforce(constraint(arch))
-                .Because("b"))
-            .Rules.Single()
-            .Sentence;
+        return OneRule(constraint).Sentence;
+    }
+
+    /// <summary>
+    ///     Asserts the one-rule specs enforcing <paramref name="actual" /> and <paramref name="expected" /> reify
+    ///     to one thing, compared as <see cref="ShouldReifyAlike(Constraint, Constraint)" /> compares them.
+    /// </summary>
+    public static void ShouldReifyAlike(Func<Arch, Constraint> actual, Func<Arch, Constraint> expected)
+    {
+        Constraint actualConstraint = OneRule(actual).Constraint!;
+        Constraint expectedConstraint = OneRule(expected).Constraint!;
+
+        ShouldReifyAlike(actualConstraint, expectedConstraint);
+    }
+
+    /// <summary>
+    ///     Asserts <paramref name="actual" /> and <paramref name="expected" /> reify to one thing: the same
+    ///     sentence and the same model-file text, which spells every node and field the checker reads.
+    /// </summary>
+    /// <remarks>
+    ///     The sentence alone cannot carry the claim: a one-operand union, a repeated adjective and a string
+    ///     anchor each render exactly like a model they are not.
+    /// </remarks>
+    public static void ShouldReifyAlike(Constraint actual, Constraint expected)
+    {
+        SentenceRenderer.Sentence(actual)
+            .ShouldBe(SentenceRenderer.Sentence(expected));
+        ModelText(actual)
+            .ShouldBe(ModelText(expected));
+    }
+
+    // A refused write is compared by its reason, so two constraints refused for different reasons still differ.
+    private static string ModelText(Constraint constraint)
+    {
+        var writer = new NodeWriter(new Dictionary<string, string>());
+        writer.WriteConstraint(constraint);
+
+        return writer.Refusal ?? writer.Text;
     }
 
     /// <summary>
@@ -274,7 +285,7 @@ internal static class Checker
     public static IReadOnlyList<string> Selects(CodebaseModel codebase, SolutionRoot root, Func<Arch, Selection> select)
     {
         Action<Arch> probe = Probe(select);
-        return Run(codebase, root, probe)
+        return Run(codebase, probe, root: root)
             .Single()
             .ShapeSubjects();
     }
@@ -322,13 +333,27 @@ internal static class Checker
     /// <summary>The single rule result — most specs under test carry exactly one rule.</summary>
     public static RuleResult Single(this CheckReport report)
     {
-        return report.Results.Single();
+        return SingleMatch(report.Results, _ => true, result => result.Rule.Id, "the report's one rule");
     }
 
     /// <summary>The rule result for a given ID (for multi-rule specs, e.g. a desugared Quarantine scope).</summary>
     public static RuleResult ForRule(this CheckReport report, string ruleId)
     {
-        return report.Results.Single(r => r.Rule.Id == ruleId);
+        return SingleMatch(
+            report.Results, result => result.Rule.Id == ruleId, result => result.Rule.Id, $"rule '{ruleId}'");
+    }
+
+    // LINQ's Single, with a message that names what was sought and the id of every item there is: the facts that
+    // settle whether the spec moved or the test's expectation did.
+    private static T SingleMatch<T>(
+        IReadOnlyList<T> items, Func<T, bool> wanted, Func<T, string> idOf, string sought)
+    {
+        List<T> matching = items.Where(wanted)
+            .ToList();
+        if (matching.Count == 1) return matching[0];
+
+        string present = string.Join(", ", items.Select(idOf));
+        throw new InvalidOperationException($"Looking for {sought}; there are: {present}.");
     }
 
     /// <summary>
@@ -440,26 +465,16 @@ internal static class Checker
     /// </summary>
     public static void ShouldRenderEdgeViolation(this CheckReport report, string kind, string source, string target)
     {
-        using JsonDocument document = JsonDocument.Parse(report.JsonReport());
-        document.RootElement.GetProperty("schemaVersion")
-            .GetInt32()
-            .ShouldBe(3);
-        JsonElement violation = FirstViolation(document);
-        violation.GetProperty("kind")
-            .GetString()
-            .ShouldBe(kind);
+        JsonElement violation = ShouldRenderFirstViolationAs(report, kind);
         violation.GetProperty("source")
             .GetString()
             .ShouldBe(source);
         violation.GetProperty("target")
             .GetString()
             .ShouldBe(target);
-        violation.TryGetProperty("targetMember", out _)
-            .ShouldBeFalse();
-        violation.TryGetProperty("subject", out _)
-            .ShouldBeFalse();
-        violation.TryGetProperty("subjectMember", out _)
-            .ShouldBeFalse();
+        ShouldCarrySlot(violation, "targetMember", null);
+        ShouldCarrySlot(violation, "subject", null);
+        ShouldCarrySlot(violation, "subjectMember", null);
         violation.GetProperty("sites")
             .GetArrayLength()
             .ShouldBeGreaterThan(0);
@@ -471,23 +486,13 @@ internal static class Checker
     /// </summary>
     public static void ShouldRenderMemberShapeViolation(this CheckReport report, string kind, string subjectMember)
     {
-        using JsonDocument document = JsonDocument.Parse(report.JsonReport());
-        document.RootElement.GetProperty("schemaVersion")
-            .GetInt32()
-            .ShouldBe(3);
-        JsonElement violation = FirstViolation(document);
-        violation.GetProperty("kind")
-            .GetString()
-            .ShouldBe(kind);
+        JsonElement violation = ShouldRenderFirstViolationAs(report, kind);
         violation.GetProperty("subjectMember")
             .GetString()
             .ShouldBe(subjectMember);
-        violation.TryGetProperty("subject", out _)
-            .ShouldBeFalse();
-        violation.TryGetProperty("target", out _)
-            .ShouldBeFalse();
-        violation.TryGetProperty("targetMember", out _)
-            .ShouldBeFalse();
+        ShouldCarrySlot(violation, "subject", null);
+        ShouldCarrySlot(violation, "target", null);
+        ShouldCarrySlot(violation, "targetMember", null);
         violation.GetProperty("sites")
             .GetArrayLength()
             .ShouldBeGreaterThan(0);
@@ -501,24 +506,15 @@ internal static class Checker
     public static void ShouldRenderTargetMemberViolation(
         this CheckReport report, string kind, string source, string targetMember)
     {
-        using JsonDocument document = JsonDocument.Parse(report.JsonReport());
-        document.RootElement.GetProperty("schemaVersion")
-            .GetInt32()
-            .ShouldBe(3);
-        JsonElement violation = FirstViolation(document);
-        violation.GetProperty("kind")
-            .GetString()
-            .ShouldBe(kind);
+        JsonElement violation = ShouldRenderFirstViolationAs(report, kind);
         violation.GetProperty("source")
             .GetString()
             .ShouldBe(source);
         violation.GetProperty("targetMember")
             .GetString()
             .ShouldBe(targetMember);
-        violation.TryGetProperty("target", out _)
-            .ShouldBeFalse();
-        violation.TryGetProperty("subject", out _)
-            .ShouldBeFalse();
+        ShouldCarrySlot(violation, "target", null);
+        ShouldCarrySlot(violation, "subject", null);
         violation.GetProperty("sites")
             .GetArrayLength()
             .ShouldBeGreaterThan(0);
@@ -534,14 +530,7 @@ internal static class Checker
     public static void ShouldRenderProjectShapeViolation(
         this CheckReport report, string kind, string subjectProject, string? package = null, string? framework = null)
     {
-        using JsonDocument document = JsonDocument.Parse(report.JsonReport());
-        document.RootElement.GetProperty("schemaVersion")
-            .GetInt32()
-            .ShouldBe(3);
-        JsonElement violation = FirstViolation(document);
-        violation.GetProperty("kind")
-            .GetString()
-            .ShouldBe(kind);
+        JsonElement violation = ShouldRenderFirstViolationAs(report, kind);
         violation.GetProperty("subjectProject")
             .GetString()
             .ShouldBe(subjectProject);
@@ -551,14 +540,10 @@ internal static class Checker
         ShouldCarrySlot(violation, "property", null);
         ShouldCarrySlot(violation, "propertyValue", null);
 
-        violation.TryGetProperty("source", out _)
-            .ShouldBeFalse();
-        violation.TryGetProperty("target", out _)
-            .ShouldBeFalse();
-        violation.TryGetProperty("subject", out _)
-            .ShouldBeFalse();
-        violation.TryGetProperty("subjectMember", out _)
-            .ShouldBeFalse();
+        ShouldCarrySlot(violation, "source", null);
+        ShouldCarrySlot(violation, "target", null);
+        ShouldCarrySlot(violation, "subject", null);
+        ShouldCarrySlot(violation, "subjectMember", null);
     }
 
     // One optional slot of a violation's wire form: omitted when expected is null, otherwise present and holding it.
@@ -583,9 +568,21 @@ internal static class Checker
         return $"{v.Source!.FullName} -> {v.Target!.FullName}";
     }
 
-    private static JsonElement FirstViolation(JsonDocument document)
+    // The first violation of the report's first rule, once the document is held at schema version 3 and the
+    // violation at kind; cloned, because the document is disposed before the caller reads its slots.
+    private static JsonElement ShouldRenderFirstViolationAs(CheckReport report, string kind)
     {
-        return document.RootElement.GetProperty("rules")[0]
-            .GetProperty("violations")[0];
+        using JsonDocument document = JsonDocument.Parse(report.JsonReport());
+        document.RootElement.GetProperty("schemaVersion")
+            .GetInt32()
+            .ShouldBe(3);
+        JsonElement violation = document.RootElement.GetProperty("rules")[0]
+            .GetProperty("violations")[0]
+            .Clone();
+        violation.GetProperty("kind")
+            .GetString()
+            .ShouldBe(kind);
+
+        return violation;
     }
 }

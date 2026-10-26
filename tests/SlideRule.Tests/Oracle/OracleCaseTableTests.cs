@@ -51,14 +51,15 @@ namespace SlideRule.Tests.Oracle;
 ///         </item>
 ///     </list>
 /// </remarks>
-public sealed class OracleCaseTableTests(WorkspaceFixture workspace, OracleArchitecture oracle) : IClassFixture<OracleArchitecture>
+public sealed class OracleCaseTableTests(WorkspaceFixture workspace, OracleArchitecture oracle)
+    : IClassFixture<OracleArchitecture>, IClassFixture<WorkspaceFixture>
 {
     // Row 1: Domain must not reference Web. Only MyApp.Domain.OrderService reaches into Web
     // (new HomeController(), typeof(HomeController), and the WebTextExtensions extension call).
     [Fact]
     public void Row1_DomainMustNotReferenceWeb()
     {
-        IReadOnlySet<string> slideRule = SlideRuleReferenceViolators(arch =>
+        IReadOnlySet<string> slideRule = ShouldHaveSlideRuleReferenceViolators(arch =>
             arch.Rule("oracle/domain-not-web")
                 .Enforce(arch.Layer("Domain", "MyApp.Domain.*").MustNotReference(arch.Layer("Web", "MyApp.Web.*")))
                 .Because("Oracle row 1: Domain must not reference Web."));
@@ -78,7 +79,7 @@ public sealed class OracleCaseTableTests(WorkspaceFixture workspace, OracleArchi
     [Fact]
     public void Row2_WebMustNotReferenceDomain()
     {
-        IReadOnlySet<string> slideRule = SlideRuleReferenceViolators(arch =>
+        IReadOnlySet<string> slideRule = ShouldHaveSlideRuleReferenceViolators(arch =>
             arch.Rule("oracle/web-not-domain")
                 .Enforce(arch.Layer("Web", "MyApp.Web.*").MustNotReference(arch.Layer("Domain", "MyApp.Domain.*")))
                 .Because("Oracle row 2: Web must not reference Domain."));
@@ -98,7 +99,7 @@ public sealed class OracleCaseTableTests(WorkspaceFixture workspace, OracleArchi
     [Fact]
     public void Row3_BillingMustNotReferenceWeb()
     {
-        IReadOnlySet<string> slideRule = SlideRuleReferenceViolators(arch =>
+        IReadOnlySet<string> slideRule = ShouldHaveSlideRuleReferenceViolators(arch =>
             arch.Rule("oracle/billing-not-web")
                 .Enforce(arch.Namespace("MyApp.Legacy.Billing.*").MustNotReference(arch.Namespace("MyApp.Web.*")))
                 .Because("Oracle row 3: Billing must not reference Web."));
@@ -119,7 +120,7 @@ public sealed class OracleCaseTableTests(WorkspaceFixture workspace, OracleArchi
     [Fact]
     public void Row4_ControllersMustNotReferenceSystemData()
     {
-        IReadOnlySet<string> slideRule = SlideRuleReferenceViolators(arch =>
+        IReadOnlySet<string> slideRule = ShouldHaveSlideRuleReferenceViolators(arch =>
             arch.Rule("oracle/controllers-no-system-data")
                 .Enforce(arch.Namespace("MyApp.Web.*").WithSuffix("Controller")
                     .MustNotReference(arch.Namespace("System.Data.*")))
@@ -142,7 +143,7 @@ public sealed class OracleCaseTableTests(WorkspaceFixture workspace, OracleArchi
     [Fact]
     public void Row5_InterfacesMustHaveIPrefix()
     {
-        IReadOnlySet<string> slideRule = SlideRuleShapeViolators(arch =>
+        IReadOnlySet<string> slideRule = ShouldHaveSlideRuleShapeViolators(arch =>
             arch.Rule("oracle/interface-prefix")
                 .Enforce(arch.Types.OfKind(TypeKind.Interface).InNamespace("MyApp.*").MustHavePrefix("I"))
                 .Because("Oracle row 5: interfaces are I-prefixed."));
@@ -168,7 +169,7 @@ public sealed class OracleCaseTableTests(WorkspaceFixture workspace, OracleArchi
     [Fact]
     public void Row6_HandlerImplementorsMustHaveHandlerSuffix()
     {
-        IReadOnlySet<string> slideRule = SlideRuleShapeViolators(arch =>
+        IReadOnlySet<string> slideRule = ShouldHaveSlideRuleShapeViolators(arch =>
             arch.Rule("oracle/handler-suffix")
                 .Enforce(arch.Types.Implementing("MyApp.Web.IHandler<T>").MustHaveSuffix("Handler"))
                 .Because("Oracle row 6: handler implementors carry the Handler suffix."));
@@ -189,7 +190,7 @@ public sealed class OracleCaseTableTests(WorkspaceFixture workspace, OracleArchi
     [Fact]
     public void Row7_QuarantinedInteriorContainment()
     {
-        IReadOnlySet<string> slideRule = SlideRuleReferenceViolators(arch =>
+        IReadOnlySet<string> slideRule = ShouldHaveSlideRuleReferenceViolators(arch =>
         {
             Selection quarantined = arch.Namespace("MyApp.Legacy.Billing.*");
             Selection facadeImpl = arch.Types.WithNameMatching("BillingFacade");
@@ -226,7 +227,7 @@ public sealed class OracleCaseTableTests(WorkspaceFixture workspace, OracleArchi
     [Fact]
     public void Row8_AmbientClockReadsAtCallerTypeGranularity()
     {
-        IReadOnlySet<string> slideRule = SlideRuleMemberUseViolators(arch =>
+        IReadOnlySet<string> slideRule = ShouldHaveSlideRuleMemberUseViolators(arch =>
             arch.Rule("oracle/no-ambient-clock")
                 .Enforce(arch.Types.MustNotUse(
                     arch.Member(typeof(DateTime), nameof(DateTime.Now)),
@@ -247,7 +248,7 @@ public sealed class OracleCaseTableTests(WorkspaceFixture workspace, OracleArchi
     [Fact]
     public void Row9_TaskReturningMethodsMustHaveAsyncSuffixAtDeclaringTypeGranularity()
     {
-        IReadOnlySet<string> slideRule = SlideRuleMemberShapeViolators(arch =>
+        IReadOnlySet<string> slideRule = ShouldHaveSlideRuleMemberShapeViolators(arch =>
             arch.Rule("oracle/async-suffix")
                 .Enforce(arch.Namespace("MyApp.Web.*").Methods.Returning(typeof(Task), typeof(Task<>))
                     .MustHaveSuffix("Async"))
@@ -266,7 +267,7 @@ public sealed class OracleCaseTableTests(WorkspaceFixture workspace, OracleArchi
     [Fact]
     public void Row10_ServiceTypesMustResideInWebProject()
     {
-        IReadOnlySet<string> slideRule = SlideRuleShapeViolators(arch =>
+        IReadOnlySet<string> slideRule = ShouldHaveSlideRuleShapeViolators(arch =>
             arch.Rule("oracle/services-in-web")
                 .Enforce(arch.Types.WithSuffix("Service").MustResideInProject("MyApp.Web"))
                 .Because("Oracle row 10: Service types reside in the Web project."));
@@ -290,7 +291,7 @@ public sealed class OracleCaseTableTests(WorkspaceFixture workspace, OracleArchi
     [Fact]
     public void Row11_EveryMyAppTypeMustBelongToDomainOrWeb()
     {
-        IReadOnlySet<string> slideRule = SlideRuleShapeViolators(arch =>
+        IReadOnlySet<string> slideRule = ShouldHaveSlideRuleShapeViolators(arch =>
             arch.Rule("oracle/no-ungoverned-types")
                 .Enforce(arch.Namespace("MyApp.*")
                     .MustBelongTo(arch.Layer("Domain", "MyApp.Domain.*"), arch.Layer("Web", "MyApp.Web.*")))
@@ -327,7 +328,7 @@ public sealed class OracleCaseTableTests(WorkspaceFixture workspace, OracleArchi
     [Fact]
     public void Row12_DomainPropertiesMustBeGetOnlyIncludingInitOnlySetters()
     {
-        IReadOnlySet<string> slideRule = SlideRuleMemberShapeViolators(arch =>
+        IReadOnlySet<string> slideRule = ShouldHaveSlideRuleMemberShapeViolators(arch =>
             arch.Rule("oracle/domain-values-immutable")
                 .Enforce(arch.Namespace("MyApp.Domain.*").Properties.MustBeGetOnly())
                 .Because("Oracle row 12: Domain properties declare no setter."));
@@ -356,7 +357,7 @@ public sealed class OracleCaseTableTests(WorkspaceFixture workspace, OracleArchi
     [Fact]
     public void Row13_WebStaticFieldsMustBeReadonlyAtDeclaringTypeGranularity()
     {
-        IReadOnlySet<string> slideRule = SlideRuleMemberShapeViolators(arch =>
+        IReadOnlySet<string> slideRule = ShouldHaveSlideRuleMemberShapeViolators(arch =>
             arch.Rule("oracle/no-static-mutable")
                 .Enforce(arch.Namespace("MyApp.Web.*").Fields.ThatAreStatic().MustBeReadonly())
                 .Because("Oracle row 13: static fields of the Web layer are readonly."));
@@ -376,15 +377,14 @@ public sealed class OracleCaseTableTests(WorkspaceFixture workspace, OracleArchi
     }
 
     /// <summary>
-    ///     The oracle assertion: both substrates equal the pinned expected set (so a shared blind spot is
-    ///     caught), and equal each other (the agreement claim). Sets are compared order-insensitively.
+    ///     The oracle assertion: both substrates equal the pinned expected set, which catches a blind spot they
+    ///     share and makes them equal to each other. Sets are compared order-insensitively.
     /// </summary>
     private static void AssertOracleAgreement(
         IReadOnlySet<string> slideRule, IReadOnlySet<string> archUnit, params string[] expected)
     {
         slideRule.ShouldBe(expected, true);
         archUnit.ShouldBe(expected, true);
-        slideRule.ShouldBe(archUnit, true);
     }
 
     // A reader keeps one violation kind, so without this guard a rule that failed as an empty subject or a
@@ -402,21 +402,21 @@ public sealed class OracleCaseTableTests(WorkspaceFixture workspace, OracleArchi
     // The four readers below stay raw rather than stating their sets through the RuleResult outcome verbs:
     // each projects a slot of its own choosing — a source rather than an edge, a declaring type rather than the
     // member — and the value has to survive as a set for AssertOracleAgreement to compare it three ways.
-    private IReadOnlySet<string> SlideRuleReferenceViolators(Action<Arch> define)
+    private IReadOnlySet<string> ShouldHaveSlideRuleReferenceViolators(Action<Arch> define)
     {
         return ShouldReachAVerdict(define)
             .Violators(ViolationKind.Reference, violation => violation.Source!.FullName)
             .ToHashSet(StringComparer.Ordinal);
     }
 
-    private IReadOnlySet<string> SlideRuleShapeViolators(Action<Arch> define)
+    private IReadOnlySet<string> ShouldHaveSlideRuleShapeViolators(Action<Arch> define)
     {
         return ShouldReachAVerdict(define)
             .ShapeSubjects()
             .ToHashSet(StringComparer.Ordinal);
     }
 
-    private IReadOnlySet<string> SlideRuleMemberUseViolators(Action<Arch> define)
+    private IReadOnlySet<string> ShouldHaveSlideRuleMemberUseViolators(Action<Arch> define)
     {
         return ShouldReachAVerdict(define)
             .Violators(ViolationKind.MemberUse, violation => violation.Source!.FullName)
@@ -427,7 +427,7 @@ public sealed class OracleCaseTableTests(WorkspaceFixture workspace, OracleArchi
     // type-granularity compare (rows 9, 12 and 13). SlideRule keys the specific member (M: DocId); the
     // oracle agrees on which types own an offending member, exactly as row 8 agrees on which types read the
     // clock.
-    private IReadOnlySet<string> SlideRuleMemberShapeViolators(Action<Arch> define)
+    private IReadOnlySet<string> ShouldHaveSlideRuleMemberShapeViolators(Action<Arch> define)
     {
         return ShouldReachAVerdict(define)
             .Violators(ViolationKind.MemberShape, violation => ((TypeNode)violation.SubjectMember!.DeclaringType).FullName)

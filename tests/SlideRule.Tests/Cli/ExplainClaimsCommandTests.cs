@@ -20,49 +20,48 @@ public sealed class ExplainClaimsCommandTests
         // The whole answer: what a reader learns here is the layout, so the pin is every line of it. The lone
         // positional after --type is the solution, not a rule ID.
         result.ShouldSucceed();
-        result.Out.NormalizedTrimmed()
-            .ShouldBe(
-                """
-                    MyApp.Domain.OrderService (class)
-                      project: MyApp.Domain
-                      file: MyApp.Domain/OrderService.cs
-                      layers:
-                        Domain
-                          namespace `MyApp.Domain` matches `MyApp.Domain.*`
-                      rules:
-                        layering/domain-independent: The Domain layer
-                          in the Domain layer
-                            namespace `MyApp.Domain` matches `MyApp.Domain.*`
-                        layering/projects-independent: Each of the projects matching `MyApp.*`
-                          declared by project `MyApp.Domain`
-                        layering/projects-reached-only-by-themselves: Each of the projects matching `MyApp.*`
-                          declared by project `MyApp.Domain`
-                        di/handlers-via-registry: Types, except `HandlerRegistry`
-                          outside the except: `HandlerRegistry`
-                        layering/no-ghost: Types in `MyApp.Domain.*`
-                          namespace `MyApp.Domain` matches `MyApp.Domain.*`
-                        exceptions/domain-throws-domain: The Domain layer
-                          in the Domain layer
-                            namespace `MyApp.Domain` matches `MyApp.Domain.*`
-                        exceptions/no-unfiltered-catch: The Web or Domain layers
-                          in the Domain layer
-                            namespace `MyApp.Domain` matches `MyApp.Domain.*`
-                        exceptions/no-swallowed-catch: The Web or Domain layers
-                          in the Domain layer
-                            namespace `MyApp.Domain` matches `MyApp.Domain.*`
-                        exceptions/no-bare-bcl-throw: The Domain layer
-                          in the Domain layer
-                            namespace `MyApp.Domain` matches `MyApp.Domain.*`
-                        layering/services-in-web: Types named `*Service`
-                          its name `OrderService` ends with `Service`
-                        layering/services-behind-contracts: Types named `*Service`
-                          its name `OrderService` ends with `Service`
-                        layering/no-ungoverned-types: Types in `MyApp.*`
-                          namespace `MyApp.Domain` matches `MyApp.*`
-                        domain/values-immutable: Properties of the Domain layer
-                          in the Domain layer
-                            namespace `MyApp.Domain` matches `MyApp.Domain.*`
-                    """.NormalizedTrimmed());
+        result.ShouldPrint(
+            """
+            MyApp.Domain.OrderService (class)
+              project: MyApp.Domain
+              file: MyApp.Domain/OrderService.cs
+              layers:
+                Domain
+                  namespace `MyApp.Domain` matches `MyApp.Domain.*`
+              rules:
+                layering/domain-independent: The Domain layer
+                  in the Domain layer
+                    namespace `MyApp.Domain` matches `MyApp.Domain.*`
+                layering/projects-independent: Each of the projects matching `MyApp.*`
+                  declared by project `MyApp.Domain`
+                layering/projects-reached-only-by-themselves: Each of the projects matching `MyApp.*`
+                  declared by project `MyApp.Domain`
+                di/handlers-via-registry: Types, except `HandlerRegistry`
+                  outside the except: `HandlerRegistry`
+                layering/no-ghost: Types in `MyApp.Domain.*`
+                  namespace `MyApp.Domain` matches `MyApp.Domain.*`
+                exceptions/domain-throws-domain: The Domain layer
+                  in the Domain layer
+                    namespace `MyApp.Domain` matches `MyApp.Domain.*`
+                exceptions/no-unfiltered-catch: The Web or Domain layers
+                  in the Domain layer
+                    namespace `MyApp.Domain` matches `MyApp.Domain.*`
+                exceptions/no-swallowed-catch: The Web or Domain layers
+                  in the Domain layer
+                    namespace `MyApp.Domain` matches `MyApp.Domain.*`
+                exceptions/no-bare-bcl-throw: The Domain layer
+                  in the Domain layer
+                    namespace `MyApp.Domain` matches `MyApp.Domain.*`
+                layering/services-in-web: Types named `*Service`
+                  its name `OrderService` ends with `Service`
+                layering/services-behind-contracts: Types named `*Service`
+                  its name `OrderService` ends with `Service`
+                layering/no-ungoverned-types: Types in `MyApp.*`
+                  namespace `MyApp.Domain` matches `MyApp.*`
+                domain/values-immutable: Properties of the Domain layer
+                  in the Domain layer
+                    namespace `MyApp.Domain` matches `MyApp.Domain.*`
+            """);
     }
 
     [Fact]
@@ -118,8 +117,7 @@ public sealed class ExplainClaimsCommandTests
             "explain", "--path", "MyApp.Web/NoSuchFile.cs", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll);
 
         result.ShouldSucceed();
-        result.Out.NormalizedTrimmed()
-            .ShouldBe("No type the solution declares is in 'MyApp.Web/NoSuchFile.cs'.");
+        result.ShouldPrint("No type the solution declares is in 'MyApp.Web/NoSuchFile.cs'.");
     }
 
     [Fact]

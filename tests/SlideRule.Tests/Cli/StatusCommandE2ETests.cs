@@ -32,21 +32,19 @@ public sealed class StatusCommandE2ETests
         // the baseline holds and the site count is what the work is. Services-behind-contracts below is one
         // subject declaration, so its line is unchanged — the parenthetical extinguishes itself.
         result.ShouldSucceed(
-            "FAIL data-access/no-inline-sql (migrate) — 1 grandfathered remaining (2 sites), 1 new, 0 fixed awaiting acceptance");
-        // Quarantine containment ratchets like Migrate (uncaptured here) but never suggests promotion.
-        result.Out.ShouldContain(
-            "FAIL legacy/billing/containment (quarantine) — no baseline captured; run 'sliderule baseline init' (2 current violations)");
-        result.Out.ShouldContain("skip legacy/billing/tripwire (tripwire) — diff-aware; run 'sliderule check --diff-base <ref>'");
-        // A caution's tripwire is the same diff-aware skip, byte for byte: the burndown reads a rule's
-        // ratchet, and neither tripwire has one, so the posture that produced the row never shows here.
-        result.Out.ShouldContain("skip domain/retry-budget/tripwire (tripwire) — diff-aware; run 'sliderule check --diff-base <ref>'");
+            "FAIL data-access/no-inline-sql (migrate) — 1 grandfathered remaining (2 sites), 1 new, 0 fixed awaiting acceptance",
+            // Quarantine containment ratchets like Migrate (uncaptured here) but never suggests promotion.
+            "FAIL legacy/billing/containment (quarantine) — no baseline captured; run 'sliderule baseline init' (2 current violations)",
+            "skip legacy/billing/tripwire (tripwire) — diff-aware; run 'sliderule check --diff-base <ref>'",
+            // A caution's tripwire is the same diff-aware skip, byte for byte: the burndown reads a rule's
+            // ratchet, and neither tripwire has one, so the posture that produced the row never shows here.
+            "skip domain/retry-budget/tripwire (tripwire) — diff-aware; run 'sliderule check --diff-base <ref>'",
+            "FAIL layering/services-behind-contracts (migrate) — 1 grandfathered remaining, 1 new, 0 fixed awaiting acceptance",
+            "Checked 32 rules: 3 passed, 27 failed, 2 skipped.",
+            "Burndown: 7 grandfathered remaining (12 sites), 0 fixed awaiting acceptance.");
         // The row names the role, never the posture: what the reader is told is that no verdict was reached,
         // not which of the two scope postures declined to reach one.
         result.Out.ShouldNotContain("domain/retry-budget/tripwire (caution)");
-        result.Out.ShouldContain(
-            "FAIL layering/services-behind-contracts (migrate) — 1 grandfathered remaining, 1 new, 0 fixed awaiting acceptance");
-        result.Out.ShouldContain("Checked 32 rules: 3 passed, 27 failed, 2 skipped.");
-        result.Out.ShouldContain("Burndown: 7 grandfathered remaining (12 sites), 0 fixed awaiting acceptance.");
     }
 
     [Fact]
@@ -75,8 +73,8 @@ public sealed class StatusCommandE2ETests
 
         result.ShouldSucceed("FAIL layering/projects-independent — 5 violations");
         result.Out.Split('\n')
-            .Count(line => line.StartsWith("  ", StringComparison.Ordinal))
-            .ShouldBe(1);
+            .Where(line => line.StartsWith("  ", StringComparison.Ordinal))
+            .ShouldHaveSingleItem();
     }
 
     [Fact]

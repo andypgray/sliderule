@@ -28,11 +28,8 @@ public sealed class WrittenPathsTests
         IReadOnlyList<WrittenPath> written = WrittenPaths.Extract("d.md", doc);
 
         // Assert: the line outside the fence is prose restating the capture, not the capture itself.
-        WrittenPath path = written.ShouldHaveSingleItem();
-        path.Doc.ShouldBe("d.md");
-        path.DocLine.ShouldBe(4);
-        path.Label.ShouldBe("unchanged");
-        path.Path.ShouldBe("src/Meridian.Web/AGENTS.md");
+        written.ShouldHaveSingleItem()
+            .ShouldBe(new WrittenPath("d.md", 4, "unchanged", "src/Meridian.Web/AGENTS.md"));
     }
 
     [Theory]
@@ -95,15 +92,8 @@ public sealed class WrittenPathsTests
         IReadOnlyList<WrittenPath> written = WrittenPaths.Extract("d.md", doc);
 
         // Assert
-        written.Count.ShouldBe(2);
-        written[0]
-            .DocLine.ShouldBe(2);
-        written[0]
-            .Path.ShouldBe("arch/baselines/data-access/no-inline-sql.json");
-        written[1]
-            .DocLine.ShouldBe(6);
-        written[1]
-            .Path.ShouldBe("AGENTS.md");
+        written.Select(static path => (path.DocLine, path.Path))
+            .ShouldBe([(2, "arch/baselines/data-access/no-inline-sql.json"), (6, "AGENTS.md")]);
     }
 
     [Fact]
@@ -114,11 +104,10 @@ public sealed class WrittenPathsTests
         IReadOnlySet<string> tracked = WrittenPaths.TrackedSet(["examples/Meridian/src/Meridian.Web/AGENTS.md"]);
 
         // Act
-        WrittenPaths.PathResult result = WrittenPaths.Classify(written, "examples/Meridian", tracked);
+        string? failure = WrittenPaths.Classify(written, "examples/Meridian", tracked);
 
         // Assert
-        result.Bucket.ShouldBe(WrittenPaths.PathBucket.Matched);
-        result.Failure.ShouldBeNull();
+        failure.ShouldBeNull();
     }
 
     [Fact]
@@ -130,10 +119,10 @@ public sealed class WrittenPathsTests
         IReadOnlySet<string> tracked = WrittenPaths.TrackedSet(["arch/baselines/mcp/env-through-seam.json"]);
 
         // Act
-        WrittenPaths.PathResult result = WrittenPaths.Classify(written, string.Empty, tracked);
+        string? failure = WrittenPaths.Classify(written, string.Empty, tracked);
 
         // Assert
-        result.Bucket.ShouldBe(WrittenPaths.PathBucket.Matched);
+        failure.ShouldBeNull();
     }
 
     [Fact]
@@ -144,13 +133,13 @@ public sealed class WrittenPathsTests
         IReadOnlySet<string> tracked = WrittenPaths.TrackedSet(["examples/Meridian/arch/baselines/time/injected-clock.json"]);
 
         // Act
-        WrittenPaths.PathResult result = WrittenPaths.Classify(written, "examples/Meridian", tracked);
+        string? failure = WrittenPaths.Classify(written, "examples/Meridian", tracked);
 
         // Assert: the failure names the doc, the line, the quoted line and the path that was looked for.
-        result.Bucket.ShouldBe(WrittenPaths.PathBucket.Untracked);
-        result.Failure!.ShouldContain("d.md:12");
-        result.Failure!.ShouldContain("wrote arch/baselines/time/inject-clock.json");
-        result.Failure!.ShouldContain("examples/Meridian/arch/baselines/time/inject-clock.json");
+        string reported = failure.ShouldNotBeNull();
+        reported.ShouldContain("d.md:12");
+        reported.ShouldContain("wrote arch/baselines/time/inject-clock.json");
+        reported.ShouldContain("examples/Meridian/arch/baselines/time/inject-clock.json");
     }
 
     [Fact]
@@ -162,9 +151,9 @@ public sealed class WrittenPathsTests
         IReadOnlySet<string> tracked = WrittenPaths.TrackedSet(["examples/Meridian.Quoting/AGENTS.md"]);
 
         // Act
-        WrittenPaths.PathResult result = WrittenPaths.Classify(written, "examples/Meridian", tracked);
+        string? failure = WrittenPaths.Classify(written, "examples/Meridian", tracked);
 
         // Assert
-        result.Bucket.ShouldBe(WrittenPaths.PathBucket.Untracked);
+        failure.ShouldNotBeNull();
     }
 }

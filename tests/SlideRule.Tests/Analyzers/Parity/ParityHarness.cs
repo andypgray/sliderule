@@ -3,7 +3,6 @@ using Microsoft.CodeAnalysis;
 using SlideRule.Analyzers;
 using SlideRule.Baselines;
 using SlideRule.Checking;
-using SlideRule.Cli.Pipeline;
 using SlideRule.Codebase;
 using SlideRule.Extraction;
 using SlideRule.Extraction.Fragments;
@@ -93,33 +92,27 @@ internal sealed record ParityGap(string Name, Func<ParityKey, bool> Covers);
 ///         once rather than reporting: <see cref="UncheckedRules" /> is what it is entitled to name.
 ///     </para>
 /// </remarks>
-internal sealed class ParityExpectation
+internal sealed class ParityExpectation(
+    IReadOnlyList<string> checkedRules,
+    IReadOnlyList<ParityKey> keys,
+    IReadOnlyList<string> unmeasured,
+    IReadOnlyList<string> uncaptured,
+    IReadOnlyDictionary<string, IReadOnlyList<string>> uncapturedFiles)
 {
-    internal ParityExpectation(
-        IReadOnlyList<string> checkedRules, IReadOnlyList<ParityKey> keys, IReadOnlyList<string> unmeasured,
-        IReadOnlyList<string> uncaptured, IReadOnlyDictionary<string, IReadOnlyList<string>> uncapturedFiles)
-    {
-        Checked = checkedRules;
-        Keys = keys;
-        Unmeasured = unmeasured;
-        Uncaptured = uncaptured;
-        UncapturedFiles = uncapturedFiles;
-    }
-
     /// <summary>The rule IDs the pin holds the build to, ordinally sorted.</summary>
-    internal IReadOnlyList<string> Checked { get; }
+    internal IReadOnlyList<string> Checked { get; } = checkedRules;
 
     /// <summary>Every finding the whole-solution check produces for those rules.</summary>
-    internal IReadOnlyList<ParityKey> Keys { get; }
+    internal IReadOnlyList<ParityKey> Keys { get; } = keys;
 
     /// <summary>The rule IDs the whole-solution check never measured, ordinally sorted.</summary>
-    internal IReadOnlyList<string> Unmeasured { get; }
+    internal IReadOnlyList<string> Unmeasured { get; } = unmeasured;
 
     /// <summary>The ratcheted rule IDs with no captured section, ordinally sorted.</summary>
-    internal IReadOnlyList<string> Uncaptured { get; }
+    internal IReadOnlyList<string> Uncaptured { get; } = uncaptured;
 
     /// <summary>Where each uncaptured rule would have reported, evaluated against an empty baseline.</summary>
-    private IReadOnlyDictionary<string, IReadOnlyList<string>> UncapturedFiles { get; }
+    private IReadOnlyDictionary<string, IReadOnlyList<string>> UncapturedFiles { get; } = uncapturedFiles;
 
     /// <summary>
     ///     The (compilation, rule) pairs the build is entitled to name as unchecked: an uncaptured rule with
@@ -145,36 +138,28 @@ internal sealed class ParityExpectation
 }
 
 /// <summary>What the build tier reported over every compilation of one leg.</summary>
-internal sealed class ParityReport
+internal sealed class ParityReport(
+    IReadOnlyList<(string Compilation, ParityKey Key, Diagnostic Diagnostic)> found,
+    IReadOnlyList<(string Compilation, string Rule)> uncheckedRules,
+    IReadOnlyList<string> strangers,
+    IReadOnlyList<(string Compilation, string TreePath, ParityKey Key, Diagnostic Diagnostic)> placed)
 {
-    internal ParityReport(
-        IReadOnlyList<(string Compilation, ParityKey Key, Diagnostic Diagnostic)> found,
-        IReadOnlyList<(string Compilation, string Rule)> uncheckedRules, IReadOnlyList<string> strangers,
-        IReadOnlyList<(string Compilation, string TreePath, ParityKey Key, Diagnostic Diagnostic)> placed)
-    {
-        Found = found;
-        Unchecked = uncheckedRules;
-        Strangers = strangers;
-        Placed = placed;
-        Keys = found
-            .Select(finding => finding.Key)
-            .ToList();
-    }
-
     /// <summary>Every <c>SR2001</c> and <c>SR2002</c>, read off the diagnostic's properties.</summary>
-    internal IReadOnlyList<ParityKey> Keys { get; }
+    internal IReadOnlyList<ParityKey> Keys { get; } = found
+        .Select(finding => finding.Key)
+        .ToList();
 
     /// <summary>
     ///     The same findings, each under the compilation that reported it and the warning it printed — what a
     ///     claim about a duplicate or about the wording needs and a bare key cannot carry.
     /// </summary>
-    internal IReadOnlyList<(string Compilation, ParityKey Key, Diagnostic Diagnostic)> Found { get; }
+    internal IReadOnlyList<(string Compilation, ParityKey Key, Diagnostic Diagnostic)> Found { get; } = found;
 
     /// <summary>Every <c>SR2092</c>, as the compilation that reported it and the rule it named.</summary>
-    internal IReadOnlyList<(string Compilation, string Rule)> Unchecked { get; }
+    internal IReadOnlyList<(string Compilation, string Rule)> Unchecked { get; } = uncheckedRules;
 
     /// <summary>Anything else the build tier said — a fault, a refusal, a missing file, a compiler AD0001.</summary>
-    internal IReadOnlyList<string> Strangers { get; }
+    internal IReadOnlyList<string> Strangers { get; } = strangers;
 
     /// <summary>
     ///     Where each finding was placed: the document it was reported in beside the key it reported. Empty on
@@ -182,6 +167,7 @@ internal sealed class ParityReport
     ///     to name.
     /// </summary>
     internal IReadOnlyList<(string Compilation, string TreePath, ParityKey Key, Diagnostic Diagnostic)> Placed { get; }
+        = placed;
 
     /// <summary>
     ///     The keys reported in the document at <paramref name="treePath" />, in report order.
@@ -205,52 +191,45 @@ internal sealed class ParityReport
 ///     One solution under one spec, prepared for the pin: the model file the build would be handed, the
 ///     baselines it names, the whole-solution expectation, and the compilations to run the analyzer over.
 /// </summary>
-internal sealed class ParitySubject
+internal sealed class ParitySubject(
+    string name,
+    CodebaseModel codebase,
+    ModelDocument document,
+    string modelText,
+    IReadOnlyList<AdditionalText> files,
+    BaselineIndex baselines,
+    string modelDirectory,
+    ParityExpectation expectation,
+    IReadOnlyList<ParityCompilation> compilations)
 {
     private IReadOnlyList<ParityCompilation>? _imaged;
 
-    internal ParitySubject(
-        string name, CodebaseModel codebase, ModelDocument document, string modelText,
-        IReadOnlyList<AdditionalText> files, BaselineIndex baselines, string modelDirectory,
-        ParityExpectation expectation, IReadOnlyList<ParityCompilation> compilations)
-    {
-        Name = name;
-        Codebase = codebase;
-        Document = document;
-        ModelText = modelText;
-        Files = files;
-        Baselines = baselines;
-        ModelDirectory = modelDirectory;
-        Expectation = expectation;
-        Compilations = compilations;
-    }
-
     /// <summary>What a failure calls this subject.</summary>
-    internal string Name { get; }
+    internal string Name { get; } = name;
 
     /// <summary>The merged model the whole-solution check reads.</summary>
-    internal CodebaseModel Codebase { get; }
+    internal CodebaseModel Codebase { get; } = codebase;
 
     /// <summary>The document read back out of the model file, which is what the build tier classifies.</summary>
-    internal ModelDocument Document { get; }
+    internal ModelDocument Document { get; } = document;
 
     /// <summary>The model file's text, byte for byte as the build would be handed it.</summary>
-    internal string ModelText { get; }
+    internal string ModelText { get; } = modelText;
 
     /// <summary>The model file and every baseline file it names, as the build hands them over.</summary>
-    internal IReadOnlyList<AdditionalText> Files { get; }
+    internal IReadOnlyList<AdditionalText> Files { get; } = files;
 
     /// <summary>The baselines the whole-solution check loads.</summary>
-    internal BaselineIndex Baselines { get; }
+    internal BaselineIndex Baselines { get; } = baselines;
 
     /// <summary>Where the model file sits, which both tiers read path globs against.</summary>
-    internal string ModelDirectory { get; }
+    internal string ModelDirectory { get; } = modelDirectory;
 
     /// <summary>What the whole-solution check says the build may report.</summary>
-    internal ParityExpectation Expectation { get; }
+    internal ParityExpectation Expectation { get; } = expectation;
 
     /// <summary>One compilation per project of the solution, in extraction order.</summary>
-    internal IReadOnlyList<ParityCompilation> Compilations { get; }
+    internal IReadOnlyList<ParityCompilation> Compilations { get; } = compilations;
 
     /// <summary>The same compilations with every sibling project substituted by a metadata-only image.</summary>
     internal IReadOnlyList<ParityCompilation> Imaged => _imaged ??= ParityHarness.AsImages(Compilations);
@@ -281,33 +260,31 @@ internal sealed class ParitySubject
 internal static class ParityHarness
 {
     /// <summary>
-    ///     One solution under the spec <paramref name="specDll" /> carries, with the baselines that sit
-    ///     beside the solution.
+    ///     One solution under <paramref name="model" />, with the baselines that sit beside the solution.
     /// </summary>
-    /// <param name="name">What a failure calls this subject.</param>
-    /// <param name="specDll">The spec assembly to load the model from.</param>
-    /// <param name="solutionPath">The solution the model governs.</param>
-    /// <param name="cancellationToken">The token the workspace and extraction run under.</param>
-    internal static Task<ParitySubject> ForSolutionAsync(
-        string name, string specDll, string solutionPath, CancellationToken cancellationToken)
-    {
-        ArchitectureModel model = ModelPipeline.LoadModel(specDll);
-
-        return ForSolutionAsync(name, model, solutionPath, cancellationToken);
-    }
-
-    /// <summary>The same, for a model a caller built inline over a bed that carries no spec project.</summary>
     /// <param name="name">What a failure calls this subject.</param>
     /// <param name="model">The spec, already built.</param>
     /// <param name="solutionPath">The solution the model governs.</param>
-    /// <param name="cancellationToken">The token the workspace and extraction run under.</param>
+    /// <param name="cancellationToken">The token the workspace load and the binding run under.</param>
     internal static async Task<ParitySubject> ForSolutionAsync(
         string name, ArchitectureModel model, string solutionPath, CancellationToken cancellationToken)
+    {
+        IReadOnlyList<ParityCompilation> compilations = await CompilationsOfAsync(solutionPath, cancellationToken);
+
+        return await ForSolutionAsync(name, model, solutionPath, compilations);
+    }
+
+    /// <summary>The same, over compilations a caller already read off the bed.</summary>
+    /// <param name="name">What a failure calls this subject.</param>
+    /// <param name="model">The spec, already built.</param>
+    /// <param name="solutionPath">The solution the model governs.</param>
+    /// <param name="compilations">One compilation per C# project of that solution, in extraction order.</param>
+    internal static async Task<ParitySubject> ForSolutionAsync(
+        string name, ArchitectureModel model, string solutionPath, IReadOnlyList<ParityCompilation> compilations)
     {
         CodebaseModel codebase = await FixtureCodebase.Of(solutionPath);
         string solutionDirectory = Path.GetDirectoryName(solutionPath)!;
         BaselineIndex baselines = BaselineStore.LoadForModel(model, solutionDirectory);
-        IReadOnlyList<ParityCompilation> compilations = await CompilationsOfAsync(solutionPath, cancellationToken);
 
         return Prepare(name, model, codebase, baselines, solutionDirectory, TextOnDisk, compilations);
     }
@@ -499,7 +476,7 @@ internal static class ParityHarness
     /// </summary>
     /// <param name="solutionPath">The solution to open, through the shared warm pool.</param>
     /// <param name="cancellationToken">The token the load and the binding run under.</param>
-    private static async Task<IReadOnlyList<ParityCompilation>> CompilationsOfAsync(
+    internal static async Task<IReadOnlyList<ParityCompilation>> CompilationsOfAsync(
         string solutionPath, CancellationToken cancellationToken)
     {
         WorkspaceSnapshot snapshot = await WarmWorkspacePool.GetCurrentAsync(solutionPath, cancellationToken);

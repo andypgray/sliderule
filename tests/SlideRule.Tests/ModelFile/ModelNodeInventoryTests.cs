@@ -2,7 +2,6 @@ using System.Reflection;
 using System.Text.RegularExpressions;
 using Shouldly;
 using SlideRule.Checking;
-using SlideRule.Hosting;
 using SlideRule.Model;
 using SlideRule.ModelFile;
 using SlideRule.Tests.DocHygiene;
@@ -161,12 +160,11 @@ public sealed class ModelNodeInventoryTests
             .ToList();
 
         // Act
-        HashSet<string> written = new(StringComparer.Ordinal);
-        foreach (ModelFileCorpus.CorpusSpec spec in ModelFileCorpus.All)
-        foreach (Match match in Discriminator.Matches(
-                     ModelDocumentComposer.Compose(ModelFileCorpus.DocumentOf(spec))))
-            written.Add(match.Groups[1]
-                .Value);
+        HashSet<string> written = ModelFileCorpus.All
+            .Select(spec => ModelDocumentComposer.Compose(ModelFileCorpus.DocumentOf(spec)))
+            .SelectMany(text => Discriminator.Matches(text))
+            .Select(match => match.Groups[1].Value)
+            .ToHashSet(StringComparer.Ordinal);
 
         // Assert
         declared.Where(discriminator => !written.Contains(discriminator))
@@ -195,17 +193,13 @@ public sealed class ModelNodeInventoryTests
             .ToList();
 
         // Act
-        HashSet<string> minted = new(StringComparer.Ordinal);
-        foreach (ModelFileCorpus.CorpusSpec spec in ModelFileCorpus.All)
-        foreach (ArchRule rule in ModelDocumentComposer.Compose(ModelFileCorpus.DocumentOf(spec))
-                     .ShouldReadBack(spec.Name)
-                     .Rules)
-        foreach (object node in ModelNodeWalk.From(rule)
-                     .Nodes)
-            if (declared.Contains(node.GetType()
-                    .Name))
-                minted.Add(node.GetType()
-                    .Name);
+        HashSet<string> minted = ModelFileCorpus.All
+            .SelectMany(spec => ModelDocumentComposer.Compose(ModelFileCorpus.DocumentOf(spec))
+                .ShouldReadBack(spec.Name)
+                .Rules)
+            .SelectMany(rule => ModelNodeWalk.From(rule).Nodes)
+            .Select(node => node.GetType().Name)
+            .ToHashSet(StringComparer.Ordinal);
 
         // Assert
         declared.Where(name => !minted.Contains(name))

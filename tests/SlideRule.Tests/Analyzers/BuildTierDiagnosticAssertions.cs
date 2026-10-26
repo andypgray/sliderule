@@ -31,6 +31,20 @@ internal static class BuildTierDiagnosticAssertions
     }
 
     /// <summary>
+    ///     Asserts exactly <paramref name="count" /> warnings came back and every one carries <paramref name="id" />,
+    ///     with <paramref name="customMessage" /> heading the red when one is given, and returns them in the order
+    ///     they came back.
+    /// </summary>
+    internal static IReadOnlyList<Diagnostic> ShouldAllBe(
+        this IReadOnlyList<Diagnostic> reported, string id, int count, string? customMessage = null)
+    {
+        reported.ShouldAllBe(id);
+        reported.Count.ShouldBe(count, reported.Describe(customMessage ?? $"Expected {count} of {id}"));
+
+        return reported;
+    }
+
+    /// <summary>
     ///     Asserts the warning sits in <paramref name="path" /> at the 1-based <paramref name="line" />,
     ///     and at <paramref name="column" /> where one is given.
     /// </summary>

@@ -28,7 +28,7 @@ public sealed class GraphFormatterTests
         // exactly as every other project's does and the roster still scans as one column of names. The
         // unread project reads as an ordinary one: the fail-open contract at the surface, since an
         // unreadable solution file must not turn every project into a reported passenger.
-        Roster(lines)
+        ShouldHaveRoster(lines)
             .ShouldBe([
                 "  Acme.App — 1 type; references: Acme.Passenger; packages: (none)",
                 "  Acme.Passenger (not a solution member) — 1 type; references: (none); packages: (none)",
@@ -45,7 +45,7 @@ public sealed class GraphFormatterTests
         IReadOnlyList<string> lines = GraphFormatter.Lines(
             MixedMembershipSummary(), "Acme.slnx", DocumentGrain.Full, []);
 
-        Section(lines, UnsupportedHeading)
+        ShouldHaveSection(lines, UnsupportedHeading)
             .ShouldBe(["  (none)"]);
     }
 
@@ -64,7 +64,7 @@ public sealed class GraphFormatterTests
                     "Acme.Shared/Acme.Shared.shproj", "a shared project, compiled into the projects that import it")
             ]);
 
-        Section(lines, UnsupportedHeading)
+        ShouldHaveSection(lines, UnsupportedHeading)
             .ShouldBe([
                 "  Acme.Signals/Acme.Signals.fsproj — not a C# project",
                 "  Acme.Shared/Acme.Shared.shproj — a shared project, compiled into the projects that import it"
@@ -82,24 +82,26 @@ public sealed class GraphFormatterTests
         // generated" rather than repeating the count it just gave, because that is the shape a reader must
         // catch: it is the one namespace here that must never become a layer glob. A namespace with none
         // says nothing at all, so the qualifier's presence is itself the signal.
-        Roster(lines)
+        ShouldHaveRoster(lines)
             .ShouldBe(["  Acme.Web — 5 types (3 generated); references: (none); packages: (none)"]);
-        Section(lines, "Namespaces:")
+        ShouldHaveSection(lines, "Namespaces:")
             .ShouldBe(["  Acme.Web: Acme.Views (2, all generated), Acme.Web (2, 1 generated), Acme.Plain (1)"]);
     }
 
     [Fact]
-    public void Lines_NoGeneratedTypes_LeaveEveryLineExactlyAsItWas()
+    public void Lines_NoGeneratedTypes_ListEachNamespaceWithItsCountAlone()
     {
-        // The negative that keeps every existing golden byte-identical: a solution with no generator output
-        // must render the survey it rendered before the qualifier existed.
+        // With no generator output in the summary, no namespace carries a qualifier. The roster for the same
+        // summary is pinned whole by Lines_MixedSolutionMembership_AnnotatesOnlyThePassenger.
         IReadOnlyList<string> lines = GraphFormatter.Lines(
             MixedMembershipSummary(), "Acme.slnx", DocumentGrain.Full, []);
 
-        Roster(lines)
-            .ShouldAllBe(line => !line.Contains("generated", StringComparison.Ordinal));
-        Section(lines, "Namespaces:")
-            .ShouldAllBe(line => !line.Contains("generated", StringComparison.Ordinal));
+        ShouldHaveSection(lines, "Namespaces:")
+            .ShouldBe([
+                "  Acme.App: Acme.App (1)",
+                "  Acme.Passenger: Acme.Passenger (1)",
+                "  Acme.Unread: Acme.Unread (1)"
+            ]);
     }
 
     [Fact]
@@ -113,7 +115,7 @@ public sealed class GraphFormatterTests
         // nothing. The parenthesis is what a rule author acts on: it names the one compilation a rule about
         // a shared type is measured against. Acme.Split targets two frameworks that share no type, so
         // nothing was displaced and there is no winner to name — the list alone still says it compiles twice.
-        Roster(lines)
+        ShouldHaveRoster(lines)
             .ShouldBe([
                 "  Acme.Plain — 1 type; references: (none); packages: (none)",
                 "  Acme.Shared — 3 types; targets net10.0, netstandard2.0 (shared types from net10.0); "
@@ -135,7 +137,7 @@ public sealed class GraphFormatterTests
         IReadOnlyList<string> lines = GraphFormatter.Lines(
             new GraphSummary([wide], [], [], [], []), "Acme.slnx", DocumentGrain.Full, []);
 
-        Roster(lines)
+        ShouldHaveRoster(lines)
             .ShouldBe([
                 "  Acme.Wide — 4 types; targets net48, net6.0, net8.0 (each shared type from the first of these "
                 + "that declares it); references: (none); packages: (none)"
@@ -153,7 +155,7 @@ public sealed class GraphFormatterTests
         // project that opted out and the project that opted in. The declared packages read like the
         // references beside them, "(none)" included, because a project declaring none is what a rule about
         // declared packages is written against.
-        Roster(lines)
+        ShouldHaveRoster(lines)
             .ShouldBe([
                 "  Acme.Locked — 0 types; targets net10.0; references: (none); packages: Shouldly; locks restore",
                 "  Acme.Ordinary — 0 types; targets net10.0; references: (none); packages: (none)",
@@ -170,7 +172,7 @@ public sealed class GraphFormatterTests
         // Assert — the packages leave a rung before the project references, beside the external-reference
         // rows they are the build-side twin of; what the project targets and ships stays, because those are
         // one value each rather than a list.
-        Roster(lines)
+        ShouldHaveRoster(lines)
             .ShouldBe([
                 "  Acme.Locked — 0 types; targets net10.0; references: (none); locks restore",
                 "  Acme.Ordinary — 0 types; targets net10.0; references: (none)",
@@ -187,7 +189,7 @@ public sealed class GraphFormatterTests
         // Assert — each private name is marked where it is named rather than listed a second time, and the
         // mark lands only on the names MustReferenceNoPackages passes, so the shipped package beside them reads
         // exactly as it did before the mark existed.
-        Roster(lines)
+        ShouldHaveRoster(lines)
             .ShouldBe([
                 "  Acme.Domain — 0 types; targets net10.0; references: (none); "
                 + "packages: Newtonsoft.Json, StyleCop.Analyzers (private)",
@@ -217,7 +219,7 @@ public sealed class GraphFormatterTests
             new GraphSummary(projects, [], [], [], []), "Acme.slnx", DocumentGrain.Full, []);
 
         // Assert — the framework mark shares the private mark's parenthesis where both apply.
-        Roster(lines)
+        ShouldHaveRoster(lines)
             .ShouldBe([
                 "  Acme.Console — 0 types; targets net10.0, netstandard2.0; references: (none); packages: "
                 + "Microsoft.Bcl.HashCode (netstandard2.0 only), PolySharp (private; netstandard2.0 only), Wcwidth"
@@ -239,7 +241,7 @@ public sealed class GraphFormatterTests
             new GraphSummary(projects, [], [], [], []), "Acme.slnx", DocumentGrain.Full, []);
 
         // Assert — the healthy line reads exactly as it did before the clause existed.
-        Roster(lines)
+        ShouldHaveRoster(lines)
             .ShouldBe([
                 "  Acme.Plugin — 0 types; targets net10.0; references: (none); "
                 + "undeclared references: Acme.Core, Acme.Web; packages: (none)",
@@ -255,7 +257,7 @@ public sealed class GraphFormatterTests
             PrivatePackageSummary(), "Acme.slnx", DocumentGrain.Skeleton, []);
 
         // Assert — the mark qualifies a package name, so it has nothing to stand on once the names are gone.
-        Roster(lines)
+        ShouldHaveRoster(lines)
             .ShouldBe([
                 "  Acme.Domain — 0 types; targets net10.0; references: (none)",
                 "  Acme.Tooling — 0 types; targets net10.0; references: (none)"
@@ -272,7 +274,7 @@ public sealed class GraphFormatterTests
         // Assert — the roster line at the floor rung, matching what the document's own row keeps. Both
         // qualifiers go: what a project declares and what it targets each multiply by the project count, on
         // the one rung whose whole job is to stay proportional to the roster.
-        Roster(lines)
+        ShouldHaveRoster(lines)
             .ShouldBe([
                 "  Acme.Plain — 1 type",
                 "  Acme.Shared — 3 types",
@@ -298,7 +300,7 @@ public sealed class GraphFormatterTests
         IReadOnlyList<string> lines = GraphFormatter.Lines(summary, "Acme.slnx", DocumentGrain.Index, []);
 
         // Assert
-        Section(lines, "Observed project references (distinct type pairs):")
+        ShouldHaveSection(lines, "Observed project references (distinct type pairs):")
             .ShouldBe(["  (elided at index grain — rerun at --grain full for the observed project references)"]);
     }
 
@@ -337,9 +339,12 @@ public sealed class GraphFormatterTests
         return new GraphSummary([web], [], [], [], []);
     }
 
-    // One section: the lines between its heading and the blank line closing it.
-    private static IReadOnlyList<string> Section(IReadOnlyList<string> lines, string heading)
+    // One section: the lines between its heading and the blank line closing it. A missing heading reds rather than
+    // reading as an empty section.
+    private static IReadOnlyList<string> ShouldHaveSection(IReadOnlyList<string> lines, string heading)
     {
+        lines.ShouldContain(heading);
+
         return lines
             .SkipWhile(line => !line.Equals(heading, StringComparison.Ordinal))
             .Skip(1)
@@ -347,9 +352,12 @@ public sealed class GraphFormatterTests
             .ToList();
     }
 
-    // The roster block alone: the lines between the "Projects (n):" header and the blank line closing it.
-    private static IReadOnlyList<string> Roster(IReadOnlyList<string> lines)
+    // The roster block alone: the lines between the "Projects (n):" header and the blank line closing it. A missing
+    // header reds as a missing heading does.
+    private static IReadOnlyList<string> ShouldHaveRoster(IReadOnlyList<string> lines)
     {
+        lines.ShouldContain(line => line.StartsWith("Projects (", StringComparison.Ordinal));
+
         return lines
             .SkipWhile(line => !line.StartsWith("Projects (", StringComparison.Ordinal))
             .Skip(1)

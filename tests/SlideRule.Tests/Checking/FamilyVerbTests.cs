@@ -63,12 +63,9 @@ public sealed class FamilyVerbTests
     [Fact]
     public void MustNotReferenceEachOther_CrossCellEdges_AreRedInBothDirections()
     {
-        RuleResult result = Checker.Run(PluginsModel, arch =>
-                arch.Rule("plugins/independent")
-                    .Enforce(arch.Each(arch.Layer("A", "Plugin.A.*"), arch.Layer("B", "Plugin.B.*"))
-                        .MustNotReferenceEachOther())
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(
+            PluginsModel, arch => arch.Each(arch.Layer("A", "Plugin.A.*"), arch.Layer("B", "Plugin.B.*"))
+                .MustNotReferenceEachOther());
 
         // Exhaustive: the two cross-cell edges and nothing else. Alpha's own-cell edge (→ AlphaHelper),
         // its host edge and AlphaHelper's Outside edge are all green — an "other" is a cell, never merely
@@ -85,11 +82,8 @@ public sealed class FamilyVerbTests
     {
         // A loop that built a family of one has said what the cell says: no other cell exists, so the ban
         // has nothing to forbid, and the sentence is the cell's own (GRAMMAR §5.1's identity).
-        RuleResult result = Checker.Run(PluginsModel, arch =>
-                arch.Rule("plugins/independent")
-                    .Enforce(arch.Each(arch.Layer("A", "Plugin.A.*")).MustNotReferenceEachOther())
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(PluginsModel, arch => arch.Each(arch.Layer("A", "Plugin.A.*"))
+            .MustNotReferenceEachOther());
 
         result.ShouldHavePassedClean();
         result.Rule.Sentence.ShouldBe("The A layer must not reference the others.");
@@ -98,12 +92,9 @@ public sealed class FamilyVerbTests
     [Fact]
     public void MustOnlyReference_OverAFamily_AllowsEachCellItsOwnMembersAndTheNamedTarget()
     {
-        RuleResult result = Checker.Run(PluginsModel, arch =>
-                arch.Rule("plugins/host-only")
-                    .Enforce(arch.Each(arch.Layer("A", "Plugin.A.*"), arch.Layer("B", "Plugin.B.*"))
-                        .MustOnlyReference(arch.Layer("Host", "Host.*")))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(
+            PluginsModel, arch => arch.Each(arch.Layer("A", "Plugin.A.*"), arch.Layer("B", "Plugin.B.*"))
+                .MustOnlyReference(arch.Layer("Host", "Host.*")));
 
         // Self is the cell, so Alpha → AlphaHelper is allowed while Alpha → Beta is not; the written
         // operand allows the host from either cell. Outside is allowed by nothing, which is what parts
@@ -119,13 +110,10 @@ public sealed class FamilyVerbTests
     [Fact]
     public void MustOnlyBeReferencedByItself_OverAFamilyWithExcept_TreatsTheCellAsDeclaredAsSelf()
     {
-        RuleResult result = Checker.Run(ModulesModel, arch =>
-                arch.Rule("modules/internals")
-                    .Enforce(arch.Each(arch.Layer("Dispatch", "Ops.Dispatch.*"), arch.Layer("Tracking", "Ops.Tracking.*"))
-                        .Except(arch.Namespace("Ops.Dispatch.Contracts.*"), arch.Namespace("Ops.Tracking.Contracts.*"))
-                        .MustOnlyBeReferencedByItself())
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(ModulesModel, arch =>
+            arch.Each(arch.Layer("Dispatch", "Ops.Dispatch.*"), arch.Layer("Tracking", "Ops.Tracking.*"))
+                .Except(arch.Namespace("Ops.Dispatch.Contracts.*"), arch.Namespace("Ops.Tracking.Contracts.*"))
+                .MustOnlyBeReferencedByItself());
 
         // DispatchGateway → DispatchEngine is green although the Except removed the gateway from the
         // subject: on a family "self" is the cell as DECLARED, which is the whole module. The two reds are
@@ -144,11 +132,8 @@ public sealed class FamilyVerbTests
     [Fact]
     public void MustOnlyBeReferencedByItself_OnAPlainSubject_AllowsOnlyTheRefinedSubject()
     {
-        RuleResult result = Checker.Run(PluginsModel, arch =>
-                arch.Rule("plugins/hermetic")
-                    .Enforce(arch.Namespace("Plugin.A.*").MustOnlyBeReferencedByItself())
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(PluginsModel, arch => arch.Namespace("Plugin.A.*")
+            .MustOnlyBeReferencedByItself());
 
         // The inbound leaf over a plain selection is a hermetic set: the intra-subject edge
         // (Alpha → AlphaHelper) is allowed, the one edge in from outside is not.
@@ -161,12 +146,9 @@ public sealed class FamilyVerbTests
     {
         // Fail closed: a type in two cells has two selves and the rule cannot say which it meant. The
         // report names the type and both cells, because the fix is to redraw one of them.
-        RuleResult result = Checker.Run(PluginsModel, arch =>
-                arch.Rule("plugins/overlapping")
-                    .Enforce(arch.Each(arch.Layer("Wide", "Plugin.*"), arch.Layer("A", "Plugin.A.*"))
-                        .MustNotReferenceEachOther())
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(
+            PluginsModel, arch => arch.Each(arch.Layer("Wide", "Plugin.*"), arch.Layer("A", "Plugin.A.*"))
+                .MustNotReferenceEachOther());
 
         result.ShouldHaveFailedWithDetail(ViolationKind.RuleError,
             "Type `Plugin.A.Alpha` sits in both the Wide and A cells of the family; "
@@ -179,13 +161,10 @@ public sealed class FamilyVerbTests
         // The partition is read from the cells as declared, where self and the far end are read too. The Except
         // takes every overlapping type out of the subject and leaves each in both cells, so an edge into one still
         // lands in two cells at once, and the refusal names the same type the unnarrowed family's does.
-        RuleResult result = Checker.Run(PluginsModel, arch =>
-                arch.Rule("plugins/overlapping")
-                    .Enforce(arch.Each(arch.Layer("Wide", "Plugin.*"), arch.Layer("A", "Plugin.A.*"))
-                        .Except(arch.Namespace("Plugin.A.*"))
-                        .MustNotReferenceEachOther())
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(PluginsModel, arch =>
+            arch.Each(arch.Layer("Wide", "Plugin.*"), arch.Layer("A", "Plugin.A.*"))
+                .Except(arch.Namespace("Plugin.A.*"))
+                .MustNotReferenceEachOther());
 
         result.ShouldHaveFailedWithDetail(ViolationKind.RuleError,
             "Type `Plugin.A.Alpha` sits in both the Wide and A cells of the family; "
@@ -197,14 +176,11 @@ public sealed class FamilyVerbTests
     {
         // The degenerate overlap, and it gets its own sentence: nothing about the codebase is wrong, the
         // family lists one cell twice.
-        RuleResult result = Checker.Run(PluginsModel, arch =>
-            {
-                Layer cell = arch.Layer("A", "Plugin.A.*");
-                arch.Rule("plugins/duplicated")
-                    .Enforce(arch.Each(cell, cell).MustNotReferenceEachOther())
-                    .Because("b");
-            })
-            .Single();
+        RuleResult result = Checker.Verdict(PluginsModel, arch =>
+        {
+            Layer cell = arch.Layer("A", "Plugin.A.*");
+            return arch.Each(cell, cell).MustNotReferenceEachOther();
+        });
 
         result.ShouldHaveFailedWithDetail(ViolationKind.RuleError, "The A layer is listed twice in the family.");
     }
@@ -214,12 +190,9 @@ public sealed class FamilyVerbTests
     {
         // A family sharpens the empty-subject default per cell exactly as a union does per operand
         // (GRAMMAR §4.1): a typo'd cell is never masked by its siblings.
-        RuleResult result = Checker.Run(PluginsModel, arch =>
-                arch.Rule("plugins/ghost")
-                    .Enforce(arch.Each(arch.Layer("A", "Plugin.A.*"), arch.Layer("Ghost", "Nowhere.*"))
-                        .MustNotReferenceEachOther())
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(
+            PluginsModel, arch => arch.Each(arch.Layer("A", "Plugin.A.*"), arch.Layer("Ghost", "Nowhere.*"))
+                .MustNotReferenceEachOther());
 
         result.ShouldHaveFailedWithDetail(ViolationKind.EmptySubject,
             ConstraintEvaluator.EmptyOperandMessage("the Ghost layer"));
@@ -230,11 +203,7 @@ public sealed class FamilyVerbTests
     {
         CodebaseModel scene = ProjectFacts.Solution(ProjectFacts.Project("Empty"));
 
-        RuleResult result = Checker.Run(scene, arch =>
-                arch.Rule("plugins/empty-project")
-                    .Enforce(arch.Each(arch.Projects).MustNotReferenceEachOther())
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(scene, arch => arch.Each(arch.Projects).MustNotReferenceEachOther());
 
         result.ShouldHaveFailedWithDetail(ViolationKind.EmptySubject,
             ConstraintEvaluator.EmptyOperandMessage("types in project `Empty`"));
@@ -244,11 +213,8 @@ public sealed class FamilyVerbTests
     public void MustNotReferenceEachOther_AProjectFormNamingNoProject_FailsWithThePlainEmptySubject()
     {
         // There is no cell to name here, so the ordinary empty-subject verdict is the honest one.
-        RuleResult result = Checker.Run(PluginsModel, arch =>
-                arch.Rule("plugins/no-projects")
-                    .Enforce(arch.Each(arch.Projects.Named("Nowhere")).MustNotReferenceEachOther())
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(PluginsModel, arch => arch.Each(arch.Projects.Named("Nowhere"))
+            .MustNotReferenceEachOther());
 
         result.ShouldHaveFailedWithDetail(ViolationKind.EmptySubject, ConstraintEvaluator.EmptySubjectMessage);
     }
@@ -260,11 +226,8 @@ public sealed class FamilyVerbTests
         // compiled into Core, Tool and Stub. Every instance of Widget → WidgetPart is intra-copy, so the
         // edge is green in a family whose cells are those very projects; Client compiles no copy, so its
         // reference into Core's declaration crosses a cell boundary and reds.
-        RuleResult result = Checker.Run(MultiplyDeclaredCodebase.Model, arch =>
-                arch.Rule("projects/independent")
-                    .Enforce(arch.Each(arch.Projects).MustNotReferenceEachOther())
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(MultiplyDeclaredCodebase.Model, arch => arch.Each(arch.Projects)
+            .MustNotReferenceEachOther());
 
         result.ShouldHaveFailedWithEdges(ViolationKind.Reference, ["Client.Consumer -> Shared.Widget"]);
         result.Rule.Sentence.ShouldBe("Each of the projects must not reference the others.");

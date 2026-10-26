@@ -51,19 +51,25 @@ public sealed class PublicSurfaceTests
     public void Render_RecordsTheValueOfEveryConstantSoAnInsertionCannotHide()
     {
         // Arrange: the failure the enum half of the pin exists for. A member inserted mid-list is one
-        // added line to a name-only pin and a renumbering of everything after it in the compiled IL.
+        // added line to a name-only pin and a renumbering of everything after it in the compiled IL. The
+        // inserted render is read under the original enum's name, so the two bodies differ only by the member
+        // inserted between Zulu and Alpha.
         string before = PublicSurface.Render([typeof(Shuffled)]);
-        string after = PublicSurface.Render([typeof(Inserted)]);
+        string after = PublicSurface.Render([typeof(Inserted)])
+            .Replace("+Inserted", "+Shuffled", StringComparison.Ordinal);
 
-        // Act: compare the two bodies, which differ only by the member inserted between Zulu and Alpha.
-        string[] movedConstants = PublicSurface.Drift(before, after)
-            .Where(static finding => finding.Contains(" = ", StringComparison.Ordinal))
-            .ToArray();
+        // Act
+        IReadOnlyList<string> drift = PublicSurface.Drift(before, after);
 
-        // Assert: the insertion and both of the members it pushed along, not the insertion alone.
-        movedConstants.Length.ShouldBeGreaterThan(1);
-        movedConstants.ShouldContain(finding => finding.EndsWith("Alpha = 2", StringComparison.Ordinal));
-        movedConstants.ShouldContain(finding => finding.EndsWith("Mike = 3", StringComparison.Ordinal));
+        // Assert: the insertion and both of the members it pushed along, and nothing ahead of it.
+        drift.ShouldBe(
+        [
+            $"+ {Prefix}Shuffled: Bravo = 1",
+            $"+ {Prefix}Shuffled: Alpha = 2",
+            $"+ {Prefix}Shuffled: Mike = 3",
+            $"- {Prefix}Shuffled: Alpha = 1",
+            $"- {Prefix}Shuffled: Mike = 2"
+        ]);
     }
 
     [Fact]

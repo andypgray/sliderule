@@ -29,12 +29,10 @@ namespace SlideRule.Tests.TestSupport;
 /// </remarks>
 internal static class SpecAssemblyCompiler
 {
-    private static readonly string CorePath = typeof(Arch).Assembly.Location;
-
     // The shared-framework + deployed-assembly reference closure (the same TRUSTED_PLATFORM_ASSEMBLIES set
     // CompilationFactory uses) minus the in-process core, so a caller supplying its own SlideRule
     // never faces two of them.
-    private static readonly ImmutableArray<MetadataReference> Platform = TrustedPlatform.Without(CorePath);
+    private static readonly ImmutableArray<MetadataReference> Platform = TrustedPlatform.WithoutContract;
 
     private static readonly ImmutableArray<MetadataReference> HostContract = TrustedPlatform.References;
 
@@ -60,14 +58,15 @@ internal static class SpecAssemblyCompiler
     ///     <c>SlideRule.{name}Spec</c> assembly-naming convention is spelled once, here.
     /// </summary>
     /// <remarks>
-    ///     The directory's delete is best-effort, which is what an emitted spec needs: a collectible spec ALC
-    ///     may not have released the file's handle by teardown (unload is GC-timed), and the run root's sweep
-    ///     reclaims whatever a failed delete leaves.
+    ///     Nothing deletes the directory during the run: a caller keeps only the DLL's path, so the directory is left
+    ///     for the run root's sweep.
     /// </remarks>
     internal static string EmitSpecDllToFreshTemp(string category, string name, string source)
     {
-        TempDirectory specTemp = TestTempRoot.Fresh($"{category}-{name}");
-        string specDll = specTemp.PathOf($"SlideRule.{name}Spec.dll");
+        string specDirectory = Path.Combine(TestTempRoot.For($"{category}-{name}"), Guid.NewGuid()
+            .ToString("N"));
+        Directory.CreateDirectory(specDirectory);
+        string specDll = Path.Combine(specDirectory, $"SlideRule.{name}Spec.dll");
         EmitSpecDll(source, specDll, $"SlideRule.{name}Spec");
         return specDll;
     }

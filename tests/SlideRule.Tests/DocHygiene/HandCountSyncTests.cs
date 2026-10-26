@@ -41,27 +41,27 @@ public sealed class HandCountSyncTests
     private static readonly CountClaim[] Claims =
     [
         new(DocPaths.Contributing, "There are {count}:", "the committed lock files", CommittedLockFiles,
-            GrandfatheredCounts.CountStyle.WordToTen),
+            CountStyle.WordToTen),
         new(DocPaths.Contributing, "one for each of the {count} packages", ShippingPackages, PackableCount,
-            GrandfatheredCounts.CountStyle.WordToTen),
+            CountStyle.WordToTen),
         new(DocPaths.Contributing, "The {count} packages (", ShippingPackages, PackableCount,
-            GrandfatheredCounts.CountStyle.WordToTen),
+            CountStyle.WordToTen),
         new(DocPaths.RootReadme, "{count} lockstep-versioned packages make up a release", ShippingPackages,
-            PackableCount, GrandfatheredCounts.CountStyle.TitleWord),
+            PackableCount, CountStyle.TitleWord),
         new(DocPaths.Security, "covering all {count} packages", ShippingPackages, PackableCount,
-            GrandfatheredCounts.CountStyle.WordToTen),
+            CountStyle.WordToTen),
         new(DocPaths.ContractReadme, "The {count} SlideRule packages ship one version in lockstep", ShippingPackages,
-            PackableCount, GrandfatheredCounts.CountStyle.WordToTen),
+            PackableCount, CountStyle.WordToTen),
         new(DocPaths.AdapterReadme, "All {count} SlideRule packages ship one version in lockstep",
-            ShippingPackages, PackableCount, GrandfatheredCounts.CountStyle.WordToTen),
+            ShippingPackages, PackableCount, CountStyle.WordToTen),
         new(DocPaths.DeriveSpecPrompt, "The {count} SlideRule packages ship one version in lockstep",
-            ShippingPackages, PackableCount, GrandfatheredCounts.CountStyle.WordToTen),
+            ShippingPackages, PackableCount, CountStyle.WordToTen),
         new(DocPaths.Architecture, "{count} declared projects", "the projects the solution declares", DeclaredCount,
-            GrandfatheredCounts.CountStyle.WordToTen),
+            CountStyle.WordToTen),
         new(DocPaths.SelfCheck, "across {count} declared layers", "the layers the self-spec declares", LayerCount,
-            GrandfatheredCounts.CountStyle.WordToTen),
+            CountStyle.WordToTen),
         new(DocPaths.SelfCheck, "its {count} projects outside the tests", "the projects the diagram draws",
-            DrawnCount, GrandfatheredCounts.CountStyle.WordToTen)
+            DrawnCount, CountStyle.WordToTen)
     ];
 
     [Fact]
@@ -129,5 +129,5 @@ public sealed class HandCountSyncTests
         string Claim,
         string Subject,
         Func<int> Authority,
-        GrandfatheredCounts.CountStyle Style);
+        CountStyle Style);
 }

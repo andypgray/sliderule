@@ -2,9 +2,6 @@ using System.Runtime.CompilerServices;
 using SlideRule.Roslyn.Hosting;
 using SlideRule.Roslyn.MsBuild;
 using SlideRule.Tests.TestSupport;
-using Xunit;
-
-[assembly: AssemblyFixture(typeof(WorkspaceFixture))]
 
 namespace SlideRule.Tests;
 

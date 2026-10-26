@@ -184,13 +184,9 @@ public sealed class CliBehaviorTests
 
         CliResult result = await CliRunner.InvokeAsync("check", temp.Path);
 
-        result.ShouldRefuseWith();
-        result.Err
-            .Trim()
-            .ShouldBe(
-                $"{settingsFile} names a solution that does not exist: {temp.PathOf("Gone.sln")}. Fix its "
-                + "'solution', or pass the solution as the argument.",
-                result.Transcript());
+        result.ShouldRefuseWithExactly(
+            $"{settingsFile} names a solution that does not exist: {temp.PathOf("Gone.sln")}. Fix its "
+            + "'solution', or pass the solution as the argument.");
     }
 
     [Fact]

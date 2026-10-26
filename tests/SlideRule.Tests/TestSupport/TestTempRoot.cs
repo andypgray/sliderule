@@ -35,9 +35,8 @@ internal static class TestTempRoot
     private static readonly string TempBase =
         PathCanonicalizer.Resolve(Path.TrimEndingDirectorySeparator(Path.GetTempPath()));
 
-    private static readonly Lock SweepGate = new();
-
-    private static bool sweepStarted;
+    // Fire-and-forget: a sweep of a large backlog can take seconds, and no test should wait for it.
+    private static readonly Lazy<Task> Sweep = new(() => Task.Run(SweepStaleRoots));
 
     /// <summary>
     ///     The run-scoped directory for <paramref name="category" />, created if absent. The first call also
@@ -48,7 +47,7 @@ internal static class TestTempRoot
         string categoryRoot = Path.Combine(TempBase, ParentFolder, category);
         string runRoot = Path.Combine(categoryRoot, RunId);
         Directory.CreateDirectory(runRoot);
-        StartSweepOnce();
+        _ = Sweep.Value;
         return runRoot;
     }
 
@@ -62,18 +61,6 @@ internal static class TestTempRoot
             .ToString("N"));
         Directory.CreateDirectory(path);
         return new TempDirectory(path);
-    }
-
-    private static void StartSweepOnce()
-    {
-        lock (SweepGate)
-        {
-            if (sweepStarted) return;
-            sweepStarted = true;
-        }
-
-        // Fire-and-forget: a sweep of a large backlog can take seconds, and no test should wait for it.
-        _ = Task.Run(SweepStaleRoots);
     }
 
     private static void SweepStaleRoots()

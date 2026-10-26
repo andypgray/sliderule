@@ -391,9 +391,6 @@ internal static class WalkthroughScenarios
         Probe, Captive, Catch, Token, Table, Contract, Snapshot, Rename
     ];
 
-    /// <summary>The four examples, in the order a reader lists the directory in.</summary>
-    internal static readonly IReadOnlyList<string> Examples = [Meridian, Quoting, Operations, Interchange];
-
     /// <summary>The scenario keyed <paramref name="key" />.</summary>
     internal static WalkthroughScenario Named(string key)
     {

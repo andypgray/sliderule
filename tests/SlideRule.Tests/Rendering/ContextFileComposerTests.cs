@@ -1,6 +1,5 @@
 using Shouldly;
 using SlideRule.Codebase;
-using SlideRule.Hosting;
 using SlideRule.Rendering;
 using SlideRule.Tests.Checking;
 using SlideRule.Tests.Extraction;
@@ -25,44 +24,38 @@ public class ContextFileComposerTests
         (ContextFixtures.Site("src", "MyApp.Legacy.Billing", "BillingCalculator.cs"),
             "namespace MyApp.Legacy.Billing; public class BillingCalculator {}"));
 
-    private static readonly IArchitectureSpec WebLayerSpec = ContextFixtures.WebLayer();
+    private static readonly Action<Arch> WebLayerSpec = ContextFixtures.WebLayer();
 
     // A Web layer that says what it is for and that no rule anchors on: the rule ranges over the same types
     // through a NamespaceNoun subject, so the layer earns a module-map row and no card.
-    private static readonly IArchitectureSpec DescribedUnanchoredLayerSpec = new InlineSpec(arch =>
+    private static readonly Action<Arch> DescribedUnanchoredLayerSpec = arch =>
     {
         arch.Layer("Web", "MyApp.Web.*").Purpose("The HTTP surface: controllers and the views they serve.");
         arch.Rule("layering/web-not-billing")
             .Enforce(arch.Namespace("MyApp.Web.*").MustNotReference(arch.Namespace("MyApp.Legacy.Billing.*")))
             .Because("Web reaches billing only through the facade.");
-    });
+    };
 
     // A Billing layer anchored by a rule, over a codebase that holds no billing type.
-    private static readonly IArchitectureSpec BillingLayerSpec = new InlineSpec(ContextFixtures.BillingLayer);
+    private static readonly Action<Arch> BillingLayerSpec = ContextFixtures.BillingLayer;
 
     // A quarantined scope over a namespace no type in the codebase occupies.
-    private static readonly IArchitectureSpec AbsentScopeSpec = new InlineSpec(QuarantineBilling);
-
-    // A layer and a quarantined scope over the same namespace, so both cards resolve to one directory.
-    private static readonly IArchitectureSpec CoLocatedSpec = CoLocatedWith(QuarantineBilling);
+    private static readonly Action<Arch> AbsentScopeSpec = QuarantineBilling;
 
     // The caution twin of AbsentScopeSpec: a posture the cost gate must recognize as something to place.
-    private static readonly IArchitectureSpec AbsentCautionSpec = new InlineSpec(CautionBilling);
-
-    // A layer and a cautioned scope over the same namespace, so both cards resolve to one directory.
-    private static readonly IArchitectureSpec CoLocatedCautionSpec = CoLocatedWith(CautionBilling);
+    private static readonly Action<Arch> AbsentCautionSpec = CautionBilling;
 
     private const string SpecName = "MyApp.Architecture";
 
     // The layer half of a co-located fixture, with the scope declared by the caller: the layer-cards-first
     // ordering is a property of the composer, so both postures prove it against one spec shape.
-    private static IArchitectureSpec CoLocatedWith(Action<Arch> declareScope)
+    private static Action<Arch> CoLocatedWith(Action<Arch> declareScope)
     {
-        return new InlineSpec(arch =>
+        return arch =>
         {
             ContextFixtures.BillingLayer(arch);
             declareScope(arch);
-        });
+        };
     }
 
     private static void QuarantineBilling(Arch arch)
@@ -81,20 +74,21 @@ public class ContextFileComposerTests
             .Because("Every caller depends on the exact rounding.");
     }
 
-    private static IArchitectureSpec CoLocated(string posture)
+    // A layer and a scope of the given posture over the same namespace, so both cards resolve to one directory.
+    private static Action<Arch> CoLocated(string posture)
     {
         return posture switch
         {
-            "Quarantined" => CoLocatedSpec,
-            "Cautioned" => CoLocatedCautionSpec,
+            "Quarantined" => CoLocatedWith(QuarantineBilling),
+            "Cautioned" => CoLocatedWith(CautionBilling),
             _ => throw new ArgumentOutOfRangeException(nameof(posture), posture, null)
         };
     }
 
     // Every scene composes inside the shared solution directory, which the scenes' codebases declare their files under.
-    private static ContextComposition Compose(IArchitectureSpec spec, CodebaseModel? codebase)
+    private static ContextComposition Compose(Action<Arch> spec, CodebaseModel? codebase)
     {
-        return ContextFileComposer.Compose(ArchModelBuilder.Build(spec), codebase, ContextFixtures.SolutionDirectory, SpecName);
+        return ContextFileComposer.Compose(Checker.Model(spec), codebase, ContextFixtures.SolutionDirectory, SpecName);
     }
 
     [Fact]
@@ -106,7 +100,7 @@ public class ContextFileComposerTests
 
         composition.Warnings.ShouldBeEmpty();
         ContextFile file = composition.Files.ShouldHaveSingleItem();
-        file.Path.ShouldBe(Path.Combine(ContextFixtures.SolutionDirectory, "AGENTS.md"));
+        file.Path.ShouldBe(ContextFixtures.Site("AGENTS.md"));
         // The root block still carries the module map (`### Layers`, a function of the spec); what the
         // missing codebase costs is the per-directory card, whose heading is `## Layer <name>`.
         file.Body.ShouldContain("## Architecture (SlideRule)");
@@ -143,10 +137,7 @@ public class ContextFileComposerTests
         // One file, not two: the second splice would clobber the first, so co-located units merge.
         composition.Files.Count.ShouldBe(2);
         string body = composition.Files[1].Body;
-        body.ShouldContain("## Layer `Billing`");
-        body.ShouldContain(scopeHeading);
-        body.IndexOf("## Layer `Billing`", StringComparison.Ordinal)
-            .ShouldBeLessThan(body.IndexOf(scopeHeading, StringComparison.Ordinal));
+        body.ShouldContainInOrder("## Layer `Billing`", scopeHeading);
 
         // And exactly one provenance line for the merged file, not one per card.
         body.Occurrences(AgentContextRenderer.ProvenanceLine(SpecName))
@@ -182,7 +173,7 @@ public class ContextFileComposerTests
     [InlineData("cautioned scope")]
     public void HasAnythingToPlace_ACardBearingDeclaration_True(string declared)
     {
-        IArchitectureSpec spec = declared switch
+        Action<Arch> spec = declared switch
         {
             "anchored layer" => WebLayerSpec,
             "quarantined scope" => AbsentScopeSpec,
@@ -190,7 +181,7 @@ public class ContextFileComposerTests
             _ => throw new ArgumentOutOfRangeException(nameof(declared), declared, null)
         };
 
-        ContextFileComposer.HasAnythingToPlace(ArchModelBuilder.Build(spec))
+        ContextFileComposer.HasAnythingToPlace(Checker.Model(spec))
             .ShouldBeTrue();
     }
 
@@ -199,7 +190,7 @@ public class ContextFileComposerTests
     {
         // A purpose describes a layer; it never places a card. The gate answers on anchoring alone, so a
         // spec whose only layer is described but unanchored still skips extraction entirely.
-        ContextFileComposer.HasAnythingToPlace(ArchModelBuilder.Build(DescribedUnanchoredLayerSpec))
+        ContextFileComposer.HasAnythingToPlace(Checker.Model(DescribedUnanchoredLayerSpec))
             .ShouldBeFalse();
     }
 

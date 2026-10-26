@@ -125,12 +125,8 @@ public sealed class MustHaveExactlyOneCounterpartVerbTests
     public void MustHaveExactlyOneCounterpart_OneMatchingName_PassesClean()
     {
         // The satisfied law: one subject, one type in the among selection carrying the derived name.
-        Checker.Run(SceneModel, arch =>
-                arch.Rule("naming/one-interface-per-service")
-                    .Enforce(arch.Types.WithNameMatching("Order")
-                        .MustHaveExactlyOneCounterpart(among: arch.Types.OfKind(TypeKind.Interface), named: "I{Name}"))
-                    .Because("b"))
-            .Single()
+        Checker.Verdict(SceneModel, arch => arch.Types.WithNameMatching("Order")
+                .MustHaveExactlyOneCounterpart(among: arch.Types.OfKind(TypeKind.Interface), named: "I{Name}"))
             .ShouldHavePassedClean();
     }
 
@@ -139,12 +135,8 @@ public sealed class MustHaveExactlyOneCounterpartVerbTests
     {
         // The missing arm has no counterpart to point at, so the file:line an agent jumps to is where the
         // uncovered subject is declared — its own declaration sites, exactly as the other shape verbs cite.
-        Checker.Run(SceneModel, arch =>
-                arch.Rule("naming/one-interface-per-service")
-                    .Enforce(arch.Types.OfKind(TypeKind.Class)
-                        .MustHaveExactlyOneCounterpart(among: arch.Types.OfKind(TypeKind.Interface), named: "I{Name}"))
-                    .Because("b"))
-            .Single()
+        Checker.Verdict(SceneModel, arch => arch.Types.OfKind(TypeKind.Class)
+                .MustHaveExactlyOneCounterpart(among: arch.Types.OfKind(TypeKind.Interface), named: "I{Name}"))
             .ShouldHaveFailedWithSubjectAtSites("App.Invoice", ["Test.cs:5"]);
     }
 
@@ -154,12 +146,8 @@ public sealed class MustHaveExactlyOneCounterpartVerbTests
         // The ambiguous arm inverts the evidence: the subject is lawful where it stands and the edit that
         // resolves the collision happens at one of the counterparts, so those are the sites. Ordered by
         // (file, line), which is the order a report prints them in.
-        Checker.Run(AmbiguousModel, arch =>
-                arch.Rule("naming/one-interface-per-service")
-                    .Enforce(arch.Types.OfKind(TypeKind.Class)
-                        .MustHaveExactlyOneCounterpart(among: arch.Types.OfKind(TypeKind.Interface), named: "I{Name}"))
-                    .Because("b"))
-            .Single()
+        Checker.Verdict(AmbiguousModel, arch => arch.Types.OfKind(TypeKind.Class)
+                .MustHaveExactlyOneCounterpart(among: arch.Types.OfKind(TypeKind.Interface), named: "I{Name}"))
             .ShouldHaveFailedWithSubjectAtSites("App.Invoice", ["Test.cs:9", "Test.cs:13"]);
     }
 
@@ -169,13 +157,9 @@ public sealed class MustHaveExactlyOneCounterpartVerbTests
         // Both claims in one row: `Order` is green only because BOTH occurrences were replaced
         // (`OrderContractOrder` exists), and `Invoice` is red although `InvoiceContract` exists — which is
         // what a replace that stopped after the first occurrence would have settled for.
-        Checker.Run(CompilationFactory.Extract(PlaceholderScene), arch =>
-                arch.Rule("naming/contract-per-type")
-                    .Enforce(arch.Types.OfKind(TypeKind.Class)
-                        .MustHaveExactlyOneCounterpart(
-                            among: arch.Types.OfKind(TypeKind.Interface), named: "{Name}Contract{Name}"))
-                    .Because("b"))
-            .Single()
+        Checker.Verdict(CompilationFactory.Extract(PlaceholderScene), arch => arch.Types.OfKind(TypeKind.Class)
+                .MustHaveExactlyOneCounterpart(
+                    among: arch.Types.OfKind(TypeKind.Interface), named: "{Name}Contract{Name}"))
             .ShouldHaveFailedWithSubjects(["App.Invoice"]);
     }
 
@@ -184,12 +168,8 @@ public sealed class MustHaveExactlyOneCounterpartVerbTests
     {
         // The subject's simple name is Roslyn's — arity-free — so `Repository<T>` derives `IRepository` and
         // an author never spells the backtick arity a metadata name would carry.
-        Checker.Run(ArityModel, arch =>
-                arch.Rule("naming/interface-per-repository")
-                    .Enforce(arch.Types.WithNameMatching("Repository")
-                        .MustHaveExactlyOneCounterpart(among: arch.Types.OfKind(TypeKind.Interface), named: "I{Name}"))
-                    .Because("b"))
-            .Single()
+        Checker.Verdict(ArityModel, arch => arch.Types.WithNameMatching("Repository")
+                .MustHaveExactlyOneCounterpart(among: arch.Types.OfKind(TypeKind.Interface), named: "I{Name}"))
             .ShouldHavePassedClean();
     }
 
@@ -200,12 +180,8 @@ public sealed class MustHaveExactlyOneCounterpartVerbTests
         // `Handler<T>` are two subjects that derive one name, and the single `IHandler` satisfies both. A
         // pairing reading would have to red one of them, and the subject count is asserted so the row
         // cannot pass by sweeping only one.
-        RuleResult result = Checker.Run(ArityModel, arch =>
-                arch.Rule("naming/interface-per-handler")
-                    .Enforce(arch.Types.WithNameMatching("Handler")
-                        .MustHaveExactlyOneCounterpart(among: arch.Types.OfKind(TypeKind.Interface), named: "I{Name}"))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(ArityModel, arch => arch.Types.WithNameMatching("Handler")
+            .MustHaveExactlyOneCounterpart(among: arch.Types.OfKind(TypeKind.Interface), named: "I{Name}"));
 
         result.ShouldHavePassedClean();
         result.SubjectTypes.ShouldBe(2);
@@ -216,12 +192,8 @@ public sealed class MustHaveExactlyOneCounterpartVerbTests
     {
         // Both sides read the leaf: the subject `App.Order.Line` derives `ILine`, and the counterpart
         // `App.Contracts.ILine` carries it — neither name is qualified by its declaring type.
-        Checker.Run(CompilationFactory.Extract(NestedScene), arch =>
-                arch.Rule("naming/interface-per-line")
-                    .Enforce(arch.Types.WithNameMatching("Line")
-                        .MustHaveExactlyOneCounterpart(among: arch.Types.OfKind(TypeKind.Interface), named: "I{Name}"))
-                    .Because("b"))
-            .Single()
+        Checker.Verdict(CompilationFactory.Extract(NestedScene), arch => arch.Types.WithNameMatching("Line")
+                .MustHaveExactlyOneCounterpart(among: arch.Types.OfKind(TypeKind.Interface), named: "I{Name}"))
             .ShouldHavePassedClean();
     }
 
@@ -231,12 +203,8 @@ public sealed class MustHaveExactlyOneCounterpartVerbTests
         // Ordinal on both halves — the substitution and the name comparison — so `iorder` is a different
         // name from `IOrder` and not a counterpart. Case-insensitivity here would silently bless the very
         // naming drift the verb exists to find.
-        Checker.Run(CompilationFactory.Extract(CaseScene), arch =>
-                arch.Rule("naming/one-interface-per-service")
-                    .Enforce(arch.Types.OfKind(TypeKind.Class)
-                        .MustHaveExactlyOneCounterpart(among: arch.Types.OfKind(TypeKind.Interface), named: "I{Name}"))
-                    .Because("b"))
-            .Single()
+        Checker.Verdict(CompilationFactory.Extract(CaseScene), arch => arch.Types.OfKind(TypeKind.Class)
+                .MustHaveExactlyOneCounterpart(among: arch.Types.OfKind(TypeKind.Interface), named: "I{Name}"))
             .ShouldHaveFailedWithSubjectAtSites("App.Order", ["Test.cs:3"]);
     }
 
@@ -246,12 +214,8 @@ public sealed class MustHaveExactlyOneCounterpartVerbTests
         // An among selection naming nothing can hold no counterpart, so every subject reds — a false red,
         // and deliberately a loud one — and the warning is what names the among as its cause (§4.1). The
         // per-operand emptiness failure guards a union SUBJECT (§4.1) and does not reach this position.
-        RuleResult result = Checker.Run(SceneModel, arch =>
-                arch.Rule("naming/absent-among")
-                    .Enforce(arch.Types.OfKind(TypeKind.Class)
-                        .MustHaveExactlyOneCounterpart(among: arch.Namespace("Nowhere.*"), named: "I{Name}"))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(SceneModel, arch => arch.Types.OfKind(TypeKind.Class)
+            .MustHaveExactlyOneCounterpart(among: arch.Namespace("Nowhere.*"), named: "I{Name}"));
 
         result.ShouldHaveFailedWithSubjects(["App.Order", "App.Invoice"]);
         result.ShouldHaveWarnedAmongOperand("types in `Nowhere.*`");
@@ -265,14 +229,10 @@ public sealed class MustHaveExactlyOneCounterpartVerbTests
         // A dead part can pass a subject it would have made ambiguous as readily as it can red one it held the
         // only counterpart of, so an entry the run left unmatched may be untested rather than fixed: the rule
         // goes in the untested bucket, unlike a dead membership.
-        RuleResult result = Checker.Run(SceneModel, arch =>
-                arch.Rule("naming/one-interface-per-service")
-                    .Enforce(arch.Types.OfKind(TypeKind.Class)
-                        .MustHaveExactlyOneCounterpart(
-                            among: arch.AnyOf(arch.Types.OfKind(TypeKind.Interface), arch.Namespace("Ghost.*")),
-                            named: "I{Name}"))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(SceneModel, arch => arch.Types.OfKind(TypeKind.Class)
+            .MustHaveExactlyOneCounterpart(
+                among: arch.AnyOf(arch.Types.OfKind(TypeKind.Interface), arch.Namespace("Ghost.*")),
+                named: "I{Name}"));
 
         result.ShouldHaveWarnedAmongOperand("types in `Ghost.*`");
         result.ShouldSatisfyAllConditions(
@@ -284,7 +244,7 @@ public sealed class MustHaveExactlyOneCounterpartVerbTests
     [Fact]
     public void MustHaveExactlyOneCounterpart_DeadAmongOnANarrowedRun_IsSilent()
     {
-        RuleResult result = Checker.Run(SceneModel, BaselineIndex.Empty, Checker.FilterNarrowing, arch =>
+        RuleResult result = Checker.Run(SceneModel, narrowing: Checker.FilterNarrowing, define: arch =>
                 arch.Rule("naming/absent-among")
                     .Enforce(arch.Types.OfKind(TypeKind.Class)
                         .MustHaveExactlyOneCounterpart(among: arch.Namespace("Nowhere.*"), named: "I{Name}"))

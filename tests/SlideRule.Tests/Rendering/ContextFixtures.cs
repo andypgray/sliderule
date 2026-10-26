@@ -1,6 +1,5 @@
 using SlideRule.Codebase;
 using SlideRule.Rendering;
-using SlideRule.Tests.Checking;
 using SlideRule.Tests.Extraction;
 using SlideRule.Tests.TestSupport;
 
@@ -70,22 +69,21 @@ internal static class ContextFixtures
     ///     A Web layer with one bare-subject Enforce rule anchored on it — saying what it is for when
     ///     given a purpose, which is the sentence the card lede carries.
     /// </summary>
-    internal static IArchitectureSpec WebLayer(string? purpose = null)
+    internal static Action<Arch> WebLayer(string? purpose = null)
     {
-        return new InlineSpec(arch =>
+        return arch =>
         {
             Layer web = arch.Layer("Web", "MyApp.Web.*");
             if (purpose is not null) web.Purpose(purpose);
             arch.Rule("layering/web-not-billing")
                 .Enforce(web.MustNotReference(arch.Namespace("MyApp.Legacy.Billing.*")))
                 .Because("Web reaches billing only through the facade.");
-        });
+        };
     }
 
     /// <summary>
     ///     The mirror of <see cref="WebLayer" />: a Billing layer with one bare-subject Enforce rule
-    ///     anchored on it. Declared as an <see cref="Arch" /> action rather than a spec so a caller can
-    ///     compose a scope statement beside it.
+    ///     anchored on it.
     /// </summary>
     internal static void BillingLayer(Arch arch)
     {

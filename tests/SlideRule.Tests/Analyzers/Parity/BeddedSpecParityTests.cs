@@ -13,9 +13,9 @@ namespace SlideRule.Tests.Analyzers.Parity;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         Every row opens an MSBuild workspace, and the extraction and the workspace are the ones the rest
-///         of the suite already pays for through <see cref="FixtureCodebase" /> and
-///         <see cref="WarmWorkspacePool" />.
+///         Each row reads its bed's compilations once per class, through <see cref="ParityBeds" />, and its
+///         extraction from <see cref="FixtureCodebase" />, both off the <see cref="WarmWorkspacePool" /> the
+///         rest of the suite already pays for.
 ///     </para>
 ///     <para>
 ///         The unmeasured list is part of each row rather than derived, so a rule that stops being
@@ -28,11 +28,8 @@ namespace SlideRule.Tests.Analyzers.Parity;
 ///         that holds its site.
 ///     </para>
 /// </remarks>
-public sealed class BeddedSpecParityTests
+public sealed class BeddedSpecParityTests(ParityBeds beds) : IClassFixture<ParityBeds>
 {
-    /// <summary>The bedded specs whose bed needs a Windows host.</summary>
-    private static readonly HashSet<string> WindowsOnly = new(StringComparer.Ordinal) { "ClassicAppSpec" };
-
     /// <summary>
     ///     The rules the whole-solution check leaves unmeasured on a bedded spec's bed, where it leaves any.
     /// </summary>
@@ -43,25 +40,23 @@ public sealed class BeddedSpecParityTests
 
     /// <summary>
     ///     Every spec this repository carries against a bed, with the rules the whole-solution check leaves
-    ///     unmeasured there and whether the bed needs a Windows host.
+    ///     unmeasured there.
     /// </summary>
-    public static TheoryData<string, string, bool, string[]> Specs =>
+    public static TheoryData<string, string, string[]> Specs =>
     [
-        .. CliRunner.BeddedSpecs.Select(spec => (
-            spec.Name, spec.Solution, WindowsOnly.Contains(spec.Name), Unmeasured.GetValueOrDefault(spec.Name, [])))
+        .. CliRunner.BeddedSpecs.Select(spec => (spec.Name, spec.Solution, Unmeasured.GetValueOrDefault(spec.Name, [])))
     ];
 
     [Theory]
     [MemberData(nameof(Specs))]
     public async Task TheBuildTier_OverEveryProjectOfABedItsSpecGoverns_AgreesWithTheWholeSolutionCheck(
-        string name, string solutionPath, bool windowsOnly, string[] unmeasured)
+        string name, string solutionPath, string[] unmeasured)
     {
-        if (windowsOnly)
-            Assert.SkipUnless(OperatingSystem.IsWindows(), "A non-SDK .NET Framework solution loads on Windows only.");
+        CliRunner.SkipUnlessLoadable(solutionPath);
 
         // Arrange
         ArchitectureModel model = ModelFileCorpus.ModelOf(name);
-        ParitySubject subject = await ParityHarness.ForSolutionAsync(name, model, solutionPath, Ct);
+        ParitySubject subject = await beds.SubjectAsync(name, model, solutionPath);
 
         // Assert — the exclusion first, so a row that grew one reds naming the rule rather than the keys.
         subject.Expectation.Unmeasured.ShouldBe(
@@ -77,7 +72,7 @@ public sealed class BeddedSpecParityTests
         // one row states that the pin is comparing sets with something in them.
         const string name = "MyAppViolatedSpec";
         ArchitectureModel model = ModelFileCorpus.ModelOf(name);
-        ParitySubject subject = await ParityHarness.ForSolutionAsync(name, model, CliRunner.MyAppSolution, Ct);
+        ParitySubject subject = await beds.SubjectAsync(name, model, CliRunner.MyAppSolution);
 
         subject.Expectation.Checked.ShouldNotBeEmpty("rules the pin holds the build to");
         subject.Expectation.Keys.ShouldNotBeEmpty("findings the whole-solution check gives");

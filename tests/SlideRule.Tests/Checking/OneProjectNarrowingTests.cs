@@ -5,6 +5,7 @@ using SlideRule.Codebase;
 using SlideRule.Hosting;
 using SlideRule.Model;
 using SlideRule.Tests.Extraction;
+using SlideRule.Tests.TestSupport;
 using Xunit;
 
 namespace SlideRule.Tests.Checking;
@@ -64,8 +65,7 @@ public sealed class OneProjectNarrowingTests
     {
         // The commonest shape on a one-project run: most of a union's layers live in projects this view
         // never saw, and the one that is here has a finding to report.
-        RuleResult result = Checker.Run(
-                WebAndDataModel, BaselineIndex.Empty, NarrowedUniverse.OneProject, UnionWithAnEmptyPart)
+        RuleResult result = Checker.Run(WebAndDataModel, UnionWithAnEmptyPart, narrowing: NarrowedUniverse.OneProject)
             .Single();
 
         // Exactly one violation, so the empty part raised none of its own.
@@ -77,10 +77,7 @@ public sealed class OneProjectNarrowingTests
     {
         // The invariant the cut is measured against: over the whole solution a union operand that matched
         // nothing is a spec defect, named in its own right (GRAMMAR §4.1), and the verb never runs.
-        // The cast names which of the harness's two three-argument overloads this row wants: over a
-        // CodebaseModel a bare null is ambiguous between the diff context and the narrowing.
-        RuleResult result = Checker.Run(
-                WebAndDataModel, BaselineIndex.Empty, (NarrowedUniverse?)null, UnionWithAnEmptyPart)
+        RuleResult result = Checker.Run(WebAndDataModel, UnionWithAnEmptyPart)
             .Single();
 
         result.ShouldHaveFailedWithDetail(
@@ -92,7 +89,7 @@ public sealed class OneProjectNarrowingTests
     {
         // Nothing survives the cut, so the subject goes to the evaluator whole and reaches the empty-subject
         // verdict an unnarrowed run would — which the checker turns into the skip, not into a red.
-        RuleResult result = Checker.Run(WebAndDataModel, BaselineIndex.Empty, NarrowedUniverse.OneProject, arch =>
+        RuleResult result = Checker.Run(WebAndDataModel, narrowing: NarrowedUniverse.OneProject, define: arch =>
                 arch.Rule("layering/x")
                     .Enforce(arch.AnyOf(arch.Namespace("App.Nowhere.*"), arch.Namespace("App.Elsewhere.*"))
                         .MustNotReference(arch.Namespace("App.Data.*")))
@@ -107,7 +104,7 @@ public sealed class OneProjectNarrowingTests
     {
         // No cut is involved at all — a plain noun has no parts — so this is the kind behaving as a
         // narrowing, exactly as the filter kind does.
-        RuleResult result = Checker.Run(WebAndDataModel, BaselineIndex.Empty, NarrowedUniverse.OneProject, arch =>
+        RuleResult result = Checker.Run(WebAndDataModel, narrowing: NarrowedUniverse.OneProject, define: arch =>
                 arch.Rule("layering/x")
                     .Enforce(arch.Namespace("App.Nowhere.*").MustNotReference(arch.Namespace("App.Data.*")))
                     .Because("b"))
@@ -141,7 +138,7 @@ public sealed class OneProjectNarrowingTests
         // What the evaluator does with the kept nested union: its per-operand gate reads top-level parts
         // only, so an empty part one level down raises nothing — as it raises nothing on an unnarrowed run.
         // The rule is measured over what the inner union does hold.
-        RuleResult result = Checker.Run(WebAndDataModel, BaselineIndex.Empty, NarrowedUniverse.OneProject, arch =>
+        RuleResult result = Checker.Run(WebAndDataModel, narrowing: NarrowedUniverse.OneProject, define: arch =>
                 arch.Rule("layering/x")
                     .Enforce(arch.AnyOf(
                             arch.AnyOf(arch.Namespace("App.Web.*"), arch.Namespace("App.Nowhere.*"))
@@ -159,7 +156,7 @@ public sealed class OneProjectNarrowingTests
     {
         // The adjective is the union's own, not its parts' (GRAMMAR §5.1), so a rebuilt union that lost it
         // would range one type wider. The interface in the bed is what says whether it did.
-        RuleResult result = Checker.Run(WebAndDataModel, BaselineIndex.Empty, NarrowedUniverse.OneProject, arch =>
+        RuleResult result = Checker.Run(WebAndDataModel, narrowing: NarrowedUniverse.OneProject, define: arch =>
                 arch.Rule("shape/x")
                     .Enforce(arch.AnyOf(arch.Namespace("App.Web.*"), arch.Namespace("App.Nowhere.*"))
                         .OfKind(TypeKind.Class)
@@ -173,7 +170,7 @@ public sealed class OneProjectNarrowingTests
     [Fact]
     public void Check_AFamilyWithAnEmptyCell_RunsTheVerbOverTheCellsThatRemain()
     {
-        RuleResult result = Checker.Run(PluginsModel, BaselineIndex.Empty, NarrowedUniverse.OneProject, arch =>
+        RuleResult result = Checker.Run(PluginsModel, narrowing: NarrowedUniverse.OneProject, define: arch =>
                 arch.Rule("plugins/independent")
                     .Enforce(arch.Each(
                             arch.Layer("A", "Plugin.A.*"), arch.Layer("B", "Plugin.B.*"),
@@ -196,7 +193,7 @@ public sealed class OneProjectNarrowingTests
     {
         // The cell checks run over the cut family, not the declared one: with the empty cell gone, the two
         // that remain are held to the partition discipline exactly as a two-cell family always was.
-        RuleResult result = Checker.Run(PluginsModel, BaselineIndex.Empty, NarrowedUniverse.OneProject, arch =>
+        RuleResult result = Checker.Run(PluginsModel, narrowing: NarrowedUniverse.OneProject, define: arch =>
                 arch.Rule("plugins/overlapping")
                     .Enforce(arch.Each(
                             arch.Layer("Wide", "Plugin.*"), arch.Layer("A", "Plugin.A.*"),
@@ -215,7 +212,7 @@ public sealed class OneProjectNarrowingTests
     {
         // The subject loaded, so the rule is measured and still warns inert — which is true of this run.
         // The cure sends the reader to the whole solution rather than advising on how the target was spelled.
-        RuleResult result = Checker.Run(WebAndDataModel, BaselineIndex.Empty, NarrowedUniverse.OneProject, arch =>
+        RuleResult result = Checker.Run(WebAndDataModel, narrowing: NarrowedUniverse.OneProject, define: arch =>
                 arch.Rule("inert/x")
                     .Enforce(arch.Namespace("App.Web.*").MustNotReference(arch.Namespace("App.Ghost.*")))
                     .Because("b"))
@@ -253,8 +250,8 @@ public sealed class OneProjectNarrowingTests
         IReadOnlyList<Selection> parts = subject.ShouldBeOfType<UnionSelection>()
             .Parts;
 
-        RuleResult result = ArchChecker
-            .Check(model.Rules, WebAndDataModel, BaselineIndex.Empty, null, NarrowedUniverse.OneProject, null, null, Ct)
+        RuleResult result = Harness.Check(
+                model.Rules, WebAndDataModel, BaselineIndex.Empty, null, NarrowedUniverse.OneProject, null)
             .Single();
 
         result.ShouldHaveFailedWithSingleEdge(ViolationKind.Reference, "App.Web.HomeController", "App.Data.Db");
@@ -273,7 +270,7 @@ public sealed class OneProjectNarrowingTests
         // name another project declares is dead in this one. Without the cut, the build would report nothing
         // for the controller this project does hold; the single edge says the name raised nothing of its own.
         RuleResult result = Checker.Run(
-                WebAndDataModel, BaselineIndex.Empty, NarrowedUniverse.OneProject, NamedListWithAnAbsentName)
+                WebAndDataModel, NamedListWithAnAbsentName, narrowing: NarrowedUniverse.OneProject)
             .Single();
 
         result.ShouldHaveFailedWithSingleEdge(ViolationKind.Reference, "App.Web.HomeController", "App.Data.Db");
@@ -282,8 +279,7 @@ public sealed class OneProjectNarrowingTests
     [Fact]
     public void Check_TheSameNamedSubjectWithNoNarrowing_RedsOnTheAbsentName()
     {
-        RuleResult result = Checker.Run(
-                WebAndDataModel, BaselineIndex.Empty, (NarrowedUniverse?)null, NamedListWithAnAbsentName)
+        RuleResult result = Checker.Run(WebAndDataModel, NamedListWithAnAbsentName)
             .Single();
 
         result.ShouldHaveFailedWithDetail(
@@ -294,13 +290,13 @@ public sealed class OneProjectNarrowingTests
     public void Check_AnAbsentNameInAUnionPartOrTheUnionsOwnList_IsCutToo()
     {
         // Both lists the evaluator reads on a union subject: a kept part's, and the union's own.
-        RuleResult inPart = Checker.Run(WebAndDataModel, BaselineIndex.Empty, NarrowedUniverse.OneProject, arch =>
+        RuleResult inPart = Checker.Run(WebAndDataModel, narrowing: NarrowedUniverse.OneProject, define: arch =>
                 arch.Rule("layering/x")
                     .Enforce(arch.AnyOf(arch.Types.Named("HomeController", "Elsewhere"), arch.Namespace("App.Nowhere.*"))
                         .MustNotReference(arch.Namespace("App.Data.*")))
                     .Because("b"))
             .Single();
-        RuleResult onUnion = Checker.Run(WebAndDataModel, BaselineIndex.Empty, NarrowedUniverse.OneProject, arch =>
+        RuleResult onUnion = Checker.Run(WebAndDataModel, narrowing: NarrowedUniverse.OneProject, define: arch =>
                 arch.Rule("layering/x")
                     .Enforce(arch.AnyOf(arch.Namespace("App.Web.*"), arch.Namespace("App.Nowhere.*"))
                         .Named("HomeController", "Elsewhere")

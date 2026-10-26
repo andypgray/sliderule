@@ -67,11 +67,9 @@ public sealed class ShapeVerbTests
     [Fact]
     public void OfKind_And_MustHavePrefix_FlagInterfaceWithoutIPrefix()
     {
-        RuleResult result = Checker.Run(NamingModel, arch =>
-                arch.Rule("naming/interfaces")
-                    .Enforce(arch.Types.OfKind(TypeKind.Interface).InNamespace("App.Naming.*").MustHavePrefix("I"))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(
+            NamingModel, arch => arch.Types.OfKind(TypeKind.Interface).InNamespace("App.Naming.*")
+                .MustHavePrefix("I"));
 
         result.ShouldHaveFailedWithSubjects(["App.Naming.Bar"]);
     }
@@ -79,11 +77,8 @@ public sealed class ShapeVerbTests
     [Fact]
     public void WithPrefix_And_MustHaveSuffix_FlagMismatchedSuffix()
     {
-        RuleResult result = Checker.Run(NamingModel, arch =>
-                arch.Rule("naming/handlers")
-                    .Enforce(arch.Types.WithPrefix("Order").MustHaveSuffix("Handler"))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(NamingModel, arch => arch.Types.WithPrefix("Order")
+            .MustHaveSuffix("Handler"));
 
         result.ShouldHaveFailedWithSubjects(["App.Naming.OrderController"]);
     }
@@ -91,11 +86,7 @@ public sealed class ShapeVerbTests
     [Fact]
     public void WithNameMatching_And_MustHaveNameMatching_Hold()
     {
-        Checker.Run(NamingModel, arch =>
-                arch.Rule("naming/repo")
-                    .Enforce(arch.Types.WithNameMatching("*Repo*").MustHaveNameMatching("*Repository"))
-                    .Because("b"))
-            .Single()
+        Checker.Verdict(NamingModel, arch => arch.Types.WithNameMatching("*Repo*").MustHaveNameMatching("*Repository"))
             .ShouldHavePassed();
     }
 
@@ -108,36 +99,20 @@ public sealed class ShapeVerbTests
     [Fact]
     public void WithSuffixAdjective_ReadsStarAsLiteral_WhereWithNameMatchingGlobs()
     {
-        Checker.Run(NamingModel, arch =>
-                arch.Rule("naming/literal-affix")
-                    .Enforce(arch.Types.WithSuffix("*Controller").MustHavePrefix("Order"))
-                    .Because("b"))
-            .Single()
+        Checker.Verdict(NamingModel, arch => arch.Types.WithSuffix("*Controller").MustHavePrefix("Order"))
             .ShouldHaveFailedWithDetail(ViolationKind.EmptySubject, ConstraintEvaluator.EmptySubjectMessage);
 
-        Checker.Run(NamingModel, arch =>
-                arch.Rule("naming/glob-affix")
-                    .Enforce(arch.Types.WithNameMatching("*Controller").MustHavePrefix("Order"))
-                    .Because("b"))
-            .Single()
+        Checker.Verdict(NamingModel, arch => arch.Types.WithNameMatching("*Controller").MustHavePrefix("Order"))
             .ShouldHavePassed();
     }
 
     [Fact]
     public void MustHaveSuffixVerb_ReadsStarAsLiteral_WhereMustHaveNameMatchingGlobs()
     {
-        Checker.Run(NamingModel, arch =>
-                arch.Rule("naming/literal-verb")
-                    .Enforce(arch.Types.Named("OrderController").MustHaveSuffix("*Controller"))
-                    .Because("b"))
-            .Single()
+        Checker.Verdict(NamingModel, arch => arch.Types.Named("OrderController").MustHaveSuffix("*Controller"))
             .ShouldHaveFailedWithSubjects(["App.Naming.OrderController"]);
 
-        Checker.Run(NamingModel, arch =>
-                arch.Rule("naming/glob-verb")
-                    .Enforce(arch.Types.Named("OrderController").MustHaveNameMatching("*Controller"))
-                    .Because("b"))
-            .Single()
+        Checker.Verdict(NamingModel, arch => arch.Types.Named("OrderController").MustHaveNameMatching("*Controller"))
             .ShouldHavePassed();
     }
 
@@ -149,11 +124,8 @@ public sealed class ShapeVerbTests
                               namespace App.Bad { public class Widget2 {} }
                               """;
 
-        RuleResult result = Checker.Run(source, arch =>
-                arch.Rule("layout/x")
-                    .Enforce(arch.Types.WithPrefix("Widget").MustResideInNamespace("App.Good.*"))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(source, arch => arch.Types.WithPrefix("Widget")
+            .MustResideInNamespace("App.Good.*"));
 
         result.ShouldHaveFailedWithSubjects(["App.Bad.Widget2"]);
     }
@@ -161,20 +133,12 @@ public sealed class ShapeVerbTests
     [Fact]
     public void Must_EscapeHatch_HoldsAndFails()
     {
-        Checker.Run(NamingModel, arch =>
-                arch.Rule("style/short")
-                    .Enforce(arch.Types.WithPrefix("X")
-                        .Must(t => t.Name.Length <= 3, "keep names at or under 3 characters"))
-                    .Because("b"))
-            .Single()
+        Checker.Verdict(NamingModel, arch => arch.Types.WithPrefix("X")
+                .Must(t => t.Name.Length <= 3, "keep names at or under 3 characters"))
             .ShouldHavePassed();
 
-        Checker.Run(NamingModel, arch =>
-                arch.Rule("style/short")
-                    .Enforce(arch.Types.WithPrefix("OrderC")
-                        .Must(t => t.Name.Length <= 3, "keep names at or under 3 characters"))
-                    .Because("b"))
-            .Single()
+        Checker.Verdict(NamingModel, arch => arch.Types.WithPrefix("OrderC")
+                .Must(t => t.Name.Length <= 3, "keep names at or under 3 characters"))
             .ShouldHaveFailedWithSubjects(["App.Naming.OrderController"]);
     }
 
@@ -182,12 +146,9 @@ public sealed class ShapeVerbTests
     public void Except_SubtractsPayloadSelection()
     {
         // Subjects = Order* except *Handler = {OrderController}; it fails the Handler suffix.
-        RuleResult result = Checker.Run(NamingModel, arch =>
-                arch.Rule("naming/x")
-                    .Enforce(arch.Types.WithPrefix("Order").Except(arch.Types.WithSuffix("Handler"))
-                        .MustHaveSuffix("Handler"))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(NamingModel, arch => arch.Types.WithPrefix("Order")
+            .Except(arch.Types.WithSuffix("Handler"))
+            .MustHaveSuffix("Handler"));
 
         result.ShouldHaveFailedWithSubjects(["App.Naming.OrderController"]);
     }
@@ -245,13 +206,9 @@ public sealed class ShapeVerbTests
     public void Where_EscapeHatch_NarrowsSubjectSelection()
     {
         // Where narrows Order* to just the Handler; it then passes the Handler suffix check.
-        Checker.Run(NamingModel, arch =>
-                arch.Rule("naming/x")
-                    .Enforce(arch.Types.WithPrefix("Order")
-                        .Where(t => t.Name.EndsWith("Handler", StringComparison.Ordinal), "whose name ends with Handler")
-                        .MustHaveSuffix("Handler"))
-                    .Because("b"))
-            .Single()
+        Checker.Verdict(NamingModel, arch => arch.Types.WithPrefix("Order")
+                .Where(t => t.Name.EndsWith("Handler", StringComparison.Ordinal), "whose name ends with Handler")
+                .MustHaveSuffix("Handler"))
             .ShouldHavePassed();
     }
 
@@ -259,11 +216,7 @@ public sealed class ShapeVerbTests
     public void ProjectNoun_SelectsTypesInNamedProject()
     {
         // CompilationFactory compiles into project "TestProject"; a non-empty pass proves the noun resolved.
-        Checker.Run(NamingModel, arch =>
-                arch.Rule("proj/x")
-                    .Enforce(arch.Project("TestProject").MustHaveNameMatching("*"))
-                    .Because("b"))
-            .Single()
+        Checker.Verdict(NamingModel, arch => arch.Project("TestProject").MustHaveNameMatching("*"))
             .ShouldHavePassed();
     }
 
@@ -288,18 +241,10 @@ public sealed class ShapeVerbTests
     {
         // Normalization visible at the verb layer: a static class fails both MustBeSealed and
         // MustBeAbstract (it is neither in C# declaration semantics).
-        Checker.Run(ShapeModel, arch =>
-                arch.Rule("shape/sealed")
-                    .Enforce(arch.Types.WithPrefix("Static").MustBeSealed())
-                    .Because("b"))
-            .Single()
+        Checker.Verdict(ShapeModel, arch => arch.Types.WithPrefix("Static").MustBeSealed())
             .ShouldHaveFailedWithSubjects(["App.Shape.StaticThing"]);
 
-        Checker.Run(ShapeModel, arch =>
-                arch.Rule("shape/abstract")
-                    .Enforce(arch.Types.WithPrefix("Static").MustBeAbstract())
-                    .Because("b"))
-            .Single()
+        Checker.Verdict(ShapeModel, arch => arch.Types.WithPrefix("Static").MustBeAbstract())
             .ShouldHaveFailedWithSubjects(["App.Shape.StaticThing"]);
     }
 
@@ -314,11 +259,7 @@ public sealed class ShapeVerbTests
                               }
                               """;
 
-        Checker.Run(source, arch =>
-                arch.Rule("events/records")
-                    .Enforce(arch.Types.InNamespace("App.Events.*").Must(t => t.IsRecord, "be a record"))
-                    .Because("b"))
-            .Single()
+        Checker.Verdict(source, arch => arch.Types.InNamespace("App.Events.*").Must(t => t.IsRecord, "be a record"))
             .ShouldHaveFailedWithSubjects(["App.Events.OrderHandler"]);
     }
 
@@ -333,14 +274,10 @@ public sealed class ShapeVerbTests
             ("Special.cs", "namespace App.Files { public class SpecialThing {} }"),
             ("Normal.cs", "namespace App.Files { public class NormalWidget {} }"));
 
-        Checker.Run(codebase, arch =>
-                arch.Rule("files/special")
-                    .Enforce(arch.Types
-                        .Where(t => t.FilePaths.Any(p => p.EndsWith("Special.cs", StringComparison.Ordinal)),
-                            "declared in `Special.cs`")
-                        .MustHaveSuffix("Thing"))
-                    .Because("b"))
-            .Single()
+        Checker.Verdict(codebase, arch => arch.Types
+                .Where(t => t.FilePaths.Any(p => p.EndsWith("Special.cs", StringComparison.Ordinal)),
+                    "declared in `Special.cs`")
+                .MustHaveSuffix("Thing"))
             .ShouldHavePassed();
     }
 
@@ -349,11 +286,9 @@ public sealed class ShapeVerbTests
     {
         // A subject-selection Where predicate that throws becomes a contained RuleError, not an aborted run;
         // the detail names the `Where` hatch and echoes the thrown exception (SelectionEvaluator.InvokePredicate).
-        RuleResult result = Checker.Run(Sources.LayeredModel, arch =>
-                arch.Rule("throwing/x")
-                    .Enforce(arch.Types.Where(_ => throw new Exception("boom"), "d").MustHavePrefix("I"))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(
+            Sources.LayeredModel, arch => arch.Types.Where(_ => throw new Exception("boom"), "d")
+                .MustHavePrefix("I"));
 
         result.ShouldHaveFailedWithDetailContaining(
             ViolationKind.RuleError, "the `Where` predicate threw Exception", "boom");

@@ -106,7 +106,7 @@ public sealed class ModelDocumentRoundTripTests
         ArchitectureModel model = Checker.Model(arch => arch.Rule("area/nested")
             .Enforce(arch.Types.MustNotDeriveFrom(typeof(Books.Ledger), typeof(Ledger)))
             .Because("b"));
-        ArchRule original = model.Rules.Single();
+        ArchRule original = model.Rules.ShouldHaveSingleItem();
         original.Sentence.ShouldBe("Types must not derive from `Nesting.Ledger` or `Archive.Ledger`.");
 
         string text = ModelDocumentComposer.Compose(ModelDocument.From(model, "S", ModelFileSpecs.Projects));
@@ -144,9 +144,9 @@ public sealed class ModelDocumentRoundTripTests
         ModelDocument parsed = model.ShouldSurviveItsFile("Pointed", codebase, BaselineIndex.Empty)
             .ShouldRoundTrip();
 
-        parsed.Rules.Single()
+        parsed.Rules.ShouldHaveSingleItem()
             .Exemplar
-            .ShouldBe(model.Rules.Single().Exemplar);
+            .ShouldBe(model.Rules.ShouldHaveSingleItem().Exemplar);
     }
 
     // Without this the round trip would hold of a file whose rules all lost their constraint on the way.

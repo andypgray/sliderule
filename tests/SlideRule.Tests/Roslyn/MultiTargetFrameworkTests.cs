@@ -27,8 +27,7 @@ public sealed class MultiTargetFrameworkTests
     private const string Web = "MultiTfm.Web";
     private const string Widget = "MultiTfm.Core.Widget";
 
-    private static readonly string SolutionPath =
-        Path.Combine(FixtureBeds.TestSolutionsRoot, "MultiTfm", "MultiTfm.sln");
+    private static readonly string SolutionPath = FixtureBeds.MultiTfmSolution;
 
     /// <summary>
     ///     The fixture's codebase, extracted once through <see cref="FixtureCodebase" /> for the tests below
@@ -194,7 +193,7 @@ public sealed class MultiTargetFrameworkTests
         // The merge note above says this in prose on one channel; the project node is the queryable form,
         // and it is what the survey renders. The order is extraction's own (ordinal), not the csproj's —
         // which declares netstandard2.0 first — so the first entry is always the one a shared type falls to.
-        ProjectNode core = model.Projects.Single(project => project.Name == Core);
+        ProjectNode core = model.Project(Core);
         core.TargetFrameworks.ShouldBe(["net10.0", "netstandard2.0"]);
         core.FactsFollow.ShouldBe("net10.0");
     }
@@ -207,7 +206,7 @@ public sealed class MultiTargetFrameworkTests
         // The contrast project inside the same model, and the two facts part company on it: what a project
         // targets is stated whatever it targets, because a rule about it has to be able to fail here too,
         // while the winner is a disclosure about a collapse and this project had none to disclose.
-        ProjectNode web = model.Projects.Single(project => project.Name == Web);
+        ProjectNode web = model.Project(Web);
         web.TargetFrameworks.ShouldBe(["net10.0"]);
         web.FactsFollow.ShouldBeNull();
     }
@@ -219,8 +218,7 @@ public sealed class MultiTargetFrameworkTests
 
         // Reference names are resolved through the same Project.Name, so a consumer's ProjectReference to a
         // multi-framework project names it once rather than naming a framework of it.
-        model.Projects
-            .Single(project => project.Name == Web)
+        model.Project(Web)
             .ProjectReferences.ShouldBe([Core]);
     }
 }

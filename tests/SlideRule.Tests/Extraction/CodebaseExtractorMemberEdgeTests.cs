@@ -178,8 +178,7 @@ public sealed class CodebaseExtractorMemberEdgeTests
                                                          """);
 
         // The pinned asymmetry: nameof mints the type edge but never a member edge (it does not use the member).
-        model.HasEdge("N.Namer", "N.Target")
-            .ShouldBeTrue();
+        model.ShouldHaveEdge("N.Namer", "N.Target");
         model.MemberEdges("N.Namer")
             .ShouldBeEmpty();
     }
@@ -260,8 +259,7 @@ public sealed class CodebaseExtractorMemberEdgeTests
                                                          """);
 
         // A constructor is not a §4.5 use: the type edge stands, the member channel is empty.
-        model.HasEdge("N.Bar", "N.Foo")
-            .ShouldBeTrue();
+        model.ShouldHaveEdge("N.Bar", "N.Foo");
         model.MemberEdges("N.Bar")
             .ShouldBeEmpty();
     }
@@ -303,8 +301,7 @@ public sealed class CodebaseExtractorMemberEdgeTests
 
         // The edge-side indexer exclusion (GRAMMAR §4.5, §11 growth): an element access binds no
         // SimpleNameSyntax, so the indexer never surfaces in the member channel; the type edge stands.
-        model.HasEdge("N.User", "N.Box")
-            .ShouldBeTrue();
+        model.ShouldHaveEdge("N.User", "N.Box");
         model.MemberEdges("N.User")
             .ShouldBeEmpty();
     }

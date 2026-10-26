@@ -59,6 +59,22 @@ internal static class FragmentQuery
         return JsonSerializer.Serialize(fragments, ManifestJson.Options);
     }
 
+    // The fragments as a cache hit replays them: written and read back through the serializer the cache persists with.
+    public static IReadOnlyList<CodebaseFragment> Persisted(this IReadOnlyList<CodebaseFragment> fragments)
+    {
+        string json = fragments.Serialized();
+
+        return JsonSerializer.Deserialize<IReadOnlyList<CodebaseFragment>>(json, ManifestJson.Options)!;
+    }
+
+    // The fragment as the cache reads it back: through the cache's own serializer, which stores no span.
+    public static CodebaseFragment Persisted(this CodebaseFragment fragment)
+    {
+        string json = JsonSerializer.Serialize(fragment, ManifestJson.Options);
+
+        return JsonSerializer.Deserialize<CodebaseFragment>(json, ManifestJson.Options)!;
+    }
+
     public static string Serialized(this FragmentType type)
     {
         return JsonSerializer.Serialize(type, ManifestJson.Options);

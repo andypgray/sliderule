@@ -35,24 +35,24 @@ public sealed class ExplainCacheE2ETests
         using TempFixtureWorkspace workspace = LayoutAppFixture.BuiltCopy();
         using var cache = new TempCacheRoot("explain-cache");
 
-        (CliResult cold, long coldLoads) = await ExplainAsync(workspace, cache.Root);
+        CliResult cold = await ExplainAsync(workspace, cache.Root);
 
         cold.ShouldSucceed($"{RuleId} (enforce)");
-        coldLoads.ShouldBe(1); // a convention spec resolves against the solution, so a miss opens one
+        cold.Loads.ShouldBe(1); // a convention spec resolves against the solution, so a miss opens one
         cache.HasCacheFile()
             .ShouldBeFalse(); // and explain, which never extracts, has nothing to write back
 
         // A verb that does extract fills the slot — and records this spec's resolution in it, which is what
         // the hit below replays instead of re-resolving against a workspace it no longer opens.
-        (CliResult check, long checkLoads) = await RunAsync(cache.Root, "check", workspace.SolutionPath);
+        CliResult check = await RunAsync(cache.Root, "check", workspace.SolutionPath);
         check.ShouldSucceed($"pass {RuleId}");
-        checkLoads.ShouldBe(1);
+        check.Loads.ShouldBe(1);
         cache.HasCacheFile()
             .ShouldBeTrue();
 
-        (CliResult cached, long cachedLoads) = await ExplainAsync(workspace, cache.Root);
+        CliResult cached = await ExplainAsync(workspace, cache.Root);
 
-        cachedLoads.ShouldBe(0); // the whole of what a convention --spec costs, skipped
+        cached.Loads.ShouldBe(0); // the whole of what a convention --spec costs, skipped
         cached.ShouldMatchTheOutputOf(cold);
     }
 
@@ -64,15 +64,15 @@ public sealed class ExplainCacheE2ETests
 
         await RunAsync(cache.Root, "check", workspace.SolutionPath);
 
-        (CliResult result, long loads) = await ExplainAsync(workspace, cache.Root, "--no-cache");
+        CliResult result = await ExplainAsync(workspace, cache.Root, "--no-cache");
 
         result.ShouldSucceed($"{RuleId} (enforce)");
-        loads.ShouldBe(1); // the flag keeps explain on the cold path, resolving against a workspace
+        result.Loads.ShouldBe(1); // the flag keeps explain on the cold path, resolving against a workspace
     }
 
     // ── harness ───────────────────────────────────────────────────────────────────────────────────────────
 
-    private static Task<(CliResult Result, long Loads)> ExplainAsync(
+    private static Task<CliResult> ExplainAsync(
         TempFixtureWorkspace workspace, string cacheRoot, params string[] extra)
     {
         return RunAsync(cacheRoot, ["explain", RuleId, workspace.SolutionPath, .. extra]);
@@ -80,11 +80,10 @@ public sealed class ExplainCacheE2ETests
 
     // Cold, so the load count means "did this run reach MSBuild", with the persisted caches isolated at a
     // private root.
-    private static async Task<(CliResult Result, long Loads)> RunAsync(string cacheRoot, params string[] args)
+    private static Task<CliResult> RunAsync(string cacheRoot, params string[] args)
     {
         FakeEnvironment environment = FakeEnvironment.WithCacheRoot(cacheRoot);
 
-        CliResult result = await CliRunner.InvokeColdAsync(environment, args);
-        return (result, result.Loads);
+        return CliRunner.InvokeColdAsync(environment, args);
     }
 }

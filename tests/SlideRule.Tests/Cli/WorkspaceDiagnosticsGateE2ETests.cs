@@ -34,7 +34,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
 
     // The project the gate is told restored badly — the fourth input, and the second that decides. It loaded
     // completely, which is exactly why it needs its own slot: nothing about the loaded solution says so.
-    private const string RestoreFailedProject = "C:/repo/MyApp.Unrestored/MyApp.Unrestored.csproj";
+    private const string RestoreFailedProject = DiagnosticInjectingSolutionSource.SimulatedRestoreFailedProject;
 
     // The NU1510 pruning advisory, captured verbatim. An ordinary restore warning that says nothing about
     // whether the model built — and it refused a solution whose one rule passed, the defect the "no message
@@ -77,18 +77,23 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
     // The four injected-diagnostic runs this class reads from more than one row. Each is a read-only
     // check over one solution, one spec and one injected cause; the rows differ only in which channel
     // they assert on, so one run answers them all — the shape CheckCommandE2ETests and
-    // TripwireDiffE2ETests already use. Nothing here writes, so a shared result cannot leak state.
+    // TripwireDiffE2ETests already use. Nothing here writes, so a shared result cannot leak state, and each
+    // runs uncancellable, because the row that starts it is not the only row that awaits it.
     private static readonly Lazy<Task<CliResult>> LoadDiagnosticHuman =
-        new(() => RunWithInjectedDiagnosticAsync(CliRunner.CleanSpecDll, false, false));
+        new(() => RunWithInjectedDiagnosticAsync(
+            CliRunner.CleanSpecDll, false, false, cancellationToken: CancellationToken.None));
 
     private static readonly Lazy<Task<CliResult>> LoadDiagnosticJson =
-        new(() => RunWithInjectedDiagnosticAsync(CliRunner.CleanSpecDll, false, true));
+        new(() => RunWithInjectedDiagnosticAsync(
+            CliRunner.CleanSpecDll, false, true, cancellationToken: CancellationToken.None));
 
     private static readonly Lazy<Task<CliResult>> RestoreFailureHuman =
-        new(() => RunWithInjectedRestoreFailureAsync(CliRunner.CleanSpecDll, false, false));
+        new(() => RunWithInjectedRestoreFailureAsync(
+            CliRunner.CleanSpecDll, false, false, cancellationToken: CancellationToken.None));
 
     private static readonly Lazy<Task<CliResult>> AuditDiagnosticJson =
-        new(() => RunWithInjectedDiagnosticAsync([AuditDiagnostic], CliRunner.CleanSpecDll, false, true));
+        new(() => RunWithInjectedDiagnosticAsync(
+            [AuditDiagnostic], CliRunner.CleanSpecDll, false, true, cancellationToken: CancellationToken.None));
 
     // One colliding-type tree, both channels off it: the two rows below assert on the same run's human
     // and JSON renderings, and this class's fixture lease exists for nothing else. The lease is taken
@@ -114,8 +119,10 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         // The clean spec would exit 0, but a project failed to load — the gate overrides that verdict.
         CliResult result = await LoadDiagnosticHuman.Value;
 
-        result.ShouldRefuseWith(GateLine, BrokenProject); // and the refusal names what failed
-        result.Err.ShouldContain($"warning: {LoadDiagnostic}"); // the load failure still prints as a warning
+        result.ShouldRefuseWith(
+            GateLine,
+            BrokenProject, // and the refusal names what failed
+            $"warning: {LoadDiagnostic}"); // the load failure still prints as a warning
     }
 
     [Fact]
@@ -151,9 +158,9 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
 
         result.ShouldRefuseWith();
         string sarif = File.ReadAllText(sarifPath);
-        sarif.ShouldContain("\"executionSuccessful\": false");
-        sarif.ShouldContain("\"toolExecutionNotifications\"");
-        sarif.ShouldContain(LoadDiagnostic);
+        sarif.SarifExecutionSuccessful()
+            .ShouldBeFalse(sarif);
+        sarif.ShouldCarryNotification("warning", LoadDiagnostic);
     }
 
     // ── The MSBuild selection rides both surfaces, but only when something failed ──────────────────────
@@ -167,9 +174,9 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
 
         result.Err.ShouldContain(
             $"warning: MSBuild for this run: {MsBuildBootstrap.LastSelection}.",
-            customMessage: result.Err);
+            customMessage: result.Transcript());
         result.Err.ShouldContain(
-            "Set SLIDERULE_VS_INSTALL_PATH to a Visual Studio install root", customMessage: result.Err);
+            "Set SLIDERULE_VS_INSTALL_PATH to a Visual Studio install root", customMessage: result.Transcript());
     }
 
     [Fact]
@@ -180,14 +187,14 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         // rather than appended at write time.
         CliResult result = await LoadDiagnosticJson.Value;
 
-        result.ShouldRefuseWith();
+        result.ShouldRefuseWith(
+            "MSBuild for this run:", // the note is still on stderr, unchanged
+            GateLine);
         using JsonDocument document = result.ShouldHaveJsonStdout();
         document.RootElement.Strings("workspaceDiagnostics")
             .ShouldBe([LoadDiagnostic, MsBuildBootstrap.SelectionNote()]);
-        result.Err.ShouldContain("MSBuild for this run:"); // and it is still on stderr, unchanged
         // The gate line goes to stderr and never leaks onto stdout, so a hook can still parse the document.
         result.Out.ShouldNotContain("error: the model is incomplete");
-        result.Err.ShouldContain(GateLine);
     }
 
     [Fact]
@@ -203,8 +210,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         document.RootElement.Strings("workspaceDiagnostics")
             .ShouldBeEmpty();
         document.ShouldCarryPackageAudit(AuditMessage, [AuditProject]);
-        document.RootElement.TryGetProperty("modelIncomplete", out _)
-            .ShouldBeFalse();
+        document.ShouldNotBeStampedIncomplete();
         result.Out.ShouldNotContain("error: the model is incomplete");
         result.Err.ShouldNotContain("error: the model is incomplete");
     }
@@ -225,8 +231,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         document.RootElement.Strings("workspaceDiagnostics")
             .ShouldBe([PruningAdvisory, MsBuildBootstrap.SelectionNote()]);
         document.ShouldCarryPackageAudit(AuditMessage, [AuditProject]);
-        document.RootElement.TryGetProperty("modelIncomplete", out _)
-            .ShouldBeFalse();
+        document.ShouldNotBeStampedIncomplete();
         result.Err.ShouldNotContain("error: the model is incomplete");
     }
 
@@ -264,8 +269,8 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
     {
         CliResult result = (await CollidingType.Value).Json;
 
-        result.ShouldSucceed("\"workspaceDiagnostics\"");
-        result.Out.ShouldContain(
+        result.ShouldSucceed(
+            "\"workspaceDiagnostics\"",
             "Projects 'MyApp.Domain' and 'MyApp.Legacy.Billing' each declare 'Shared.Widget'");
         result.Out.ShouldNotContain("error: the model is incomplete");
     }
@@ -301,11 +306,13 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         CliResult result = await RunWithInjectedDiagnosticAsync(
             [AuditDiagnostic, LoadDiagnostic], CliRunner.CleanSpecDll, false, false, null, [BrokenProject]);
 
-        result.ShouldRefuseWith(GateLine, BrokenProject);
-        // the advisory, grouped
-        result.Err.ShouldContain("warning: " + new PackageAuditEntry(AuditMessage, [AuditProject]).Describe());
-        result.Err.ShouldContain($"warning: {LoadDiagnostic}"); // and the load failure — no over-filtering
-        result.Err.ShouldContain("warning: MSBuild for this run:"); // with the note the load failure raises
+        result.ShouldRefuseWith(
+            GateLine,
+            BrokenProject,
+            // the advisory, grouped
+            "warning: " + new PackageAuditEntry(AuditMessage, [AuditProject]).Describe(),
+            $"warning: {LoadDiagnostic}", // and the load failure — no over-filtering
+            "warning: MSBuild for this run:"); // with the note the load failure raises
     }
 
     [Fact]
@@ -320,7 +327,8 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
 
         result.ShouldSucceed();
         string sarif = File.ReadAllText(sarifPath);
-        sarif.ShouldContain("\"executionSuccessful\": true");
+        sarif.SarifExecutionSuccessful()
+            .ShouldBeTrue(sarif);
         sarif.ShouldCarryOneAuditNotification(AuditMessage, [AuditProject]);
     }
 
@@ -368,7 +376,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         result.ShouldReportViolations();
         string grouped = "warning: " + new PackageAuditEntry(AuditMessage, ["App", "App.Tests"]).Describe();
         result.Out.Occurrences(grouped)
-            .ShouldBe(1, result.Out);
+            .ShouldBe(1, result.Transcript());
         result.Out.ShouldNotContain(AuditDiagnostic);
     }
 
@@ -417,10 +425,9 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         CliResult result = await RunWithInjectedDiagnosticAsync(
             [PruningAdvisory], CliRunner.CleanSpecDll, false, true);
 
-        result.ShouldSucceed();
+        result.ShouldSucceed("will not be pruned"); // it still rides workspaceDiagnostics
         using JsonDocument document = result.ShouldHaveJsonStdout();
-        document.RootElement.TryGetProperty("modelIncomplete", out _)
-            .ShouldBeFalse();
+        document.ShouldNotBeStampedIncomplete();
         document.RootElement.TryGetProperty("failedProjects", out _)
             .ShouldBeFalse();
         document.RootElement.TryGetProperty("uncheckedProjects", out _)
@@ -428,7 +435,6 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         document.RootElement.TryGetProperty("restoreFailedProjects", out _)
             .ShouldBeFalse();
         document.ShouldCarryNoPackageAudit();
-        result.Out.ShouldContain("will not be pruned"); // it still rides workspaceDiagnostics
     }
 
     [Fact]
@@ -442,9 +448,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
 
         result.ShouldRefuseWith();
         using JsonDocument document = result.ShouldHaveJsonStdout();
-        document.RootElement.GetProperty("modelIncomplete")
-            .GetBoolean()
-            .ShouldBeTrue();
+        document.ShouldBeStampedIncomplete();
         // Solution-relative and forward-slashed, like every other path in the document, so no machine path
         // ever lands in one a golden pins.
         document.RootElement.Strings("failedProjects")
@@ -466,8 +470,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
 
         result.ShouldSucceed();
         using JsonDocument document = result.ShouldHaveJsonStdout();
-        document.RootElement.TryGetProperty("modelIncomplete", out _)
-            .ShouldBeFalse();
+        document.ShouldNotBeStampedIncomplete();
         document.RootElement.TryGetProperty("failedProjects", out _)
             .ShouldBeFalse();
         // Solution-relative and forward-slashed, like failedProjects beside it and every other path here.
@@ -490,12 +493,14 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
 
         result.ShouldSucceed();
         string sarif = File.ReadAllText(sarifPath);
-        sarif.ShouldContain("\"executionSuccessful\": true");
-        sarif.ShouldContain("\"level\": \"warning\"");
-        sarif.ShouldContain(
-            "A solution filter narrowed this run: 1 project the solution declares was not checked, so these "
-            + "results cover part of the solution: ");
-        sarif.ShouldContain("MyApp.Skipped/MyApp.Skipped.csproj");
+        sarif.SarifExecutionSuccessful()
+            .ShouldBeTrue(sarif);
+        sarif.ShouldCarryNotification(
+                "warning",
+                "A solution filter narrowed this run: 1 project the solution declares was not checked, so these "
+                + "results cover part of the solution: ")
+            .SarifMessageText()
+            .ShouldContain("MyApp.Skipped/MyApp.Skipped.csproj");
     }
 
     // ── a failed NuGet restore gates on the same terms as a failed load ───────────────────────────────
@@ -555,9 +560,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
 
         result.ShouldRefuseWith();
         using JsonDocument document = result.ShouldHaveJsonStdout();
-        document.RootElement.GetProperty("modelIncomplete")
-            .GetBoolean()
-            .ShouldBeTrue();
+        document.ShouldBeStampedIncomplete();
         document.RootElement.TryGetProperty("failedProjects", out _)
             .ShouldBeFalse();
         document.RootElement.Strings("restoreFailedProjects")
@@ -574,9 +577,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
 
         result.ShouldSucceed();
         using JsonDocument document = result.ShouldHaveJsonStdout();
-        document.RootElement.GetProperty("modelIncomplete")
-            .GetBoolean()
-            .ShouldBeTrue();
+        document.ShouldBeStampedIncomplete();
         document.RootElement.Strings("restoreFailedProjects")
             .ShouldHaveSingleItem();
     }
@@ -596,12 +597,14 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
 
         result.ShouldRefuseWith();
         string sarif = File.ReadAllText(sarifPath);
-        sarif.ShouldContain("\"executionSuccessful\": false");
-        sarif.ShouldContain(
-            "The model is incomplete: NuGet packages did not resolve for 1 project, so these results were "
-            + "reached against a codebase whose package references resolved to nothing: ");
-        sarif.ShouldContain("MyApp.Unrestored/MyApp.Unrestored.csproj");
-        sarif.ShouldContain("\"level\": \"error\"");
+        sarif.SarifExecutionSuccessful()
+            .ShouldBeFalse(sarif);
+        sarif.ShouldCarryNotification(
+                "error",
+                "The model is incomplete: NuGet packages did not resolve for 1 project, so these results were "
+                + "reached against a codebase whose package references resolved to nothing: ")
+            .SarifMessageText()
+            .ShouldContain("MyApp.Unrestored/MyApp.Unrestored.csproj");
     }
 
     [Fact]
@@ -615,11 +618,13 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         CliResult result = await RunWithInjectedDiagnosticAsync(CliRunner.CleanSpecDll, false, false, sarifPath);
 
         result.ShouldRefuseWith();
-        string sarif = File.ReadAllText(sarifPath);
-        sarif.ShouldContain(
-            "The model is incomplete: 1 project failed to load, so these results were reached against a "
-            + "codebase missing whole projects: ");
-        sarif.ShouldContain("MyApp.Broken/MyApp.Broken.csproj");
+        File.ReadAllText(sarifPath)
+            .ShouldCarryNotification(
+                "error",
+                "The model is incomplete: 1 project failed to load, so these results were reached against a "
+                + "codebase missing whole projects: ")
+            .SarifMessageText()
+            .ShouldContain("MyApp.Broken/MyApp.Broken.csproj");
     }
 
     [Fact]
@@ -633,28 +638,30 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
             restoreFailedProjects: [RestoreFailedProject]);
 
         result.ShouldRefuseWith(GateLine, BrokenProject, RestoreGateLine, RestoreFailedProject);
-        result.Err.IndexOf(RestoreGateLine, StringComparison.Ordinal)
-            .ShouldBeGreaterThan(result.Err.IndexOf(GateLine, StringComparison.Ordinal));
+        result.Err.ShouldContainInOrder(GateLine, RestoreGateLine);
     }
 
     // ── harness ───────────────────────────────────────────────────────────────────────────────────────────
 
     // The load-failure shape: the diagnostic renders, and the project beside it is what gates.
     private static Task<CliResult> RunWithInjectedDiagnosticAsync(
-        string spec, bool allowWorkspaceDiagnostics, bool json, string? sarif = null)
+        string spec, bool allowWorkspaceDiagnostics, bool json, string? sarif = null,
+        CancellationToken? cancellationToken = null)
     {
         return RunWithInjectedDiagnosticAsync(
-            [LoadDiagnostic], spec, allowWorkspaceDiagnostics, json, sarif, [BrokenProject]);
+            [LoadDiagnostic], spec, allowWorkspaceDiagnostics, json, sarif, [BrokenProject],
+            cancellationToken: cancellationToken);
     }
 
     // The restore-failure shape: no diagnostic at all, because the SDK's replay of NuGet's own logs is not
     // this product's to synthesize — the project beside it is the whole gate input.
     private static Task<CliResult> RunWithInjectedRestoreFailureAsync(
-        string spec, bool allowWorkspaceDiagnostics, bool json, string? sarif = null)
+        string spec, bool allowWorkspaceDiagnostics, bool json, string? sarif = null,
+        CancellationToken? cancellationToken = null)
     {
         return RunWithInjectedDiagnosticAsync(
             [], spec, allowWorkspaceDiagnostics, json, sarif,
-            restoreFailedProjects: [RestoreFailedProject]);
+            restoreFailedProjects: [RestoreFailedProject], cancellationToken: cancellationToken);
     }
 
     private static async Task<CliResult> RunWithInjectedDiagnosticAsync(
@@ -662,7 +669,8 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         string? sarif = null, IReadOnlyList<string>? failedProjects = null,
         IReadOnlyList<string>? uncheckedProjects = null,
         IReadOnlyList<string>? restoreFailedProjects = null,
-        bool hookJson = false)
+        bool hookJson = false,
+        CancellationToken? cancellationToken = null)
     {
         string solution = CliRunner.MyAppSolution;
         var source = new DiagnosticInjectingSolutionSource(
@@ -674,7 +682,8 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
                 Sarif = sarif
             };
 
-        return await CliResult.CapturedAsync((output, error) => new CheckRunner(output, error, source, new FakeEnvironment()).RunAsync(request, Ct));
+        return await CliResult.CapturedAsync((output, error) =>
+            new CheckRunner(output, error, source, new FakeEnvironment()).RunAsync(request, cancellationToken ?? Ct));
     }
 
     // Declares Shared.Widget in two projects that do not reference each other (Domain → Web → Billing, so

@@ -40,18 +40,13 @@ public sealed class FamilyMembershipTests
         ShouldNameWhatTheUnionNames(arch => arch.Each(arch.Projects.Named("Sales", "Web")), asSubject);
     }
 
-    private static SelectionPosition PositionOf(bool asSubject)
-    {
-        return asSubject ? SelectionPosition.Subject : SelectionPosition.Target;
-    }
-
     // The one claim both forms make: a family names exactly what a union of the same project nouns names,
     // in either position. Asserts, so it is named for the claim rather than for what it builds.
     private static void ShouldNameWhatTheUnionNames(Func<Arch, Selection> family, bool asSubject)
     {
         var arch = new Arch();
         Selection union = arch.AnyOf(arch.Project("Sales"), arch.Project("Web"));
-        SelectionPosition position = PositionOf(asSubject);
+        SelectionPosition position = asSubject ? SelectionPosition.Subject : SelectionPosition.Target;
 
         IReadOnlyList<string> viaFamily = Names(family(arch), position);
         IReadOnlyList<string> viaUnion = Names(union, position);

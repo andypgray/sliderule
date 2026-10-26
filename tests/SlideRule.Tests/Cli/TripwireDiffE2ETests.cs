@@ -41,22 +41,26 @@ public sealed class TripwireDiffE2ETests
         "green under the unfiltered-catch rule, and it is the fixture's one sanctioned broad handler. " +
         "Keep the filter; add cases beside it, never inside it.";
 
-    // The one touched Domain file every caution row runs against, read on three channels. The rows differ
-    // only in the output they ask for and none of them mutates further, so the leased tree, its reset and its git
-    // commit are the class's rather than each row's. The repo is disposed inside the lambda, so the lease is
-    // released before the class's other rows ask for one.
-    private static readonly Lazy<Task<(CliResult Human, CliResult Json, CliResult Hook)>> Caution = new(async () =>
-    {
-        using var repo = new TempGitRepo();
-        File.AppendAllText(repo.PathOf("MyApp.Domain", "RetryPolicy.cs"), CautionTouch);
+    // The Domain tree before and after its one touch: the untouched tree read once for the hook, then the
+    // touched file every caution row runs against, read on three channels. The rows differ only in the output
+    // they ask for and none of them mutates further, so the leased tree, its reset and its git commit are the
+    // class's rather than each row's. The repo is disposed inside the lambda, so the lease is released before
+    // the class's other rows ask for one.
+    private static readonly Lazy<Task<(CliResult Clean, CliResult Human, CliResult Json, CliResult Hook)>> Caution =
+        new(async () =>
+        {
+            using var repo = new TempGitRepo();
+            CliResult clean = await CheckForTheHookAsync(repo);
+            File.AppendAllText(repo.PathOf("MyApp.Domain", "RetryPolicy.cs"), CautionTouch);
 
-        string[] args =
-            ["check", repo.SolutionPath, "--spec", CliRunner.QuarantinedSpecDll, "--diff-base", "HEAD"];
-        return (
-            await CliRunner.InvokeAsync(args),
-            await CliRunner.InvokeAsync([.. args, "--json"]),
-            await CheckForTheHookAsync(repo));
-    });
+            string[] args =
+                ["check", repo.SolutionPath, "--spec", CliRunner.QuarantinedSpecDll, "--diff-base", "HEAD"];
+            return (
+                clean,
+                await CliRunner.InvokeAsync(args),
+                await CliRunner.InvokeAsync([.. args, "--json"]),
+                await CheckForTheHookAsync(repo));
+        });
 
     private const string QuarantineWarning =
         "Changed file 'MyApp.Legacy.Billing/LegacyNote.cs' is inside quarantined scope 'legacy/billing'";
@@ -64,11 +68,12 @@ public sealed class TripwireDiffE2ETests
     private const string QuarantineDragons =
         "  dragons: Banker's rounding happens at line-item level, NOT invoice level. Do not normalize.";
 
-    // One untracked file in dragon territory, read on three channels. The rows differ only in the output they
-    // ask for and none of them mutates further, so the leased tree — and the wholesale workspace reload a new
-    // source file forces on it — is paid once for the trio rather than once per row.
-    private static readonly Lazy<Task<(CliResult Human, CliResult Hook, CliResult StopHook)>> Untracked =
-        new(async () =>
+    // One untracked file in dragon territory, read on three channels and once more through a request naming a
+    // different file. The rows differ only in the output they ask for and none of them mutates further, so the
+    // leased tree — and the wholesale workspace reload a new source file forces on it — is paid once for the four
+    // rather than once per row.
+    private static readonly Lazy<Task<(CliResult Human, CliResult Hook, CliResult StopHook, CliResult GivenChangedFiles)>>
+        Untracked = new(async () =>
         {
             using var repo = new TempGitRepo();
             // A brand-new, still-untracked file in the quarantined billing project — SDK globs compile it in.
@@ -79,7 +84,14 @@ public sealed class TripwireDiffE2ETests
             return (
                 await CliRunner.InvokeAsync(args),
                 await CheckForTheHookAsync(repo),
-                await CheckForTheHookAsync(repo, "Stop"));
+                await CheckForTheHookAsync(repo, "Stop"),
+                // A new file git would list as changed, and a request naming instead a tracked file nobody
+                // touched. The hook hands the check the files a turn changed, which it has already listed, so
+                // the check must take the list as given rather than ask git again.
+                await CheckInProcessAsync(repo, request => request with
+                {
+                    ChangedFiles = [repo.PathOf("MyApp.Legacy.Billing", "BillingCalculator.cs")]
+                }));
         });
 
     // One tree carrying both halves of a red run — a touched tracked file inside the scope and a new interior
@@ -107,31 +119,22 @@ public sealed class TripwireDiffE2ETests
     {
         CliResult result = (await Untracked.Value).Human;
 
-        result.ShouldSucceed("warn legacy/billing/tripwire");
-        result.Out.ShouldContain(
+        result.ShouldSucceed(
+            "warn legacy/billing/tripwire",
             "warning: Changed file 'MyApp.Legacy.Billing/LegacyNote.cs' is inside quarantined scope 'legacy/billing' — " +
-            "does the task actually require editing dragon territory? Dragons: sliderule explain legacy/billing/tripwire.");
-        // The dragons ride under the warning that fired, so the agent mid-edit reads them here rather than
-        // paying a round trip to `explain` for prose the rule already carries.
-        result.Out.ShouldContain(QuarantineDragons);
+            "does the task actually require editing dragon territory? Dragons: sliderule explain legacy/billing/tripwire.",
+            // The dragons ride under the warning that fired, so the agent mid-edit reads them here rather than
+            // paying a round trip to `explain` for prose the rule already carries.
+            QuarantineDragons);
     }
 
     [Fact]
     public async Task CheckGivenChangedFiles_WarnsForExactlyThoseFiles()
     {
-        // Arrange: a new file git would list as changed, and a request naming instead a tracked file nobody touched.
-        // The hook hands the check the files a turn changed, which it has already listed, so the check must take
-        // the list as given rather than ask git again.
-        using var repo = new TempGitRepo();
-        repo.WriteQuarantineNote();
-        string named = repo.PathOf("MyApp.Legacy.Billing", "BillingCalculator.cs");
+        CliResult result = (await Untracked.Value).GivenChangedFiles;
 
-        // Act
-        CliResult result = await CheckInProcessAsync(repo, request => request with { ChangedFiles = [named] });
-
-        // Assert
-        result.ShouldSucceed("warn legacy/billing/tripwire");
-        result.Out.ShouldContain(
+        result.ShouldSucceed(
+            "warn legacy/billing/tripwire",
             "Changed file 'MyApp.Legacy.Billing/BillingCalculator.cs' is inside quarantined scope 'legacy/billing'");
         result.Out.ShouldNotContain(
             "LegacyNote.cs",
@@ -144,11 +147,12 @@ public sealed class TripwireDiffE2ETests
         CliResult result = (await Red.Value).Human;
 
         // Exit code is containment-driven only; the tripwire warning rides alongside.
-        result.ShouldReportViolations("FAIL legacy/billing/containment");
-        result.Out.ShouldContain("MyApp.Web.HomeController references MyApp.Legacy.Billing.BillingCalculator");
-        result.Out.ShouldContain("warn legacy/billing/tripwire");
-        result.Out.ShouldContain("Changed file 'MyApp.Legacy.Billing/BillingCalculator.cs' is inside quarantined scope 'legacy/billing'");
-        result.Out.ShouldContain(QuarantineDragons);
+        result.ShouldReportViolations(
+            "FAIL legacy/billing/containment",
+            "MyApp.Web.HomeController references MyApp.Legacy.Billing.BillingCalculator",
+            "warn legacy/billing/tripwire",
+            "Changed file 'MyApp.Legacy.Billing/BillingCalculator.cs' is inside quarantined scope 'legacy/billing'",
+            QuarantineDragons);
     }
 
     [Fact]
@@ -160,11 +164,12 @@ public sealed class TripwireDiffE2ETests
         // verdict a warning, and this the only spec in the suite that can prove it.
         CliResult result = (await Caution.Value).Human;
 
-        result.ShouldSucceed("warn domain/retry-budget/tripwire");
-        // A different question from the quarantine's wording: not whether the task belongs here at all, only
-        // that the weirdness gets read before it is edited away.
-        result.Out.ShouldContain($"warning: {CautionWarning}");
-        result.Out.ShouldContain(CautionDragons);
+        result.ShouldSucceed(
+            "warn domain/retry-budget/tripwire",
+            // A different question from the quarantine's wording: not whether the task belongs here at all, only
+            // that the weirdness gets read before it is edited away.
+            $"warning: {CautionWarning}",
+            CautionDragons);
         // Domain is outside both quarantined scopes, so this run's one warning is the caution's own.
         result.Out.ShouldNotContain("warn legacy/billing/tripwire");
         result.Out.ShouldNotContain("warn legacy/web-shell/tripwire");
@@ -199,11 +204,11 @@ public sealed class TripwireDiffE2ETests
         // with the spec: enough of them push the context past the client's inline limit, and the preview the
         // agent is left with then holds no warning at all. So the context is the plain run's report with
         // exactly those blocks gone, the stamps, the warned block and the summary line all kept.
-        (CliResult human, CliResult hook, _) = await Untracked.Value;
+        (CliResult human, CliResult hook, _, _) = await Untracked.Value;
         human.Err.ShouldBeEmpty("The plain run wrote diagnostics, which hook mode composes into the same text.");
         string expected = WithoutPassBlocks(human.Out);
         expected.ShouldNotBe(
-            human.Out.ReplaceLineEndings("\n").TrimEnd('\n'),
+            ReportText(human.Out),
             "The plain run carried no pass block, so this row would prove nothing.");
 
         // Exit 0 exactly as outside hook mode — a warning never moves the verdict — and stdout is the one
@@ -253,9 +258,7 @@ public sealed class TripwireDiffE2ETests
         // The same repository untouched: the tripwire finds no changed file, and a hook with nothing to say
         // must say nothing rather than post an empty document. Silence is what keeps the channel bearable at
         // all, so it is pinned as tightly as the document itself.
-        using var repo = new TempGitRepo();
-
-        CliResult result = await CheckForTheHookAsync(repo);
+        CliResult result = (await Caution.Value).Clean;
 
         result.ShouldSucceed();
         result.Out.ShouldBeEmpty();
@@ -290,17 +293,26 @@ public sealed class TripwireDiffE2ETests
             // A brand-new untracked file in dragon territory (the agent-hook case).
             repo.WriteQuarantineNote();
 
+            // Cache off: a hit on this class's slot would replay fragments an earlier row recorded through the
+            // canonical path, and so pass whether or not discovery canonicalized this one.
             CliResult result = await CliRunner.InvokeAsync(
-                "check", Path.Combine(linkRoot, "MyApp.sln"), "--spec", CliRunner.QuarantinedSpecDll, "--diff-base", "HEAD");
+                "check", Path.Combine(linkRoot, "MyApp.sln"), "--spec", CliRunner.QuarantinedSpecDll, "--diff-base", "HEAD",
+                "--no-cache");
 
-            result.ShouldSucceed("warn legacy/billing/tripwire");
-            result.Out.ShouldContain(QuarantineWarning);
+            result.ShouldSucceed("warn legacy/billing/tripwire", QuarantineWarning);
         }
         finally
         {
             // Delete only the symlink (non-recursive), never through it into the real repo.
             if (Directory.Exists(linkRoot)) Directory.Delete(linkRoot);
         }
+    }
+
+    // A report with LF line endings and no trailing newline, whichever newline the console capture wrote.
+    private static string ReportText(string report)
+    {
+        return report.ReplaceLineEndings("\n")
+            .TrimEnd('\n');
     }
 
     // A human report with the blocks headed `pass` taken out, a block being its header line and the indented
@@ -310,7 +322,7 @@ public sealed class TripwireDiffE2ETests
     {
         var kept = new List<string>();
         var inPassBlock = false;
-        foreach (string line in report.ReplaceLineEndings("\n").TrimEnd('\n').Split('\n'))
+        foreach (string line in ReportText(report).Split('\n'))
         {
             if (!line.StartsWith("  ", StringComparison.Ordinal))
                 inPassBlock = line.StartsWith("pass ", StringComparison.Ordinal);

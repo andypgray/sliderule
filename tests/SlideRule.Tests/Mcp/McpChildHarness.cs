@@ -1,6 +1,8 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using SlideRule.Roslyn.Hosting;
 using SlideRule.Tests.TestSupport;
 
@@ -108,11 +110,10 @@ internal static class McpChildHarness
     /// </summary>
     /// <param name="startInfo">The child to launch — one of the <c>ServerStartInfo</c> overloads above.</param>
     /// <param name="calls">
-    ///     The <c>tools/call</c> frames to send once the handshake is complete, in order: each with the
-    ///     JSON-RPC id its response carries and the name its answer is filed under. May be empty, for a
-    ///     caller whose subject is the handshake itself.
+    ///     The tool calls to make once the handshake is complete, in order: each a tool name and its argument
+    ///     object as JSON text. The harness numbers them from 2 and files each answer under its tool's name.
+    ///     May be empty, for a caller whose subject is the handshake itself.
     /// </param>
-    /// <param name="handshakeBudget">Overrides <see cref="HandshakeBudget" />.</param>
     /// <param name="callBudget">
     ///     Overrides <see cref="CallBudget" /> for every call. Worth passing, named, when the tool under test
     ///     refuses before it opens anything and does not need the cold-workspace allowance.
@@ -126,8 +127,7 @@ internal static class McpChildHarness
     /// </param>
     internal static async Task<ChildConversation> ConverseAsync(
         ProcessStartInfo startInfo,
-        IReadOnlyList<(string Name, int Id, string Frame)> calls,
-        TimeSpan? handshakeBudget = null,
+        IReadOnlyList<(string Tool, string Arguments)> calls,
         TimeSpan? callBudget = null,
         Action<Process>? whileComplete = null)
     {
@@ -144,15 +144,17 @@ internal static class McpChildHarness
             try
             {
                 await SendAsync(server, InitializeRequest);
-                handshake = await ReadResponseAsync(server.StandardOutput, id: 1, handshakeBudget ?? HandshakeBudget);
+                handshake = await ReadResponseAsync(server.StandardOutput, id: 1, HandshakeBudget);
 
                 if (handshake is not null)
                 {
                     await SendAsync(server, InitializedNotification);
-                    foreach ((string name, int id, string frame) in calls)
+                    for (var index = 0; index < calls.Count; index++)
                     {
-                        await SendAsync(server, frame);
-                        answers[name] = await ReadResponseAsync(server.StandardOutput, id, callBudget ?? CallBudget);
+                        (string tool, string arguments) = calls[index];
+                        int id = index + 2;
+                        await SendAsync(server, ToolCallFrame(id, tool, arguments));
+                        answers[tool] = await ReadResponseAsync(server.StandardOutput, id, callBudget ?? CallBudget);
                     }
                 }
 
@@ -194,6 +196,23 @@ internal static class McpChildHarness
     {
         await server.StandardInput.WriteAsync(frame + "\n");
         await server.StandardInput.FlushAsync(Ct);
+    }
+
+    /// <summary>
+    ///     The <c>tools/call</c> frame calling <paramref name="tool" /> with <paramref name="arguments" /> under
+    ///     JSON-RPC id <paramref name="id" />.
+    /// </summary>
+    private static string ToolCallFrame(int id, string tool, string arguments)
+    {
+        var frame = new JsonObject
+        {
+            ["jsonrpc"] = "2.0",
+            ["id"] = id,
+            ["method"] = "tools/call",
+            ["params"] = new JsonObject { ["name"] = tool, ["arguments"] = JsonNode.Parse(arguments) }
+        };
+
+        return frame.ToJsonString();
     }
 
     /// <summary>
@@ -262,16 +281,20 @@ internal static class McpChildHarness
         return first == pending ? await pending : null;
     }
 
-    /// <summary>Kills the child and everything it started, tolerating a process that has already gone.</summary>
+    /// <summary>
+    ///     Kills the child and everything it started, tolerating a process that has already gone or cannot be
+    ///     reached.
+    /// </summary>
     private static void TryKillTree(Process process)
     {
         try
         {
             if (!process.HasExited) process.Kill(true);
         }
-        catch (Exception ex) when (ex is InvalidOperationException or NotSupportedException)
+        catch (Exception ex) when (ex is InvalidOperationException or NotSupportedException or Win32Exception
+                                       or AggregateException)
         {
-            // Already gone — nothing left to clean up.
+            // Already gone or inaccessible: nothing left to clean up.
         }
     }
 
@@ -282,10 +305,7 @@ internal static class McpChildHarness
     /// </summary>
     internal static void StageDirectory(string sourceDirectory, string targetDirectory)
     {
-        // File.Copy carries the read-only attribute across, so a staged tree can only be re-staged by a
-        // delete that clears it.
-        ReadOnlyTolerant.DeleteTree(targetDirectory);
-        DirectoryTree.Copy(sourceDirectory, targetDirectory);
+        DirectoryTree.Replace(sourceDirectory, targetDirectory);
     }
 }
 

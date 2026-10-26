@@ -1,5 +1,4 @@
 using System.Text;
-using System.Text.Json;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
@@ -163,10 +162,11 @@ public sealed class FragmentSiteRemapperTests
 
     private static readonly IReadOnlyList<CompilationInput> AfterInsertions = CompileSolution(WithInsertedLines);
 
-    private static readonly IReadOnlyDictionary<string, LineMap> InsertionMaps = MapsBetween(Before, AfterInsertions);
+    private static readonly IReadOnlyDictionary<string, LineMap> InsertionMaps =
+        ShouldMapEachFileBetween(Before, AfterInsertions);
 
-    private static readonly IReadOnlyList<CodebaseFragment> BeforeFragments = Before.Select(static input => FragmentExtractor.Extract(input, CancellationToken.None))
-        .ToList();
+    private static readonly IReadOnlyList<CodebaseFragment> BeforeFragments =
+        FragmentExtractor.ExtractAll(Before, artifactFacts: null, CancellationToken.None);
 
     // One selector per site family, read twice by ShouldHaveMovedEverySiteFamily — once for the stored
     // fragment and once for the remapped one. Spelled once so a pair can never name two different families.
@@ -192,8 +192,7 @@ public sealed class FragmentSiteRemapperTests
     public void TryRemap_LinesInsertedInEveryFile_SerializesLikeAColdWalk()
     {
         // Arrange
-        List<CodebaseFragment> afterEdit = AfterInsertions.Select(input => FragmentExtractor.Extract(input, Ct))
-            .ToList();
+        IReadOnlyList<CodebaseFragment> afterEdit = FragmentExtractor.ExtractAll(AfterInsertions, artifactFacts: null, Ct);
 
         // Act
         var remapped = new List<CodebaseFragment>();
@@ -284,7 +283,7 @@ public sealed class FragmentSiteRemapperTests
             : EdgeFragmentAt(3, 4);
         var maps = new Dictionary<string, LineMap>(PathComparison.Comparer)
         {
-            ["Elsewhere.cs"] = MapBetween(PairBefore, PairJoined)
+            ["Elsewhere.cs"] = ShouldMapBetween(PairBefore, PairJoined)
         };
 
         // Act
@@ -299,8 +298,8 @@ public sealed class FragmentSiteRemapperTests
     {
         // Arrange — a whitespace-only edit: every token keeps its line, so every map is the identity. The
         // fragment is read back from its persisted form, as the cache holds it, which carries no span.
-        IReadOnlyDictionary<string, LineMap> maps = ReindentedMaps();
-        CodebaseFragment fragment = Persisted(BeforeFragments[0]);
+        IReadOnlyDictionary<string, LineMap> maps = ShouldMapReindentedAsIdentity();
+        CodebaseFragment fragment = BeforeFragments[0].Persisted();
         SpannedSites(fragment).ShouldBeEmpty("a persisted fragment should carry no span");
 
         // Act
@@ -315,7 +314,7 @@ public sealed class FragmentSiteRemapperTests
     {
         // Arrange — the same edit over a fragment extracted live, whose spans the reindent has made stale:
         // every line still holds its reference, at a column two characters further on.
-        IReadOnlyDictionary<string, LineMap> maps = ReindentedMaps();
+        IReadOnlyDictionary<string, LineMap> maps = ShouldMapReindentedAsIdentity();
         CodebaseFragment fragment = BeforeFragments[0];
         SpannedSites(fragment).ShouldNotBeEmpty("a live fragment should carry spans, or there is nothing to drop");
 
@@ -336,7 +335,7 @@ public sealed class FragmentSiteRemapperTests
         CodebaseFragment fragment = EdgeFragmentOf(new FragmentSite("Pair.cs", 3) { Start = 40, Length = 5 });
         var maps = new Dictionary<string, LineMap>(PathComparison.Comparer)
         {
-            ["Pair.cs"] = MapBetween(PairBefore, PairJoined)
+            ["Pair.cs"] = ShouldMapBetween(PairBefore, PairJoined)
         };
 
         // Act
@@ -357,7 +356,7 @@ public sealed class FragmentSiteRemapperTests
         CodebaseFragment fragment = EdgeFragmentAt(2);
         var maps = new Dictionary<string, LineMap>(PathComparison.Comparer)
         {
-            ["Pair.cs"] = MapBetween(NotedPair, NotedPair)
+            ["Pair.cs"] = ShouldMapBetween(NotedPair, NotedPair)
         };
 
         // Act
@@ -374,7 +373,7 @@ public sealed class FragmentSiteRemapperTests
         CodebaseFragment fragment = EdgeFragmentAt(3, 4);
         var maps = new Dictionary<string, LineMap>(PathComparison.Comparer)
         {
-            ["Pair.cs"] = MapBetween(PairBefore, PairJoined)
+            ["Pair.cs"] = ShouldMapBetween(PairBefore, PairJoined)
         };
 
         // Act
@@ -409,21 +408,12 @@ public sealed class FragmentSiteRemapperTests
             .ToList();
     }
 
-    // The fragment as the cache reads it back: through the cache's own serializer, which stores no span.
-    private static CodebaseFragment Persisted(CodebaseFragment fragment)
-    {
-        string json = JsonSerializer.Serialize(fragment, ManifestJson.Options);
-
-        return JsonSerializer.Deserialize<CodebaseFragment>(json, ManifestJson.Options)
-            .ShouldNotBeNull();
-    }
-
     // The maps of a whitespace-only edit, each the identity. The reindented solution is these cases' alone,
     // so it is compiled here rather than joining the shared fields.
-    private static IReadOnlyDictionary<string, LineMap> ReindentedMaps()
+    private static IReadOnlyDictionary<string, LineMap> ShouldMapReindentedAsIdentity()
     {
         IReadOnlyList<CompilationInput> after = CompileSolution(Reindented);
-        IReadOnlyDictionary<string, LineMap> maps = MapsBetween(Before, after);
+        IReadOnlyDictionary<string, LineMap> maps = ShouldMapEachFileBetween(Before, after);
         maps.Values.ShouldAllBe(map => map.IsIdentity);
 
         return maps;
@@ -459,7 +449,7 @@ public sealed class FragmentSiteRemapperTests
             ServiceRegistrations: []);
     }
 
-    private static LineMap MapBetween(string before, string after)
+    private static LineMap ShouldMapBetween(string before, string after)
     {
         SourceShape shapeBefore = SourceShape.Of(TreeOf(before));
         SourceShape shapeAfter = SourceShape.Of(TreeOf(after));
@@ -473,7 +463,7 @@ public sealed class FragmentSiteRemapperTests
         return CSharpSyntaxTree.ParseText(text, path: "Pair.cs");
     }
 
-    private static IReadOnlyDictionary<string, LineMap> MapsBetween(
+    private static IReadOnlyDictionary<string, LineMap> ShouldMapEachFileBetween(
         IReadOnlyList<CompilationInput> before, IReadOnlyList<CompilationInput> after)
     {
         Dictionary<string, SyntaxTree> afterByPath = after

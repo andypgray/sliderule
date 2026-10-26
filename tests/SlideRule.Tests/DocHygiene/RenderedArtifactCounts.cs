@@ -46,7 +46,7 @@ internal static class RenderedArtifactCounts
     ///     of it rounded to.
     /// </summary>
     private static readonly Regex ArtifactClaim = new(
-        $@"\b{GrandfatheredCounts.CountToken} committed artifacts\b",
+        $@"\b{CountSpelling.CountToken} committed artifacts\b",
         RegexOptions.CultureInvariant);
 
     /// <summary>
@@ -54,7 +54,7 @@ internal static class RenderedArtifactCounts
     ///     writes it: one sentence counts the files and the other counts the directories holding them.
     /// </summary>
     private static readonly Regex CardClaim = new(
-        $@"\b{GrandfatheredCounts.CountToken} (?:per-directory cards|directories under)\b",
+        $@"\b{CountSpelling.CountToken} (?:per-directory cards|directories under)\b",
         RegexOptions.CultureInvariant);
 
     /// <summary>
@@ -99,13 +99,6 @@ internal static class RenderedArtifactCounts
     /// </summary>
     public static IReadOnlyList<RenderedArtifactCountClaim> Extract(string doc, string docText)
     {
-        // The release history is the one doc whose counts are frozen. A release note states what a past version
-        // rendered ("Six per-directory cards are now committed where there was one"), and holding that to
-        // today's set would rewrite history every time a rule places a card. Every other tracked doc is swept,
-        // and ReleaseHistory_IsSilencedByItsExemption_NotByTheScannerMissingIt pins that this exemption, rather
-        // than a pattern that stopped matching, is what keeps the file quiet.
-        if (string.Equals(doc, DocPaths.Changelog, StringComparison.Ordinal)) return [];
-
         List<RenderedArtifactCountClaim> claims = new();
         string[] lines = docText.Split('\n');
 
@@ -135,7 +128,7 @@ internal static class RenderedArtifactCounts
             // example is built around" — and that is a reference rather than a claim. Requiring a spelled
             // count is what tells one from the other, and it is why every doc that merely mentions the
             // cards needs no exemption entry.
-            if (!GrandfatheredCounts.IsCountWord(written)) continue;
+            if (!CountSpelling.IsCountWord(written)) continue;
 
             claims.Add(new RenderedArtifactCountClaim(doc, docLine, kind, written));
         }

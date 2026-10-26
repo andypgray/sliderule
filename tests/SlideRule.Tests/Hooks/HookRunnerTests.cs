@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Text.Json.Nodes;
 using Shouldly;
 using SlideRule.Cli.Hooks;
 using SlideRule.Cli.Rendering;
@@ -47,9 +46,6 @@ public sealed class HookRunnerTests
     private const string CannedReport =
         "FAIL arch/stub-rule -- canned violation report\n"
         + "  Probe.cs:10 -- second report line, so the multi-line path is covered";
-
-    private const string CodeEditPayload = """{"tool_input":{"file_path":"src/SlideRule/Probe.cs"}}""";
-    private const string DocsEditPayload = """{"tool_input":{"file_path":"docs/notes.md"}}""";
 
     /// <summary>
     ///     The <c>.git</c> of a repository with one empty commit, made once per test process for every row that
@@ -120,7 +116,7 @@ public sealed class HookRunnerTests
     public async Task NonCodePayload_SkipsTheCheckEntirely()
     {
         // Act
-        HookRun run = await FireAsync(Arrange(), DocsEditPayload, ExitCodes.Clean);
+        HookRun run = await FireAsync(Arrange(), HookPayloads.Edit("docs/notes.md"), ExitCodes.Clean);
 
         // Assert
         run.ShouldExitWith(HookExitCodes.Proceed);
@@ -131,7 +127,7 @@ public sealed class HookRunnerTests
     public async Task CodePayload_RunsTheCheck()
     {
         // Act: the payload path is relative, which is the fallback the guard reads as project-relative.
-        HookRun run = await FireAsync(Arrange(), CodeEditPayload, ExitCodes.Clean);
+        HookRun run = await FireAsync(Arrange(), HookPayloads.Edit("src/SlideRule/Probe.cs"), ExitCodes.Clean);
 
         // Assert
         run.ShouldExitWith(HookExitCodes.Proceed);
@@ -358,9 +354,9 @@ public sealed class HookRunnerTests
         run.Result.ShouldBlockWith(CannedReport);
         // Both files are written before the hook exits, because the next stop decides from them: a skip trusts the
         // verdict, and the cap reads the count.
-        ReadState(sandbox, "verdict")
+        ShouldHaveState(sandbox, "verdict")
             .ShouldStartWith("red");
-        ReadState(sandbox, "rounds")
+        ShouldHaveState(sandbox, "rounds")
             .Trim()
             .ShouldBe("p1 1");
     }
@@ -377,10 +373,10 @@ public sealed class HookRunnerTests
         // Assert: a tripwire warning leaves the verdict green, but the agent still has to read it. Exit 0 with the
         // document on stdout is how Claude Code turns it into one continuation of the turn rather than a block.
         run.Result.ShouldProceedWith(CannedReport);
-        ReadState(sandbox, "verdict")
+        ShouldHaveState(sandbox, "verdict")
             .ShouldStartWith("green");
         // Counted like a block, because the cap bounds every continuation of the turn, whatever caused it.
-        ReadState(sandbox, "rounds")
+        ShouldHaveState(sandbox, "rounds")
             .Trim()
             .ShouldBe("p1 1");
     }
@@ -396,7 +392,7 @@ public sealed class HookRunnerTests
 
         // Assert: the everyday turn. The check is clean, the hook says nothing, and the stop stands.
         run.Result.ShouldProceedSilently();
-        ReadState(sandbox, "verdict")
+        ShouldHaveState(sandbox, "verdict")
             .ShouldStartWith("green");
         File.Exists(StatePath(sandbox, "rounds"))
             .ShouldBeFalse(
@@ -673,12 +669,12 @@ public sealed class HookRunnerTests
 
         // Assert: a red rule in any tree the turn wrote blocks the stop, and the report says which tree it is in.
         run.Result.ShouldBlockWith("sliderule: ", "/.claude/worktrees/w1");
-        ReadState(sandbox, "rounds")
+        ShouldHaveState(sandbox, "rounds")
             .Trim()
             .ShouldBe("p1 1", "One stop is one round, however many trees it checked.");
-        ReadState(sandbox, "verdict")
+        ShouldHaveState(sandbox, "verdict")
             .ShouldStartWith("green", customMessage: "The session's own tree was clean, and keeps its own verdict.");
-        ReadTreeState(sandbox, "verdict")
+        ShouldHaveTreeState(sandbox, "verdict")
             .ShouldStartWith("red", customMessage: "The worktree keeps the verdict its own check gave.");
     }
 
@@ -700,12 +696,11 @@ public sealed class HookRunnerTests
 
         // Assert: Claude Code parses one document from stdout, so both trees' warnings ride in it, each under its tree.
         run.ShouldExitWith(HookExitCodes.Proceed);
-        var context = JsonNode.Parse(run.Result.Out)!["hookSpecificOutput"]!["additionalContext"]!
-            .GetValue<string>();
-        context.Split("sliderule: ")
-            .Length.ShouldBe(3, context);
+        string context = run.Result.ShouldHaveHookAdditionalContext("Stop");
+        context.Occurrences("sliderule: ")
+            .ShouldBe(2, context);
         context.ShouldContain("/.claude/worktrees/w1\n" + CannedReport);
-        ReadState(sandbox, "rounds")
+        ShouldHaveState(sandbox, "rounds")
             .Trim()
             .ShouldBe("p1 1");
     }
@@ -782,7 +777,7 @@ public sealed class HookRunnerTests
         // Arrange
         HookSandbox sandbox = ArrangeRepository();
         (string worktree, _, _) = await ArrangeCheckedWorktreeAsync(sandbox);
-        string before = ReadTreeState(sandbox, "baseline");
+        string before = ShouldHaveTreeState(sandbox, "baseline");
         GitCommand.Run(sandbox.ProjectDirectory, "worktree", "remove", "--force", worktree);
 
         // Act
@@ -790,9 +785,9 @@ public sealed class HookRunnerTests
 
         // Assert
         prompt.Result.ShouldProceedSilently();
-        ReadState(sandbox, "baseline")
+        ShouldHaveState(sandbox, "baseline")
             .ShouldStartWith("prompt\n", customMessage: "The session's own tree still gets the prompt's baseline.");
-        ReadTreeState(sandbox, "baseline")
+        ShouldHaveTreeState(sandbox, "baseline")
             .ShouldBe(before, "A recorded worktree that no longer exists is skipped, its record left as it was.");
     }
 
@@ -802,15 +797,15 @@ public sealed class HookRunnerTests
         // Arrange: the worktree's records as an older build wrote them, with no file naming the tree.
         HookSandbox sandbox = ArrangeRepository();
         (_, string probe, _) = await ArrangeCheckedWorktreeAsync(sandbox);
-        string before = ReadTreeState(sandbox, "baseline");
-        File.Delete(TreeStatePath(sandbox, "tree"));
+        string before = ShouldHaveTreeState(sandbox, "baseline");
+        File.Delete(ShouldHaveTreeStatePath(sandbox, "tree"));
         Rewrite(probe);
 
         // Act
         await FireAsync(sandbox, PromptPayload(sandbox), ExitCodes.Clean);
 
         // Assert: a record that names no tree cannot be matched to one, so the prompt never writes to it.
-        ReadTreeState(sandbox, "baseline")
+        ShouldHaveTreeState(sandbox, "baseline")
             .ShouldBe(before, "A tree record with no name must be left as the stop left it.");
     }
 
@@ -821,7 +816,7 @@ public sealed class HookRunnerTests
         HookSandbox sandbox = ArrangeRepository();
         (_, string probe, _) = await ArrangeCheckedWorktreeAsync(sandbox);
         await FireAsync(sandbox, PromptPayload(sandbox), ExitCodes.Clean);
-        string first = ReadTreeState(sandbox, "baseline");
+        string first = ShouldHaveTreeState(sandbox, "baseline");
         Rewrite(probe);
 
         // Act: a second prompt with no stop between, which keeps the session's baseline.
@@ -829,7 +824,7 @@ public sealed class HookRunnerTests
 
         // Assert: the turn the standing baseline belongs to may have written the worktree too, so its baseline there
         // stands as well.
-        ReadTreeState(sandbox, "baseline")
+        ShouldHaveTreeState(sandbox, "baseline")
             .ShouldBe(first, "A prompt that keeps the session's baseline must keep the worktrees' baselines too.");
     }
 
@@ -906,7 +901,7 @@ public sealed class HookRunnerTests
         // file with the digest of its bytes.
         run.Result.ShouldProceedSilently();
         run.ShouldNotHaveRunTheCheck("The prompt's end of the turn must never spend a check.");
-        string baseline = ReadState(sandbox, "baseline");
+        string baseline = ShouldHaveState(sandbox, "baseline");
         baseline.ShouldStartWith("prompt\n");
         baseline.ShouldContain($"\n{TreeSnapshot.Digest(probe)} src/Probe.cs\n");
     }
@@ -940,7 +935,7 @@ public sealed class HookRunnerTests
         HookSandbox sandbox = ArrangeRepository();
         WriteProbe(sandbox);
         await FireAsync(sandbox, PromptPayload(sandbox), ExitCodes.Clean);
-        string first = ReadState(sandbox, "baseline");
+        string first = ShouldHaveState(sandbox, "baseline");
         WriteCodeFile(sandbox.ProjectDirectory, "Second.cs");
 
         // Act
@@ -949,7 +944,7 @@ public sealed class HookRunnerTests
         // Assert: no stop has ended the turn the first baseline belongs to: a prompt the client fires mid-turn, or a
         // turn the user interrupted. Replacing the baseline now would take in whatever that turn wrote, and the stop
         // would then skip code nothing ever checked.
-        ReadState(sandbox, "baseline")
+        ShouldHaveState(sandbox, "baseline")
             .ShouldBe(first);
     }
 
@@ -970,7 +965,7 @@ public sealed class HookRunnerTests
         // warnings to an agent that had only read.
         stop.Result.ShouldProceedSilently();
         stop.ShouldNotHaveRunTheCheck("A turn that wrote no code since its prompt must not spend a check.");
-        ReadState(sandbox, "baseline")
+        ShouldHaveState(sandbox, "baseline")
             .ShouldStartWith(
                 "stop\n",
                 customMessage: "A stop that stands ends the turn, and the baseline becomes the tree the stop left, "
@@ -1046,8 +1041,7 @@ public sealed class HookRunnerTests
         await FireAsync(sandbox, PromptPayload(sandbox), ExitCodes.Clean);
         // A formatter run that changed nothing, a checkout of the same content, a build step that touches sources:
         // the file is written and its timestamp moves, but its bytes do not.
-        File.WriteAllText(probe, File.ReadAllText(probe));
-        File.SetLastWriteTimeUtc(probe, DateTime.UtcNow.AddMinutes(1));
+        FixtureEdits.EditOnDisk(probe, static source => source);
 
         // Act
         HookRun stop = await FireAsync(sandbox, StopPayload(sandbox), ExitCodes.Violations);
@@ -1152,7 +1146,7 @@ public sealed class HookRunnerTests
         await FireAsync(sandbox, PromptPayload(sandbox), ExitCodes.Clean);
 
         // Assert: a stop's baseline stands only until the next turn begins, whose prompt records the tree it found.
-        string baseline = ReadState(sandbox, "baseline");
+        string baseline = ShouldHaveState(sandbox, "baseline");
         baseline.ShouldStartWith("prompt\n");
         baseline.ShouldContain($"\n{TreeSnapshot.Digest(second)} src/Second.cs\n");
     }
@@ -1212,7 +1206,7 @@ public sealed class HookRunnerTests
         // Assert: the user reads the error and the turn ends as it would on any stop that stands, so the next
         // prompt records a baseline of its own rather than inheriting this one.
         stop.Result.ShouldReportConfigError();
-        ReadState(sandbox, "baseline")
+        ShouldHaveState(sandbox, "baseline")
             .ShouldStartWith(
                 "stop\n", customMessage: "A stop the hook could not check still ends the turn, and rolls its baseline.");
     }
@@ -1368,10 +1362,12 @@ public sealed class HookRunnerTests
     /// <summary>
     ///     A throwaway project directory with a state directory beside it: what one run is fired against. Minting it
     ///     apart from the run is what lets a row build a git repository, or a linked worktree, inside it first.
+    ///     Nothing deletes it at test end; the run root's sweep reclaims it.
     /// </summary>
     private static HookSandbox Arrange()
     {
-        string root = TestTempRoot.Fresh("hook-verb").Path;
+        string root = Path.Combine(TestTempRoot.For("hook-verb"), Guid.NewGuid()
+            .ToString("N"));
         string projectDirectory = Path.Combine(root, "project");
         string stateDirectory = Path.Combine(root, "state");
         Directory.CreateDirectory(projectDirectory);
@@ -1531,27 +1527,26 @@ public sealed class HookRunnerTests
     ///     The <paramref name="name" /> record the session keeps for the one other tree a row wrote into, found under
     ///     the session's <c>trees</c> directory whatever digest names it.
     /// </summary>
-    private static string ReadTreeState(HookSandbox sandbox, string name)
+    private static string ShouldHaveTreeState(HookSandbox sandbox, string name)
     {
-        return File.ReadAllText(TreeStatePath(sandbox, name));
+        return File.ReadAllText(ShouldHaveTreeStatePath(sandbox, name));
     }
 
     /// <summary>
     ///     Where the session keeps the <paramref name="name" /> record for the one other tree a row wrote into,
     ///     whatever digest names its directory.
     /// </summary>
-    private static string TreeStatePath(HookSandbox sandbox, string name)
+    private static string ShouldHaveTreeStatePath(HookSandbox sandbox, string name)
     {
         string trees = StatePath(sandbox, "trees");
         string[] records = Directory.Exists(trees)
             ? Directory.GetFiles(trees, name, SearchOption.AllDirectories)
             : [];
-        records.Length.ShouldBe(1, $"The hook should have kept one {name} record for the other tree under {trees}.");
-
-        return records[0];
+        return records.ShouldHaveSingleItem(
+            $"The hook should have kept one {name} record for the other tree under {trees}.");
     }
 
-    private static string ReadState(HookSandbox sandbox, string name)
+    private static string ShouldHaveState(HookSandbox sandbox, string name)
     {
         string path = StatePath(sandbox, name);
         File.Exists(path)

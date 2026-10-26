@@ -87,8 +87,8 @@ internal static class HookRunAssertions
     internal static HookRun ShouldHaveOnlyRunTheCheckIn(this HookRun run, string directory, string because)
     {
         string explained = Explain(run, because);
-        run.Checks.Count.ShouldBe(1, explained);
-        SameDirectory(run.Checks[0].WorkingDirectory, directory)
+        CheckRequest check = run.Checks.ShouldHaveSingleItem(explained);
+        SameDirectory(check.WorkingDirectory, directory)
             .ShouldBeTrue(explained);
 
         return run;
@@ -105,9 +105,7 @@ internal static class HookRunAssertions
     /// <summary>Asserts the hook spent exactly one check, and hands it back for the row to read.</summary>
     internal static CheckRequest ShouldHaveRunOneCheck(this HookRun run)
     {
-        run.Checks.Count.ShouldBe(1, Explain(run, "The hook should have spent exactly one check."));
-
-        return run.Checks[0];
+        return run.Checks.ShouldHaveSingleItem(Explain(run, "The hook should have spent exactly one check."));
     }
 
     /// <summary>

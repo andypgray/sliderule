@@ -1,4 +1,5 @@
 using Shouldly;
+using SlideRule.Rendering;
 using Xunit;
 
 namespace SlideRule.Tests.DocHygiene;
@@ -118,15 +119,8 @@ public sealed class RuleQuotesTests
         IReadOnlyList<RuleQuote> quotes = RuleQuotes.Extract("d.md", doc);
 
         // Assert
-        quotes.Count.ShouldBe(2);
-        quotes[0]
-            .DocLine.ShouldBe(2);
-        quotes[0]
-            .RuleId.ShouldBe("http/reuse-httpclient");
-        quotes[1]
-            .DocLine.ShouldBe(6);
-        quotes[1]
-            .RuleId.ShouldBe("naming/async-suffix");
+        quotes.Select(static quote => (quote.DocLine, quote.RuleId))
+            .ShouldBe([(2, "http/reuse-httpclient"), (6, "naming/async-suffix")]);
     }
 
     [Fact]
@@ -295,9 +289,7 @@ public sealed class RuleQuotesTests
 
     private static string Card(params string[] bodyLines)
     {
-        return string.Join(
-            "\n",
-            ["<!-- sliderule:begin -->", .. bodyLines, "<!-- sliderule:end -->"]);
+        return string.Join("\n", [ManagedBlock.BeginMarker, .. bodyLines, ManagedBlock.EndMarker]);
     }
 
     private static IReadOnlyDictionary<string, IReadOnlyList<string>> Bullets(string ruleId, params string[] texts)

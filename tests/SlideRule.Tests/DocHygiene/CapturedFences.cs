@@ -82,7 +82,7 @@ internal sealed record QuotedFence(int Line, IReadOnlyList<string> Lines)
     /// <remarks>Asserting, hence the name.</remarks>
     internal static QuotedFence ShouldFindOne(string doc, string marker, string expectation)
     {
-        List<IReadOnlyList<(string Text, int Number)>> carrying = SourceAnchors.FencedBlocks(RepoRoot.ReadText(doc))
+        List<IReadOnlyList<(string Text, int Number)>> carrying = DocFences.FencedBlocks(RepoRoot.ReadText(doc))
             .Where(candidate => candidate.Any(line => line.Text.Contains(marker, StringComparison.Ordinal)))
             .ToList();
 
@@ -130,7 +130,7 @@ internal static class CapturedFences
         DocPaths.SelfCheck,
         "explain-type",
         "it is named `CommandEntryPoint`",
-        $"{nameof(SelfCheckClaimsFenceTests)}.{nameof(SelfCheckClaimsFenceTests.ClaimsFence_IsAnExcerptOfWhatExplainPrintsForTheShell)}");
+        $"{nameof(SelfSpecTests)}.{nameof(SelfSpecTests.ClaimsFence_IsAnExcerptOfWhatExplainPrintsForTheShell)}");
 
     /// <summary>
     ///     One result object from <c>check --sarif</c> over Meridian. The <c>"ruleId":</c> spelling is what

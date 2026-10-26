@@ -30,7 +30,7 @@ internal static class DocProse
     ///     in the doc. Newlines come back as <c>"\n"</c>.
     /// </summary>
     /// <remarks>
-    ///     Where a fence opens and closes is <see cref="SourceAnchors.ProseLines" />'s decision — the quote gates
+    ///     Where a fence opens and closes is <see cref="DocFences.ProseLines" />'s decision — the quote gates
     ///     and the prose gates read one scanner, or a doc could be fenced for one of them and not the other.
     /// </remarks>
     public static string BlankFences(string text)
@@ -41,7 +41,7 @@ internal static class DocProse
         string[] kept = Enumerable.Repeat(string.Empty, lineCount)
             .ToArray();
 
-        foreach ((string line, int number) in SourceAnchors.ProseLines(text))
+        foreach ((string line, int number) in DocFences.ProseLines(text))
             kept[number - 1] = line;
 
         return string.Join("\n", kept);
@@ -73,7 +73,7 @@ internal static class DocProse
     /// </summary>
     public static IReadOnlyList<(string Text, int Number)> HeadingLines(string text)
     {
-        return SourceAnchors.ProseLines(text)
+        return DocFences.ProseLines(text)
             .Where(static line => AtxHeadingOpening.IsMatch(line.Text))
             .ToArray();
     }
@@ -109,10 +109,9 @@ internal static class DocProse
     /// </summary>
     public static IReadOnlyList<string> FindForbidden(string text, IEnumerable<Regex> patterns)
     {
-        Regex[] patternList = patterns as Regex[] ?? patterns.ToArray();
         string normalized = text.NormalizedLines();
 
-        Regex[] present = patternList.Where(pattern => CanSkipWholeText(pattern) || pattern.IsMatch(normalized))
+        Regex[] present = patterns.Where(pattern => CanSkipWholeText(pattern) || pattern.IsMatch(normalized))
             .ToArray();
         if (present.Length == 0) return [];
 

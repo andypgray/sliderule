@@ -650,34 +650,30 @@ internal static class CoreFirewall
             }
         }
 
-        private TypeDefinitionHandle? OwnTypeOf(EntityHandle parent)
+        // The type a member reference's parent names: the parent itself, or the generic definition an
+        // instantiation names. Null for a specification of anything else.
+        private EntityHandle? TypeNamedBy(EntityHandle parent)
         {
-            if (parent.Kind == HandleKind.TypeDefinition) return (TypeDefinitionHandle)parent;
-            if (parent.Kind != HandleKind.TypeSpecification) return null;
+            if (parent.Kind != HandleKind.TypeSpecification) return parent;
 
-            BlobReader blob = Metadata.GetBlobReader(Metadata.GetTypeSpecification((TypeSpecificationHandle)parent).Signature);
+            TypeSpecification specification = Metadata.GetTypeSpecification((TypeSpecificationHandle)parent);
+            BlobReader blob = Metadata.GetBlobReader(specification.Signature);
             if (blob.ReadSignatureTypeCode() != SignatureTypeCode.GenericTypeInstance) return null;
 
             blob.ReadSignatureTypeCode();
-            EntityHandle generic = blob.ReadTypeHandle();
 
-            return generic.Kind == HandleKind.TypeDefinition ? (TypeDefinitionHandle)generic : null;
+            return blob.ReadTypeHandle();
+        }
+
+        private TypeDefinitionHandle? OwnTypeOf(EntityHandle parent)
+        {
+            return TypeNamedBy(parent) is { Kind: HandleKind.TypeDefinition } type ? (TypeDefinitionHandle)type : null;
         }
 
         // The namespace and name of the type a member reference's parent is, or of its generic definition.
         private (string Namespace, string Name)? ParentName(EntityHandle parent)
         {
-            EntityHandle type = parent;
-            if (parent.Kind == HandleKind.TypeSpecification)
-            {
-                BlobReader blob = Metadata.GetBlobReader(Metadata.GetTypeSpecification((TypeSpecificationHandle)parent).Signature);
-                if (blob.ReadSignatureTypeCode() != SignatureTypeCode.GenericTypeInstance) return null;
-
-                blob.ReadSignatureTypeCode();
-                type = blob.ReadTypeHandle();
-            }
-
-            if (type.Kind != HandleKind.TypeReference) return null;
+            if (TypeNamedBy(parent) is not { Kind: HandleKind.TypeReference } type) return null;
 
             TypeReference reference = Metadata.GetTypeReference((TypeReferenceHandle)type);
 
@@ -1270,13 +1266,9 @@ internal static class CoreFirewall
 
         private bool IsGuarded(Method method, int offset)
         {
-            foreach (ExceptionRegion region in method.Body!.ExceptionRegions)
-            {
-                if (offset < region.TryOffset || offset >= region.TryOffset + region.TryLength) continue;
-                if (IsGuard(method, region)) return true;
-            }
-
-            return false;
+            return method.Body!.ExceptionRegions.Any(region => offset >= region.TryOffset
+                                                               && offset < region.TryOffset + region.TryLength
+                                                               && IsGuard(method, region));
         }
 
         // A catch clause of System.Exception, or a filter whose block tests for it, which is how C# writes a

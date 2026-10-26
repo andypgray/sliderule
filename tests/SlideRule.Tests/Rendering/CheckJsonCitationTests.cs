@@ -2,9 +2,7 @@ using System.Text.Json;
 using Shouldly;
 using SlideRule.Checking;
 using SlideRule.Cli.Rendering;
-using SlideRule.Codebase;
 using SlideRule.Tests.Checking;
-using SlideRule.Tests.Extraction;
 using Xunit;
 // The suite's reader over a check document, not the CLI renderer of the same name that this file also imports.
 using CheckJson = SlideRule.Tests.TestSupport.CheckJson;
@@ -21,17 +19,13 @@ public sealed class CheckJsonCitationTests
 {
     private const string Page = "https://learn.microsoft.com/dotnet/architecture/modern-web-apps-azure/common-web-application-architectures";
 
-    // One extraction, two reports: the arms differ only in whether the rule cites, so the compile is the
-    // class's rather than each field's.
-    private static readonly CodebaseModel Codebase = CompilationFactory.Extract(Sources.OneController);
-
-    private static readonly CheckReport Cited = Checker.Run(Codebase, arch =>
+    private static readonly CheckReport Cited = Checker.Run(Sources.OneControllerModel, arch =>
         arch.Rule("layer/no-data")
             .Enforce(arch.Namespace("App.Web.*").MustNotReference(arch.Namespace("App.Data.*")))
             .Because("The web layer must not open the data layer directly.")
             .Citation(Page));
 
-    private static readonly CheckReport Uncited = Checker.Run(Codebase, arch =>
+    private static readonly CheckReport Uncited = Checker.Run(Sources.OneControllerModel, arch =>
         arch.Rule("layer/no-data")
             .Enforce(arch.Namespace("App.Web.*").MustNotReference(arch.Namespace("App.Data.*")))
             .Because("The web layer must not open the data layer directly."));

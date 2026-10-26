@@ -52,11 +52,8 @@ public sealed class MustNotThrowVerbTests
     {
         // Service throws DomainError (unbanned → silent) and InfraError (banned → red): the ban flags only the
         // listed type, and the unlisted throw passing proves the ban enumerates rather than allow-lists.
-        RuleResult result = Checker.Run(SceneModel, arch =>
-                arch.Rule("ex/no-infra-throws")
-                    .Enforce(arch.Namespace("App.*").MustNotThrow(arch.Namespace("Errors.*").WithSuffix("InfraError")))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(SceneModel, arch => arch.Namespace("App.*")
+            .MustNotThrow(arch.Namespace("Errors.*").WithSuffix("InfraError")));
 
         result.ShouldHaveFailedWithSingleEdge(ViolationKind.Throw, "App.Service", "Errors.InfraError");
 
@@ -71,12 +68,8 @@ public sealed class MustNotThrowVerbTests
         // CleanService throws an external OperationCanceledException — a throw, but outside the banned Errors.*
         // namespace, so the ban is silent. The forbidden target resolves (the Errors types exist), so this is a
         // real pass, not an inert one.
-        RuleResult result = Checker.Run(SceneModel, arch =>
-                arch.Rule("ex/no-domain-throws")
-                    .Enforce(arch.Namespace("App.*").WithSuffix("CleanService")
-                        .MustNotThrow(arch.Namespace("Errors.*")))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(SceneModel, arch => arch.Namespace("App.*").WithSuffix("CleanService")
+            .MustNotThrow(arch.Namespace("Errors.*")));
 
         result.ShouldHavePassedClean();
     }
@@ -102,11 +95,7 @@ public sealed class MustNotThrowVerbTests
                               }
                               """;
 
-        RuleResult result = Checker.Run(source, arch =>
-                arch.Rule("ex/no-bare-throws")
-                    .Enforce(arch.Types.MustNotThrow(typeof(Exception)))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(source, arch => arch.Types.MustNotThrow(typeof(Exception)));
 
         result.ShouldHaveFailedWithEdges(ViolationKind.Throw, ["App.Broad -> System.Exception"]);
     }
@@ -133,11 +122,8 @@ public sealed class MustNotThrowVerbTests
                               }
                               """;
 
-        RuleResult result = Checker.Run(source, arch =>
-                arch.Rule("ex/no-derived-throws")
-                    .Enforce(arch.Namespace("N.*").MustNotThrow(arch.Types.DerivedFrom(typeof(Exception))))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(source, arch => arch.Namespace("N.*")
+            .MustNotThrow(arch.Types.DerivedFrom(typeof(Exception))));
 
         result.ShouldHaveFailedWithEdges(ViolationKind.Throw, ["N.Worker -> N.AppError"]);
     }
@@ -148,11 +134,8 @@ public sealed class MustNotThrowVerbTests
         // The forbidden target (a namespace glob) matches no types, so the rule can never fire — inert. The
         // pattern operand is the warning gate: the verb joins the forbidden-set inert-warn family (§4.1), which
         // is exactly where it parts company with MustOnlyThrow, which names a dead pattern as stricter instead.
-        RuleResult result = Checker.Run(SceneModel, arch =>
-                arch.Rule("ex/inert")
-                    .Enforce(arch.Namespace("App.*").MustNotThrow(arch.Namespace("Nonexistent.*")))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(SceneModel, arch => arch.Namespace("App.*")
+            .MustNotThrow(arch.Namespace("Nonexistent.*")));
 
         result.ShouldHaveWarnedInertTarget();
     }
@@ -163,11 +146,8 @@ public sealed class MustNotThrowVerbTests
         // A bare typeof target absent from the codebase is the WIN condition, not an inert warning: nobody throws
         // System.FormatException, so the ban resolves empty but — being a concrete typeof anchor, not a pattern —
         // stays silent. This is the shape a forward tripwire takes: a ban nobody trips renders no noise.
-        RuleResult result = Checker.Run(SceneModel, arch =>
-                arch.Rule("ex/no-format-throws")
-                    .Enforce(arch.Namespace("App.*").MustNotThrow(typeof(FormatException)))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(SceneModel, arch => arch.Namespace("App.*")
+            .MustNotThrow(typeof(FormatException)));
 
         result.ShouldHavePassedClean();
     }

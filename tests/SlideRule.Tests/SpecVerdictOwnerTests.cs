@@ -25,11 +25,8 @@ public sealed class SpecVerdictOwnerTests
         List<string> fieldNames = declared.Select(field => field.Name).ToList();
         List<string> slotNames = SpecSlot.All.Select(slot => slot.Name).ToList();
 
-        foreach (FieldInfo field in declared)
-        {
-            var slot = (SpecSlot)field.GetValue(null)!;
-            slot.Name.ShouldBe(field.Name);
-        }
+        declared.Select(field => ((SpecSlot)field.GetValue(null)!).Name)
+            .ShouldBe(fieldNames);
 
         slotNames.ShouldBe(fieldNames, ignoreOrder: true);
         slotNames.ShouldBeUnique();

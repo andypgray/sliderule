@@ -229,7 +229,7 @@ public sealed class AnalyzerCoreFirewallTests
     [Fact]
     public void TheWalk_ReportsEachRuleWhereAProbeBreaksItAndNothingWhereItHolds()
     {
-        ImmutableArray<byte> image = Emitted(ProbeSource);
+        ImmutableArray<byte> image = ShouldEmit(ProbeSource);
 
         CoreFirewall.Inspect(image, ["Probe.Faults.Report"])
             .ShouldBreachExactly(
@@ -291,7 +291,7 @@ public sealed class AnalyzerCoreFirewallTests
     // memory: the walk reads bytes, so no file is written. It is named as the build analyzer is, because it stands
     // in for an analyzer assembly, and an analyzer reads Core's engine through the InternalsVisibleTo entry Core
     // declares for that name.
-    private static ImmutableArray<byte> Emitted(string source)
+    private static ImmutableArray<byte> ShouldEmit(string source)
     {
         SyntaxTree tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.CSharp14), "Probe.cs");
         var compilation = CSharpCompilation.Create(

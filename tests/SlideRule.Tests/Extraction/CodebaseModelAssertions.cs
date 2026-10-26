@@ -7,7 +7,8 @@ namespace SlideRule.Tests.Extraction;
 /// <summary>
 ///     The Shouldly surface over total-fact equality of two <see cref="CodebaseModel" />s: the claim that
 ///     <em>this model carries the same facts as that one</em>, rather than the two
-///     <see cref="ModelDump" /> renders that establish it.
+///     <see cref="ModelDump" /> renders that establish it. Beside it, one assertion per edge family that a
+///     source reaches a target, whose red lists the far ends the source does reach.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -56,6 +57,48 @@ internal static class CodebaseModelAssertions
             .ShouldBe(LineAt(expectedLines, index), Describe(actualLines, expectedLines, index));
 
         return actual;
+    }
+
+    internal static CodebaseModel ShouldHaveEdge(this CodebaseModel model, string source, string target)
+    {
+        return ShouldReach(model, model.Edges, source, target, "references");
+    }
+
+    internal static CodebaseModel ShouldHaveConstructorEdge(this CodebaseModel model, string source, string constructed)
+    {
+        return ShouldReach(model, model.ConstructorEdges, source, constructed, "constructs");
+    }
+
+    internal static CodebaseModel ShouldHaveInjectionEdge(this CodebaseModel model, string source, string injected)
+    {
+        return ShouldReach(model, model.InjectionEdges, source, injected, "injects");
+    }
+
+    internal static CodebaseModel ShouldHaveCatchEdge(this CodebaseModel model, string source, string caught)
+    {
+        return ShouldReach(model, model.CatchEdges, source, caught, "catches");
+    }
+
+    internal static CodebaseModel ShouldHaveThrowEdge(this CodebaseModel model, string source, string thrown)
+    {
+        return ShouldReach(model, model.ThrowEdges, source, thrown, "throws");
+    }
+
+    internal static CodebaseModel ShouldHaveExposureEdge(this CodebaseModel model, string source, string exposed)
+    {
+        return ShouldReach(model, model.ExposureEdges, source, exposed, "exposes");
+    }
+
+    // The far ends of the source's edges of one family, asserted to contain the one sought, so a red prints what
+    // the source does reach: under a constructed or converted name, that is the whole diagnosis.
+    private static CodebaseModel ShouldReach<TEdge>(
+        CodebaseModel model, IEnumerable<TEdge> edges, string source, string target, string verb)
+        where TEdge : IEdgeEnds
+    {
+        IReadOnlyList<string> reached = edges.Where(edge => edge.Source.FullName == source)
+            .TargetNames();
+        reached.ShouldContain(target, customMessage: $"{source} {verb} only these");
+        return model;
     }
 
     private static string Describe(string[] actualLines, string[] expectedLines, int index)

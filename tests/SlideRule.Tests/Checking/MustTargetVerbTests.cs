@@ -34,10 +34,7 @@ public sealed class MustTargetVerbTests
         // line a fix adds the missing moniker to.
         // The flag is what the wording reads to say "does not target" rather than "targets", over the same
         // framework slot MustOnlyTarget fills with a framework the project does target.
-        Violation violation = Checker.Run(Scene, arch => arch.Rule("packaging/standard-floor")
-                .Enforce(arch.Projects.Named("Host").MustTarget("netstandard2.0"))
-                .Because("b"))
-            .Single()
+        Violation violation = Checker.Verdict(Scene, arch => arch.Projects.Named("Host").MustTarget("netstandard2.0"))
             .ShouldHaveFailedWithProjectAtSites("Host -> netstandard2.0", ["Directory.Build.props:3"]);
 
         violation.FrameworkMissing.ShouldBeTrue();
@@ -47,10 +44,7 @@ public sealed class MustTargetVerbTests
     public void MustTarget_FrameworkAmongSeveral_PassesClean()
     {
         // A floor, not a ceiling: the project targets other frameworks beside the required one and passes.
-        Checker.Run(Scene, arch => arch.Rule("packaging/modern-floor")
-                .Enforce(arch.Projects.Named("Host").MustTarget("net8.0"))
-                .Because("b"))
-            .Single()
+        Checker.Verdict(Scene, arch => arch.Projects.Named("Host").MustTarget("net8.0"))
             .ShouldHavePassedClean();
     }
 
@@ -59,10 +53,7 @@ public sealed class MustTargetVerbTests
     {
         // The absent-fact row: an empty framework list is what nothing evaluated looks like, and unknown never
         // reds.
-        Checker.Run(Scene, arch => arch.Rule("packaging/standard-floor")
-                .Enforce(arch.Projects.Named("Unevaluated").MustTarget("netstandard2.0"))
-                .Because("b"))
-            .Single()
+        Checker.Verdict(Scene, arch => arch.Projects.Named("Unevaluated").MustTarget("netstandard2.0"))
             .ShouldHavePassedClean();
     }
 
@@ -73,10 +64,7 @@ public sealed class MustTargetVerbTests
         // missing framework is still a real finding, so it reds with nothing to point at.
         CodebaseModel siteless = ProjectFacts.Solution(ProjectFacts.Project("Legacy", ["net48"]));
 
-        Checker.Run(siteless, arch => arch.Rule("packaging/modern-floor")
-                .Enforce(arch.Projects.Named("Legacy").MustTarget("net8.0"))
-                .Because("b"))
-            .Single()
+        Checker.Verdict(siteless, arch => arch.Projects.Named("Legacy").MustTarget("net8.0"))
             .ShouldHaveFailedWithProjectAtSites("Legacy -> net8.0", []);
     }
 
@@ -85,10 +73,7 @@ public sealed class MustTargetVerbTests
     {
         // Monikers are compared as the normalized short forms are spelled, so a differently cased moniker is a
         // different framework, as it is for MustOnlyTarget.
-        Checker.Run(Scene, arch => arch.Rule("packaging/standard-floor")
-                .Enforce(arch.Projects.Named("Contract").MustTarget("NetStandard2.0"))
-                .Because("b"))
-            .Single()
+        Checker.Verdict(Scene, arch => arch.Projects.Named("Contract").MustTarget("NetStandard2.0"))
             .ShouldHaveFailedWithProjectAtSites("Contract -> NetStandard2.0", ["src/Contract/Contract.csproj:5"]);
     }
 
@@ -97,10 +82,7 @@ public sealed class MustTargetVerbTests
     {
         // Each project lacking the framework is one finding keyed by the moniker, so a migrated rule
         // grandfathers the projects it saw and reds on the next one (GRAMMAR §4.3, §4.10).
-        Checker.Run(Scene, arch => arch.Rule("packaging/modern-floor")
-                .Enforce(arch.Projects.Matching("*").MustTarget("net10.0"))
-                .Because("b"))
-            .Single()
+        Checker.Verdict(Scene, arch => arch.Projects.Matching("*").MustTarget("net10.0"))
             .ShouldHaveFailedWithProjectSubjects(["Contract -> net10.0", "Host -> net10.0"]);
     }
 }

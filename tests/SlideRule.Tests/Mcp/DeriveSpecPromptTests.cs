@@ -73,7 +73,7 @@ public sealed class DeriveSpecPromptTests
 
     // A prompt call never resolves the binding (prompts read no solution/spec), so any working directory
     // serves; a real one keeps StartAsync's host build honest.
-    private static McpServerBinding Binding => new(null, null, Directory.GetCurrentDirectory());
+    private static McpServerBinding Binding => McpServerBindings.For(null, null);
 
     [Fact]
     public async Task ListPrompts_AdvertisesDeriveSpec()
@@ -147,7 +147,7 @@ public sealed class DeriveSpecPromptTests
     [Fact]
     public async Task GetPrompt_DeriveSpec_CollectsStatedIntentWithItsSources()
     {
-        string text = await ServedRecipeAsync();
+        string text = await ShouldServeRecipeAsync();
 
         // Assert — the first step is an action whose artifact the receipt transcribes. Written as a conditional
         // bullet inside a checklist, it was read as one grep over the repository, and no derivation followed a link
@@ -162,7 +162,7 @@ public sealed class DeriveSpecPromptTests
     [Fact]
     public async Task GetPrompt_DeriveSpec_ReadsDecisionRecordsWholeFromRawText()
     {
-        string text = await ServedRecipeAsync();
+        string text = await ShouldServeRecipeAsync();
 
         // Assert — the laws maintainers care about most are often written outside the docs pages: in a ruling on a
         // pull request, an upgrade guide, a first-party template or an approval test. The README and the analyzer
@@ -182,7 +182,7 @@ public sealed class DeriveSpecPromptTests
     [Fact]
     public async Task GetPrompt_DeriveSpec_WritesEachPostureIntoTheSpecBeforeTheGate()
     {
-        string text = await ServedRecipeAsync();
+        string text = await ShouldServeRecipeAsync();
 
         // Assert — postures proposed in the curation table alone left the spec all Enforce, and Enforce has no
         // baseline, so the human's baseline captured nothing and the check stayed red. The recipe has the agent
@@ -196,7 +196,7 @@ public sealed class DeriveSpecPromptTests
     [Fact]
     public async Task GetPrompt_DeriveSpec_ChecksARedBeforeCallingItDebt()
     {
-        string text = await ServedRecipeAsync();
+        string text = await ShouldServeRecipeAsync();
 
         // Assert — when a statement that disagrees with the code makes the code the debt and every red defaults to
         // Migrate, a misread sentence, a statement older than the code it describes, a policy its maintainers apply
@@ -216,7 +216,7 @@ public sealed class DeriveSpecPromptTests
     [Fact]
     public async Task GetPrompt_DeriveSpec_WarnsAtTheStepWhereEachTrapIsMet()
     {
-        string text = await ServedRecipeAsync();
+        string text = await ShouldServeRecipeAsync();
 
         // Assert — each warning sits where its trap is met: an SDK pinned below 10 at the scaffold's framework, a
         // props file's versionless package references under the central-management opt-out, MVC action names under
@@ -232,7 +232,7 @@ public sealed class DeriveSpecPromptTests
     [Fact]
     public async Task GetPrompt_DeriveSpec_EmbedsAuthoringSignalAnchors()
     {
-        string text = await ServedRecipeAsync();
+        string text = await ShouldServeRecipeAsync();
 
         // Assert — the checker's authoring signals must survive prose edits: they are what stop an agent
         // misreading an empty subject or an inert target as evidence about the code. The cure itself
@@ -251,7 +251,7 @@ public sealed class DeriveSpecPromptTests
     [Fact]
     public async Task GetPrompt_DeriveSpec_ClosesWithTheFixedKeyReceipt()
     {
-        string text = await ServedRecipeAsync();
+        string text = await ShouldServeRecipeAsync();
 
         // Assert — the outcome report was a prose list, so every derivation closed in a different shape and
         // nothing downstream could read one. The keys are the contract a reader or a script finds each claim
@@ -272,7 +272,7 @@ public sealed class DeriveSpecPromptTests
             "baseline: not run (human)",
             "render: not run (human)"
         ];
-        foreach (string key in receiptKeys) text.ShouldContain(key);
+        receiptKeys.ShouldAllBe(key => text.Contains(key, StringComparison.Ordinal));
         text.ShouldContain("none implies another");
         text.ShouldContain("has *not observed* the rule");
 
@@ -334,7 +334,7 @@ public sealed class DeriveSpecPromptTests
         // Arrange: the candidate lines are the floor under step 3. A derivation that stops at layering rules has
         // left the other questions unanswered, and the example is what it copies, so the example answers every
         // question the step asks, each under the label the step gives it.
-        string text = await ServedRecipeAsync();
+        string text = await ShouldServeRecipeAsync();
         QuotedFence fence = ShouldFindReceiptFence();
 
         // Act
@@ -355,7 +355,7 @@ public sealed class DeriveSpecPromptTests
     [Fact]
     public async Task GetPrompt_DeriveSpec_SubstitutesRunningVersionIntoScaffold()
     {
-        string text = await ServedRecipeAsync();
+        string text = await ShouldServeRecipeAsync();
 
         // Assert
         text.ShouldContain($"<PackageReference Include=\"SlideRule\" Version=\"{ServerVersion.SemVer}\" />");
@@ -366,7 +366,7 @@ public sealed class DeriveSpecPromptTests
     [Fact]
     public async Task GetPrompt_DeriveSpec_NamesTheDnxPrefixForASessionWithNoInstalledCommand()
     {
-        string text = await ServedRecipeAsync();
+        string text = await ShouldServeRecipeAsync();
 
         // Assert — the recipe names `sliderule` commands throughout and is served to a session that may have no
         // such command: the registry manifest's dnx launch runs the package without installing the tool.
@@ -389,7 +389,7 @@ public sealed class DeriveSpecPromptTests
     [Fact]
     public async Task GetPrompt_DeriveSpec_ScaffoldOptsOutOfCentralPackageManagement()
     {
-        string text = await ServedRecipeAsync();
+        string text = await ShouldServeRecipeAsync();
 
         // Assert — the scaffold pins its own version inline, which is NU1008 on a repository that manages
         // package versions centrally. The opt-out is what makes one csproj valid either way, so it cannot
@@ -400,7 +400,7 @@ public sealed class DeriveSpecPromptTests
     [Fact]
     public async Task GetPrompt_DeriveSpec_ScaffoldSetsTheLanguageVersionItsSpecClassNeeds()
     {
-        string text = await ServedRecipeAsync();
+        string text = await ShouldServeRecipeAsync();
 
         // Assert — the recipe sends a legacy adopter to change the TFM and keep the rest, and net48 and
         // netstandard2.0 both default to C# 7.3, where the spec class below the csproj is CS8370. What is
@@ -430,7 +430,7 @@ public sealed class DeriveSpecPromptTests
     [Fact]
     public async Task GetPrompt_DeriveSpec_WarnsThatAnArchNamespaceSegmentShadowsTheContractType()
     {
-        string text = await ServedRecipeAsync();
+        string text = await ShouldServeRecipeAsync();
 
         // Assert — the recipe's own arch/ folder convention makes an Arch-suffixed project name the
         // natural reach, and neither resulting compiler error mentions this library: the recipe must
@@ -442,7 +442,7 @@ public sealed class DeriveSpecPromptTests
     [Fact]
     public async Task GetPrompt_DeriveSpec_WarnsAgainstHandTrimmingTheSolutionAddRewrite()
     {
-        string text = await ServedRecipeAsync();
+        string text = await ShouldServeRecipeAsync();
 
         // Assert — on a multi-configuration solution the CLI's own rewrite dwarfs the spec project it
         // adds, which reads as damage against the recipe's one-diff close; the tidy-looking repair is a
@@ -489,7 +489,7 @@ public sealed class DeriveSpecPromptTests
     }
 
     // The recipe a prompts/get serves, as the text of its message.
-    private static async Task<string> ServedRecipeAsync()
+    private static async Task<string> ShouldServeRecipeAsync()
     {
         GetPromptResult result = await GetDeriveSpecAsync();
 

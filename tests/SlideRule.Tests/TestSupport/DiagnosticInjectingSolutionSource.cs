@@ -53,6 +53,11 @@ internal sealed class DiagnosticInjectingSolutionSource(
     /// <summary>The project the gate rows inject as failed to load: the input that decides.</summary>
     internal const string SimulatedFailedProject = "C:/repo/MyApp.Broken/MyApp.Broken.csproj";
 
+    /// <summary>
+    ///     The project the gate rows inject as restore-failed: it loaded, and the restore gate refuses it.
+    /// </summary>
+    internal const string SimulatedRestoreFailedProject = "C:/repo/MyApp.Unrestored/MyApp.Unrestored.csproj";
+
     public async Task<SolutionHandle> AcquireAsync(string solutionPath, CancellationToken ct)
     {
         SolutionHandle real = await (inner ?? WarmWorkspacePool.Source).AcquireAsync(solutionPath, ct);

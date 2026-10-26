@@ -79,11 +79,8 @@ public sealed class MustNotCatchUnfilteredVerbTests
     [Fact]
     public void MustNotCatchUnfiltered_SubjectCatchesBannedTypeUnfiltered_FailsWithSourceTargetSitesAndHumanLine()
     {
-        RuleResult result = Checker.Run(SceneModel, arch =>
-                arch.Rule("ex/filter-domain-catches")
-                    .Enforce(arch.Namespace("App.*").MustNotCatchUnfiltered(arch.Namespace("Errors.*")))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(SceneModel, arch => arch.Namespace("App.*")
+            .MustNotCatchUnfiltered(arch.Namespace("Errors.*")));
 
         // The subject covers FilteredHandler too, and the single-item claim below is the verb's whole point:
         // its identical catch of the identical type is absent from the report.
@@ -101,12 +98,8 @@ public sealed class MustNotCatchUnfilteredVerbTests
         // plain MustNotCatch would red it — but every site of that edge spells a `when` filter, so the unfiltered
         // subset is empty and the rule passes. The forbidden target resolves (Errors.DbError exists), so this is a
         // real pass, not an inert one.
-        RuleResult result = Checker.Run(SceneModel, arch =>
-                arch.Rule("ex/filter-domain-catches")
-                    .Enforce(arch.Namespace("App.*").WithSuffix("FilteredHandler")
-                        .MustNotCatchUnfiltered(arch.Namespace("Errors.*")))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(SceneModel, arch => arch.Namespace("App.*").WithSuffix("FilteredHandler")
+            .MustNotCatchUnfiltered(arch.Namespace("Errors.*")));
 
         result.ShouldHavePassedClean();
     }
@@ -122,16 +115,11 @@ public sealed class MustNotCatchUnfilteredVerbTests
             .Sites.Lines()
             .ShouldBe([9, 11]);
 
-        RuleResult result = Checker.Run(MixedModel, arch =>
-                arch.Rule("ex/filter-domain-catches")
-                    .Enforce(arch.Namespace("App.*").MustNotCatchUnfiltered(arch.Namespace("Errors.*")))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(MixedModel, arch => arch.Namespace("App.*")
+            .MustNotCatchUnfiltered(arch.Namespace("Errors.*")));
 
-        result.ShouldHaveFailed();
-        Violation violation = result.Violations.ShouldHaveSingleItem();
-        violation.Sites.Select(site => site.Line)
-            .ShouldBe([11]);
+        result.ShouldHaveFailedWithEdgeAtSites(
+            ViolationKind.Catch, "App.MixedHandler", "Errors.DbError", ["Test.cs:11"]);
 
         string block = result.HumanBlock();
         block.ShouldContain("Test.cs:11 — App.MixedHandler catches Errors.DbError");
@@ -144,11 +132,8 @@ public sealed class MustNotCatchUnfilteredVerbTests
         // The forbidden target (a namespace glob) matches no types, so the rule can never fire — inert. The
         // pattern operand is the warning gate: the verb joins the forbidden-set inert-warn family (§4.1) exactly
         // as its sibling does.
-        RuleResult result = Checker.Run(SceneModel, arch =>
-                arch.Rule("ex/inert")
-                    .Enforce(arch.Namespace("App.*").MustNotCatchUnfiltered(arch.Namespace("Nonexistent.*")))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(SceneModel, arch => arch.Namespace("App.*")
+            .MustNotCatchUnfiltered(arch.Namespace("Nonexistent.*")));
 
         result.ShouldHaveWarnedInertTarget();
     }

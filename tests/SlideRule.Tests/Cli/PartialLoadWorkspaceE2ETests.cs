@@ -1,9 +1,7 @@
 using System.Text.Json;
 using ModelContextProtocol.Protocol;
 using Shouldly;
-using SlideRule.Cli.Mcp;
 using SlideRule.Cli.Mcp.Infrastructure;
-using SlideRule.Cli.Pipeline;
 using SlideRule.Cli.Verbs;
 using SlideRule.Tests.Mcp;
 using SlideRule.Tests.TestSupport;
@@ -33,9 +31,11 @@ namespace SlideRule.Tests.Cli;
 ///         composition over a real tree, because the cheaper beds hand both lists in ready-made.
 ///     </para>
 ///     <para>
-///         Cold invocations throughout (<see cref="CliRunner.InvokeColdAsync(string[])" />), never the warm pool: a
-///         pooled session keyed on a shared workspace must never be handed a broken one. The MCP leg gets
-///         its own harness, which composes its own session.
+///         The first row loads cold (<see cref="CliRunner.InvokeColdAsync(string[])" />), the CLI's own path to
+///         this refusal; the rest read the warm pool, whose session runs the same loader and carries the same
+///         failed and restore-failed projects. The copy's lease is this class's alone, so no other class is
+///         handed the broken session the pool keeps for it. The MCP leg gets its own harness, which composes its
+///         own session.
 ///     </para>
 /// </remarks>
 public sealed class PartialLoadWorkspaceE2ETests
@@ -109,18 +109,18 @@ public sealed class PartialLoadWorkspaceE2ETests
 
         CliResult graph = await CliRunner.InvokeColdAsync("graph", workspace.SolutionPath, "--no-cache");
 
-        graph.ShouldRefuseWith();
-        graph.Err.ShouldContain("the model is incomplete");
-        graph.Err.ShouldContain("graph cannot survey the codebase");
-        // It names what failed, inline — the MCP surface discards the error writer, so a refusal that
-        // pointed at "the warnings above" would name evidence half its callers cannot reach.
-        graph.Err.ShouldContain(MissingProject);
-        // ... says which MSBuild opened them, which is nearly always the next question ...
-        graph.Err.ShouldContain("MSBuild for this run:");
-        // ... and says what to do about it, in both dialects.
-        graph.Err.ShouldContain("Restore and build the solution first");
-        graph.Err.ShouldContain("--allow-workspace-diagnostics");
-        graph.Err.ShouldContain("allowWorkspaceDiagnostics");
+        graph.ShouldRefuseWith(
+            "the model is incomplete",
+            "graph cannot survey the codebase",
+            // It names what failed, inline — the MCP surface discards the error writer, so a refusal that
+            // pointed at "the warnings above" would name evidence half its callers cannot reach.
+            MissingProject,
+            // ... says which MSBuild opened them, which is nearly always the next question ...
+            "MSBuild for this run:",
+            // ... and says what to do about it, in both dialects.
+            "Restore and build the solution first",
+            "--allow-workspace-diagnostics",
+            "allowWorkspaceDiagnostics");
         // ... and the second cause, which on a survey is the sharper of the two: these projects are all
         // present with all their types, so a reader has nothing to notice as absent.
         graph.ShouldTellBothCausesLoadFirst(
@@ -141,25 +141,25 @@ public sealed class PartialLoadWorkspaceE2ETests
         // mint ordinary externals.
         using TempFixtureWorkspace workspace = BrokenApp();
 
-        CliResult human = await CliRunner.InvokeColdAsync(
+        CliResult human = await CliRunner.InvokeAsync(
             "graph", workspace.SolutionPath, "--no-cache", "--allow-workspace-diagnostics");
 
-        human.ShouldSucceed();
-        human.Out.ShouldContain("Codebase survey: BrokenApp.sln");
-        human.Out.ShouldContain("BrokenApp.Core");
+        human.ShouldSucceed("Codebase survey: BrokenApp.sln", "BrokenApp.Core");
         human.Err.ShouldContain("warning: Project file not found:"); // the diagnostics still render
         human.Err.ShouldNotContain(InvariantViolationFragment);
 
-        CliResult json = await CliRunner.InvokeColdAsync(
+        CliResult json = await CliRunner.InvokeAsync(
             "graph", workspace.SolutionPath, "--no-cache", "--json", "--allow-workspace-diagnostics");
 
         json.ShouldSucceed();
-        using JsonDocument _ = json.ShouldHaveJsonStdout();
+        using JsonDocument document = json.ShouldHaveJsonStdout();
         // The survey is a partial map, and says so in the document — the only channel an MCP client has.
-        json.Out.ShouldContain("\"workspaceDiagnostics\"");
-        json.Out.ShouldContain(MissingProject);
-        json.Out.ShouldContain("\"failedProjects\"");
-        json.Out.ShouldContain("\"modelIncomplete\": true");
+        document.ShouldBeStampedIncomplete();
+        document.RootElement.Strings("workspaceDiagnostics")
+            .ShouldNotBeEmpty(json.Transcript());
+        document.RootElement.Strings("failedProjects")
+            .ShouldHaveSingleItem(json.Transcript())
+            .ShouldEndWith(MissingProject);
     }
 
     [Fact]
@@ -169,31 +169,35 @@ public sealed class PartialLoadWorkspaceE2ETests
         // computing its gate, so on a tree like this an extraction that threw would beat the refusal.
         using TempFixtureWorkspace workspace = BrokenApp();
 
-        CliResult check = await CliRunner.InvokeColdAsync(
+        CliResult check = await CliRunner.InvokeAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.CleanSpecDll, "--no-cache");
         check.ShouldRefuseWith(CheckGateLine, MissingProject);
         check.ShouldTellBothCausesLoadFirst(CheckGateLine, CheckRestoreGateLine);
         check.Err.ShouldNotContain(InvariantViolationFragment);
 
-        CliResult checkAllowed = await CliRunner.InvokeColdAsync(
+        CliResult checkAllowed = await CliRunner.InvokeAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.CleanSpecDll, "--no-cache",
             "--allow-workspace-diagnostics");
-        checkAllowed.Exit.ShouldNotBe(2, checkAllowed.Err); // 0 or 1 — a verdict, not a refusal
+        checkAllowed.Exit.ShouldNotBe(2, checkAllowed.Transcript()); // 0 or 1 — a verdict, not a refusal
         checkAllowed.Err.ShouldNotContain("error: the model is incomplete");
 
-        CliResult status = await CliRunner.InvokeColdAsync(
+        CliResult status = await CliRunner.InvokeAsync(
             "status", workspace.SolutionPath, "--spec", CliRunner.CleanSpecDll, "--no-cache");
         status.ShouldRefuseWith(StatusGateLine, MissingProject);
         status.ShouldTellBothCausesLoadFirst(StatusGateLine, StatusRestoreGateLine);
         status.Out.ShouldNotBeEmpty(); // status renders the burndown it does have, then gates
 
-        CliResult statusAllowed = await CliRunner.InvokeColdAsync(
+        CliResult statusAllowed = await CliRunner.InvokeAsync(
             "status", workspace.SolutionPath, "--spec", CliRunner.CleanSpecDll, "--no-cache", "--json",
             "--allow-workspace-diagnostics");
         statusAllowed.ShouldSucceed();
-        statusAllowed.Out.ShouldContain("\"workspaceDiagnostics\"");
-        statusAllowed.Out.ShouldContain("\"modelIncomplete\": true");
-        statusAllowed.Out.ShouldContain(MissingProject); // and the document names it, not only the exit code
+        using JsonDocument document = statusAllowed.ShouldHaveJsonStdout();
+        document.ShouldBeStampedIncomplete();
+        document.RootElement.Strings("workspaceDiagnostics")
+            .ShouldNotBeEmpty(statusAllowed.Transcript());
+        document.RootElement.Strings("failedProjects")
+            .ShouldHaveSingleItem(statusAllowed.Transcript())
+            .ShouldEndWith(MissingProject); // and the document names it, not only the exit code
     }
 
     [Fact]
@@ -207,16 +211,18 @@ public sealed class PartialLoadWorkspaceE2ETests
         // projects failed to load and be shown none of them.
         using TempFixtureWorkspace workspace = BrokenApp();
 
-        CliResult check = await CliRunner.InvokeColdAsync("check", workspace.SolutionPath, "--no-cache");
+        CliResult check = await CliRunner.InvokeAsync("check", workspace.SolutionPath, "--no-cache");
 
-        check.ShouldRefuseWith(SpecGateLine, MissingProject); // the evidence, inline
+        check.ShouldRefuseWith(
+            SpecGateLine,
+            MissingProject, // the evidence, inline
+            // ... says which MSBuild opened them, which is nearly always the next question — and nothing has
+            // written to this stream above the refusal, so the note reaches the reader here or nowhere ...
+            "MSBuild for this run:",
+            // ... and says what to do about it.
+            "Restore and build the solution first",
+            "Restore the solution first (dotnet restore), then retry.");
         check.ShouldTellBothCausesLoadFirst(SpecGateLine, SpecRestoreGateLine);
-        // ... says which MSBuild opened them, which is nearly always the next question — and nothing has
-        // written to this stream above the refusal, so the note reaches the reader here or nowhere ...
-        check.Err.ShouldContain("MSBuild for this run:");
-        // ... and says what to do about it.
-        check.Err.ShouldContain("Restore and build the solution first");
-        check.Err.ShouldContain("Restore the solution first (dotnet restore), then retry.");
         check.Err.ShouldNotContain("Pass --spec to name one");
         check.Err.ShouldNotContain(InvariantViolationFragment);
     }
@@ -226,15 +232,15 @@ public sealed class PartialLoadWorkspaceE2ETests
     {
         // The stakes command. Nothing under the solution root may appear as a result of this run.
         using TempFixtureWorkspace workspace = BrokenApp();
-        string[] before = FilesUnder(workspace);
+        string[] before = WriteFootprint.Of(workspace.PathOf());
 
-        CliResult baseline = await CliRunner.InvokeColdAsync(
+        CliResult baseline = await CliRunner.InvokeAsync(
             "baseline", "init", workspace.SolutionPath, "--spec", CliRunner.CleanSpecDll);
 
         baseline.ShouldRefuseWith(BaselineGateLine, MissingProject);
         baseline.ShouldTellBothCausesLoadFirst(BaselineGateLine, BaselineRestoreGateLine);
         baseline.Err.ShouldNotContain(InvariantViolationFragment);
-        FilesUnder(workspace)
+        WriteFootprint.Of(workspace.PathOf())
             .ShouldBe(before);
     }
 
@@ -245,16 +251,16 @@ public sealed class PartialLoadWorkspaceE2ETests
         // composes wrong rather than short: a card whose project failed to load resolves no directory and is
         // dropped. So nothing under the solution root may appear, or change, as a result of this run.
         using TempFixtureWorkspace workspace = BrokenApp();
-        string[] before = FilesUnder(workspace);
+        string[] before = WriteFootprint.Of(workspace.PathOf());
 
-        CliResult render = await CliRunner.InvokeColdAsync(
+        CliResult render = await CliRunner.InvokeAsync(
             "render", workspace.SolutionPath, "--spec", CliRunner.CleanSpecDll);
 
         render.ShouldRefuseWith(RenderGateLine, MissingProject);
         render.ShouldTellBothCausesLoadFirst(RenderGateLine, RenderRestoreGateLine);
         render.Err.ShouldNotContain(InvariantViolationFragment);
         render.Out.ShouldBeEmpty(); // it refused before the first wrote/unchanged line
-        FilesUnder(workspace)
+        WriteFootprint.Of(workspace.PathOf())
             .ShouldBe(before);
     }
 
@@ -265,9 +271,9 @@ public sealed class PartialLoadWorkspaceE2ETests
         // model, the load failures still print, and the root block lands. The tree written to is this
         // class's own copy, which the next test's arrange resets.
         using TempFixtureWorkspace workspace = BrokenApp();
-        string rootAgents = Path.Combine(Path.GetDirectoryName(workspace.SolutionPath)!, "AGENTS.md");
+        string rootAgents = workspace.PathOf("AGENTS.md");
 
-        CliResult render = await CliRunner.InvokeColdAsync(
+        CliResult render = await CliRunner.InvokeAsync(
             "render", workspace.SolutionPath, "--spec", CliRunner.CleanSpecDll, "--allow-workspace-diagnostics");
 
         render.ShouldSucceed("wrote AGENTS.md");
@@ -289,18 +295,16 @@ public sealed class PartialLoadWorkspaceE2ETests
             null, workspace.SolutionPath, CliRunner.CleanSpecDll, solutionDirectory, NoCache: true,
             Path: Path.Combine("BrokenApp.Web", "WidgetController.cs"));
 
-        CliResult result = await CliResult.CapturedAsync((output, error) => new ExplainRunner(output, error, new ColdSolutionSource(), new SystemEnvironment()).RunAsync(request, Ct));
+        CliResult result = await CliResult.CapturedAsync((output, error) => new ExplainRunner(output, error, WarmWorkspacePool.Source, new SystemEnvironment()).RunAsync(request, Ct));
 
-        result.ShouldSucceed();
-        string answer = result.Out;
-        answer.ShouldStartWith(
+        result.ShouldSucceed(
+            MissingProject,
+            "caveat: the model is incomplete — NuGet packages did not resolve for 2 projects, so a selection that "
+            + "reads a package's base types, interfaces or attributes cannot be trusted for the types they declare:",
+            "BrokenApp.Web"); // the answer the partial model still supports follows
+        result.Out.ShouldStartWith(
             "caveat: the model is incomplete — 1 project failed to load, so a type declared only there reads as "
             + "unknown and a path under them as declaring no type:");
-        answer.ShouldContain(MissingProject);
-        answer.ShouldContain(
-            "caveat: the model is incomplete — NuGet packages did not resolve for 2 projects, so a selection that "
-            + "reads a package's base types, interfaces or attributes cannot be trusted for the types they declare:");
-        answer.ShouldContain("BrokenApp.Web"); // the answer the partial model still supports follows
     }
 
     [Fact]
@@ -312,36 +316,28 @@ public sealed class PartialLoadWorkspaceE2ETests
         // twin, no --json). Driven through the runner directly, because there is no CLI verb to invoke.
         using TempFixtureWorkspace workspace = BrokenApp();
         string solutionDirectory = Path.GetDirectoryName(workspace.SolutionPath)!;
-        var output = new StringWriter();
+        var request = new ContextRequest(
+            Path.Combine("BrokenApp.Web", "WidgetController.cs"), workspace.SolutionPath, CliRunner.CleanSpecDll,
+            solutionDirectory);
 
-        int exit = await new ContextRunner(output, new ColdSolutionSource(), new SystemEnvironment()).RunAsync(
-            new ContextRequest(
-                Path.Combine("BrokenApp.Web", "WidgetController.cs"), workspace.SolutionPath,
-                CliRunner.CleanSpecDll, solutionDirectory),
-            Ct);
+        CliResult result = await CliResult.CapturedAsync((output, _) =>
+            new ContextRunner(output, WarmWorkspacePool.Source, new SystemEnvironment()).RunAsync(request, Ct));
 
-        exit.ShouldBe(0); // a lookup, never a gate
-        var answer = output.ToString();
-        answer.ShouldStartWith("caveat: the model is incomplete"); // the caveat opens the body, above the answer
-        answer.ShouldContain(MissingProject); // naming what failed, inline: there is no stderr here
-        answer.ShouldContain("MSBuild for this run:");
-        answer.ShouldContain("Restore and build the solution first (dotnet build), then retry for a whole answer.");
-        // Both causes ride the body, load first, because the caveat is the whole of what this verb can say —
-        // and the path being looked up is under one of the projects the second cause names.
-        answer.ShouldContain(
+        // A lookup, never a gate.
+        result.ShouldSucceed(
+            MissingProject, // naming what failed, inline: there is no stderr here
+            "MSBuild for this run:",
+            "Restore and build the solution first (dotnet build), then retry for a whole answer.",
+            // Both causes ride the body, load first, because the caveat is the whole of what this verb can say —
+            // and the path being looked up is under one of the projects the second cause names.
             "caveat: the model is incomplete — NuGet packages did not resolve for 2 projects, so a rule about "
-            + "a package cannot be trusted to have been measured for paths under them:");
-        answer.ShouldContain("Restore the solution first (dotnet restore), then retry for a whole answer.");
+            + "a package cannot be trusted to have been measured for paths under them:",
+            "Restore the solution first (dotnet restore), then retry for a whole answer.",
+            // ... and the answer the partial model still supports follows, one blank line below the caveat.
+            "\n\nNo architecture scope covers");
+        string answer = result.Out;
+        answer.ShouldStartWith("caveat: the model is incomplete"); // the caveat opens the body, above the answer
         answer.ShouldNotContain(InvariantViolationFragment);
-
-        // ... and the answer the partial model still supports follows, one blank line below the caveat.
-        string[] lines = answer.NormalizedLines()
-            .TrimEnd()
-            .Split('\n');
-        int pointer = Array.FindIndex(lines, line => line.StartsWith("No architecture scope covers", StringComparison.Ordinal));
-        pointer.ShouldBeGreaterThan(0, answer);
-        lines[pointer - 1]
-            .ShouldBeEmpty();
     }
 
     [Fact]
@@ -351,7 +347,7 @@ public sealed class PartialLoadWorkspaceE2ETests
         // exception dump is the whole point: the agent has to be able to read the refusal as actionable.
         using TempFixtureWorkspace workspace = BrokenApp();
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
-            new McpServerBinding(workspace.SolutionPath, null, Path.GetDirectoryName(workspace.SolutionPath)!), Ct);
+            McpServerBindings.For(workspace.SolutionPath, null), Ct);
 
         CallToolResult refused = await harness.Client.CallToolAsync("arch_graph", cancellationToken: Ct);
 
@@ -375,12 +371,17 @@ public sealed class PartialLoadWorkspaceE2ETests
         surveyed.IsError.ShouldNotBe(true);
         string survey = surveyed.ShouldHaveTextContent();
         survey.ShouldContain("BrokenApp.Core");
-        survey.ShouldContain("\"modelIncomplete\": true");
-        survey.ShouldContain("\"workspaceDiagnostics\"");
+        using JsonDocument surveyDocument = JsonDocument.Parse(survey);
+        surveyDocument.ShouldBeStampedIncomplete();
+        surveyDocument.RootElement.Strings("workspaceDiagnostics")
+            .ShouldNotBeEmpty(survey);
+        surveyDocument.RootElement.Strings("failedProjects")
+            .ShouldHaveSingleItem(survey)
+            .ShouldEndWith(MissingProject);
     }
 
     /// <summary>
-    ///     A private copy of the BrokenApp fixture, with the arrange-time guard that keeps this whole class
+    ///     This class's leased copy of the BrokenApp fixture, with the arrange-time guard that keeps this whole class
     ///     honest: <c>BrokenApp.Contracts</c> must still be absent. Creating that directory — or committing a
     ///     stub csproj for it — is the single edit that would silently turn every fact above into a test of
     ///     nothing, so it fails loudly here instead.
@@ -388,8 +389,7 @@ public sealed class PartialLoadWorkspaceE2ETests
     private static TempFixtureWorkspace BrokenApp()
     {
         var workspace = new TempFixtureWorkspace("PartialLoadSolutions/BrokenApp", "BrokenApp.sln", false);
-        string missingProject = Path.Combine(
-            Path.GetDirectoryName(workspace.SolutionPath)!, "BrokenApp.Contracts", "BrokenApp.Contracts.csproj");
+        string missingProject = workspace.PathOf("BrokenApp.Contracts", "BrokenApp.Contracts.csproj");
 
         File.Exists(missingProject)
             .ShouldBeFalse(
@@ -398,17 +398,6 @@ public sealed class PartialLoadWorkspaceE2ETests
                 + "every fact in PartialLoadWorkspaceE2ETests would pass without exercising the incomplete-model gate.");
 
         return workspace;
-    }
-
-    // Every file under the solution root, ordered, excluding build output — the "wrote nothing" oracle.
-    private static string[] FilesUnder(TempFixtureWorkspace workspace)
-    {
-        string root = Path.GetDirectoryName(workspace.SolutionPath)!;
-        return Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories)
-            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")
-                           && !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}"))
-            .Order(StringComparer.Ordinal)
-            .ToArray();
     }
 }
 
@@ -448,13 +437,7 @@ file static class PartialLoadRefusalAssertions
         string channel = result.Err;
         string report = result.Transcript();
 
-        channel.ShouldContain(loadLede, report);
-        channel.ShouldContain(restoreLede, report);
+        channel.ShouldContainInOrder(loadLede, restoreLede, customMessage: report);
         foreach (string project in UnrestoredProjects) channel.ShouldContain(project, report);
-
-        channel.IndexOf(loadLede, StringComparison.Ordinal)
-            .ShouldBeLessThan(
-                channel.IndexOf(restoreLede, StringComparison.Ordinal),
-                $"The restore block should follow the load block.{Environment.NewLine}{report}");
     }
 }

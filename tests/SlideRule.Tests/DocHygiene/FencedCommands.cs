@@ -36,7 +36,7 @@ internal static class FencedCommands
     /// </summary>
     public static IReadOnlyList<FencedCommand> Find(string docText)
     {
-        return SourceAnchors.FencedBlocks(docText)
+        return DocFences.FencedBlocks(docText)
             .SelectMany(Lines)
             .Where(static line => CommandStart.IsMatch(line.Text))
             .ToList();

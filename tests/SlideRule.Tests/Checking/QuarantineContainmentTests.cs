@@ -20,6 +20,10 @@ public sealed class QuarantineContainmentTests
     private const string ContainmentId = "legacy/quarantined/containment";
     private static readonly CodebaseModel Codebase = Sources.ContainmentModel;
 
+    // User's reference into the interior, as a baseline keys it.
+    private static readonly BaselineEntry UserToInternal = BaselineEntry.ForEdge(
+        Codebase.Type("App.Client.User").SymbolId, Codebase.Type("App.Legacy.Internal").SymbolId);
+
     // Boundary variant: IFacade is the sanctioned surface, resolved by full name via the name-carrier
     // App.Legacy.IFacade (ContainmentFacadeStub.cs).
     private static void BoundaryScope(Arch arch)
@@ -84,9 +88,7 @@ public sealed class QuarantineContainmentTests
     [Fact]
     public void GrandfatheredInboundEdge_Passes()
     {
-        BaselineIndex baselines = Index(
-            BaselineEntry.ForEdge(
-                Codebase.Type("App.Client.User").SymbolId, Codebase.Type("App.Legacy.Internal").SymbolId));
+        BaselineIndex baselines = Index(UserToInternal);
 
         RuleResult containment = Containment(baselines, BoundaryScope);
 
@@ -101,9 +103,7 @@ public sealed class QuarantineContainmentTests
     {
         // Hermetic: User → {IFacade, Internal} are both violations. Grandfather only User → Internal;
         // the User → IFacade edge is a distinct (source, target) pair and stays red (GRAMMAR §4.3).
-        BaselineIndex baselines = Index(
-            BaselineEntry.ForEdge(
-                Codebase.Type("App.Client.User").SymbolId, Codebase.Type("App.Legacy.Internal").SymbolId));
+        BaselineIndex baselines = Index(UserToInternal);
 
         RuleResult containment = Containment(baselines, Sources.HermeticContainment);
 
@@ -117,8 +117,7 @@ public sealed class QuarantineContainmentTests
         // Boundary variant → the only violation is User → Internal (grandfathered). The second entry
         // (User → Impl) matches no current violation, so it is stale but the rule still passes.
         BaselineIndex baselines = Index(
-            BaselineEntry.ForEdge(
-                Codebase.Type("App.Client.User").SymbolId, Codebase.Type("App.Legacy.Internal").SymbolId),
+            UserToInternal,
             BaselineEntry.ForEdge(
                 Codebase.Type("App.Client.User").SymbolId, Codebase.Type("App.Legacy.Impl").SymbolId));
 

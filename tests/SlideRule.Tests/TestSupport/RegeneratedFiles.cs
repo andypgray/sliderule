@@ -36,10 +36,11 @@ internal static class RegeneratedFiles
     {
         string actual = Write(repoRelativePath, regenerated);
         string committed = RepoRoot.Absolute(repoRelativePath);
-        List<string> report = moved.Select(finding => $"{repoRelativePath}  {finding}")
-            .ToList();
-        report.Add($"{repoRelativePath}  once every line above is intended: cp '{actual}' '{committed}'");
 
-        return report;
+        return
+        [
+            .. moved.Select(finding => $"{repoRelativePath}  {finding}"),
+            $"{repoRelativePath}  once every line above is intended: cp '{actual}' '{committed}'"
+        ];
     }
 }

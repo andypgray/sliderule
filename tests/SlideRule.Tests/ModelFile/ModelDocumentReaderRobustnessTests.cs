@@ -86,10 +86,7 @@ public sealed class ModelDocumentReaderRobustnessTests
     [Fact]
     public void MemberSelectionsOf_AKindOutsideTheEnum_ThrowsRatherThanGuessingAClass()
     {
-        Selection source = Checker.Model(arch => arch.Rule("a/b")
-                .Enforce(arch.Types.MustBeSealed())
-                .Because("b"))
-            .Rules.Single()
+        Selection source = Checker.OneRule(arch => arch.Types.MustBeSealed())
             .Constraint!.Subject!;
 
         Should.Throw<InvalidOperationException>(() => MemberSelections.Of(source, (MemberKindFilter)99, []));

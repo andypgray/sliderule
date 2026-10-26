@@ -68,7 +68,7 @@ public sealed class EvaluatorFailClosedTests
         ArchitectureModel model = Checker.HandBuilt("area/rule", constraint);
 
         RuleResult result = Harness.Check(model, ProjectFacts.Solution())
-            .Results.Single();
+            .Results.ShouldHaveSingleItem();
 
         result.ShouldHaveFailedWithDetailContaining(
             ViolationKind.RuleError, "Rule evaluation failed: Unhandled selection adjective 'UnknownAdjective'.");
@@ -91,7 +91,7 @@ public sealed class EvaluatorFailClosedTests
         ArchitectureModel model = Checker.HandBuilt("area/rule", constraint);
 
         RuleResult result = Harness.Check(model, ProjectFacts.Solution())
-            .Results.Single();
+            .Results.ShouldHaveSingleItem();
 
         result.ShouldHaveFailedWithDetailContaining(ViolationKind.RuleError, "Unhandled member adjective 'UnknownMemberAdjective'.");
     }
@@ -121,7 +121,7 @@ public sealed class EvaluatorFailClosedTests
         ArchitectureModel model = Checker.HandBuilt("area/rule", constraint);
 
         RuleResult result = Harness.Check(model, ProjectFacts.Solution())
-            .Results.Single();
+            .Results.ShouldHaveSingleItem();
 
         result.ShouldHaveFailedWithDetailContaining(ViolationKind.RuleError, "Unhandled project adjective 'UnknownProjectAdjective'.");
     }

@@ -27,9 +27,9 @@ namespace SlideRule.Tests.Cli;
 ///         <c>RequireBuiltOutput</c>'s primary <c>File.Exists</c> branch and prove nothing.
 ///     </para>
 ///     <para>
-///         Each arm is a private copy, a real <c>dotnet restore</c>, a real <c>dotnet build -c Release</c>
-///         and a cold workspace load, which costs seconds per fact. Add a third arm only for a layout that is
-///         not a reshuffle of these two.
+///         Each arm is a private copy, a real <c>dotnet build -c Release</c>, which restores first, and a cold
+///         workspace load, which costs seconds per fact. Add a third arm only for a layout that is not a
+///         reshuffle of these two.
 ///     </para>
 /// </remarks>
 public sealed class OutputLayoutSpecResolutionE2ETests
@@ -112,7 +112,7 @@ public sealed class OutputLayoutSpecResolutionE2ETests
     }
 
     // A private copy of the fixture, built for real under the requested layout.
-    private static TempFixtureWorkspace BuiltCopy(IEnumerable<string> layoutProperties)
+    private static TempFixtureWorkspace BuiltCopy(string[] layoutProperties)
     {
         // Dedicated, not leased: the leased copy resets by pruning anything the fixture source does not
         // contain, which would delete the build output the arm exists to produce.
@@ -120,12 +120,9 @@ public sealed class OutputLayoutSpecResolutionE2ETests
             LayoutAppFixture.FixtureDirectory, LayoutAppFixture.SolutionFileName, restore: false);
         string workingDirectory = Path.GetDirectoryName(workspace.SolutionPath)!;
 
-        File.WriteAllText(workspace.PathOf("Directory.Build.props"), LayoutAppFixture.PropsFile(layoutProperties));
-        FixtureRestorer.Restore(workspace.SolutionPath);
+        LayoutAppFixture.WritePropsFile(workspace, layoutProperties);
 
-        // --disable-build-servers (plus DotnetCli's node/server env) keeps the drained child from leaving a
-        // persistent worker that would wedge the output pipe.
-        DotnetCli.Run($"build \"{workspace.SolutionPath}\" -c Release --disable-build-servers", workingDirectory);
+        DotnetCli.Run($"build \"{workspace.SolutionPath}\" -c Release", workingDirectory);
 
         return workspace;
     }

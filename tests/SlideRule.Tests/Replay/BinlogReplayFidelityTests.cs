@@ -99,8 +99,8 @@ public sealed class BinlogReplayFidelityTests(BinlogFixtureWorkspace fixture) : 
     {
         // A binlog of less than the solution. A capture's ingest refuses one, but a run that ingests nothing
         // replays it as given, and only this answer stops it checking a model missing that project.
-        using ScopedFile widerSolution = Fixture.WriteSolutionWithUnbuiltMember("MyApp.Unbuilt");
-        string unbuilt = Fixture.PathOf("MyApp.Unbuilt", "MyApp.Unbuilt.csproj");
+        using ScopedFile widerSolution = Fixture.WriteSolutionWithUnbuiltMember();
+        string unbuilt = Fixture.UnbuiltProject;
         var diagnostics = new List<string>();
 
         using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath, widerSolution.Path, diagnostics.Add, ct: Ct);
@@ -125,8 +125,7 @@ public sealed class BinlogReplayFidelityTests(BinlogFixtureWorkspace fixture) : 
         using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath, Fixture.SolutionPath, ct: Ct);
         CodebaseModel model = await CodebaseExtractor.ExtractFromSolutionAsync(replayed.Solution, ct: Ct);
 
-        model.HasConstructorEdge("MyApp.Domain.OrderService", "MyApp.Web.HomeController")
-            .ShouldBeTrue();
+        model.ShouldHaveConstructorEdge("MyApp.Domain.OrderService", "MyApp.Web.HomeController");
         model.ConstructorEdge("MyApp.Web.InvoiceController", "System.Data.DataTable")
             .Constructed.IsExternal.ShouldBeTrue();
     }

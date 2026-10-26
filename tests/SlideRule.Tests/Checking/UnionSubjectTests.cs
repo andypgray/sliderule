@@ -11,7 +11,7 @@ namespace SlideRule.Tests.Checking;
 ///     through it ((a ∪ b) − c), and every operand must match at least one type so a typo'd operand is
 ///     never masked by its siblings.
 /// </summary>
-public sealed class UnionSubjectTests(WorkspaceFixture fixture)
+public sealed class UnionSubjectTests(WorkspaceFixture fixture) : IClassFixture<WorkspaceFixture>
 {
     [Fact]
     public void UnionSubject_OperandWithNoViolation_Passes()
@@ -84,7 +84,8 @@ public sealed class UnionSubjectTests(WorkspaceFixture fixture)
             .Single();
 
         result.ShouldHaveFailed();
-        result.Violations.ShouldAllBe(v => v.Kind == ViolationKind.EmptySubject);
+        result.Violations.Select(violation => violation.Kind)
+            .ShouldAllBe(kind => kind == ViolationKind.EmptySubject);
         result.Violations.Select(v => v.Detail)
             .ShouldBe(
             [

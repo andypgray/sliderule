@@ -62,10 +62,27 @@ public sealed class StatusFormatterTests
             .Because("b");
     });
 
+    // The one result's whole report, for the rows that read more than its first line.
+    private static IReadOnlyList<string> Lines(RuleResult result)
+    {
+        return StatusFormatter.Lines(new CheckReport([result]));
+    }
+
     private static string Line(RuleResult result)
     {
-        return StatusFormatter.Lines(new CheckReport([result]))
+        return Lines(result)
             .First();
+    }
+
+    private static string Summary(RuleResult result)
+    {
+        return Summary(new CheckReport([result]));
+    }
+
+    private static string Summary(CheckReport report)
+    {
+        return StatusFormatter.Lines(report)
+            .Last();
     }
 
     [Fact]
@@ -197,20 +214,15 @@ public sealed class StatusFormatterTests
         // The nudge is advice, so it rides the summary's uncounted clause and nowhere else: repeated down
         // every rule line it would be noise on a run whose remedy is one command. The rule line still says
         // how many of its own entries are uncounted, which is the number the command will record.
-        var report = new CheckReport(
-        [
-            Result(
-                Model.Rule("data-access/no-inline-sql"), RuleStatus.Passed, grandfathered: 2, captured: true,
-                sitesEach: 4, uncounted: 2)
-        ]);
-
-        IReadOnlyList<string> lines = StatusFormatter.Lines(report);
+        IReadOnlyList<string> lines = Lines(Result(
+            Model.Rule("data-access/no-inline-sql"), RuleStatus.Passed, grandfathered: 2, captured: true,
+            sitesEach: 4, uncounted: 2));
 
         lines[0]
             .ShouldBe(
                 "pass data-access/no-inline-sql (migrate) — 2 grandfathered remaining (8 sites), 0 new, "
                 + "0 fixed awaiting acceptance, 2 uncounted");
-        lines.Last()
+        lines[^1]
             .ShouldBe(
                 "Checked 1 rule: 1 passed, 0 failed, 0 skipped. Burndown: 2 grandfathered remaining (8 sites), "
                 + "0 fixed awaiting acceptance, 2 uncounted; run 'sliderule baseline accept-reductions' "
@@ -285,8 +297,8 @@ public sealed class StatusFormatterTests
         // different morning's work from twelve spread evenly, and the row alone cannot say which this is.
         IReadOnlyList<Violation> debt = [.. SitedDummies(1, 3, "Checking"), .. SitedDummies(11, 8, "Rendering")];
 
-        IReadOnlyList<string> lines = StatusFormatter.Lines(
-            new CheckReport([Result(Model.Rule("layering/cuts-not-circular"), RuleStatus.Passed, captured: true, debt: debt)]));
+        IReadOnlyList<string> lines = Lines(Result(
+            Model.Rule("layering/cuts-not-circular"), RuleStatus.Passed, captured: true, debt: debt));
 
         // The row is byte-for-byte the row this rule printed before the split existed — the sub-line rides
         // under it, never inside it, which is what keeps the quoted-count gate's anchored pattern matching.
@@ -302,13 +314,9 @@ public sealed class StatusFormatterTests
     public void FamilyMigrate_DebtInOneCell_KeepsTheKeySingular()
     {
         // The same inflection the summary tails carry: the key counts the cells shown, not the family's.
-        IReadOnlyList<string> lines = StatusFormatter.Lines(
-            new CheckReport(
-            [
-                Result(
-                    Model.Rule("layering/cuts-not-circular"), RuleStatus.Passed, captured: true,
-                    debt: SitedDummies(3, 3, "Rendering"))
-            ]));
+        IReadOnlyList<string> lines = Lines(Result(
+            Model.Rule("layering/cuts-not-circular"), RuleStatus.Passed, captured: true,
+            debt: SitedDummies(3, 3, "Rendering")));
 
         lines[1]
             .ShouldBe("  layer: Rendering 3 (9 sites)");
@@ -321,8 +329,8 @@ public sealed class StatusFormatterTests
         // says nothing the pair count does not, and says it beside a cell that does.
         IReadOnlyList<Violation> debt = [.. SitedDummies(2, 2, "App.Api"), .. SitedDummies(1, 1, "App.Web")];
 
-        IReadOnlyList<string> lines = StatusFormatter.Lines(
-            new CheckReport([Result(Model.Rule("modules/independent"), RuleStatus.Passed, captured: true, debt: debt)]));
+        IReadOnlyList<string> lines = Lines(Result(
+            Model.Rule("modules/independent"), RuleStatus.Passed, captured: true, debt: debt));
 
         lines[1]
             .ShouldBe("  projects: App.Api 2 (4 sites), App.Web 1");
@@ -336,8 +344,8 @@ public sealed class StatusFormatterTests
         // names sorted would put Api first here, so this row is what tells the two apart.
         IReadOnlyList<Violation> debt = [.. SitedDummies(1, 2, "Api"), .. SitedDummies(2, 2, "Web")];
 
-        IReadOnlyList<string> lines = StatusFormatter.Lines(
-            new CheckReport([Result(Model.Rule("layering/leaves"), RuleStatus.Passed, captured: true, debt: debt)]));
+        IReadOnlyList<string> lines = Lines(Result(
+            Model.Rule("layering/leaves"), RuleStatus.Passed, captured: true, debt: debt));
 
         lines[1]
             .ShouldBe("  layers: Web 2 (4 sites), Api 1 (2 sites)");
@@ -348,8 +356,8 @@ public sealed class StatusFormatterTests
     {
         // A burned-down family has nowhere to point, and an empty key under the promotion suggestion would
         // be one more line saying nothing.
-        IReadOnlyList<string> lines = StatusFormatter.Lines(
-            new CheckReport([Result(Model.Rule("layering/cuts-not-circular"), RuleStatus.Passed, captured: true)]));
+        IReadOnlyList<string> lines = Lines(Result(
+            Model.Rule("layering/cuts-not-circular"), RuleStatus.Passed, captured: true));
 
         lines[0]
             .ShouldBe("pass layering/cuts-not-circular (migrate) — 0 remaining; promotable to Enforce (baseline is empty)");
@@ -361,8 +369,7 @@ public sealed class StatusFormatterTests
     {
         // Keyed on the baseline like every other reader of "is this rule ratcheted": a family with no
         // baseline has no debt to place, only violations to fix, and check is where those are read.
-        IReadOnlyList<string> lines = StatusFormatter.Lines(
-            new CheckReport([Result(Model.Rule("layering/cuts-independent"), RuleStatus.Failed, 4)]));
+        IReadOnlyList<string> lines = Lines(Result(Model.Rule("layering/cuts-independent"), RuleStatus.Failed, 4));
 
         lines[0]
             .ShouldBe("FAIL layering/cuts-independent — 4 violations");
@@ -374,13 +381,9 @@ public sealed class StatusFormatterTests
     {
         // The other half of the same gate: a plain subject has no cells, so its debt has nowhere to be
         // grouped and its row reads exactly as it always has.
-        IReadOnlyList<string> lines = StatusFormatter.Lines(
-            new CheckReport(
-            [
-                Result(
-                    Model.Rule("data-access/no-inline-sql"), RuleStatus.Passed, grandfathered: 2, captured: true,
-                    sitesEach: 3)
-            ]));
+        IReadOnlyList<string> lines = Lines(Result(
+            Model.Rule("data-access/no-inline-sql"), RuleStatus.Passed, grandfathered: 2, captured: true,
+            sitesEach: 3));
 
         lines[0]
             .ShouldBe(
@@ -395,13 +398,9 @@ public sealed class StatusFormatterTests
         // The harm this whole shape exists to prevent. A forbidden target that matched nothing warns and
         // passes with no violations, so every captured entry goes unmatched — which would read as "fixed
         // awaiting acceptance" under a nudge to run the one command that then deletes the section outright.
-        IReadOnlyList<string> lines = StatusFormatter.Lines(
-            new CheckReport(
-            [
-                Result(
-                    Model.Rule("data-access/no-inline-sql"), RuleStatus.Passed, stale: 12, captured: true,
-                    inertHint: "THE-TARGET-CURE")
-            ]));
+        IReadOnlyList<string> lines = Lines(Result(
+            Model.Rule("data-access/no-inline-sql"), RuleStatus.Passed, stale: 12, captured: true,
+            inertHint: "THE-TARGET-CURE"));
 
         lines[0]
             .ShouldBe("pass data-access/no-inline-sql (migrate) — 0 remaining, 12 not measured");
@@ -415,13 +414,9 @@ public sealed class StatusFormatterTests
         // The other rotted shape reaches the other arm: an empty subject IS one new violation, so the rule
         // fails and the row carries all three counters. The term has to be honest in both places, or half the
         // rot keeps reading as paid-down debt.
-        IReadOnlyList<string> lines = StatusFormatter.Lines(
-            new CheckReport(
-            [
-                Result(
-                    Model.Rule("data-access/no-inline-sql"), RuleStatus.Failed, captured: true, stale: 12,
-                    emptySubjectHint: "THE-SUBJECT-CURE")
-            ]));
+        IReadOnlyList<string> lines = Lines(Result(
+            Model.Rule("data-access/no-inline-sql"), RuleStatus.Failed, captured: true, stale: 12,
+            emptySubjectHint: "THE-SUBJECT-CURE"));
 
         lines[0]
             .ShouldBe(
@@ -434,13 +429,9 @@ public sealed class StatusFormatterTests
         // The cure is the one the signal minted, not a second sentence composed here: status and the check
         // report would otherwise be two places to correct the same advice. The row above keeps its anchored
         // shape — the line rides under it, which is what keeps the quoted-count gate matching.
-        IReadOnlyList<string> lines = StatusFormatter.Lines(
-            new CheckReport(
-            [
-                Result(
-                    Model.Rule("data-access/no-inline-sql"), RuleStatus.Passed, stale: 2, captured: true,
-                    inertHint: "A trailing `.*` covers the namespace itself.")
-            ]));
+        IReadOnlyList<string> lines = Lines(Result(
+            Model.Rule("data-access/no-inline-sql"), RuleStatus.Passed, stale: 2, captured: true,
+            inertHint: "A trailing `.*` covers the namespace itself."));
 
         lines[1]
             .ShouldBe(
@@ -453,13 +444,9 @@ public sealed class StatusFormatterTests
     {
         // Burned to zero and never measured are the same four counts, and only one of them is progress:
         // without the predicate on Promotable this row would invite enforcing a rule that measures nothing.
-        IReadOnlyList<string> lines = StatusFormatter.Lines(
-            new CheckReport(
-            [
-                Result(
-                    Model.Rule("data-access/no-inline-sql"), RuleStatus.Passed, captured: true,
-                    inertHint: "THE-TARGET-CURE")
-            ]));
+        IReadOnlyList<string> lines = Lines(Result(
+            Model.Rule("data-access/no-inline-sql"), RuleStatus.Passed, captured: true,
+            inertHint: "THE-TARGET-CURE"));
 
         lines[0]
             .ShouldBe("pass data-access/no-inline-sql (migrate) — 0 grandfathered remaining");
@@ -473,13 +460,9 @@ public sealed class StatusFormatterTests
         // The third arm, and the same reasoning as the acceptance nudge: capturing from a rule that measured
         // nothing signs off "zero debt" nobody saw, which is why the verb refuses it. What is left is the
         // state, which is true whatever the selection did.
-        IReadOnlyList<string> lines = StatusFormatter.Lines(
-            new CheckReport(
-            [
-                Result(
-                    Model.Rule("data-access/no-inline-sql"), RuleStatus.Failed,
-                    emptySubjectHint: "THE-SUBJECT-CURE")
-            ]));
+        IReadOnlyList<string> lines = Lines(Result(
+            Model.Rule("data-access/no-inline-sql"), RuleStatus.Failed,
+            emptySubjectHint: "THE-SUBJECT-CURE"));
 
         lines[0]
             .ShouldBe("FAIL data-access/no-inline-sql (migrate) — no baseline captured (1 current violation)");
@@ -496,13 +479,9 @@ public sealed class StatusFormatterTests
         // Enforce rule has none. Its row is also not the misleading one — it reads the warning count it always
         // read, and check is where the cure for a rule the reader has to fix actually belongs. Two of the
         // violated fixture's rules are exactly this shape, so the gate is exercised on a real report.
-        IReadOnlyList<string> lines = StatusFormatter.Lines(
-            new CheckReport(
-            [
-                Result(
-                    Model.Rule("layering/billing-independent"), RuleStatus.Passed, warnings: 1,
-                    inertHint: "THE-TARGET-CURE")
-            ]));
+        IReadOnlyList<string> lines = Lines(Result(
+            Model.Rule("layering/billing-independent"), RuleStatus.Passed, warnings: 1,
+            inertHint: "THE-TARGET-CURE"));
 
         lines[0]
             .ShouldBe("pass layering/billing-independent — 2 warnings");
@@ -515,13 +494,9 @@ public sealed class StatusFormatterTests
         // The rule measured its live pattern, so the sentence for a whole selection that matched nothing would be
         // false here. One pattern matched no types, and the unmatched entry cannot be read as fixed, since the
         // dead pattern might have been the one to match it.
-        IReadOnlyList<string> lines = StatusFormatter.Lines(
-            new CheckReport(
-            [
-                Result(
-                    Model.Rule("data-access/no-inline-sql"), RuleStatus.Passed, grandfathered: 2, stale: 1,
-                    captured: true, inertOperands: ["the Legacy layer"], operandHint: "THE-OPERAND-CURE")
-            ]));
+        IReadOnlyList<string> lines = Lines(Result(
+            Model.Rule("data-access/no-inline-sql"), RuleStatus.Passed, grandfathered: 2, stale: 1,
+            captured: true, inertOperands: ["the Legacy layer"], operandHint: "THE-OPERAND-CURE"));
 
         lines[0]
             .ShouldBe("pass data-access/no-inline-sql (migrate) — 2 grandfathered remaining, 0 new, 1 not measured");
@@ -534,13 +509,9 @@ public sealed class StatusFormatterTests
     [Fact]
     public void Migrate_TwoDeadOperands_NamesBothInOnePluralPhrase()
     {
-        IReadOnlyList<string> lines = StatusFormatter.Lines(
-            new CheckReport(
-            [
-                Result(
-                    Model.Rule("data-access/no-inline-sql"), RuleStatus.Passed, stale: 1, captured: true,
-                    inertOperands: ["the Legacy layer", "types in `App.Ghost.*`"])
-            ]));
+        IReadOnlyList<string> lines = Lines(Result(
+            Model.Rule("data-access/no-inline-sql"), RuleStatus.Passed, stale: 1, captured: true,
+            inertOperands: ["the Legacy layer", "types in `App.Ghost.*`"]));
 
         lines[1]
             .ShouldBe(
@@ -553,13 +524,9 @@ public sealed class StatusFormatterTests
     {
         // The verb refuses to capture a rule that measured only part of what it names, so the row cannot
         // suggest it; the sub-line is where a reader learns why, and what clears it.
-        IReadOnlyList<string> lines = StatusFormatter.Lines(
-            new CheckReport(
-            [
-                Result(
-                    Model.Rule("data-access/no-inline-sql"), RuleStatus.Failed, 2,
-                    inertOperands: ["the Legacy layer"])
-            ]));
+        IReadOnlyList<string> lines = Lines(Result(
+            Model.Rule("data-access/no-inline-sql"), RuleStatus.Failed, 2,
+            inertOperands: ["the Legacy layer"]));
 
         lines[0]
             .ShouldBe("FAIL data-access/no-inline-sql (migrate) — no baseline captured (2 current violations)");
@@ -574,13 +541,9 @@ public sealed class StatusFormatterTests
     {
         // No debt left, no violation and nothing stale would make the rule promotable, but one pattern of its ban
         // matched nothing. The row reads the state and suggests nothing.
-        IReadOnlyList<string> lines = StatusFormatter.Lines(
-            new CheckReport(
-            [
-                Result(
-                    Model.Rule("data-access/no-inline-sql"), RuleStatus.Passed, captured: true,
-                    inertOperands: ["the Legacy layer"])
-            ]));
+        IReadOnlyList<string> lines = Lines(Result(
+            Model.Rule("data-access/no-inline-sql"), RuleStatus.Passed, captured: true,
+            inertOperands: ["the Legacy layer"]));
 
         lines[0]
             .ShouldBe("pass data-access/no-inline-sql (migrate) — 0 grandfathered remaining");
@@ -597,13 +560,9 @@ public sealed class StatusFormatterTests
         // split beneath it is read already qualified.
         IReadOnlyList<Violation> debt = [.. SitedDummies(1, 1, "Checking"), .. SitedDummies(2, 1, "Rendering")];
 
-        IReadOnlyList<string> lines = StatusFormatter.Lines(
-            new CheckReport(
-            [
-                Result(
-                    Model.Rule("layering/cuts-only-shared"), RuleStatus.Passed, stale: 1, captured: true,
-                    debt: debt, allowedOperands: ["types in `App.Ghost.*`"], operandHint: "THE-OPERAND-CURE")
-            ]));
+        IReadOnlyList<string> lines = Lines(Result(
+            Model.Rule("layering/cuts-only-shared"), RuleStatus.Passed, stale: 1, captured: true,
+            debt: debt, allowedOperands: ["types in `App.Ghost.*`"], operandHint: "THE-OPERAND-CURE"));
 
         lines.Take(3)
             .ShouldBe(
@@ -621,13 +580,9 @@ public sealed class StatusFormatterTests
     {
         // A capture would record what the dead pattern was meant to allow as debt, so init refuses the rule and
         // the row cannot suggest it; the sub-line says why, and that the cure is the pattern itself.
-        IReadOnlyList<string> lines = StatusFormatter.Lines(
-            new CheckReport(
-            [
-                Result(
-                    Model.Rule("layering/cuts-only-shared"), RuleStatus.Failed, 2,
-                    allowedOperands: ["types in `App.Ghost.*`"])
-            ]));
+        IReadOnlyList<string> lines = Lines(Result(
+            Model.Rule("layering/cuts-only-shared"), RuleStatus.Failed, 2,
+            allowedOperands: ["types in `App.Ghost.*`"]));
 
         lines[0]
             .ShouldBe("FAIL layering/cuts-only-shared (migrate) — no baseline captured (2 current violations)");
@@ -642,13 +597,9 @@ public sealed class StatusFormatterTests
     {
         // No debt left, no violation and nothing stale would make the rule promotable, but a dead allowed pattern
         // leaves it stricter than written. The row reads the state and suggests nothing.
-        IReadOnlyList<string> lines = StatusFormatter.Lines(
-            new CheckReport(
-            [
-                Result(
-                    Model.Rule("layering/cuts-only-shared"), RuleStatus.Passed, captured: true,
-                    allowedOperands: ["types in `App.Ghost.*`"])
-            ]));
+        IReadOnlyList<string> lines = Lines(Result(
+            Model.Rule("layering/cuts-only-shared"), RuleStatus.Passed, captured: true,
+            allowedOperands: ["types in `App.Ghost.*`"]));
 
         lines[0]
             .ShouldBe("pass layering/cuts-only-shared (migrate) — 0 grandfathered remaining");
@@ -658,13 +609,9 @@ public sealed class StatusFormatterTests
     public void Migrate_DeadAllowedPatternWithNothingRemaining_KeepsTheAcceptReductionsNudge()
     {
         // The dead pattern never unmatched an entry, so the entry is fixed debt and accept-reductions retires it.
-        IReadOnlyList<string> lines = StatusFormatter.Lines(
-            new CheckReport(
-            [
-                Result(
-                    Model.Rule("layering/cuts-only-shared"), RuleStatus.Passed, stale: 2, captured: true,
-                    allowedOperands: ["types in `App.Ghost.*`"])
-            ]));
+        IReadOnlyList<string> lines = Lines(Result(
+            Model.Rule("layering/cuts-only-shared"), RuleStatus.Passed, stale: 2, captured: true,
+            allowedOperands: ["types in `App.Ghost.*`"]));
 
         lines[0]
             .ShouldBe(
@@ -688,8 +635,7 @@ public sealed class StatusFormatterTests
                 inertHint: "THE-TARGET-CURE")
         ]);
 
-        StatusFormatter.Lines(report)
-            .Last()
+        Summary(report)
             .ShouldBe(
                 "Checked 2 rules: 2 passed, 0 failed, 0 skipped. Burndown: 0 grandfathered remaining, "
                 + "2 fixed awaiting acceptance, 12 not measured.");
@@ -708,8 +654,7 @@ public sealed class StatusFormatterTests
                 inertOperands: ["the Legacy layer"])
         ]);
 
-        StatusFormatter.Lines(report)
-            .Last()
+        Summary(report)
             .ShouldBe(
                 "Checked 2 rules: 2 passed, 0 failed, 0 skipped. Burndown: 0 grandfathered remaining, "
                 + "2 fixed awaiting acceptance, 3 not measured.");
@@ -720,13 +665,9 @@ public sealed class StatusFormatterTests
     {
         // A dead membership only adds violations, as a dead allowed pattern does, so its row keeps the fixed term
         // and the sub-line names the memberships by their own noun.
-        IReadOnlyList<string> lines = StatusFormatter.Lines(
-            new CheckReport(
-            [
-                Result(
-                    Model.Rule("layering/cuts-only-shared"), RuleStatus.Passed, grandfathered: 1, stale: 1,
-                    captured: true, memberships: ["types in `Ghost.*`", "the Legacy layer"])
-            ]));
+        IReadOnlyList<string> lines = Lines(Result(
+            Model.Rule("layering/cuts-only-shared"), RuleStatus.Passed, grandfathered: 1, stale: 1,
+            captured: true, memberships: ["types in `Ghost.*`", "the Legacy layer"]));
 
         lines.Take(2)
             .ShouldBe(
@@ -741,13 +682,9 @@ public sealed class StatusFormatterTests
     {
         // A dead among part can pass a subject as readily as red one, so the rule's entries are in doubt and its
         // cure is to fix or remove the part rather than to move it to a rule of its own.
-        IReadOnlyList<string> lines = StatusFormatter.Lines(
-            new CheckReport(
-            [
-                Result(
-                    Model.Rule("layering/cuts-only-shared"), RuleStatus.Failed, 2,
-                    amongOperands: ["types in `Ghost.*`"])
-            ]));
+        IReadOnlyList<string> lines = Lines(Result(
+            Model.Rule("layering/cuts-only-shared"), RuleStatus.Failed, 2,
+            amongOperands: ["types in `Ghost.*`"]));
 
         lines[1]
             .ShouldBe(
@@ -768,8 +705,7 @@ public sealed class StatusFormatterTests
                 allowedOperands: ["types in `App.Ghost.*`"])
         ]);
 
-        StatusFormatter.Lines(report)
-            .Last()
+        Summary(report)
             .ShouldBe(
                 "Checked 2 rules: 2 passed, 0 failed, 0 skipped. Burndown: 0 grandfathered remaining, "
                 + "5 fixed awaiting acceptance.");
@@ -780,15 +716,9 @@ public sealed class StatusFormatterTests
     {
         // accept-reductions writes to a rule stricter than written, so the nudge over its entries is advice that
         // works.
-        var report = new CheckReport(
-        [
-            Result(
+        Summary(Result(
                 Model.Rule("layering/cuts-only-shared"), RuleStatus.Passed, grandfathered: 2, captured: true,
-                uncounted: 2, allowedOperands: ["types in `App.Ghost.*`"])
-        ]);
-
-        StatusFormatter.Lines(report)
-            .Last()
+                uncounted: 2, allowedOperands: ["types in `App.Ghost.*`"]))
             .ShouldEndWith(", 2 uncounted; run 'sliderule baseline accept-reductions' to record site counts.");
     }
 
@@ -797,15 +727,9 @@ public sealed class StatusFormatterTests
     {
         // accept-reductions skips a rule not measured in full, so a nudge over that rule's entries alone
         // would name a run that records nothing. The count stays: the entries are uncounted either way.
-        var report = new CheckReport(
-        [
-            Result(
+        Summary(Result(
                 Model.Rule("data-access/no-inline-sql"), RuleStatus.Passed, grandfathered: 2, captured: true,
-                uncounted: 2, inertOperands: ["the Legacy layer"])
-        ]);
-
-        StatusFormatter.Lines(report)
-            .Last()
+                uncounted: 2, inertOperands: ["the Legacy layer"]))
             .ShouldBe(
                 "Checked 1 rule: 1 passed, 0 failed, 0 skipped. Burndown: 2 grandfathered remaining, "
                 + "0 fixed awaiting acceptance, 2 uncounted.");
@@ -824,8 +748,7 @@ public sealed class StatusFormatterTests
             Result(Model.Rule("layering/cuts-not-circular"), RuleStatus.Passed, grandfathered: 1, captured: true, uncounted: 1)
         ]);
 
-        StatusFormatter.Lines(report)
-            .Last()
+        Summary(report)
             .ShouldEndWith(", 3 uncounted; run 'sliderule baseline accept-reductions' to record site counts.");
     }
 
@@ -834,11 +757,7 @@ public sealed class StatusFormatterTests
     {
         // The term extinguishes itself, like the two measure clauses beside it: a run with no rot in it reads
         // byte for byte as it did before rot had a word.
-        var report = new CheckReport(
-            [Result(Model.Rule("data-access/no-inline-sql"), RuleStatus.Passed, stale: 2, captured: true)]);
-
-        StatusFormatter.Lines(report)
-            .Last()
+        Summary(Result(Model.Rule("data-access/no-inline-sql"), RuleStatus.Passed, stale: 2, captured: true))
             .ShouldNotContain("not measured");
     }
 
@@ -854,8 +773,7 @@ public sealed class StatusFormatterTests
             Result(Model.Rule("layering/domain-independent"), RuleStatus.Failed, 1)
         ]);
 
-        StatusFormatter.Lines(report)
-            .Last()
+        Summary(report)
             .ShouldBe(
                 "Checked 5 rules: 2 passed, 3 failed, 0 skipped. Burndown: 1 grandfathered remaining, 0 fixed awaiting acceptance.");
     }

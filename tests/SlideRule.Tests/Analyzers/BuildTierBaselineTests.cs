@@ -1,5 +1,4 @@
 using Microsoft.CodeAnalysis;
-using Shouldly;
 using SlideRule.Baselines;
 using SlideRule.Hosting;
 using SlideRule.Tests.Checking;
@@ -59,8 +58,7 @@ public sealed class BuildTierBaselineTests
         IReadOnlyList<Diagnostic> reported = await Diagnose(
             Checker.Model(BuildTier.QuarantineScope), (BuildTier.BaselineFilePath, baseline));
 
-        reported.ShouldAllBe("SR2001")
-            .Count.ShouldBe(3, "one warning per site the containment is crossed at");
+        reported.ShouldAllBe("SR2001", 3, "one warning per site the containment is crossed at");
     }
 
     [Fact]
@@ -74,8 +72,8 @@ public sealed class BuildTierBaselineTests
 
         IReadOnlyList<Diagnostic> reported = await Diagnose(model, (BuildTier.BaselineFilePath, baseline));
 
-        IReadOnlyList<Diagnostic> grown = reported.ShouldAllBe("SR2002");
-        grown.Count.ShouldBe(2, "one warning per site of the pair that grew");
+        IReadOnlyList<Diagnostic> grown = reported.ShouldAllBe(
+            "SR2002", 2, "one warning per site of the pair that grew");
         string expected = BuildTier.Composed(
             model, BuildTier.RuleId, "Data.Store",
             "The baseline holds 1 site of this pair and 2 were found.");

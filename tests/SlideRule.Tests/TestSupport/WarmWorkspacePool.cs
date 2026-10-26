@@ -1,8 +1,6 @@
 using SlideRule.Cli;
 using SlideRule.Cli.Pipeline;
-using SlideRule.Internal;
 using SlideRule.Roslyn;
-using SlideRule.Roslyn.Threading;
 
 namespace SlideRule.Tests.TestSupport;
 
@@ -38,24 +36,19 @@ namespace SlideRule.Tests.TestSupport;
 ///         workspaces; each such test says so at its own call site.
 ///     </para>
 ///     <para>
-///         <b>Bounded.</b> At most <see cref="Capacity" /> sessions are live, evicted least-recently-used
+///         <b>Bounded.</b> At most <see cref="WorkspacePool.Capacity" /> sessions are live, evicted least-recently-used
 ///         first, because each holds an <c>MSBuildWorkspace</c> and its out-of-process BuildHost. Eviction
 ///         passes over one key, this repo's own solution: it is the single most expensive load there is, and
 ///         its consumers sit far apart in a run, with enough leased fixture copies between them, each a fresh
 ///         key, that recency alone evicts it before the next consumer arrives. It still counts toward
-///         <see cref="Capacity" />, and <see cref="DropUnder" /> and <see cref="DropAll" /> still release it.
+///         <see cref="WorkspacePool.Capacity" />, and <see cref="DropUnder" /> and <see cref="DropAll" /> still release it.
+///         A session with a call in flight is never evicted, so while every other session is mid-call the
+///         pool runs over <see cref="WorkspacePool.Capacity" />, by at most the number of callers.
 ///     </para>
 /// </remarks>
 internal static class WarmWorkspacePool
 {
-    private const int Capacity = 4;
-
-    private static readonly SemaphoreSlim Gate = new(1, 1);
-
-    // Least-recently-used first; the tail is the most recent acquisition.
-    private static readonly List<Entry> Live = [];
-
-    private static readonly string PinnedKey = Path.GetFullPath(RepoRoot.Solution);
+    private static readonly WorkspacePool Shared = new(Path.GetFullPath(RepoRoot.Solution));
 
     /// <summary>
     ///     The pool as an <see cref="ISolutionSource" />, for handing to <see cref="CliEntry" /> or to any
@@ -69,88 +62,34 @@ internal static class WarmWorkspacePool
     ///     The number of acquisitions served from an already-loaded session. With
     ///     <see cref="WorkspaceLoader.LoadCount" /> this is the pool's whole value proposition in two numbers.
     /// </summary>
-    internal static long ReuseCount { get; private set; }
+    internal static long ReuseCount => Shared.ReuseCount;
 
-    /// <summary>
-    ///     The reconciled snapshot for <paramref name="solutionPath" />, loading it if no session holds it.
-    /// </summary>
-    internal static async Task<WorkspaceSnapshot> GetCurrentAsync(string solutionPath, CancellationToken ct)
+    /// <summary>The process-wide pool's <see cref="WorkspacePool.GetCurrentAsync" />.</summary>
+    internal static Task<WorkspaceSnapshot> GetCurrentAsync(string solutionPath, CancellationToken ct)
     {
-        string key = Path.GetFullPath(solutionPath);
-
-        using SemaphoreRelease held = await Gate.LockAsync(ct);
-        WorkspaceSession session = await RentAsync(key);
-        return await session.GetCurrentAsync(key, ct);
+        return Shared.GetCurrentAsync(solutionPath, ct);
     }
 
-    /// <summary>
-    ///     Disposes every session whose solution lives under <paramref name="directory" />, releasing the
-    ///     workspaces and their BuildHosts.
-    /// </summary>
-    /// <remarks>
-    ///     Call this before rewriting or deleting a tree, so a warm workspace can never be the reason a
-    ///     file is locked.
-    /// </remarks>
+    /// <summary>The process-wide pool's <see cref="WorkspacePool.DropUnder" />.</summary>
     internal static void DropUnder(string directory)
     {
-        string prefix = Path.TrimEndingDirectorySeparator(Path.GetFullPath(directory)) + Path.DirectorySeparatorChar;
-
-        using SemaphoreRelease held = Gate.Lock();
-        List<Entry> doomed = Live.Where(entry => entry.Key.StartsWith(prefix, PathComparison.Comparison))
-            .ToList();
-        foreach (Entry entry in doomed)
-        {
-            Live.Remove(entry);
-            Dispose(entry);
-        }
+        Shared.DropUnder(directory);
     }
 
-    /// <summary>Disposes every live session.</summary>
+    /// <summary>The process-wide pool's <see cref="WorkspacePool.DropAll" />.</summary>
     internal static void DropAll()
     {
-        using SemaphoreRelease held = Gate.Lock();
-        foreach (Entry entry in Live) Dispose(entry);
-        Live.Clear();
+        Shared.DropAll();
     }
 
-    // Caller holds the gate. Deliberately uncancellable: an eviction half-done would leave a workspace
-    // undisposed and its BuildHost orphaned, and the work is a dispose plus a list edit.
-    private static async Task<WorkspaceSession> RentAsync(string key)
+    /// <summary>
+    ///     A pool of its own that pins no key, for the class whose subject is the pool itself: no class running
+    ///     beside it can evict its sessions. The caller disposes it.
+    /// </summary>
+    internal static WorkspacePool Private()
     {
-        int index = Live.FindIndex(entry => string.Equals(entry.Key, key, PathComparison.Comparison));
-        if (index >= 0)
-        {
-            Entry existing = Live[index];
-            Live.RemoveAt(index);
-            Live.Add(existing); // most recently used
-            ReuseCount++;
-            return existing.Session;
-        }
-
-        while (Live.Count >= Capacity)
-        {
-            int oldest = Live.FindIndex(static entry => !string.Equals(entry.Key, PinnedKey, PathComparison.Comparison));
-            Entry evicted = Live[oldest];
-            Live.RemoveAt(oldest);
-            await evicted.Session.DisposeAsync();
-        }
-
-        var minted = new Entry(key, new WorkspaceSession());
-        Live.Add(minted);
-        return minted.Session;
+        return new WorkspacePool(pinnedKey: null);
     }
-
-    // Blocking dispose: the pool's sync entry points run between tests, never inside a workspace call, and a
-    // session's own DisposeAsync is already bounded, so there is nothing here to deadlock against.
-    private static void Dispose(Entry entry)
-    {
-        entry.Session.DisposeAsync()
-            .AsTask()
-            .GetAwaiter()
-            .GetResult();
-    }
-
-    private sealed record Entry(string Key, WorkspaceSession Session);
 
     /// <summary>
     ///     The pool behind the <see cref="ISolutionSource" /> seam: serve the pooled session's reconciled

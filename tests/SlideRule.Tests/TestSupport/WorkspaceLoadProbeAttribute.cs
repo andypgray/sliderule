@@ -66,11 +66,14 @@ internal sealed class WorkspaceLoadProbeAttribute : BeforeAfterTestAttribute
 
         try
         {
-            var lines = new List<string> { "class\tmethod\tloads\tms" };
-            lines.AddRange(Rows.OrderBy(r => r, StringComparer.Ordinal));
-            lines.Add($"TOTAL\t\t{WorkspaceLoader.LoadCount}\t");
-            // The other half of the story: how many acquisitions a warm pooled session answered instead.
-            lines.Add($"POOL-REUSED\t\t{WarmWorkspacePool.ReuseCount}\t");
+            string[] lines =
+            [
+                "class\tmethod\tloads\tms",
+                .. Rows.OrderBy(r => r, StringComparer.Ordinal),
+                $"TOTAL\t\t{WorkspaceLoader.LoadCount}\t",
+                // The other half of the story: how many acquisitions a warm pooled session answered instead.
+                $"POOL-REUSED\t\t{WarmWorkspacePool.ReuseCount}\t"
+            ];
             File.WriteAllLines(path, lines);
         }
         catch

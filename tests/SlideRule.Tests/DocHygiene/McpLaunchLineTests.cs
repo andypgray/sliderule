@@ -232,7 +232,7 @@ public sealed class McpLaunchLineTests
     // Every launch line in the fences of one doc.
     private static IEnumerable<LaunchLine> Find(string doc, string text)
     {
-        foreach (SourceAnchors.TaggedBlock block in SourceAnchors.TaggedBlocks(text))
+        foreach (DocFences.TaggedBlock block in DocFences.TaggedBlocks(text))
         {
             if (JsonInfoStrings.Contains(block.Info, StringComparer.Ordinal))
                 foreach (LaunchLine config in ClientConfigs(doc, block.Lines))
@@ -279,7 +279,7 @@ public sealed class McpLaunchLineTests
     // with, named by its first content line, or by its opening delimiter when it has none.
     private static IEnumerable<string> UnparsedJsonFences(string doc, string text)
     {
-        foreach (SourceAnchors.TaggedBlock block in SourceAnchors.TaggedBlocks(text))
+        foreach (DocFences.TaggedBlock block in DocFences.TaggedBlocks(text))
         {
             if (!JsonInfoStrings.Contains(block.Info, StringComparer.Ordinal)) continue;
 

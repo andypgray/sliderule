@@ -113,7 +113,7 @@ public sealed class BuildTierDescriptorTests
     public void Descriptor_OfEachField_CarriesTheIdTitleMessageAndDescriptionItShipsWith(
         string field, string id, string title, string messageFormat, string description)
     {
-        DiagnosticDescriptor descriptor = Declared(field);
+        DiagnosticDescriptor descriptor = ShouldDeclare(field);
 
         descriptor.Id.ShouldBe(id);
         descriptor.Title.Invariant()
@@ -184,7 +184,7 @@ public sealed class BuildTierDescriptorTests
     }
 
     // A descriptor by the field that declares it, which is the one name two descriptors under one ID do not share.
-    private static DiagnosticDescriptor Declared(string field)
+    private static DiagnosticDescriptor ShouldDeclare(string field)
     {
         FieldInfo declared = typeof(BuildTierDiagnostics)
             .GetField(field, BindingFlags.NonPublic | BindingFlags.Static)

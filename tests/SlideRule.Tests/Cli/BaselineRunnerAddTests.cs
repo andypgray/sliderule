@@ -74,8 +74,7 @@ public sealed class BaselineRunnerAddTests : IDisposable
             .Baseline("member.json")
             .Because("b"));
         CheckReport report = Harness.Check(model, CompilationFactory.Extract(Source), BaselineIndex.Empty);
-        string path = Path.Combine(_temp.Path, "member.json");
-        File.WriteAllText(path, BaselineComposer.Compose(RuleId));
+        string path = _temp.WriteFile(["member.json"], BaselineComposer.Compose(RuleId));
 
         var output = new StringWriter();
         BaselineRequest request = BaselineRequests.Add(
@@ -91,8 +90,7 @@ public sealed class BaselineRunnerAddTests : IDisposable
             "time/inject-clock: added 1 grandfathered entry — MyApp.Web.HomeController -> System.DateTime.Now (because: INC-1234).");
         echo.ShouldContain("wrote member.json");
 
-        string written = File.ReadAllText(path)
-            .NormalizedLines();
+        string written = File.ReadAllText(path);
         written.ShouldContain(
             "        { \"source\": \"T:MyApp.Web.HomeController\", \"target\": \"P:System.DateTime.Now\", \"siteCount\": 1, \"because\": \"INC-1234\", \"seal\": ");
         // Composer as oracle: the whole file is the canonical composition of exactly that one entry.
@@ -114,8 +112,7 @@ public sealed class BaselineRunnerAddTests : IDisposable
             .Baseline("ctor.json")
             .Because("b"));
         CheckReport report = Harness.Check(model, CompilationFactory.Extract(CtorSource), BaselineIndex.Empty);
-        string path = Path.Combine(_temp.Path, "ctor.json");
-        File.WriteAllText(path, BaselineComposer.Compose(CtorRuleId));
+        string path = _temp.WriteFile(["ctor.json"], BaselineComposer.Compose(CtorRuleId));
 
         var output = new StringWriter();
         BaselineRequest request = BaselineRequests.Add(
@@ -132,8 +129,7 @@ public sealed class BaselineRunnerAddTests : IDisposable
             "data-access/no-new: added 1 grandfathered entry — MyApp.Web.OrderController -> MyApp.Data.Db (because: INC-9).");
         echo.ShouldContain("wrote ctor.json");
 
-        string written = File.ReadAllText(path)
-            .NormalizedLines();
+        string written = File.ReadAllText(path);
         written.ShouldContain(
             "        { \"source\": \"T:MyApp.Web.OrderController\", \"target\": \"T:MyApp.Data.Db\", \"siteCount\": 1, \"because\": \"INC-9\", \"seal\": ");
         // Composer as oracle: the whole file is the canonical composition of exactly that one edge entry.
@@ -160,8 +156,7 @@ public sealed class BaselineRunnerAddTests : IDisposable
         report.Single()
             .ShouldHaveFailedWithEdges(
                 ViolationKind.Catch, ["App.ImportHandler -> Errors.DbError", "App.LegacyHandler -> Errors.DbError"]);
-        string path = Path.Combine(_temp.Path, "catch.json");
-        File.WriteAllText(path, BaselineComposer.Compose(UnfilteredCatchRuleId));
+        string path = _temp.WriteFile(["catch.json"], BaselineComposer.Compose(UnfilteredCatchRuleId));
 
         var output = new StringWriter();
         BaselineRequest request = BaselineRequests.Add(
@@ -177,7 +172,6 @@ public sealed class BaselineRunnerAddTests : IDisposable
             .ShouldContain(
                 "exceptions/no-unfiltered-catch: added 1 grandfathered entry — App.LegacyHandler -> Errors.DbError (because: INC-77).");
         File.ReadAllText(path)
-            .NormalizedLines()
             .ShouldBe(BaselineComposer.Compose(
                 UnfilteredCatchRuleId,
                 BaselineEntry.ForEdge("T:App.LegacyHandler", "T:Errors.DbError")

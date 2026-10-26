@@ -45,7 +45,7 @@ public sealed class ExemplarResolutionTests
         result.ShouldHavePassedClean();
         result.ShouldHaveResolvedExemplar("App.Domain.Model");
         result.Exemplar
-            .Single()
+            .ShouldHaveSingleItem()
             .DeclarationSites
             .ShouldNotBeEmpty();
     }
@@ -121,9 +121,7 @@ public sealed class ExemplarResolutionTests
                 "App.Domain.Apple -> App.Web.Controller", "App.Domain.Service -> App.Web.Controller",
                 "App.Domain.Service -> App.Web.Helper", "App.Domain.Zebra -> App.Web.Controller"
             ]);
-        result.ShouldHaveWarnedDeadExemplars("types named `Ghost`");
-        result.Warnings
-            .Single()
+        result.ShouldHaveWarnedDeadExemplar("types named `Ghost`")
             .Hint
             .ShouldBe(NameCure);
     }
@@ -139,7 +137,8 @@ public sealed class ExemplarResolutionTests
         result.ShouldHavePassed();
         result.ShouldHaveResolvedExemplar("App.Domain.Model");
         result.ShouldHaveWarnedDeadExemplars("types named `Ghost`", "types named `Phantom`");
-        result.Warnings.ShouldAllBe(warning => warning.Hint == NameCure);
+        result.Warnings.Select(warning => warning.Hint)
+            .ShouldAllBe(hint => hint == NameCure);
     }
 
     [Fact]
@@ -153,9 +152,7 @@ public sealed class ExemplarResolutionTests
 
         result.ShouldHavePassed();
         result.ShouldHaveResolvedExemplar("App.Domain.Model");
-        result.ShouldHaveWarnedDeadExemplars("types in `App.Ghost.*`");
-        result.Warnings
-            .Single()
+        result.ShouldHaveWarnedDeadExemplar("types in `App.Ghost.*`")
             .Hint
             .ShouldBe(NamespaceCure);
     }
@@ -202,9 +199,7 @@ public sealed class ExemplarResolutionTests
 
         result.ShouldHavePassed();
         result.ShouldHaveResolvedExemplar();
-        result.ShouldHaveWarnedDeadExemplars("`Uri`");
-        result.Warnings
-            .Single()
+        result.ShouldHaveWarnedDeadExemplar("`Uri`")
             .Hint
             .ShouldBe(
                 "A typeof anchor reaches only a type this solution declares, never one supplied by a package or by "
@@ -261,7 +256,8 @@ public sealed class ExemplarResolutionTests
             .Single();
 
         result.ShouldHaveFailed();
-        result.Violations.ShouldAllBe(violation => violation.Kind == ViolationKind.Reference);
+        result.Violations.Select(violation => violation.Kind)
+            .ShouldAllBe(kind => kind == ViolationKind.Reference);
         result.Warnings
             .ShouldHaveSingleItem()
             .Message
@@ -273,11 +269,12 @@ public sealed class ExemplarResolutionTests
     {
         Action<Arch> define = WebRuleWithExemplar(arch => arch.Types.Named("Model", "Ghost"));
 
-        RuleResult result = Checker.Run(Sources.LayeredModel, BaselineIndex.Empty, NarrowedUniverse.OneProject, define)
+        RuleResult result = Checker.Run(Sources.LayeredModel, define, narrowing: NarrowedUniverse.OneProject)
             .Single();
 
         result.ShouldHaveResolvedExemplar();
-        result.Warnings.ShouldNotContain(warning => warning.Kind == CheckWarningKind.DeadExemplar);
+        result.Warnings.Select(warning => warning.Kind)
+            .ShouldNotContain(CheckWarningKind.DeadExemplar);
     }
 
     [Fact]
@@ -287,7 +284,7 @@ public sealed class ExemplarResolutionTests
         // evidence the pointer went stale.
         Action<Arch> define = WebRuleWithExemplar(arch => arch.Types.Named("Model", "Ghost"));
 
-        RuleResult result = Checker.Run(Sources.LayeredModel, BaselineIndex.Empty, Checker.FilterNarrowing, define)
+        RuleResult result = Checker.Run(Sources.LayeredModel, define, narrowing: Checker.FilterNarrowing)
             .Single();
 
         result.ShouldHavePassedClean();
@@ -297,7 +294,7 @@ public sealed class ExemplarResolutionTests
     [Fact]
     public void ARuleTheFilterSkipped_StillCarriesItsExemplar()
     {
-        RuleResult result = Checker.Run(Sources.LayeredModel, BaselineIndex.Empty, Checker.FilterNarrowing, arch =>
+        RuleResult result = Checker.Run(Sources.LayeredModel, narrowing: Checker.FilterNarrowing, define: arch =>
                 arch.Rule("layering/nowhere")
                     .Enforce(arch.Namespace("App.Nowhere.*").MustNotReference(arch.Namespace("App.Web.*")))
                     .Because("b")
@@ -313,12 +310,10 @@ public sealed class ExemplarResolutionTests
     {
         Action<Arch> define = WebRuleWithExemplar(arch => arch.Types.Named("Ghost"));
 
-        RuleResult result = Checker.Run(Sources.LayeredModel, Checker.PartialModel, define)
+        RuleResult result = Checker.Run(Sources.LayeredModel, define, incompleteModel: Checker.PartialModel)
             .Single();
 
-        result.ShouldHaveWarnedDeadExemplars("types named `Ghost`");
-        result.Warnings
-            .Single()
+        result.ShouldHaveWarnedDeadExemplar("types named `Ghost`")
             .Hint
             .ShouldBe(Checker.PartialModelCure);
     }
@@ -336,7 +331,7 @@ public sealed class ExemplarResolutionTests
         result.ShouldHavePassedClean();
         result.ShouldHaveResolvedExemplar("App.Data.OrdersRepository");
         result.Exemplar
-            .Single()
+            .ShouldHaveSingleItem()
             .DeclarationSites
             .Select(site => site.Line)
             .ShouldBe([3, 4]);
@@ -375,9 +370,7 @@ public sealed class ExemplarResolutionTests
 
         result.ShouldHavePassed();
         result.ShouldHaveGrandfathered(1);
-        result.ShouldHaveWarnedDeadExemplars("types named `BookingRepository`");
-        result.Warnings
-            .Single()
+        result.ShouldHaveWarnedDeadExemplar("types named `BookingRepository`")
             .ShouldSatisfyAllConditions(
                 warning => warning.Message.ShouldBe(
                     "This rule's exemplar \"types named `BookingRepository`\" matched no solution-declared types."),

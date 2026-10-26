@@ -32,6 +32,8 @@ public sealed class SelfSpecTests
     /// </summary>
     private const string SpecName = "SlideRule.Architecture";
 
+    private const string ClaimsFenceType = "SlideRule.Cli.CommandEntryPoint";
+
     /// <summary>
     ///     Where this solution's own render can place a context file. <c>examples/</c> is deliberately
     ///     absent: those <c>AGENTS.md</c>s belong to the example solutions' own specs and are gated by the
@@ -72,7 +74,7 @@ public sealed class SelfSpecTests
     ///     <c>render --diagram</c> draws, extracted the way both of them extract it.
     /// </summary>
     /// <remarks>
-    ///     The model is immutable and already shared assembly-wide by <see cref="WorkspaceFixture" />, so
+    ///     The model is immutable and already shared across the run by <see cref="FixtureCodebase" />, so
     ///     several gates reading one instance is the established shape rather than a new risk — internal so
     ///     that a gate elsewhere that needs this repository as a real codebase shares it too rather than
     ///     paying the Roslyn walk a second time. The two gates that need a <em>different</em> model —
@@ -133,10 +135,7 @@ public sealed class SelfSpecTests
         string composed = AgentContextRenderer.RootBlock(SelfModel, SpecName);
         string committed = File.ReadAllText(RepoRoot.AgentsMd);
 
-        // Exactly one marker pair (ExtractBody throws on any other count), and its body is current.
-        ManagedBlocks.MarkerPairCount(committed)
-            .ShouldBe(1);
-        ManagedBlock.ExtractBody(committed)
+        committed.ShouldCarryOneManagedBlock("AGENTS.md must carry exactly one managed block.")
             .ShouldBe(composed);
     }
 
@@ -152,9 +151,7 @@ public sealed class SelfSpecTests
             summary, Path.GetFileName(RepoRoot.Solution), SelfModel, SpecName, new DiagramScope(ShippingProjects, []));
         string committed = File.ReadAllText(RepoRoot.ArchitectureMd);
 
-        ManagedBlocks.MarkerPairCount(committed)
-            .ShouldBe(1);
-        ManagedBlock.ExtractBody(committed)
+        committed.ShouldCarryOneManagedBlock("ARCHITECTURE.md must carry exactly one managed block.")
             .ShouldBe(composed);
     }
 
@@ -179,7 +176,7 @@ public sealed class SelfSpecTests
             "It prints {count} project lines",
             "the project lines the survey prints",
             summary.Projects.Count,
-            GrandfatheredCounts.CountStyle.WordToTen);
+            CountStyle.WordToTen);
 
         drift.ShouldReportNothing("The self-check page states a project-line count the survey contradicts");
     }
@@ -221,6 +218,25 @@ public sealed class SelfSpecTests
 
         // Assert
         drift.ShouldReportNothing("The self-check page's survey fence is not what `graph` prints for the drawn projects");
+    }
+
+    /// <summary>
+    ///     The self-check page's <c>explain --type</c> excerpt is a run of this repository's spec over this
+    ///     repository: every line it quotes is a line of the answer for <c>CommandEntryPoint</c>, in order.
+    /// </summary>
+    [Fact]
+    public async Task ClaimsFence_IsAnExcerptOfWhatExplainPrintsForTheShell()
+    {
+        // Arrange: the answer as explain --type composes it, over the model the shared self-spec gates read.
+        CodebaseModel codebase = await WholeCodebase.Value;
+        TypeNode type = codebase.Types.Single(candidate => candidate.FullName == ClaimsFenceType && !candidate.IsExternal);
+        TypeClaims claims = TypeClaims.Of(SelfModel, new ClaimTracer(codebase), type);
+
+        // Act
+        string answer = string.Join("\n", ClaimsFormatter.Lines(claims, RepoRoot.Directory));
+
+        // Assert
+        CapturedFences.SelfCheckClaims.ShouldBeAnInOrderExcerptOf(answer, $"The answer for {ClaimsFenceType}:\n{answer}");
     }
 
     /// <summary>
@@ -304,9 +320,7 @@ public sealed class SelfSpecTests
                 .ShouldBeTrue($"{relative} is not committed; run `sliderule render`.");
 
             string committed = File.ReadAllText(file.Path);
-            ManagedBlocks.MarkerPairCount(committed)
-                .ShouldBe(1, relative);
-            ManagedBlock.ExtractBody(committed)
+            committed.ShouldCarryOneManagedBlock(relative)
                 .ShouldBe(file.Body, relative);
         }
 
@@ -677,16 +691,10 @@ public sealed class SelfSpecTests
 
             files.AddRange(Directory
                 .EnumerateFiles(directory, ContextFileComposer.FileName, SearchOption.AllDirectories)
-                .Where(path => !IsBuildOutput(path))
+                .Where(path => !TempFixtureWorkspace.IsBuildArtifact(RepoRoot.Relative(path)))
                 .Select(Path.GetFullPath));
         }
 
         return files;
-    }
-
-    private static bool IsBuildOutput(string path)
-    {
-        return path.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
-            .Any(segment => segment is "bin" or "obj");
     }
 }

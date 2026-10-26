@@ -45,13 +45,7 @@ public sealed class WorkspaceDiagnosticsRendererTests
             LoadFailures = ["first failure", "second failure"]
         }).Rendered;
 
-        composed.Count.ShouldBe(3);
-        composed[0]
-            .ShouldBe("first failure");
-        composed[1]
-            .ShouldBe("second failure");
-        composed[2]
-            .ShouldBe(MsBuildBootstrap.SelectionNote());
+        composed.ShouldBe(["first failure", "second failure", MsBuildBootstrap.SelectionNote()]);
     }
 
     [Fact]
@@ -77,13 +71,7 @@ public sealed class WorkspaceDiagnosticsRendererTests
             MergeNotes = ["a conflation advisory"]
         }).RenderedWithMergeNotes;
 
-        composed.Count.ShouldBe(3);
-        composed[0]
-            .ShouldBe("a load failure");
-        composed[1]
-            .ShouldBe("a conflation advisory");
-        composed[2]
-            .ShouldBe(MsBuildBootstrap.SelectionNote());
+        composed.ShouldBe(["a load failure", "a conflation advisory", MsBuildBootstrap.SelectionNote()]);
     }
 
     [Fact]

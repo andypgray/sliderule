@@ -1,5 +1,4 @@
 using Shouldly;
-using SlideRule.Tests.TestSupport;
 using Xunit;
 
 namespace SlideRule.Tests.DocHygiene;
@@ -36,7 +35,7 @@ public sealed class WrittenPathSyncTests
     private static readonly DocGate<WrittenPath> Gate = new(
         WriteDocs.Select(static entry => entry.Doc)
             .ToArray(),
-        ExtractDoc,
+        WrittenPaths.Extract,
         quotes: "write reports");
 
     [Fact]
@@ -49,10 +48,8 @@ public sealed class WrittenPathSyncTests
         // Act: every quoted path, resolved against its own example root, must be a file git tracks.
         foreach ((string doc, string exampleRoot) in WriteDocs)
         foreach (WrittenPath written in Gate.Scan(doc))
-        {
-            WrittenPaths.PathResult result = WrittenPaths.Classify(written, exampleRoot, tracked);
-            if (result.Bucket != WrittenPaths.PathBucket.Matched) stranded.Add(result.Failure!);
-        }
+            if (WrittenPaths.Classify(written, exampleRoot, tracked) is { } failure)
+                stranded.Add(failure);
 
         // Assert
         stranded.ShouldReportNothing("Quoted write reports name files this repository no longer publishes");
@@ -88,11 +85,5 @@ public sealed class WrittenPathSyncTests
             counted: "write report line(s)",
             swept: "write reports",
             authority: "the tracked file set");
-    }
-
-    private static IReadOnlyList<WrittenPath> ExtractDoc(string doc)
-    {
-        string text = RepoRoot.ReadText(doc);
-        return WrittenPaths.Extract(doc, text);
     }
 }

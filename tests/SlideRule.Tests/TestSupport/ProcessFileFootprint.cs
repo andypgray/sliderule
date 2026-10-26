@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
 using Microsoft.Win32.SafeHandles;
+using Xunit;
 
 // Every P/Invoke in this assembly is one of the imports below, and each names a Windows system DLL that
 // can resolve nowhere but System32 — so the search path is stated once for the assembly rather than
@@ -101,6 +102,15 @@ internal static class ProcessFileFootprint
     ///     exist or would read the wrong address space; callers skip rather than pretend.
     /// </summary>
     internal static bool IsSupported => OperatingSystem.IsWindows() && Environment.Is64BitProcess;
+
+    /// <summary>
+    ///     Skips the running test where <see cref="IsSupported" /> is false: the first statement of a scan's
+    ///     caller.
+    /// </summary>
+    internal static void SkipUnlessSupported()
+    {
+        Assert.SkipUnless(IsSupported, "The footprint scan is Windows-x64 only.");
+    }
 
     /// <summary>
     ///     Every distinct path under <paramref name="root" /> that <paramref name="process" /> is holding —
@@ -207,21 +217,20 @@ internal static class ProcessFileFootprint
     internal static IReadOnlyList<RetainedPath> AcquiredPathsUnder(
         this Process process,
         string root,
-        IReadOnlyCollection<RetainedPath>? inheritedHandles,
+        IReadOnlyCollection<RetainedPath> inheritedHandles,
         string? injectedProfilerDirectory)
     {
         IReadOnlyList<RetainedPath> retained = process.PathsUnder(root);
-        if (inheritedHandles is not null)
-            retained = ExceptInherited(retained, inheritedHandles);
+        IReadOnlyList<RetainedPath> acquired = ExceptInherited(retained, inheritedHandles);
 
-        return ExceptInjected(retained, injectedProfilerDirectory);
+        return ExceptInjected(acquired, injectedProfilerDirectory);
     }
 
     private static IReadOnlyList<RetainedPath> Scan(Process process, string root, bool includeMappedViews)
     {
         if (!IsSupported)
             throw new InvalidOperationException(
-                "ProcessFileFootprint needs a 64-bit Windows host; guard callers with IsSupported.");
+                "ProcessFileFootprint needs a 64-bit Windows host; guard callers with SkipUnlessSupported.");
 
         if (process.HasExited)
             throw new InvalidOperationException(

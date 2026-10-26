@@ -115,12 +115,12 @@ public sealed class StringifiedArrayRefusalCoverageTests
         // The preventive half, and the only half reflection can see. Both directions, because a description
         // that disagrees with the behaviour is wrong whichever way it disagrees.
         List<string> disagreements = [];
-        List<string> checkedParameters = [];
+        List<(string Tool, ParameterInfo Parameter)> parameters = LiveStringParameters()
+            .ToList();
 
-        foreach ((string tool, ParameterInfo parameter) in LiveStringParameters())
+        foreach ((string tool, ParameterInfo parameter) in parameters)
         {
             string where = Key(tool, parameter);
-            checkedParameters.Add(where);
 
             string description = parameter.GetCustomAttribute<DescriptionAttribute>()
                 ?.Description ?? "";
@@ -138,7 +138,7 @@ public sealed class StringifiedArrayRefusalCoverageTests
         disagreements.ShouldReportNothing(
             "Schema description(s) that disagree with what the parameter does when a JSON array is written "
             + "into it — the description is the only half of this a client reads before making the call");
-        checkedParameters.ShouldNotBeEmpty("the live arch_* tools declare no JSON-bound string parameters");
+        parameters.ShouldNotBeEmpty("the live arch_* tools declare no JSON-bound string parameters");
     }
 
     [Fact]

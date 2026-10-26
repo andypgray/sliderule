@@ -11,6 +11,7 @@ using SlideRule.Roslyn;
 using SlideRule.Roslyn.Solutions;
 using SlideRule.Tests.Checking;
 using SlideRule.Tests.DocHygiene;
+using SlideRule.Tests.Extraction;
 using SlideRule.Tests.TestSupport;
 using Xunit;
 
@@ -63,7 +64,7 @@ public sealed class HookReportFenceTests
                                                  }
                                                  """;
 
-    private static readonly Lazy<Task<CliModels>> Models = new(ExtractAsync);
+    private static readonly Lazy<Task<CliModels>> Models = new(ShouldExtractCliModelsAsync);
 
     [Theory]
     [InlineData(DocPaths.SelfCheck)]
@@ -145,10 +146,11 @@ public sealed class HookReportFenceTests
 
     // The CLI project extracted twice, as committed and with the imagined file added in memory. Every other
     // project is left out before the walk, so each model costs that one project.
-    private static async Task<CliModels> ExtractAsync()
+    private static async Task<CliModels> ShouldExtractCliModelsAsync()
     {
         WorkspaceSnapshot snapshot = await WarmWorkspacePool.GetCurrentAsync(RepoRoot.Solution, CancellationToken.None);
-        Project cli = snapshot.Solution.Projects.Single(project => project.Name == CliProject);
+        Project cli = snapshot.Solution.Projects.ShouldHaveSingle(
+            project => project.Name == CliProject, static project => project.Name);
         string imaginedPath = RepoRoot.Absolute(ProgressPrinterPath);
 
         // Committed, the file would put this very violation in the tree, and the pages' anchors would stop
@@ -196,17 +198,17 @@ public sealed class HookReportFenceTests
     {
         return model.Edges.Where(edge => edge.Source.FullName == source)
             .Select(static edge => edge.Target)
-            .Concat(model.MemberEdges.Where(edge => edge.Source.FullName == source)
+            .Concat(model.MemberEdges(source)
                 .Select(static edge => edge.Member.ContainingType))
-            .Concat(model.ConstructorEdges.Where(edge => edge.Source.FullName == source)
+            .Concat(model.ConstructorEdges(source)
                 .Select(static edge => edge.Constructed))
-            .Concat(model.InjectionEdges.Where(edge => edge.Source.FullName == source)
+            .Concat(model.InjectionEdges(source)
                 .Select(static edge => edge.Injected))
-            .Concat(model.CatchEdges.Where(edge => edge.Source.FullName == source)
+            .Concat(model.CatchEdges(source)
                 .Select(static edge => edge.Caught))
-            .Concat(model.ThrowEdges.Where(edge => edge.Source.FullName == source)
+            .Concat(model.ThrowEdges(source)
                 .Select(static edge => edge.Thrown))
-            .Concat(model.ExposureEdges.Where(edge => edge.Source.FullName == source)
+            .Concat(model.ExposureEdges(source)
                 .Select(static edge => edge.Exposed))
             .ToList();
     }

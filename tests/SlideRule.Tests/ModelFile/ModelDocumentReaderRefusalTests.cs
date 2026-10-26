@@ -1,6 +1,7 @@
 using Shouldly;
 using SlideRule.Internal;
 using SlideRule.ModelFile;
+using SlideRule.Tests.TestSupport;
 using Xunit;
 
 namespace SlideRule.Tests.ModelFile;
@@ -22,34 +23,25 @@ public sealed class ModelDocumentReaderRefusalTests
     [Fact]
     public void Read_ASchemaVersionAboveTheOneItUnderstands_RefusesAsNewer()
     {
-        ModelRefusal refusal = ShouldRefuseAfterEdit(
-            ModelFileSpecs.SampleText(), "\"schemaVersion\": 2,", "\"schemaVersion\": 3,");
-
-        refusal.Kind.ShouldBe(ModelRefusalKind.Newer);
-        refusal.Describe()
-            .ShouldBe("line 2, column 20: schemaVersion 3 is newer than this reader understands (2).");
+        ShouldRefuseAfterEdit(
+            ModelFileSpecs.SampleText(), "\"schemaVersion\": 2,", "\"schemaVersion\": 3,",
+            ModelRefusalKind.Newer, "line 2, column 20: schemaVersion 3 is newer than this reader understands (2).");
     }
 
     [Fact]
     public void Read_ASchemaVersionBelowTheOneItUnderstands_RefusesAsOlder()
     {
-        ModelRefusal refusal = ShouldRefuseAfterEdit(
-            ModelFileSpecs.SampleText(), "\"schemaVersion\": 2,", "\"schemaVersion\": 1,");
-
-        refusal.Kind.ShouldBe(ModelRefusalKind.Older);
-        refusal.Describe()
-            .ShouldBe("line 2, column 20: schemaVersion 1 is older than this reader understands (2).");
+        ShouldRefuseAfterEdit(
+            ModelFileSpecs.SampleText(), "\"schemaVersion\": 2,", "\"schemaVersion\": 1,",
+            ModelRefusalKind.Older, "line 2, column 20: schemaVersion 1 is older than this reader understands (2).");
     }
 
     [Fact]
     public void Read_AValueOfTheWrongKind_RefusesNamingTheKindItWanted()
     {
         ModelRefusal refusal = ShouldRefuseAfterEdit(
-            ModelFileSpecs.SampleText(), "\"spec\": \"MyApp architecture\",", "\"spec\": 1,");
-
-        refusal.Kind.ShouldBe(ModelRefusalKind.Malformed);
-        refusal.Describe()
-            .ShouldBe("line 3, column 11: \"spec\" must be a string.");
+            ModelFileSpecs.SampleText(), "\"spec\": \"MyApp architecture\",", "\"spec\": 1,",
+            ModelRefusalKind.Malformed, "line 3, column 11: \"spec\" must be a string.");
 
         // The offset counts from the start of the text: two code units for the opening line and
         // twenty-two for the version line put line 3 at 24, and column 11 is ten further on.
@@ -71,185 +63,145 @@ public sealed class ModelDocumentReaderRefusalTests
     [Fact]
     public void Read_AMissingRequiredKey_RefusesNamingTheKindOfThingItIsMissingFrom()
     {
-        ModelRefusal refusal = ShouldRefuseAfterEdit(
-            ModelFileSpecs.SampleText(), "      \"because\": \"The domain must not know the web.\",\n", "");
-
-        refusal.Kind.ShouldBe(ModelRefusalKind.Malformed);
-        refusal.Describe()
-            .ShouldBe("line 13, column 5: a rule has no \"because\".");
+        ShouldRefuseAfterEdit(
+            ModelFileSpecs.SampleText(), "      \"because\": \"The domain must not know the web.\",\n", "",
+            ModelRefusalKind.Malformed, "line 13, column 5: a rule has no \"because\".");
     }
 
     [Fact]
     public void Read_AnUnknownKey_RefusesRatherThanIgnoringIt()
     {
-        ModelRefusal refusal = ShouldRefuseAfterEdit(
+        ShouldRefuseAfterEdit(
             ModelFileSpecs.SampleText(),
             "      \"id\": \"layering/domain-independent\",\n",
-            "      \"id\": \"layering/domain-independent\",\n      \"extra\": 1,\n");
-
-        refusal.Kind.ShouldBe(ModelRefusalKind.Malformed);
-        refusal.Describe()
-            .ShouldBe("line 15, column 7: a rule does not take \"extra\".");
+            "      \"id\": \"layering/domain-independent\",\n      \"extra\": 1,\n",
+            ModelRefusalKind.Malformed, "line 15, column 7: a rule does not take \"extra\".");
     }
 
     [Fact]
     public void Read_AWordThatNamesNothing_RefusesNamingTheFamilyItLookedIn()
     {
-        ModelRefusal refusal = ShouldRefuseAfterEdit(
+        ShouldRefuseAfterEdit(
             ModelFileSpecs.SampleText(),
             "\"id\": \"api/handlers-are-public\",\n      \"posture\": \"enforce\",",
-            "\"id\": \"api/handlers-are-public\",\n      \"posture\": \"encourage\",");
-
-        refusal.Kind.ShouldBe(ModelRefusalKind.Malformed);
-        refusal.Describe()
-            .ShouldBe("line 23, column 18: \"encourage\" is not a posture.");
+            "\"id\": \"api/handlers-are-public\",\n      \"posture\": \"encourage\",",
+            ModelRefusalKind.Malformed, "line 23, column 18: \"encourage\" is not a posture.");
     }
 
     [Fact]
     public void Read_ALayerNameNothingDeclared_RefusesNamingIt()
     {
-        ModelRefusal refusal = ShouldRefuseAfterEdit(
-            ModelFileSpecs.SampleText(), "{ \"name\": \"Domain\", \"globs\":", "{ \"name\": \"Realm\", \"globs\":");
-
-        refusal.Kind.ShouldBe(ModelRefusalKind.Malformed);
-        refusal.Describe()
-            .ShouldBe("line 19, column 99: layer \"Domain\" is not declared above this point.");
+        ShouldRefuseAfterEdit(
+            ModelFileSpecs.SampleText(), "{ \"name\": \"Domain\", \"globs\":", "{ \"name\": \"Realm\", \"globs\":",
+            ModelRefusalKind.Malformed, "line 19, column 99: layer \"Domain\" is not declared above this point.");
     }
 
     [Fact]
     public void Read_ALayerNameDeclaredTwice_RefusesNamingIt()
     {
-        ModelRefusal refusal = ShouldRefuseAfterEdit(
+        ShouldRefuseAfterEdit(
             ModelFileSpecs.SampleText(),
-            "    { \"name\": \"Handlers\", \"definition\"", "    { \"name\": \"Domain\", \"definition\"");
-
-        refusal.Kind.ShouldBe(ModelRefusalKind.Malformed);
-        refusal.Describe()
-            .ShouldBe("line 10, column 15: layer \"Domain\" is declared twice.");
+            "    { \"name\": \"Handlers\", \"definition\"", "    { \"name\": \"Domain\", \"definition\"",
+            ModelRefusalKind.Malformed, "line 10, column 15: layer \"Domain\" is declared twice.");
     }
 
     [Fact]
     public void Read_ARuleIdUsedTwice_RefusesNamingIt()
     {
-        ModelRefusal refusal = ShouldRefuseAfterEdit(
+        ShouldRefuseAfterEdit(
             ModelFileSpecs.SampleText(),
-            "\"id\": \"time/no-ambient-clock\",", "\"id\": \"api/handlers-are-public\",");
-
-        refusal.Kind.ShouldBe(ModelRefusalKind.Malformed);
-        refusal.Describe()
-            .ShouldBe("line 29, column 13: rule \"api/handlers-are-public\" appears twice.");
+            "\"id\": \"time/no-ambient-clock\",", "\"id\": \"api/handlers-are-public\",",
+            ModelRefusalKind.Malformed, "line 29, column 13: rule \"api/handlers-are-public\" appears twice.");
     }
 
     [Fact]
     public void Read_ARuleIdOfTheWrongShape_RefusesQuotingIt()
     {
-        ModelRefusal refusal = ShouldRefuseAfterEdit(
-            ModelFileSpecs.SampleText(), "\"id\": \"time/no-ambient-clock\",", "\"id\": \"Time/No Ambient\",");
-
-        refusal.Kind.ShouldBe(ModelRefusalKind.Malformed);
-        refusal.Describe()
-            .ShouldBe("line 29, column 13: \"Time/No Ambient\" is not a rule id.");
+        ShouldRefuseAfterEdit(
+            ModelFileSpecs.SampleText(), "\"id\": \"time/no-ambient-clock\",", "\"id\": \"Time/No Ambient\",",
+            ModelRefusalKind.Malformed, "line 29, column 13: \"Time/No Ambient\" is not a rule id.");
     }
 
     [Fact]
     public void Read_ANamespaceGlobThatCanNeverMatch_RefusesInTheValidatorsOwnWords()
     {
-        ModelRefusal refusal = ShouldRefuseAfterEdit(
-            ModelFileSpecs.SampleText(), "\"glob\": \"MyApp.Web.*\"", "\"glob\": \"MyApp.*.Web.*\"");
-
-        refusal.Kind.ShouldBe(ModelRefusalKind.Malformed);
-        refusal.Describe()
-            .ShouldBe("line 19, column 373: namespace pattern \"MyApp.*.Web.*\" has a trailing `.*` subtree "
-                      + "operator but its literal prefix contains a `*`, which never matches; anchor the "
-                      + "subtree on a literal prefix.");
+        ShouldRefuseAfterEdit(
+            ModelFileSpecs.SampleText(), "\"glob\": \"MyApp.Web.*\"", "\"glob\": \"MyApp.*.Web.*\"",
+            ModelRefusalKind.Malformed,
+            "line 19, column 373: namespace pattern \"MyApp.*.Web.*\" has a trailing `.*` subtree "
+            + "operator but its literal prefix contains a `*`, which never matches; anchor the "
+            + "subtree on a literal prefix.");
     }
 
     [Fact]
     public void Read_ABlankTypeNameGlob_RefusesQuotingIt()
     {
-        ModelRefusal refusal = ShouldRefuseAfterEdit(
+        ShouldRefuseAfterEdit(
             ModelFileSpecs.SampleText(),
-            "{ \"node\": \"withSuffix\", \"suffix\": \"Dto\" }", "{ \"node\": \"withNameMatching\", \"glob\": \"\" }");
-
-        refusal.Kind.ShouldBe(ModelRefusalKind.Malformed);
-        refusal.Describe()
-            .ShouldBe("line 19, column 241: type-name pattern \"\" is blank.");
+            "{ \"node\": \"withSuffix\", \"suffix\": \"Dto\" }", "{ \"node\": \"withNameMatching\", \"glob\": \"\" }",
+            ModelRefusalKind.Malformed, "line 19, column 241: type-name pattern \"\" is blank.");
     }
 
     [Fact]
     public void Read_AMalformedPathGlob_RefusesInTheMatchersOwnWords()
     {
-        ModelRefusal refusal = ShouldRefuseAfterEdit(
+        ShouldRefuseAfterEdit(
             ModelFileSpecs.SampleText(),
-            "{ \"node\": \"withSuffix\", \"suffix\": \"Dto\" }", "{ \"node\": \"under\", \"globs\": [\"src/../Widgets\"] }");
-
-        refusal.Kind.ShouldBe(ModelRefusalKind.Malformed);
-        refusal.Describe()
-            .ShouldBe("line 19, column 232: path glob \"src/../Widgets\" has a `.` or `..` segment; name the "
-                      + "directories from the solution directory down.");
+            "{ \"node\": \"withSuffix\", \"suffix\": \"Dto\" }", "{ \"node\": \"under\", \"globs\": [\"src/../Widgets\"] }",
+            ModelRefusalKind.Malformed,
+            "line 19, column 232: path glob \"src/../Widgets\" has a `.` or `..` segment; name the "
+            + "directories from the solution directory down.");
     }
 
     [Fact]
     public void Read_ASelectionCarryingBothANounAndAUnion_RefusesNamingBothKeys()
     {
-        ModelRefusal refusal = ShouldRefuseAfterEdit(
-            ModelFileSpecs.SampleText(), "[{ \"union\": [", "[{ \"noun\": { \"node\": \"types\" }, \"union\": [");
-
-        refusal.Kind.ShouldBe(ModelRefusalKind.Malformed);
-        refusal.Describe()
-            .ShouldBe("line 19, column 267: a selection takes exactly one of \"noun\" and \"union\".");
+        ShouldRefuseAfterEdit(
+            ModelFileSpecs.SampleText(), "[{ \"union\": [", "[{ \"noun\": { \"node\": \"types\" }, \"union\": [",
+            ModelRefusalKind.Malformed,
+            "line 19, column 267: a selection takes exactly one of \"noun\" and \"union\".");
     }
 
     [Fact]
     public void Read_AFamilyNounCarryingBothArms_RefusesNamingBothKeys()
     {
-        ModelRefusal refusal = ShouldRefuseAfterEdit(
+        ShouldRefuseAfterEdit(
             ModelFileSpecs.TextOf(ModelFileSpecs.DefineFamily),
             "{ \"node\": \"each\", \"layers\": [\"Alpha\", \"Beta\"] }",
-            "{ \"node\": \"each\", \"layers\": [\"Alpha\", \"Beta\"], \"projects\": {} }");
-
-        refusal.Kind.ShouldBe(ModelRefusalKind.Malformed);
-        refusal.Describe()
-            .ShouldBe("line 18, column 81: an \"each\" noun takes exactly one of \"layers\" and \"projects\".");
+            "{ \"node\": \"each\", \"layers\": [\"Alpha\", \"Beta\"], \"projects\": {} }",
+            ModelRefusalKind.Malformed,
+            "line 18, column 81: an \"each\" noun takes exactly one of \"layers\" and \"projects\".");
     }
 
     [Fact]
     public void Read_ALayerCarryingBothGlobsAndADefinition_RefusesNamingBothKeys()
     {
-        ModelRefusal refusal = ShouldRefuseAfterEdit(
+        ShouldRefuseAfterEdit(
             ModelFileSpecs.SampleText(),
             "{ \"name\": \"Domain\", \"globs\": [\"MyApp.Domain.*\"], ",
-            "{ \"name\": \"Domain\", \"globs\": [\"MyApp.Domain.*\"], \"definition\": { \"noun\": { \"node\": \"types\" } }, ");
-
-        refusal.Kind.ShouldBe(ModelRefusalKind.Malformed);
-        refusal.Describe()
-            .ShouldBe("line 9, column 5: a layer takes exactly one of \"globs\" and \"definition\".");
+            "{ \"name\": \"Domain\", \"globs\": [\"MyApp.Domain.*\"], \"definition\": { \"noun\": { \"node\": \"types\" } }, ",
+            ModelRefusalKind.Malformed, "line 9, column 5: a layer takes exactly one of \"globs\" and \"definition\".");
     }
 
     [Fact]
     public void Read_ALayerWhoseGlobsAreNotAnArray_RefusesRatherThanThrowing()
     {
-        ModelRefusal refusal = ShouldRefuseAfterEdit(
-            ModelFileSpecs.SampleText(), "\"globs\": [\"MyApp.Domain.*\"]", "\"globs\": \"MyApp.Domain.*\"");
-
-        refusal.Kind.ShouldBe(ModelRefusalKind.Malformed);
-        refusal.Describe()
-            .ShouldBe("line 9, column 34: \"globs\" must be an array.");
+        ShouldRefuseAfterEdit(
+            ModelFileSpecs.SampleText(), "\"globs\": [\"MyApp.Domain.*\"]", "\"globs\": \"MyApp.Domain.*\"",
+            ModelRefusalKind.Malformed, "line 9, column 34: \"globs\" must be an array.");
     }
 
     [Fact]
     public void Read_ATripwireCarryingAConstraint_RefusesNamingTheRule()
     {
-        ModelRefusal refusal = ShouldRefuseAfterEdit(
+        ShouldRefuseAfterEdit(
             ModelFileSpecs.TextOf(ModelFileSpecs.DefineScope),
             "      \"scope\": { \"role\": \"tripwire\"",
             "      \"constraint\": { \"node\": \"mustBeSealed\", \"subject\": { \"noun\": { \"node\": \"types\" } } },\n"
-            + "      \"scope\": { \"role\": \"tripwire\"");
-
-        refusal.Kind.ShouldBe(ModelRefusalKind.Malformed);
-        refusal.Describe()
-            .ShouldBe("line 19, column 5: rule \"legacy/billing/tripwire\" carries a \"constraint\" unless its "
-                      + "scope is a tripwire, and a tripwire carries none.");
+            + "      \"scope\": { \"role\": \"tripwire\"",
+            ModelRefusalKind.Malformed,
+            "line 19, column 5: rule \"legacy/billing/tripwire\" carries a \"constraint\" unless its "
+            + "scope is a tripwire, and a tripwire carries none.");
     }
 
     [Fact]
@@ -257,7 +209,7 @@ public sealed class ModelDocumentReaderRefusalTests
     {
         string valid = ModelFileSpecs.SampleText();
         valid.ShouldReadBack();
-        string edited = Edited(valid, "\"schemaVersion\": 2,", "\"schemaVersion\": 2");
+        string edited = ShouldReplaceOnce(valid, "\"schemaVersion\": 2,", "\"schemaVersion\": 2");
         edited.ShouldNotBe(valid);
         StrictJson.TryParse(edited, out _, out StrictJsonError? parserError)
             .ShouldBeFalse();
@@ -300,13 +252,10 @@ public sealed class ModelDocumentReaderRefusalTests
         // A file holding one was not written from a spec that loaded, so reading it would mint a model no spec
         // could have built.
         string valid = ModelFileSpecs.TextOf(DefineEveryEmptiableList);
-        (string edited, int at) = WithEmptiedArray(valid, node, key);
+        (string edited, int at) = ShouldEmptyTheArray(valid, node, key);
 
-        ModelRefusal refusal = ShouldRefuseEdited(valid, edited);
-
-        refusal.Kind.ShouldBe(ModelRefusalKind.Malformed);
-        refusal.Describe()
-            .ShouldBe($"{PositionOf(edited, at)}: \"{key}\" must not be empty.");
+        ShouldRefuseEdited(
+            valid, edited, ModelRefusalKind.Malformed, $"{PositionOf(edited, at)}: \"{key}\" must not be empty.");
     }
 
     private static void DefineEveryEmptiableList(Arch arch)
@@ -333,7 +282,7 @@ public sealed class ModelDocumentReaderRefusalTests
 
     // The text with the array under `key` in the one node opening with `node` emptied, and the offset of that
     // array's opening bracket. The bracket is matched to its close, so the edit holds whatever the entries spell.
-    private static (string Edited, int At) WithEmptiedArray(string text, string node, string key)
+    private static (string Edited, int At) ShouldEmptyTheArray(string text, string node, string key)
     {
         int start = ShouldFindOnce(text, node);
 
@@ -350,22 +299,23 @@ public sealed class ModelDocumentReaderRefusalTests
 
     private static string PositionOf(string text, int offset)
     {
-        int lineStart = text.LastIndexOf('\n', offset - 1) + 1;
-        int line = text.Take(offset).Count(character => character == '\n') + 1;
+        ReadOnlySpan<char> before = text.AsSpan(0, offset);
 
-        return $"line {line}, column {offset - lineStart + 1}";
+        return $"line {before.Count('\n') + 1}, column {offset - before.LastIndexOf('\n')}";
     }
 
     // One surgical edit of a text that read clean, with the three guards a refusal row needs: that the
     // text read before the edit, that the edit changed it, and that what comes back is the reader's
-    // refusal rather than the JSON parser's.
-    private static ModelRefusal ShouldRefuseAfterEdit(string valid, string find, string replace)
+    // refusal rather than the JSON parser's; then the row's kind and its described position.
+    private static ModelRefusal ShouldRefuseAfterEdit(
+        string valid, string find, string replace, ModelRefusalKind kind, string described)
     {
-        string edited = Edited(valid, find, replace);
-        return ShouldRefuseEdited(valid, edited);
+        string edited = ShouldReplaceOnce(valid, find, replace);
+        return ShouldRefuseEdited(valid, edited, kind, described);
     }
 
-    private static ModelRefusal ShouldRefuseEdited(string valid, string edited)
+    private static ModelRefusal ShouldRefuseEdited(
+        string valid, string edited, ModelRefusalKind kind, string described)
     {
         valid.ShouldReadBack();
 
@@ -375,12 +325,17 @@ public sealed class ModelDocumentReaderRefusalTests
 
         ModelReadResult result = ModelDocumentReader.Read(edited);
         result.Document.ShouldBeNull();
-        return result.Refusal.ShouldNotBeNull();
+        ModelRefusal refusal = result.Refusal.ShouldNotBeNull();
+        refusal.Kind.ShouldBe(kind);
+        refusal.Describe()
+            .ShouldBe(described);
+
+        return refusal;
     }
 
     // Replaces the one occurrence of `find`, and says so if there is not exactly one: an edit that landed
     // somewhere else would move the position every row above asserts.
-    private static string Edited(string text, string find, string replace)
+    private static string ShouldReplaceOnce(string text, string find, string replace)
     {
         int at = ShouldFindOnce(text, find);
         return text.Substring(0, at) + replace + text.Substring(at + find.Length);
@@ -388,11 +343,9 @@ public sealed class ModelDocumentReaderRefusalTests
 
     private static int ShouldFindOnce(string text, string find)
     {
-        int at = text.IndexOf(find, StringComparison.Ordinal);
-        at.ShouldBeGreaterThanOrEqualTo(0, $"the text should carry '{find}'");
-        text.IndexOf(find, at + find.Length, StringComparison.Ordinal)
-            .ShouldBe(-1, $"the text should carry '{find}' exactly once");
+        text.Occurrences(find)
+            .ShouldBe(1, $"the text should carry '{find}' exactly once");
 
-        return at;
+        return text.IndexOf(find, StringComparison.Ordinal);
     }
 }

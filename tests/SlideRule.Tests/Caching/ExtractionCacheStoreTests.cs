@@ -70,11 +70,11 @@ public sealed class ExtractionCacheStoreTests
         solution.AddProject("A", [], ("A.cs", "class A {}"));
         solution.BackdateAll();
         ExtractionCacheStore store = solution.NewStore();
-        var extraction = new ExtractionResult(
-            solution.Projects.Select(p => new CodebaseFragment(p.ProjectName, null, p.ProjectReferences, [], [], [], [], [], [], [], [], [], []))
-                .ToList(),
-            [new SpecResolutionRecord("", "A", ["A"], ["/out/A.dll"], null)],
-            WorkspaceDiagnostics.None);
+        ExtractionResult extraction = TrivialExtraction(solution) with
+        {
+            SpecResolutions = [new SpecResolutionRecord("", "A", ["A"], ["/out/A.dll"], null)],
+            LoadDiagnostics = WorkspaceDiagnostics.None
+        };
         store.ShouldWrite(solution.Projects, extraction);
 
         solution.MutateCacheJson(root =>
@@ -128,12 +128,8 @@ public sealed class ExtractionCacheStoreTests
 
         IReadOnlyDictionary<string, bool> stamps = solution.StructuralStampsByPath();
 
-        stamps.ShouldContainKey(solution.ArtifactsAssetsPathOf("A"));
-        stamps[solution.ArtifactsAssetsPathOf("A")]
-            .ShouldBeTrue();
-        stamps.ShouldContainKey(solution.DefaultLayoutAssetsPathOf("A"));
-        stamps[solution.DefaultLayoutAssetsPathOf("A")]
-            .ShouldBeFalse();
+        stamps.ShouldContainKeyAndValue(solution.ArtifactsAssetsPathOf("A"), true);
+        stamps.ShouldContainKeyAndValue(solution.DefaultLayoutAssetsPathOf("A"), false);
     }
 
     [Fact]
@@ -280,8 +276,7 @@ public sealed class ExtractionCacheStoreTests
         store.ShouldWrite(solution.Projects, TrivialExtraction(solution));
 
         // Act — change A's content; the Merkle keys carry the change to every dependent.
-        File.WriteAllText(solution.PathOf("A", "A.cs"), "class A { int x; }");
-        File.SetLastWriteTimeUtc(solution.PathOf("A", "A.cs"), DateTime.UtcNow.AddHours(-1));
+        RewriteBackdated(solution.PathOf("A", "A.cs"), "class A { int x; }");
         CacheReadResult result = store.ReadAndValidate(Ct);
 
         // Assert — {A, B, C} dirty (D clean); the reusable fragments are exactly the clean projects'.
@@ -358,9 +353,9 @@ public sealed class ExtractionCacheStoreTests
         (store.CaptureStampCount - beforeCapture).ShouldBe(1);
         fingerprint.FreshStamps.ShouldNotBeNull()
             .Select(stamp => stamp.Path)
-            .ShouldBe([Path.GetFullPath(solution.PathOf("A", "A.cs"))]);
-        fingerprint.Projects.Single(project => project.ProjectName == "B")
-            .Documents.ShouldBe(partial.Validated.ShouldNotBeNull().Projects.Single(project => project.Entry.ProjectName == "B").Entry.Documents);
+            .ShouldBe([solution.PathOf("A", "A.cs")]);
+        fingerprint.Projects.ShouldHaveSingle(project => project.ProjectName == "B", project => project.ProjectName)
+            .Documents.ShouldBe(partial.Validated.ShouldNotBeNull().Projects.ShouldHaveSingle(project => project.Entry.ProjectName == "B", project => project.Entry.ProjectName).Entry.Documents);
         store.Write(fingerprint, TrivialExtraction(solution), Ct)
             .ShouldBeTrue();
         store.ShouldValidateAsAPureStatHit();
@@ -413,9 +408,9 @@ public sealed class ExtractionCacheStoreTests
 
         // Assert — the added document is the one read, and it is in the written entry.
         (store.CaptureStampCount - beforeCapture).ShouldBe(1);
-        fingerprint.Projects.Single(project => project.ProjectName == "A")
+        fingerprint.Projects.ShouldHaveSingle(project => project.ProjectName == "A", project => project.ProjectName)
             .Documents.Select(stamp => stamp.Path)
-            .ShouldBe([Path.GetFullPath(solution.PathOf("A", "A1.cs")), Path.GetFullPath(added)]);
+            .ShouldBe([solution.PathOf("A", "A1.cs"), added]);
         store.Write(fingerprint, TrivialExtraction(solution), Ct)
             .ShouldBeTrue();
         store.ShouldValidateAsAPureStatHit();
@@ -441,9 +436,9 @@ public sealed class ExtractionCacheStoreTests
 
         // Assert — nothing was read, and the deleted document is gone from the entry.
         (store.CaptureStampCount - beforeCapture).ShouldBe(0);
-        fingerprint.Projects.Single()
+        fingerprint.Projects.ShouldHaveSingleItem()
             .Documents.Select(stamp => stamp.Path)
-            .ShouldBe([Path.GetFullPath(solution.PathOf("A", "A1.cs"))]);
+            .ShouldBe([solution.PathOf("A", "A1.cs")]);
         store.Write(fingerprint, TrivialExtraction(solution), Ct)
             .ShouldBeTrue();
         store.ShouldValidateAsAPureStatHit();
@@ -530,11 +525,10 @@ public sealed class ExtractionCacheStoreTests
         solution.BackdateAll();
         ExtractionCacheStore store = solution.NewStore();
         SpecResolutionRecord[] specs = [new("", "A", ["A", "PrivatePack"], ["/out/A.dll"], "/obj/A.dll")];
-        var extraction = new ExtractionResult(
-            solution.Projects.Select(p => new CodebaseFragment(p.ProjectName, null, p.ProjectReferences, [], [], [], [], [], [], [], [], [], []))
-                .ToList(),
-            specs,
-            WorkspaceDiagnostics.None with
+        ExtractionResult extraction = TrivialExtraction(solution) with
+        {
+            SpecResolutions = specs,
+            LoadDiagnostics = WorkspaceDiagnostics.None with
             {
                 LoadFailures = ["load-diag-1", "load-diag-2"],
                 FailedProjects = ["/repo/Broken/Broken.csproj"],
@@ -544,7 +538,8 @@ public sealed class ExtractionCacheStoreTests
                     new UnsupportedProject("/repo/Fs/Fs.fsproj", UnsupportedProjectKind.NotCsharp),
                     new UnsupportedProject("/repo/Shared/Shared.shproj", UnsupportedProjectKind.SharedProject)
                 ]
-            });
+            }
+        };
         store.ShouldWrite(solution.Projects, extraction);
 
         // Act
@@ -636,7 +631,7 @@ public sealed class ExtractionCacheStoreTests
         // Assert — a hit, one read (the edited document), and the sites moved down by the two comment lines.
         afterEdit.Outcome.ShouldBe(CacheOutcome.Hit);
         (store.ContentHashCount - beforeEdit).ShouldBe(1);
-        store.LastRemappedDocuments.ShouldBe([Path.GetFullPath(solution.PathOf("A", "A.cs"))]);
+        store.LastRemappedDocuments.ShouldBe([solution.PathOf("A", "A.cs")]);
         SiteLinesOf(afterEdit, "A")
             .ShouldBe([5, 6]);
 
@@ -674,7 +669,7 @@ public sealed class ExtractionCacheStoreTests
             .ShouldBe([5, 6]);
         SiteLinesOf(result, "B")
             .ShouldBe([3, 4]);
-        store.LastRemappedDocuments.ShouldBe([Path.GetFullPath(solution.PathOf("A", "A.cs"))]);
+        store.LastRemappedDocuments.ShouldBe([solution.PathOf("A", "A.cs")]);
     }
 
     [Fact]
@@ -856,7 +851,7 @@ public sealed class ExtractionCacheStoreTests
         // Act — validate while the document is held open against every other reader.
         long beforeHeld = store.ContentHashCount;
         CacheReadResult held;
-        using (HoldUnreadable(path))
+        using (FileHold.Exclusive(path))
         {
             held = store.ReadAndValidate(Ct);
         }
@@ -927,7 +922,7 @@ public sealed class ExtractionCacheStoreTests
     // compilation exposes, goes with it.
     private static void ShouldDirtyBothProjects(string before, string after)
     {
-        CacheReadResult result = RewriteADependency(before, after);
+        CacheReadResult result = ShouldStoreThenRewriteADependency(before, after);
 
         result.Outcome.ShouldBe(CacheOutcome.Partial);
         result.DirtyProjects.ShouldBe(["A", "B"], true);
@@ -937,7 +932,7 @@ public sealed class ExtractionCacheStoreTests
     // re-walks, and B's fragment rides through.
     private static void ShouldDirtyTheEditedProjectOnly(string before, string after)
     {
-        CacheReadResult result = RewriteADependency(before, after);
+        CacheReadResult result = ShouldStoreThenRewriteADependency(before, after);
 
         result.Outcome.ShouldBe(CacheOutcome.Partial);
         result.DirtyProjects.ShouldBe(["A"]);
@@ -945,7 +940,7 @@ public sealed class ExtractionCacheStoreTests
             .ShouldBe(["B"]);
     }
 
-    private static CacheReadResult RewriteADependency(string before, string after)
+    private static CacheReadResult ShouldStoreThenRewriteADependency(string before, string after)
     {
         using var solution = new SyntheticSolution();
         solution.AddProject("A", [], ("A.cs", before));
@@ -1005,7 +1000,7 @@ public sealed class ExtractionCacheStoreTests
             .Select(placement => new FragmentEdge(
                 $"N.{placement.Project}.Source",
                 "N.Target",
-                placement.Lines.Select(line => new FragmentSite(Path.GetFullPath(solution.PathOf(placement.Project, placement.File)), line))
+                placement.Lines.Select(line => new FragmentSite(solution.PathOf(placement.Project, placement.File), line))
                     .ToList()))
             .ToList();
     }
@@ -1031,14 +1026,6 @@ public sealed class ExtractionCacheStoreTests
     {
         string prefix = string.Concat(lines.Select(line => line + "\n"));
         RewriteBackdated(path, prefix + File.ReadAllText(path));
-    }
-
-    // Opens a document so that no other open of it through the runtime succeeds until the handle is disposed:
-    // Windows enforces the sharing mode, and elsewhere the runtime takes an exclusive lock that its own reads
-    // test for. A stat still succeeds on the held file, so the document reads as present rather than deleted.
-    private static FileStream HoldUnreadable(string path)
-    {
-        return new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.None);
     }
 
     // No placements, so every fragment is site-free — what most cases here want out of the store.
@@ -1067,12 +1054,13 @@ public sealed class ExtractionCacheStoreTests
 
         private readonly TempDirectory temp = TestTempRoot.Fresh("cache-store");
 
+        private readonly TempDirectory cache = TestTempRoot.Fresh("cache-store");
+
         public SyntheticSolution()
         {
             Root = temp.Path;
-            CacheRoot = Path.Combine(Root, "cache");
-            SolutionPath = Path.Combine(Root, "App.sln");
-            File.WriteAllText(SolutionPath, "Microsoft Visual Studio Solution File\n");
+            CacheRoot = cache.Path;
+            SolutionPath = temp.WriteFile(["App.sln"], "Microsoft Visual Studio Solution File\n");
         }
 
         public string Root { get; }
@@ -1088,26 +1076,16 @@ public sealed class ExtractionCacheStoreTests
         public void Dispose()
         {
             temp.Dispose();
+            cache.Dispose();
         }
 
         public void AddProject(string name, IReadOnlyList<string> references, params (string File, string Content)[] documents)
         {
-            string directory = Path.Combine(Root, name);
-            Directory.CreateDirectory(Path.Combine(directory, "obj"));
-            string csproj = Path.Combine(directory, $"{name}.csproj");
-            File.WriteAllText(csproj, "<Project Sdk=\"Microsoft.NET.Sdk\" />\n");
-            File.WriteAllText(Path.Combine(directory, "obj", "project.assets.json"), "{}\n");
+            string csproj = temp.WriteFile([name, $"{name}.csproj"], "<Project Sdk=\"Microsoft.NET.Sdk\" />\n");
+            temp.WriteFile([name, "obj", "project.assets.json"], "{}\n");
+            List<string> documentPaths = WriteDocuments([name], documents);
 
-            var documentPaths = new List<string>();
-            foreach ((string file, string content) in documents)
-            {
-                string documentPath = Path.Combine(directory, file);
-                File.WriteAllText(documentPath, content);
-                documentPaths.Add(documentPath);
-            }
-
-            var inputs = new ProjectInputs(name, csproj, directory, references, documentPaths);
-            projects.Add(inputs);
+            projects.Add(new ProjectInputs(name, csproj, temp.PathOf(name), references, documentPaths));
         }
 
         // A project built under UseArtifactsOutput: its intermediate tree — project.assets.json included —
@@ -1116,31 +1094,32 @@ public sealed class ExtractionCacheStoreTests
         // location can be derived.
         public void AddArtifactsLayoutProject(string name, params (string File, string Content)[] documents)
         {
-            string directory = Path.Combine(Root, "src", name);
-            Directory.CreateDirectory(directory);
-            string csproj = Path.Combine(directory, $"{name}.csproj");
-            File.WriteAllText(csproj, "<Project Sdk=\"Microsoft.NET.Sdk\" />\n");
+            string csproj = temp.WriteFile(["src", name, $"{name}.csproj"], "<Project Sdk=\"Microsoft.NET.Sdk\" />\n");
 
             string intermediateDirectory = Path.Combine(Root, "artifacts", "obj", name, "debug");
             Directory.CreateDirectory(intermediateDirectory);
             File.WriteAllText(ArtifactsAssetsPathOf(name), "{}\n");
 
-            var documentPaths = new List<string>();
-            foreach ((string file, string content) in documents)
-            {
-                string documentPath = Path.Combine(directory, file);
-                File.WriteAllText(documentPath, content);
-                documentPaths.Add(documentPath);
-            }
+            List<string> documentPaths = WriteDocuments(["src", name], documents);
 
             projects.Add(new ProjectInputs(
                 name,
                 csproj,
-                directory,
+                temp.PathOf("src", name),
                 [],
                 documentPaths,
                 Path.Combine(Root, "artifacts", "bin", name, "debug", $"{name}.dll"),
                 Path.Combine(intermediateDirectory, $"{name}.dll")));
+        }
+
+        // Writes each document under the directory the segments name, returning the paths written in order.
+        private List<string> WriteDocuments(string[] directory, (string File, string Content)[] documents)
+        {
+            var documentPaths = new List<string>();
+            foreach ((string file, string content) in documents)
+                documentPaths.Add(temp.WriteFile([.. directory, file], content));
+
+            return documentPaths;
         }
 
         public string ArtifactsAssetsPathOf(string name)
@@ -1157,7 +1136,7 @@ public sealed class ExtractionCacheStoreTests
         // store wrote — the level a claim about a persisted slot has to be read at.
         public IReadOnlyList<JsonObject> CacheDocumentStamps()
         {
-            var root = (JsonObject)JsonNode.Parse(File.ReadAllText(CacheFilePath))!;
+            JsonObject root = ReadCacheJson();
             return DocumentStampsOf(root);
         }
 
@@ -1182,7 +1161,7 @@ public sealed class ExtractionCacheStoreTests
         // Every structural stamp the written manifest carries, path -> whether the file existed at capture.
         public IReadOnlyDictionary<string, bool> StructuralStampsByPath()
         {
-            var root = (JsonObject)JsonNode.Parse(File.ReadAllText(CacheFilePath))!;
+            JsonObject root = ReadCacheJson();
             return root["StructuralStamps"]!.AsArray()
                 .ToDictionary(stamp => stamp!["Path"]!.GetValue<string>(), stamp => stamp!["Exists"]!.GetValue<bool>());
         }
@@ -1196,7 +1175,7 @@ public sealed class ExtractionCacheStoreTests
 
         public string PathOf(string project, string file)
         {
-            return Path.Combine(Root, project, file);
+            return Path.GetFullPath(temp.PathOf(project, file));
         }
 
         public ExtractionCacheStore NewStore()
@@ -1205,25 +1184,29 @@ public sealed class ExtractionCacheStoreTests
         }
 
         // Set every input file's mtime well into the past so a capture stamps it promoted — the precondition
-        // for the stat fast path. The cache root lives inside the tree, so it is excluded: the store's own
-        // writes must keep the times it wrote them with.
+        // for the stat fast path.
         public void BackdateAll()
         {
-            FixtureEdits.BackdateTree(Root, CacheRoot);
+            FixtureEdits.BackdateTree(Root);
         }
 
         // The number of project entries the written manifest carries — the fingerprint's own grain, which a
         // multi-framework project must not multiply however many fragments it extracted to.
         public int CacheProjectEntryCount()
         {
-            var root = (JsonObject)JsonNode.Parse(File.ReadAllText(CacheFilePath))!;
+            JsonObject root = ReadCacheJson();
             return root["Projects"]!.AsArray()
                 .Count;
         }
 
+        private JsonObject ReadCacheJson()
+        {
+            return (JsonObject)JsonNode.Parse(File.ReadAllText(CacheFilePath))!;
+        }
+
         public void MutateCacheJson(Action<JsonObject> mutate)
         {
-            var root = (JsonObject)JsonNode.Parse(File.ReadAllText(CacheFilePath))!;
+            JsonObject root = ReadCacheJson();
             mutate(root);
             File.WriteAllText(CacheFilePath, root.ToJsonString());
         }

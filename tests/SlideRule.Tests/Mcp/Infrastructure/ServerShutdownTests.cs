@@ -32,11 +32,7 @@ public sealed class ServerShutdownTests : IDisposable
         // Arrange — track the order in which the disposer and exit callback run.
         var disposerRan = false;
         var exitRanAfterDisposer = false;
-        ServerShutdown.RegisterDisposer(() =>
-        {
-            disposerRan = true;
-            return ValueTask.CompletedTask;
-        });
+        RegisterSynchronousDisposer(() => disposerRan = true);
 
         // Act
         ServerShutdown.ExitWith("test", () => exitRanAfterDisposer = disposerRan, TimeSpan.FromSeconds(1));
@@ -54,11 +50,7 @@ public sealed class ServerShutdownTests : IDisposable
         // disposer runs once (would corrupt state if rerun on a half-disposed workspace).
         var disposerCallCount = 0;
         var exitCount = 0;
-        ServerShutdown.RegisterDisposer(() =>
-        {
-            Interlocked.Increment(ref disposerCallCount);
-            return ValueTask.CompletedTask;
-        });
+        RegisterSynchronousDisposer(() => Interlocked.Increment(ref disposerCallCount));
 
         // Act
         ServerShutdown.ExitWith("first", () => Interlocked.Increment(ref exitCount), TimeSpan.FromSeconds(1));
@@ -134,21 +126,9 @@ public sealed class ServerShutdownTests : IDisposable
         // Arrange — the API permits more than one disposer; lock in ordering so a second call site
         // is not surprised.
         List<int> order = [];
-        ServerShutdown.RegisterDisposer(() =>
-        {
-            order.Add(1);
-            return ValueTask.CompletedTask;
-        });
-        ServerShutdown.RegisterDisposer(() =>
-        {
-            order.Add(2);
-            return ValueTask.CompletedTask;
-        });
-        ServerShutdown.RegisterDisposer(() =>
-        {
-            order.Add(3);
-            return ValueTask.CompletedTask;
-        });
+        RegisterSynchronousDisposer(() => order.Add(1));
+        RegisterSynchronousDisposer(() => order.Add(2));
+        RegisterSynchronousDisposer(() => order.Add(3));
 
         // Act
         ServerShutdown.ExitWith("test", () => { }, TimeSpan.FromSeconds(1));
@@ -202,11 +182,7 @@ public sealed class ServerShutdownTests : IDisposable
         IdleTimeoutWatchdog.EnterCall(); // in-flight count = 1
 
         var disposerRan = false;
-        ServerShutdown.RegisterDisposer(() =>
-        {
-            disposerRan = true;
-            return ValueTask.CompletedTask;
-        });
+        RegisterSynchronousDisposer(() => disposerRan = true);
 
         using ManualResetEventSlim exited = new();
         // The await at the end of the test keeps `exited` alive for as long as ExitWith can call it; were an
@@ -239,5 +215,15 @@ public sealed class ServerShutdownTests : IDisposable
         ServerShutdown.ExitWith("test", () => exited = true, TimeSpan.FromSeconds(1), TimeSpan.FromMilliseconds(200));
 
         exited.ShouldBeTrue();
+    }
+
+    // A disposer that does its work and completes before it returns.
+    private static void RegisterSynchronousDisposer(Action dispose)
+    {
+        ServerShutdown.RegisterDisposer(() =>
+        {
+            dispose();
+            return ValueTask.CompletedTask;
+        });
     }
 }

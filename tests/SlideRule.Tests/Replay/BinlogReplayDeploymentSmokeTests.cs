@@ -60,7 +60,7 @@ public sealed class BinlogReplayDeploymentSmokeTests(BinlogFixtureWorkspace fixt
             cli, FreshCache(),
             "check", Fixture.SolutionPath, "--binlog", Fixture.BinlogPath, "--spec", CliRunner.CleanSpecDll);
 
-        replay.ExitCode.ShouldBe(0);
+        replay.ExitCode.ShouldBe(0, replay.StandardError);
         replay.StandardError.ShouldNotContain("could not be replayed");
         replay.StandardError.ShouldNotContain("Microsoft.Build.Framework");
 
@@ -69,7 +69,7 @@ public sealed class BinlogReplayDeploymentSmokeTests(BinlogFixtureWorkspace fixt
         ChildProcess.ProcessResult cold = RunCliOutOfProcess(
             cli, FreshCache(), "check", Fixture.SolutionPath, "--spec", CliRunner.CleanSpecDll);
 
-        cold.ExitCode.ShouldBe(0);
+        cold.ExitCode.ShouldBe(0, cold.StandardError);
         replay.StandardOutput.ShouldBe(cold.StandardOutput);
     }
 

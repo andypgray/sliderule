@@ -20,7 +20,7 @@ namespace SlideRule.Tests.Checking;
 ///     this is the gate on the fold. An adjective needs none: the trace asks it through the per-type test a
 ///     narrowing filters with.
 /// </remarks>
-public sealed class ClaimTraceParityTests(WorkspaceFixture fixture)
+public sealed class ClaimTraceParityTests(WorkspaceFixture fixture) : IClassFixture<WorkspaceFixture>
 {
     [Fact]
     public void TheCanonicalSample_OverMyApp_TracesWhatItEvaluates()

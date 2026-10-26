@@ -1,4 +1,3 @@
-using Shouldly;
 using SlideRule.Baselines;
 using SlideRule.Checking;
 using SlideRule.Codebase;
@@ -62,11 +61,8 @@ public sealed class MustBeReadonlyVerbTests
     {
         // A member-shape violation has no edge to cite, so the file:line an agent jumps to is where the
         // writable field is declared — its own declaration sites, carried as evidence.
-        Checker.Run(SceneModel, arch =>
-                arch.Rule("state/no-static-mutable")
-                    .Enforce(arch.Namespace("App.State.*").Fields.WithPrefix("RenderCount").MustBeReadonly())
-                    .Because("b"))
-            .Single()
+        Checker.Verdict(SceneModel, arch => arch.Namespace("App.State.*").Fields.WithPrefix("RenderCount")
+                .MustBeReadonly())
             .ShouldHaveFailedWithMemberAtSites("F:App.State.Ledger.RenderCount", ["Test.cs:7"]);
     }
 
@@ -74,18 +70,11 @@ public sealed class MustBeReadonlyVerbTests
     public void MustBeReadonly_ReadonlyField_PassesClean()
     {
         // The two readonly declarations green independently of staticness — one static, one instance.
-        Checker.Run(SceneModel, arch =>
-                arch.Rule("state/no-static-mutable")
-                    .Enforce(arch.Namespace("App.State.*").Fields.WithPrefix("DefaultFormat").MustBeReadonly())
-                    .Because("b"))
-            .Single()
+        Checker.Verdict(SceneModel, arch => arch.Namespace("App.State.*").Fields.WithPrefix("DefaultFormat")
+                .MustBeReadonly())
             .ShouldHavePassedClean();
 
-        Checker.Run(SceneModel, arch =>
-                arch.Rule("state/no-static-mutable")
-                    .Enforce(arch.Namespace("App.State.*").Fields.WithPrefix("Opening").MustBeReadonly())
-                    .Because("b"))
-            .Single()
+        Checker.Verdict(SceneModel, arch => arch.Namespace("App.State.*").Fields.WithPrefix("Opening").MustBeReadonly())
             .ShouldHavePassedClean();
     }
 
@@ -105,8 +94,7 @@ public sealed class MustBeReadonlyVerbTests
                     .Because("A writable static is process-wide state nothing in the type system declares."))
             .Single();
 
-        result.MemberShapeSubjects()
-            .ShouldBe(["F:App.State.Ledger.PurgeCount"]);
+        result.ShouldHaveFailedWithMemberSubjects(["F:App.State.Ledger.PurgeCount"]);
         result.ShouldHaveGrandfathered(1);
     }
 
@@ -117,11 +105,7 @@ public sealed class MustBeReadonlyVerbTests
         // in the spec says so — the checker's predicate is `IsReadOnly || IsConst`, and IsConst is a
         // disjoint fact (a const field reports IsReadOnly false), which is what makes the second arm load-
         // bearing rather than decorative.
-        Checker.Run(SceneModel, arch =>
-                arch.Rule("state/no-static-mutable")
-                    .Enforce(arch.Namespace("App.State.*").Fields.WithPrefix("MaxRows").MustBeReadonly())
-                    .Because("b"))
-            .Single()
+        Checker.Verdict(SceneModel, arch => arch.Namespace("App.State.*").Fields.WithPrefix("MaxRows").MustBeReadonly())
             .ShouldHavePassedClean();
     }
 
@@ -132,14 +116,8 @@ public sealed class MustBeReadonlyVerbTests
         // not compile if .ThatAreStatic() returned a bare MemberSelection. Self-guarding: Running is an
         // equally writable INSTANCE field that would red alongside RenderCount had the adjective failed to
         // narrow, and the const is in the subject (a const is static) yet still greens.
-        FailedMemberIds(arch => arch.Namespace("App.State.*").Fields.ThatAreStatic()
+        Checker.Verdict(SceneModel, arch => arch.Namespace("App.State.*").Fields.ThatAreStatic()
                 .MustBeReadonly())
-            .ShouldBe(["F:App.State.Ledger.RenderCount"]);
-    }
-
-    private static IReadOnlyList<string> FailedMemberIds(Func<Arch, Constraint> constraint)
-    {
-        return Checker.Verdict(SceneModel, constraint)
-            .MemberShapeSubjects();
+            .ShouldHaveFailedWithMemberSubjects(["F:App.State.Ledger.RenderCount"]);
     }
 }

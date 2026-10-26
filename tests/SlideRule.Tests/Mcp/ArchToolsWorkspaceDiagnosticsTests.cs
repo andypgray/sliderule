@@ -42,14 +42,7 @@ public sealed class ArchToolsWorkspaceDiagnosticsTests
 {
     private const string LoadDiagnostic = DiagnosticInjectingSolutionSource.SimulatedLoadFailure;
 
-    private const string UnrestoredProject = "C:/repo/MyApp.Unrestored/MyApp.Unrestored.csproj";
-
-    // NuGet's advice to prune a package reference: an ordinary restore warning, so a line of the stream rather
-    // than an advisory.
-    private const string RestoreWarning =
-        CapturedAuditLines.FramePrefix + "/src/App/App.csproj" + CapturedAuditLines.FrameSeparator
-        + "PackageReference System.Text.Encodings.Web will not be pruned. Consider removing this package "
-        + "from your dependencies, as it is likely unnecessary.";
+    private const string UnrestoredProject = DiagnosticInjectingSolutionSource.SimulatedRestoreFailedProject;
 
     // How many frameworks each advisory-raising project restores on, and so how many times the load repeats
     // that project's line.
@@ -61,9 +54,17 @@ public sealed class ArchToolsWorkspaceDiagnosticsTests
     private static readonly string TestsAdvisory =
         CapturedAuditLines.FramedFor("App.Tests", CapturedAuditLines.BuildTasksGitAdvisory);
 
-    // The one check two rows read, an advisory beside a load failure: read-only, so a shared result leaks nothing.
+    // NuGet's advice to prune a package reference: an ordinary restore warning, so a line of the stream rather
+    // than an advisory.
+    private static readonly string RestoreWarning = CapturedAuditLines.FramedFor(
+        "App",
+        "PackageReference System.Text.Encodings.Web will not be pruned. Consider removing this package "
+        + "from your dependencies, as it is likely unnecessary.");
+
+    // The one check two rows read, an advisory beside a load failure: read-only, so a shared result leaks
+    // nothing, and uncancellable, because the row that starts it is not the only row that awaits it.
     private static readonly Lazy<Task<string>> AdvisoryBesideLoadFailure =
-        new(() => ToolsWith([AppAdvisory, LoadDiagnostic]).CheckAsync(cancellationToken: Ct));
+        new(() => ToolsWith([AppAdvisory, LoadDiagnostic]).CheckAsync(cancellationToken: CancellationToken.None));
 
     [Fact]
     public async Task ArchCheck_WorkspaceLoadDiagnostic_CarriesTheMsBuildNoteLastInTheDocument()
@@ -98,10 +99,7 @@ public sealed class ArchToolsWorkspaceDiagnosticsTests
 
         string document = await tools.CheckAsync(cancellationToken: Ct);
 
-        using JsonDocument parsed = JsonDocument.Parse(document);
-        parsed.RootElement.GetProperty("modelIncomplete")
-            .GetBoolean()
-            .ShouldBeTrue();
+        document.ShouldBeStampedIncomplete();
     }
 
     [Fact]
@@ -132,10 +130,7 @@ public sealed class ArchToolsWorkspaceDiagnosticsTests
 
         string document = await tools.GraphAsync(true, cancellationToken: Ct);
 
-        using JsonDocument parsed = JsonDocument.Parse(document);
-        parsed.RootElement.GetProperty("modelIncomplete")
-            .GetBoolean()
-            .ShouldBeTrue();
+        document.ShouldBeStampedIncomplete();
     }
 
     [Fact]
@@ -192,7 +187,7 @@ public sealed class ArchToolsWorkspaceDiagnosticsTests
             .GraphAsync(cancellationToken: Ct);
 
         document.ShouldCarryPackageAudit(CapturedAuditLines.BuildTasksGitAdvisory, ["App", "App.Tests"]);
-        document.ShouldNotContain("\"workspaceDiagnostic");
+        document.ShouldCarryNoDiagnosticStream();
     }
 
     [Fact]
@@ -253,7 +248,7 @@ public sealed class ArchToolsWorkspaceDiagnosticsTests
         var tools = new ArchTools(binding, new DiagnosticInjectingSolutionSource(lines), new SystemEnvironment(), new BudgetedResponseFitter(budget));
         string document = await tools.CheckAsync(rules: rules, grain: grain, cancellationToken: Ct);
 
-        using JsonDocument parsed = JsonDocument.Parse(document);
+        using JsonDocument parsed = CheckJsonAssertions.ShouldParseAsJson(document);
         string? stampedGrain = parsed.RootElement.StringOrDefault("grain");
         stampedGrain.ShouldBe(grain, document);
         parsed.ShouldCarryPackageAudit(CapturedAuditLines.BuildTasksGitAdvisory, projects);

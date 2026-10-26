@@ -22,11 +22,8 @@ public sealed class SolutionDirSurveyE2ETests
     [Fact]
     public async Task Graph_ReferencesSpelledWithSolutionDir_AreEachProjectsDeclaredOnes()
     {
-        // Arrange
-        using var fixture = new TempFixtureWorkspace("TestSolutions/SolutionDirApp", "SolutionDirApp.sln");
-
         // Act
-        CliResult result = await CliRunner.InvokeAsync("graph", fixture.SolutionPath, "--json");
+        CliResult result = await CliRunner.InvokeAsync("graph", FixtureBeds.SolutionDirAppSolution, "--json");
 
         // Assert — the plugin declares the web project alone; the core project it also compiles against is the
         // closure's, which the edges show and the declared list does not.
@@ -50,11 +47,8 @@ public sealed class SolutionDirSurveyE2ETests
     [Fact]
     public async Task Graph_ReferencesSpelledWithSolutionDir_LeaveNothingUndeclared()
     {
-        // Arrange
-        using var fixture = new TempFixtureWorkspace("TestSolutions/SolutionDirApp", "SolutionDirApp.sln");
-
         // Act
-        CliResult result = await CliRunner.InvokeAsync("graph", fixture.SolutionPath, "--json");
+        CliResult result = await CliRunner.InvokeAsync("graph", FixtureBeds.SolutionDirAppSolution, "--json");
 
         // Assert — every reference the compilations were built against is one a declaration reaches, so no row
         // carries the key that would say otherwise.

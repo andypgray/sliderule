@@ -615,9 +615,7 @@ public sealed class OneProjectDecidabilityTests
 
     private static OneProjectVerdict Enforcing(Func<Arch, Constraint> constraint)
     {
-        return Classify(arch => arch.Rule("area/rule")
-            .Enforce(constraint(arch))
-            .Because("b"));
+        return OneProjectDecidability.Classify(Checker.OneRule(constraint));
     }
 
     private static OneProjectVerdict Classify(Action<Arch> define)

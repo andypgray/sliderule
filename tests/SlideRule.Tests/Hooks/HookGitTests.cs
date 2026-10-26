@@ -76,11 +76,8 @@ public sealed class HookGitTests
     {
         // Arrange
         using TempDirectory temp = TestTempRoot.Fresh("hook-digest");
-        string directory = temp.Path;
-        string first = Path.Combine(directory, "First.cs");
-        string second = Path.Combine(directory, "Second.cs");
-        File.WriteAllText(first, "public sealed class Probe;\n");
-        File.WriteAllText(second, "public sealed class Probe;\n");
+        string first = temp.WriteFile(["First.cs"], "public sealed class Probe;\n");
+        string second = temp.WriteFile(["Second.cs"], "public sealed class Probe;\n");
 
         // Act
         string firstDigest = TreeSnapshot.Digest(first);
@@ -92,7 +89,7 @@ public sealed class HookGitTests
         firstDigest.ShouldBe(secondDigest, "A digest is of the bytes alone, so two files that hold the same bytes agree.");
         firstDigest.ShouldMatch("^[0-9a-f]{64}$", "A digest is lowercase hex SHA-256, which the state record parses.");
         changedDigest.ShouldNotBe(firstDigest, "Changed bytes change the digest.");
-        TreeSnapshot.Digest(Path.Combine(directory, "Missing.cs"))
+        TreeSnapshot.Digest(temp.PathOf("Missing.cs"))
             .ShouldBe(TreeSnapshot.Absent, "A listed file that is not there is a deletion, digested as absent.");
     }
 

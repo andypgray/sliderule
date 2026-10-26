@@ -1,6 +1,5 @@
 using Shouldly;
 using SlideRule.Cli.Pipeline;
-using SlideRule.Cli.Verbs;
 using SlideRule.Roslyn;
 using SlideRule.Roslyn.Diagnostics;
 using SlideRule.Tests.TestSupport;
@@ -12,7 +11,9 @@ namespace SlideRule.Tests.Cli;
 ///     End-to-end tests for a partial check that loads only its dirty projects' closure rather than the whole
 ///     solution. MyApp's reference chain is <c>Domain → Web → Billing</c>, so a body edit in Web dirties Web
 ///     alone and its closure is Web and Billing: Domain is the project such a run never loads. Every row holds
-///     the run to a <c>--no-cache</c> run of the same tree on every output channel.
+///     the run to a <c>--no-cache</c> run of the same tree on every output channel. A run that fills the slot from
+///     the whole clean solution reads the warm pool; the partial run and the run it is held to stay cold,
+///     because the pool answers a closure request with the whole solution.
 /// </summary>
 public sealed class CheckCacheClosureE2ETests
 {
@@ -25,7 +26,7 @@ public sealed class CheckCacheClosureE2ETests
     {
         using var workspace = new TempFixtureWorkspace();
         using var cache = new TempCacheRoot("check-closure");
-        CacheRun cold = await RunCheckAsync(workspace.SolutionPath, cache.Root);
+        CacheRun cold = await RunCheckAsync(workspace.SolutionPath, cache.Root, source: CountingSolutionSource.OverWarmPool());
         cold.Outcome.ShouldBe(CodebaseSourceOutcome.Miss);
         EditWebBody(workspace);
 
@@ -35,9 +36,9 @@ public sealed class CheckCacheClosureE2ETests
         // Web's closure was loaded, and nothing else: Domain, which references Web, was never opened.
         partial.Outcome.ShouldBe(CodebaseSourceOutcome.Partial);
         partial.ReExtracted.ShouldBe([Web]);
-        partial.Source.ClosureRequests.Single()
+        partial.Source.ClosureRequests.ShouldHaveSingleItem()
             .ShouldBe([workspace.PathOf(Web, $"{Web}.csproj")]);
-        partial.ShouldHaveLoadedOnly(true, Web, Billing);
+        partial.Source.ShouldHaveLoadedOnly(true, Web, Billing);
         partial.Result.ShouldMatchTheOutputOf(noCache.Result);
         partial.Result.Out.ShouldNotBe(cold.Result.Out); // the edit's new red site was seen
 
@@ -53,14 +54,14 @@ public sealed class CheckCacheClosureE2ETests
     {
         using var workspace = new TempFixtureWorkspace();
         using var cache = new TempCacheRoot("check-closure");
-        await CacheRuns.GraphAsync(workspace.SolutionPath, cache.Root);
+        await CacheRuns.GraphAsync(workspace.SolutionPath, cache.Root, source: CountingSolutionSource.OverWarmPool());
         EditWebBody(workspace);
 
         CacheRun partial = await CacheRuns.GraphAsync(workspace.SolutionPath, cache.Root);
         CacheRun noCache = await CacheRuns.GraphAsync(workspace.SolutionPath, cache.Root, true);
 
         partial.Outcome.ShouldBe(CodebaseSourceOutcome.Partial);
-        partial.ShouldHaveLoadedOnly(true, Web, Billing);
+        partial.Source.ShouldHaveLoadedOnly(true, Web, Billing);
         partial.Result.ShouldMatchTheOutputOf(noCache.Result);
     }
 
@@ -85,9 +86,12 @@ public sealed class CheckCacheClosureE2ETests
             workspace.SolutionPath, cache.Root, true, new CountingSolutionSource(BrokenDomain(workspace, verdict)));
 
         partial.Outcome.ShouldBe(CodebaseSourceOutcome.Partial);
-        partial.ShouldHaveLoadedOnly(true, Web, Billing);
-        (partial.Result.Out + partial.Result.Err).ShouldContain(Domain);
-        partial.Result.Exit.ShouldBe(ExitCodes.Error);
+        partial.Source.ShouldHaveLoadedOnly(true, Web, Billing);
+        string slot = verdict == "restore-failed" ? "restoreFailedProjects" : "failedProjects";
+        CheckJson.Strings(partial.Result.Out, slot)
+            .ShouldHaveSingleItem(partial.Result.Transcript())
+            .ShouldEndWith($"{Domain}/{Domain}.csproj");
+        partial.Result.ShouldRefuseWith();
         partial.Result.ShouldMatchTheOutputOf(noCache.Result);
     }
 
@@ -96,7 +100,7 @@ public sealed class CheckCacheClosureE2ETests
     {
         using var workspace = new TempFixtureWorkspace();
         using var cache = new TempCacheRoot("check-closure");
-        await RunCheckAsync(workspace.SolutionPath, cache.Root);
+        await RunCheckAsync(workspace.SolutionPath, cache.Root, source: CountingSolutionSource.OverWarmPool());
         EditWebBody(workspace);
         var closureFails = new CountingSolutionSource(new ClosureFailingSolutionSource());
 
@@ -119,7 +123,7 @@ public sealed class CheckCacheClosureE2ETests
         // refuses, the same way it refuses with no cache at all.
         using var workspace = new TempFixtureWorkspace();
         using var cache = new TempCacheRoot("check-closure");
-        await CacheRuns.GraphAsync(workspace.SolutionPath, cache.Root);
+        await CacheRuns.GraphAsync(workspace.SolutionPath, cache.Root, source: CountingSolutionSource.OverWarmPool());
         EditWebBody(workspace);
         var partialSource = new CountingSolutionSource();
         var noCacheSource = new CountingSolutionSource();
@@ -128,10 +132,7 @@ public sealed class CheckCacheClosureE2ETests
         var noCache = await Should.ThrowAsync<UserErrorException>(() => RunCheckAsync(workspace.SolutionPath, cache.Root, true, noCacheSource, true));
 
         partialSource.ClosureRequests.ShouldBeEmpty();
-        partialSource.Loads.Single()
-            .IsClosure.ShouldBeFalse();
-        partialSource.Loads.Single()
-            .Projects.ShouldBe([Billing, Domain, Web], true);
+        partialSource.ShouldHaveLoadedOnly(false, Billing, Domain, Web);
         partial.Message.ShouldBe(noCache.Message);
     }
 
@@ -158,7 +159,7 @@ public sealed class CheckCacheClosureE2ETests
 
         partial.Outcome.ShouldBe(CodebaseSourceOutcome.Partial);
         partial.ReExtracted.ShouldBe([Billing]);
-        partial.ShouldHaveLoadedOnly(true, Billing);
+        partial.Source.ShouldHaveLoadedOnly(true, Billing);
         partial.Result.ShouldMatchTheOutputOf(noCache.Result);
     }
 
@@ -225,10 +226,11 @@ public sealed class CheckCacheClosureE2ETests
 
 file static class CheckCacheClosureAssertions
 {
-    // The run made one acquisition, of the kind given, and it loaded exactly these projects.
-    internal static void ShouldHaveLoadedOnly(this CacheRun run, bool isClosure, params string[] projects)
+    // The source made one acquisition, of the kind given, and it loaded exactly these projects.
+    internal static void ShouldHaveLoadedOnly(
+        this CountingSolutionSource source, bool isClosure, params string[] projects)
     {
-        (bool IsClosure, IReadOnlySet<string> Projects) load = run.Source.Loads.ShouldHaveSingleItem();
+        (bool IsClosure, IReadOnlySet<string> Projects) load = source.Loads.ShouldHaveSingleItem();
         load.IsClosure.ShouldBe(isClosure);
         load.Projects.ShouldBe(projects, true);
     }

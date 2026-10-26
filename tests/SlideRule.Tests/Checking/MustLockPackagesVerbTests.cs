@@ -25,20 +25,14 @@ public sealed class MustLockPackagesVerbTests
     [Fact]
     public void MustLockPackages_RestoreWritesNoLockFile_FailsAtTheDeclaringPropsFile()
     {
-        Checker.Run(Scene, arch => arch.Rule("packaging/locked-restore")
-                .Enforce(arch.Projects.Named("Unlocked").MustLockPackages())
-                .Because("b"))
-            .Single()
+        Checker.Verdict(Scene, arch => arch.Projects.Named("Unlocked").MustLockPackages())
             .ShouldHaveFailedWithProjectAtSites("Unlocked", ["Directory.Build.props:7"]);
     }
 
     [Fact]
     public void MustLockPackages_RestoreWritesALockFile_PassesClean()
     {
-        Checker.Run(Scene, arch => arch.Rule("packaging/locked-restore")
-                .Enforce(arch.Projects.Named("Locked").MustLockPackages())
-                .Because("b"))
-            .Single()
+        Checker.Verdict(Scene, arch => arch.Projects.Named("Locked").MustLockPackages())
             .ShouldHavePassedClean();
     }
 
@@ -47,10 +41,7 @@ public sealed class MustLockPackagesVerbTests
     {
         // The absent-fact row: unknown never reds, even though NuGet's own default is off — the model says
         // nothing about this project, and a verdict against silence would be the load's gap wearing a law.
-        Checker.Run(Scene, arch => arch.Rule("packaging/locked-restore")
-                .Enforce(arch.Projects.Named("Unevaluated").MustLockPackages())
-                .Because("b"))
-            .Single()
+        Checker.Verdict(Scene, arch => arch.Projects.Named("Unevaluated").MustLockPackages())
             .ShouldHavePassedClean();
     }
 
@@ -59,10 +50,7 @@ public sealed class MustLockPackagesVerbTests
     {
         CodebaseModel siteless = ProjectFacts.Solution(ProjectFacts.Project("Loose", locksPackages: false));
 
-        Checker.Run(siteless, arch => arch.Rule("packaging/locked-restore")
-                .Enforce(arch.Projects.Named("Loose").MustLockPackages())
-                .Because("b"))
-            .Single()
+        Checker.Verdict(siteless, arch => arch.Projects.Named("Loose").MustLockPackages())
             .ShouldHaveFailedWithProjectAtSites("Loose", []);
     }
 
@@ -71,10 +59,7 @@ public sealed class MustLockPackagesVerbTests
     {
         // Over the whole solution the verb separates the three states in one pass: only the declared-false
         // project is a finding.
-        Checker.Run(Scene, arch => arch.Rule("packaging/locked-restore")
-                .Enforce(arch.Projects.Matching("*").MustLockPackages())
-                .Because("b"))
-            .Single()
+        Checker.Verdict(Scene, arch => arch.Projects.Matching("*").MustLockPackages())
             .ShouldHaveFailedWithProjectSubjects(["Unlocked"]);
     }
 }

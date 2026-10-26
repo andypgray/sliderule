@@ -7,19 +7,12 @@ using Xunit;
 namespace SlideRule.Tests.Roslyn;
 
 /// <summary>
-///     Serializes the cases that set MSBuild-selection environment variables, so a variable one case scopes
-///     to itself cannot be read by another running beside it.
-/// </summary>
-[CollectionDefinition("MsBuildBootstrapEnvVar", DisableParallelization = true)]
-public sealed class MsBuildBootstrapEnvVarCollection;
-
-/// <summary>
 ///     <see cref="MsBuildBootstrap.SelectBestInstance" /> is pure and needs no MSBuild runtime. The
 ///     two <c>Initialize</c> tests exercise the override throw-paths, which run BEFORE any
 ///     <c>MSBuildLocator</c> registration call — safe even though the module initializer has already
 ///     registered MSBuild. Env vars are scoped to the test that sets them and the collection is serial.
 /// </summary>
-[Collection("MsBuildBootstrapEnvVar")]
+[Collection("Serial")]
 public sealed class MsBuildBootstrapTests
 {
     [Fact]

@@ -128,11 +128,10 @@ public sealed class ClaudeInstructionFilesTests
     [Fact]
     public void ImportsBlockFile_AFileThatCannotBeRead_CountsAsNotImporting()
     {
-        Assert.SkipUnless(OperatingSystem.IsWindows(), "Only Windows refuses a read while another handle holds the file exclusively.");
         using TempDirectory tree = TestTempRoot.Fresh("claude-files");
         string block = tree.WriteFile(["repo", "AGENTS.md"], "block");
         string file = tree.WriteFile(["repo", "CLAUDE.md"], "@AGENTS.md\n");
-        using var holder = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.None);
+        using FileHold hold = FileHold.Exclusive(file);
 
         // The text imports the block, so only the refused read can make the answer false.
         ClaudeInstructionFiles.ImportsBlockFile(file, block, null)

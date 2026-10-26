@@ -95,11 +95,7 @@ public sealed class MustBeRegisteredVerbTests
         // AddScoped<IBar, Bar>() makes BOTH names members — the service ∪ implementation union the noun
         // resolves — so the interface and the class registered against it green under one rule. The subject
         // is non-empty by construction: an empty one would fail rather than pass.
-        Checker.Run(SceneModel, arch =>
-                arch.Rule("di/services-registered")
-                    .Enforce(arch.Types.WithNameMatching("*Bar").MustBeRegistered())
-                    .Because("b"))
-            .Single()
+        Checker.Verdict(SceneModel, arch => arch.Types.WithNameMatching("*Bar").MustBeRegistered())
             .ShouldHavePassedClean();
     }
 
@@ -108,11 +104,7 @@ public sealed class MustBeRegisteredVerbTests
     {
         // A shape violation has no edge to cite, so the file:line an agent jumps to is where the unregistered
         // type is declared — the subject's own declaration sites, carried as evidence.
-        Checker.Run(SceneModel, arch =>
-                arch.Rule("di/services-registered")
-                    .Enforce(arch.Types.Except(arch.Types.WithNameMatching("Wiring")).MustBeRegistered())
-                    .Because("b"))
-            .Single()
+        Checker.Verdict(SceneModel, arch => arch.Types.Except(arch.Types.WithNameMatching("Wiring")).MustBeRegistered())
             .ShouldHaveFailedWithSubjectAtSites("App.Orphan", ["Scene.cs:6"]);
     }
 
@@ -121,11 +113,7 @@ public sealed class MustBeRegisteredVerbTests
     {
         // Membership is arch.Registered() with no lifetime — the union across all three — so a rule using the
         // verb never has an opinion about how long an instance lives.
-        Checker.Run(LifetimesModel, arch =>
-                arch.Rule("di/services-registered")
-                    .Enforce(arch.Types.WithSuffix("Dep").MustBeRegistered())
-                    .Because("b"))
-            .Single()
+        Checker.Verdict(LifetimesModel, arch => arch.Types.WithSuffix("Dep").MustBeRegistered())
             .ShouldHavePassedClean();
     }
 
@@ -137,12 +125,9 @@ public sealed class MustBeRegisteredVerbTests
         // keyed overload, a raw ServiceDescriptor, an extension compiled into a package — reds every subject
         // instead of missing a violation. An estate that registers by convention should not use the verb, and
         // this is what ignoring that looks like.
-        RuleResult result = Checker.Run(
-                "namespace App { public interface IBar {} public class Bar : IBar {} }",
-                arch => arch.Rule("di/services-registered")
-                    .Enforce(arch.Types.MustBeRegistered())
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(
+            "namespace App { public interface IBar {} public class Bar : IBar {} }",
+            arch => arch.Types.MustBeRegistered());
 
         result.ShouldHaveFailedWithSubjects(["App.IBar", "App.Bar"]);
     }

@@ -1,7 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
-using SlideRule.Baselines;
 using SlideRule.Checking;
 using SlideRule.Codebase;
 using SlideRule.Extraction;
@@ -227,8 +226,8 @@ public sealed class OneProjectExtractionTests
         CodebaseModel wholeSolution = FragmentMerger.Merge(WholeSolutionView(asImage));
 
         // Act
-        CheckReport narrowed = Checker.Run(oneProject, BaselineIndex.Empty, NarrowedUniverse.OneProject, HierarchyRules);
-        CheckReport whole = Checker.Run(wholeSolution, BaselineIndex.Empty, (NarrowedUniverse?)null, HierarchyRules);
+        CheckReport narrowed = Checker.Run(oneProject, HierarchyRules, narrowing: NarrowedUniverse.OneProject);
+        CheckReport whole = Checker.Run(wholeSolution, HierarchyRules);
 
         // Assert: the facts the three adjectives read, then the verdicts themselves. Without the first the
         // two reports would agree by both finding nothing.
@@ -549,15 +548,14 @@ public sealed class OneProjectExtractionTests
         CompilationInput input = CompilationFactory.Compile("TestProject", FragmentQuery.EveryPassSource);
 
         // Act
-        IReadOnlyList<CodebaseFragment> view = FragmentExtractor.ExtractOneProject(input, null, CancellationToken.None);
+        IReadOnlyList<CodebaseFragment> view = FragmentExtractor.ExtractOneProject(input, null, Ct);
 
         // Assert
-        view.Count.ShouldBe(1);
-        view[0].Serialized()
-            .ShouldContain("N.Widget");
-        view[0].Serialized()
-            .ShouldBe(FragmentExtractor.Extract(input, Ct)
-                .Serialized());
+        string serialized = view.ShouldHaveSingleItem()
+            .Serialized();
+        serialized.ShouldContain("N.Widget");
+        serialized.ShouldBe(FragmentExtractor.Extract(input, Ct)
+            .Serialized());
     }
 
     [Fact]
@@ -626,7 +624,7 @@ public sealed class OneProjectExtractionTests
 
         model.Projects.Select(project => project.Name)
             .ShouldBe([SiblingProjectName, OwnProjectName]);
-        ProjectNode sibling = model.Projects.Single(project => project.Name == SiblingProjectName);
+        ProjectNode sibling = model.Project(SiblingProjectName);
         sibling.TargetFrameworks.ShouldBeEmpty();
         sibling.SolutionMember.ShouldBeNull();
         sibling.ProjectReferences.ShouldBeEmpty();
@@ -953,7 +951,7 @@ public sealed class OneProjectExtractionTests
 
     private static CheckReport Checked(IReadOnlyList<CodebaseFragment> fragments, Action<Arch> define)
     {
-        return Checker.Run(FragmentMerger.Merge(fragments), BaselineIndex.Empty, NarrowedUniverse.OneProject, define);
+        return Checker.Run(FragmentMerger.Merge(fragments), define, narrowing: NarrowedUniverse.OneProject);
     }
 
     // What a verdict is made of: the status each rule reached and the endpoints of everything it reported.

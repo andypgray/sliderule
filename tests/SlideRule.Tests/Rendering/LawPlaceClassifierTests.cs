@@ -118,7 +118,9 @@ public sealed class LawPlaceClassifierTests
         });
 
         // Act + Assert
-        model.Rules.ShouldAllBe(rule => LawPlaceClassifier.Classify(rule.Constraint) != null);
+        model.Rules.Where(rule => LawPlaceClassifier.Classify(rule.Constraint) is null)
+            .Select(rule => rule.Id)
+            .ShouldBeEmpty();
     }
 
     [Fact]
@@ -140,7 +142,9 @@ public sealed class LawPlaceClassifierTests
         });
 
         // Act + Assert
-        model.Rules.ShouldAllBe(rule => LawPlaceClassifier.Classify(rule.Constraint) == null);
+        model.Rules.Where(rule => LawPlaceClassifier.Classify(rule.Constraint) is not null)
+            .Select(rule => rule.Id)
+            .ShouldBeEmpty();
     }
 
     [Fact]
@@ -578,8 +582,8 @@ public sealed class LawPlaceClassifierTests
         return model.Rules[rule].Constraint!.Subject!;
     }
 
-    private static Selection Operand(ArchitectureModel model, int rule = 0, int operand = 0)
+    private static Selection Operand(ArchitectureModel model, int rule = 0)
     {
-        return model.Rules[rule].Constraint!.Operands[operand];
+        return model.Rules[rule].Constraint!.Operands[0];
     }
 }

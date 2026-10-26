@@ -18,6 +18,7 @@ using SlideRule.Roslyn.Baselines;
 using SlideRule.Roslyn.Diagnostics;
 using SlideRule.Roslyn.Files;
 using SlideRule.Roslyn.Solutions;
+using SlideRule.Tests.Cli;
 using SlideRule.Tests.TestSupport;
 
 namespace SlideRule.Tests.DocHygiene.Walkthroughs;
@@ -37,7 +38,9 @@ namespace SlideRule.Tests.DocHygiene.Walkthroughs;
 ///     <para>
 ///         One run per example, made once and cached. The cache is started with no cancellation token, so the
 ///         first test to ask cannot leave a cancelled run behind for every test after it, and it keeps reports and
-///         strings rather than a <see cref="Solution" />, so the warm pool may evict the workspace at no cost.
+///         strings rather than a <see cref="Solution" />, so the warm pool may evict the workspace at no cost. The
+///         read-only verbs run inside it too, right after the load, so what they print is read without reloading
+///         the workspace.
 ///     </para>
 /// </remarks>
 internal static class ExampleReplay
@@ -45,10 +48,11 @@ internal static class ExampleReplay
     private const string AdoptingSpec = "Meridian.Architecture";
 
     private static readonly IReadOnlyDictionary<string, Lazy<Task<ExampleRun>>> Runs =
-        WalkthroughScenarios.Examples.ToDictionary(
-            static example => example,
-            static example => new Lazy<Task<ExampleRun>>(() => RunAsync(example)),
-            StringComparer.Ordinal);
+        ExampleSolutions.Discovered()
+            .ToDictionary(
+                static example => example.Name,
+                static example => new Lazy<Task<ExampleRun>>(() => RunAsync(example)),
+                StringComparer.Ordinal);
 
     /// <summary>The replay of <paramref name="example" />, made on first use.</summary>
     internal static Task<ExampleRun> RunOf(string example)
@@ -56,41 +60,45 @@ internal static class ExampleReplay
         return Runs[example].Value;
     }
 
-    private static async Task<ExampleRun> RunAsync(string example)
+    private static async Task<ExampleRun> RunAsync(ExampleSolution solution)
     {
-        ExampleSolution solution = ExampleSolutions.Named(example);
         string directory = solution.SolutionDirectory;
 
-        SpecfulCodebase extracted = await SpecfulCodebase.ExtractAsync(
-            solution.SolutionPath, spec: null, directory, CancellationToken.None);
+        SpecfulCodebase extracted = await ExampleCodebase.Of(solution);
         ArchitectureModel model = extracted.Model;
 
         WorkspaceSnapshot snapshot = await WarmWorkspacePool.GetCurrentAsync(solution.SolutionPath, CancellationToken.None);
-        ShouldHaveLoadedCleanly(example, snapshot.LoadDiagnostics);
+        ShouldHaveLoadedCleanly(solution.Name, snapshot.LoadDiagnostics);
+
+        // The read-only verbs over the committed tree, run while this example's session is still the pool's most
+        // recent, so reading what they print never reloads an evicted workspace.
+        CliResult checkVerb = await CliRunner.InvokeAsync("check", solution.SolutionPath, "--no-cache");
+        CliResult statusVerb = await CliRunner.InvokeAsync("status", solution.SolutionPath, "--no-cache");
 
         IReadOnlySet<string>? declaredMembers = SpecExclusion.TryReadDeclaredMembers(solution.SolutionPath);
         var edits = new ScenarioEditor(snapshot, extracted.ExcludeProjectNames, declaredMembers);
 
         CodebaseModel committed = await edits.ExtractAsync(snapshot.Solution);
-        committed.MergeNotes.ShouldBeEmpty($"{example}'s committed tree merged with notes the pages never show.");
+        committed.MergeNotes.ShouldBeEmpty($"{solution.Name}'s committed tree merged with notes the pages never show.");
 
         BaselineIndex baselines = BaselineStore.LoadForModel(model, directory);
         ScenarioRun tree = Check(model, committed, baselines, directory, []);
 
         Dictionary<string, ScenarioRun> scenarios = new(StringComparer.Ordinal);
-        foreach (WalkthroughScenario scenario in WalkthroughScenarios.All.Where(scenario => scenario.Example == example))
+        foreach (WalkthroughScenario scenario in WalkthroughScenarios.All.Where(scenario => scenario.Example == solution.Name))
         {
-            (CodebaseModel codebase, IReadOnlyList<string> changed) = await edits.ApplyAsync(scenario, directory);
+            (CodebaseModel codebase, IReadOnlyList<string> changed) = await edits.ShouldApplyAsync(scenario, directory);
             scenarios[scenario.Key] = Check(model, codebase, baselines, directory, changed);
         }
 
-        AdoptionRun? adoption = example == WalkthroughScenarios.Meridian
-            ? await AdoptAsync(solution, model, extracted.Governed)
+        AdoptionRun? adoption = solution.Name == WalkthroughScenarios.Meridian
+            ? await ShouldAdoptAsync(solution, model, extracted.Governed)
             : null;
 
         return new ExampleRun(
-            example, directory, extracted.Governed, committed, tree, scenarios,
-            RenderLines(model, extracted.Governed, directory, extracted.SpecName), adoption);
+            solution.Name, directory, extracted.Governed, committed, tree, scenarios,
+            ShouldRenderLines(model, extracted.Governed, directory, extracted.SpecName), adoption, checkVerb,
+            statusVerb);
     }
 
     // The pages say the examples build green, and a partial model would quote a smaller codebase than the one
@@ -115,16 +123,15 @@ internal static class ExampleReplay
         ArchitectureModel model, CodebaseModel codebase, BaselineIndex baselines, string directory,
         IReadOnlyList<string> changed)
     {
-        CheckReport plain = Harness.Check(model.Rules, codebase, baselines, null);
-        CheckReport diffAware = Harness.Check(model.Rules, codebase, baselines, new DiffContext(directory, changed));
+        CheckReport plain = Harness.CheckUncancellable(model.Rules, codebase, baselines, null);
+        CheckReport diffAware = Harness.CheckUncancellable(model.Rules, codebase, baselines, new DiffContext(directory, changed));
 
         return new ScenarioRun(plain, diffAware, directory);
     }
 
-    // What `render` reports over the committed tree, composed as the verb composes it and judged against the
-    // committed files without writing them: a managed block is unchanged when splicing the composed body leaves
-    // the file as it is, and the model file when its text is the text the composer writes.
-    private static IReadOnlyList<string> RenderLines(
+    // What `render` reports over the committed tree, composed as the verb composes it and judged as
+    // `render --check` judges each target, without writing it.
+    private static IReadOnlyList<string> ShouldRenderLines(
         ArchitectureModel model, CodebaseModel governed, string directory, string specName)
     {
         string modelPath = Path.Combine(directory, ModelDocument.FileName);
@@ -141,9 +148,7 @@ internal static class ExampleReplay
         if (!wantsModel) return lines;
 
         string composed = ModelDocumentComposer.Compose(ModelDocument.From(model, specName, ModelDocumentProject.ListOf(governed)));
-        WriteOutcome outcome = WholeFile.NormalizeNewlines(File.ReadAllText(modelPath)) == composed
-            ? WriteOutcome.Unchanged
-            : WriteOutcome.Wrote;
+        WriteOutcome outcome = WholeFile.IsCurrent(modelPath, composed) ? WriteOutcome.Unchanged : WriteOutcome.Wrote;
         lines.Add(WriteReport.Line(outcome, directory, modelPath));
 
         return lines;
@@ -151,15 +156,13 @@ internal static class ExampleReplay
 
     private static WriteOutcome SpliceOutcome(ContextFile file)
     {
-        if (!File.Exists(file.Path)) return WriteOutcome.Wrote;
-
-        string committed = File.ReadAllText(file.Path);
-        return ManagedBlock.Splice(committed, file.Body) == committed ? WriteOutcome.Unchanged : WriteOutcome.Wrote;
+        return ManagedBlockFile.IsCurrent(file.Path, file.Body) ? WriteOutcome.Unchanged : WriteOutcome.Wrote;
     }
 
     // The adoption walkthrough's day-zero steps over Meridian: the survey before any spec existed, the check of the
     // drafted spec with nothing yet grandfathered, and the baseline capture of the curated one.
-    private static async Task<AdoptionRun> AdoptAsync(ExampleSolution solution, ArchitectureModel model, CodebaseModel governed)
+    private static async Task<AdoptionRun> ShouldAdoptAsync(
+        ExampleSolution solution, ArchitectureModel model, CodebaseModel governed)
     {
         string directory = solution.SolutionDirectory;
 
@@ -168,8 +171,8 @@ internal static class ExampleReplay
             GraphSummarizer.Summarize(governed), Path.GetFileName(solution.SolutionPath), [],
             WorkspaceTrustStamp.From(WorkspaceDiagnostics.None, directory), DocumentGrain.Full, []);
 
-        ArchitectureModel draft = await LoadDraftAsync(solution);
-        CheckReport draftCheck = Harness.Check(draft, governed, BaselineIndex.Empty);
+        ArchitectureModel draft = await ShouldLoadDraftAsync(solution);
+        CheckReport draftCheck = Harness.CheckUncancellable(draft.Rules, governed, BaselineIndex.Empty, null);
         string draftReport = ScenarioRun.Rendered(draftCheck, directory, HumanReportRenderer.Render);
 
         (IReadOnlyList<string> initLines, IReadOnlyDictionary<string, byte[]> baselineFiles) = CaptureBaselines(model, governed);
@@ -180,13 +183,13 @@ internal static class ExampleReplay
     // The draft the walkthrough's step 3 prints, compiled exactly as the page quotes it — with the spec project's
     // implicit usings, which the page leaves to the SDK — into a copy of the built spec's output, and loaded from
     // there so its package references resolve as the committed spec's do.
-    private static async Task<ArchitectureModel> LoadDraftAsync(ExampleSolution solution)
+    private static async Task<ArchitectureModel> ShouldLoadDraftAsync(ExampleSolution solution)
     {
         string specProject = solution.SpecProjectDirectory
                              ?? throw new InvalidOperationException($"{solution.Name} has no spec project to stage the draft beside.");
-        string built = Directory.EnumerateFiles(
-                ExampleBuilds.SpecOutputDirectory(specProject), $"{AdoptingSpec}.dll", SearchOption.AllDirectories)
-            .Single();
+        string searched = ExampleBuilds.SpecOutputDirectory(specProject);
+        string built = Directory.EnumerateFiles(searched, $"{AdoptingSpec}.dll", SearchOption.AllDirectories)
+            .ShouldHaveSingleItem($"Looking for one {AdoptingSpec}.dll under {searched}.");
         string builtDirectory = Path.GetDirectoryName(built)!;
 
         string outputPath = Path.GetRelativePath(Path.Combine(specProject, "bin"), builtDirectory);
@@ -213,7 +216,7 @@ internal static class ExampleReplay
     private static (IReadOnlyList<string> Lines, IReadOnlyDictionary<string, byte[]> Files) CaptureBaselines(
         ArchitectureModel model, CodebaseModel governed)
     {
-        CheckReport survey = Harness.Check(model, governed, BaselineIndex.Empty);
+        CheckReport survey = Harness.CheckUncancellable(model.Rules, governed, BaselineIndex.Empty, null);
         List<RuleResult> ratcheted = survey.Results.Where(static result => result.Rule.IsRatcheted)
             .ToList();
 
@@ -252,7 +255,7 @@ internal static class ExampleReplay
         }
 
         /// <summary>The scenario's edited codebase, and the absolute paths of the files it changed.</summary>
-        internal async Task<(CodebaseModel Codebase, IReadOnlyList<string> Changed)> ApplyAsync(
+        internal async Task<(CodebaseModel Codebase, IReadOnlyList<string> Changed)> ShouldApplyAsync(
             WalkthroughScenario scenario, string directory)
         {
             IReadOnlyDictionary<string, string> texts = scenario.Apply(path => ReadCommitted(directory, path));
@@ -353,7 +356,8 @@ internal static class ExampleReplay
 
 /// <summary>
 ///     One example's replay: its <see cref="Tree" /> as committed, each of its <see cref="Scenarios" />, what
-///     <c>render</c> reports over it, and for Meridian the adoption walkthrough's day-zero steps.
+///     <c>render</c> reports over it, what <c>check</c> and <c>status</c> print over it, and for Meridian the
+///     adoption walkthrough's day-zero steps.
 /// </summary>
 /// <param name="Example">The example's name, which is its directory under <c>examples/</c>.</param>
 /// <param name="SolutionDirectory">The example's directory, which every printed path is relative to.</param>
@@ -363,6 +367,8 @@ internal static class ExampleReplay
 /// <param name="Scenarios">Each scenario's check, keyed by the scenario.</param>
 /// <param name="RenderLines">The lines <c>render</c> prints over the committed tree.</param>
 /// <param name="Adoption">The day-zero steps, which only Meridian's adoption walkthrough takes.</param>
+/// <param name="CheckVerb">What <c>check --no-cache</c> printed over the committed tree.</param>
+/// <param name="StatusVerb">What <c>status --no-cache</c> printed over it.</param>
 internal sealed record ExampleRun(
     string Example,
     string SolutionDirectory,
@@ -371,7 +377,9 @@ internal sealed record ExampleRun(
     ScenarioRun Tree,
     IReadOnlyDictionary<string, ScenarioRun> Scenarios,
     IReadOnlyList<string> RenderLines,
-    AdoptionRun? Adoption)
+    AdoptionRun? Adoption,
+    CliResult CheckVerb,
+    CliResult StatusVerb)
 {
     /// <summary>The run of the scenario keyed <paramref name="key" />.</summary>
     internal ScenarioRun Scenario(string key)

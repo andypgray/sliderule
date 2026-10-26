@@ -1,11 +1,12 @@
+using System.Text.Json;
 using Shouldly;
 
 namespace SlideRule.Tests.TestSupport;
 
 /// <summary>
-///     The Shouldly surface over a rendered document's key order, read as text: which slot serializes ahead
-///     of which, for the documents whose order is the claim — what a reader with a response budget keeps
-///     when the cut lands, and what it loses first.
+///     The Shouldly surface over a rendered document's key order: which slot serializes ahead of which, for
+///     the documents whose order is the claim — what a reader with a response budget keeps when the cut
+///     lands, and what it loses first.
 /// </summary>
 /// <remarks>
 ///     Deliberately <em>not</em> attributed <c>[ShouldlyMethods]</c>, for the reason given on
@@ -23,6 +24,25 @@ internal static class JsonKeyOrderAssertions
         int laterAt = document.ShouldHaveKeyAt(later);
 
         earlierAt.ShouldBeLessThan(laterAt, $"\"{earlier}\" must serialize before \"{later}\":\n{document}");
+    }
+
+    /// <summary>
+    ///     Asserts <paramref name="element" /> carries both keys as properties of its own and that
+    ///     <paramref name="earlier" /> serializes ahead of <paramref name="later" />, read off the one object
+    ///     rather than the whole text, so a key of the same name elsewhere in the document cannot answer for it.
+    /// </summary>
+    internal static void ShouldSerializeBefore(this JsonElement element, string earlier, string later)
+    {
+        List<string> keys = element.EnumerateObject()
+            .Select(property => property.Name)
+            .ToList();
+        var report = $"the object's keys are {string.Join(", ", keys)}:\n{element.GetRawText()}";
+        int earlierAt = keys.IndexOf(earlier);
+        int laterAt = keys.IndexOf(later);
+
+        earlierAt.ShouldBeGreaterThanOrEqualTo(0, report);
+        laterAt.ShouldBeGreaterThanOrEqualTo(0, report);
+        earlierAt.ShouldBeLessThan(laterAt, report);
     }
 
     /// <summary>

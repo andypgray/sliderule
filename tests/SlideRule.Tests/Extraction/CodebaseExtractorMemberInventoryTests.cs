@@ -403,7 +403,7 @@ public sealed class CodebaseExtractorMemberInventoryTests
 
         // The return type is the method's own type parameter, rendered as its declared name (definition-level).
         MemberNode echo = model.Type("N.C")
-            .Members.Single(m => m.Name == "Echo");
+            .MemberNamed("Echo");
         echo.SymbolId.ShouldBe("M:N.C.Echo``1(``0)");
         echo.ReturnTypeFullName.ShouldBe("T");
     }
@@ -468,7 +468,7 @@ public sealed class CodebaseExtractorMemberInventoryTests
         // Declaration order is preserved ([count, cancellationToken], not sorted or reversed) and a
         // default-valued parameter is a fact like any other — it counts (GRAMMAR §4.6, §5.6).
         MemberNode seed = model.Type("N.C")
-            .Members.Single(m => m.Name == "Seed");
+            .MemberNamed("Seed");
         seed.Parameters.Select(p => (p.Name, p.TypeFullName))
             .ShouldBe(
             [
@@ -510,7 +510,7 @@ public sealed class CodebaseExtractorMemberInventoryTests
         // ref/in/out are calling-convention modifiers, not part of the recorded parameter type — all three
         // record the underlying System.Int32.
         MemberNode move = model.Type("N.C")
-            .Members.Single(m => m.Name == "Move");
+            .MemberNamed("Move");
         move.Parameters.Select(p => (p.Name, p.TypeFullName))
             .ShouldBe(
             [
@@ -533,7 +533,7 @@ public sealed class CodebaseExtractorMemberInventoryTests
 
         // A params parameter records the ARRAY type, never the element type.
         MemberNode cancelAll = model.Type("N.C")
-            .Members.Single(m => m.Name == "CancelAll");
+            .MemberNamed("CancelAll");
         cancelAll.Parameters.Select(p => (p.Name, p.TypeFullName))
             .ShouldBe(
                 [("tokens", "System.Threading.CancellationToken[]")]);
@@ -553,7 +553,7 @@ public sealed class CodebaseExtractorMemberInventoryTests
         // A T? parameter records System.Nullable<T>'s definition form (never the unwrapped T), the same
         // construction-erasing normalization the return type uses.
         MemberNode maybe = model.Type("N.C")
-            .Members.Single(m => m.Name == "Maybe");
+            .MemberNamed("Maybe");
         maybe.Parameters.Select(p => (p.Name, p.TypeFullName))
             .ShouldBe([("token", "System.Nullable<T>")]);
     }
@@ -568,7 +568,7 @@ public sealed class CodebaseExtractorMemberInventoryTests
 
         // The same definition-level path that renders Echo's RETURN type as "T" renders its parameter type "T".
         MemberNode echo = model.Type("N.C")
-            .Members.Single(m => m.Name == "Echo");
+            .MemberNamed("Echo");
         echo.Parameters.Select(p => (p.Name, p.TypeFullName))
             .ShouldBe([("value", "T")]);
     }
@@ -606,10 +606,11 @@ public sealed class CodebaseExtractorMemberInventoryTests
                             public partial class Host { partial void OnScan(int index, string label) {} }
                             """));
 
-        // A partial method's defining and implementing parts resolve to ONE inventory member (Single throws on
-        // a duplicate), and its parameters are read once — [index, label], never doubled to four or reordered.
+        // A partial method's defining and implementing parts resolve to ONE inventory member (MemberNamed throws
+        // on a duplicate, listing both), and its parameters are read once — [index, label], never doubled to four
+        // or reordered.
         MemberNode onScan = model.Type("N.Host")
-            .Members.Single(m => m.Name == "OnScan");
+            .MemberNamed("OnScan");
         onScan.Parameters.Select(p => (p.Name, p.TypeFullName))
             .ShouldBe(
             [
@@ -815,7 +816,7 @@ public sealed class CodebaseExtractorMemberInventoryTests
         // is the honest reading for a member subject (either part's attribute is authored surface). The names
         // are chosen so ordinal order reverses part order, which pins the ordering as by constructed name.
         model.Type("N.Host")
-            .Members.Single(m => m.Name == "OnScan")
+            .MemberNamed("OnScan")
             .Attributes.Select(a => a.FullName)
             .ShouldBe(["N.AlsoOnImplementingAttribute", "N.OnDefiningAttribute"]);
     }
@@ -993,14 +994,14 @@ public sealed class CodebaseExtractorMemberInventoryTests
                             """));
 
         // EMPIRICAL PIN, the partial-method row's C# 13 twin: a partial property's defining and implementing
-        // parts resolve to ONE inventory member (Single throws on a duplicate), and the setter fact is read
-        // off that merged symbol — so the get-only pair reports no setter while the get/set pair does, and
-        // being partial is not itself a shape.
+        // parts resolve to ONE inventory member (MemberNamed throws on a duplicate, listing both), and the setter
+        // fact is read off that merged symbol — so the get-only pair reports no setter while the get/set pair
+        // does, and being partial is not itself a shape.
         TypeNode host = model.Type("N.Host");
-        MemberNode count = host.Members.Single(m => m.Name == "Count");
+        MemberNode count = host.MemberNamed("Count");
         count.HasSetter.ShouldBeTrue();
         count.HasInitOnlySetter.ShouldBeFalse();
-        MemberNode label = host.Members.Single(m => m.Name == "Label");
+        MemberNode label = host.MemberNamed("Label");
         label.HasSetter.ShouldBeFalse();
     }
 }

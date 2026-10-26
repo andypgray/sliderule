@@ -1,7 +1,6 @@
 using System.Text.Json;
 using Shouldly;
 using SlideRule.Cli.Mcp.Infrastructure;
-using SlideRule.Cli.Pipeline;
 using SlideRule.Cli.Verbs;
 using SlideRule.Tests.TestSupport;
 using Xunit;
@@ -32,11 +31,13 @@ namespace SlideRule.Tests.Cli;
 ///         transitively — and is the negative fixture that keeps the stamps from being unconditional.
 ///     </para>
 ///     <para>
-///         <b>Cold invocations throughout</b> (<see cref="CliRunner.InvokeColdAsync(string[])" />, or the
-///         runner directly for the verbs the CLI does not expose): the subject here is the load boundary,
-///         where the narrowing is measured as declared minus loaded, so every run loads its filter cold rather
-///         than reading a workspace the warm pool already holds, which would prove nothing about the filter's
-///         own load.
+///         <b>A cold witness for each answer, the warm pool for the repeats.</b> The narrowing is measured as
+///         declared minus loaded, and a pooled session runs the same loader and carries the same verdict a cold
+///         load returns, so the rows that read the same filter again take
+///         <see cref="CliRunner.InvokeAsync(string[])" /> and the filter loads once. The shared narrowed check,
+///         the check over the filter that narrows nothing, and the rows whose filter is read once stay on
+///         <see cref="CliRunner.InvokeColdAsync(string[])" />, so the CLI's own cold load of a filter keeps a
+///         witness of both answers.
 ///     </para>
 ///     <para>
 ///         <b>Both answers a filter can get.</b> <c>check</c>, <c>status</c>, <c>graph</c> and
@@ -138,7 +139,7 @@ public sealed class FilteredSolutionE2ETests
             "check", BillingOnlyFilter(), "--spec", CliRunner.CleanSpecDll, "--no-cache", "--json"));
 
     private static string FilterDirectory =>
-        Path.Combine(AppContext.BaseDirectory, "Fixtures", "FilteredSolutions");
+        Path.Combine(FixtureBeds.FixturesRoot, "FilteredSolutions");
 
     [Fact]
     public async Task Check_NarrowingFilter_StampsTheNarrowingAboveTheVerdict()
@@ -150,9 +151,8 @@ public sealed class FilteredSolutionE2ETests
         // Exit 0: the clean spec is clean over this solution, and it stays clean read through a filter. The
         // rule whose subject the filter dropped is skipped rather than red — see the row below — so the only
         // thing narrowing changes about the verdict is what the stamp above it says the verdict covers.
-        result.ShouldSucceed();
-        result.Out.NormalizedLines()
-            .ShouldStartWith(CheckStamp + "\n\n"); // a blank line separates the stamp from the verdict it scopes
+        result.ShouldSucceed()
+            .ShouldOpenWith(CheckStamp + "\n\n"); // a blank line separates the stamp from the verdict it scopes
     }
 
     [Fact]
@@ -164,13 +164,12 @@ public sealed class FilteredSolutionE2ETests
         // for a solution that is clean, so the rule skips, and the reason names the filter that did it.
         CliResult result = await NarrowedCheck.Value;
 
-        result.ShouldSucceed();
-        string report = result.Out.NormalizedLines();
-        report.ShouldContain("\nskip data-access/no-inline-sql — ");
-        report.ShouldContain("\n  skipped: " + RuleSkipReason);
-        // The whole verdict, so a skip that quietly became a pass — or a second rule that started skipping —
-        // cannot hide behind the two fragments above.
-        report.ShouldContain("Checked 3 rules: 2 passed, 0 failed, 1 skipped (0 violations, 1 warning).");
+        result.ShouldSucceed(
+            "\nskip data-access/no-inline-sql — ",
+            "\n  skipped: " + RuleSkipReason,
+            // The whole verdict, so a skip that quietly became a pass — or a second rule that started skipping —
+            // cannot hide behind the two fragments above.
+            "Checked 3 rules: 2 passed, 0 failed, 1 skipped (0 violations, 1 warning).");
     }
 
     [Fact]
@@ -181,12 +180,10 @@ public sealed class FilteredSolutionE2ETests
         // inert and the warning is true.
         CliResult result = await NarrowedCheck.Value;
 
-        result.ShouldSucceed();
-        string report = result.Out.NormalizedLines();
-        report.ShouldContain(
+        result.ShouldSucceed(
             "\n  warning: This rule is inert: its target selection matched no types.\n"
             + "  hint: " + InertTargetHint + "\n");
-        report.ShouldNotContain("`Legacy*` never crosses a dot");
+        result.Out.ShouldNotContain("`Legacy*` never crosses a dot");
     }
 
     [Fact]
@@ -206,12 +203,11 @@ public sealed class FilteredSolutionE2ETests
     {
         // status's counts are the thing a narrowed universe corrupts most quietly: an unchecked project
         // declares no types and so contributes no violations, which reads as progress.
-        CliResult result = await CliRunner.InvokeColdAsync(
+        CliResult result = await CliRunner.InvokeAsync(
             "status", BillingOnlyFilter(), "--spec", CliRunner.CleanSpecDll, "--no-cache");
 
-        result.ShouldSucceed();
-        result.Out.NormalizedLines()
-            .ShouldStartWith(StatusStamp + "\n\n");
+        result.ShouldSucceed()
+            .ShouldOpenWith(StatusStamp + "\n\n");
     }
 
     [Fact]
@@ -219,12 +215,10 @@ public sealed class FilteredSolutionE2ETests
     {
         // graph needs no spec and is the first verb a stranger runs, where a project out of view reads as a
         // codebase that does not have one.
-        CliResult result = await CliRunner.InvokeColdAsync("graph", BillingOnlyFilter(), "--no-cache");
+        CliResult result = await CliRunner.InvokeAsync("graph", BillingOnlyFilter(), "--no-cache");
 
-        result.ShouldSucceed();
-        result.Out.NormalizedLines()
-            .ShouldStartWith(GraphStamp + "\n\n");
-        result.Out.ShouldContain("MyApp.Legacy.Billing"); // the survey it does have still follows
+        result.ShouldSucceed("MyApp.Legacy.Billing"); // the survey it does have still follows
+        result.ShouldOpenWith(GraphStamp + "\n\n");
     }
 
     [Fact]
@@ -243,14 +237,13 @@ public sealed class FilteredSolutionE2ETests
         document.RootElement.Strings("uncheckedProjects")
             .ShouldBe(TheTwoUncheckedProjects);
         // It scopes the verdict rather than overturning it: nothing failed to load.
-        document.RootElement.TryGetProperty("modelIncomplete", out _)
-            .ShouldBeFalse();
+        document.ShouldNotBeStampedIncomplete();
     }
 
     [Fact]
     public async Task StatusJson_NarrowingFilter_CarriesTheUncheckedProjectsAndNoStamp()
     {
-        CliResult result = await CliRunner.InvokeColdAsync(
+        CliResult result = await CliRunner.InvokeAsync(
             "status", BillingOnlyFilter(), "--spec", CliRunner.CleanSpecDll, "--no-cache", "--json");
 
         result.ShouldSucceed();
@@ -263,7 +256,7 @@ public sealed class FilteredSolutionE2ETests
     [Fact]
     public async Task GraphJson_NarrowingFilter_CarriesTheUncheckedProjectsAndNoStamp()
     {
-        CliResult result = await CliRunner.InvokeColdAsync(
+        CliResult result = await CliRunner.InvokeAsync(
             "graph", BillingOnlyFilter(), "--no-cache", "--json");
 
         result.ShouldSucceed();
@@ -281,17 +274,17 @@ public sealed class FilteredSolutionE2ETests
         using TempDirectory temp = TestTempRoot.Fresh("filtered-sarif");
         string sarifPath = temp.PathOf("filtered.sarif");
 
-        CliResult result = await CliRunner.InvokeColdAsync(
+        CliResult result = await CliRunner.InvokeAsync(
             "check", BillingOnlyFilter(), "--spec", CliRunner.CleanSpecDll, "--no-cache", "--sarif", sarifPath);
 
         result.ShouldSucceed(); // clean over the subset, which is exactly why the notification has to be there
-        string sarif = File.ReadAllText(sarifPath);
-        sarif.ShouldContain("\"level\": \"warning\"");
-        sarif.ShouldContain(
-            "A solution filter narrowed this run: 2 projects the solution declares were not checked, so "
-            + "these results cover part of the solution: "
-            + "MyApp.Domain/MyApp.Domain.csproj, "
-            + "MyApp.Web/MyApp.Web.csproj");
+        File.ReadAllText(sarifPath)
+            .ShouldCarryNotification(
+                "warning",
+                "A solution filter narrowed this run: 2 projects the solution declares were not checked, so "
+                + "these results cover part of the solution: "
+                + "MyApp.Domain/MyApp.Domain.csproj, "
+                + "MyApp.Web/MyApp.Web.csproj");
     }
 
     [Fact]
@@ -303,9 +296,9 @@ public sealed class FilteredSolutionE2ETests
         // A spec-ful verb and the spec-less one, so the suppression is proven on both sides of the seam.
         string filter = Path.Combine(FilterDirectory, "DomainAndWeb.slnf");
 
-        CliResult status = await CliRunner.InvokeColdAsync(
+        CliResult status = await CliRunner.InvokeAsync(
             "status", filter, "--spec", CliRunner.CleanSpecDll, "--no-cache");
-        CliResult graph = await CliRunner.InvokeColdAsync("graph", filter, "--no-cache", "--json");
+        CliResult graph = await CliRunner.InvokeAsync("graph", filter, "--no-cache", "--json");
 
         status.ShouldSucceed();
         status.Out.ShouldNotContain(AnyNarrowing);
@@ -358,8 +351,9 @@ public sealed class FilteredSolutionE2ETests
             "check", Path.Combine(FilterDirectory, "Malformed.slnf"), "--spec", CliRunner.CleanSpecDll,
             "--no-cache");
 
-        result.ShouldRefuseWith("Could not read the solution filter", "Malformed.slnf");
-        result.Err.ShouldContain(
+        result.ShouldRefuseWith(
+            "Could not read the solution filter",
+            "Malformed.slnf",
             "A filter must be well-formed JSON whose 'solution' path resolves to a .sln or .slnx, and every "
             + "project it lists must be a member of that solution.");
     }
@@ -370,32 +364,29 @@ public sealed class FilteredSolutionE2ETests
         // Context never gates — it is a lookup an agent runs mid-edit — but its pointer line is exactly the
         // answer a narrowed universe turns into a false all-clear, and stdout is its only channel. Driven
         // through the runner directly, because there is no CLI verb to invoke.
-        var output = new StringWriter();
+        var request = new ContextRequest(
+            "MyApp.Legacy.Billing", BillingOnlyFilter(), CliRunner.CleanSpecDll, FilterDirectory);
 
-        int exit = await new ContextRunner(output, new ColdSolutionSource(), new SystemEnvironment()).RunAsync(
-            new ContextRequest("MyApp.Legacy.Billing", BillingOnlyFilter(), CliRunner.CleanSpecDll, FilterDirectory),
-            Ct);
+        CliResult result = await CliResult.CapturedAsync((output, _) =>
+            new ContextRunner(output, WarmWorkspacePool.Source, new SystemEnvironment()).RunAsync(request, Ct));
 
-        exit.ShouldBe(0); // a smaller true answer, so it answers
-        string answer = output.ToString()
-            .NormalizedLines();
-        answer.ShouldStartWith(ContextStamp + "\n\n");
-        answer.ShouldContain("No architecture scope covers"); // the answer it does have still follows
+        // A smaller true answer, so it answers, and the answer it does have still follows the stamp.
+        result.ShouldSucceed("No architecture scope covers")
+            .ShouldOpenWith(ContextStamp + "\n\n");
     }
 
     [Fact]
     public async Task Context_FilterThatNarrowsNothing_SaysNothingAboutNarrowing()
     {
-        var output = new StringWriter();
+        var request = new ContextRequest(
+            "MyApp.Legacy.Billing", Path.Combine(FilterDirectory, "DomainAndWeb.slnf"),
+            CliRunner.CleanSpecDll, FilterDirectory);
 
-        int exit = await new ContextRunner(output, new ColdSolutionSource(), new SystemEnvironment()).RunAsync(
-            new ContextRequest(
-                "MyApp.Legacy.Billing", Path.Combine(FilterDirectory, "DomainAndWeb.slnf"),
-                CliRunner.CleanSpecDll, FilterDirectory),
-            Ct);
+        CliResult result = await CliResult.CapturedAsync((output, _) =>
+            new ContextRunner(output, WarmWorkspacePool.Source, new SystemEnvironment()).RunAsync(request, Ct));
 
-        exit.ShouldBe(0);
-        var answer = output.ToString();
+        result.ShouldSucceed();
+        string answer = result.Out;
         answer.ShouldNotContain(AnyNarrowing);
         answer.ShouldStartWith("No architecture scope covers");
     }
@@ -410,10 +401,10 @@ public sealed class FilteredSolutionE2ETests
         string[] before = FilesWhereAWriteWouldLand();
         before.ShouldNotBeEmpty();
 
-        CliResult result = await CliRunner.InvokeColdAsync(
+        CliResult result = await CliRunner.InvokeAsync(
             "baseline", "init", BillingOnlyFilter(), "--spec", CliRunner.CleanSpecDll);
 
-        result.ShouldRefuseWith(BaselineRefusal.Split('\n'));
+        result.ShouldRefuseWith(BaselineRefusal);
         result.Out.ShouldBeEmpty(); // it refused before the first captured/unchanged line
         FilesWhereAWriteWouldLand()
             .ShouldBe(before);
@@ -428,10 +419,10 @@ public sealed class FilteredSolutionE2ETests
         string[] before = FilesWhereAWriteWouldLand();
         before.ShouldNotBeEmpty();
 
-        CliResult result = await CliRunner.InvokeColdAsync(
+        CliResult result = await CliRunner.InvokeAsync(
             "baseline", "accept-reductions", BillingOnlyFilter(), "--spec", CliRunner.CleanSpecDll);
 
-        result.ShouldRefuseWith(BaselineRefusal.Split('\n'));
+        result.ShouldRefuseWith(BaselineRefusal);
         result.Out.ShouldBeEmpty();
         FilesWhereAWriteWouldLand()
             .ShouldBe(before);
@@ -444,7 +435,7 @@ public sealed class FilteredSolutionE2ETests
         // nothing about what it did not. On this bed it cannot go on to write, because the clean spec's only
         // ratcheted rule is scoped to MyApp.Web and loses its subject with it — so what proves the branch is
         // that the message is add's own, reached after the load, the gate and the whole check.
-        CliResult result = await CliRunner.InvokeColdAsync(
+        CliResult result = await CliRunner.InvokeAsync(
             "baseline", "add", BillingOnlyFilter(), "--spec", CliRunner.CleanSpecDll,
             "--rule", "data-access/no-inline-sql", "--because", "Legacy import path.",
             "--source", "MyApp.Web.HomeController", "--target", "System.Data.DataTable");
@@ -462,10 +453,10 @@ public sealed class FilteredSolutionE2ETests
         string[] before = FilesWhereAWriteWouldLand();
         before.ShouldNotBeEmpty();
 
-        CliResult result = await CliRunner.InvokeColdAsync(
+        CliResult result = await CliRunner.InvokeAsync(
             "render", BillingOnlyFilter(), "--spec", CliRunner.CleanSpecDll);
 
-        result.ShouldRefuseWith(RenderRefusal.Split('\n'));
+        result.ShouldRefuseWith(RenderRefusal);
         result.Out.ShouldBeEmpty(); // it refused before the first wrote/unchanged line
         FilesWhereAWriteWouldLand()
             .ShouldBe(before);
@@ -521,8 +512,8 @@ public sealed class FilteredSolutionE2ETests
     /// </summary>
     private static string BillingOnlyFilter()
     {
-        string solution = File.ReadAllText(CliRunner.MyAppSolution);
-        int declared = solution.Split(".csproj").Length - 1;
+        int declared = File.ReadAllText(CliRunner.MyAppSolution)
+            .Occurrences(".csproj");
         declared.ShouldBe(
             3,
             $"MyApp.sln now declares {declared} projects rather than three, so the paths "
@@ -542,24 +533,9 @@ public sealed class FilteredSolutionE2ETests
 
     // The whole write-nothing assertion, over both directories a leaked write could reach: the filter's own,
     // and — since a filtered run anchors at the solution it references — MyApp's bed, where a baseline would
-    // be created and where a render's targets would land. Size and mtime ride along because a leak need not
-    // add a file to be a leak: the bed is full of sources and project files a verb could rewrite in place,
-    // and against those a listing of names alone could not tell an overwrite from a refusal. bin/obj are
-    // left out: a design-time build touches them legitimately mid-row, and no verb here writes to them.
+    // be created and where a render's targets would land.
     private static string[] FilesWhereAWriteWouldLand()
     {
-        string[] roots = [FilterDirectory, Path.GetDirectoryName(CliRunner.MyAppSolution)!];
-        return roots
-            .SelectMany(root => Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories)
-                .Where(path => !TempFixtureWorkspace.IsBuildArtifact(Path.GetRelativePath(root, path))))
-            .Select(Describe)
-            .Order(StringComparer.Ordinal)
-            .ToArray();
-    }
-
-    private static string Describe(string path)
-    {
-        var file = new FileInfo(path);
-        return $"{path}|{file.Length}|{file.LastWriteTimeUtc.Ticks}";
+        return WriteFootprint.Of(FilterDirectory, FixtureBeds.MyAppRoot);
     }
 }

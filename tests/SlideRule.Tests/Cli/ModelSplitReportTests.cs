@@ -42,8 +42,7 @@ public sealed class ModelSplitReportTests
         ModelDocument document = Document([Decidable("naming/interfaces"), Decidable("naming/handlers")]);
 
         ModelSplitReport.Lines(document)
-            .First()
-            .ShouldBe("  2 rules: 2 decidable from one project, 0 left to the whole solution, 0 not in the file");
+            .ShouldBe(["  2 rules: 2 decidable from one project, 0 left to the whole solution, 0 not in the file"]);
     }
 
     [Fact]

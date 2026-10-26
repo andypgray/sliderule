@@ -306,24 +306,13 @@ public sealed class SpecLiteralParityTests(SpecFixtureCorpus corpus) : IClassFix
         }
     }
 
-    // Both sides of the whole corpus walked once: what failed to pair, which codes did pair, and which
-    // fixtures never reached validation at all. Held together rather than recomputed per arm, so every arm
-    // is reading one answer about one corpus.
-    private sealed class ParityRun
+    // Both sides of the whole corpus walked in one pass: what failed to pair, which codes did pair, and which
+    // fixtures never reached validation at all.
+    private sealed record ParityRun(
+        IReadOnlyList<string> Findings,
+        IReadOnlySet<string> PairedCodes,
+        IReadOnlyList<string> Refused)
     {
-        private ParityRun(IReadOnlyList<string> findings, IReadOnlySet<string> pairedCodes, IReadOnlyList<string> refused)
-        {
-            Findings = findings;
-            PairedCodes = pairedCodes;
-            Refused = refused;
-        }
-
-        internal IReadOnlyList<string> Findings { get; }
-
-        internal IReadOnlySet<string> PairedCodes { get; }
-
-        internal IReadOnlyList<string> Refused { get; }
-
         internal static ParityRun Over(SpecFixtureCorpus corpus)
         {
             var findings = new List<string>();

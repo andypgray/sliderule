@@ -173,21 +173,23 @@ public sealed class TrackedFileHygieneTests
     [Fact]
     public void NonSourceExemptions_AllStillMatchAHit()
     {
-        // Arrange
+        // Arrange: read from the very text the arm scans rather than from the file on disk, so an exemption whose
+        // file git no longer tracks, or now sniffs as binary, counts as dead.
         Regex[] everyPattern = [.. DocHygieneTests.InternalReferencePatterns, .. EnvironmentPatterns];
+        Dictionary<string, string> byPath = LazyNonSourceTexts.Value
+            .ToDictionary(static entry => entry.Path, static entry => entry.Text, StringComparer.Ordinal);
         List<string> dead = new();
 
         // Act
         foreach ((string path, string token) in NonSourceExemptions)
         {
-            string absolute = RepoRoot.Absolute(path);
-            if (!File.Exists(absolute))
+            if (!byPath.TryGetValue(path, out string? text))
             {
-                dead.Add($"{path} no longer exists.");
+                dead.Add($"{path} is no longer a tracked text file.");
                 continue;
             }
 
-            IReadOnlyList<string> hits = DocProse.FindForbidden(File.ReadAllText(absolute), everyPattern);
+            IReadOnlyList<string> hits = DocProse.FindForbidden(text, everyPattern);
             if (!hits.Any(hit => IsToken(hit, token))) dead.Add($"{path} no longer carries '{token}'.");
         }
 

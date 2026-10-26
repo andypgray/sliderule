@@ -41,13 +41,15 @@ public sealed class PublicSurfaceSyncTests
     private const string CoreCsproj = "src/SlideRule/SlideRule.csproj";
 
     /// <summary>
-    ///     The two assemblies a consumer writes code against: the contract package every spec project
-    ///     references, and the adapter a test project derives from.
+    ///     The two packages a consumer writes code against, each named by its csproj and by one type its assembly
+    ///     exports, which the reflection sweep must see in that assembly's render: the contract package every spec
+    ///     project references, and the adapter a test project derives from. The types are read through typeof, so a
+    ///     rename follows them here and is left for the drift arm to report.
     /// </summary>
-    private static readonly (string Csproj, Assembly Assembly)[] PinnedPackages =
+    private static readonly (string Csproj, Type Anchor)[] PinnedPackages =
     [
-        (CoreCsproj, typeof(Arch).Assembly),
-        (DocPaths.AdapterProject, typeof(ArchRuleTests<>).Assembly)
+        (CoreCsproj, typeof(Arch)),
+        (DocPaths.AdapterProject, typeof(ArchRuleTests<>))
     ];
 
     /// <summary>
@@ -110,8 +112,9 @@ public sealed class PublicSurfaceSyncTests
         List<string> drift = new();
 
         // Act: render each shipped surface fresh and compare it to the committed pin.
-        foreach ((string _, Assembly assembly) in PinnedPackages)
+        foreach ((string _, Type anchor) in PinnedPackages)
         {
+            Assembly assembly = anchor.Assembly;
             string pinPath = PublicSurface.PinPath(assembly);
             string pinned = RepoRoot.ReadText(pinPath);
             string rendered = PublicSurface.Render(assembly);
@@ -133,18 +136,13 @@ public sealed class PublicSurfaceSyncTests
     public void TheReflectionSweep_SeesTheWholeSurface()
     {
         // Arrange: the failure this arm exists for is a pin regenerated from a sweep that saw nothing.
-        // An empty pin compared against an empty render passes forever and says nothing. The anchors are
-        // read through typeof so a rename follows them here and is left for the arm above to report.
-        (Assembly Assembly, Type Anchor)[] anchors =
-        [
-            (typeof(Arch).Assembly, typeof(Arch)),
-            (typeof(ArchRuleTests<>).Assembly, typeof(ArchRuleTests<>))
-        ];
+        // An empty pin compared against an empty render passes forever and says nothing.
         List<string> blind = new();
 
         // Act
-        foreach ((Assembly assembly, Type anchor) in anchors)
+        foreach ((string _, Type anchor) in PinnedPackages)
         {
+            Assembly assembly = anchor.Assembly;
             string rendered = PublicSurface.Render(assembly);
             var anchorLine = $"{anchor.FullName}\n";
             if (!rendered.Contains(anchorLine, StringComparison.Ordinal))
@@ -171,11 +169,11 @@ public sealed class PublicSurfaceSyncTests
 
         // Act: a pinned package must have the pack-time check switched on and a committed pin beside it,
         // and an exempt one must still carry the text its exemption rests on.
-        foreach ((string csproj, Assembly assembly) in PinnedPackages)
+        foreach ((string csproj, Type anchor) in PinnedPackages)
         {
             findings.AddRange(MissingValidation(csproj));
 
-            string pinPath = PublicSurface.PinPath(assembly);
+            string pinPath = PublicSurface.PinPath(anchor.Assembly);
             if (!File.Exists(RepoRoot.Absolute(pinPath)))
                 findings.Add($"{csproj} is registered as pinned but {pinPath} does not exist.");
         }
@@ -236,7 +234,7 @@ public sealed class PublicSurfaceSyncTests
         List<string> findings = new();
 
         // Act
-        foreach ((string csproj, Assembly _) in PinnedPackages)
+        foreach ((string csproj, Type _) in PinnedPackages)
         {
             PropertyDeclaration declared = SolutionInventory.Effective(csproj, BaselineProperty)
                                            ?? throw new InvalidOperationException(
@@ -332,8 +330,9 @@ public sealed class PublicSurfaceSyncTests
         List<string> findings = new();
 
         // Act
-        foreach ((string _, Assembly assembly) in PinnedPackages)
+        foreach ((string _, Type anchor) in PinnedPackages)
         {
+            Assembly assembly = anchor.Assembly;
             string pinPath = PublicSurface.PinPath(assembly);
             string text = RepoRoot.ReadText(pinPath);
 

@@ -52,8 +52,12 @@ internal static class CacheRuns
             source);
     }
 
-    /// <summary>One <c>graph --json</c> run over <paramref name="solution" />.</summary>
-    internal static Task<CacheRun> GraphAsync(string solution, string cacheRoot, bool noCache = false)
+    /// <summary>
+    ///     One <c>graph --json</c> run over <paramref name="solution" />. A null <paramref name="source" /> counts
+    ///     over a cold source.
+    /// </summary>
+    internal static Task<CacheRun> GraphAsync(
+        string solution, string cacheRoot, bool noCache = false, CountingSolutionSource? source = null)
     {
         GraphRequest request = GraphRequests.For(solution, SolutionPaths.SolutionDirectoryOf(solution))
             with
@@ -64,7 +68,8 @@ internal static class CacheRuns
         return RunAsync(
             cacheRoot,
             static (output, error, counting, environment) => new GraphRunner(output, error, counting, environment),
-            runner => runner.RunAsync(request, Ct));
+            runner => runner.RunAsync(request, Ct),
+            source);
     }
 
     /// <summary>

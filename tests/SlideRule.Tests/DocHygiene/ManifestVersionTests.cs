@@ -36,7 +36,7 @@ public sealed class ManifestVersionTests
     public void EveryVersionSite_NamesTheSameVersion()
     {
         // Arrange
-        IReadOnlyList<VersionSite> sites = ReadSites();
+        IReadOnlyList<VersionSite> sites = ShouldReadSites();
 
         // Act
         string[] distinct = sites
@@ -52,16 +52,16 @@ public sealed class ManifestVersionTests
             + $"document diff at the end of a Release suite. What the sites say:\n{Describe(sites)}");
     }
 
-    private static IReadOnlyList<VersionSite> ReadSites()
+    private static IReadOnlyList<VersionSite> ShouldReadSites()
     {
-        (string top, string package) = ManifestVersions();
+        (string top, string package) = ShouldHaveManifestVersions();
 
         return
         [
             new VersionSite($"{SolutionInventory.RootProps} <Version>", ShouldHaveSinglePropsVersion()),
             new VersionSite(ManifestTopSite, top),
             new VersionSite(ManifestPackageSite, package),
-            new VersionSite(SarifDriverSite, SarifDriverVersion())
+            new VersionSite(SarifDriverSite, ShouldHaveSarifDriverVersion())
         ];
     }
 
@@ -78,7 +78,7 @@ public sealed class ManifestVersionTests
         return version.Value;
     }
 
-    private static (string Top, string Package) ManifestVersions()
+    private static (string Top, string Package) ShouldHaveManifestVersions()
     {
         string json = RepoRoot.ReadText(DocPaths.McpManifest);
 
@@ -94,7 +94,7 @@ public sealed class ManifestVersionTests
 
     // The golden's shape is CheckCommandE2ETests' pin, so navigating it plainly is safe; only the
     // leaf — the field a bump has to reach and nothing cross-checks against the tag — is read here.
-    private static string SarifDriverVersion()
+    private static string ShouldHaveSarifDriverVersion()
     {
         string json = RepoRoot.ReadText(SarifGoldenPath);
 
@@ -108,11 +108,8 @@ public sealed class ManifestVersionTests
 
     private static string ShouldHaveText(JsonElement parent, string name, string site)
     {
-        bool found = parent.TryGetProperty(name, out JsonElement value);
-        found.ShouldBeTrue($"{site} is absent, so nothing there states a version at all.");
-
-        return value.GetString()
-            .ShouldNotBeNull($"{site} carries no version string.");
+        return parent.StringOrDefault(name)
+            .ShouldNotBeNull($"{site} carries no version string, so nothing there states a version at all.");
     }
 
     private static string Describe(IEnumerable<VersionSite> sites)

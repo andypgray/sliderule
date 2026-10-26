@@ -1,5 +1,6 @@
 using Shouldly;
 using SlideRule.Checking;
+using SlideRule.Tests.TestSupport;
 using Xunit;
 
 namespace SlideRule.Tests.Checking;
@@ -11,10 +12,6 @@ namespace SlideRule.Tests.Checking;
 /// </summary>
 public sealed class DiffContextTests
 {
-    // Membership case sensitivity follows the OS file system: case-insensitive on Windows/macOS,
-    // ordinal on Linux — the PathComparison rule the tripwire shares.
-    private static readonly bool CaseInsensitiveFileSystem = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS();
-
     private static DiffContext Make(params string[] changed)
     {
         return new DiffContext(@"C:\repo\sln", changed);
@@ -34,7 +31,7 @@ public sealed class DiffContextTests
     [Fact]
     public void Contains_OnCaseInsensitiveFileSystem_MatchesRegardlessOfCase()
     {
-        Assert.SkipUnless(CaseInsensitiveFileSystem, "Case-insensitive path matching is Windows/macOS behavior.");
+        FileNameCase.SkipUnlessIgnored();
         Make(@"C:\repo\sln\App\Foo.cs")
             .Contains("c:/REPO/sln/app/foo.cs")
             .ShouldBeTrue();
@@ -43,7 +40,7 @@ public sealed class DiffContextTests
     [Fact]
     public void Contains_OnCaseSensitiveFileSystem_DoesNotMatchCaseVariant()
     {
-        Assert.SkipWhen(CaseInsensitiveFileSystem, "Case-sensitive path matching is Linux behavior.");
+        FileNameCase.SkipUnlessCompared();
         Make(@"C:\repo\sln\App\Foo.cs")
             .Contains("c:/REPO/sln/app/foo.cs")
             .ShouldBeFalse();

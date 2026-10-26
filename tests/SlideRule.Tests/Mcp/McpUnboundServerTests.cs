@@ -31,9 +31,6 @@ namespace SlideRule.Tests.Mcp;
 /// </remarks>
 public sealed class McpUnboundServerTests : IDisposable
 {
-    private const string GraphRequest =
-        """{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"arch_graph","arguments":{}}}""";
-
     /// <summary>
     ///     What a polluted environment would cost both shapes: discovery walks parents to the drive root, so
     ///     a stray solution in any ancestor of the temp root would bind the server and quietly void the test.
@@ -122,7 +119,7 @@ public sealed class McpUnboundServerTests : IDisposable
         ProcessStartInfo startInfo = McpChildHarness.ServerStartInfo(TestsBinCli.Dll(), _temp.Path);
 
         ChildConversation conversation = await McpChildHarness.ConverseAsync(
-            startInfo, [("arch_graph", 2, GraphRequest)], callBudget: DiscoveryRefusalBudget);
+            startInfo, [("arch_graph", "{}")], callBudget: DiscoveryRefusalBudget);
 
         conversation.Handshake.ShouldNotBeNull(
             "the MCP server never answered `initialize`. An unresolvable walk-up must not kill the server: "

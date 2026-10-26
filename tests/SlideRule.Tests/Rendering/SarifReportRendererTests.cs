@@ -45,7 +45,7 @@ public sealed class SarifReportRendererTests
     {
         // An uncaptured Enforce reference violation: every site is a red error at baselineState new, and —
         // nothing grandfathers it — carries no suppressions property at all (null-omitted, not an empty array).
-        CheckReport report = Checker.Run(Sources.OneController, arch =>
+        CheckReport report = Checker.Run(Sources.OneControllerModel, arch =>
             arch.Rule("layer/no-data")
                 .Enforce(arch.Namespace("App.Web.*").MustNotReference(arch.Namespace("App.Data.*")))
                 .Because("The web layer must not open the data layer directly."));
@@ -96,10 +96,10 @@ public sealed class SarifReportRendererTests
         // All sites belong to the one Page -> Db violation, so the fingerprints share every slot but the ordinal.
         IReadOnlyList<string> fingerprints = results.Select(result => result.SarifFingerprint())
             .ToList();
-        fingerprints.ShouldAllBe(f => f.StartsWith("v1|T:App.Web.Page|T:App.Data.Db|", StringComparison.Ordinal));
-        List<int> ordinals = fingerprints.Select(f => int.Parse(f.Split('|')[^1]))
-            .ToList();
-        ordinals.ShouldBe(Enumerable.Range(0, ordinals.Count)); // consecutive, 0-based, distinct
+        fingerprints.ShouldBe(
+            Enumerable.Range(0, fingerprints.Count)
+                .Select(ordinal => $"v1|T:App.Web.Page|T:App.Data.Db||Test.cs|{ordinal}")
+                .ToList());
     }
 
     [Fact]
@@ -128,15 +128,10 @@ public sealed class SarifReportRendererTests
         results.Count.ShouldBe(2);
         IReadOnlyList<string> fingerprints = results.Select(result => result.SarifFingerprint())
             .ToList();
-        fingerprints.ShouldBeUnique();
-        // Not the whole string: the path slot depends on relativizing a bare relative site against the
-        // current directory. The source and target slots are the identity, and they read in render order.
-        IReadOnlyList<string> edges = fingerprints.Select(f => $"{f.Split('|')[1]} -> {f.Split('|')[2]}")
-            .ToList();
-        edges.ShouldBe(
+        fingerprints.ShouldBe(
         [
-            "project:Zphil.Domain -> package:Newtonsoft.Json",
-            "project:Zphil.Domain -> package:Serilog"
+            "v1|project:Zphil.Domain|package:Newtonsoft.Json||Domain.csproj|0",
+            "v1|project:Zphil.Domain|package:Serilog||Domain.csproj|0"
         ]);
     }
 
@@ -235,11 +230,11 @@ public sealed class SarifReportRendererTests
 
         // The filter law is not in the message, so it has to be somewhere a standalone viewer looks: the rule
         // descriptor's shortDescription, which carries the law sentence verbatim.
-        string sentence = report.Results.Single()
+        string sentence = report.Results.ShouldHaveSingleItem()
             .Rule.Sentence;
         sentence.ShouldContain("without a `when` filter");
         json.SarifRules()
-            .Single()
+            .ShouldHaveSingleItem()
             .GetProperty("shortDescription")
             .GetProperty("text")
             .GetString()
@@ -311,7 +306,7 @@ public sealed class SarifReportRendererTests
         string json = report.ToSarif();
 
         JsonElement rule = json.SarifRules()
-            .Single();
+            .ShouldHaveSingleItem();
         rule.TryGetProperty("shortDescription", out _)
             .ShouldBeFalse();
         rule.GetProperty("fullDescription")
@@ -510,7 +505,7 @@ public sealed class SarifReportRendererTests
         // the severity of a broken law. Its containment twin, desugared from the same scope statement, is a red
         // law and stays where it was — which is why the level is read off the rule's own payload rather than
         // off the posture the two share.
-        CheckReport report = Checker.Run(QuarantinedCodebase, BaselineIndex.Empty, TouchedAlpha, QuarantinedScope);
+        CheckReport report = Checker.Run(QuarantinedCodebase, QuarantinedScope, diff: TouchedAlpha);
 
         string json = report.ToSarif();
 
@@ -536,7 +531,7 @@ public sealed class SarifReportRendererTests
         // with nothing to report through this channel. The location is the changed file and
         // nothing narrower — the finding is that the file was touched, and a start line would anchor the alert
         // wherever the renderer chose rather than where anything happened.
-        CheckReport report = Checker.Run(QuarantinedCodebase, BaselineIndex.Empty, TouchedAlpha, QuarantinedScope);
+        CheckReport report = Checker.Run(QuarantinedCodebase, QuarantinedScope, diff: TouchedAlpha);
 
         string json = report.ToSarif();
 
@@ -552,7 +547,6 @@ public sealed class SarifReportRendererTests
             .ShouldContain("App.Legacy/Alpha.cs");
         JsonElement location = result.GetProperty("locations")
             .EnumerateArray()
-            .ToList()
             .ShouldHaveSingleItem()
             .GetProperty("physicalLocation");
         location.GetProperty("artifactLocation")
@@ -569,7 +563,7 @@ public sealed class SarifReportRendererTests
         // The renderer has no code of its own for this posture: the level is keyed on the tripwire role rather
         // than the posture, and the posture rides the model's own enum through the shared lower-casing. The
         // pin keeps both right.
-        CheckReport report = Checker.Run(QuarantinedCodebase, BaselineIndex.Empty, TouchedAlpha, CautionedScope);
+        CheckReport report = Checker.Run(QuarantinedCodebase, CautionedScope, diff: TouchedAlpha);
 
         JsonElement rule = report.ToSarif()
             .SarifRules()
@@ -591,7 +585,7 @@ public sealed class SarifReportRendererTests
     [Fact]
     public void Serialize_CautionWarning_EmitsAWarningResultAtTheChangedFile()
     {
-        CheckReport report = Checker.Run(QuarantinedCodebase, BaselineIndex.Empty, TouchedAlpha, CautionedScope);
+        CheckReport report = Checker.Run(QuarantinedCodebase, CautionedScope, diff: TouchedAlpha);
 
         JsonElement result = report.ToSarif()
             .SarifResults()
@@ -605,7 +599,6 @@ public sealed class SarifReportRendererTests
             .ShouldBe("warning");
         result.GetProperty("locations")
             .EnumerateArray()
-            .ToList()
             .ShouldHaveSingleItem()
             .GetProperty("physicalLocation")
             .GetProperty("artifactLocation")
@@ -640,8 +633,8 @@ public sealed class SarifReportRendererTests
         // code scanning, where an alert stands in front of the whole team rather than the spec's author. The
         // empty-subject cure could not join it in any case — those violations are site-less and mint no
         // result — so carrying one here would land half a family's advice and hide the rest.
-        InertTargetReport.Single()
-            .Warnings.Single()
+        InertTargetReport.Results.ShouldHaveSingleItem()
+            .Warnings.ShouldHaveSingleItem()
             .Hint.ShouldNotBeNull();
 
         string json = InertTargetReport.ToSarif();
@@ -704,7 +697,7 @@ public sealed class SarifReportRendererTests
         // the generic `grandfathered in {conventional baseline path}` form (note level, unchanged state), and
         // reaches the message as well as the suppression.
         BaselineIndex index = Checker.Baselines("data/x", BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db"));
-        CheckReport report = Checker.Run(Sources.OneController, index, Sources.NoDataAccess);
+        CheckReport report = Checker.Run(Sources.OneControllerModel, index, Sources.NoDataAccess);
 
         string json = report.ToSarif();
 
@@ -721,7 +714,7 @@ public sealed class SarifReportRendererTests
         const string because = "Legacy Active Record; scheduled for removal in Q3.";
         BaselineEntry entry = BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db")
             .WithBecause(because);
-        CheckReport report = Checker.Run(Sources.OneController, Checker.Baselines("data/x", entry), Sources.NoDataAccess);
+        CheckReport report = Checker.Run(Sources.OneControllerModel, Checker.Baselines("data/x", entry), Sources.NoDataAccess);
 
         string json = report.ToSarif();
 
@@ -740,7 +733,7 @@ public sealed class SarifReportRendererTests
         BaselineEntry entry = BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db")
             .WithSiteCount(1)
             .WithBecause("Legacy Active Record; scheduled for removal in Q3.");
-        CheckReport report = Checker.Run(Sources.TwoSiteController, Checker.Baselines("data/x", entry), Sources.NoDataAccess);
+        CheckReport report = Checker.Run(Sources.TwoSiteControllerModel, Checker.Baselines("data/x", entry), Sources.NoDataAccess);
 
         string json = report.ToSarif();
 
@@ -847,7 +840,7 @@ public sealed class SarifReportRendererTests
                 .ShouldBe("unchanged");
             JsonElement suppression = note.GetProperty("suppressions")
                 .EnumerateArray()
-                .Single();
+                .ShouldHaveSingleItem();
             suppression.GetProperty("kind")
                 .GetString()
                 .ShouldBe("external");

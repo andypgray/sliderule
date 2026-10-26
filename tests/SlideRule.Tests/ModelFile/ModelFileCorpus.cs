@@ -43,12 +43,6 @@ internal static class ModelFileCorpus
     /// <summary>Every corpus spec, each with the name its file records.</summary>
     internal static IReadOnlyList<CorpusSpec> All => LazyAll.Value;
 
-    /// <summary>The model of one fixture spec assembly, loaded the way the CLI loads it.</summary>
-    private static ArchitectureModel FixtureModel(string specDllPath)
-    {
-        return ModelPipeline.LoadModel(specDllPath);
-    }
-
     /// <summary>The model of one corpus spec, by the name its file records.</summary>
     internal static ArchitectureModel ModelOf(string name)
     {
@@ -70,9 +64,9 @@ internal static class ModelFileCorpus
             new CorpusSpec("Canonical sample", Checker.Canonical),
             new CorpusSpec("PackedNineSpec", ArchModelBuilder.Build(new PackedNineSpec())),
             new CorpusSpec("InlineNineSpec", ArchModelBuilder.Build(new InlineNineSpec())),
-            .. CliRunner.BeddedSpecs.Select(spec => new CorpusSpec(spec.Name, FixtureModel(spec.SpecDll))),
-            new CorpusSpec("LegacySpec", FixtureModel(CliRunner.LegacySpecDll)),
-            new CorpusSpec("SpecFixture", FixtureModel(CliRunner.SpecFixtureDll)),
+            .. CliRunner.BeddedSpecs.Select(spec => new CorpusSpec(spec.Name, ModelPipeline.LoadModel(spec.SpecDll))),
+            new CorpusSpec("LegacySpec", ModelPipeline.LoadModel(CliRunner.LegacySpecDll)),
+            new CorpusSpec("SpecFixture", ModelPipeline.LoadModel(CliRunner.SpecFixtureDll)),
             new CorpusSpec("VocabularyRemainderSpec", Checker.Model(VocabularyRemainderSpec.Define))
         ];
     }

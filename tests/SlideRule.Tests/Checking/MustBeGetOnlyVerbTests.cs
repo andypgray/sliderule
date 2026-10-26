@@ -1,4 +1,3 @@
-using Shouldly;
 using SlideRule.Baselines;
 using SlideRule.Checking;
 using SlideRule.Codebase;
@@ -69,11 +68,8 @@ public sealed class MustBeGetOnlyVerbTests
     {
         // A member-shape violation has no edge to cite, so the file:line an agent jumps to is where the
         // settable property is declared — its own declaration sites, carried as evidence.
-        Checker.Run(SceneModel, arch =>
-                arch.Rule("domain/values-immutable")
-                    .Enforce(arch.Namespace("App.Values.*").Properties.WithPrefix("Reference").MustBeGetOnly())
-                    .Because("b"))
-            .Single()
+        Checker.Verdict(SceneModel, arch => arch.Namespace("App.Values.*").Properties.WithPrefix("Reference")
+                .MustBeGetOnly())
             .ShouldHaveFailedWithMemberAtSites("P:App.Values.Order.Reference", ["Test.cs:5"]);
     }
 
@@ -106,8 +102,7 @@ public sealed class MustBeGetOnlyVerbTests
                     .Because("A value another thread can write is not a value."))
             .Single();
 
-        result.MemberShapeSubjects()
-            .ShouldBe(["P:App.Values.Order.Total"]);
+        result.ShouldHaveFailedWithMemberSubjects(["P:App.Values.Order.Total"]);
         result.ShouldHaveGrandfathered(1);
     }
 
@@ -118,9 +113,9 @@ public sealed class MustBeGetOnlyVerbTests
         // the declaration, not about when the write is allowed to happen — an init-only property is written
         // exactly once, and the verb still refuses it. The narrower "set banned, init fine" reading stays
         // reachable through the escape hatch, because HasInitOnlySetter records the setter's kind.
-        FailedMemberIds(arch => arch.Namespace("App.Values.*").Properties.WithPrefix("Name")
+        Checker.Verdict(SceneModel, arch => arch.Namespace("App.Values.*").Properties.WithPrefix("Name")
                 .MustBeGetOnly())
-            .ShouldBe(["P:App.Values.Line.Name"]);
+            .ShouldHaveFailedWithMemberSubjects(["P:App.Values.Line.Name"]);
     }
 
     [Fact]
@@ -128,13 +123,13 @@ public sealed class MustBeGetOnlyVerbTests
     {
         // Accessibility-blind: a `private set` and an `internal set` are setters, so both red. The verb tests
         // whether the declaration has a setter, never whether a caller outside the type could reach it.
-        FailedMemberIds(arch => arch.Namespace("App.Values.*").Properties.WithPrefix("Total")
+        Checker.Verdict(SceneModel, arch => arch.Namespace("App.Values.*").Properties.WithPrefix("Total")
                 .MustBeGetOnly())
-            .ShouldBe(["P:App.Values.Order.Total"]);
+            .ShouldHaveFailedWithMemberSubjects(["P:App.Values.Order.Total"]);
 
-        FailedMemberIds(arch => arch.Namespace("App.Values.*").Properties.WithPrefix("Draft")
+        Checker.Verdict(SceneModel, arch => arch.Namespace("App.Values.*").Properties.WithPrefix("Draft")
                 .MustBeGetOnly())
-            .ShouldBe(["P:App.Values.Order.Draft"]);
+            .ShouldHaveFailedWithMemberSubjects(["P:App.Values.Order.Draft"]);
     }
 
     [Fact]
@@ -157,14 +152,8 @@ public sealed class MustBeGetOnlyVerbTests
         // The adjective preserves PropertySelection, so the verb is still reachable after it — this line
         // would not compile if .ThatAreStatic() returned a bare MemberSelection. Self-guarding: the four
         // settable INSTANCE properties would red alongside Limit had the adjective failed to narrow.
-        FailedMemberIds(arch => arch.Namespace("App.Values.*").Properties.ThatAreStatic()
+        Checker.Verdict(SceneModel, arch => arch.Namespace("App.Values.*").Properties.ThatAreStatic()
                 .MustBeGetOnly())
-            .ShouldBe(["P:App.Values.Order.Limit"]);
-    }
-
-    private static IReadOnlyList<string> FailedMemberIds(Func<Arch, Constraint> constraint)
-    {
-        return Checker.Verdict(SceneModel, constraint)
-            .MemberShapeSubjects();
+            .ShouldHaveFailedWithMemberSubjects(["P:App.Values.Order.Limit"]);
     }
 }

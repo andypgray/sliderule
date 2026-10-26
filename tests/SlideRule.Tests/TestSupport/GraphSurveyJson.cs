@@ -21,6 +21,16 @@ internal static class GraphSurveyJson
                 .GetString() == name);
     }
 
+    /// <summary>Every project row's name, in the order the survey lists them.</summary>
+    internal static IReadOnlyList<string> ProjectNames(this JsonDocument document)
+    {
+        return document.RootElement.GetProperty("projects")
+            .EnumerateArray()
+            .Select(project => project.GetProperty("name")
+                .GetString()!)
+            .ToList();
+    }
+
     /// <summary>Every project reference edge, as the pair it joins and how many references cross it.</summary>
     internal static IReadOnlyList<(string Source, string Target, int References)> ProjectEdges(
         this JsonDocument document)

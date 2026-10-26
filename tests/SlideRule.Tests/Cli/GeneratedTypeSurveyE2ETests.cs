@@ -26,11 +26,8 @@ public sealed class GeneratedTypeSurveyE2ETests
     [Fact]
     public async Task Graph_GeneratedTypes_AreCountedBesideTheProjectsTotal()
     {
-        // Arrange
-        using var fixture = new TempFixtureWorkspace("TestSolutions/RazorApp", "RazorApp.slnx");
-
         // Act
-        CliResult result = await CliRunner.InvokeAsync("graph", fixture.SolutionPath, "--json");
+        CliResult result = await CliRunner.InvokeAsync("graph", FixtureBeds.RazorAppSolution, "--json");
 
         // Assert — the pair a reader needs before writing arch.Project("RazorApp.Web"): how big the noun is,
         // and how much of it nobody wrote. The generated count is a SUBSET of types, never a population
@@ -50,11 +47,8 @@ public sealed class GeneratedTypeSurveyE2ETests
     [Fact]
     public async Task Graph_ProjectWithNoGeneratedTypes_OmitsTheKeyEntirely()
     {
-        // Arrange
-        using var fixture = new TempFixtureWorkspace("TestSolutions/RazorApp", "RazorApp.slnx");
-
         // Act
-        CliResult result = await CliRunner.InvokeAsync("graph", fixture.SolutionPath, "--json");
+        CliResult result = await CliRunner.InvokeAsync("graph", FixtureBeds.RazorAppSolution, "--json");
 
         // Assert — the omit-at-zero rule, which keeps the key out of every survey of a generator-free
         // solution. Asserted on the contrast project inside the same document as the one above, so the two
@@ -73,11 +67,8 @@ public sealed class GeneratedTypeSurveyE2ETests
     [Fact]
     public async Task Graph_WhollyGeneratedNamespace_IsMarkedInTheNamespaceInventory()
     {
-        // Arrange
-        using var fixture = new TempFixtureWorkspace("TestSolutions/RazorApp", "RazorApp.slnx");
-
         // Act
-        CliResult result = await CliRunner.InvokeAsync("graph", fixture.SolutionPath, "--json");
+        CliResult result = await CliRunner.InvokeAsync("graph", FixtureBeds.RazorAppSolution, "--json");
 
         // Assert — the per-namespace half, which is the one that stops a wholly generated namespace becoming
         // a layer glob. A reader scanning the inventory for a name to anchor on sees this one is entirely
@@ -103,20 +94,15 @@ public sealed class GeneratedTypeSurveyE2ETests
     [Fact]
     public async Task Graph_HumanSurvey_QualifiesBothTheProjectLineAndTheNamespaceEntry()
     {
-        // Arrange
-        using var fixture = new TempFixtureWorkspace("TestSolutions/RazorApp", "RazorApp.slnx");
-
         // Act
-        CliResult result = await CliRunner.InvokeAsync("graph", fixture.SolutionPath);
+        CliResult result = await CliRunner.InvokeAsync("graph", FixtureBeds.RazorAppSolution);
 
         // Assert — the same two facts a terminal reader gets, so nobody is sent to --json for them. The
         // wholly generated namespace reads "all generated" rather than repeating the count it just gave.
-        result.ShouldSucceed();
-        string output = result.Out.NormalizedLines();
-
-        output.ShouldContain($"  {Web} — 4 types (2 generated); targets net10.0; references: {Core}; packages: (none)");
-        output.ShouldContain($"{GeneratedNamespace} (2, all generated)");
-        output.ShouldContain($"  {Core} — 1 type; targets net10.0; references: (none); packages: (none)");
+        result.ShouldSucceed(
+            $"  {Web} — 4 types (2 generated); targets net10.0; references: {Core}; packages: (none)",
+            $"{GeneratedNamespace} (2, all generated)",
+            $"  {Core} — 1 type; targets net10.0; references: (none); packages: (none)");
     }
 
     private static JsonElement Namespace(JsonElement project, string name)

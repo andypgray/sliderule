@@ -354,31 +354,13 @@ public sealed class BaselineDocumentReaderTests
     // at a different occurrence of the same words.
     private static void ShouldSitAt(BaselineRefusal refusal, string text, string at)
     {
+        text.Occurrences(at)
+            .ShouldBe(1, $"the text should carry '{at}' exactly once");
         int offset = text.IndexOf(at, StringComparison.Ordinal);
-        offset.ShouldBeGreaterThanOrEqualTo(0, $"the text should carry '{at}'");
-        text.IndexOf(at, offset + at.Length, StringComparison.Ordinal)
-            .ShouldBe(-1, $"the text should carry '{at}' exactly once");
 
+        ReadOnlySpan<char> before = text.AsSpan(0, offset);
         refusal.Position.Offset.ShouldBe(offset);
-        refusal.Position.Line.ShouldBe(LineOf(text, offset));
-        refusal.Position.Column.ShouldBe(ColumnOf(text, offset));
-    }
-
-    private static int LineOf(string text, int offset)
-    {
-        var line = 1;
-        for (var i = 0; i < offset; i++)
-            if (text[i] == '\n')
-                line++;
-
-        return line;
-    }
-
-    private static int ColumnOf(string text, int offset)
-    {
-        var column = 1;
-        for (int i = offset - 1; i >= 0 && text[i] != '\n'; i--) column++;
-
-        return column;
+        refusal.Position.Line.ShouldBe(before.Count('\n') + 1);
+        refusal.Position.Column.ShouldBe(offset - before.LastIndexOf('\n'));
     }
 }

@@ -44,7 +44,7 @@ public sealed class BaselineMergeTests : IDisposable
         // Five captured entries in one rule's section; one branch pays off B, the other D. Nothing the two
         // sides both touch, so there is nothing to conflict on; the legacy format's whole-file digest is a
         // line both sides always rewrite.
-        MergeResult merged = Merge(
+        MergeResult merged = ShouldRunMergeFile(
             Compose("A", "B", "C", "D", "E"),
             Compose("A", "C", "D", "E"),
             Compose("A", "B", "C", "E"));
@@ -62,7 +62,7 @@ public sealed class BaselineMergeTests : IDisposable
         // conflicted, since the surviving set is neither side's, so whichever digest a human keeps was
         // computed over entries the file no longer holds and the file is refused as tampered. Restoring
         // from version control cannot help: both committed sides are equally stale.
-        MergeResult merged = Merge(
+        MergeResult merged = ShouldRunMergeFile(
             ComposeLegacy("A", "B", "C", "D", "E"),
             ComposeLegacy("A", "C", "D", "E"),
             ComposeLegacy("A", "B", "C", "E"));
@@ -85,7 +85,7 @@ public sealed class BaselineMergeTests : IDisposable
         // What the seal buys is that every line either side committed is a complete, self-sealed entry, so
         // the resolution below chooses whole lines and closes the new last one. A trailing comma is JSON
         // punctuation, not sealed content; nothing is recomputed, and no valve is re-run.
-        MergeResult merged = Merge(
+        MergeResult merged = ShouldRunMergeFile(
             Compose("A", "B", "C", "D", "E"),
             Compose("A", "B", "C", "E"),
             Compose("A", "B", "C", "D"));
@@ -103,7 +103,7 @@ public sealed class BaselineMergeTests : IDisposable
         // stricter allowance is the one that holds, and the next write folds the pair into one line that
         // also keeps the reason.
         BaselineEntry a = Entry("A");
-        MergeResult merged = Merge(
+        MergeResult merged = ShouldRunMergeFile(
             BaselineComposer.Compose(Rule, a.WithSiteCount(5), Entry("B"), Entry("C")),
             BaselineComposer.Compose(Rule, a.WithSiteCount(3), Entry("B"), Entry("C")),
             BaselineComposer.Compose(Rule, a.WithSiteCount(5).WithBecause("legacy import"), Entry("B"), Entry("C")));
@@ -215,7 +215,7 @@ public sealed class BaselineMergeTests : IDisposable
     ///     merge over files, with no repository and no index — the same algorithm a branch merge runs over
     ///     these bytes.
     /// </summary>
-    private MergeResult Merge(string @base, string ours, string theirs)
+    private MergeResult ShouldRunMergeFile(string @base, string ours, string theirs)
     {
         _temp.WriteFile(["base.json"], @base);
         _temp.WriteFile(["ours.json"], ours);

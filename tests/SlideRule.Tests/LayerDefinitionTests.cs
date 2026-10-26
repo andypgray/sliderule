@@ -18,7 +18,7 @@ public class LayerDefinitionTests
     public void Domain_RendersDefinitionFragment()
     {
         LayerDefinition domain = Checker.Canonical
-            .Layers.Single(layer => layer.Name == "Domain");
+            .Layers.ShouldHaveSingle(layer => layer.Name == "Domain", layer => layer.Name);
 
         // Prefix-preserving: the fragment a purposeless layer renders, then ". " and the purpose verbatim
         // — the author writes its final period, exactly as Because prose is rendered.
@@ -40,23 +40,17 @@ public class LayerDefinitionTests
     {
         // Which is what makes both authoring forms work: the chained form a discarded layer uses, and the
         // two-statement form that stores the Layer and describes it afterwards.
-        Layer? minted = null;
-        Layer? returned = null;
+        Layer minted = new Arch().Layer("Domain", "MyApp.Domain.*");
 
-        Checker.Model(arch =>
-        {
-            minted = arch.Layer("Domain", "MyApp.Domain.*");
-            returned = minted.Purpose("The quote and rate-card model.");
-        });
-
-        returned.ShouldBeSameAs(minted);
+        minted.Purpose("The quote and rate-card model.")
+            .ShouldBeSameAs(minted);
     }
 
     [Fact]
     public void Web_HasNoPurpose_WhenTheSpecGivesItNone()
     {
         Checker.Canonical
-            .Layers.Single(layer => layer.Name == "Web")
+            .Layers.ShouldHaveSingle(layer => layer.Name == "Web", layer => layer.Name)
             .Purpose.ShouldBeNull();
     }
 
@@ -67,7 +61,7 @@ public class LayerDefinitionTests
         // is already a definition rather than a sentence about types.
         LayerDefinition core = Checker.Model(arch =>
                 arch.Layer("Core", arch.Project("MyApp.Core")).Purpose("Core is the model both readers consume."))
-            .Layers.Single();
+            .Layers.ShouldHaveSingleItem();
 
         core.DefinitionFragment.ShouldBe("**Core** — project `MyApp.Core`. Core is the model both readers consume.");
         core.Globs.ShouldBeEmpty();
@@ -78,7 +72,7 @@ public class LayerDefinitionTests
     {
         Checker.Model(arch =>
                 arch.Layer("Kernel", arch.AnyOf(arch.Project("MyApp.Core"), arch.Project("MyApp.Abstractions"))))
-            .Layers.Single()
+            .Layers.ShouldHaveSingleItem()
             .DefinitionFragment.ShouldBe("**Kernel** — projects `MyApp.Core` or `MyApp.Abstractions`");
     }
 
@@ -87,10 +81,10 @@ public class LayerDefinitionTests
     {
         // A type's locative names it rather than a place, so the row falls through to the bare name.
         Checker.Model(arch => arch.Layer("Entry", arch.Type(typeof(SqlConnection))))
-            .Layers.Single()
+            .Layers.ShouldHaveSingleItem()
             .DefinitionFragment.ShouldBe("**Entry** — `SqlConnection`");
         Checker.Model(arch => arch.Layer("Entry", arch.AnyOf(typeof(SqlConnection), typeof(SqlCommand))))
-            .Layers.Single()
+            .Layers.ShouldHaveSingleItem()
             .DefinitionFragment.ShouldBe("**Entry** — `SqlConnection` or `SqlCommand`");
     }
 
@@ -104,7 +98,7 @@ public class LayerDefinitionTests
                 Layer core = arch.Layer("Core", arch.Project("MyApp.Core"));
                 arch.Layer("Model", core.InNamespace("MyApp.Core.Model.*"));
             })
-            .Layers.Single(layer => layer.Name == "Model")
+            .Layers.ShouldHaveSingle(layer => layer.Name == "Model", layer => layer.Name)
             .DefinitionFragment.ShouldBe("**Model** — types in the Core layer in `MyApp.Core.Model.*`");
     }
 
@@ -115,7 +109,7 @@ public class LayerDefinitionTests
         // the region the definition names, which is what the drawing collapses on.
         LayerDefinition billing = Checker.Model(arch =>
                 arch.Layer("Billing", arch.Namespace("MyApp.Legacy.Billing.*")))
-            .Layers.Single();
+            .Layers.ShouldHaveSingleItem();
 
         billing.DefinitionFragment.ShouldBe("**Billing** — `MyApp.Legacy.Billing.*`");
         billing.Globs.ShouldBe(["MyApp.Legacy.Billing.*"]);
@@ -129,13 +123,13 @@ public class LayerDefinitionTests
         // of them are an intersection and name no region. The drawing has a third shape of its own — see
         // ARefinementDefinition_CarriesNoRegion for why this one must not grow to match it.
         LayerDefinition web = Checker.Model(arch => arch.Layer("Web", arch.Types.InNamespace("MyApp.Web.*")))
-            .Layers.Single();
+            .Layers.ShouldHaveSingleItem();
 
         web.DefinitionFragment.ShouldBe("**Web** — types in `MyApp.Web.*`");
         web.Globs.ShouldBe(["MyApp.Web.*"]);
 
         Checker.Model(arch => arch.Layer("Both", arch.Types.InNamespace("MyApp.*").InNamespace("MyApp.Web.*")))
-            .Layers.Single()
+            .Layers.ShouldHaveSingleItem()
             .Globs.ShouldBeEmpty();
     }
 
@@ -152,9 +146,8 @@ public class LayerDefinitionTests
                 Layer core = arch.Layer("Core", arch.Project("MyApp.Core"));
                 arch.Layer("Model", core.InNamespace("MyApp.Core.Model.*"));
             })
-            .Layers.Last();
+            .Layers.ShouldHaveSingle(layer => layer.Name == "Model", layer => layer.Name);
 
-        model.Name.ShouldBe("Model");
         model.Globs.ShouldBeEmpty();
     }
 
@@ -164,7 +157,7 @@ public class LayerDefinitionTests
         // A registration is a lifetime rather than a location: legal as a definition, and it names no
         // region for the payload or the drawing to stand on.
         LayerDefinition wiring = Checker.Model(arch => arch.Layer("Wiring", arch.Registered(Lifetime.Singleton)))
-            .Layers.Single();
+            .Layers.ShouldHaveSingleItem();
 
         wiring.DefinitionFragment.ShouldBe("**Wiring** — singleton-registered types");
         wiring.Globs.ShouldBeEmpty();

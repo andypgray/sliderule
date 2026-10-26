@@ -9,8 +9,9 @@ namespace SlideRule.Tests.TestSupport;
 
 /// <summary>
 ///     Shorthands over the one production entry point each of the extractor and the checker has, for rows that
-///     build a codebase from compilations or check a model with no host around it. Each passes the running test's
-///     token, so a hung extraction or check fails its test rather than stalling the run.
+///     build a codebase from compilations or check a model with no host around it. Each but
+///     <see cref="CheckUncancellable" /> passes the running test's token, so a hung extraction or check fails its
+///     test rather than stalling the run.
 /// </summary>
 internal static class Harness
 {
@@ -35,21 +36,21 @@ internal static class Harness
         return Check(model.Rules, codebase, baselines, null);
     }
 
-    /// <summary>
-    ///     Checks every rule against <paramref name="baselines" /> and the changed files in <paramref name="diff" />,
-    ///     or skips every tripwire where <paramref name="diff" /> is null.
-    /// </summary>
-    public static CheckReport Check(
-        ArchitectureModel model, CodebaseModel codebase, BaselineIndex baselines, DiffContext? diff)
-    {
-        return Check(model.Rules, codebase, baselines, diff);
-    }
-
     /// <summary>Checks exactly <paramref name="rules" />, over a whole universe and a whole model.</summary>
     public static CheckReport Check(
         IReadOnlyList<ArchRule> rules, CodebaseModel codebase, BaselineIndex baselines, DiffContext? diff)
     {
         return Check(rules, codebase, baselines, diff, null, null);
+    }
+
+    /// <summary>
+    ///     Checks exactly <paramref name="rules" /> with no cancellation token, for a check whose result a cache
+    ///     shares with the tests after the one that started it.
+    /// </summary>
+    public static CheckReport CheckUncancellable(
+        IReadOnlyList<ArchRule> rules, CodebaseModel codebase, BaselineIndex baselines, DiffContext? diff)
+    {
+        return ArchChecker.Check(rules, codebase, baselines, diff, null, null, null, CancellationToken.None);
     }
 
     /// <summary>Checks exactly <paramref name="rules" /> with every argument the checker takes but the token.</summary>

@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Shouldly;
 using SlideRule.Codebase;
 using SlideRule.Roslyn;
@@ -15,9 +16,9 @@ namespace SlideRule.Tests.TestSupport;
 ///     The two facts split on how <c>WorkspaceSession</c> has to notice the reset. An in-place content
 ///     restore is folded into the snapshot chain; a deleted file forces a full reload. The first is the one
 ///     with a <see cref="SlideRule.Roslyn.Caching.FileFreshness.RacyWindow">racy window</see>, so it gets the
-///     load-count assertion too.
+///     load-count assertion too. Each fact runs on a pool of its own, so no class running beside it can evict
+///     its session between the two leases.
 /// </remarks>
-[Collection("Serial")]
 public sealed class WarmWorkspacePoolTests
 {
     private const string Domain = "MyApp.Domain";
@@ -37,32 +38,37 @@ public sealed class WarmWorkspacePoolTests
         // Arrange — lease the class's tree, rename the delegate in place, and let the pool see it. The
         // fingerprint the sweep records here is captured within the racy window of the write it just read,
         // so it stays unpromoted and the next sweep is obliged to content-verify rather than trust the stat.
+        await using WorkspacePool pool = WarmWorkspacePool.Private();
         using (var mutated = new TempFixtureWorkspace())
         {
+            // A session already warm over the tree, so the read after the edit is a sweep rather than a load.
+            await pool.GetCurrentAsync(mutated.SolutionPath, Ct);
+
             string strategyFile = mutated.PathOf(Domain, $"{PristineType}.cs");
             await File.WriteAllTextAsync(
                 strategyFile,
                 (await File.ReadAllTextAsync(strategyFile, Ct)).Replace(PristineType, MutatedType, StringComparison.Ordinal),
                 Ct);
 
-            CodebaseModel model = await ExtractAsync(mutated.SolutionPath);
+            CodebaseModel model = await ExtractAsync(pool, mutated.SolutionPath);
             model.Types.ShouldContain(type => type.FullName == $"{Domain}.{MutatedType}");
         }
 
-        long loadsBeforeReset = WorkspaceLoader.LoadCount;
+        StrongBox<long> loads = WorkspaceLoader.CountLoadsOnThisFlow();
 
         // Act — the next lease of the same key resets the tree, exactly as the next test in a class would.
         using var restored = new TempFixtureWorkspace();
-        CodebaseModel afterReset = await ExtractAsync(restored.SolutionPath);
+        CodebaseModel afterReset = await ExtractAsync(pool, restored.SolutionPath);
 
         // Assert — the reset is visible: the fixture's type is back and the mutation is gone…
         afterReset.Types.ShouldContain(type => type.FullName == $"{Domain}.{PristineType}");
         afterReset.Types.ShouldNotContain(type => type.FullName == $"{Domain}.{MutatedType}");
 
         // …and it was reconciled, not reloaded — the same warm session served both leases, which is the
-        // whole point of the pool. A non-zero delta here means the reset had to drop the session (a held
-        // file), so the win is being paid for twice.
-        (WorkspaceLoader.LoadCount - loadsBeforeReset).ShouldBe(0);
+        // whole point of the pool. A load counted here means the second lease was not served from that
+        // session (a reset blocked by a held file hands back a private copy, a new key), so the win is being
+        // paid for twice.
+        loads.Value.ShouldBe(0);
     }
 
     [Fact]
@@ -70,26 +76,27 @@ public sealed class WarmWorkspacePoolTests
     {
         // Arrange — a file that did not exist at load: only the cone scan can see the add, and only a full
         // reload can absorb it. The reset then deletes it, which the sweep must also see.
+        await using WorkspacePool pool = WarmWorkspacePool.Private();
         using (var added = new TempFixtureWorkspace())
         {
             await File.WriteAllTextAsync(
                 added.PathOf(Domain, $"{AddedType}.cs"), $"namespace {Domain};\n\npublic class {AddedType};\n", Ct);
 
-            CodebaseModel model = await ExtractAsync(added.SolutionPath);
+            CodebaseModel model = await ExtractAsync(pool, added.SolutionPath);
             model.Types.ShouldContain(type => type.FullName == $"{Domain}.{AddedType}");
         }
 
         // Act
         using var swept = new TempFixtureWorkspace();
-        CodebaseModel afterReset = await ExtractAsync(swept.SolutionPath);
+        CodebaseModel afterReset = await ExtractAsync(pool, swept.SolutionPath);
 
         // Assert — the deleted document is gone from the reused session's solution.
         afterReset.Types.ShouldNotContain(type => type.FullName == $"{Domain}.{AddedType}");
     }
 
-    private static async Task<CodebaseModel> ExtractAsync(string solutionPath)
+    private static async Task<CodebaseModel> ExtractAsync(WorkspacePool pool, string solutionPath)
     {
-        WorkspaceSnapshot snapshot = await WarmWorkspacePool.GetCurrentAsync(solutionPath, Ct);
+        WorkspaceSnapshot snapshot = await pool.GetCurrentAsync(solutionPath, Ct);
         return await CodebaseExtractor.ExtractFromSolutionAsync(snapshot.Solution, ct: Ct);
     }
 }

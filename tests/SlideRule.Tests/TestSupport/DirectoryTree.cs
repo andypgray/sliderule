@@ -13,8 +13,9 @@ namespace SlideRule.Tests.TestSupport;
 ///         descended where the delete will not would build trees nothing can take down again.
 ///     </para>
 ///     <para>
-///         <b>Files overwrite.</b> A destination that already holds a file of the same name is written over
-///         rather than left alone, so no caller has to clear the destination first.
+///         <b>Files overwrite</b>, except a read-only one: <see cref="File.Copy(string,string,bool)" /> carries
+///         the read-only attribute across and will not write over it, so a tree an earlier copy produced is
+///         re-staged through <see cref="Replace" />, which empties the destination first.
 ///     </para>
 ///     <para>
 ///         <b>Destination directories are created per copied file</b>, so a source directory whose every
@@ -35,6 +36,17 @@ internal static class DirectoryTree
     {
         Directory.CreateDirectory(destination);
         CopyInto(source, destination, string.Empty, include);
+    }
+
+    /// <summary>
+    ///     <see cref="Copy" /> into <paramref name="destination" /> emptied first, so it holds what
+    ///     <paramref name="source" /> holds now and nothing an earlier copy left there. The emptying gets past the
+    ///     read-only files an earlier copy carried across.
+    /// </summary>
+    internal static void Replace(string source, string destination, Func<string, bool>? include = null)
+    {
+        ReadOnlyTolerant.DeleteTree(destination);
+        Copy(source, destination, include);
     }
 
     private static void CopyInto(

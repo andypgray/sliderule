@@ -1,5 +1,4 @@
 using Shouldly;
-using SlideRule.Baselines;
 using SlideRule.Checking;
 using Xunit;
 
@@ -36,11 +35,6 @@ public sealed class AuthoringHintTests
 
     // The action clauses of the per-piece cures, spelled from the verb on, so one fragment holds for the
     // pattern tail and the name tail alike.
-    private const string BansNothingAction = "matches nothing bans nothing, so decide before keeping it";
-
-    private const string AllowsNothingAction =
-        "matches nothing allows nothing, so what it was meant to allow is reported as a violation";
-
     private const string HoldsNoTypeAction =
         "matches nothing holds no type, so each subject it was meant to hold is reported as a violation";
 
@@ -49,10 +43,6 @@ public sealed class AuthoringHintTests
         + "none, and one it was meant to make ambiguous passes";
 
     private const string NameCure = NamedClause + "; a name that matches nothing bans nothing, so decide before keeping it.";
-
-    // The same kind of stand-in as Checker.PartialModelCure, for the inert-target cure a solution filter's
-    // narrowing composes.
-    private const string NarrowedInertCure = "THE-NARROWED-INERT-CURE";
 
     [Fact]
     public void TypesNarrowedByOneInNamespace_EarnsTheGlobSemanticsToo()
@@ -213,7 +203,7 @@ public sealed class AuthoringHintTests
                     .Because("b"))
             .Single();
 
-        result.Warnings.Single()
+        result.Warnings.ShouldHaveSingleItem()
             .Hint.ShouldBe(NamedClause + "; a rule whose target matches nothing passes forever, so decide before keeping it.");
     }
 
@@ -347,10 +337,7 @@ public sealed class AuthoringHintTests
     [Fact]
     public void AnInertTarget_CarriesItsCureThroughTheChecker()
     {
-        RuleResult result = Checker.Run(Sources.LayeredModel, arch =>
-                arch.Rule("inert/x")
-                    .Enforce(arch.Namespace("App.Domain.*").MustNotReference(arch.Namespace("App.Ghost.*")))
-                    .Because("b"))
+        RuleResult result = Checker.Run(Sources.LayeredModel, InertTargetRule)
             .Single();
 
         string? hint = result.Warnings.Single()
@@ -388,10 +375,7 @@ public sealed class AuthoringHintTests
     {
         // The operand's own shape advice would describe the operand, whose other names still match. What
         // failed is one exact name, so the cure says what an exact name is.
-        RuleResult result = Checker.Run(Sources.LayeredModel, arch =>
-                arch.Rule("inert/name")
-                    .Enforce(arch.Namespace("App.Web.*").MustNotReference(arch.Types.Named("Service", "Ghost")))
-                    .Because("b"))
+        RuleResult result = Checker.Run(Sources.LayeredModel, DeadNameRule)
             .Single();
 
         string? hint = result.Warnings.Single()
@@ -407,21 +391,15 @@ public sealed class AuthoringHintTests
         // it the run's facts: a call that passed neither would keep every row above green.
         IncompleteModel partial = Checker.PartialModel;
 
-        RuleResult broken = Checker.Run(Sources.LayeredModel, partial, arch =>
-                arch.Rule("inert/name")
-                    .Enforce(arch.Namespace("App.Web.*").MustNotReference(arch.Types.Named("Service", "Ghost")))
-                    .Because("b"))
+        RuleResult broken = Checker.Run(Sources.LayeredModel, DeadNameRule, incompleteModel: partial)
             .Single();
-        RuleResult filtered = Checker.Run(Sources.LayeredModel, BaselineIndex.Empty, Narrowed(), arch =>
-                arch.Rule("inert/name")
-                    .Enforce(arch.Namespace("App.Web.*").MustNotReference(arch.Types.Named("Service", "Ghost")))
-                    .Because("b"))
+        RuleResult filtered = Checker.Run(Sources.LayeredModel, DeadNameRule, narrowing: Checker.FilterNarrowing)
             .Single();
 
-        broken.Warnings.Single()
+        broken.Warnings.ShouldHaveSingleItem()
             .Hint.ShouldBe(Checker.PartialModelCure);
-        filtered.Warnings.Single()
-            .Hint.ShouldBe(NarrowedInertCure);
+        filtered.Warnings.ShouldHaveSingleItem()
+            .Hint.ShouldBe(Checker.FilterInertCure);
     }
 
     [Fact]
@@ -430,16 +408,13 @@ public sealed class AuthoringHintTests
         // AnInertTarget_CarriesItsCureThroughTheChecker over a run a solution filter narrowed. The subject loaded,
         // so the rule is measured and still warns inert, which is true of the run; the cure names the filter where
         // that row advises on how the target was spelled.
-        RuleResult result = Checker.Run(Sources.LayeredModel, BaselineIndex.Empty, Narrowed(), arch =>
-                arch.Rule("inert/x")
-                    .Enforce(arch.Namespace("App.Domain.*").MustNotReference(arch.Namespace("App.Ghost.*")))
-                    .Because("b"))
+        RuleResult result = Checker.Run(Sources.LayeredModel, InertTargetRule, narrowing: Checker.FilterNarrowing)
             .Single();
 
         string? hint = result.Warnings.Single()
             .Hint;
 
-        hint.ShouldBe(NarrowedInertCure);
+        hint.ShouldBe(Checker.FilterInertCure);
     }
 
     [Fact]
@@ -456,34 +431,18 @@ public sealed class AuthoringHintTests
         // half-fix the member and project row below exists to prevent, one stratum over.
         IncompleteModel partial = Checker.PartialModel;
 
-        foreach ((string shape, Selection pattern, string shapeFragment) in EveryShape())
+        foreach ((string shape, Selection pattern) in EveryShape())
         {
-            string subject = AuthoringHints.ForSubject(pattern, partial);
+            AuthoringHints.ForSubject(pattern, partial)
+                .ShouldBe(Checker.PartialModelCure, shape);
 
-            subject.ShouldSatisfyAllConditions(
-                () => subject.ShouldBe(Checker.PartialModelCure, shape),
-                () => subject.ShouldNotContain(shapeFragment, shape),
-                () => subject.ShouldNotContain(SubjectAction, shape));
+            foreach ((string cure, InertCure hintFor) in EveryInertCure())
+                hintFor(pattern, partial, null)
+                    .ShouldBe(Checker.PartialModelCure, $"{cure} on {shape}");
 
-            foreach ((string cure, InertCure hintFor, string action) in EveryInertCure())
-            {
-                string hint = hintFor(pattern, partial, null);
-                var context = $"{cure} on {shape}";
-
-                hint.ShouldSatisfyAllConditions(
-                    () => hint.ShouldBe(Checker.PartialModelCure, context),
-                    () => hint.ShouldNotContain(action, context));
-            }
-
-            foreach ((string cure, SubjectSideCure hintFor, string action) in EverySubjectSideCure())
-            {
-                string hint = hintFor(pattern, partial);
-                var context = $"{cure} on {shape}";
-
-                hint.ShouldSatisfyAllConditions(
-                    () => hint.ShouldBe(Checker.PartialModelCure, context),
-                    () => hint.ShouldNotContain(action, context));
-            }
+            foreach ((string cure, SubjectSideCure hintFor) in EverySubjectSideCure())
+                hintFor(pattern, partial)
+                    .ShouldBe(Checker.PartialModelCure, $"{cure} on {shape}");
         }
     }
 
@@ -509,35 +468,23 @@ public sealed class AuthoringHintTests
         // extracted would report itself inert with a cure about globs.
         IncompleteModel partial = Checker.PartialModel;
 
-        RuleResult empty = Checker.Run(Sources.LayeredModel, partial, arch =>
-                arch.Rule("empty/x")
-                    .Enforce(arch.Namespace("Nope.Nowhere.*").MustHaveSuffix("X"))
-                    .Because("b"))
+        RuleResult empty = Checker.Run(Sources.LayeredModel, EmptySubjectRule, incompleteModel: partial)
             .Single();
-        RuleResult inert = Checker.Run(Sources.LayeredModel, partial, arch =>
-                arch.Rule("inert/x")
-                    .Enforce(arch.Namespace("App.Domain.*").MustNotReference(arch.Namespace("App.Ghost.*")))
-                    .Because("b"))
+        RuleResult inert = Checker.Run(Sources.LayeredModel, InertTargetRule, incompleteModel: partial)
             .Single();
 
-        empty.Violations.Single()
+        empty.Violations.ShouldHaveSingleItem()
             .Hint.ShouldBe(Checker.PartialModelCure);
-        inert.Warnings.Single()
+        inert.Warnings.ShouldHaveSingleItem()
             .Hint.ShouldBe(Checker.PartialModelCure);
     }
 
     [Fact]
     public void AWholeModel_KeepsTheShapeCure()
     {
-        // The control on the whole feature: null is every run whose projects loaded, and those get the shape
-        // cure rather than the partial model's reason. Declared rather than passed inline because a bare null
-        // is ambiguous between this overload and the baselines one, and a cast would read as noise.
-        IncompleteModel? whole = null;
-
-        RuleResult result = Checker.Run(Sources.LayeredModel, whole, arch =>
-                arch.Rule("empty/x")
-                    .Enforce(arch.Namespace("Nope.Nowhere.*").MustHaveSuffix("X"))
-                    .Because("b"))
+        // The control on the whole feature: a run whose projects all loaded gets the shape cure rather than the
+        // partial model's reason.
+        RuleResult result = Checker.Run(Sources.LayeredModel, EmptySubjectRule)
             .Single();
 
         string? hint = result.Violations.Single()
@@ -553,16 +500,10 @@ public sealed class AuthoringHintTests
         // A solution filter's narrowing takes over every cure on a target or an allow-list, for the partial model's
         // reason: a project the filter left out may declare what the selection names, so advice about how it was
         // spelled is advice about the wrong thing. Every shape the chooser reads, for the same reason as there.
-        foreach ((string shape, Selection pattern, _) in EveryShape())
-        foreach ((string cure, InertCure hintFor, string action) in EveryInertCure())
-        {
-            string hint = hintFor(pattern, null, Narrowed());
-            var context = $"{cure} on {shape}";
-
-            hint.ShouldSatisfyAllConditions(
-                () => hint.ShouldBe(NarrowedInertCure, context),
-                () => hint.ShouldNotContain(action, context));
-        }
+        foreach ((string shape, Selection pattern) in EveryShape())
+        foreach ((string cure, InertCure hintFor) in EveryInertCure())
+            hintFor(pattern, null, Checker.FilterNarrowing)
+                .ShouldBe(Checker.FilterInertCure, $"{cure} on {shape}");
     }
 
     [Fact]
@@ -573,41 +514,65 @@ public sealed class AuthoringHintTests
         // for every cure a narrowing replaces, whatever the shape of what came up empty.
         IncompleteModel partial = Checker.PartialModel;
 
-        foreach ((string shape, Selection pattern, _) in EveryShape())
-        foreach ((string cure, InertCure hintFor, _) in EveryInertCure())
-            hintFor(pattern, partial, Narrowed())
+        foreach ((string shape, Selection pattern) in EveryShape())
+        foreach ((string cure, InertCure hintFor) in EveryInertCure())
+            hintFor(pattern, partial, Checker.FilterNarrowing)
                 .ShouldBe(Checker.PartialModelCure, $"{cure} on {shape}");
+    }
+
+    // A namespace subject no type occupies, so the rule fails empty and its cure is read off the selection.
+    private static void EmptySubjectRule(Arch arch)
+    {
+        arch.Rule("empty/x")
+            .Enforce(arch.Namespace("Nope.Nowhere.*").MustHaveSuffix("X"))
+            .Because("b");
+    }
+
+    // A ban whose one target pattern matches nothing, so the rule passes inert and warns.
+    private static void InertTargetRule(Arch arch)
+    {
+        arch.Rule("inert/x")
+            .Enforce(arch.Namespace("App.Domain.*").MustNotReference(arch.Namespace("App.Ghost.*")))
+            .Because("b");
+    }
+
+    // A ban whose Named target holds one live name and one dead one.
+    private static void DeadNameRule(Arch arch)
+    {
+        arch.Rule("inert/name")
+            .Enforce(arch.Namespace("App.Web.*").MustNotReference(arch.Types.Named("Service", "Ghost")))
+            .Because("b");
     }
 
     // Every shape the cure chooser reads, so a row over this table makes its claim of every shape rather than
     // of one. One table for every row that walks it: a new shape has to reach them together, and a shape added
     // to one alone would leave the others reading green.
-    private static (string Shape, Selection Pattern, string ShapeFragment)[] EveryShape()
+    private static (string Shape, Selection Pattern)[] EveryShape()
     {
         var arch = new Arch();
         return
         [
-            ("a namespace glob", arch.Namespace("App.Nowhere.*"), NamespaceFragment),
-            ("a project name", arch.Project("App.Nowhere"), ProjectFragment),
-            ("a typeof anchor", arch.Type(typeof(AuthoringHintTests)), TypeFragment),
-            ("a narrowed types selection", arch.Types.WithSuffix("Service"), NarrowingFragment),
-            ("a Named list", arch.Types.Named("Nowhere"), NamedFragment)
+            ("a namespace glob", arch.Namespace("App.Nowhere.*")),
+            ("a project name", arch.Project("App.Nowhere")),
+            ("a typeof anchor", arch.Type(typeof(AuthoringHintTests))),
+            ("a narrowed types selection", arch.Types.WithSuffix("Service")),
+            ("a Named list", arch.Types.Named("Nowhere"))
         ];
     }
 
     private delegate string InertCure(Selection piece, IncompleteModel? model, NarrowedUniverse? narrowing);
 
-    // The three cures on a target or an allow-list, the entry points a narrowing reaches, each beside the action
-    // clause it closes on. Walked rather than listed per row, for EveryShape's reason: an entry point left off a
-    // hand-kept list is one whose replacements and voice nothing checks.
-    private static (string Cure, InertCure HintFor, string Action)[] EveryInertCure()
+    // The three cures on a target or an allow-list, the entry points a narrowing reaches. Walked rather than listed
+    // per row, for EveryShape's reason: an entry point left off a hand-kept list is one whose replacements and voice
+    // nothing checks.
+    private static (string Cure, InertCure HintFor)[] EveryInertCure()
     {
         return
         [
             (nameof(AuthoringHints.ForInertTarget),
-                (piece, model, narrowing) => AuthoringHints.ForInertTarget([piece], model, narrowing), InertAction),
-            (nameof(AuthoringHints.ForInertTargetOperand), AuthoringHints.ForInertTargetOperand, BansNothingAction),
-            (nameof(AuthoringHints.ForDeadAllowedOperand), AuthoringHints.ForDeadAllowedOperand, AllowsNothingAction)
+                (piece, model, narrowing) => AuthoringHints.ForInertTarget([piece], model, narrowing)),
+            (nameof(AuthoringHints.ForInertTargetOperand), AuthoringHints.ForInertTargetOperand),
+            (nameof(AuthoringHints.ForDeadAllowedOperand), AuthoringHints.ForDeadAllowedOperand)
         ];
     }
 
@@ -615,19 +580,12 @@ public sealed class AuthoringHintTests
 
     // The two cures on a membership or an among part. Kept apart from EveryInertCure because a narrowed run
     // raises neither warning, so they take no narrowing to replace their advice with.
-    private static (string Cure, SubjectSideCure HintFor, string Action)[] EverySubjectSideCure()
+    private static (string Cure, SubjectSideCure HintFor)[] EverySubjectSideCure()
     {
         return
         [
-            (nameof(AuthoringHints.ForDeadMembership), AuthoringHints.ForDeadMembership, HoldsNoTypeAction),
-            (nameof(AuthoringHints.ForDeadAmongOperand), AuthoringHints.ForDeadAmongOperand, HoldsNoCounterpartAction)
+            (nameof(AuthoringHints.ForDeadMembership), AuthoringHints.ForDeadMembership),
+            (nameof(AuthoringHints.ForDeadAmongOperand), AuthoringHints.ForDeadAmongOperand)
         ];
-    }
-
-    // The narrowing a filtered run hands the checker. Its skip reason is a stand-in no row here reaches: an
-    // inert target's subject loaded, so its rule is measured rather than skipped.
-    private static NarrowedUniverse Narrowed()
-    {
-        return new NarrowedUniverse("THE-NARROWED-SKIP-REASON", NarrowedInertCure);
     }
 }

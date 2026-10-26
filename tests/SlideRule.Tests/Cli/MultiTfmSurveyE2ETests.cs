@@ -25,11 +25,8 @@ public sealed class MultiTfmSurveyE2ETests
     [Fact]
     public async Task Graph_MultiTargetedProject_NamesItsFrameworksAndTheWinningOne()
     {
-        // Arrange
-        using var fixture = new TempFixtureWorkspace("TestSolutions/MultiTfm", "MultiTfm.sln");
-
         // Act
-        CliResult result = await CliRunner.InvokeAsync("graph", fixture.SolutionPath, "--json");
+        CliResult result = await CliRunner.InvokeAsync("graph", FixtureBeds.MultiTfmSolution, "--json");
 
         // Assert — the pair a reader needs before writing arch.Project("MultiTfm.Core"): how many
         // compilations that noun spans, and which one a rule about a type they share is measured against.
@@ -49,11 +46,8 @@ public sealed class MultiTfmSurveyE2ETests
     [Fact]
     public async Task Graph_MultiTargetedProject_CountsTheLosingFrameworksExclusiveType()
     {
-        // Arrange
-        using var fixture = new TempFixtureWorkspace("TestSolutions/MultiTfm", "MultiTfm.sln");
-
         // Act
-        CliResult result = await CliRunner.InvokeAsync("graph", fixture.SolutionPath, "--json");
+        CliResult result = await CliRunner.InvokeAsync("graph", FixtureBeds.MultiTfmSolution, "--json");
 
         // Assert — three, not two: Widget, which both frameworks compile, plus ModernOnly and LegacyOnly,
         // each of which one framework's #if guards out. The winner takes a shared type's facts, so a reader
@@ -71,11 +65,8 @@ public sealed class MultiTfmSurveyE2ETests
     [Fact]
     public async Task Graph_SingleTargetedProject_StatesItsFrameworkAndOmitsTheWinner()
     {
-        // Arrange
-        using var fixture = new TempFixtureWorkspace("TestSolutions/MultiTfm", "MultiTfm.sln");
-
         // Act
-        CliResult result = await CliRunner.InvokeAsync("graph", fixture.SolutionPath, "--json");
+        CliResult result = await CliRunner.InvokeAsync("graph", FixtureBeds.MultiTfmSolution, "--json");
 
         // Assert — the contrast project inside the same document as the one above, so the two shapes
         // cannot drift apart. What a project targets is stated whatever it targets; the winner is a
@@ -95,11 +86,9 @@ public sealed class MultiTfmSurveyE2ETests
     [InlineData("skeleton")]
     public async Task Graph_CoarserGrain_KeepsBothKeysOnTheProjectRow(string grain)
     {
-        // Arrange
-        using var fixture = new TempFixtureWorkspace("TestSolutions/MultiTfm", "MultiTfm.sln");
-
         // Act
-        CliResult result = await CliRunner.InvokeAsync("graph", fixture.SolutionPath, "--json", "--grain", grain);
+        CliResult result = await CliRunner.InvokeAsync(
+            "graph", FixtureBeds.MultiTfmSolution, "--json", "--grain", grain);
 
         // Assert — the pair rides the row, so it survives every rung the roster does. That is the rung a
         // reader most needs it at: a coarser survey is the one where a project noun is all they have left,
@@ -118,20 +107,14 @@ public sealed class MultiTfmSurveyE2ETests
     [Fact]
     public async Task Graph_HumanSurvey_NamesTheWinnerOnlyOnTheMultiTargetedProjectsLine()
     {
-        // Arrange
-        using var fixture = new TempFixtureWorkspace("TestSolutions/MultiTfm", "MultiTfm.sln");
-
         // Act
-        CliResult result = await CliRunner.InvokeAsync("graph", fixture.SolutionPath);
+        CliResult result = await CliRunner.InvokeAsync("graph", FixtureBeds.MultiTfmSolution);
 
         // Assert — the same two facts a terminal reader gets, so nobody is sent to --json for them. Both
         // lines say what they target; only the line whose frameworks collapsed a type says whose facts won.
-        result.ShouldSucceed();
-        string output = result.Out.NormalizedLines();
-
-        output.ShouldContain(
+        result.ShouldSucceed(
             $"  {Core} — 3 types; targets net10.0, netstandard2.0 (shared types from net10.0); "
-            + "references: (none); packages: (none)");
-        output.ShouldContain($"  {Web} — 1 type; targets net10.0; references: {Core}; packages: (none)");
+            + "references: (none); packages: (none)",
+            $"  {Web} — 1 type; targets net10.0; references: {Core}; packages: (none)");
     }
 }

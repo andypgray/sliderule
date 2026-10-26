@@ -34,7 +34,7 @@ public sealed class GrandfatheredCountSyncTests
     ///     here reads each card and baseline once for the whole class where a reader minted per call reads
     ///     them again every time.
     /// </summary>
-    private static readonly Func<string, string?> ReadDiskText = RuleQuotes.DiskTextReader(RepoRoot.Directory);
+    private static readonly Func<string, string?> ReadDiskText = RepoRoot.TextReader();
 
     /// <summary>The count-quoting docs, each paired with the root whose baselines it quotes.</summary>
     private static readonly (string Doc, string ExampleRoot)[] CountDocs =
@@ -53,7 +53,7 @@ public sealed class GrandfatheredCountSyncTests
     private static readonly DocGate<GrandfatheredCount> Gate = new(
         CountDocs.Select(static entry => entry.Doc)
             .ToArray(),
-        ExtractDoc,
+        GrandfatheredCounts.Extract,
         quotes: "grandfathered counts");
 
     /// <summary>
@@ -62,7 +62,7 @@ public sealed class GrandfatheredCountSyncTests
     /// </summary>
     private static readonly DocGate<GrandfatheredCounts.ProseMention> Sweep = new(
         TrackedFiles.Markdown,
-        SweepDoc,
+        GrandfatheredCounts.ProseMentions,
         quotes: "grandfathered count mentions");
 
     /// <summary>
@@ -77,65 +77,65 @@ public sealed class GrandfatheredCountSyncTests
         new(DocPaths.MeridianReadme, ExampleRoots.Meridian,
             "{0} current violations are grandfathered",
             [GrandfatheredCounts.RootTotal],
-            GrandfatheredCounts.CountStyle.WordToTen),
+            CountStyle.WordToTen),
         new(DocPaths.MeridianReadme, ExampleRoots.Meridian,
             // A series mixing counts above and below ten reads as one list in digits.
             "{0} inline-SQL references, {1} wall-clock reads, {2} `Task`-returning methods missing the `Async` suffix, and {3} reach into the quarantined module",
             [InlineSql, InjectClock, AsyncSuffix, ClearanceContainment],
-            GrandfatheredCounts.CountStyle.Numeral),
+            CountStyle.Numeral),
         new(DocPaths.MeridianReadme, ExampleRoots.Meridian,
             "the {0} grandfathered ones stay quiet",
             [InlineSql],
-            GrandfatheredCounts.CountStyle.WordToTen),
+            CountStyle.WordToTen),
         new(DocPaths.MeridianReadme, ExampleRoots.Meridian,
             "{0} reach into the module already exists",
             [ClearanceContainment],
-            GrandfatheredCounts.CountStyle.TitleWord),
+            CountStyle.TitleWord),
         new(DocPaths.MeridianAdopting, ExampleRoots.Meridian,
             // Step 5's refinement, and the one place the walkthrough states the curated rule's own count.
             "which leaves {0} grandfathered controller reads and one type doing its job",
             [InjectClock],
-            GrandfatheredCounts.CountStyle.WordToTen),
+            CountStyle.WordToTen),
         new(DocPaths.MeridianAdopting, ExampleRoots.Meridian,
             "holding {0} inline-SQL references, {1} clock reads, {2} unsuffixed methods, and {3} inbound reach",
             [InlineSql, InjectClock, AsyncSuffix, ClearanceContainment],
-            GrandfatheredCounts.CountStyle.Numeral),
+            CountStyle.Numeral),
         new(DocPaths.MeridianAdopting, ExampleRoots.Meridian,
             "prints its grandfathered count ({0}, {1}, {2}, and {3})",
             [InlineSql, InjectClock, AsyncSuffix, ClearanceContainment],
-            GrandfatheredCounts.CountStyle.Numeral),
+            CountStyle.Numeral),
         new(DocPaths.MeridianStoryboard, ExampleRoots.Meridian,
             // Beat 2: what the rendered block told the agent, and what made the name it chose debt.
             "the {0} inline-SQL references are grandfathered debt",
             [InlineSql],
-            GrandfatheredCounts.CountStyle.WordToTen),
+            CountStyle.WordToTen),
         new(DocPaths.MeridianStoryboard, ExampleRoots.Meridian,
             "a second ratchet with {0} sites already on the record",
             [AsyncSuffix],
-            GrandfatheredCounts.CountStyle.WordToTen),
+            CountStyle.WordToTen),
         new(DocPaths.MeridianStoryboard, ExampleRoots.Meridian,
             "is one of the {0}",
             [AsyncSuffix],
-            GrandfatheredCounts.CountStyle.WordToTen),
+            CountStyle.WordToTen),
         new(DocPaths.MeridianStoryboard, ExampleRoots.Meridian,
             // Beat 3 points at the captured board rather than restating the count in words.
             "counted in the same block as `grandfathered: {0}`",
             [AsyncSuffix],
-            GrandfatheredCounts.CountStyle.Numeral),
+            CountStyle.Numeral),
         new(DocPaths.InterchangeReadme, ExampleRoots.Interchange,
             "the generated baseline contains {0} entries",
             [NoSyncOverAsync],
-            GrandfatheredCounts.CountStyle.WordToTen),
+            CountStyle.WordToTen),
         new(DocPaths.OperationsReadme, ExampleRoots.Operations,
             // The closing line of the quarantine argument: the count of grandfathered edges is the point.
             "{0} edge, one owner",
             [DemurrageContainment],
-            GrandfatheredCounts.CountStyle.TitleWord),
+            CountStyle.TitleWord),
         new(DocPaths.SelfCheck, ExampleRoots.Meridian,
             // The SARIF section's claim about the Meridian ratchet it is cut from.
             "Its {0} baselined violations keep the rule green",
             [InlineSql],
-            GrandfatheredCounts.CountStyle.WordToTen)
+            CountStyle.WordToTen)
     ];
 
     /// <summary>
@@ -153,17 +153,17 @@ public sealed class GrandfatheredCountSyncTests
             "`time/inject-clock` reports eight sites",
             "`time/inject-clock` reports {0} sites",
             InjectClock,
-            GrandfatheredCounts.CountStyle.Word),
+            CountStyle.Word),
         new(DocPaths.MeridianAdopting, ExampleRoots.Meridian,
             "| `time/inject-clock` | 8 clock reads |",
             "| `time/inject-clock` | {0} clock reads |",
             InjectClock,
-            GrandfatheredCounts.CountStyle.Numeral),
+            CountStyle.Numeral),
         new(DocPaths.MeridianAdopting, ExampleRoots.Meridian,
             "The clock rule has eight sites",
             "The clock rule has {0} sites",
             InjectClock,
-            GrandfatheredCounts.CountStyle.Word)
+            CountStyle.Word)
     ];
 
     /// <summary>
@@ -243,7 +243,7 @@ public sealed class GrandfatheredCountSyncTests
                 continue;
             }
 
-            if (HandCounts.CollapsedText(prose.Doc)
+            if (CollapsedText.Of(prose.Doc)
                     .Span(fragment) is null)
                 drift.Add($"{prose.Doc} no longer reads '{fragment}', which its baselines compose from template '{prose.Template}'.");
         }
@@ -306,7 +306,7 @@ public sealed class GrandfatheredCountSyncTests
         // gone away and it should join the registry above.
         foreach (DraftCount draft in DraftCounts)
         {
-            GrandfatheredCounts.CollapsedText collapsed = HandCounts.CollapsedText(draft.Doc);
+            CollapsedText collapsed = CollapsedText.Of(draft.Doc);
             if (collapsed.Span(draft.Fragment) is null) failures.Add($"{draft.Doc} no longer reads the drafted '{draft.Fragment}'.");
 
             int? expected = Expected(draft.ExampleRoot, draft.RuleId);
@@ -316,23 +316,13 @@ public sealed class GrandfatheredCountSyncTests
                 continue;
             }
 
-            string composed = GrandfatheredCounts.Compose(draft.Template, [expected.Value], draft.Style);
+            string composed = CountSpelling.Compose(draft.Template, [expected.Value], draft.Style);
             if (collapsed.Span(composed) is not null)
                 failures.Add($"{draft.Doc} now reads '{composed}', which its baseline composes; the draft exemption is dead and the sentence should be registered.");
         }
 
         // Assert
         failures.ShouldReportNothing("Draft-era counts no longer diverge from the baselines they precede");
-    }
-
-    private static IReadOnlyList<GrandfatheredCount> ExtractDoc(string doc)
-    {
-        return GrandfatheredCounts.Extract(doc, RepoRoot.ReadText(doc));
-    }
-
-    private static IReadOnlyList<GrandfatheredCounts.ProseMention> SweepDoc(string doc)
-    {
-        return GrandfatheredCounts.ProseMentions(doc, RepoRoot.ReadText(doc));
     }
 
     private static int? Expected(string exampleRoot, string ruleId)
@@ -351,7 +341,7 @@ public sealed class GrandfatheredCountSyncTests
             .ToArray();
         if (counts.Any(static count => count is null)) return null;
 
-        return GrandfatheredCounts.Compose(
+        return CountSpelling.Compose(
             prose.Template,
             counts.Select(static count => count!.Value)
                 .ToArray(),
@@ -366,7 +356,7 @@ public sealed class GrandfatheredCountSyncTests
         // them: nothing is claimed in a doc no entry names, so the collapse is not worth paying for.
         if (ProseCounts.All(entry => entry.Doc != doc)) return new HashSet<int>();
 
-        GrandfatheredCounts.CollapsedText collapsed = HandCounts.CollapsedText(doc);
+        CollapsedText collapsed = CollapsedText.Of(doc);
         HashSet<int> claimed = new();
 
         foreach (ProseCount prose in ProseCounts.Where(entry => entry.Doc == doc))
@@ -401,7 +391,7 @@ public sealed class GrandfatheredCountSyncTests
         string ExampleRoot,
         string Template,
         IReadOnlyList<string> RuleIds,
-        GrandfatheredCounts.CountStyle Style);
+        CountStyle Style);
 
     /// <summary>
     ///     One draft-era count: the <paramref name="Fragment" /> the doc must still carry, and the
@@ -414,5 +404,5 @@ public sealed class GrandfatheredCountSyncTests
         string Fragment,
         string Template,
         string RuleId,
-        GrandfatheredCounts.CountStyle Style);
+        CountStyle Style);
 }

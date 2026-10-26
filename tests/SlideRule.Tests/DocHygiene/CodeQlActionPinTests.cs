@@ -100,7 +100,7 @@ public sealed class CodeQlActionPinTests
 
     private static Pin ToPin(string workflow, Match match)
     {
-        string path = match.Groups["path"].Success ? match.Groups["path"].Value : "";
+        string path = match.Groups["path"].Value;
         string version = match.Groups["version"].Success ? match.Groups["version"].Value : match.Groups["sha"].Value;
 
         return new Pin(workflow, $"github/codeql-action{path}", match.Groups["sha"].Value, version);

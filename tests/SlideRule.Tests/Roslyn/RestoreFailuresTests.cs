@@ -405,10 +405,7 @@ public sealed class RestoreFailuresTests
     // thing there is to read.
     private static string WriteProject(TempDirectory temp, string projectName, string projectXml)
     {
-        Directory.CreateDirectory(temp.PathOf(projectName));
-        string csproj = temp.PathOf(projectName, projectName + ".csproj");
-        File.WriteAllText(csproj, projectXml);
-        return csproj;
+        return temp.WriteFile([projectName, projectName + ".csproj"], projectXml);
     }
 
     private static string Logs(params string[] entries)

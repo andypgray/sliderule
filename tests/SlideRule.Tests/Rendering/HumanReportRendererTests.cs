@@ -3,6 +3,7 @@ using SlideRule.Baselines;
 using SlideRule.Checking;
 using SlideRule.Codebase;
 using SlideRule.Hosting;
+using SlideRule.Model;
 using SlideRule.Rendering;
 using SlideRule.Tests.Checking;
 using SlideRule.Tests.Extraction;
@@ -54,8 +55,7 @@ public sealed class HumanReportRendererTests
 
         string block = result.HumanBlock();
 
-        result.Violations.ShouldHaveSingleItem()
-            .Kind.ShouldBe(ViolationKind.RuleError);
+        result.ShouldHaveFailedWithSingle(ViolationKind.RuleError);
         block.ShouldContain(
             "error: `Task<Int32>` is a closed generic construction; member return-type matching is definition-level. " +
             "Anchor on the open definition instead.");
@@ -73,8 +73,7 @@ public sealed class HumanReportRendererTests
 
         string block = result.HumanBlock();
 
-        result.Violations.ShouldHaveSingleItem()
-            .Kind.ShouldBe(ViolationKind.EmptySubject);
+        result.ShouldHaveFailedWithSingle(ViolationKind.EmptySubject);
         block.ShouldContain("The subject selection matched no solution-declared types.");
     }
 
@@ -91,8 +90,7 @@ public sealed class HumanReportRendererTests
         string block = result.HumanBlock();
 
         block.ShouldContain("hint: A trailing `.*` covers the namespace itself");
-        block.IndexOf("matched no solution-declared types", StringComparison.Ordinal)
-            .ShouldBeLessThan(block.IndexOf("hint:", StringComparison.Ordinal));
+        block.ShouldContainInOrder("matched no solution-declared types", "hint:");
     }
 
     [Fact]
@@ -128,8 +126,7 @@ public sealed class HumanReportRendererTests
         string block = result.HumanBlock();
 
         block.ShouldContain("warning: This rule is inert");
-        block.IndexOf("warning:", StringComparison.Ordinal)
-            .ShouldBeLessThan(block.IndexOf("hint:", StringComparison.Ordinal));
+        block.ShouldContainInOrder("warning:", "hint:");
     }
 
     [Fact]
@@ -192,7 +189,7 @@ public sealed class HumanReportRendererTests
         // record — so that hint is an instruction which silently does nothing, and printing it beside the
         // cure that works leaves two `hint:` lines disagreeing about what to do.
         var result = new RuleResult(
-            MigrateRule("data/x"), RuleStatus.Failed,
+            MigrateRule(), RuleStatus.Failed,
             [Violation.EmptySubject("matched nothing", "THE-REAL-CURE")]);
 
         string block = result.HumanBlock();
@@ -210,7 +207,7 @@ public sealed class HumanReportRendererTests
         // what actually went wrong. The reason stays — it is a fact about the rule whatever happened to it,
         // and the xunit adapter's failure message is this same block.
         var result = new RuleResult(
-            FixedRule("naming/x"), RuleStatus.Failed,
+            FixedRule(), RuleStatus.Failed,
             [Violation.EmptySubject("matched nothing", "THE-REAL-CURE")]);
 
         string block = result.HumanBlock();
@@ -227,7 +224,7 @@ public sealed class HumanReportRendererTests
         // The same question, the same answer: a predicate that threw reached no verdict about the code either,
         // so the gate is keyed on that rather than on the one kind the empty-subject case named.
         var result = new RuleResult(
-            FixedRule("naming/x"), RuleStatus.Failed, [Violation.RuleError("boom")]);
+            FixedRule(), RuleStatus.Failed, [Violation.RuleError("boom")]);
 
         string block = result.HumanBlock();
 
@@ -243,7 +240,7 @@ public sealed class HumanReportRendererTests
         // The control: a real finding is exactly what the fix is advice for, so the fix prints. Without this
         // row the gate could pass by withholding the fix from everything.
         var result = new RuleResult(
-            FixedRule("naming/x"), RuleStatus.Failed, [Violation.Shape(SyntheticNodes.Type("App.Orphan"), [])]);
+            FixedRule(), RuleStatus.Failed, [Violation.Shape(SyntheticNodes.Type("App.Orphan"), [])]);
 
         result.HumanBlock()
             .ShouldContain("fix: Rename it.");
@@ -273,7 +270,7 @@ public sealed class HumanReportRendererTests
     public void RuleBlock_ExemplarOfSeveralTypes_JoinsEachPointerAtItsFirstDeclarationSite()
     {
         // The types arrive ordered by full name; a partial type is one pointer, at the first of its sites.
-        ArchRule rule = FixedRule("naming/x");
+        ArchRule rule = FixedRule();
         var result = new RuleResult(
             rule, RuleStatus.Failed, [Violation.Shape(SyntheticNodes.Type("App.Orphan"), [])],
             exemplar:
@@ -312,7 +309,7 @@ public sealed class HumanReportRendererTests
         // The exemplar is the fix's pointer, so it is advice for the same situation and stands under the same
         // gate: a rule that reached no verdict about the code has nothing to copy a pattern for.
         var result = new RuleResult(
-            FixedRule("naming/x"), RuleStatus.Failed,
+            FixedRule(), RuleStatus.Failed,
             [Violation.EmptySubject("matched nothing", "THE-REAL-CURE")],
             exemplar: [SyntheticNodes.Type("OrderService", new SourceLocation("Domain/OrderService.cs", 5))]);
 
@@ -325,7 +322,7 @@ public sealed class HumanReportRendererTests
     {
         // A pointer at the type to copy is for whoever is fixing a violation, and a passing rule has none.
         var result = new RuleResult(
-            FixedRule("naming/x"), RuleStatus.Passed, [],
+            FixedRule(), RuleStatus.Passed, [],
             [CheckWarning.DeadExemplar("types named `Ghost`", "THE-CURE")],
             exemplar: [SyntheticNodes.Type("OrderService", new SourceLocation("Domain/OrderService.cs", 5))]);
 
@@ -361,7 +358,7 @@ public sealed class HumanReportRendererTests
         // is keyed on the identity rather than on the kinds that lack one, so it covers this kind and the
         // empty subject alike.
         var result = new RuleResult(
-            MigrateRule("data/x"), RuleStatus.Failed, [Violation.RuleError("boom")]);
+            MigrateRule(), RuleStatus.Failed, [Violation.RuleError("boom")]);
 
         result.HumanBlock()
             .ShouldNotContain("baseline init");
@@ -420,8 +417,7 @@ public sealed class HumanReportRendererTests
 
         string block = result.HumanBlock();
 
-        result.Violations.ShouldHaveSingleItem()
-            .Kind.ShouldBe(ViolationKind.Construction);
+        result.ShouldHaveFailedWithSingle(ViolationKind.Construction);
         block.ShouldContain("App.Factory constructs Widgets.Widget");
         block.ShouldContain(":12 — App.Factory constructs Widgets.Widget");
     }
@@ -439,8 +435,7 @@ public sealed class HumanReportRendererTests
 
         string block = result.HumanBlock();
 
-        result.Violations.ShouldHaveSingleItem()
-            .Kind.ShouldBe(ViolationKind.Catch);
+        result.ShouldHaveFailedWithSingle(ViolationKind.Catch);
         block.ShouldContain("App.Handler catches Errors.DbError");
         block.ShouldContain(":9 — App.Handler catches Errors.DbError");
     }
@@ -458,8 +453,7 @@ public sealed class HumanReportRendererTests
 
         string block = result.HumanBlock();
 
-        result.Violations.ShouldHaveSingleItem()
-            .Kind.ShouldBe(ViolationKind.Expose);
+        result.ShouldHaveFailedWithSingle(ViolationKind.Expose);
         block.ShouldContain("App.Facade exposes Secrets.Secret");
         block.ShouldContain(":5 — App.Facade exposes Secrets.Secret");
     }
@@ -477,8 +471,7 @@ public sealed class HumanReportRendererTests
 
         string block = result.HumanBlock();
 
-        result.Violations.ShouldHaveSingleItem()
-            .Kind.ShouldBe(ViolationKind.Throw);
+        result.ShouldHaveFailedWithSingle(ViolationKind.Throw);
         block.ShouldContain("App.Service throws Errors.InfraError");
         block.ShouldContain(":14 — App.Service throws Errors.InfraError");
     }
@@ -514,8 +507,7 @@ public sealed class HumanReportRendererTests
 
         string block = result.HumanBlock();
 
-        result.Violations.ShouldHaveSingleItem()
-            .Kind.ShouldBe(ViolationKind.Catch);
+        result.ShouldHaveFailedWithSingle(ViolationKind.Catch);
         block.ShouldContain("Test.cs:11 — App.Handler catches Errors.DbError");
         block.ShouldNotContain("Test.cs:9");
     }
@@ -542,8 +534,7 @@ public sealed class HumanReportRendererTests
 
         string block = result.HumanBlock();
 
-        result.Violations.ShouldHaveSingleItem()
-            .Kind.ShouldBe(ViolationKind.Throw);
+        result.ShouldHaveFailedWithSingle(ViolationKind.Throw);
         block.ShouldContain("Test.cs:5 — App.Service throws System.Exception");
     }
 
@@ -562,8 +553,7 @@ public sealed class HumanReportRendererTests
 
         // The unlocated EmptySubject detail precedes the located Shape's `path:line — App.Located`, though the
         // located violation was listed first.
-        block.IndexOf("UNLOCATED-MARKER", StringComparison.Ordinal)
-            .ShouldBeLessThan(block.IndexOf("App.Located", StringComparison.Ordinal));
+        block.ShouldContainInOrder("UNLOCATED-MARKER", "App.Located");
     }
 
     [Fact]
@@ -577,12 +567,7 @@ public sealed class HumanReportRendererTests
             BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db")
                 .WithSiteCount(1));
 
-        RuleResult result = Checker.Run(Sources.TwoSiteController, index, arch =>
-                arch.Rule("data/x")
-                    .Migrate(
-                        "Controllers open the data layer directly (legacy Active Record style).",
-                        arch.Namespace("App.Web.*").WithSuffix("Controller").MustNotReference(arch.Namespace("App.Data.*")))
-                    .Because("Repository pattern for testability."))
+        RuleResult result = Checker.Run(Sources.TwoSiteControllerModel, index, Sources.NoDataAccess)
             .Single();
 
         string block = result.HumanBlock();
@@ -602,7 +587,7 @@ public sealed class HumanReportRendererTests
         // and the baseline init hint are both claims about a check that never happened. Pinned as the
         // whole block rather than as two absences, so any line that ever creeps in below the reason reds.
         const string reason = "'BillingOnly.slnf' narrowed this run.";
-        ArchRule rule = MigrateRule("data/x");
+        ArchRule rule = MigrateRule();
         var result = new RuleResult(rule, RuleStatus.Skipped, [], [], reason, [], default, true);
 
         string block = result.HumanBlock();
@@ -621,19 +606,19 @@ public sealed class HumanReportRendererTests
 
         // Two changed files, one set of dragons: they are a fact about the scope, not about which file was
         // touched, so the reader meets them once however many warnings fired.
-        string block = Touched(tripwire, CheckWarningKind.QuarantinedScopeTouched, "Calc.cs", "Rounding.cs")
+        string block = Touched(tripwire, "Calc.cs", "Rounding.cs")
             .HumanBlock();
 
         block.ShouldEndWith("\n  dragons: Banker's rounding happens at line-item level.");
         block.Occurrences("  dragons: ")
-            .ShouldBe(1);
+            .ShouldBe(1, block);
         block.ShouldNotContain("dragons-doc:");
     }
 
     [Fact]
     public void RuleBlock_FiredCautionTripwire_PrintsTheDragonsBeneathTheWarning()
     {
-        Touched(SharedUtilitiesTripwire, CheckWarningKind.CautionedScopeTouched, "Helpers.cs")
+        Touched(SharedUtilitiesTripwire, "Helpers.cs")
             .HumanBlock()
             .ShouldEndWith("\n  dragons: Argument order is structural.");
     }
@@ -659,7 +644,7 @@ public sealed class HumanReportRendererTests
                 .DragonsDoc("arch/utilities-dragons.md")
                 .Because("Every caller passes them positionally."));
 
-        Touched(tripwire, CheckWarningKind.CautionedScopeTouched, "Helpers.cs")
+        Touched(tripwire, "Helpers.cs")
             .HumanBlock()
             .ShouldEndWith("\n  dragons: Argument order is structural.\n  dragons-doc: arch/utilities-dragons.md");
     }
@@ -673,7 +658,7 @@ public sealed class HumanReportRendererTests
                 .DragonsDoc("arch/utilities-dragons.md")
                 .Because("Every caller passes them positionally."));
 
-        string block = Touched(tripwire, CheckWarningKind.CautionedScopeTouched, "Helpers.cs")
+        string block = Touched(tripwire, "Helpers.cs")
             .HumanBlock();
 
         block.ShouldEndWith("\n  dragons-doc: arch/utilities-dragons.md");
@@ -707,7 +692,7 @@ public sealed class HumanReportRendererTests
         var report = new CheckReport(
         [
             new RuleResult(Checker.Rule("r/pass"), RuleStatus.Passed, []),
-            Touched(SharedUtilitiesTripwire, CheckWarningKind.CautionedScopeTouched, "Helpers.cs")
+            Touched(SharedUtilitiesTripwire, "Helpers.cs")
         ]);
 
         var writer = new StringWriter { NewLine = "\n" };
@@ -729,7 +714,7 @@ public sealed class HumanReportRendererTests
         var report = new CheckReport(
         [
             new RuleResult(Checker.Rule("r/pass"), RuleStatus.Passed, []),
-            Touched(SharedUtilitiesTripwire, CheckWarningKind.CautionedScopeTouched, "Helpers.cs"),
+            Touched(SharedUtilitiesTripwire, "Helpers.cs"),
             new RuleResult(Checker.Rule("r/skip"), RuleStatus.Skipped, [], [], "no --diff-base diff context", [])
         ]);
         var whole = new StringWriter { NewLine = "\n" };
@@ -738,10 +723,12 @@ public sealed class HumanReportRendererTests
         HumanReportRenderer.Render(whole, report, Directory.GetCurrentDirectory());
         HumanReportRenderer.RenderWithoutPasses(trimmed, report, Directory.GetCurrentDirectory());
 
+        const string warnHeader = "warn shared/utilities/tripwire";
         var wholeText = whole.ToString();
         wholeText.ShouldStartWith("pass r/pass");
+        wholeText.ShouldContain(warnHeader);
         trimmed.ToString()
-            .ShouldBe(wholeText[wholeText.IndexOf("warn shared/utilities/tripwire", StringComparison.Ordinal)..]);
+            .ShouldBe(wholeText[wholeText.IndexOf(warnHeader, StringComparison.Ordinal)..]);
         trimmed.ToString()
             .ShouldEndWith("Checked 3 rules: 2 passed, 0 failed, 1 skipped (0 violations, 1 warning).\n");
     }
@@ -782,18 +769,18 @@ public sealed class HumanReportRendererTests
     // A rule carrying both halves of the failing rule's framing, spelled out rather than placeholders: the
     // rows below assert which of them reached the page, so a reader of a red has to be able to tell the two
     // lines apart.
-    private static ArchRule FixedRule(string id)
+    private static ArchRule FixedRule()
     {
-        return Checker.Rule(id, because: "A reader cannot find the type.", fix: "Rename it.");
+        return Checker.Rule("naming/x", because: "A reader cannot find the type.", fix: "Rename it.");
     }
 
-    // A tripwire that fired: one warning per changed file, which is what the checker produces and what lets
-    // a row ask whether two of them still print one set of dragons.
-    private static RuleResult Touched(ArchRule tripwire, CheckWarningKind kind, params string[] files)
+    // A tripwire that fired: one warning per changed file, of the kind its posture raises, which is what the
+    // checker produces and what lets a row ask whether two of them still print one set of dragons.
+    private static RuleResult Touched(ArchRule tripwire, params string[] files)
     {
+        bool caution = tripwire.Posture == Posture.Caution;
         List<CheckWarning> warnings = files
-            .Select(file => CheckWarning.ScopeTouched(
-                kind == CheckWarningKind.CautionedScopeTouched, $"Changed file '{file}' is inside the scope.", file))
+            .Select(file => CheckWarning.ScopeTouched(caution, $"Changed file '{file}' is inside the scope.", file))
             .ToList();
 
         return new RuleResult(tripwire, RuleStatus.Passed, [], warnings);
@@ -801,11 +788,11 @@ public sealed class HumanReportRendererTests
 
     // A ratcheted rule, built through the spec so it carries a real BaselinePath — the one thing that makes
     // the renderer's ratchet lines reachable at all.
-    private static ArchRule MigrateRule(string id)
+    private static ArchRule MigrateRule()
     {
-        return Checker.Model(arch => arch.Rule(id)
+        return Checker.Model(arch => arch.Rule("data/x")
                 .Migrate("old", arch.Namespace("App.*").MustHaveSuffix("X"))
                 .Because("b"))
-            .Rules.Single();
+            .Rule("data/x");
     }
 }

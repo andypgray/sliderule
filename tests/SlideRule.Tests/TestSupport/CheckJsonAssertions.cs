@@ -37,7 +37,7 @@ internal static class CheckJsonAssertions
     /// <summary>Asserts <paramref name="ruleId" /> is green in <paramref name="checkJson" />.</summary>
     internal static string ShouldHavePassed(this string checkJson, string ruleId)
     {
-        JsonElement rule = RuleOrFail(checkJson, ruleId);
+        JsonElement rule = ShouldCarryRule(checkJson, ruleId);
         rule.GetProperty("status")
             .GetString()
             .ShouldBe("passed", Describe(rule));
@@ -51,7 +51,7 @@ internal static class CheckJsonAssertions
     /// </summary>
     internal static string ShouldHaveFailed(this string checkJson, string ruleId)
     {
-        JsonElement rule = RuleOrFail(checkJson, ruleId);
+        JsonElement rule = ShouldCarryRule(checkJson, ruleId);
         rule.GetProperty("status")
             .GetString()
             .ShouldBe("failed", Describe(rule));
@@ -72,7 +72,7 @@ internal static class CheckJsonAssertions
     /// </remarks>
     internal static string ShouldReportViolationCount(this string checkJson, string ruleId, int count)
     {
-        JsonElement rule = RuleOrFail(checkJson, ruleId);
+        JsonElement rule = ShouldCarryRule(checkJson, ruleId);
         string report = Describe(rule);
 
         rule.TryGetProperty("violationCount", out JsonElement violationCount)
@@ -89,7 +89,7 @@ internal static class CheckJsonAssertions
     /// </summary>
     internal static string ShouldHaveSkipped(this string checkJson, string ruleId, string reason)
     {
-        JsonElement rule = RuleOrFail(checkJson, ruleId);
+        JsonElement rule = ShouldCarryRule(checkJson, ruleId);
         string report = Describe(rule);
 
         rule.GetProperty("status")
@@ -108,7 +108,7 @@ internal static class CheckJsonAssertions
     /// </summary>
     internal static string ShouldHaveGrandfathered(this string checkJson, string ruleId, int count)
     {
-        JsonElement rule = RuleOrFail(checkJson, ruleId);
+        JsonElement rule = ShouldCarryRule(checkJson, ruleId);
         rule.GetProperty("baseline")
             .GetProperty("grandfathered")
             .GetInt32()
@@ -126,7 +126,7 @@ internal static class CheckJsonAssertions
     internal static string ShouldHaveSubjectCoverage(
         this string checkJson, string ruleId, int types, int generated)
     {
-        JsonElement rule = RuleOrFail(checkJson, ruleId);
+        JsonElement rule = ShouldCarryRule(checkJson, ruleId);
         string report = Describe(rule);
 
         rule.GetProperty("subjectTypes")
@@ -151,7 +151,7 @@ internal static class CheckJsonAssertions
     /// </remarks>
     internal static string ShouldReportNoSubjectCoverage(this string checkJson, string ruleId)
     {
-        JsonElement rule = RuleOrFail(checkJson, ruleId);
+        JsonElement rule = ShouldCarryRule(checkJson, ruleId);
         string report = Describe(rule);
 
         rule.TryGetProperty("subjectTypes", out _)
@@ -171,7 +171,7 @@ internal static class CheckJsonAssertions
     internal static string ShouldHaveFailedWith(
         this string checkJson, string ruleId, string endpoint, string[] expected)
     {
-        JsonElement red = RuleOrFail(checkJson, ruleId);
+        JsonElement red = ShouldCarryRule(checkJson, ruleId);
         string report = Describe(red);
 
         red.GetProperty("status")
@@ -198,7 +198,7 @@ internal static class CheckJsonAssertions
     /// </remarks>
     internal static string ShouldHaveDetailOnEveryViolation(this string checkJson, string ruleId, string detail)
     {
-        JsonElement red = RuleOrFail(checkJson, ruleId);
+        JsonElement red = ShouldCarryRule(checkJson, ruleId);
         string report = Describe(red);
 
         List<JsonElement> violations = red.GetProperty("violations")
@@ -221,18 +221,8 @@ internal static class CheckJsonAssertions
     /// </summary>
     internal static string ShouldHaveCaptured(this string checkJson, string ruleId, int count)
     {
-        JsonElement captured = RuleOrFail(checkJson, ruleId);
-        string report = Describe(captured);
-
-        captured.GetProperty("status")
-            .GetString()
-            .ShouldBe("passed", report);
-        captured.GetProperty("baseline")
-            .GetProperty("grandfathered")
-            .GetInt32()
-            .ShouldBe(count, report);
-
-        return checkJson;
+        return checkJson.ShouldHavePassed(ruleId)
+            .ShouldHaveGrandfathered(ruleId, count);
     }
 
     /// <summary>
@@ -247,9 +237,9 @@ internal static class CheckJsonAssertions
     internal static string ShouldHaveSingleViolationOnEdge(
         this string checkJson, string ruleId, string kind, string source, string target)
     {
-        JsonElement red = RuleOrFail(checkJson, ruleId);
+        JsonElement red = ShouldCarryRule(checkJson, ruleId);
         string report = Describe(red);
-        JsonElement violation = SoleViolationOrFail(red, report);
+        JsonElement violation = ShouldHaveSoleViolation(red, report);
 
         violation.ShouldSatisfyAllConditions(
             () => violation.StringOrDefault("kind")
@@ -276,9 +266,9 @@ internal static class CheckJsonAssertions
     internal static string ShouldHaveSingleViolationOnMember(
         this string checkJson, string ruleId, string kind, string slot, string member)
     {
-        JsonElement red = RuleOrFail(checkJson, ruleId);
+        JsonElement red = ShouldCarryRule(checkJson, ruleId);
         string report = Describe(red);
-        JsonElement violation = SoleViolationOrFail(red, report);
+        JsonElement violation = ShouldHaveSoleViolation(red, report);
 
         violation.ShouldSatisfyAllConditions(
             () => violation.StringOrDefault("kind")
@@ -298,7 +288,7 @@ internal static class CheckJsonAssertions
     internal static string ShouldHaveViolationAtSites(
         this string checkJson, string ruleId, (string Slot, string Value) identity, int sites)
     {
-        JsonElement red = RuleOrFail(checkJson, ruleId);
+        JsonElement red = ShouldCarryRule(checkJson, ruleId);
         string report = Describe(red);
         red.GetProperty("status")
             .GetString()
@@ -323,7 +313,7 @@ internal static class CheckJsonAssertions
     ///     The status assertion comes first and is not batched: a passing rule reports an empty array, and
     ///     "0 items" is a worse answer to why the row went red than "the rule passed".
     /// </remarks>
-    private static JsonElement SoleViolationOrFail(JsonElement rule, string report)
+    private static JsonElement ShouldHaveSoleViolation(JsonElement rule, string report)
     {
         rule.GetProperty("status")
             .GetString()
@@ -336,30 +326,24 @@ internal static class CheckJsonAssertions
     }
 
     /// <summary>
-    ///     One rule's object, failing by name when the report does not carry it.
+    ///     One rule's object, failing by name when the report does not carry it exactly once.
     /// </summary>
     /// <remarks>
-    ///     <see cref="CheckJson.Rule(JsonDocument, string)" /> selects with <c>Single</c>, whose miss is an
-    ///     <see cref="InvalidOperationException" /> naming neither the rule asked for nor the ones present
-    ///     — and "the rule is absent" is exactly the regression these assertions exist to catch.
+    ///     <see cref="CheckJson.Rule(JsonDocument, string)" /> throws like LINQ's <c>Single</c>, naming the rule
+    ///     asked for and every rule present; this reports that as a failure rather than an error, because "the
+    ///     rule is absent" is exactly the regression these assertions exist to catch.
     /// </remarks>
-    private static JsonElement RuleOrFail(string checkJson, string ruleId)
+    private static JsonElement ShouldCarryRule(string checkJson, string ruleId)
     {
-        using JsonDocument document = ParseOrFail(checkJson);
+        using JsonDocument document = ShouldParseAsJson(checkJson);
 
         try
         {
             return CheckJson.Rule(document, ruleId);
         }
-        catch (InvalidOperationException)
+        catch (InvalidOperationException miss)
         {
-            IEnumerable<string?> present = document.RootElement.GetProperty("rules")
-                .EnumerateArray()
-                .Select(rule => rule.GetProperty("id")
-                    .GetString());
-
-            throw new ShouldAssertException(
-                $"the report carries no rule '{ruleId}'. It reported: {string.Join(", ", present)}");
+            throw new ShouldAssertException(miss.Message);
         }
     }
 
@@ -370,7 +354,7 @@ internal static class CheckJsonAssertions
     ///     that would say what was written. <c>CliResultAssertions.ShouldHaveJsonStdout</c> holds this for a
     ///     CLI run's stdout; this covers the MCP tool text, which nothing else parses.
     /// </remarks>
-    internal static JsonDocument ParseOrFail(string report)
+    internal static JsonDocument ShouldParseAsJson(string report)
     {
         try
         {
@@ -382,6 +366,42 @@ internal static class CheckJsonAssertions
                 $"the report should have been one JSON document but did not parse: {exception.Message}"
                 + Environment.NewLine + report);
         }
+    }
+
+    /// <summary>
+    ///     Asserts <paramref name="document" />, any verb's <c>--json</c> document, is stamped
+    ///     <c>modelIncomplete: true</c>: an answer reached against a model that did not load whole.
+    /// </summary>
+    internal static void ShouldBeStampedIncomplete(this string document)
+    {
+        using JsonDocument parsed = ShouldParseAsJson(document);
+        parsed.ShouldBeStampedIncomplete();
+    }
+
+    /// <summary>The same, over a document a caller already holds for its other reads.</summary>
+    internal static void ShouldBeStampedIncomplete(this JsonDocument document)
+    {
+        var report = $"The document:{Environment.NewLine}{document.RootElement.GetRawText()}";
+        document.RootElement.TryGetProperty("modelIncomplete", out JsonElement stamp)
+            .ShouldBeTrue(report);
+        stamp.ValueKind.ShouldBe(JsonValueKind.True, report);
+    }
+
+    /// <summary>
+    ///     Asserts <paramref name="document" />, any verb's <c>--json</c> document, carries no
+    ///     <c>modelIncomplete</c> stamp: a model that loaded whole.
+    /// </summary>
+    internal static void ShouldNotBeStampedIncomplete(this string document)
+    {
+        using JsonDocument parsed = ShouldParseAsJson(document);
+        parsed.ShouldNotBeStampedIncomplete();
+    }
+
+    /// <summary>The same, over a document a caller already holds for its other reads.</summary>
+    internal static void ShouldNotBeStampedIncomplete(this JsonDocument document)
+    {
+        document.RootElement.TryGetProperty("modelIncomplete", out _)
+            .ShouldBeFalse($"The document:{Environment.NewLine}{document.RootElement.GetRawText()}");
     }
 
     /// <summary>The rule's whole JSON object — its status, every violation and its baseline counts.</summary>

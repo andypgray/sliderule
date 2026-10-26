@@ -9,8 +9,10 @@ namespace SlideRule.Tests.Extraction;
 /// </summary>
 /// <remarks>
 ///     The dump is total by contract: a fact this file does not render is pinned by no dump comparison,
-///     so a new model fact must gain a line here or it ships unguarded. The model arrives fully ordered,
-///     so a straight walk is stable without sorting.
+///     so a new model fact must gain a line here or it ships unguarded. The one fact left out is a site's
+///     span: the cache never writes one and a line remap drops it, so rendering it would set every cached or
+///     remapped model apart from its cold twin. The model's lists arrive fully ordered, so a straight walk is
+///     stable; the one dictionary, a type's per-declarer sites, is sorted here.
 /// </remarks>
 internal static class ModelDump
 {
@@ -118,6 +120,10 @@ internal static class ModelDump
                 .Append("] bound=[")
                 .Append(string.Join(", ", shadowed.BoundFromAssemblyBy))
                 .AppendLine("]");
+
+        builder.AppendLine("== MERGE NOTES ==");
+        foreach (string note in model.MergeNotes)
+            builder.AppendLine(note);
 
         builder.AppendLine("== DECLARED MEMBERS ==");
         foreach (TypeNode type in model.Types)
@@ -292,10 +298,21 @@ internal static class ModelDump
             .Append(type.ProjectName)
             .Append(" external=")
             .Append(type.IsExternal)
-            .AppendLine();
+            .Append(" alsoDeclaredBy=[")
+            .Append(string.Join(", ", type.AlsoDeclaredBy))
+            .AppendLine("]");
         builder.Append("  declSites=[")
             .Append(RenderSites(type.DeclarationSites))
             .AppendLine("]");
+        if (type.DeclarationSitesByDeclarer is { } byDeclarer)
+        {
+            IEnumerable<string> shares = byDeclarer.OrderBy(entry => entry.Key, StringComparer.Ordinal)
+                .Select(entry => $"{entry.Key} @ [{RenderSites(entry.Value)}]");
+            builder.Append("  sitesByDeclarer=[")
+                .Append(string.Join(", ", shares))
+                .AppendLine("]");
+        }
+
         builder.Append("  filePaths=[")
             .Append(string.Join(", ", type.FilePaths))
             .AppendLine("]");
@@ -320,7 +337,7 @@ internal static class ModelDump
 
     private static string RenderSites(IReadOnlyList<SourceLocation> sites)
     {
-        return string.Join(", ", sites.Select(s => s.ToString()));
+        return string.Join(", ", sites.Rendered());
     }
 
     // An edge's recorded instances, each as the project that made it, the project whose copy it reached and its

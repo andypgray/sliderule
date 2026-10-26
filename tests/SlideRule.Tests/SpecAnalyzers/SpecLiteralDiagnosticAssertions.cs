@@ -46,7 +46,7 @@ internal static class SpecLiteralDiagnosticAssertions
         FileLinePositionSpan span = diagnostic.Location.GetLineSpan();
         (span.StartLinePosition.Line + 1).ShouldBe(line, $"the line {diagnostic.Id} sits on");
         (span.StartLinePosition.Character + 1).ShouldBe(column, $"the column {diagnostic.Id} sits at");
-        diagnostic.Covers()
+        ShouldHaveTextAt(diagnostic.Location)
             .ShouldBe(text, $"the text {diagnostic.Id} covers");
     }
 
@@ -61,7 +61,7 @@ internal static class SpecLiteralDiagnosticAssertions
         FileLinePositionSpan span = related.GetLineSpan();
         (span.StartLinePosition.Line + 1).ShouldBe(line, $"the line {diagnostic.Id} points at");
         (span.StartLinePosition.Character + 1).ShouldBe(column, $"the column {diagnostic.Id} points at");
-        TextAt(related)
+        ShouldHaveTextAt(related)
             .ShouldBe(text, $"the text {diagnostic.Id} points at");
     }
 
@@ -71,14 +71,7 @@ internal static class SpecLiteralDiagnosticAssertions
         diagnostic.AdditionalLocations.ShouldBeEmpty($"{diagnostic.Id} should carry no related location.");
     }
 
-    // The source the warning's own span covers, which is the fact every position assertion here is really
-    // about: a span over the invocation and a span over the literal both start on the same line.
-    private static string Covers(this Diagnostic diagnostic)
-    {
-        return TextAt(diagnostic.Location);
-    }
-
-    private static string TextAt(Location location)
+    private static string ShouldHaveTextAt(Location location)
     {
         SyntaxTree tree = location.SourceTree
             .ShouldNotBeNull("The warning should sit in a syntax tree.");

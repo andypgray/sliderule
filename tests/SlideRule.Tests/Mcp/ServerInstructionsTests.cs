@@ -1,5 +1,6 @@
 using Shouldly;
 using SlideRule.Cli.Mcp.Infrastructure;
+using SlideRule.Tests.TestSupport;
 using Xunit;
 
 namespace SlideRule.Tests.Mcp;
@@ -102,13 +103,9 @@ public sealed class ServerInstructionsTests
         // the quoted failure; Text carries neither marker, so neither can match below the banner either.
         string instructions = ServerInstructions.For("x");
 
-        int recovery = instructions.IndexOf(ServerInstructions.UnboundCallCoda, StringComparison.Ordinal);
-        int configRemedies = instructions.IndexOf("`args`", StringComparison.Ordinal);
-
         // Verbatim, not merely equivalent: the banner and every tool-call error carry the same constant, so
         // the handshake channel and the per-call channel cannot drift into describing different recoveries.
-        recovery.ShouldBeGreaterThanOrEqualTo(0);
-        configRemedies.ShouldBeGreaterThan(recovery);
+        instructions.ShouldContainInOrder(ServerInstructions.UnboundCallCoda, "`args`");
     }
 
     [Fact]

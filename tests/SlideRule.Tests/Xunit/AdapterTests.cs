@@ -120,7 +120,7 @@ public sealed class AdapterTests
     [Fact]
     public async Task Tripwire_WithoutDiff_Skips()
     {
-        Exception? exception = await AdapterOutcome.CaughtAsync(() => new InlineScopedArchTests().Rule_Holds("legacy/billing/tripwire"));
+        Exception? exception = await AdapterOutcome.CaughtAsync(() => new InlineViolatedArchTests().Rule_Holds("legacy/billing/tripwire"));
 
         var skip = exception.ShouldBeOfType<SkipException>();
         // SkipException.ForSkip prefixes the reason with an internal dynamic-skip marker; the reason is the suffix.
@@ -134,7 +134,7 @@ public sealed class AdapterTests
         // permanent skip here: present in the explorer, naming the scope, never firing. That is the
         // adapter's nature and not a defect — the verdict a caution wants is `check --diff-base`'s, which
         // is a pull-request concern.
-        Exception? exception = await AdapterOutcome.CaughtAsync(() => new InlineScopedArchTests().Rule_Holds("domain/retry-budget/tripwire"));
+        Exception? exception = await AdapterOutcome.CaughtAsync(() => new InlineViolatedArchTests().Rule_Holds("domain/retry-budget/tripwire"));
 
         var skip = exception.ShouldBeOfType<SkipException>();
         skip.Message.ShouldEndWith(ArchChecker.CautionTripwireSkipReason);
@@ -195,14 +195,13 @@ public sealed class AdapterTests
         Exception? exception = await AdapterOutcome.CaughtAsync(() => new BillingOnlyArchTests().Workspace_LoadedCompletely());
 
         var skip = exception.ShouldBeOfType<SkipException>();
-        skip.Message.NormalizedLines()
-            .ShouldContain(
-                "'BillingOnly.slnf' narrowed this run: 2 projects the solution declares were not checked.\n"
-                + "  MyApp.Domain/MyApp.Domain.csproj\n"
-                + "  MyApp.Web/MyApp.Web.csproj\n"
-                + "Rule verdicts come from the projects that loaded, but a test by this name cannot pass "
-                + "while declared projects went unchecked; run the solution the filter references for the "
-                + "whole answer.");
+        skip.Message.ShouldContain(
+            "'BillingOnly.slnf' narrowed this run: 2 projects the solution declares were not checked.\n"
+            + "  MyApp.Domain/MyApp.Domain.csproj\n"
+            + "  MyApp.Web/MyApp.Web.csproj\n"
+            + "Rule verdicts come from the projects that loaded, but a test by this name cannot pass "
+            + "while declared projects went unchecked; run the solution the filter references for the "
+            + "whole answer.");
     }
 
     [Fact]
@@ -221,7 +220,7 @@ public sealed class AdapterTests
         // The other side of the row above: a verdict a filtered run could not reach is not a verdict, and
         // the adapter is where that lands hardest — an empty-subject red arrives as a failing named test
         // accusing the spec of naming a namespace the solution does have.
-        Exception? exception = await AdapterOutcome.CaughtAsync(() => new BillingOnlyWebArchTests().Rule_Holds(BillingOnlyWebRuleId));
+        Exception? exception = await AdapterOutcome.CaughtAsync(() => new BillingOnlyArchTests().Rule_Holds(BillingOnlyWebRuleId));
 
         var skip = exception.ShouldBeOfType<SkipException>();
         skip.Message.ShouldEndWith(NarrowedUniverseNotice.RuleSkipReason("BillingOnly.slnf", 2));
@@ -237,12 +236,11 @@ public sealed class AdapterTests
         Exception? exception = await AdapterOutcome.CaughtAsync(() => new PolyglotArchTests().Workspace_LoadedCompletely());
 
         var skip = exception.ShouldBeOfType<SkipException>();
-        skip.Message.NormalizedLines()
-            .ShouldContain(
-                "1 project the solution declares was not surveyed:\n"
-                + "  PolyglotApp.Fs/PolyglotApp.Fs.fsproj — not a C# project\n"
-                + "Rule verdicts come from the projects this product can read, but a test by this name "
-                + "cannot pass while the solution declares projects the model never held.");
+        skip.Message.ShouldContain(
+            "1 project the solution declares was not surveyed:\n"
+            + "  PolyglotApp.Fs/PolyglotApp.Fs.fsproj — not a C# project\n"
+            + "Rule verdicts come from the projects this product can read, but a test by this name "
+            + "cannot pass while the solution declares projects the model never held.");
     }
 
     [Fact]
@@ -270,9 +268,11 @@ public sealed class AdapterTests
         exception.Message.ShouldBe($"Could not locate 'no-such-file-f2.slnx' walking up from '{AppContext.BaseDirectory}'.");
     }
 
-    // A verbatim inline copy of the fixture's layering/domain-independent rule, checked against the real
-    // MyApp solution with no project excluded (as the CLI does for a by-path DLL spec), so its one rule
-    // produces the identical violation block.
+    // The fixture's layering/domain-independent rule verbatim, beside both scope postures over MyApp, in one
+    // spec so the adapter loads the solution once. Checked with no project excluded, as the CLI does for a
+    // by-path DLL spec, so the rule's block is the CLI's; the quarantine over MyApp.Legacy.Billing and the
+    // caution over MyApp.Domain desugar to tripwires that skip without a --diff-base, which is what the two
+    // tripwire rows read.
     private sealed class MyAppViolatedInlineSpec : IArchitectureSpec
     {
         public void Define(Arch arch)
@@ -284,6 +284,16 @@ public sealed class AdapterTests
                 .Enforce(domain.MustNotReference(web))
                 .Because("Domain is UI-agnostic; transaction boundaries live in services.")
                 .Fix("Define an abstraction in Domain and implement it in Web.");
+
+            arch.Scope("legacy/billing")
+                .Quarantine(arch.Namespace("MyApp.Legacy.Billing.*"))
+                .Dragons("Banker's rounding happens at line-item level, NOT invoice level. Do not normalize.")
+                .Because("Replacement scheduled; not worth stabilizing.");
+
+            arch.Scope("domain/retry-budget")
+                .Caution(arch.Namespace("MyApp.Domain.*"))
+                .Dragons("The back-off table is tuned against production, not first principles. Keep the timings.")
+                .Because("Every caller depends on the exact timings.");
         }
     }
 
@@ -307,33 +317,6 @@ public sealed class AdapterTests
         }
     }
 
-    // Both scope postures over MyApp, in one spec so the adapter loads the solution once: a quarantined
-    // scope over MyApp.Legacy.Billing and a cautioned one over MyApp.Domain. Their desugared tripwires
-    // both skip without a --diff-base, which is what the two rows below read. Disjoint namespaces, and a
-    // Caution desugars to its tripwire alone, so neither scope can move the other's verdict — the shape
-    // MyAppRenderSpec already ships.
-    private sealed class MyAppScopedInlineSpec : IArchitectureSpec
-    {
-        public void Define(Arch arch)
-        {
-            arch.Scope("legacy/billing")
-                .Quarantine(arch.Namespace("MyApp.Legacy.Billing.*"))
-                .Dragons("Banker's rounding happens at line-item level, NOT invoice level. Do not normalize.")
-                .Because("Replacement scheduled; not worth stabilizing.");
-
-            arch.Scope("domain/retry-budget")
-                .Caution(arch.Namespace("MyApp.Domain.*"))
-                .Dragons("The back-off table is tuned against production, not first principles. Keep the timings.")
-                .Because("Every caller depends on the exact timings.");
-        }
-    }
-
-    private sealed class InlineScopedArchTests : ArchRuleTests<MyAppScopedInlineSpec>
-    {
-        protected override string SolutionPath => CliRunner.MyAppSolution;
-        protected override string? ExcludeProjectName => null;
-    }
-
     // A spec that fails build-time validation: the rule carries a posture but no required .Because(...), so
     // ArchModelBuilder.Build throws SpecValidationException and RuleRows() takes its spec-build-failure branch.
     private sealed class SpecBuildFailsSpec : IArchitectureSpec
@@ -352,11 +335,11 @@ public sealed class AdapterTests
     // reads the tree. BrokenApp.Contracts must stay absent — PartialLoadWorkspaceE2ETests guards that at arrange
     // time, and the two assertions on "BrokenApp.Contracts.csproj" below go red if the fixture ever heals.
     private static string BrokenAppSolution =>
-        Path.Combine(AppContext.BaseDirectory, "Fixtures", "PartialLoadSolutions", "BrokenApp", "BrokenApp.sln");
+        Path.Combine(FixtureBeds.FixturesRoot, "PartialLoadSolutions", "BrokenApp", "BrokenApp.sln");
 
     // One rule spanning the two projects that DO load, so the opted-in run reaches a genuine verdict rather than
     // the empty-subject pass this whole gate exists to refuse.
-    private class BrokenAppInlineSpec : IArchitectureSpec
+    private sealed class BrokenAppInlineSpec : IArchitectureSpec
     {
         public void Define(Arch arch)
         {
@@ -370,18 +353,15 @@ public sealed class AdapterTests
         }
     }
 
-    // The same spec under a second type purely to close ArchRuleTests<> over a different TSpec: the check run is
-    // cached in a static per closed generic with no reset hook, so one spec type would hand both drivers the
-    // first one's run and the AllowWorkspaceDiagnostics override would never be read.
-    private sealed class BrokenAppOptedInInlineSpec : BrokenAppInlineSpec;
-
     private sealed class BrokenAppArchTests : ArchRuleTests<BrokenAppInlineSpec>
     {
         protected override string SolutionPath => BrokenAppSolution;
         protected override string? ExcludeProjectName => null;
     }
 
-    private sealed class BrokenAppOptedInArchTests : ArchRuleTests<BrokenAppOptedInInlineSpec>
+    // Shares BrokenAppArchTests' run: the adapter seeds it from SolutionPath and ExcludeProjectName and reads
+    // AllowWorkspaceDiagnostics per case.
+    private sealed class BrokenAppOptedInArchTests : ArchRuleTests<BrokenAppInlineSpec>
     {
         protected override string SolutionPath => BrokenAppSolution;
         protected override string? ExcludeProjectName => null;
@@ -390,15 +370,17 @@ public sealed class AdapterTests
 
     private const string BillingOnlyRuleId = "layering/billing-independent";
 
+    private const string BillingOnlyWebRuleId = "layering/web-independent";
+
     // The narrowing fixture, read in place from the test output for FilteredSolutionE2ETests' reason: the
     // filter reaches its solution by relative path, which a leased copy would strand. It selects the leaf of
     // the reference chain, so two of MyApp's three declared projects go unchecked; that class's arrange-time
     // guard is what keeps the two paths asserted above true.
     private static string BillingOnlyFilter =>
-        Path.Combine(AppContext.BaseDirectory, "Fixtures", "FilteredSolutions", "BillingOnly.slnf");
+        Path.Combine(FixtureBeds.FixturesRoot, "FilteredSolutions", "BillingOnly.slnf");
 
-    // Scoped to the one project the filter does select, so the rule case reaches a verdict over a subject
-    // that really loaded rather than the empty-subject pass the narrowing notice exists to make visible.
+    // One rule over the project the filter selects, which reaches a verdict over a subject that loaded, and
+    // one over a project it drops, which reaches none.
     private sealed class BillingOnlyInlineSpec : IArchitectureSpec
     {
         public void Define(Arch arch)
@@ -406,30 +388,14 @@ public sealed class AdapterTests
             arch.Rule(BillingOnlyRuleId)
                 .Enforce(arch.Namespace("MyApp.Legacy.Billing.*").MustNotReference(arch.Namespace("MyApp.Web.*")))
                 .Because("Billing must not reach up into the web layer.");
-        }
-    }
 
-    private sealed class BillingOnlyArchTests : ArchRuleTests<BillingOnlyInlineSpec>
-    {
-        protected override string SolutionPath => BillingOnlyFilter;
-        protected override string? ExcludeProjectName => null;
-    }
-
-    private const string BillingOnlyWebRuleId = "layering/web-independent";
-
-    // The mirror of BillingOnlyInlineSpec: scoped to a project the filter drops rather than one it selects,
-    // so the rule selects nothing and the run reaches no verdict for it — the case the skip exists for.
-    private sealed class BillingOnlyWebInlineSpec : IArchitectureSpec
-    {
-        public void Define(Arch arch)
-        {
             arch.Rule(BillingOnlyWebRuleId)
                 .Enforce(arch.Namespace("MyApp.Web.*").MustNotReference(arch.Namespace("MyApp.Legacy.Billing.*")))
                 .Because("The web layer talks to billing through an abstraction.");
         }
     }
 
-    private sealed class BillingOnlyWebArchTests : ArchRuleTests<BillingOnlyWebInlineSpec>
+    private sealed class BillingOnlyArchTests : ArchRuleTests<BillingOnlyInlineSpec>
     {
         protected override string SolutionPath => BillingOnlyFilter;
         protected override string? ExcludeProjectName => null;

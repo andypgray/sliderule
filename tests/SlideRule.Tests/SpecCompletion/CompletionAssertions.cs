@@ -91,7 +91,8 @@ internal static class CompletionAssertions
     {
         offered.ShouldOffer(names);
 
-        List<int> positions = names.Select(name => IndexOf(offered, name))
+        List<string> texts = [.. offered.Texts];
+        List<int> positions = names.Select(name => texts.IndexOf(name))
             .ToList();
 
         string ranks = string.Join(", ", positions);
@@ -106,7 +107,7 @@ internal static class CompletionAssertions
     /// <param name="tag">The tag, from the host's own well-known set.</param>
     internal static void ShouldOfferWithTag(this OfferedList offered, string name, string tag)
     {
-        CompletionItem item = offered.Pick(name);
+        CompletionItem item = offered.ShouldHaveSingleRowNamed(name);
 
         item.Tags.ShouldContain(tag, offered.Describe($"Expected '{name}' to be tagged {tag}"));
     }
@@ -126,7 +127,7 @@ internal static class CompletionAssertions
     internal static async Task ShouldInsertAsync(
         this OfferedList offered, string name, string literal, CancellationToken cancellationToken)
     {
-        CompletionItem item = offered.Pick(name);
+        CompletionItem item = offered.ShouldHaveSingleRowNamed(name);
         CompletionChange change =
             await offered.Service.GetChangeAsync(offered.Document, item, commitCharacter: null, cancellationToken);
 
@@ -155,10 +156,10 @@ internal static class CompletionAssertions
     /// <param name="characters">The characters, and no others.</param>
     internal static void ShouldCommitOnly(this OfferedList offered, string name, params char[] characters)
     {
-        CompletionItem item = offered.Pick(name);
+        CompletionItem item = offered.ShouldHaveSingleRowNamed(name);
         string commits = Folded(
             offered.Service.GetRules().DefaultCommitCharacters, item.Rules.CommitCharacterRules);
-        string expected = Folded([], [CharacterSetModificationRule.Create(CharacterSetModificationKind.Add, characters)]);
+        var expected = new string(characters.Distinct().Order().ToArray());
 
         commits.ShouldBe(
             expected,
@@ -174,9 +175,9 @@ internal static class CompletionAssertions
     /// <param name="characters">The characters, and no others.</param>
     internal static void ShouldFilterOn(this OfferedList offered, string name, params char[] characters)
     {
-        CompletionItem item = offered.Pick(name);
+        CompletionItem item = offered.ShouldHaveSingleRowNamed(name);
         string filters = Folded([], item.Rules.FilterCharacterRules);
-        string expected = Folded([], [CharacterSetModificationRule.Create(CharacterSetModificationKind.Add, characters)]);
+        var expected = new string(characters.Distinct().Order().ToArray());
 
         filters.ShouldBe(
             expected,
@@ -184,22 +185,13 @@ internal static class CompletionAssertions
     }
 
     // The one row carrying this name, or a failure naming every row there was.
-    private static CompletionItem Pick(this OfferedList offered, string name)
+    private static CompletionItem ShouldHaveSingleRowNamed(this OfferedList offered, string name)
     {
         List<CompletionItem> matching = offered.Items
             .Where(item => string.Equals(OfferedList.TextOf(item), name, StringComparison.Ordinal))
             .ToList();
 
         return matching.ShouldHaveSingleItem(offered.Describe($"Looking for exactly one row named '{name}'"));
-    }
-
-    private static int IndexOf(OfferedList offered, string name)
-    {
-        for (var index = 0; index < offered.Texts.Count; index++)
-            if (string.Equals(offered.Texts[index], name, StringComparison.Ordinal))
-                return index;
-
-        return -1;
     }
 
     // A host applies each of an item's rules to its own default set in order, and the last word belongs to

@@ -53,10 +53,8 @@ public sealed class MustSetPropertyVerbTests
     {
         // The framework that enables it passes; the one that sets nothing reds, sited where the missing
         // declaration would go.
-        Violation violation = Checker.Run(Scene, arch => arch.Rule("build/nullable")
-                .Enforce(arch.Projects.Named("Abstractions").MustSetProperty("Nullable", "enable"))
-                .Because("b"))
-            .Single()
+        Violation violation = Checker.Verdict(Scene, arch => arch.Projects.Named("Abstractions")
+                .MustSetProperty("Nullable", "enable"))
             .ShouldHaveFailedWithProjectAtSites(
                 "Abstractions -> Nullable@netstandard2.0", ["src/Abstractions/Abstractions.csproj:1"]);
 
@@ -66,10 +64,8 @@ public sealed class MustSetPropertyVerbTests
     [Fact]
     public void MustSetProperty_SetToAnotherValue_FailsAtTheDefinitionThatWon()
     {
-        Violation violation = Checker.Run(Scene, arch => arch.Rule("build/nullable")
-                .Enforce(arch.Projects.Named("Legacy").MustSetProperty("Nullable", "enable"))
-                .Because("b"))
-            .Single()
+        Violation violation = Checker.Verdict(Scene, arch => arch.Projects.Named("Legacy")
+                .MustSetProperty("Nullable", "enable"))
             .ShouldHaveFailedWithProjectAtSites("Legacy -> Nullable@net48", ["Directory.Build.props:4"]);
 
         violation.PropertyValue.ShouldBe("disable");
@@ -80,10 +76,7 @@ public sealed class MustSetPropertyVerbTests
     {
         // MSBuild matches property names ignoring case and compares condition strings the same way, and the value
         // here carries the whitespace a property written across lines would.
-        Checker.Run(Scene, arch => arch.Rule("build/nullable")
-                .Enforce(arch.Projects.Named("Modern").MustSetProperty("Nullable", "enable"))
-                .Because("b"))
-            .Single()
+        Checker.Verdict(Scene, arch => arch.Projects.Named("Modern").MustSetProperty("Nullable", "enable"))
             .ShouldHavePassedClean();
     }
 
@@ -91,10 +84,7 @@ public sealed class MustSetPropertyVerbTests
     public void MustSetProperty_ProjectNothingEvaluated_PassesClean()
     {
         // No evaluation, nothing to judge: unknown never reds.
-        Checker.Run(Scene, arch => arch.Rule("build/nullable")
-                .Enforce(arch.Projects.Named("Unevaluated").MustSetProperty("Nullable", "enable"))
-                .Because("b"))
-            .Single()
+        Checker.Verdict(Scene, arch => arch.Projects.Named("Unevaluated").MustSetProperty("Nullable", "enable"))
             .ShouldHavePassedClean();
     }
 
@@ -114,10 +104,8 @@ public sealed class MustSetPropertyVerbTests
                 ]),
             ProjectFacts.Project("Tool", evaluations: [ProjectFacts.Evaluation(null, "src/Tool/Tool.csproj")]));
 
-        RuleResult result = Checker.Run(scene, arch => arch.Rule("build/nullable")
-                .Enforce(arch.Projects.Matching("*").MustSetProperty("Nullable", "enable"))
-                .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(scene, arch => arch.Projects.Matching("*")
+            .MustSetProperty("Nullable", "enable"));
 
         result.ShouldHaveBaselineIdentities(
         [

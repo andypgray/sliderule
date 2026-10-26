@@ -131,7 +131,7 @@ public sealed class RuleSelectionTests
         report.RulesFailed.ShouldBe(0);
         report.ViolationCount.ShouldBe(0);
         report.HasViolations.ShouldBeFalse();
-        report.Results.Single()
+        report.Results.ShouldHaveSingleItem()
             .ShouldHavePassedClean();
     }
 
@@ -150,7 +150,7 @@ public sealed class RuleSelectionTests
         report.RulesChecked.ShouldBe(1);
         report.RulesFailed.ShouldBe(1);
         report.HasViolations.ShouldBeTrue();
-        report.Results.Single()
+        report.Results.ShouldHaveSingleItem()
             .ShouldHaveFailedWithSingleEdge(ViolationKind.Reference, "App.Web.OldController", "App.Data.Db");
     }
 
@@ -164,7 +164,7 @@ public sealed class RuleSelectionTests
 
         // Act
         CheckReport subset = Harness.Check(selected, codebase, BaselineIndex.Empty, null);
-        CheckReport whole = Harness.Check(model, codebase, BaselineIndex.Empty, null);
+        CheckReport whole = Harness.Check(model, codebase, BaselineIndex.Empty);
 
         // Assert — the unfiltered narrow path is the whole-model path, so nothing about the default run moves.
         subset.Results.Select(result => result.Rule.Id)

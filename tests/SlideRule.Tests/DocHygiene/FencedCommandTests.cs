@@ -133,7 +133,7 @@ public sealed class FencedCommandTests
     {
         // Arrange: the launch-line gate reads its registrations through the same reader, so a continued line
         // joins whatever command it belongs to.
-        IReadOnlyList<(string Text, int Number)> block = SourceAnchors.FencedBlocks(
+        IReadOnlyList<(string Text, int Number)> block = DocFences.FencedBlocks(
                 "```bash\nclaude mcp add sliderule \\\n  -- sliderule mcp App.sln   # register\n```\n")
             .ShouldHaveSingleItem();
 

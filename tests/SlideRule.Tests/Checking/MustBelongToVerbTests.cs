@@ -49,23 +49,16 @@ public sealed class MustBelongToVerbTests
     {
         // A shape violation has no edge to cite, so the file:line an agent jumps to is where the uncovered
         // type is declared — the subject's own declaration sites, carried as evidence.
-        Checker.Run(SceneModel, arch =>
-                arch.Rule("layering/no-ungoverned-types")
-                    .Enforce(arch.Types.MustBelongTo(arch.Namespace("Domain.*"), arch.Namespace("Web.*")))
-                    .Because("b"))
-            .Single()
+        Checker.Verdict(SceneModel, arch => arch.Types
+                .MustBelongTo(arch.Namespace("Domain.*"), arch.Namespace("Web.*")))
             .ShouldHaveFailedWithSubjectAtSites("Legacy.Ledger", ["Test.cs:12"]);
     }
 
     [Fact]
     public void MustBelongTo_EverySubjectCoveredByAMembership_PassesClean()
     {
-        Checker.Run(SceneModel, arch =>
-                arch.Rule("layering/no-ungoverned-types")
-                    .Enforce(arch.Types.Except(arch.Namespace("Legacy.*"))
-                        .MustBelongTo(arch.Namespace("Domain.*"), arch.Namespace("Web.*")))
-                    .Because("b"))
-            .Single()
+        Checker.Verdict(SceneModel, arch => arch.Types.Except(arch.Namespace("Legacy.*"))
+                .MustBelongTo(arch.Namespace("Domain.*"), arch.Namespace("Web.*")))
             .ShouldHavePassedClean();
     }
 
@@ -74,18 +67,10 @@ public sealed class MustBelongToVerbTests
     {
         // One membership is the degenerate case and stays a membership test rather than becoming an identity
         // test: the types the selection names pass, and everything else is the remainder.
-        Checker.Run(SceneModel, arch =>
-                arch.Rule("layering/domain-only")
-                    .Enforce(arch.Namespace("Domain.*").MustBelongTo(arch.Namespace("Domain.*")))
-                    .Because("b"))
-            .Single()
+        Checker.Verdict(SceneModel, arch => arch.Namespace("Domain.*").MustBelongTo(arch.Namespace("Domain.*")))
             .ShouldHavePassedClean();
 
-        Checker.Run(SceneModel, arch =>
-                arch.Rule("layering/domain-only")
-                    .Enforce(arch.Types.MustBelongTo(arch.Namespace("Domain.*")))
-                    .Because("b"))
-            .Single()
+        Checker.Verdict(SceneModel, arch => arch.Types.MustBelongTo(arch.Namespace("Domain.*")))
             .ShouldHaveFailedWithSubjects(["Web.HomeController", "Legacy.Ledger"]);
     }
 
@@ -94,22 +79,15 @@ public sealed class MustBelongToVerbTests
     {
         // A union operand resolves as ONE membership covering both its parts, so this names the same set the
         // two-membership spelling above does.
-        Checker.Run(SceneModel, arch =>
-                arch.Rule("layering/union-membership")
-                    .Enforce(arch.Types.MustBelongTo(arch.AnyOf(arch.Namespace("Domain.*"), arch.Namespace("Web.*"))))
-                    .Because("b"))
-            .Single()
+        Checker.Verdict(SceneModel, arch => arch.Types
+                .MustBelongTo(arch.AnyOf(arch.Namespace("Domain.*"), arch.Namespace("Web.*"))))
             .ShouldHaveFailedWithSubjects(["Legacy.Ledger"]);
 
         // Except narrows the membership itself: Domain minus Invoice no longer covers Invoice, so the type
         // joins the uncovered remainder rather than staying green on a layer it is still inside.
-        Checker.Run(SceneModel, arch =>
-                arch.Rule("layering/excepted-membership")
-                    .Enforce(arch.Types.MustBelongTo(
-                        arch.Namespace("Domain.*").Except(arch.Types.WithNameMatching("Invoice")),
-                        arch.Namespace("Web.*")))
-                    .Because("b"))
-            .Single()
+        Checker.Verdict(SceneModel, arch => arch.Types.MustBelongTo(
+                arch.Namespace("Domain.*").Except(arch.Types.WithNameMatching("Invoice")),
+                arch.Namespace("Web.*")))
             .ShouldHaveFailedWithSubjects(["Domain.Invoice", "Legacy.Ledger"]);
     }
 
@@ -120,11 +98,8 @@ public sealed class MustBelongToVerbTests
         // name; the warning is what names the stale membership (§4.1). The per-operand emptiness failure
         // guards a union SUBJECT (§4.1) and does not reach a membership, so the reds are the uncovered subjects
         // and nothing else.
-        RuleResult result = Checker.Run(SceneModel, arch =>
-                arch.Rule("layering/absent-membership")
-                    .Enforce(arch.Types.MustBelongTo(arch.Namespace("Domain.*"), arch.Namespace("Nowhere.*")))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(SceneModel, arch => arch.Types
+            .MustBelongTo(arch.Namespace("Domain.*"), arch.Namespace("Nowhere.*")));
 
         result.ShouldHaveFailedWithSubjects(["Web.HomeController", "Legacy.Ledger"]);
         result.ShouldHaveWarnedStricterOnMembership("types in `Nowhere.*`");
@@ -140,19 +115,10 @@ public sealed class MustBelongToVerbTests
     {
         // The reside pair is MustBelongTo with one membership, so its warning is that form's in every slot a
         // host reads: kind, key, message and cure.
-        RuleResult reside = Checker.Run(SceneModel, arch =>
-                arch.Rule("layering/reside")
-                    .Enforce(arch.Types.MustResideInNamespace("Nowhere.*"))
-                    .Because("b"))
-            .Single();
-        RuleResult belong = Checker.Run(SceneModel, arch =>
-                arch.Rule("layering/reside")
-                    .Enforce(arch.Types.MustBelongTo(arch.Namespace("Nowhere.*")))
-                    .Because("b"))
-            .Single();
+        RuleResult reside = Checker.Verdict(SceneModel, arch => arch.Types.MustResideInNamespace("Nowhere.*"));
+        RuleResult belong = Checker.Verdict(SceneModel, arch => arch.Types.MustBelongTo(arch.Namespace("Nowhere.*")));
 
-        reside.ShouldHaveWarnedStricterOnMembership("types in `Nowhere.*`");
-        CheckWarning resided = reside.Warnings.Single();
+        CheckWarning resided = reside.ShouldHaveWarnedStricterOnMembership("types in `Nowhere.*`");
         CheckWarning belonged = belong.Warnings.ShouldHaveSingleItem();
         $"{resided.Kind} {resided.Key}: {resided.Message} | {resided.Hint}"
             .ShouldBe($"{belonged.Kind} {belonged.Key}: {belonged.Message} | {belonged.Hint}");
@@ -161,11 +127,8 @@ public sealed class MustBelongToVerbTests
     [Fact]
     public void MustBelongTo_DeadNameInANamedMembership_WarnsNamingTheOneNameSpelling()
     {
-        RuleResult result = Checker.Run(SceneModel, arch =>
-                arch.Rule("layering/named-membership")
-                    .Enforce(arch.Types.MustBelongTo(arch.Types.Named("Order", "Invoice", "Ghost"), arch.Namespace("Web.*")))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(SceneModel, arch => arch.Types
+            .MustBelongTo(arch.Types.Named("Order", "Invoice", "Ghost"), arch.Namespace("Web.*")));
 
         result.ShouldHaveFailedWithSubjects(["Legacy.Ledger"]);
         result.ShouldHaveWarnedStricterOnMembership("types named `Ghost`");
@@ -174,13 +137,9 @@ public sealed class MustBelongToVerbTests
     [Fact]
     public void MustBelongTo_DeadPartOfAUnionMembership_Warns()
     {
-        RuleResult result = Checker.Run(SceneModel, arch =>
-                arch.Rule("layering/union-membership")
-                    .Enforce(arch.Types.MustBelongTo(
-                        arch.AnyOf(arch.Namespace("Domain.*"), arch.Namespace("Ghost.*")),
-                        arch.Namespace("Web.*")))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(SceneModel, arch => arch.Types.MustBelongTo(
+            arch.AnyOf(arch.Namespace("Domain.*"), arch.Namespace("Ghost.*")),
+            arch.Namespace("Web.*")));
 
         result.ShouldHaveFailedWithSubjects(["Legacy.Ledger"]);
         result.ShouldHaveWarnedStricterOnMembership("types in `Ghost.*`");
@@ -191,14 +150,11 @@ public sealed class MustBelongToVerbTests
     {
         // A membership is never cut down to one project the way a rule subject is, so a layer used as one is
         // opened and the dead piece of its definition named.
-        RuleResult result = Checker.Run(SceneModel, arch =>
-            {
-                Layer core = arch.Layer("Core", arch.AnyOf(arch.Namespace("Domain.*"), arch.Namespace("Ghost.*")));
-                arch.Rule("layering/layer-membership")
-                    .Enforce(arch.Types.MustBelongTo(core, arch.Namespace("Web.*")))
-                    .Because("b");
-            })
-            .Single();
+        RuleResult result = Checker.Verdict(SceneModel, arch =>
+        {
+            Layer core = arch.Layer("Core", arch.AnyOf(arch.Namespace("Domain.*"), arch.Namespace("Ghost.*")));
+            return arch.Types.MustBelongTo(core, arch.Namespace("Web.*"));
+        });
 
         result.ShouldHaveFailedWithSubjects(["Legacy.Ledger"]);
         result.ShouldHaveWarnedStricterOnMembership("types in `Ghost.*`");
@@ -208,11 +164,8 @@ public sealed class MustBelongToVerbTests
     public void MustBelongTo_TypeofMembershipAbsentFromTheCode_IsSilent()
     {
         // A typeof the code does not declare holds nothing, and the compiler has already checked its name.
-        RuleResult result = Checker.Run(SceneModel, arch =>
-                arch.Rule("layering/typeof-membership")
-                    .Enforce(arch.Types.MustBelongTo(arch.Namespace("Domain.*"), arch.Type(typeof(Guid))))
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(SceneModel, arch => arch.Types
+            .MustBelongTo(arch.Namespace("Domain.*"), arch.Type(typeof(Guid))));
 
         result.ShouldHaveFailedWithSubjects(["Web.HomeController", "Legacy.Ledger"]);
         result.Warnings.ShouldBeEmpty();
@@ -227,7 +180,7 @@ public sealed class MustBelongToVerbTests
         // evidence it went stale.
         NarrowedUniverse universe = narrowing == "filter" ? Checker.FilterNarrowing : NarrowedUniverse.OneProject;
 
-        RuleResult result = Checker.Run(SceneModel, BaselineIndex.Empty, universe, arch =>
+        RuleResult result = Checker.Run(SceneModel, narrowing: universe, define: arch =>
                 arch.Rule("layering/absent-membership")
                     .Enforce(arch.Types.MustBelongTo(arch.Namespace("Domain.*"), arch.Namespace("Nowhere.*")))
                     .Because("b"))

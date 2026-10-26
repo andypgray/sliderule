@@ -64,41 +64,41 @@ public sealed class BaselineCommandE2ETests
         CliResult init = await CliRunner.InvokeAsync(
             "baseline", "init", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll);
 
-        init.ShouldSucceed("wrote");
+        init.ShouldSucceed(
+            "wrote",
+            // The survey ends by naming every failing Enforce rule, after the per-file lines, so a first init
+            // explains why check will stay red.
+            "failing with no baseline to capture",
+            "layering/domain-independent",
+            "naming/nonexistent",
+            "exceptions/domain-throws-domain",
+            "async/accept-cancellation",
+            "exceptions/no-unfiltered-catch",
+            "exceptions/no-swallowed-catch",
+            "exceptions/no-bare-bcl-throw");
         // init grandfathers the current state: both controllers' DataTable sites.
         File.ReadAllText(file)
-            .NormalizedLines()
             .ShouldBe(BothPairsComposed());
         // init also grandfathers the quarantine containment rule into its explicit (uncommitted) baseline —
         // InvoiceController's two interior references into the quarantined billing scope.
         File.ReadAllText(workspace.PathOf("arch", "violated-quarantine-baseline.json"))
-            .NormalizedLines()
             .ShouldBe(ContainmentPairsComposed());
 
-        // The survey ends by naming every failing Enforce rule, after the per-file lines, so a first init
-        // explains why check will stay red.
-        init.Out.ShouldContain("failing with no baseline to capture");
-        init.Out.ShouldContain("layering/domain-independent");
-        init.Out.ShouldContain("naming/nonexistent");
-        init.Out.ShouldContain("exceptions/domain-throws-domain");
-        init.Out.ShouldContain("async/accept-cancellation");
-        init.Out.ShouldContain("exceptions/no-unfiltered-catch");
-        init.Out.ShouldContain("exceptions/no-swallowed-catch");
-        init.Out.ShouldContain("exceptions/no-bare-bcl-throw");
-        init.Out.IndexOf("wrote", StringComparison.Ordinal)
-            .ShouldBeLessThan(init.Out.IndexOf("failing with no baseline to capture", StringComparison.Ordinal));
+        init.Out.ShouldContainInOrder("wrote", "failing with no baseline to capture");
 
         // check now sees the Migrate rule fully grandfathered.
         CliResult check = await CliRunner.InvokeAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
-        check.Out.ShouldContain("\"grandfathered\": 2");
+        check.Out.ShouldHaveCaptured(InlineSqlRule, 2);
 
-        // A second init is a no-op: the rule is already captured, and the bytes do not change.
+        // A second init is a no-op: the rule is already captured, and the bytes do not change. Other captured
+        // rules print the same words for their own sections, so each fragment names its rule or its file.
         byte[] afterFirst = File.ReadAllBytes(file);
         CliResult init2 = await CliRunner.InvokeAsync(
             "baseline", "init", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll);
-        init2.Out.ShouldContain("already captured (2 entries)");
-        init2.Out.ShouldContain("unchanged");
+        init2.ShouldSucceed(
+            $"{InlineSqlRule}: already captured (2 entries) — unchanged.",
+            "unchanged arch/baselines/data-access/no-inline-sql.json");
         File.ReadAllBytes(file)
             .ShouldBe(afterFirst);
     }
@@ -114,16 +114,20 @@ public sealed class BaselineCommandE2ETests
         CliResult accept = await CliRunner.InvokeAsync(
             "baseline", "accept-reductions", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll);
 
-        accept.ShouldSucceed("accepted 1 reduction");
-        accept.Out.ShouldContain("refused 1 addition");
+        accept.ShouldSucceed(
+            $"{InlineSqlRule}: accepted 1 reduction.",
+            $"{InlineSqlRule}: refused 1 addition — a captured baseline grows only via 'sliderule baseline add', one attributed entry at a time.");
         // The Invoice entry is gone, and with it its seal; the section renders as an empty array.
         File.ReadAllText(workspace.PathOf(ConventionalFile))
-            .NormalizedLines()
             .ShouldBe(EmptySectionComposed());
 
-        // The ratchet never gated: HomeController is still red, so check still fails.
-        CliResult check = await CliRunner.InvokeAsync("check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll);
+        // The ratchet never gated: HomeController is still red under this rule. The exit code alone cannot say
+        // so, because the spec's Enforce rules fail the check whatever the ratchet does.
+        CliResult check = await CliRunner.InvokeAsync(
+            "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
         check.ShouldReportViolations();
+        check.Out.ShouldHaveSingleViolationOnEdge(
+            InlineSqlRule, "reference", "MyApp.Web.HomeController", "System.Data.DataTable");
     }
 
     [Fact]
@@ -202,7 +206,6 @@ public sealed class BaselineCommandE2ETests
             "wrote arch/baselines/data-access/no-inline-sql.json",
             "deleted arch/baselines/data-access/inline-sql.json");
         File.ReadAllText(workspace.PathOf(ConventionalFile))
-            .NormalizedLines()
             .ShouldBe(committed);
         File.Exists(workspace.PathOf(OrphanFile)).ShouldBeFalse();
 
@@ -222,12 +225,11 @@ public sealed class BaselineCommandE2ETests
         CliResult json = await CliRunner.InvokeAsync(
             "status", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
 
-        human.Out.NormalizedLines()
-            .ShouldContain("\n" + OrphanLine + "\n", human.Transcript());
+        human.ShouldSucceed("\n" + OrphanLine + "\n");
         using JsonDocument document = json.ShouldHaveJsonStdout();
         JsonElement orphan = document.RootElement.GetProperty("orphans")
             .EnumerateArray()
-            .Single();
+            .ShouldHaveSingleItem();
         orphan.ShouldSatisfyAllConditions(
             () => orphan.GetProperty("ruleId")
                 .GetString()
@@ -253,8 +255,7 @@ public sealed class BaselineCommandE2ETests
 
         // A nudge, not a refusal: init still captures the renamed rule afresh.
         init.ShouldSucceed(OrphanLine, "data-access/no-inline-sql: captured 2 grandfathered violations.");
-        init.Out.IndexOf(OrphanLine, StringComparison.Ordinal)
-            .ShouldBeLessThan(init.Out.IndexOf("captured", StringComparison.Ordinal), init.Transcript());
+        init.Out.ShouldContainInOrder(OrphanLine, "captured", customMessage: init.Transcript());
     }
 
     [Fact]
@@ -288,8 +289,7 @@ public sealed class BaselineCommandE2ETests
             .EnumerateArray()
             .Select(warning => warning.GetProperty("kind")
                 .GetString())
-            .Count(kind => kind == "orphanedBaseline")
-            .ShouldBe(1, json.Transcript());
+            .ShouldContain(kind => kind == "orphanedBaseline", expectedCount: 1, customMessage: json.Transcript());
     }
 
     // Both controllers declare the DataTable twice — as a return type and as a construction, on two lines —
@@ -326,8 +326,7 @@ public sealed class BaselineCommandE2ETests
     private static string ConstructOrphan(TempFixtureWorkspace workspace)
     {
         string conventional = workspace.PathOf(ConventionalFile);
-        string committed = File.ReadAllText(conventional)
-            .NormalizedLines();
+        string committed = TextNormalization.ReadNormalizedLines(conventional);
         BaselineDocument document = BaselineStore.TryReadDocument(conventional)!;
         IReadOnlyList<BaselineEntry> entries = document.Sections[InlineSqlRule];
 

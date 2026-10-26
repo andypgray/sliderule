@@ -47,8 +47,7 @@ public sealed class GlobalCallToolFilterTests
             cancellationToken: Ct);
 
         // Assert — surfaced as an error result with the exact message, and the filter stayed silent.
-        result.IsError.ShouldBe(true);
-        string text = result.ShouldHaveTextContent();
+        string text = result.ShouldHaveRefused();
         text.ShouldStartWith("Unknown rule ID 'nope/nope'.");
         // A bound server pays nothing for the unbound path: no recovery advice, because there is nothing
         // here to recover from.
@@ -71,8 +70,7 @@ public sealed class GlobalCallToolFilterTests
             cancellationToken: Ct);
 
         // Assert — the user-error path, which logs nothing, rather than the unexpected-fault path, which warns.
-        result.IsError.ShouldBe(true);
-        result.ShouldHaveTextContent()
+        result.ShouldHaveRefused()
             .ShouldBe(NoConstructorSpec.Refusal);
         harness.Logs.Warnings.ShouldBeEmpty();
     }
@@ -95,8 +93,7 @@ public sealed class GlobalCallToolFilterTests
 
         // Assert — the shape named, and no roster. A refusal that lists every other ID beside the one inside the
         // caller's own brackets reads as self-contradictory.
-        result.IsError.ShouldBe(true);
-        string text = result.ShouldHaveTextContent();
+        string text = result.ShouldHaveRefused();
         text.ShouldStartWith(
             "Unknown rule ID '[\"layering/domain-independent\"]'. That is a JSON array written as text; "
             + "pass one rule ID: 'layering/domain-independent'.");
@@ -123,8 +120,7 @@ public sealed class GlobalCallToolFilterTests
 
         // Assert — the error still leads with what went wrong, and closes with what the reader can do about
         // it. ShouldEndWith is the placement pin: appended, never interleaved, never ahead of the reason.
-        result.IsError.ShouldBe(true);
-        string text = result.ShouldHaveTextContent();
+        string text = result.ShouldHaveRefused();
         text.ShouldStartWith("Unknown rule ID 'nope/nope'.");
         text.ShouldEndWith(ServerInstructions.UnboundCallCoda);
         harness.Logs.Warnings.ShouldBeEmpty();
@@ -148,8 +144,7 @@ public sealed class GlobalCallToolFilterTests
             cancellationToken: Ct);
 
         // Assert
-        result.IsError.ShouldBe(true);
-        string text = result.ShouldHaveTextContent();
+        string text = result.ShouldHaveRefused();
         text.ShouldContain("\"rule\"");
         text.ShouldEndWith(ServerInstructions.UnboundCallCoda);
         harness.Logs.Warnings.ShouldBeEmpty();
@@ -161,8 +156,7 @@ public sealed class GlobalCallToolFilterTests
         // Arrange — a garbage .dll spec throws BadImageFormatException on load: not a user error. A file with
         // a .dll name but non-PE bytes is what SpecResolver's fast path finds, and what the ALC then rejects.
         using TempDirectory temp = TestTempRoot.Fresh("garbage-spec");
-        string garbageDll = temp.PathOf("not-really.dll");
-        File.WriteAllText(garbageDll, "this is not a portable executable");
+        string garbageDll = temp.WriteFile(["not-really.dll"], "this is not a portable executable");
 
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
             McpServerBindings.For(CliRunner.MyAppSolution, garbageDll), Ct);
@@ -174,7 +168,7 @@ public sealed class GlobalCallToolFilterTests
             cancellationToken: Ct);
 
         // Assert — surfaced as an error, and logged exactly once as a warning that names the tool.
-        result.IsError.ShouldBe(true);
+        result.ShouldHaveRefused();
         LogEntry warning = harness.Logs.Warnings.ShouldHaveSingleItem();
         warning.Message.ShouldContain("arch_explain");
     }
@@ -194,8 +188,7 @@ public sealed class GlobalCallToolFilterTests
             cancellationToken: Ct);
 
         // Assert — a successful result, truncated, unlogged.
-        result.IsError.ShouldNotBe(true);
-        result.ShouldHaveTextContent()
+        result.ShouldHaveAnswered()
             .ShouldContain("--- RESPONSE TRUNCATED ---");
         harness.Logs.Warnings.ShouldBeEmpty();
     }
@@ -217,8 +210,7 @@ public sealed class GlobalCallToolFilterTests
 
         // Assert — the hint travels the whole pipeline, keyed on the tool name the filter passes through, and
         // points at scope rather than back down a ladder this survey has already reached the bottom of.
-        result.IsError.ShouldNotBe(true);
-        string text = result.ShouldHaveTextContent();
+        string text = result.ShouldHaveAnswered();
         text.ShouldContain("--- RESPONSE TRUNCATED ---");
         text.ShouldContain("Narrow the subject");
         text.ShouldContain("sliderule graph --projects <globs> --json");
@@ -243,8 +235,7 @@ public sealed class GlobalCallToolFilterTests
             cancellationToken: Ct);
 
         // Assert — the coercer's actionable message surfaces as an error, unlogged.
-        result.IsError.ShouldBe(true);
-        result.ShouldHaveTextContent()
+        result.ShouldHaveRefused()
             .ShouldContain("Expected true or false");
         harness.Logs.Warnings.ShouldBeEmpty();
     }
@@ -264,8 +255,7 @@ public sealed class GlobalCallToolFilterTests
             cancellationToken: Ct);
 
         // Assert — the guard names the key and the spelling that binds, ahead of the binder.
-        result.IsError.ShouldBe(true);
-        result.ShouldHaveTextContent()
+        result.ShouldHaveRefused()
             .ShouldBe("Unknown parameter \"Path\" on \"arch_context\". Valid: path.");
         harness.Logs.Warnings.ShouldBeEmpty();
     }
@@ -285,8 +275,7 @@ public sealed class GlobalCallToolFilterTests
             cancellationToken: Ct);
 
         // Assert
-        result.IsError.ShouldBe(true);
-        result.ShouldHaveTextContent()
+        result.ShouldHaveRefused()
             .ShouldStartWith("Unknown parameter \"Grain\" on \"arch_graph\". Valid: ");
         harness.Logs.Warnings.ShouldBeEmpty();
     }

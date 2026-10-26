@@ -53,6 +53,10 @@ public sealed class MigrateRatchetTests
     // The one forbidden edge every controller fixture carries, as the baseline keys it.
     private static readonly BaselineEntry OldControllerToDb = BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db");
 
+    // An edge from a controller no fixture declares, so no run's violations match it.
+    private static readonly BaselineEntry GhostControllerToDb =
+        BaselineEntry.ForEdge("T:App.Web.GhostController", "T:App.Data.Db");
+
     private static readonly CodebaseModel ThreeCatchHandlerModel = CompilationFactory.Extract(ThreeCatchHandler);
 
     // The one forbidden edge again, this time as a model carrying it with no site at all — the state a
@@ -118,7 +122,7 @@ public sealed class MigrateRatchetTests
 
         result.ShouldHaveFailed();
         result.Violations.ShouldHaveSingleItem();
-        result.Grandfathered.ShouldBeEmpty();
+        result.ShouldHaveGrandfathered(0);
         result.BaselineCaptured.ShouldBeTrue();
     }
 
@@ -345,7 +349,7 @@ public sealed class MigrateRatchetTests
         BaselineIndex index = Checker.Baselines(
             "data/x",
             OldControllerToDb,
-            BaselineEntry.ForEdge("T:App.Web.GhostController", "T:App.Data.Db"));
+            GhostControllerToDb);
 
         RuleResult result = Checker.Run(Sources.OneControllerModel, index, Sources.NoDataAccess)
             .Single();
@@ -380,7 +384,7 @@ public sealed class MigrateRatchetTests
 
         result.ShouldHavePassed();
         result.BaselineCaptured.ShouldBeTrue();
-        result.Grandfathered.ShouldBeEmpty();
+        result.ShouldHaveGrandfathered(0);
         result.ShouldHaveStale(0);
     }
 
@@ -395,10 +399,11 @@ public sealed class MigrateRatchetTests
         BaselineIndex index = Checker.Baselines(
             "data/x",
             OldControllerToDb,
-            BaselineEntry.ForEdge("T:App.Web.GhostController", "T:App.Data.Db"));
+            GhostControllerToDb);
 
         RuleResult result = Checker.Run(
-                "namespace App { public class X {} }", index, Checker.FilterNarrowing, NoDataAccessFromNowhere)
+                "namespace App { public class X {} }", NoDataAccessFromNowhere,
+                baselines: index, narrowing: Checker.FilterNarrowing)
             .Single();
 
         result.ShouldHaveSkipped(Checker.FilterSkipReason);
@@ -416,9 +421,7 @@ public sealed class MigrateRatchetTests
                     .Because("b"))
             .Single();
 
-        result.ShouldHaveFailed();
-        result.Violations.ShouldHaveSingleItem()
-            .Kind.ShouldBe(ViolationKind.RuleError);
+        result.ShouldHaveFailedWithSingle(ViolationKind.RuleError);
     }
 
     [Fact]
@@ -447,7 +450,7 @@ public sealed class MigrateRatchetTests
         BaselineIndex index = Checker.Baselines(
             "data/x",
             OldControllerToDb,
-            BaselineEntry.ForEdge("T:App.Web.GhostController", "T:App.Data.Db"));
+            GhostControllerToDb);
 
         RuleResult result = Checker.Run("namespace App.Web { public class HomeController {} }", index, arch =>
                 arch.Rule("data/x")
@@ -479,9 +482,7 @@ public sealed class MigrateRatchetTests
                     .Because("b"))
             .Single();
 
-        result.ShouldHaveFailed();
-        result.Violations.ShouldHaveSingleItem()
-            .Kind.ShouldBe(ViolationKind.EmptySubject);
+        result.ShouldHaveFailedWithSingle(ViolationKind.EmptySubject);
         result.ShouldHaveStale(1);
         result.SelectionMatchedNothing.ShouldBeTrue();
     }
@@ -505,7 +506,7 @@ public sealed class MigrateRatchetTests
         // could have matched would go unmatched in exactly the same way, and nothing on the result tells the
         // two apart. So the rule is not measured in full although its selection did match something, and the
         // report moves the unmatched entry out of the fixed total rather than offering it for acceptance.
-        BaselineIndex index = Checker.Baselines("data/x", BaselineEntry.ForEdge("T:App.Web.GhostController", "T:App.Data.Db"));
+        BaselineIndex index = Checker.Baselines("data/x", GhostControllerToDb);
 
         CheckReport report = Checker.Run(Sources.CleanWebBesideDataModel, index, Sources.PartlyInertDataAccess);
         RuleResult result = report.Single();
@@ -528,7 +529,7 @@ public sealed class MigrateRatchetTests
         // A dead allowed pattern only adds violations, so it cannot be why the ghost pair's entry went unmatched:
         // the entry is fixed debt and the report counts it so, while the rule as a whole stays unmeasured as
         // written and is never offered for promotion.
-        BaselineIndex index = Checker.Baselines("data/x", BaselineEntry.ForEdge("T:App.Web.GhostController", "T:App.Data.Db"));
+        BaselineIndex index = Checker.Baselines("data/x", GhostControllerToDb);
 
         CheckReport report = Checker.Run(Sources.CleanWebBesideDataModel, index, Sources.StricterDataAccess);
         RuleResult result = report.Single();
@@ -653,7 +654,8 @@ public sealed class MigrateRatchetTests
 
         result.ShouldHaveFailed();
         result.ShouldHaveOrphanWarnings("data/old-x");
-        result.Warnings.Single(warning => warning.Kind == CheckWarningKind.OrphanedBaseline)
+        result.Warnings.ShouldHaveSingle(
+                warning => warning.Kind == CheckWarningKind.OrphanedBaseline, warning => $"{warning.Kind}: {warning.Message}")
             .Hint.ShouldBe(
                 "If this rule was renamed from 'data/old-x', run 'sliderule baseline rename --from data/old-x "
                 + "--to data/x' to keep its entries.");
@@ -672,6 +674,6 @@ public sealed class MigrateRatchetTests
             .Single();
 
         result.ShouldHaveFailed();
-        result.Grandfathered.ShouldBeEmpty();
+        result.ShouldHaveGrandfathered(0);
     }
 }

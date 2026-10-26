@@ -38,7 +38,7 @@ public sealed class SolutionDiscoveryTests : IDisposable
 
     private string CreateDir(params string[] segments)
     {
-        string dir = Path.Combine([_temp.Path, .. segments]);
+        string dir = _temp.PathOf(segments);
         Directory.CreateDirectory(dir);
         return dir;
     }

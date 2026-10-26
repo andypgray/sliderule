@@ -68,9 +68,7 @@ public sealed class StrictJsonTests
 
         // The three position members are one point stated three ways, and a caller that slices the text
         // by Offset must land on the character the sentence points at.
-        error.Position.Line.ShouldBe(1);
-        error.Position.Column.ShouldBe(9);
-        error.Position.Offset.ShouldBe(8);
+        Coordinates(error.Position).ShouldBe((1, 9, 8));
     }
 
     [Fact]
@@ -189,15 +187,9 @@ public sealed class StrictJsonTests
         StrictJsonValue value = ShouldRead("{\"id\":1,\"name\":\"x\",\"on\":true}");
 
         value.ValueKind.ShouldBe(StrictJsonKind.Object);
-        string[] names = value.EnumerateObject()
-            .Select(member => member.Name)
-            .ToArray();
-        StrictJsonKind[] kinds = value.EnumerateObject()
-            .Select(member => member.Value.ValueKind)
-            .ToArray();
-
-        names.ShouldBe(["id", "name", "on"]);
-        kinds.ShouldBe([StrictJsonKind.Number, StrictJsonKind.String, StrictJsonKind.True]);
+        value.EnumerateObject()
+            .Select(member => (member.Name, member.Value.ValueKind))
+            .ShouldBe([("id", StrictJsonKind.Number), ("name", StrictJsonKind.String), ("on", StrictJsonKind.True)]);
     }
 
     [Fact]
@@ -233,7 +225,7 @@ public sealed class StrictJsonTests
 
         int[] ids = value.EnumerateArray()
             .Select(element => element.GetProperty("id"))
-            .Select(ReadInt32)
+            .Select(ShouldReadInt32)
             .ToArray();
 
         ids.ShouldBe([1, 2]);
@@ -245,7 +237,7 @@ public sealed class StrictJsonTests
         StrictJsonValue value = ShouldRead("[3,1,2]");
 
         int[] elements = value.EnumerateArray()
-            .Select(ReadInt32)
+            .Select(ShouldReadInt32)
             .ToArray();
 
         elements.ShouldBe([3, 1, 2]);
@@ -274,7 +266,7 @@ public sealed class StrictJsonTests
 
         int[] elements = value.GetProperty("a")
             .EnumerateArray()
-            .Select(ReadInt32)
+            .Select(ShouldReadInt32)
             .ToArray();
 
         elements.ShouldBe([1, 2]);
@@ -286,20 +278,14 @@ public sealed class StrictJsonTests
         StrictJsonValue value = ShouldRead("{\n  \"a\": [1, \"x\"]\n}");
 
         StrictJsonProperty member = value.EnumerateObject().Single();
-        member.Position.Line.ShouldBe(2);
-        member.Position.Column.ShouldBe(3);
-        member.Position.Offset.ShouldBe(4);
+        Coordinates(member.Position).ShouldBe((2, 3, 4));
 
         // The member's own position is its name's opening quote; its value's is the bracket.
-        member.Value.Position.Line.ShouldBe(2);
-        member.Value.Position.Column.ShouldBe(8);
-        member.Value.Position.Offset.ShouldBe(9);
+        Coordinates(member.Value.Position).ShouldBe((2, 8, 9));
 
         // An offset counts from the start of the text where a column restarts on every line.
         StrictJsonValue element = member.Value.EnumerateArray().Last();
-        element.Position.Line.ShouldBe(2);
-        element.Position.Column.ShouldBe(12);
-        element.Position.Offset.ShouldBe(13);
+        Coordinates(element.Position).ShouldBe((2, 12, 13));
     }
 
     [Fact]
@@ -334,10 +320,16 @@ public sealed class StrictJsonTests
         }
     }
 
-    private static int ReadInt32(StrictJsonValue value)
+    private static int ShouldReadInt32(StrictJsonValue value)
     {
         value.TryGetInt32(out int read).ShouldBeTrue();
         return read;
+    }
+
+    // A position's three members as one value, so a red shows all three; JsonPosition has no ToString.
+    private static (int Line, int Column, int Offset) Coordinates(JsonPosition position)
+    {
+        return (position.Line, position.Column, position.Offset);
     }
 
     private static StrictJsonValue ShouldRead(string text)

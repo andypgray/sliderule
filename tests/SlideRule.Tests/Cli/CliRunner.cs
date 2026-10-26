@@ -1,11 +1,14 @@
 using System.CommandLine;
+using System.Reflection;
 using System.Runtime.CompilerServices;
+using Shouldly;
 using SlideRule.Cli;
 using SlideRule.Cli.Mcp.Infrastructure;
 using SlideRule.Cli.Pipeline;
 using SlideRule.Cli.Replay;
 using SlideRule.Roslyn;
 using SlideRule.Tests.TestSupport;
+using Xunit;
 
 namespace SlideRule.Tests.Cli;
 
@@ -80,6 +83,19 @@ internal static class CliRunner
     /// <summary>The net10 spec whose <c>Define()</c> anchors a type from a .NET shared framework.</summary>
     public static string SharedFrameworkSpecDll => FixtureBeds.BakedPath("SharedFrameworkSpecPath");
 
+    /// <summary>
+    ///     Asserts this test host cannot load the ASP.NET Core assembly the anchor in
+    ///     <see cref="SharedFrameworkSpecDll" /> names: on a host that can, the anchor resolves through the default
+    ///     context and the fixture reproduces nothing.
+    /// </summary>
+    public static void ShouldNotLoadTheSharedFrameworkAnchor()
+    {
+        Should.Throw<FileNotFoundException>(
+            () => Assembly.Load(new AssemblyName("Microsoft.AspNetCore.Mvc.Core")),
+            "This test host can load Microsoft.AspNetCore.Mvc.Core itself, so the fixture's anchor would "
+            + "resolve through the default context and could not reproduce the failure it exists for.");
+    }
+
     /// <summary>The net48 spec DLL, built at the C# 7.3 default.</summary>
     public static string LegacySpecDll => FixtureBeds.BakedPath("LegacySpecPath");
 
@@ -94,7 +110,22 @@ internal static class CliRunner
 
     /// <summary>The non-SDK-style .NET Framework fixture solution, copied to the test output as content.</summary>
     public static string ClassicAppSolution =>
-        Path.Combine(AppContext.BaseDirectory, "Fixtures", "LegacySolutions", "ClassicApp", "ClassicApp.sln");
+        Path.Combine(FixtureBeds.FixturesRoot, "LegacySolutions", "ClassicApp", "ClassicApp.sln");
+
+    /// <summary>
+    ///     Skips the running test on a host that cannot load the bed at <paramref name="solution" />: the ClassicApp
+    ///     bed's non-SDK-style project loads only through the .NET Framework build host, which needs Windows. Every
+    ///     other bed loads on any host.
+    /// </summary>
+    public static void SkipUnlessLoadable(string solution)
+    {
+        if (!string.Equals(solution, ClassicAppSolution, StringComparison.Ordinal)) return;
+
+        Assert.SkipUnless(
+            OperatingSystem.IsWindows(),
+            "The ClassicApp bed's non-SDK-style .NET Framework project loads through the net472 build host, "
+            + "which needs Windows.");
+    }
 
     /// <summary>
     ///     Every fixture spec that governs a bed of its own: the name its model file records, its DLL, and the

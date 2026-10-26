@@ -2,10 +2,12 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Text.RegularExpressions;
 using Shouldly;
+using SlideRule.Hosting;
 using SlideRule.ModelFile;
 using SlideRule.Roslyn.Hosting;
 using SlideRule.Tests.Analyzers.Parity;
 using SlideRule.Tests.Cli;
+using SlideRule.Tests.ModelFile;
 using SlideRule.Tests.TestSupport;
 using Xunit;
 
@@ -105,8 +107,8 @@ public sealed class BuildTierDemoE2ETests
         // Arrange
         using var workspace = new TempFixtureWorkspace(restore: false);
         string root = workspace.PathOf();
-        ParitySubject subject = await ParityHarness.ForSolutionAsync(
-            SpecName, CliRunner.ViolatedSpecDll, CliRunner.MyAppSolution, Ct);
+        ArchitectureModel model = ModelFileCorpus.ModelOf(SpecName);
+        ParitySubject subject = await ParityHarness.ForSolutionAsync(SpecName, model, CliRunner.MyAppSolution, Ct);
         File.WriteAllText(Path.Combine(root, ModelDocument.FileName), subject.ModelText);
         AttachTheAnalyzer(root, AppContext.BaseDirectory);
 

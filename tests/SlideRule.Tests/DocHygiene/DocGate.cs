@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using SlideRule.Tests.TestSupport;
 
 namespace SlideRule.Tests.DocHygiene;
 
@@ -31,7 +32,9 @@ namespace SlideRule.Tests.DocHygiene;
 ///     </para>
 /// </remarks>
 /// <param name="registeredDocs">The docs the gate holds, in registration order — how the emptiness failure lists them.</param>
-/// <param name="scan">Lifts every quote of this gate's shape out of one doc, named by its repo-relative path.</param>
+/// <param name="scan">
+///     Lifts every quote of this gate's shape out of one doc, given its repo-relative path and its committed text.
+/// </param>
 /// <param name="quotes">The plural of what the scanner yields, as the emptiness header names it ("rule quotes").</param>
 /// <param name="docs">The doc-set noun in that same header, for a gate whose docs are a named kind ("anchor docs").</param>
 /// <param name="scanner">
@@ -40,7 +43,7 @@ namespace SlideRule.Tests.DocHygiene;
 /// </param>
 internal sealed class DocGate<TQuote>(
     IReadOnlyList<string> registeredDocs,
-    Func<string, IReadOnlyList<TQuote>> scan,
+    Func<string, string, IReadOnlyList<TQuote>> scan,
     string quotes,
     string docs = "docs",
     string scanner = "scanner")
@@ -48,12 +51,12 @@ internal sealed class DocGate<TQuote>(
     private readonly ConcurrentDictionary<string, IReadOnlyList<TQuote>> _scanned = new(StringComparer.Ordinal);
 
     /// <summary>
-    ///     Every quote the scanner lifts from <paramref name="doc" />, scanned once however many facts ask
-    ///     for it.
+    ///     Every quote the scanner lifts from <paramref name="doc" />'s committed text, read and scanned once
+    ///     however many facts ask for it.
     /// </summary>
     internal IReadOnlyList<TQuote> Scan(string doc)
     {
-        return _scanned.GetOrAdd(doc, scan);
+        return _scanned.GetOrAdd(doc, path => scan(path, RepoRoot.ReadText(path)));
     }
 
     /// <summary>

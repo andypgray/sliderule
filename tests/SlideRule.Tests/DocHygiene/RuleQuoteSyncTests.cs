@@ -23,6 +23,9 @@ namespace SlideRule.Tests.DocHygiene;
 /// </remarks>
 public sealed class RuleQuoteSyncTests
 {
+    /// <summary>The reader every card lookup below goes through, held for the class so each card is read once.</summary>
+    private static readonly Func<string, string?> ReadDiskText = RepoRoot.TextReader();
+
     /// <summary>The rule-quoting docs, each paired with the example root whose rendered bullets it quotes.</summary>
     private static readonly (string Doc, string ExampleRoot)[] QuoteDocs =
     [
@@ -67,7 +70,7 @@ public sealed class RuleQuoteSyncTests
     private static readonly DocGate<RuleQuote> Gate = new(
         QuoteDocs.Select(static entry => entry.Doc)
             .ToArray(),
-        ExtractDoc,
+        RuleQuotes.Extract,
         quotes: "rule quotes");
 
     [Fact]
@@ -160,14 +163,8 @@ public sealed class RuleQuoteSyncTests
         return NarrativeQuotes.Contains((quote.Doc, quote.RuleId, quote.Sentence));
     }
 
-    private static IReadOnlyList<RuleQuote> ExtractDoc(string doc)
-    {
-        string text = RepoRoot.ReadText(doc);
-        return RuleQuotes.Extract(doc, text);
-    }
-
     private static IReadOnlyDictionary<string, IReadOnlyList<string>> BulletsFor(string exampleRoot)
     {
-        return RuleQuotes.RenderedBullets(exampleRoot, TrackedFiles.All, RuleQuotes.DiskTextReader(RepoRoot.Directory));
+        return RuleQuotes.RenderedBullets(exampleRoot, TrackedFiles.All, ReadDiskText);
     }
 }

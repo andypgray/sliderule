@@ -1,5 +1,3 @@
-using Shouldly;
-using SlideRule.Baselines;
 using SlideRule.Checking;
 using SlideRule.Codebase;
 using SlideRule.Tests.Checking.Targets;
@@ -37,7 +35,7 @@ public sealed class NarrowedUniverseSkipTests
         // The commonest shape by far: a whole layer's rule whose namespace lives in a project the filter
         // dropped. Red, it reads as "your spec names a namespace that does not exist" — for a namespace the
         // solution does have.
-        RuleResult result = Checker.Run(WebAndData, BaselineIndex.Empty, Checker.FilterNarrowing, arch =>
+        RuleResult result = Checker.Run(WebAndData, narrowing: Checker.FilterNarrowing, define: arch =>
                 arch.Rule("layering/x")
                     .Enforce(arch.Namespace("App.Nowhere.*").MustNotReference(arch.Namespace("App.Data.*")))
                     .Because("b"))
@@ -51,7 +49,7 @@ public sealed class NarrowedUniverseSkipTests
     {
         // The member gate dispatches before the type-subject one and speaks in member terms (GRAMMAR §4.6),
         // so it is its own empty-selection site and would otherwise red on its own message.
-        RuleResult result = Checker.Run(WebAndData, BaselineIndex.Empty, Checker.FilterNarrowing, arch =>
+        RuleResult result = Checker.Run(WebAndData, narrowing: Checker.FilterNarrowing, define: arch =>
                 arch.Rule("member/x")
                     .Enforce(arch.Namespace("App.Nowhere.*").Methods.MustBePublic())
                     .Because("b"))
@@ -66,7 +64,7 @@ public sealed class NarrowedUniverseSkipTests
         // The third site: the per-operand gate (GRAMMAR §4.1) fires for an operand that matched nothing even
         // when its siblings matched plenty, and returns only those. Under a filter a dropped project is
         // exactly what an empty operand looks like — which is why the run declines rather than accuses.
-        RuleResult result = Checker.Run(WebAndData, BaselineIndex.Empty, Checker.FilterNarrowing, arch =>
+        RuleResult result = Checker.Run(WebAndData, narrowing: Checker.FilterNarrowing, define: arch =>
                 arch.Rule("layering/x")
                     .Enforce(arch.AnyOf(arch.Namespace("App.Web.*"), arch.Namespace("App.Nowhere.*"))
                         .MustNotReference(arch.Namespace("App.Data.*")))
@@ -82,7 +80,7 @@ public sealed class NarrowedUniverseSkipTests
         // The fourth empty-selection site (GRAMMAR §4.10). A filter that dropped whole projects is exactly
         // what an empty PROJECT subject looks like — more directly than for any type subject — so the run
         // declines rather than accusing the spec of naming a project the solution does not have.
-        RuleResult result = Checker.Run(OneProject(), BaselineIndex.Empty, Checker.FilterNarrowing, arch =>
+        RuleResult result = Checker.Run(OneProject(), narrowing: Checker.FilterNarrowing, define: arch =>
                 arch.Rule("packaging/x")
                     .Enforce(arch.Projects.Named("App.Dropped").MustNotBePackable())
                     .Because("b"))
@@ -96,7 +94,7 @@ public sealed class NarrowedUniverseSkipTests
     {
         // The invariant the narrowed-universe skip is measured against: an unfiltered run must reach
         // byte-identical verdicts. Over the whole solution an empty subject is a spec defect and stays loud.
-        RuleResult result = Checker.Run(WebAndData, BaselineIndex.Empty, null, arch =>
+        RuleResult result = Checker.Run(WebAndData, arch =>
                 arch.Rule("layering/x")
                     .Enforce(arch.Namespace("App.Nowhere.*").MustNotReference(arch.Namespace("App.Data.*")))
                     .Because("b"))
@@ -110,7 +108,7 @@ public sealed class NarrowedUniverseSkipTests
     {
         // The predicate is "every violation is an empty subject", not "the run was narrowed". A finding over
         // types that did load is a finding, and a filter is no reason to hold it back.
-        RuleResult result = Checker.Run(WebAndData, BaselineIndex.Empty, Checker.FilterNarrowing, arch =>
+        RuleResult result = Checker.Run(WebAndData, narrowing: Checker.FilterNarrowing, define: arch =>
                 arch.Rule("layering/x")
                     .Enforce(arch.Namespace("App.Web.*").MustNotReference(arch.Namespace("App.Data.*")))
                     .Because("b"))
@@ -124,15 +122,13 @@ public sealed class NarrowedUniverseSkipTests
     {
         // The other never-baselinable violation, and the one kind deliberately outside the skip: a rule that
         // could not be evaluated is broken whatever the universe, and a filter must not quieten it.
-        RuleResult result = Checker.Run(Sources.HierarchyModel, BaselineIndex.Empty, Checker.FilterNarrowing, arch =>
+        RuleResult result = Checker.Run(Sources.HierarchyModel, narrowing: Checker.FilterNarrowing, define: arch =>
                 arch.Rule("layering/x")
                     .Enforce(arch.Types.MustNotReference(typeof(IHandler<Order>)))
                     .Because("b"))
             .Single();
 
-        result.ShouldHaveFailed();
-        result.Violations.ShouldHaveSingleItem()
-            .Kind.ShouldBe(ViolationKind.RuleError);
+        result.ShouldHaveFailedWithSingle(ViolationKind.RuleError);
     }
 
     // A solution the filter left one project of — so a rule naming any other project reaches nothing, which

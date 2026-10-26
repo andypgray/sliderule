@@ -31,7 +31,7 @@ public sealed class SequenceOverloadBindingTests
     [MemberData(nameof(BothVersions))]
     public void OneProjectName_StaysOnTheParamsForm(LanguageVersion version)
     {
-        BoundOverload(version, "Named", "arch.Projects.Named(\"A\");")
+        ShouldBindOverload(version, "Named", "arch.Projects.Named(\"A\");")
             .ShouldBe("ProjectSelectionAdjectives.Named(ProjectSelection, string, params string[])");
     }
 
@@ -39,7 +39,7 @@ public sealed class SequenceOverloadBindingTests
     [MemberData(nameof(BothVersions))]
     public void OneMemberName_StaysOnTheParamsForm(LanguageVersion version)
     {
-        BoundOverload(version, "Named", "arch.Types.Methods.Named(\"Main\");")
+        ShouldBindOverload(version, "Named", "arch.Types.Methods.Named(\"Main\");")
             .ShouldBe("MemberSelectionAdjectives.Named(TSelf, string, params string[])");
     }
 
@@ -47,7 +47,7 @@ public sealed class SequenceOverloadBindingTests
     [MemberData(nameof(BothVersions))]
     public void ALayerArray_BindsTheSelectionSequenceForm(LanguageVersion version)
     {
-        BoundOverload(
+        ShouldBindOverload(
                 version, "AnyOf",
                 "Layer[] layers = { arch.Layer(\"A\", \"MyApp.A.*\"), arch.Layer(\"B\", \"MyApp.B.*\") };",
                 "arch.AnyOf(layers);")
@@ -58,7 +58,7 @@ public sealed class SequenceOverloadBindingTests
     [MemberData(nameof(BothVersions))]
     public void AMemberArray_BindsTheMemberSequenceForm(LanguageVersion version)
     {
-        BoundOverload(
+        ShouldBindOverload(
                 version, "MustNotUse",
                 "Member[] members = { arch.Member(typeof(DateTime), \"Now\") };",
                 "arch.Types.MustNotUse(members);")
@@ -69,7 +69,7 @@ public sealed class SequenceOverloadBindingTests
     [MemberData(nameof(BothVersions))]
     public void AMemberLambda_KeepsTheExpressionForm(LanguageVersion version)
     {
-        BoundOverload(version, "MustNotUse", "arch.Types.MustNotUse(() => DateTime.Now);")
+        ShouldBindOverload(version, "MustNotUse", "arch.Types.MustNotUse(() => DateTime.Now);")
             .ShouldBe(
                 "SelectionConstraints.MustNotUse(Selection, Expression<Func<object>>, params Expression<Func<object>>[])");
     }
@@ -78,7 +78,7 @@ public sealed class SequenceOverloadBindingTests
     [MemberData(nameof(BothVersions))]
     public void AMethodSelectionList_BindsTheMemberSelectionSequenceFormWithoutACast(LanguageVersion version)
     {
-        BoundOverload(
+        ShouldBindOverload(
                 version, "Except",
                 "List<MethodSelection> exemptions = new List<MethodSelection> { arch.Types.Named(\"Program\").Methods };",
                 "arch.Types.Methods.Except(exemptions);")
@@ -99,24 +99,27 @@ public sealed class SequenceOverloadBindingTests
     public void AnEmptyCollectionExpressionOfProjectNames_BindsTheSequenceForm()
     {
         // The params form needs a string first, which a collection expression cannot be, so only one form applies.
-        BoundOverload(LanguageVersion.CSharp14, "Named", "arch.Projects.Named([]);")
+        ShouldBindOverload(LanguageVersion.CSharp14, "Named", "arch.Projects.Named([]);")
             .ShouldBe("ProjectSelectionAdjectives.Named(ProjectSelection, IEnumerable<string>)");
     }
 
     // The overload the last call to `method` in the statements bound, spelled by its declaring type, name and
     // parameter types; an extension method is spelled as declared, with its receiver as the first parameter.
-    private static string BoundOverload(LanguageVersion version, string method, params string[] statements)
+    private static string ShouldBindOverload(LanguageVersion version, string method, params string[] statements)
     {
         (CSharpCompilation compilation, SyntaxTree tree) = Compile(version, statements);
         compilation.GetDiagnostics(Ct)
             .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
             .ShouldBeEmpty();
 
-        InvocationExpressionSyntax call = tree.GetRoot(Ct)
+        List<InvocationExpressionSyntax> calls = tree.GetRoot(Ct)
             .DescendantNodes()
             .OfType<InvocationExpressionSyntax>()
-            .Last(invocation => invocation.Expression is MemberAccessExpressionSyntax access
-                                && access.Name.Identifier.Text == method);
+            .Where(invocation => invocation.Expression is MemberAccessExpressionSyntax access
+                                 && access.Name.Identifier.Text == method)
+            .ToList();
+        calls.ShouldNotBeEmpty($"The statements make no call to {method}: {string.Join(" ", statements)}");
+        InvocationExpressionSyntax call = calls[^1];
         var bound = (IMethodSymbol)compilation.GetSemanticModel(tree)
             .GetSymbolInfo(call, Ct)
             .Symbol!;

@@ -26,7 +26,7 @@ public sealed class HierarchyConstructionTests
 
         TypeConstruction handler = model.Type("N.MyHandler")
             .AllInterfaces
-            .Single(c => c.Definition.FullName == "N.IHandler<T>");
+            .ShouldHaveSingle(c => c.Definition.FullName == "N.IHandler<T>", c => c.FullName);
         handler.FullName.ShouldBe("N.IHandler<N.Order>");
     }
 
@@ -55,7 +55,7 @@ public sealed class HierarchyConstructionTests
                                                          """);
 
         TypeConstruction handler = model.Type("N.IntHandler")
-            .AllInterfaces.Single();
+            .AllInterfaces.ShouldHaveSingleItem();
         handler.Definition.FullName.ShouldBe("N.IHandler<T>");
         handler.FullName.ShouldBe("N.IHandler<System.Int32>");
     }
@@ -138,7 +138,7 @@ public sealed class HierarchyConstructionTests
                                                          """);
 
         TypeConstruction tag = model.Type("N.C")
-            .AttributeConstructions.Single();
+            .AttributeConstructions.ShouldHaveSingleItem();
         tag.Definition.FullName.ShouldBe("N.TagAttribute<T>");
         tag.FullName.ShouldBe("N.TagAttribute<System.Int32>");
     }

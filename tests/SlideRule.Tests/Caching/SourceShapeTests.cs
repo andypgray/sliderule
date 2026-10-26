@@ -277,6 +277,7 @@ public sealed class SourceShapeTests
         SourceShape after = ShapeOf(mention);
 
         // Assert
+        mention.ShouldNotBe(OneLineBody, customMessage: "the edit must change the text");
         after.Hash.ShouldBe(before.Hash);
     }
 

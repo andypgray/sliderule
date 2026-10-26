@@ -14,7 +14,7 @@ public sealed class ProcessFileFootprintTests
     [Fact]
     public void PathsUnder_TheTestAssemblyDirectory_ReportsMappedImages()
     {
-        Assert.SkipUnless(ProcessFileFootprint.IsSupported, "The footprint scan is Windows-x64 only.");
+        ProcessFileFootprint.SkipUnlessSupported();
 
         using var self = Process.GetCurrentProcess();
 
@@ -32,7 +32,7 @@ public sealed class ProcessFileFootprintTests
     [Fact]
     public void PathsUnder_AnOpenFileStream_ReportsItAndStopsOnceClosed()
     {
-        Assert.SkipUnless(ProcessFileFootprint.IsSupported, "The footprint scan is Windows-x64 only.");
+        ProcessFileFootprint.SkipUnlessSupported();
 
         string probeRoot = TestTempRoot.For("footprint-probe");
         string probeFile = Path.Combine(probeRoot, "held.txt");

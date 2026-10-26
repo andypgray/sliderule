@@ -1,5 +1,4 @@
 using Shouldly;
-using SlideRule.Baselines;
 using SlideRule.Checking;
 using SlideRule.Codebase;
 using SlideRule.Tests.Extraction;
@@ -79,7 +78,7 @@ public sealed class UnderAdjectiveTests
     public void Under_OnATarget_ReachesTheTypesDeclaredThere()
     {
         // The target side reads the same way: Writer reaches into Internal, and nothing else does.
-        RuleResult result = Checker.Run(Sources.FolderModel, Sources.FolderRoot, arch =>
+        RuleResult result = Checker.Run(Sources.FolderModel, root: Sources.FolderRoot, define: arch =>
                 arch.Rule("console/internal")
                     .Enforce(arch.Types.Under("src").MustNotReference(arch.Types.Under("src/Console/Internal")))
                     .Because("b"))
@@ -93,7 +92,7 @@ public sealed class UnderAdjectiveTests
     {
         // Writer reaches Ansi and the framework's StringBuilder; a ban over every path reds the first alone,
         // because a type the solution does not declare has no file in it.
-        RuleResult result = Checker.Run(Sources.FolderModel, Sources.FolderRoot, arch =>
+        RuleResult result = Checker.Run(Sources.FolderModel, root: Sources.FolderRoot, define: arch =>
                 arch.Rule("console/self-contained")
                     .Enforce(arch.Types.Named("Writer").MustNotReference(arch.Types.Under("**")))
                     .Because("b"))
@@ -120,7 +119,7 @@ public sealed class UnderAdjectiveTests
     [Fact]
     public void Under_ARunOverOneProject_ReadsTheGlobAgainstTheRootItWasGiven()
     {
-        Checker.Run(Sources.FolderModel, BaselineIndex.Empty, NarrowedUniverse.OneProject, Sources.FolderRoot, arch =>
+        Checker.Run(Sources.FolderModel, narrowing: NarrowedUniverse.OneProject, root: Sources.FolderRoot, define: arch =>
                 arch.Rule("widgets/sealed")
                     .Enforce(arch.Types.Under("src/Widgets").MustBeSealed())
                     .Because("b"))

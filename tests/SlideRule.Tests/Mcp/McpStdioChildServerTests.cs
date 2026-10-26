@@ -31,7 +31,7 @@ namespace SlideRule.Tests.Mcp;
 ///     <para>
 ///         <see cref="McpChildServerRepoHandleTests" /> drives the same conversation over the same
 ///         plumbing, so the setups are near-identical, but every one of its facts opens with
-///         <c>Assert.SkipUnless(ProcessFileFootprint.IsSupported, …)</c>, and the footprint scan
+///         <c>ProcessFileFootprint.SkipUnlessSupported()</c>, and the footprint scan
 ///         is Windows-x64 only. CI runs ubuntu and macos legs too, and on those this is the only
 ///         real-child-over-real-stdio coverage there is. Deleting it would leave the stdin-inheritance
 ///         wedge unguarded on two of four legs.
@@ -39,9 +39,6 @@ namespace SlideRule.Tests.Mcp;
 /// </remarks>
 public sealed class McpStdioChildServerTests
 {
-    private const string CheckWithDiffBaseRequest =
-        """{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"arch_check","arguments":{"diffBase":"HEAD"}}}""";
-
     [Fact]
     public async Task ArchCheckWithDiffBase_OverRealStdio_ReturnsTheReport()
     {
@@ -57,7 +54,7 @@ public sealed class McpStdioChildServerTests
             repo.Root);
 
         ChildConversation conversation = await McpChildHarness.ConverseAsync(
-            startInfo, [("arch_check", 2, CheckWithDiffBaseRequest)]);
+            startInfo, [("arch_check", """{"diffBase":"HEAD"}""")]);
 
         conversation.Handshake.ShouldNotBeNull(
             $"the MCP server never answered `initialize` over real stdio.\nstderr:\n{conversation.Diagnostics}");

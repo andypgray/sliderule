@@ -141,7 +141,8 @@ public sealed class DeadSubjectNameTests
             .Single();
 
         result.ShouldHaveFailedWithEdgesIncluding(ViolationKind.Reference, "App.Domain.Service -> App.Web.Controller");
-        result.Violations.ShouldNotContain(violation => violation.Kind == ViolationKind.EmptySubject);
+        result.Violations.Select(violation => violation.Kind)
+            .ShouldNotContain(ViolationKind.EmptySubject);
     }
 
     [Fact]
@@ -164,7 +165,7 @@ public sealed class DeadSubjectNameTests
     {
         IncompleteModel partial = Checker.PartialModel;
 
-        RuleResult result = Checker.Run(Sources.LayeredModel, partial, arch =>
+        RuleResult result = Checker.Run(Sources.LayeredModel, incompleteModel: partial, define: arch =>
                 arch.Rule("naming/named")
                     .Enforce(arch.Types.Named("Service", "Ghost").MustBeSealed())
                     .Because("b"))

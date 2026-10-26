@@ -58,12 +58,11 @@ public sealed class GeneratedSubjectCheckE2ETests
     public async Task Check_ProjectSubjectSweepingGeneratedTypes_StatesBothNumbers()
     {
         // Arrange
-        using var fixture = new TempFixtureWorkspace("TestSolutions/RazorApp", "RazorApp.slnx");
         string specDll = SpecAssemblyCompiler.EmitSpecDllToFreshTemp("generated-subject", "ProjectSubject", ProjectSubjectSpec);
 
         // Act
         CliResult result = await CliRunner.InvokeAsync(
-            "check", fixture.SolutionPath, "--spec", specDll, "--json");
+            "check", FixtureBeds.RazorAppSolution, "--spec", specDll, "--json");
 
         // Assert — both numbers, because either alone is unreadable: "2 generated" says nothing without the
         // 4 it is 2 of, and the denominator appears nowhere else in the document. Here the pair says the
@@ -75,12 +74,11 @@ public sealed class GeneratedSubjectCheckE2ETests
     public async Task Check_SubjectNarrowedToAuthored_ReportsNeitherKey()
     {
         // Arrange — the same rule, one call different.
-        using var fixture = new TempFixtureWorkspace("TestSolutions/RazorApp", "RazorApp.slnx");
         string specDll = SpecAssemblyCompiler.EmitSpecDllToFreshTemp("generated-subject", "AuthoredSubject", AuthoredSubjectSpec);
 
         // Act
         CliResult result = await CliRunner.InvokeAsync(
-            "check", fixture.SolutionPath, "--spec", specDll, "--json");
+            "check", FixtureBeds.RazorAppSolution, "--spec", specDll, "--json");
 
         // Assert — the statement extinguishes itself. Both keys go, never one.
         result.Out.ShouldReportNoSubjectCoverage(RuleId);
@@ -90,31 +88,27 @@ public sealed class GeneratedSubjectCheckE2ETests
     public async Task Check_HumanReport_CarriesTheSubjectLineForAFailingRule()
     {
         // Arrange
-        using var fixture = new TempFixtureWorkspace("TestSolutions/RazorApp", "RazorApp.slnx");
         string specDll = SpecAssemblyCompiler.EmitSpecDllToFreshTemp("generated-subject", "ProjectSubjectHuman", ProjectSubjectSpec);
 
         // Act
-        CliResult result = await CliRunner.InvokeAsync("check", fixture.SolutionPath, "--spec", specDll);
+        CliResult result = await CliRunner.InvokeAsync("check", FixtureBeds.RazorAppSolution, "--spec", specDll);
 
         // Assert — the terminal reader gets the same fact, sited between the rule's own framing and its list
         // of violations, so it reads as scope rather than as one more finding.
-        result.Out.NormalizedLines()
-            .ShouldContain("  subject: 4 types, 2 generated");
+        result.Out.ShouldContain("  subject: 4 types, 2 generated");
     }
 
     [Fact]
     public async Task Check_HumanReport_NarrowedToAuthored_SaysNothingAboutTheSubject()
     {
         // Arrange
-        using var fixture = new TempFixtureWorkspace("TestSolutions/RazorApp", "RazorApp.slnx");
         string specDll = SpecAssemblyCompiler.EmitSpecDllToFreshTemp("generated-subject", "AuthoredSubjectHuman", AuthoredSubjectSpec);
 
         // Act
-        CliResult result = await CliRunner.InvokeAsync("check", fixture.SolutionPath, "--spec", specDll);
+        CliResult result = await CliRunner.InvokeAsync("check", FixtureBeds.RazorAppSolution, "--spec", specDll);
 
         // Assert — no line at all rather than a line reading zero. A rule aimed squarely at code someone
         // wrote has nothing to say here, and its silence is what makes the line's presence a finding.
-        result.Out.NormalizedLines()
-            .ShouldNotContain("subject:");
+        result.Out.ShouldNotContain("subject:");
     }
 }

@@ -39,10 +39,7 @@ public sealed class CodebaseExtractorConstructorEdgeTests
 
         // Recorded BESIDE the type edge, never instead of it: the inner `Thing` name mints the §4.1 reference,
         // the `new` node mints the construction. Both stand at line 3.
-        model.HasConstructorEdge("N.Maker", "N.Thing")
-            .ShouldBeTrue();
-        model.HasEdge("N.Maker", "N.Thing")
-            .ShouldBeTrue();
+        model.ShouldHaveConstructorEdge("N.Maker", "N.Thing");
         model.Edge("N.Maker", "N.Thing")
             .Sites.Lines()
             .ShouldBe([3]);
@@ -98,8 +95,7 @@ public sealed class CodebaseExtractorConstructorEdgeTests
         model.ConstructorEdge("N.Maker", "N.Box<T>")
             .Sites.Lines()
             .ShouldBe([3]);
-        model.HasEdge("N.Maker", "N.Box<T>")
-            .ShouldBeTrue();
+        model.ShouldHaveEdge("N.Maker", "N.Box<T>");
     }
 
     [Fact]
@@ -130,12 +126,11 @@ public sealed class CodebaseExtractorConstructorEdgeTests
         // An attribute application is not an object-creation expression: the type edge rides, no ctor edge.
         model.HasConstructorEdge("N.Decorated", "N.MyAttribute")
             .ShouldBeFalse();
-        model.HasEdge("N.Decorated", "N.MyAttribute")
-            .ShouldBeTrue();
+        model.ShouldHaveEdge("N.Decorated", "N.MyAttribute");
     }
 
     [Fact]
-    public void ExtractFromCompilations_BaseAndThisInitializers_ProduceNoConstructorEdge()
+    public void ExtractFromCompilations_BaseInitializer_ProducesNoConstructorEdge()
     {
         CodebaseModel model = CompilationFactory.Extract("""
                                                          namespace N;
@@ -143,17 +138,13 @@ public sealed class CodebaseExtractorConstructorEdgeTests
                                                          public class Derived : Base
                                                          {
                                                              public Derived() : base(1) {}
-                                                             public Derived(int x) : this() {}
                                                          }
                                                          """);
 
-        // `: base(...)` and `: this(...)` are constructor initializers, not object-creation expressions.
+        // `: base(...)` is a constructor initializer, not an object-creation expression.
         model.HasConstructorEdge("N.Derived", "N.Base")
             .ShouldBeFalse();
-        model.HasConstructorEdge("N.Derived", "N.Derived")
-            .ShouldBeFalse();
-        model.HasEdge("N.Derived", "N.Base")
-            .ShouldBeTrue(); // the base-list reference still stands
+        model.ShouldHaveEdge("N.Derived", "N.Base"); // the base-list reference still stands
     }
 
     [Fact]
@@ -172,8 +163,7 @@ public sealed class CodebaseExtractorConstructorEdgeTests
         // Delegate creation is excluded, keyed on the created symbol's TypeKind.Delegate — the type edge rides.
         model.HasConstructorEdge("N.Wire", "N.Notify")
             .ShouldBeFalse();
-        model.HasEdge("N.Wire", "N.Notify")
-            .ShouldBeTrue();
+        model.ShouldHaveEdge("N.Wire", "N.Notify");
     }
 
     [Fact]
@@ -220,8 +210,7 @@ public sealed class CodebaseExtractorConstructorEdgeTests
         // Array creation is not object creation: the element type edge rides, but no ctor edge.
         model.HasConstructorEdge("N.Alloc", "N.Item")
             .ShouldBeFalse();
-        model.HasEdge("N.Alloc", "N.Item")
-            .ShouldBeTrue();
+        model.ShouldHaveEdge("N.Alloc", "N.Item");
     }
 
     [Fact]

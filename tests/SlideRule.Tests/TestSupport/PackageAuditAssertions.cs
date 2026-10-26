@@ -29,7 +29,7 @@ internal static class PackageAuditAssertions
     /// </summary>
     internal static void ShouldCarryPackageAudit(this string document, string message, IReadOnlyList<string> projects)
     {
-        using JsonDocument parsed = CheckJsonAssertions.ParseOrFail(document);
+        using JsonDocument parsed = CheckJsonAssertions.ShouldParseAsJson(document);
         parsed.ShouldCarryPackageAudit(message, projects);
     }
 
@@ -59,41 +59,27 @@ internal static class PackageAuditAssertions
     /// </summary>
     internal static void ShouldElidePackageAuditTo(this string document, int count)
     {
-        using JsonDocument parsed = CheckJsonAssertions.ParseOrFail(document);
+        using JsonDocument parsed = CheckJsonAssertions.ShouldParseAsJson(document);
         parsed.ShouldElidePackageAuditTo(count);
     }
 
     /// <summary>The same, over a document a caller already holds for its other reads.</summary>
     internal static void ShouldElidePackageAuditTo(this JsonDocument document, int count)
     {
-        string report = Describe(document);
-        JsonElement root = document.RootElement;
-
-        root.TryGetProperty(Key, out _)
-            .ShouldBeFalse(report);
-        root.TryGetProperty(CountKey, out JsonElement elided)
-            .ShouldBeTrue(report);
-        elided.GetInt32()
-            .ShouldBe(count, report);
+        document.ShouldElideSlotTo(Key, CountKey, count);
     }
 
     /// <summary>Asserts <paramref name="document" /> carries neither advisory key — a run that raised none.</summary>
     internal static void ShouldCarryNoPackageAudit(this string document)
     {
-        using JsonDocument parsed = CheckJsonAssertions.ParseOrFail(document);
+        using JsonDocument parsed = CheckJsonAssertions.ShouldParseAsJson(document);
         parsed.ShouldCarryNoPackageAudit();
     }
 
     /// <summary>The same, over a document a caller already holds for its other reads.</summary>
     internal static void ShouldCarryNoPackageAudit(this JsonDocument document)
     {
-        string report = Describe(document);
-        JsonElement root = document.RootElement;
-
-        root.TryGetProperty(Key, out _)
-            .ShouldBeFalse(report);
-        root.TryGetProperty(CountKey, out _)
-            .ShouldBeFalse(report);
+        document.ShouldCarryNeitherSlot(Key, CountKey);
     }
 
     /// <summary>

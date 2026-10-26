@@ -11,13 +11,21 @@ namespace SlideRule.Tests.TestSupport;
 ///     Zero is the fact every persisted-cache suite is really after: a hit replays the recorded spec
 ///     resolution and merges stored fragments, so the whole of MSBuild — the design-time build, the
 ///     workspace, the solution load — is skipped, and an acquisition count is the only observable that says
-///     so without measuring a clock. Cold underneath rather than warm: a pooled workspace would be acquired
-///     once for a whole class and count nothing per run.
+///     so without measuring a clock. The count is of calls, so it means the same over any inner source. The
+///     default is cold because the warm pool answers a closure request with the whole solution, and what
+///     <see cref="Loads" /> records about a closure is only true of a real one; a run whose assertions read
+///     nothing but the count can take <see cref="OverWarmPool" />.
 /// </remarks>
 internal sealed class CountingSolutionSource(ISolutionSource inner) : ISolutionSource
 {
     public CountingSolutionSource() : this(new ColdSolutionSource())
     {
+    }
+
+    /// <summary>A counter over <see cref="WarmWorkspacePool.Source" />.</summary>
+    public static CountingSolutionSource OverWarmPool()
+    {
+        return new CountingSolutionSource(WarmWorkspacePool.Source);
     }
 
     /// <summary>How many times a run asked this source for a loaded solution, closures included.</summary>

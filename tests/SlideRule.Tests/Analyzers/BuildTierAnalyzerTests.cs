@@ -364,8 +364,8 @@ public sealed class BuildTierAnalyzerTests
         IReadOnlyList<Diagnostic> reported = await BuildTier.DiagnoseAsync(
             BuildTier.OwnCompilation(asImage), [BuildTier.ModelFile(text)], cancellationToken: Ct);
 
-        IReadOnlyList<Diagnostic> broken = reported.ShouldAllBe("SR2001");
-        broken.Count.ShouldBe(3, "one warning per site the rule is broken at");
+        IReadOnlyList<Diagnostic> broken = reported.ShouldAllBe(
+            "SR2001", 3, "one warning per site the rule is broken at");
 
         broken[0]
             .ShouldSay(BuildTier.Composed(model, BuildTier.RuleId, "Data.Store"));
@@ -402,13 +402,13 @@ public sealed class BuildTierAnalyzerTests
     {
         IReadOnlyList<Diagnostic> reported = await HeardAsync(BuildTier.OwnCompilation(asImage), perDocument);
 
-        TheSitesOfOwnSource(reported);
+        ShouldSitAtTheOwnSourceSites(reported);
     }
 
     [Fact]
     public async Task AConstructionSite_CoversNewThroughItsArguments()
     {
-        Diagnostic broken = await TheOneWarningAsync(ConstructionSource, ConstructRule);
+        Diagnostic broken = await ShouldWarnOnceAsync(ConstructionSource, ConstructRule);
 
         broken.ShouldSitAt("Web.cs", 5);
         broken.ShouldCover("new Data.Store()");
@@ -419,7 +419,7 @@ public sealed class BuildTierAnalyzerTests
     {
         // No argument list to run to, and the initializer that stands in for one opens a block: covering it
         // would put the squiggle on three lines and move nothing about where the warning is reported.
-        Diagnostic broken = await TheOneWarningAsync(InitializedConstructionSource, ConstructRule);
+        Diagnostic broken = await ShouldWarnOnceAsync(InitializedConstructionSource, ConstructRule);
 
         broken.ShouldSitAt("Web.cs", 7);
         broken.ShouldCover("new Data.Store");
@@ -428,8 +428,8 @@ public sealed class BuildTierAnalyzerTests
     [Fact]
     public async Task ACatchSite_CoversCatchThroughItsDeclaration()
     {
-        Diagnostic onOneLine = await TheOneWarningAsync(CatchSource, CatchRule);
-        Diagnostic overTwoLines = await TheOneWarningAsync(FilteredCatchSource, CatchRule);
+        Diagnostic onOneLine = await ShouldWarnOnceAsync(CatchSource, CatchRule);
+        Diagnostic overTwoLines = await ShouldWarnOnceAsync(FilteredCatchSource, CatchRule);
 
         onOneLine.ShouldSitAt("Web.cs", 8);
         onOneLine.ShouldCover("catch (Data.Fault e)");
@@ -443,8 +443,8 @@ public sealed class BuildTierAnalyzerTests
     [Fact]
     public async Task AThrowSite_CoversTheKeywordThroughTheEndOfItsLine()
     {
-        Diagnostic onOneLine = await TheOneWarningAsync(ThrowSource, ThrowRule);
-        Diagnostic wrapped = await TheOneWarningAsync(WrappedThrowSource, ThrowRule);
+        Diagnostic onOneLine = await ShouldWarnOnceAsync(ThrowSource, ThrowRule);
+        Diagnostic wrapped = await ShouldWarnOnceAsync(WrappedThrowSource, ThrowRule);
 
         onOneLine.ShouldSitAt("Web.cs", 5);
         onOneLine.ShouldCover("throw new Data.Fault();");
@@ -455,7 +455,7 @@ public sealed class BuildTierAnalyzerTests
     [Fact]
     public async Task AnInjectionSite_CoversTheParameterName()
     {
-        Diagnostic broken = await TheOneWarningAsync(
+        Diagnostic broken = await ShouldWarnOnceAsync(
             InjectionSource,
             arch => arch.Rule("span/does-not-inject")
                 .Enforce(arch.Types.Named("Injected").MustNotInject(arch.Types.Named("Store")))
@@ -468,7 +468,7 @@ public sealed class BuildTierAnalyzerTests
     [Fact]
     public async Task AShapeSite_CoversTheTypeName()
     {
-        Diagnostic broken = await TheOneWarningAsync(
+        Diagnostic broken = await ShouldWarnOnceAsync(
             ShapeSource,
             arch => arch.Rule("span/is-sealed")
                 .Enforce(arch.Types.Named("OrderController").MustBeSealed())
@@ -483,7 +483,7 @@ public sealed class BuildTierAnalyzerTests
     {
         // The one narrowing that is a narrowing of nothing: a member access is not widened onto its
         // receiver, because what the rule bans is the member.
-        Diagnostic broken = await TheOneWarningAsync(
+        Diagnostic broken = await ShouldWarnOnceAsync(
             MemberUseSource,
             arch => arch.Rule("span/does-not-read-the-clock")
                 .Enforce(arch.Types.Named("Reader").MustNotUse(() => DateTime.Now))
@@ -582,8 +582,7 @@ public sealed class BuildTierAnalyzerTests
 
         Lines(live)
             .ShouldBe(Lines(build), "the two tiers must report the same set over a whole compilation");
-        live.ShouldAllBe("SR2001")
-            .Count.ShouldBe(3, "the legs must agree on something rather than on silence");
+        live.ShouldAllBe("SR2001", 3, "the legs must agree on something rather than on silence");
     }
 
     [Fact]
@@ -593,8 +592,7 @@ public sealed class BuildTierAnalyzerTests
             await EnforcedPerDocumentAsync(TwoDocuments());
 
         IReadOnlyList<Diagnostic> web = perDocument["Web.cs"];
-        web.ShouldAllBe("SR2001")
-            .Count.ShouldBe(2, "the two sites Web.cs holds");
+        web.ShouldAllBe("SR2001", 2, "the two sites Web.cs holds");
         web[0]
             .ShouldSitAt("Web.cs", 5);
         web[1]
@@ -644,8 +642,7 @@ public sealed class BuildTierAnalyzerTests
             await EnforcedPerDocumentAsync(OneDocumentAndAnEmptyOne());
 
         reached.ShouldBe(1, "only the document that declares a type should have reached the check");
-        reported.ShouldAllBe("SR2001")
-            .Count.ShouldBe(3, "the document that does declare a type is still reported on");
+        reported.ShouldAllBe("SR2001", 3, "the document that does declare a type is still reported on");
         perDocument["Empty.cs"]
             .ShouldBeSilent();
     }
@@ -660,15 +657,15 @@ public sealed class BuildTierAnalyzerTests
             await BuildTier.DiagnoseEachDocumentAsync(
                 TwoTreesUnderOneName(), [BuildTier.ModelFile(text)], cancellationToken: Ct);
 
-        IReadOnlyList<Diagnostic> broken = reported.ShouldAllBe("SR2001");
-        broken.Count.ShouldBe(3, "one warning per site of the first tree, not one per tree under the path");
+        IReadOnlyList<Diagnostic> broken = reported.ShouldAllBe(
+            "SR2001", 3, "one warning per site of the first tree, not one per tree under the path");
         broken[0]
             .ShouldSitAt("Web.cs", 5);
         broken[1]
             .ShouldSitAt("Web.cs", 6);
         broken[2]
             .ShouldSitAt("Web.cs", 7);
-        TheSitesOfOwnSource(documents[0].Reported);
+        ShouldSitAtTheOwnSourceSites(documents[0].Reported);
         documents[1].Reported
             .ShouldBeSilent();
     }
@@ -682,8 +679,7 @@ public sealed class BuildTierAnalyzerTests
 
         perDocument["Web.cs"]
             .ShouldBeSilent();
-        reported.ShouldAllBe("SR2001")
-            .Count.ShouldBe(3, "the build tier reports every site, from its end action");
+        reported.ShouldAllBe("SR2001", 3, "the build tier reports every site, from its end action");
     }
 
     [Fact]
@@ -761,8 +757,7 @@ public sealed class BuildTierAnalyzerTests
             analyzer, BuildTier.OwnCompilation(), [BuildTier.ModelFile(text)], cancellationToken: Ct);
 
         reads.ShouldBe(1, "a second text of an unchanged file should be answered by the first read");
-        first.ShouldAllBe("SR2001")
-            .Count.ShouldBe(3);
+        first.ShouldAllBe("SR2001", 3);
         Lines(second)
             .ShouldBe(Lines(first));
     }
@@ -808,8 +803,7 @@ public sealed class BuildTierAnalyzerTests
 
         faulted.ShouldBeTheOnly("SR2093");
         reads.ShouldBe(2, "a faulted read should never answer the next compilation");
-        next.ShouldAllBe("SR2001")
-            .Count.ShouldBe(3);
+        next.ShouldAllBe("SR2001", 3);
     }
 
     [Fact]
@@ -831,8 +825,7 @@ public sealed class BuildTierAnalyzerTests
 
         faulted.ShouldBeTheOnly("SR2093");
         reads.ShouldBe(2, "a faulted read should never answer the next compilation, even from the same text");
-        next.ShouldAllBe("SR2001")
-            .Count.ShouldBe(3);
+        next.ShouldAllBe("SR2001", 3);
     }
 
     [Fact]
@@ -922,7 +915,7 @@ public sealed class BuildTierAnalyzerTests
 
     // One document breaking one rule at one site, and the warning it earns — the shape every per-channel
     // row above takes, so each of them is a source, a rule and two assertions about where the squiggle is.
-    private static async Task<Diagnostic> TheOneWarningAsync(string source, Action<Arch> define)
+    private static async Task<Diagnostic> ShouldWarnOnceAsync(string source, Action<Arch> define)
     {
         string text = BuildTier.ModelText(define);
 
@@ -964,7 +957,7 @@ public sealed class BuildTierAnalyzerTests
 
     // Where the three warnings the own source earns sit, and what the first one's span covers — the same
     // fact whether it was asked of the whole compilation or of the one document that holds the sites.
-    private static void TheSitesOfOwnSource(IReadOnlyList<Diagnostic> reported)
+    private static void ShouldSitAtTheOwnSourceSites(IReadOnlyList<Diagnostic> reported)
     {
         IReadOnlyList<Diagnostic> broken = reported.ShouldAllBe("SR2001");
         broken[0]

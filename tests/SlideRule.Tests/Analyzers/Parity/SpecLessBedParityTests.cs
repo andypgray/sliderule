@@ -38,16 +38,8 @@ namespace SlideRule.Tests.Analyzers.Parity;
 ///         nothing else — because it is the one bed whose csproj yields two compilations.
 ///     </para>
 /// </remarks>
-public sealed class SpecLessBedParityTests
+public sealed class SpecLessBedParityTests(ParityBeds beds) : IClassFixture<ParityBeds>
 {
-    private const string LinkedSolution = "LinkedApp/LinkedApp.slnx";
-
-    private const string MultiTfmSolution = "MultiTfm/MultiTfm.sln";
-
-    private const string RazorSolution = "RazorApp/RazorApp.slnx";
-
-    private const string ShadowedSolution = "ShadowedApp/ShadowedApp.slnx";
-
     private const string ResidencyRuleId = "linked/shared-lives-in-core";
 
     private const string ExclusionRuleId = "linked/tool-reaches-only-core-owned-shared-types";
@@ -358,7 +350,7 @@ public sealed class SpecLessBedParityTests
     public async Task TheBuildTier_OverALayerOfAuthoredAndGeneratedTypes_AgreesWithTheWholeSolutionCheck()
     {
         ParitySubject subject = await BedAsync(
-            "RazorApp", RazorSolution,
+            "RazorApp", FixtureBeds.RazorAppSolution,
             arch => arch.Rule("razor/handwritten-web-types-are-sealed")
                 .Enforce(arch
                     .AnyOf(arch.Namespace("RazorApp.Web"), arch.Namespace("AspNetCoreGeneratedDocument"))
@@ -389,7 +381,7 @@ public sealed class SpecLessBedParityTests
     public async Task TheBuildTier_OverABanOnAShadowedTypeName_AgreesWithTheWholeSolutionCheck()
     {
         ParitySubject subject = await BedAsync(
-            "ShadowedApp", ShadowedSolution,
+            "ShadowedApp", FixtureBeds.ShadowedAppSolution,
             arch => arch.Rule("shadowed/no-service-descriptor")
                 .Enforce(arch.Namespace("ShadowedApp.*")
                     .MustNotReference(arch.Types.Named("Microsoft.Extensions.DependencyInjection.ServiceDescriptor")))
@@ -443,13 +435,13 @@ public sealed class SpecLessBedParityTests
     private static string BedDirectory =>
         FixtureBeds.TestSolutionsRoot;
 
-    private static Task<ParitySubject> LinkedAsync(string name, Action<Arch> define)
+    private Task<ParitySubject> LinkedAsync(string name, Action<Arch> define)
     {
-        return BedAsync(name, LinkedSolution, define);
+        return BedAsync(name, FixtureBeds.LinkedAppSolution, define);
     }
 
     /// <summary>The linked bed under the residency rule, shared by its row and the forced row that explains it.</summary>
-    private static Task<ParitySubject> ResidencyAsync(string name)
+    private Task<ParitySubject> ResidencyAsync(string name)
     {
         return LinkedAsync(
             name,
@@ -459,7 +451,7 @@ public sealed class SpecLessBedParityTests
     }
 
     /// <summary>The linked bed under the project-headed exclusion, shared the same way.</summary>
-    private static Task<ParitySubject> ExclusionAsync(string name)
+    private Task<ParitySubject> ExclusionAsync(string name)
     {
         return LinkedAsync(
             name,
@@ -471,10 +463,10 @@ public sealed class SpecLessBedParityTests
 
     // The multi-framework bed's one spec, shared by the two rows that run it: a ban the web project breaks
     // and a shape rule the core project breaks under each of its frameworks.
-    private static Task<ParitySubject> MultiTfmAsync(string name)
+    private Task<ParitySubject> MultiTfmAsync(string name)
     {
         return BedAsync(
-            name, MultiTfmSolution,
+            name, FixtureBeds.MultiTfmSolution,
             arch =>
             {
                 arch.Rule("multi/web-not-through-core")
@@ -487,10 +479,8 @@ public sealed class SpecLessBedParityTests
             });
     }
 
-    private static Task<ParitySubject> BedAsync(string name, string relativeSolutionPath, Action<Arch> define)
+    private Task<ParitySubject> BedAsync(string name, string solutionPath, Action<Arch> define)
     {
-        string solutionPath = Path.Combine(BedDirectory, relativeSolutionPath.Replace('/', Path.DirectorySeparatorChar));
-
-        return ParityHarness.ForSolutionAsync(name, Checker.Model(define), solutionPath, Ct);
+        return beds.SubjectAsync(name, Checker.Model(define), solutionPath);
     }
 }

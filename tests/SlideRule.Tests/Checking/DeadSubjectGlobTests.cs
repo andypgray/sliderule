@@ -1,5 +1,4 @@
 using Shouldly;
-using SlideRule.Baselines;
 using SlideRule.Checking;
 using Xunit;
 
@@ -21,7 +20,7 @@ public sealed class DeadSubjectGlobTests
     [Fact]
     public void EveryDeadGlobBesideALiveOne_FailsTheRule_InListOrder()
     {
-        RuleResult result = Checker.Run(Sources.FolderModel, Sources.FolderRoot, arch =>
+        RuleResult result = Checker.Run(Sources.FolderModel, root: Sources.FolderRoot, define: arch =>
                 arch.Rule("widgets/sealed")
                     .Enforce(arch.Types.Under("src/Gone", "src/Widgets", "src/Lost").MustBeSealed())
                     .Because("b"))
@@ -33,13 +32,14 @@ public sealed class DeadSubjectGlobTests
                 ConstraintEvaluator.EmptyOperandMessage("types under `src/Gone`"),
                 ConstraintEvaluator.EmptyOperandMessage("types under `src/Lost`")
             ]);
-        result.Violations.ShouldAllBe(violation => violation.Hint == GlobCure);
+        result.Violations.Select(violation => violation.Hint)
+            .ShouldAllBe(hint => hint == GlobCure);
     }
 
     [Fact]
     public void AListNoneOfWhoseGlobsMatched_FailsWholeWithTheGlobCure()
     {
-        RuleResult result = Checker.Run(Sources.FolderModel, Sources.FolderRoot, arch =>
+        RuleResult result = Checker.Run(Sources.FolderModel, root: Sources.FolderRoot, define: arch =>
                 arch.Rule("widgets/sealed")
                     .Enforce(arch.Types.Under("src/Gone", "src/Lost").MustBeSealed())
                     .Because("b"))
@@ -53,7 +53,7 @@ public sealed class DeadSubjectGlobTests
     public void ARunOverOneProject_DropsTheDeadGlob_AndJudgesTheLiveOne()
     {
         // Another project's types may be declared under the glob, so it is not this compilation's to fail.
-        Checker.Run(Sources.FolderModel, BaselineIndex.Empty, NarrowedUniverse.OneProject, Sources.FolderRoot, arch =>
+        Checker.Run(Sources.FolderModel, narrowing: NarrowedUniverse.OneProject, root: Sources.FolderRoot, define: arch =>
                 arch.Rule("widgets/sealed")
                     .Enforce(arch.Types.Under("src/Widgets", "src/Gone").MustBeSealed())
                     .Because("b"))
@@ -66,14 +66,8 @@ public sealed class DeadSubjectGlobTests
     public void ADeadGlobInAnExceptPayload_IsNotRead()
     {
         // An exemption's dead glob exempts nothing, which leaves the rule stricter, not unmeasured.
-        Checker.Run(Sources.FolderModel, Sources.FolderRoot, arch =>
-                arch.Rule("widgets/sealed")
-                    .Enforce(arch.Types.Under("src/Widgets")
-                        .Except(arch.Types.Under("src/Widgets/Deep", "src/Gone"))
-                        .MustBeSealed())
-                    .Because("b"))
-            .Single()
-            .ShapeSubjects()
+        Checker.Selects(Sources.FolderModel, Sources.FolderRoot,
+                arch => arch.Types.Under("src/Widgets").Except(arch.Types.Under("src/Widgets/Deep", "src/Gone")))
             .ShouldBe(["App.Button"]);
     }
 }

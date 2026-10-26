@@ -1,6 +1,7 @@
 using System.Text.Json;
 using ModelContextProtocol.Protocol;
 using Shouldly;
+using SlideRule.Tests.TestSupport;
 
 namespace SlideRule.Tests.Mcp;
 
@@ -33,6 +34,24 @@ internal static class McpResultAssertions
             .Text;
     }
 
+    /// <summary>Asserts the tool refused: an error result carrying one text block, whose text is handed back.</summary>
+    internal static string ShouldHaveRefused(this CallToolResult result)
+    {
+        string text = result.ShouldHaveTextContent();
+        result.IsError.ShouldBe(true, $"the tool answered rather than refused:{Environment.NewLine}{text}");
+
+        return text;
+    }
+
+    /// <summary>Asserts the tool answered: no error flag, and one text block, whose text is handed back.</summary>
+    internal static string ShouldHaveAnswered(this CallToolResult result)
+    {
+        string text = result.ShouldHaveTextContent();
+        result.IsError.ShouldNotBe(true, $"the tool refused:{Environment.NewLine}{text}");
+
+        return text;
+    }
+
     /// <summary>Asserts the prompt result has at least one message, text-first, and returns that text.</summary>
     internal static string ShouldHaveTextContent(this GetPromptResult result)
     {
@@ -42,6 +61,30 @@ internal static class McpResultAssertions
             .Content
             .ShouldBeOfType<TextContentBlock>()
             .Text;
+    }
+
+    /// <summary>
+    ///     Asserts <paramref name="actual" /> is <paramref name="expected" />'s text, CRLF folded to LF and the ends
+    ///     trimmed on both sides: the parity a tool's answer is held to against a CLI channel or another answer.
+    ///     Hands <paramref name="actual" /> back.
+    /// </summary>
+    internal static string ShouldBeTheSameTextAs(this string actual, string expected)
+    {
+        actual.NormalizedTrimmed()
+            .ShouldBe(expected.NormalizedTrimmed());
+
+        return actual;
+    }
+
+    /// <summary>
+    ///     Asserts <paramref name="actual" /> differs from <paramref name="other" /> under the same folding.
+    /// </summary>
+    internal static string ShouldNotBeTheSameTextAs(this string actual, string other)
+    {
+        actual.NormalizedTrimmed()
+            .ShouldNotBe(other.NormalizedTrimmed());
+
+        return actual;
     }
 
     /// <summary>

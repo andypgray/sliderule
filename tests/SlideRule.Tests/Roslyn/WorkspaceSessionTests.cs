@@ -93,7 +93,7 @@ public sealed class WorkspaceSessionTests(SharedWorkspaceSession shared) : IClas
         string moneyFile = shared.PathOf("MyApp.Domain", "Money.cs");
 
         // Act — bump the mtime without changing the bytes (an IDE-style touch).
-        File.SetLastWriteTimeUtc(moneyFile, DateTime.UtcNow.AddSeconds(2));
+        FixtureEdits.StampForward(moneyFile);
         WorkspaceSnapshot after = await session.GetCurrentAsync(shared.SolutionPath, Ct);
 
         // Assert — content-verified equal, so no new snapshot is minted.
@@ -171,7 +171,7 @@ public sealed class WorkspaceSessionTests(SharedWorkspaceSession shared) : IClas
         long reloadsBefore = session.FullReloadCount;
 
         // Act — a structural touch on a project file.
-        File.SetLastWriteTimeUtc(shared.PathOf("MyApp.Domain", "MyApp.Domain.csproj"), DateTime.UtcNow.AddSeconds(2));
+        FixtureEdits.StampForward(shared.PathOf("MyApp.Domain", "MyApp.Domain.csproj"));
         WorkspaceSnapshot after = await session.GetCurrentAsync(shared.SolutionPath, Ct);
 
         // Assert — a structural reload, which bumps the generation so the store flushes and re-walks all.
@@ -188,8 +188,7 @@ public sealed class WorkspaceSessionTests(SharedWorkspaceSession shared) : IClas
         long reloadsBefore = session.FullReloadCount;
 
         // Act — a restore signal: obj/project.assets.json changes.
-        File.SetLastWriteTimeUtc(
-            shared.PathOf("MyApp.Domain", "obj", "project.assets.json"), DateTime.UtcNow.AddSeconds(2));
+        FixtureEdits.StampForward(shared.PathOf("MyApp.Domain", "obj", "project.assets.json"));
         await session.GetCurrentAsync(shared.SolutionPath, Ct);
 
         // Assert
@@ -207,7 +206,7 @@ public sealed class WorkspaceSessionTests(SharedWorkspaceSession shared) : IClas
         WorkspaceSession session = shared.Session;
         await session.GetCurrentAsync(shared.SolutionPath, Ct);
         long reloadsBefore = session.FullReloadCount;
-        string propsFile = Path.Combine(Path.GetDirectoryName(shared.SolutionPath)!, "Directory.Build.props");
+        string propsFile = shared.PathOf("Directory.Build.props");
 
         // The write lands in an ancestor of the whole fixture copy, so it outlives this test's tree
         // unless it is taken back: every later case would build against a props file it never asked for.
@@ -238,7 +237,7 @@ public sealed class WorkspaceSessionTests(SharedWorkspaceSession shared) : IClas
         long reloadsBefore = session.FullReloadCount;
 
         // Act — a structural touch on the referenced solution, the filter and every project left alone.
-        File.SetLastWriteTimeUtc(fixture.SolutionPath, DateTime.UtcNow.AddSeconds(2));
+        FixtureEdits.StampForward(fixture.SolutionPath);
         WorkspaceSnapshot after = await session.GetCurrentAsync(filter, Ct);
 
         // Assert
@@ -291,23 +290,13 @@ public sealed class WorkspaceSessionTests(SharedWorkspaceSession shared) : IClas
         // Arrange
         using var fixture = new TempFixtureWorkspace();
         await using var session = new WorkspaceSession();
-        string bogusSolution = Path.Combine(Path.GetDirectoryName(fixture.SolutionPath)!, "DoesNotExist.sln");
+        string bogusSolution = fixture.PathOf("DoesNotExist.sln");
 
         // Act — a bad path throws; the session resets to unloaded so the next call retries cleanly.
-        var threw = false;
-        try
-        {
-            await session.GetCurrentAsync(bogusSolution, Ct);
-        }
-        catch
-        {
-            threw = true;
-        }
-
+        await Should.ThrowAsync<Exception>(async () => await session.GetCurrentAsync(bogusSolution, Ct));
         WorkspaceSnapshot recovered = await session.GetCurrentAsync(fixture.SolutionPath, Ct);
 
         // Assert
-        threw.ShouldBeTrue();
         recovered.Solution.Projects.ShouldNotBeEmpty();
     }
 

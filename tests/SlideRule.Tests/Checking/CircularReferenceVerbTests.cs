@@ -64,12 +64,9 @@ public sealed class CircularReferenceVerbTests
     [Fact]
     public void MustNotHaveCircularReferences_TwoCellsPointingBothWays_RedBothArrowsWithTheCircleNamed()
     {
-        RuleResult result = Checker.Run(CycleModel, arch =>
-                arch.Rule("cyc/two-cells")
-                    .Enforce(arch.Each(arch.Layer("A", "Cyc.A.*"), arch.Layer("B", "Cyc.B.*"))
-                        .MustNotHaveCircularReferences())
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(
+            CycleModel, arch => arch.Each(arch.Layer("A", "Cyc.A.*"), arch.Layer("B", "Cyc.B.*"))
+                .MustNotHaveCircularReferences());
 
         // Exhaustive: the two arrows of the circle and nothing else. Alpha's Outside edge names no cell and
         // its StringBuilder edge is external, so neither is a node of the cell graph at all.
@@ -83,12 +80,9 @@ public sealed class CircularReferenceVerbTests
     [Fact]
     public void MustNotHaveCircularReferences_AnArrowIntoTheCircle_IsGreenAndUnnamed()
     {
-        RuleResult result = Checker.Run(CycleModel, arch =>
-                arch.Rule("cyc/three-cells")
-                    .Enforce(arch.Each(arch.Layer("A", "Cyc.A.*"), arch.Layer("B", "Cyc.B.*"), arch.Layer("C", "Cyc.C.*"))
-                        .MustNotHaveCircularReferences())
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(CycleModel, arch =>
+            arch.Each(arch.Layer("A", "Cyc.A.*"), arch.Layer("B", "Cyc.B.*"), arch.Layer("C", "Cyc.C.*"))
+                .MustNotHaveCircularReferences());
 
         // Adding C to the family changes nothing: Gamma → Alpha lies on no circle, because nothing leads
         // back to C. The detail is the same two-cell one, and C's name is not in it.
@@ -102,12 +96,9 @@ public sealed class CircularReferenceVerbTests
     [Fact]
     public void MustNotHaveCircularReferences_OneArrowWithNoWayBack_PassesClean()
     {
-        RuleResult result = Checker.Run(CycleModel, arch =>
-                arch.Rule("cyc/one-way")
-                    .Enforce(arch.Each(arch.Layer("A", "Cyc.A.*"), arch.Layer("C", "Cyc.C.*"))
-                        .MustNotHaveCircularReferences())
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(
+            CycleModel, arch => arch.Each(arch.Layer("A", "Cyc.A.*"), arch.Layer("C", "Cyc.C.*"))
+                .MustNotHaveCircularReferences());
 
         // C → A and nothing back: the cells MAY reference each other, which is exactly what parts this verb
         // from the cross-cell ban over the same subject.
@@ -117,12 +108,9 @@ public sealed class CircularReferenceVerbTests
     [Fact]
     public void MustNotHaveCircularReferences_ACircleOfThree_RedsEveryArrowOnIt()
     {
-        RuleResult result = Checker.Run(RingModel, arch =>
-                arch.Rule("cyc/ring")
-                    .Enforce(arch.Each(arch.Layer("A", "Ring.A.*"), arch.Layer("B", "Ring.B.*"), arch.Layer("C", "Ring.C.*"))
-                        .MustNotHaveCircularReferences())
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(RingModel, arch =>
+            arch.Each(arch.Layer("A", "Ring.A.*"), arch.Layer("B", "Ring.B.*"), arch.Layer("C", "Ring.C.*"))
+                .MustNotHaveCircularReferences());
 
         const string amongABC = "circular references among the A, B and C layers";
         result.ShouldHaveFailedWithDetailedEdges(ViolationKind.Reference,
@@ -136,12 +124,9 @@ public sealed class CircularReferenceVerbTests
     [Fact]
     public void MustNotHaveCircularReferences_TheDetail_NamesTheCellsInDeclarationOrder()
     {
-        RuleResult result = Checker.Run(RingModel, arch =>
-                arch.Rule("cyc/ring-reordered")
-                    .Enforce(arch.Each(arch.Layer("C", "Ring.C.*"), arch.Layer("A", "Ring.A.*"), arch.Layer("B", "Ring.B.*"))
-                        .MustNotHaveCircularReferences())
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(RingModel, arch =>
+            arch.Each(arch.Layer("C", "Ring.C.*"), arch.Layer("A", "Ring.A.*"), arch.Layer("B", "Ring.B.*"))
+                .MustNotHaveCircularReferences());
 
         // The same circle, the same three arrows: only the order the family declares its cells in moves,
         // and the detail follows it, because that is the order the rule's own sentence names them in.
@@ -157,16 +142,12 @@ public sealed class CircularReferenceVerbTests
     [Fact]
     public void MustNotHaveCircularReferences_TwoCirclesInOneFamily_EachPairNamesItsOwn()
     {
-        RuleResult result = Checker.Run(TwinModel, arch =>
-                arch.Rule("cyc/twin")
-                    .Enforce(arch.Each(
-                            arch.Layer("A", "Twin.A.*"),
-                            arch.Layer("B", "Twin.B.*"),
-                            arch.Layer("C", "Twin.C.*"),
-                            arch.Layer("D", "Twin.D.*"))
-                        .MustNotHaveCircularReferences())
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(TwinModel, arch => arch.Each(
+                arch.Layer("A", "Twin.A.*"),
+                arch.Layer("B", "Twin.B.*"),
+                arch.Layer("C", "Twin.C.*"),
+                arch.Layer("D", "Twin.D.*"))
+            .MustNotHaveCircularReferences());
 
         // Components, not the family: A/B and C/D are two circles that never meet, so a reader of either
         // pair is told which cells to redraw and is not handed the whole family.
@@ -183,11 +164,8 @@ public sealed class CircularReferenceVerbTests
     [Fact]
     public void MustNotHaveCircularReferences_OneCellFamily_PassesVacuouslyAndReadsAsTheCell()
     {
-        RuleResult result = Checker.Run(CycleModel, arch =>
-                arch.Rule("cyc/alone")
-                    .Enforce(arch.Each(arch.Layer("A", "Cyc.A.*")).MustNotHaveCircularReferences())
-                    .Because("b"))
-            .Single();
+        RuleResult result = Checker.Verdict(CycleModel, arch => arch.Each(arch.Layer("A", "Cyc.A.*"))
+            .MustNotHaveCircularReferences());
 
         // One cell has no arrow to any other, so no component holds two — and the sentence is the cell's
         // own (GRAMMAR §5.1's identity), exactly as the cross-cell ban's is.

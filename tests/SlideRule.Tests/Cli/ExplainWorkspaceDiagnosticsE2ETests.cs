@@ -48,7 +48,7 @@ public sealed class ExplainWorkspaceDiagnosticsE2ETests
         CliResult result = await RunAsync(
             new ExplainRequest(
                 "layering/domain-independent", CliRunner.MyAppSolution, CliRunner.ViolatedSpecDll,
-                Path.GetDirectoryName(CliRunner.MyAppSolution)!, true));
+                SolutionPaths.SolutionDirectoryOf(CliRunner.MyAppSolution), true));
 
         result.ShouldSucceed("layering/domain-independent (enforce)");
         result.Err.ShouldBeEmpty();

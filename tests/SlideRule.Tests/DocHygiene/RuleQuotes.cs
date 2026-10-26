@@ -76,7 +76,7 @@ internal static class RuleQuotes
 
     /// <summary>
     ///     Extracts every rule-header line from the fenced code blocks of <paramref name="docText" />.
-    ///     Fence state is tracked by <see cref="SourceAnchors.FencedLines" />'s scanner, so a rule-header line
+    ///     Fence state is tracked by <see cref="DocFences.FencedLines" />'s scanner, so a rule-header line
     ///     in running prose is ignored: prose restates the quoted output and is commentary rather than the
     ///     quote. Line numbers are 1-based positions in the doc, so a failure names the exact line.
     /// </summary>
@@ -84,7 +84,7 @@ internal static class RuleQuotes
     {
         List<RuleQuote> quotes = new();
 
-        foreach ((string line, int number) in SourceAnchors.FencedLines(docText))
+        foreach ((string line, int number) in DocFences.FencedLines(docText))
         {
             Match match = HeaderLine.Match(line);
             if (!match.Success) continue;
@@ -112,35 +112,19 @@ internal static class RuleQuotes
     /// </summary>
     public static IReadOnlyDictionary<string, IReadOnlyList<string>> IndexBullets(IEnumerable<string> cardTexts)
     {
-        Dictionary<string, List<string>> index = new(StringComparer.Ordinal);
-
-        foreach (string cardText in cardTexts)
-        {
-            string? body = ManagedBlock.ExtractBody(cardText);
-            if (body is null) continue;
-
-            foreach (string line in body.Split('\n'))
-            {
-                Match match = BulletLine.Match(line.TrimEnd('\r'));
-                if (!match.Success) continue;
-
-                string id = match.Groups["id"]
-                    .Value;
-                if (!index.TryGetValue(id, out List<string>? texts))
-                {
-                    texts = new List<string>();
-                    index[id] = texts;
-                }
-
-                texts.Add(match.Groups["text"]
-                    .Value);
-            }
-        }
-
-        return index.ToDictionary(
-            static entry => entry.Key,
-            static entry => (IReadOnlyList<string>)entry.Value,
-            StringComparer.Ordinal);
+        return cardTexts
+            .Select(ManagedBlock.ExtractBody)
+            .OfType<string>()
+            .SelectMany(static body => body.Split('\n'))
+            .Select(static line => BulletLine.Match(line))
+            .Where(static match => match.Success)
+            .GroupBy(static match => match.Groups["id"].Value, StringComparer.Ordinal)
+            .ToDictionary(
+                static bullets => bullets.Key,
+                static bullets => (IReadOnlyList<string>)bullets
+                    .Select(static match => match.Groups["text"].Value)
+                    .ToList(),
+                StringComparer.Ordinal);
     }
 
     /// <summary>
@@ -197,28 +181,6 @@ internal static class RuleQuotes
         return new QuoteResult(
             QuoteBucket.Drifted,
             $"{quote.Doc}:{quote.DocLine} quotes '{quote.RuleId}' as:\n    {quote.Sentence}\n  but the rendered bullet reads:\n    {string.Join("\n    ", texts)}");
-    }
-
-    /// <summary>
-    ///     A whole-text reader rooted at <paramref name="repoRoot" />: it maps a repository-relative path
-    ///     to its text, or <see langword="null" /> when the file does not exist. Each reader remembers
-    ///     every path it has answered for, absent ones included: the gates that read through one ask for
-    ///     the same handful of cards and baselines once per quote.
-    /// </summary>
-    public static Func<string, string?> DiskTextReader(string repoRoot)
-    {
-        Dictionary<string, string?> read = new(StringComparer.Ordinal);
-
-        return repoRelative =>
-        {
-            if (read.TryGetValue(repoRelative, out string? cached)) return cached;
-
-            string full = Path.Combine(repoRoot, repoRelative.Replace('/', Path.DirectorySeparatorChar));
-            string? text = File.Exists(full) ? File.ReadAllText(full) : null;
-            read[repoRelative] = text;
-
-            return text;
-        };
     }
 
     /// <summary>

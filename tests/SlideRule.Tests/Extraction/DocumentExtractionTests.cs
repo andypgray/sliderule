@@ -358,8 +358,8 @@ public sealed class DocumentExtractionTests
 
         // Assert — the shadow first, by count rather than by asking for the single node: a split name is
         // exactly two nodes of one name, and a red that says "two" names the failure the guard exists for.
-        fromWeb.Types.Count(type => type.FullName == "Shared.Widget")
-            .ShouldBe(1, "the linked type must reach the merge as one name meaning one type");
+        fromWeb.Types.ShouldContain(
+            type => type.FullName == "Shared.Widget", 1, "the linked type must reach the merge as one name meaning one type");
         fromWeb.Type("Domain.Linked")
             .IsExternal.ShouldBeFalse();
         fromWeb.Type("Domain.Linked")
@@ -391,8 +391,9 @@ public sealed class DocumentExtractionTests
         CodebaseModel fromWeb = FragmentMerger.Merge(perDocument["Web.cs"]);
 
         // Assert — by count first, for the reason the row above gives: a split name is two nodes of one name.
-        fromWeb.Types.Count(type => type.FullName == "Shared.Outer.Inner")
-            .ShouldBe(1, "the linked nested type must reach the merge as one name meaning one type");
+        fromWeb.Types.ShouldContain(
+            type => type.FullName == "Shared.Outer.Inner", 1,
+            "the linked nested type must reach the merge as one name meaning one type");
         fromWeb.Type("Domain.Linked")
             .IsExternal.ShouldBeFalse();
         fromWeb.Type("Domain.Linked")
@@ -516,8 +517,7 @@ public sealed class DocumentExtractionTests
         IReadOnlyList<CodebaseFragment> fragments = PerDocument(own)[EmptyPath];
 
         // Assert — total, not skipped: a caller may hand over any tree of the compilation.
-        fragments.Count.ShouldBe(1, "a document declaring nothing touches nobody's types either");
-        CodebaseFragment only = fragments[0];
+        CodebaseFragment only = fragments.ShouldHaveSingleItem("a document declaring nothing touches nobody's types either");
         only.DeclaredTypes.ShouldBeEmpty();
         only.Externals.ShouldBeEmpty();
 

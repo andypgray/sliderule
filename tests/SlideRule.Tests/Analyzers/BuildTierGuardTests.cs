@@ -46,29 +46,13 @@ public sealed class BuildTierGuardTests
 
     /// <summary>Every guarded point on both tiers, which end the compilation in different actions.</summary>
     public static TheoryData<GuardedPoint, string> PointsOnBothTiers =>
-        new()
-        {
-            { GuardedPoint.Start, "live" },
-            { GuardedPoint.Start, "build" },
-            { GuardedPoint.ModelRead, "live" },
-            { GuardedPoint.ModelRead, "build" },
-            { GuardedPoint.BaselineRead, "live" },
-            { GuardedPoint.BaselineRead, "build" },
-            { GuardedPoint.ModelRefusal, "live" },
-            { GuardedPoint.ModelRefusal, "build" },
-            { GuardedPoint.BaselineRefusal, "live" },
-            { GuardedPoint.BaselineRefusal, "build" }
-        };
+    [
+        .. Enum.GetValues<GuardedPoint>()
+            .SelectMany(point => new[] { (point, "live"), (point, "build") })
+    ];
 
     /// <summary>Every guarded point once.</summary>
-    public static TheoryData<GuardedPoint> Points =>
-    [
-        GuardedPoint.Start,
-        GuardedPoint.ModelRead,
-        GuardedPoint.BaselineRead,
-        GuardedPoint.ModelRefusal,
-        GuardedPoint.BaselineRefusal
-    ];
+    public static TheoryData<GuardedPoint> Points => [.. Enum.GetValues<GuardedPoint>()];
 
     [Theory]
     [MemberData(nameof(Points))]

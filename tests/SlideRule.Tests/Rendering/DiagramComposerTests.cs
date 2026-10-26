@@ -3,6 +3,7 @@ using SlideRule.Codebase;
 using SlideRule.Hosting;
 using SlideRule.Rendering;
 using SlideRule.Tests.Checking;
+using SlideRule.Tests.TestSupport;
 using Xunit;
 
 namespace SlideRule.Tests.Rendering;
@@ -35,8 +36,7 @@ public sealed class DiagramComposerTests
             .ShouldBe(2);
         body.ShouldContain($"    accTitle: Codebase survey: {SolutionName}");
         body.ShouldContain($"    accTitle: Architecture law: {SpecName}");
-        body.IndexOf("Codebase survey:", StringComparison.Ordinal)
-            .ShouldBeLessThan(body.IndexOf("Architecture law:", StringComparison.Ordinal));
+        body.ShouldContainInOrder("Codebase survey:", "Architecture law:");
     }
 
     [Fact]

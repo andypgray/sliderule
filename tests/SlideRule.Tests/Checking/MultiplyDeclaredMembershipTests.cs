@@ -181,8 +181,7 @@ public sealed class MultiplyDeclaredMembershipTests
                     .Because("Awaitable methods are discovered by suffix."))
             .Single();
 
-        result.MemberShapeSubjects()
-            .ShouldBe(["M:Shared.Widget.Run"]);
+        result.ShouldHaveFailedWithMemberSubjects(["M:Shared.Widget.Run"]);
     }
 
     [Fact]

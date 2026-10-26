@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using SlideRule.Codebase;
+using SlideRule.Internal;
 using SlideRule.Roslyn;
 
 namespace SlideRule.Tests.TestSupport;
@@ -16,19 +17,22 @@ namespace SlideRule.Tests.TestSupport;
 ///     </para>
 ///     <para>
 ///         The extraction starts at most once per solution and every caller awaits that one task. It takes no
-///         test's cancellation token, because the task it produces outlives the test that first awaits it.
+///         test's cancellation token, because the task it produces outlives the test that first awaits it. It
+///         is keyed by the solution's full path under the platform's path comparison, which must agree with
+///         the key WarmWorkspacePool gives a session, so every spelling of one bed shares one walk.
 ///     </para>
 /// </remarks>
 internal static class FixtureCodebase
 {
     private static readonly ConcurrentDictionary<string, Lazy<Task<CodebaseModel>>> Extractions =
-        new(StringComparer.Ordinal);
+        new(PathComparison.Comparer);
 
     /// <summary>The model extracted from the solution at <paramref name="solutionPath" />.</summary>
     internal static Task<CodebaseModel> Of(string solutionPath)
     {
+        string key = Path.GetFullPath(solutionPath);
         Lazy<Task<CodebaseModel>> extraction = Extractions.GetOrAdd(
-            solutionPath, path => new Lazy<Task<CodebaseModel>>(() => ExtractAsync(path)));
+            key, path => new Lazy<Task<CodebaseModel>>(() => ExtractAsync(path)));
 
         return extraction.Value;
     }

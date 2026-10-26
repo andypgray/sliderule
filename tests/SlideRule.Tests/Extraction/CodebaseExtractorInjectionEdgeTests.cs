@@ -44,10 +44,8 @@ public sealed class CodebaseExtractorInjectionEdgeTests
                                                          """);
 
         model.InjectionEdges("N.Rec")
-            .Select(e => e.Injected.FullName)
+            .TargetNames()
             .ShouldBe(["N.IDep"]);
-        model.HasInjectionEdge("N.Rec", "N.Rec")
-            .ShouldBeFalse();
     }
 
     [Fact]
@@ -60,10 +58,6 @@ public sealed class CodebaseExtractorInjectionEdgeTests
                                                          public class C { public C(IHandler<Order> h) {} }
                                                          """);
 
-        model.HasInjectionEdge("N.C", "N.IHandler<T>")
-            .ShouldBeTrue();
-        model.HasInjectionEdge("N.C", "N.Order")
-            .ShouldBeTrue();
         model.InjectionEdge("N.C", "N.IHandler<T>")
             .Sites.Lines()
             .ShouldBe([4]);
@@ -83,7 +77,7 @@ public sealed class CodebaseExtractorInjectionEdgeTests
 
         // The element type is the endpoint; the array type itself is not a node.
         model.InjectionEdges("N.C")
-            .Select(e => e.Injected.FullName)
+            .TargetNames()
             .ShouldBe(["N.IDep"]);
     }
 
@@ -96,10 +90,8 @@ public sealed class CodebaseExtractorInjectionEdgeTests
                                                          public class C { public C(System.Collections.Generic.IEnumerable<IFoo> foos) {} }
                                                          """);
 
-        model.HasInjectionEdge("N.C", "System.Collections.Generic.IEnumerable<T>")
-            .ShouldBeTrue();
-        model.HasInjectionEdge("N.C", "N.IFoo")
-            .ShouldBeTrue();
+        model.ShouldHaveInjectionEdge("N.C", "System.Collections.Generic.IEnumerable<T>");
+        model.ShouldHaveInjectionEdge("N.C", "N.IFoo");
     }
 
     [Fact]
@@ -127,6 +119,7 @@ public sealed class CodebaseExtractorInjectionEdgeTests
                                                          """);
 
         model.InjectionEdges("N.WithStaticCtor")
+            .TargetNames()
             .ShouldBeEmpty();
     }
 
@@ -141,6 +134,7 @@ public sealed class CodebaseExtractorInjectionEdgeTests
         model.HasInjectionEdge("N.Selfish", "N.Selfish")
             .ShouldBeFalse();
         model.InjectionEdges("N.Selfish")
+            .TargetNames()
             .ShouldBeEmpty();
     }
 
@@ -156,8 +150,10 @@ public sealed class CodebaseExtractorInjectionEdgeTests
                                                          """);
 
         model.InjectionEdges("N.Notify")
+            .TargetNames()
             .ShouldBeEmpty();
         model.InjectionEdges("N.Color")
+            .TargetNames()
             .ShouldBeEmpty();
     }
 

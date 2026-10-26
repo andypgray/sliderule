@@ -4,8 +4,8 @@ using Xunit;
 namespace SlideRule.Tests.DocHygiene;
 
 /// <summary>
-///     Unit and negative tests for <see cref="GrandfatheredCounts" />, over hand-built fences, baselines and
-///     prose rather than the committed docs.
+///     Unit and negative tests for <see cref="GrandfatheredCounts" />, <see cref="CountSpelling" /> and
+///     <see cref="CollapsedText" />, over hand-built fences, baselines and prose rather than the committed docs.
 /// </summary>
 public sealed class GrandfatheredCountsTests
 {
@@ -156,7 +156,9 @@ public sealed class GrandfatheredCountsTests
         IReadOnlyList<GrandfatheredCount> counts = GrandfatheredCounts.Extract("d.md", doc);
 
         // Assert
-        GrandfatheredCount split = counts.Last();
+        counts.Select(count => count.DocLine)
+            .ShouldBe([2, 3]);
+        GrandfatheredCount split = counts[^1];
         split.DocLine.ShouldBe(3);
         split.RuleId.ShouldBe("layering/no-circular-references");
         split.Count.ShouldBe(12);
@@ -179,8 +181,8 @@ public sealed class GrandfatheredCountsTests
         IReadOnlyList<GrandfatheredCount> counts = GrandfatheredCounts.Extract("d.md", doc);
 
         // Assert
-        counts.Last()
-            .Count.ShouldBe(3);
+        counts.Select(count => count.Count)
+            .ShouldBe([3, 3]);
     }
 
     [Fact]
@@ -199,8 +201,8 @@ public sealed class GrandfatheredCountsTests
         IReadOnlyList<GrandfatheredCount> counts = GrandfatheredCounts.Extract("d.md", doc);
 
         // Assert
-        counts.Last()
-            .Count.ShouldBe(4);
+        counts.Select(count => count.Count)
+            .ShouldBe([4, 4]);
     }
 
     [Fact]
@@ -432,7 +434,7 @@ public sealed class GrandfatheredCountsTests
     public void Spell_WordStyle_ReadsAsTheProseWritesIt(int count, string expected)
     {
         // Act & Assert
-        GrandfatheredCounts.Spell(count, GrandfatheredCounts.CountStyle.Word)
+        CountSpelling.Spell(count, CountStyle.Word)
             .ShouldBe(expected);
     }
 
@@ -440,9 +442,9 @@ public sealed class GrandfatheredCountsTests
     public void Spell_NumeralAndTitleWordStyles_ReadAsTheirSurfacesWriteThem()
     {
         // Act & Assert: the tool prints digits, and a sentence that opens on the number capitalizes it.
-        GrandfatheredCounts.Spell(12, GrandfatheredCounts.CountStyle.Numeral)
+        CountSpelling.Spell(12, CountStyle.Numeral)
             .ShouldBe("12");
-        GrandfatheredCounts.Spell(33, GrandfatheredCounts.CountStyle.TitleWord)
+        CountSpelling.Spell(33, CountStyle.TitleWord)
             .ShouldBe("Thirty-three");
     }
 
@@ -456,7 +458,7 @@ public sealed class GrandfatheredCountsTests
     public void Spell_WordToTenStyle_SpellsToTenAndWritesDigitsAbove(int count, string expected)
     {
         // Act & Assert
-        GrandfatheredCounts.Spell(count, GrandfatheredCounts.CountStyle.WordToTen)
+        CountSpelling.Spell(count, CountStyle.WordToTen)
             .ShouldBe(expected);
     }
 
@@ -465,17 +467,17 @@ public sealed class GrandfatheredCountsTests
     {
         // Act & Assert: an unspellable number would compose a fragment nothing contains, and a gate that
         // can only fail for the wrong reason is worse than one that says it cannot answer.
-        Should.Throw<ArgumentOutOfRangeException>(() => GrandfatheredCounts.Spell(100, GrandfatheredCounts.CountStyle.Word));
+        Should.Throw<ArgumentOutOfRangeException>(() => CountSpelling.Spell(100, CountStyle.Word));
     }
 
     [Fact]
     public void Compose_TemplateAndCounts_FillsEveryPlaceholder()
     {
         // Act
-        string fragment = GrandfatheredCounts.Compose(
+        string fragment = CountSpelling.Compose(
             "holding {0} inline-SQL references and {1} inbound reach",
             [12, 1],
-            GrandfatheredCounts.CountStyle.Word);
+            CountStyle.Word);
 
         // Assert
         fragment.ShouldBe("holding twelve inline-SQL references and one inbound reach");
@@ -485,10 +487,10 @@ public sealed class GrandfatheredCountsTests
     public void Compose_WordToTenStyle_MixesWordsAndDigitsAsTheCountsFall()
     {
         // Act
-        string fragment = GrandfatheredCounts.Compose(
+        string fragment = CountSpelling.Compose(
             "holding {0} inline-SQL references and {1} inbound reach",
             [12, 1],
-            GrandfatheredCounts.CountStyle.WordToTen);
+            CountStyle.WordToTen);
 
         // Assert
         fragment.ShouldBe("holding 12 inline-SQL references and one inbound reach");
@@ -501,7 +503,7 @@ public sealed class GrandfatheredCountsTests
         string doc = string.Join("\n", "# Title", "", "goes red while its thirteen grandfathered", "sites stay quiet.");
 
         // Act
-        GrandfatheredCounts.CollapsedText collapsed = GrandfatheredCounts.Collapse(doc);
+        CollapsedText collapsed = CollapsedText.From(doc);
 
         // Assert
         collapsed.Text.ShouldContain("its thirteen grandfathered sites stay quiet.");
@@ -513,7 +515,7 @@ public sealed class GrandfatheredCountsTests
     public void Collapse_FragmentTheDocDoesNotCarry_HasNoSpan()
     {
         // Act & Assert
-        GrandfatheredCounts.Collapse("some prose")
+        CollapsedText.From("some prose")
             .Span("other prose")
             .ShouldBeNull();
     }

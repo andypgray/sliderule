@@ -76,7 +76,7 @@ public sealed class BuildFindingsTests
         BuildFinding finding = FindingsOf(result)
             .ShouldHaveSingleItem();
 
-        finding.Message.ShouldStartWith($"{RuleId}: {HumanWordingOf(result)}.");
+        finding.Message.ShouldStartWith($"{RuleId}: {ShouldHaveHumanWording(result)}.");
     }
 
     [Fact]
@@ -405,8 +405,7 @@ public sealed class BuildFindingsTests
         // the three shapes the message is composed from — so the claim below is about all of them.
         findings.Select(finding => finding.ViolationKind)
             .Distinct()
-            .Count()
-            .ShouldBe(PlaceableKinds.Count);
+            .ShouldBe(PlaceableKinds, ignoreOrder: true);
         findings.Select(finding => finding.Message)
             .ShouldContain(message => message.Contains("The baseline holds", StringComparison.Ordinal));
         findings.Select(finding => finding.Message)
@@ -481,7 +480,7 @@ public sealed class BuildFindingsTests
     // The very text the human report prints for this result's one violation, read back out of its own output
     // rather than typed a second time — so the report a developer reads and the line a build prints cannot
     // drift into two spellings of one violation.
-    private static string HumanWordingOf(RuleResult result)
+    private static string ShouldHaveHumanWording(RuleResult result)
     {
         string block = result.HumanBlock();
         // The header line carries the same separator between the rule ID and its sentence, so it is dropped:

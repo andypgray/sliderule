@@ -60,7 +60,7 @@ internal static class RuleResultAssertions
     ///     to its words: which cure a target earns depends on its shape, and every caller here is about its
     ///     verb.
     /// </remarks>
-    internal static RuleResult ShouldHaveWarnedInertTarget(this RuleResult result)
+    internal static CheckWarning ShouldHaveWarnedInertTarget(this RuleResult result)
     {
         string report = Describe(result);
         result.Status.ShouldBe(RuleStatus.Passed, report);
@@ -72,7 +72,7 @@ internal static class RuleResultAssertions
             () => warning.Message.ShouldBe(InertTargetMessage, report),
             () => warning.Hint.ShouldNotBeNullOrWhiteSpace(report));
 
-        return result;
+        return warning;
     }
 
     /// <summary>
@@ -85,10 +85,11 @@ internal static class RuleResultAssertions
     ///     <em>live</em> operands found, which is a fact about the codebase rather than about the dead
     ///     operand this is asserting. A caller that cares asserts it beside this.
     /// </remarks>
-    internal static RuleResult ShouldHaveWarnedPartlyInertOnOperand(
+    internal static CheckWarning ShouldHaveWarnedPartlyInertOnOperand(
         this RuleResult result, string operandReference)
     {
-        return result.ShouldHaveWarnedPartlyInertOnOperands([operandReference]);
+        return result.ShouldHaveWarnedPartlyInertOnOperands([operandReference])
+            .Warnings[0];
     }
 
     /// <summary>
@@ -120,10 +121,10 @@ internal static class RuleResultAssertions
     ///     keyed on the same operand, with its own message. Says nothing about status, for
     ///     <see cref="ShouldHaveWarnedPartlyInertOnOperand" />'s reason.
     /// </remarks>
-    internal static RuleResult ShouldHaveWarnedStricterOnOperand(this RuleResult result, string operandReference)
+    internal static CheckWarning ShouldHaveWarnedStricterOnOperand(this RuleResult result, string operandReference)
     {
-        return result.ShouldHaveWarnedPerPart(
-            [operandReference], CheckWarningKind.DeadOperand, StricterMessage);
+        return result.ShouldHaveWarnedPerPart([operandReference], CheckWarningKind.DeadOperand, StricterMessage)
+            .Warnings[0];
     }
 
     /// <summary>
@@ -136,10 +137,11 @@ internal static class RuleResultAssertions
     ///     Compared as <see cref="ShouldHaveWarnedPartlyInertOnOperands" /> compares its warnings. Says nothing
     ///     about status, for <see cref="ShouldHaveWarnedPartlyInertOnOperand" />'s reason.
     /// </remarks>
-    internal static RuleResult ShouldHaveWarnedStricterOnMembership(this RuleResult result, string membershipReference)
+    internal static CheckWarning ShouldHaveWarnedStricterOnMembership(
+        this RuleResult result, string membershipReference)
     {
-        return result.ShouldHaveWarnedPerPart(
-            [membershipReference], CheckWarningKind.DeadOperand, MembershipMessage);
+        return result.ShouldHaveWarnedPerPart([membershipReference], CheckWarningKind.DeadOperand, MembershipMessage)
+            .Warnings[0];
     }
 
     /// <summary>
@@ -151,9 +153,10 @@ internal static class RuleResultAssertions
     ///     Compared as <see cref="ShouldHaveWarnedPartlyInertOnOperands" /> compares its warnings. Says nothing
     ///     about status, for <see cref="ShouldHaveWarnedPartlyInertOnOperand" />'s reason.
     /// </remarks>
-    internal static RuleResult ShouldHaveWarnedAmongOperand(this RuleResult result, string amongReference)
+    internal static CheckWarning ShouldHaveWarnedAmongOperand(this RuleResult result, string amongReference)
     {
-        return result.ShouldHaveWarnedPerPart([amongReference], CheckWarningKind.DeadOperand, AmongMessage);
+        return result.ShouldHaveWarnedPerPart([amongReference], CheckWarningKind.DeadOperand, AmongMessage)
+            .Warnings[0];
     }
 
     // The per-part warnings (a dead target, allow-list, membership or among operand, a dead exemplar part) share
@@ -162,7 +165,7 @@ internal static class RuleResultAssertions
         this RuleResult result, string[] references, CheckWarningKind kind, Func<string, string> messageOf)
     {
         string report = Describe(result);
-        RequireExpectation(references, report);
+        ShouldExpectSomething(references, report);
 
         IReadOnlyList<string> rendered = result.Warnings
             .Select(warning => $"{warning.Kind} {warning.Key ?? NothingPopulated}: {warning.Message}")
@@ -219,6 +222,16 @@ internal static class RuleResultAssertions
     }
 
     /// <summary>
+    ///     The one-part form of <see cref="ShouldHaveWarnedDeadExemplars" />, handing back the warning for a row
+    ///     that reads its cure.
+    /// </summary>
+    internal static CheckWarning ShouldHaveWarnedDeadExemplar(this RuleResult result, string reference)
+    {
+        return result.ShouldHaveWarnedDeadExemplars(reference)
+            .Warnings[0];
+    }
+
+    /// <summary>
     ///     Asserts the rule's exemplar resolved to exactly the types named <paramref name="fullNames" />, in that
     ///     order; with none given, that it resolved to nothing.
     /// </summary>
@@ -242,7 +255,7 @@ internal static class RuleResultAssertions
     ///     <paramref name="message" /> about <paramref name="file" /> — the shape a scope tripwire that
     ///     fired reports in, with the path carried structurally as well as in the prose.
     /// </summary>
-    internal static RuleResult ShouldHaveWarnedOnce(
+    internal static CheckWarning ShouldHaveWarnedOnce(
         this RuleResult result, CheckWarningKind kind, string message, string file)
     {
         string report = Describe(result);
@@ -255,7 +268,7 @@ internal static class RuleResultAssertions
             () => warning.Message.ShouldBe(message, report),
             () => warning.File.ShouldBe(file, report));
 
-        return result;
+        return warning;
     }
 
     /// <summary>
@@ -364,7 +377,7 @@ internal static class RuleResultAssertions
     {
         string report = Describe(result);
         string[] expected = identities.Select(IdentityOf).ToArray();
-        RequireExpectation(expected, report);
+        ShouldExpectSomething(expected, report);
         string[] actual = result.Violations
             .Select(violation => IdentityOf(violation.BaselineIdentity()))
             .ToArray();
@@ -378,7 +391,7 @@ internal static class RuleResultAssertions
     {
         string report = Describe(result);
         string[] expected = entries.Select(IdentityOf).ToArray();
-        RequireExpectation(expected, report);
+        ShouldExpectSomething(expected, report);
         string[] actual = result.GrandfatheredEntries
             .Select(IdentityOf)
             .ToArray();
@@ -401,6 +414,20 @@ internal static class RuleResultAssertions
     {
         result.Status.ShouldBe(RuleStatus.Failed, Describe(result));
         return result;
+    }
+
+    /// <summary>
+    ///     Asserts the rule failed on exactly one violation, of <paramref name="kind" />, and says nothing about what
+    ///     that violation names: for the rows whose claim is the kind alone.
+    /// </summary>
+    internal static Violation ShouldHaveFailedWithSingle(this RuleResult result, ViolationKind kind)
+    {
+        string report = Describe(result);
+        result.Status.ShouldBe(RuleStatus.Failed, report);
+        Violation violation = result.Violations.ShouldHaveSingleItem(report);
+        violation.Kind.ShouldBe(kind, report);
+
+        return violation;
     }
 
     /// <summary>
@@ -507,7 +534,7 @@ internal static class RuleResultAssertions
         this RuleResult result, ViolationKind kind, string[] edges)
     {
         string report = Describe(result);
-        RequireExpectation(edges, report);
+        ShouldExpectSomething(edges, report);
         result.Status.ShouldBe(RuleStatus.Failed, report);
         Rendered(result, kind)
             .ShouldBe(edges, ignoreOrder: true, customMessage: report);
@@ -533,7 +560,7 @@ internal static class RuleResultAssertions
         this RuleResult result, ViolationKind kind, (string Edge, string[] Sites)[] edges)
     {
         string report = Describe(result);
-        RequireExpectation(edges.Select(edge => edge.Edge).ToArray(), report);
+        ShouldExpectSomething(edges.Select(edge => edge.Edge).ToArray(), report);
         result.Status.ShouldBe(RuleStatus.Failed, report);
 
         IReadOnlyList<string> rendered = result.Violations.Where(violation => violation.Kind == kind)
@@ -570,7 +597,7 @@ internal static class RuleResultAssertions
         this RuleResult result, ViolationKind kind, (string Edge, string Detail)[] edges)
     {
         string report = Describe(result);
-        RequireExpectation(edges.Select(edge => edge.Edge).ToArray(), report);
+        ShouldExpectSomething(edges.Select(edge => edge.Edge).ToArray(), report);
         result.Status.ShouldBe(RuleStatus.Failed, report);
 
         IReadOnlyList<(string Edge, string Detail)> rendered = result.Violations
@@ -590,10 +617,26 @@ internal static class RuleResultAssertions
     internal static RuleResult ShouldHaveFailedWithSubjects(this RuleResult result, string[] subjects)
     {
         string report = Describe(result);
-        RequireExpectation(subjects, report);
+        ShouldExpectSomething(subjects, report);
         result.Status.ShouldBe(RuleStatus.Failed, report);
         Rendered(result, ViolationKind.Shape)
             .ShouldBe(subjects, ignoreOrder: true, customMessage: report);
+
+        return result;
+    }
+
+    /// <summary>
+    ///     Asserts the rule failed on exactly the member-shape violations <paramref name="symbolIds" /> names, each
+    ///     rendered as the offending member's DocId (GRAMMAR §4.6). In any order, for the reason given on
+    ///     <see cref="ShouldHaveFailedWithEdges" />.
+    /// </summary>
+    internal static RuleResult ShouldHaveFailedWithMemberSubjects(this RuleResult result, string[] symbolIds)
+    {
+        string report = Describe(result);
+        ShouldExpectSomething(symbolIds, report);
+        result.Status.ShouldBe(RuleStatus.Failed, report);
+        Rendered(result, ViolationKind.MemberShape)
+            .ShouldBe(symbolIds, ignoreOrder: true, customMessage: report);
 
         return result;
     }
@@ -636,7 +679,7 @@ internal static class RuleResultAssertions
     internal static RuleResult ShouldHaveFailedWithProjectSubjects(this RuleResult result, string[] projects)
     {
         string report = Describe(result);
-        RequireExpectation(projects, report);
+        ShouldExpectSomething(projects, report);
         result.Status.ShouldBe(RuleStatus.Failed, report);
         Rendered(result, ViolationKind.ProjectShape)
             .ShouldBe(projects, ignoreOrder: true, customMessage: report);
@@ -701,7 +744,7 @@ internal static class RuleResultAssertions
         this RuleResult result, ViolationKind kind, params string[] edges)
     {
         string report = Describe(result);
-        RequireExpectation(edges, report);
+        ShouldExpectSomething(edges, report);
         result.Status.ShouldBe(RuleStatus.Failed, report);
         IReadOnlyList<string> rendered = Rendered(result, kind);
 
@@ -793,7 +836,7 @@ internal static class RuleResultAssertions
     ///     satisfies the status assertion and then matches empty against empty. The rows that mean it —
     ///     "failed, but not on this kind" — have <see cref="ShouldHaveFailed" /> to say so.
     /// </remarks>
-    private static void RequireExpectation(string[] expected, string report)
+    private static void ShouldExpectSomething(string[] expected, string report)
     {
         if (expected.Length > 0) return;
 

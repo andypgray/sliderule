@@ -25,10 +25,8 @@ public sealed class CodebaseExtractorThrowEdgeTests
         model.ThrowEdge("N.Worker", "N.MyError")
             .Sites.Lines()
             .ShouldBe([3]);
-        model.HasConstructorEdge("N.Worker", "N.MyError")
-            .ShouldBeTrue();
-        model.HasEdge("N.Worker", "N.MyError")
-            .ShouldBeTrue();
+        model.ShouldHaveConstructorEdge("N.Worker", "N.MyError");
+        model.ShouldHaveEdge("N.Worker", "N.MyError");
     }
 
     [Fact]
@@ -43,8 +41,7 @@ public sealed class CodebaseExtractorThrowEdgeTests
         // CRITICAL: the thrown type is the expression's NATURAL static type (MyError), never the throw
         // conversion's ConvertedType (System.Exception) — using ConvertedType would collapse every throw to
         // System.Exception and erase the real type.
-        model.HasThrowEdge("N.Worker", "N.MyError")
-            .ShouldBeTrue();
+        model.ShouldHaveThrowEdge("N.Worker", "N.MyError");
         model.HasThrowEdge("N.Worker", "System.Exception")
             .ShouldBeFalse();
     }
@@ -148,6 +145,7 @@ public sealed class CodebaseExtractorThrowEdgeTests
 
         // A bare rethrow `throw;` (null expression) mints no throw edge.
         model.ThrowEdges("N.Worker")
+            .TargetNames()
             .ShouldBeEmpty();
     }
 
@@ -161,6 +159,7 @@ public sealed class CodebaseExtractorThrowEdgeTests
 
         // `throw null` has no thrown type (the null literal), so it mints nothing.
         model.ThrowEdges("N.Worker")
+            .TargetNames()
             .ShouldBeEmpty();
     }
 
@@ -174,6 +173,7 @@ public sealed class CodebaseExtractorThrowEdgeTests
 
         // A type-parameter thrown type is not a named type, so it mints nothing.
         model.ThrowEdges("N.Worker")
+            .TargetNames()
             .ShouldBeEmpty();
     }
 
@@ -194,9 +194,9 @@ public sealed class CodebaseExtractorThrowEdgeTests
         // A throw helper is an ordinary invocation, not a throw: the walk sees a member use, not a throw. So it
         // mints the member-use (and reference) edge but NO throw edge — the named §4.8 honesty boundary.
         model.ThrowEdges("N.Worker")
+            .TargetNames()
             .ShouldBeEmpty();
-        model.HasEdge("N.Worker", "System.ArgumentNullException")
-            .ShouldBeTrue();
+        model.ShouldHaveEdge("N.Worker", "System.ArgumentNullException");
         model.MemberEdges("N.Worker")
             .ShouldContain(e => e.Member.Name == "ThrowIfNull");
     }
@@ -211,8 +211,7 @@ public sealed class CodebaseExtractorThrowEdgeTests
                                                          """);
 
         // throw new Boom<int>() records the OPEN definition N.Boom<T> (§4.1).
-        model.HasThrowEdge("N.Worker", "N.Boom<T>")
-            .ShouldBeTrue();
+        model.ShouldHaveThrowEdge("N.Worker", "N.Boom<T>");
     }
 
     [Fact]
@@ -230,6 +229,7 @@ public sealed class CodebaseExtractorThrowEdgeTests
         model.HasThrowEdge("N.Recursive", "N.Recursive")
             .ShouldBeFalse();
         model.ThrowEdges("N.Recursive")
+            .TargetNames()
             .ShouldBeEmpty();
     }
 
@@ -249,8 +249,7 @@ public sealed class CodebaseExtractorThrowEdgeTests
                                                          }
                                                          """);
 
-        model.HasThrowEdge("N.Worker", "N.MyError")
-            .ShouldBeTrue();
+        model.ShouldHaveThrowEdge("N.Worker", "N.MyError");
     }
 
     [Fact]
@@ -269,8 +268,7 @@ public sealed class CodebaseExtractorThrowEdgeTests
                                                          }
                                                          """);
 
-        model.HasThrowEdge("N.Worker", "N.MyError")
-            .ShouldBeTrue();
+        model.ShouldHaveThrowEdge("N.Worker", "N.MyError");
     }
 
     [Fact]
@@ -306,7 +304,7 @@ public sealed class CodebaseExtractorThrowEdgeTests
                                                          """);
 
         model.ThrowEdges("N.Worker")
-            .Select(e => e.Thrown.FullName)
+            .TargetNames()
             .ShouldBe(["N.Alpha", "N.Beta"]);
     }
 }

@@ -48,8 +48,7 @@ public sealed class DeadAllowOperandTests
             .Single();
 
         result.ShouldHavePassed();
-        result.ShouldHaveWarnedStricterOnOperand("types in `App.Ghost.*`");
-        result.Warnings.Single()
+        result.ShouldHaveWarnedStricterOnOperand("types in `App.Ghost.*`")
             .Hint.ShouldBe(NamespaceCure);
         result.ShouldSatisfyAllConditions(
             () => result.MeasuredInFull.ShouldBeFalse(),
@@ -73,7 +72,7 @@ public sealed class DeadAllowOperandTests
     [Fact]
     public void MustOnlyReference_DeadGlobInAnUnderList_WarnsNamingTheOneGlobSpelling()
     {
-        RuleResult result = Checker.Run(Sources.FolderModel, Sources.FolderRoot, arch =>
+        RuleResult result = Checker.Run(Sources.FolderModel, root: Sources.FolderRoot, define: arch =>
                 arch.Rule("only/glob")
                     .Enforce(arch.Types.Named("Writer").MustOnlyReference(arch.Types.Under("src/Console", "src/Gone")))
                     .Because("b"))
@@ -161,8 +160,7 @@ public sealed class DeadAllowOperandTests
         RuleResult containment = Containment("IFacade", "Ghost");
 
         containment.ShouldHaveFailedWithEdges(ViolationKind.Reference, ["App.Client.User -> App.Legacy.Internal"]);
-        containment.ShouldHaveWarnedStricterOnOperand("types named `Ghost`");
-        containment.Warnings.Single()
+        containment.ShouldHaveWarnedStricterOnOperand("types named `Ghost`")
             .Hint.ShouldBe(NameCure);
     }
 

@@ -328,7 +328,7 @@ public sealed class QuoteSyncTests
             .Select(static marked => marked.Doc)
             .Distinct(StringComparer.Ordinal)
             .ToArray(),
-        static doc => SourceAnchors.Fences(RepoRoot.ReadText(doc)),
+        static (_, text) => DocFences.Fences(text),
         quotes: "fenced code blocks",
         scanner: "fence scanner");
 
@@ -360,7 +360,7 @@ public sealed class QuoteSyncTests
     public void SyncedExcerpts_AppearVerbatimInTheirSource()
     {
         // Arrange
-        Func<string, IReadOnlyList<string>?> readSource = SourceAnchors.DiskReader(RepoRoot.Directory);
+        Func<string, IReadOnlyList<string>?> readSource = RepoRoot.LineReader();
         List<string> drift = new();
 
         // Act: every non-blank line of an excerpt's fence must appear, in order, as a verbatim substring
@@ -388,7 +388,7 @@ public sealed class QuoteSyncTests
     public void WholeExcerpts_EqualTheirSource()
     {
         // Arrange
-        Func<string, IReadOnlyList<string>?> readSource = SourceAnchors.DiskReader(RepoRoot.Directory);
+        Func<string, IReadOnlyList<string>?> readSource = RepoRoot.LineReader();
         List<string> drift = new();
 
         // Act: a quote that presents itself as whole must be its source line for line, as much of the source as
@@ -402,7 +402,7 @@ public sealed class QuoteSyncTests
                 Extent.TailFromMarker => ($"{excerpt.Source} from its one line beginning '{excerpt.Marker}' to its end",
                     SourceTail(excerpt, readSource)),
                 Extent.WholeStatements => SourceStatements(excerpt, fence, readSource),
-                _ => ($"the one fence of {excerpt.Source} marked '{excerpt.Marker}'", SourceFence(excerpt))
+                _ => ($"the one fence of {excerpt.Source} marked '{excerpt.Marker}'", SourceFence(excerpt, readSource))
             };
             if (source is null)
             {
@@ -434,9 +434,9 @@ public sealed class QuoteSyncTests
             .ToList();
 
         // Act
-        List<string> unregistered = SourceAnchors.FencedBlocks(RepoRoot.ReadText(page))
-            .Where(block => !markers.Any(marker => block.Any(line => line.Text.Contains(marker, StringComparison.Ordinal))))
-            .Select(block => $"{page}:{block.FirstOrDefault().Number}")
+        List<string> unregistered = DocFences.TaggedBlocks(RepoRoot.ReadText(page))
+            .Where(block => !markers.Any(marker => block.Lines.Any(line => line.Text.Contains(marker, StringComparison.Ordinal))))
+            .Select(block => $"{page}:{block.OpeningLine}")
             .ToList();
 
         // Assert
@@ -565,10 +565,11 @@ public sealed class QuoteSyncTests
     // What is wrong with how one step cuts one registered fence, or null when nothing is. CI's cut (fence.sh) opens a
     // fence only on a line starting with three backticks at column 0, takes the rest of that line as the language
     // with only its trailing side trimmed, and selects by language as well as by marker; so an indented or tilde
-    // fence, or a cut naming a language the opening line does not carry, comes back empty. The opening line is read
-    // raw, because TaggedBlocks opens fences CI never does and trims the tag both sides. A marker that resolves to no
-    // fence or to several is EachExcerpt_MatchesExactlyOneFence's to report. CI closes a fence on any line starting
-    // with three backticks, so a fence nested inside another is not modelled; no tracked doc nests one in a cut fence.
+    // fence, or a cut naming a language the opening line does not carry, comes back empty. The opening line is the
+    // delimiter as written, TaggedBlock.Opening rather than its Info, because TaggedBlocks opens fences CI never does
+    // and trims the tag both sides. A marker that resolves to no fence or to several is
+    // EachExcerpt_MatchesExactlyOneFence's to report. CI closes a fence on any line starting with three backticks,
+    // so a fence nested inside another is not modelled; no tracked doc nests one in a cut fence.
     private static string? CutFinding(string doc, string key, string marker, string runBy, string step, string docText)
     {
         Regex cut = new($@"\bfence {Regex.Escape(doc)} (\S+) '{Regex.Escape(marker)}'", RegexOptions.CultureInvariant);
@@ -576,12 +577,12 @@ public sealed class QuoteSyncTests
         if (!match.Success) return $"{doc} {key}: the step '{runBy}' does not cut this fence with fence {doc} <lang> '{marker}'.";
 
         string language = match.Groups[1].Value;
-        SourceAnchors.TaggedBlock[] marked = SourceAnchors.TaggedBlocks(docText)
+        DocFences.TaggedBlock[] marked = DocFences.TaggedBlocks(docText)
             .Where(block => block.Lines.Any(line => line.Text.Contains(marker, StringComparison.Ordinal)))
             .ToArray();
         if (marked is not [var fence]) return null;
 
-        string opening = docText.Split('\n')[fence.OpeningLine - 1].TrimEnd('\r');
+        string opening = fence.Opening;
         if (!opening.StartsWith("```", StringComparison.Ordinal))
             return $"{doc} {key}: the step '{runBy}' cuts this fence, but it opens with '{opening}', and CI's cut opens only a fence of three backticks at column 0, so the cut comes back empty.";
 
@@ -622,10 +623,12 @@ public sealed class QuoteSyncTests
     }
 
     // The source's own fence for a whole-fence excerpt: the one carrying the excerpt's marker, or null when
-    // the source carries none or several.
-    private static IReadOnlyList<string>? SourceFence(Excerpt excerpt)
+    // the source is missing or carries none or several.
+    private static IReadOnlyList<string>? SourceFence(Excerpt excerpt, Func<string, IReadOnlyList<string>?> readSource)
     {
-        List<IReadOnlyList<string>> carrying = SourceAnchors.Fences(RepoRoot.ReadText(excerpt.Source))
+        if (readSource(excerpt.Source) is not { } lines) return null;
+
+        List<IReadOnlyList<string>> carrying = DocFences.Fences(string.Join("\n", lines))
             .Where(candidate => ContainsMarker(candidate, excerpt.Marker))
             .ToList();
 

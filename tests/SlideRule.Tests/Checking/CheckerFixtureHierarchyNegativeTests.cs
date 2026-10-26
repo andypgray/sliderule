@@ -13,23 +13,19 @@ namespace SlideRule.Tests.Checking;
 ///     <c>System.Exception</c> is the one external (BCL) base anchor, and the one that still wants a
 ///     <c>typeof</c> — the spec side of this test compiles against the BCL already.
 /// </summary>
-public sealed class CheckerFixtureHierarchyNegativeTests(WorkspaceFixture fixture)
+public sealed class CheckerFixtureHierarchyNegativeTests(WorkspaceFixture fixture) : IClassFixture<WorkspaceFixture>
 {
     [Fact]
     public void MustNotImplement_OpenGeneric_RedsInvoiceCreatedHandler_PassesHomeController()
     {
         // InvoiceCreatedHandler : IHandler<InvoiceCreated> — the open-generic construction match reds it.
-        Checker.Run(fixture.Model, arch => arch.Rule("hierarchy/no-handlers")
-                .Enforce(arch.Types.WithPrefix("InvoiceCreatedHandler").MustNotImplement("MyApp.Web.IHandler<T>"))
-                .Because("b"))
-            .Single()
+        Checker.Verdict(fixture.Model, arch => arch.Types.WithPrefix("InvoiceCreatedHandler")
+                .MustNotImplement("MyApp.Web.IHandler<T>"))
             .ShouldHaveFailedWithSubjects(["MyApp.Web.InvoiceCreatedHandler"]);
 
         // HomeController does not implement IHandler — the ban silently passes.
-        Checker.Run(fixture.Model, arch => arch.Rule("hierarchy/no-handlers")
-                .Enforce(arch.Types.WithPrefix("HomeController").MustNotImplement("MyApp.Web.IHandler<T>"))
-                .Because("b"))
-            .Single()
+        Checker.Verdict(fixture.Model, arch => arch.Types.WithPrefix("HomeController")
+                .MustNotImplement("MyApp.Web.IHandler<T>"))
             .ShouldHavePassed();
     }
 
@@ -37,17 +33,13 @@ public sealed class CheckerFixtureHierarchyNegativeTests(WorkspaceFixture fixtur
     public void MustNotDeriveFrom_ExternalBaseException_RedsOrderRuleViolation_PassesOrderApproval()
     {
         // OrderRuleViolation : System.Exception — the direct external base is recorded, so the ban reds it.
-        Checker.Run(fixture.Model, arch => arch.Rule("hierarchy/no-bcl-exceptions")
-                .Enforce(arch.Types.WithPrefix("OrderRuleViolation").MustNotDeriveFrom(typeof(Exception)))
-                .Because("b"))
-            .Single()
+        Checker.Verdict(fixture.Model, arch => arch.Types.WithPrefix("OrderRuleViolation")
+                .MustNotDeriveFrom(typeof(Exception)))
             .ShouldHaveFailedWithSubjects(["MyApp.Domain.OrderRuleViolation"]);
 
         // OrderApproval derives from no BCL exception — the ban silently passes.
-        Checker.Run(fixture.Model, arch => arch.Rule("hierarchy/no-bcl-exceptions")
-                .Enforce(arch.Types.WithPrefix("OrderApproval").MustNotDeriveFrom(typeof(Exception)))
-                .Because("b"))
-            .Single()
+        Checker.Verdict(fixture.Model, arch => arch.Types.WithPrefix("OrderApproval")
+                .MustNotDeriveFrom(typeof(Exception)))
             .ShouldHavePassed();
     }
 
@@ -55,18 +47,13 @@ public sealed class CheckerFixtureHierarchyNegativeTests(WorkspaceFixture fixtur
     public void MustNotBeAttributedWith_WebRoute_RedsHomeController_PassesInvoiceCreatedHandler()
     {
         // HomeController carries [WebRoute("/home")] — the declared attribute reds it.
-        Checker.Run(fixture.Model, arch => arch.Rule("hierarchy/no-webroute")
-                .Enforce(arch.Types.WithPrefix("HomeController").MustNotBeAttributedWith("MyApp.Web.WebRouteAttribute"))
-                .Because("b"))
-            .Single()
+        Checker.Verdict(fixture.Model, arch => arch.Types.WithPrefix("HomeController")
+                .MustNotBeAttributedWith("MyApp.Web.WebRouteAttribute"))
             .ShouldHaveFailedWithSubjects(["MyApp.Web.HomeController"]);
 
         // InvoiceCreatedHandler carries no attribute — the ban silently passes.
-        Checker.Run(fixture.Model, arch => arch.Rule("hierarchy/no-webroute")
-                .Enforce(arch.Types.WithPrefix("InvoiceCreatedHandler")
-                    .MustNotBeAttributedWith("MyApp.Web.WebRouteAttribute"))
-                .Because("b"))
-            .Single()
+        Checker.Verdict(fixture.Model, arch => arch.Types.WithPrefix("InvoiceCreatedHandler")
+                .MustNotBeAttributedWith("MyApp.Web.WebRouteAttribute"))
             .ShouldHavePassed();
     }
 }

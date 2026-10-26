@@ -18,6 +18,10 @@ internal static class FixtureRestorer
 
     private static readonly string[] SolutionExtensions = [".sln", ".slnx"];
 
+    // Written after every sweep that restored all the beds. It sits above every bed, so neither a leased copy's
+    // sync nor a walk of one bed sees it.
+    private static string SweepMarker => Path.Combine(FixtureBeds.TestSolutionsRoot, ".restored");
+
     /// <summary>Restores every fixture solution once, the first time it is called; free on repeat.</summary>
     internal static void EnsureRestored()
     {
@@ -37,13 +41,24 @@ internal static class FixtureRestorer
             .EnumerateFiles(testSolutionsDir, "*.*proj", SearchOption.AllDirectories)
             .Any(projectPath => !File.Exists(
                 Path.Combine(Path.GetDirectoryName(projectPath)!, "obj", "project.assets.json")));
-        if (!anyUnrestored) return true;
+
+        // An assets file says a project was restored once, not that it was restored since its project file
+        // last changed, so a restore-relevant file newer than the last sweep sweeps again. Compared with the
+        // marker rather than with each assets file, because a restore that changes nothing need not rewrite one.
+        DateTime? swept = File.Exists(SweepMarker) ? File.GetLastWriteTimeUtc(SweepMarker) : null;
+        bool anyChanged = swept is null || Directory
+            .EnumerateFiles(testSolutionsDir, "*", SearchOption.AllDirectories)
+            .Where(path => !TempFixtureWorkspace.IsBuildArtifact(Path.GetRelativePath(testSolutionsDir, path)))
+            .Where(TempFixtureWorkspace.IsProjectFile)
+            .Any(path => File.GetLastWriteTimeUtc(path) > swept);
+        if (!anyUnrestored && !anyChanged) return true;
 
         IEnumerable<string> solutions = Directory
             .EnumerateFiles(testSolutionsDir, "*", SearchOption.AllDirectories)
             .Where(IsSolutionFile);
         foreach (string solutionPath in solutions) Restore(solutionPath);
 
+        File.WriteAllText(SweepMarker, "");
         return true;
     }
 
@@ -65,10 +80,6 @@ internal static class FixtureRestorer
     /// <summary>Restores one solution with a clean SDK environment (via <see cref="DotnetCli" />).</summary>
     internal static void Restore(string solutionPath)
     {
-        // --disable-build-servers plus DotnetCli.Run's node-reuse/MSBuild-server env kills persistence:
-        // without it the restore leaves a reused MSBuild worker node (and, on newer SDKs, an MSBuild
-        // server) alive, and that lingering child inherits the restore's redirected stdout write-handle,
-        // so the drain never reaches EOF. No persistent children means the pipe closes cleanly on exit.
-        DotnetCli.Run($"restore \"{solutionPath}\" --disable-build-servers", Path.GetDirectoryName(solutionPath)!);
+        DotnetCli.Run($"restore \"{solutionPath}\"", Path.GetDirectoryName(solutionPath)!);
     }
 }

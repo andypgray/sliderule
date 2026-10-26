@@ -67,7 +67,7 @@ public sealed class WalkthroughScenarioTests
         List<string> strays = [];
         foreach ((string file, IReadOnlyList<string> lines) in Segments(quoted.Lines, fence.File!))
         {
-            IReadOnlyList<string> source = EditedFile(edited, file, scenario.Key)
+            IReadOnlyList<string> source = ShouldHaveEditedFile(edited, file, scenario.Key)
                 .Split('\n');
             string? stray = QuoteSyncTests.FirstLineNotInSource(lines, source);
             if (stray is not null) strays.Add($"'{stray}' is not a line of {file} after the one before it");
@@ -196,7 +196,7 @@ public sealed class WalkthroughScenarioTests
     }
 
     // The scenario's edited text of the one file it changes under this name.
-    private static string EditedFile(IReadOnlyDictionary<string, string> edited, string fileName, string scenario)
+    private static string ShouldHaveEditedFile(IReadOnlyDictionary<string, string> edited, string fileName, string scenario)
     {
         List<string> named = edited.Keys.Where(candidate => Path.GetFileName(candidate) == fileName)
             .ToList();
@@ -215,7 +215,7 @@ public sealed class WalkthroughScenarioTests
     // The page's prose as one run of single-spaced words, so a sentence reads the same however it is wrapped.
     private static string Prose(string doc)
     {
-        return Spaced(string.Join(" ", SourceAnchors.ProseLines(RepoRoot.ReadText(doc))
+        return Spaced(string.Join(" ", DocFences.ProseLines(RepoRoot.ReadText(doc))
             .Select(static line => line.Text)));
     }
 

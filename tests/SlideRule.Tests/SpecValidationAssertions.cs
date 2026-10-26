@@ -4,8 +4,8 @@ using SlideRule.Validation;
 namespace SlideRule.Tests;
 
 /// <summary>
-///     The Shouldly surface over <see cref="SpecValidationException" />: one assertion for the question
-///     the catalog asks of every failing spec — was this code reported, against this rule (GRAMMAR §8).
+///     The Shouldly surface over <see cref="SpecValidationException" />: the questions the catalog asks of
+///     every failing spec — was this code reported, against this rule, and how many times (GRAMMAR §8).
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -15,7 +15,7 @@ namespace SlideRule.Tests;
 ///         about a one-pass validator raises.
 ///     </para>
 ///     <para>
-///         Returns the matched error so the site can go on to pin its message, which stays at the call
+///         Each returns what it matched so the site can go on to pin a message, which stays at the call
 ///         site: those strings are the spec, and burying them in an overload would hide them.
 ///     </para>
 ///     <para>
@@ -43,6 +43,24 @@ internal static class SpecValidationAssertions
         }
 
         return match;
+    }
+
+    /// <summary>
+    ///     Asserts <paramref name="exception" /> reported <paramref name="code" /> exactly <paramref name="count" />
+    ///     times, zero included, and returns those errors in validator order.
+    /// </summary>
+    internal static IReadOnlyList<SpecValidationError> ShouldHaveErrors(
+        this SpecValidationException exception, SpecValidationErrorCode code, int count)
+    {
+        List<SpecValidationError> matching = exception.Errors
+            .Where(error => error.Code == code)
+            .ToList();
+
+        if (matching.Count != count)
+            throw new ShouldAssertException(
+                $"Expected {count} {code}, found {matching.Count}.{Environment.NewLine}{Describe(exception)}");
+
+        return matching;
     }
 
     /// <summary>Every reported error as <c>Code on 'ruleId'</c>, in validator order.</summary>

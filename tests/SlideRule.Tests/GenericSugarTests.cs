@@ -1,4 +1,3 @@
-using Shouldly;
 using SlideRule.Tests.Checking;
 using Xunit;
 
@@ -8,89 +7,90 @@ namespace SlideRule.Tests;
 ///     Generic-type sugar (GRAMMAR §5.2/§5.3): <c>arch.Type&lt;T&gt;()</c>, the
 ///     <c>Implementing</c>/<c>DerivedFrom</c>/<c>AttributedWith</c> adjective twins, and the
 ///     <c>MustImplement</c>/<c>MustDeriveFrom</c>/<c>MustBeAttributedWith</c> constraint twins each reify
-///     identically to their <c>typeof</c> counterpart — the model is the sole source of prose, so identical
-///     rendered sentences prove identical reification. A <c>[Fact]</c> per family: type arguments are
-///     compile-time, so there is nothing to theorize. (Open generics stay <c>typeof</c> — inexpressible as
-///     a type argument — and are out of scope by design.)
+///     identically to their <c>typeof</c> counterpart: the same model-file text and the same sentence. A
+///     <c>[Fact]</c> per family: type arguments are compile-time, so there is nothing to theorize. (Open
+///     generics stay <c>typeof</c> — inexpressible as a type argument — and are out of scope by design.)
 /// </summary>
 public class GenericSugarTests
 {
     [Fact]
     public void TypeSugar_Generic_ReifiesIdenticallyToTypeof()
     {
-        Checker.Sentence(arch => arch.Type<SugarType>()
-                .MustBeSealed())
-            .ShouldBe(Checker.Sentence(arch => arch.Type(typeof(SugarType))
-                .MustBeSealed()));
+        Checker.ShouldReifyAlike(
+            arch => arch.Type<SugarType>().MustBeSealed(),
+            arch => arch.Type(typeof(SugarType)).MustBeSealed());
     }
 
     [Fact]
     public void Implementing_Generic_ReifiesIdenticallyToTypeof()
     {
-        Checker.Sentence(arch => arch.Types.Implementing<ISugarPort>()
-                .MustBeSealed())
-            .ShouldBe(Checker.Sentence(arch => arch.Types.Implementing(typeof(ISugarPort))
-                .MustBeSealed()));
+        Checker.ShouldReifyAlike(
+            arch => arch.Types.Implementing<ISugarPort>().MustBeSealed(),
+            arch => arch.Types.Implementing(typeof(ISugarPort)).MustBeSealed());
     }
 
     [Fact]
     public void DerivedFrom_Generic_ReifiesIdenticallyToTypeof()
     {
-        Checker.Sentence(arch => arch.Types.DerivedFrom<SugarBase>()
-                .MustBeSealed())
-            .ShouldBe(Checker.Sentence(arch => arch.Types.DerivedFrom(typeof(SugarBase))
-                .MustBeSealed()));
+        Checker.ShouldReifyAlike(
+            arch => arch.Types.DerivedFrom<SugarBase>().MustBeSealed(),
+            arch => arch.Types.DerivedFrom(typeof(SugarBase)).MustBeSealed());
     }
 
     [Fact]
     public void AttributedWith_Generic_ReifiesIdenticallyToTypeof()
     {
-        Checker.Sentence(arch => arch.Types.AttributedWith<SugarAttribute>()
-                .MustBeSealed())
-            .ShouldBe(Checker.Sentence(arch => arch.Types.AttributedWith(typeof(SugarAttribute))
-                .MustBeSealed()));
+        Checker.ShouldReifyAlike(
+            arch => arch.Types.AttributedWith<SugarAttribute>().MustBeSealed(),
+            arch => arch.Types.AttributedWith(typeof(SugarAttribute)).MustBeSealed());
     }
 
     [Fact]
     public void MustImplement_Generic_ReifiesIdenticallyToTypeof()
     {
-        Checker.Sentence(arch => arch.Types.MustImplement<ISugarPort>())
-            .ShouldBe(Checker.Sentence(arch => arch.Types.MustImplement(typeof(ISugarPort))));
+        Checker.ShouldReifyAlike(
+            arch => arch.Types.MustImplement<ISugarPort>(),
+            arch => arch.Types.MustImplement(typeof(ISugarPort)));
     }
 
     [Fact]
     public void MustDeriveFrom_Generic_ReifiesIdenticallyToTypeof()
     {
-        Checker.Sentence(arch => arch.Types.MustDeriveFrom<SugarBase>())
-            .ShouldBe(Checker.Sentence(arch => arch.Types.MustDeriveFrom(typeof(SugarBase))));
+        Checker.ShouldReifyAlike(
+            arch => arch.Types.MustDeriveFrom<SugarBase>(),
+            arch => arch.Types.MustDeriveFrom(typeof(SugarBase)));
     }
 
     [Fact]
     public void MustBeAttributedWith_Generic_ReifiesIdenticallyToTypeof()
     {
-        Checker.Sentence(arch => arch.Types.MustBeAttributedWith<SugarAttribute>())
-            .ShouldBe(Checker.Sentence(arch => arch.Types.MustBeAttributedWith(typeof(SugarAttribute))));
+        Checker.ShouldReifyAlike(
+            arch => arch.Types.MustBeAttributedWith<SugarAttribute>(),
+            arch => arch.Types.MustBeAttributedWith(typeof(SugarAttribute)));
     }
 
     [Fact]
     public void MustNotImplement_Generic_ReifiesIdenticallyToTypeof()
     {
-        Checker.Sentence(arch => arch.Types.MustNotImplement<ISugarPort>())
-            .ShouldBe(Checker.Sentence(arch => arch.Types.MustNotImplement(typeof(ISugarPort))));
+        Checker.ShouldReifyAlike(
+            arch => arch.Types.MustNotImplement<ISugarPort>(),
+            arch => arch.Types.MustNotImplement(typeof(ISugarPort)));
     }
 
     [Fact]
     public void MustNotDeriveFrom_Generic_ReifiesIdenticallyToTypeof()
     {
-        Checker.Sentence(arch => arch.Types.MustNotDeriveFrom<SugarBase>())
-            .ShouldBe(Checker.Sentence(arch => arch.Types.MustNotDeriveFrom(typeof(SugarBase))));
+        Checker.ShouldReifyAlike(
+            arch => arch.Types.MustNotDeriveFrom<SugarBase>(),
+            arch => arch.Types.MustNotDeriveFrom(typeof(SugarBase)));
     }
 
     [Fact]
     public void MustNotBeAttributedWith_Generic_ReifiesIdenticallyToTypeof()
     {
-        Checker.Sentence(arch => arch.Types.MustNotBeAttributedWith<SugarAttribute>())
-            .ShouldBe(Checker.Sentence(arch => arch.Types.MustNotBeAttributedWith(typeof(SugarAttribute))));
+        Checker.ShouldReifyAlike(
+            arch => arch.Types.MustNotBeAttributedWith<SugarAttribute>(),
+            arch => arch.Types.MustNotBeAttributedWith(typeof(SugarAttribute)));
     }
 
     // ---- The member attribute axis (GRAMMAR §5.7): one receiver-typed overload per member selection, each
@@ -101,12 +101,13 @@ public class GenericSugarTests
     {
         // The MethodSelection overload returns a MethodSelection, so `.Returning` chains off the sugar —
         // this would not compile against the MemberSelection overload alone.
-        Checker.Sentence(arch => arch.Types.Methods.AttributedWith<SugarAttribute>()
+        Checker.ShouldReifyAlike(
+            arch => arch.Types.Methods.AttributedWith<SugarAttribute>()
                 .Returning(typeof(Task))
-                .MustBePublic())
-            .ShouldBe(Checker.Sentence(arch => arch.Types.Methods.AttributedWith(typeof(SugarAttribute))
+                .MustBePublic(),
+            arch => arch.Types.Methods.AttributedWith(typeof(SugarAttribute))
                 .Returning(typeof(Task))
-                .MustBePublic()));
+                .MustBePublic());
     }
 
     [Fact]
@@ -114,20 +115,22 @@ public class GenericSugarTests
     {
         // The PropertySelection overload returns a PropertySelection, so the properties-only verb chains off
         // the sugar — this would not compile against the MemberSelection overload alone.
-        Checker.Sentence(arch => arch.Types.Properties.AttributedWith<SugarAttribute>()
-                .MustBeGetOnly())
-            .ShouldBe(Checker.Sentence(arch => arch.Types.Properties.AttributedWith(typeof(SugarAttribute))
-                .MustBeGetOnly()));
+        Checker.ShouldReifyAlike(
+            arch => arch.Types.Properties.AttributedWith<SugarAttribute>()
+                .MustBeGetOnly(),
+            arch => arch.Types.Properties.AttributedWith(typeof(SugarAttribute))
+                .MustBeGetOnly());
     }
 
     [Fact]
     public void MemberAttributedWith_GenericOnFieldSelection_KeepsMustBeReadonlyReachable()
     {
         // The FieldSelection twin of the row above — the fields-only verb after the sugar.
-        Checker.Sentence(arch => arch.Types.Fields.AttributedWith<SugarAttribute>()
-                .MustBeReadonly())
-            .ShouldBe(Checker.Sentence(arch => arch.Types.Fields.AttributedWith(typeof(SugarAttribute))
-                .MustBeReadonly()));
+        Checker.ShouldReifyAlike(
+            arch => arch.Types.Fields.AttributedWith<SugarAttribute>()
+                .MustBeReadonly(),
+            arch => arch.Types.Fields.AttributedWith(typeof(SugarAttribute))
+                .MustBeReadonly());
     }
 
     [Fact]
@@ -136,10 +139,11 @@ public class GenericSugarTests
         // .Members is typed MemberSelection — its KindMemberSelection is internal, so no per-kind overload
         // can name it and the MemberSelection overload is the only one that binds. This test and the .Events
         // one below are the only ones in the suite that reach that overload.
-        Checker.Sentence(arch => arch.Types.Members.AttributedWith<SugarAttribute>()
-                .MustBePublic())
-            .ShouldBe(Checker.Sentence(arch => arch.Types.Members.AttributedWith(typeof(SugarAttribute))
-                .MustBePublic()));
+        Checker.ShouldReifyAlike(
+            arch => arch.Types.Members.AttributedWith<SugarAttribute>()
+                .MustBePublic(),
+            arch => arch.Types.Members.AttributedWith(typeof(SugarAttribute))
+                .MustBePublic());
     }
 
     [Fact]
@@ -147,24 +151,27 @@ public class GenericSugarTests
     {
         // .Events is the other MemberSelection-typed projection — same overload, a different kind filter
         // riding underneath it.
-        Checker.Sentence(arch => arch.Types.Events.AttributedWith<SugarAttribute>()
-                .MustBePublic())
-            .ShouldBe(Checker.Sentence(arch => arch.Types.Events.AttributedWith(typeof(SugarAttribute))
-                .MustBePublic()));
+        Checker.ShouldReifyAlike(
+            arch => arch.Types.Events.AttributedWith<SugarAttribute>()
+                .MustBePublic(),
+            arch => arch.Types.Events.AttributedWith(typeof(SugarAttribute))
+                .MustBePublic());
     }
 
     [Fact]
     public void MemberMustBeAttributedWith_Generic_ReifiesIdenticallyToTypeof()
     {
-        Checker.Sentence(arch => arch.Types.Methods.MustBeAttributedWith<SugarAttribute>())
-            .ShouldBe(Checker.Sentence(arch => arch.Types.Methods.MustBeAttributedWith(typeof(SugarAttribute))));
+        Checker.ShouldReifyAlike(
+            arch => arch.Types.Methods.MustBeAttributedWith<SugarAttribute>(),
+            arch => arch.Types.Methods.MustBeAttributedWith(typeof(SugarAttribute)));
     }
 
     [Fact]
     public void MemberMustNotBeAttributedWith_Generic_ReifiesIdenticallyToTypeof()
     {
-        Checker.Sentence(arch => arch.Types.Methods.MustNotBeAttributedWith<SugarAttribute>())
-            .ShouldBe(Checker.Sentence(arch => arch.Types.Methods.MustNotBeAttributedWith(typeof(SugarAttribute))));
+        Checker.ShouldReifyAlike(
+            arch => arch.Types.Methods.MustNotBeAttributedWith<SugarAttribute>(),
+            arch => arch.Types.Methods.MustNotBeAttributedWith(typeof(SugarAttribute)));
     }
 
     [Fact]
@@ -172,10 +179,9 @@ public class GenericSugarTests
     {
         // arch.AnyOf(typeof(A), typeof(B)) ≡ arch.AnyOf(arch.Type(a), arch.Type(b)) — the multi-type noun
         // that arch.Types(params Type[]) cannot be (CS0102 against the arch.Types property).
-        Checker.Sentence(arch => arch.AnyOf(typeof(SugarType), typeof(SugarBase))
-                .MustBeSealed())
-            .ShouldBe(Checker.Sentence(arch => arch.AnyOf(arch.Type<SugarType>(), arch.Type<SugarBase>())
-                .MustBeSealed()));
+        Checker.ShouldReifyAlike(
+            arch => arch.AnyOf(typeof(SugarType), typeof(SugarBase)).MustBeSealed(),
+            arch => arch.AnyOf(arch.Type<SugarType>(), arch.Type<SugarBase>()).MustBeSealed());
     }
 
     [Fact]
@@ -183,15 +189,12 @@ public class GenericSugarTests
     {
         // .Except(typeof(A)) ≡ .Except(arch.Type(a)); several types are the union arch.AnyOf would mint, so
         // the multi-type form is the AnyOf spelling written for the caller.
-        Checker.Sentence(arch => arch.Types.Except(typeof(SugarType))
-                .MustBeSealed())
-            .ShouldBe(Checker.Sentence(arch => arch.Types.Except(arch.Type(typeof(SugarType)))
-                .MustBeSealed()));
-        Checker.Sentence(arch => arch.Types.Except(typeof(SugarType), typeof(SugarBase))
-                .MustBeSealed())
-            .ShouldBe(Checker.Sentence(arch => arch.Types
-                .Except(arch.AnyOf(typeof(SugarType), typeof(SugarBase)))
-                .MustBeSealed()));
+        Checker.ShouldReifyAlike(
+            arch => arch.Types.Except(typeof(SugarType)).MustBeSealed(),
+            arch => arch.Types.Except(arch.Type(typeof(SugarType))).MustBeSealed());
+        Checker.ShouldReifyAlike(
+            arch => arch.Types.Except(typeof(SugarType), typeof(SugarBase)).MustBeSealed(),
+            arch => arch.Types.Except(arch.AnyOf(typeof(SugarType), typeof(SugarBase))).MustBeSealed());
     }
 
     // Local reification markers — the sugar-equality tests only need a non-generic interface, base class,

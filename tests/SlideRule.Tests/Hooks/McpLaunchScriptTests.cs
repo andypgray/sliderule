@@ -59,7 +59,7 @@ public sealed class McpLaunchScriptTests
 
         result.ShouldHaveExitedWith(0);
 
-        string[] argv = lab.ExecutedArguments();
+        string[] argv = lab.ShouldHaveExecutedArguments();
         argv.ShouldBe(["exec", lab.StagedServerDll(), "mcp", "MyApp.sln", "--spec", "./Spec.dll"]);
 
         // The whole build output travels, not just the file the identity is keyed on.
@@ -73,7 +73,7 @@ public sealed class McpLaunchScriptTests
     {
         using var lab = new Lab();
         lab.Launch("MyApp.sln");
-        string first = lab.ExecedServerDll();
+        string first = lab.ShouldHaveExecedServerDll();
 
         // Written into the staged copy between the two launches: a re-stage would replace the directory this
         // sits in, so surviving is what "copied nothing" looks like from outside.
@@ -83,7 +83,7 @@ public sealed class McpLaunchScriptTests
         ChildProcess.ProcessResult result = lab.Launch("MyApp.sln");
 
         result.ShouldHaveExitedWith(0);
-        lab.ExecedServerDll()
+        lab.ShouldHaveExecedServerDll()
             .ShouldBe(first);
         string staged = lab.StagedDirectories()
             .ShouldHaveSingleItem(
@@ -97,13 +97,13 @@ public sealed class McpLaunchScriptTests
     {
         using var lab = new Lab();
         lab.Launch("MyApp.sln");
-        string beforeRebuild = lab.ExecedServerDll();
+        string beforeRebuild = lab.ShouldHaveExecedServerDll();
 
         lab.WriteBuildOutput("a rebuilt CLI, of a different size");
         ChildProcess.ProcessResult result = lab.Launch("MyApp.sln");
 
         result.ShouldHaveExitedWith(0);
-        string afterRebuild = lab.ExecedServerDll();
+        string afterRebuild = lab.ShouldHaveExecedServerDll();
         afterRebuild.ShouldNotBe(
             beforeRebuild, "a rebuild has to be picked up, or the client is served the previous build forever.");
 
@@ -144,7 +144,7 @@ public sealed class McpLaunchScriptTests
 
         result.ShouldHaveExitedWith(0);
         result.StandardError.ShouldContain("could not stage a copy");
-        lab.ExecedServerDll()
+        lab.ShouldHaveExecedServerDll()
             .ShouldBe($"{lab.BuildOutput}/{ServerDll}");
     }
 
@@ -153,7 +153,7 @@ public sealed class McpLaunchScriptTests
     {
         using var lab = new Lab();
         lab.Launch("MyApp.sln");
-        string beforeRebuild = lab.ExecedServerDll();
+        string beforeRebuild = lab.ShouldHaveExecedServerDll();
 
         // Only the dependency moves, and to a new size, so no filesystem clock is coarse enough to hide it. The entry
         // assembly keeps its bytes and its timestamp: a change inside a project that builds a reference assembly
@@ -162,7 +162,7 @@ public sealed class McpLaunchScriptTests
         ChildProcess.ProcessResult result = lab.Launch("MyApp.sln");
 
         result.ShouldHaveExitedWith(0);
-        string afterRebuild = lab.ExecedServerDll();
+        string afterRebuild = lab.ShouldHaveExecedServerDll();
         afterRebuild.ShouldNotBe(
             beforeRebuild, "a copy keyed on the entry assembly alone goes on serving the dependency from before the rebuild.");
         File.ReadAllText(Path.Combine(Path.GetDirectoryName(afterRebuild)!, SiblingDll))
@@ -185,7 +185,7 @@ public sealed class McpLaunchScriptTests
         ChildProcess.ProcessResult result = lab.Launch("MyApp.sln");
 
         result.ShouldHaveExitedWith(0);
-        lab.ExecedServerDll()
+        lab.ShouldHaveExecedServerDll()
             .ShouldBe(
                 lab.StagedServerDll(),
                 "the launcher has to restage the key it found empty, not fall back to the build output.");
@@ -204,7 +204,7 @@ public sealed class McpLaunchScriptTests
         result.ShouldHaveExitedWith(0);
         string published = lab.StagedDirectories()
             .ShouldHaveSingleItem("the copy taken while the build wrote must be discarded, not published beside the stable one.");
-        lab.ExecedServerDll()
+        lab.ShouldHaveExecedServerDll()
             .ShouldBe(lab.StagedServerDll());
         File.ReadAllText(Path.Combine(published, SiblingDll))
             .ShouldBe(
@@ -229,7 +229,7 @@ public sealed class McpLaunchScriptTests
             + "moving is the whole build output copied only to be thrown away.");
         string published = lab.StagedDirectories()
             .ShouldHaveSingleItem("only the copy of the settled build is published.");
-        lab.ExecedServerDll()
+        lab.ShouldHaveExecedServerDll()
             .ShouldBe(lab.StagedServerDll());
         File.ReadAllText(Path.Combine(published, SiblingDll))
             .ShouldBe(lab.BuiltSibling, "the server has to run the build as it stood once it settled.");
@@ -250,7 +250,7 @@ public sealed class McpLaunchScriptTests
             .ShouldHaveSingleItem("the copy the launcher runs from is the one directory it keeps.");
         Path.GetFileName(unpublished)
             .ShouldStartWith(".staging.", customMessage: "a copy the build wrote into is never published under a key.");
-        lab.ExecedServerDll()
+        lab.ShouldHaveExecedServerDll()
             .ShouldBe(
                 ShellInterpreter.Posix(Path.Combine(unpublished, ServerDll)),
                 "a copy the build wrote into still beats a build output that a build is writing to.");
@@ -269,7 +269,7 @@ public sealed class McpLaunchScriptTests
 
         result.ShouldHaveExitedWith(0);
         result.StandardError.ShouldContain("could not stage a copy");
-        lab.ExecedServerDll()
+        lab.ShouldHaveExecedServerDll()
             .ShouldBe(
                 $"{lab.BuildOutput}/{ServerDll}",
                 "a copy the cp left unmade cannot start a server, and the build output at least still can.");
@@ -288,7 +288,7 @@ public sealed class McpLaunchScriptTests
         result.ShouldHaveExitedWith(0);
         result.StandardError.ShouldContain("could not stage a copy");
         lab.CopiesTaken.ShouldBe(1, "with nothing writing the build, a second copy fails the way the first did.");
-        lab.ExecedServerDll()
+        lab.ShouldHaveExecedServerDll()
             .ShouldBe($"{lab.BuildOutput}/{ServerDll}");
         lab.StagedDirectories()
             .ShouldBeEmpty("the copy that failed is not a copy to keep, published or staged.");
@@ -315,7 +315,7 @@ public sealed class McpLaunchScriptTests
         ChildProcess.ProcessResult result = lab.Launch("MyApp.sln");
 
         result.ShouldHaveExitedWith(0);
-        lab.ExecedServerDll()
+        lab.ShouldHaveExecedServerDll()
             .ShouldBe(
                 ShellInterpreter.Posix(Path.Combine(copy, ServerDll)),
                 "the build went back to the one this copy holds, so the launcher has to re-key onto it.");
@@ -350,7 +350,7 @@ public sealed class McpLaunchScriptTests
             .ShouldBeFalse(
                 "a copy nothing has launched from in five days outlived the sweep, so copies of old builds pile up "
                 + "under the run root for good.");
-        lab.ExecedServerDll()
+        lab.ShouldHaveExecedServerDll()
             .ShouldBe(lab.StagedServerDll());
     }
 
@@ -576,7 +576,7 @@ public sealed class McpLaunchScriptTests
         }
 
         /// <summary>What the stub <c>dotnet</c> was execed with, one argument per line.</summary>
-        internal string[] ExecutedArguments()
+        internal string[] ShouldHaveExecutedArguments()
         {
             File.Exists(_argumentsFile)
                 .ShouldBeTrue("the launcher never reached the exec.");
@@ -588,9 +588,9 @@ public sealed class McpLaunchScriptTests
         ///     The server the launcher did exec: the dll is argv[1], because the exec vector is
         ///     <c>dotnet exec &lt;dll&gt; mcp …</c>.
         /// </summary>
-        internal string ExecedServerDll()
+        internal string ShouldHaveExecedServerDll()
         {
-            return ExecutedArguments()[1];
+            return ShouldHaveExecutedArguments()[1];
         }
 
         /// <summary>The copies staged so far, newest key last.</summary>

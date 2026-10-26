@@ -34,7 +34,7 @@ public sealed class PackageShadowedNameTests
                                          public class Gadget {}
                                          """;
 
-    private static readonly CodebaseModel Model = Extract();
+    private static readonly CodebaseModel Model = Harness.Extract(Inputs());
 
     [Fact]
     public void ExtractFromCompilations_ProductBindsThePackage_ResolvesToTheAssemblyNotTheDeclaringProject()
@@ -152,8 +152,7 @@ public sealed class PackageShadowedNameTests
         // assembly — a hand-built one, or a cache written before the fragment carried the fact — must never
         // make the merge conclude that one name denotes two types. Unreachable through CompilationFactory,
         // which always names the assembly, so the blanking is done here rather than built in.
-        List<CodebaseFragment> unnamed = Inputs()
-            .Select(input => FragmentExtractor.Extract(input, Ct))
+        List<CodebaseFragment> unnamed = FragmentExtractor.ExtractAll(Inputs(), artifactFacts: null, Ct)
             .Select(fragment => fragment with { AssemblyName = null })
             .ToList();
 
@@ -264,11 +263,6 @@ public sealed class PackageShadowedNameTests
             ]);
     }
 
-    private static CodebaseModel Extract()
-    {
-        return Harness.Extract(Inputs());
-    }
-
     private static List<CompilationInput> Inputs()
     {
         CSharpCompilation vendor = CompilationFactory.CreateCompilation(
@@ -299,24 +293,22 @@ public sealed class PackageShadowedNameTests
 
         // The test project declares the stand-in and carries NO reference to the package — which is the
         // whole reason the idiom exists — plus a real reference to the product, the control edge.
-        var tests = new CompilationInput(
-            CompilationFactory.CreateCompilation(
-                "Product.Tests",
-                [CompilationFactory.CoreLibrary, product.Compilation.ToMetadataReference()],
-                ("Mocks/Vendor.cs", """
-                                    namespace Vendor;
-                                    public class Widget {}
-                                    """),
-                ("WidgetTests.cs", """
-                                   namespace Product.Tests;
-                                   public class WidgetTests
-                                   {
-                                       private Vendor.Widget stub;
-                                       private Product.Service subject;
-                                   }
-                                   """)),
+        CompilationInput tests = CompilationFactory.CompileReferencing(
             "Product.Tests",
-            ["Product"]);
+            product.Compilation,
+            "Product",
+            ("Mocks/Vendor.cs", """
+                                namespace Vendor;
+                                public class Widget {}
+                                """),
+            ("WidgetTests.cs", """
+                               namespace Product.Tests;
+                               public class WidgetTests
+                               {
+                                   private Vendor.Widget stub;
+                                   private Product.Service subject;
+                               }
+                               """));
 
         return [product, core, tests];
     }
@@ -410,8 +402,8 @@ public sealed class PackageShadowedNameTests
         return Nodes(Model, fullName);
     }
 
-    // Deliberately not ModelQuery.Type: its Single is exactly the uniqueness assumption this file exists to
-    // disprove, and a shadowed name would red it with an unhelpful message.
+    // Deliberately not ModelQuery.Type: it finds exactly one node per name, which is the uniqueness assumption this
+    // file exists to disprove.
     private static IReadOnlyList<TypeNode> Nodes(CodebaseModel model, string fullName)
     {
         return model.Types

@@ -29,4 +29,20 @@ public sealed class SpecValidationAssertionsTests
 
         Should.Throw<ShouldAssertException>(() => ex.ShouldHaveError(Code.MissingPosture, "area/nothing"));
     }
+
+    [Fact]
+    public void ShouldHaveErrors_CodeNeverReported_Reds()
+    {
+        var ex = Should.Throw<SpecValidationException>(() => ArchModelBuilder.Build(new DanglingRuleSpec()));
+
+        Should.Throw<ShouldAssertException>(() => ex.ShouldHaveErrors(Code.DuplicateId, 1));
+    }
+
+    [Fact]
+    public void ShouldHaveErrors_ReportedCodeCountedAsZero_Reds()
+    {
+        var ex = Should.Throw<SpecValidationException>(() => ArchModelBuilder.Build(new DanglingRuleSpec()));
+
+        Should.Throw<ShouldAssertException>(() => ex.ShouldHaveErrors(Code.MissingPosture, 0));
+    }
 }

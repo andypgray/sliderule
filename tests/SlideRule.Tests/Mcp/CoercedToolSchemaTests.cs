@@ -1,9 +1,9 @@
 using System.ComponentModel;
-using System.Diagnostics;
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.AI;
+using ModelContextProtocol.Client;
 using ModelContextProtocol.Server;
 using Shouldly;
 using SlideRule.Cli.Mcp.Pipeline;
@@ -131,12 +131,12 @@ public sealed class CoercedToolSchemaTests
     }
 
     [Fact]
-    public void LiveBoolParameter_KeepsItsTypeDescriptionAndDefault()
+    public async Task LiveBoolParameter_KeepsItsTypeDescriptionAndDefault()
     {
         // The repair puts back only the erased type, so the keywords the exporter still emits must survive
         // it. Their order in the object shifts — `type` lands last rather than first — which is not
         // something a client can read as meaning; their presence and values are.
-        JsonObject property = ShouldHaveLiveSchemaPropertyFor("arch_graph", "allowWorkspaceDiagnostics");
+        JsonObject property = await ShouldHaveLiveSchemaPropertyForAsync("arch_graph", "allowWorkspaceDiagnostics");
 
         property["type"]!.GetValue<string>()
             .ShouldBe("boolean");
@@ -170,7 +170,7 @@ public sealed class CoercedToolSchemaTests
         // off so it is an assertion rather than a claim: a converter-bound parameter with neither a
         // description nor a default has no keyword left to carry, so the exporter emits the bare `true`
         // schema rather than the `{}` the described parameters land as.
-        JsonNode property = SchemaNodeFor(methodName, parameterName, repairErasures: false);
+        JsonNode property = ShouldHaveSchemaNodeFor(methodName, parameterName, repairErasures: false);
 
         property.GetValueKind()
             .ShouldBe(JsonValueKind.True);
@@ -181,7 +181,7 @@ public sealed class CoercedToolSchemaTests
     {
         // `true` is only a repair target for the types the repair knows. A parameter no branch claims
         // is handed back byte-identical rather than widened into an equivalent-but-different `{}`.
-        JsonNode property = SchemaNodeFor(nameof(Probe.WithUndescribedObject), "payload");
+        JsonNode property = ShouldHaveSchemaNodeFor(nameof(Probe.WithUndescribedObject), "payload");
 
         property.GetValueKind()
             .ShouldBe(JsonValueKind.True);
@@ -199,14 +199,15 @@ public sealed class CoercedToolSchemaTests
     }
 
     [Fact]
-    public void EveryLiveArchToolParameter_AdvertisesAType()
+    public async Task EveryLiveArchToolParameter_AdvertisesAType()
     {
         // The live half of the repair, and the standing form of "no arch_* parameter may move": each one
         // reaches the client with a type only because this hook puts back what the coercers erased, and
         // both erasures — `{}` and `true` — read to a client as "any value at all".
         List<string> checkedParameters = [];
+        IList<McpClientTool> tools = await ServedArchToolsAsync();
 
-        foreach (McpServerTool tool in LiveArchTools())
+        foreach (McpClientTool tool in tools)
         {
             JsonObject schema = JsonNode.Parse(tool.ProtocolTool.InputSchema.GetRawText())!.AsObject();
             JsonObject properties = schema["properties"]
@@ -229,23 +230,15 @@ public sealed class CoercedToolSchemaTests
     }
 
     /// <summary>
-    ///     The real <c>arch_*</c> tools, created the way the server creates them. The activation callback
-    ///     never runs: <c>McpServerTool.Create</c> builds the schema from the method signature, and only a
-    ///     <c>tools/call</c> would reach for an instance.
+    ///     The real <c>arch_*</c> tools as the server lists them to a client over <c>tools/list</c>, from a host of the
+    ///     caller's own, disposed before the caller reads the schemas it returns.
     /// </summary>
-    private static IEnumerable<McpServerTool> LiveArchTools()
+    private static async Task<IList<McpClientTool>> ServedArchToolsAsync()
     {
-        McpServerToolCreateOptions options = new()
-        {
-            SchemaCreateOptions = CoercingToolRegistration.SchemaOptions,
-            SerializerOptions = ToolInputSerializerOptions.Instance
-        };
+        await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
+            McpServerBindings.MyAppWithCleanSpec(), Ct);
 
-        return ToolAttributeDiscovery.GetToolMethods()
-            .Select(method => McpServerTool.Create(
-                method,
-                _ => throw new UnreachableException("A schema-only tool was asked for an instance."),
-                options));
+        return await harness.Client.ListToolsAsync(cancellationToken: Ct);
     }
 
     /// <summary>
@@ -253,10 +246,10 @@ public sealed class CoercedToolSchemaTests
     ///     <paramref name="toolName" />, so a claim about the repair can be made against a shipped
     ///     parameter rather than a probe standing in for one.
     /// </summary>
-    private static JsonObject ShouldHaveLiveSchemaPropertyFor(string toolName, string parameterName)
+    private static async Task<JsonObject> ShouldHaveLiveSchemaPropertyForAsync(string toolName, string parameterName)
     {
-        McpServerTool? tool = LiveArchTools()
-            .SingleOrDefault(candidate => candidate.ProtocolTool.Name == toolName);
+        IList<McpClientTool> tools = await ServedArchToolsAsync();
+        McpClientTool? tool = tools.SingleOrDefault(candidate => candidate.ProtocolTool.Name == toolName);
         tool.ShouldNotBeNull($"no live tool is named '{toolName}'");
 
         JsonObject schema = JsonNode.Parse(tool.ProtocolTool.InputSchema.GetRawText())!.AsObject();
@@ -282,7 +275,7 @@ public sealed class CoercedToolSchemaTests
     /// </summary>
     private static JsonObject ShouldHaveSchemaPropertyFor(string methodName, string parameterName)
     {
-        JsonNode property = SchemaNodeFor(methodName, parameterName);
+        JsonNode property = ShouldHaveSchemaNodeFor(methodName, parameterName);
         property.ShouldBeOfType<JsonObject>($"'{parameterName}' is not an object schema: {property.ToJsonString()}");
 
         return property.AsObject();
@@ -294,7 +287,7 @@ public sealed class CoercedToolSchemaTests
     ///     <paramref name="repairErasures" /> as <see langword="false" /> to swap the production hook for a
     ///     default-constructed one, which leaves the exporter's own output — the erasure — visible.
     /// </summary>
-    private static JsonNode SchemaNodeFor(string methodName, string parameterName, bool repairErasures = true)
+    private static JsonNode ShouldHaveSchemaNodeFor(string methodName, string parameterName, bool repairErasures = true)
     {
         MethodInfo method = typeof(Probe).GetMethod(methodName)
                             ?? throw new InvalidOperationException($"No probe method '{methodName}'.");

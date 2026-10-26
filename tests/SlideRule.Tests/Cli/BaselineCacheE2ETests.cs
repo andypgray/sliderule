@@ -42,7 +42,8 @@ public sealed class BaselineCacheE2ETests
 
         // Populate the slot: graph has no spec and no exclusion, so it writes every project's fragments —
         // exactly the set a spec-ful hit merges from.
-        CacheRun populate = await CacheRuns.GraphAsync(workspace.SolutionPath, cache.Root);
+        CacheRun populate = await CacheRuns.GraphAsync(
+            workspace.SolutionPath, cache.Root, source: CountingSolutionSource.OverWarmPool());
         populate.Outcome.ShouldBe(CodebaseSourceOutcome.Miss);
 
         // add first, so the hit below cannot be an artefact of what the two write-happy modes leave on disk.
@@ -68,7 +69,8 @@ public sealed class BaselineCacheE2ETests
         using var workspace = new TempFixtureWorkspace();
         using var cache = new TempCacheRoot("baseline-cache");
 
-        CacheRun populate = await CacheRuns.GraphAsync(workspace.SolutionPath, cache.Root);
+        CacheRun populate = await CacheRuns.GraphAsync(
+            workspace.SolutionPath, cache.Root, source: CountingSolutionSource.OverWarmPool());
         populate.Outcome.ShouldBe(CodebaseSourceOutcome.Miss);
 
         // The mode gate only ever forces the cache OFF, so on add the flag is the whole policy: the same
@@ -105,6 +107,7 @@ public sealed class BaselineCacheE2ETests
         return CacheRuns.RunAsync(
             cacheRoot,
             static (output, error, counting, environment) => new BaselineRunner(output, error, counting, environment),
-            runner => runner.RunAsync(request, Ct));
+            runner => runner.RunAsync(request, Ct),
+            CountingSolutionSource.OverWarmPool());
     }
 }
