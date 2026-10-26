@@ -47,18 +47,12 @@ internal readonly struct EdgeInstance
 ///     reaching its target's.
 /// </summary>
 /// <remarks>
-///     The checker and the survey read the same record directly, edge by edge, and never through
-///     <see cref="Of" />, which builds a one-element list for every edge with no record. The two must keep
-///     reading that one record, or a verdict and the survey that led an author to it can disagree about which
-///     project made a reference.
+///     The checker and the survey read the same record, <c>Evidence.Instances</c>, directly, edge by edge, and
+///     take <see cref="Implicit" /> only for an edge with no record. The two must keep reading that one record, or
+///     a verdict and the survey that led an author to it can disagree about which project made a reference.
 /// </remarks>
 internal static class EdgeInstances
 {
-    internal static IReadOnlyList<EdgeInstance> Of(ReferenceEdge edge)
-    {
-        return edge.Evidence.Instances ?? [Implicit(edge)];
-    }
-
     // The one instance an edge with no record stands for.
     internal static EdgeInstance Implicit(ReferenceEdge edge)
     {

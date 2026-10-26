@@ -1115,15 +1115,16 @@ public sealed class FragmentMergeTests
     }
 
     [Fact]
-    public void EdgeInstancesOf_AnEdgeTheMergeKeptNoRecordFor_YieldsOneInstanceHoldingTheEdgesOwnSiteList()
+    public void EdgeInstancesImplicit_AnEdgeTheMergeKeptNoRecordFor_YieldsOneInstanceHoldingTheEdgesOwnSiteList()
     {
-        // The unrecorded edge read back. Its one instance is the pair its two nodes name, and the sites it
-        // answers with are the edge's own list — the same object — so a caller may ask any instance which sites
-        // it made without first asking whether a record exists.
+        // The unrecorded edge read back. The merge keeps no record for it, so its one instance is the pair its two
+        // nodes name, and the sites it answers with are the edge's own list — the same object — so a caller may
+        // ask the instance which sites it made as it would ask a recorded one.
         CodebaseModel model = OrdinaryEdgeBesideASharedName();
 
         ReferenceEdge ordinary = model.Edge("Core.User", "Core.Cell");
-        EdgeInstance only = EdgeInstances.Of(ordinary).ShouldHaveSingleItem();
+        ordinary.Evidence.Instances.ShouldBeNull();
+        EdgeInstance only = EdgeInstances.Implicit(ordinary);
         only.SourceProject.ShouldBe("Core");
         only.TargetProject.ShouldBe("Core");
         only.Sites.ShouldBeSameAs(ordinary.Sites);

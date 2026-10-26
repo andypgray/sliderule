@@ -29,6 +29,7 @@ public sealed class SelfTestOnlyMemberTests
     private const string Counter = "a test observable counting work the product does, so a test can pin that it was not repeated";
     private const string Inventory = "an inventory a test holds to the code it lists, so a type added there cannot go unlisted";
     private const string EdgeSites = "the edge family's site list, which production reads on the reference, catch and throw edges";
+    private const string CatchNarrowing = "a catch edge's narrowed site list, the view of its evidence that Sites is of the edge's own";
 
     private static readonly IReadOnlyDictionary<string, string> Allowed = new Dictionary<string, string>(StringComparer.Ordinal)
     {
@@ -37,15 +38,22 @@ public sealed class SelfTestOnlyMemberTests
         ["SlideRule.Cli.Mcp.Infrastructure.IdleTimeoutWatchdog.ResetForTests"] = Probe,
         ["SlideRule.Cli.Mcp.Infrastructure.ServerShutdown.HasExited"] = Probe,
         ["SlideRule.Cli.Mcp.Infrastructure.ServerShutdown.ResetForTests"] = Probe,
+        ["SlideRule.Cli.Pipeline.MsBuildGate.RecordAcquisitionOnThisFlow"] = Probe,
         ["SlideRule.Cli.Rendering.ToolNamedHelpAction.MaxWidth"] = Seam,
         ["SlideRule.Cli.Verbs.BaselineRunner.CapturedEntries"] = Seam,
+        ["SlideRule.Codebase.CatchEdge.SwallowingSites"] = CatchNarrowing,
+        ["SlideRule.Codebase.CatchEdge.UnfilteredSites"] = CatchNarrowing,
         ["SlideRule.Codebase.MemberEdge.Sites"] = EdgeSites,
         ["SlideRule.ModelFile.NodeReaders.Discriminators"] = Inventory,
+        ["SlideRule.ModelFile.NodeWriters.DelegateTypes"] = Inventory,
+        ["SlideRule.ModelFile.NodeWriters.ShapeWrittenTypes"] = Inventory,
         ["SlideRule.ModelFile.NodeWriters.WritableTypes"] = Inventory,
         ["SlideRule.Rendering.ManagedBlock.ExtractBody"] = Seam,
         ["SlideRule.Roslyn.Caching.ExtractionCacheStore.CaptureStampCount"] = Counter,
+        ["SlideRule.Roslyn.Caching.ExtractionCacheStore.ContentHashCount"] = Counter,
         ["SlideRule.Roslyn.Caching.LineMap.IsIdentity"] = Seam,
         ["SlideRule.Roslyn.MsBuild.MsBuildBootstrap.Initialize"] = Seam,
+        ["SlideRule.Roslyn.WorkspaceLoader.CountLoadsOnThisFlow"] = Counter,
         ["SlideRule.Roslyn.WorkspaceLoader.LoadCount"] = Counter
     };
 
@@ -149,7 +157,8 @@ public sealed class SelfTestOnlyMemberTests
     // Keeps the candidates the compiler agrees no production document references. Members a consumer outside the
     // solution can call, members a library finds by reflection and overrides a host calls are passed over: no
     // reference here can show their use. A reference through an interface or base member counts, because the
-    // search cascades to it.
+    // search cascades to it. A doc comment's cref does not: the search reports it as a reference, and counted, a
+    // production doc that names a member would keep it alive.
     private static async Task<IReadOnlyList<TestOnlyMember>> ShouldConfirmAsync(
         IReadOnlyList<TestOnlyMember> candidates, Solution solution, IReadOnlySet<string> production, CancellationToken ct)
     {
@@ -160,13 +169,31 @@ public sealed class SelfTestOnlyMemberTests
             if (IsShippedSurface(symbol) || IsRegisteredByReflection(symbol) || OverridesAHostMember(symbol)) continue;
 
             IEnumerable<ReferencedSymbol> references = await SymbolFinder.FindReferencesAsync(symbol, solution, ct);
-            bool usedInProduction = references
+            List<ReferenceLocation> productionLocations = references
                 .SelectMany(static reference => reference.Locations)
-                .Any(location => production.Contains(location.Document.Project.Name));
+                .Where(location => production.Contains(location.Document.Project.Name))
+                .ToList();
+            var usedInProduction = false;
+            foreach (ReferenceLocation location in productionLocations)
+                if (!await IsInDocumentationCommentAsync(location, ct))
+                {
+                    usedInProduction = true;
+                    break;
+                }
+
             if (!usedInProduction) confirmed.Add(candidate);
         }
 
         return confirmed;
+    }
+
+    private static async Task<bool> IsInDocumentationCommentAsync(ReferenceLocation location, CancellationToken ct)
+    {
+        SyntaxTree tree = location.Location.SourceTree!;
+        SyntaxNode root = await tree.GetRootAsync(ct);
+        SyntaxToken token = root.FindToken(location.Location.SourceSpan.Start, findInsideTrivia: true);
+
+        return token.Parent?.IsPartOfStructuredTrivia() == true;
     }
 
     private static async Task<ISymbol> ShouldResolveAsync(TestOnlyMember candidate, Solution solution, CancellationToken ct)
