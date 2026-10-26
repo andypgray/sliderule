@@ -1414,7 +1414,7 @@ internal sealed class ConstraintEvaluator
     }
 
     private static (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>) MemberShape(
-        IReadOnlyList<MemberNode> members, Func<IMemberInfo, bool> holds)
+        IReadOnlyList<MemberNode> members, Func<MemberNode, bool> holds)
     {
         var violations = new List<Violation>();
         foreach (MemberNode member in members)

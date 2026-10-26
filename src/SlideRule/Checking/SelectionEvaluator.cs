@@ -547,9 +547,9 @@ internal sealed class SelectionEvaluator
         return Invoke<TypeNode>(predicate, type, hatch, subject => subject.FullName);
     }
 
-    internal static bool InvokePredicate(Func<IMemberInfo, bool> predicate, IMemberInfo member, string hatch)
+    internal static bool InvokePredicate(Func<IMemberInfo, bool> predicate, MemberNode member, string hatch)
     {
-        return Invoke(predicate, member, hatch, MemberIdentity);
+        return Invoke<MemberNode>(predicate, member, hatch, subject => $"{subject.DeclaringType.FullName}.{subject.Name}");
     }
 
     // A project's own name is its whole identity, so there is no qualified form to compose.
@@ -576,12 +576,5 @@ internal sealed class SelectionEvaluator
             throw new RuleEvaluationException(
                 $"the `{hatch}` predicate threw {ex.GetType().Name} on `{identityOf(subject)}`: {ex.Message}");
         }
-    }
-
-    // The declaring-type-dot-member identity for a member escape-hatch error; the declaring type is always
-    // a TypeNode (IMemberInfo.DeclaringType), so its FullName is available for a fully-qualified name.
-    private static string MemberIdentity(IMemberInfo member)
-    {
-        return member.DeclaringType is TypeNode type ? $"{type.FullName}.{member.Name}" : member.Name;
     }
 }

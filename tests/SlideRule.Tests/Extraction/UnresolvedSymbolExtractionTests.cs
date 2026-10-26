@@ -33,7 +33,7 @@ public sealed class UnresolvedSymbolExtractionTests
         external.Accessibility.ShouldBe(Accessibility.Public);
         external.IsExternal.ShouldBeTrue();
         model.Type("App.Widget")
-            .BaseType!.FullName()
+            .BaseType!.FullName
             .ShouldBe("Ghost.Base");
     }
 
@@ -50,7 +50,7 @@ public sealed class UnresolvedSymbolExtractionTests
         model.Type("Ghost.ICache")
             .Accessibility.ShouldBe(Accessibility.Public);
         model.Type("App.Cache")
-            .Interfaces.Select(i => i.FullName())
+            .Interfaces.Select(i => i.FullName)
             .ShouldContain("Ghost.ICache");
     }
 

@@ -363,7 +363,7 @@ public sealed class DocumentExtractionTests
         fromWeb.Type("Domain.Linked")
             .IsExternal.ShouldBeFalse();
         fromWeb.Type("Domain.Linked")
-            .BaseType!.FullName()
+            .BaseType!.FullName
             .ShouldBe("Shared.Widget");
         fromWeb.Type("Shared.Widget")
             .AlsoDeclaredBy.ShouldBeEmpty();
@@ -397,7 +397,7 @@ public sealed class DocumentExtractionTests
         fromWeb.Type("Domain.Linked")
             .IsExternal.ShouldBeFalse();
         fromWeb.Type("Domain.Linked")
-            .BaseType!.FullName()
+            .BaseType!.FullName
             .ShouldBe("Shared.Outer.Inner");
         fromWeb.Type("Shared.Outer.Inner")
             .AlsoDeclaredBy.ShouldBeEmpty();
@@ -500,7 +500,7 @@ public sealed class DocumentExtractionTests
         whole.Type("Web.Emitted")
             .IsGenerated.ShouldBeTrue("the project's own extraction reads the banner");
         fromConsumer.Type("Web.Derived")
-            .BaseType!.FullName()
+            .BaseType!.FullName
             .ShouldBe("Web.Emitted");
         TypeNode emitted = fromConsumer.Type("Web.Emitted");
         emitted.IsExternal.ShouldBeTrue("Consumer.cs names Derived, not its base");

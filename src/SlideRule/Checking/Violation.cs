@@ -165,7 +165,7 @@ internal sealed class Violation
             // reaches them.
             string primary = (Source ?? Subject)?.FullName
                              ?? SubjectProject?.Name
-                             ?? (SubjectMember is { } member ? member.DeclaringTypeFullName : string.Empty);
+                             ?? (SubjectMember is { } member ? member.DeclaringType.FullName : string.Empty);
             string secondary = Target?.FullName ?? ProjectItemName ?? string.Empty;
             string tertiary = Member?.SymbolId ?? SubjectMember?.SymbolId ?? string.Empty;
             string quaternary = (Target ?? Subject)?.ProjectName ?? string.Empty;

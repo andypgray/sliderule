@@ -349,7 +349,7 @@ public sealed class OneProjectExtractionTests
         widget.IsExternal.ShouldBeFalse();
         widget.ProjectName.ShouldBe(OwnProjectName);
         model.Type("Domain.Linked")
-            .BaseType!.FullName()
+            .BaseType!.FullName
             .ShouldBe("Shared.Widget");
         widget.AlsoDeclaredBy.ShouldBeEmpty();
         model.MergeNotes.ShouldBeEmpty();

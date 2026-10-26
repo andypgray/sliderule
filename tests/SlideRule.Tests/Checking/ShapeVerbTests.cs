@@ -264,6 +264,31 @@ public sealed class ShapeVerbTests
     }
 
     [Fact]
+    public void Must_EscapeHatch_ReachesTheTypeLinks()
+    {
+        // Linked passes only while the base type, the interfaces and the attributes all reach the predicate, so
+        // a link that read as null or empty would fail it beside Lone.
+        const string source = """
+                              namespace App.Links
+                              {
+                                  public interface IHandler {}
+                                  public sealed class MarkAttribute : System.Attribute {}
+                                  public class Base {}
+                                  [Mark] public class Linked : Base, IHandler {}
+                                  public class Lone {}
+                              }
+                              """;
+
+        Checker.Verdict(source, arch => arch.Types.InNamespace("App.Links.*").WithPrefix("L")
+                .Must(
+                    t => t.BaseType?.Name == "Base"
+                         && t.Interfaces.Any(i => i.Name == "IHandler")
+                         && t.Attributes.Any(a => a.Name == "MarkAttribute"),
+                    "derive from Base, implement IHandler and carry [Mark]"))
+            .ShouldHaveFailedWithSubjects(["App.Links.Lone"]);
+    }
+
+    [Fact]
     public void Where_EscapeHatch_ReachesFilePaths()
     {
         // Two-file input; the Where narrows by FilePaths. Self-guarding: if FilePaths were empty the

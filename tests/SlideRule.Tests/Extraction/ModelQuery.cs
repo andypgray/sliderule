@@ -87,11 +87,6 @@ internal static class ModelQuery
         return AnyBetween(model.ConstructorEdges, sourceFullName, constructedFullName);
     }
 
-    public static string FullName(this ITypeInfo type)
-    {
-        return ((TypeNode)type).FullName;
-    }
-
     // ── injection edges (GRAMMAR §4.7) ────────────────────────────────────────────────────────────────────
 
     public static InjectionEdge InjectionEdge(this CodebaseModel model, string sourceFullName, string injectedFullName)

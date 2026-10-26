@@ -366,9 +366,9 @@ internal static class ModelDump
         return $"{FullNameOf(construction.Definition)}::{construction.FullName}";
     }
 
-    private static string FullNameOf(ITypeInfo? info)
+    private static string FullNameOf(TypeNode? node)
     {
-        return info is TypeNode node ? Endpoint(node) : "<null>";
+        return node is null ? "<null>" : Endpoint(node);
     }
 
     // An endpoint's node, not merely its name. A full name a project declares and a referenced assembly

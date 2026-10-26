@@ -20,7 +20,7 @@ internal static class MemberDisplay
 
     internal static string Of(MemberNode member)
     {
-        return $"{member.DeclaringTypeFullName}.{member.Name}{Suffix(member.Kind)}";
+        return $"{member.DeclaringType.FullName}.{member.Name}{Suffix(member.Kind)}";
     }
 
     private static string Suffix(MemberKind kind)

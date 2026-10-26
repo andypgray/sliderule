@@ -1,7 +1,6 @@
 using ArchUnitNET.Fluent;
 using Shouldly;
 using SlideRule.Checking;
-using SlideRule.Codebase;
 using SlideRule.Tests.Checking;
 using SlideRule.Tests.TestSupport;
 using Xunit;
@@ -430,7 +429,7 @@ public sealed class OracleCaseTableTests(WorkspaceFixture workspace, OracleArchi
     private IReadOnlySet<string> ShouldHaveSlideRuleMemberShapeViolators(Action<Arch> define)
     {
         return ShouldReachAVerdict(define)
-            .Violators(ViolationKind.MemberShape, violation => ((TypeNode)violation.SubjectMember!.DeclaringType).FullName)
+            .Violators(ViolationKind.MemberShape, violation => violation.SubjectMember!.DeclaringType.FullName)
             .ToHashSet(StringComparer.Ordinal);
     }
 }

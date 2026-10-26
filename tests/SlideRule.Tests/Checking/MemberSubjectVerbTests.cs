@@ -860,6 +860,22 @@ public sealed class MemberSubjectVerbTests
     }
 
     [Fact]
+    public void Must_ThrowingPredicate_BecomesARuleErrorNamingTheMember()
+    {
+        const string source = """
+                              namespace App.Hatch
+                              {
+                                  public class Thrower { public void Go() {} }
+                              }
+                              """;
+
+        Checker.Verdict(CompilationFactory.Extract(source), arch => arch.Namespace("App.Hatch.*").Methods
+                .Must(_ => throw new InvalidOperationException("boom"), "explode"))
+            .ShouldHaveFailedWithDetailContaining(
+                ViolationKind.RuleError, "the `Must` predicate threw InvalidOperationException on `App.Hatch.Thrower.Go`", "boom");
+    }
+
+    [Fact]
     public void Where_EscapeHatch_ReachesParametersEndToEnd()
     {
         // Self-guarding: the Where narrows to methods declaring a System.Threading.CancellationToken

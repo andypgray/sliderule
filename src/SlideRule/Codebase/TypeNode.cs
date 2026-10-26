@@ -34,8 +34,8 @@ internal sealed class TypeNode : ITypeInfo
         DeclarationSites = Array.Empty<SourceLocation>();
         FilePaths = Array.Empty<string>();
         AlsoDeclaredBy = Array.Empty<string>();
-        Interfaces = Array.Empty<ITypeInfo>();
-        Attributes = Array.Empty<ITypeInfo>();
+        Interfaces = Array.Empty<TypeNode>();
+        Attributes = Array.Empty<TypeNode>();
         AllInterfaces = Array.Empty<TypeConstruction>();
         BaseTypeChain = Array.Empty<TypeConstruction>();
         AttributeConstructions = Array.Empty<TypeConstruction>();
@@ -156,14 +156,20 @@ internal sealed class TypeNode : ITypeInfo
     /// <inheritdoc />
     public bool IsGenerated { get; }
 
-    /// <inheritdoc />
-    public ITypeInfo? BaseType { get; internal set; }
+    /// <summary>Gets the direct base type's node, as <see cref="ITypeInfo.BaseType" /> describes it.</summary>
+    public TypeNode? BaseType { get; internal set; }
 
-    /// <inheritdoc />
-    public IReadOnlyList<ITypeInfo> Interfaces { get; internal set; }
+    ITypeInfo? ITypeInfo.BaseType => BaseType;
 
-    /// <inheritdoc />
-    public IReadOnlyList<ITypeInfo> Attributes { get; internal set; }
+    /// <summary>Gets the nodes of the interfaces the type implements, as <see cref="ITypeInfo.Interfaces" /> describes them.</summary>
+    public IReadOnlyList<TypeNode> Interfaces { get; internal set; }
+
+    IReadOnlyList<ITypeInfo> ITypeInfo.Interfaces => Interfaces;
+
+    /// <summary>Gets the nodes of the type's attribute classes, as <see cref="ITypeInfo.Attributes" /> describes them.</summary>
+    public IReadOnlyList<TypeNode> Attributes { get; internal set; }
+
+    IReadOnlyList<ITypeInfo> ITypeInfo.Attributes => Attributes;
 
     /// <summary>
     ///     Reports whether <paramref name="projectName" />, as <see cref="ProjectNode.Name" /> reports it, declares

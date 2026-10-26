@@ -63,7 +63,7 @@ internal static class BaselineAddMatcher
 
     private static bool MatchesMemberSubject(MemberNode member, string subject)
     {
-        return string.Equals($"{member.DeclaringTypeFullName}.{member.Name}", subject, StringComparison.Ordinal)
+        return string.Equals($"{member.DeclaringType.FullName}.{member.Name}", subject, StringComparison.Ordinal)
                || string.Equals(member.SymbolId, subject, StringComparison.Ordinal);
     }
 

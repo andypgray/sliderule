@@ -73,8 +73,10 @@ internal sealed class MemberNode : IMemberInfo
     /// <inheritdoc />
     public MemberKind Kind { get; }
 
-    /// <inheritdoc />
-    public ITypeInfo DeclaringType { get; }
+    /// <summary>Gets the declaring type's node, as <see cref="IMemberInfo.DeclaringType" /> describes it.</summary>
+    public TypeNode DeclaringType { get; }
+
+    ITypeInfo IMemberInfo.DeclaringType => DeclaringType;
 
     /// <inheritdoc />
     public Accessibility Accessibility { get; }
@@ -123,7 +125,4 @@ internal sealed class MemberNode : IMemberInfo
 
     /// <inheritdoc />
     public IReadOnlyList<string> FilePaths { get; }
-
-    // ITypeInfo carries no full name, and the constructor takes the declaring TypeNode, so the cast holds.
-    internal string DeclaringTypeFullName => ((TypeNode)DeclaringType).FullName;
 }

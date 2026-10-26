@@ -139,7 +139,7 @@ public sealed class CodebaseExtractorTypeTests
                                                          """);
 
         model.Type("N.Derived")
-            .BaseType!.FullName()
+            .BaseType!.FullName
             .ShouldBe("N.Base");
         model.ShouldHaveEdge("N.Derived", "N.Base");
     }
@@ -152,7 +152,7 @@ public sealed class CodebaseExtractorTypeTests
                                                          public class Plain {}
                                                          """);
 
-        var baseType = (TypeNode)model.Type("N.Plain")
+        TypeNode baseType = model.Type("N.Plain")
             .BaseType!;
         baseType.FullName.ShouldBe("System.Object");
         baseType.IsExternal.ShouldBeTrue();
@@ -183,7 +183,7 @@ public sealed class CodebaseExtractorTypeTests
                                                          """);
 
         model.Type("N.C")
-            .Interfaces.Select(i => i.FullName())
+            .Interfaces.Select(i => i.FullName)
             .ShouldBe(["N.IA", "N.IB"], true);
     }
 
@@ -199,7 +199,7 @@ public sealed class CodebaseExtractorTypeTests
                                                          """);
 
         model.Type("N.C")
-            .Attributes.Select(a => a.FullName())
+            .Attributes.Select(a => a.FullName)
             .ShouldContain("N.TagAttribute");
     }
 
@@ -214,7 +214,7 @@ public sealed class CodebaseExtractorTypeTests
                                                          """);
 
         model.Type("N.SelfAttribute")
-            .Attributes.Select(a => a.FullName())
+            .Attributes.Select(a => a.FullName)
             .ShouldContain("N.SelfAttribute");
     }
 

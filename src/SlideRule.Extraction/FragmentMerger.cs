@@ -470,11 +470,11 @@ internal static class FragmentMerger
             if (declared.BaseTypeFullName is { } baseFqn) node.BaseType = ResolveNode(NodeKeyFor(suppliers, baseFqn));
 
             node.Interfaces = declared.Interfaces
-                .Select(f => (ITypeInfo)ResolveNode(NodeKeyFor(suppliers, f)))
+                .Select(f => ResolveNode(NodeKeyFor(suppliers, f)))
                 .ToList();
 
             node.Attributes = declared.Attributes
-                .Select(f => (ITypeInfo)ResolveNode(NodeKeyFor(suppliers, f)))
+                .Select(f => ResolveNode(NodeKeyFor(suppliers, f)))
                 .ToList();
 
             node.AllInterfaces = declared.AllInterfaces.Select(c => ToConstruction(suppliers, c))

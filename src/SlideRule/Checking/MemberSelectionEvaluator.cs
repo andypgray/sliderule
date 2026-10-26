@@ -23,7 +23,7 @@ internal static class MemberSelectionEvaluator
         MemberSelection selection, HashSet<TypeNode> sourceTypes, SelectionEvaluator selections)
     {
         return Narrowed(selection, sourceTypes, selections)
-            .OrderBy(member => member.DeclaringTypeFullName, StringComparer.Ordinal)
+            .OrderBy(member => member.DeclaringType.FullName, StringComparer.Ordinal)
             .ThenBy(member => member.SymbolId, StringComparer.Ordinal)
             .ToList();
     }

@@ -378,19 +378,19 @@ public sealed class WorkspaceExtractionTests(WorkspaceFixture fixture) : IClassF
     public void ExtractFromSolutionAsync_HomeController_PopulatesITypeInfoSurface()
     {
         TypeNode home = fixture.Model.Type("MyApp.Web.HomeController");
-        home.Attributes.Select(a => a.FullName())
+        home.Attributes.Select(a => a.FullName)
             .ShouldBe(["MyApp.Web.WebRouteAttribute"]);
-        var homeBase = (TypeNode)home.BaseType!;
+        TypeNode homeBase = home.BaseType!;
         homeBase.FullName.ShouldBe("System.Object");
         homeBase.IsExternal.ShouldBeTrue();
         home.DeclarationSites.Lines()
             .ShouldBe([7]);
 
-        ((TypeNode)fixture.Model.Type("MyApp.Web.WebRouteAttribute")
-            .BaseType!).FullName.ShouldBe("System.Attribute");
+        fixture.Model.Type("MyApp.Web.WebRouteAttribute")
+            .BaseType!.FullName.ShouldBe("System.Attribute");
 
         fixture.Model.Type("MyApp.Web.InvoiceCreatedHandler")
-            .Interfaces.Select(i => i.FullName())
+            .Interfaces.Select(i => i.FullName)
             .ShouldBe(["MyApp.Web.IHandler<T>"]);
     }
 
