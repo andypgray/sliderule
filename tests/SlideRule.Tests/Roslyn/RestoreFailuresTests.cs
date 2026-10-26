@@ -253,6 +253,19 @@ public sealed class RestoreFailuresTests
     }
 
     [Fact]
+    public void Detect_LogsKeySpelledWithAnEscape_StillReportsTheProject()
+    {
+        // JSON may spell a property name through \u escapes, and the reader matches the unescaped name, so a
+        // byte search for the literal spelling must not decide on its own that the file holds no logs.
+        using TempDirectory temp = TestTempRoot.Fresh("restore-escaped-logs");
+        string csproj = WriteAssets(temp, "Core", """{ "\u006cogs": [ { "code": "NU1301", "level": "Error" } ] }""");
+        using var workspace = new AdhocWorkspace();
+
+        RestoreFailures.Detect(SolutionOf(workspace, csproj), [])
+            .ShouldBe([csproj]);
+    }
+
+    [Fact]
     public void Detect_AssetsFileWithAUtf8Bom_StillReportsTheProject()
     {
         // Every assets file a real restore writes carries a UTF-8 BOM. The rest of this class writes them

@@ -1,5 +1,3 @@
-using SlideRule.Internal;
-
 namespace SlideRule.Roslyn.Solutions;
 
 /// <summary>
@@ -27,10 +25,11 @@ namespace SlideRule.Roslyn.Solutions;
 /// </remarks>
 internal sealed class ProjectFileCanonicalizer
 {
-    // Ordinal, so the memo never answers for a spelling the probe was not asked about.
+    // Both ordinal, so a memo never answers for a spelling it was not asked about: a resolve keeps the casing
+    // it was handed, and a case-variant spelling of one directory must come back in its own casing.
     private readonly Dictionary<string, string?> linkTargets = new(StringComparer.Ordinal);
 
-    private readonly Dictionary<string, string> resolvedDirectories = new(PathComparison.Comparer);
+    private readonly Dictionary<string, string> resolvedDirectories = new(StringComparer.Ordinal);
 
     /// <summary>
     ///     The canonical spelling of <paramref name="projectFilePath" />, byte for byte what

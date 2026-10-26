@@ -139,8 +139,9 @@ internal static class RestoreFailures
             // skip on its own: left in place, it would make the reader refuse the exact shape production meets.
             if (json.StartsWith(preamble)) json = json[preamble.Length..];
 
-            // A file whose bytes never spell the property name cannot record a restore error.
-            if (json.IndexOf("\"logs\""u8) < 0) return false;
+            // A file whose bytes never spell the property name cannot record a restore error. A \u escape is the
+            // one other way JSON can spell it, so a file holding one is read in full.
+            if (json.IndexOf("\"logs\""u8) < 0 && json.IndexOf("\\u"u8) < 0) return false;
 
             var reader = new Utf8JsonReader(json);
             if (!reader.Read() || reader.TokenType != JsonTokenType.StartObject) return false;
