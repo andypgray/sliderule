@@ -1,5 +1,3 @@
-using System.Security;
-using System.Xml;
 using System.Xml.Linq;
 using SlideRule.Roslyn.Diagnostics;
 
@@ -47,33 +45,13 @@ internal static class SdkStyleProject
     /// </summary>
     internal static bool IsSdkStyle(string projectFilePath)
     {
-        try
-        {
-            // DTD processing is prohibited, so a DOCTYPE raises an XmlException and the file answers false like
-            // any other this cannot read. XDocument.Load on a path would parse it and expand its entities.
-            var settings = new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit };
-            using FileStream stream = File.OpenRead(projectFilePath);
-            using var reader = XmlReader.Create(stream, settings);
-            XElement? root = XDocument.Load(reader)
-                .Root;
+        if (ProjectFileXml.TryReadProjectRoot(projectFilePath) is not { } root) return false;
 
-            if (root is null || root.Name.LocalName != "Project") return false;
-
-            return HasSdkAttribute(root)
-                   || root.Elements()
-                       .Any(element => element.Name.LocalName == "Sdk")
-                   || root.Descendants()
-                       .Any(element => element.Name.LocalName == "Import" && HasSdkAttribute(element));
-        }
-        catch (Exception ex) when (ex is IOException
-                                       or UnauthorizedAccessException
-                                       or NotSupportedException
-                                       or SecurityException
-                                       or ArgumentException
-                                       or XmlException)
-        {
-            return false;
-        }
+        return HasSdkAttribute(root)
+               || root.Elements()
+                   .Any(element => element.Name.LocalName == "Sdk")
+               || root.Descendants()
+                   .Any(element => element.Name.LocalName == "Import" && HasSdkAttribute(element));
     }
 
     // Unprefixed attributes are in no namespace whatever the element's is, so the local name is the whole

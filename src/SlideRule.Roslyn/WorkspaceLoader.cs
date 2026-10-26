@@ -88,6 +88,9 @@ internal static class WorkspaceLoader
             if (settled.StrippedAnalyzerReferences > 0)
                 diagnosticLog?.Invoke(StrippedAnalyzersMessage(settled.StrippedAnalyzerReferences));
 
+            foreach (UnresolvedReferences.Finding found in UnresolvedReferences.Detect(settled.Solution, settled.Report.Failed))
+                diagnosticLog?.Invoke(UnresolvedReferences.Message(found.ProjectPath, found.Names));
+
             // A project whose restore failed loads completely, so nothing in the loaded structure says so and
             // only its assets file can.
             IReadOnlyList<string> restoreFailed = RestoreFailures.Detect(settled.Solution, settled.Report.Failed);

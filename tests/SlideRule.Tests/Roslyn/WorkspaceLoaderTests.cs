@@ -1,6 +1,8 @@
 using System.Runtime.CompilerServices;
 using Shouldly;
 using SlideRule.Roslyn;
+using SlideRule.Roslyn.Diagnostics;
+using SlideRule.Tests.Cli;
 using SlideRule.Tests.TestSupport;
 using Xunit;
 
@@ -30,9 +32,10 @@ namespace SlideRule.Tests.Roslyn;
 ///         loads the whole solution instead, and it answers before any workspace opens.
 ///     </para>
 ///     <para>
-///         The stripped-analyzer notice is the one pin here that loads a solution: an <c>Analyzer</c> item naming a
-///         file that does not exist is the route that leaves an unresolved reference for the load boundary to
-///         strip, and the workspace itself reports nothing about it.
+///         The load warnings the workspace itself never reports, each driven through a real load: an <c>Analyzer</c>
+///         item naming a file that does not exist leaves an unresolved reference for the load boundary to strip, and a
+///         <c>Reference</c> whose HintPath is missing is dropped by the build before the compiler sees it. The legacy
+///         row also holds the framework references the build resolves without a HintPath out of the warning.
 ///     </para>
 /// </remarks>
 public sealed class WorkspaceLoaderTests
@@ -112,6 +115,53 @@ public sealed class WorkspaceLoaderTests
             "Load stripped 1 unresolved analyzer reference; an analyzer or source generator the build names was "
             + "missing from disk, so any code it generates is absent from the model."
         ]);
+    }
+
+    [Fact]
+    public async Task LoadAsync_AnSdkProjectReferenceWhoseHintPathIsMissing_LogsTheUnresolvedReference()
+    {
+        using TempDirectory temp = TestTempRoot.Fresh("loader-unresolved-reference");
+        string csproj = temp.WriteFile(
+            ["App", "App.csproj"],
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+              <ItemGroup>
+                <Reference Include="Vendor.Missing">
+                  <HintPath>lib/Vendor.Missing.dll</HintPath>
+                </Reference>
+              </ItemGroup>
+            </Project>
+            """);
+        temp.WriteFile(["App", "Widget.cs"], "namespace App { public sealed class Widget { } }\n");
+        string solution = temp.WriteFile(["App.slnx"], "<Solution>\n  <Project Path=\"App/App.csproj\" />\n</Solution>\n");
+        var diagnostics = new List<string>();
+
+        using LoadedSolution loaded = await WorkspaceLoader.LoadAsync(solution, diagnostics.Add, Ct);
+
+        diagnostics.ShouldBe([UnresolvedReferences.Message(csproj, ["Vendor.Missing"])]);
+    }
+
+    [Fact]
+    public async Task LoadAsync_ALegacyProjectReferenceWhoseHintPathIsMissing_LogsItAloneBesideTheFrameworkReferences()
+    {
+        CliRunner.SkipUnlessLoadable(CliRunner.ClassicAppSolution);
+        using var fixture = new TempFixtureWorkspace("LegacySolutions/ClassicApp", "ClassicApp.sln", false);
+        string csproj = fixture.PathOf("Classic.Billing", "Classic.Billing.csproj");
+        FixtureEdits.EditOnDisk(
+            csproj,
+            content => content.Replace(
+                "<Reference Include=\"System.Data\" />",
+                "<Reference Include=\"System.Data\" />"
+                + "<Reference Include=\"Vendor.Missing\"><HintPath>lib\\Vendor.Missing.dll</HintPath></Reference>",
+                StringComparison.Ordinal));
+        var diagnostics = new List<string>();
+
+        using LoadedSolution loaded = await WorkspaceLoader.LoadAsync(fixture.SolutionPath, diagnostics.Add, Ct);
+
+        diagnostics.ShouldBe([UnresolvedReferences.Message(csproj, ["Vendor.Missing"])]);
     }
 
     private static async Task<long> ShouldFailLoadingOnceAsync(string missingSolution)

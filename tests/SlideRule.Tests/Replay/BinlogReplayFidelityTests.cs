@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis.MSBuild;
 using Shouldly;
 using SlideRule.Codebase;
 using SlideRule.Roslyn;
+using SlideRule.Roslyn.Diagnostics;
 using SlideRule.Roslyn.Replay;
 using SlideRule.Roslyn.Solutions;
 using SlideRule.Tests.Extraction;
@@ -14,8 +15,9 @@ namespace SlideRule.Tests.Replay;
 /// <summary>
 ///     The fidelity gate: a binlog replayed into an <c>AdhocWorkspace</c> must produce the
 ///     same <see cref="CodebaseModel" /> the MSBuildWorkspace path produces from the same tree — edge for
-///     edge, external for external, site for site. All tests share this class's own binlog fixture and
-///     run sequentially, so the freshness test may mutate the copy in place and revert it without racing
+///     edge, external for external, site for site. The tests share this class's own binlog fixture, except
+///     one whose bed needs a reference the fixture lacks, and run sequentially, so the freshness test may mutate the copy
+///     in place and revert it without racing
 ///     the others. Pinned facts are the spec.
 /// </summary>
 public sealed class BinlogReplayFidelityTests(BinlogFixtureWorkspace fixture) : IClassFixture<BinlogFixtureWorkspace>
@@ -107,6 +109,38 @@ public sealed class BinlogReplayFidelityTests(BinlogFixtureWorkspace fixture) : 
 
         replayed.FailedProjects.ShouldBe([unbuilt]);
         diagnostics.ShouldBe([BinlogReplayer.UnbuiltMemberMessage(unbuilt)]);
+    }
+
+    [Fact]
+    public void Replay_AReferenceWhoseHintPathIsMissing_ReportsTheLineTheLoadReports()
+    {
+        // The build drops the reference before the compiler call the binlog records, so the replay has nothing of
+        // it to strip and only the declared side can say so. The class fixture's binlog has no such reference, so
+        // this test builds a bed of its own; nothing in it uses the missing assembly, so the build succeeds.
+        using TempDirectory temp = TestTempRoot.Fresh("replay-unresolved-reference");
+        string csproj = temp.WriteFile(
+            ["App", "App.csproj"],
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+              <ItemGroup>
+                <Reference Include="Vendor.Missing">
+                  <HintPath>lib/Vendor.Missing.dll</HintPath>
+                </Reference>
+              </ItemGroup>
+            </Project>
+            """);
+        temp.WriteFile(["App", "Widget.cs"], "namespace App { public sealed class Widget { } }\n");
+        string solution = temp.WriteFile(["App.slnx"], "<Solution>\n  <Project Path=\"App/App.csproj\" />\n</Solution>\n");
+        string binlog = temp.PathOf("App.binlog");
+        DotnetCli.Run($"build \"{solution}\" -bl:LogFile=\"{binlog}\"", temp.Path);
+        var diagnostics = new List<string>();
+
+        using ReplayedSolution replayed = BinlogReplayer.Replay(binlog, solution, diagnostics.Add, ct: Ct);
+
+        diagnostics.ShouldBe([UnresolvedReferences.Message(csproj, ["Vendor.Missing"])]);
     }
 
     [Fact]

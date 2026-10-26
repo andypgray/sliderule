@@ -110,6 +110,9 @@ internal static class BinlogReplayer
             foreach (string unbuilt in settled.Report.Failed)
                 diagnosticSink?.Invoke(UnbuiltMemberMessage(unbuilt));
 
+            foreach (UnresolvedReferences.Finding found in UnresolvedReferences.Detect(settled.Solution, settled.Report.Failed))
+                diagnosticSink?.Invoke(UnresolvedReferences.Message(found.ProjectPath, found.Names));
+
             // Every one of them is NotCsharp by construction: the predicate below drops a compiler call for
             // exactly one reason, and a shared project mints no compiler call of its own to be dropped.
             List<UnsupportedProject> unsupported = unsupportedProjects
