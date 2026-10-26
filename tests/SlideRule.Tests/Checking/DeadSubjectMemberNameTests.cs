@@ -124,10 +124,11 @@ public sealed class DeadSubjectMemberNameTests
     }
 
     [Fact]
-    public void ARunOverOneProject_SkipsTheGate_AndJudgesTheLiveNames()
+    public void ARunOverOneProject_CutsTheDeadName_AndJudgesTheLiveNames()
     {
-        // A name only another project's members carry is not one compilation's to judge, so the live name is
-        // measured as written: Main is static and the rule passes rather than failing on Ghost.
+        // A name only another project's members carry is not one compilation's to judge, so the checker cuts it
+        // before the gate reads the list and the live name is measured as written: Main is static and the rule
+        // passes rather than failing on Ghost.
         Checker.Run(Model, narrowing: NarrowedUniverse.OneProject, define: arch =>
                 arch.Rule("members/named")
                     .Enforce(arch.Types.Named("Program").Methods.Named("Main", "Ghost").MustBeStatic())

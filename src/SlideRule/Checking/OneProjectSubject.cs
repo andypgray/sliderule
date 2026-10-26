@@ -1,3 +1,4 @@
+using SlideRule.Codebase;
 using SlideRule.Model;
 
 namespace SlideRule.Checking;
@@ -20,6 +21,9 @@ namespace SlideRule.Checking;
 ///         error against the one universe that cannot judge it. The gate also fails each name of a
 ///         <c>Named</c> list that matched nothing, so the same agreement drops those names from the lists of
 ///         the subject and of each union part kept: a name another project declares is not this one's to judge.
+///         A member subject's <c>Named</c> lists lose their dead names by the same argument, on the members of
+///         the cut subject's types (<see cref="CutMembers" />), which leaves the evaluator's member-name gate
+///         nothing to fail in this universe.
 ///     </para>
 ///     <para>
 ///         A union's top-level parts are kept or dropped whole, a nested union being one such part: opening
@@ -52,6 +56,25 @@ internal static class OneProjectSubject
 
         // Guarded, because collecting the whole subject a second time is paid by every rule in every build.
         return DeadNames.Possible(cut) ? Live(selections, cut) ?? cut : cut;
+    }
+
+    /// <summary>
+    ///     <paramref name="members" /> without the names of its own <c>Named</c> lists that no member it selects
+    ///     carries, read over <paramref name="subject" />, the type subject as <see cref="Cut" /> left it; or
+    ///     <paramref name="members" /> itself where no name is dead or no member is selected.
+    /// </summary>
+    /// <exception cref="RuleEvaluationException">
+    ///     The members could not be resolved, as the evaluator's own reading of them fails.
+    /// </exception>
+    internal static MemberSelection CutMembers(
+        SelectionEvaluator selections, Selection subject, MemberSelection members)
+    {
+        // Guarded as Cut is: resolving the members a second time would otherwise be paid by every member rule.
+        if (!MemberDeadNames.Possible(members)) return members;
+
+        SelectionAdmission sources = SelectionAdmission.Collect(selections, subject, SelectionPosition.Subject);
+        IReadOnlyList<MemberNode> resolved = MemberSelectionEvaluator.Resolve(members, sources.Nodes, selections);
+        return resolved.Count == 0 ? members : MemberDeadNames.Dropped(members, resolved);
     }
 
     private static Selection CutUnion(SelectionEvaluator selections, UnionSelection union)

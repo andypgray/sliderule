@@ -106,16 +106,19 @@ internal sealed class ConstraintEvaluator
     }
 
     /// <summary>
-    ///     Evaluates <paramref name="constraint" /> over <paramref name="subject" />: the constraint's own
-    ///     subject, or what a caller that narrowed it before evaluation hands in (GRAMMAR §4.1).
+    ///     Evaluates <paramref name="constraint" /> over <paramref name="subject" /> and, for a member
+    ///     constraint, <paramref name="memberSubject" />: the constraint's own subjects, or what a caller that
+    ///     narrowed them before evaluation hands in (GRAMMAR §4.1).
     /// </summary>
     /// <remarks>
-    ///     Null exactly where <c>Constraint.Subject</c> is: a project constraint, which dispatches before the
-    ///     subject is read at all. Every gate below judges what it is handed, so the evaluator's own reading
-    ///     of an empty subject — an authoring error — is unchanged and belongs to whoever chose the subject.
+    ///     <paramref name="subject" /> is null exactly where <c>Constraint.Subject</c> is: a project constraint,
+    ///     which dispatches before the subject is read at all. <paramref name="memberSubject" /> is null exactly
+    ///     where the constraint is not a <see cref="MemberConstraint" />. Every gate below judges what it is
+    ///     handed, so the evaluator's own reading of an empty subject or a dead name — an authoring error — is
+    ///     unchanged and belongs to whoever chose the subject.
     /// </remarks>
     internal (IReadOnlyList<Violation> Violations, IReadOnlyList<CheckWarning> Warnings, SubjectCoverage Coverage)
-        Evaluate(Constraint constraint, Selection? subject)
+        Evaluate(Constraint constraint, Selection? subject, MemberSelection? memberSubject)
     {
         // A project constraint ranges over the solution's PROJECTS (GRAMMAR §4.10), and its own empty check
         // speaks in project terms.
@@ -133,7 +136,8 @@ internal sealed class ConstraintEvaluator
         // A member-subject constraint (GRAMMAR §4.6) ranges over declared members, so it dispatches before
         // the type-subject gate: its own empty check speaks in member terms (a type subject that matches
         // types none of whose members survive the kind filter is the ordinary way to fail empty).
-        if (constraint is MemberConstraint memberConstraint) return EvaluateMember(memberConstraint, admission.Nodes);
+        if (constraint is MemberConstraint memberConstraint)
+            return EvaluateMember(memberConstraint, memberSubject!, admission.Nodes);
 
         HashSet<TypeNode> subjects = admission.Nodes;
         if (subjects.Count == 0)
@@ -1259,13 +1263,12 @@ internal sealed class ConstraintEvaluator
     // declaration sites, identity keyed on its DocId (§4.6). Resolution can throw RuleEvaluationException (a
     // closed-generic .Returning anchor).
     private (IReadOnlyList<Violation>, IReadOnlyList<CheckWarning>, SubjectCoverage) EvaluateMember(
-        MemberConstraint constraint, HashSet<TypeNode> sourceTypes)
+        MemberConstraint constraint, MemberSelection memberSubject, HashSet<TypeNode> sourceTypes)
     {
         // MemberConstraint.Subject IS MemberSubject.Source, so the subject the gate already resolved IS
         // this member selection's source types — read from there rather than evaluated a second time. The
         // members themselves take the set alone: a member verb is shape-only, with no edge to attribute.
-        IReadOnlyList<MemberNode> members =
-            MemberSelectionEvaluator.Resolve(constraint.MemberSubject, sourceTypes, _selections);
+        IReadOnlyList<MemberNode> members = MemberSelectionEvaluator.Resolve(memberSubject, sourceTypes, _selections);
         if (members.Count == 0)
             return (
             [
@@ -1275,17 +1278,13 @@ internal sealed class ConstraintEvaluator
 
         // A member Named list is read per name in the type subject's register (ResolveSubject): Named(a, b)
         // names what a and b each name, so a name no member carries fails as an empty operand of its own and
-        // the verb never runs. A run over one project's compilation skips the gate, since a name only another
-        // project's members carry is not that compilation's to judge.
-        if (_narrowing is not { Kind: NarrowingKind.OneProject })
-        {
-            List<Violation> deadNames = MemberDeadNames.In(constraint.MemberSubject, members)
-                .Select(dead => Violation.EmptySubject(
-                    EmptyMemberOperandMessage(dead.ReferenceProse()),
-                    AuthoringHints.ForMemberName(_incompleteModel)))
-                .ToList();
-            if (deadNames.Count > 0) return (deadNames, NoWarnings, default);
-        }
+        // the verb never runs.
+        List<Violation> deadNames = MemberDeadNames.In(memberSubject, members)
+            .Select(dead => Violation.EmptySubject(
+                EmptyMemberOperandMessage(dead.ReferenceProse()),
+                AuthoringHints.ForMemberName(_incompleteModel)))
+            .ToList();
+        if (deadNames.Count > 0) return (deadNames, NoWarnings, default);
 
         (IReadOnlyList<Violation> violations, IReadOnlyList<CheckWarning> warnings) = DispatchMember(constraint, members);
         return (violations, warnings, MemberCoverageOf(members));

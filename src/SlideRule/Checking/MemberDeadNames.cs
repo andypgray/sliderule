@@ -28,7 +28,7 @@ internal static class MemberDeadNames
         {
             if (adjectives[j] is not MemberNamedAdjective { Names.Count: > 1 } named) continue;
 
-            carried ??= new HashSet<string>(members.Select(member => member.Name), StringComparer.Ordinal);
+            carried ??= Carried(members);
             foreach (string name in named.Names)
             {
                 if (carried.Contains(name)) continue;
@@ -38,5 +38,43 @@ internal static class MemberDeadNames
                 yield return selection.WithAdjectives(narrowed);
             }
         }
+    }
+
+    /// <summary>Whether <paramref name="selection" /> carries a list of its own that a name could be dead in.</summary>
+    internal static bool Possible(MemberSelection selection)
+    {
+        return selection.Adjectives.Any(adjective => adjective is MemberNamedAdjective { Names.Count: > 1 });
+    }
+
+    /// <summary>
+    ///     <paramref name="selection" /> with its dead names dropped from their lists, or <paramref name="selection" />
+    ///     itself where none is dead. <paramref name="members" /> must be non-empty: then every list keeps at least
+    ///     one name, since each member carries one from each list.
+    /// </summary>
+    internal static MemberSelection Dropped(MemberSelection selection, IReadOnlyList<MemberNode> members)
+    {
+        IReadOnlyList<MemberAdjective> adjectives = selection.Adjectives;
+        HashSet<string>? carried = null;
+        List<MemberAdjective>? kept = null;
+        for (var j = 0; j < adjectives.Count; j++)
+        {
+            if (adjectives[j] is not MemberNamedAdjective { Names.Count: > 1 } named) continue;
+
+            carried ??= Carried(members);
+            List<string> live = named.Names
+                .Where(carried.Contains)
+                .ToList();
+            if (live.Count == named.Names.Count) continue;
+
+            kept ??= new List<MemberAdjective>(adjectives);
+            kept[j] = new MemberNamedAdjective(live);
+        }
+
+        return kept is null ? selection : selection.WithAdjectives(kept);
+    }
+
+    private static HashSet<string> Carried(IReadOnlyList<MemberNode> members)
+    {
+        return new HashSet<string>(members.Select(member => member.Name), StringComparer.Ordinal);
     }
 }

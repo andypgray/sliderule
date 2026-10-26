@@ -158,15 +158,21 @@ internal static class ArchChecker
             // than aborting the run, and evaluating the scoped selection is an evaluation like any other.
             if (rule.IsTripwire) return Tripwire(rule, selections, diff);
 
-            // The cut is the checker's, never the evaluator's. The evaluator's gates are what make an empty
-            // part an authoring error, and they stay exactly that for every run over a whole solution; what a
-            // run over one project's compilation may honestly be asked is decided before the evaluator is.
+            // The cut is the checker's, never the evaluator's, for the type subject and a member subject alike.
+            // The evaluator's gates are what make an empty part or a dead name an authoring error, and they stay
+            // exactly that for every run over a whole solution; what a run over one project's compilation may
+            // honestly be asked is decided before the evaluator is.
             Selection? subject = rule.Constraint!.Subject;
+            MemberSelection? memberSubject = (rule.Constraint as MemberConstraint)?.MemberSubject;
             if (narrowing is { Kind: NarrowingKind.OneProject } && subject is not null)
+            {
                 subject = OneProjectSubject.Cut(selections, subject);
+                if (memberSubject is not null)
+                    memberSubject = OneProjectSubject.CutMembers(selections, subject, memberSubject);
+            }
 
             (IReadOnlyList<Violation> violations, IReadOnlyList<CheckWarning> warnings, SubjectCoverage coverage) =
-                evaluator.Evaluate(rule.Constraint!, subject);
+                evaluator.Evaluate(rule.Constraint!, subject, memberSubject);
             // Ahead of the ratchet fork, because the question it answers — did this run have the subject in
             // view at all — is asked of the raw violations and is the same one for both branches.
             if (narrowing is not null && SelectedNothing(violations))
