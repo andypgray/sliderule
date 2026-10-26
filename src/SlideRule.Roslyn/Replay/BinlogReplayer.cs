@@ -32,8 +32,8 @@ internal static class BinlogReplayer
 {
     /// <summary>
     ///     Replays <paramref name="binlogPath" /> into a <see cref="ReplayedSolution" /> of its regular C# compiler
-    ///     invocations, stripping unresolved references exactly as <see cref="WorkspaceLoader" /> does so
-    ///     downstream behaviour is identical.
+    ///     invocations, settled through the same <see cref="LoadBoundary" /> as <see cref="WorkspaceLoader" />'s
+    ///     load so downstream behaviour is identical.
     /// </summary>
     /// <param name="binlogPath">Absolute path to the <c>.binlog</c> a real build of the current tree produced.</param>
     /// <param name="solutionPath">
@@ -95,23 +95,19 @@ internal static class BinlogReplayer
                 if (e.Diagnostic.Kind == WorkspaceDiagnosticKind.Failure) diagnosticSink?.Invoke(e.Diagnostic.Message);
             });
 
-            Solution solution = workspace.AddSolution(solutionInfo);
-            (Solution normalized, IReadOnlyDictionary<ProjectId, string> targetFrameworks) =
-                NormalizeProjects(solution);
-            (Solution stripped, int analyzerCount, int metadataCount) = normalized.StripUnresolvedReferences();
-            if (analyzerCount > 0 || metadataCount > 0)
+            Solution solution = AlignWithMsBuildWorkspace(workspace.AddSolution(solutionInfo));
+            SettledSolution settled = LoadBoundary.Settle(solution, solutionPath);
+            if (settled.StrippedAnalyzerReferences > 0 || settled.StrippedMetadataReferences > 0)
             {
-                string analyzers = Plurals.Counted(analyzerCount, "unresolved analyzer reference");
-                string metadata = Plurals.Counted(metadataCount, "unresolved metadata reference");
+                string analyzers = Plurals.Counted(settled.StrippedAnalyzerReferences, "unresolved analyzer reference");
+                string metadata = Plurals.Counted(settled.StrippedMetadataReferences, "unresolved metadata reference");
                 diagnosticSink?.Invoke(
                     $"Replay stripped {analyzers} and {metadata}; a build artifact recorded in the binlog was missing "
                     + "from disk.");
             }
 
-            // The same computation the MSBuild path's gate keys on; ReplayedSolution.FailedProjects says what it can
-            // find on this path.
-            ProjectLoadReport report = ProjectLoadFailures.Detect(stripped, solutionPath);
-            foreach (string unbuilt in report.Failed)
+            // ReplayedSolution.FailedProjects says what the report's failed list can hold on this path.
+            foreach (string unbuilt in settled.Report.Failed)
                 diagnosticSink?.Invoke(UnbuiltMemberMessage(unbuilt));
 
             // Every one of them is NotCsharp by construction: the predicate below drops a compiler call for
@@ -122,7 +118,8 @@ internal static class BinlogReplayer
                 .ToList();
 
             return new ReplayedSolution(
-                workspace, reader, stripped, targetFrameworks, report.Failed, report.Unchecked, unsupported);
+                workspace, reader, settled.Solution, settled.TargetFrameworks, settled.Report.Failed,
+                settled.Report.Unchecked, unsupported);
         }
         catch
         {
@@ -143,12 +140,11 @@ internal static class BinlogReplayer
     }
 
     // Two SolutionReader project-metadata spellings need aligning with what MSBuildWorkspace produces, so every
-    // consumer sees identical data on either path. The shared project-name normalization then runs over the
-    // result, exactly as the MSBuild path runs it: SolutionReader never discriminates a multi-target-framework
-    // project's name, so that pass renames nothing here and only reports each project's framework (read from its
-    // output path) for the merge.
-    private static (Solution Solution, IReadOnlyDictionary<ProjectId, string> TargetFrameworks) NormalizeProjects(
-        Solution solution)
+    // consumer sees identical data on either path. It runs before the shared load boundary, whose name
+    // normalization renames only a multi-targeted project and so relies on every other name already being the
+    // MSBuild spelling. SolutionReader never discriminates a multi-target-framework project's name, so that pass
+    // renames nothing here and only reports each project's framework (read from its output path) for the merge.
+    private static Solution AlignWithMsBuildWorkspace(Solution solution)
     {
         foreach (ProjectId projectId in solution.ProjectIds.ToList())
         {
@@ -177,7 +173,7 @@ internal static class BinlogReplayer
             }
         }
 
-        return solution.NormalizeProjectNames();
+        return solution;
     }
 
     // Path.GetExtension is unusable here: a dotted assembly name ("MyApp.Legacy.Billing") reads as extension

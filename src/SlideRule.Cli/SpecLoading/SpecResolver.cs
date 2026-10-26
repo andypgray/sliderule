@@ -378,7 +378,7 @@ internal static class SpecResolver
         {
             // The evaluated path exists: it is the answer, with no search and — deliberately — no
             // intermediate refusal. Binlog replay hands an obj-side assembly as this primary argument
-            // (BinlogReplayer.NormalizeProjects), because a capture records no other path, so refusing an
+            // (BinlogReplayer.AlignWithMsBuildWorkspace), because a capture records no other path, so refusing an
             // intermediate here would refuse every replayed run.
             if (File.Exists(outputFilePath)) return outputFilePath;
 

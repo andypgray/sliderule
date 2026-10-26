@@ -81,16 +81,14 @@ internal static class WorkspaceLoader
         try
         {
             Solution solution = await OpenAsync(workspace, solutionPath, ct).ConfigureAwait(false);
-            (Solution stripped, int _, int _) = solution.StripUnresolvedReferences();
-            (Solution normalized, IReadOnlyDictionary<ProjectId, string> targetFrameworks) =
-                stripped.NormalizeProjectNames();
+            SettledSolution settled = LoadBoundary.Settle(solution, solutionPath);
 
             // A project whose restore failed loads completely, so nothing in the loaded structure says so and
             // only its assets file can.
-            ProjectLoadReport report = ProjectLoadFailures.Detect(normalized, solutionPath);
-            IReadOnlyList<string> restoreFailed = RestoreFailures.Detect(normalized, report.Failed);
+            IReadOnlyList<string> restoreFailed = RestoreFailures.Detect(settled.Solution, settled.Report.Failed);
 
-            return new LoadedSolution(workspace, normalized, targetFrameworks, report, restoreFailed);
+            return new LoadedSolution(
+                workspace, settled.Solution, settled.TargetFrameworks, settled.Report, restoreFailed);
         }
         catch
         {
