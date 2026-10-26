@@ -13,13 +13,10 @@ namespace SlideRule.Baselines;
 /// </remarks>
 internal sealed class BaselineRefusal
 {
-    internal BaselineRefusal(
-        BaselineRefusalKind kind, string detail, string? ruleId, string? entryIdentity, JsonPosition position)
+    internal BaselineRefusal(BaselineRefusalKind kind, string detail, JsonPosition position)
     {
         Kind = kind;
         Detail = detail;
-        RuleId = ruleId;
-        EntryIdentity = entryIdentity;
         Position = position;
     }
 
@@ -27,20 +24,10 @@ internal sealed class BaselineRefusal
 
     /// <summary>
     ///     The refusal on its own: a lower-case sentence ending in a full stop, naming neither a position nor a
-    ///     file path.
+    ///     file path. A refusal under one rule's section names that rule, and a seal mismatch also names the
+    ///     entry, as its subject or <c>source -&gt; target</c>.
     /// </summary>
     internal string Detail { get; }
-
-    /// <summary>
-    ///     The rule whose section the refusal sits under, or null for one about the file as a whole.
-    /// </summary>
-    internal string? RuleId { get; }
-
-    /// <summary>
-    ///     The entry the seal check refused — its subject, or <c>source -&gt; target</c> — or null on
-    ///     every other refusal.
-    /// </summary>
-    internal string? EntryIdentity { get; }
 
     internal JsonPosition Position { get; }
 

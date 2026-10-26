@@ -2,9 +2,9 @@ using Shouldly;
 using SlideRule.Cli.Rendering;
 using SlideRule.Codebase;
 using SlideRule.Extraction;
-using SlideRule.Roslyn;
 using SlideRule.Tests.Checking;
 using SlideRule.Tests.Extraction;
+using SlideRule.Tests.TestSupport;
 using Xunit;
 
 namespace SlideRule.Tests.Cli;
@@ -417,7 +417,7 @@ public sealed class GraphFormatterTests
                                                                                           public class Thing {}
                                                                                           """));
 
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([app, passenger, unread]);
+        CodebaseModel model = Harness.Extract([app, passenger, unread]);
         return GraphSummarizer.Summarize(model);
     }
 }

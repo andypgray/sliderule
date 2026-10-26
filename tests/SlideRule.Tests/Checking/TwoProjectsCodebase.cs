@@ -1,7 +1,7 @@
 using SlideRule.Codebase;
 using SlideRule.Extraction;
-using SlideRule.Roslyn;
 using SlideRule.Tests.Extraction;
+using SlideRule.Tests.TestSupport;
 
 namespace SlideRule.Tests.Checking;
 
@@ -29,6 +29,6 @@ internal static class TwoProjectsCodebase
         CompilationInput web = CompilationFactory.CompileReferencing(
             "Web", sales.Compilation, "Sales", ("Web.cs", WebFile));
 
-        return CodebaseExtractor.ExtractFromCompilations([sales, web]);
+        return Harness.Extract([sales, web]);
     }
 }

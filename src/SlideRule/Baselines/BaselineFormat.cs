@@ -148,18 +148,6 @@ internal static class BaselineFormat
     }
 
     /// <summary>
-    ///     The <c>seal</c> an entry carries in the section for <paramref name="ruleId" />: the first 16
-    ///     lowercase hex characters of the SHA-256 of the UTF-8 bytes of <see cref="SealInput" />.
-    ///     Recompute it to verify a stored entry — a result differing from the entry's own <c>seal</c>
-    ///     means the line was edited by hand rather than written by <see cref="ComposeFile" />.
-    /// </summary>
-    public static string ComputeSeal(string ruleId, BaselineEntry entry)
-    {
-        using var sealer = new BaselineSealer();
-        return sealer.Seal(ruleId, entry);
-    }
-
-    /// <summary>
     ///     The exact text <see cref="LegacyDigest" /> hashes, in <see cref="LegacySchemaVersion" />'s
     ///     frozen grammar: a fixed preamble line, then a <c>rule &lt;id&gt;</c> line per rule and an
     ///     <c>edge &lt;source&gt; -&gt; &lt;target&gt;</c> or <c>subject &lt;id&gt;</c> line per entry, in

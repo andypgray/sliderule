@@ -104,9 +104,9 @@ public sealed class AnalyzerCoreFirewallTests
             }
 
             [MethodImpl(MethodImplOptions.NoInlining)]
-            public static int Counted(IReadOnlyList<string> paths) => paths.Count(path => PathFormat.Contains("a", path));
+            public static int Counted(IReadOnlyList<string> paths) => paths.Count(path => PathFormat.Leaf(path) == "a");
 
-            public static Func<string, bool> Loose() => path => PathFormat.Contains("a", path);
+            public static Func<string, bool> Loose() => path => PathFormat.Leaf(path) == "a";
 
             [MethodImpl(MethodImplOptions.NoInlining)]
             public static IEnumerable<string> BoundaryLeaves(IEnumerable<string> paths)
@@ -188,7 +188,7 @@ public sealed class AnalyzerCoreFirewallTests
             [MethodImpl(MethodImplOptions.NoInlining)]
             private static void Start(CompilationStartAnalysisContext context)
             {
-                context.RegisterCompilationEndAction(end => PathFormat.Contains("a", "a/b"));
+                context.RegisterCompilationEndAction(end => PathFormat.Leaf("a/b"));
             }
 
             [MethodImpl(MethodImplOptions.NoInlining)]
@@ -234,7 +234,7 @@ public sealed class AnalyzerCoreFirewallTests
         CoreFirewall.Inspect(image, ["Probe.Faults.Report"])
             .ShouldBreachExactly(
                 "Probe.Analyzer+<>c.<Start>b__5_0: rule 1, names Core outside a boundary: "
-                + "SlideRule.Rendering.PathFormat.Contains",
+                + "SlideRule.Rendering.PathFormat.Leaf",
                 "Probe.Analyzer..cctor: rule 2, calls a boundary outside a guard: Probe.Analyzer.Compute",
                 "Probe.Analyzer..cctor: rule 3, hands Roslyn a boundary: "
                 + "SourceTextValueProvider`1..ctor is handed Probe.Analyzer.Compute",
@@ -248,7 +248,7 @@ public sealed class AnalyzerCoreFirewallTests
                 + "AnalysisContext.RegisterCompilationStartAction is handed Probe.Analyzer.Start",
                 "Probe.Analyzer.get_SupportedDiagnostics: rule 3, hands Roslyn a boundary: Roslyn calls it directly",
                 "Probe.Calls+<>c.<Loose>b__8_0: rule 1, names Core outside a boundary: "
-                + "SlideRule.Rendering.PathFormat.Contains",
+                + "SlideRule.Rendering.PathFormat.Leaf",
                 "Probe.Calls+<LooseLeaves>d__10.MoveNext: rule 1, names Core outside a boundary: "
                 + "SlideRule.Rendering.PathFormat.Relative",
                 "Probe.Calls.InFinally: rule 2, calls a boundary outside a guard: Probe.Calls.Boundary",

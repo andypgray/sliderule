@@ -45,20 +45,20 @@ public sealed class NoticingSolutionSourceTests
         public Task<SolutionHandle> AcquireAsync(string solutionPath, CancellationToken ct)
         {
             Calls.Add("whole");
-            return Task.FromResult(Handle(solutionPath, false));
+            return Task.FromResult(Handle(false));
         }
 
         public Task<SolutionHandle> AcquireClosureAsync(
             string solutionPath, IReadOnlyCollection<string> projectFiles, CancellationToken ct)
         {
             Calls.Add($"closure {string.Join(",", projectFiles)}");
-            return Task.FromResult(Handle(solutionPath, true));
+            return Task.FromResult(Handle(true));
         }
 
-        private SolutionHandle Handle(string solutionPath, bool isClosure)
+        private SolutionHandle Handle(bool isClosure)
         {
             return new SolutionHandle(
-                workspace.CurrentSolution, solutionPath, WorkspaceDiagnostics.None, null, isClosure: isClosure);
+                workspace.CurrentSolution, WorkspaceDiagnostics.None, null, isClosure: isClosure);
         }
     }
 }

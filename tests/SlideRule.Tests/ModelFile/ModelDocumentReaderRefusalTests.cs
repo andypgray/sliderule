@@ -268,7 +268,7 @@ public sealed class ModelDocumentReaderRefusalTests
         ModelRefusal refusal = result.Refusal.ShouldNotBeNull();
         refusal.Kind.ShouldBe(ModelRefusalKind.Malformed);
         refusal.Describe()
-            .ShouldBe(parserError!.Describe());
+            .ShouldBe(parserError!.Position.Describe(parserError.Reason));
         refusal.Position.Offset.ShouldBe(parserError.Position.Offset);
         refusal.Describe()
             .ShouldBe("line 3, column 3: expected ',' or '}', found '\"'.");
@@ -371,7 +371,7 @@ public sealed class ModelDocumentReaderRefusalTests
 
         edited.ShouldNotBe(valid);
         StrictJson.TryParse(edited, out _, out StrictJsonError? parserError)
-            .ShouldBeTrue($"a model-level refusal is meant, but the text stopped being JSON: {parserError?.Describe()}");
+            .ShouldBeTrue($"a model-level refusal is meant, but the text stopped being JSON: {parserError?.Position.Describe(parserError.Reason)}");
 
         ModelReadResult result = ModelDocumentReader.Read(edited);
         result.Document.ShouldBeNull();

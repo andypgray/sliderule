@@ -63,11 +63,6 @@ internal static class LawPlaceClassifier
         return new DrawableVerb(inbound, only, verbWord);
     }
 
-    internal static bool IsDrawableVerb(Constraint? constraint)
-    {
-        return Classify(constraint) is not null;
-    }
-
     /// <summary>
     ///     The place a rule subject stands on, or null when the subject is not place-shaped. A single
     ///     type is not a subject place: a rule anchored on one type is a statement about that type's

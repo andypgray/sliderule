@@ -1,8 +1,8 @@
 using Shouldly;
 using SlideRule.Codebase;
 using SlideRule.Extraction;
-using SlideRule.Roslyn;
 using SlideRule.Roslyn.Diagnostics;
+using SlideRule.Tests.TestSupport;
 using Xunit;
 
 namespace SlideRule.Tests.Extraction;
@@ -26,7 +26,7 @@ public sealed class MultiTargetedProjectsTests
         // exists to state, and the one case the merge also raises a note for.
         CompilationInput modern = CompilationFactory.SharedWidgetFramework("net10.0");
         CompilationInput legacy = CompilationFactory.SharedWidgetFramework("netstandard2.0");
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([modern, legacy]);
+        CodebaseModel model = Harness.Extract([modern, legacy]);
 
         // Act
         IReadOnlyList<MultiTargetedProject> projects = MultiTargetedProjects.Of(model);
@@ -57,7 +57,7 @@ public sealed class MultiTargetedProjectsTests
         {
             TargetFramework = "net10.0"
         };
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([legacy, modern]);
+        CodebaseModel model = Harness.Extract([legacy, modern]);
 
         // Act
         IReadOnlyList<MultiTargetedProject> projects = MultiTargetedProjects.Of(model);

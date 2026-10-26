@@ -10,7 +10,7 @@ namespace SlideRule.Tests.Internal;
 ///     returns instead of throwing, and the position each refusal points at.
 /// </summary>
 /// <remarks>
-///     Every refusal is asserted as a whole <see cref="StrictJsonError.Describe" /> string rather than by
+///     Every refusal is asserted as a whole <see cref="JsonPosition.Describe" /> string rather than by
 ///     probing a code or a substring. The description is what a person reading a rejected file sees, so
 ///     the line, the column and the sentence are one pinned artefact; a change to any of them is a change
 ///     to the product and moves a row here deliberately.
@@ -103,12 +103,11 @@ public sealed class StrictJsonTests
         for (var open = 1; open < StrictJson.MaxDepth; open++)
         {
             value.ValueKind.ShouldBe(StrictJsonKind.Array);
-            value.GetArrayLength().ShouldBe(1);
-            value = value.EnumerateArray().Single();
+            value = value.EnumerateArray().ShouldHaveSingleItem();
         }
 
         value.ValueKind.ShouldBe(StrictJsonKind.Array);
-        value.GetArrayLength().ShouldBe(0);
+        value.EnumerateArray().ShouldBeEmpty();
     }
 
     [Fact]
@@ -245,7 +244,6 @@ public sealed class StrictJsonTests
     {
         StrictJsonValue value = ShouldRead("[3,1,2]");
 
-        value.GetArrayLength().ShouldBe(3);
         int[] elements = value.EnumerateArray()
             .Select(ReadInt32)
             .ToArray();
@@ -260,7 +258,7 @@ public sealed class StrictJsonTests
         StrictJsonValue map = ShouldRead("{}");
 
         array.ValueKind.ShouldBe(StrictJsonKind.Array);
-        array.GetArrayLength().ShouldBe(0);
+        array.EnumerateArray().ShouldBeEmpty();
         map.ValueKind.ShouldBe(StrictJsonKind.Object);
         map.EnumerateObject().ShouldBeEmpty();
     }
@@ -346,7 +344,7 @@ public sealed class StrictJsonTests
     {
         bool read = StrictJson.TryParse(text, out StrictJsonValue? root, out StrictJsonError? error);
 
-        read.ShouldBeTrue(error?.Describe());
+        read.ShouldBeTrue(error?.Position.Describe(error.Reason));
         error.ShouldBeNull();
         root.ShouldNotBeNull();
         return root;
@@ -359,7 +357,7 @@ public sealed class StrictJsonTests
         read.ShouldBeFalse();
         root.ShouldBeNull();
         error.ShouldNotBeNull();
-        error.Describe().ShouldBe(description);
+        error.Position.Describe(error.Reason).ShouldBe(description);
         return error;
     }
 }

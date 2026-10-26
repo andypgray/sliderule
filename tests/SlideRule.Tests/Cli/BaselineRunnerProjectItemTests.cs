@@ -117,7 +117,7 @@ public sealed class BaselineRunnerProjectItemTests : IDisposable
 
     private static CheckReport Check(CodebaseModel codebase, BaselineIndex baselines)
     {
-        return ArchChecker.Check(Model, codebase, baselines);
+        return Harness.Check(Model, codebase, baselines);
     }
 
     private string WriteBaseline(string content)

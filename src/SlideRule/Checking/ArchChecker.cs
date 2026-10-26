@@ -37,77 +37,34 @@ internal static class ArchChecker
     private static readonly IComparer<(string, string, string, string)> ReportOrder = new ReportOrderComparer();
 
     /// <summary>
-    ///     Checks every rule with no baselines and no diff, so every violation fails and every tripwire skips.
-    /// </summary>
-    public static CheckReport Check(ArchitectureModel model, CodebaseModel codebase)
-    {
-        return Check(model, codebase, BaselineIndex.Empty, null);
-    }
-
-    /// <summary>
-    ///     Checks every rule against <paramref name="baselines" /> with no diff, so every tripwire skips;
-    ///     <see cref="BaselineIndex.Empty" /> grandfathers nothing.
-    /// </summary>
-    public static CheckReport Check(ArchitectureModel model, CodebaseModel codebase, BaselineIndex baselines)
-    {
-        return Check(model, codebase, baselines, null);
-    }
-
-    /// <summary>
-    ///     Checks every rule against <paramref name="baselines" /> and the changed files in
-    ///     <paramref name="diff" />, or skips every tripwire where <paramref name="diff" /> is null.
-    /// </summary>
-    public static CheckReport Check(
-        ArchitectureModel model, CodebaseModel codebase, BaselineIndex baselines, DiffContext? diff)
-    {
-        Guard.NotNull(model, nameof(model));
-
-        return Check(model.Rules, codebase, baselines, diff);
-    }
-
-    /// <summary>
     ///     Checks exactly <paramref name="rules" />, the whole model's or the subset <see cref="SelectRules" />
     ///     chose, and reports on those alone; choosing a subset changes nothing about how a rule is judged.
-    /// </summary>
-    public static CheckReport Check(
-        IReadOnlyList<ArchRule> rules, CodebaseModel codebase, BaselineIndex baselines, DiffContext? diff)
-    {
-        return Check(rules, codebase, baselines, diff, null, null);
-    }
-
-    /// <summary>
-    ///     Checks exactly <paramref name="rules" /> over a run whose universe may be smaller than the solution
-    ///     (<paramref name="narrowing" />) or whose model may be smaller than the codebase
-    ///     (<paramref name="incompleteModel" />, the fact that part of it never loaded); each is null where the
-    ///     universe or the model is whole. <paramref name="root" /> is the directory path globs are relative to,
-    ///     or null for a run that has none to give.
+    ///     <paramref name="baselines" /> grandfathers what it records (<see cref="BaselineIndex.Empty" /> nothing),
+    ///     and every tripwire skips where <paramref name="diff" /> is null. <paramref name="narrowing" /> is set
+    ///     where the run's universe is smaller than the solution, and <paramref name="incompleteModel" /> where
+    ///     part of the model never loaded; each is null where the universe or the model is whole.
+    ///     <paramref name="root" /> is the directory path globs are relative to, or null for a run that has none
+    ///     to give. <paramref name="cancellationToken" /> is observed once before each rule is evaluated, so a
+    ///     caller that has given up waits at worst for the rule already running.
     /// </summary>
     /// <remarks>
-    ///     Under a narrowing, a rule whose every violation is an empty subject is <see cref="RuleStatus.Skipped" />
-    ///     rather than red, because a subject that lives wholly in the projects the run left out is the narrowing's
-    ///     doing and not a defect in the spec, and a rule whose target, or one of whose target patterns, matched
-    ///     nothing still warns but names the narrowing as its cure. Under a partial model, a rule whose selection
-    ///     matched nothing still fails or warns as it would, but carries that fact as its cure instead of advice
-    ///     about the shape it was written in; a partial model skips nothing.
-    /// </remarks>
-    internal static CheckReport Check(
-        IReadOnlyList<ArchRule> rules, CodebaseModel codebase, BaselineIndex baselines, DiffContext? diff,
-        NarrowedUniverse? narrowing, IncompleteModel? incompleteModel, SolutionRoot? root = null)
-    {
-        return Check(rules, codebase, baselines, diff, narrowing, incompleteModel, root, CancellationToken.None);
-    }
-
-    /// <summary>
-    ///     The same check, abandonable: <paramref name="cancellationToken" /> is observed once before each
-    ///     rule is evaluated, so a caller that has given up waits at worst for the rule already running.
-    /// </summary>
-    /// <remarks>
-    ///     A rule is the grain because it is the unit whose result the report carries: a run abandoned
-    ///     part-way returns nothing at all rather than a report silently missing its tail. Cancellation
-    ///     therefore leaves by being thrown, and the blanket arms in <see cref="Verdict" /> and
-    ///     <see cref="AttachExemplar" /> let it past for that reason. The token is per-call, and the two
-    ///     evaluators built here hold no static state, so concurrent runs over one model cannot see each
-    ///     other's.
+    ///     <para>
+    ///         Under a narrowing, a rule whose every violation is an empty subject is
+    ///         <see cref="RuleStatus.Skipped" /> rather than red, because a subject that lives wholly in the
+    ///         projects the run left out is the narrowing's doing and not a defect in the spec, and a rule whose
+    ///         target, or one of whose target patterns, matched nothing still warns but names the narrowing as its
+    ///         cure. Under a partial model, a rule whose selection matched nothing still fails or warns as it
+    ///         would, but carries that fact as its cure instead of advice about the shape it was written in; a
+    ///         partial model skips nothing.
+    ///     </para>
+    ///     <para>
+    ///         A rule is the grain of cancellation because it is the unit whose result the report carries: a run
+    ///         abandoned part-way returns nothing at all rather than a report silently missing its tail.
+    ///         Cancellation therefore leaves by being thrown, and the blanket arms in <see cref="Verdict" /> and
+    ///         <see cref="AttachExemplar" /> let it past for that reason. The token is per-call, and the two
+    ///         evaluators built here hold no static state, so concurrent runs over one model cannot see each
+    ///         other's.
+    ///     </para>
     /// </remarks>
     internal static CheckReport Check(
         IReadOnlyList<ArchRule> rules, CodebaseModel codebase, BaselineIndex baselines, DiffContext? diff,

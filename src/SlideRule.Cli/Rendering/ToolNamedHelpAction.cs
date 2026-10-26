@@ -21,6 +21,8 @@ internal sealed class ToolNamedHelpAction(HelpAction inner, string toolName) : S
     private const string UsageHeading = "Usage:";
 
     /// <summary>The wrap width of the stock action this one renders through.</summary>
+    // A deliberate test seam: no product path sets a width, and the help-fence gates render every page at one
+    // fixed width so a committed fence does not follow the console it was captured in.
     internal int MaxWidth
     {
         get => inner.MaxWidth;

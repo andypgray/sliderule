@@ -28,6 +28,8 @@ internal sealed class LineMap : IEquatable<LineMap>
     }
 
     /// <summary>Whether every mapped line maps to itself — the shape a whitespace-only edit produces.</summary>
+    // A deliberate test seam: no product path asks it, and the array it reads is private, so a test has no
+    // other way to state that a map moved nothing.
     internal bool IsIdentity => IsIdentityMapping(_newLineByOldLine);
 
     /// <summary>

@@ -1,7 +1,7 @@
 using Shouldly;
 using SlideRule.Codebase;
 using SlideRule.Extraction;
-using SlideRule.Roslyn;
+using SlideRule.Tests.TestSupport;
 using Xunit;
 
 namespace SlideRule.Tests.Extraction;
@@ -346,7 +346,7 @@ public sealed class CodebaseExtractorEdgeTests
                                                                                                      public class Bar { public A.Foo F; }
                                                                                                      """));
 
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([a, b]);
+        CodebaseModel model = Harness.Extract([a, b]);
 
         TypeNode target = model.Edge("B.Bar", "A.Foo")
             .Target;
@@ -366,7 +366,7 @@ public sealed class CodebaseExtractorEdgeTests
         CompilationInput first = CompilationFactory.Compile("P", file);
         CompilationInput second = CompilationFactory.Compile("P", file);
 
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([first, second]);
+        CodebaseModel model = Harness.Extract([first, second]);
 
         model.Edges.ShouldContain(e => e.Source.FullName == "P.B" && e.Target.FullName == "P.A", expectedCount: 1);
         model.Types.ShouldContain(t => t.FullName == "P.A", expectedCount: 1);

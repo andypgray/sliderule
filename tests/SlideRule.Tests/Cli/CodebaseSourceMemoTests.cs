@@ -52,9 +52,9 @@ public sealed class CodebaseSourceMemoTests
         // workspace for all three oracles: what is under test is the extraction, and a second load of the
         // same untouched tree would only cost the suite a design-time build per oracle.
         using SolutionHandle oracle = await new ColdSolutionSource().AcquireAsync(fixture.SolutionPath, Ct);
-        excludingBilling.ShouldModelTheSameAs(await ColdAsync(oracle, [Billing]));
-        excludingNothing.ShouldModelTheSameAs(await ColdAsync(oracle, []));
-        excludingDomain.ShouldModelTheSameAs(await ColdAsync(oracle, [Domain]));
+        excludingBilling.ShouldModelTheSameAs(await ColdAsync(oracle, fixture.SolutionPath, [Billing]));
+        excludingNothing.ShouldModelTheSameAs(await ColdAsync(oracle, fixture.SolutionPath, []));
+        excludingDomain.ShouldModelTheSameAs(await ColdAsync(oracle, fixture.SolutionPath, [Domain]));
 
         // Keyed, not global: three exclusion sets are three models, and no two of them are the same object.
         excludingBilling.ShouldNotBeSameAs(excludingNothing);
@@ -109,11 +109,11 @@ public sealed class CodebaseSourceMemoTests
     // exclusion applied at collection rather than at merge. It is handed the solution's declared membership
     // for the same reason the memoized source reads it — the comparison is about where the exclusion is
     // applied, and a fact the oracle was never given would read as a difference the memo introduced.
-    private static Task<CodebaseModel> ColdAsync(SolutionHandle handle, string[] excludeProjectNames)
+    private static Task<CodebaseModel> ColdAsync(SolutionHandle handle, string solutionPath, string[] excludeProjectNames)
     {
         return CodebaseExtractor.ExtractFromSolutionAsync(
             handle.Solution, excludeProjectNames,
-            declaredMembers: SpecExclusion.TryReadDeclaredMembers(handle.SolutionPath), ct: Ct);
+            declaredMembers: SpecExclusion.TryReadDeclaredMembers(solutionPath), ct: Ct);
     }
 
     // The cache root only matters where a fact turns the cache on; elsewhere the run is disabled and reads

@@ -5,7 +5,4 @@ namespace SlideRule.Prose;
 ///     extraction-format analog.
 /// </summary>
 internal sealed class UnrepresentableTypeException(Type type)
-    : Exception($"Type '{type}' has no source-level display form the checker can match against.")
-{
-    internal Type Type { get; } = type;
-}
+    : Exception($"Type '{type}' has no source-level display form the checker can match against.");

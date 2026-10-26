@@ -50,10 +50,11 @@ internal static class BaselineComposer
                 "A legacy baseline carries no site count — compose the entries without one.", nameof(sections));
 
         string composed = BaselineFormat.ComposeFile(input);
+        using var sealer = new BaselineSealer();
         foreach ((string ruleId, BaselineEntry[] entries) in sections)
         foreach (BaselineEntry entry in entries)
         {
-            string seal = BaselineFormat.ComputeSeal(ruleId, entry);
+            string seal = sealer.Seal(ruleId, entry);
             composed = composed.Replace($", \"seal\": \"{seal}\"", string.Empty);
         }
 

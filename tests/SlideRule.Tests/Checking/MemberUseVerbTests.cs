@@ -229,7 +229,7 @@ public sealed class MemberUseVerbTests
 
         // Empty baseline → the blocking Wait() is red; capture its exact member identity.
         CodebaseModel before = CompilationFactory.Extract(WaitSource("t.Wait();"));
-        RuleResult red = ArchChecker.Check(model, before, BaselineIndex.Empty)
+        RuleResult red = Harness.Check(model, before, BaselineIndex.Empty)
             .Single();
         red.ShouldHaveFailed();
         Violation observed = red.Violations.Single(v => v.Kind == ViolationKind.MemberUse);
@@ -244,7 +244,7 @@ public sealed class MemberUseVerbTests
         BaselineStore.Write(path, new BaselineDocument(sections));
 
         BaselineIndex loaded = BaselineStore.LoadForModel(model, dir.Path);
-        RuleResult grandfathered = ArchChecker.Check(model, before, loaded)
+        RuleResult grandfathered = Harness.Check(model, before, loaded)
             .Single();
         grandfathered.ShouldHavePassed();
         grandfathered.ShouldHaveGrandfathered(1);
@@ -252,7 +252,7 @@ public sealed class MemberUseVerbTests
         // Change the used overload Wait() → Wait(timeout): identity is the specific member id, so the
         // grandfathered blessing does not cover it — NEW red.
         CodebaseModel after = CompilationFactory.Extract(WaitSource("t.Wait(System.TimeSpan.Zero);"));
-        RuleResult regressed = ArchChecker.Check(model, after, loaded)
+        RuleResult regressed = Harness.Check(model, after, loaded)
             .Single();
         regressed.ShouldHaveFailed();
         regressed.Violations.Single(v => v.Kind == ViolationKind.MemberUse)

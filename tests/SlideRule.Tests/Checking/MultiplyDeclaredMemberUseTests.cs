@@ -1,8 +1,8 @@
 using Shouldly;
 using SlideRule.Codebase;
 using SlideRule.Extraction;
-using SlideRule.Roslyn;
 using SlideRule.Tests.Extraction;
+using SlideRule.Tests.TestSupport;
 using Xunit;
 
 namespace SlideRule.Tests.Checking;
@@ -92,7 +92,7 @@ internal static class DriftedMemberUsesCodebase
         CompilationInput tools = CompilationFactory.Compile("Tools", ("Tools/Cells/Ticker.cs", ToolsOwn));
 
         // Input order decides the winner, so Core leads Satellite.
-        return CodebaseExtractor.ExtractFromCompilations([core, satellite, tools]);
+        return Harness.Extract([core, satellite, tools]);
     }
 }
 
@@ -202,7 +202,7 @@ internal static class CopiedClockCodebase
             "Ledger", clockShim.Compilation, "ClockShim", ("Ledger/Stamps/Stamp.cs", StampCopy));
 
         // Input order decides the winners, so ClockCore leads ClockShim and Billing leads Ledger.
-        return CodebaseExtractor.ExtractFromCompilations([billing, clockCore, clockShim, ledger]);
+        return Harness.Extract([billing, clockCore, clockShim, ledger]);
     }
 }
 

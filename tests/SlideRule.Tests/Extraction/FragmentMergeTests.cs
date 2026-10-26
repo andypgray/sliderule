@@ -1,7 +1,7 @@
 using Shouldly;
 using SlideRule.Codebase;
 using SlideRule.Extraction;
-using SlideRule.Roslyn;
+using SlideRule.Tests.TestSupport;
 using Xunit;
 
 namespace SlideRule.Tests.Extraction;
@@ -41,7 +41,7 @@ public sealed class FragmentMergeTests
                                                                                public sealed class Dup {}
                                                                                """));
 
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([first, second]);
+        CodebaseModel model = Harness.Extract([first, second]);
 
         TypeNode dup = model.Type("N.Dup");
         dup.ProjectName.ShouldBe("Aproj");
@@ -61,7 +61,7 @@ public sealed class FragmentMergeTests
                                                                                public class Dup {}
                                                                                """));
 
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([first, second]);
+        CodebaseModel model = Harness.Extract([first, second]);
 
         model.Type("N.Dup")
             .DeclarationSites.Select(s => (s.FilePath, s.Line))
@@ -75,7 +75,7 @@ public sealed class FragmentMergeTests
         CompilationInput first = CompilationFactory.Compile("Aproj", ("A.cs", DupSource));
         CompilationInput second = CompilationFactory.Compile("Bproj", ("B.cs", DupSource));
 
-        TypeNode dup = CodebaseExtractor.ExtractFromCompilations([first, second])
+        TypeNode dup = Harness.Extract([first, second])
             .Type("N.Dup");
 
         SitesOf(dup, "Aproj")
@@ -91,7 +91,7 @@ public sealed class FragmentMergeTests
         CompilationInput newer = CompilationFactory.Compile("Aproj", ("A2.cs", DupSource)) with { TargetFramework = "net10.0" };
         CompilationInput other = CompilationFactory.Compile("Bproj", ("B.cs", DupSource));
 
-        TypeNode dup = CodebaseExtractor.ExtractFromCompilations([older, newer, other])
+        TypeNode dup = Harness.Extract([older, newer, other])
             .Type("N.Dup");
 
         dup.DeclarationSitesByDeclarer.ShouldNotBeNull()
@@ -108,7 +108,7 @@ public sealed class FragmentMergeTests
         CompilationInput tool = CompilationFactory.Compile(
             "Tool", ("Shared/Dup.cs", DupSource), ("Command.cs", "namespace N; public class Command {}"));
 
-        TypeNode dup = CodebaseExtractor.ExtractFromCompilations([core, tool])
+        TypeNode dup = Harness.Extract([core, tool])
             .Type("N.Dup");
 
         SitesOf(dup, "Core")
@@ -127,7 +127,7 @@ public sealed class FragmentMergeTests
         CompilationInput other = CompilationFactory.Compile("Bproj", ("B.cs", DupSource));
         CompilationInput newer = CompilationFactory.Compile("Aproj", ("A2.cs", DupSource)) with { TargetFramework = "net10.0" };
 
-        TypeNode dup = CodebaseExtractor.ExtractFromCompilations([older, other, newer])
+        TypeNode dup = Harness.Extract([older, other, newer])
             .Type("N.Dup");
 
         SitesOf(dup, "Aproj")
@@ -151,7 +151,7 @@ public sealed class FragmentMergeTests
                                                                  public class Early { public N.Late L; }
                                                                  """));
 
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([referencer, declarer]);
+        CodebaseModel model = Harness.Extract([referencer, declarer]);
 
         TypeNode target = model.Edge("N2.Early", "N.Late")
             .Target;
@@ -175,7 +175,7 @@ public sealed class FragmentMergeTests
                                                           public class Handler : N.IHandler<N.Msg> {}
                                                           """));
 
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([lib, app]);
+        CodebaseModel model = Harness.Extract([lib, app]);
 
         TypeNode handlerDef = model.Type("N.IHandler<T>");
         TypeConstruction construction = model.Type("N2.Handler")
@@ -200,7 +200,7 @@ public sealed class FragmentMergeTests
                                                           public class Handler : N.IHandler<N.Msg> {}
                                                           """));
 
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([lib, app]);
+        CodebaseModel model = Harness.Extract([lib, app]);
 
         TypeNode handler = model.Type("N2.Handler");
         TypeNode handlerDef = model.Type("N.IHandler<T>");
@@ -225,7 +225,7 @@ public sealed class FragmentMergeTests
         CompilationInput first = CompilationFactory.Compile("P", file) with { ProjectReferences = ["Legacy"] };
         CompilationInput second = CompilationFactory.Compile("P", file) with { ProjectReferences = ["Modern"] };
 
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([first, second]);
+        CodebaseModel model = Harness.Extract([first, second]);
 
         model.Projects.ShouldContain(p => p.Name == "P", expectedCount: 1);
         model.Projects.Single(p => p.Name == "P")
@@ -244,7 +244,7 @@ public sealed class FragmentMergeTests
                                                                                public class CB { public System.Exception E; }
                                                                                """));
 
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([first, second]);
+        CodebaseModel model = Harness.Extract([first, second]);
 
         model.Types.ShouldContain(t => t.FullName == "System.Exception", expectedCount: 1);
         TypeNode shared = model.Type("System.Exception");
@@ -270,7 +270,7 @@ public sealed class FragmentMergeTests
                                                           public class Maker { public object M() => new N.Widget(); }
                                                           """));
 
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([lib, app]);
+        CodebaseModel model = Harness.Extract([lib, app]);
 
         TypeNode widget = model.Type("N.Widget");
         ConstructorEdge edge = model.ConstructorEdge("N2.Maker", "N.Widget");
@@ -292,7 +292,7 @@ public sealed class FragmentMergeTests
         CompilationInput first = CompilationFactory.Compile("P", file);
         CompilationInput second = CompilationFactory.Compile("P", file);
 
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([first, second]);
+        CodebaseModel model = Harness.Extract([first, second]);
 
         model.ConstructorEdges.ShouldContain(
             e => e.Source.FullName == "P.B" && e.Constructed.FullName == "P.A", expectedCount: 1);
@@ -317,7 +317,7 @@ public sealed class FragmentMergeTests
                                                           public class Svc { public Svc(N.IDep d) {} }
                                                           """));
 
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([lib, app]);
+        CodebaseModel model = Harness.Extract([lib, app]);
 
         TypeNode dep = model.Type("N.IDep");
         InjectionEdge edge = model.InjectionEdge("N2.Svc", "N.IDep");
@@ -339,7 +339,7 @@ public sealed class FragmentMergeTests
         CompilationInput first = CompilationFactory.Compile("P", file);
         CompilationInput second = CompilationFactory.Compile("P", file);
 
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([first, second]);
+        CodebaseModel model = Harness.Extract([first, second]);
 
         model.InjectionEdges.ShouldContain(
             e => e.Source.FullName == "P.Svc" && e.Injected.FullName == "P.IDep", expectedCount: 1);
@@ -365,7 +365,7 @@ public sealed class FragmentMergeTests
         CompilationInput first = CompilationFactory.CompileWithDi("P", file) with { ProjectReferences = ["Legacy"] };
         CompilationInput second = CompilationFactory.CompileWithDi("P", file) with { ProjectReferences = ["Modern"] };
 
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([first, second]);
+        CodebaseModel model = Harness.Extract([first, second]);
 
         model.ServiceRegistrations.ShouldContain(r => r.ServiceFullName == "P.IFoo", expectedCount: 1);
         model.Registration(Lifetime.Singleton, "P.IFoo", "P.Foo")
@@ -388,7 +388,7 @@ public sealed class FragmentMergeTests
                                                                                public class Dup {}
                                                                                """));
 
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([first, second]);
+        CodebaseModel model = Harness.Extract([first, second]);
 
         model.MergeNotes.ShouldBe([
             "Projects 'Aproj' and 'Bproj' each declare 'N.Dup'; its facts and project attribution follow "
@@ -409,7 +409,7 @@ public sealed class FragmentMergeTests
         CompilationInput first = CompilationFactory.Compile("P", file) with { ProjectReferences = ["Legacy"] };
         CompilationInput second = CompilationFactory.Compile("P", file) with { ProjectReferences = ["Modern"] };
 
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([first, second]);
+        CodebaseModel model = Harness.Extract([first, second]);
 
         model.MergeNotes.ShouldBeEmpty();
     }
@@ -427,7 +427,7 @@ public sealed class FragmentMergeTests
                                                                                public class B {}
                                                                                """));
 
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([first, second]);
+        CodebaseModel model = Harness.Extract([first, second]);
 
         model.MergeNotes.ShouldBeEmpty();
     }
@@ -454,7 +454,7 @@ public sealed class FragmentMergeTests
                                                          """))
                 .Compilation, "Bproj", ["Modern"]);
 
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([winner, loserFirst, loserSecond]);
+        CodebaseModel model = Harness.Extract([winner, loserFirst, loserSecond]);
 
         model.MergeNotes.ShouldHaveSingleItem()
             .ShouldContain("Projects 'Aproj' and 'Bproj' each declare 'N.Dup'");
@@ -483,7 +483,7 @@ public sealed class FragmentMergeTests
                                                                                """));
 
         // Losers arrive out of order; the note orders them ordinal so the line is stable across runs.
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([winner, stubB, stubA]);
+        CodebaseModel model = Harness.Extract([winner, stubB, stubA]);
 
         model.MergeNotes.ShouldBe([
             "Projects 'App.Web', 'Spec.A' and 'Spec.B' each declare 'N.Dup'; its facts and project "
@@ -507,7 +507,7 @@ public sealed class FragmentMergeTests
         CompilationInput winner = CompilationFactory.Compile("Aproj", shared);
         CompilationInput loser = CompilationFactory.Compile("Bproj", shared);
 
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([winner, loser]);
+        CodebaseModel model = Harness.Extract([winner, loser]);
 
         model.MergeNotes.ShouldBe([
             "Projects 'Aproj' and 'Bproj' each declare 'N.Dup' and 'N.Other'; their facts and project "
@@ -537,7 +537,7 @@ public sealed class FragmentMergeTests
                                                                                 public class Dup {}
                                                                                 """));
 
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([both, otherOnly, dupOnly]);
+        CodebaseModel model = Harness.Extract([both, otherOnly, dupOnly]);
 
         model.MergeNotes.ShouldBe([
             "Projects 'Aproj' and 'Bproj' each declare 'N.Dup'; its facts and project attribution follow "
@@ -568,7 +568,7 @@ public sealed class FragmentMergeTests
                                                                                   public class Other {}
                                                                                   """));
 
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([winner, everyType, otherOnly]);
+        CodebaseModel model = Harness.Extract([winner, everyType, otherOnly]);
 
         model.MergeNotes.ShouldBe([
             "Projects 'Aproj' and 'Bproj' each declare 'N.Dup'; its facts and project attribution follow "
@@ -599,7 +599,7 @@ public sealed class FragmentMergeTests
                                                                           public class A {}
                                                                           """));
 
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([modern, legacy, other]);
+        CodebaseModel model = Harness.Extract([modern, legacy, other]);
 
         model.MergeNotes.ShouldBe([
             "Project 'P' targets 'net10.0' and 'netstandard2.0'; the types they share take their members and "
@@ -632,7 +632,7 @@ public sealed class FragmentMergeTests
                                                                                """));
 
         // Losers arrive out of order; the list orders them ordinal like the note that reads the same table.
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([winner, stubB, stubA]);
+        CodebaseModel model = Harness.Extract([winner, stubB, stubA]);
 
         TypeNode dup = model.Type("N.Dup");
         dup.ProjectName.ShouldBe("App.Web");
@@ -656,7 +656,7 @@ public sealed class FragmentMergeTests
                                                                           public class B {}
                                                                           """));
 
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([modern, legacy, other]);
+        CodebaseModel model = Harness.Extract([modern, legacy, other]);
 
         model.Type("P.A")
             .AlsoDeclaredBy.ShouldBeEmpty();
@@ -679,7 +679,7 @@ public sealed class FragmentMergeTests
         CompilationInput modern = CompilationFactory.Compile("P", file) with { TargetFramework = "net10.0" };
         CompilationInput legacy = CompilationFactory.Compile("P", file) with { TargetFramework = "netstandard2.0" };
 
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([modern, legacy]);
+        CodebaseModel model = Harness.Extract([modern, legacy]);
 
         model.MergeNotes.ShouldBe([
             "Project 'P' targets 'net10.0' and 'netstandard2.0'; the types they share take their members and "
@@ -708,7 +708,7 @@ public sealed class FragmentMergeTests
                                                           """))
                 .Compilation, "P", [], "netstandard2.0");
 
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([modern, legacy]);
+        CodebaseModel model = Harness.Extract([modern, legacy]);
 
         model.MergeNotes.ShouldBeEmpty();
     }
@@ -726,7 +726,7 @@ public sealed class FragmentMergeTests
         CompilationInput first = CompilationFactory.Compile("P", file) with { TargetFramework = "net10.0" };
         CompilationInput second = CompilationFactory.Compile("P", file) with { TargetFramework = "net10.0" };
 
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([first, second]);
+        CodebaseModel model = Harness.Extract([first, second]);
 
         model.MergeNotes.ShouldBeEmpty();
         model.Projects.Single(project => project.Name == "P")
@@ -746,7 +746,7 @@ public sealed class FragmentMergeTests
                                                                                   public class A {}
                                                                                   """));
 
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([first, second]);
+        CodebaseModel model = Harness.Extract([first, second]);
 
         model.MergeNotes.ShouldBeEmpty();
         model.Projects.Select(project => project.Name)
@@ -772,7 +772,7 @@ public sealed class FragmentMergeTests
         CompilationInput modern = CompilationFactory.Compile("P", file) with { TargetFramework = "net10.0" };
         CompilationInput legacy = CompilationFactory.Compile("P", file) with { TargetFramework = "netstandard2.0" };
 
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([modern, legacy]);
+        CodebaseModel model = Harness.Extract([modern, legacy]);
 
         model.MergeNotes.ShouldHaveSingleItem()
             .ShouldContain("Project 'P' targets 'net10.0' and 'netstandard2.0'");
@@ -801,7 +801,7 @@ public sealed class FragmentMergeTests
                                                           """))
                 .Compilation, "P", [], "netstandard2.0");
 
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([modern, legacy]);
+        CodebaseModel model = Harness.Extract([modern, legacy]);
 
         model.Edge("P.A", "P.Legacy")
             .Sites.ShouldHaveSingleItem();
@@ -847,7 +847,7 @@ public sealed class FragmentMergeTests
             TargetFramework = "net8.0"
         };
 
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([legacy, modern, latest]);
+        CodebaseModel model = Harness.Extract([legacy, modern, latest]);
 
         model.MergeNotes.ShouldBe([
             "Project 'P' targets 'net48', 'net6.0' and 'net8.0'; each type they share takes its members and "
@@ -884,7 +884,7 @@ public sealed class FragmentMergeTests
         CompilationInput modern = CompilationFactory.Compile("P", file) with { TargetFramework = "net6.0" };
         CompilationInput latest = CompilationFactory.Compile("P", file) with { TargetFramework = "net8.0" };
 
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([legacy, modern, latest]);
+        CodebaseModel model = Harness.Extract([legacy, modern, latest]);
 
         model.MergeNotes.ShouldBe([
             "Project 'P' targets 'net48', 'net6.0' and 'net8.0'; the types they share take their members and "
@@ -925,7 +925,7 @@ public sealed class FragmentMergeTests
                 TargetFramework = "netstandard2.0", SolutionMember = second
             };
 
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([modern, legacy]);
+        CodebaseModel model = Harness.Extract([modern, legacy]);
 
         model.Projects.Single()
             .SolutionMember.ShouldBe(expected);
@@ -937,7 +937,7 @@ public sealed class FragmentMergeTests
         // One declarer records no shares: its own project reads every site, and any other project reads none.
         CompilationInput only = CompilationFactory.Compile("Aproj", ("A.cs", DupSource));
 
-        TypeNode dup = CodebaseExtractor.ExtractFromCompilations([only])
+        TypeNode dup = Harness.Extract([only])
             .Type("N.Dup");
 
         dup.DeclarationSitesByDeclarer.ShouldBeNull();
@@ -980,7 +980,7 @@ public sealed class FragmentMergeTests
                                                                                                         }
                                                                                                         """));
 
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([core, satellite]);
+        CodebaseModel model = Harness.Extract([core, satellite]);
 
         ReferenceEdge reference = model.Edge("Drift.Formatter", "Cells.Cell");
         ConstructorEdge construction = model.ConstructorEdge("Drift.Formatter", "Cells.Cell");
@@ -1032,7 +1032,7 @@ public sealed class FragmentMergeTests
         CompilationInput reader = CompilationFactory.CompileReferencing(
             "Reader", satellite.Compilation, "Satellite", ("Reader/Page.cs", "namespace Reader { public class Page { public Drift.Formatter F; } }"));
 
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([client, core, reader, satellite]);
+        CodebaseModel model = Harness.Extract([client, core, reader, satellite]);
 
         ReferenceEdge fromClient = model.Edge("Client.View", "Drift.Formatter");
         ReferenceEdge fromReader = model.Edge("Reader.Page", "Drift.Formatter");
@@ -1054,7 +1054,7 @@ public sealed class FragmentMergeTests
         CompilationInput reader = CompilationFactory.CompileReferencing(
             "Reader", satellite.Compilation, "Satellite", ("Reader/Page.cs", "namespace Reader { public class Page { public Drift.Formatter F; } }"));
 
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([core, reader, satellite]);
+        CodebaseModel model = Harness.Extract([core, reader, satellite]);
 
         ReferenceEdge fromReader = model.Edge("Reader.Page", "Drift.Formatter");
         InstancesOf(fromReader.Evidence.Instances)
@@ -1106,7 +1106,7 @@ public sealed class FragmentMergeTests
         CompilationInput satellite = CompilationFactory.CompileReferencing(
             "Satellite", cells.Compilation, "Cells", ("Satellite/Formatter.cs", satelliteCopy));
 
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([cells, core, satellite]);
+        CodebaseModel model = Harness.Extract([cells, core, satellite]);
 
         ReferenceEdge reference = model.Edge("Drift.Formatter", "Cells.Cell");
         IReadOnlyList<EdgeInstance> instances = reference.Evidence.Instances.ShouldNotBeNull();
@@ -1179,7 +1179,7 @@ public sealed class FragmentMergeTests
         CompilationInput satellite = CompilationFactory.Compile(
             "Satellite", ("Satellite/Formatter.cs", FormatterSource));
 
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([legacy, modern, satellite]);
+        CodebaseModel model = Harness.Extract([legacy, modern, satellite]);
 
         ReferenceEdge reference = model.Edge("Drift.Formatter", "Cells.Cell");
         IReadOnlyList<EdgeInstance> instances = reference.Evidence.Instances.ShouldNotBeNull();
@@ -1273,7 +1273,7 @@ public sealed class FragmentMergeTests
         CompilationInput satellite = CompilationFactory.CompileReferencing(
             "Satellite", cells.Compilation, "Cells", ("Satellite/Formatter.cs", satelliteCopy));
 
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([cells, core, satellite]);
+        CodebaseModel model = Harness.Extract([cells, core, satellite]);
 
         CatchEdge caught = model.CatchEdge("Drift.Formatter", "Cells.CellException");
         (string, string)[] bothCopies = [("Core", "Cells"), ("Satellite", "Cells")];
@@ -1309,7 +1309,7 @@ public sealed class FragmentMergeTests
         CompilationInput core = CompilationFactory.Compile("Core", ("Shared/Widget.cs", LinkedWidgetSource));
         CompilationInput tool = CompilationFactory.Compile("Tool", ("Shared/Widget.cs", LinkedWidgetSource));
 
-        return CodebaseExtractor.ExtractFromCompilations([core, tool]);
+        return Harness.Extract([core, tool]);
     }
 
     // One project under two frameworks, the older declaring Formatter itself as a #if-guarded polyfill would and
@@ -1330,7 +1330,7 @@ public sealed class FragmentMergeTests
                 TargetFramework = "net10.0"
             };
 
-        return CodebaseExtractor.ExtractFromCompilations([older, newer, core]);
+        return Harness.Extract([older, newer, core]);
     }
 
     // An edge neither of whose ends is shared, sitting beside a name two projects declare so that the merge is
@@ -1343,7 +1343,7 @@ public sealed class FragmentMergeTests
                                                                                """));
         CompilationInput satellite = CompilationFactory.Compile("Satellite", ("Satellite.cs", FormatterSource));
 
-        return CodebaseExtractor.ExtractFromCompilations([core, satellite]);
+        return Harness.Extract([core, satellite]);
     }
 
     // A site list as file:line strings, the shape every per-instance site pin in this class reads.

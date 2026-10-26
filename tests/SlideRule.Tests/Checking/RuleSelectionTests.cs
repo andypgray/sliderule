@@ -4,14 +4,14 @@ using SlideRule.Checking;
 using SlideRule.Codebase;
 using SlideRule.Hosting;
 using SlideRule.Tests.Extraction;
+using SlideRule.Tests.TestSupport;
 using Xunit;
 
 namespace SlideRule.Tests.Checking;
 
 /// <summary>
-///     <see cref="ArchChecker.SelectRules" /> and the rule-list
-///     <see cref="ArchChecker.Check(IReadOnlyList{ArchRule}, CodebaseModel, BaselineIndex, DiffContext?)" />
-///     overload: which rules a narrowed run evaluates, and what the resulting report counts. A glob matches
+///     <see cref="ArchChecker.SelectRules" /> and <see cref="ArchChecker.Check" /> over the rule list it
+///     returns: which rules a narrowed run evaluates, and what the resulting report counts. A glob matches
 ///     the whole ID with <c>*</c> spanning the <c>/</c> separator and no implicit subtree, selection keeps
 ///     model order, and an empty glob list selects everything. Because selection decides what
 ///     <em>runs</em>, the report's counters are the subset's for free — and the verdict contract is
@@ -121,7 +121,7 @@ public sealed class RuleSelectionTests
         IReadOnlyList<ArchRule> selected = ArchChecker.SelectRules(model, ["layering/web-not-legacy"]);
 
         // Act
-        CheckReport report = ArchChecker.Check(selected, codebase, BaselineIndex.Empty, null);
+        CheckReport report = Harness.Check(selected, codebase, BaselineIndex.Empty, null);
 
         // Assert — the counters are the subset's, and the unselected red rule does not reach the verdict.
         report.Results.Select(result => result.Rule.Id)
@@ -144,7 +144,7 @@ public sealed class RuleSelectionTests
         IReadOnlyList<ArchRule> selected = ArchChecker.SelectRules(model, ["layering/web-not-data"]);
 
         // Act
-        CheckReport report = ArchChecker.Check(selected, codebase, BaselineIndex.Empty, null);
+        CheckReport report = Harness.Check(selected, codebase, BaselineIndex.Empty, null);
 
         // Assert — narrowing changes what runs, never what a violation means.
         report.RulesChecked.ShouldBe(1);
@@ -163,8 +163,8 @@ public sealed class RuleSelectionTests
         IReadOnlyList<ArchRule> selected = ArchChecker.SelectRules(model, []);
 
         // Act
-        CheckReport subset = ArchChecker.Check(selected, codebase, BaselineIndex.Empty, null);
-        CheckReport whole = ArchChecker.Check(model, codebase, BaselineIndex.Empty, null);
+        CheckReport subset = Harness.Check(selected, codebase, BaselineIndex.Empty, null);
+        CheckReport whole = Harness.Check(model, codebase, BaselineIndex.Empty, null);
 
         // Assert — the unfiltered narrow path is the whole-model path, so nothing about the default run moves.
         subset.Results.Select(result => result.Rule.Id)

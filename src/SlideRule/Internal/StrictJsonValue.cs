@@ -102,12 +102,6 @@ internal sealed class StrictJsonValue
         return _elements!;
     }
 
-    internal int GetArrayLength()
-    {
-        Require(StrictJsonKind.Array, "Array");
-        return _elements!.Count;
-    }
-
     internal string GetString()
     {
         Require(StrictJsonKind.String, "String");

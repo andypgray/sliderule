@@ -15,7 +15,7 @@ namespace SlideRule.Tests.Rendering;
 public sealed class LawPlaceClassifierTests
 {
     [Fact]
-    public void IsDrawableVerb_TheLeafForm_IsDrawableSoItsSubjectStaysAPlace()
+    public void Classify_TheLeafForm_IsDrawableSoItsSubjectStaysAPlace()
     {
         // Arrange — the verb draws nothing, having no operand to point at, and is drawable all the same:
         // declining it here would drop the subject's place with it, and a leaf is a node of the graph
@@ -26,12 +26,12 @@ public sealed class LawPlaceClassifierTests
                 .Because("x"));
 
         // Act + Assert
-        LawPlaceClassifier.IsDrawableVerb(model.Rules.Single().Constraint)
-            .ShouldBeTrue();
+        LawPlaceClassifier.Classify(model.Rules.Single().Constraint)
+            .ShouldNotBeNull();
     }
 
     [Fact]
-    public void IsDrawableVerb_TheInboundLeafForm_IsDrawableForTheSameReasonTheOutboundOneIs()
+    public void Classify_TheInboundLeafForm_IsDrawableForTheSameReasonTheOutboundOneIs()
     {
         // Arrange — a hermetic set is a node of the graph whether or not an arrow reaches it, so the
         // inbound leaf classifies like its outbound twin: it registers its subject's place and draws
@@ -51,7 +51,7 @@ public sealed class LawPlaceClassifierTests
     }
 
     [Fact]
-    public void IsDrawableVerb_TheCrossCellBan_IsNotDrawable()
+    public void Classify_TheCrossCellBan_IsNotDrawable()
     {
         // Arrange — the far end is a different place for every cell, so one arrow could not say the law.
         ArchitectureModel model = Checker.Model(arch =>
@@ -60,12 +60,12 @@ public sealed class LawPlaceClassifierTests
                 .Because("x"));
 
         // Act + Assert
-        LawPlaceClassifier.IsDrawableVerb(model.Rules.Single().Constraint)
-            .ShouldBeFalse();
+        LawPlaceClassifier.Classify(model.Rules.Single().Constraint)
+            .ShouldBeNull();
     }
 
     [Fact]
-    public void IsDrawableVerb_TheCircularReferencesVerb_IsNotDrawable()
+    public void Classify_TheCircularReferencesVerb_IsNotDrawable()
     {
         // Arrange — the law forbids a property of a path, not an edge, so no arrow can say "no circle".
         ArchitectureModel model = Checker.Model(arch =>
@@ -74,8 +74,8 @@ public sealed class LawPlaceClassifierTests
                 .Because("x"));
 
         // Act + Assert
-        LawPlaceClassifier.IsDrawableVerb(model.Rules.Single().Constraint)
-            .ShouldBeFalse();
+        LawPlaceClassifier.Classify(model.Rules.Single().Constraint)
+            .ShouldBeNull();
     }
 
     [Fact]
@@ -95,7 +95,7 @@ public sealed class LawPlaceClassifierTests
     }
 
     [Fact]
-    public void IsDrawableVerb_TheFourDirectionVerbsAndExpose_AreDrawable()
+    public void Classify_TheFourDirectionVerbsAndExpose_AreDrawable()
     {
         // Arrange — one rule per drawable verb, in one model.
         ArchitectureModel model = Checker.Model(arch =>
@@ -118,11 +118,11 @@ public sealed class LawPlaceClassifierTests
         });
 
         // Act + Assert
-        model.Rules.ShouldAllBe(rule => LawPlaceClassifier.IsDrawableVerb(rule.Constraint));
+        model.Rules.ShouldAllBe(rule => LawPlaceClassifier.Classify(rule.Constraint) != null);
     }
 
     [Fact]
-    public void IsDrawableVerb_AShapeOrNamingVerb_IsNotDrawable()
+    public void Classify_AShapeOrNamingVerb_IsNotDrawable()
     {
         // Arrange — a verb that constrains what a type IS rather than what it may reach has no direction,
         // and an arrow would misrepresent it.
@@ -140,7 +140,7 @@ public sealed class LawPlaceClassifierTests
         });
 
         // Act + Assert
-        model.Rules.ShouldAllBe(rule => !LawPlaceClassifier.IsDrawableVerb(rule.Constraint));
+        model.Rules.ShouldAllBe(rule => LawPlaceClassifier.Classify(rule.Constraint) == null);
     }
 
     [Fact]

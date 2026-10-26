@@ -23,7 +23,7 @@ internal static class BaselineDocumentReader
             // what is wrong in the same register, and re-wording it would only move the reader's eye.
             StrictJsonError json = error!;
             return BaselineReadResult.Refused(
-                new BaselineRefusal(BaselineRefusalKind.Syntax, json.Reason, null, null, json.Position));
+                new BaselineRefusal(BaselineRefusalKind.Syntax, json.Reason, json.Position));
         }
 
         var walk = new Walk();
@@ -90,7 +90,7 @@ internal static class BaselineDocumentReader
             if (string.Equals(recomputed, legacyDigest, StringComparison.Ordinal)) return document;
 
             Refuse(
-                BaselineRefusalKind.LegacyDigestMismatch, "the digest does not match the entries.", null, null,
+                BaselineRefusalKind.LegacyDigestMismatch, "the digest does not match the entries.",
                 digestValue!.Position);
             return null;
         }
@@ -154,7 +154,7 @@ internal static class BaselineDocumentReader
                 StrictJsonValue section = ruleProperty.Value;
                 if (section.ValueKind != StrictJsonKind.Object)
                 {
-                    RefuseAt(section, $"rule '{ruleId}' must be an object.", ruleId);
+                    RefuseAt(section, $"rule '{ruleId}' must be an object.");
                     return null;
                 }
 
@@ -163,7 +163,7 @@ internal static class BaselineDocumentReader
                 StrictJsonValue entriesValue = section.GetProperty("entries");
                 if (entriesValue.ValueKind != StrictJsonKind.Array)
                 {
-                    RefuseAt(entriesValue, $"rule '{ruleId}' entries must be an array.", ruleId);
+                    RefuseAt(entriesValue, $"rule '{ruleId}' entries must be an array.");
                     return null;
                 }
 
@@ -187,7 +187,7 @@ internal static class BaselineDocumentReader
         {
             if (entry.ValueKind != StrictJsonKind.Object)
             {
-                RefuseAt(entry, $"rule '{ruleId}' has a non-object entry.", ruleId);
+                RefuseAt(entry, $"rule '{ruleId}' has a non-object entry.");
                 return null;
             }
 
@@ -240,15 +240,14 @@ internal static class BaselineDocumentReader
             bool isEdge = !hasStranger && source is not null && target is not null && subject is null;
             if (!isSubject && !isEdge)
             {
-                RefuseAt(entry, $"rule '{ruleId}' has an entry that is neither {{source, target}} nor {{subject}}.", ruleId);
+                RefuseAt(entry, $"rule '{ruleId}' has an entry that is neither {{source, target}} nor {{subject}}.");
                 return null;
             }
 
             if (isSubject && siteCount is not null)
             {
                 RefuseAt(
-                    siteCount, $"rule '{ruleId}' has a 'siteCount' on a subject entry — only edge entries carry one.",
-                    ruleId);
+                    siteCount, $"rule '{ruleId}' has a 'siteCount' on a subject entry — only edge entries carry one.");
                 return null;
             }
 
@@ -256,7 +255,7 @@ internal static class BaselineDocumentReader
             // rather than tamper: the more precise diagnosis, and both refusals exit the same way.
             if (sealsEntries && seal is null)
             {
-                RefuseAt(entry, $"rule '{ruleId}' has an entry with no 'seal'.", ruleId);
+                RefuseAt(entry, $"rule '{ruleId}' has an entry with no 'seal'.");
                 return null;
             }
 
@@ -315,8 +314,7 @@ internal static class BaselineDocumentReader
             string identity = parsed.SymbolForm;
             Refuse(
                 BaselineRefusalKind.SealMismatch,
-                $"the entry '{identity}' under rule '{ruleId}' does not match its seal.", ruleId, identity,
-                entry.Position);
+                $"the entry '{identity}' under rule '{ruleId}' does not match its seal.", entry.Position);
             return null;
         }
 
@@ -326,7 +324,7 @@ internal static class BaselineDocumentReader
             bool whole = value.ValueKind == StrictJsonKind.Number && value.TryGetInt32(out siteCount) && siteCount >= 1;
             if (whole) return siteCount;
 
-            RefuseAt(value, $"rule '{ruleId}' has a 'siteCount' that is not an integer of at least 1.", ruleId);
+            RefuseAt(value, $"rule '{ruleId}' has a 'siteCount' that is not an integer of at least 1.");
             return null;
         }
 
@@ -338,7 +336,7 @@ internal static class BaselineDocumentReader
             bool blankOrMultiline = string.IsNullOrWhiteSpace(text) || SingleLineProse.IsMultiLine(text);
             if (!blankOrMultiline) return text;
 
-            RefuseAt(value, $"rule '{ruleId}' has a blank or multi-line 'because'.", ruleId);
+            RefuseAt(value, $"rule '{ruleId}' has a blank or multi-line 'because'.");
             return null;
         }
 
@@ -346,7 +344,7 @@ internal static class BaselineDocumentReader
         {
             if (value.ValueKind != StrictJsonKind.String)
             {
-                RefuseAt(value, $"rule '{ruleId}' has a non-string 'seal'.", ruleId);
+                RefuseAt(value, $"rule '{ruleId}' has a non-string 'seal'.");
                 return null;
             }
 
@@ -355,7 +353,7 @@ internal static class BaselineDocumentReader
             if (wellFormed) return seal;
 
             string length = JsonText.Digits(BaselineFormat.SealLength);
-            RefuseAt(value, $"rule '{ruleId}' has a 'seal' that is not {length} lowercase hex characters.", ruleId);
+            RefuseAt(value, $"rule '{ruleId}' has a 'seal' that is not {length} lowercase hex characters.");
             return null;
         }
 
@@ -364,7 +362,7 @@ internal static class BaselineDocumentReader
             bool filled = value.ValueKind == StrictJsonKind.String && value.GetString().Length > 0;
             if (filled) return value.GetString();
 
-            RefuseAt(value, $"rule '{ruleId}' has an empty or non-string '{property}'.", ruleId);
+            RefuseAt(value, $"rule '{ruleId}' has an empty or non-string '{property}'.");
             return null;
         }
 
@@ -394,22 +392,21 @@ internal static class BaselineDocumentReader
         }
 
         // The offending value's own start, which is where a reader opens the file.
-        private void RefuseAt(StrictJsonValue at, string detail, string? ruleId = null)
+        private void RefuseAt(StrictJsonValue at, string detail)
         {
-            Refuse(BaselineRefusalKind.Malformed, detail, ruleId, null, at.Position);
+            Refuse(BaselineRefusalKind.Malformed, detail, at.Position);
         }
 
         // A key nothing admits is reported at the name rather than at the value beside it, because the
         // name is the word the reader is looking for.
         private void RefuseAt(StrictJsonProperty at, string detail)
         {
-            Refuse(BaselineRefusalKind.Malformed, detail, null, null, at.Position);
+            Refuse(BaselineRefusalKind.Malformed, detail, at.Position);
         }
 
-        private void Refuse(
-            BaselineRefusalKind kind, string detail, string? ruleId, string? entryIdentity, JsonPosition at)
+        private void Refuse(BaselineRefusalKind kind, string detail, JsonPosition at)
         {
-            Refusal ??= new BaselineRefusal(kind, detail, ruleId, entryIdentity, at);
+            Refusal ??= new BaselineRefusal(kind, detail, at);
         }
     }
 }

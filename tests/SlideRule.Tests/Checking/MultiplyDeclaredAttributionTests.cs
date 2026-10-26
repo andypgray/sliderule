@@ -2,8 +2,8 @@ using Shared;
 using SlideRule.Checking;
 using SlideRule.Codebase;
 using SlideRule.Extraction;
-using SlideRule.Roslyn;
 using SlideRule.Tests.Extraction;
+using SlideRule.Tests.TestSupport;
 using Xunit;
 
 namespace SlideRule.Tests.Checking;
@@ -68,7 +68,7 @@ internal static class MixedDeclarerCodebase
 
         // Input order decides the winners, and it is ordinal here so both readings of "first declarer"
         // agree: Anchor wins Beta, Middle wins Alpha.
-        return CodebaseExtractor.ExtractFromCompilations([anchor, middle, shell]);
+        return Harness.Extract([anchor, middle, shell]);
     }
 }
 
@@ -175,7 +175,7 @@ internal static class DriftedCopiesCodebase
         CompilationInput reader = CompilationFactory.CompileReferencing(
             "Reader", satellite.Compilation, "Satellite", ("Reader/Page.cs", ReaderOwn));
 
-        return CodebaseExtractor.ExtractFromCompilations([client, core, reader, satellite]);
+        return Harness.Extract([client, core, reader, satellite]);
     }
 }
 
@@ -300,7 +300,7 @@ internal static class DriftedSitesCodebase
             "Satellite", @base.Compilation, "Base", ("Satellite/Drift/Formatter.cs", SatelliteCopy));
 
         // Input order decides the winner, so Core leads Satellite.
-        return CodebaseExtractor.ExtractFromCompilations([@base, core, satellite]);
+        return Harness.Extract([@base, core, satellite]);
     }
 }
 

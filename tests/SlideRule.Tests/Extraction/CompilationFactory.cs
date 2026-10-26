@@ -4,7 +4,6 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Emit;
 using SlideRule.Codebase;
 using SlideRule.Extraction;
-using SlideRule.Roslyn;
 using SlideRule.Tests.TestSupport;
 
 namespace SlideRule.Tests.Extraction;
@@ -143,7 +142,7 @@ internal static class CompilationFactory
     /// <summary>Single-source convenience: extracts a model from one file in project <c>TestProject</c>.</summary>
     public static CodebaseModel Extract(string source)
     {
-        return CodebaseExtractor.ExtractFromCompilations([Compile("TestProject", source)]);
+        return Harness.Extract([Compile("TestProject", source)]);
     }
 
     /// <summary>
@@ -154,7 +153,7 @@ internal static class CompilationFactory
     public static CodebaseModel ExtractConsoleApp(params (string Path, string Source)[] files)
     {
         CSharpCompilation compilation = CreateCompilation("TestProject", [CoreLibrary], OutputKind.ConsoleApplication, files);
-        return CodebaseExtractor.ExtractFromCompilations([new CompilationInput(compilation, "TestProject", [])]);
+        return Harness.Extract([new CompilationInput(compilation, "TestProject", [])]);
     }
 
     /// <summary>
@@ -191,14 +190,14 @@ internal static class CompilationFactory
             ? driver.GetRunResult().GeneratedTrees.ToHashSet()
             : null;
 
-        return CodebaseExtractor.ExtractFromCompilations(
+        return Harness.Extract(
             [new CompilationInput(generated, "TestProject", [], GeneratedTrees: generatedTrees)]);
     }
 
     /// <summary>Multi-file convenience: extracts a model from several files in one project.</summary>
     public static CodebaseModel Extract(string projectName, params (string Path, string Source)[] files)
     {
-        return CodebaseExtractor.ExtractFromCompilations([Compile(projectName, files)]);
+        return Harness.Extract([Compile(projectName, files)]);
     }
 
     /// <summary>
@@ -210,7 +209,7 @@ internal static class CompilationFactory
     public static CodebaseModel ExtractWithoutReferences(params (string Path, string Source)[] files)
     {
         CSharpCompilation compilation = CreateCompilation("NoRefs", [], files);
-        return CodebaseExtractor.ExtractFromCompilations([new CompilationInput(compilation, "NoRefs", [])]);
+        return Harness.Extract([new CompilationInput(compilation, "NoRefs", [])]);
     }
 
     /// <summary>
@@ -231,7 +230,7 @@ internal static class CompilationFactory
     /// </summary>
     public static CodebaseModel ExtractWithDi(params (string Path, string Source)[] files)
     {
-        return CodebaseExtractor.ExtractFromCompilations([CompileWithDi("TestProject", files)]);
+        return Harness.Extract([CompileWithDi("TestProject", files)]);
     }
 
     /// <summary>
@@ -243,7 +242,7 @@ internal static class CompilationFactory
     public static CodebaseModel ExtractWithDiNoHosting(params (string Path, string Source)[] files)
     {
         CSharpCompilation compilation = CreateCompilation("TestProject", DiReferencesNoHosting, files);
-        return CodebaseExtractor.ExtractFromCompilations([new CompilationInput(compilation, "TestProject", [])]);
+        return Harness.Extract([new CompilationInput(compilation, "TestProject", [])]);
     }
 
     /// <summary>
@@ -255,6 +254,6 @@ internal static class CompilationFactory
     public static CodebaseModel ExtractConsoleAppWithDi(params (string Path, string Source)[] files)
     {
         CSharpCompilation compilation = CreateCompilation("TestProject", DiReferences, OutputKind.ConsoleApplication, files);
-        return CodebaseExtractor.ExtractFromCompilations([new CompilationInput(compilation, "TestProject", [])]);
+        return Harness.Extract([new CompilationInput(compilation, "TestProject", [])]);
     }
 }

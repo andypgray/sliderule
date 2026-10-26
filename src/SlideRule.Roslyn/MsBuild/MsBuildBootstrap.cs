@@ -12,7 +12,7 @@ namespace SlideRule.Roslyn.MsBuild;
 ///     root (the parent of <c>MSBuild\Current\Bin</c>); a value that is not an existing directory, or holds no
 ///     <c>MSBuild.exe</c> there, fails with a message naming the variable and the path that was probed.
 /// </summary>
-// A host inside this repository calls EnsureInitialized (or Initialize) before anything touches a Roslyn
+// A host inside this repository calls EnsureInitialized before anything touches a Roslyn
 // workspace type: left until later, the runtime resolves MSBuild assemblies before anything has said which
 // ones to resolve. The two processes are pointed at MSBuild separately, and not at the same one: see
 // ApplyDevConsoleEnv for the BuildHost subprocess and RegisterEngineForThisProcess for this one.
@@ -58,11 +58,8 @@ internal static class MsBuildBootstrap
     ///     Visual Studio install behind the selection. Returns what was chosen, whose
     ///     <see cref="MsBuildSelection.Source" /> is the one line worth logging.
     /// </summary>
-    /// <remarks>
-    ///     Call it only where this host owns registration outright; where something else may have registered
-    ///     MSBuild already, a test project that registers in a module initializer for instance, call
-    ///     <see cref="EnsureInitialized" /> instead.
-    /// </remarks>
+    // A deliberate test seam: unlike EnsureInitialized, it selects whether or not MSBuild is already registered,
+    // so a test can drive the override's refusals in a process that registered before any test ran.
     internal static MsBuildSelection Initialize()
     {
         return SelectAndRegister();
@@ -73,9 +70,8 @@ internal static class MsBuildBootstrap
     ///     MSBuild is already registered.
     /// </summary>
     /// <remarks>
-    ///     Safe to call from every entry point of a host, which is why it is the form to prefer over
-    ///     <see cref="Initialize" />. A null answer is not a failure: it says the choice was already made, and
-    ///     <see cref="MsBuildSelection.Source" /> is only available from the call that made it.
+    ///     Safe to call from every entry point of a host. A null answer is not a failure: it says the choice was
+    ///     already made, and <see cref="MsBuildSelection.Source" /> is only available from the call that made it.
     /// </remarks>
     internal static MsBuildSelection? EnsureInitialized()
     {

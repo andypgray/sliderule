@@ -3,9 +3,9 @@ using SlideRule.Checking;
 using SlideRule.Codebase;
 using SlideRule.Hosting;
 using SlideRule.Rendering;
-using SlideRule.Roslyn;
 using SlideRule.Tests.Checking;
 using SlideRule.Tests.Extraction;
+using SlideRule.Tests.TestSupport;
 using Xunit;
 
 namespace SlideRule.Tests.Rendering;
@@ -61,7 +61,6 @@ public class ScopedContextResolverTests
         IReadOnlyList<ScopePlacement> placements = Resolve(Model(), codebase);
 
         ScopePlacement placement = placements.ShouldHaveSingleItem();
-        placement.ScopeId.ShouldBe("legacy/billing");
         placement.Rule.Id.ShouldBe("legacy/billing/containment");
         ContextFixtures.Relative(placement.Destination.DirectoryPath)
             .ShouldBe("MyApp.Legacy.Billing");
@@ -83,7 +82,7 @@ public class ScopedContextResolverTests
     [Fact]
     public void Resolve_ScopeScatteredAcrossProjects_PicksTheCommonRoot()
     {
-        CodebaseModel codebase = CodebaseExtractor.ExtractFromCompilations([
+        CodebaseModel codebase = Harness.Extract([
             CompilationFactory.Compile("ProjA",
                 (ContextFixtures.Site("src", "ProjA", "Calc.cs"), "namespace MyApp.Legacy.Billing; public class Calc {}")),
             CompilationFactory.Compile("ProjB",
@@ -105,7 +104,6 @@ public class ScopedContextResolverTests
         ScopePlacement placement = Resolve(CautionModel(), codebase)
             .ShouldHaveSingleItem();
 
-        placement.ScopeId.ShouldBe("shared/utilities");
         placement.Rule.Id.ShouldBe("shared/utilities/tripwire");
         ContextFixtures.Relative(placement.Destination.DirectoryPath)
             .ShouldBe("src/MyApp.Shared");

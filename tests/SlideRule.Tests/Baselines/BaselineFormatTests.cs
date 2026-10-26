@@ -229,8 +229,9 @@ public sealed class BaselineFormatTests
     }
 
     [Fact]
-    public void ComputeSeal_KnownEntry_IsTheIndependentSha256TruncatedToSixteen()
+    public void Seal_KnownEntry_IsTheIndependentSha256TruncatedToSixteen()
     {
+        using var sealer = new BaselineSealer();
         BaselineEntry entry = BaselineEntry.ForEdge("T:N.Src", "T:N.Tgt")
             .WithSiteCount(2);
 
@@ -238,7 +239,7 @@ public sealed class BaselineFormatTests
         byte[] hash = sha.ComputeHash(Encoding.UTF8.GetBytes(BaselineFormat.SealInput("a/one", entry)));
         string independent = string.Concat(hash.Select(b => b.ToString("x2")));
 
-        string seal = BaselineFormat.ComputeSeal("a/one", entry);
+        string seal = sealer.Seal("a/one", entry);
         // Length pinned literally and the value against the untruncated hash: together those say "the first
         // sixteen characters of the SHA-256" without restating the truncation the product does.
         seal.Length.ShouldBe(16);
@@ -246,22 +247,23 @@ public sealed class BaselineFormatTests
     }
 
     [Fact]
-    public void ComputeSeal_TheSameEntryUnderTwoRules_Differs()
+    public void Seal_TheSameEntryUnderTwoRules_Differs()
     {
+        using var sealer = new BaselineSealer();
         // The rule ID is the one whole-file property the seal keeps: an entry lifted out of one section and
         // dropped into another fails there rather than riding in as blessed. The composer binds it the same
         // way, which is why the two identical lines below come out with different seals.
         BaselineEntry entry = BaselineEntry.ForEdge("T:A", "T:B");
 
-        BaselineFormat.ComputeSeal("r/x", entry)
-            .ShouldNotBe(BaselineFormat.ComputeSeal("r/y", entry));
+        sealer.Seal("r/x", entry)
+            .ShouldNotBe(sealer.Seal("r/y", entry));
 
         string composed = BaselineFormat.ComposeFile(BaselineComposer.Rules(
             ("r/x", [BaselineEntry.ForEdge("T:A", "T:B")]),
             ("r/y", [BaselineEntry.ForEdge("T:A", "T:B")])));
 
-        composed.ShouldContain($"\"seal\": \"{BaselineFormat.ComputeSeal("r/x", entry)}\"");
-        composed.ShouldContain($"\"seal\": \"{BaselineFormat.ComputeSeal("r/y", entry)}\"");
+        composed.ShouldContain($"\"seal\": \"{sealer.Seal("r/x", entry)}\"");
+        composed.ShouldContain($"\"seal\": \"{sealer.Seal("r/y", entry)}\"");
     }
 
     [Fact]
@@ -305,14 +307,15 @@ public sealed class BaselineFormatTests
     }
 
     [Fact]
-    public void ComputeSeal_AttributedVsUnattributed_Differ()
+    public void Seal_AttributedVsUnattributed_Differ()
     {
-        string plain = BaselineFormat.ComputeSeal("r/x", BaselineEntry.ForEdge("T:A", "T:B"));
-        string attributed = BaselineFormat.ComputeSeal(
+        using var sealer = new BaselineSealer();
+        string plain = sealer.Seal("r/x", BaselineEntry.ForEdge("T:A", "T:B"));
+        string attributed = sealer.Seal(
             "r/x",
             BaselineEntry.ForEdge("T:A", "T:B")
                 .WithBecause("INC-1234"));
-        string otherText = BaselineFormat.ComputeSeal(
+        string otherText = sealer.Seal(
             "r/x",
             BaselineEntry.ForEdge("T:A", "T:B")
                 .WithBecause("INC-9999"));
@@ -322,16 +325,17 @@ public sealed class BaselineFormatTests
     }
 
     [Fact]
-    public void ComputeSeal_CountedVsUncounted_Differ()
+    public void Seal_CountedVsUncounted_Differ()
     {
+        using var sealer = new BaselineSealer();
         // The measure is folded into the seal, which is what makes a hand-raised count tamper rather than a
         // silently widened allowance — the one property that stops the ratchet being edited open.
-        string uncounted = BaselineFormat.ComputeSeal("r/x", BaselineEntry.ForEdge("T:A", "T:B"));
-        string two = BaselineFormat.ComputeSeal(
+        string uncounted = sealer.Seal("r/x", BaselineEntry.ForEdge("T:A", "T:B"));
+        string two = sealer.Seal(
             "r/x",
             BaselineEntry.ForEdge("T:A", "T:B")
                 .WithSiteCount(2));
-        string three = BaselineFormat.ComputeSeal(
+        string three = sealer.Seal(
             "r/x",
             BaselineEntry.ForEdge("T:A", "T:B")
                 .WithSiteCount(3));

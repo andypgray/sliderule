@@ -2,7 +2,6 @@ using System.Text.Json.Nodes;
 using Microsoft.CodeAnalysis;
 using Shouldly;
 using SlideRule.Roslyn;
-using SlideRule.Roslyn.Caching;
 using SlideRule.Roslyn.Replay;
 using SlideRule.Roslyn.Solutions;
 using SlideRule.Tests.TestSupport;
@@ -46,14 +45,14 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
 
         // Assert — both files land under the override root, and validation points at the copy.
         persisted.ShouldBeTrue();
-        File.Exists(CacheLocations.CaptureManifestPath(Fixture.SolutionPath, _cacheRoot.Path))
+        File.Exists(CaptureFiles.Manifest(Fixture.SolutionPath, _cacheRoot.Path))
             .ShouldBeTrue();
-        File.Exists(CacheLocations.CaptureBinlogPath(Fixture.SolutionPath, _cacheRoot.Path))
+        File.Exists(CaptureFiles.Binlog(Fixture.SolutionPath, _cacheRoot.Path))
             .ShouldBeTrue();
 
         CaptureValidation validation = store.Validate(Ct);
         validation.State.ShouldBe(CaptureState.Usable);
-        validation.BinlogCopyPath.ShouldBe(CacheLocations.CaptureBinlogPath(Fixture.SolutionPath, _cacheRoot.Path));
+        validation.BinlogCopyPath.ShouldBe(CaptureFiles.Binlog(Fixture.SolutionPath, _cacheRoot.Path));
     }
 
     [Fact]
@@ -207,7 +206,7 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
     {
         // Arrange
         BinlogCaptureStore store = IngestFullCapture();
-        File.WriteAllText(CacheLocations.CaptureManifestPath(Fixture.SolutionPath, _cacheRoot.Path), "{ not: valid json ]");
+        File.WriteAllText(CaptureFiles.Manifest(Fixture.SolutionPath, _cacheRoot.Path), "{ not: valid json ]");
 
         // Act
         CaptureValidation validation = store.Validate(Ct);
@@ -222,7 +221,7 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
     {
         // Arrange
         BinlogCaptureStore store = IngestFullCapture();
-        File.Delete(CacheLocations.CaptureBinlogPath(Fixture.SolutionPath, _cacheRoot.Path));
+        File.Delete(CaptureFiles.Binlog(Fixture.SolutionPath, _cacheRoot.Path));
 
         // Act
         CaptureValidation validation = store.Validate(Ct);
@@ -450,7 +449,7 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
 
     private void MutateManifest(Action<JsonObject> mutate)
     {
-        string path = CacheLocations.CaptureManifestPath(Fixture.SolutionPath, _cacheRoot.Path);
+        string path = CaptureFiles.Manifest(Fixture.SolutionPath, _cacheRoot.Path);
         var root = (JsonObject)JsonNode.Parse(File.ReadAllText(path))!;
         mutate(root);
         File.WriteAllText(path, root.ToJsonString());

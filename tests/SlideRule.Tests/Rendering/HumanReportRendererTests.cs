@@ -49,7 +49,7 @@ public sealed class HumanReportRendererTests
         Constraint constraint = arch.Namespace("App.Async.*").Methods.Returning(typeof(Task<int>))
             .MustHaveSuffix("Async");
         ArchitectureModel model = Checker.HandBuilt("naming/x", constraint);
-        RuleResult result = ArchChecker.Check(model, AsyncModel)
+        RuleResult result = Harness.Check(model, AsyncModel)
             .Single();
 
         string block = result.HumanBlock();

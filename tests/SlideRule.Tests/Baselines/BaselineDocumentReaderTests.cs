@@ -31,11 +31,8 @@ public sealed class BaselineDocumentReaderTests
     [Fact]
     public void Read_TextThatIsNotJson_PassesTheParsersOwnRefusalThroughUnchanged()
     {
-        BaselineRefusal refusal = ShouldRefuse(
+        ShouldRefuse(
             "{ this is not json", BaselineRefusalKind.Syntax, "expected a key or '}', found 't'.", "this");
-
-        refusal.RuleId.ShouldBeNull();
-        refusal.EntryIdentity.ShouldBeNull();
     }
 
     [Fact]
@@ -77,11 +74,8 @@ public sealed class BaselineDocumentReaderTests
                             + "  }\n"
                             + "}\n";
 
-        // A section is not a rule-level complaint: the sentence names the key, not the rule, so the
-        // refusal carries no rule ID either.
-        BaselineRefusal refusal = ShouldRefuse(
-            text, BaselineRefusalKind.Malformed, "missing property 'entries'.", "{}");
-        refusal.RuleId.ShouldBeNull();
+        // A section is not a rule-level complaint: the sentence names the key, not the rule.
+        ShouldRefuse(text, BaselineRefusalKind.Malformed, "missing property 'entries'.", "{}");
     }
 
     [Fact]
@@ -171,7 +165,7 @@ public sealed class BaselineDocumentReaderTests
                             + "  }\n"
                             + "}\n";
 
-        ShouldRefuse(text, BaselineRefusalKind.Malformed, "rule 'data/x' must be an object.", "[]", Rule);
+        ShouldRefuse(text, BaselineRefusalKind.Malformed, "rule 'data/x' must be an object.", "[]");
     }
 
     [Fact]
@@ -186,7 +180,7 @@ public sealed class BaselineDocumentReaderTests
                             + "  }\n"
                             + "}\n";
 
-        ShouldRefuse(text, BaselineRefusalKind.Malformed, "rule 'data/x' entries must be an array.", "{}", Rule);
+        ShouldRefuse(text, BaselineRefusalKind.Malformed, "rule 'data/x' entries must be an array.", "{}");
     }
 
     // Every refusal an entry can make, each against the same envelope: the detail names the rule the
@@ -213,10 +207,7 @@ public sealed class BaselineDocumentReaderTests
         "rule 'data/x' has a 'seal' that is not 16 lowercase hex characters.", "\"abc\"")]
     public void Read_AMalformedEntry_NamesTheRuleAndPointsAtWhatIsWrong(string entryJson, string detail, string at)
     {
-        BaselineRefusal refusal = ShouldRefuse(EntryDoc(entryJson), BaselineRefusalKind.Malformed, detail, at, Rule);
-
-        // Only a seal mismatch has an entry to name: everything above is refused before the entry is one.
-        refusal.EntryIdentity.ShouldBeNull();
+        ShouldRefuse(EntryDoc(entryJson), BaselineRefusalKind.Malformed, detail, at);
     }
 
     [Fact]
@@ -228,7 +219,7 @@ public sealed class BaselineDocumentReaderTests
         BaselineRefusal refusal = ShouldRefuse(
             tampered, BaselineRefusalKind.SealMismatch,
             "the entry 'T:App.Web.Hacked -> T:App.Data.Db' under rule 'data/x' does not match its seal.",
-            "{ \"source\"", Rule, "T:App.Web.Hacked -> T:App.Data.Db");
+            "{ \"source\"");
 
         refusal.Describe()
             .ShouldStartWith("line 6, column 9: ");
@@ -244,7 +235,7 @@ public sealed class BaselineDocumentReaderTests
         ShouldRefuse(
             tampered, BaselineRefusalKind.SealMismatch,
             "the entry 'T:App.Legacy.Other' under rule 'shape/x' does not match its seal.",
-            "{ \"subject\"", "shape/x", "T:App.Legacy.Other");
+            "{ \"subject\"");
     }
 
     [Fact]
@@ -254,13 +245,9 @@ public sealed class BaselineDocumentReaderTests
         string tampered = composed.Replace("T:App.Web.Old", "T:App.Web.Hacked");
         string digest = DigestOf(tampered);
 
-        BaselineRefusal refusal = ShouldRefuse(
+        ShouldRefuse(
             tampered, BaselineRefusalKind.LegacyDigestMismatch, "the digest does not match the entries.",
             "\"" + digest + "\"");
-
-        // The whole file failed, so there is no one entry and no one rule to name.
-        refusal.RuleId.ShouldBeNull();
-        refusal.EntryIdentity.ShouldBeNull();
     }
 
     [Fact]
@@ -350,9 +337,7 @@ public sealed class BaselineDocumentReaderTests
         return result.Document.ShouldNotBeNull();
     }
 
-    private static BaselineRefusal ShouldRefuse(
-        string text, BaselineRefusalKind kind, string detail, string at, string? ruleId = null,
-        string? entryIdentity = null)
+    private static BaselineRefusal ShouldRefuse(string text, BaselineRefusalKind kind, string detail, string at)
     {
         BaselineReadResult result = BaselineDocumentReader.Read(text);
 
@@ -360,8 +345,6 @@ public sealed class BaselineDocumentReaderTests
         BaselineRefusal refusal = result.Refusal.ShouldNotBeNull();
         refusal.Kind.ShouldBe(kind);
         refusal.Detail.ShouldBe(detail);
-        refusal.RuleId.ShouldBe(ruleId);
-        refusal.EntryIdentity.ShouldBe(entryIdentity);
         ShouldSitAt(refusal, text, at);
         return refusal;
     }

@@ -67,34 +67,20 @@ internal static class CacheLocations
     }
 
     /// <summary>
-    ///     The absolute path to the build-capture manifest (<c>capture.json</c>) for
-    ///     <paramref name="solutionPath" /> — the structure-only-keyed sidecar beside
-    ///     <see cref="CacheFilePath" /> in the same per-solution directory.
-    /// </summary>
-    internal static string CaptureManifestPath(string solutionPath, string? cacheRootOverride)
-    {
-        return CaptureManifestPathIn(CacheDirectory(solutionPath, cacheRootOverride));
-    }
-
-    /// <summary>
-    ///     The absolute path to the captured binlog copy (<c>capture.binlog</c>) for
-    ///     <paramref name="solutionPath" />, stored beside its <see cref="CaptureManifestPath" /> manifest.
-    /// </summary>
-    internal static string CaptureBinlogPath(string solutionPath, string? cacheRootOverride)
-    {
-        return CaptureBinlogPathIn(CacheDirectory(solutionPath, cacheRootOverride));
-    }
-
-    /// <summary>
-    ///     The capture manifest inside an already-derived <paramref name="cacheDirectory" />, for a caller that
-    ///     derives the directory once: deriving it costs a symlink resolve, a fold and a SHA-256.
+    ///     The build-capture manifest (<c>capture.json</c>) inside a <paramref name="cacheDirectory" /> derived by
+    ///     <see cref="CacheDirectory" />: the structure-only-keyed sidecar beside <see cref="CacheFilePath" />.
+    ///     The directory comes in already derived because deriving it costs a symlink resolve, a fold and a
+    ///     SHA-256.
     /// </summary>
     internal static string CaptureManifestPathIn(string cacheDirectory)
     {
         return Path.Combine(cacheDirectory, CaptureManifestFileName);
     }
 
-    /// <summary>The captured binlog copy inside an already-derived <paramref name="cacheDirectory" />.</summary>
+    /// <summary>
+    ///     The captured binlog copy (<c>capture.binlog</c>) inside an already-derived
+    ///     <paramref name="cacheDirectory" />, beside its <see cref="CaptureManifestPathIn" /> manifest.
+    /// </summary>
     internal static string CaptureBinlogPathIn(string cacheDirectory)
     {
         return Path.Combine(cacheDirectory, CaptureBinlogFileName);

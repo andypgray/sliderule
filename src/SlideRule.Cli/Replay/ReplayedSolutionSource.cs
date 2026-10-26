@@ -21,6 +21,6 @@ internal sealed class ReplayedSolutionSource(
     public Task<SolutionHandle> AcquireAsync(string solutionPath, CancellationToken ct)
     {
         return Task.FromResult(new SolutionHandle(
-            replayedSolution, solutionPath, loadDiagnostics, null, targetFrameworks: targetFrameworks));
+            replayedSolution, loadDiagnostics, null, targetFrameworks: targetFrameworks));
     }
 }

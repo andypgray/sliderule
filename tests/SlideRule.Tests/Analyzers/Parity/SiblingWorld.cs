@@ -5,9 +5,9 @@ using SlideRule.Baselines;
 using SlideRule.Codebase;
 using SlideRule.Extraction;
 using SlideRule.Hosting;
-using SlideRule.Roslyn;
 using SlideRule.Tests.Checking;
 using SlideRule.Tests.Extraction;
+using SlideRule.Tests.TestSupport;
 
 namespace SlideRule.Tests.Analyzers.Parity;
 
@@ -118,7 +118,7 @@ internal sealed class SiblingWorld
         List<CompilationInput> inputs = projects
             .Select(unit => new CompilationInput(unit.Compilation, unit.ProjectName!, ProjectNamesOf(unit)))
             .ToList();
-        CodebaseModel codebase = CodebaseExtractor.ExtractFromCompilations(inputs);
+        CodebaseModel codebase = Harness.Extract(inputs);
         ArchitectureModel model = Checker.Model(define);
 
         var texts = new Dictionary<string, string>(StringComparer.Ordinal);

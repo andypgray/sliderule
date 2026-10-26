@@ -1,7 +1,7 @@
 using Shouldly;
 using SlideRule.Codebase;
 using SlideRule.Extraction;
-using SlideRule.Roslyn;
+using SlideRule.Tests.TestSupport;
 using Xunit;
 
 namespace SlideRule.Tests.Extraction;
@@ -421,7 +421,7 @@ public sealed class CodebaseExtractorCatchEdgeTests
                                                                            }
                                                                            """));
 
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([first, second]);
+        CodebaseModel model = Harness.Extract([first, second]);
 
         // Both lists union per (source, caught), each staying (file, line) ordered.
         CatchEdge edge = model.CatchEdge("N.Worker", "N.MyError");
@@ -463,7 +463,7 @@ public sealed class CodebaseExtractorCatchEdgeTests
                                                                                     }
                                                                                     """));
 
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([filtered, unfiltered]);
+        CodebaseModel model = Harness.Extract([filtered, unfiltered]);
 
         CatchEdge edge = model.CatchEdge("N.Worker", "N.MyError");
         edge.Sites.Select(s => s.ToString())
@@ -747,7 +747,7 @@ public sealed class CodebaseExtractorCatchEdgeTests
                                                                                     }
                                                                                     """));
 
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([rethrowing, swallowing]);
+        CodebaseModel model = Harness.Extract([rethrowing, swallowing]);
 
         CatchEdge edge = model.CatchEdge("N.Worker", "N.MyError");
         edge.Sites.Select(s => s.ToString())

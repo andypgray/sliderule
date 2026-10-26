@@ -2,8 +2,8 @@ using Microsoft.CodeAnalysis;
 using Shouldly;
 using SlideRule.Codebase;
 using SlideRule.Extraction;
-using SlideRule.Roslyn;
 using SlideRule.Tests.Checking;
+using SlideRule.Tests.TestSupport;
 using Xunit;
 
 namespace SlideRule.Tests.Extraction;
@@ -39,7 +39,7 @@ public sealed class GraphSummarizerTests
                                                                                                                """));
 
         // Act — input order [lib, app]; the summary must come back ordinal by name regardless.
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([lib, app]);
+        CodebaseModel model = Harness.Extract([lib, app]);
         GraphSummary summary = GraphSummarizer.Summarize(model);
 
         // Assert
@@ -63,7 +63,7 @@ public sealed class GraphSummarizerTests
                                                                                                                """));
 
         // Act
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([lib, app]);
+        CodebaseModel model = Harness.Extract([lib, app]);
         GraphSummary summary = GraphSummarizer.Summarize(model);
 
         // Assert — the declared reference is visible, but no observed edge backs it (the dead-reference signal).
@@ -95,7 +95,7 @@ public sealed class GraphSummarizerTests
                                                                                                                      """));
 
         // Act — extract App only, so Vendor's types stay external.
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([app]);
+        CodebaseModel model = Harness.Extract([app]);
         GraphSummary summary = GraphSummarizer.Summarize(model);
 
         // Assert — grouped by (source, root) ordinal; Vendor.Data collapses its two type-pairs to one row.
@@ -175,7 +175,7 @@ public sealed class GraphSummarizerTests
         CompilationInput legacy = CompilationFactory.SharedWidgetFramework("netstandard2.0");
 
         // Act
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([modern, legacy]);
+        CodebaseModel model = Harness.Extract([modern, legacy]);
         GraphSummary summary = GraphSummarizer.Summarize(model);
 
         // Assert — both frameworks, and the one whose facts the shared Widget carries.
@@ -222,7 +222,7 @@ public sealed class GraphSummarizerTests
         };
 
         // Act
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([legacy, modern]);
+        CodebaseModel model = Harness.Extract([legacy, modern]);
         GraphSummary summary = GraphSummarizer.Summarize(model);
 
         // Assert
@@ -255,7 +255,7 @@ public sealed class GraphSummarizerTests
                                                                                   """));
 
         // Act
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([lib, app, loose]);
+        CodebaseModel model = Harness.Extract([lib, app, loose]);
         GraphSummary summary = GraphSummarizer.Summarize(model);
 
         // Assert — all three survive the survey; only the label differs. Dropping the passenger here would
@@ -319,7 +319,7 @@ public sealed class GraphSummarizerTests
             SolutionMember = true
         };
 
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([lib, app]);
+        CodebaseModel model = Harness.Extract([lib, app]);
 
         // Act
         GraphSummary scoped = GraphSummarizer.Scope(GraphSummarizer.Summarize(model), ["Acme.*"]);
@@ -455,7 +455,7 @@ public sealed class GraphSummarizerTests
                                                                                                                """));
 
         // Act
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([lib, app]);
+        CodebaseModel model = Harness.Extract([lib, app]);
         GraphSummary summary = GraphSummarizer.Summarize(model);
 
         // Assert — one edge, one type pair: App.Client -> Lib.Service.
@@ -497,7 +497,7 @@ public sealed class GraphSummarizerTests
         CompilationInput satellite = CompilationFactory.Compile("Satellite", ("Satellite/Formatter.cs", satelliteCopy));
 
         // Act
-        GraphSummary summary = GraphSummarizer.Summarize(CodebaseExtractor.ExtractFromCompilations([core, satellite]));
+        GraphSummary summary = GraphSummarizer.Summarize(Harness.Extract([core, satellite]));
 
         // Assert
         summary.ExternalEdges.Select(e => (e.Source, e.TargetNamespaceRoot, e.References))
@@ -513,7 +513,7 @@ public sealed class GraphSummarizerTests
         CompilationInput app = CompilationFactory.Compile("App", ("Shared/Widget.cs", linked));
 
         // Act
-        GraphSummary summary = GraphSummarizer.Summarize(CodebaseExtractor.ExtractFromCompilations([lib, app]));
+        GraphSummary summary = GraphSummarizer.Summarize(Harness.Extract([lib, app]));
 
         // Assert — one row per project that made it, never one first-declarer row standing for both.
         summary.ExternalEdges.Select(e => (e.Source, e.TargetNamespaceRoot, e.References))
@@ -547,7 +547,7 @@ public sealed class GraphSummarizerTests
                                                                             """));
 
         // Act
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([lib, app]);
+        CodebaseModel model = Harness.Extract([lib, app]);
         GraphSummary summary = GraphSummarizer.Summarize(model);
 
         // Assert
@@ -640,7 +640,7 @@ public sealed class GraphSummarizerTests
                                                                             namespace App { public class Own { public Shared.Widget W; } }
                                                                             """));
 
-        return CodebaseExtractor.ExtractFromCompilations([lib, app]);
+        return Harness.Extract([lib, app]);
     }
 
     // One name declared twice with the ends split across projects, which is what a stand-in under a package's
@@ -673,7 +673,7 @@ public sealed class GraphSummarizerTests
                                public class WidgetTests { private Vendor.Widget stub; }
                                """));
 
-        return CodebaseExtractor.ExtractFromCompilations([product, tests]);
+        return Harness.Extract([product, tests]);
     }
 
     // Three projects in a chain — Contoso.Web -> Acme.App -> Acme.Lib — with one external edge, out of
@@ -694,7 +694,7 @@ public sealed class GraphSummarizerTests
                                                                                                                             public class Controller { public Acme.App.Client C; }
                                                                                                                             """));
 
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([lib, app, web]);
+        CodebaseModel model = Harness.Extract([lib, app, web]);
         return GraphSummarizer.Summarize(model);
     }
 

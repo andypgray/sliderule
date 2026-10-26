@@ -571,7 +571,7 @@ public sealed class MigrateRatchetTests
         // and its violation stays red.
         ArchitectureModel model = Checker.Model(Sources.NoDataAccess);
 
-        RuleResult result = ArchChecker.Check(model, Sources.OneControllerModel)
+        RuleResult result = Harness.Check(model, Sources.OneControllerModel)
             .Single();
 
         result.ShouldHaveFailed();

@@ -13,14 +13,9 @@ internal sealed class StrictJsonError
 
     /// <summary>
     ///     The refusal on its own, as a lower-case sentence ending in a full stop. It never names a
-    ///     position — <see cref="Describe" /> puts that in front.
+    ///     position: <see cref="JsonPosition.Describe" /> over <see cref="Position" /> puts that in front.
     /// </summary>
     internal string Reason { get; }
 
     internal JsonPosition Position { get; }
-
-    internal string Describe()
-    {
-        return Position.Describe(Reason);
-    }
 }

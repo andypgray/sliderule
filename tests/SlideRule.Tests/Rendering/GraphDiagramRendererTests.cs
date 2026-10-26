@@ -2,8 +2,8 @@ using Shouldly;
 using SlideRule.Codebase;
 using SlideRule.Extraction;
 using SlideRule.Rendering;
-using SlideRule.Roslyn;
 using SlideRule.Tests.Extraction;
+using SlideRule.Tests.TestSupport;
 using Xunit;
 
 namespace SlideRule.Tests.Rendering;
@@ -306,7 +306,7 @@ public sealed class GraphDiagramRendererTests
             inputs.Add(orphan);
         }
 
-        return GraphSummarizer.Summarize(CodebaseExtractor.ExtractFromCompilations(inputs));
+        return GraphSummarizer.Summarize(Harness.Extract(inputs));
     }
 
     // Three reference-free projects: two whose names differ only in a character the slug flattens, and a
@@ -317,6 +317,6 @@ public sealed class GraphDiagramRendererTests
         CompilationInput dot = CompilationFactory.Compile("My.App", ("B.cs", "namespace B; public class Two {}"));
         CompilationInput digit = CompilationFactory.Compile("My.App2", ("C.cs", "namespace C; public class Three {}"));
 
-        return GraphSummarizer.Summarize(CodebaseExtractor.ExtractFromCompilations([hyphen, dot, digit]));
+        return GraphSummarizer.Summarize(Harness.Extract([hyphen, dot, digit]));
     }
 }

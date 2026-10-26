@@ -516,7 +516,7 @@ public sealed class BaselineRunnerCountTests : IDisposable
 
     private static CheckReport Check(string source, ArchitectureModel model)
     {
-        return ArchChecker.Check(model, CompilationFactory.Extract(source), BaselineIndex.Empty);
+        return Harness.Check(model, CompilationFactory.Extract(source), BaselineIndex.Empty);
     }
 
     private static ArchitectureModel Model()

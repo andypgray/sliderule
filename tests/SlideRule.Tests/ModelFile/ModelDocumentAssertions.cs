@@ -6,6 +6,7 @@ using SlideRule.Hosting;
 using SlideRule.ModelFile;
 using SlideRule.Prose;
 using SlideRule.Tests.Checking;
+using SlideRule.Tests.TestSupport;
 
 namespace SlideRule.Tests.ModelFile;
 
@@ -56,8 +57,8 @@ internal static class ModelDocumentAssertions
     /// <param name="projects">The projects of the checked universe; see <see cref="ModelDocumentProject.ListOf" />.</param>
     /// <param name="check">
     ///     Runs a rule list with the caller's own codebase, baselines, diff, narrowing and partial-model
-    ///     arguments — a delegate rather than those five parameters, so one verb serves every
-    ///     <c>ArchChecker.Check</c> overload without restating any of them.
+    ///     arguments — a delegate rather than those five parameters, so one verb serves every way a caller
+    ///     checks a rule list without restating any of them.
     /// </param>
     /// <param name="liveReport">
     ///     The report the caller already computed over the whole model, used as the live side when nothing
@@ -96,7 +97,7 @@ internal static class ModelDocumentAssertions
     {
         ModelDocument document = model.ShouldCheckIdentically(
             spec, ModelDocumentProject.ListOf(codebase),
-            rules => ArchChecker.Check(rules, codebase, baselines, null));
+            rules => Harness.Check(rules, codebase, baselines, null));
 
         // A model whose every rule was omitted is a fixed point for free.
         document.Rules.ShouldNotBeEmpty(Describe(document));

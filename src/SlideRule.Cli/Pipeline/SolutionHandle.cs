@@ -13,7 +13,6 @@ namespace SlideRule.Cli.Pipeline;
 /// </remarks>
 internal sealed class SolutionHandle(
     Solution solution,
-    string solutionPath,
     WorkspaceDiagnostics loadDiagnostics,
     IDisposable? owned,
     Func<IReadOnlyCollection<string>, IReadOnlySet<string>?, CancellationToken, Task<SessionCodebase>>? warmCodebase = null,
@@ -37,9 +36,6 @@ internal sealed class SolutionHandle(
     /// </summary>
     public IReadOnlyDictionary<ProjectId, string> TargetFrameworks { get; } =
         targetFrameworks ?? TargetFrameworkMaps.None;
-
-    /// <summary>Absolute path to the discovered <c>.sln</c>/<c>.slnx</c>, or to the <c>.slnf</c> filtering one.</summary>
-    public string SolutionPath { get; } = solutionPath;
 
     /// <summary>How well the workspace loaded. Its merge notes are empty: only extraction produces them.</summary>
     public WorkspaceDiagnostics LoadDiagnostics { get; } = loadDiagnostics;

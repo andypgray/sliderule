@@ -651,7 +651,7 @@ internal static class ParityHarness
         IReadOnlyList<ArchRule> rules, CodebaseModel codebase, BaselineIndex baselines, string modelDirectory)
     {
         var root = new SolutionRoot(modelDirectory);
-        return ArchChecker.Check(rules, codebase, baselines, null, null, null, root);
+        return Harness.Check(rules, codebase, baselines, null, null, null, root);
     }
 
     // The file the tool would have read, at the path the tool resolves it to. A declared path with nothing

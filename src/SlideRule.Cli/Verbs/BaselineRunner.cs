@@ -682,8 +682,9 @@ internal sealed class BaselineRunner(
     }
 
     // What init writes for one rule's empty-baseline result once ApplyRule's refusals have passed: each current
-    // identity, duplicates max-folded, as a write records it; null where the rule is unbaselinable. Internal so the
-    // ratchet rows capture what init would write without a file.
+    // identity, duplicates max-folded, as a write records it; null where the rule is unbaselinable. A deliberate
+    // test seam, since no product path reads the entries without writing them: it lets a test capture what init
+    // would write with no file.
     internal static IReadOnlyList<BaselineEntry>? CapturedEntries(RuleResult result)
     {
         IReadOnlyList<(BaselineEntry Identity, int Sites)>? current = CurrentEntries(result);

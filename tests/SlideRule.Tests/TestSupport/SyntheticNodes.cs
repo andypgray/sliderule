@@ -45,10 +45,25 @@ internal static class SyntheticNodes
     /// </summary>
     internal static MemberNode MemberSubject(string declaringFullName, string name, string symbolId, MemberKind kind)
     {
-        return new MemberNode(
-            Type(declaringFullName), symbolId, name, kind,
-            Accessibility.Public, false, false, false, false, null, null,
-            Array.Empty<SourceLocation>(), Array.Empty<string>());
+        return DeclaredMember(Type(declaringFullName), name, symbolId, kind, Accessibility.Public);
+    }
+
+    /// <summary>
+    ///     A member of <paramref name="declaringType" /> itself, so an edge built on that node reaches it; its symbol
+    ///     ID is the kind's documentation-comment prefix, the type's full name and the member's name.
+    /// </summary>
+    internal static MemberNode MemberOf(
+        TypeNode declaringType, string name, MemberKind kind, Accessibility accessibility = Accessibility.Public)
+    {
+        string prefix = kind switch
+        {
+            MemberKind.Method => "M:",
+            MemberKind.Property => "P:",
+            MemberKind.Field => "F:",
+            _ => "E:"
+        };
+
+        return DeclaredMember(declaringType, name, $"{prefix}{declaringType.FullName}.{name}", kind, accessibility);
     }
 
     /// <summary>
@@ -86,6 +101,15 @@ internal static class SyntheticNodes
         return Enumerable.Range(0, count)
             .Select(_ => Violation.RuleError("x"))
             .ToList();
+    }
+
+    private static MemberNode DeclaredMember(
+        TypeNode declaringType, string name, string symbolId, MemberKind kind, Accessibility accessibility)
+    {
+        return new MemberNode(
+            declaringType, symbolId, name, kind,
+            accessibility, false, false, false, false, null, null,
+            Array.Empty<SourceLocation>(), Array.Empty<string>());
     }
 
     private static TypeNode Type(string fullName, string symbolId, string project, IReadOnlyList<SourceLocation> sites)

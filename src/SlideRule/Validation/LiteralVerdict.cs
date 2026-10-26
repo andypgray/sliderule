@@ -1,8 +1,9 @@
 namespace SlideRule.Validation;
 
 /// <summary>
-///     What one string literal decided, held as the parts of a sentence rather than a finished one, so the two
-///     frames that read it (<see cref="On" />, <see cref="AtTheLiteral" />) cannot drift into different English.
+///     What one string literal decided, held as the parts of a sentence rather than a finished one, so the frame
+///     that names a subject (<see cref="On" />) and the frame at the literal, which joins <see cref="Head" /> and
+///     <see cref="Tail" />, cannot drift into different English.
 /// </summary>
 /// <remarks>
 ///     The verdict carries the code rather than the slot, because one slot can decide two ways: a counterpart
@@ -47,9 +48,6 @@ internal sealed class LiteralVerdict
 
     /// <summary>Whether the sentence has a place for the thing the literal was written on.</summary>
     internal bool NamesSubject { get; }
-
-    /// <summary>The sentence with no subject clause, for a reader already looking at the literal.</summary>
-    internal string AtTheLiteral => Head + Tail;
 
     /// <summary>
     ///     The sentence with <paramref name="subject" /> named as what the literal was written on, for a reader

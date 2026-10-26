@@ -29,21 +29,16 @@ internal static class PathFormat
     }
 
     /// <summary>
-    ///     Reports whether <paramref name="directory" /> is <paramref name="path" /> or an ancestor of it.
+    ///     Reports whether <paramref name="directory" /> is the path <paramref name="pathSegments" /> spell, or
+    ///     an ancestor of it.
     /// </summary>
     /// <remarks>
-    ///     Both arguments are made absolute and compared segment by segment, the way the platform compares
-    ///     file names, so this and <see cref="Relative" /> cannot disagree about whether two spellings are
-    ///     one path. Symlinks are not resolved: canonicalize first if that matters.
+    ///     <paramref name="pathSegments" /> is a full path already split by <see cref="Segments" />, so a caller
+    ///     asking of many directories normalizes its path once. The directory is made absolute and compared
+    ///     segment by segment, the way the platform compares file names, so this and <see cref="Relative" />
+    ///     cannot disagree about whether two spellings are one path. Symlinks are not resolved: canonicalize
+    ///     first if that matters.
     /// </remarks>
-    public static bool Contains(string directory, string path)
-    {
-        string[] pathSegments = Segments(Path.GetFullPath(path));
-        return Contains(directory, pathSegments);
-    }
-
-    // The same question for a caller asking it of many directories against one path it has already resolved
-    // and split, so the path is normalized once rather than once per directory.
     internal static bool Contains(string directory, string[] pathSegments)
     {
         string[] directorySegments = Segments(Path.GetFullPath(directory));

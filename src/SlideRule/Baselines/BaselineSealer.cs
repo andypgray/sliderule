@@ -23,8 +23,10 @@ internal sealed class BaselineSealer : IDisposable
     }
 
     /// <summary>
-    ///     The seal for <paramref name="entry" /> in the section for <paramref name="ruleId" />, as
-    ///     <see cref="BaselineFormat.ComputeSeal" /> defines it.
+    ///     The <c>seal</c> <paramref name="entry" /> carries in the section for <paramref name="ruleId" />: the
+    ///     first 16 lowercase hex characters of the SHA-256 of the UTF-8 bytes of
+    ///     <see cref="BaselineFormat.SealInput" />. A stored entry whose own <c>seal</c> differs from this was
+    ///     edited by hand rather than written by <see cref="BaselineFormat.ComposeFile" />.
     /// </summary>
     internal string Seal(string ruleId, BaselineEntry entry)
     {

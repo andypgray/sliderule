@@ -105,7 +105,7 @@ public sealed class SpecVerdictOwnerTests
         verdict.NamesSubject.ShouldBeTrue();
         verdict.On("'area/rule'")
             .ShouldBe("Blank suffix on 'area/rule'.");
-        verdict.AtTheLiteral.ShouldBe("Blank suffix.");
+        (verdict.Head + verdict.Tail).ShouldBe("Blank suffix.");
     }
 
     [Fact]
@@ -118,7 +118,7 @@ public sealed class SpecVerdictOwnerTests
         verdict.NamesSubject.ShouldBeFalse();
         verdict.On("'Bad_Id'")
             .ShouldBe("Malformed ID 'Bad_Id'.");
-        verdict.AtTheLiteral.ShouldBe("Malformed ID 'Bad_Id'.");
+        (verdict.Head + verdict.Tail).ShouldBe("Malformed ID 'Bad_Id'.");
         verdict.Tail.ShouldBe(string.Empty);
     }
 

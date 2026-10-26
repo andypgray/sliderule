@@ -26,7 +26,7 @@ internal static class ScopedContextResolver
             CardDestination destination = DirectoryPlacement.Place(
                 evaluator, scope.Scoped, boundary, "scope", scope.ScopeId);
 
-            placements.Add(new ScopePlacement(scope.ScopeId, rule, destination));
+            placements.Add(new ScopePlacement(rule, destination));
         }
 
         return placements;

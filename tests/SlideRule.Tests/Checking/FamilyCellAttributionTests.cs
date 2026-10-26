@@ -3,8 +3,8 @@ using SlideRule.Baselines;
 using SlideRule.Checking;
 using SlideRule.Codebase;
 using SlideRule.Extraction;
-using SlideRule.Roslyn;
 using SlideRule.Tests.Extraction;
+using SlideRule.Tests.TestSupport;
 using Xunit;
 
 namespace SlideRule.Tests.Checking;
@@ -322,7 +322,7 @@ public sealed class FamilyCellAttributionTests
         CompilationInput beta = CompilationFactory.CompileReferencing(
             "Beta", api.Compilation, "Api", ("Shared/Bridge.cs", Bridge));
 
-        return CodebaseExtractor.ExtractFromCompilations([api, alpha, beta]);
+        return Harness.Extract([api, alpha, beta]);
     }
 
     // Two projects that each compile the shim from one package path. Testing references Json, which is what gives the
@@ -334,6 +334,6 @@ public sealed class FamilyCellAttributionTests
         CompilationInput testing = CompilationFactory.CompileReferencing(
             "Testing", json.Compilation, "Json", ("packages/Polyfill/Guard.cs", Shim), ("Testing/Probe.cs", Probe));
 
-        return CodebaseExtractor.ExtractFromCompilations([json, testing]);
+        return Harness.Extract([json, testing]);
     }
 }

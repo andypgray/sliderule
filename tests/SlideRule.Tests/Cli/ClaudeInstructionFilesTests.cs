@@ -154,7 +154,7 @@ public sealed class ClaudeInstructionFilesTests
     private static List<string> FoundInside(TempDirectory tree, string solution, IReadOnlySet<string> excluded)
     {
         return ClaudeInstructionFiles.Find(solution, excluded)
-            .Where(path => PathFormat.Contains(tree.Path, path))
+            .Where(path => PathFormat.Contains(tree.Path, PathFormat.Segments(Path.GetFullPath(path))))
             .ToList();
     }
 }

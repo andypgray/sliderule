@@ -16,7 +16,7 @@ internal sealed class ColdSolutionSource : ISolutionSource
         var diagnostics = new List<string>();
         LoadedSolution loaded = await WorkspaceLoader.LoadAsync(solutionPath, diagnostics.Add, ct);
         return new SolutionHandle(
-            loaded.Solution, solutionPath, loaded.LoadDiagnosticsWith(diagnostics), loaded,
+            loaded.Solution, loaded.LoadDiagnosticsWith(diagnostics), loaded,
             targetFrameworks: loaded.TargetFrameworks);
     }
 
@@ -33,7 +33,7 @@ internal sealed class ColdSolutionSource : ISolutionSource
         if (loaded is null) return await AcquireAsync(solutionPath, ct);
 
         return new SolutionHandle(
-            loaded.Solution, solutionPath, loaded.LoadDiagnosticsWith(diagnostics), loaded,
+            loaded.Solution, loaded.LoadDiagnosticsWith(diagnostics), loaded,
             targetFrameworks: loaded.TargetFrameworks, isClosure: true);
     }
 }

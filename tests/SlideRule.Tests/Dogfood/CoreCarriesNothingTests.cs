@@ -1,6 +1,7 @@
 using SlideRule.Checking;
 using SlideRule.Codebase;
 using SlideRule.Tests.Checking;
+using SlideRule.Tests.TestSupport;
 using Xunit;
 
 namespace SlideRule.Tests.Dogfood;
@@ -30,7 +31,7 @@ public sealed class CoreCarriesNothingTests
                 ]));
 
         // Act
-        RuleResult result = ArchChecker.Check(SelfSpecTests.SelfModel, scene)
+        RuleResult result = Harness.Check(SelfSpecTests.SelfModel, scene)
             .ForRule(RuleId);
 
         // Assert — the dependency every consumer would inherit, at the line to delete, and nothing for the
@@ -52,7 +53,7 @@ public sealed class CoreCarriesNothingTests
                 ]));
 
         // Act
-        RuleResult result = ArchChecker.Check(SelfSpecTests.SelfModel, scene)
+        RuleResult result = Harness.Check(SelfSpecTests.SelfModel, scene)
             .ForRule(RuleId);
 
         // Assert

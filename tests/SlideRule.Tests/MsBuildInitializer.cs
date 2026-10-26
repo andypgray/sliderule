@@ -1,5 +1,4 @@
 using System.Runtime.CompilerServices;
-using Microsoft.Build.Locator;
 using SlideRule.Roslyn.Hosting;
 using SlideRule.Roslyn.MsBuild;
 using SlideRule.Tests.TestSupport;
@@ -19,7 +18,7 @@ internal static class MsBuildInitializer
     [ModuleInitializer]
     internal static void Initialize()
     {
-        if (!MSBuildLocator.IsRegistered) MsBuildBootstrap.Initialize();
+        MsBuildBootstrap.EnsureInitialized();
 
         // Point the persisted extraction cache at a fresh per-run temp directory so no run
         // reads a cache another run wrote, and so this process never touches a developer's real

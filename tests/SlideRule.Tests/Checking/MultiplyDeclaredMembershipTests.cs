@@ -2,8 +2,8 @@ using Shouldly;
 using SlideRule.Checking;
 using SlideRule.Codebase;
 using SlideRule.Extraction;
-using SlideRule.Roslyn;
 using SlideRule.Tests.Extraction;
+using SlideRule.Tests.TestSupport;
 using Xunit;
 
 namespace SlideRule.Tests.Checking;
@@ -112,7 +112,7 @@ internal static class MultiplyDeclaredCodebase
             "Client", core.Compilation, "Core", ("Consumer.cs", ClientOwn));
 
         // Input order decides the winner, so Core leads.
-        return CodebaseExtractor.ExtractFromCompilations([core, tool, stub, client]);
+        return Harness.Extract([core, tool, stub, client]);
     }
 }
 

@@ -5,6 +5,7 @@ using SlideRule.Codebase;
 using SlideRule.Hosting;
 using SlideRule.Tests.Checking.Targets;
 using SlideRule.Tests.Extraction;
+using SlideRule.Tests.TestSupport;
 using Xunit;
 
 namespace SlideRule.Tests.Checking;
@@ -916,7 +917,7 @@ public sealed class MemberSubjectVerbTests
             .Because("Async discovery is suffix-based."));
 
         // Empty baseline → Save() is red (SaveAsync passes); capture its member-subject identity (a M: DocId).
-        RuleResult red = ArchChecker.Check(model, AsyncModel, BaselineIndex.Empty)
+        RuleResult red = Harness.Check(model, AsyncModel, BaselineIndex.Empty)
             .Single();
         red.ShouldHaveFailed();
         Violation observed = red.Violations.Single(v => v.Kind == ViolationKind.MemberShape);
@@ -926,7 +927,7 @@ public sealed class MemberSubjectVerbTests
         // Grandfather Save through an in-memory BaselineIndex — the shape-verb identity substrate
         // (GRAMMAR §4.6).
         BaselineIndex index = Checker.Baselines("naming/async-suffix", identity.WithBecause("INC-1"));
-        RuleResult grandfathered = ArchChecker.Check(model, AsyncModel, index)
+        RuleResult grandfathered = Harness.Check(model, AsyncModel, index)
             .Single();
         grandfathered.ShouldHavePassed();
         grandfathered.ShouldHaveGrandfathered(1);
@@ -947,7 +948,7 @@ public sealed class MemberSubjectVerbTests
                                  }
                              }
                              """;
-        RuleResult regressed = ArchChecker.Check(model, CompilationFactory.Extract(after), index)
+        RuleResult regressed = Harness.Check(model, CompilationFactory.Extract(after), index)
             .Single();
         regressed.ShouldHaveFailed();
         regressed.ShouldHaveGrandfathered(1);
@@ -979,7 +980,7 @@ public sealed class MemberSubjectVerbTests
         CodebaseModel beforeModel = CompilationFactory.Extract(before);
 
         // Empty baseline → Poll() is red (Fetch passes); capture its member-subject identity (a M: DocId).
-        RuleResult red = ArchChecker.Check(model, beforeModel, BaselineIndex.Empty)
+        RuleResult red = Harness.Check(model, beforeModel, BaselineIndex.Empty)
             .Single();
         red.ShouldHaveFailed();
         Violation observed = red.Violations.Single(v => v.Kind == ViolationKind.MemberShape);
@@ -989,7 +990,7 @@ public sealed class MemberSubjectVerbTests
         // Grandfather Poll through an in-memory BaselineIndex carrying an attribution — the shape-verb
         // identity substrate (GRAMMAR §4.6).
         BaselineIndex index = Checker.Baselines("async/accept-cancellation", identity.WithBecause("INC-1"));
-        RuleResult grandfathered = ArchChecker.Check(model, beforeModel, index)
+        RuleResult grandfathered = Harness.Check(model, beforeModel, index)
             .Single();
         grandfathered.ShouldHavePassed();
         grandfathered.ShouldHaveGrandfathered(1);
@@ -1011,7 +1012,7 @@ public sealed class MemberSubjectVerbTests
                                  }
                              }
                              """;
-        RuleResult regressed = ArchChecker.Check(model, CompilationFactory.Extract(after), index)
+        RuleResult regressed = Harness.Check(model, CompilationFactory.Extract(after), index)
             .Single();
         regressed.ShouldHaveFailed();
         regressed.ShouldHaveGrandfathered(1);
@@ -1032,7 +1033,7 @@ public sealed class MemberSubjectVerbTests
             .MustHaveSuffix("Async");
         ArchitectureModel model = Checker.HandBuilt("naming/x", constraint);
 
-        RuleResult result = ArchChecker.Check(model, AsyncModel)
+        RuleResult result = Harness.Check(model, AsyncModel)
             .Single();
 
         result.ShouldHaveFailedWithDetail(
@@ -1052,7 +1053,7 @@ public sealed class MemberSubjectVerbTests
             .MustHaveSuffix("Async");
         ArchitectureModel model = Checker.HandBuilt("naming/x", constraint);
 
-        RuleResult result = ArchChecker.Check(model, AsyncModel)
+        RuleResult result = Harness.Check(model, AsyncModel)
             .Single();
 
         result.ShouldHaveFailedWithDetail(
@@ -1072,7 +1073,7 @@ public sealed class MemberSubjectVerbTests
         Constraint constraint = arch.Namespace("App.Parameters.*").Methods.MustAcceptParameter(typeof(IProgress<int>));
         ArchitectureModel model = Checker.HandBuilt("async/x", constraint);
 
-        RuleResult result = ArchChecker.Check(model, ParametersModel)
+        RuleResult result = Harness.Check(model, ParametersModel)
             .Single();
 
         result.ShouldHaveFailedWithDetail(

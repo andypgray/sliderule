@@ -11,15 +11,6 @@ namespace SlideRule.Roslyn;
 internal static class CodebaseExtractor
 {
     /// <summary>
-    ///     Extracts the model from compilations built without MSBuild. Where two of <paramref name="inputs" />
-    ///     declare the same type, the first supplies its facts.
-    /// </summary>
-    public static CodebaseModel ExtractFromCompilations(IReadOnlyList<CompilationInput> inputs)
-    {
-        return CodebaseModelBuilder.Build(inputs, null, CancellationToken.None);
-    }
-
-    /// <summary>
     ///     Extracts the model from a loaded solution's C# projects, less those named in
     ///     <paramref name="excludeProjects" />.
     /// </summary>

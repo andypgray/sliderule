@@ -3,6 +3,7 @@ using SlideRule.Checking;
 using SlideRule.Codebase;
 using SlideRule.Hosting;
 using SlideRule.Model;
+using SlideRule.Tests.TestSupport;
 using Xunit;
 
 namespace SlideRule.Tests.Checking;
@@ -66,7 +67,7 @@ public sealed class EvaluatorFailClosedTests
         Constraint constraint = selection.MustHavePrefix("I");
         ArchitectureModel model = Checker.HandBuilt("area/rule", constraint);
 
-        RuleResult result = ArchChecker.Check(model, ProjectFacts.Solution())
+        RuleResult result = Harness.Check(model, ProjectFacts.Solution())
             .Results.Single();
 
         result.ShouldHaveFailedWithDetailContaining(
@@ -89,7 +90,7 @@ public sealed class EvaluatorFailClosedTests
         Constraint constraint = memberSelection.MustHaveSuffix("Async");
         ArchitectureModel model = Checker.HandBuilt("area/rule", constraint);
 
-        RuleResult result = ArchChecker.Check(model, ProjectFacts.Solution())
+        RuleResult result = Harness.Check(model, ProjectFacts.Solution())
             .Results.Single();
 
         result.ShouldHaveFailedWithDetailContaining(ViolationKind.RuleError, "Unhandled member adjective 'UnknownMemberAdjective'.");
@@ -119,7 +120,7 @@ public sealed class EvaluatorFailClosedTests
         Constraint constraint = selection.MustNotBePackable();
         ArchitectureModel model = Checker.HandBuilt("area/rule", constraint);
 
-        RuleResult result = ArchChecker.Check(model, ProjectFacts.Solution())
+        RuleResult result = Harness.Check(model, ProjectFacts.Solution())
             .Results.Single();
 
         result.ShouldHaveFailedWithDetailContaining(ViolationKind.RuleError, "Unhandled project adjective 'UnknownProjectAdjective'.");

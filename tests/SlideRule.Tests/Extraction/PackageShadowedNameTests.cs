@@ -4,8 +4,8 @@ using SlideRule.Checking;
 using SlideRule.Codebase;
 using SlideRule.Extraction;
 using SlideRule.Extraction.Fragments;
-using SlideRule.Roslyn;
 using SlideRule.Tests.Checking;
+using SlideRule.Tests.TestSupport;
 using Xunit;
 
 namespace SlideRule.Tests.Extraction;
@@ -136,7 +136,7 @@ public sealed class PackageShadowedNameTests
                                                                         public class Service { private Core.Thing thing; }
                                                                         """));
 
-        CodebaseModel model = CodebaseExtractor.ExtractFromCompilations([consumer, core]);
+        CodebaseModel model = Harness.Extract([consumer, core]);
 
         model.MergeNotes.ShouldBeEmpty();
         model.ShadowedNames.ShouldBeEmpty();
@@ -266,7 +266,7 @@ public sealed class PackageShadowedNameTests
 
     private static CodebaseModel Extract()
     {
-        return CodebaseExtractor.ExtractFromCompilations(Inputs());
+        return Harness.Extract(Inputs());
     }
 
     private static List<CompilationInput> Inputs()
@@ -366,7 +366,7 @@ public sealed class PackageShadowedNameTests
                               }
                               """));
 
-        return CodebaseExtractor.ExtractFromCompilations([product, tests]);
+        return Harness.Extract([product, tests]);
     }
 
     // The narrowest reach there is: the product names the factory, never the exception, so `Vendor.Fault`
@@ -402,7 +402,7 @@ public sealed class PackageShadowedNameTests
                                                                                                  public class Fault : System.Exception {}
                                                                                                  """));
 
-        return CodebaseExtractor.ExtractFromCompilations([product, tests]);
+        return Harness.Extract([product, tests]);
     }
 
     private static IReadOnlyList<TypeNode> Nodes(string fullName)

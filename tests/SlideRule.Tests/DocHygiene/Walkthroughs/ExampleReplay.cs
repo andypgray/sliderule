@@ -115,8 +115,8 @@ internal static class ExampleReplay
         ArchitectureModel model, CodebaseModel codebase, BaselineIndex baselines, string directory,
         IReadOnlyList<string> changed)
     {
-        CheckReport plain = ArchChecker.Check(model.Rules, codebase, baselines, null);
-        CheckReport diffAware = ArchChecker.Check(model.Rules, codebase, baselines, new DiffContext(directory, changed));
+        CheckReport plain = Harness.Check(model.Rules, codebase, baselines, null);
+        CheckReport diffAware = Harness.Check(model.Rules, codebase, baselines, new DiffContext(directory, changed));
 
         return new ScenarioRun(plain, diffAware, directory);
     }
@@ -169,7 +169,7 @@ internal static class ExampleReplay
             WorkspaceTrustStamp.From(WorkspaceDiagnostics.None, directory), DocumentGrain.Full, []);
 
         ArchitectureModel draft = await LoadDraftAsync(solution);
-        CheckReport draftCheck = ArchChecker.Check(draft, governed, BaselineIndex.Empty);
+        CheckReport draftCheck = Harness.Check(draft, governed, BaselineIndex.Empty);
         string draftReport = ScenarioRun.Rendered(draftCheck, directory, HumanReportRenderer.Render);
 
         (IReadOnlyList<string> initLines, IReadOnlyDictionary<string, byte[]> baselineFiles) = CaptureBaselines(model, governed);
@@ -213,7 +213,7 @@ internal static class ExampleReplay
     private static (IReadOnlyList<string> Lines, IReadOnlyDictionary<string, byte[]> Files) CaptureBaselines(
         ArchitectureModel model, CodebaseModel governed)
     {
-        CheckReport survey = ArchChecker.Check(model, governed, BaselineIndex.Empty);
+        CheckReport survey = Harness.Check(model, governed, BaselineIndex.Empty);
         List<RuleResult> ratcheted = survey.Results.Where(static result => result.Rule.IsRatcheted)
             .ToList();
 

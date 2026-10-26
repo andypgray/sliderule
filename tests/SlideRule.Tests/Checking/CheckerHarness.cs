@@ -12,6 +12,7 @@ using SlideRule.Rendering;
 using SlideRule.Roslyn.Diagnostics;
 using SlideRule.Tests.Extraction;
 using SlideRule.Tests.ModelFile;
+using SlideRule.Tests.TestSupport;
 
 namespace SlideRule.Tests.Checking;
 
@@ -33,7 +34,7 @@ internal static class Checker
 
     public static CheckReport Run(CodebaseModel codebase, Action<Arch> define)
     {
-        return Pinned(define, codebase, rules => ArchChecker.Check(rules, codebase, BaselineIndex.Empty, null));
+        return Pinned(define, codebase, rules => Harness.Check(rules, codebase, BaselineIndex.Empty, null));
     }
 
     public static CheckReport Run(string source, Action<Arch> define)
@@ -43,7 +44,7 @@ internal static class Checker
 
     public static CheckReport Run(CodebaseModel codebase, BaselineIndex baselines, Action<Arch> define)
     {
-        return Pinned(define, codebase, rules => ArchChecker.Check(rules, codebase, baselines, null));
+        return Pinned(define, codebase, rules => Harness.Check(rules, codebase, baselines, null));
     }
 
     public static CheckReport Run(string source, BaselineIndex baselines, Action<Arch> define)
@@ -53,7 +54,7 @@ internal static class Checker
 
     public static CheckReport Run(CodebaseModel codebase, BaselineIndex baselines, DiffContext? diff, Action<Arch> define)
     {
-        return Pinned(define, codebase, rules => ArchChecker.Check(rules, codebase, baselines, diff));
+        return Pinned(define, codebase, rules => Harness.Check(rules, codebase, baselines, diff));
     }
 
     /// <summary>The line a rule reports when <see cref="FilterNarrowing" /> emptied its subject.</summary>
@@ -91,7 +92,7 @@ internal static class Checker
     public static CheckReport Run(
         CodebaseModel codebase, BaselineIndex baselines, NarrowedUniverse? narrowing, Action<Arch> define)
     {
-        return Pinned(define, codebase, rules => ArchChecker.Check(rules, codebase, baselines, null, narrowing, null));
+        return Pinned(define, codebase, rules => Harness.Check(rules, codebase, baselines, null, narrowing, null));
     }
 
     /// <summary>The same narrowed run, extracting <paramref name="source" /> first.</summary>
@@ -110,7 +111,7 @@ internal static class Checker
     {
         return Pinned(
             define, codebase,
-            rules => ArchChecker.Check(rules, codebase, BaselineIndex.Empty, null, null, incompleteModel));
+            rules => Harness.Check(rules, codebase, BaselineIndex.Empty, null, null, incompleteModel));
     }
 
     /// <summary>
@@ -128,7 +129,7 @@ internal static class Checker
     ///     <para>
     ///         Deliberately not on the path of <see cref="HandBuilt" />, whose models bypass spec-build
     ///         validation and hold nodes no file can carry — its callers reach
-    ///         <see cref="ArchChecker.Check(ArchitectureModel,CodebaseModel)" /> directly and must keep
+    ///         <see cref="Harness.Check(ArchitectureModel,CodebaseModel)" /> directly and must keep
     ///         doing so.
     ///     </para>
     /// </remarks>
@@ -159,7 +160,7 @@ internal static class Checker
         Action<Arch> define)
     {
         return Pinned(
-            define, codebase, rules => ArchChecker.Check(rules, codebase, baselines, null, narrowing, null, root));
+            define, codebase, rules => Harness.Check(rules, codebase, baselines, null, narrowing, null, root));
     }
 
     /// <summary>The reified model of a one-off spec — for the tests whose subject is the model, not the check.</summary>

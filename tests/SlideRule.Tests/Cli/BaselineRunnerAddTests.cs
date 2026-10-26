@@ -73,7 +73,7 @@ public sealed class BaselineRunnerAddTests : IDisposable
                 arch.Types.MustNotUse(arch.Member(typeof(DateTime), nameof(DateTime.Now))))
             .Baseline("member.json")
             .Because("b"));
-        CheckReport report = ArchChecker.Check(model, CompilationFactory.Extract(Source), BaselineIndex.Empty);
+        CheckReport report = Harness.Check(model, CompilationFactory.Extract(Source), BaselineIndex.Empty);
         string path = Path.Combine(_temp.Path, "member.json");
         File.WriteAllText(path, BaselineComposer.Compose(RuleId));
 
@@ -113,7 +113,7 @@ public sealed class BaselineRunnerAddTests : IDisposable
                 arch.Namespace("MyApp.Web.*").MustNotConstruct(arch.Namespace("MyApp.Data.*")))
             .Baseline("ctor.json")
             .Because("b"));
-        CheckReport report = ArchChecker.Check(model, CompilationFactory.Extract(CtorSource), BaselineIndex.Empty);
+        CheckReport report = Harness.Check(model, CompilationFactory.Extract(CtorSource), BaselineIndex.Empty);
         string path = Path.Combine(_temp.Path, "ctor.json");
         File.WriteAllText(path, BaselineComposer.Compose(CtorRuleId));
 
@@ -156,7 +156,7 @@ public sealed class BaselineRunnerAddTests : IDisposable
             .Baseline("catch.json")
             .Because("b"));
         CodebaseModel codebase = CompilationFactory.Extract(UnfilteredCatchSource);
-        CheckReport report = ArchChecker.Check(model, codebase, BaselineIndex.Empty);
+        CheckReport report = Harness.Check(model, codebase, BaselineIndex.Empty);
         report.Single()
             .ShouldHaveFailedWithEdges(
                 ViolationKind.Catch, ["App.ImportHandler -> Errors.DbError", "App.LegacyHandler -> Errors.DbError"]);
@@ -186,7 +186,7 @@ public sealed class BaselineRunnerAddTests : IDisposable
 
         // …and the ratchet holds on the bytes the valve wrote: re-checking against the file grandfathers the
         // added edge and leaves ImportHandler's identical-looking catch — a distinct identity — red.
-        RuleResult ratcheted = ArchChecker.Check(model, codebase, BaselineStore.LoadForModel(model, _temp.Path))
+        RuleResult ratcheted = Harness.Check(model, codebase, BaselineStore.LoadForModel(model, _temp.Path))
             .Single();
         ratcheted.ShouldHaveFailedWithEdges(ViolationKind.Catch, ["App.ImportHandler -> Errors.DbError"]);
         ratcheted.ShouldHaveGrandfathered(1);

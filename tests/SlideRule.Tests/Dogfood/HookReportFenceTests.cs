@@ -76,7 +76,7 @@ public sealed class HookReportFenceTests
 
         // Act: relativized against the repository root, where the pages' paths hang from, rather than
         // against the working directory the test host happens to run in.
-        RuleResult result = ArchChecker.Check([rule], models.Imagined, BaselineIndex.Empty, diff: null)
+        RuleResult result = Harness.Check([rule], models.Imagined, BaselineIndex.Empty, diff: null)
             .Results.Single();
         string stanza = HumanReportRenderer.RuleBlock(result, RepoRoot.Directory);
 
@@ -133,9 +133,9 @@ public sealed class HookReportFenceTests
         ArchRule rule = SelfSpecTests.SelfModel.Rule(RuleId);
 
         // Act
-        RuleResult narrowed = ArchChecker.Check([rule], models.Committed, BaselineIndex.Empty, diff: null)
+        RuleResult narrowed = Harness.Check([rule], models.Committed, BaselineIndex.Empty, diff: null)
             .Results.Single();
-        RuleResult widest = ArchChecker.Check([rule], whole, BaselineIndex.Empty, diff: null)
+        RuleResult widest = Harness.Check([rule], whole, BaselineIndex.Empty, diff: null)
             .Results.Single();
 
         // Assert
@@ -185,7 +185,7 @@ public sealed class HookReportFenceTests
 
     private static IReadOnlyList<RuleResult> CheckOneProject(CodebaseModel model)
     {
-        return ArchChecker.Check(
+        return Harness.Check(
                 SelfSpecTests.SelfModel.Rules, model, BaselineIndex.Empty, diff: null,
                 NarrowedUniverse.OneProject, incompleteModel: null)
             .Results;

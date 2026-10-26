@@ -75,6 +75,8 @@ internal static class ManagedBlock
     ///     The markers are in any malformed state, so a non-null return also says that exactly one
     ///     well-formed marker pair exists.
     /// </exception>
+    // A deliberate test seam: the product only ever writes a block, and reading one back through the marker
+    // parser Splice uses keeps a test from accepting a block the splice would refuse.
     public static string? ExtractBody(string existing)
     {
         Guard.NotNull(existing, nameof(existing));

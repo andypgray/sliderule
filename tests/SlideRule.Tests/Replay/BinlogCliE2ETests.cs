@@ -66,9 +66,9 @@ public sealed class BinlogCliE2ETests(BinlogFixtureWorkspace fixture)
         replay.ShouldMatchTheOutputOf(cold);
         replay.Gate.ShouldBe(GateAcquisition.ExplicitReplay);
         replay.Loads.ShouldBe(0);
-        File.Exists(CacheLocations.CaptureManifestPath(Sln, replayCache))
+        File.Exists(CaptureFiles.Manifest(Sln, replayCache))
             .ShouldBeTrue();
-        File.Exists(CacheLocations.CaptureBinlogPath(Sln, replayCache))
+        File.Exists(CaptureFiles.Binlog(Sln, replayCache))
             .ShouldBeTrue();
 
         // (c) rerun WITHOUT --binlog on the same cache: (b) wrote fragments, so this is a fragment-cache hit —
@@ -142,9 +142,9 @@ public sealed class BinlogCliE2ETests(BinlogFixtureWorkspace fixture)
         run.Err.Trim()
             .ShouldBe(BinlogCaptureStore.StaleAtIngestMessage(Binlog, Path.GetFullPath(csproj)));
         // The refusal fired before persistence: nothing was written.
-        File.Exists(CacheLocations.CaptureManifestPath(Sln, cache))
+        File.Exists(CaptureFiles.Manifest(Sln, cache))
             .ShouldBeFalse();
-        File.Exists(CacheLocations.CaptureBinlogPath(Sln, cache))
+        File.Exists(CaptureFiles.Binlog(Sln, cache))
             .ShouldBeFalse();
     }
 
@@ -180,14 +180,14 @@ public sealed class BinlogCliE2ETests(BinlogFixtureWorkspace fixture)
         // With a persisted capture present, `--no-cache` runs cold and never reads it — no notice, capture untouched.
         string seededCache = FreshCache();
         await RunAsync(seededCache, "check", Sln, "--binlog", Binlog, "--spec", CleanSpec); // seed (replay)
-        byte[] captureBefore = await File.ReadAllBytesAsync(CacheLocations.CaptureBinlogPath(Sln, seededCache), Ct);
+        byte[] captureBefore = await File.ReadAllBytesAsync(CaptureFiles.Binlog(Sln, seededCache), Ct);
 
         CliResult cold = await RunAsync(seededCache, "check", Sln, "--spec", CleanSpec, "--no-cache");
         cold.Loads.ShouldBe(1); // cold: the design-time build ran
         cold.Gate.ShouldBe(GateAcquisition.Cold);
         cold.Err.ShouldNotContain("build capture"); // no capture notice on the --no-cache path
-        (await File.ReadAllBytesAsync(CacheLocations.CaptureBinlogPath(Sln, seededCache), Ct)).ShouldBe(captureBefore);
-        File.Exists(CacheLocations.CaptureManifestPath(Sln, seededCache))
+        (await File.ReadAllBytesAsync(CaptureFiles.Binlog(Sln, seededCache), Ct)).ShouldBe(captureBefore);
+        File.Exists(CaptureFiles.Manifest(Sln, seededCache))
             .ShouldBeTrue();
 
         // An explicit --binlog under --no-cache still replays for this run (an input, not persisted state) —
@@ -197,9 +197,9 @@ public sealed class BinlogCliE2ETests(BinlogFixtureWorkspace fixture)
         replay.ShouldMatchTheOutputOf(cold);
         replay.Gate.ShouldBe(GateAcquisition.ExplicitReplay);
         replay.Loads.ShouldBe(0);
-        File.Exists(CacheLocations.CaptureManifestPath(Sln, freshCache))
+        File.Exists(CaptureFiles.Manifest(Sln, freshCache))
             .ShouldBeFalse();
-        File.Exists(CacheLocations.CaptureBinlogPath(Sln, freshCache))
+        File.Exists(CaptureFiles.Binlog(Sln, freshCache))
             .ShouldBeFalse();
         File.Exists(CacheLocations.CacheFilePath(Sln, freshCache))
             .ShouldBeFalse();
@@ -268,7 +268,7 @@ public sealed class BinlogCliE2ETests(BinlogFixtureWorkspace fixture)
 
         // Corrupt the binlog copy but leave the manifest valid: Validate never re-reads the copy's bytes, so it
         // still reports Usable — the failure only surfaces when the lazy source tries to replay it at runtime.
-        await File.WriteAllTextAsync(CacheLocations.CaptureBinlogPath(Sln, cache), "corrupt", Ct);
+        await File.WriteAllTextAsync(CaptureFiles.Binlog(Sln, cache), "corrupt", Ct);
         // Delete the fragment cache so the runner must actually acquire (and thus replay) rather than hit.
         File.Delete(CacheLocations.CacheFilePath(Sln, cache));
 

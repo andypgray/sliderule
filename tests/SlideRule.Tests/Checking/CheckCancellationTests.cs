@@ -2,6 +2,7 @@ using Shouldly;
 using SlideRule.Baselines;
 using SlideRule.Checking;
 using SlideRule.Hosting;
+using SlideRule.Tests.TestSupport;
 using Xunit;
 
 namespace SlideRule.Tests.Checking;
@@ -85,7 +86,7 @@ public sealed class CheckCancellationTests
 
         // Throwing is the whole claim: a rule error would have come back as a report, so no assertion on a
         // result can state this one.
-        Should.Throw<OperationCanceledException>(() => ArchChecker.Check(model, Sources.LayeredModel));
+        Should.Throw<OperationCanceledException>(() => Harness.Check(model, Sources.LayeredModel));
     }
 
     [Fact]
@@ -95,7 +96,7 @@ public sealed class CheckCancellationTests
             .Enforce(arch.Types.Must(_ => throw new InvalidOperationException("boom"), description: "fault"))
             .Because("b"));
 
-        ArchChecker.Check(model, Sources.LayeredModel)
+        Harness.Check(model, Sources.LayeredModel)
             .Single()
             .ShouldHaveFailedWithDetailContaining(
                 ViolationKind.RuleError, "the `Must` predicate threw InvalidOperationException", "boom");

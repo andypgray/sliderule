@@ -67,7 +67,7 @@ internal sealed class DiagnosticInjectingSolutionSource(
         // exercise today: this double re-wraps a real handle, so anything it drops silently sends the run
         // down the cold path and quietly changes what the gate is being tested against.
         return new SolutionHandle(
-            real.Solution, real.SolutionPath, injected, real, real.WarmCodebase, real.WarmSpecResolution,
+            real.Solution, injected, real, real.WarmCodebase, real.WarmSpecResolution,
             real.TargetFrameworks);
     }
 }

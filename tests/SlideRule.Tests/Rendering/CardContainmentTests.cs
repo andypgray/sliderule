@@ -2,7 +2,6 @@ using Shouldly;
 using SlideRule.Codebase;
 using SlideRule.Hosting;
 using SlideRule.Rendering;
-using SlideRule.Roslyn;
 using SlideRule.Tests.Checking;
 using SlideRule.Tests.Extraction;
 using SlideRule.Tests.TestSupport;
@@ -52,7 +51,7 @@ public sealed class CardContainmentTests
         (ShimFile, ContextFixtures.ShimSource));
 
     // Two sibling projects that each compile their own copy of one name, so the model carries one node for it.
-    private static readonly CodebaseModel TwoCopies = CodebaseExtractor.ExtractFromCompilations([
+    private static readonly CodebaseModel TwoCopies = Harness.Extract([
         CompilationFactory.Compile("Acme.Ansi",
             (Path.Combine(SolutionDirectory, "Acme.Ansi", "AnsiWriter.cs"), AnsiWriterSource),
             (Path.Combine(SolutionDirectory, "Acme.Ansi", "Internal", "Constants.cs"), ConstantsSource)),
@@ -171,7 +170,7 @@ public sealed class CardContainmentTests
         // the card up to the directory both projects share, and the card stays inside.
         string linkedFile = Path.Combine(SolutionDirectory, "Extensions", "Acme.Core", "Guard.cs");
         string jsonFile = Path.Combine(ProjectDirectory, "JsonWriter.cs");
-        CodebaseModel codebase = CodebaseExtractor.ExtractFromCompilations([
+        CodebaseModel codebase = Harness.Extract([
             CompilationFactory.Compile("Acme.Core", (linkedFile, GuardSource)),
             CompilationFactory.Compile("Acme.Json", (jsonFile, JsonWriterSource), (linkedFile, GuardSource))
         ]);
