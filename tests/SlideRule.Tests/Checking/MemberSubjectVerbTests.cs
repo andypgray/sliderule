@@ -171,7 +171,32 @@ public sealed class MemberSubjectVerbTests
                                        }
                                        """;
 
+    private const string Inherited = """
+                                     namespace App.Inherited
+                                     {
+                                         public interface IJob { void Run(); }
+                                         public abstract class Job
+                                         {
+                                             public abstract void Run();
+                                             public virtual void Stop() {}
+                                             public void Pause() {}
+                                         }
+                                         public class Nightly : Job, IJob
+                                         {
+                                             public override void Run() {}
+                                             public override void Stop() {}
+                                             public void Log() {}
+                                         }
+                                         public class Adhoc : IJob
+                                         {
+                                             public void Run() {}
+                                             public void Log() {}
+                                         }
+                                     }
+                                     """;
+
     private static readonly CodebaseModel AccessModel = CompilationFactory.Extract(Access);
+    private static readonly CodebaseModel InheritedModel = CompilationFactory.Extract(Inherited);
     private static readonly CodebaseModel OverridableModel = CompilationFactory.Extract(Overridable);
     private static readonly CodebaseModel MembersModel = CompilationFactory.Extract(Members);
     private static readonly CodebaseModel AsyncModel = CompilationFactory.Extract(Async);
@@ -407,6 +432,38 @@ public sealed class MemberSubjectVerbTests
         ShouldFailOnTheEmptyMemberSubject(
             AccessModel, arch => arch.Namespace("App.Access.*").Fields.ThatArePrivate().ThatAreProtected()
                 .MustBeStatic());
+    }
+
+    // ── inheritance adjectives ────────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void InheritanceAdjectives_EachKeepExactlyItsOwnFact()
+    {
+        // MustBeStatic reds every instance method, so each failure list is exactly the set the adjective kept.
+        // Nightly.Run overrides and implements, so both adjectives keep it.
+        Checker.Verdict(InheritedModel, arch => arch.Namespace("App.Inherited.*").Methods.ThatAreOverrides().MustBeStatic())
+            .ShouldHaveFailedWithMemberSubjects(["M:App.Inherited.Nightly.Run", "M:App.Inherited.Nightly.Stop"]);
+        Checker.Verdict(InheritedModel, arch => arch.Namespace("App.Inherited.*").Methods.ThatImplementInterfaces()
+                .MustBeStatic())
+            .ShouldHaveFailedWithMemberSubjects(["M:App.Inherited.Adhoc.Run", "M:App.Inherited.Nightly.Run"]);
+    }
+
+    [Fact]
+    public void InheritanceAdjectives_AsExceptPayloads_LeaveTheSignaturesEachTypeDeclares()
+    {
+        // The shape a parameter or naming rule takes: what remains is every method whose signature its own
+        // declaration owns, the interface's and the abstract base's included.
+        Checker.Verdict(InheritedModel, arch => arch.Namespace("App.Inherited.*").Methods
+                .Except(arch.Types.Methods.ThatAreOverrides(), arch.Types.Methods.ThatImplementInterfaces())
+                .MustBeStatic())
+            .ShouldHaveFailedWithMemberSubjects([
+                "M:App.Inherited.Adhoc.Log",
+                "M:App.Inherited.IJob.Run",
+                "M:App.Inherited.Job.Pause",
+                "M:App.Inherited.Job.Run",
+                "M:App.Inherited.Job.Stop",
+                "M:App.Inherited.Nightly.Log"
+            ]);
     }
 
     // ── static / abstract / virtual verbs ─────────────────────────────────────────────────────────────

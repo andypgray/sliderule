@@ -1592,6 +1592,23 @@ public class SentenceAssemblyTests
             .ShouldBe("`[Audit]`-attributed protected internal methods of types");
     }
 
+    [Fact]
+    public void InheritanceAdjectives_InAMemberExcept_ReadAsTheSignaturesDeclaredElsewhere()
+    {
+        // The shape a parameter or naming rule takes to report only the declaration that owns a signature: both
+        // prefixes stand in reference position inside the parenthetical, and stack with the others in the order
+        // written.
+        SentenceRenderer.Sentence(Arch.Types.Methods.ThatArePublic()
+                .Except(Arch.Types.Methods.ThatAreOverrides(), Arch.Types.Methods.ThatImplementInterfaces())
+                .MustAcceptParameter<CancellationToken>())
+            .ShouldBe("Public methods of types, except overriding methods of types or interface-implementing methods of types, "
+                      + "must accept a parameter of type `CancellationToken`.");
+
+        SentenceRenderer.MemberSubject(Arch.Types.Properties.ThatImplementInterfaces()
+                .ThatAreStatic())
+            .ShouldBe("Interface-implementing static properties of types");
+    }
+
     // ---- The coverage verb (GRAMMAR §5.3, §6, §10): its memberships render in reference position through
     //      the SHARED target list, so layers read as layers and colliding types widen like any other list ----
 

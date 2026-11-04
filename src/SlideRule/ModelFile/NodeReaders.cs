@@ -176,8 +176,9 @@ internal static class NodeReaders
         Field(map, MemberAdjectiveWhere, "anchors", Anchors, anchors => new ReturningAdjective(anchors));
         Field(map, MemberAdjectiveWhere, "anchor", Anchor, anchor => new MemberAttributedWithAdjective(anchor));
 
-        map.Add(Key<MemberThatAreStaticAdjective>(),
-            (r, v) => r.OnlyKeys(v, MemberAdjectiveWhere, "node") ? new MemberThatAreStaticAdjective() : null);
+        Bare<MemberAdjective, MemberThatAreStaticAdjective>(map, MemberAdjectiveWhere);
+        Bare<MemberAdjective, MemberThatAreOverridesAdjective>(map, MemberAdjectiveWhere);
+        Bare<MemberAdjective, MemberThatImplementInterfacesAdjective>(map, MemberAdjectiveWhere);
 
         Field(map, MemberAdjectiveWhere, "payloads", NonEmptyMemberSelections,
             payloads => new MemberExceptAdjective(payloads));
@@ -203,8 +204,7 @@ internal static class NodeReaders
         Field(map, ProjectAdjectiveWhere, "names", NonEmptyTexts, names => new ProjectNamedAdjective(names));
         Field(map, ProjectAdjectiveWhere, "globs", NonEmptyTexts, globs => new ProjectMatchingAdjective(globs));
 
-        map.Add(Key<ProjectPackableAdjective>(),
-            (r, v) => r.OnlyKeys(v, ProjectAdjectiveWhere, "node") ? new ProjectPackableAdjective() : null);
+        Bare<ProjectAdjective, ProjectPackableAdjective>(map, ProjectAdjectiveWhere);
 
         Field(map, ProjectAdjectiveWhere, "payload", ProjectSelectionAt, payload => new ProjectExceptAdjective(payload));
 
@@ -317,6 +317,15 @@ internal static class NodeReaders
             string? value = r.RequiredText(v, ConstraintWhere, "value");
             return value is null ? null : new MustSetPropertyConstraint(subject, name, value);
         });
+    }
+
+    // The arm of a node with nothing beside its discriminator.
+    private static void Bare<TFamily, TNode>(
+        Dictionary<string, Func<ModelNodeReader, StrictJsonValue, TFamily?>> map, string where)
+        where TFamily : class
+        where TNode : class, TFamily, new()
+    {
+        map.Add(Key<TNode>(), (r, v) => r.OnlyKeys(v, where, "node") ? new TNode() : null);
     }
 
     // The arm of a node with one field beside its discriminator.

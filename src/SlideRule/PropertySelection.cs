@@ -5,8 +5,9 @@ namespace SlideRule;
 /// <summary>
 ///     The properties the selected types declare, reached with <c>.Properties</c> on a
 ///     <see cref="Selection" />. Narrow it with the member adjectives (<c>WithSuffix</c>,
-///     <c>WithPrefix</c>, <c>WithNameMatching</c>, <c>Named</c>, <c>AttributedWith</c>, <c>ThatAreStatic</c>, the
-///     accessibility adjectives such as <c>ThatArePublic</c>, <c>Where</c>), each of which hands back a
+///     <c>WithPrefix</c>, <c>WithNameMatching</c>, <c>Named</c>, <c>AttributedWith</c>, <c>ThatAreStatic</c>,
+///     <c>ThatAreOverrides</c>, <c>ThatImplementInterfaces</c>, the accessibility adjectives such as
+///     <c>ThatArePublic</c>, <c>Where</c>), each of which hands back a
 ///     property selection again, so the property-only call
 ///     stays reachable whatever the order; finish it with a member verb such as <c>MustHaveSuffix</c>
 ///     or <c>MustBePublic</c>, or with <c>MustBeGetOnly</c>, which properties alone accept.

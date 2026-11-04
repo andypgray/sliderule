@@ -264,6 +264,7 @@ public sealed class ManifestJsonTests
             IsVirtual: true,
             IsOverride: true,
             IsSealed: true,
+            IsInterfaceImplementation: true,
             IsAsync: false,
             ReturnTypeFullName: "System.Threading.Tasks.Task",
             MemberTypeFullName: "N.Msg",

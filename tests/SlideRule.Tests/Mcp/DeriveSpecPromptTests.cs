@@ -51,7 +51,7 @@ public sealed class DeriveSpecPromptTests
     ///         codebases rather than by a character count.
     ///     </para>
     /// </remarks>
-    private const int ServedBodyCeiling = 70_250;
+    private const int ServedBodyCeiling = 70_750;
 
     // The text only the receipt's fence carries, which picks that fence out of the recipe's others.
     private const string ReceiptMarker = "curation: pending";

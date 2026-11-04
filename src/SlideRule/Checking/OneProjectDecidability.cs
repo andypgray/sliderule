@@ -410,6 +410,8 @@ internal static class OneProjectDecidability
             typeof(ReturningAdjective),
             typeof(MemberAttributedWithAdjective),
             typeof(MemberThatAreStaticAdjective),
+            typeof(MemberThatAreOverridesAdjective),
+            typeof(MemberThatImplementInterfacesAdjective),
             typeof(MemberAccessibilityAdjective),
             typeof(MemberExceptAdjective));
     }

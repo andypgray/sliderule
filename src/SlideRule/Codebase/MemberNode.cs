@@ -29,7 +29,8 @@ internal sealed class MemberNode : IMemberInfo
         bool isReadOnly = false,
         bool isConst = false,
         bool isOverride = false,
-        bool isSealed = false)
+        bool isSealed = false,
+        bool isInterfaceImplementation = false)
     {
         DeclaringType = declaringType;
         SymbolId = symbolId;
@@ -52,6 +53,7 @@ internal sealed class MemberNode : IMemberInfo
         IsConst = isConst;
         IsOverride = isOverride;
         IsSealed = isSealed;
+        IsInterfaceImplementation = isInterfaceImplementation;
     }
 
     /// <summary>
@@ -95,6 +97,9 @@ internal sealed class MemberNode : IMemberInfo
 
     /// <inheritdoc />
     public bool IsSealed { get; }
+
+    /// <inheritdoc />
+    public bool IsInterfaceImplementation { get; }
 
     /// <inheritdoc />
     public bool IsAsync { get; }

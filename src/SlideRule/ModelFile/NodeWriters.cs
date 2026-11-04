@@ -153,6 +153,8 @@ internal static class NodeWriters
         Add<ReturningAdjective>(arms, (w, a) => w.DefinitionAnchors("anchors", a.Anchors));
         Add<MemberAttributedWithAdjective>(arms, (w, a) => w.ConstructionAnchor("anchor", a.Anchor));
         Add<MemberThatAreStaticAdjective>(arms, (_, _) => { });
+        Add<MemberThatAreOverridesAdjective>(arms, (_, _) => { });
+        Add<MemberThatImplementInterfacesAdjective>(arms, (_, _) => { });
         Add<MemberAccessibilityAdjective>(arms, (w, a) => w.EnumField("accessibility", a.Accessibility));
         Add<MemberExceptAdjective>(arms, (w, a) => w.MemberSelections("payloads", a.Payloads));
     }

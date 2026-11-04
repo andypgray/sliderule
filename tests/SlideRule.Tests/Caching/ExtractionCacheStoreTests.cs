@@ -28,7 +28,7 @@ public sealed class ExtractionCacheStoreTests
     [InlineData(999)]
     // Behind: a cache written before a bump lacks what this reader expects, and a hit would replay facts a fresh
     // extraction no longer produces. Every older version takes this one branch, so one row stands for them all.
-    [InlineData(38)]
+    [InlineData(39)]
     public void ReadAndValidate_SchemaVersionOtherThanTheCurrentOne_ReturnsMiss(int schemaVersion)
     {
         // Arrange
@@ -57,7 +57,7 @@ public sealed class ExtractionCacheStoreTests
 
         version.ShouldNotBeNull("the extraction cache still declares a schema version");
         version.GetRawConstantValue()
-            .ShouldBe(39);
+            .ShouldBe(40);
     }
 
     [Fact]

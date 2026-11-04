@@ -434,6 +434,8 @@ line.
 | `.Returning` | `(Type, …)` · `(string, …)` on `.Methods` | Methods returning `Task` declared in types |
 | `.AttributedWith` | `(Type)` · `(string)` · `<T>()` | `[ApiController]`-attributed methods of types |
 | `.ThatAreStatic` | `()` | Static fields of types |
+| `.ThatAreOverrides` | `()` | Overriding methods of types |
+| `.ThatImplementInterfaces` | `()` | Interface-implementing methods of types |
 | `.ThatArePublic` | `()` | Public methods of types |
 | `.ThatAreInternal` | `()` | Internal methods of types |
 | `.ThatAreProtected` | `()` | Protected fields of types |
@@ -542,7 +544,9 @@ superset). `.ThatAreStatic()` prefixes the subject head ("static fields of ...")
 accessibility adjective, which on members also has `.ThatAreProtected()`, `.ThatAreProtectedInternal()`
 and `.ThatArePrivateProtected()`, each matching its level exactly; `.Named(name, ...)` picks
 members by exact name ("`Main` methods of ..."), and `.Except(memberSelection, ...)` exempts members a
-name alone cannot: `.Methods.Except(arch.Types.Named("Program").Methods.Named("Main"))`. The flagship:
+name alone cannot: `.Methods.Except(arch.Types.Named("Program").Methods.Named("Main"))`.
+`.ThatAreOverrides()` and `.ThatImplementInterfaces()` pick members whose signature is declared elsewhere;
+except both to report only the owner. The flagship:
 `web.Methods.Returning(typeof(Task)).MustHaveSuffix("Async")` — *"Methods returning `Task` declared in
 types in `MyApp.Web.*` must be named `*Async`."* `arch.Projects` names the solution's projects as build
 artifacts (`arch.Project(name)` is the unrelated type noun).

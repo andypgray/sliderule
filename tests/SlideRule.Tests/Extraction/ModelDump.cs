@@ -222,6 +222,8 @@ internal static class ModelDump
             .Append(member.IsOverride)
             .Append(" sealed=")
             .Append(member.IsSealed)
+            .Append(" implementation=")
+            .Append(member.IsInterfaceImplementation)
             .Append(" async=")
             .Append(member.IsAsync)
             .AppendLine();

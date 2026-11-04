@@ -17,6 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `sliderule.model.json` declares one of these rules keeps it, and the package does not report that rule.
   The package is one analyzer assembly with no dependencies, so it needs neither the contract nor the build
   analyzer at any version.
+- `.ThatAreOverrides()` and `.ThatImplementInterfaces()` narrow a member selection to the members whose
+  signature another declaration owns: those declared `override`, and those that implement a member of an
+  interface their type implements, a package's interface included. As payloads of a member `.Except`, they
+  let a parameter or naming rule report the declaration that owns a signature rather than every member
+  that follows it: "methods of types in `MyApp.*`, except overriding methods of types or
+  interface-implementing methods of types, must accept a parameter of type `CancellationToken`".
+- `IMemberInfo.IsInterfaceImplementation` reports a member that implements an interface member, for
+  `.Where` and `.Must` predicates.
 
 ## [0.2.1] - 2026-10-26
 

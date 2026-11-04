@@ -925,16 +925,36 @@ internal static class FragmentExtractor
         {
             if (kind is CoreTypeKind.Enum or CoreTypeKind.Delegate) return [];
 
+            ImmutableHashSet<ISymbol> implementations = InterfaceImplementationsOf(type);
             var members = new List<(ISymbol Symbol, FragmentMember Member)>();
             foreach (ISymbol member in type.GetMembers())
                 if (IsInventoried(member))
-                    members.Add((member, BuildMember(member)));
+                    members.Add((member, BuildMember(member, implementations.Contains(member))));
 
             members.Sort((left, right) => string.CompareOrdinal(left.Member.Facts.SymbolId, right.Member.Facts.SymbolId));
             return members;
         }
 
-        private FragmentMember BuildMember(ISymbol member)
+        // The implementations the type's own interface map names (GRAMMAR §4.6). Only the type's own members are
+        // looked up in it, so a base class's member that a derived type uses to satisfy an interface reports false
+        // on the base class. An interface implements its base interfaces' members only explicitly, and explicit
+        // implementations are never inventoried, so an interface's map is not read. Accessors, operators and
+        // nested types are not looked up, since the inventory keeps no method that is not ordinary and a nested
+        // type implements nothing.
+        private static ImmutableHashSet<ISymbol> InterfaceImplementationsOf(INamedTypeSymbol type)
+        {
+            ImmutableHashSet<ISymbol>.Builder implementations = ImmutableHashSet.CreateBuilder<ISymbol>(SymbolEqualityComparer.Default);
+            if (type.TypeKind == RoslynTypeKind.Interface) return implementations.ToImmutable();
+
+            foreach (INamedTypeSymbol @interface in type.AllInterfaces)
+            foreach (ISymbol interfaceMember in @interface.GetMembers().Where(member => member is not (IMethodSymbol { MethodKind: not MethodKind.Ordinary } or INamedTypeSymbol)))
+                if (type.FindImplementationForInterfaceMember(interfaceMember) is { } implementation)
+                    implementations.Add(implementation);
+
+            return implementations.ToImmutable();
+        }
+
+        private FragmentMember BuildMember(ISymbol member, bool isInterfaceImplementation)
         {
             string symbolId = MemberSymbolIdOf(member);
             (string? returnTypeFullName, string? memberTypeFullName) = MemberTypeNames(member);
@@ -949,6 +969,7 @@ internal static class FragmentExtractor
                 member.IsVirtual, // false for an override or abstract member — an override is not itself "virtual"
                 member.IsOverride, // the `override` keyword, sealed or not
                 member.IsSealed, // a `sealed override` only; `sealed` makes an interface member non-virtual instead
+                isInterfaceImplementation,
                 member is IMethodSymbol { IsAsync: true },
                 returnTypeFullName,
                 memberTypeFullName,

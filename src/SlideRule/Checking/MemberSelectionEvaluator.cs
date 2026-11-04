@@ -94,6 +94,10 @@ internal static class MemberSelectionEvaluator
                 return current.Where(attributeMatch);
             case MemberThatAreStaticAdjective:
                 return current.Where(member => member.IsStatic);
+            case MemberThatAreOverridesAdjective:
+                return current.Where(member => member.IsOverride);
+            case MemberThatImplementInterfacesAdjective:
+                return current.Where(member => member.IsInterfaceImplementation);
             case MemberAccessibilityAdjective accessibility:
                 return current.Where(member => member.Accessibility == accessibility.Accessibility);
             case MemberExceptAdjective except:

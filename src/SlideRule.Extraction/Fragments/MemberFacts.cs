@@ -22,6 +22,7 @@ internal sealed record MemberFacts(
     bool IsVirtual,
     bool IsOverride,
     bool IsSealed,
+    bool IsInterfaceImplementation,
     bool IsAsync,
     string? ReturnTypeFullName,
     string? MemberTypeFullName,

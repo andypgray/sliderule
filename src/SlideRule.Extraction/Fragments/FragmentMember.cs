@@ -42,6 +42,7 @@ internal sealed record FragmentMember(
             isReadOnly: Facts.IsReadOnly,
             isConst: Facts.IsConst,
             isOverride: Facts.IsOverride,
-            isSealed: Facts.IsSealed);
+            isSealed: Facts.IsSealed,
+            isInterfaceImplementation: Facts.IsInterfaceImplementation);
     }
 }

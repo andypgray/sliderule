@@ -72,6 +72,17 @@ public interface IMemberInfo
     bool IsSealed { get; }
 
     /// <summary>
+    ///     Whether the member implements a member of an interface its declaring type implements, so its
+    ///     signature is declared on that interface. Any interface counts, one from a referenced package
+    ///     included: a class's <c>public void Dispose()</c> reports <c>true</c> through
+    ///     <c>IDisposable</c>. Only the declaring type's own interfaces are read, so a base class's method
+    ///     that a derived class uses to satisfy an interface the base class does not implement reports
+    ///     <c>false</c>. An interface member reports <c>false</c>, and so does a field. It is independent of
+    ///     <see cref="IsOverride" />, so an override that also implements an interface member reports both.
+    /// </summary>
+    bool IsInterfaceImplementation { get; }
+
+    /// <summary>
     ///     Whether a method's declaration says <c>async</c>, and <c>false</c> for a property, field or
     ///     event.
     /// </summary>

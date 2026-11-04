@@ -273,6 +273,64 @@ public sealed class CodebaseExtractorMemberInventoryTests
     }
 
     [Fact]
+    public void Inventory_InterfaceImplementation_ReadsTheDeclaringTypesOwnInterfaceMap()
+    {
+        // IsInterfaceImplementation (GRAMMAR §4.6) is what the declaring type's own interface map names: any
+        // interface, a referenced one included, and methods, properties, events and static abstract members
+        // alike. A base class's member that only a derived type uses to satisfy an interface reports false on
+        // the base class; a public method beside the explicit implementation the map names reports false; an
+        // interface's own members report false; and an override that also implements reports both facts.
+        CodebaseModel model = CompilationFactory.Extract("""
+                                                         namespace N;
+                                                         public interface IRun { void Run(); }
+                                                         public interface IShape { int Size { get; } event System.Action Changed; }
+                                                         public interface IStore<T> { T Load(); }
+                                                         public interface IMake { static abstract void Make(); }
+                                                         public interface IMore : IRun { void More(); }
+                                                         public class Impl : IRun, IShape, IStore<string>, IMake, System.IDisposable
+                                                         {
+                                                             public void Run() {}
+                                                             public int Size => 0;
+                                                             public event System.Action Changed;
+                                                             public string Load() => "";
+                                                             public static void Make() {}
+                                                             public void Dispose() {}
+                                                             public int Count;
+                                                             public void Other() {}
+                                                         }
+                                                         public class RunnerBase { public void Run() {} }
+                                                         public class Runner : RunnerBase, IRun {}
+                                                         public abstract class Worker { public abstract void Run(); }
+                                                         public class RunningWorker : Worker, IRun { public override void Run() {} }
+                                                         public class Split : IRun { void IRun.Run() {} public void Run() {} }
+                                                         """);
+
+        string[] types = ["N.Impl", "N.RunnerBase", "N.Worker", "N.RunningWorker", "N.Split", "N.IRun", "N.IMore"];
+        List<(string Member, bool Implementation, bool Override)> facts = types
+            .SelectMany(type => model.Type(type)
+                .Members)
+            .Select(member => (member.SymbolId, member.IsInterfaceImplementation, member.IsOverride))
+            .ToList();
+
+        facts.ShouldBe([
+            ("E:N.Impl.Changed", true, false),
+            ("F:N.Impl.Count", false, false),
+            ("M:N.Impl.Dispose", true, false),
+            ("M:N.Impl.Load", true, false),
+            ("M:N.Impl.Make", true, false),
+            ("M:N.Impl.Other", false, false),
+            ("M:N.Impl.Run", true, false),
+            ("P:N.Impl.Size", true, false),
+            ("M:N.RunnerBase.Run", false, false),
+            ("M:N.Worker.Run", false, false),
+            ("M:N.RunningWorker.Run", true, true),
+            ("M:N.Split.Run", false, false),
+            ("M:N.IRun.Run", false, false),
+            ("M:N.IMore.More", false, false),
+        ]);
+    }
+
+    [Fact]
     public void Inventory_InheritanceFlags_OnPropertiesAndEvents_AndNeverOnAField()
     {
         // The keywords reach properties and events the same way they reach methods; a field can carry neither.

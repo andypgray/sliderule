@@ -160,7 +160,8 @@ Selection    — adjectives → Selection; modal verbs → Constraint (terminal)
                projections (.Members / .Methods / .Properties / .Fields / .Events)
                → MemberSelection (§4.6)
 MemberSelection — member adjectives (.WithSuffix / .WithPrefix / .WithNameMatching /
-               .Named / .AttributedWith / .ThatAreStatic / .ThatArePublic and the
+               .Named / .AttributedWith / .ThatAreStatic / .ThatAreOverrides /
+               .ThatImplementInterfaces / .ThatArePublic and the
                other accessibility adjectives / .Except / .Where) → the SAME concrete
                member-selection type, .Named and .Except also over a computed list
                (§3.3); member modal verbs → Constraint (terminal)
@@ -999,7 +1000,13 @@ Quarantine desugaring (§7) — is the underlying **type** selection.
   it non-virtual rather than sealed; `IsAbstract` is true for an `abstract` member and for every interface
   member without a body (interface members are abstract; a default implementation is virtual
   instead), and `MustBeOverridable` (§5.7) reads `IsVirtual`, `IsAbstract`, `IsOverride` and
-  `IsSealed` together; `IsAsync` reflects the `async` keyword; and
+  `IsSealed` together; `IsInterfaceImplementation` is true for a member the declaring type's own
+  interface map names as the implementation of a member of any interface it implements, one from a
+  referenced assembly included, so a base class's member that only a derived type uses to satisfy an
+  interface reports false on the base class, an interface's own members report false (an interface
+  implements its base interfaces' members only explicitly, and explicit implementations are not
+  inventoried), and an override that also implements reports both flags; `IsAsync` reflects the
+  `async` keyword; and
   the four mutability flags read the declaration the same way — an expression-bodied property has
   no setter, a manually written `set` accessor is one, and an `abstract` or interface property's
   `set` counts because the declaration writes it. These
@@ -1424,6 +1431,8 @@ posture verbs, trailers and escape hatches of §5.4–§5.6 are written by hand.
 | `.Returning` | `(Type, …)` · `(string, …)` on `.Methods` | Methods returning `Task` declared in types |
 | `.AttributedWith` | `(Type)` · `(string)` · `<T>()` | `[ApiController]`-attributed methods of types |
 | `.ThatAreStatic` | `()` | Static fields of types |
+| `.ThatAreOverrides` | `()` | Overriding methods of types |
+| `.ThatImplementInterfaces` | `()` | Interface-implementing methods of types |
 | `.ThatArePublic` | `()` | Public methods of types |
 | `.ThatAreInternal` | `()` | Internal methods of types |
 | `.ThatAreProtected` | `()` | Protected fields of types |
@@ -1774,7 +1783,8 @@ can combine it with anything else the contract carries.
 Member-predicate input contract (`IMemberInfo`, the input to a member `.Where`/`.Must`, §4.6):
 `Name`, `Kind` (`MemberKind`: Method / Property / Field / Event), `DeclaringType` (an
 `ITypeInfo` — the type-side contract, reused so a member predicate can reach its declaring
-type's facts), `Accessibility`, `IsStatic`, `IsAbstract`, `IsVirtual`, `IsOverride`, `IsSealed`, `IsAsync`,
+type's facts), `Accessibility`, `IsStatic`, `IsAbstract`, `IsVirtual`, `IsOverride`, `IsSealed`,
+`IsInterfaceImplementation`, `IsAsync`,
 `ReturnTypeFullName` (methods; `System.Void` for a void method; null otherwise),
 `MemberTypeFullName` (the property/field/event type; null for methods), `Parameters` (the
 declared parameters in declaration order — each an `IParameterInfo` of `Name` and
@@ -1857,6 +1867,7 @@ form cannot reach, because a string anchor still names one definition rather tha
 - `.Returning(typeof(Task))` / `.Returning("System.Threading.Tasks.Task")` — declaration-level (§4.6); an open generic renders declared type-parameter names ("returning `Task<TResult>`"); multiple anchors join "returning `Task` or `Task<TResult>`", colliding simple names widening as in §6; the string form is §5.2's escape hatch, rendering byte-identically. Methods-only. A trailing clause on the kind-plural: the subject joins its types with "declared in" rather than "of", so the clause sits between the two nouns and cannot be read as narrowing the types: "methods returning `Task` declared in types in `MyApp.Web.*`" (§6)
 - `.AttributedWith(typeof(McpServerToolAttribute))` / `.AttributedWith("ModelContextProtocol.Server.McpServerToolAttribute")` — head prefix: "`[McpServerTool]`-attributed" — premodifies the kind-plural (§6), so the subject reads "`[McpServerTool]`-attributed methods of types in `SlideRule.*`". Declared member attributes only (§4.6); the string form is §5.2's escape hatch, rendering byte-identically
 - `.ThatAreStatic()` — head prefix: "static" — premodifies the kind-plural (§6), so the subject reads "static fields of the Core layer". A member **shape** adjective (§11); head prefixes stack across families and concatenate in authoring order
+- `.ThatAreOverrides()` / `.ThatImplementInterfaces()` — head prefixes: "overriding", "interface-implementing" — the members whose signature another declaration owns: `.ThatAreOverrides()` keeps `IsOverride` (the `override` keyword, sealed or not) and `.ThatImplementInterfaces()` keeps `IsInterfaceImplementation` (§4.6: the declaring type's own interface map, any interface). Two adjectives over two facts rather than one over their union, because an override of a codebase base and an implementation of a framework interface are different laws to exempt. Their usual place is a member `Except` payload, so a parameter or naming law reports the declaration that owns a signature and not each member that follows it: `.Methods.Except(arch.Types.Methods.ThatAreOverrides(), arch.Types.Methods.ThatImplementInterfaces())` reads ", except overriding methods of types or interface-implementing methods of types". Member **shape** adjectives like `.ThatAreStatic()`; they stack with the other head prefixes in authoring order
 - `.ThatArePublic()` / `.ThatAreInternal()` / `.ThatAreProtected()` / `.ThatArePrivate()` / `.ThatAreProtectedInternal()` / `.ThatArePrivateProtected()` — head prefix naming the declared accessibility: "protected fields of types in `MyApp.Services.*`", "private protected methods of types". Each matches its level exactly, so `.ThatAreProtected()` leaves out the `protected internal` and `private protected` members, which have adjectives of their own, and a class member written with no modifier is private. All six levels ship where the type side ships three (§5.2), because the laws that need the protected levels are laws about members: a base class's fields and hooks are what an inheritor reaches. The adjective half of the family `MustBePublic`, `MustBeInternal`, `MustBeProtected` and `MustBePrivate` constrain; the prefixes stack with `.ThatAreStatic()` and the attribute prefix in authoring order
 - `.Except(memberSelection, …)` — ", except `Main` methods of types named `Program`" — a parenthetical rendered last, after the type reference and so after any member `Where`, and closed by the composer, as on the type side (§5.2, §6). Each operand is a member selection over types of its own (`arch.Types.Named("Program").Methods.Named("Main")`), several or-joined, and is resolved and subtracted on §4.6's terms. It is the exemption form for a member a law must not reach when no name or kind picks it out of the subject alone
 - `.Where(pred, description:)` — description verbatim — a trailing clause on the kind-plural like `Returning`, after any `Returning` clauses whatever the chain order: "fields that are not constants declared in types". The description completes the subject as a relative clause, so it cannot premodify the head as the other member adjectives do; after the type reference, `arch.Types.Fields.Where(p, "that are X")` would render the sentence `arch.Types.Where(q, "that are X").Fields` renders, "Fields of types that are X", for a different subject (§6)
@@ -2081,7 +2092,7 @@ carries its sugar overload too, or the verb silently stops compiling after the s
   *"Methods returning `Task` declared in types in `MyApp.Web.*` must be named `*Async`."* The
   member attribute adjective premodifies the kind-plural
   ("`[McpServerTool]`-attributed methods of types in `SlideRule.*`"), as do `.ThatAreStatic()`,
-  the accessibility adjectives ("private fields of types"), member `Named` ("`Main` methods of
+  `.ThatAreOverrides()` ("overriding methods of types"), `.ThatImplementInterfaces()`, the accessibility adjectives ("private fields of types"), member `Named` ("`Main` methods of
   types named `Program`") and the name adjectives `WithSuffix`, `WithPrefix` and `WithNameMatching`
   ("`*Async` methods of types"), and stacked
   member prefixes concatenate in authoring order (§5.7), so every
@@ -2628,7 +2639,8 @@ member-granular *source* attribution on the dependency verbs (a violation names 
 that neither `typeof` + `nameof` nor an expression lambda can name (a member on a type the spec
 project cannot reference); indexer/operator bans (the syntax-walk boundary moves,
 §4.5); and the remaining subject-side member *shape* adjectives (`.Methods.ThatAreVirtual()`,
-`.ThatAreAbstract()`, …) beside `.ThatAreStatic()` — the constraint-side verbs and the
+`.ThatAreAbstract()`, …) beside `.ThatAreStatic()`, `.ThatAreOverrides()` and
+`.ThatImplementInterfaces()` — the constraint-side verbs and the
 `IMemberInfo` flags exist (§5.7, §5.6).
 
 On the parameter facts (§4.6): the `WithParameterOfType` adjective — the adjective-position

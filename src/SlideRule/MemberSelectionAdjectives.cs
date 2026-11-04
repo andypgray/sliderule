@@ -158,6 +158,36 @@ public static class MemberSelectionAdjectives
     }
 
     /// <summary>
+    ///     Narrows the selection to the members declared <c>override</c>, sealed or not, such as
+    ///     <c>arch.Types.Methods.ThatAreOverrides()</c>. An override's signature belongs to the member it
+    ///     overrides, so a naming or parameter rule usually leaves overrides out with
+    ///     <c>.Except(arch.Types.Methods.ThatAreOverrides())</c> and reports the declaration that owns the
+    ///     signature instead. It reads as a premodifier in the rendered sentence: "overriding methods of types".
+    /// </summary>
+    public static TSelf ThatAreOverrides<TSelf>(this TSelf selection)
+        where TSelf : MemberSelection
+    {
+        return Append(selection, new MemberThatAreOverridesAdjective());
+    }
+
+    /// <summary>
+    ///     Narrows the selection to the members that implement a member of an interface their declaring type
+    ///     implements, such as <c>arch.Types.Methods.ThatImplementInterfaces()</c>. Any interface counts, one
+    ///     from a referenced package included, so a class's <c>public void Dispose()</c> is selected through
+    ///     <c>IDisposable</c>. An explicit implementation (<c>void IDisposable.Dispose()</c>) is never in a
+    ///     member selection, and a base class's method is selected only when the base class itself implements
+    ///     the interface. An implementation's signature belongs to the interface, so a naming or parameter rule
+    ///     usually leaves implementations out with <c>.Except(arch.Types.Methods.ThatImplementInterfaces())</c>
+    ///     and reports the interface member instead. It reads as a premodifier in the rendered sentence:
+    ///     "interface-implementing methods of types".
+    /// </summary>
+    public static TSelf ThatImplementInterfaces<TSelf>(this TSelf selection)
+        where TSelf : MemberSelection
+    {
+        return Append(selection, new MemberThatImplementInterfacesAdjective());
+    }
+
+    /// <summary>
     ///     Narrows the selection to the members declared <c>public</c>, such as
     ///     <c>arch.Types.InNamespace("MyApp.Services.*").Methods.ThatArePublic()</c>. The accessibility is the
     ///     one the member's declaration writes, compared exactly, so a <c>protected internal</c> member is

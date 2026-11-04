@@ -133,6 +133,12 @@ internal static class VocabularyRemainderSpec
                 .MustBeProtected())
             .Because("A policy case reads the base's state directly, which a private field puts out of its reach.");
 
+        arch.Rule("remainder/own-signatures-take-the-token")
+            .Enforce(arch.Types.InNamespace("Remainder.Jobs.*")
+                .Methods.Except(arch.Types.Methods.ThatAreOverrides(), arch.Types.Methods.ThatImplementInterfaces())
+                .MustAcceptParameter<CancellationToken>())
+            .Because("The declaration that owns a signature is the one that can add the token; its implementations follow it.");
+
         arch.Rule("remainder/factories-are-static")
             .Enforce(arch.Types.InNamespace("Remainder.Api.*")
                 .Methods.WithNameMatching("Create*")

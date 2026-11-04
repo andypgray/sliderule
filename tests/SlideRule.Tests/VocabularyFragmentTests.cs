@@ -433,6 +433,15 @@ public class VocabularyFragmentTests
     }
 
     [Fact]
+    public void Member_InheritanceAdjectives_PremodifyTheKindPlural()
+    {
+        SentenceRenderer.MemberSubject(Arch.Types.Methods.ThatAreOverrides())
+            .ShouldBe("Overriding methods of types");
+        SentenceRenderer.MemberSubject(Arch.Types.Methods.ThatImplementInterfaces())
+            .ShouldBe("Interface-implementing methods of types");
+    }
+
+    [Fact]
     public void Member_Named_PremodifiesTheKindPluralWithTheNames()
     {
         // A head prefix where the type side's Named is an inline clause: the name premodifies the members and

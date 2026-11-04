@@ -452,6 +452,18 @@ public class ModelReificationTests
     }
 
     [Fact]
+    public void InheritanceAdjectives_ReifyOntoTheMemberSelection_OneNodeEach_InAuthoringOrder()
+    {
+        var constraint = ShouldReifyTo<MemberMustHaveSuffixConstraint>(arch => arch.Namespace("MyApp.*").Methods.ThatImplementInterfaces()
+            .ThatAreOverrides()
+            .MustHaveSuffix("Async"));
+
+        constraint.MemberSubject.Adjectives.Select(adjective => adjective.GetType())
+            .ShouldBe([typeof(MemberThatImplementInterfacesAdjective), typeof(MemberThatAreOverridesAdjective)]);
+        constraint.MemberSubject.ShouldBeOfType<MethodSelection>();
+    }
+
+    [Fact]
     public void Under_ReifiesItsGlobsAsWritten()
     {
         // No normalization: the model carries what the author wrote, case and all, for every reader to match.

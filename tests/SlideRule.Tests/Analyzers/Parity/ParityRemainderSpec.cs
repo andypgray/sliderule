@@ -164,7 +164,7 @@ internal static class ParityRemainderSpec
             public int Loud { get; set; }
         }
 
-        public class Methods
+        public class Methods : System.IDisposable
         {
             public void Instance() { }
             public void Fixed() { }
@@ -176,6 +176,7 @@ internal static class ParityRemainderSpec
             public void Marked() { }
             public void NoToken() { }
             private void Loud() { }
+            public void Dispose() { }
         }
         """;
 
@@ -364,6 +365,10 @@ internal static class ParityRemainderSpec
                 .Except(arch.Types.Named("Methods").Methods.Named("Loud"))
                 .MustBeStatic())
             .Because("A factory that needs an instance to call cannot be the way that instance is made.");
+
+        arch.Rule("remainder/implementations-are-static")
+            .Enforce(arch.Types.Named("Methods").Methods.ThatImplementInterfaces().MustBeStatic())
+            .Because("A disposer that needs an instance to call cannot be the one the host reaches before it builds one.");
 
         arch.Rule("remainder/members-are-overridable")
             .Enforce(arch.Types.Named("Methods").Methods.WithPrefix("Fixed").MustBeOverridable())

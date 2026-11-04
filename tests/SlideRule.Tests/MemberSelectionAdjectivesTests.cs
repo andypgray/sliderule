@@ -113,6 +113,20 @@ public sealed class MemberSelectionAdjectivesTests
     }
 
     [Fact]
+    public void InheritanceAdjectives_PreserveTheConcreteSelectionType()
+    {
+        // The same compile-time pin for the two adjectives over a member's inherited signature.
+        Arch.Types.Methods.ThatAreOverrides()
+            .ThatImplementInterfaces()
+            .Returning(typeof(Task))
+            .ShouldBeOfType<MethodSelection>();
+        Arch.Types.Properties.ThatImplementInterfaces()
+            .ThatAreOverrides()
+            .MustBeGetOnly()
+            .ShouldNotBeNull();
+    }
+
+    [Fact]
     public void AccessibilityAdjectives_PreserveTheConcreteSelectionType()
     {
         // The same compile-time pin for the six accessibility adjectives, which share their names with the

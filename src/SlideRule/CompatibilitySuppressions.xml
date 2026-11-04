@@ -1,0 +1,32 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!-- https://learn.microsoft.com/dotnet/fundamentals/package-validation/diagnostic-ids -->
+<Suppressions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:SlideRule.IMemberInfo.get_IsInterfaceImplementation</Target>
+    <Left>lib/netstandard2.0/SlideRule.dll</Left>
+    <Right>lib/netstandard2.0/SlideRule.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:SlideRule.MemberSelectionAdjectives.ThatAreOverrides``1(``0)</Target>
+    <Left>lib/netstandard2.0/SlideRule.dll</Left>
+    <Right>lib/netstandard2.0/SlideRule.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:SlideRule.MemberSelectionAdjectives.ThatImplementInterfaces``1(``0)</Target>
+    <Left>lib/netstandard2.0/SlideRule.dll</Left>
+    <Right>lib/netstandard2.0/SlideRule.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0006</DiagnosticId>
+    <Target>P:SlideRule.IMemberInfo.IsInterfaceImplementation</Target>
+    <Left>lib/netstandard2.0/SlideRule.dll</Left>
+    <Right>lib/netstandard2.0/SlideRule.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+</Suppressions>
