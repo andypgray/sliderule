@@ -4,6 +4,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
+using Shouldly;
 using SlideRule.Cli.Mcp;
 using SlideRule.Cli.Mcp.Infrastructure;
 using SlideRule.Cli.Mcp.Pipeline;
@@ -35,17 +36,18 @@ namespace SlideRule.Tests.Mcp;
 internal sealed class McpPipelineHarness : IAsyncDisposable
 {
     private readonly IHost _host;
+    private McpClient? _client;
+    private ReplyRelay? _relay;
 
-    private McpPipelineHarness(IHost host, McpClient client, FakeEnvironment environment, CapturingLoggerProvider logs)
+    private McpPipelineHarness(IHost host, FakeEnvironment environment, CapturingLoggerProvider logs)
     {
         _host = host;
-        Client = client;
         Environment = environment;
         Logs = logs;
     }
 
     /// <summary>The connected client, past the <c>initialize</c> handshake — call <c>ListTools</c>/<c>CallTool</c> on it.</summary>
-    public McpClient Client { get; }
+    public McpClient Client => _client ?? throw new InvalidOperationException("The client connects before StartAsync returns.");
 
     /// <summary>The server's environment seam: set <c>MAX_MCP_OUTPUT_TOKENS</c>, etc.</summary>
     public FakeEnvironment Environment { get; }
@@ -65,10 +67,11 @@ internal sealed class McpPipelineHarness : IAsyncDisposable
         // Dispose order matters: closing the client sends EOF, which ends the single-session server's
         // RunAsync and triggers host shutdown; then stop the host (bounded so a stuck stop can't hang the
         // suite). Each step runs in the finally of the one before, so a throw early in the chain still
-        // tears down the rest.
+        // tears down the rest. A start that failed before the client connected has no client to close.
         try
         {
-            await Client.DisposeAsync();
+            if (_client is not null)
+                await _client.DisposeAsync();
         }
         finally
         {
@@ -91,18 +94,27 @@ internal sealed class McpPipelineHarness : IAsyncDisposable
                 }
                 finally
                 {
-                    // The warm ISolutionSource factory registers the session's disposer on the static
-                    // ServerShutdown list; clear it so registrations don't accumulate (or dangle onto a disposed
-                    // session) across the suite.
-                    ServerShutdown.ResetForTests();
+                    try
+                    {
+                        if (_relay is not null)
+                            await _relay.DisposeAsync();
+                    }
+                    finally
+                    {
+                        // The warm ISolutionSource factory registers the session's disposer on the static
+                        // ServerShutdown list; clear it so registrations don't accumulate (or dangle onto a
+                        // disposed session) across the suite.
+                        ServerShutdown.ResetForTests();
+                    }
                 }
             }
         }
     }
 
     /// <summary>
-    ///     Builds the host bound to <paramref name="binding" />, starts it, and connects a client over the
-    ///     pipe pair.
+    ///     Builds the host bound to <paramref name="binding" />, starts it, and connects a client over the pipe pair,
+    ///     asserting that the handshake negotiated the server's pinned protocol revision. A start that fails tears
+    ///     down what it began.
     /// </summary>
     /// <param name="binding">The solution + spec the composed server answers for.</param>
     /// <param name="cancellationToken">Cancels host start and the client handshake.</param>
@@ -113,10 +125,17 @@ internal sealed class McpPipelineHarness : IAsyncDisposable
     ///     see <c>McpUnboundServerTests</c>). Flagging a harness over a solution that does resolve is
     ///     therefore deliberate: the filter's contract is the nullness of this value, nothing else.
     /// </param>
+    /// <param name="clientOptions">The client's options; null takes the SDK's defaults, as a real client would.</param>
+    /// <param name="replyDelay">
+    ///     How long the server's output is held before the client starts reading it, for the tests of a reply that
+    ///     arrives after the client has given up waiting. Zero connects the two directly.
+    /// </param>
     public static async Task<McpPipelineHarness> StartAsync(
         McpServerBinding binding,
         CancellationToken cancellationToken,
-        string? bindingFailure = null)
+        string? bindingFailure = null,
+        McpClientOptions? clientOptions = null,
+        TimeSpan replyDelay = default)
     {
         FakeEnvironment environment = new();
         CapturingLoggerProvider logs = new();
@@ -142,27 +161,37 @@ internal sealed class McpPipelineHarness : IAsyncDisposable
         McpServerCommand.AddToolServices(builder.Services);
 
         builder.Services
-            .AddMcpServer(options =>
-            {
-                options.ServerInstructions = ServerInstructions.Text;
-                options.ServerInfo = new Implementation
-                {
-                    Name = "sliderule",
-                    Title = "SlideRule architecture spec",
-                    Version = ServerVersion.SemVer
-                };
-            })
+            .AddMcpServer(options => McpServerCommand.ConfigureServer(options, ServerInstructions.Text))
             .WithCoercingTools()
             .WithPrompts<ArchPrompts>()
             .WithGlobalCallToolFilter(bindingFailure)
             .WithStreamServerTransport(clientToServer.Reader.AsStream(), serverToClient.Writer.AsStream());
 
         IHost host = builder.Build();
-        await host.StartAsync(cancellationToken);
+        McpPipelineHarness harness = new(host, environment, logs);
+        try
+        {
+            await host.StartAsync(cancellationToken);
 
-        StreamClientTransport clientTransport = new(clientToServer.Writer.AsStream(), serverToClient.Reader.AsStream());
-        var client = await McpClient.CreateAsync(clientTransport, cancellationToken: cancellationToken);
+            PipeReader clientReads = serverToClient.Reader;
+            if (replyDelay > TimeSpan.Zero)
+            {
+                harness._relay = new ReplyRelay(serverToClient.Reader, replyDelay);
+                clientReads = harness._relay.Reader;
+            }
 
-        return new McpPipelineHarness(host, client, environment, logs);
+            StreamClientTransport clientTransport = new(clientToServer.Writer.AsStream(), clientReads.AsStream());
+            harness._client = await McpClient.CreateAsync(clientTransport, clientOptions, cancellationToken: cancellationToken);
+            harness._client.NegotiatedProtocolVersion.ShouldBe(
+                McpServerCommand.ProtocolVersion,
+                customMessage: "the harness client negotiated a protocol revision other than the server's pinned one");
+        }
+        catch
+        {
+            await harness.DisposeAsync();
+            throw;
+        }
+
+        return harness;
     }
 }

@@ -58,6 +58,9 @@ internal static class TestSourceHygiene
                 "A static cache field cannot take a Should name; its guard is the Should* replay its initializer calls.",
             [Root + "Hooks/McpLaunchScriptTests.cs::Launch"] =
                 "Runs the launcher; its summary names the empty-stdout guard every case holds it to.",
+            [Root + "Mcp/McpPipelineHarness.cs::StartAsync"] =
+                "The harness's one construction path; its summary names the negotiated-version guard, and a Should "
+                + "name would carry into every MCP pipeline test.",
             [Root + "Mcp/McpUnboundServerTests.cs::ConverseAsync"] =
                 "An orchestrator whose summary names the handshake guards it asserts inline.",
             [Root + "SpecAnalyzers/SpecFixtureCorpus.cs::InitializeAsync"] =
