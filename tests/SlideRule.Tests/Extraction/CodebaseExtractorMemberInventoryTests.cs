@@ -326,7 +326,7 @@ public sealed class CodebaseExtractorMemberInventoryTests
             ("M:N.RunningWorker.Run", true, true),
             ("M:N.Split.Run", false, false),
             ("M:N.IRun.Run", false, false),
-            ("M:N.IMore.More", false, false),
+            ("M:N.IMore.More", false, false)
         ]);
     }
 

@@ -67,7 +67,7 @@ internal static class GuidanceDiagnostics
         + "calls it makes, so a Task- or ValueTask-returning method without one cannot take part in cooperative "
         + "cancellation.",
         "https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap",
-        isEnabledByDefault: false);
+        DiagnosticSeverity.Info);
 
     internal static readonly DiagnosticDescriptor NoMappingAttributes = Rule(
         "SR3008",
@@ -114,11 +114,12 @@ internal static class GuidanceDiagnostics
         RuleTable.Select(entry => entry.Descriptor).ToImmutableArray().Add(AnalyzerFault);
 
     // The message is the finding's own, which carries the rule's ID, its sentence, its reason and its fix, as the
-    // build analyzer's does. The reason is the description, and the page it rests on is the help link.
+    // build analyzer's does. The reason is the description, and the page it rests on is the help link. A rule
+    // whose findings would land on almost every site of a codebase not yet following it ships at Info, which an
+    // editor shows and a build does not count.
     private static DiagnosticDescriptor Rule(
-        string id, string title, string because, string citation, bool isEnabledByDefault = true)
+        string id, string title, string because, string citation, DiagnosticSeverity severity = DiagnosticSeverity.Warning)
     {
-        return new DiagnosticDescriptor(
-            id, title, "{0}", Category, DiagnosticSeverity.Warning, isEnabledByDefault, because, citation);
+        return new DiagnosticDescriptor(id, title, "{0}", Category, severity, isEnabledByDefault: true, because, citation);
     }
 }

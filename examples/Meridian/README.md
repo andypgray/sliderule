@@ -12,7 +12,7 @@ Meridian handles bookings, rating, customs, invoicing, and dispatch through eigh
 
 Behind `IClearanceGateway`, the `Meridian.Clearance` module validates container numbers. Its `ContainerCheckDigit` computes the ISO 6346 check digit, the calculation that decides whether `CSQU3054383` is a real container number or a typo. That module is quarantined.
 
-In all, 33 current violations are grandfathered: 12 inline-SQL references, 7 wall-clock reads, 13 `Task`-returning methods missing the `Async` suffix, and 1 reach into the quarantined module. A reference here is one type naming another, so a controller that names `SqlCommand` on several lines counts once, with each line a site. The app builds and runs; the whole thing reads in about ten minutes. It is shaped like the systems SlideRule is built for, which are long-lived, business-critical, and too important to rewrite on a whim.
+In all, 28 current violations are grandfathered: 12 inline-SQL references, 7 wall-clock reads, 8 `Task`-returning methods missing the `Async` suffix, and 1 reach into the quarantined module. A reference here is one type naming another, so a controller that names `SqlCommand` on several lines counts once, with each line a site. A repository method that implements an interface counts once too, at the interface. The app builds and runs; the whole thing reads in about ten minutes. It is shaped like the systems SlideRule is built for, which are long-lived, business-critical, and too important to rewrite on a whim.
 
 ## The spec
 
@@ -24,7 +24,7 @@ The architecture is seven statements of ordinary C# in [arch/Meridian.Architectu
 | `naming/controllers` | Enforce | controllers are named `*Controller` |
 | `data-access/no-inline-sql` | Migrate | controllers must not open `SqlConnection` |
 | `time/inject-clock` | Migrate | Web must not read `DateTime.Now` / `UtcNow` |
-| `naming/async-suffix` | Migrate | authored `Task`/`ValueTask`-returning methods end in `Async` (from the pack) |
+| `naming/async-suffix` | Migrate | authored `Task`/`ValueTask`-returning methods end in `Async`, where the signature is declared (from the pack) |
 | `di/no-buildserviceprovider` | Enforce | no `BuildServiceProvider` while configuring (from the pack) |
 | `clearance/engine` | Quarantine | reach the module only via `IClearanceGateway` |
 
@@ -55,7 +55,7 @@ The same `naming/async-suffix` is `Enforce` in the [Interchange example](../Meri
 ### Migrations
 - `data-access/no-inline-sql` — Some existing code here still follows the OLD pattern: Controllers open SqlConnection and run inline SQL directly. That is grandfathered debt, not house style. New code must follow: Types in `Meridian.Web.Controllers.*` must not reference `SqlConnection` or `SqlCommand`. Data access behind a repository can be tested and swapped; SQL in the request path cannot. If you are already editing a grandfathered site and the migration is small, migrate it; otherwise do not grow the debt.
 - `time/inject-clock` — Some existing code here still follows the OLD pattern: Code reads the ambient clock directly. That is grandfathered debt, not house style. New code must follow: Types in the Web layer, except types named `SystemClock`, must not use `DateTime.Now` or `DateTime.UtcNow`. Cutoffs, demurrage, and ETA stamps read from the wall clock cannot be tested at a fixed instant; an injected IClock makes the moment an input. If you are already editing a grandfathered site and the migration is small, migrate it; otherwise do not grow the debt.
-- `naming/async-suffix` — Some existing code here still follows the OLD pattern: Repository and controller methods return Task without the Async suffix. That is grandfathered debt, not house style. New code must follow: Methods returning `Task`, `Task<TResult>`, `ValueTask` or `ValueTask<TResult>` declared in authored types in the Domain or Web layers must be named `*Async`. Task- and ValueTask-returning methods carry the Async suffix so callers see at the call site that a method must be awaited. See <https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap>. If you are already editing a grandfathered site and the migration is small, migrate it; otherwise do not grow the debt.
+- `naming/async-suffix` — Some existing code here still follows the OLD pattern: Repository and controller methods return Task without the Async suffix. That is grandfathered debt, not house style. New code must follow: Methods returning `Task`, `Task<TResult>`, `ValueTask` or `ValueTask<TResult>` declared in authored types in the Domain or Web layers, except overriding methods of types or interface-implementing methods of types, must be named `*Async`. Task- and ValueTask-returning methods carry the Async suffix so callers see at the call site that a method must be awaited. See <https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap>. If you are already editing a grandfathered site and the migration is small, migrate it; otherwise do not grow the debt.
 
 ### Quarantined scopes
 - `clearance/engine` — Types in `Meridian.Clearance.*`, except `IClearanceGateway` or `ClearanceGateway`, must be referenced only by types in `Meridian.Clearance.*`, `IClearanceGateway` or `ClearanceGateway`. The check-digit table implements a published external standard with no cleaner target shape; contain it behind the gateway rather than change it. Sanctioned surface: `IClearanceGateway`, `ClearanceGateway`.
@@ -124,11 +124,11 @@ pass layering/domain-independent
 pass naming/controllers
 pass data-access/no-inline-sql (migrate) — 12 grandfathered remaining (31 sites), 0 new, 0 fixed awaiting acceptance
 pass time/inject-clock (migrate) — 7 grandfathered remaining, 0 new, 0 fixed awaiting acceptance
-pass naming/async-suffix (migrate) — 13 grandfathered remaining, 0 new, 0 fixed awaiting acceptance
+pass naming/async-suffix (migrate) — 8 grandfathered remaining, 0 new, 0 fixed awaiting acceptance
 pass di/no-buildserviceprovider
 pass clearance/engine/containment (quarantine) — 1 grandfathered remaining (2 sites), 0 new, 0 fixed awaiting acceptance
 skip clearance/engine/tripwire (tripwire) — diff-aware; run 'sliderule check --diff-base <ref>'
-Checked 8 rules: 7 passed, 0 failed, 1 skipped. Burndown: 33 grandfathered remaining (53 sites), 0 fixed awaiting acceptance.
+Checked 8 rules: 7 passed, 0 failed, 1 skipped. Burndown: 28 grandfathered remaining (48 sites), 0 fixed awaiting acceptance.
 ```
 
 Move a controller onto a repository and its grandfathered count drops. When a Migrate rule reaches zero and `sliderule baseline accept-reductions` has emptied its baseline, `status` reports it as promotable to `Enforce`.

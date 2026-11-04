@@ -302,7 +302,7 @@ FAIL time/inject-clock — The Web layer must not use `DateTime.Now` or `DateTim
   src/Meridian.Web/Controllers/RatesController.cs:15 — Meridian.Web.Controllers.RatesController uses System.DateTime.UtcNow
   src/Meridian.Web/Controllers/ShipmentsController.cs:15 — Meridian.Web.Controllers.ShipmentsController uses System.DateTime.UtcNow
   src/Meridian.Web/Data/SystemClock.cs:7 — Meridian.Web.Data.SystemClock uses System.DateTime.UtcNow
-FAIL naming/async-suffix — Methods returning `Task`, `Task<TResult>`, `ValueTask` or `ValueTask<TResult>` declared in authored types in the Domain or Web layers must be named `*Async`.
+FAIL naming/async-suffix — Methods returning `Task`, `Task<TResult>`, `ValueTask` or `ValueTask<TResult>` declared in authored types in the Domain or Web layers, except overriding methods of types or interface-implementing methods of types, must be named `*Async`.
   because: Task- and ValueTask-returning methods carry the Async suffix so callers see at the call site that a method must be awaited.
   citation: https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap
   fix: Rename the method to end in Async.
@@ -314,11 +314,6 @@ FAIL naming/async-suffix — Methods returning `Task`, `Task<TResult>`, `ValueTa
   src/Meridian.Web/Controllers/BookingsController.cs:18 — Meridian.Web.Controllers.BookingsController.Create()
   src/Meridian.Web/Controllers/QuotesController.cs:15 — Meridian.Web.Controllers.QuotesController.Create()
   src/Meridian.Web/Controllers/QuotesController.cs:39 — Meridian.Web.Controllers.QuotesController.Get()
-  src/Meridian.Web/Data/BookingRepository.cs:8 — Meridian.Web.Data.BookingRepository.Add()
-  src/Meridian.Web/Data/BookingRepository.cs:29 — Meridian.Web.Data.BookingRepository.Get()
-  src/Meridian.Web/Data/QuoteRepository.cs:8 — Meridian.Web.Data.QuoteRepository.Add()
-  src/Meridian.Web/Data/QuoteRepository.cs:30 — Meridian.Web.Data.QuoteRepository.Get()
-  src/Meridian.Web/Data/RateCardRepository.cs:8 — Meridian.Web.Data.RateCardRepository.GetForLane()
 pass di/no-buildserviceprovider — Types must not use `ServiceCollectionContainerBuilderExtensions.BuildServiceProvider()`.
 FAIL clearance/engine/containment — Types in `Meridian.Clearance.*`, except `IClearanceGateway` or `ClearanceGateway`, must be referenced only by types in `Meridian.Clearance.*`, `IClearanceGateway` or `ClearanceGateway`.
   because: Candidate: a self-contained clearance module already sits behind a gateway facade.
@@ -329,13 +324,13 @@ FAIL clearance/engine/containment — Types in `Meridian.Clearance.*`, except `I
 skip clearance/engine/tripwire
   skipped: Tripwire: no diff context — run 'sliderule check --diff-base <ref>' to check changed files against this quarantined scope.
 
-Checked 8 rules: 3 passed, 4 failed, 1 skipped (34 violations, 0 warnings).
+Checked 8 rules: 3 passed, 4 failed, 1 skipped (29 violations, 0 warnings).
 exit: 1
 ```
 
 The two direction-and-naming rules pass with zero violations, which already settles their posture. The same goes for one of the two pack rules, `di/no-buildserviceprovider`, which is green on the first run. The four that fail are the evidence. `data-access/no-inline-sql` reports 12 violations across six controllers, with 31 reference sites in the full output. Of those, the capture above shows CustomsController's five and drops the other five controllers. The inline-SQL result answers the survey's open question. The `Microsoft.Data` references do land in controllers, and in six of the eight.
 
-`time/inject-clock` reports eight sites, shown in full, and one of them is the answer to step 3's setup. That site is `src/Meridian.Web/Data/SystemClock.cs:7`, in a type whose job is to read the clock. `naming/async-suffix` reports 13, shown in full. Five are interface declarations in Domain, and eight are implementations and actions in Web. That is the shape of a convention the codebase never adopted rather than one it drifted from. `clearance/engine/containment` reports one inbound reference the gateway does not sanction, with the hint that no baseline exists yet. The tripwire reports `skip`, as expected, because a plain `check` takes its changed files only from a `--diff-base` ref, and this run gives none. In all, the check reports 34 located, named violations, ready to price.
+`time/inject-clock` reports eight sites, shown in full, and one of them is the answer to step 3's setup. That site is `src/Meridian.Web/Data/SystemClock.cs:7`, in a type whose job is to read the clock. `naming/async-suffix` reports eight, shown in full. Five are interface declarations in Domain and three are controller actions in Web. The repositories in Web that implement those interfaces are not reported, because their names come from the interfaces, where the rename is made. That is the shape of a convention the codebase never adopted rather than one it drifted from. `clearance/engine/containment` reports one inbound reference the gateway does not sanction, with the hint that no baseline exists yet. The tripwire reports `skip`, as expected, because a plain `check` takes its changed files only from a `--diff-base` ref, and this run gives none. In all, the check reports 29 located, named violations, ready to price.
 
 Notice that the pack rules were checked exactly like the ones written by hand. A pack ships a rule and its reason, and the check reports whether your code obeys it.
 
@@ -353,11 +348,11 @@ Meridian's evidence assigns cleanly:
 | `naming/controllers` | 0 violations | Enforce |
 | `data-access/no-inline-sql` | 12 pairs, 6 controllers | Migrate |
 | `time/inject-clock` | 8 clock reads | Migrate |
-| `naming/async-suffix` | 13 unsuffixed methods | Migrate |
+| `naming/async-suffix` | 8 unsuffixed methods | Migrate |
 | `di/no-buildserviceprovider` | 0 violations | Enforce |
 | `clearance/engine` | 1 non-facade inbound | Quarantine |
 
-The three zero-violation rules become law. The inline-SQL rule has 12 violations (six controllers, each referencing both `SqlConnection` and `SqlCommand`), and the team wants repositories, so it is a `Migrate`. The majority pattern is the one being retired, and the two already-migrated controllers show the target. The clock rule has eight sites and the same shape, so `Migrate` again, with one refinement. The naming rule has 13 and the team wants the convention, so `Migrate` as well. The single non-facade reach into Clearance has no target state (the ISO 6346 table stays as it is). New code should reach Clearance only through the gateway, so the scope is `Quarantine`.
+The three zero-violation rules become law. The inline-SQL rule has 12 violations (six controllers, each referencing both `SqlConnection` and `SqlCommand`), and the team wants repositories, so it is a `Migrate`. The majority pattern is the one being retired, and the two already-migrated controllers show the target. The clock rule has eight sites and the same shape, so `Migrate` again, with one refinement. The naming rule has eight and the team wants the convention, so `Migrate` as well. The single non-facade reach into Clearance has no target state (the ISO 6346 table stays as it is). New code should reach Clearance only through the gateway, so the scope is `Quarantine`.
 
 The two pack rules come from the same source on the same run and land on opposite sides of that line. `di/no-buildserviceprovider` is `Enforce`, and `naming/async-suffix` is `Migrate`. In the [Interchange example](../Meridian.Interchange/) the identical `naming/async-suffix` is `Enforce`, because that codebase already keeps it. A pack therefore gives you the rule and its reason and leaves the posture to you, since only your own check measures your code.
 
@@ -386,14 +381,14 @@ data-access/no-inline-sql: captured 12 grandfathered violations.
 wrote arch/baselines/data-access/no-inline-sql.json
 time/inject-clock: captured 7 grandfathered violations.
 wrote arch/baselines/time/inject-clock.json
-naming/async-suffix: captured 13 grandfathered violations.
+naming/async-suffix: captured 8 grandfathered violations.
 wrote arch/baselines/naming/async-suffix.json
 clearance/engine/containment: captured 1 grandfathered violation.
 wrote arch/baselines/clearance/engine/containment.json
 exit: 0
 ```
 
-`baseline init` writes four baselines, one per ratcheted rule, holding 12 inline-SQL references, 7 clock reads, 13 unsuffixed methods, and 1 inbound reach. Re-run `check` and the same code is green, because every red is now grandfathered:
+`baseline init` writes four baselines, one per ratcheted rule, holding 12 inline-SQL references, 7 clock reads, 8 unsuffixed methods, and 1 inbound reach. Re-run `check` and the same code is green, because every red is now grandfathered:
 
 ```text
 $ sliderule check examples/Meridian/Meridian.slnx
@@ -401,7 +396,7 @@ pass layering/domain-independent — The Domain layer must not reference the Web
 pass naming/controllers — Types derived from `ControllerBase` must be named `*Controller`.
 pass data-access/no-inline-sql — Types in `Meridian.Web.Controllers.*` must not reference `SqlConnection` or `SqlCommand`.
 pass time/inject-clock — Types in the Web layer, except types named `SystemClock`, must not use `DateTime.Now` or `DateTime.UtcNow`.
-pass naming/async-suffix — Methods returning `Task`, `Task<TResult>`, `ValueTask` or `ValueTask<TResult>` declared in authored types in the Domain or Web layers must be named `*Async`.
+pass naming/async-suffix — Methods returning `Task`, `Task<TResult>`, `ValueTask` or `ValueTask<TResult>` declared in authored types in the Domain or Web layers, except overriding methods of types or interface-implementing methods of types, must be named `*Async`.
 pass di/no-buildserviceprovider — Types must not use `ServiceCollectionContainerBuilderExtensions.BuildServiceProvider()`.
 pass clearance/engine/containment — Types in `Meridian.Clearance.*`, except `IClearanceGateway` or `ClearanceGateway`, must be referenced only by types in `Meridian.Clearance.*`, `IClearanceGateway` or `ClearanceGateway`.
 skip clearance/engine/tripwire
@@ -411,7 +406,7 @@ Checked 8 rules: 7 passed, 0 failed, 1 skipped (0 violations, 0 warnings).
 exit: 0
 ```
 
-Each of the four ratcheted passes also prints its grandfathered count (12, 7, 13, and 1); those sub-lines are dropped above. The check exits 0 with zero live violations, and the debt is on the record. These are the only two `check` fences on this page (the draft red and the post-baseline green). The curated-but-unbaselined run in between is the one `baseline init` captured. From here `sliderule status` prints the per-rule burndown, and the [README's status board](README.md#the-burndown) shows what it reports as the numbers fall.
+Each of the four ratcheted passes also prints its grandfathered count (12, 7, 8, and 1); those sub-lines are dropped above. The check exits 0 with zero live violations, and the debt is on the record. These are the only two `check` fences on this page (the draft red and the post-baseline green). The curated-but-unbaselined run in between is the one `baseline init` captured. From here `sliderule status` prints the per-rule burndown, and the [README's status board](README.md#the-burndown) shows what it reports as the numbers fall.
 
 The rule IDs you commit here are the keys of those files. If you rename a rule later, its section stays filed under the old ID. `check` then reports its grandfathered sites as new violations and names the old section in a warning. Run `sliderule baseline rename --from <old-id> --to <new-id>` in the same commit as the rename. It moves the section with every entry in it and never reads the code, so it cannot grandfather anything new. `sliderule status` lists any baseline section that no rule in the spec names.
 

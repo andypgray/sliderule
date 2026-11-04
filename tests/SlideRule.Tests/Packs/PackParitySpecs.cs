@@ -112,6 +112,7 @@ internal sealed class InlineNineSpec : IArchitectureSpec
         arch.Rule("naming/async-suffix")
             .Enforce(arch.Types.InNamespace("Meridian.Interchange.*").Authored().Methods
                 .Returning(typeof(Task), typeof(Task<>), typeof(ValueTask), typeof(ValueTask<>))
+                .Except(arch.Types.Methods.ThatAreOverrides(), arch.Types.Methods.ThatImplementInterfaces())
                 .MustHaveSuffix("Async"))
             .Because("Task- and ValueTask-returning methods carry the Async suffix so callers see at the call site that a method must be awaited.")
             .Citation("https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap")
@@ -128,6 +129,7 @@ internal sealed class InlineNineSpec : IArchitectureSpec
         arch.Rule("async/accept-cancellation")
             .Enforce(arch.Types.InNamespace("Meridian.Interchange.*").Authored().Methods
                 .Returning(typeof(Task), typeof(Task<>), typeof(ValueTask), typeof(ValueTask<>))
+                .Except(arch.Types.Methods.ThatAreOverrides(), arch.Types.Methods.ThatImplementInterfaces())
                 .MustAcceptParameter(typeof(CancellationToken)))
             .Because("Accepting a CancellationToken lets a caller stop in-flight async work and flow that request on to the calls it makes, so a Task- or ValueTask-returning method without one cannot take part in cooperative cancellation.")
             .Citation("https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap")

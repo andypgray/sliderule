@@ -8,9 +8,9 @@ namespace SlideRule;
 ///     <c>.Fields</c> or <c>.Events</c> on a <see cref="Selection" />. Narrow it with adjectives such
 ///     as <c>WithSuffix</c>, <c>WithPrefix</c>, <c>WithNameMatching</c>, <c>Named</c>, <c>AttributedWith</c>,
 ///     <c>ThatAreStatic</c>, <c>ThatAreOverrides</c>, <c>ThatImplementInterfaces</c>, the accessibility
-///     adjectives such as <c>ThatArePublic</c> and <c>ThatAreProtected</c>, or <c>Where</c>, each of which returns a new selection of the same kind so
-///     that a projection's own calls stay reachable; finish it with a verb such as
-///     <c>MustHaveSuffix</c>, <c>MustBePublic</c>, <c>MustBeStatic</c> or <c>MustBeAttributedWith</c>,
+///     adjectives such as <c>ThatArePublic</c> and <c>ThatAreProtected</c>, or <c>Where</c>, each of which
+///     returns a new selection of the same kind so that a projection's own calls stay reachable; finish it with a verb
+///     such as <c>MustHaveSuffix</c>, <c>MustBePublic</c>, <c>MustBeStatic</c> or <c>MustBeAttributedWith</c>,
 ///     which yields the <see cref="Constraint" /> a rule takes. What counts as a member is what the
 ///     type declares: property and event accessors, constructors, operators, indexers, finalizers and
 ///     explicit interface implementations are not members here, and enum and delegate types contribute

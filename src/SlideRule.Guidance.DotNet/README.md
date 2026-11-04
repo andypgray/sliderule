@@ -40,7 +40,7 @@ WeatherService.cs(6,33): warning SR3001: http/reuse-httpclient: Contoso.WeatherS
 | `SR3004` | `async/no-sync-over-async` | Warning | [Async scenarios](https://learn.microsoft.com/dotnet/csharp/asynchronous-programming/async-scenarios) |
 | `SR3005` | `naming/async-suffix` | Warning | [Task-based async pattern](https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap) |
 | `SR3006` | `exceptions/no-general-catch` | Warning | [Standard exception types](https://learn.microsoft.com/dotnet/standard/design-guidelines/using-standard-exception-types) |
-| `SR3007` | `async/accept-cancellation` | Off | [Task-based async pattern](https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap) |
+| `SR3007` | `async/accept-cancellation` | Info | [Task-based async pattern](https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap) |
 | `SR3008` | `persistence/no-mapping-attributes` | Warning | [Architectural principles](https://learn.microsoft.com/dotnet/architecture/modern-web-apps-azure/architectural-principles) |
 
 `SR3001` reports a `new HttpClient(...)`. `SR3002` reports a call to `IServiceProvider.GetService`,
@@ -51,8 +51,9 @@ does not end in `Async`. `SR3006` reports a `catch (Exception)` that neither fil
 rethrows. `SR3007` reports a `Task`- or `ValueTask`-returning method with no `CancellationToken`
 parameter. `SR3008` reports a type attributed with `[Table]` or `[ComplexType]`.
 
-`SR3007` ships off because a codebase that does not flow tokens today gets one warning per async
-method, and an interface method's warning repeats at every implementation.
+`SR3007` ships at Info: an editor shows it, and a build neither prints it nor fails on it. A codebase that
+does not pass tokens yet meets it at nearly every async method it declares, so it is yours to raise once
+you mean to.
 
 ## What each rule leaves alone
 
@@ -65,6 +66,10 @@ method, and an interface method's warning repeats at every implementation.
   `[DataTestMethod]`, `[TestInitialize]` or `[TestCleanup]`. They also include the public methods of a
   type derived from an MVC or Web API controller base, or from a SignalR `Hub`.
 - `SR3007` leaves alone the same test methods.
+- Both async rules leave alone a method declared `override` and a method that implements an interface
+  member, a package's interface included. The rule reports the declaration that owns the signature
+  instead when that declaration is in your own code, so a missing token or suffix is reported once,
+  where it can be fixed. A signature that comes from a package is not reported.
 - Both async rules skip generated code.
 
 The attributes match as written on the method. An attribute of your own derived from `[Fact]` is not
@@ -76,7 +81,7 @@ Each rule is an ordinary analyzer rule, so `.editorconfig` sets its severity:
 
 ```ini
 [*.cs]
-# Turn on the cancellation rule.
+# Report the cancellation rule as a warning.
 dotnet_diagnostic.SR3007.severity = warning
 # Turn off the suffix rule.
 dotnet_diagnostic.SR3005.severity = none

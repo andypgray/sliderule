@@ -187,6 +187,36 @@ public class DotNetGuidanceTests
         result.ShouldHaveFailedWithMemberSubjects(["M:Sample.Orders.Load"]);
     }
 
+    [Theory]
+    [InlineData("naming/async-suffix")]
+    [InlineData("async/accept-cancellation")]
+    public void AsyncRules_ReportASignatureWhereItIsDeclared_NotAtItsOverridesOrImplementations(string id)
+    {
+        const string source = """
+                              namespace Sample
+                              {
+                                  public interface IOrders { System.Threading.Tasks.Task Load(); }
+
+                                  public sealed class Orders : IOrders
+                                  {
+                                      public System.Threading.Tasks.Task Load() => System.Threading.Tasks.Task.CompletedTask;
+                                  }
+
+                                  public abstract class Shipper { public abstract System.Threading.Tasks.Task Ship(); }
+
+                                  public sealed class Courier : Shipper
+                                  {
+                                      public override System.Threading.Tasks.Task Ship() => System.Threading.Tasks.Task.CompletedTask;
+                                  }
+                              }
+                              """;
+
+        RuleResult result = Checker.Run(source, arch => DeclareOne(arch, id, PackPosture.Enforce))
+            .Single();
+
+        result.ShouldHaveFailedWithMemberSubjects(["M:Sample.IOrders.Load", "M:Sample.Shipper.Ship"]);
+    }
+
     [Fact]
     public void SameRule_EnforceInOneSpecAndMigrateInAnother_IsTheConsumersChoice()
     {

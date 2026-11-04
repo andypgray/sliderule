@@ -12,8 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SlideRule.Guidance.DotNet`, a new package: Microsoft's .NET guidance as compiler warnings, with no spec,
   model file or tool. Reference it and the next build reports. Each rule has its own ID, `SR3001` to
   `SR3008`, links to the Microsoft page it rests on, and takes a severity in `.editorconfig`. `SR3007`
-  (`async/accept-cancellation`) ships off. The async-suffix rule leaves alone xUnit, NUnit and MSTest test
-  methods and the public methods of controllers and SignalR hubs. A project whose own
+  (`async/accept-cancellation`) ships at Info, which an editor shows and a build does not count. The two async
+  rules report a signature where it is declared and leave alone overrides and interface implementations, so
+  a missing token or suffix is reported once. Both leave alone xUnit, NUnit and MSTest test methods, and the
+  async-suffix rule also leaves alone the public methods of controllers and SignalR hubs. A project whose own
   `sliderule.model.json` declares one of these rules keeps it, and the package does not report that rule.
   The package is one analyzer assembly with no dependencies, so it needs neither the contract nor the build
   analyzer at any version.

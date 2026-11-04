@@ -1,5 +1,5 @@
 extern alias guidance;
-using System.Collections.Immutable;
+using System.Globalization;
 using System.Reflection;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
@@ -19,9 +19,9 @@ namespace SlideRule.Tests.Guidance;
 ///     own ID, in a project of any name, and leaves a rule to a project's own model that declares it.
 /// </summary>
 /// <remarks>
-///     The parity pin runs every rule at warning, the one that ships disabled included, because parity is a
-///     claim about what the engine finds; which rules a build shows by default is a claim of its own, made on
-///     the conforming project.
+///     The parity pin runs every rule at warning, whatever its shipped severity, because parity is a claim
+///     about what the engine finds; which rules a build shows by default is a claim of its own, made on the
+///     conforming project.
 /// </remarks>
 public sealed class GuidanceAnalyzerTests(ParityBeds beds) : IClassFixture<ParityBeds>
 {
@@ -61,6 +61,28 @@ public sealed class GuidanceAnalyzerTests(ParityBeds beds) : IClassFixture<Parit
         IReadOnlyList<Diagnostic> reported = await DiagnoseAsync(conforming);
 
         reported.ShouldBeSilent();
+    }
+
+    [Fact]
+    public async Task TheAsyncRules_ReportASignatureWhereItIsDeclared_NeverWhereItIsInherited()
+    {
+        // Of the types read here, the bed declares two signatures that break both async rules, an interface method
+        // and an abstract one, beside an implementation of the one, an override of the other and a framework
+        // interface's implementation. A message opens with the rule and the member it reports.
+        Compilation rules = await CompilationAsync(RulesProject);
+        string[] types = ["IExporter", "Exporter", "Job", "NightlyJob", "Disposer"];
+
+        IReadOnlyList<Diagnostic> reported = await DiagnoseAsync(rules);
+
+        reported
+            .Select(diagnostic => $"{diagnostic.Id} {diagnostic.GetMessage(CultureInfo.InvariantCulture).Split(". ")[0]}")
+            .Where(line => types.Any(type => line.Contains($"GuidanceApp.Rules.{type}.")))
+            .ShouldBe([
+                "SR3005 naming/async-suffix: GuidanceApp.Rules.IExporter.Export()",
+                "SR3007 async/accept-cancellation: GuidanceApp.Rules.IExporter.Export()",
+                "SR3005 naming/async-suffix: GuidanceApp.Rules.Job.Run()",
+                "SR3007 async/accept-cancellation: GuidanceApp.Rules.Job.Run()"
+            ], ignoreOrder: true);
     }
 
     [Fact]
@@ -136,7 +158,6 @@ public sealed class GuidanceAnalyzerTests(ParityBeds beds) : IClassFixture<Parit
     }
 
     [Theory]
-    [InlineData("as shipped")]
     [InlineData("in the compilation options")]
     [InlineData("in an .editorconfig")]
     [InlineData("in a global config")]
@@ -145,7 +166,7 @@ public sealed class GuidanceAnalyzerTests(ParityBeds beds) : IClassFixture<Parit
     public async Task ARuleSwitchedOffInEveryTree_IsNeverChecked(string form)
     {
         // Arrange: every rule off in one form and the fault left on, with the check seam armed to fault, so a
-        // rule checked anyway reports the fault. The guard turns the one rule that ships off back on.
+        // rule checked anyway reports the fault. The guard turns one rule back on.
         Compilation rules = await CompilationAsync(RulesProject);
         (Compilation off, AnalyzerConfigOptionsProvider options) = EveryRuleOff(rules, form);
         Compilation oneOn = BuildTier.WithSeverity(off, ReportDiagnostic.Warn, GuidanceDiagnostics.AcceptCancellation.Id);
@@ -221,12 +242,15 @@ public sealed class GuidanceAnalyzerTests(ParityBeds beds) : IClassFixture<Parit
     }
 
     [Fact]
-    public void OnlyAcceptCancellation_ShipsDisabled()
+    public void EveryDescriptor_ShipsEnabled_AtWarning_ButAcceptCancellationAtInfo()
     {
         GuidanceDiagnostics.All
-            .Where(descriptor => !descriptor.IsEnabledByDefault)
-            .Select(descriptor => descriptor.Id)
-            .ShouldBe([GuidanceDiagnostics.AcceptCancellation.Id]);
+            .Select(descriptor => $"{descriptor.Id} {descriptor.IsEnabledByDefault} {descriptor.DefaultSeverity}")
+            .ShouldBe([
+                "SR3001 True Warning", "SR3002 True Warning", "SR3003 True Warning", "SR3004 True Warning",
+                "SR3005 True Warning", "SR3006 True Warning", "SR3007 True Info", "SR3008 True Warning",
+                "SR3093 True Warning"
+            ]);
     }
 
     [Fact]
@@ -275,19 +299,11 @@ public sealed class GuidanceAnalyzerTests(ParityBeds beds) : IClassFixture<Parit
         return BuildTier.DiagnoseAsync(new GuidanceAnalyzer(), compilation, files, cancellationToken: Ct);
     }
 
-    // Every rule at warning, the one that ships disabled included.
+    // Every rule at warning, whatever its shipped severity.
     private static Compilation AllEnabled(Compilation compilation)
     {
         return BuildTier.WithSeverity(
             compilation, ReportDiagnostic.Warn, [.. GuidanceDiagnostics.All.Select(descriptor => descriptor.Id)]);
-    }
-
-    private static Compilation WithSeverity(Compilation compilation, ReportDiagnostic severity, params string[] ids)
-    {
-        ImmutableDictionary<string, ReportDiagnostic> set = compilation.Options.SpecificDiagnosticOptions
-            .SetItems(ids.Select(id => new KeyValuePair<string, ReportDiagnostic>(id, severity)));
-
-        return compilation.WithOptions(compilation.Options.WithSpecificDiagnosticOptions(set));
     }
 
     private static string[] RuleIds => [.. GuidanceDiagnostics.ByRule.Values.Select(descriptor => descriptor.Id)];
@@ -298,16 +314,8 @@ public sealed class GuidanceAnalyzerTests(ParityBeds beds) : IClassFixture<Parit
     {
         string byId = string.Join("\n", RuleIds.Select(id => $"dotnet_diagnostic.{id}.severity = none"));
         var faultOn = $"dotnet_diagnostic.{GuidanceDiagnostics.AnalyzerFault.Id}.severity = warning";
-        string[] onByDefault =
-        [
-            .. GuidanceDiagnostics.ByRule.Values
-                .Where(descriptor => descriptor.IsEnabledByDefault)
-                .Select(descriptor => descriptor.Id)
-        ];
-
         return form switch
         {
-            "as shipped" => BuildTier.Configured(WithSeverity(compilation, ReportDiagnostic.Suppress, onByDefault)),
             "in the compilation options" => BuildTier.Configured(
                 BuildTier.WithSeverity(compilation, ReportDiagnostic.Suppress, RuleIds)),
             "in an .editorconfig" => BuildTier.Configured(compilation, EditorConfig(compilation, "*.cs", byId)),

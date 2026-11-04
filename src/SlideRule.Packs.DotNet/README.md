@@ -51,9 +51,9 @@ form.
 | `NoBuildServiceProvider` | `di/no-buildserviceprovider` | no second container is built while configuring services |
 | `NoSyncOverAsync` | `async/no-sync-over-async` | no blocking on a `Task` or a `ValueTask` |
 | `NoCaptiveDependencies` | `di/no-captive-dependencies` | singletons inject no scoped or transient type |
-| `AsyncSuffix` | `naming/async-suffix` | authored `Task`/`ValueTask`-returning methods end in `Async` |
+| `AsyncSuffix` | `naming/async-suffix` | authored `Task`/`ValueTask`-returning methods end in `Async`, where the signature is declared |
 | `NoGeneralCatch` | `exceptions/no-general-catch` | only the top-level handler swallows base `Exception` |
-| `AcceptCancellation` | `async/accept-cancellation` | authored `Task`/`ValueTask`-returning methods accept a `CancellationToken` |
+| `AcceptCancellation` | `async/accept-cancellation` | authored `Task`/`ValueTask`-returning methods accept a `CancellationToken`, where the signature is declared |
 | `NoMappingAttributes` | `persistence/no-mapping-attributes` | persisted types have no `[Table]` or `[ComplexType]` |
 
 A method's name is the rule-name half of its ID, in PascalCase and with the area dropped, so

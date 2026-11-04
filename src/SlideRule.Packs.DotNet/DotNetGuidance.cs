@@ -253,6 +253,10 @@ public static class DotNetGuidance
     ///     Declares <c>naming/async-suffix</c>: every <see cref="Task" />- or
     ///     <see cref="ValueTask" />-returning method the types in <paramref name="subject" /> declare is
     ///     named with the <c>Async</c> suffix, so a caller sees at the call site that it must be awaited.
+    ///     Overrides and methods that implement an interface member are left alone, because each takes its
+    ///     name from the declaration it overrides or implements. That declaration is reported when the
+    ///     subject reaches it, so a missing suffix is reported once, where the rename is made; a declaration
+    ///     on an interface or base class from a package is not reported.
     /// </summary>
     /// <param name="arch">The <see cref="Arch" /> the spec is declaring on.</param>
     /// <param name="subject">
@@ -272,7 +276,7 @@ public static class DotNetGuidance
     ///     Methods the rule leaves alone because another convention governs them, such as test methods:
     ///     <c>[arch.Types.Methods.AttributedWith("Xunit.FactAttribute")]</c>. A method any one of them names is
     ///     left alone. <c>AttributedWith</c> matches the attribute it names and no other, so xUnit's <c>[Theory]</c>
-    ///     methods need a selection of their own. Optional; an empty list is reported when the spec is loaded.
+    ///     methods need a selection of their own. Optional.
     /// </param>
     public static void AsyncSuffix(
         Arch arch, Selection subject, PackPosture posture, string? fix = null,
@@ -280,7 +284,7 @@ public static class DotNetGuidance
     {
         ArgumentNullException.ThrowIfNull(arch);
         ArgumentNullException.ThrowIfNull(posture);
-        Constraint constraint = TaskReturningMethods(subject, exempt)
+        Constraint constraint = TaskReturningMethods(arch, subject, exempt)
             .MustHaveSuffix("Async");
         IRuleBuilder rule = arch.Rule("naming/async-suffix");
 
@@ -330,7 +334,11 @@ public static class DotNetGuidance
     ///     Declares <c>async/accept-cancellation</c>: every <see cref="Task" />- or
     ///     <see cref="ValueTask" />-returning method the types in <paramref name="subject" /> declare
     ///     accepts a <see cref="CancellationToken" /> parameter, so a caller can stop in-flight work and
-    ///     flow its token on through the calls the method makes.
+    ///     flow its token on through the calls the method makes. Overrides and methods that implement an
+    ///     interface member are left alone, because each takes its parameters from the declaration it
+    ///     overrides or implements. That declaration is reported when the subject reaches it, so a missing
+    ///     token is reported once, where the parameter is added; a declaration on an interface or base class
+    ///     from a package is not reported.
     /// </summary>
     /// <param name="arch">The <see cref="Arch" /> the spec is declaring on.</param>
     /// <param name="subject">
@@ -350,7 +358,7 @@ public static class DotNetGuidance
     ///     Methods the rule leaves alone because another convention governs them, such as test methods:
     ///     <c>[arch.Types.Methods.AttributedWith("Xunit.FactAttribute")]</c>. A method any one of them names is
     ///     left alone. <c>AttributedWith</c> matches the attribute it names and no other, so xUnit's <c>[Theory]</c>
-    ///     methods need a selection of their own. Optional; an empty list is reported when the spec is loaded.
+    ///     methods need a selection of their own. Optional.
     /// </param>
     public static void AcceptCancellation(
         Arch arch, Selection subject, PackPosture posture, string? fix = null,
@@ -358,7 +366,7 @@ public static class DotNetGuidance
     {
         ArgumentNullException.ThrowIfNull(arch);
         ArgumentNullException.ThrowIfNull(posture);
-        Constraint constraint = TaskReturningMethods(subject, exempt)
+        Constraint constraint = TaskReturningMethods(arch, subject, exempt)
             .MustAcceptParameter<CancellationToken>();
         IRuleBuilder rule = arch.Rule("async/accept-cancellation");
 
@@ -437,13 +445,23 @@ public static class DotNetGuidance
     }
 
     // The authored methods returning a task or a value task, generic or not, less the exempt ones, defined once
-    // so the async rules agree on which methods they govern.
-    private static MethodSelection TaskReturningMethods(Selection subject, IEnumerable<MemberSelection>? exempt)
+    // so the async rules agree on which methods they govern. An override or an interface implementation takes
+    // its signature from another declaration, which the rules report instead, so a missing token or suffix is
+    // reported once and where it can be fixed. The caller's exemptions come first: the guidance package's
+    // embedded model is written from this order.
+    private static MethodSelection TaskReturningMethods(
+        Arch arch, Selection subject, IEnumerable<MemberSelection>? exempt)
     {
         MethodSelection methods = subject.Authored().Methods
             .Returning(typeof(Task), typeof(Task<>), typeof(ValueTask), typeof(ValueTask<>));
+        List<MemberSelection> exclusions =
+        [
+            .. exempt ?? [],
+            arch.Types.Methods.ThatAreOverrides(),
+            arch.Types.Methods.ThatImplementInterfaces()
+        ];
 
-        return exempt is null ? methods : methods.Except(exempt);
+        return methods.Except(exclusions);
     }
 
     // The one place a posture becomes a chain. IEnforceRule and IMigrateRule are unrelated interfaces,

@@ -111,3 +111,30 @@ public sealed class Cache(ScopedRepository repository, SingletonClock clock)    
     public ScopedRepository Repository { get; } = repository;
     public SingletonClock Clock { get; } = clock;
 }
+
+// The async rules report a signature where it is declared, never again where a member inherits it.
+
+public interface IExporter
+{
+    Task Export();                                                                     // POSITIVE: async-suffix AND accept-cancellation
+}
+
+public sealed class Exporter : IExporter
+{
+    public Task Export() => Task.CompletedTask;                                        // near-miss: both async rules (implements IExporter)
+}
+
+public abstract class Job
+{
+    public abstract Task Run();                                                        // POSITIVE: async-suffix AND accept-cancellation
+}
+
+public sealed class NightlyJob : Job
+{
+    public override Task Run() => Task.CompletedTask;                                  // near-miss: both async rules (overrides Job)
+}
+
+public sealed class Disposer : IAsyncDisposable
+{
+    public ValueTask DisposeAsync() => default;                                        // near-miss: accept-cancellation (implements a framework interface)
+}

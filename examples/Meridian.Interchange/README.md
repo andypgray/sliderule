@@ -34,9 +34,9 @@ The spec is one class of ordinary C#, [arch/Meridian.Interchange.Architecture/In
 | `async/no-sync-over-async` | Migrate | do not block on a `Task` or a `ValueTask` |
 | `di/hosted-services-scope-their-work` | Enforce | a hosted service captures no scoped service |
 | `di/no-captive-dependencies` | Enforce | a singleton injects no scoped or transient service |
-| `naming/async-suffix` | Enforce | authored `Task`/`ValueTask`-returning methods end in `Async` |
+| `naming/async-suffix` | Enforce | authored `Task`/`ValueTask`-returning methods end in `Async`, where the signature is declared |
 | `exceptions/no-general-catch` | Enforce | swallow base `Exception` only in a top-level handler |
-| `async/accept-cancellation` | Enforce | authored `Task`/`ValueTask`-returning methods accept a `CancellationToken` |
+| `async/accept-cancellation` | Enforce | authored `Task`/`ValueTask`-returning methods accept a `CancellationToken`, where the signature is declared |
 | `persistence/no-mapping-attributes` | Enforce | no `[Table]`/`[ComplexType]` on a persisted type |
 | `contracts/no-entity-exposure` | Enforce | do not expose `OutboxMessage` outside the `Outbox` cone |
 
@@ -181,7 +181,7 @@ The match is exact, so `MustNotSwallow(typeof(Exception))` flags a catch of base
 
 ## The flowed token
 
-`async/accept-cancellation` is green over a worker that passes a token the whole way down. Every `Task`-returning method on an authored type in `Meridian.Interchange.*` accepts a `CancellationToken`. `OutboxDispatcher.ExecuteAsync` receives the host's `stoppingToken`, and `ScopedDispatchRunner` and `OutboxProcessor` pass it to the calls they make. The partner clients and the outbox store take it at the leaf, and the rule requires the parameter on every one of them.
+`async/accept-cancellation` is green over a worker that passes a token the whole way down. Every `Task`-returning method on an authored type in `Meridian.Interchange.*` accepts a `CancellationToken`. `OutboxDispatcher.ExecuteAsync` receives the host's `stoppingToken`, and `ScopedDispatchRunner` and `OutboxProcessor` pass it to the calls they make. The partner clients and the outbox store take it at the leaf. The rule requires the parameter on their interfaces, and each implementation takes its signature from the interface it implements.
 
 ```csharp
 DotNetGuidance.AcceptCancellation(arch, arch.Types.InNamespace("Meridian.Interchange.*"), PackPosture.Enforce,
@@ -211,7 +211,7 @@ await runner.RunPendingAsync();
 The build warns `SR2001` at the method and exits 0, and `check` exits 1:
 
 ```text
-FAIL async/accept-cancellation — Methods returning `Task`, `Task<TResult>`, `ValueTask` or `ValueTask<TResult>` declared in authored types in `Meridian.Interchange.*` must accept a parameter of type `CancellationToken`.
+FAIL async/accept-cancellation — Methods returning `Task`, `Task<TResult>`, `ValueTask` or `ValueTask<TResult>` declared in authored types in `Meridian.Interchange.*`, except overriding methods of types or interface-implementing methods of types, must accept a parameter of type `CancellationToken`.
   because: Accepting a CancellationToken lets a caller stop in-flight async work and flow that request on to the calls it makes, so a Task- or ValueTask-returning method without one cannot take part in cooperative cancellation.
   citation: https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap
   fix: Add a CancellationToken parameter and flow OutboxDispatcher's stoppingToken through the call chain.
@@ -345,15 +345,14 @@ FAIL di/hosted-services-scope-their-work — Types derived from `BackgroundServi
   src/Meridian.Interchange/Dispatch/OutboxDispatcher.cs:14 — Meridian.Interchange.Dispatch.OutboxDispatcher references Microsoft.Extensions.Options.IOptionsSnapshot<TOptions>
 ```
 
-Rename `IOutboxProcessor.ProcessPendingAsync` to `ProcessPending`, with its implementation and the one call site in `ScopedDispatchRunner`, so it compiles. Both the interface and the class now declare a `Task`-returning method without the suffix. The build warns `SR2001` twice, and the rule fires on both:
+Rename `IOutboxProcessor.ProcessPendingAsync` to `ProcessPending`, with its implementation and the one call site in `ScopedDispatchRunner`, so it compiles. Both the interface and the class now declare a `Task`-returning method without the suffix. The class takes its name from the interface, so the build warns `SR2001` once, at the interface, and the rule fires there:
 
 ```text
-FAIL naming/async-suffix — Methods returning `Task`, `Task<TResult>`, `ValueTask` or `ValueTask<TResult>` declared in authored types in `Meridian.Interchange.*` must be named `*Async`.
+FAIL naming/async-suffix — Methods returning `Task`, `Task<TResult>`, `ValueTask` or `ValueTask<TResult>` declared in authored types in `Meridian.Interchange.*`, except overriding methods of types or interface-implementing methods of types, must be named `*Async`.
   because: Task- and ValueTask-returning methods carry the Async suffix so callers see at the call site that a method must be awaited.
   citation: https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap
   fix: Rename the method to end in Async.
   src/Meridian.Interchange/Processing/IOutboxProcessor.cs:7 — Meridian.Interchange.Processing.IOutboxProcessor.ProcessPending()
-  src/Meridian.Interchange/Processing/OutboxProcessor.cs:19 — Meridian.Interchange.Processing.OutboxProcessor.ProcessPending()
 ```
 
 Revert either edit and `check` is back to exit 0.

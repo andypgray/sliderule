@@ -825,8 +825,9 @@ jobs:
       # no model file, no tool. So a fresh project takes it from the pack and nothing else (package source
       # mapping sends every SlideRule id to the pack), over the sources of the suite's own guidance bed, and
       # the build is read three ways. The conforming sources are silent on every SR ID. The violating sources
-      # report each rule that ships on, under its own ID, and the one that ships off stays off until an
-      # .editorconfig turns it on, which also turns one off, the way the README documents. And the contract
+      # report each rule that ships at Warning, under its own ID, and the one that ships at Info stays out of the
+      # build's warnings until an .editorconfig raises it, which also turns one off, the way the README
+      # documents. And the contract
       # package beside it at the same version changes nothing: the guidance assembly shares no file with it,
       # so there is no second SlideRule.dll for the compiler to choose between.
       - name: Build a fresh project on the packed guidance package
@@ -891,7 +892,7 @@ jobs:
           build violating
           expected='SR3001 SR3002 SR3003 SR3004 SR3005 SR3006 SR3008'
           [ "$reported" = "$expected" ] || {
-            echo "::error::The violating sources reported '$reported', not each rule that ships on: '$expected'"
+            echo "::error::The violating sources reported '$reported', not each rule that ships at Warning: '$expected'"
             cat "$log"
             exit 1
           }
@@ -900,7 +901,7 @@ jobs:
           build tuned
           expected='SR3001 SR3002 SR3003 SR3004 SR3006 SR3007 SR3008'
           [ "$reported" = "$expected" ] || {
-            echo "::error::An .editorconfig turning SR3007 on and SR3005 off left the build reporting '$reported', not '$expected'"
+            echo "::error::An .editorconfig raising SR3007 and turning SR3005 off left the build reporting '$reported', not '$expected'"
             cat "$log"
             exit 1
           }

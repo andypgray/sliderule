@@ -79,8 +79,8 @@ public async Task<IActionResult> GetByReference(string reference)
 
 The rendered block steered the first attempt away from the pattern Meridian is retiring, before any
 check ran. The method's name did not follow the block. `GetByReference` returns a `Task`, and
-`naming/async-suffix` is a second ratchet with 13 sites already on the record.
-`IBookingRepository.Get`, the repository method the new endpoint calls, is one of the 13. So the
+`naming/async-suffix` is a second ratchet with eight sites already on the record.
+`IBookingRepository.Get`, the repository method the new endpoint calls, is one of the eight. So the
 agent copied a name that only the baseline allows. The code compiles and runs, and it is new debt.
 
 ## Beat 3: the turn ends, and the hook blocks the stop
@@ -95,12 +95,12 @@ pass data-access/no-inline-sql — Types in `Meridian.Web.Controllers.*` must no
   grandfathered: 12 (baselined; run 'sliderule status' for burndown)
 pass time/inject-clock — Types in the Web layer, except types named `SystemClock`, must not use `DateTime.Now` or `DateTime.UtcNow`.
   grandfathered: 7 (baselined; run 'sliderule status' for burndown)
-FAIL naming/async-suffix — Methods returning `Task`, `Task<TResult>`, `ValueTask` or `ValueTask<TResult>` declared in authored types in the Domain or Web layers must be named `*Async`.
+FAIL naming/async-suffix — Methods returning `Task`, `Task<TResult>`, `ValueTask` or `ValueTask<TResult>` declared in authored types in the Domain or Web layers, except overriding methods of types or interface-implementing methods of types, must be named `*Async`.
   because: Task- and ValueTask-returning methods carry the Async suffix so callers see at the call site that a method must be awaited.
   citation: https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap
   fix: Rename the method to end in Async and update its callers; see the interface and its implementation together.
   src/Meridian.Web/Controllers/BookingsController.cs:60 — Meridian.Web.Controllers.BookingsController.GetByReference()
-  grandfathered: 13 (baselined; run 'sliderule status' for burndown)
+  grandfathered: 8 (baselined; run 'sliderule status' for burndown)
 pass di/no-buildserviceprovider — Types must not use `ServiceCollectionContainerBuilderExtensions.BuildServiceProvider()`.
 pass clearance/engine/containment — Types in `Meridian.Clearance.*`, except `IClearanceGateway` or `ClearanceGateway`, must be referenced only by types in `Meridian.Clearance.*`, `IClearanceGateway` or `ClearanceGateway`.
   grandfathered: 1 (baselined; run 'sliderule status' for burndown)
@@ -120,7 +120,7 @@ Stop hook feedback:
 The report gives the five things an agent needs to act on. They are the rule ID
 (`naming/async-suffix`), the reason, the page that reason rests on, the fix, and the exact
 `file:line`. The sites already on the record stay quiet, counted in the same block as
-`grandfathered: 13`; only the new name is red. Two rules above it, the inline-SQL sites are quiet
+`grandfathered: 8`; only the new name is red. Two rules above it, the inline-SQL sites are quiet
 for the same reason. That is the debt the block had already steered the agent away from.
 
 ## Beat 4: the agent self-corrects
