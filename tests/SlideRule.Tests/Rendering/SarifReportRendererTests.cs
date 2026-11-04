@@ -697,7 +697,7 @@ public sealed class SarifReportRendererTests
         string solutionDirectory = Directory.GetCurrentDirectory();
         string solutionLeaf = Path.GetFileName(solutionDirectory);
 
-        IReadOnlyList<JsonElement> results = report.ToSarif(uriRoot: Path.GetDirectoryName(solutionDirectory))
+        IReadOnlyList<JsonElement> results = report.ToSarif(solutionPrefix: solutionLeaf)
             .SarifResults();
 
         results.Select(result => (result.SarifUri(), result.SarifFingerprint()))
@@ -716,7 +716,7 @@ public sealed class SarifReportRendererTests
         string solutionLeaf = Path.GetFileName(solutionDirectory);
 
         List<(string Uri, string Fingerprint)> warnings = report
-            .ToSarif(uriRoot: Path.GetDirectoryName(solutionDirectory))
+            .ToSarif(solutionPrefix: solutionLeaf)
             .SarifResults()
             .Where(result => result.SarifLevel() == "warning")
             .Select(result => (result.SarifUri(), result.SarifFingerprint()))
@@ -727,6 +727,41 @@ public sealed class SarifReportRendererTests
             ($"{solutionLeaf}/arch/baselines/data/old-x.json", "v1||data/old-x||arch/baselines/data/old-x.json|0"),
             ($"{solutionLeaf}/arch/shared.json", "v1||legacy/old||arch/shared.json|0")
         ]);
+    }
+
+    [Fact]
+    public void Serialize_APrefixSpelledApartFromTheSolutionDirectory_LeadsEachUriWithThePrefix()
+    {
+        // The prefix is git's spelling of the path below the repository root, which differs from the solution
+        // directory's own when that was reached through a short name, so the URI takes the prefix's names.
+        CheckReport report = Checker.Run(
+            "namespace App.Web { public class Page { public App.Data.Db Open() => new App.Data.Db(); } }"
+            + " namespace App.Data { public class Db {} }",
+            Sources.NoDataReference);
+
+        IReadOnlyList<JsonElement> results = report.ToSarif(solutionPrefix: "Long Name/app")
+            .SarifResults();
+
+        results.Select(result => result.SarifUri())
+            .Distinct()
+            .ShouldBe(["Long Name/app/Test.cs"]);
+    }
+
+    [Fact]
+    public void Serialize_ASolutionDirectoryApartFromTheWorkingDirectory_LeadsEachWarningUriWithThePrefix()
+    {
+        // A warning's file is already relative to the solution directory, so its URI is that path under the prefix;
+        // read as a path of its own it would resolve against the working directory, which is not the solution's.
+        CheckReport report = Checker.Run(
+            Sources.OneControllerModel, BaselineIndex.Empty.WithOrphanScan(Sources.TwoOrphans), Sources.NoDataAccess);
+        using TempDirectory solution = TestTempRoot.Fresh("sarif-renderer");
+
+        string sarif = report.ToSarif(solutionPrefix: "app", solutionDirectory: solution.Path);
+
+        sarif.SarifResults()
+            .Where(result => result.SarifLevel() == "warning")
+            .Select(result => result.SarifUri())
+            .ShouldBe(["app/arch/baselines/data/old-x.json", "app/arch/shared.json"]);
     }
 
     [Fact]

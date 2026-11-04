@@ -1,5 +1,5 @@
 using SlideRule.Checking;
-using SlideRule.Cli.Hooks;
+using SlideRule.Cli.Diff;
 using SlideRule.Cli.Mcp.Infrastructure;
 using SlideRule.Cli.Pipeline;
 using SlideRule.Cli.Rendering;
@@ -110,11 +110,11 @@ internal sealed class CheckRunner(
         // otherwise the agent would not learn that a clean verdict came from rules the sources have since changed.
         bool cleanWithWarnings = !gated && !report.HasViolations && (report.WarningCount > 0 || source.StaleSpec is not null);
 
-        string sarifUriRoot = request.Sarif is null
-            ? source.SolutionDirectory
-            : await SarifUriRootAsync(source.SolutionDirectory, ct);
+        string sarifSolutionPrefix = request.Sarif is null
+            ? ""
+            : await SarifSolutionPrefixAsync(source.SolutionDirectory, ct);
         Render(
-            request, stdout, human, stderr, report, source, sarifUriRoot, !gated, ruleGlobs,
+            request, stdout, human, stderr, report, source, sarifSolutionPrefix, !gated, ruleGlobs,
             forHook && cleanWithWarnings);
 
         // The incomplete-model gate: exit 2 overrides the 0/1 verdict. SARIF (if requested) was already
@@ -140,20 +140,18 @@ internal sealed class CheckRunner(
         human.WriteLine();
     }
 
-    // Code scanning reads a relative SARIF URI from the repository root, so the URIs are written from git's top
-    // level when the solution lies inside one, and from the solution directory when git gives no answer.
-    private static async Task<string> SarifUriRootAsync(string solutionDirectory, CancellationToken ct)
+    // Code scanning reads a relative SARIF URI from the repository root, so the URIs lead with git's path from its top
+    // level down to the solution directory when the solution lies inside one, and read from the solution directory
+    // when git gives no answer.
+    private static async Task<string> SarifSolutionPrefixAsync(string solutionDirectory, CancellationToken ct)
     {
-        string? topLevel = await HookGit.TopLevelAsync(solutionDirectory, ct);
-        if (topLevel is null) return solutionDirectory;
-
-        string[] solutionSegments = PathFormat.Segments(Path.GetFullPath(solutionDirectory));
-        return PathFormat.Contains(topLevel, solutionSegments) ? topLevel : solutionDirectory;
+        GitWorkTree.Location? workTree = await GitWorkTree.LocateAsync(solutionDirectory, ct);
+        return workTree?.Below ?? "";
     }
 
     private void Render(
         CheckRequest request, TextWriter stdout, TextWriter human, TextWriter stderr, CheckReport report,
-        CodebaseSource source, string sarifUriRoot, bool executionSuccessful, IReadOnlyList<string> ruleGlobs,
+        CodebaseSource source, string sarifSolutionPrefix, bool executionSuccessful, IReadOnlyList<string> ruleGlobs,
         bool withoutPasses)
     {
         // check is the one verb that folds the advisory merge notes into its rendered diagnostics stream
@@ -190,7 +188,7 @@ internal sealed class CheckRunner(
         if (request.Sarif is { } sarifPath)
         {
             SarifReportRenderer.Render(
-                sarifPath, report, source.SolutionDirectory, sarifUriRoot, executionSuccessful, renderedDiagnostics,
+                sarifPath, report, source.SolutionDirectory, sarifSolutionPrefix, executionSuccessful, renderedDiagnostics,
                 trust);
             human.WriteLine(WriteReport.Line(WriteOutcome.Wrote, source.SolutionDirectory, sarifPath));
         }

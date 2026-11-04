@@ -36,23 +36,40 @@ internal static class GitChangedFiles
     /// </summary>
     public static async Task<DiffContext> ResolveAsync(string baseRef, string solutionDirectory, CancellationToken ct)
     {
-        // The three commands share nothing and process spawn dominates, so they run together. They are
+        // The commands share nothing and process spawn dominates, so they run together. The loud ones are
         // awaited in launch order because that order is the refusal precedence: a directory that is not a
-        // repository still surfaces rev-parse's message, not whichever child failed first.
+        // repository still surfaces rev-parse's message, not whichever child failed first. The location is quiet,
+        // so it is awaited last and answers null on any failure.
         Task<string> toplevelRun = RunGitAsync(solutionDirectory, ct, "rev-parse", "--show-toplevel");
         Task<string> committedRun = RunGitAsync(solutionDirectory, ct, CommittedArguments(baseRef, "HEAD"));
         Task<string> statusRun = RunGitAsync(solutionDirectory, ct, StatusArguments);
+        Task<GitWorkTree.Location?> locationRun = GitWorkTree.LocateAsync(solutionDirectory, ct);
 
         string toplevelOutput = await toplevelRun;
-        string toplevel = Path.GetFullPath(toplevelOutput.Trim());
+        string toplevel = Path.GetFullPath(GitProcess.AnswerLines(toplevelOutput)[0]);
 
         string committedOutput = await committedRun;
         string statusOutput = await statusRun;
+        GitWorkTree.Location? location = await locationRun;
 
         IReadOnlyList<string> committed = ParseZTerminated(committedOutput);
         IEnumerable<string> uncommitted = StatusPaths(statusOutput);
+        IEnumerable<string> changed = committed.Concat(uncommitted);
 
-        IReadOnlyList<string> files = ComposeAbsolute(toplevel, committed.Concat(uncommitted));
+        // git spells its top level and the paths below it in long names, and the model's sites carry the spelling
+        // the solution was reached by, so the root is the caller's and a path below the solution directory is
+        // joined onto the caller's spelling of that directory. Path.Combine keeps such a path as it is.
+        string root = location?.Root ?? toplevel;
+        if (location is { Below.Length: > 0 })
+        {
+            string belowPrefix = location.Below + "/";
+            string fullSolutionDirectory = Path.GetFullPath(solutionDirectory);
+            changed = changed.Select(path => path.StartsWith(belowPrefix, PathComparison.Comparison)
+                ? Path.Join(fullSolutionDirectory, path[belowPrefix.Length..])
+                : path);
+        }
+
+        IReadOnlyList<string> files = ComposeAbsolute(root, changed);
         return new DiffContext(solutionDirectory, files);
     }
 

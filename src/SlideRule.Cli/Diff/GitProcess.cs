@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Text;
 using SlideRule.Roslyn.Hosting;
@@ -6,7 +7,8 @@ namespace SlideRule.Cli.Diff;
 
 /// <summary>
 ///     How this tool starts git: rooted at a directory with <c>git -C</c>, through <see cref="ChildProcess" />,
-///     under one bound, with git's optional locks off. What a failure means is left to each caller.
+///     under one bound, with git's optional locks off. <see cref="RunAsync" /> leaves what a failure means to each
+///     caller; <see cref="AnswerAsync" /> reads every failure as no answer.
 /// </summary>
 internal static class GitProcess
 {
@@ -48,5 +50,48 @@ internal static class GitProcess
 
         TimeSpan bound = TimeSpan.FromSeconds(TimeoutSeconds);
         return ChildProcess.RunAsync(startInfo, bound, ct: ct);
+    }
+
+    /// <summary>
+    ///     git's standard output when it exits 0, or null when it fails, is not on PATH, cannot start in the
+    ///     directory, or outlives its bound. A cancel still propagates.
+    /// </summary>
+    // The exit code decides, not the output: rev-parse HEAD in a repository with no commit prints "HEAD" and fails.
+    internal static async Task<string?> AnswerAsync(string directory, CancellationToken ct, params string[] arguments)
+    {
+        try
+        {
+            ChildProcess.ProcessResult result = await RunAsync(directory, ct, arguments);
+            return result.ExitCode == 0 ? result.StandardOutput : null;
+        }
+        catch (Exception ex) when (ex is Win32Exception or InvalidOperationException or TimeoutException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    ///     <see cref="AnswerAsync" />'s answer read as <see cref="AnswerLines" />, or null where it gave none.
+    /// </summary>
+    internal static async Task<string[]?> AnswerLinesAsync(
+        string directory, CancellationToken ct, params string[] arguments)
+    {
+        string? output = await AnswerAsync(directory, ct, arguments);
+        return output is null ? null : AnswerLines(output);
+    }
+
+    /// <summary>
+    ///     git's line-per-answer output split into its lines, each with its line ending cut and nothing else, so an
+    ///     empty answer, such as <c>--show-prefix</c> at the top level, is an empty line.
+    /// </summary>
+    // Only the line ending is cut: a folder's own name can start or end with a space.
+    internal static string[] AnswerLines(string output)
+    {
+        string[] lines = output.Split('\n');
+        int count = output.EndsWith('\n') ? lines.Length - 1 : lines.Length;
+        return lines
+            .Take(count)
+            .Select(static line => line.TrimEnd('\r'))
+            .ToArray();
     }
 }

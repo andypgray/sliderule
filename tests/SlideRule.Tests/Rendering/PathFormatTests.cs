@@ -55,4 +55,29 @@ public sealed class PathFormatTests
         PathFormat.Relative(solutionDirectory, filePath)
             .ShouldBe(expected);
     }
+
+    [Theory]
+    [InlineData("app", "Test.cs", "app/Test.cs")]
+    [InlineData("Long Name/app", "src/Test.cs", "Long Name/app/src/Test.cs")]
+    [InlineData("a/b", "../x.cs", "a/x.cs")] // a leading .. takes back one prefix segment
+    [InlineData("app", "../../x.cs", "../x.cs")] // more .. than the prefix holds stay
+    [InlineData("app", ".", "app")] // the directory itself
+    [InlineData("app", "../app", "app")]
+    [InlineData("", "Test.cs", "Test.cs")] // no prefix: the URIs read from the directory itself
+    public void Rebase_PutsTheRelativePathUnderThePrefix(string prefix, string relative, string expected)
+    {
+        PathFormat.Rebase(prefix, relative)
+            .ShouldBe(expected);
+    }
+
+    [Fact]
+    public void Rebase_ARootedPath_ComesBackUnchanged()
+    {
+        // Relative gives the raw path for a file on another drive, which no prefix can lead to.
+        string rooted = Path.Combine(Path.GetTempPath(), "x.cs")
+            .Replace('\\', '/');
+
+        PathFormat.Rebase("app", rooted)
+            .ShouldBe(rooted);
+    }
 }

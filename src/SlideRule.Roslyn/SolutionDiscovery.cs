@@ -6,8 +6,9 @@ namespace SlideRule.Roslyn;
 
 /// <summary>
 ///     Resolves which solution file to load, by the precedence <see cref="Choose" /> states, and returns it absolute
-///     and symlink-free (<see cref="PathCanonicalizer" />), so it compares equal to a path another tool resolved,
-///     such as git's toplevel.
+///     and symlink-free (<see cref="PathCanonicalizer" />), so it compares equal to a path another tool resolved
+///     through the same links. A Windows short name in it is kept as given, so it can still differ from git's
+///     spelling, which expands short names.
 /// </summary>
 /// <remarks>
 ///     A search climbs from its start to the first directory holding exactly one <c>.sln</c>, <c>.slnx</c> or

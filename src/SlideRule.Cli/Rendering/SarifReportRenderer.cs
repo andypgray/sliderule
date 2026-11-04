@@ -45,34 +45,35 @@ internal static class SarifReportRenderer
         string sarifPath,
         CheckReport report,
         string solutionDirectory,
-        string uriRoot,
+        string solutionPrefix,
         bool executionSuccessful,
         IReadOnlyList<string> workspaceDiagnostics,
         WorkspaceTrustStamp trust)
     {
-        string json = Serialize(report, solutionDirectory, uriRoot, executionSuccessful, workspaceDiagnostics, trust);
+        string json = Serialize(
+            report, solutionDirectory, solutionPrefix, executionSuccessful, workspaceDiagnostics, trust);
         AtomicFile.WriteAllText(sarifPath, json + "\n");
     }
 
     /// <summary>
     ///     Serializes <paramref name="report" /> to the SARIF 2.1.0 JSON string, with no workspace or filesystem
-    ///     behind it. Every artifact URI is relative to <paramref name="uriRoot" />, the repository's top level
-    ///     or the solution directory, while fingerprints and messages keep their paths relative to
-    ///     <paramref name="solutionDirectory" />. <paramref name="executionSuccessful" /> becomes the invocation
-    ///     verdict, false when the incomplete-model gate will exit 2.
+    ///     behind it. Fingerprints and messages keep their paths relative to <paramref name="solutionDirectory" />,
+    ///     and every artifact URI is that path under <paramref name="solutionPrefix" />, the solution directory's
+    ///     path below the repository's top level with forward slashes, or empty when the URIs read from the
+    ///     solution directory itself. <paramref name="executionSuccessful" /> becomes the invocation verdict, false
+    ///     when the incomplete-model gate will exit 2.
     /// </summary>
     internal static string Serialize(
         CheckReport report,
         string solutionDirectory,
-        string uriRoot,
+        string solutionPrefix,
         bool executionSuccessful,
         IReadOnlyList<string> workspaceDiagnostics,
         WorkspaceTrustStamp trust)
     {
-        // One relativizer per frame for the whole log: each base is the same string for every site, and
-        // normalizing plus splitting it is the constant half of the walk.
-        var paths = new SitePaths(
-            solutionDirectory, new PathFormat.Relativizer(solutionDirectory), new PathFormat.Relativizer(uriRoot));
+        // One relativizer for the whole log: its base is the same string for every site, and normalizing plus
+        // splitting it is the constant half of the walk.
+        var paths = new SitePaths(new PathFormat.Relativizer(solutionDirectory), solutionPrefix);
 
         var driver = new SarifDriver(
             DriverName, ServerVersion.SemVer, InformationUri, BuildRules(report, paths.Solution));
@@ -337,7 +338,7 @@ internal static class SarifReportRenderer
     // stays one alert across runs.
     private static SarifResult WarningResult(string ruleId, CheckWarning warning, string file, SitePaths paths)
     {
-        var artifact = new SarifArtifactLocation(paths.UriOfSolutionRelative(file), SrcRootBaseId);
+        var artifact = new SarifArtifactLocation(paths.UriOf(file), SrcRootBaseId);
         var location = new SarifLocation(new SarifPhysicalLocation(artifact, null));
         string target = warning.Key ?? string.Empty;
         Dictionary<string, string> fingerprints = Fingerprint(string.Empty, target, string.Empty, file, 0);
@@ -394,7 +395,7 @@ internal static class SarifReportRenderer
             Dictionary<string, string> fingerprints = Fingerprint(source, target, subject, relativePath, ordinal);
             var location = new SarifLocation(
                 new SarifPhysicalLocation(
-                    new SarifArtifactLocation(paths.Uri.Relative(site.FilePath), SrcRootBaseId),
+                    new SarifArtifactLocation(paths.UriOf(relativePath), SrcRootBaseId),
                     new SarifRegion(site.Line)));
 
             yield return new SarifResult(
@@ -404,15 +405,14 @@ internal static class SarifReportRenderer
 
     // The log's two path frames. A fingerprint and a message read from the solution directory, as the baselines
     // and the human report do, so an alert keeps its fingerprint wherever the repository root lies; an artifact
-    // URI reads from the URI root, because code scanning resolves a relative URI there.
-    private sealed record SitePaths(
-        string SolutionDirectory,
-        PathFormat.Relativizer Solution,
-        PathFormat.Relativizer Uri)
+    // URI reads from the repository root, because code scanning resolves a relative URI there. The URI is the
+    // solution-relative path under the solution's prefix rather than a path relativized against the root, because
+    // the prefix carries git's names below the root and a site's path may carry a short name in their place.
+    private sealed record SitePaths(PathFormat.Relativizer Solution, string SolutionPrefix)
     {
-        public string UriOfSolutionRelative(string solutionRelativePath)
+        public string UriOf(string solutionRelativePath)
         {
-            return Uri.Relative(Path.Combine(SolutionDirectory, solutionRelativePath));
+            return PathFormat.Rebase(SolutionPrefix, solutionRelativePath.Replace('\\', '/'));
         }
     }
 }

@@ -1,8 +1,6 @@
-using System.ComponentModel;
 using System.Security.Cryptography;
 using SlideRule.Cli.Diff;
 using SlideRule.Internal;
-using SlideRule.Roslyn.Hosting;
 
 namespace SlideRule.Cli.Hooks;
 
@@ -11,22 +9,12 @@ namespace SlideRule.Cli.Hooks;
 ///     belongs to, which git directory that tree shares, and what HEAD and the changed code files are.
 /// </summary>
 /// <remarks>
-///     Every question has a null answer, and none of them throws. A directory outside any repository, git missing
-///     from PATH, and a command that fails or outlives its bound all answer null, and the caller reads null as
-///     doubt: where a skip was on offer, the check runs instead.
+///     Every question has a null answer, and none of them throws except on a cancel. A directory outside any
+///     repository, git missing from PATH, and a command that fails or outlives its bound all answer null, and the
+///     caller reads null as doubt: where a skip was on offer, the check runs instead.
 /// </remarks>
 internal static class HookGit
 {
-    /// <summary>
-    ///     The top level of the working tree <paramref name="directory" /> belongs to, as git spells it, or null
-    ///     when it belongs to none. A linked worktree answers with its own root.
-    /// </summary>
-    public static async Task<string?> TopLevelAsync(string directory, CancellationToken ct)
-    {
-        string? output = await RunAsync(directory, ct, "rev-parse", "--show-toplevel");
-        return NonBlank(output);
-    }
-
     /// <summary>
     ///     The top level of the working tree <paramref name="directory" /> belongs to, as git spells it, with the git
     ///     directory every working tree of its repository shares, or null when it belongs to none. One git process
@@ -44,9 +32,9 @@ internal static class HookGit
     public static async Task<(string TopLevel, string SharedGitDirectory)?> TreeIdentityAsync(
         string directory, CancellationToken ct)
     {
-        string[] answers = (await RunAsync(directory, ct, "rev-parse", "--show-toplevel", "--git-common-dir") ?? "")
-            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        if (answers.Length != 2) return null;
+        string[]? answers =
+            await GitProcess.AnswerLinesAsync(directory, ct, "rev-parse", "--show-toplevel", "--git-common-dir");
+        if (answers is not { Length: 2 }) return null;
 
         string askedFrom = Path.GetFullPath(directory);
         return (answers[0], GitDirectoryIdentity(answers[1], askedFrom));
@@ -63,7 +51,7 @@ internal static class HookGit
     public static async Task<IReadOnlyList<string>?> WorktreesAsync(string tree, CancellationToken ct)
     {
         const string prefix = "worktree ";
-        string? output = await RunAsync(tree, ct, "worktree", "list", "--porcelain");
+        string? output = await GitProcess.AnswerAsync(tree, ct, "worktree", "list", "--porcelain");
         return output?.Split('\n')
             .Select(static line => line.TrimEnd('\r'))
             .Where(static line => line.StartsWith(prefix, StringComparison.Ordinal))
@@ -96,13 +84,12 @@ internal static class HookGit
     public static async Task<TreeSnapshot> SnapshotAsync(string directory, CancellationToken ct)
     {
         // The two questions share nothing and process start-up dominates, so they run together.
-        Task<string?> headRun = RunAsync(directory, ct, "rev-parse", "--show-toplevel", "HEAD");
-        Task<string?> statusRun = RunAsync(directory, ct, GitChangedFiles.StatusArguments);
+        Task<string[]?> headRun = GitProcess.AnswerLinesAsync(directory, ct, "rev-parse", "--show-toplevel", "HEAD");
+        Task<string?> statusRun = GitProcess.AnswerAsync(directory, ct, GitChangedFiles.StatusArguments);
 
-        string[] answers = (await headRun ?? "")
-            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        string[]? answers = await headRun;
         string? status = await statusRun;
-        if (answers.Length != 2 || status is null) return TreeSnapshot.Unknown;
+        if (answers is not { Length: 2 } || status is null) return TreeSnapshot.Unknown;
 
         string topLevel = answers[0];
         return TreeSnapshot.Of(answers[1], topLevel, status, path => TreeSnapshot.Digest(Path.Combine(topLevel, path)));
@@ -116,7 +103,7 @@ internal static class HookGit
     public static async Task<IReadOnlyList<string>?> CommittedBetweenAsync(
         string directory, string from, string to, CancellationToken ct)
     {
-        string? output = await RunAsync(directory, ct, GitChangedFiles.CommittedArguments(from, to));
+        string? output = await GitProcess.AnswerAsync(directory, ct, GitChangedFiles.CommittedArguments(from, to));
         return output is null ? null : GitChangedFiles.ParseZTerminated(output);
     }
 
@@ -128,28 +115,6 @@ internal static class HookGit
     {
         return path.StartsWith('/')
                || (path.Length >= 3 && char.IsAsciiLetter(path[0]) && path[1] == ':' && path[2] == '/');
-    }
-
-    private static string? NonBlank(string? output)
-    {
-        string? trimmed = output?.Trim();
-        return string.IsNullOrEmpty(trimmed) ? null : trimmed;
-    }
-
-    // The exit code decides, not the output: rev-parse HEAD in a repository with no commit prints "HEAD" and fails.
-    private static async Task<string?> RunAsync(string directory, CancellationToken ct, params string[] arguments)
-    {
-        try
-        {
-            ChildProcess.ProcessResult result = await GitProcess.RunAsync(directory, ct, arguments);
-            return result.ExitCode == 0 ? result.StandardOutput : null;
-        }
-        catch (Exception ex) when (ex is Win32Exception or InvalidOperationException or TimeoutException)
-        {
-            // git is not on PATH, the directory is missing, git would not start, or it outlived its bound: no
-            // answer, which reads as doubt.
-            return null;
-        }
     }
 }
 

@@ -10,7 +10,8 @@ namespace SlideRule.Tests.Init;
 
 /// <summary>
 ///     <c>sliderule init</c> through the command tree, over product trees written under the run's temp root, which
-///     no git work tree encloses, so <c>init</c> writes its settings beside the solution.
+///     no git work tree encloses, so <c>init</c> writes its settings beside the solution unless a row initialises a
+///     repository of its own.
 /// </summary>
 public sealed class InitCommandTests : IDisposable
 {
@@ -106,6 +107,74 @@ public sealed class InitCommandTests : IDisposable
         result.ShouldRefuseWith("CS1002", "dotnet exited 1.", "  dotnet build ", "  sliderule check");
         result.Err.ShouldNotContain("dotnet sln ");
         File.Exists(_temp.PathOf("failed-build", "sliderule.json")).ShouldBeTrue();
+    }
+
+    [Theory]
+    [InlineData("app")]
+    // git prints the path below the root as written, so a name's own leading space is part of it.
+    [InlineData(" app")]
+    public async Task Init_InsideAGitRepository_WritesTheSettingsAtItsRoot(string folder)
+    {
+        // Arrange
+        string solution = RestoredProductTree(Path.Combine("repo", folder));
+        GitCommand.Run(_temp.PathOf("repo"), "init");
+        ScriptedSpecProjectCommands commands = ScriptedSpecProjectCommands.Answering();
+
+        // Act
+        await CliRunner.InvokeWithSpecProjectCommandsAsync(commands, "init", solution);
+
+        // Assert
+        ShouldHaveWrittenSettingsAtRoot("repo", folder);
+    }
+
+    [Fact]
+    public async Task Init_ThroughAShortNameBelowTheRepositoryRoot_WritesTheSettingsAtTheRootInLongNames()
+    {
+        // git names the path below the root in long names, so a solution reached through a folder's short name still
+        // has its root found, and the committed settings record the names another clone will have.
+        // Arrange
+        string longSolution = ProductTree(Path.Combine("short", "Application Folder"));
+        string shortFolder = ShortPaths.ShortSpellingOrSkip(_temp.PathOf("short", "Application Folder"));
+        Restore(longSolution);
+        GitCommand.Run(_temp.PathOf("short"), "init");
+        string solution = Path.Join(shortFolder, Path.GetFileName(longSolution));
+        ScriptedSpecProjectCommands commands = ScriptedSpecProjectCommands.Answering();
+
+        // Act
+        await CliRunner.InvokeWithSpecProjectCommandsAsync(commands, "init", solution);
+
+        // Assert
+        ShouldHaveWrittenSettingsAtRoot("short", "Application Folder");
+    }
+
+    [Fact]
+    public async Task Init_ASettingsFileAtTheRepositoryRoot_RefusesBeforeWritingAnything()
+    {
+        string solution = ProductTree(Path.Combine("rooted", "app"));
+        GitCommand.Run(_temp.PathOf("rooted"), "init");
+        _temp.WriteFile(["rooted", "sliderule.json"], """{ "solution": "app/MyApp.slnx" }""");
+
+        await ShouldRefuseUntouchedAsync("rooted", solution, "sliderule.json already exists");
+    }
+
+    [Fact]
+    public async Task Init_AStrayGitDirectoryThatGitDoesNotRecognise_IsNoRepositoryRoot()
+    {
+        // An empty .git directory is no repository to git, so the settings go beside the solution as they do
+        // outside any work tree; a walk that stopped at the first .git would write them one level up.
+        // Arrange
+        string solution = RestoredProductTree(Path.Combine("stray", "app"));
+        Directory.CreateDirectory(_temp.PathOf("stray", ".git"));
+        ScriptedSpecProjectCommands commands = ScriptedSpecProjectCommands.Answering();
+
+        // Act
+        await CliRunner.InvokeWithSpecProjectCommandsAsync(commands, "init", solution);
+
+        // Assert
+        File.Exists(_temp.PathOf("stray", "app", "sliderule.json"))
+            .ShouldBeTrue("git names no work tree here, so the settings go beside the solution");
+        File.Exists(_temp.PathOf("stray", "sliderule.json"))
+            .ShouldBeFalse("a directory git does not recognise as a repository is not a repository root");
     }
 
     [Fact]

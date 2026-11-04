@@ -32,20 +32,23 @@ internal static class SarifAssertions
     ///     The populated shape is the gate suites' subject, and the golden's.
     /// </summary>
     /// <remarks>
-    ///     No caller chooses the solution directory. An in-memory report's site paths are already relative
-    ///     — a bare <c>Test.cs</c> from the MSBuild-free source factory, a bare <c>Internal.csproj</c> from
-    ///     the project-facts one — so every directory relativizes them to themselves. The URIs read from the
-    ///     solution directory too unless <paramref name="uriRoot" /> names another directory, as a repository's
-    ///     top level above the solution would be.
+    ///     The solution directory is the working directory unless <paramref name="solutionDirectory" /> names one
+    ///     apart from it. An in-memory report's site paths are already relative — a bare <c>Test.cs</c> from the
+    ///     MSBuild-free source factory, a bare <c>Internal.csproj</c> from the project-facts one — so every
+    ///     directory relativizes them to themselves. The URIs read from the solution directory too unless
+    ///     <paramref name="solutionPrefix" /> names the solution directory's path below a repository's top level.
     /// </remarks>
     internal static string ToSarif(
-        this CheckReport report, WorkspaceDiagnostics? diagnostics = null, string? uriRoot = null)
+        this CheckReport report,
+        WorkspaceDiagnostics? diagnostics = null,
+        string solutionPrefix = "",
+        string? solutionDirectory = null)
     {
         WorkspaceDiagnostics load = diagnostics ?? WorkspaceDiagnostics.None;
-        string solutionDirectory = Directory.GetCurrentDirectory();
-        WorkspaceTrustStamp trust = WorkspaceTrustStamp.From(load, solutionDirectory);
+        string directory = solutionDirectory ?? Directory.GetCurrentDirectory();
+        WorkspaceTrustStamp trust = WorkspaceTrustStamp.From(load, directory);
         return SarifReportRenderer.Serialize(
-            report, solutionDirectory, uriRoot ?? solutionDirectory, true, load.RenderedWithMergeNotes, trust);
+            report, directory, solutionPrefix, true, load.RenderedWithMergeNotes, trust);
     }
 
     /// <summary>

@@ -551,10 +551,10 @@ internal sealed class HookRunner(
                 return false;
         }
 
-        string? editedRoot = await HookGit.TopLevelAsync(editedDirectory, ct);
+        string? editedRoot = await GitWorkTree.TopLevelAsync(editedDirectory, ct);
         if (editedRoot is null || SameDirectory(editedRoot, project)) return true;
 
-        string? projectRoot = await HookGit.TopLevelAsync(project, ct);
+        string? projectRoot = await GitWorkTree.TopLevelAsync(project, ct);
         return projectRoot is null || string.Equals(editedRoot, projectRoot, StringComparison.Ordinal);
     }
 

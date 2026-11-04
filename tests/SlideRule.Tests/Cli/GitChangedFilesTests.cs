@@ -43,6 +43,18 @@ public sealed class GitChangedFilesTests
             .ShouldBe(["a", "b"]);
     }
 
+    // A folder's name can start or end with a space, and `--show-prefix` answers an empty line at the top level, so
+    // only the line ending is cut.
+    [Theory]
+    [InlineData(" top \n\n", new[] { " top ", "" })]
+    [InlineData(" top \r\nsub/\r\n", new[] { " top ", "sub/" })]
+    [InlineData("top", new[] { "top" })]
+    public void AnswerLines_CutsOnlyTheLineEnding(string output, string[] expected)
+    {
+        GitProcess.AnswerLines(output)
+            .ShouldBe(expected);
+    }
+
     [Fact]
     public void ComposeAbsolute_RebasesOntoToplevelWithForwardSlashes()
     {
@@ -210,6 +222,29 @@ public sealed class GitChangedFilesTests
             .ShouldBeTrue(
                 "The listing is what was committed since the ref together with what changed against HEAD, so a file "
                 + "changed and then changed back is listed: a tripwire only warns, and that is the safe direction.");
+    }
+
+    [Fact]
+    public async Task ResolveAsync_SolutionDirectoryReachedThroughAShortName_ListsTheFileInTheCallersSpelling()
+    {
+        // git names its top level and the paths below it in long names, while the model's sites carry the spelling
+        // the solution was reached by, so a changed file listed in git's spelling matches no site and trips nothing.
+        // Arrange
+        using TempDirectory temp = TestTempRoot.Fresh("git-changed-files");
+        string repository = Path.Combine(temp.Path, "short");
+        string longFolder = Path.Combine(repository, "Application Folder");
+        Directory.CreateDirectory(longFolder);
+        string shortFolder = ShortPaths.ShortSpellingOrSkip(longFolder);
+        GitCommand.Run(repository, "init");
+        GitCommand.Commit(repository, "--allow-empty", "-m", "baseline");
+        File.WriteAllText(Path.Combine(longFolder, "Probe.cs"), "public sealed class Probe;\n");
+
+        // Act
+        DiffContext context = await GitChangedFiles.ResolveAsync("HEAD", shortFolder, Ct);
+
+        // Assert
+        context.Contains(Path.Join(shortFolder, "Probe.cs"))
+            .ShouldBeTrue("A file changed below a solution reached through a short name is listed in that spelling.");
     }
 
     // Initialises the repository on first use, then writes and commits one C# file at its root.

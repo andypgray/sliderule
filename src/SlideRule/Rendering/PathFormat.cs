@@ -29,6 +29,32 @@ internal static class PathFormat
     }
 
     /// <summary>
+    ///     Returns <paramref name="relative" />, a forward-slashed path relative to some directory, as the path relative
+    ///     to the directory <paramref name="prefix" /> leads down from, each leading <c>..</c> taking back one of
+    ///     <paramref name="prefix" />'s segments. An empty prefix, or a rooted <paramref name="relative" /> (the raw
+    ///     path <see cref="Relative" /> gives for a file on another drive), returns <paramref name="relative" /> as it is.
+    /// </summary>
+    // Lexical only: the prefix's names are taken as given, so a prefix spelled differently from the directory the
+    // relative path was taken from still yields that prefix's spelling.
+    internal static string Rebase(string prefix, string relative)
+    {
+        if (prefix.Length == 0 || Path.IsPathRooted(relative)) return relative;
+
+        var parts = new List<string>(prefix.Split('/'));
+        foreach (string segment in relative.Split('/'))
+        {
+            if (segment == ".") continue;
+
+            if (segment == ".." && parts.Count > 0 && parts[parts.Count - 1] != "..")
+                parts.RemoveAt(parts.Count - 1);
+            else
+                parts.Add(segment);
+        }
+
+        return parts.Count == 0 ? "." : string.Join("/", parts);
+    }
+
+    /// <summary>
     ///     Reports whether <paramref name="directory" /> is the path <paramref name="pathSegments" /> spell, or
     ///     an ancestor of it.
     /// </summary>

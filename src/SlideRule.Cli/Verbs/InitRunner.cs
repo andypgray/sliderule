@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Text;
 using System.Text.Json;
+using SlideRule.Cli.Diff;
 using SlideRule.Cli.Init;
 using SlideRule.Cli.Mcp.Infrastructure;
 using SlideRule.Cli.Pipeline;
@@ -28,9 +29,9 @@ namespace SlideRule.Cli.Verbs;
 ///         refuses the folder the first one wrote.
 ///     </para>
 ///     <para>
-///         The settings file goes at the root of the git work tree above the solution, where the hook and every
-///         command run from that root find it, and beside the solution where there is no work tree. A
-///         <c>sliderule.json</c> anywhere between the two would govern the solution instead, so it refuses.
+///         The settings file goes at the root of the work tree git reports for the solution's directory, where the
+///         hook and every command run from that root find it, and beside the solution where there is no work tree.
+///         A <c>sliderule.json</c> anywhere between the two would govern the solution instead, so it refuses.
 ///     </para>
 /// </remarks>
 internal sealed class InitRunner(
@@ -49,7 +50,17 @@ internal sealed class InitRunner(
             throw new UserErrorException(
                 $"{solutionPath} is a solution filter, which dotnet sln add cannot edit. Pass the solution it filters.");
 
-        Layout layout = Layout.For(solutionPath, request);
+        string solutionDirectory = Path.GetDirectoryName(Path.GetFullPath(solutionPath))!;
+        GitWorkTree.Location? workTree = await GitWorkTree.LocateAsync(solutionDirectory, ct);
+        if (workTree is not null)
+        {
+            // The settings file is committed, so the paths it records take git's names below the root, never a short
+            // name the solution happened to be reached through.
+            solutionDirectory = workTree.Directory;
+            solutionPath = Path.Join(solutionDirectory, Path.GetFileName(solutionPath));
+        }
+
+        Layout layout = Layout.For(solutionPath, solutionDirectory, workTree?.Root ?? solutionDirectory, request);
         RefuseExistingSettings(layout);
         RefuseEnclosingProjects(layout);
         if (Directory.Exists(layout.ProjectDirectory))
@@ -245,14 +256,13 @@ internal sealed class InitRunner(
 
         public string SettingsFile => Path.Combine(SettingsDirectory, ProjectSettings.FileName);
 
-        public static Layout For(string solutionPath, InitRequest request)
+        public static Layout For(
+            string solutionPath, string solutionDirectory, string settingsDirectory, InitRequest request)
         {
-            string solutionDirectory = Path.GetDirectoryName(Path.GetFullPath(solutionPath))!;
             SpecProjectName name = SpecProjectName.For(solutionPath, request.Name);
             string parent = request.Output is null
                 ? Path.Combine(solutionDirectory, "arch")
                 : Path.GetFullPath(request.Output, request.WorkingDirectory);
-            string settingsDirectory = WorkTreeRoot(solutionDirectory) ?? solutionDirectory;
             return new Layout(name, solutionDirectory, Path.Combine(parent, name.Project), settingsDirectory);
         }
 
@@ -283,17 +293,6 @@ internal sealed class InitRunner(
                         Path.TrimEndingDirectorySeparator(SettingsDirectory)))
                     yield break;
             }
-        }
-
-        private static string? WorkTreeRoot(string start)
-        {
-            for (DirectoryInfo? directory = new(start); directory is not null; directory = directory.Parent)
-            {
-                string marker = Path.Combine(directory.FullName, ".git");
-                if (Directory.Exists(marker) || File.Exists(marker)) return directory.FullName;
-            }
-
-            return null;
         }
     }
 }
