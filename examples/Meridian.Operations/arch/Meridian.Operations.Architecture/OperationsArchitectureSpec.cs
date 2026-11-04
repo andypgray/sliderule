@@ -82,7 +82,7 @@ public sealed class OperationsArchitectureSpec : IArchitectureSpec
         arch.Scope("demurrage/engine")
             .Quarantine(demurrage)
             .BoundaryOnlyVia(typeof(IDemurrageCalculator), typeof(DemurrageCalculator))
-            .Dragons("Demurrage engine: it counts free-time then billable days between discharge and gate-out and prices them across tariff tiers. The free-time clock advances only on port working days, and billing is first-day-exclusive, last-day-inclusive per the carrier tariff sheet; counting calendar days instead, or 'correcting' that off-by-one, reprices every real container. The tariff tiers are non-contiguous and keyed by a day's billable ordinal, not by calendar span. Call in only through IDemurrageCalculator.")
+            .Dragons("Demurrage engine: it counts free-time then billable days between discharge and gate-out and prices them across tariff tiers. The free-time clock advances only on port working days, and billing is first-day-exclusive, last-day-inclusive per the carrier tariff sheet; counting calendar days instead, or 'correcting' that off-by-one, reprices real containers. The tariff tiers are non-contiguous and keyed by a day's billable ordinal, not by calendar span. Call in only through IDemurrageCalculator.")
             .Because("The day counting and the tariff table encode a published carrier tariff sheet with no cleaner target shape; the charges come out right because of the conventions that read like bugs, so the engine is contained behind its calculator facade and left as written.");
     }
 }

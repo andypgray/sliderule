@@ -80,7 +80,7 @@ public sealed class MeridianArchitectureSpec : IArchitectureSpec
             .BoundaryOnlyVia(typeof(IClearanceGateway), typeof(ClearanceGateway))
             .Dragons("ISO 6346 check digit: the letter-value table skips every multiple of 11 " +
                      "(A=10, B=12 … U=32); the gaps are structural — linearizing the table " +
-                     "breaks every real container number. Call in only through IClearanceGateway.")
+                     "breaks real container numbers. Call in only through IClearanceGateway.")
             .Because("The check-digit table implements a published external standard with no cleaner target shape; contain it behind the gateway rather than change it.");
     }
 }

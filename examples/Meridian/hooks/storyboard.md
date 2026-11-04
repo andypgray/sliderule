@@ -181,7 +181,7 @@ instructions. What remains is the rule that warned and the summary line:
 ```text
 warn clearance/engine/tripwire
   warning: Changed file 'src/Meridian.Clearance/ContainerNumberValidator.cs' is inside quarantined scope 'clearance/engine' — does the task actually require editing dragon territory? Dragons: sliderule explain clearance/engine/tripwire.
-  dragons: ISO 6346 check digit: the letter-value table skips every multiple of 11 (A=10, B=12 … U=32); the gaps are structural — linearizing the table breaks every real container number. Call in only through IClearanceGateway.
+  dragons: ISO 6346 check digit: the letter-value table skips every multiple of 11 (A=10, B=12 … U=32); the gaps are structural — linearizing the table breaks real container numbers. Call in only through IClearanceGateway.
 
 Checked 8 rules: 8 passed, 0 failed, 0 skipped (0 violations, 1 warning).
 ```

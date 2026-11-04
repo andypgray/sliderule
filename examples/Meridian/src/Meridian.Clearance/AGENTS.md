@@ -5,7 +5,7 @@
 
 This directory contains the quarantined `clearance/engine` scope: types in `Meridian.Clearance.*`. Here be dragons: do not spread references into it.
 
-Dragons: ISO 6346 check digit: the letter-value table skips every multiple of 11 (A=10, B=12 … U=32); the gaps are structural — linearizing the table breaks every real container number. Call in only through IClearanceGateway.
+Dragons: ISO 6346 check digit: the letter-value table skips every multiple of 11 (A=10, B=12 … U=32); the gaps are structural — linearizing the table breaks real container numbers. Call in only through IClearanceGateway.
 
 - `clearance/engine/containment` — Types in `Meridian.Clearance.*`, except `IClearanceGateway` or `ClearanceGateway`, must be referenced only by types in `Meridian.Clearance.*`, `IClearanceGateway` or `ClearanceGateway`. The check-digit table implements a published external standard with no cleaner target shape; contain it behind the gateway rather than change it.
 - Sanctioned surface: `IClearanceGateway`, `ClearanceGateway`.

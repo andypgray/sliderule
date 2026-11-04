@@ -72,14 +72,14 @@
       "because": "The check-digit table implements a published external standard with no cleaner target shape; contain it behind the gateway rather than change it.",
       "fix": "use `IClearanceGateway`",
       "constraint": { "node": "mustOnlyBeReferencedBy", "subject": { "noun": { "node": "namespace", "glob": "Meridian.Clearance.*" }, "adjectives": [{ "node": "except", "payload": { "union": [{ "noun": { "node": "type", "anchor": { "name": "Meridian.Clearance.IClearanceGateway" } } }, { "noun": { "node": "type", "anchor": { "name": "Meridian.Clearance.ClearanceGateway" } } }] } }] }, "operands": [{ "noun": { "node": "namespace", "glob": "Meridian.Clearance.*" } }, { "noun": { "node": "type", "anchor": { "name": "Meridian.Clearance.IClearanceGateway" } } }, { "noun": { "node": "type", "anchor": { "name": "Meridian.Clearance.ClearanceGateway" } } }] },
-      "scope": { "role": "containment", "scopeId": "clearance/engine", "scoped": { "noun": { "node": "namespace", "glob": "Meridian.Clearance.*" } }, "surface": ["`IClearanceGateway`", "`ClearanceGateway`"], "baselinePath": "arch/baselines/clearance/engine/containment.json", "dragons": "ISO 6346 check digit: the letter-value table skips every multiple of 11 (A=10, B=12 … U=32); the gaps are structural — linearizing the table breaks every real container number. Call in only through IClearanceGateway." }
+      "scope": { "role": "containment", "scopeId": "clearance/engine", "scoped": { "noun": { "node": "namespace", "glob": "Meridian.Clearance.*" } }, "surface": ["`IClearanceGateway`", "`ClearanceGateway`"], "baselinePath": "arch/baselines/clearance/engine/containment.json", "dragons": "ISO 6346 check digit: the letter-value table skips every multiple of 11 (A=10, B=12 … U=32); the gaps are structural — linearizing the table breaks real container numbers. Call in only through IClearanceGateway." }
     },
     {
       "id": "clearance/engine/tripwire",
       "posture": "quarantine",
       "sentence": "",
       "because": "The check-digit table implements a published external standard with no cleaner target shape; contain it behind the gateway rather than change it.",
-      "scope": { "role": "tripwire", "scopeId": "clearance/engine", "scoped": { "noun": { "node": "namespace", "glob": "Meridian.Clearance.*" } }, "surface": [], "dragons": "ISO 6346 check digit: the letter-value table skips every multiple of 11 (A=10, B=12 … U=32); the gaps are structural — linearizing the table breaks every real container number. Call in only through IClearanceGateway." }
+      "scope": { "role": "tripwire", "scopeId": "clearance/engine", "scoped": { "noun": { "node": "namespace", "glob": "Meridian.Clearance.*" } }, "surface": [], "dragons": "ISO 6346 check digit: the letter-value table skips every multiple of 11 (A=10, B=12 … U=32); the gaps are structural — linearizing the table breaks real container numbers. Call in only through IClearanceGateway." }
     }
   ],
   "omitted": []

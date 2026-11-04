@@ -9,7 +9,7 @@ SlideRule is a .NET architecture checker that enforces one C# spec and renders t
 A long-lived codebase has layers, boundaries and rules. They live in a few heads, no build step checks them, and the diagrams drift. A change can cross a boundary and the build still passes. A coding agent makes that change quickly and plausibly, and it cannot see which walls are structural. SlideRule's answer is architecture-as-code. The rules become one C# spec, and the spec produces every surface this page names.
 
 1. **Enforcement.** One checker passes or fails the rules at the command line, in CI, in the build and as named xUnit tests. A Claude Code hook runs the same check when an agent's turn ends.
-2. **Agent context.** The rules render to a managed `AGENTS.md` block, per-directory rule cards and MCP query tools for coding agents.
+2. **Agent context.** The rules render to a managed `AGENTS.md` block and per-directory rule cards, and MCP query tools serve the same rules to coding agents.
 
 SlideRule is pre-alpha. Minor versions can still change the spec API before 1.0. [Status](#status) describes what exists today and the versioning rules.
 
@@ -71,7 +71,7 @@ The three postures after `Enforce` each answer a way a coding agent goes wrong o
 
 - An agent copies the majority pattern, the statistical prior. Six of Meridian's eight controllers open a `SqlConnection`, so inline SQL reads as house style and an agent writes its next controller the same way. `Migrate` answers it. The rendered context calls that pattern debt, in words the agent reads before it writes.
 - An agent tidies away a gateway, the helpful refactor. A public type inside a module invites a direct call that skips the gateway in front of it. A `Quarantine` scope makes the gateway the only sanctioned way in.
-- An agent corrects structural weirdness. A check-digit table that skips values looks like a bug, and making it contiguous breaks every real container number. The dragons on a `Quarantine` or `Caution` scope answer it. The card on that scope's directory explains what the code does, which part is structural, and how to call in.
+- An agent corrects structural weirdness. A check-digit table that skips values looks like a bug, and making it contiguous breaks real container numbers. The dragons on a `Quarantine` or `Caution` scope answer it. The card on that scope's directory explains what the code does, which part is structural, and how to call in.
 
 ## What one spec produces
 

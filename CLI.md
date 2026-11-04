@@ -528,7 +528,7 @@ Options:
   -?, -h, --help  Show help and usage information
 ```
 
-The [Coding agents](https://github.com/andypgray/sliderule/blob/main/CODING-AGENTS.md#connecting-the-mcp-server) page covers the client config, how the server binds a solution, and its tools. A solution argument that does not resolve exits 2 before the handshake. Without an argument, the server starts even when it cannot bind a solution. Started at a terminal, with no client on its input, `mcp` prints how to configure one and exits 2.
+The [Coding agents](https://github.com/andypgray/sliderule/blob/main/CODING-AGENTS.md#connecting-the-mcp-server) page covers the client config, how the server binds a solution, and its tools. A solution argument that does not resolve exits 2 before the handshake. Without an argument, the server starts even when it finds no solution, but `mcp` still exits 2 when a `sliderule.json` it reaches is malformed or names a missing solution. Started at a terminal, with no client on its input, `mcp` prints how to configure one and exits 2.
 
 The server keeps the solution loaded between calls, and never reads or writes the persisted cache. It exits after a stretch with no tool call, and when the process that launched it exits. The variables that change either are listed under [Environment variables](#environment-variables).
 
@@ -687,7 +687,7 @@ The [GitHub Action](https://github.com/andypgray/sliderule/blob/main/action.yml)
 
 ## Caching
 
-`check`, `explain`, `render`, `status`, `graph`, `baseline add` and `hook` keep what they extract in a persisted cache, one directory per solution. `baseline init` and `baseline accept-reductions` always extract fresh. When no file has changed, or an edit changed only whitespace or comments, the next run builds the model from the cache without loading the workspace.
+`check`, `explain`, `render`, `status`, `graph`, `baseline add` and `hook` keep what they extract in a persisted cache, one directory per solution. `baseline init` and `baseline accept-reductions` always extract fresh. When no file has changed, or an edit changed only whitespace or comments, the next run builds the model from the cache without loading the workspace. Such an edit still re-extracts its project when it splits a line's code across two lines or adds or removes a generated-code banner.
 
 After an edit, a run loads only the projects it re-extracts and the projects they reference, through a temporary solution filter. An edit inside member bodies, non-constant initializers or top-level statements re-extracts only its own project. A project that references an edited one, directly or through another, is re-extracted only when the edit changed a declaration, even a private one.
 
@@ -701,7 +701,7 @@ The cache's record of the last whole load provides the spec's resolution and the
 
 Each solution gets a directory under the root, named after the solution file with a short hash of its full path. `SLIDERULE_CACHE_DIR` moves the root. The cache is local derived data, so deleting it costs one cold run.
 
-A `--binlog` capture is kept in the solution's cache directory. Later `check`, `status`, `graph` and `hook` runs replay the whole capture, even after an edit. A stored capture can go stale, become unreadable or come from another SlideRule version. A run that then needs the workspace prints a `warning:` line on stderr and runs a design-time build instead. For a stale capture the line is `warning: build capture is stale ('<path>' no longer matches the capture); running a design-time build instead. Re-capture: rebuild with -bl and re-run with --binlog.` A `--binlog` file that cannot be replayed fails the run with exit 2 and names the cause.
+A `--binlog` capture is kept in the solution's cache directory. Later `check`, `status`, `graph` and `hook` runs replay the whole capture whenever they need the workspace, even after an edit. A run the cache serves whole skips the replay. A stored capture can go stale, become unreadable or come from another SlideRule version. A run that then needs the workspace prints a `warning:` line on stderr and runs a design-time build instead. For a stale capture the line is `warning: build capture is stale ('<path>' no longer matches the capture); running a design-time build instead. Re-capture: rebuild with -bl and re-run with --binlog.` A `--binlog` file that cannot be replayed fails the run with exit 2 and names the cause.
 
 A run with `--no-cache` bypasses the cache and any stored capture, loads and extracts fresh, and leaves both as they were.
 

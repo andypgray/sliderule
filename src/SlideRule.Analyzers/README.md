@@ -109,11 +109,14 @@ That covers the subject of a rule, what a `MustNot...` verb bans, and the allow-
 `MustOnly...` verb. An allow-list entry is asked about the project whose copy of a type the
 reference reached. That is the copy the compiler bound, so one project's build has the exact answer.
 
-Inside an `.Except(...)`, a layer defined by `arch.Project(...)` is left to `check`, because
-`.Except(...)` drops a type from a set whichever project compiled it. A file compiled into two
-projects is declared by both, and one project's build sees only its own declaration. So a name that
-spares a type in `check` cannot spare it in the build. A rule that asks which project a type resides
-in, or which layer it belongs to, is left to `check` however its layers are defined.
+Inside an `.Except(...)` on a rule's subject or on what a `MustNot...` verb bans, a layer defined by
+`arch.Project(...)` is left to `check`. `.Except(...)` drops a type from a set whichever project
+compiled it. A file compiled into two projects is declared by both, and one project's build sees
+only its own declaration. So a name that spares a type in `check` cannot spare it in the build.
+Inside an `.Except(...)` on a `MustOnly...` allow-list, the same layer takes types out of what is
+allowed. A build that misses some of them can only report less, so that rule is still decided in
+the build. A rule that asks which project a type resides in, or which layer it belongs to, is left
+to `check` however its layers are defined.
 
 The build never reports a violation that `check` would not. Where one project's view cannot be sure,
 the analyzer stays silent, and a referenced type it cannot fully resolve is left out of the verdict.

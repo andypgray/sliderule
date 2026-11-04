@@ -103,14 +103,14 @@ One reach into the module already exists (`CustomsController` news up the valida
 
 ### Misreading structural weirdness
 
-The ISO 6346 check-digit table looks broken. It assigns A=10, B=12, C=13, and skips a value every so often, so K=21 is followed by L=23. An agent that "corrects" the gap to make the table contiguous breaks the check digit for every real container number in the system. This is the weirdness a `Quarantine` scope can only document, because agents still have to call into the code. `render` writes this card into the module's own directory, next to the file:
+The ISO 6346 check-digit table looks broken. It assigns A=10, B=12, C=13, and skips a value every so often, so K=21 is followed by L=23. An agent that "corrects" the gap to make the table contiguous breaks the check digit for real container numbers in the system. This is the weirdness a `Quarantine` scope can only document, because agents still have to call into the code. `render` writes this card into the module's own directory, next to the file:
 
 ```markdown
 ## Quarantined scope `clearance/engine`
 
 This directory contains the quarantined `clearance/engine` scope: types in `Meridian.Clearance.*`. Here be dragons: do not spread references into it.
 
-Dragons: ISO 6346 check digit: the letter-value table skips every multiple of 11 (A=10, B=12 … U=32); the gaps are structural — linearizing the table breaks every real container number. Call in only through IClearanceGateway.
+Dragons: ISO 6346 check digit: the letter-value table skips every multiple of 11 (A=10, B=12 … U=32); the gaps are structural — linearizing the table breaks real container numbers. Call in only through IClearanceGateway.
 ```
 
 The gaps are the standard. The letter values skip every multiple of 11 (11, 22, 33), which is why the table is not contiguous. The dragons prose explains what the code does, which part is structural, and how to call into it. The tripwire prints that prose when a turn edits the module.
