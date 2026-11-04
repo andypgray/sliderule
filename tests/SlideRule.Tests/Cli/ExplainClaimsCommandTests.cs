@@ -61,7 +61,29 @@ public sealed class ExplainClaimsCommandTests
                 domain/values-immutable: Properties of the Domain layer
                   in the Domain layer
                     namespace `MyApp.Domain` matches `MyApp.Domain.*`
+              operand of:
+                layering/no-ungoverned-types (membership): the Domain layer
+                  in the Domain layer
+                    namespace `MyApp.Domain` matches `MyApp.Domain.*`
             """);
+    }
+
+    [Fact]
+    public async Task ExplainType_OfAScopedRegistration_NamesTheCaptiveRuleThroughItsOperand()
+    {
+        // The scoped end of the captive-dependency ban is an operand, never the rule's subject, so the operand group
+        // is the only place the answer can name the rule. The whole layout is pinned by the row above.
+        CliResult result = await CliRunner.InvokeAsync(
+            "explain", "--type", "MyApp.Web.IOrderFeed", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll);
+
+        result.ShouldSucceed();
+        result.Out.NormalizedLines()
+            .ShouldContain(
+                """
+                    di/no-captive-dependencies (target operand): scoped-registered types
+                      registered as the service of a scoped registration
+                        at MyApp.Web/ServiceWiring.cs:14
+                """);
     }
 
     [Fact]

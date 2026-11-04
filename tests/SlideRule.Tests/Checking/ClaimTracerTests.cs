@@ -198,7 +198,59 @@ public sealed class ClaimTracerTests
              rules:
                di/scoped-public: Scoped-registered types
                  registered as the {role} of a scoped registration
+                   at Shop.cs:17
              """);
+    }
+
+    // The shape a test host makes: a product type registered as an instance whose type argument the compiler
+    // inferred, so no line spelling the type and a lifetime exists for a reader to find.
+    [Fact]
+    public void ARegisteredSubject_NamesEveryRegistrationAndItsSites()
+    {
+        CodebaseModel lab = CompilationFactory.ExtractWithDi(
+            ("src/Lab.cs", """
+                           using Microsoft.Extensions.DependencyInjection;
+                           namespace Lab
+                           {
+                               public interface IClock {}
+                               public class Clock : IClock {}
+                               public static class Wiring
+                               {
+                                   public static void Configure(IServiceCollection services) => services.AddScoped<IClock, Clock>();
+                               }
+                           }
+                           """),
+            ("tests/ClockTests.cs", """
+                                    using Microsoft.Extensions.DependencyInjection;
+                                    namespace Lab.Tests
+                                    {
+                                        public static class ClockTests
+                                        {
+                                            public static void Host(IServiceCollection services, Lab.Clock clock)
+                                            {
+                                                services.AddSingleton(clock);
+                                                services.AddSingleton(new Lab.Clock());
+                                            }
+                                        }
+                                    }
+                                    """));
+        ArchitectureModel model = Checker.Model(arch =>
+            arch.Rule("di/registered-public")
+                .Enforce(arch.Registered().MustBePublic())
+                .Because("b"));
+
+        TypeClaims claims = TypeClaims.Of(model, new ClaimTracer(lab), lab.Type("Lab.Clock"));
+
+        claims.ShouldReadClaims(
+            """
+            rules:
+              di/registered-public: Registered types
+                registered as the service of a singleton registration
+                  at tests/ClockTests.cs:8
+                  at tests/ClockTests.cs:9
+                registered as the implementation of a scoped registration
+                  at src/Lab.cs:8
+            """);
     }
 
     [Fact]
@@ -227,11 +279,15 @@ public sealed class ClaimTracerTests
                 .Dragons("d")
                 .Because("b"));
 
+        // The boundary names the surface, so the containment rule lists it as an allow-list operand too.
         claims.ShouldReadClaims(
             """
             scopes:
               domain/legacy (quarantine): Types in `Shop.Domain`
                 namespace `Shop.Domain` matches `Shop.Domain`
+            operand of:
+              domain/legacy/containment (allow-list operand): types named `OrderRepository`
+                it is named `OrderRepository`
             excepted by:
               rule domain/legacy/containment: Types in `Shop.Domain`, except types named `OrderRepository`
                 namespace `Shop.Domain` matches `Shop.Domain`
@@ -259,6 +315,64 @@ public sealed class ClaimTracerTests
             not evaluated:
               rule broken/where: Types that explode
                 could not be evaluated: the `Where` predicate threw InvalidOperationException on `Shop.Domain.Order`: boom
+            """);
+    }
+
+    [Fact]
+    public void OperandsThatThrow_AreNotEvaluated_OnceForTheirRule()
+    {
+        TypeClaims claims = ClaimsOn("Shop.Domain.Order", arch =>
+            arch.Rule("broken/targets")
+                .Enforce(
+                    arch.Namespace("Shop.Web")
+                        .MustNotReference(
+                            arch.Types.Where(_ => throw new InvalidOperationException("one"), "that explode"),
+                            arch.Types.Where(_ => throw new InvalidOperationException("two"), "that blow up")))
+                .Because("b"));
+
+        claims.ShouldReadClaims(
+            """
+            claimed by: no layer, rule or scope
+            not evaluated:
+              rule broken/targets (target operand): types that explode
+                could not be evaluated: the `Where` predicate threw InvalidOperationException on `Shop.Domain.Order`: one
+            """);
+    }
+
+    [Fact]
+    public void AnOperandThatThrows_BesideASubjectThatThrows_IsNotEvaluatedOnlyThroughTheSubject()
+    {
+        TypeClaims claims = ClaimsOn("Shop.Domain.Order", arch =>
+            arch.Rule("broken/both")
+                .Enforce(
+                    arch.Types.Where(_ => throw new InvalidOperationException("subject"), "that explode")
+                        .MustNotReference(arch.Types.Where(_ => throw new InvalidOperationException("operand"), "that blow up")))
+                .Because("b"));
+
+        claims.ShouldReadClaims(
+            """
+            claimed by: no layer, rule or scope
+            not evaluated:
+              rule broken/both: Types that explode
+                could not be evaluated: the `Where` predicate threw InvalidOperationException on `Shop.Domain.Order`: subject
+            """);
+    }
+
+    [Fact]
+    public void AnExternalType_UnderAnOperandThatThrows_IsNotEvaluatedRatherThanClaimedByNothing()
+    {
+        TypeClaims claims = ClaimsOn("System.SerializableAttribute", arch =>
+            arch.Rule("broken/external")
+                .Enforce(
+                    arch.Namespace("Shop.Domain")
+                        .MustNotReference(arch.Namespace("System").Where(_ => throw new InvalidOperationException("boom"), "that explode")))
+                .Because("b"));
+
+        claims.ShouldReadClaims(
+            """
+            not evaluated:
+              rule broken/external (target operand): types in `System` that explode
+                could not be evaluated: the `Where` predicate threw InvalidOperationException on `System.SerializableAttribute`: boom
             """);
     }
 
@@ -370,6 +484,118 @@ public sealed class ClaimTracerTests
         outside.Verdict.ShouldBe(ClaimVerdict.Narrowed);
         outside.Steps.Select(step => step.Text).ShouldBe(["none of the files declaring it is under `src/Widgets` or `src/Console`"]);
         fileless.Steps.Select(step => step.Text).ShouldBe(["it has no source file in the solution"]);
+    }
+
+    [Fact]
+    public void AQuarantine_ListsNoAllowListClaimForAScopedTypeTheBoundaryDoesNotName()
+    {
+        // The containment rule's first operand is the scoped selection itself, which the scope already answers.
+        TypeClaims claims = ClaimsOn("Shop.Domain.Order", arch =>
+            arch.Scope("domain/legacy")
+                .Quarantine(arch.Namespace("Shop.Domain"))
+                .BoundaryOnlyVia(arch.Types.Named("OrderRepository"))
+                .Dragons("d")
+                .Because("b"));
+
+        claims.ShouldReadClaims(
+            """
+            rules:
+              domain/legacy/containment: Types in `Shop.Domain`, except types named `OrderRepository`
+                namespace `Shop.Domain` matches `Shop.Domain`
+                outside the except: types named `OrderRepository`
+            scopes:
+              domain/legacy (quarantine): Types in `Shop.Domain`
+                namespace `Shop.Domain` matches `Shop.Domain`
+            """);
+    }
+
+    [Fact]
+    public void ARegisteredOperand_NamesTheRuleWithItsRoleAndTheRegistration()
+    {
+        TypeClaims claims = ClaimsOn("Shop.Domain.IRepository", arch =>
+            arch.Rule("di/web-not-scoped")
+                .Enforce(arch.Namespace("Shop.Web").MustNotInject(arch.Registered(Lifetime.Scoped)))
+                .Because("b"));
+
+        claims.ShouldReadClaims(
+            """
+            operand of:
+              di/web-not-scoped (target operand): scoped-registered types
+                registered as the service of a scoped registration
+                  at Shop.cs:17
+            """);
+    }
+
+    [Fact]
+    public void AnOperandsExcept_ListsTheRuleUnderExceptedByWithItsRole()
+    {
+        TypeClaims claims = ClaimsOn("Shop.Domain.OrderRepository", arch =>
+            arch.Rule("layering/web-not-domain")
+                .Enforce(
+                    arch.Namespace("Shop.Web")
+                        .MustNotReference(arch.Namespace("Shop.Domain").Except(arch.Types.Named("OrderRepository"))))
+                .Because("b"));
+
+        claims.ShouldReadClaims(
+            """
+            claimed by: no layer, rule or scope
+            excepted by:
+              rule layering/web-not-domain (target operand): types in `Shop.Domain`, except types named `OrderRepository`
+                namespace `Shop.Domain` matches `Shop.Domain`
+                removed by the except: types named `OrderRepository`
+                  it is named `OrderRepository`
+            """);
+    }
+
+    [Fact]
+    public void AMembershipAndAnAllowList_EachNameTheirRole()
+    {
+        TypeClaims claims = ClaimsOn("Shop.Domain.Order", arch =>
+        {
+            arch.Rule("layering/governed")
+                .Enforce(arch.Namespace("Shop.Web").MustBelongTo(arch.Namespace("Shop.Domain")))
+                .Because("b");
+            arch.Rule("layering/web-uses-domain")
+                .Enforce(arch.Namespace("Shop.Web").MustOnlyReference(arch.Namespace("Shop.Domain")))
+                .Because("b");
+        });
+
+        claims.ShouldReadClaims(
+            """
+            operand of:
+              layering/governed (membership): types in `Shop.Domain`
+                namespace `Shop.Domain` matches `Shop.Domain`
+              layering/web-uses-domain (allow-list operand): types in `Shop.Domain`
+                namespace `Shop.Domain` matches `Shop.Domain`
+            """);
+    }
+
+    [Fact]
+    public void AnExternalType_IsListedByTheRulesWhoseTargetNamesIt()
+    {
+        TypeClaims claims = ClaimsOn("System.SerializableAttribute", arch =>
+        {
+            arch.Rule("shape/no-serializable")
+                .Enforce(arch.Namespace("Shop.Domain").MustNotReference(arch.Type(typeof(SerializableAttribute))))
+                .Because("b");
+            arch.Rule("shape/system-except-serializable")
+                .Enforce(
+                    arch.Namespace("Shop.Domain")
+                        .MustNotReference(arch.Namespace("System").Except(arch.Type(typeof(SerializableAttribute)))))
+                .Because("b");
+        });
+
+        claims.ShouldReadClaims(
+            """
+            operand of:
+              shape/no-serializable (target operand): `SerializableAttribute`
+                it is the named type `SerializableAttribute`
+            excepted by:
+              rule shape/system-except-serializable (target operand): types in `System`, except `SerializableAttribute`
+                namespace `System` matches `System`
+                removed by the except: `SerializableAttribute`
+                  it is the named type `SerializableAttribute`
+            """);
     }
 
     private static TypeClaims ClaimsOn(string fullName, Action<Arch> define)

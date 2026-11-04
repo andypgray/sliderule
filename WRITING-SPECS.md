@@ -204,7 +204,7 @@ A rule pack is a static class whose methods declare rules on the spec's `Arch`, 
 
 The contract package's analyzer reports a malformed ID, pattern or prose argument as a warning on the literal while you type. Its completion provider offers the namespaces and type names of the projects your spec references. The [package README](https://github.com/andypgray/sliderule/blob/main/src/SlideRule/README.md) lists both.
 
-`sliderule explain <rule-id>` prints a rule as it renders, with its reason, fix, citation, exemplar and posture. `explain --type <name>` and `explain --path <file>` show which layers, rules and scopes claim a type, and why. Run one after adding a layer or rule to see whether its selection reaches the types you meant.
+`sliderule explain <rule-id>` prints a rule as it renders, with its reason, fix, citation, exemplar and posture. `explain --type <name>` and `explain --path <file>` show which layers, rules and scopes claim a type, which rules name it as an operand, and why. Run one after adding a layer or rule to see whether its selection reaches the types you meant.
 
 `check` also reports, as [warnings](https://github.com/andypgray/sliderule/blob/main/CLI.md#warnings), what a verdict alone cannot show. Three point at the spec: a forbidden target that matched no types (`inertTarget`), a pattern in a rule's list that matched none (`deadOperand`), and an exemplar that matched no type (`deadExemplar`).
 

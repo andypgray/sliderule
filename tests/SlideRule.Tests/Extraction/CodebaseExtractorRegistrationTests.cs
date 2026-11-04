@@ -107,24 +107,28 @@ public sealed class CodebaseExtractorRegistrationTests
             .ShouldContain((Lifetime.Singleton, "N.Foo", "N.Foo"));
     }
 
-    [Fact]
-    public void Recognize_AddSingletonOneTypeArgWithFactory_RecordsNoImplementation()
+    // A factory or an instance names no implementation type, so each records (Foo, null), never (Foo, Foo). An
+    // instance call need not spell the type at all: the compiler infers the type argument from the argument, and the
+    // registration is recorded under that type all the same.
+    [Theory]
+    [InlineData("services.AddSingleton<Foo>(sp => new Foo())")]
+    [InlineData("services.AddSingleton(foo)")]
+    [InlineData("services.TryAddSingleton(new Foo())")]
+    public void Recognize_AddSingletonWithFactoryOrInstance_RecordsNoImplementation(string call)
     {
-        CodebaseModel model = CompilationFactory.ExtractWithDi(("Reg.cs", """
-                                                                          using Microsoft.Extensions.DependencyInjection;
-                                                                          namespace N;
-                                                                          public class Foo {}
-                                                                          public static class Reg
-                                                                          {
-                                                                              public static void Configure(IServiceCollection services) => services.AddSingleton<Foo>(sp => new Foo());
-                                                                          }
-                                                                          """));
+        CodebaseModel model = CompilationFactory.ExtractWithDi(("Reg.cs", $$"""
+                                                                            using Microsoft.Extensions.DependencyInjection;
+                                                                            using Microsoft.Extensions.DependencyInjection.Extensions;
+                                                                            namespace N;
+                                                                            public class Foo {}
+                                                                            public static class Reg
+                                                                            {
+                                                                                public static void Configure(IServiceCollection services, Foo foo) => {{call}};
+                                                                            }
+                                                                            """));
 
-        // A factory registration names no implementation type — (Foo, null), not (Foo, Foo).
         Registrations(model)
-            .ShouldContain((Lifetime.Singleton, "N.Foo", null));
-        Registrations(model)
-            .ShouldNotContain((Lifetime.Singleton, "N.Foo", "N.Foo"));
+            .ShouldBe([(Lifetime.Singleton, "N.Foo", null)]);
     }
 
     // ── Add{...} — typeof forms ───────────────────────────────────────────────────────────────────────────

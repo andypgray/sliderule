@@ -1,3 +1,5 @@
+using SlideRule.Codebase;
+
 namespace SlideRule.Checking;
 
 /// <summary>How a selection stands toward one type, as <see cref="ClaimTracer" /> found it.</summary>
@@ -25,15 +27,20 @@ internal enum ClaimVerdict
 /// </summary>
 internal sealed class ClaimStep
 {
-    internal ClaimStep(string text, IReadOnlyList<ClaimStep>? steps = null)
+    internal ClaimStep(string text, IReadOnlyList<ClaimStep>? steps = null, IReadOnlyList<SourceLocation>? sites = null)
     {
         Text = text;
         Steps = steps ?? Array.Empty<ClaimStep>();
+        Sites = sites ?? Array.Empty<SourceLocation>();
     }
 
     internal string Text { get; }
 
     internal IReadOnlyList<ClaimStep> Steps { get; }
+
+    // The source lines the fact rests on, absolute as the model holds them: a renderer makes them relative to the
+    // solution it answers for.
+    internal IReadOnlyList<SourceLocation> Sites { get; }
 }
 
 /// <summary>A selection's verdict on one type and the steps that decided it.</summary>

@@ -59,7 +59,7 @@ internal static class DeadOperandWording
         };
     }
 
-    private static string Noun(DeadOperandRole role)
+    internal static string Noun(DeadOperandRole role)
     {
         return role switch
         {

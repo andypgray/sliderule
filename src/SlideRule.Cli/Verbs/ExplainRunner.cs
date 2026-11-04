@@ -127,7 +127,8 @@ internal sealed class ExplainRunner(
 
     // By full name first, the spelling check reports; then by simple name, every match, since a simple name is
     // what an author writes in a Named list. A type the solution declares outranks an external one of the same
-    // full name, and an external is still an answer, because it tells the reader the type is outside every subject.
+    // full name, and an external is still an answer: the rules whose operands name it, or that it is outside every
+    // subject and named by no operand.
     private static IReadOnlyList<TypeNode> NamedTypes(CodebaseModel codebase, string name, bool incomplete)
     {
         List<TypeNode> byFullName = codebase.Types.Where(type => type.FullName == name).ToList();

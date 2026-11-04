@@ -55,7 +55,7 @@ The hook's report lists every rule, and each red one gets a stanza like this. A 
 
 ## When a rule reaches a type you did not expect
 
-`explain --type` names every layer, rule and scope that claims a type, and why. An agent asks it when a rule fires somewhere it did not expect, and an author asks it when an exemption seems not to apply. Here is this repository's spec answering for `CommandEntryPoint`, the shell every CLI command runs inside. The excerpt keeps the lines above and below its list of rules:
+`explain --type` names every layer, rule and scope that claims a type, every rule that names it as an operand, and why. An agent asks it when a rule fires somewhere it did not expect, and an author asks it when an exemption seems not to apply. Here is this repository's spec answering for `CommandEntryPoint`, the shell every CLI command runs inside. The excerpt keeps the lines above and below its list of rules:
 
 ```text
 SlideRule.Cli.CommandEntryPoint (class)
@@ -189,7 +189,7 @@ The same rule from `check --json`, the document `arch_check` returns over MCP, s
 `sliderule graph` surveys the codebase a spec is written against: projects and their references, namespaces and their sizes, and every external dependency by root. It needs no spec. It prints 28 project lines for this solution, one for every project the load reaches, so the projects that test fixtures reference are among them. These are the lines for its 11 projects outside the tests and their fixtures:
 
 ```text
-  SlideRule — 395 types; targets netstandard2.0; references: (none); packages: (none); locks restore
+  SlideRule — 397 types; targets netstandard2.0; references: (none); packages: (none); locks restore
   SlideRule.Analyzers — 15 types; targets netstandard2.0; references: SlideRule, SlideRule.Extraction; packages: Microsoft.CodeAnalysis.Analyzers (private); locks restore
   SlideRule.Architecture — 1 type; targets net10.0; references: SlideRule, SlideRule.Packs.DotNet; packages: Microsoft.Build.Locator; does not pack
   SlideRule.Cli — 222 types (1 generated); targets net10.0; references: SlideRule, SlideRule.Extraction, SlideRule.Roslyn; packages: Microsoft.Extensions.Hosting, ModelContextProtocol, Serilog.Extensions.Hosting, Serilog.Sinks.File, SlideRule.Analyzers (private), System.CommandLine; locks restore

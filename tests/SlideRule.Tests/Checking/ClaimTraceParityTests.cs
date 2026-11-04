@@ -12,8 +12,9 @@ namespace SlideRule.Tests.Checking;
 
 /// <summary>
 ///     The claim trace and the checker agree on every type: a trace claims a type exactly when
-///     <see cref="SelectionEvaluator.Evaluate" /> names it, for every rule subject, scope and layer of the
-///     canonical sample over the MyApp fixture and of this repository's own spec over this repository.
+///     <see cref="SelectionEvaluator.Evaluate" /> names it, for every rule subject, rule operand, scope and layer of
+///     the canonical sample over the MyApp fixture and of this repository's own spec over this repository. An
+///     operand is compared in the position <see cref="OperandRoles" /> gives it, over external types as well.
 /// </summary>
 /// <remarks>
 ///     The trace asks the evaluator each noun and adjective of one type and restates only the compound fold, so
@@ -63,10 +64,12 @@ public sealed class ClaimTraceParityTests(WorkspaceFixture fixture) : IClassFixt
         var disagreements = new List<string>();
         var compared = 0;
 
-        foreach ((string name, Func<TypeNode, ClaimTrace> trace, HashSet<TypeNode> members) in Subjects(model, evaluator, tracer))
+        foreach ((string name, Func<TypeNode, ClaimTrace> trace, HashSet<TypeNode> members, SelectionPosition position) in
+                 Subjects(model, evaluator, tracer))
         {
             compared++;
-            foreach (TypeNode type in declared)
+            IReadOnlyList<TypeNode> universe = position == SelectionPosition.Target ? codebase.Types : declared;
+            foreach (TypeNode type in universe)
             {
                 bool traced = trace(type).Verdict == ClaimVerdict.Claimed;
                 if (traced != members.Contains(type))
@@ -80,22 +83,35 @@ public sealed class ClaimTraceParityTests(WorkspaceFixture fixture) : IClassFixt
 
     // Every selection the explain answer traces, beside what the checker's evaluator names for it. A subject the
     // evaluator refuses is skipped, as the answer reports it under "not evaluated" rather than tracing it.
-    private static IEnumerable<(string Name, Func<TypeNode, ClaimTrace> Trace, HashSet<TypeNode> Members)> Subjects(
-        ArchitectureModel model, SelectionEvaluator evaluator, ClaimTracer tracer)
+    private static IEnumerable<(string Name, Func<TypeNode, ClaimTrace> Trace, HashSet<TypeNode> Members,
+        SelectionPosition Position)> Subjects(ArchitectureModel model, SelectionEvaluator evaluator, ClaimTracer tracer)
     {
+        const SelectionPosition subjectPosition = SelectionPosition.Subject;
         foreach (LayerDefinition layer in model.Layers)
         {
             HashSet<TypeNode> members = LayerMembers(layer, evaluator);
-            yield return ($"layer {layer.Name}", type => tracer.Trace(layer, type), members);
+            yield return ($"layer {layer.Name}", type => tracer.Trace(layer, type), members, subjectPosition);
         }
 
         foreach (ArchRule rule in model.Rules)
         {
-            if (rule.Scope?.Scoped is { } scoped && Evaluated(evaluator, scoped) is { } scopedMembers)
-                yield return ($"scope of {rule.Id}", type => tracer.Trace(scoped, type), scopedMembers);
+            if (rule.Scope?.Scoped is { } scoped && Evaluated(evaluator, scoped, subjectPosition) is { } scopedMembers)
+                yield return ($"scope of {rule.Id}", type => tracer.Trace(scoped, type), scopedMembers, subjectPosition);
 
-            if (rule.Constraint?.Subject is { } subject && Evaluated(evaluator, subject) is { } subjectMembers)
-                yield return ($"rule {rule.Id}", type => tracer.Trace(subject, type), subjectMembers);
+            if (rule.Constraint is not { } constraint) continue;
+
+            if (constraint.Subject is { } subject && Evaluated(evaluator, subject, subjectPosition) is { } subjectMembers)
+                yield return ($"rule {rule.Id}", type => tracer.Trace(subject, type), subjectMembers, subjectPosition);
+
+            IReadOnlyList<OperandRole> operands = OperandRoles.Of(constraint);
+            for (var i = 0; i < operands.Count; i++)
+            {
+                OperandRole operand = operands[i];
+                if (Evaluated(evaluator, operand.Operand, operand.Position) is not { } operandMembers) continue;
+
+                yield return ($"operand {i} of {rule.Id}", type => tracer.Trace(operand.Operand, type, operand.Position),
+                    operandMembers, operand.Position);
+            }
         }
     }
 
@@ -110,11 +126,12 @@ public sealed class ClaimTraceParityTests(WorkspaceFixture fixture) : IClassFixt
             .ToHashSet();
     }
 
-    private static HashSet<TypeNode>? Evaluated(SelectionEvaluator evaluator, Selection selection)
+    private static HashSet<TypeNode>? Evaluated(
+        SelectionEvaluator evaluator, Selection selection, SelectionPosition position)
     {
         try
         {
-            return evaluator.Evaluate(selection, SelectionPosition.Subject);
+            return evaluator.Evaluate(selection, position);
         }
         catch (RuleEvaluationException)
         {

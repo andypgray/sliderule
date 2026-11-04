@@ -12,15 +12,16 @@ namespace SlideRule.Cli.Rendering;
 /// <remarks>
 ///     The layout is rule <c>explain</c>'s: a header line, then two-space-indented <c>key: value</c> lines, so
 ///     the two forms of the verb read as one. A group with no claimant is left out, and a type nothing claims
-///     says so in one line, above the rules whose except removed it.
+///     says so in one line, above the rules whose except removed it. A rule that names the type through an
+///     operand is listed apart from the rules whose subject claims it, with the operand's role beside its ID.
 /// </remarks>
 internal static class ClaimsFormatter
 {
     private const string NothingClaims = "  claimed by: no layer, rule or scope";
 
     internal const string ExternalLine =
-        "  claimed by: nothing; it is declared outside the solution, and every selection ranges over the types "
-        + "the solution declares";
+        "  claimed by: nothing; it is declared outside the solution, where no layer, scope or rule subject reaches, "
+        + "and no rule names it as an operand";
 
     public static IReadOnlyList<string> Lines(TypeClaims claims, string solutionDirectory)
     {
@@ -28,7 +29,11 @@ internal static class ClaimsFormatter
         var lines = new List<string> { $"{type.FullName} ({KindWord(type)})" };
         if (type.IsExternal)
         {
-            lines.Add(ExternalLine);
+            Group(lines, "operand of", claims.Operands, false, solutionDirectory);
+            Group(lines, "excepted by", claims.ExceptedBy, true, solutionDirectory);
+            Group(lines, "not evaluated", claims.Unevaluated, true, solutionDirectory);
+            if (lines.Count == 1) lines.Add(ExternalLine);
+
             return lines;
         }
 
@@ -42,19 +47,21 @@ internal static class ClaimsFormatter
             .ToList();
         if (files.Count > 0) lines.Add($"  {Plurals.Noun(files.Count, "file")}: {string.Join(", ", files)}");
 
-        Group(lines, "layers", claims.Layers, false);
-        Group(lines, "rules", claims.Rules, false);
-        Group(lines, "scopes", claims.Scopes, false);
+        Group(lines, "layers", claims.Layers, false, solutionDirectory);
+        Group(lines, "rules", claims.Rules, false, solutionDirectory);
+        Group(lines, "scopes", claims.Scopes, false, solutionDirectory);
+        Group(lines, "operand of", claims.Operands, false, solutionDirectory);
         if (!claims.ClaimedByAnything) lines.Add(NothingClaims);
-        Group(lines, "excepted by", claims.ExceptedBy, true);
-        Group(lines, "not evaluated", claims.Unevaluated, true);
+        Group(lines, "excepted by", claims.ExceptedBy, true, solutionDirectory);
+        Group(lines, "not evaluated", claims.Unevaluated, true, solutionDirectory);
 
         return lines;
     }
 
     // The last two groups mix layers, rules and scopes, so there each claimant says which it is; the claimed
-    // groups are named by their heading.
-    private static void Group(List<string> lines, string heading, IReadOnlyList<Claimant> claimants, bool named)
+    // groups are named by their heading. An operand claimant carries its role in every group.
+    private static void Group(
+        List<string> lines, string heading, IReadOnlyList<Claimant> claimants, bool named, string solutionDirectory)
     {
         if (claimants.Count == 0) return;
 
@@ -62,18 +69,22 @@ internal static class ClaimsFormatter
         foreach (Claimant claimant in claimants)
         {
             string kind = named ? KindLabel(claimant.Kind) + " " : string.Empty;
+            string role = claimant.Role is { } operandRole ? $" ({DeadOperandWording.Noun(operandRole)})" : string.Empty;
             string subject = claimant.Subject is { } phrase ? $": {phrase}" : string.Empty;
-            lines.Add($"    {kind}{claimant.Name}{subject}");
-            Steps(lines, claimant.Trace.Steps, "      ");
+            lines.Add($"    {kind}{claimant.Name}{role}{subject}");
+            Steps(lines, claimant.Trace.Steps, "      ", solutionDirectory);
         }
     }
 
-    private static void Steps(List<string> lines, IReadOnlyList<ClaimStep> steps, string indent)
+    private static void Steps(List<string> lines, IReadOnlyList<ClaimStep> steps, string indent, string solutionDirectory)
     {
         foreach (ClaimStep step in steps)
         {
             lines.Add(indent + step.Text);
-            Steps(lines, step.Steps, indent + "  ");
+            foreach (SourceLocation site in step.Sites)
+                lines.Add($"{indent}  at {PathFormat.Relative(solutionDirectory, site.FilePath)}:{site.Line}");
+
+            Steps(lines, step.Steps, indent + "  ", solutionDirectory);
         }
     }
 

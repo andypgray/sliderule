@@ -28,11 +28,14 @@ internal sealed class ClaimTracer(CodebaseModel model, SolutionRoot? root = null
     private readonly SelectionEvaluator _evaluator = new(model, root);
 
     /// <summary>
-    ///     A subject's verdict on <paramref name="type" />, with a failed evaluation caught as its own verdict.
+    ///     A selection's verdict on <paramref name="type" /> in <paramref name="position" />, subject by default, with
+    ///     a failed evaluation caught as its own verdict. An operand that resolves in target position admits types the
+    ///     solution only references.
     /// </summary>
-    internal ClaimTrace Trace(Selection selection, TypeNode type)
+    internal ClaimTrace Trace(
+        Selection selection, TypeNode type, SelectionPosition position = SelectionPosition.Subject)
     {
-        return Guarded(() => Trace(selection, SelectionPosition.Subject, type));
+        return Guarded(() => Walk(selection, position, type));
     }
 
     /// <summary>
@@ -43,7 +46,7 @@ internal sealed class ClaimTracer(CodebaseModel model, SolutionRoot? root = null
     {
         return Guarded(() =>
         {
-            if (layer.Definition is { } definition) return Trace(definition, SelectionPosition.Subject, type);
+            if (layer.Definition is { } definition) return Walk(definition, SelectionPosition.Subject, type);
 
             return _evaluator.NounAdmits(layer.Noun, SelectionPosition.Subject, type)
                 ? new ClaimTrace(ClaimVerdict.Claimed, [GlobStep(layer.Globs, type)])
@@ -65,7 +68,7 @@ internal sealed class ClaimTracer(CodebaseModel model, SolutionRoot? root = null
         }
     }
 
-    private ClaimTrace Trace(Selection selection, SelectionPosition position, TypeNode type)
+    private ClaimTrace Walk(Selection selection, SelectionPosition position, TypeNode type)
     {
         List<ClaimStep>? steps = _evaluator.Composite(selection) is { } parts
             ? PartSteps(selection, parts, position, type)
@@ -96,14 +99,14 @@ internal sealed class ClaimTracer(CodebaseModel model, SolutionRoot? root = null
     {
         if (selection.Noun is LayerNoun layer)
         {
-            ClaimTrace definition = Trace(parts[0], position, type);
+            ClaimTrace definition = Walk(parts[0], position, type);
             return definition.Verdict == ClaimVerdict.Claimed ? [new ClaimStep(LayerStep(layer.Name), definition.Steps)] : null;
         }
 
         var steps = new List<ClaimStep>();
         foreach (Selection part in parts)
         {
-            ClaimTrace trace = Trace(part, position, type);
+            ClaimTrace trace = Walk(part, position, type);
             if (trace.Verdict != ClaimVerdict.Claimed) continue;
 
             if (parts.Count > 1 && (part is UnionSelection || part.Adjectives.Count > 0))
@@ -122,6 +125,7 @@ internal sealed class ClaimTracer(CodebaseModel model, SolutionRoot? root = null
         SelectionNoun noun = selection.Noun!;
         if (!_evaluator.NounAdmits(noun, position, type)) return null;
         if (noun is TypesNoun && selection.Adjectives.Count > 0) return [];
+        if (noun is RegisteredNoun registered) return RegistrationSteps(registered.Lifetime, type);
 
         ClaimStep step = noun switch
         {
@@ -130,7 +134,6 @@ internal sealed class ClaimTracer(CodebaseModel model, SolutionRoot? root = null
             NamespaceNoun ns => NamespaceMatchStep(type, ns.Glob),
             ProjectNoun project => new ClaimStep($"declared by project {ProseFormat.Backtick(project.Name)}"),
             TypeNoun named => new ClaimStep($"it is the named type {named.ReferenceFragment}"),
-            RegisteredNoun registered => RegistrationStep(registered.Lifetime, type),
             _ => new ClaimStep(noun.ReferenceFragment)
         };
 
@@ -155,24 +158,36 @@ internal sealed class ClaimTracer(CodebaseModel model, SolutionRoot? root = null
         return new ClaimStep($"{NamespaceDisplay(type)} matches {ProseFormat.Backtick(glob)}");
     }
 
-    // The registration that put the type in the noun's set, and the role it plays there. The noun admitted the
-    // type, so one registration at the noun's lifetime names it as its service or its implementation.
-    private ClaimStep RegistrationStep(Lifetime? lifetime, TypeNode type)
+    // Every registration at the noun's lifetime that names the type, one step per role and lifetime, each carrying
+    // the calls behind it: a registration the reader cannot find, such as an instance whose type argument the
+    // compiler inferred, is otherwise a claim with nothing to check it against. The noun admitted the type, so at
+    // least one registration names it as its service or its implementation.
+    private List<ClaimStep> RegistrationSteps(Lifetime? lifetime, TypeNode type)
     {
-        foreach (ServiceRegistration registration in model.ServiceRegistrations)
-        {
-            if (lifetime is { } wanted && registration.Lifetime != wanted) continue;
+        List<ClaimStep> steps = model.ServiceRegistrations
+            .Where(registration => lifetime is null || registration.Lifetime == lifetime)
+            .Where(registration => registration.ServiceFullName == type.FullName || registration.ImplementationFullName == type.FullName)
+            .GroupBy(registration => (IsService: registration.ServiceFullName == type.FullName, registration.Lifetime))
+            .OrderByDescending(group => group.Key.IsService)
+            .ThenBy(group => group.Key.Lifetime)
+            .Select(group => RegistrationStep(group.Key.IsService, group.Key.Lifetime, group.SelectMany(registration => registration.Sites)))
+            .ToList();
 
-            string? role = registration.ServiceFullName == type.FullName ? "service"
-                : registration.ImplementationFullName == type.FullName ? "implementation"
-                : null;
-            if (role is null) continue;
+        return steps.Count > 0 ? steps : [new ClaimStep(ProseFormat.RegisteredFragment(lifetime))];
+    }
 
-            string kind = registration.Lifetime.ToString().ToLowerInvariant();
-            return new ClaimStep($"registered as the {role} of a {kind} registration");
-        }
+    private static ClaimStep RegistrationStep(bool isService, Lifetime lifetime, IEnumerable<SourceLocation> sites)
+    {
+        string role = isService ? "service" : "implementation";
+        string kind = lifetime.ToString().ToLowerInvariant();
+        List<SourceLocation> ordered = sites
+            .GroupBy(site => (site.FilePath, site.Line))
+            .Select(group => group.First())
+            .OrderBy(site => site.FilePath, StringComparer.Ordinal)
+            .ThenBy(site => site.Line)
+            .ToList();
 
-        return new ClaimStep(ProseFormat.RegisteredFragment(lifetime));
+        return new ClaimStep($"registered as the {role} of a {kind} registration", sites: ordered);
     }
 
     private ClaimStep Kept(SelectionAdjective adjective, TypeNode type)
@@ -255,7 +270,7 @@ internal sealed class ClaimTracer(CodebaseModel model, SolutionRoot? root = null
             // the type is in it — read in target position, where an Except payload is always resolved.
             ExceptAdjective except => new ClaimStep(
                 $"removed by the except: {except.Payload.ReferenceProse()}",
-                Trace(except.Payload, SelectionPosition.Target, type).Steps),
+                Walk(except.Payload, SelectionPosition.Target, type).Steps),
             WhereAdjective where => new ClaimStep($"it fails the predicate \"{where.Description}\""),
             AuthoredAdjective => new ClaimStep("it is generated, not authored"),
             AccessibilityAdjective accessibility => new ClaimStep(

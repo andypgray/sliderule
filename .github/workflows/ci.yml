@@ -1487,17 +1487,29 @@ jobs:
       # repository under any gate; a shipped verb nobody points at its own codebase is a verb whose first
       # real consumer is a stranger. With render above, that leaves only `baseline`, which stays out
       # deliberately — it is the human escape valve, and a gate that ran it would be moving the ratchet.
-      # Exit 0 is the whole assertion — red rules never fail `status` or `graph`, and `explain` needs no
-      # workspace — so this is a smoke test, not a second check. Since 2026-08-04 it does carry one real
+      # Exit 0 is most of the assertion — red rules never fail `status` or `graph`, and a rule's `explain` needs
+      # no workspace — so this is a smoke test, not a second check. It does carry one real
       # assertion beyond "the command ran": `status` and `graph` exit 2 on a workspace that loaded only
       # partially, so exit 0 here says this solution loads completely on the runner. `graph --format mermaid`
       # is the spec-less drawing, the one path to the survey fence that needs no spec.
-      - name: Read verbs against this solution (status, graph, explain)
+      #
+      # `explain --type` is asked of SpecModelCache, which the MCP server registers as a singleton through an
+      # inferred type argument, so the answer has to walk to the registration site. A type no rule claims
+      # also exits 0, so the step requires the registration line and its site rather than the exit code.
+      - name: Read verbs against this solution (status, graph, explain by rule and by type)
         run: |
           dotnet run --no-build --project src/SlideRule.Cli -- status
           dotnet run --no-build --project src/SlideRule.Cli -- graph
           dotnet run --no-build --project src/SlideRule.Cli -- graph --format mermaid
           dotnet run --no-build --project src/SlideRule.Cli -- explain layering/model-independent
+          claims="$(dotnet run --no-build --project src/SlideRule.Cli -- explain --type SlideRule.Cli.SpecLoading.SpecModelCache)"
+          printf '%s\n' "$claims"
+          for expected in 'registered as the service of a singleton registration' 'at src/'; do
+            grep -Fq "$expected" <<< "$claims" || {
+              echo "::error::explain --type SlideRule.Cli.SpecLoading.SpecModelCache printed no '$expected' line, so the answer did not reach the singleton registration in McpServerCommand"
+              exit 1
+            }
+          done
 
   # The action as an adopter on Windows runs it: installed at a released version through its install step,
   # against a solution below the repository root. self-check covers neither, since it is ubuntu, runs the CLI

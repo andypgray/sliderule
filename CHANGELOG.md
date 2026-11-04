@@ -101,6 +101,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the collection counts, and so does a subclass of `ServiceDescriptor` declared in the same project whose
   constructor passes its parameters straight to the base constructor. Entries a builder adds to collections
   of its own, rather than to the service collection, are still not seen.
+- `explain --type` and `arch_explain` give the file and line of each container registration that puts a type
+  in an `arch.Registered` selection, below the line naming its role and lifetime. A registration whose type
+  is inferred from its argument, such as `services.AddSingleton(instance)` in a test project, is listed like
+  any other, so a type that is unexpectedly a singleton can be traced to the call that made it one. Where a
+  rule names the type in one of its operands, such as the scoped end of a captive-dependency ban, the answer
+  lists that rule under `operand of` with the operand's role, framework types included.
 - The `derive_spec` recipe's attributes question says that only attributes declared on a type count. For an
   attribute a shared base class declares, it writes two rules: the types derive from the base, and the base
   has the attribute. It also warns that a concrete intermediate base class is a subject like the types below

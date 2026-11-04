@@ -70,8 +70,9 @@ internal sealed class ArchTools(
 
     private const string ExplainDescription =
         "Return one rule's because, fix, citation, exemplar, posture payload, and linked prose as text. Given a " +
-        "type or a path instead of a rule ID, return which layers, rules and scopes claim each type, the step that " +
-        "admitted it to each, and the rules whose selection reached it and then left it out: call it when a rule " +
+        "type or a path instead of a rule ID, return which layers, rules and scopes claim each type, the rules " +
+        "that name it as an operand, the step that admitted it to each, and the rules whose selection reached it " +
+        "and then left it out: call it when a rule " +
         "fires on a type you did not expect it to govern. Pass exactly one of ruleId, type and path. If projects " +
         "fail to load or to restore, a type or path answer opens with a caveat naming them. A spec source that " +
         "differs from the spec project's last build is named in a line above any answer: the answer is of the " +
