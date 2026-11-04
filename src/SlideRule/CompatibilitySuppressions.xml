@@ -23,6 +23,41 @@
     <IsBaselineSuppression>true</IsBaselineSuppression>
   </Suppression>
   <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:SlideRule.SelectionAdjectives.ThatAreAbstract(SlideRule.Selection)</Target>
+    <Left>lib/netstandard2.0/SlideRule.dll</Left>
+    <Right>lib/netstandard2.0/SlideRule.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:SlideRule.SelectionAdjectives.ThatAreRecords(SlideRule.Selection)</Target>
+    <Left>lib/netstandard2.0/SlideRule.dll</Left>
+    <Right>lib/netstandard2.0/SlideRule.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:SlideRule.SelectionAdjectives.ThatAreSealed(SlideRule.Selection)</Target>
+    <Left>lib/netstandard2.0/SlideRule.dll</Left>
+    <Right>lib/netstandard2.0/SlideRule.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:SlideRule.SelectionAdjectives.ThatAreStatic(SlideRule.Selection)</Target>
+    <Left>lib/netstandard2.0/SlideRule.dll</Left>
+    <Right>lib/netstandard2.0/SlideRule.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:SlideRule.SelectionConstraints.MustBeRecords(SlideRule.Selection)</Target>
+    <Left>lib/netstandard2.0/SlideRule.dll</Left>
+    <Right>lib/netstandard2.0/SlideRule.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
     <DiagnosticId>CP0006</DiagnosticId>
     <Target>P:SlideRule.IMemberInfo.IsInterfaceImplementation</Target>
     <Left>lib/netstandard2.0/SlideRule.dll</Left>

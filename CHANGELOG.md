@@ -30,6 +30,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `sliderule.model.json` declares one of these rules keeps it, and the package does not report that rule.
   The package is one analyzer assembly with no dependencies, so it needs neither the contract nor the build
   analyzer at any version.
+- `MustBeRecords()` requires every type in a selection to be declared as a record, a record class or a record
+  struct, and `.ThatAreRecords()` narrows a selection to the records. A record rule no longer needs a
+  `Must(t => t.IsRecord, ...)` predicate, so it is written to the model file and the build analyzer reports it.
+  `.ThatAreRecords()` composes with `OfKind`: "record structs in `MyApp.*`".
+- `.ThatAreSealed()`, `.ThatAreStatic()` and `.ThatAreAbstract()` narrow a type selection by its declared
+  shape, reading the same facts as `MustBeSealed`, `MustBeStatic` and `MustBeAbstract`. A rule about concrete
+  classes leaves the other two shapes out with
+  `.OfKind(TypeKind.Class).Except(arch.Types.ThatAreAbstract(), arch.Types.ThatAreStatic())`, which reads
+  "classes, except abstract types or static types" and, unlike a `Where` predicate, reaches the build.
 - `.ThatAreOverrides()` and `.ThatImplementInterfaces()` narrow a member selection to the members whose
   signature another declaration owns: those declared `override`, and those that implement a member of an
   interface their type implements, a package's interface included. As payloads of a member `.Except`, they

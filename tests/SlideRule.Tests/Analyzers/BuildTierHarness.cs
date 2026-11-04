@@ -320,8 +320,15 @@ internal static class BuildTier
     /// <summary>The same compilation over several files, for the facts about where a site sits.</summary>
     internal static CSharpCompilation OwnCompilationOf(bool asImage, params (string Path, string Source)[] files)
     {
+        return OwnCompilationBeside(SiblingSource, asImage, files);
+    }
+
+    /// <summary>The same compilation against a sibling declaring <paramref name="siblingSource" /> instead.</summary>
+    internal static CSharpCompilation OwnCompilationBeside(
+        string siblingSource, bool asImage, params (string Path, string Source)[] files)
+    {
         CSharpCompilation sibling = CompilationFactory.CreateCompilation(
-            SiblingAssembly, [CompilationFactory.CoreLibrary], ("Data.cs", SiblingSource));
+            SiblingAssembly, [CompilationFactory.CoreLibrary], ("Data.cs", siblingSource));
         MetadataReference reference = CompilationFactory.Reference(sibling, asImage);
 
         return CompilationFactory.CreateCompilation(

@@ -51,6 +51,10 @@ public sealed class OneProjectSiblingFactsTests
 
     private static readonly Regex MemberRead = new(@"\.Members\b");
 
+    // The one source under Checking/ allowed to read IsRecord, and only IsRecord; RecordShape says why that
+    // read is sound.
+    private const string RecordReadingSource = CheckerSources.Root + "RecordShape.cs";
+
     [Fact]
     public void NoCheckingSource_ReadsAFactATypeFromAnotherProjectCannotAnswer()
     {
@@ -58,13 +62,19 @@ public sealed class OneProjectSiblingFactsTests
         IReadOnlyList<string> checkingSources = CheckerSources.All;
 
         // Act
-        List<string> reads = checkingSources.SelectMany(SiblingUnsafeReads)
+        List<string> reads = checkingSources.Where(path => path != RecordReadingSource)
+            .SelectMany(SiblingUnsafeReads)
             .ToList();
+        List<string> recordReads = SiblingUnsafeReads(RecordReadingSource).ToList();
 
         // Assert: the floor first, so a sweep that reached no file says so rather than reporting nothing.
         checkingSources.Count.ShouldBeGreaterThan(5, "the sweep reached the checker's own sources");
         SiblingUnsafeReads(HierarchyIsPopulated)
             .ShouldNotBeEmpty("the search no longer finds the place a type's hierarchy is populated");
+        recordReads.ShouldNotBeEmpty("the recorded record read is no longer where this test says it is");
+        recordReads.Where(read => !read.EndsWith(".IsRecord)", StringComparison.Ordinal))
+            .ToList()
+            .ShouldReportNothing("The recorded record source now reads a slot other than IsRecord");
         reads.ShouldReportNothing(
             "The checker now reads a type's Interfaces, Attributes, BaseType or IsRecord. A type from "
             + "another project carries those differently depending on how that project was referenced, so a "

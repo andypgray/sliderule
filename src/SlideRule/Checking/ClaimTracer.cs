@@ -198,6 +198,10 @@ internal sealed class ClaimTracer(CodebaseModel model, SolutionRoot? root = null
             WhereAdjective where => new ClaimStep($"it passes the predicate \"{where.Description}\""),
             AuthoredAdjective => new ClaimStep("it is authored, not generated"),
             AccessibilityAdjective => new ClaimStep($"it is declared {AccessibilityWord(type.Accessibility)}"),
+            ThatAreSealedAdjective => new ClaimStep("it is declared sealed"),
+            ThatAreStaticAdjective => new ClaimStep("it is declared static"),
+            ThatAreAbstractAdjective => new ClaimStep("it is declared abstract"),
+            ThatAreRecordsAdjective => new ClaimStep("it is declared as a record"),
             UnderAdjective under => UnderStep(under, type),
             _ => new ClaimStep($"it passes \"{adjective.Fragment.Trim()}\"")
         };
@@ -256,6 +260,10 @@ internal sealed class ClaimTracer(CodebaseModel model, SolutionRoot? root = null
             AuthoredAdjective => new ClaimStep("it is generated, not authored"),
             AccessibilityAdjective accessibility => new ClaimStep(
                 $"it is declared {AccessibilityWord(type.Accessibility)}, not {AccessibilityWord(accessibility.Accessibility)}"),
+            ThatAreSealedAdjective => new ClaimStep("it is not declared sealed"),
+            ThatAreStaticAdjective => new ClaimStep("it is not declared static"),
+            ThatAreAbstractAdjective => new ClaimStep("it is not declared abstract"),
+            ThatAreRecordsAdjective => new ClaimStep("it is not declared as a record"),
             UnderAdjective under => NotUnderStep(under, type),
             _ => new ClaimStep($"it fails \"{adjective.Fragment.Trim()}\"")
         };

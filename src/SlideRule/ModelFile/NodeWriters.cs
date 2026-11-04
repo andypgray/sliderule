@@ -142,6 +142,10 @@ internal static class NodeWriters
         });
         Add<AuthoredAdjective>(arms, (_, _) => { });
         Add<AccessibilityAdjective>(arms, (w, a) => w.EnumField("accessibility", a.Accessibility));
+        Add<ThatAreSealedAdjective>(arms, (_, _) => { });
+        Add<ThatAreStaticAdjective>(arms, (_, _) => { });
+        Add<ThatAreAbstractAdjective>(arms, (_, _) => { });
+        Add<ThatAreRecordsAdjective>(arms, (_, _) => { });
     }
 
     private static void AddMemberAdjectives(Dictionary<Type, Action<NodeWriter, object>> arms)
@@ -176,6 +180,7 @@ internal static class NodeWriters
         Subject<MustBeSealedConstraint>(arms);
         Subject<MustBeStaticConstraint>(arms);
         Subject<MustBeAbstractConstraint>(arms);
+        Subject<MustBeRecordsConstraint>(arms);
         Subject<MustBePublicConstraint>(arms);
         Subject<MustBeInternalConstraint>(arms);
         Subject<MustBeRegisteredConstraint>(arms);

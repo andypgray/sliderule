@@ -178,6 +178,8 @@ internal static class ParityRemainderSpec
             private void Loud() { }
             public void Dispose() { }
         }
+
+        public class Plain { }
         """;
 
     /// <summary>Every rule of the remainder, at least one per verb.</summary>
@@ -212,6 +214,10 @@ internal static class ParityRemainderSpec
         arch.Rule("remainder/internal")
             .Enforce(arch.Types.Named("Exposed").MustBeInternal())
             .Because("It is free to change, which only holds while nothing outside can name it.");
+
+        arch.Rule("remainder/records")
+            .Enforce(arch.Types.Named("Plain").MustBeRecords())
+            .Because("A message is compared by value, which only a record does without code.");
     }
 
     private static void DefineReach(Arch arch)

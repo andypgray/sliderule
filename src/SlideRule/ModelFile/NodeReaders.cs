@@ -148,8 +148,11 @@ internal static class NodeReaders
         Field(map, AdjectiveWhere, "anchor", Anchor, anchor => new AttributedWithAdjective(anchor));
         Field(map, AdjectiveWhere, "payload", SelectionAt, payload => new ExceptAdjective(payload));
 
-        map.Add(Key<AuthoredAdjective>(),
-            (r, v) => r.OnlyKeys(v, AdjectiveWhere, "node") ? new AuthoredAdjective() : null);
+        Bare<SelectionAdjective, AuthoredAdjective>(map, AdjectiveWhere);
+        Bare<SelectionAdjective, ThatAreSealedAdjective>(map, AdjectiveWhere);
+        Bare<SelectionAdjective, ThatAreStaticAdjective>(map, AdjectiveWhere);
+        Bare<SelectionAdjective, ThatAreAbstractAdjective>(map, AdjectiveWhere);
+        Bare<SelectionAdjective, ThatAreRecordsAdjective>(map, AdjectiveWhere);
 
         map.Add(Key<AccessibilityAdjective>(), (r, v) =>
         {
@@ -225,6 +228,7 @@ internal static class NodeReaders
         Subject<MustBeSealedConstraint>(map, s => new MustBeSealedConstraint(s));
         Subject<MustBeStaticConstraint>(map, s => new MustBeStaticConstraint(s));
         Subject<MustBeAbstractConstraint>(map, s => new MustBeAbstractConstraint(s));
+        Subject<MustBeRecordsConstraint>(map, s => new MustBeRecordsConstraint(s));
         Subject<MustBePublicConstraint>(map, s => new MustBePublicConstraint(s));
         Subject<MustBeInternalConstraint>(map, s => new MustBeInternalConstraint(s));
         Subject<MustBeRegisteredConstraint>(map, s => new MustBeRegisteredConstraint(s));

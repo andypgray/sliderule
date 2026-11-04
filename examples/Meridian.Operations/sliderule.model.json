@@ -35,6 +35,14 @@
       "constraint": { "node": "mustOnlyReferenceItself", "subject": { "noun": { "node": "layer", "name": "Tracking" } } }
     },
     {
+      "id": "modules/tracking/event-naming",
+      "posture": "enforce",
+      "sentence": "Types in the Tracking layer named `*Event` must be records.",
+      "because": "The `*Event` values are what tracking projects across the module boundary and, later, onto a bus; declaring them as records makes them immutable and compared by value, so an event cannot be mutated after it is published or matched by reference identity.",
+      "fix": "Declare the `*Event` type as a `record`.",
+      "constraint": { "node": "mustBeRecords", "subject": { "noun": { "node": "layer", "name": "Tracking" }, "adjectives": [{ "node": "withSuffix", "suffix": "Event" }] } }
+    },
+    {
       "id": "modules/invoicing/outbound",
       "posture": "enforce",
       "sentence": "The Invoicing layer must reference only types in `Meridian.Operations.Tracking.Contracts.*` or the Demurrage layer (external packages are not constrained by this rule).",
@@ -65,7 +73,5 @@
       "scope": { "role": "tripwire", "scopeId": "demurrage/engine", "scoped": { "noun": { "node": "layer", "name": "Demurrage" } }, "surface": [], "dragons": "Demurrage engine: it counts free-time then billable days between discharge and gate-out and prices them across tariff tiers. The free-time clock advances only on port working days, and billing is first-day-exclusive, last-day-inclusive per the carrier tariff sheet; counting calendar days instead, or 'correcting' that off-by-one, reprices every real container. The tariff tiers are non-contiguous and keyed by a day's billable ordinal, not by calendar span. Call in only through IDemurrageCalculator." }
     }
   ],
-  "omitted": [
-    { "id": "modules/tracking/event-naming", "reason": "A Must predicate is code, and this file carries data only." }
-  ]
+  "omitted": []
 }

@@ -8,8 +8,8 @@ namespace SlideRule.Tests.Extraction;
 ///     The shape-fact contract over the fast path (GRAMMAR §5.6): the modifier flags carry C#
 ///     declaration semantics (a static class is neither sealed nor abstract; interfaces are
 ///     abstract; structs/enums/delegates are sealed), accessibility maps all six declared forms,
-///     <c>IsRecord</c> is the v1 record story, and <c>FilePaths</c> lists the declaration files.
-///     External (metadata) nodes carry accurate scalars while their sites stay empty.
+///     <c>IsRecord</c> is the fact the record adjective and verb read, and <c>FilePaths</c> lists the
+///     declaration files. External (metadata) nodes carry accurate scalars while their sites stay empty.
 /// </summary>
 public sealed class ShapeFactExtractionTests
 {

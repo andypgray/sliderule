@@ -47,6 +47,10 @@ public sealed class OneProjectDecidabilityTests
         "Selects other types by attribute, and a project compiled against another's assembly does not see "
         + "every attribute its source declares.";
 
+    private const string Records =
+        "Selects other types by whether they are records, and a project compiled against another's assembly "
+        + "does not see that a record struct is one.";
+
     private const string Under =
         "Selects other types by the files declaring them, and a project compiled against another's assembly does "
         + "not see its source files.";
@@ -291,6 +295,57 @@ public sealed class OneProjectDecidabilityTests
         // Act + Assert
         ShouldAllClassifyAs(
             shapes, AttributedWith, "AttributedWith read over the whole solution but not classified as such");
+    }
+
+    [Fact]
+    public void Classify_RecordsOnTheSubject_AndTheRecordVerb_AreDecidable()
+    {
+        // The subject's own types are the ones this rule reports at, and this project compiled them, so a
+        // record struct among them still shows as one; the verb reads the subject alone.
+        OneProjectVerdict bare = Enforcing(arch => arch.Types.ThatAreRecords().MustBeSealed());
+        OneProjectVerdict inALayer = Enforcing(arch => arch.Layer("Messages", arch.Types.ThatAreRecords())
+            .MustBeSealed());
+        OneProjectVerdict verb = Enforcing(arch => arch.Types.MustBeRecords());
+
+        bare.Reason.ShouldBeNull();
+        inALayer.Reason.ShouldBeNull();
+        verb.Reason.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Classify_RecordsReadOverTheWholeSolution_ReportsTheRecordsReason()
+    {
+        // Arrange — the record adjective's three readings over other types, and an inbound verb, whose violations are
+        // sited in the referrer's code rather than at the subject's declaration.
+        (string Where, Func<Arch, Constraint> Rule)[] shapes =
+        [
+            ("in an operand", arch => arch.Types.MustNotReference(arch.Types.ThatAreRecords())),
+            ("in an Except payload of the subject", arch => arch.Types.Except(arch.Types.ThatAreRecords()).MustBeSealed()),
+            ("in a layer definition an operand names",
+                arch => arch.Types.MustNotReference(arch.Layer("Messages", arch.Types.ThatAreRecords()))),
+            ("on the subject of an inbound verb",
+                arch => arch.Types.ThatAreRecords().MustNotBeReferencedBy(arch.Namespace("App.Web.*")))
+        ];
+
+        // Act + Assert
+        ShouldAllClassifyAs(shapes, Records, "A records read over the whole solution but not classified as such");
+    }
+
+    [Fact]
+    public void Classify_SealedStaticAndAbstract_AreDecidableWhereverTheyStand()
+    {
+        // Arrange — scalar flags another project's image carries as its source declares them, so even read
+        // over other types they answer as a check over the whole solution does.
+        (string Where, Func<Arch, Constraint> Rule)[] shapes =
+        [
+            ("sealed in an operand", arch => arch.Types.MustNotReference(arch.Types.ThatAreSealed())),
+            ("static in an Except payload", arch => arch.Types.Except(arch.Types.ThatAreStatic()).MustBeSealed()),
+            ("abstract on an inbound subject",
+                arch => arch.Types.ThatAreAbstract().MustNotBeReferencedBy(arch.Namespace("App.Web.*")))
+        ];
+
+        // Act + Assert
+        ShouldAllClassifyAs(shapes, null, "A shape adjective left to the whole solution");
     }
 
     [Fact]

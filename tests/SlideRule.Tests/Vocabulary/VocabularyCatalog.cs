@@ -87,11 +87,15 @@ internal static class VocabularyCatalog
                 arch => arch.Types.AttributedWith(typeof(ApiControllerAttribute))),
             TypeAdjective(nameof(SelectionAdjectives.Except), arch => arch.Types.Except(arch.Type<HandlerRegistry>())),
             TypeAdjective(nameof(SelectionAdjectives.Where),
-                arch => arch.Types.Where(type => type.IsRecord, description: "that are records")),
+                arch => arch.Types.Where(type => type.Interfaces.Count > 3, description: "that implement more than three interfaces")),
             TypeAdjective(nameof(SelectionAdjectives.Authored), arch => arch.Types.Authored()),
             TypeAdjective(nameof(SelectionAdjectives.ThatArePublic), arch => arch.Types.ThatArePublic()),
             TypeAdjective(nameof(SelectionAdjectives.ThatAreInternal), arch => arch.Types.ThatAreInternal()),
-            TypeAdjective(nameof(SelectionAdjectives.ThatArePrivate), arch => arch.Types.ThatArePrivate())
+            TypeAdjective(nameof(SelectionAdjectives.ThatArePrivate), arch => arch.Types.ThatArePrivate()),
+            TypeAdjective(nameof(SelectionAdjectives.ThatAreSealed), arch => arch.Types.ThatAreSealed()),
+            TypeAdjective(nameof(SelectionAdjectives.ThatAreStatic), arch => arch.Types.ThatAreStatic()),
+            TypeAdjective(nameof(SelectionAdjectives.ThatAreAbstract), arch => arch.Types.ThatAreAbstract()),
+            TypeAdjective(nameof(SelectionAdjectives.ThatAreRecords), arch => arch.Types.ThatAreRecords())
         ];
     }
 
@@ -142,6 +146,7 @@ internal static class VocabularyCatalog
             TypeVerb(nameof(SelectionConstraints.MustBeSealed), arch => arch.Types.MustBeSealed()),
             TypeVerb(nameof(SelectionConstraints.MustBeStatic), arch => arch.Types.MustBeStatic()),
             TypeVerb(nameof(SelectionConstraints.MustBeAbstract), arch => arch.Types.MustBeAbstract()),
+            TypeVerb(nameof(SelectionConstraints.MustBeRecords), arch => arch.Types.MustBeRecords()),
             TypeVerb(nameof(SelectionConstraints.MustBePublic), arch => arch.Types.MustBePublic()),
             TypeVerb(nameof(SelectionConstraints.MustBeInternal), arch => arch.Types.MustBeInternal()),
             TypeVerb(nameof(SelectionConstraints.Must),

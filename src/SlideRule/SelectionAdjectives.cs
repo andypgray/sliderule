@@ -35,7 +35,8 @@ public static class SelectionAdjectives
     ///     Narrows the selection to the types of one kind, such as
     ///     <c>arch.Types.OfKind(TypeKind.Interface)</c>. The kinds are class, interface, struct, enum and
     ///     delegate; a value outside them is refused at the call. There is no record kind: select records
-    ///     with <see cref="Where" /> over <c>IsRecord</c> on <see cref="ITypeInfo" />.
+    ///     with <see cref="ThatAreRecords" />, which composes with this, so
+    ///     <c>arch.Types.OfKind(TypeKind.Struct).ThatAreRecords()</c> reads "record structs".
     /// </summary>
     public static Selection OfKind(this Selection selection, TypeKind kind)
     {
@@ -322,11 +323,11 @@ public static class SelectionAdjectives
 
     /// <summary>
     ///     Narrows the selection with a predicate of your own, for what the adjectives cannot say:
-    ///     <c>arch.Types.Where(t =&gt; t.IsRecord, description: "that are records")</c>. The predicate
-    ///     reads the facts on <see cref="ITypeInfo" /> and runs against each candidate type when the check
-    ///     runs, never when the spec is loaded. <paramref name="description" /> is required and completes
-    ///     the subject as a relative clause ("that are records"); it is rendered verbatim in the generated
-    ///     agent context in place of the wording an adjective would produce, last in the clause list, and
+    ///     <c>arch.Types.Where(t =&gt; t.Interfaces.Count &gt; 3, description: "with many interfaces")</c>.
+    ///     The predicate reads the facts on <see cref="ITypeInfo" /> and runs against each candidate type when
+    ///     the check runs, never when the spec is loaded. <paramref name="description" /> is required and
+    ///     completes the subject as a relative clause ("with many interfaces"); it is rendered verbatim in the
+    ///     generated agent context in place of the wording an adjective would produce, last in the clause list, and
     ///     nothing checks that it describes what the predicate does. A blank or multi-line description is
     ///     reported when the spec is loaded.
     /// </summary>
@@ -401,6 +402,56 @@ public static class SelectionAdjectives
     public static Selection ThatArePrivate(this Selection selection)
     {
         return Append(selection, new AccessibilityAdjective(Accessibility.Private));
+    }
+
+    /// <summary>
+    ///     Narrows the selection to the types declared <c>sealed</c>, such as
+    ///     <c>arch.Types.InNamespace("MyApp.*").ThatAreSealed()</c>. C# declaration semantics apply, so a
+    ///     struct, an enum and a delegate are sealed, while a static class is not. It reads as a premodifier
+    ///     in the rendered sentence ("sealed types in <c>MyApp.*</c>") and composes with
+    ///     <see cref="OfKind" />, giving "sealed classes". <c>.Except(arch.Types.ThatAreSealed())</c> leaves
+    ///     them out instead.
+    /// </summary>
+    public static Selection ThatAreSealed(this Selection selection)
+    {
+        return Append(selection, new ThatAreSealedAdjective());
+    }
+
+    /// <summary>
+    ///     Narrows the selection to the types declared <c>static</c>, such as
+    ///     <c>arch.Types.InNamespace("MyApp.*").ThatAreStatic()</c>. It reads as a premodifier in the
+    ///     rendered sentence ("static types in <c>MyApp.*</c>"). Most often it is wanted the other way round:
+    ///     a rule about concrete classes leaves static and abstract ones out with
+    ///     <c>.Except(arch.Types.ThatAreStatic(), arch.Types.ThatAreAbstract())</c>, which renders ", except
+    ///     static types or abstract types".
+    /// </summary>
+    public static Selection ThatAreStatic(this Selection selection)
+    {
+        return Append(selection, new ThatAreStaticAdjective());
+    }
+
+    /// <summary>
+    ///     Narrows the selection to the types declared <c>abstract</c>, such as
+    ///     <c>arch.Types.InNamespace("MyApp.*").ThatAreAbstract()</c>. C# declaration semantics apply, so an
+    ///     interface is abstract, while a static class is not. It reads as a premodifier in the rendered
+    ///     sentence ("abstract types in <c>MyApp.*</c>") and composes with <see cref="OfKind" />, giving
+    ///     "abstract classes". <c>.Except(arch.Types.ThatAreAbstract())</c> leaves them out instead.
+    /// </summary>
+    public static Selection ThatAreAbstract(this Selection selection)
+    {
+        return Append(selection, new ThatAreAbstractAdjective());
+    }
+
+    /// <summary>
+    ///     Narrows the selection to the types declared as a <c>record</c>, either a record class or a record
+    ///     struct, such as <c>arch.Types.InNamespace("MyApp.Messages.*").ThatAreRecords()</c>. It reads as a
+    ///     premodifier in the rendered sentence ("record types in <c>MyApp.Messages.*</c>") and composes with
+    ///     <see cref="OfKind" />, giving "record structs". To require records rather than select them, use
+    ///     <see cref="SelectionConstraints.MustBeRecords" />.
+    /// </summary>
+    public static Selection ThatAreRecords(this Selection selection)
+    {
+        return Append(selection, new ThatAreRecordsAdjective());
     }
 
     // One operand stays the bare payload, never a union of one; several become the union arch.AnyOf would

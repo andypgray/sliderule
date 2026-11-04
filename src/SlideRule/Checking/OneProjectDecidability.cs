@@ -57,6 +57,10 @@ internal static class OneProjectDecidability
         "Selects other types by attribute, and a project compiled against another's assembly does not see "
         + "every attribute its source declares.";
 
+    private const string RecordReason =
+        "Selects other types by whether they are records, and a project compiled against another's assembly "
+        + "does not see that a record struct is one.";
+
     private const string UnderReason =
         "Selects other types by the files declaring them, and a project compiled against another's assembly does "
         + "not see its source files.";
@@ -379,6 +383,9 @@ internal static class OneProjectDecidability
             typeof(InNamespaceAdjective),
             typeof(OfKindAdjective),
             typeof(AccessibilityAdjective),
+            typeof(ThatAreSealedAdjective),
+            typeof(ThatAreStaticAdjective),
+            typeof(ThatAreAbstractAdjective),
             typeof(WithSuffixAdjective),
             typeof(WithPrefixAdjective),
             typeof(WithNameMatchingAdjective),
@@ -387,13 +394,14 @@ internal static class OneProjectDecidability
             typeof(DerivedFromAdjective),
             typeof(ExceptAdjective));
 
-        // The side-keyed adjective rows: what each costs depends on whose types it is filtering. Neither of
-        // these two is rescued by polarity — a filter that can answer either way over another project's types
+        // The side-keyed adjective rows: what each costs depends on whose types it is filtering. None of
+        // these is rescued by polarity — a filter that can answer either way over another project's types
         // both admits types the whole solution excludes and excludes ones it admits.
         OutOnTargetSide(rows, AuthoredReason, typeof(AuthoredAdjective));
         OutOnTargetSide(rows, AttributedWithReason, typeof(AttributedWithAdjective));
+        OutOnTargetSide(rows, RecordReason, typeof(ThatAreRecordsAdjective));
 
-        // The third side-keyed row. The own project's types carry the paths of the files that declare them, so a
+        // A side-keyed row of its own. The own project's types carry the paths of the files that declare them, so a
         // glob over them is decidable; another project's carry none here, so a glob can only exclude them. A ban
         // would survive that, but an allow-list and an Except payload, which stand on the same side, would not, and
         // the row keys on the side rather than on which of the three a position is.
@@ -432,6 +440,7 @@ internal static class OneProjectDecidability
             typeof(MustBeSealedConstraint),
             typeof(MustBeStaticConstraint),
             typeof(MustBeAbstractConstraint),
+            typeof(MustBeRecordsConstraint),
             typeof(MustBePublicConstraint),
             typeof(MustBeInternalConstraint),
             typeof(MustOnlyReferenceItselfConstraint),

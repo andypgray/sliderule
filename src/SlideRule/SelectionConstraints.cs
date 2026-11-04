@@ -1033,6 +1033,16 @@ public static class SelectionConstraints
     }
 
     /// <summary>
+    ///     States that every type in the subject is declared as a <c>record</c>, either a record class or a
+    ///     record struct, such as <c>arch.Types.InNamespace("MyApp.Messages.*").MustBeRecords()</c>. Takes
+    ///     no arguments.
+    /// </summary>
+    public static Constraint MustBeRecords(this Selection subject)
+    {
+        return new MustBeRecordsConstraint(subject);
+    }
+
+    /// <summary>
     ///     States that every type in the subject is declared <c>public</c>. The test is the type's own
     ///     declared accessibility rather than whether it can be reached, so a <c>public</c> type nested in
     ///     an <c>internal</c> one counts as public. Takes no arguments.

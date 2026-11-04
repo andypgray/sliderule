@@ -57,7 +57,7 @@ public sealed class OperationsArchitectureSpec : IArchitectureSpec
             .Because("Tracking is the leaf of the module graph: it owns the shipment milestone timeline that every other module reads and depends on no module in turn, so nothing it does can pull another module's state into that shared source of truth.");
 
         arch.Rule("modules/tracking/event-naming")
-            .Enforce(tracking.WithSuffix("Event").Must(t => t.IsRecord, description: "be declared as records"))
+            .Enforce(tracking.WithSuffix("Event").MustBeRecords())
             .Because("The `*Event` values are what tracking projects across the module boundary and, later, onto a bus; declaring them as records makes them immutable and compared by value, so an event cannot be mutated after it is published or matched by reference identity.")
             .Fix("Declare the `*Event` type as a `record`.");
 

@@ -67,8 +67,7 @@ public sealed class QuotingArchitectureSpec : IArchitectureSpec
             .Fix("Move the `*Repository` interface into Meridian.Quoting.Domain; leave the implementation in Meridian.Quoting.Infrastructure.");
 
         arch.Rule("messaging/immutable-messages")
-            .Enforce(arch.Types.InNamespace("Meridian.Quoting.Application.Messages.*")
-                         .Must(t => t.IsRecord, description: "be declared as records"))
+            .Enforce(arch.Types.InNamespace("Meridian.Quoting.Application.Messages.*").MustBeRecords())
             .Because("Commands, queries, and the views they return are values that cross the dispatch boundary; record equality and init-only members keep a message from being mutated after it is sent.")
             .Fix("Declare the type as a `record` (or `record struct`).");
 

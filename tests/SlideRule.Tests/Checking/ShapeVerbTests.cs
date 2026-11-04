@@ -55,6 +55,8 @@ public sealed class ShapeVerbTests
                                      public abstract class AbstractThing {}
                                      internal class InternalThing {}
                                      public class PublicThing {}
+                                     public record RecordThing(int Id);
+                                     public record struct RecordStructThing(int Id);
                                  }
                                  """;
 
@@ -226,6 +228,8 @@ public sealed class ShapeVerbTests
     [InlineData("MustBeAbstract", "Abstract", "Sealed", "App.Shape.SealedThing")]
     [InlineData("MustBePublic", "Public", "Internal", "App.Shape.InternalThing")]
     [InlineData("MustBeInternal", "Internal", "Public", "App.Shape.PublicThing")]
+    // The green prefix holds a record class and a record struct, so both kinds of record pass.
+    [InlineData("MustBeRecords", "Record", "Open", "App.Shape.OpenThing")]
     public void ShapeVerb_HoldsForTheGreenPrefix_FlagsTheRedPrefix(
         string verb, string green, string red, string flagged)
     {
@@ -319,7 +323,7 @@ public sealed class ShapeVerbTests
             ViolationKind.RuleError, "the `Where` predicate threw Exception", "boom");
     }
 
-    private static Constraint ShapeVerb(Selection subject, string verb)
+    internal static Constraint ShapeVerb(Selection subject, string verb)
     {
         return verb switch
         {
@@ -328,6 +332,7 @@ public sealed class ShapeVerbTests
             "MustBeAbstract" => subject.MustBeAbstract(),
             "MustBePublic" => subject.MustBePublic(),
             "MustBeInternal" => subject.MustBeInternal(),
+            "MustBeRecords" => subject.MustBeRecords(),
             _ => throw new ArgumentOutOfRangeException(nameof(verb), verb, "No shape verb has this name.")
         };
     }

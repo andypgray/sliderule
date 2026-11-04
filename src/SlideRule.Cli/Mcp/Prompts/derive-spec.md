@@ -170,8 +170,8 @@ Then draft one candidate for each question the codebase answers yes to, and answ
 
 - **`layering`: Which layer must never reach which?** `domain.MustNotReference(web)`, one rule per pair, for every clean pair no project reference already forbids and every pair a stated-intent line names. Not for peers whose order nobody has stated: that is the family law below.
 - **`externals`: Which externals are banned, and from where?** `web.MustNotReference(arch.Namespace("System.Data.*"))`. Use a namespace pattern, not `typeof`: a `typeof` target that does not exist passes silently (absence is the win condition), while a pattern that matches nothing raises an inert warning. Not for an external the code reaches everywhere on purpose.
-- **`naming`: Do names follow a convention?** `arch.Project("MyApp").OfKind(TypeKind.Interface).MustHavePrefix("I")`, handler types `MustHaveSuffix("Handler")`, `MustBeSealed()` where the convention looks intended, after asking which way inheritance runs: virtual members and protected fields mean the contract is derivation, and a seal rule reds the design. Not for a pattern a few types share by accident.
-- **`async`: Are async methods named `*Async`?** `web.Methods.Returning(typeof(Task), typeof(Task<>)).MustHaveSuffix("Async")`, where the codebase names them so. **On an MVC estate, take the controllers out first** — `web.Except(arch.Types.DerivedFrom("Microsoft.AspNetCore.Mvc.ControllerBase")).Methods.Returning(typeof(Task), typeof(Task<>)).MustHaveSuffix("Async")`, or `System.Web.Mvc.Controller` on .NET Framework — because action methods are named for the routes they serve and usually carry no `Async` suffix, and they can be nearly every violation the rule reports.
+- **`naming`: Do names follow a convention?** `arch.Project("MyApp").OfKind(TypeKind.Interface).MustHavePrefix("I")`, handler types `MustHaveSuffix("Handler")`, `MustBeSealed()` on classes `.Except(arch.Types.ThatAreAbstract(), arch.Types.ThatAreStatic())` where the convention looks intended, after asking which way inheritance runs: virtual members and protected fields mean the contract is derivation, and a seal rule reds the design. Not for a pattern a few types share by accident.
+- **`async`: Are async methods named `*Async`?** `web.Methods.Returning(typeof(Task), typeof(Task<>)).MustHaveSuffix("Async")`, where the codebase names them so. **On an MVC estate, take the controllers out first** — `web.Except(arch.Types.DerivedFrom("Microsoft.AspNetCore.Mvc.ControllerBase")).Methods.Returning(typeof(Task), typeof(Task<>)).MustHaveSuffix("Async")`, or `System.Web.Mvc.Controller` on .NET Framework — because action methods are named for their routes and can be nearly every violation the rule reports.
 - **`cancellation`: Do `Task`-returning methods take a `CancellationToken`?** `web.Methods.Returning(typeof(Task), typeof(Task<>)).MustAcceptParameter(typeof(CancellationToken))`, where most already do. Matching is declaration-level and exact (a `CancellationToken?` parameter does not count), and whether a body *flows* the token is not this rule's question.
 - **`members`: Which members are banned?** `domain.MustNotUse(() => DateTime.Now, () => DateTime.UtcNow)` where timestamps persist or compare and a clock seam exists; likewise blocking waits on async paths (`arch.Member(typeof(Task), "Wait")`) and ambient configuration (`Environment.GetEnvironmentVariable`) where a settings type exists. Not for a member the code has no alternative to.
 - **`attributes`: Must a set of types or actions carry an attribute?** `web.WithSuffix("Controller").MustBeAttributedWith("MyApp.Web.AuthorizeAdminAttribute")`, where a guide prescribes one (authorization, area, antiforgery) or nearly every member of the set carries it; on actions, `web.Methods.AttributedWith("Microsoft.AspNetCore.Mvc.HttpPostAttribute").MustBeAttributedWith(…)`. Not for what a framework convention applies unwritten. Only attributes declared on the type itself count. For one a shared base declares, rule that the set `MustDeriveFrom` the base and the base `MustBeAttributedWith` it. Concrete intermediate bases are subjects too.
@@ -251,7 +251,7 @@ The step-4 counts decide each rule's posture, and the posture goes into the code
 - **Nothing the team would stand behind → drop the rule**, with the reason for `dropped:`.
 - **Work the team has said it is doing now, or a rule step 4 left `undecided` → leave it as drafted** (`Enforce`, or the scope as written). The team has said so only in a stated-intent line or in the human's own words this session; a red with neither takes the posture its evidence sets, `Migrate`. Which of these reach `leftRed:` is the last check's to say, through the receipt's transcription rule.
 
-Then rebuild the spec project and run the whole check again. That document is what the receipt transcribes, and it is this step's test: every rule it shows with `posture: enforce` and `status: failed` must be one of the last bullet's two kinds. Any other is a miss: re-posture it, fence it or drop it, rebuild, and check again. A different posture you would argue for belongs in the curation table's note; the code carries the one the evidence set, the sampled sites and the re-read statement included.
+Then rebuild the spec project and run the whole check again. That document is what the receipt transcribes, and it is this step's test: every rule it shows with `posture: enforce` and `status: failed` must be one of the last bullet's two kinds. Any other is a miss: re-posture it, fence it or drop it, rebuild, and check again.
 
 **Done when** the last whole check passes that test.
 
@@ -385,11 +385,15 @@ line.
 | `.DerivedFrom` | `(Type)` · `(string)` · `<T>()` | Types derived from `ControllerBase` |
 | `.AttributedWith` | `(Type)` · `(string)` · `<T>()` | Types attributed with `[ApiController]` |
 | `.Except` | `(Selection, …)` · `(Type, …)` | Types, except `HandlerRegistry` |
-| `.Where` | `(Func<ITypeInfo, bool>, string)` | Types that are records |
+| `.Where` | `(Func<ITypeInfo, bool>, string)` | Types that implement more than three interfaces |
 | `.Authored` | `()` | Authored types |
 | `.ThatArePublic` | `()` | Public types |
 | `.ThatAreInternal` | `()` | Internal types |
 | `.ThatArePrivate` | `()` | Private types |
+| `.ThatAreSealed` | `()` | Sealed types |
+| `.ThatAreStatic` | `()` | Static types |
+| `.ThatAreAbstract` | `()` | Abstract types |
+| `.ThatAreRecords` | `()` | Record types |
 
 | Verb | Overloads | Fragment |
 |---|---|---|
@@ -427,6 +431,7 @@ line.
 | `.MustBeSealed` | `()` | must be sealed |
 | `.MustBeStatic` | `()` | must be static |
 | `.MustBeAbstract` | `()` | must be abstract |
+| `.MustBeRecords` | `()` | must be records |
 | `.MustBePublic` | `()` | must be public |
 | `.MustBeInternal` | `()` | must be internal |
 | `.Must` | `(Func<ITypeInfo, bool>, string)` | must keep type names at or under 40 characters |
@@ -530,7 +535,8 @@ types and on members alike. `.Authored()` drops generated types on two signals: 
 the type or its container, or declared only in files a source generator emitted or that open with an
 `<auto-generated>` banner. `.ThatArePublic()` / `.ThatAreInternal()` / `.ThatArePrivate()` read
 declared accessibility, and `.Except(arch.Types.ThatArePrivate())` is how a subject drops private
-nested types.
+nested types. The shape adjectives `.ThatAreSealed()`, `.ThatAreStatic()`, `.ThatAreAbstract()` and
+`.ThatAreRecords()` mirror the shape verbs.
 
 **Verbs** — `MustNotBeReferencedBy` and `MustOnlyBeReferencedBy` are the inbound pair. `MustNotCatch`
 bans every `catch` clause naming the target; `MustNotCatchUnfiltered` reaches only the clauses that
@@ -538,7 +544,7 @@ carry no `when` filter, and `MustNotSwallow` only those that neither filter nor 
 `throw`. `MustNotExpose` bans surfacing a type on the public API. `MustResideInNamespace(glob)` and
 `MustResideInProject(name)` are the residence pair (one project name, and any declarer satisfies it),
 and `MustBelongTo(membership, ...)` is the coverage verb over several memberships (layers, projects,
-namespaces), with deliberately no `typeof` membership.
+namespaces), with no `typeof` membership.
 `MustHaveExactlyOneCounterpart(among: selection, named: "I{Name}")` demands, per subject, exactly one
 type in `among:` whose name is the template with `{Name}` replaced by the subject's simple name; zero
 and several are both red. Write `among:` and `named:` as named arguments at every call site, and union
@@ -548,15 +554,14 @@ checker cannot see reds a correctly registered type. `MustImplement`, `MustDeriv
 `MustBeAttributedWith` take one anchor; `MustNotImplement`, `MustNotDeriveFrom` and
 `MustNotBeAttributedWith` take one or more and red a subject matching any of them.
 `MustHaveNameMatching(glob)` is the glob form beside the suffix and prefix verbs. The shape verbs
-`MustBeStatic`, `MustBeAbstract`, `MustBePublic` and `MustBeInternal` carry C# declaration semantics:
+`MustBeStatic`, `MustBeAbstract`, `MustBeRecords`, `MustBePublic` and `MustBeInternal` carry C# declaration semantics:
 a static class is neither sealed nor abstract, and an interface is abstract.
 
 **Member and project subjects** — The member verbs reuse the type-side names, with six of their own:
 `MustBeProtected`, `MustBePrivate`, `MustBeVirtual` and `MustBeOverridable` (an unsealed override passes it)
 have no type-side twin, `MustBeGetOnly()` chains only off
-`.Properties` and is strict about the declaration (an `init`-only setter is a setter, so it reds), and
-`MustBeReadonly()` chains only off `.Fields` (a `const` field satisfies it, const being readonly's
-superset). `.ThatAreStatic()` prefixes the subject head ("static fields of ..."), as does each
+`.Properties` and is strict about the declaration (an `init` setter reds), and
+`MustBeReadonly()` chains only off `.Fields` (a `const` field satisfies it). `.ThatAreStatic()` prefixes the subject head ("static fields of ..."), as does each
 accessibility adjective, which on members also has `.ThatAreProtected()`, `.ThatAreProtectedInternal()`
 and `.ThatArePrivateProtected()`, each matching its level exactly; `.Named(name, ...)` picks
 members by exact name ("`Main` methods of ..."), and `.Except(memberSelection, ...)` exempts members a
@@ -566,10 +571,8 @@ except both to report only the owner. The flagship:
 `web.Methods.Returning(typeof(Task)).MustHaveSuffix("Async")` — *"Methods returning `Task` declared in
 types in `MyApp.Web.*` must be named `*Async`."* `arch.Projects` names the solution's projects as build
 artifacts (`arch.Project(name)` is the unrelated type noun).
-`.Matching(glob, ...)` reads `*` over one token, because a project name carries no dot-segment
-structure, and `.Packable()` is the projects an evaluation reported packable.
-`MustOnlyTarget(tfm, ...)` is strict, with no external exemption, because a project's frameworks are
-a closed set, and `MustTarget(tfm)` states the floor; `MustLockPackages()` reads
+`.Matching(glob, ...)` reads `*` over one token, a project name having no dot segments, and `.Packable()` is the projects an evaluation reported packable.
+`MustOnlyTarget(tfm, ...)` is strict, a project's frameworks being a closed set, and `MustTarget(tfm)` states the floor; `MustLockPackages()` reads
 `RestorePackagesWithLockFile`; `MustReferenceNoPackages()` passes only private references, whose
 `PrivateAssets` is `all` (analyzers and build tooling), `MustOnlyReferencePackages(glob, ...)` adds an
 allow-list to it, and `MustNotReferencePackages(glob, ...)` bans packages, private ones included, both
@@ -593,10 +596,9 @@ and interface closure are walked through metadata, so
 string always names the **definition**, so it reads like the open-generic `typeof` form
 (`"IHandler<T>"` matches every construction) and a constructed spelling matches nothing.
 
-The generic twins (`<T>` beside a `typeof` form, and the lambda anchors beside a `typeof`/`nameof`
-one) are pure sugar and reify identically; a twin needs the same compile-time reference the
-`typeof` does, so where you cannot have one, use the string overload rather than reaching for
-`<T>`. An **open** generic has no type-argument form, so it stays `typeof`
+The generic twins (`<T>` beside `typeof`, and the lambda anchors beside `typeof`/`nameof`) reify
+identically and need the same compile-time reference, so where you cannot have one, use the string
+overload. An **open** generic has no type-argument form, so it stays `typeof`
 (`Implementing(typeof(IHandler<>))`, `.Returning(typeof(Task<>))`), and `.Returning` has no `<T>`
 twin at all. An anchor list is all-`typeof` or all-string and never a mix, so a return-type list
 that reaches for a shared-framework type is spelled all-string, the open generic written with its
@@ -619,8 +621,7 @@ rules — the canonical page the reason rests on, an absolute `http`/`https` URL
 descriptions are relative clauses continuing the noun ("whose name contains a digit"); `Must`
 descriptions are bare-infinitive phrases completing "must …" ("keep type names at or under 40
 characters"). The predicate sees `ITypeInfo`: `Name`, `Namespace`, `Kind`, `ProjectName`,
-`Accessibility`, `IsSealed`, `IsStatic`, `IsAbstract`, `IsRecord` (how record rules are
-written), `FilePaths`, attributes, base type, interfaces. On a member subject it sees `IMemberInfo`:
+`Accessibility`, `IsSealed`, `IsStatic`, `IsAbstract`, `IsRecord`, `FilePaths`, attributes, base type, interfaces. On a member subject it sees `IMemberInfo`:
 `Name`, `Kind`, `DeclaringType`, `Accessibility`, `IsStatic`, `IsVirtual`, `IsOverride`, `IsSealed`,
 `IsAsync`, `IsConst`, `IsReadOnly`, `ReturnTypeFullName`, `Parameters`, attributes, so a constants law
 is a `.Where(m => m.IsConst, "that are constants")` away.
@@ -661,9 +662,8 @@ the same way. On a family (`arch.Each`) both read the subject per cell — the w
 project a type sits in, as declared — so a cell's own `Except`-ed types still count as its own,
 and `MustOnlyBeReferencedByItself()` is the leaf where the source list is empty. `MustOnlyThrow` is stricter
 still: external thrown types ARE constrained (no type must throw a BCL exception), so its
-sentence carries no exemption; `MustNotThrow` is its ban twin, and a spec may carry either or
-both. All five exception verbs match their operands exactly — banning `Exception` never flags a
-narrower catch or a derived throw, which is the good state — and the three catch verbs key the
+sentence carries no exemption; `MustNotThrow` is its ban twin. All five exception verbs match their operands exactly (banning `Exception` never flags a
+narrower catch or a derived throw), and the three catch verbs key the
 same (source, caught) edge, so a baseline entry means the same thing under any of them.
 `Implementing`/`DerivedFrom`
 are transitive with type-argument substitution; an open generic (`typeof(IHandler<>)`)

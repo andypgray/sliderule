@@ -487,6 +487,16 @@ internal sealed class SelectionEvaluator
                 // through containers — the same fact ITypeInfo reports and MustBePublic tests, so the
                 // adjective and the verb cannot disagree about one type.
                 return t => t.Accessibility == accessibility.Accessibility;
+            // The flags MustBeSealed, MustBeStatic, MustBeAbstract and MustBeRecords test, so an adjective and
+            // its verb cannot disagree about one type.
+            case ThatAreSealedAdjective:
+                return t => t.IsSealed;
+            case ThatAreStaticAdjective:
+                return t => t.IsStatic;
+            case ThatAreAbstractAdjective:
+                return t => t.IsAbstract;
+            case ThatAreRecordsAdjective:
+                return RecordShape.Matches;
             case UnderAdjective under:
                 // Any declaring file under any glob (GRAMMAR §5.2): a partial type is where any of its files
                 // is, and an external type, declared in no file of the solution, is under nothing.

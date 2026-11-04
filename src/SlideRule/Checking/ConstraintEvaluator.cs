@@ -258,6 +258,8 @@ internal sealed class ConstraintEvaluator
                 return Shape(subjects, t => t.IsStatic);
             case MustBeAbstractConstraint:
                 return Shape(subjects, t => t.IsAbstract);
+            case MustBeRecordsConstraint:
+                return Shape(subjects, RecordShape.Matches);
             case MustBePublicConstraint:
                 return Shape(subjects, t => t.Accessibility == Accessibility.Public);
             case MustBeInternalConstraint:

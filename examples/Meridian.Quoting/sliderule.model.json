@@ -70,6 +70,14 @@
       "constraint": { "node": "mustResideInNamespace", "subject": { "noun": { "node": "types" }, "adjectives": [{ "node": "ofKind", "kind": "interface" }, { "node": "withSuffix", "suffix": "Repository" }] }, "glob": "Meridian.Quoting.Domain.*" }
     },
     {
+      "id": "messaging/immutable-messages",
+      "posture": "enforce",
+      "sentence": "Types in `Meridian.Quoting.Application.Messages.*` must be records.",
+      "because": "Commands, queries, and the views they return are values that cross the dispatch boundary; record equality and init-only members keep a message from being mutated after it is sent.",
+      "fix": "Declare the type as a `record` (or `record struct`).",
+      "constraint": { "node": "mustBeRecords", "subject": { "noun": { "node": "types" }, "adjectives": [{ "node": "inNamespace", "glob": "Meridian.Quoting.Application.Messages.*" }] } }
+    },
+    {
       "id": "time/injected-clock",
       "posture": "enforce",
       "sentence": "Types in `Meridian.Quoting.*`, except types named `SystemClock`, must not use `DateTime.Now` or `DateTime.UtcNow`.",
@@ -79,7 +87,5 @@
       "constraint": { "node": "mustNotUse", "subject": { "noun": { "node": "types" }, "adjectives": [{ "node": "inNamespace", "glob": "Meridian.Quoting.*" }, { "node": "except", "payload": { "noun": { "node": "types" }, "adjectives": [{ "node": "named", "names": ["SystemClock"] }] } }] }, "members": [{ "declaring": { "name": "System.DateTime" }, "name": "Now", "isMethod": false }, { "declaring": { "name": "System.DateTime" }, "name": "UtcNow", "isMethod": false }] }
     }
   ],
-  "omitted": [
-    { "id": "messaging/immutable-messages", "reason": "A Must predicate is code, and this file carries data only." }
-  ]
+  "omitted": []
 }

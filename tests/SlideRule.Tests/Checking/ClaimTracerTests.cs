@@ -36,6 +36,10 @@ public sealed class ClaimTracerTests
                                         }
                                     }
                                 }
+                                namespace Shop.Messages
+                                {
+                                    public sealed record Placed(int Id);
+                                }
                                 """;
 
     private static readonly CodebaseModel ShopModel = CompilationFactory.ExtractWithDi(("Shop.cs", Shop));
@@ -295,6 +299,14 @@ public sealed class ClaimTracerTests
     [InlineData("authored", "Shop.Domain.Order", true, "it is authored, not generated")]
     [InlineData("public", "Shop.Domain.Order", true, "it is declared public")]
     [InlineData("public", "Shop.Domain.LegacyOrderRepository", false, "it is declared internal, not public")]
+    [InlineData("sealed", "Shop.Messages.Placed", true, "it is declared sealed")]
+    [InlineData("sealed", "Shop.Domain.Order", false, "it is not declared sealed")]
+    [InlineData("static", "Shop.Web.Wiring", true, "it is declared static")]
+    [InlineData("static", "Shop.Domain.Order", false, "it is not declared static")]
+    [InlineData("abstract", "Shop.Domain.IRepository", true, "it is declared abstract")]
+    [InlineData("abstract", "Shop.Domain.Order", false, "it is not declared abstract")]
+    [InlineData("record", "Shop.Messages.Placed", true, "it is declared as a record")]
+    [InlineData("record", "Shop.Domain.Order", false, "it is not declared as a record")]
     [InlineData("where-true", "Shop.Domain.Order", true, "it passes the predicate \"that pass\"")]
     [InlineData("where-false", "Shop.Domain.Order", false, "it fails the predicate \"that fail\"")]
     public void EachAdjective_NamesTheFactThatKeptOrDroppedTheType(string adjective, string fullName, bool kept, string step)
@@ -313,6 +325,10 @@ public sealed class ClaimTracerTests
             "attributed" => arch.Types.AttributedWith("System.SerializableAttribute"),
             "authored" => arch.Types.Authored(),
             "public" => arch.Types.ThatArePublic(),
+            "sealed" => arch.Types.ThatAreSealed(),
+            "static" => arch.Types.ThatAreStatic(),
+            "abstract" => arch.Types.ThatAreAbstract(),
+            "record" => arch.Types.ThatAreRecords(),
             "where-true" => arch.Types.Where(_ => true, "that pass"),
             _ => arch.Types.Where(_ => false, "that fail")
         };

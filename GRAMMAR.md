@@ -1381,11 +1381,15 @@ posture verbs, trailers and escape hatches of §5.4–§5.6 are written by hand.
 | `.DerivedFrom` | `(Type)` · `(string)` · `<T>()` | Types derived from `ControllerBase` |
 | `.AttributedWith` | `(Type)` · `(string)` · `<T>()` | Types attributed with `[ApiController]` |
 | `.Except` | `(Selection, …)` · `(Type, …)` | Types, except `HandlerRegistry` |
-| `.Where` | `(Func<ITypeInfo, bool>, string)` | Types that are records |
+| `.Where` | `(Func<ITypeInfo, bool>, string)` | Types that implement more than three interfaces |
 | `.Authored` | `()` | Authored types |
 | `.ThatArePublic` | `()` | Public types |
 | `.ThatAreInternal` | `()` | Internal types |
 | `.ThatArePrivate` | `()` | Private types |
+| `.ThatAreSealed` | `()` | Sealed types |
+| `.ThatAreStatic` | `()` | Static types |
+| `.ThatAreAbstract` | `()` | Abstract types |
+| `.ThatAreRecords` | `()` | Record types |
 
 | Verb | Overloads | Fragment |
 |---|---|---|
@@ -1423,6 +1427,7 @@ posture verbs, trailers and escape hatches of §5.4–§5.6 are written by hand.
 | `.MustBeSealed` | `()` | must be sealed |
 | `.MustBeStatic` | `()` | must be static |
 | `.MustBeAbstract` | `()` | must be abstract |
+| `.MustBeRecords` | `()` | must be records |
 | `.MustBePublic` | `()` | must be public |
 | `.MustBeInternal` | `()` | must be internal |
 | `.Must` | `(Func<ITypeInfo, bool>, string)` | must keep type names at or under 40 characters |
@@ -1592,7 +1597,7 @@ partition. Pinned semantics:
 
 What the table cannot show, per adjective:
 
-- `.OfKind(TypeKind.Interface)` — noun substitution: "interfaces" (kinds: Class, Interface, Struct, Enum, Delegate; records via escape hatch in v1)
+- `.OfKind(TypeKind.Interface)` — noun substitution: "interfaces" (kinds: Class, Interface, Struct, Enum, Delegate; a record is a class or a struct of its kind, and `.ThatAreRecords()` selects it)
 - `.Named("Program")` — the exact simple name, ordinal (§4.2); "named `A` or `B`" for several. It belongs to the `WithSuffix`/`WithPrefix` family, whose fragments already say *named*, as the member whose fragment carries no `*`; all three match their argument literally
 - `.Under("src/Widgets")` / `.Under("src/*/Internal", "vendor/Compiler.cs")` — the types any one of whose declaring files is under any of the path globs (§4.2): " under `src/Widgets`", " under `A` or `B`" for several, an inline clause after the locative ("types in `Spectre.Console.*` under `src/Spectre.Console/Internal`"). For a codebase whose folders are its only structure, and for one vendored file only a path picks out. What is settled about it:
   - **Root.** Every glob is relative to the solution directory, and in the build analyzer to the model file's directory, which `render` writes beside the solution, so both read one path alike. A run with no directory to read against fails the rule closed, as a rule error, rather than reading the subject as empty.
@@ -1607,6 +1612,7 @@ What the table cannot show, per adjective:
 - `.Where(pred, description:)` — description verbatim — canonicalized to sentence-final (§6)
 - `.Authored()` — head premodifier: "authored types", "authored interfaces" (§6)
 - `.ThatArePublic()` / `.ThatAreInternal()` / `.ThatArePrivate()` — head premodifier: "public types in `MyApp.*`", "internal interfaces". Stacks with `.Authored()` in the order written: "authored public types" (§6). The accessibility the declaration writes, not one computed through containers, so a public type nested in an internal one is public. The adjective half of the family `MustBePublic` / `MustBeInternal` constrain (§5.3). Only a nested type can be private, which is what `.ThatArePrivate()` is for: a nested type reports its container's namespace and answers to its own short name (§4.2), so a namespace-scoped subject reaches it and no name can pick it out again. There is no negated spelling — `.Except(arch.Types.ThatArePrivate())` is how a subject leaves nested state out, and it renders ", except private types"
+- `.ThatAreSealed()` / `.ThatAreStatic()` / `.ThatAreAbstract()` / `.ThatAreRecords()` — head premodifiers naming the declared shape: "sealed types in `MyApp.*`", "abstract classes", "record structs". Each is the adjective half of `MustBeSealed`, `MustBeStatic`, `MustBeAbstract` or `MustBeRecords` (§5.3) and reads the same flag with the same C# declaration semantics (§5.6), so an adjective and its verb never disagree about one type: a static class is neither sealed nor abstract, an interface is abstract, and a struct, an enum and a delegate are sealed. They stack with the other head prefixes in the order written. Their usual place is an `Except` payload, because the subject a shape law wants is most often the types of *no* listed shape: `.OfKind(TypeKind.Class).Except(arch.Types.ThatAreAbstract(), arch.Types.ThatAreStatic())` reads "classes, except abstract types or static types", and no `concrete` adjective ships beside them, because the two exclusions already name the shapes that leave. `.ThatAreRecords()` premodifies rather than substituting the head, as `OfKind` does, so the two compose in either order: "record classes", "record structs". **One project's view.** Sealed, static and abstract are decidable from one project wherever they stand. `.ThatAreRecords()` is decidable on a subject; read over other projects' types, as a target or in an `Except` payload, it is left to the whole solution, because a record struct compiled into another project's assembly no longer shows as a record
 
 `Implementing` auto-detects open generics: `typeof(IHandler<>)` means *any* construction;
 `typeof(IHandler<Order>)` means that construction exactly. Generic rendering uses declared
@@ -1747,6 +1753,7 @@ What the table cannot show, per verb:
 - `.MustImplement(type)` — also anchors by string (§5.2's escape hatch): `MustImplement("MyApp.Web.IHandler<T>")`
 - `.MustDeriveFrom(type)` — string form likewise
 - `.MustBeAttributedWith(type)` — also anchors by string (§5.2's escape hatch): `MustBeAttributedWith("N.XAttribute")`
+- `.MustBeRecords()` — nullary; a record class and a record struct pass, and any other type reds. Decidable from one project: a run over one project's compilation reports only sites in that project's own files, and a type another project declares has none there, so a record struct whose flag the assembly drops is judged only by the build of the project declaring it
 - `.MustNotImplement(type, ...)` — none-of over the anchors; the negatives take `(Type first, params Type[] more)` (§10), and `(string first, params string[] more)` (§5.2), each call's list homogeneous
 - `.MustNotDeriveFrom(type, ...)` — same two arities
 - `.MustNotBeAttributedWith(type, ...)` — anchors bracketed and `Attribute`-stripped like the positive; also `(string first, params string[] more)` (§5.2), each call's list homogeneous
@@ -1805,8 +1812,8 @@ Predicate input contract (`ITypeInfo`): `Name`, `Namespace`, `Kind`, `ProjectNam
 interfaces. The
 contract grows additively as extraction learns new facts. The flags carry C# declaration
 semantics — a static class is neither sealed nor abstract, interfaces are abstract,
-structs/enums/delegates are sealed — and `IsRecord` is how record rules are written in v1
-(§5.2). `IsGenerated` is the fact `.Authored()` filters on (§5.2), readable here so a predicate
+structs/enums/delegates are sealed — and `IsRecord` is the fact `.ThatAreRecords()` and `MustBeRecords` read
+(§5.2, §5.3). `IsGenerated` is the fact `.Authored()` filters on (§5.2), readable here so a predicate
 can combine it with anything else the contract carries.
 
 Member-predicate input contract (`IMemberInfo`, the input to a member `.Where`/`.Must`, §4.6):
@@ -2806,12 +2813,7 @@ macro for the ordering half (the coverage half is `MustBelongTo`, the independen
 other but not in a circle — is `arch.Each(…).MustNotHaveCircularReferences()`, and ordering
 stays explicit `MustNotReference` pairs — N overlapping sentences under one ID would muddy a
 baseline where a partition's cells do not);
-the remaining type-side shape adjectives (`.ThatAreSealed()`, `.ThatAreStatic()`,
-`.ThatAreAbstract()`) — the constraint-side verbs and the `ITypeInfo` flags exist (§5.3, §5.6);
-only the adjective position is missing. The accessibility leg of that entry shipped
-(`.ThatArePublic()` / `.ThatAreInternal()` / `.ThatArePrivate()`, §5.2), on a consumer that could
-not be written without it: a namespace-scoped residency subject that has to leave private nested
-types out, which no name and no glob can reach; a
+a
 `.MayMatchNothing()` opt-out from the fail-on-empty default (§4.1); a `MustBeOfKind` constraint
 twin.
 

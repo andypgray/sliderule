@@ -32,7 +32,7 @@ internal static class VocabularyRemainderSpec
         DefineMemberShapes(arch);
     }
 
-    // The five type-shape modals. Each takes a subject narrow enough that the law reads as one a codebase
+    // The type-shape modals and adjectives. Each takes a subject narrow enough that the law reads as one a codebase
     // could hold, rather than as a blanket claim over every type.
     private static void DefineTypeShapes(Arch arch)
     {
@@ -65,6 +65,22 @@ internal static class VocabularyRemainderSpec
             .Enforce(arch.Types.Under("src/*/Internal", "src/Vendored")
                 .MustBeInternal())
             .Because("A folder is the boundary where one namespace holds everything, and a type in it is free to change.");
+
+        arch.Rule("remainder/messages-are-records")
+            .Enforce(arch.Types.InNamespace("Remainder.Messages.*")
+                .MustBeRecords())
+            .Because("A message is compared by value, which only a record does without code.");
+
+        arch.Rule("remainder/concrete-handlers-are-sealed")
+            .Enforce(arch.Types.InNamespace("Remainder.Handlers.*").OfKind(TypeKind.Class)
+                .Except(arch.Types.ThatAreAbstract(), arch.Types.ThatAreStatic())
+                .MustBeSealed())
+            .Because("A handler nobody may subclass is a handler whose behaviour is the one the registry resolved.");
+
+        arch.Rule("remainder/sealed-records-stay-internal")
+            .Enforce(arch.Types.InNamespace("Remainder.Messages.*").ThatAreSealed().ThatAreRecords()
+                .MustBeInternal())
+            .Because("A sealed message is one this assembly alone constructs.");
     }
 
     // Both directions of the two hierarchy axes.

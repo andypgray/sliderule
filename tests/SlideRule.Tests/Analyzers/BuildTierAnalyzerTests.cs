@@ -1,5 +1,6 @@
 using System.Globalization;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
 using SlideRule.Analyzers;
 using SlideRule.Hosting;
@@ -476,6 +477,30 @@ public sealed class BuildTierAnalyzerTests
 
         broken.ShouldSitAt("Web.cs", 3);
         broken.ShouldCover("OrderController");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task MustBeRecords_ReportsOnlyTheOwnProjectsTypes_WhateverASiblingsRecordStructShowsAs(bool asImage)
+    {
+        // Placed's field puts the sibling's record struct in the one-project model, where whether it shows as a
+        // record depends on the reference kind. It is never reported either way: a sibling type has no
+        // declaration site this build owns, so the one warning is the own project's plain class.
+        CSharpCompilation own = BuildTier.OwnCompilationBeside(
+            "namespace Data;\n\npublic record struct Reading(int Value);\n",
+            asImage,
+            ("Web.cs", "namespace Web;\n\npublic record struct Placed(int Id, Data.Reading Last);\n\npublic class Plain { }\n"));
+        string text = BuildTier.ModelText(arch => arch.Rule("shape/records")
+            .Enforce(arch.Types.MustBeRecords())
+            .Because(SpanBecause));
+
+        IReadOnlyList<Diagnostic> reported = await BuildTier.DiagnoseAsync(
+            own, [BuildTier.ModelFile(text)], cancellationToken: Ct);
+
+        Diagnostic broken = reported.ShouldAllBe("SR2001", 1, "one warning, at the own project's plain class")[0];
+        broken.ShouldSitAt("Web.cs", 5);
+        broken.ShouldCover("Plain");
     }
 
     [Fact]

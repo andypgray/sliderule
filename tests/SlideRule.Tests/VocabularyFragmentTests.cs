@@ -264,6 +264,13 @@ public class VocabularyFragmentTests
     }
 
     [Fact]
+    public void MustBeRecords_RendersFragment()
+    {
+        SentenceRenderer.Sentence(Arch.Types.MustBeRecords())
+            .ShouldBe("Types must be records.");
+    }
+
+    [Fact]
     public void MustBePublic_RendersFragment()
     {
         SentenceRenderer.Sentence(Arch.Types.MustBePublic())
