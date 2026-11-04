@@ -1,3 +1,5 @@
+using System.ComponentModel;
+using System.Diagnostics;
 using System.Text;
 using SlideRule.Internal;
 using SlideRule.Roslyn.Caching;
@@ -20,6 +22,7 @@ internal sealed class HookState
     private const string RoundsFile = "rounds";
     private const string BaselineFile = "baseline";
     private const string SaidFile = "said";
+    private const string CheckFile = "check";
     private const string TreeFile = "tree";
     private const string TreesDirectory = "trees";
     private const string GreenWord = "green";
@@ -29,24 +32,28 @@ internal sealed class HookState
 
     private readonly string? _directory;
     private readonly string _said;
+    private readonly string _check;
 
-    private HookState(string? directory, string said)
+    // A subagent's said and check files carry its id, so they stay apart from the main agent's in one directory.
+    private HookState(string? directory, string? agentId = null)
     {
+        string suffix = agentId is null ? "" : "-" + agentId;
         _directory = directory;
-        _said = said;
+        _said = SaidFile + suffix;
+        _check = CheckFile + suffix;
     }
 
     /// <summary>No state at all.</summary>
-    public static HookState None { get; } = new(null, SaidFile);
+    public static HookState None { get; } = new(null);
 
     /// <summary>Whether there is a directory to keep state in.</summary>
     public bool Stateful => _directory is not null;
 
     /// <summary>
     ///     The state of session <paramref name="sessionId" /> under <paramref name="root" />, in
-    ///     <c>sliderule-hook/&lt;session&gt;</c>, with what was said kept apart for subagent
+    ///     <c>sliderule-hook/&lt;session&gt;</c>, with what was said and the check in flight kept apart for subagent
     ///     <paramref name="agentId" />: a worker's warnings are in the worker's context, not the main agent's
-    ///     (verified 2026-10-20 on Claude Code 2.1.300).
+    ///     (verified 2026-10-20 on Claude Code 2.1.300), and a worker's stop can run beside the main agent's.
     /// </summary>
     /// <returns>The session's state, or <see cref="None" /> when its directory cannot be made.</returns>
     public static HookState Open(string root, string? sessionId, string? agentId)
@@ -54,7 +61,7 @@ internal sealed class HookState
         string directory = Path.Combine(root, "sliderule-hook", sessionId ?? "nosession");
         if (!TryCreate(directory)) return None;
 
-        return new HookState(directory, agentId is null ? SaidFile : $"{SaidFile}-{agentId}");
+        return new HookState(directory, agentId);
     }
 
     /// <summary>
@@ -78,7 +85,7 @@ internal sealed class HookState
         string directory = Path.Combine(_directory, TreesDirectory, identity);
         if (!TryCreate(directory)) return None;
 
-        var tree = new HookState(directory, SaidFile);
+        var tree = new HookState(directory);
         if (tree.ReadTreeName() != topLevel) tree.Write(TreeFile, topLevel + "\n");
 
         return tree;
@@ -102,7 +109,7 @@ internal sealed class HookState
             var recorded = new List<(string TopLevel, HookState State)>();
             foreach (string directory in Directory.EnumerateDirectories(trees))
             {
-                var tree = new HookState(directory, SaidFile);
+                var tree = new HookState(directory);
                 if (tree.ReadTreeName() is { } topLevel) recorded.Add((topLevel, tree));
             }
 
@@ -213,6 +220,88 @@ internal sealed class HookState
     public void ForgetSaid()
     {
         Delete(_said);
+    }
+
+    /// <summary>
+    ///     Marks this agent's check as started by this process, in a file of its own named for a fresh attempt, so
+    ///     that a firing the client kills before <see cref="ClearCheck" /> leaves the mark for a later firing to find,
+    ///     and no firing's mark ever replaces another's.
+    /// </summary>
+    /// <returns>The mark, which <see cref="ClearCheck" /> takes back.</returns>
+    public string StartCheck()
+    {
+        var mark = $"{_check}.{Guid.NewGuid():N}";
+        using var self = Process.GetCurrentProcess();
+        long startTicks = self.StartTime.ToUniversalTime()
+            .Ticks;
+        Write(mark, $"{self.Id}\n{startTicks}\n");
+
+        return mark;
+    }
+
+    /// <summary>Removes <paramref name="mark" />, the one <see cref="StartCheck" /> made.</summary>
+    public void ClearCheck(string mark)
+    {
+        Delete(mark);
+    }
+
+    /// <summary>
+    ///     The marks in this session, the main agent's and every worker's, whose process no longer runs: each one a
+    ///     stop whose check never answered. A mark that does not read as <see cref="StartCheck" /> writes one is
+    ///     not among them.
+    /// </summary>
+    /// <returns>The abandoned marks, or none when the session has no state or its files cannot be listed.</returns>
+    public IReadOnlyList<HookAbandonedCheck> AbandonedChecks()
+    {
+        if (_directory is null) return [];
+
+        try
+        {
+            var abandoned = new List<HookAbandonedCheck>();
+            foreach (string path in Directory.EnumerateFiles(_directory, CheckFile + "*.*"))
+            {
+                string name = Path.GetFileName(path);
+                bool subagent = name.StartsWith(CheckFile + "-", StringComparison.Ordinal);
+                bool mark = subagent || name.StartsWith(CheckFile + ".", StringComparison.Ordinal);
+                if (mark
+                    && ReadLines(name) is [var id, var ticks, ..]
+                    && int.TryParse(id, out int processId)
+                    && long.TryParse(ticks, out long startTicks)
+                    && !IsRunning(processId, startTicks))
+                    abandoned.Add(new HookAbandonedCheck(name, subagent));
+            }
+
+            return abandoned;
+        }
+        catch (Exception ex) when (IsFileSystemFailure(ex))
+        {
+            return [];
+        }
+    }
+
+    /// <summary>Removes <paramref name="check" />'s mark.</summary>
+    public void ForgetCheck(HookAbandonedCheck check)
+    {
+        Delete(check.Name);
+    }
+
+    // Whether the process a mark names still runs, by its id and its start time, so that a reused id is not taken
+    // for the check.
+    private static bool IsRunning(int processId, long startTicks)
+    {
+        try
+        {
+            using var process = Process.GetProcessById(processId);
+            long started = process.StartTime.ToUniversalTime()
+                .Ticks;
+            return !process.HasExited && started == startTicks;
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or NotSupportedException
+                                       or Win32Exception)
+        {
+            // Gone, or a process this user cannot read, so not the hook that wrote the mark, which ran as this user.
+            return false;
+        }
     }
 
     // The top level a tree's records name: their tree file's one line, or null for a file that is missing, blank or
@@ -360,6 +449,12 @@ internal sealed class HookState
 
 /// <summary>A verdict read back from the hook's state: whether the check was green, and over which tree.</summary>
 internal sealed record HookVerdict(bool Green, TreeSnapshot Tree);
+
+/// <summary>
+///     A mark a stop left and never cleared: the file holding it, and whether a worker's stop left it rather than the
+///     main agent's.
+/// </summary>
+internal sealed record HookAbandonedCheck(string Name, bool Subagent);
 
 /// <summary>A baseline read back from the hook's state: a tree, and whether a prompt or a stop recorded it.</summary>
 internal sealed record HookBaseline(TreeSnapshot Tree, bool FromPrompt);

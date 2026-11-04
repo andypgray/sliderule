@@ -33,19 +33,25 @@ internal static class HookReportRenderer
 
     /// <summary>
     ///     The one-object document carrying <paramref name="report" /> as additional context for
-    ///     <paramref name="hookEvent" />, with no trailing newline (the caller writes it through
+    ///     <paramref name="hookEvent" />, and <paramref name="userMessage" />, when given, as the notice Claude Code
+    ///     shows the user, with no trailing newline (the caller writes it through
     ///     <see cref="SlideRuleJson.Terminated" />). The context's line ends are LF on every OS, whatever the
     ///     report was written with.
     /// </summary>
-    public static string Document(string report, string hookEvent)
+    public static string Document(string report, string hookEvent, string? userMessage = null)
     {
-        var payload = new HookJson(new HookSpecificOutputJson(hookEvent, report.Replace("\r\n", "\n")));
+        var payload = new HookJson(
+            new HookSpecificOutputJson(hookEvent, report.Replace("\r\n", "\n")), userMessage?.Replace("\r\n", "\n"));
         return JsonSerializer.Serialize(payload, SlideRuleJson.Context.HookJson);
     }
 }
 
-/// <summary>The root of the hook document: Claude Code reads one <c>hookSpecificOutput</c> object.</summary>
-internal sealed record HookJson(HookSpecificOutputJson HookSpecificOutput);
+/// <summary>
+///     The root of the hook document: Claude Code reads one <c>hookSpecificOutput</c> object, and shows a
+///     <c>systemMessage</c> to the user as a notice (verified 2026-11-01 on Claude Code 2.1.312, at
+///     <c>UserPromptSubmit</c> and <c>Stop</c>).
+/// </summary>
+internal sealed record HookJson(HookSpecificOutputJson HookSpecificOutput, string? SystemMessage = null);
 
 /// <summary>
 ///     The hook payload: which event it answers, and the text Claude Code turns into a transcript system

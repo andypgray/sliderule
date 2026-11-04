@@ -57,6 +57,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   existing outputs, and `--json` stays as the short form of the second. `arch_graph` takes the same choice
   as `format`, `json` by default or `mermaid`; a fence over the response budget is an error that names
   `projects`, because a cut would leave it unclosed.
+- A stop whose check never answered, because Claude Code killed the hook at its timeout, is reported. `hook`
+  marks each stop's check before it starts and clears the mark once it has answered. The next prompt, or the
+  main agent's next stop, finds a mark left behind and tells the agent and the user that the stop passed
+  unchecked. Before, such a stop passed and neither of them heard about it.
 
 ### Changed
 

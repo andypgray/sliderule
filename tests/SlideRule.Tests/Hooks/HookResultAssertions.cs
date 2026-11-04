@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Shouldly;
 using SlideRule.Cli.Hooks;
 using SlideRule.Cli.Verbs;
@@ -56,6 +57,24 @@ internal static class HookResultAssertions
         result.Err.ShouldBeEmpty(report);
         result.ShouldHaveHookAdditionalContext(hookEvent)
             .ShouldBe(context, report);
+
+        return result;
+    }
+
+    /// <summary>
+    ///     Asserts the hook proceeded with <paramref name="context" /> for the agent and
+    ///     <paramref name="userMessage" /> for the user: exit 0, nothing on stderr, and stdout the one document naming
+    ///     <paramref name="hookEvent" /> and carrying exactly those two texts.
+    /// </summary>
+    internal static CliResult ShouldProceedWithNotice(
+        this CliResult result, string hookEvent, string context, string userMessage)
+    {
+        result.ShouldProceedWithContext(hookEvent, context);
+        using JsonDocument document = result.ShouldHaveJsonStdout();
+        string? shown = document.RootElement.TryGetProperty("systemMessage", out JsonElement message)
+            ? message.GetString()
+            : null;
+        shown.ShouldBe(userMessage, result.Transcript());
 
         return result;
     }

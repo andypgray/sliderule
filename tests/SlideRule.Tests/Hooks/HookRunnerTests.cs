@@ -1320,6 +1320,190 @@ public sealed class HookRunnerTests
         fromBeside.ShouldNotHaveRunTheCheckIn(beside, "and never the repository beside it.");
     }
 
+    [Fact]
+    public async Task StopPayload_ChecksUnderAMarkTheAnswerClears()
+    {
+        // Arrange
+        HookSandbox sandbox = await ArrangeTurnThatWroteCodeAsync();
+        string[] during = [];
+
+        // Act
+        HookRun stop = await FireAsync(
+            sandbox, StopPayload(sandbox), ExitCodes.Clean, quiet: true,
+            duringCheck: () => during = Marks(sandbox)
+                .Select(File.ReadAllText)
+                .ToArray());
+
+        // Assert: while the check ran, one mark named this process and its start; once the answer was out, it was
+        // gone, so the next prompt has nothing to report.
+        stop.Result.ShouldProceedSilently();
+        during.ShouldBe([$"{Environment.ProcessId}\n{ThisProcessStartTicks()}\n"], "The check should have run under one mark.");
+        Marks(sandbox)
+            .ShouldBeEmpty("A check that answered must clear its mark.");
+        (await FireAsync(sandbox, PromptPayload(sandbox), ExitCodes.Clean)).Result.ShouldProceedSilently();
+    }
+
+    [Fact]
+    public async Task PromptPayload_AfterAStopThatNeverAnswered_TellsTheAgentAndTheUserOnce()
+    {
+        // Arrange: the mark a stop leaves when the client kills it mid-check, naming a process that is gone.
+        HookSandbox sandbox = ArrangeRepository();
+        PlantMark(sandbox, "check.planted", GoneProcessId, ThisProcessStartTicks());
+
+        // Act
+        HookRun first = await FireAsync(sandbox, PromptPayload(sandbox), ExitCodes.Clean);
+        HookRun second = await FireAsync(sandbox, PromptPayload(sandbox), ExitCodes.Clean);
+
+        // Assert
+        first.Result.ShouldProceedWithNotice(
+            "UserPromptSubmit", HookRunner.UncheckedStopLine, HookRunner.UncheckedStopLine);
+        second.Result.ShouldProceedSilently();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task PromptPayload_MarkNamingARunningProcess_IsReportedOnlyWhenItsStartDiffers(bool reused)
+    {
+        // Arrange: a mark naming this process. With its start time the mark is a check still in flight; with another,
+        // the id has been reused and the process that wrote the mark is gone.
+        HookSandbox sandbox = ArrangeRepository();
+        long start = ThisProcessStartTicks() + (reused ? TimeSpan.TicksPerHour : 0);
+        PlantMark(sandbox, "check.planted", Environment.ProcessId, start);
+
+        // Act
+        HookRun run = await FireAsync(sandbox, PromptPayload(sandbox), ExitCodes.Clean);
+
+        // Assert
+        if (reused)
+            run.Result.ShouldProceedWithNotice(
+                "UserPromptSubmit", HookRunner.UncheckedStopLine, HookRunner.UncheckedStopLine);
+        else
+            run.Result.ShouldProceedSilently();
+    }
+
+    [Fact]
+    public async Task StopPayload_SilentGreenAfterAStopThatNeverAnswered_SaysItInADocument()
+    {
+        // Arrange
+        HookSandbox sandbox = await ArrangeTurnThatWroteCodeAsync();
+        PlantMark(sandbox, "check.planted", GoneProcessId, ThisProcessStartTicks());
+
+        // Act
+        HookRun stop = await FireAsync(sandbox, StopPayload(sandbox), ExitCodes.Clean, quiet: true);
+
+        // Assert
+        stop.Result.ShouldProceedWithNotice("Stop", HookRunner.UncheckedStopLine, HookRunner.UncheckedStopLine);
+        Marks(sandbox)
+            .ShouldBeEmpty("A notice that reached the agent must take the mark with it.");
+    }
+
+    [Fact]
+    public async Task StopPayload_SkippedAfterAStopThatNeverAnswered_SaysItInADocument()
+    {
+        // Arrange: a turn that changed no code, so its stop spends no check.
+        HookSandbox sandbox = ArrangeRepository();
+        WriteProbe(sandbox);
+        await FireAsync(sandbox, PromptPayload(sandbox), ExitCodes.Clean);
+        PlantMark(sandbox, "check.planted", GoneProcessId, ThisProcessStartTicks());
+
+        // Act
+        HookRun stop = await FireAsync(sandbox, StopPayload(sandbox), ExitCodes.Clean);
+
+        // Assert
+        stop.ShouldNotHaveRunTheCheck("The turn changed no code.");
+        stop.Result.ShouldProceedWithNotice("Stop", HookRunner.UncheckedStopLine, HookRunner.UncheckedStopLine);
+    }
+
+    [Fact]
+    public async Task StopPayload_WarningsAfterAStopThatNeverAnswered_CarryTheNoticeAbove()
+    {
+        // Arrange
+        HookSandbox sandbox = await ArrangeTurnThatWroteCodeAsync();
+        PlantMark(sandbox, "check.planted", GoneProcessId, ThisProcessStartTicks());
+
+        // Act
+        HookRun stop = await FireAsync(sandbox, StopPayload(sandbox), ExitCodes.Clean);
+
+        // Assert
+        stop.Result.ShouldProceedWithNotice(
+            "Stop", $"{HookRunner.UncheckedStopLine}\n\n{CannedReport}", HookRunner.UncheckedStopLine);
+    }
+
+    [Fact]
+    public async Task StopPayload_BlockAfterAStopThatNeverAnswered_PutsTheNoticeAboveTheReport()
+    {
+        // Arrange
+        HookSandbox sandbox = await ArrangeTurnThatWroteCodeAsync();
+        PlantMark(sandbox, "check.planted", GoneProcessId, ThisProcessStartTicks());
+
+        // Act
+        HookRun stop = await FireAsync(sandbox, StopPayload(sandbox), ExitCodes.Violations);
+
+        // Assert
+        stop.Result.ShouldBlockWith(CannedReport);
+        stop.Result.Err.ShouldBe($"{HookRunner.UncheckedStopLine}\n{CannedReport}\n", stop.Result.Transcript());
+    }
+
+    [Fact]
+    public async Task StopPayload_ConfigErrorAfterAStopThatNeverAnswered_LeavesItForThePrompt()
+    {
+        // Arrange
+        HookSandbox sandbox = await ArrangeTurnThatWroteCodeAsync();
+        PlantMark(sandbox, "check.planted", GoneProcessId, ThisProcessStartTicks());
+
+        // Act: a config error's report reaches the user alone, and a hook document beside it would decide in place
+        // of its exit code.
+        HookRun stop = await FireAsync(sandbox, StopPayload(sandbox), ExitCodes.Error);
+        HookRun prompt = await FireAsync(sandbox, PromptPayload(sandbox), ExitCodes.Clean);
+
+        // Assert
+        stop.Result.ShouldReportConfigError();
+        stop.Result.Err.ShouldNotContain(HookRunner.UncheckedStopLine, customMessage: stop.Result.Transcript());
+        prompt.Result.ShouldProceedWithNotice(
+            "UserPromptSubmit", HookRunner.UncheckedStopLine, HookRunner.UncheckedStopLine);
+    }
+
+    [Fact]
+    public async Task SubagentStop_LeavesTheMarksForTheMainAgent()
+    {
+        // Arrange: the main agent's stop and another worker's both ended unchecked.
+        HookSandbox sandbox = await ArrangeTurnThatWroteCodeAsync();
+        PlantMark(sandbox, "check.planted", GoneProcessId, ThisProcessStartTicks());
+        PlantMark(sandbox, "check-a2.planted", GoneProcessId, ThisProcessStartTicks());
+
+        // Act
+        HookRun worker = await FireAsync(
+            sandbox, StopPayload(sandbox, eventName: "SubagentStop", agentId: "a1"), ExitCodes.Clean, quiet: true);
+        HookRun prompt = await FireAsync(sandbox, PromptPayload(sandbox), ExitCodes.Clean);
+
+        // Assert: a worker's context ends with the worker, so it says nothing of either; the main agent's next
+        // prompt says both.
+        worker.ShouldHaveRunTheCheckIn(sandbox.ProjectDirectory, "The worker's turn wrote code.");
+        worker.Result.ShouldProceedSilently();
+        var both = $"{HookRunner.UncheckedStopLine}\n{HookRunner.UncheckedSubagentStopLine}";
+        prompt.Result.ShouldProceedWithNotice("UserPromptSubmit", both, both);
+    }
+
+    [Fact]
+    public async Task StopThenPrompt_InAStateDirThatCannotBeMade_SayNothingOfAMark()
+    {
+        // Arrange: a file where the state root should be.
+        HookSandbox sandbox = ArrangeRepository();
+        string blocked = Path.Combine(sandbox.Root, "state-root-is-a-file");
+        File.WriteAllText(blocked, "not a directory");
+
+        // Act
+        HookRun stop = await FireAsync(
+            sandbox, StopPayload(sandbox), ExitCodes.Clean, quiet: true, stateDirectory: blocked);
+        HookRun prompt = await FireAsync(sandbox, PromptPayload(sandbox), ExitCodes.Clean, stateDirectory: blocked);
+
+        // Assert
+        stop.ShouldHaveRunTheCheckIn(sandbox.ProjectDirectory, "A stateless stop always checks.");
+        stop.Result.ShouldProceedSilently();
+        prompt.Result.ShouldProceedSilently();
+    }
+
     /// <summary>
     ///     Runs the hook against <paramref name="sandbox" /> with <paramref name="payload" /> on stdin, as Claude
     ///     Code feeds a hook its event, and a scripted check that exits <paramref name="checkExit" />.
@@ -1333,7 +1517,8 @@ public sealed class HookRunnerTests
     ///     <paramref name="quiet" /> silences the check, which is how a clean check with no warnings, the check's
     ///     own silence under hook mode, is put in front of the hook. <paramref name="redTree" /> names a tree whose
     ///     check reports violations whatever <paramref name="checkExit" /> says, for the rows that check two, and
-    ///     <paramref name="stdout" /> replaces what every check writes to stdout.
+    ///     <paramref name="stdout" /> replaces what every check writes to stdout. <paramref name="duringCheck" /> runs
+    ///     inside each check, while the hook waits on it.
     /// </remarks>
     private static async Task<HookRun> FireAsync(
         HookSandbox sandbox,
@@ -1348,11 +1533,12 @@ public sealed class HookRunnerTests
         string? spec = null,
         string? redTree = null,
         string? stdout = null,
-        string stderr = "")
+        string stderr = "",
+        Action? duringCheck = null)
     {
         string launchDirectory = workingDirectory ?? sandbox.Root;
         string checkOutput = stdout ?? (quiet ? "" : CannedReport + Environment.NewLine);
-        var check = new ScriptedHookCheck(checkExit, checkOutput, redTree, stderr);
+        var check = new ScriptedHookCheck(checkExit, checkOutput, redTree, stderr, duringCheck);
         FakeEnvironment environment = HookEnvironment.With(
             stateDirectory ?? sandbox.StateDirectory, withProjectDirectory ? sandbox.ProjectDirectory : null);
         var request = new HookRequest(solution, spec, "HEAD", maxRounds, launchDirectory);
@@ -1510,6 +1696,49 @@ public sealed class HookRunnerTests
         File.WriteAllText(file, $"public sealed class {Path.GetFileNameWithoutExtension(name)};\n");
 
         return file;
+    }
+
+    /// <summary>
+    ///     A sandbox whose prompt was recorded and whose turn then wrote code, so its stop is due a check.
+    /// </summary>
+    private static async Task<HookSandbox> ArrangeTurnThatWroteCodeAsync()
+    {
+        HookSandbox sandbox = ArrangeRepository();
+        string probe = WriteProbe(sandbox);
+        await FireAsync(sandbox, PromptPayload(sandbox), ExitCodes.Clean);
+        Rewrite(probe);
+
+        return sandbox;
+    }
+
+    /// <summary>A process id no process holds: ids are far below it on every platform the suite runs on.</summary>
+    private const int GoneProcessId = int.MaxValue;
+
+    private static long ThisProcessStartTicks()
+    {
+        using var self = Process.GetCurrentProcess();
+        return self.StartTime.ToUniversalTime()
+            .Ticks;
+    }
+
+    /// <summary>
+    ///     Plants the mark <paramref name="name" /> in the session's state as the hook writes one, the process id and
+    ///     its start a line each, for a firing that never cleared it.
+    /// </summary>
+    private static void PlantMark(HookSandbox sandbox, string name, int processId, long startTicks)
+    {
+        string path = StatePath(sandbox, name);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, $"{processId}\n{startTicks}\n");
+    }
+
+    /// <summary>Every check mark in the session's state, the main agent's and its workers'.</summary>
+    private static string[] Marks(HookSandbox sandbox)
+    {
+        string session = StatePath(sandbox, "");
+        return Directory.Exists(session)
+            ? Directory.GetFiles(session, "check*.*")
+            : [];
     }
 
     private static string StatePath(HookSandbox sandbox, string name)

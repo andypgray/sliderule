@@ -56,6 +56,13 @@ namespace SlideRule.Cli.Verbs;
 ///         resolving the solution and spec happens in here for that reason, and so does everything else that can
 ///         fail.
 ///     </para>
+///     <para>
+///         <b>A stop that never answered.</b> A stop's checks run under a mark naming this process, removed once the
+///         answer has left it. The client kills the whole hook at its timeout, so a mark whose process is gone is a
+///         stop that passed unchecked. The next prompt, or the main agent's next stop, says so to the agent and the
+///         user in a hook document, or above a block's report; a stop whose answer reaches only the user leaves it
+///         for the next prompt. A worker's stop marks and clears its own mark and reports none.
+///     </para>
 /// </remarks>
 internal sealed class HookRunner(
     TextWriter output,
@@ -66,6 +73,14 @@ internal sealed class HookRunner(
 {
     /// <summary>The line SlideRule's own failure is reported under on stderr, with the report below it.</summary>
     internal const string ConfigErrorLine = "sliderule config error:";
+
+    /// <summary>The notice for a main-agent stop whose check never answered, said at the next prompt or stop.</summary>
+    internal const string UncheckedStopLine =
+        "sliderule: the previous stop ended without a completed hook answer; it passed unchecked.";
+
+    /// <summary>The same notice for a subagent's stop, said to the main agent.</summary>
+    internal const string UncheckedSubagentStopLine =
+        "sliderule: a subagent's stop ended without a completed hook answer; it passed unchecked.";
 
     private const string PromptEvent = "UserPromptSubmit";
     private const string NoPrompt = "noprompt";
@@ -108,13 +123,22 @@ internal sealed class HookRunner(
     // from the code it found there. A prompt's baseline still standing belongs to a turn no stop has ended, and it is
     // kept, along with every other tree's: it predates everything since, and replacing it would hide what that turn
     // wrote. The baseline the last turn's stop left is replaced, and so is each other tree's the session keeps
-    // records for. Never a word on stdout and never an exit but 0, because a prompt hook's stdout joins the prompt
-    // and its exit 2 refuses it.
+    // records for. Never plain text on stdout and never an exit but 0, because a prompt hook's plain stdout joins the
+    // prompt and its exit 2 refuses it; the one thing it says is a stop that never answered, in a hook document.
     private async Task<int> OpenTurnAsync(
         HookPayload payload, string? projectDirectory, HookRequest request, CancellationToken ct)
     {
         HookState state = OpenState(payload);
-        if (!state.Stateful || state.ReadBaseline() is { FromPrompt: true }) return HookExitCodes.Proceed;
+        IReadOnlyList<HookAbandonedCheck> abandoned = state.AbandonedChecks();
+        await RecordTurnStartAsync(state, payload, projectDirectory, request, ct);
+
+        return await SayUncheckedAsync(PromptEvent, state, abandoned, ct);
+    }
+
+    private static async Task RecordTurnStartAsync(
+        HookState state, HookPayload payload, string? projectDirectory, HookRequest request, CancellationToken ct)
+    {
+        if (!state.Stateful || state.ReadBaseline() is { FromPrompt: true }) return;
 
         string tree = await SessionTreeAsync(payload.Cwd, projectDirectory, ct) ?? request.WorkingDirectory;
         Task<TreeSnapshot> ownRun = HookGit.SnapshotAsync(tree, ct);
@@ -123,7 +147,7 @@ internal sealed class HookRunner(
         await Task.WhenAll(ownRun, othersRun);
 
         TreeSnapshot snapshot = await ownRun;
-        if (!snapshot.Known) return HookExitCodes.Proceed;
+        if (!snapshot.Known) return;
 
         state.RecordBaseline(snapshot);
 
@@ -133,8 +157,6 @@ internal sealed class HookRunner(
         foreach ((string other, HookState otherState, TreeSnapshot otherSnapshot) in await othersRun)
             if (otherSnapshot.Known && otherSnapshot.TopLevel is { } topLevel && SameDirectory(topLevel, other))
                 otherState.RecordBaseline(otherSnapshot);
-
-        return HookExitCodes.Proceed;
     }
 
     // Each other tree a stop of this session has weighed, as the prompt finds it. The prompt waits on them, and they
@@ -154,6 +176,10 @@ internal sealed class HookRunner(
         string tree = await SessionTreeAsync(payload.Cwd, projectDirectory, ct) ?? request.WorkingDirectory;
         HookState state = OpenState(payload);
 
+        // Only the main agent's stop speaks for a stop that never answered: a worker's context ends with the worker.
+        IReadOnlyList<HookAbandonedCheck> abandoned =
+            hookEvent == HookReportRenderer.StopEvent ? state.AbandonedChecks() : [];
+
         // The trees share nothing, so the session's own is examined while the others are found, and the others
         // beside each other. The list keeps the session's own first, then the others in the order the turn wrote them.
         Task<TreeTurn> ownRun = ExamineAsync(tree, state, own: true, ct);
@@ -166,7 +192,11 @@ internal sealed class HookRunner(
         var trees = new List<TreeTurn> { await ownRun };
         trees.AddRange(otherTurns);
 
-        if (!trees.Any(static turn => turn.Due)) return EndTurn(hookEvent, trees);
+        if (!trees.Any(static turn => turn.Due))
+        {
+            EndTurn(hookEvent, trees);
+            return await SayUncheckedAsync(hookEvent, state, abandoned, ct);
+        }
 
         // Consecutive continuations for this prompt: a block and a warning passed on both count, and a silent green
         // resets. At the cap the hook says its piece and lets the turn end. A count that cannot be kept reads as no
@@ -175,7 +205,7 @@ internal sealed class HookRunner(
         int rounds = state.RoundsFor(promptId);
 
         var firing = new Firing(
-            hookEvent, state, trees, promptId, rounds, request.MaxRounds, payload.StopHookActive);
+            hookEvent, state, trees, promptId, rounds, request.MaxRounds, payload.StopHookActive, abandoned);
         return await CheckAsync(firing, request, ct);
     }
 
@@ -277,14 +307,26 @@ internal sealed class HookRunner(
             [new(tree, HookState.None, TreeSnapshot.Unknown, Own: true, Due: true, ChangedFiles: null)];
         var firing = new Firing(
             HookReportRenderer.DefaultEvent, HookState.None, trees, NoPrompt, 0, request.MaxRounds,
-            StopHookActive: false);
+            StopHookActive: false, Abandoned: []);
         return await CheckAsync(firing, request, ct);
+    }
+
+    // The firing's checks under this agent's mark, which comes off only once the answer has left the process: a
+    // client that kills the hook before then leaves the mark for the next prompt or stop to report.
+    private async Task<int> CheckAsync(Firing firing, HookRequest request, CancellationToken ct)
+    {
+        string mark = firing.State.StartCheck();
+        int code = await AnswerAsync(firing, request, ct);
+        await FlushAsync(ct);
+        firing.State.ClearCheck(mark);
+
+        return code;
     }
 
     // Each due tree's check in turn, the session's own first, answered as one: SlideRule's own failure in any of
     // them ends the turn, a red rule in any blocks, and otherwise the warnings go out together. Each tree records
     // the verdict its own check gave.
-    private async Task<int> CheckAsync(Firing firing, HookRequest request, CancellationToken ct)
+    private async Task<int> AnswerAsync(Firing firing, HookRequest request, CancellationToken ct)
     {
         var checks = new List<(TreeTurn Tree, HookCheckResult Result)>();
         foreach (TreeTurn tree in firing.Trees.Where(static turn => turn.Due))
@@ -307,9 +349,9 @@ internal sealed class HookRunner(
 
         List<(TreeTurn Tree, HookCheckResult Result)> red = checks.Where(static check => check.Result.ExitCode == ExitCodes.Violations)
             .ToList();
-        if (red.Count > 0) return await RedAsync(firing, Reports(red, named));
+        if (red.Count > 0) return await RedAsync(firing, Reports(red, named), ct);
 
-        return await CleanAsync(firing, checks, named);
+        return await CleanAsync(firing, checks, named, ct);
 
         static bool GaveVerdict(HookCheckResult result)
         {
@@ -318,7 +360,7 @@ internal sealed class HookRunner(
     }
 
     private async Task<int> CleanAsync(
-        Firing firing, IReadOnlyList<(TreeTurn Tree, HookCheckResult Result)> checks, bool named)
+        Firing firing, IReadOnlyList<(TreeTurn Tree, HookCheckResult Result)> checks, bool named, CancellationToken ct)
     {
         HookState state = firing.State;
 
@@ -334,7 +376,8 @@ internal sealed class HookRunner(
             // Nothing to say. Users switch off a hook that prints something on every clean run.
             state.ForgetRounds();
             state.ForgetSaid();
-            return EndTurn(firing);
+            EndTurn(firing);
+            return await SayUncheckedAsync(firing.Event, state, firing.Abandoned, ct);
         }
 
         // A tripwire warns for as long as its file stays changed, and a warning repeated at every stop stops being
@@ -342,17 +385,23 @@ internal sealed class HookRunner(
         if (state.AlreadySaid(document))
         {
             state.ForgetRounds();
-            return EndTurn(firing);
+            EndTurn(firing);
+            return await SayUncheckedAsync(firing.Event, state, firing.Abandoned, ct);
         }
 
         if (firing.AtCap || !MayContinue(firing)) return EndTurn(firing);
 
+        // What was said is the warnings alone, so a notice that rides along once never makes them read as new.
         state.RememberSaid(document);
-        await output.WriteAsync(SlideRuleJson.Terminated(document));
+        string sent = firing.Abandoned.Count == 0 ? document : Document(firing.Event, checks, named, firing.Abandoned);
+        await output.WriteAsync(SlideRuleJson.Terminated(sent));
+        await ForgetAbandonedAsync(state, firing.Abandoned, ct);
         return HookExitCodes.Proceed;
     }
 
-    private async Task<int> RedAsync(Firing firing, string report)
+    // A red that reaches only the user, at the cap or where no continuation may be counted, leaves a stop that never
+    // answered for the next prompt to tell the agent about, as a config error does.
+    private async Task<int> RedAsync(Firing firing, string report, CancellationToken ct)
     {
         if (firing.AtCap)
         {
@@ -364,8 +413,50 @@ internal sealed class HookRunner(
 
         if (!MayContinue(firing)) return EndTurn(firing);
 
+        if (firing.Abandoned.Count > 0) await WriteLineAsync(error, UncheckedNotice(firing.Abandoned));
         await WriteLineAsync(error, report);
+        await ForgetAbandonedAsync(firing.State, firing.Abandoned, ct);
         return HookExitCodes.Block;
+    }
+
+    // Tells the agent, and the user, about the stops that never answered, in a document of their own, or says
+    // nothing when there are none. Exit 0 either way. A stop's document continues the turn once; the marks are gone
+    // by the next stop, so it cannot continue it again.
+    private async Task<int> SayUncheckedAsync(
+        string hookEvent, HookState state, IReadOnlyList<HookAbandonedCheck> abandoned, CancellationToken ct)
+    {
+        if (abandoned.Count == 0) return HookExitCodes.Proceed;
+
+        string notice = UncheckedNotice(abandoned);
+        await output.WriteAsync(SlideRuleJson.Terminated(HookReportRenderer.Document(notice, hookEvent, notice)));
+        await ForgetAbandonedAsync(state, abandoned, ct);
+        return HookExitCodes.Proceed;
+    }
+
+    // The marks come off only once the notice has left the process, so a kill before then says it again.
+    private async Task ForgetAbandonedAsync(
+        HookState state, IReadOnlyList<HookAbandonedCheck> abandoned, CancellationToken ct)
+    {
+        if (abandoned.Count == 0) return;
+
+        await FlushAsync(ct);
+        foreach (HookAbandonedCheck mark in abandoned) state.ForgetCheck(mark);
+    }
+
+    private async Task FlushAsync(CancellationToken ct)
+    {
+        await output.FlushAsync(ct);
+        await error.FlushAsync(ct);
+    }
+
+    // One line for the main agent's stops and one for its workers', whichever left a mark.
+    private static string UncheckedNotice(IReadOnlyList<HookAbandonedCheck> abandoned)
+    {
+        var lines = new List<string>();
+        if (abandoned.Any(static check => !check.Subagent)) lines.Add(UncheckedStopLine);
+        if (abandoned.Any(static check => check.Subagent)) lines.Add(UncheckedSubagentStopLine);
+
+        return string.Join("\n", lines);
     }
 
     // Resolution and the check, each under the command handler, so whatever the CLI would refuse with exit 2 comes
@@ -566,15 +657,22 @@ internal sealed class HookRunner(
     }
 
     // The hook document for the clean checks, naming the stop's event or the per-edit path's, or "" when none had
-    // anything to say. Each check's text goes under a line naming its tree when the stop is `named`, in one document.
+    // anything to say. Each check's text goes under a line naming its tree when the stop is `named`, in one document,
+    // with the notice for any stop that never answered above it and shown to the user as well.
     private static string Document(
-        string hookEvent, IReadOnlyList<(TreeTurn Tree, HookCheckResult Result)> checks, bool named)
+        string hookEvent, IReadOnlyList<(TreeTurn Tree, HookCheckResult Result)> checks, bool named,
+        IReadOnlyList<HookAbandonedCheck>? abandoned = null)
     {
         List<string> contexts = checks.Select(check => (check.Tree, Context: check.Result.Output.TrimEnd('\r', '\n')))
             .Where(static check => check.Context.Length > 0)
             .Select(check => named ? $"{TreeLine(check.Tree)}\n{check.Context}" : check.Context)
             .ToList();
-        return contexts.Count == 0 ? "" : HookReportRenderer.Document(string.Join("\n\n", contexts), hookEvent);
+        if (contexts.Count == 0) return "";
+        if (abandoned is not { Count: > 0 }) return HookReportRenderer.Document(string.Join("\n\n", contexts), hookEvent);
+
+        string notice = UncheckedNotice(abandoned);
+        contexts.Insert(0, notice);
+        return HookReportRenderer.Document(string.Join("\n\n", contexts), hookEvent, notice);
     }
 
     private static string TreeLine(TreeTurn tree)
@@ -609,7 +707,8 @@ internal sealed class HookRunner(
     }
 
     // One firing that reached the check. StopHookActive is the payload's own stop_hook_active: a stop hook has
-    // already continued this turn.
+    // already continued this turn. Abandoned are the stops that never answered, for this firing to tell the agent of
+    // where its answer reaches it.
     private sealed record Firing(
         string Event,
         HookState State,
@@ -617,7 +716,8 @@ internal sealed class HookRunner(
         string PromptId,
         int Rounds,
         int MaxRounds,
-        bool StopHookActive)
+        bool StopHookActive,
+        IReadOnlyList<HookAbandonedCheck> Abandoned)
     {
         public bool AtCap => Rounds >= MaxRounds;
     }
