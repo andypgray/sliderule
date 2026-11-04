@@ -60,6 +60,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   left out listed below it. Before, the workspace's failure to open such an entry counted as a load problem,
   and the refusal said to restore and build the solution, which could not end it. The workspace's line for the
   entry stays in `workspaceDiagnostics`.
+- The spec project in the `derive_spec` recipe sets `<IsPackable>false</IsPackable>`, so it restores in a
+  repository whose `Directory.Build.props` turns on package validation for every project. Without the
+  setting, restore looks for the spec project's own package at the baseline version and fails with NU1101.
+  The recipe's list of errors now includes NU1101 and its fix.
+- The `derive_spec` recipe's spec project builds under more of the settings a repository's
+  `Directory.Build.props` applies to every project. It names its framework in `<TargetFrameworks>`, so a
+  framework list set above it no longer fails the build with NETSDK1005. It sets
+  `<GenerateDocumentationFile>false</GenerateDocumentationFile>`, so generated documentation does not report
+  CS1591 on the spec class, and suppresses CS8002, which a signed .NET Framework spec reports because the
+  SlideRule assemblies are not strong-named. Under `TreatWarningsAsErrors` either was a failed build. The
+  recipe now asks for the spec files in the repository's own style, its header included, and its list of
+  errors adds IDE0073, NU1100 under package source mapping and NU1004 under locked restore, each with its fix.
 
 ## [0.2.1] - 2026-10-26
 

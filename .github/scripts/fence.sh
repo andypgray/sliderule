@@ -1,6 +1,5 @@
-# Sourced by the pack-check steps that execute a published document, never run on its own: the step that
-# scaffolds the derive_spec recipe's spec project, and the step that walks GETTING-STARTED.md and the README
-# quickstart. What they share is the cut.
+# Sourced by the pack-check steps that execute a published document, never run on its own. What they share
+# is the cut.
 #
 # fence <file> <lang> <marker> prints the body of the first fenced block in <file> whose language is <lang>
 # and whose body carries <marker>. The cut is anchored on content rather than on fence order, so re-ordering

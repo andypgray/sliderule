@@ -51,7 +51,7 @@ public sealed class DeriveSpecPromptTests
     ///         codebases rather than by a character count.
     ///     </para>
     /// </remarks>
-    private const int ServedBodyCeiling = 70_750;
+    private const int ServedBodyCeiling = 72_750;
 
     // The text only the receipt's fence carries, which picks that fence out of the recipe's others.
     private const string ReceiptMarker = "curation: pending";
@@ -404,15 +404,29 @@ public sealed class DeriveSpecPromptTests
         text.ShouldContain("https://github.com/andypgray/sliderule/blob/main/GRAMMAR.md");
     }
 
-    [Fact]
-    public async Task GetPrompt_DeriveSpec_ScaffoldOptsOutOfCentralPackageManagement()
+    // Each opt-out keeps the scaffold valid under a repository-wide setting it would otherwise inherit:
+    // central package management makes the inline version NU1008; package validation makes restore fetch
+    // every packable project's own id at the baseline version, NU1101 for a spec never published; generated
+    // documentation reports CS1591 on the public spec class; signing a .NET Framework spec reports CS8002 on
+    // the unsigned contract; and an inherited TargetFrameworks list decides restore while a singular element
+    // decides the build, NETSDK1005. The prose quotes some of these elements too, so only the csproj fence,
+    // cut as CI cuts it, can tell an opt-out that left the scaffold from one still named in the prose. CI
+    // executes the same commitments against real central, props and editorconfig files.
+    [Theory]
+    [InlineData("<ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>")]
+    [InlineData("<IsPackable>false</IsPackable>")]
+    [InlineData("<GenerateDocumentationFile>false</GenerateDocumentationFile>")]
+    [InlineData("<NoWarn>$(NoWarn);CS8002</NoWarn>")]
+    [InlineData("<TargetFrameworks>net10.0</TargetFrameworks>")]
+    public void DeriveSpec_ScaffoldCsproj_CarriesEachOptOut(string element)
     {
-        string text = await ShouldServeRecipeAsync();
+        QuotedFence fence = QuotedFence.ShouldFindOne(
+            DocPaths.DeriveSpecPrompt, "PackageReference Include=\"SlideRule\"",
+            "where the scaffold's spec csproj should be exactly one");
 
-        // Assert — the scaffold pins its own version inline, which is NU1008 on a repository that manages
-        // package versions centrally. The opt-out is what makes one csproj valid either way, so it cannot
-        // drop out of the recipe quietly; CI executes the same commitment against a real central file.
-        text.ShouldContain("<ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>");
+        fence.Lines
+            .Select(line => line.Trim())
+            .ShouldContain(element);
     }
 
     [Fact]

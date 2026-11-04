@@ -8,12 +8,12 @@ on:
 permissions:
   contents: read
 
-# The build analyzer's six diagnostic IDs. Two builds promote them to errors: self-check's build of
+# The build analyzer's diagnostic IDs. Two builds promote them to errors: self-check's build of
 # this solution, whose src projects take the analyzer package, and the examples job's builds of the
-# four example solutions, which attach it by project path. The examples job says why all six.
+# example solutions, which attach it by project path. The examples job says why every one of them.
 env:
   SR_BUILD_TIER_IDS: 'SR2001,SR2002,SR2090,SR2091,SR2092,SR2093'
-  # The guidance analyzer's IDs: its eight rules and its fault. The Interchange example's build takes it too.
+  # The guidance analyzer's IDs: its rules and its fault. The Interchange example's build takes it too.
   SR_GUIDANCE_IDS: 'SR3001,SR3002,SR3003,SR3004,SR3005,SR3006,SR3007,SR3008,SR3093'
 
 jobs:
@@ -250,9 +250,9 @@ jobs:
       - name: Pack
         run: dotnet pack SlideRule.slnx -c Release -o artifacts -p:RestoreLockedMode=true
 
-      # Target the Cli package explicitly: the solution pack emits five nupkgs and only the
-      # Cli one carries the MCP manifest. A bare artifacts/*.nupkg glob would hand unzip five
-      # files and break, so glob the single Cli package here.
+      # Target the Cli package explicitly: the solution pack emits one nupkg per shipped package
+      # and only the Cli one carries the MCP manifest. A bare artifacts/*.nupkg glob would hand
+      # unzip several files and break, so glob the single Cli package here.
       - name: Verify server.json is packed at .mcp/server.json
         run: |
           entries="$(unzip -Z1 artifacts/SlideRule.Cli.*.nupkg)"
@@ -440,18 +440,8 @@ jobs:
       # out of the pack above and checks it. It is also the first time anything compiles the scaffold
       # the recipe publishes.
       #
-      # The csproj and the spec class are cut from the recipe rather than written here, and the csproj
-      # gets the same Version="..." substitution ArchPrompts applies when the server serves the
-      # prompt. So this executes the published recipe instead of a copy that could drift from it, and
-      # a recipe edit that breaks the scaffold reddens here rather than reaching a reader. The cut is
-      # anchored on content rather than on fence order, and an empty cut is a loud failure: a
-      # restructure must redden this leg, never quietly scaffold nothing.
-      #
-      # One rule is authored here, in its own file, because the recipe's Define() is empty by design
-      # and a spec with no rules would prove loading and evaluate nothing. A second spec class is the
-      # honest seam — the model runs every IArchitectureSpec in the assembly over one shared Arch — so
-      # the recipe's own file stays byte for byte what it publishes, and the csproj, the artifact
-      # actually under test, is untouched.
+      # The tree comes from .github/scripts/spec-scaffold.sh, which cuts the csproj and the spec class
+      # out of the recipe and adds one rule in a file of its own; its header says why.
       #
       # Under $RUNNER_TEMP, outside the working tree: nothing inherits this repository's
       # Directory.Build.props (which would stamp its version, binding identity and package metadata
@@ -475,102 +465,27 @@ jobs:
       # treat as protected, and this leg is what stops that from being prose. Its own negative
       # control strips the opt-out and requires NU1008 back — not merely a failure, since any other
       # error would satisfy a bare non-zero test for the reason the control exists to rule out.
-      - name: Scaffold the documented PackageReference spec project — plain and CPM — and check it
+      #
+      # A third run puts the csproj under a Directory.Build.props that turns on package validation for
+      # every project, a baseline version included. Restore then fetches each packable project's own id
+      # at that version, and a spec project that was never published fails NU1101 on its own name. The
+      # recipe sets IsPackable false for that reason, and this leg's control strips it and requires
+      # NU1101 back, naming the spec project.
+      - name: Scaffold the documented PackageReference spec project — plain, CPM and package validation — and check it
         run: |
           . .github/scripts/local-pack.sh
           version="$(pack_version)"
           export PATH="$PATH:$HOME/.dotnet/tools"
 
-          recipe="src/SlideRule.Cli/Mcp/Prompts/derive-spec.md"
           plain="$RUNNER_TEMP/packageref"
           cpm="$RUNNER_TEMP/packageref-cpm"
+          pv="$RUNNER_TEMP/packageref-pv"
           # One package folder for both legs: warm for the second, and still isolated from the machine
           # cache and from nuget.org, which is what makes the restore assertion below name the pack.
           export NUGET_PACKAGES="$plain/.packages"
 
-          # fence <file> <lang> <marker>: the first fenced block in <lang> whose body carries <marker>. A
-          # marker that has gone yields nothing and trips the guard below.
-          . .github/scripts/fence.sh
-
-          csproj="$(fence "$recipe" xml 'PackageReference Include="SlideRule"')"
-          spec="$(fence "$recipe" csharp 'IArchitectureSpec')"
-          [ -n "$csproj" ] && [ -n "$spec" ] || {
-            echo "::error::Could not cut the spec scaffold out of $recipe — the xml fence carrying the PackageReference, or the csharp fence carrying the IArchitectureSpec class, has moved or changed shape. That recipe is what adopters follow, so fix it or fix this cut; do not delete the assertion."
-            exit 1
-          }
-
-          # The Version="..." substitution ArchPrompts applies when it serves the prompt, done once so
-          # both legs scaffold the identical csproj an adopter is handed.
-          csproj="$(printf '%s\n' "$csproj" | sed 's|Version="\.\.\."|Version="'"$version"'"|')"
-
-          # scaffold <root> — the reader's tree, written under <root>. The body is deliberately not
-          # indented: these heredocs are quoted (<<'CS', never <<-), so every terminator has to reach
-          # column 0 once YAML strips this block's indentation.
-          scaffold() {
-          mkdir -p "$1/src/MyApp" "$1/arch/MyApp.Architecture"
-          printf '%s\n' "$csproj" > "$1/arch/MyApp.Architecture/MyApp.Architecture.csproj"
-          printf '%s\n' "$spec" > "$1/arch/MyApp.Architecture/ArchitectureSpec.cs"
-
-          # The same line DeriveSpecPromptTests pins the served prompt to, asserted from the other
-          # side: the csproj under test is the one an adopter is handed, pinned to the pack above.
-          grep -Fq "<PackageReference Include=\"SlideRule\" Version=\"$version\" />" \
-            "$1/arch/MyApp.Architecture/MyApp.Architecture.csproj" || {
-            echo "::error::The scaffold csproj did not come out pinned to $version — the Version=\"...\" placeholder ArchPrompts substitutes is no longer where the recipe spells it"
-            cat "$1/arch/MyApp.Architecture/MyApp.Architecture.csproj"
-            exit 1
-          }
-
-          cat > "$1/arch/MyApp.Architecture/CheckedRule.cs" <<'CS'
-          using SlideRule;
-
-          namespace MyApp.Architecture;
-
-          public sealed class PackageReferenceProof : IArchitectureSpec
-          {
-              public void Define(Arch arch)
-              {
-                  arch.Rule("naming/interfaces")
-                      .Enforce(arch.Project("MyApp").OfKind(TypeKind.Interface).MustHavePrefix("I"))
-                      .Because("The scaffolded spec has to evaluate over real symbols for a green run to mean anything, so it states the one convention the product below obeys and the violation below breaks.");
-              }
-          }
-          CS
-
-          cat > "$1/src/MyApp/MyApp.csproj" <<'CSPROJ'
-          <Project Sdk="Microsoft.NET.Sdk">
-              <PropertyGroup>
-                  <TargetFramework>net10.0</TargetFramework>
-              </PropertyGroup>
-          </Project>
-          CSPROJ
-
-          cat > "$1/src/MyApp/Shipments.cs" <<'CS'
-          namespace MyApp;
-
-          public interface IShipmentPort
-          {
-              string Describe();
-          }
-
-          public sealed class ShipmentPort : IShipmentPort
-          {
-              public string Describe() => "shipment";
-          }
-          CS
-
-          cat > "$1/MyApp.slnx" <<'SLNX'
-          <Solution>
-            <Folder Name="/src/">
-              <Project Path="src/MyApp/MyApp.csproj" />
-            </Folder>
-            <Folder Name="/arch/">
-              <Project Path="arch/MyApp.Architecture/MyApp.Architecture.csproj" />
-            </Folder>
-          </Solution>
-          SLNX
-
-          local_pack_feed "$1"
-          }
+          . .github/scripts/spec-scaffold.sh
+          spec_scaffold_cut "$version"
 
           # ── Leg A: a repository that pins package versions per project ──────────────────────────
           scaffold "$plain"
@@ -583,13 +498,7 @@ jobs:
             exit 1
           }
 
-          cat > "$plain/src/MyApp/Broken.cs" <<'CS'
-          namespace MyApp;
-
-          public interface ShipmentPortWithoutThePrefix
-          {
-          }
-          CS
+          write_violation "$plain"
           dotnet build "$plain/MyApp.slnx"
           rc=0
           sliderule check "$plain/MyApp.slnx" || rc=$?
@@ -619,13 +528,289 @@ jobs:
 
           # Leg B's negative control: strip the opt-out back out and the build must fail with NU1008.
           sed -i '/<ManagePackageVersionsCentrally>/d' "$cpm/arch/MyApp.Architecture/MyApp.Architecture.csproj"
-          rc=0
-          dotnet build "$cpm/MyApp.slnx" > "$RUNNER_TEMP/cpm-without-opt-out.log" 2>&1 || rc=$?
-          if [ "$rc" -eq 0 ] || ! grep -q NU1008 "$RUNNER_TEMP/cpm-without-opt-out.log"; then
-            echo "::error::Removing ManagePackageVersionsCentrally from the scaffold csproj did not produce NU1008 (build exited $rc) — that line is no longer what makes the published scaffold valid under central package management, so the leg above proves nothing"
-            cat "$RUNNER_TEMP/cpm-without-opt-out.log"
+          build_fails_with "$cpm/MyApp.slnx" "$RUNNER_TEMP/cpm-without-opt-out.log" NU1008 \
+            "Removing ManagePackageVersionsCentrally from the scaffold csproj did not produce NU1008 — that line is no longer what makes the published scaffold valid under central package management, so the leg above proves nothing"
+
+          # ── Leg C: the same csproj under repository-wide package validation ─────────────────────
+          scaffold "$pv"
+          cat > "$pv/Directory.Build.props" <<'PROPS'
+          <Project>
+              <PropertyGroup>
+                  <EnablePackageValidation>true</EnablePackageValidation>
+                  <PackageValidationBaselineVersion>1.0.0</PackageValidationBaselineVersion>
+              </PropertyGroup>
+          </Project>
+          PROPS
+          # The product opts out the way a repository's own non-shipping projects do, so the spec csproj is
+          # the one project the props file can fail.
+          cat > "$pv/src/Directory.Build.props" <<'PROPS'
+          <Project>
+              <Import Project="../Directory.Build.props" />
+              <PropertyGroup>
+                  <IsPackable>false</IsPackable>
+              </PropertyGroup>
+          </Project>
+          PROPS
+
+          dotnet build "$pv/MyApp.slnx" || {
+            echo "::error::The scaffold csproj did not restore or build under a Directory.Build.props that turns on package validation — the shape derive_spec publishes has to be valid there, and valid without the adopter editing that file"
             exit 1
-          fi
+          }
+          sliderule check "$pv/MyApp.slnx" || {
+            echo "::error::The scaffolded spec project built under package validation but was not discovered, or did not pass over conforming code"
+            exit 1
+          }
+
+          # Leg C's negative control: strip the opt-out back out and the restore must fail with NU1101 on
+          # the spec project's own id.
+          sed -i '/<IsPackable>/d' "$pv/arch/MyApp.Architecture/MyApp.Architecture.csproj"
+          build_fails_with "$pv/MyApp.slnx" "$RUNNER_TEMP/pv-without-opt-out.log" 'NU1101.*MyApp\.Architecture' \
+            "Removing IsPackable from the scaffold csproj did not produce NU1101 on MyApp.Architecture — that line is no longer what makes the published scaffold valid under package validation, so the leg above proves nothing"
+
+      # The scaffold lands inside the adopter's tree and inherits its Directory.Build.props, nuget.config and
+      # .editorconfig, so its first build can fail on repository policy that has nothing to do with this
+      # tool, with an error a stranger reads as this tool's. Each leg below sets one such policy around the
+      # unchanged scaffold. Where the spec project can opt out without overriding a choice the repository
+      # made, the recipe's csproj carries the opt-out: the leg builds and checks green, and its control
+      # strips the line and requires the named error back. Where the policy is the repository's to keep, the
+      # leg requires the named error from the unchanged scaffold, applies the cure the recipe's
+      # troubleshooting list gives, and requires a green build and check. Either way a control matches the
+      # error code, never a bare non-zero exit, which any unrelated failure would satisfy.
+      #
+      # D: warnings as errors with documentation and signing on. Generated documentation is CS1591 on the
+      #    public spec class, and a signed .NET Framework spec is CS8002 on the unsigned contract library
+      #    (a .NET target does not report it, so that control retargets the spec to net48, and the leg's feed
+      #    adds nuget.org behind the mapping for the reference assemblies). Both are
+      #    opt-outs; TreatWarningsAsErrors itself stays the repository's, and its control is a dead spec
+      #    literal, whose analyzer warning becomes error SR1017.
+      # E: code style enforced in the build, with a file header required at error. The spec files are the
+      #    repository's code, so the recipe has the agent write the header rather than opt out of the style.
+      # F: a TargetFrameworks list in the root props without the spec's framework. Restore follows the list
+      #    while a singular element decides the build, which is NETSDK1005; the plural element overrides both.
+      #    The control needs a net9.0 reference pack, so this leg's feed adds nuget.org behind the mapping.
+      # G: lock files restored in locked mode. The spec's first build writes its lock file; the failure is a
+      #    lock file left behind a version change, NU1004, and the cure is a forced re-evaluation.
+      # H: package source mapping that maps nothing to SlideRule, NU1100. A package folder that already holds
+      #    the package answers the restore without consulting the mapping, so this leg gets a cold one.
+      - name: Scaffold the documented spec project under inherited repository policy, and check it
+        run: |
+          . .github/scripts/local-pack.sh
+          version="$(pack_version)"
+          export PATH="$PATH:$HOME/.dotnet/tools"
+          . .github/scripts/spec-scaffold.sh
+          spec_scaffold_cut "$version"
+
+          # A strong-name key for leg D, made before NUGET_PACKAGES points at a scaffold's folder. The program
+          # writes the key pair and prints the public key a strong-named product's InternalsVisibleTo grant names:
+          # the strong-name header, then the key blob with the signing algorithm in it, since the provider exports
+          # an exchange key.
+          mkdir -p "$RUNNER_TEMP/keygen"
+          cat > "$RUNNER_TEMP/keygen/key.cs" <<'CS'
+          using System.Security.Cryptography;
+
+          using var rsa = new RSACryptoServiceProvider(1024);
+          File.WriteAllBytes(args[0], rsa.ExportCspBlob(includePrivateParameters: true));
+          CS
+          key="$RUNNER_TEMP/keygen/scaffold.snk"
+          dotnet run "$RUNNER_TEMP/keygen/key.cs" -- "$key"
+
+          export NUGET_PACKAGES="$RUNNER_TEMP/packageref-policy-packages"
+
+          # ── Leg D: warnings as errors, with documentation and signing on ────────────────────────
+          wae="$RUNNER_TEMP/packageref-wae"
+          scaffold "$wae" mapped_pack_feed
+          cat > "$wae/Directory.Build.props" <<PROPS
+          <Project>
+              <PropertyGroup>
+                  <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+                  <GenerateDocumentationFile>true</GenerateDocumentationFile>
+                  <SignAssembly>true</SignAssembly>
+                  <AssemblyOriginatorKeyFile>$key</AssemblyOriginatorKeyFile>
+              </PropertyGroup>
+          </Project>
+          PROPS
+          # The product documents nothing, so it opts out the way a repository's undocumented projects do,
+          # and the spec csproj is the one project the documentation setting can fail.
+          cat > "$wae/src/Directory.Build.props" <<'PROPS'
+          <Project>
+              <Import Project="../Directory.Build.props" />
+              <PropertyGroup>
+                  <GenerateDocumentationFile>false</GenerateDocumentationFile>
+              </PropertyGroup>
+          </Project>
+          PROPS
+
+          dotnet build "$wae/MyApp.slnx" || {
+            echo "::error::The scaffold csproj did not build under TreatWarningsAsErrors with documentation and signing on — the shape derive_spec publishes has to raise no warning of its own there"
+            exit 1
+          }
+          sliderule check "$wae/MyApp.slnx" || {
+            echo "::error::The scaffolded spec project built under TreatWarningsAsErrors but was not discovered, or did not pass over conforming code"
+            exit 1
+          }
+
+          speccsproj="$wae/arch/MyApp.Architecture/MyApp.Architecture.csproj"
+          cp "$speccsproj" "$RUNNER_TEMP/wae-csproj.orig"
+
+          sed -i '/<GenerateDocumentationFile>/d' "$speccsproj"
+          build_fails_with "$speccsproj" "$RUNNER_TEMP/wae-without-docs-opt-out.log" 'error CS1591.*ArchitectureSpec' \
+            "Removing GenerateDocumentationFile from the scaffold csproj did not produce CS1591 on ArchitectureSpec — that line is no longer what keeps the published scaffold building where the repository generates documentation, so the leg above proves nothing"
+
+          cp "$RUNNER_TEMP/wae-csproj.orig" "$speccsproj"
+          sed -i 's|<TargetFrameworks>net10.0</TargetFrameworks>|<TargetFrameworks>net48</TargetFrameworks>|' "$speccsproj"
+          dotnet build "$speccsproj" || {
+            echo "::error::The scaffold csproj retargeted to net48, as the recipe tells a .NET Framework estate to, did not build signed under TreatWarningsAsErrors"
+            exit 1
+          }
+          sed -i '/<NoWarn>/d' "$speccsproj"
+          build_fails_with "$speccsproj" "$RUNNER_TEMP/wae-without-cs8002-opt-out.log" 'error CS8002.*SlideRule' \
+            "Removing the CS8002 NoWarn from the net48 scaffold csproj did not produce CS8002 on SlideRule — that line is no longer what keeps a signed .NET Framework spec building, so the leg above proves nothing"
+
+          cp "$RUNNER_TEMP/wae-csproj.orig" "$speccsproj"
+          dead_pattern_rule "$wae/arch/MyApp.Architecture"
+          build_fails_with "$speccsproj" "$RUNNER_TEMP/wae-dead-literal.log" 'DeadPattern\.cs\([0-9]+,[0-9]+\): error SR1017' \
+            "A dead spec literal under TreatWarningsAsErrors did not fail the build with error SR1017 — the troubleshooting entry for an SR error under that setting describes a failure this leg can no longer show"
+
+          # ── Leg E: code style enforced in the build, with a file header required ─────────────────
+          style="$RUNNER_TEMP/packageref-style"
+          scaffold "$style"
+          cat > "$style/Directory.Build.props" <<'PROPS'
+          <Project>
+              <PropertyGroup>
+                  <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+              </PropertyGroup>
+          </Project>
+          PROPS
+          cat > "$style/.editorconfig" <<'EDITORCONFIG'
+          root = true
+
+          [*.cs]
+          file_header_template = Copyright (c) Contoso. All rights reserved.
+          dotnet_diagnostic.IDE0073.severity = error
+          EDITORCONFIG
+          # with_header <file>: the header the template names, as the repository's own files carry it.
+          with_header() {
+            { printf '// Copyright (c) Contoso. All rights reserved.\n\n'; cat "$1"; } > "$1.tmp" && mv "$1.tmp" "$1"
+          }
+          with_header "$style/src/MyApp/Shipments.cs"
+          with_header "$style/arch/MyApp.Architecture/CheckedRule.cs"
+
+          build_fails_with "$style/MyApp.slnx" "$RUNNER_TEMP/style-without-header.log" 'ArchitectureSpec\.cs\([0-9]+,[0-9]+\): error IDE0073' \
+            "The recipe's spec class without the repository's header did not fail with IDE0073 — the troubleshooting entry for it describes a failure this leg can no longer show"
+
+          with_header "$style/arch/MyApp.Architecture/ArchitectureSpec.cs"
+          dotnet build "$style/MyApp.slnx" || {
+            echo "::error::The scaffold did not build under enforced code style once its spec file carried the repository's header, the cure the recipe gives"
+            exit 1
+          }
+          sliderule check "$style/MyApp.slnx" || {
+            echo "::error::The scaffolded spec project built under enforced code style but was not discovered, or did not pass over conforming code"
+            exit 1
+          }
+
+          # ── Leg F: a TargetFrameworks list in the root props without the spec's framework ────────
+          tfms="$RUNNER_TEMP/packageref-tfms"
+          scaffold "$tfms" mapped_pack_feed
+          cat > "$tfms/Directory.Build.props" <<'PROPS'
+          <Project>
+              <PropertyGroup>
+                  <TargetFrameworks>net9.0</TargetFrameworks>
+              </PropertyGroup>
+          </Project>
+          PROPS
+          # The product states its own list, as a repository's projects do where the root list does not fit them.
+          sed -i 's|<TargetFramework>net10.0</TargetFramework>|<TargetFrameworks>net10.0</TargetFrameworks>|' "$tfms/src/MyApp/MyApp.csproj"
+
+          dotnet build "$tfms/MyApp.slnx" || {
+            echo "::error::The scaffold csproj did not build under a root TargetFrameworks list that leaves its framework out — the shape derive_spec publishes has to be valid there, and valid without the adopter editing that file"
+            exit 1
+          }
+          sliderule check "$tfms/MyApp.slnx" || {
+            echo "::error::The scaffolded spec project built under a root TargetFrameworks list but was not discovered, or did not pass over conforming code"
+            exit 1
+          }
+
+          sed -i 's|<TargetFrameworks>net10.0</TargetFrameworks>|<TargetFramework>net10.0</TargetFramework>|' "$tfms/arch/MyApp.Architecture/MyApp.Architecture.csproj"
+          build_fails_with "$tfms/arch/MyApp.Architecture/MyApp.Architecture.csproj" "$RUNNER_TEMP/tfms-singular.log" 'error NETSDK1005.*MyApp\.Architecture' \
+            "The scaffold csproj with a singular TargetFramework did not produce NETSDK1005 under a root TargetFrameworks list — the plural element is no longer what makes the published scaffold valid there, so the leg above proves nothing"
+
+          # ── Leg G: lock files restored in locked mode ──────────────────────────────────────────
+          lock="$RUNNER_TEMP/packageref-lock"
+          scaffold "$lock"
+          cat > "$lock/Directory.Build.props" <<'PROPS'
+          <Project>
+              <PropertyGroup>
+                  <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+                  <RestoreLockedMode>true</RestoreLockedMode>
+              </PropertyGroup>
+          </Project>
+          PROPS
+
+          dotnet build "$lock/MyApp.slnx" || {
+            echo "::error::The scaffold csproj did not build its first time under locked restore — the shape derive_spec publishes has to be valid there before any lock file exists"
+            exit 1
+          }
+          speclock="$lock/arch/MyApp.Architecture/packages.lock.json"
+          grep -Fq "\"requested\": \"[$version, )\"" "$speclock" || {
+            echo "::error::The scaffold's first locked build wrote no lock file requesting SlideRule $version — the troubleshooting entry tells the adopter to commit the one it writes"
+            cat "$speclock" || true
+            exit 1
+          }
+          sliderule check "$lock/MyApp.slnx" || {
+            echo "::error::The scaffolded spec project built under locked restore but was not discovered, or did not pass over conforming code"
+            exit 1
+          }
+
+          # The adopter moves the pin, and the committed lock file now trails it. The pin moves to the exact
+          # range of the same version because the local pack holds only one; an edit to the lock file alone
+          # would not do, since restore's no-op check never reads it and the build would pass.
+          sed -i 's|Version="'"$version"'"|Version="['"$version"']"|' "$lock/arch/MyApp.Architecture/MyApp.Architecture.csproj"
+          build_fails_with "$lock/MyApp.slnx" "$RUNNER_TEMP/lock-stale.log" 'error NU1004.*SlideRule' \
+            "A lock file trailing a moved SlideRule pin did not produce NU1004 under locked restore — the troubleshooting entry for it describes a failure this leg can no longer show"
+          dotnet restore "$lock/arch/MyApp.Architecture/MyApp.Architecture.csproj" --force-evaluate
+          dotnet build "$lock/MyApp.slnx" || {
+            echo "::error::The scaffold did not build under locked restore after the forced re-evaluation the recipe gives as the cure for NU1004"
+            exit 1
+          }
+
+          # ── Leg H: package source mapping that maps nothing to SlideRule ────────────────────────
+          map="$RUNNER_TEMP/packageref-map"
+          scaffold "$map"
+          # mapped_feed <patterns>: the local pack as the only source, mapped to the given package patterns.
+          mapped_feed() {
+          cat > "$map/nuget.config" <<CONFIG
+          <?xml version="1.0" encoding="utf-8"?>
+          <configuration>
+              <packageSources>
+                  <clear />
+                  <add key="local-pack" value="$GITHUB_WORKSPACE/artifacts" />
+              </packageSources>
+              <packageSourceMapping>
+                  <packageSource key="local-pack">
+                      <package pattern="Contoso.*" />
+          $1
+                  </packageSource>
+              </packageSourceMapping>
+          </configuration>
+          CONFIG
+          }
+          export NUGET_PACKAGES="$map/.packages"
+
+          mapped_feed ''
+          build_fails_with "$map/MyApp.slnx" "$RUNNER_TEMP/map-unmapped.log" "error NU1100: Unable to resolve 'SlideRule" \
+            "The scaffold under a source mapping that maps nothing to SlideRule did not produce NU1100 — the troubleshooting entry for it describes a failure this leg can no longer show"
+
+          mapped_feed '            <package pattern="SlideRule" />
+                      <package pattern="SlideRule.*" />'
+          dotnet build "$map/MyApp.slnx" || {
+            echo "::error::The scaffold did not restore once the source mapping carried the two patterns the recipe gives as the cure for NU1100"
+            exit 1
+          }
+          require_contract_from_pack "$version" "The scaffold under package source mapping"
+          sliderule check "$map/MyApp.slnx" || {
+            echo "::error::The scaffolded spec project built under package source mapping but was not discovered, or did not pass over conforming code"
+            exit 1
+          }
 
       # Above proves the contract package restores and that `check` finds the scaffold. Nothing yet proves
       # the other half of what that one PackageReference delivers: a spec author who references the contract
@@ -656,6 +841,7 @@ jobs:
       - name: The contract package's own analyzer reports a dead literal, with no second reference
         run: |
           export PATH="$PATH:$HOME/.dotnet/tools"
+          . .github/scripts/spec-scaffold.sh
           root="$RUNNER_TEMP/packageref"
           export NUGET_PACKAGES="$root/.packages"
           spec="$root/arch/MyApp.Architecture/DeadPattern.cs"
@@ -686,8 +872,20 @@ jobs:
           # short-circuits before any target does, so it reports the two the SDK adds and nothing of
           # this package's three. Measured 2026-09-22: bare, two rows; with the target,
           # five.
+          #
+          # The framework is named too. The recipe's csproj sets TargetFrameworks, and a build of it
+          # with no framework is the outer build that dispatches to one per framework, which has no
+          # ResolveLockFileAnalyzers target and fails with MSB4057. It is read from the csproj, so the
+          # probe follows the recipe's first framework.
+          speccsproj="$root/arch/MyApp.Architecture/MyApp.Architecture.csproj"
+          framework="$(sed -n 's:.*<TargetFrameworks>\([^;<]*\).*:\1:p' "$speccsproj")"
+          [ -n "$framework" ] || {
+            echo "::error::The scaffold csproj names no TargetFrameworks, so the Analyzer probe below has no framework to build"
+            cat "$speccsproj"
+            exit 1
+          }
           items="$RUNNER_TEMP/scaffold-analyzers.txt"
-          dotnet build "$root/arch/MyApp.Architecture/MyApp.Architecture.csproj" -t:ResolveLockFileAnalyzers -getItem:Analyzer > "$items" 2>&1 || {
+          dotnet build "$speccsproj" -f "$framework" -t:ResolveLockFileAnalyzers -getItem:Analyzer > "$items" 2>&1 || {
             echo "::error::Could not read the scaffold's Analyzer items"
             cat "$items"
             exit 1
@@ -700,25 +898,7 @@ jobs:
             }
           done
 
-          # One rule, one bad literal. 'MyApp.*.Controllers.*' is a subtree glob whose literal prefix itself
-          # carries a wildcard, so it can never match anything — a deduction from the matcher's own
-          # semantics, which is the line the catalog draws and the analyzer holds to.
-          cat > "$spec" <<'CS'
-          using SlideRule;
-
-          namespace MyApp.Architecture;
-
-          public sealed class DeadPatternProof : IArchitectureSpec
-          {
-              public void Define(Arch arch)
-              {
-                  arch.Rule("naming/dead-pattern")
-                      .Enforce(arch.Namespace("MyApp.*.Controllers.*").MustHavePrefix("I"))
-                      .Because("The pattern this rule selects on can never match a namespace, so the rule holds nothing to anything.")
-                      .Fix("Anchor the subtree on a literal prefix, so the pattern names the namespaces it means.");
-              }
-          }
-          CS
+          dead_pattern_rule "$root/arch/MyApp.Architecture"
 
           # The position is asserted, not just the ID: a diagnostic on the statement rather than on the
           # literal would pass a bare ID grep and be useless in an editor. The line is computed from the file
@@ -769,6 +949,7 @@ jobs:
       - name: Reference the analyzer package from the scaffold and build a broken rule
         run: |
           . .github/scripts/local-pack.sh
+          . .github/scripts/spec-scaffold.sh
           version="$(pack_version)"
           export PATH="$PATH:$HOME/.dotnet/tools"
           root="$RUNNER_TEMP/packageref"
@@ -802,13 +983,7 @@ jobs:
             exit 1
           fi
 
-          cat > "$root/src/MyApp/Broken.cs" <<'CS'
-          namespace MyApp;
-
-          public interface ShipmentPortWithoutThePrefix
-          {
-          }
-          CS
+          write_violation "$root"
           broken="$RUNNER_TEMP/analyzer-broken.log"
           dotnet build "$root/MyApp.slnx" > "$broken" 2>&1 || {
             echo "::error::A broken rule failed the build; the analyzer reports warnings and must never stop one"
@@ -1198,7 +1373,7 @@ jobs:
       # Restore step carries the reason.
       #
       # The src projects run the build analyzer over themselves (src/Directory.Build.props), so this
-      # build is also its verdict on this repository, with all six IDs as errors for the reasons the
+      # build is also its verdict on this repository, with every one of its IDs an error for the reasons the
       # examples job gives. It is the one build that gates them: build-and-test prints them as
       # warnings, and check below decides the rules a single project cannot.
       - name: Build
@@ -1296,11 +1471,11 @@ jobs:
       # it keeps setting it.
       #
       # Each example attaches the build analyzer (examples/Directory.Build.targets), so these builds
-      # are also what holds it to saying nothing here. All six of its IDs are errors: a broken rule
+      # are also what holds it to saying nothing here. Every one of its IDs is an error: a broken rule
       # or an unheld ratchet (SR2001, SR2002) would be a finding `check` below does not have, and the
-      # other four report the analyzer's own state — no model file, a file it could not read, a
+      # others report the analyzer's own state — no model file, a file it could not read, a
       # ratcheted rule it had no baseline for, a fault inside it. Each example commits a
-      # sliderule.model.json and checks green on its committed baselines, so any of the six is news.
+      # sliderule.model.json and checks green on its committed baselines, so any of them is news.
       - name: Build the Meridian example solution
         run: dotnet build examples/Meridian/Meridian.slnx -p:RestoreLockedMode=true -warnaserror:${{ env.SR_BUILD_TIER_IDS }}
       - name: Build the Meridian.Quoting example solution
