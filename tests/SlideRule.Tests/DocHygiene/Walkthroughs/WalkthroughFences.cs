@@ -1,4 +1,6 @@
 using Shouldly;
+using SlideRule.Tests.Cli;
+using SlideRule.Tests.TestSupport;
 using static SlideRule.Tests.DocHygiene.Walkthroughs.WalkthroughScenarios;
 
 namespace SlideRule.Tests.DocHygiene.Walkthroughs;
@@ -105,15 +107,28 @@ internal static class WalkthroughFences
         "Spells arch.Types.InNamespace(\"Meridian.Interchange.*\") where the spec uses its interchange local, so no "
         + "line is a line of the spec.";
 
+    // The rule the showcase page leads with.
+    private const string ShowcaseHeadline = "layering/core-declares-no-blazor-shared";
+
     private static readonly string HeldBy =
         $"{nameof(WalkthroughReplayTests)}.{nameof(WalkthroughReplayTests.Fence_IsWhatItsScenarioPrints)}";
+
+    private static readonly string ShowcaseHeldBy =
+        $"{nameof(ShowcaseReplayTests)}.{nameof(ShowcaseReplayTests.Fence_IsWhatTheShowcaseRunPrints)}";
+
+    // Per doc, the line numbers of every fence that carries a showcase fence's or a showcase excerpt's marker, read
+    // once because the question is asked line by line.
+    private static readonly Lazy<IReadOnlyDictionary<string, HashSet<int>>> ShowcaseHeldLines = new(ReadShowcaseHeldLines);
 
     /// <summary>The draft spec the adoption walkthrough checks in its step 4, compiled as the page prints it.</summary>
     internal static readonly EditFence AdoptingDraft = new(
         DocPaths.MeridianAdopting, "adopting-draft-spec", "DotNetGuidance.AsyncSuffix(arch, arch.AnyOf(domain, web), PackPosture.Enforce);",
         Scenario: null, File: null);
 
-    /// <summary>Every fence the replay re-makes, page by page in the order each page prints them.</summary>
+    /// <summary>
+    ///     Every fence the replay re-makes over this repository's own examples, page by page in the order each page
+    ///     prints them.
+    /// </summary>
     internal static readonly IReadOnlyList<ReplayedFence> Replayed =
     [
         // The plain check skips the diff-aware tripwire and the hook's run does not, so the summary's skip
@@ -204,6 +219,23 @@ internal static class WalkthroughFences
         RuleBlockOf(DocPaths.InterchangeReadme, "interchange-rename-check", "FAIL naming/async-suffix", Rename, cut: InterchangeCut)
     ];
 
+    /// <summary>
+    ///     Every fence the showcase page cuts from a run over the pinned fork, in the order the page prints them. The
+    ///     check and status fences are cut from what the verbs printed, stamp included, and the others from the
+    ///     replay's composition of the same run.
+    /// </summary>
+    internal static readonly IReadOnlyList<ReplayedFence> Showcase =
+    [
+        FromShowcase(
+            "showcase-unbaselined-check", $"FAIL {ShowcaseHeadline}", static run => run.Unbaselined.RuleBlock(ShowcaseHeadline),
+            cut: "`check` fails the rule with this block"),
+        FromShowcase("showcase-explain", "  policy: MigrateIfSmall", static run => run.Explain(ShowcaseHeadline)),
+        FromShowcase(
+            "showcase-check", "The verdict below covers only", static run => FenceCuts.StampAndSummary(Printed(run.CheckVerb)),
+            cut: "that stamp and the report's summary line"),
+        FromShowcase("showcase-status", "Burndown:", static run => Printed(run.StatusVerb))
+    ];
+
     /// <summary>Every fence showing the code a scenario writes, and the draft spec the replay compiles.</summary>
     internal static readonly IReadOnlyList<EditFence> Edits =
     [
@@ -275,6 +307,38 @@ internal static class WalkthroughFences
                ?? throw new InvalidOperationException($"No replayed walkthrough fence is keyed '{key}'.");
     }
 
+    /// <summary>
+    ///     Whether <paramref name="line" /> of <paramref name="doc" /> is inside a showcase fence that a gated test
+    ///     holds to the pinned fork, a replayed run or an excerpt. A sweep that holds quotes to this repository's own
+    ///     files passes these lines by, because the fork is their authority. A marker that picks out no fence, or
+    ///     several, is the quote-sync gate's to report.
+    /// </summary>
+    internal static bool IsHeldByTheShowcase(string doc, int line)
+    {
+        return ShowcaseHeldLines.Value.TryGetValue(doc, out HashSet<int>? held) && held.Contains(line);
+    }
+
+    private static IReadOnlyDictionary<string, HashSet<int>> ReadShowcaseHeldLines()
+    {
+        return Showcase.Select(static fence => (fence.Fence.Doc, fence.Fence.Marker))
+            .Concat(QuoteSyncTests.ShowcaseExcerpts.Select(static excerpt => (excerpt.Doc, excerpt.Marker)))
+            .GroupBy(static fence => fence.Doc, static fence => fence.Marker, StringComparer.Ordinal)
+            .ToDictionary(
+                static markers => markers.Key,
+                static markers => DocFences.FencedBlocks(RepoRoot.ReadText(markers.Key))
+                    .Where(block => markers.Any(marker => block.Any(fenceLine => fenceLine.Text.Contains(marker, StringComparison.Ordinal))))
+                    .SelectMany(static block => block.Select(static fenceLine => fenceLine.Number))
+                    .ToHashSet(),
+                StringComparer.Ordinal);
+    }
+
+    /// <summary>The showcase fence keyed <paramref name="key" />.</summary>
+    internal static ReplayedFence ShowcaseNamed(string key)
+    {
+        return Showcase.SingleOrDefault(fence => string.Equals(fence.Fence.Key, key, StringComparison.Ordinal))
+               ?? throw new InvalidOperationException($"No showcase fence is keyed '{key}'.");
+    }
+
     /// <summary>The edit fence keyed <paramref name="key" />.</summary>
     internal static EditFence EditNamed(string key)
     {
@@ -285,7 +349,8 @@ internal static class WalkthroughFences
     /// <summary>Every marker these registries hold a fence to, with the doc it names a fence in.</summary>
     internal static IEnumerable<(string Doc, string Key, string Marker)> Markers()
     {
-        return Replayed.Select(static fence => (fence.Fence.Doc, fence.Fence.Key, fence.Fence.Marker))
+        return Replayed.Concat(Showcase)
+            .Select(static fence => (fence.Fence.Doc, fence.Fence.Key, fence.Fence.Marker))
             .Concat(Edits.Select(static fence => (fence.Doc, fence.Key, fence.Marker)))
             .Concat(Illustrative.Select(static fence => (fence.Doc, fence.Key, fence.Marker)))
             .Concat(Reading.Select(static fence => (fence.Doc, fence.Key, fence.Marker)));
@@ -305,6 +370,21 @@ internal static class WalkthroughFences
     private static ReplayedFence RuleBlockOf(string doc, string key, string marker, WalkthroughScenario scenario, string? cut)
     {
         return FromScenario(doc, key, marker, scenario, run => run.RuleBlock(scenario.Moves.Single()), cut);
+    }
+
+    // A fence cut from the showcase's run over the pinned fork.
+    private static ReplayedFence FromShowcase(string key, string marker, Func<ExampleRun, string> expected, string? cut = null)
+    {
+        return new ReplayedFence(
+            new CapturedFence(DocPaths.ShowcaseReadme, key, marker, ShowcaseHeldBy), ShowcaseCheckout.Name, null,
+            (run, _) => expected(run), cut);
+    }
+
+    // What a verb printed, LF throughout and with no trailing newline, the shape every cut takes.
+    private static string Printed(CliResult verb)
+    {
+        return verb.Out.NormalizedLines()
+            .TrimEnd('\n');
     }
 
     // A fence cut from the example's committed tree, or from the adoption walkthrough's steps over it.

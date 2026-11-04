@@ -89,9 +89,9 @@ public sealed class WalkthroughReplayTests
         // Assert — the replay extracts the committed tree as the verbs do.
         run.Committed.ShouldModelTheSameAs(run.Governed);
         run.CheckVerb.ShouldSucceed()
-            .ShouldPrintVerbatim($"{run.Tree.Report}\n");
+            .ShouldPrintVerbatim($"{run.CheckPrinted}\n");
         run.StatusVerb.ShouldSucceed()
-            .ShouldPrintVerbatim($"{string.Join("\n", run.Tree.StatusLines)}\n");
+            .ShouldPrintVerbatim($"{run.StatusPrinted}\n");
     }
 
     /// <summary>

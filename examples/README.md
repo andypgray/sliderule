@@ -1,21 +1,23 @@
 # Examples
 
-Six worked examples demonstrate one spec model with two render targets (deterministic enforcement
-and generated agent context). Four are solutions, and CI builds each one with the
+Seven worked examples demonstrate one spec model with two render targets (deterministic enforcement
+and generated agent context). Four are solutions in this repository, and CI builds each one with the
 [build analyzer](../src/SlideRule.Analyzers/README.md) attached and runs `check` against its
 committed baselines. CI also re-runs `render` to prove that the committed agent context and the
-committed architecture drawings both still match the code. The other two walk a flow with captured
-output. Three of the four postures (`Enforce` law, ratcheted `Migrate` debt, and `Quarantine`
-containment) are spread across the set. The fourth, `Caution`, is
-in [SlideRule's own spec](../arch/SlideRule.Architecture/SlideRuleArchitectureSpec.cs) instead.
+committed architecture drawings both still match the code. Two walk a flow with captured output,
+and the seventh walks a fork outside this repository. Three of the four postures (`Enforce` law,
+ratcheted `Migrate` debt, and `Quarantine` containment) are spread across the Meridian examples. The
+fourth, `Caution`, appears in the eShopOnWeb walkthrough and in
+[SlideRule's own spec](../arch/SlideRule.Architecture/SlideRuleArchitectureSpec.cs).
 
 Each of the four solutions ships an `ARCHITECTURE.md` with a pair of drawings that
 `render --diagram` writes. One is a codebase survey of the projects and the references between them,
 drawn from what the code does. The other is a law fence of the places the spec names and the
 references it forbids, drawn from the spec.
 
-All six share one fiction (Meridian, a freight-forwarding company), so the examples can
-cross-reference one another as parts of one business.
+The first six share one fiction (Meridian, a freight-forwarding company), so the examples can
+cross-reference one another as parts of one business. The seventh runs on eShopOnWeb, Microsoft's
+reference application, in a public fork that CI fetches at a pinned commit.
 
 - [Three of the four postures on one codebase](Meridian/): the `Meridian` monolith mid-migration.
   It has the law it keeps, three ratcheted migrations with their burndown, and a quarantined scope
@@ -49,6 +51,11 @@ cross-reference one another as parts of one business.
 - [The agent loop, closed by a hook](Meridian/hooks/): the `Meridian/hooks` showcase. A Claude
   Code hook runs `check` when the agent's turn ends, so new code in a retired pattern goes red at the
   moment of creation. The storyboard walks one task from the old pattern to self-correction.
+
+- [A reference architecture held to its own book](eShopOnWeb/): a public fork of eShopOnWeb
+  that adopts SlideRule end to end. One agent session derived the spec from the e-book and the
+  repository's docs, and the curated spec finds a project reference that the repository's own rule
+  for the core forbids. CI re-runs every output on the page against the fork's pinned commit.
 
 Read them in list order. Later pages build on earlier ones, and each ends with cross-links to
 the examples it connects to.

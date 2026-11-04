@@ -45,6 +45,18 @@ internal static class FenceCuts
         return Lines(report)[^1];
     }
 
+    /// <summary>
+    ///     The stamp a verb writes above its report, up to and including the blank line that closes it, then the
+    ///     report's summary line.
+    /// </summary>
+    internal static string StampAndSummary(string printed)
+    {
+        IEnumerable<string> stamp = Lines(printed)
+            .TakeWhile(static line => line.Length > 0);
+
+        return $"{string.Join("\n", stamp)}\n\n{SummaryLine(printed)}";
+    }
+
     /// <summary>The text without the lines that start with <paramref name="prefix" />.</summary>
     internal static string WithoutLinesStarting(string text, string prefix)
     {

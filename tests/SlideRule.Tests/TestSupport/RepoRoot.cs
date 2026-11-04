@@ -33,7 +33,13 @@ internal static class RepoRoot
     /// <summary>The absolute native path for a forward-slash repo-relative one.</summary>
     public static string Absolute(string repoRelativePath)
     {
-        return Path.Combine([Directory, .. repoRelativePath.Split('/')]);
+        return Under(Directory, repoRelativePath);
+    }
+
+    /// <summary>The native path for a forward-slash path relative to <paramref name="root" />.</summary>
+    public static string Under(string root, string relativePath)
+    {
+        return Path.Combine([root, .. relativePath.Split('/')]);
     }
 
     /// <summary>The whole text of a committed file, named by its forward-slash repo-relative path.</summary>
@@ -56,13 +62,22 @@ internal static class RepoRoot
     /// </summary>
     public static Func<string, IReadOnlyList<string>?> LineReader()
     {
+        return LineReaderUnder(Directory);
+    }
+
+    /// <summary>
+    ///     The same reader over the tree under <paramref name="root" />, this repository or another checkout, by
+    ///     forward-slash paths relative to that root.
+    /// </summary>
+    public static Func<string, IReadOnlyList<string>?> LineReaderUnder(string root)
+    {
         Dictionary<string, IReadOnlyList<string>?> read = new(StringComparer.Ordinal);
 
         return repoRelative =>
         {
             if (read.TryGetValue(repoRelative, out IReadOnlyList<string>? cached)) return cached;
 
-            string full = Absolute(repoRelative);
+            string full = Under(root, repoRelative);
             IReadOnlyList<string>? lines = File.Exists(full) ? File.ReadAllLines(full) : null;
             read[repoRelative] = lines;
 

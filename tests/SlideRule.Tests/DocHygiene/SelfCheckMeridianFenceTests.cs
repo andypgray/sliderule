@@ -29,7 +29,7 @@ public sealed class SelfCheckMeridianFenceTests
     ///     The suite's example-gated classes: each skips unless the examples are built, and the examples job is the
     ///     only place they are.
     /// </summary>
-    private static readonly string[] ExampleGatedClasses =
+    internal static readonly string[] ExampleGatedClasses =
     [
         nameof(ExampleModelRoundTripTests),
         nameof(SelfCheckMeridianFenceTests),

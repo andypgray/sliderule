@@ -1353,6 +1353,81 @@ jobs:
           dotnet run --no-build --project src/SlideRule.Cli -- render examples/Meridian.Interchange/Meridian.Interchange.slnx --diagram examples/Meridian.Interchange/ARCHITECTURE.md --check || rc=$?
           exit "$rc"
 
+  # The showcase page quotes an external repository: the eShopOnWeb fork pinned in
+  # examples/eShopOnWeb/showcase.json. This job fetches that commit into $RUNNER_TEMP, outside the
+  # workspace, so none of this repository's props, targets or global.json reach it, and
+  # actions/checkout cannot place a repository there. It runs this commit's check over the fork, runs
+  # the page's commands against a fresh clone with the release the fork pins, and runs the gated classes
+  # that hold the page's fences and excerpts to the checkout. The fork's rendered files and model file
+  # are its pinned release's, so render is not held to them here. A contract change that the fork's
+  # pinned spec cannot load keeps this job red until a release moves the fork and the pin.
+  showcase:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+      # Relock for Dependabot NuGet PRs, so the CLI build below is of the bump. Identical text in
+      # build-and-test, which carries the rationale.
+      - name: Regenerate NuGet lock files (Dependabot NuGet PRs)
+        if: startsWith(github.head_ref, 'dependabot/nuget/')
+        shell: bash
+        env:
+          CI: ''
+        run: |
+          dotnet restore SlideRule.slnx --force-evaluate
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- '*packages.lock.json'
+          git diff --cached --quiet || git commit -q -m 'Regenerate NuGet lock files'
+      # The pin names a commit, which a shallow fetch reaches without its history. The audit is off
+      # because the replay quotes no advisory, and the advisories change with the date.
+      - name: Fetch and build the pinned showcase fork
+        run: |
+          pin=examples/eShopOnWeb/showcase.json
+          root="$RUNNER_TEMP/showcase"
+          git init -q "$root"
+          git -C "$root" fetch -q --depth 1 "$(jq -r '.fork.repository' "$pin")" "$(jq -r '.fork.commit' "$pin")"
+          git -C "$root" checkout -q FETCH_HEAD
+          solution="$root/$(jq -r '.solution' "$pin")"
+          spec="$root/$(jq -r '.specProject' "$pin")"
+          dotnet restore "$solution" -p:NuGetAudit=false
+          dotnet build "$spec" --no-restore
+          {
+            echo "SHOWCASE_ROOT=$root"
+            echo "SHOWCASE_SOLUTION=$solution"
+            echo "SHOWCASE_SPEC=$spec"
+          } >> "$GITHUB_ENV"
+      - name: Build the SlideRule CLI
+        run: dotnet build src/SlideRule.Cli/SlideRule.Cli.csproj -p:RestoreLockedMode=true
+      - name: Check the showcase fork with this commit's CLI (expect exit 0 on its committed baselines)
+        run: dotnet run --no-build --project src/SlideRule.Cli -- check "$SHOWCASE_SOLUTION" --spec "$SHOWCASE_SPEC"
+      # The page's commands as a reader runs them: a clone at the tag, the release the fork pins, a
+      # build and a check. Run through `bash -e -c`, so a failing middle line fails the step.
+      - name: Run the showcase page's commands against a fresh clone of the pinned fork
+        run: |
+          . .github/scripts/fence.sh
+          commands="$(fence examples/eShopOnWeb/README.md bash 'git clone --branch sliderule-showcase-1')"
+          [ -n "$commands" ] || {
+            echo "::error::Could not cut the command fence out of examples/eShopOnWeb/README.md; it has moved or changed shape. Fix the page or fix this cut; do not delete the assertion."
+            exit 1
+          }
+          export PATH="$PATH:$HOME/.dotnet/tools"
+          walk="$RUNNER_TEMP/showcase-walk"
+          mkdir -p "$walk"
+          cd "$walk"
+          bash -e -c "$commands"
+      # No --no-build: nothing above builds the test project, so dotnet test restores and builds it,
+      # and it carries a lock file.
+      - name: The showcase page's fences and excerpts match the pinned fork
+        env:
+          SLIDERULE_SHOWCASE_ROOT: ${{ env.SHOWCASE_ROOT }}
+        run: dotnet test tests/SlideRule.Tests/SlideRule.Tests.csproj --filter "FullyQualifiedName~ShowcaseReplayTests|FullyQualifiedName~ShowcaseExcerptTests" --output Detailed -p:RestoreLockedMode=true
+
   # The one check a Dependabot NuGet PR is meant to fail. Every job above relocks so it can test the
   # bump; this one relocks and requires a zero diff, so the PR carries real signal about the update
   # and exactly one red naming the command that closes it.

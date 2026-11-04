@@ -1,0 +1,34 @@
+{
+  "fork": {
+    "repository": "https://github.com/andypgray/eShopOnWeb",
+    "commit": "a99ad6d366f40d24961879599d902e684c91046e",
+    "tag": "sliderule-showcase-1"
+  },
+  "upstream": {
+    "repository": "https://github.com/NimblePros/eShopOnWeb",
+    "commit": "f21d6233b851897371c25c5e7ffa67bb8552dba8"
+  },
+  "solution": "eShopOnWeb.slnx",
+  "specProject": "arch/EShopOnWeb.Architecture/EShopOnWeb.Architecture.csproj",
+  "declared": {
+    "unsupportedProjects": [
+      "docker-compose.dcproj"
+    ],
+    "loadDiagnostics": [
+      "Cannot open project 'docker-compose.dcproj' because the file extension '.dcproj' is not associated with a language.",
+      "Msbuild failed when processing the file 'src/BlazorAdmin/BlazorAdmin.csproj' with message: PackageReference System.Net.Http.Json will not be pruned. This package is automatically available and does not need to be referenced explicitly. Remove the PackageReference item.",
+      "Msbuild failed when processing the file 'src/Web/Web.csproj' with message: PackageReference System.Diagnostics.Debug will not be pruned. This package is automatically available and does not need to be referenced explicitly. Remove the PackageReference item.",
+      "Msbuild failed when processing the file 'src/Web/Web.csproj' with message: PackageReference System.Diagnostics.Tracing will not be pruned. This package is automatically available and does not need to be referenced explicitly. Remove the PackageReference item.",
+      "Msbuild failed when processing the file 'src/Web/Web.csproj' with message: PackageReference System.IO.FileSystem will not be pruned. This package is automatically available and does not need to be referenced explicitly. Remove the PackageReference item.",
+      "Msbuild failed when processing the file 'src/Web/Web.csproj' with message: PackageReference System.IO.FileSystem.Primitives will not be pruned. This package is automatically available and does not need to be referenced explicitly. Remove the PackageReference item.",
+      "Msbuild failed when processing the file 'src/Web/Web.csproj' with message: PackageReference System.Net.Primitives will not be pruned. This package is automatically available and does not need to be referenced explicitly. Remove the PackageReference item.",
+      "Msbuild failed when processing the file 'src/Web/Web.csproj' with message: PackageReference System.Runtime.Handles will not be pruned. This package is automatically available and does not need to be referenced explicitly. Remove the PackageReference item.",
+      "Msbuild failed when processing the file 'src/Web/Web.csproj' with message: PackageReference System.Runtime.InteropServices will not be pruned. This package is automatically available and does not need to be referenced explicitly. Remove the PackageReference item.",
+      "Msbuild failed when processing the file 'src/Web/Web.csproj' with message: PackageReference System.Text.Encoding.Extensions will not be pruned. This package is automatically available and does not need to be referenced explicitly. Remove the PackageReference item.",
+      "Msbuild failed when processing the file 'src/Web/Web.csproj' with message: PackageReference System.Threading will not be pruned. This package is automatically available and does not need to be referenced explicitly. Remove the PackageReference item."
+    ],
+    "mergeNotes": [
+      "Projects 'BlazorAdmin', 'PublicApi', 'Web' and 'eShopWeb.AppHost' each declare 'Program'; its facts and project attribution follow 'BlazorAdmin' (the first declarer), but arch.Project('PublicApi'), arch.Project('Web') and arch.Project('eShopWeb.AppHost') selections include it too, and each declarer's reference to its own compiled-in copy counts against that declarer alone."
+    ]
+  }
+}

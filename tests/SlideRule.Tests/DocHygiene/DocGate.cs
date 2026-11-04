@@ -81,12 +81,17 @@ internal sealed class DocGate<TQuote>(
     /// <param name="counted">The countable in the per-doc finding, singular-with-plural as it is counted ("rule sentence(s)").</param>
     /// <param name="swept">The plural of that countable, as the header names it ("rule sentences").</param>
     /// <param name="authority">What the gate holds those quotes to, as the header names it ("the spec").</param>
+    /// <param name="heldElsewhere">
+    ///     Whether another test holds a quote to its own authority, so the sweep does not count it; null when
+    ///     every quote outside the registry counts.
+    /// </param>
     /// <remarks>
     ///     Git decides the scope, as it does for every hygiene gate here, and the sweep runs over every
     ///     tracked markdown file rather than only the ones under a named root: narrowing it would leave the
     ///     registered docs' siblings unguarded for no reason.
     /// </remarks>
-    internal void ShouldFindNothingOutsideTheRegistry(string counted, string swept, string authority)
+    internal void ShouldFindNothingOutsideTheRegistry(
+        string counted, string swept, string authority, Func<TQuote, bool>? heldElsewhere = null)
     {
         HashSet<string> registered = registeredDocs.ToHashSet(StringComparer.Ordinal);
         List<string> unregistered = new();
@@ -96,7 +101,7 @@ internal sealed class DocGate<TQuote>(
             if (registered.Contains(path)) continue;
 
             int found = Scan(path)
-                .Count;
+                .Count(quote => heldElsewhere is null || !heldElsewhere(quote));
             if (found > 0) unregistered.Add($"{path} quotes {found} {counted} but is not registered.");
         }
 

@@ -52,67 +52,143 @@ internal static class ExampleReplay
                 static example => new Lazy<Task<ExampleRun>>(() => RunAsync(example)),
                 StringComparer.Ordinal);
 
+    // The showcase's checkout is named by a variable and read once the gate has passed, so its run is made on the
+    // first ask, never at type load.
+    private static readonly Lazy<Task<ExampleRun>> Showcase = new(static () => ShouldReplayShowcaseAsync(ShowcaseCheckout.Solution));
+
     /// <summary>The replay of <paramref name="example" />, made on first use.</summary>
     internal static Task<ExampleRun> RunOf(string example)
     {
         return Runs[example].Value;
     }
 
+    /// <summary>
+    ///     The replay of the showcase's pinned checkout, made on first use. Call it after
+    ///     <see cref="ShowcaseCheckout.ShouldBeAtThePin" />, which is what decides there is a checkout to replay.
+    /// </summary>
+    internal static Task<ExampleRun> ShowcaseRun()
+    {
+        return Showcase.Value;
+    }
+
     private static async Task<ExampleRun> RunAsync(ExampleSolution solution)
     {
         string directory = solution.SolutionDirectory;
+        CommittedTree committed = await ShouldReplayCommittedAsync(solution, LoadExpectations.Clean);
+        ArchitectureModel model = committed.Extracted.Model;
 
-        SpecfulCodebase extracted = await ExampleCodebase.Of(solution);
+        Dictionary<string, ScenarioRun> scenarios = new(StringComparer.Ordinal);
+        foreach (WalkthroughScenario scenario in WalkthroughScenarios.All.Where(scenario => scenario.Example == solution.Name))
+        {
+            (CodebaseModel codebase, IReadOnlyList<string> changed) = await committed.Edits.ShouldApplyAsync(scenario, directory);
+            scenarios[scenario.Key] = Check(model, codebase, committed.Baselines, directory, changed);
+        }
+
+        AdoptionRun? adoption = solution.Name == WalkthroughScenarios.Meridian
+            ? await ShouldAdoptAsync(solution, model, committed.Extracted.Governed)
+            : null;
+
+        IReadOnlyList<string> renderLines = ShouldRenderLines(model, committed.Extracted.Governed, directory, committed.Extracted.SpecName);
+        return committed.Run with { Scenarios = scenarios, RenderLines = renderLines, Adoption = adoption };
+    }
+
+    // The showcase's page imagines no edit and takes no adoption walk, so its replay is the committed tree alone.
+    // The replay leaves render out, because the fork's rendered files are its pinned release's and this commit's
+    // render is not held to them.
+    private static async Task<ExampleRun> ShouldReplayShowcaseAsync(ExampleSolution solution)
+    {
+        ShowcasePin pin = ShowcaseCheckout.Pin;
+        string spec = ShowcaseCheckout.SpecProject;
+        LoadExpectations declared = new(spec, pin.Declared.UnsupportedProjects, pin.Declared.LoadDiagnostics, pin.Declared.MergeNotes);
+
+        CommittedTree committed = await ShouldReplayCommittedAsync(solution, declared);
+        return committed.Run;
+    }
+
+    // The committed tree as the read-only verbs see it, checked against the solution's own baselines and against
+    // none, with the editor its scenarios are made through.
+    private static async Task<CommittedTree> ShouldReplayCommittedAsync(ExampleSolution solution, LoadExpectations expectations)
+    {
+        string directory = solution.SolutionDirectory;
+
+        SpecfulCodebase extracted = expectations.Spec is null
+            ? await ExampleCodebase.Of(solution)
+            : await SpecfulCodebase.ExtractAsync(solution.SolutionPath, expectations.Spec, directory, CancellationToken.None);
         ArchitectureModel model = extracted.Model;
 
         WorkspaceSnapshot snapshot = await WarmWorkspacePool.GetCurrentAsync(solution.SolutionPath, CancellationToken.None);
-        ShouldHaveLoadedCleanly(solution.Name, snapshot.LoadDiagnostics);
+        ShouldHaveLoadedAsExpected(solution.Name, directory, snapshot.LoadDiagnostics, expectations);
 
-        // The read-only verbs over the committed tree, run while this example's session is still the pool's most
+        // The read-only verbs over the committed tree, run while this solution's session is still the pool's most
         // recent, so reading what they print never reloads an evicted workspace.
-        CliResult checkVerb = await CliRunner.InvokeAsync("check", solution.SolutionPath, "--no-cache");
-        CliResult statusVerb = await CliRunner.InvokeAsync("status", solution.SolutionPath, "--no-cache");
+        string[] specArguments = expectations.Spec is { } spec ? ["--spec", spec] : [];
+        CliResult checkVerb = await CliRunner.InvokeAsync(["check", solution.SolutionPath, "--no-cache", .. specArguments]);
+        CliResult statusVerb = await CliRunner.InvokeAsync(["status", solution.SolutionPath, "--no-cache", .. specArguments]);
 
         IReadOnlySet<string>? declaredMembers = SpecExclusion.TryReadDeclaredMembers(solution.SolutionPath);
         var edits = new ScenarioEditor(snapshot, extracted.ExcludeProjectNames, declaredMembers);
 
         CodebaseModel committed = await edits.ExtractAsync(snapshot.Solution);
-        committed.MergeNotes.ShouldBeEmpty($"{solution.Name}'s committed tree merged with notes the pages never show.");
+        List<string> mergeNotes = Differences("merge note", expectations.MergeNotes, committed.MergeNotes);
+        mergeNotes.ShouldReportNothing($"{solution.Name}'s committed tree merged with notes its pages do not declare");
 
         BaselineIndex baselines = BaselineStore.LoadForModel(model, directory);
         ScenarioRun tree = Check(model, committed, baselines, directory, []);
+        ScenarioRun unbaselined = Check(model, committed, BaselineIndex.Empty, directory, []);
+        IReadOnlyList<string> unsupported = UnsupportedProjectsNotice.Relative(snapshot.LoadDiagnostics.UnsupportedProjects, directory);
 
-        Dictionary<string, ScenarioRun> scenarios = new(StringComparer.Ordinal);
-        foreach (WalkthroughScenario scenario in WalkthroughScenarios.All.Where(scenario => scenario.Example == solution.Name))
-        {
-            (CodebaseModel codebase, IReadOnlyList<string> changed) = await edits.ShouldApplyAsync(scenario, directory);
-            scenarios[scenario.Key] = Check(model, codebase, baselines, directory, changed);
-        }
+        var run = new ExampleRun(
+            solution.Name, directory, model, extracted.Governed, committed, tree, unbaselined, unsupported,
+            new Dictionary<string, ScenarioRun>(StringComparer.Ordinal), [], null, checkVerb, statusVerb);
 
-        AdoptionRun? adoption = solution.Name == WalkthroughScenarios.Meridian
-            ? await ShouldAdoptAsync(solution, model, extracted.Governed)
-            : null;
-
-        return new ExampleRun(
-            solution.Name, directory, extracted.Governed, committed, tree, scenarios,
-            ShouldRenderLines(model, extracted.Governed, directory, extracted.SpecName), adoption, checkVerb,
-            statusVerb);
+        return new CommittedTree(run, extracted, edits, baselines);
     }
 
-    // The pages say the examples build green, and a partial model would quote a smaller codebase than the one
-    // on disk, so a load that is anything less than whole fails the replay before any fence is compared.
-    private static void ShouldHaveLoadedCleanly(string example, WorkspaceDiagnostics diagnostics)
+    // A partial model would quote a smaller codebase than the one on disk, so a load that failed or skipped a
+    // project fails the replay before any fence is compared. What a load reports beyond that is held to the list
+    // its pages declare: nothing, for an example that says it builds green.
+    private static void ShouldHaveLoadedAsExpected(
+        string name, string directory, WorkspaceDiagnostics diagnostics, LoadExpectations expectations)
     {
+        var relativizer = new PathFormat.Relativizer(directory);
         string[] problems =
         [
             .. diagnostics.FailedProjects.Select(static path => $"failed to load: {path}"),
             .. diagnostics.RestoreFailedProjects.Select(static path => $"failed to restore: {path}"),
             .. diagnostics.UncheckedProjects.Select(static path => $"unchecked: {path}"),
-            .. diagnostics.UnsupportedProjects.Select(static project => $"unsupported: {project.Path}"),
-            .. diagnostics.Rendered.Select(static line => $"diagnostic: {line}")
+            .. Differences(
+                "unsupported project", expectations.UnsupportedProjects,
+                diagnostics.UnsupportedProjects.Select(project => relativizer.Relative(project.Path))),
+            .. Differences(
+                "load diagnostic", expectations.LoadDiagnostics,
+                diagnostics.ActionableDiagnostics.Select(diagnostic => RootRelative(diagnostic, directory)))
         ];
 
-        problems.ShouldReportNothing($"The {example} workspace did not load cleanly, so no walkthrough fence can be replayed over it");
+        problems.ShouldReportNothing($"The {name} workspace did not load as its pages declare, so no fence can be replayed over it");
+    }
+
+    // What one list holds that the declared one does not, and the reverse, each entry once per occurrence.
+    private static List<string> Differences(string what, IReadOnlyList<string> declared, IEnumerable<string> reported)
+    {
+        List<string> unexplained = reported.ToList();
+        List<string> absent = [];
+        foreach (string entry in declared)
+            if (!unexplained.Remove(entry))
+                absent.Add(entry);
+
+        return
+        [
+            .. unexplained.Select(entry => $"undeclared {what}: {entry}"),
+            .. absent.Select(entry => $"declared {what} not reported: {entry}")
+        ];
+    }
+
+    // A diagnostic with the solution's directory taken out of every path it names, separators forward, so a
+    // declaration reads the same on every machine.
+    private static string RootRelative(string diagnostic, string directory)
+    {
+        return diagnostic.Replace(directory + Path.DirectorySeparatorChar, "", PathComparison.Comparison)
+            .Replace('\\', '/');
     }
 
     // The check a run prints, with and without the changed files a diff-aware run reads. Both are always made:
@@ -352,6 +428,28 @@ internal static class ExampleReplay
             return $"{diagnostic.Id} {diagnostic.GetMessage(CultureInfo.InvariantCulture)}";
         }
     }
+
+    /// <summary>
+    ///     The <paramref name="Spec" /> a replay's verbs are pointed at (null for the convention), and what the
+    ///     solution's pages declare its load reports beyond the model: the <paramref name="UnsupportedProjects" />,
+    ///     <paramref name="LoadDiagnostics" /> and <paramref name="MergeNotes" />, each relative to the solution's
+    ///     directory with forward slashes.
+    /// </summary>
+    private sealed record LoadExpectations(
+        string? Spec,
+        IReadOnlyList<string> UnsupportedProjects,
+        IReadOnlyList<string> LoadDiagnostics,
+        IReadOnlyList<string> MergeNotes)
+    {
+        /// <summary>The convention's spec, and a load that reports nothing beside its model.</summary>
+        internal static LoadExpectations Clean { get; } = new(null, [], [], []);
+    }
+
+    /// <summary>
+    ///     The committed half of a replay, which every replay makes before anything it imagines: the
+    ///     <paramref name="Run" /> with no scenario, render or adoption yet, and what the imagined half is made from.
+    /// </summary>
+    private sealed record CommittedTree(ExampleRun Run, SpecfulCodebase Extracted, ScenarioEditor Edits, BaselineIndex Baselines);
 }
 
 /// <summary>
@@ -360,27 +458,68 @@ internal static class ExampleReplay
 ///     adoption walkthrough's day-zero steps.
 /// </summary>
 /// <param name="Example">The example's name, which is its directory under <c>examples/</c>.</param>
-/// <param name="SolutionDirectory">The example's directory, which every printed path is relative to.</param>
+/// <param name="SolutionDirectory">The solution's directory, which every printed path is relative to.</param>
+/// <param name="Model">The spec's model, which <c>explain</c> answers from.</param>
 /// <param name="Governed">The codebase the verbs extract, the spec project and its plumbing left out.</param>
 /// <param name="Committed">The same codebase, extracted by the call every scenario's edit is extracted by.</param>
 /// <param name="Tree">The committed tree's check, as the verbs print it.</param>
+/// <param name="Unbaselined">
+///     The same check with nothing grandfathered, which is what it reports before a baseline.
+/// </param>
+/// <param name="UnsupportedProjects">
+///     The stamp's entries for the projects the solution declares and no extractor reads, empty for a solution
+///     whose every project loads.
+/// </param>
 /// <param name="Scenarios">Each scenario's check, keyed by the scenario.</param>
-/// <param name="RenderLines">The lines <c>render</c> prints over the committed tree.</param>
+/// <param name="RenderLines">
+///     The lines <c>render</c> prints over the committed tree; empty where render is not replayed.
+/// </param>
 /// <param name="Adoption">The day-zero steps, which only Meridian's adoption walkthrough takes.</param>
 /// <param name="CheckVerb">What <c>check --no-cache</c> printed over the committed tree.</param>
 /// <param name="StatusVerb">What <c>status --no-cache</c> printed over it.</param>
 internal sealed record ExampleRun(
     string Example,
     string SolutionDirectory,
+    ArchitectureModel Model,
     CodebaseModel Governed,
     CodebaseModel Committed,
     ScenarioRun Tree,
+    ScenarioRun Unbaselined,
+    IReadOnlyList<string> UnsupportedProjects,
     IReadOnlyDictionary<string, ScenarioRun> Scenarios,
     IReadOnlyList<string> RenderLines,
     AdoptionRun? Adoption,
     CliResult CheckVerb,
     CliResult StatusVerb)
 {
+    /// <summary>
+    ///     What <c>check</c> prints over the committed tree: the unsupported-projects stamp, then the report.
+    /// </summary>
+    internal string CheckPrinted => Stamped(UnsupportedProjectsNotice.CheckStamp, Tree.Report);
+
+    /// <summary>
+    ///     What <c>status</c> prints over the committed tree: the unsupported-projects stamp, then the board.
+    /// </summary>
+    internal string StatusPrinted => Stamped(UnsupportedProjectsNotice.StatusStamp, string.Join("\n", Tree.StatusLines));
+
+    /// <summary>What <c>explain</c> prints for <paramref name="ruleId" />, with no trailing newline.</summary>
+    internal string Explain(string ruleId)
+    {
+        ArchRule rule = Model.Rules.SingleOrDefault(candidate => candidate.Id == ruleId)
+                        ?? throw new InvalidOperationException($"{Example}'s spec has no rule '{ruleId}'.");
+
+        return string.Join("\n", ExplainFormatter.Lines(rule));
+    }
+
+    private string Stamped(Func<IReadOnlyList<string>, string> stamp, string answer)
+    {
+        if (UnsupportedProjects.Count == 0) return answer;
+
+        var writer = new StringWriter { NewLine = "\n" };
+        LineBlocks.WriteStamp(writer, stamp(UnsupportedProjects));
+        return writer + answer;
+    }
+
     /// <summary>The run of the scenario keyed <paramref name="key" />.</summary>
     internal ScenarioRun Scenario(string key)
     {

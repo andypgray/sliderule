@@ -103,7 +103,8 @@ public sealed class WalkthroughScenarioTests
 
         // Act: a fence compared with a cut of its run is honest only while the page says what it cut; the
         // sentence saying so must still be in the page's prose, however the paragraph is wrapped.
-        foreach (ReplayedFence fence in WalkthroughFences.Replayed.Where(static fence => fence.DeclaredCut is not null))
+        foreach (ReplayedFence fence in WalkthroughFences.Replayed.Concat(WalkthroughFences.Showcase)
+                     .Where(static fence => fence.DeclaredCut is not null))
             if (!Prose(fence.Fence.Doc)
                     .Contains(Spaced(fence.DeclaredCut!), StringComparison.Ordinal))
                 undeclared.Add($"{fence.Fence.Doc} {fence.Fence.Key}: the page no longer says \"{fence.DeclaredCut}\"");

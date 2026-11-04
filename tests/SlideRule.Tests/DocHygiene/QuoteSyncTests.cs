@@ -54,6 +54,14 @@ public sealed class QuoteSyncTests
     private const string OperationsSpec = "examples/Meridian.Operations/arch/Meridian.Operations.Architecture/OperationsArchitectureSpec.cs";
     private const string CanonicalSample = "tests/SlideRule.Tests/CanonicalSampleSpec.cs";
 
+    /// <summary>The showcase fork's spec, relative to the fork's root.</summary>
+    private const string ShowcaseSpec = "arch/EShopOnWeb.Architecture/ArchitectureSpec.cs";
+
+    /// <summary>
+    ///     The showcase job's step that cuts the page's commands out and runs them against a fresh clone.
+    /// </summary>
+    internal const string ShowcaseWalk = "Run the showcase page's commands against a fresh clone of the pinned fork";
+
     /// <summary>
     ///     The workflow step that runs the getting-started page and the README quickstart as written, with the
     ///     tool and the contract package packed from the same commit.
@@ -260,6 +268,27 @@ public sealed class QuoteSyncTests
     ];
 
     /// <summary>
+    ///     The showcase page's quotes of the pinned eShopOnWeb fork, each source a forward-slash path relative to the
+    ///     fork's root. <see cref="ShowcaseExcerptTests" /> holds them to a checkout of the pinned commit, which this
+    ///     repository does not contain; this gate holds each marker to its one fence.
+    /// </summary>
+    internal static readonly Excerpt[] ShowcaseExcerpts =
+    [
+        new(DocPaths.ShowcaseReadme, "showcase-receipt", "specBuild: ok", "arch/derive_spec-receipt.md"),
+        new(
+            DocPaths.ShowcaseReadme, "showcase-spec-headline", "arch.Rule(\"layering/core-declares-no-blazor-shared\")", ShowcaseSpec,
+            Extent.WholeStatements),
+        new(
+            DocPaths.ShowcaseReadme, "showcase-spec-composition-root", "Selection webRoot = arch.AnyOf(", ShowcaseSpec,
+            Extent.WholeStatements),
+        new(
+            DocPaths.ShowcaseReadme, "showcase-spec-web-rule", "arch.Rule(\"layering/web-infrastructure-via-composition-root\")",
+            ShowcaseSpec, Extent.WholeStatements),
+        new(DocPaths.ShowcaseReadme, "showcase-agents", "### Migrations", "AGENTS.md"),
+        new(DocPaths.ShowcaseReadme, "showcase-workflow", "--sarif sliderule.sarif", ".github/workflows/architecture.yml")
+    ];
+
+    /// <summary>
     ///     The fences that quote nothing: commands for the reader to run, and files for the reader to save.
     ///     Each is registered so that its page can promise every fence is held by something, and held to its
     ///     place so that promise cannot silently lapse.
@@ -304,6 +333,7 @@ public sealed class QuoteSyncTests
         new(DocPaths.OperationsReadme, "operations-build-and-check", "sliderule check examples/Meridian.Operations/Meridian.Operations.slnx"),
         new(DocPaths.InterchangeReadme, "interchange-install", "dotnet tool install -g SlideRule.Cli"),
         new(DocPaths.InterchangeReadme, "interchange-build-and-check", "sliderule check examples/Meridian.Interchange/Meridian.Interchange.slnx"),
+        new(DocPaths.ShowcaseReadme, "showcase-run-it", "git clone --branch sliderule-showcase-1", ShowcaseWalk),
 
         // The README's own build and test lines, the contributor guide's, the lock-file regeneration that guide
         // walks a maintainer through, and the security policy's release verification.
@@ -361,24 +391,14 @@ public sealed class QuoteSyncTests
     {
         // Arrange
         Func<string, IReadOnlyList<string>?> readSource = RepoRoot.LineReader();
-        List<string> drift = new();
 
         // Act: every non-blank line of an excerpt's fence must appear, in order, as a verbatim substring
         // of its source's lines; a miss means the quote has drifted from the committed file. A whole quote
         // is held to more than this, below.
-        foreach (Excerpt excerpt in Excerpts.Where(static excerpt => excerpt.Extent == Extent.Slice))
-        {
-            IReadOnlyList<string>? source = readSource(excerpt.Source);
-            if (source is null)
-            {
-                drift.Add($"{excerpt.Doc} {excerpt.Key}: source {excerpt.Source} does not exist.");
-                continue;
-            }
-
-            string? unmatched = FirstLineNotInSource(FenceOf(excerpt), source);
-            if (unmatched is not null)
-                drift.Add($"{excerpt.Doc} {excerpt.Key}: fence line '{unmatched}' is not a verbatim substring, in order, of {excerpt.Source}.");
-        }
+        List<string> drift = Excerpts.Where(static excerpt => excerpt.Extent == Extent.Slice)
+            .Select(excerpt => DriftOf(excerpt, FenceOf(excerpt), readSource))
+            .OfType<string>()
+            .ToList();
 
         // Assert
         drift.ShouldReportNothing("Quoted excerpts no longer match their committed sources");
@@ -389,35 +409,47 @@ public sealed class QuoteSyncTests
     {
         // Arrange
         Func<string, IReadOnlyList<string>?> readSource = RepoRoot.LineReader();
-        List<string> drift = new();
 
         // Act: a quote that presents itself as whole must be its source line for line, as much of the source as
         // its extent names. The in-order substring check above passes a quote with lines left out.
-        foreach (Excerpt excerpt in Excerpts.Where(static excerpt => excerpt.Extent != Extent.Slice))
-        {
-            IReadOnlyList<string> fence = FenceOf(excerpt);
-            (string whole, IReadOnlyList<string>? source) = excerpt.Extent switch
-            {
-                Extent.WholeFile => ($"{excerpt.Source} whole", readSource(excerpt.Source)),
-                Extent.TailFromMarker => ($"{excerpt.Source} from its one line beginning '{excerpt.Marker}' to its end",
-                    SourceTail(excerpt, readSource)),
-                Extent.WholeStatements => SourceStatements(excerpt, fence, readSource),
-                _ => ($"the one fence of {excerpt.Source} marked '{excerpt.Marker}'", SourceFence(excerpt, readSource))
-            };
-            if (source is null)
-            {
-                drift.Add($"{excerpt.Doc} {excerpt.Key}: there is no {whole} to compare the fence with.");
-                continue;
-            }
-
-            if (!fence.SequenceEqual(source, StringComparer.Ordinal))
-                drift.Add(
-                    $"{excerpt.Doc} {excerpt.Key}: the fence is not {whole}, line for line; replace its body with:\n"
-                    + string.Join("\n", source));
-        }
+        List<string> drift = Excerpts.Where(static excerpt => excerpt.Extent != Extent.Slice)
+            .Select(excerpt => DriftOf(excerpt, FenceOf(excerpt), readSource))
+            .OfType<string>()
+            .ToList();
 
         // Assert
         drift.ShouldReportNothing("Quotes presented as whole no longer equal their committed sources");
+    }
+
+    /// <summary>
+    ///     What is wrong with <paramref name="fence" /> as a quote of <paramref name="excerpt" />'s source, read
+    ///     through <paramref name="readSource" />, or null when it quotes the source as its <see cref="Extent" />
+    ///     says.
+    /// </summary>
+    internal static string? DriftOf(Excerpt excerpt, IReadOnlyList<string> fence, Func<string, IReadOnlyList<string>?> readSource)
+    {
+        if (excerpt.Extent == Extent.Slice)
+        {
+            if (readSource(excerpt.Source) is not { } lines) return $"{excerpt.Doc} {excerpt.Key}: source {excerpt.Source} does not exist.";
+
+            return FirstLineNotInSource(fence, lines) is { } unmatched
+                ? $"{excerpt.Doc} {excerpt.Key}: fence line '{unmatched}' is not a verbatim substring, in order, of {excerpt.Source}."
+                : null;
+        }
+
+        (string whole, IReadOnlyList<string>? source) = excerpt.Extent switch
+        {
+            Extent.WholeFile => ($"{excerpt.Source} whole", readSource(excerpt.Source)),
+            Extent.TailFromMarker => ($"{excerpt.Source} from its one line beginning '{excerpt.Marker}' to its end",
+                SourceTail(excerpt, readSource)),
+            Extent.WholeStatements => SourceStatements(excerpt, fence, readSource),
+            _ => ($"the one fence of {excerpt.Source} marked '{excerpt.Marker}'", SourceFence(excerpt, readSource))
+        };
+        if (source is null) return $"{excerpt.Doc} {excerpt.Key}: there is no {whole} to compare the fence with.";
+
+        return fence.SequenceEqual(source, StringComparer.Ordinal)
+            ? null
+            : $"{excerpt.Doc} {excerpt.Key}: the fence is not {whole}, line for line; replace its body with:\n" + string.Join("\n", source);
     }
 
     public static TheoryData<string> HeldPageCases => [.. DocPaths.HeldPages];
@@ -556,7 +588,8 @@ public sealed class QuoteSyncTests
     // Every marker any registry holds a fence to, with the doc it names a fence in.
     private static IEnumerable<(string Doc, string Key, string Marker)> Markers()
     {
-        return Excerpts.Select(static excerpt => (excerpt.Doc, excerpt.Key, excerpt.Marker))
+        return Excerpts.Concat(ShowcaseExcerpts)
+            .Select(static excerpt => (excerpt.Doc, excerpt.Key, excerpt.Marker))
             .Concat(CapturedFences.All.Select(static fence => (fence.Doc, fence.Key, fence.Marker)))
             .Concat(CommandFences.Select(static command => (command.Doc, command.Key, command.Marker)))
             .Concat(WalkthroughFences.Markers());
@@ -592,14 +625,22 @@ public sealed class QuoteSyncTests
         return $"{doc} {key}: the step '{runBy}' cuts this fence as '{language}', but the fence is tagged '{tag}', so the cut comes back empty.";
     }
 
-    // The run body of every step the workflow gives this name: the lines after its "- name:" line, up to the first
-    // non-blank line indented no deeper than that line. A blank line inside a run block carries no indentation at
-    // all, so a blank line cannot end the step.
-    private static IReadOnlyList<string> WorkflowSteps(string workflow, string name)
+    // The run body of every step the workflow gives this name.
+    internal static IReadOnlyList<string> WorkflowSteps(string workflow, string name)
+    {
+        return WorkflowStepsWithLines(workflow, name)
+            .Select(static step => step.Body)
+            .ToArray();
+    }
+
+    // Every step the workflow gives this name: the 1-based line of its "- name:" line, and its run body, the lines
+    // after that one up to the first non-blank line indented no deeper than it. A blank line inside a run block
+    // carries no indentation at all, so a blank line cannot end the step.
+    internal static IReadOnlyList<(int NameLine, string Body)> WorkflowStepsWithLines(string workflow, string name)
     {
         string[] lines = workflow.NormalizedLines()
             .Split('\n');
-        List<string> steps = new();
+        List<(int NameLine, string Body)> steps = new();
 
         for (var index = 0; index < lines.Length; index++)
         {
@@ -610,7 +651,7 @@ public sealed class QuoteSyncTests
             IEnumerable<string> body = lines
                 .Skip(index + 1)
                 .TakeWhile(candidate => candidate.Trim().Length == 0 || candidate.Length - candidate.TrimStart().Length > indent);
-            steps.Add(string.Join("\n", body));
+            steps.Add((index + 1, string.Join("\n", body)));
         }
 
         return steps;
@@ -805,7 +846,7 @@ public sealed class QuoteSyncTests
     }
 
     /// <summary>How much of its source a registered excerpt quotes, and so how it is held.</summary>
-    private enum Extent
+    internal enum Extent
     {
         /// <summary>A deliberate excerpt: every non-blank line in order, each a verbatim substring of a source line.</summary>
         Slice,
@@ -833,7 +874,7 @@ public sealed class QuoteSyncTests
     ///     (<paramref name="Extent" />), and the workflow step that cuts it out of the doc and runs it
     ///     (<paramref name="RunBy" />), where CI runs it.
     /// </summary>
-    private sealed record Excerpt(
+    internal sealed record Excerpt(
         string Doc,
         string Key,
         string Marker,

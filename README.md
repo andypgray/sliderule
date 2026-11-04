@@ -108,7 +108,7 @@ The grammar comes from surveying that prior art, and [GRAMMAR.md](https://github
 
 ## Starting on a codebase that already exists
 
-SlideRule is built for long-lived, business-critical .NET codebases, where the architecture is real but lives in a few people's heads. You can write the first rules yourself or have an agent draft them through the `derive_spec` prompt, as [Getting started](https://github.com/andypgray/sliderule/blob/main/GETTING-STARTED.md) shows. You review every rule the agent proposes, and accept, edit or drop it before anything is committed.
+SlideRule is built for long-lived, business-critical .NET codebases, where the architecture is real but lives in a few people's heads. You can write the first rules yourself or have an agent draft them through the `derive_spec` prompt, as [Getting started](https://github.com/andypgray/sliderule/blob/main/GETTING-STARTED.md) shows. You review every rule the agent proposes, and accept, edit or drop it before anything is committed. [A reference architecture held to its own book](https://github.com/andypgray/sliderule/tree/main/examples/eShopOnWeb) shows the whole adoption on Microsoft's reference application, from the agent's draft to CI.
 
 ## What it handles
 
@@ -151,7 +151,7 @@ Loading a non-SDK-style project and replaying a log from .NET Framework `MSBuild
 
 ## Examples
 
-Six worked examples in [`examples/`](https://github.com/andypgray/sliderule/tree/main/examples) share one fictional freight-forwarding company. Four are solutions. CI builds each one, keeps `check` green against the committed tree, and runs `render --check` to prove every file a render writes under `examples/` current:
+Six of the worked examples in [`examples/`](https://github.com/andypgray/sliderule/tree/main/examples) share one fictional freight-forwarding company. Four are solutions. CI builds each one, keeps `check` green against the committed tree, and runs `render --check` to prove every file a render writes under `examples/` current:
 
 - [Enforce-only clean architecture](https://github.com/andypgray/sliderule/tree/main/examples/Meridian.Quoting): the greenfield quoting subsystem. Nine rules govern a four-layer clean architecture, and every rule runs as a named xUnit test.
 
@@ -166,6 +166,10 @@ The other two walk a flow on the Meridian monolith, with captured output:
 - [Day-one adoption on an existing codebase](https://github.com/andypgray/sliderule/blob/main/examples/Meridian/ADOPTING.md): the full derive flow, every step a real command with real output.
 
 - [The agent loop, closed by a hook](https://github.com/andypgray/sliderule/tree/main/examples/Meridian/hooks): the storyboard for the loop above, walked beat by beat. It also has the paste-in hook config.
+
+The seventh runs on code you may already know:
+
+- [A reference architecture held to its own book](https://github.com/andypgray/sliderule/tree/main/examples/eShopOnWeb): a public fork of eShopOnWeb, Microsoft's reference application, with a spec an agent drafted from the application's e-book and a person then curated. CI fetches the fork's pinned commit and re-runs every command output the page shows.
 
 ## Installing
 

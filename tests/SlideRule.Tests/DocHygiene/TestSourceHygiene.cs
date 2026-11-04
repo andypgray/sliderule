@@ -54,6 +54,8 @@ internal static class TestSourceHygiene
             [Root + "DocHygiene/Walkthroughs/ExampleReplay.cs::RunAsync"] =
                 "The replay behind a static cache of runs; its load guards vouch for the committed tree every "
                 + "walkthrough fact reads.",
+            [Root + "DocHygiene/Walkthroughs/ExampleReplay.cs::Showcase"] =
+                "A static cache field cannot take a Should name; its guard is the Should* replay its initializer calls.",
             [Root + "Hooks/McpLaunchScriptTests.cs::Launch"] =
                 "Runs the launcher; its summary names the empty-stdout guard every case holds it to.",
             [Root + "Mcp/McpUnboundServerTests.cs::ConverseAsync"] =

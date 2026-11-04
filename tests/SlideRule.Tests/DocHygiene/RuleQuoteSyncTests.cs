@@ -1,3 +1,4 @@
+using SlideRule.Tests.DocHygiene.Walkthroughs;
 using SlideRule.Tests.TestSupport;
 using Xunit;
 
@@ -151,11 +152,13 @@ public sealed class RuleQuoteSyncTests
     public void EveryTrackedDocQuotingRules_IsRegistered()
     {
         // Act & Assert: the registry above is hand-written, so the failure it cannot see is a doc that
-        // quotes rules and was never added to it — a whole example silently outside the gate.
+        // quotes rules and was never added to it — a whole example silently outside the gate. The showcase's
+        // fences quote the pinned fork's spec, which its own gated tests hold them to.
         Gate.ShouldFindNothingOutsideTheRegistry(
             counted: "rule sentence(s)",
             swept: "rule sentences",
-            authority: "the spec");
+            authority: "the spec",
+            heldElsewhere: static quote => WalkthroughFences.IsHeldByTheShowcase(quote.Doc, quote.DocLine));
     }
 
     private static bool IsNarrative(RuleQuote quote)

@@ -1,3 +1,4 @@
+using SlideRule.Tests.DocHygiene.Walkthroughs;
 using SlideRule.Tests.TestSupport;
 using Xunit;
 
@@ -219,11 +220,13 @@ public sealed class GrandfatheredCountSyncTests
     public void EveryTrackedDocQuotingFencedCounts_IsRegistered()
     {
         // Act & Assert: the registry above is hand-written, so the failure it cannot see is a doc that
-        // quotes a count and was never added to it — a whole walkthrough silently outside the gate.
+        // quotes a count and was never added to it — a whole walkthrough silently outside the gate. The
+        // showcase's fences quote the pinned fork's baselines, which its own gated tests hold them to.
         Gate.ShouldFindNothingOutsideTheRegistry(
             counted: "grandfathered count(s)",
             swept: "grandfathered counts",
-            authority: "a baseline");
+            authority: "a baseline",
+            heldElsewhere: static count => WalkthroughFences.IsHeldByTheShowcase(count.Doc, count.DocLine));
     }
 
     [Fact]

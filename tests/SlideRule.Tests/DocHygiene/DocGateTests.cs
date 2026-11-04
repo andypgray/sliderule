@@ -99,6 +99,39 @@ public sealed class DocGateTests
     }
 
     [Fact]
+    public void RegistrySweep_CountsOnlyTheQuotesNoOtherTestHolds()
+    {
+        // Arrange: three quotes in an unregistered doc, the first and the last held by another test.
+        DocGate<int> gate = GateOver([], static doc => doc == TrackedDoc ? 3 : 0, "rule quotes");
+
+        // Act
+        var failure = Should.Throw<ShouldAssertException>(() =>
+            gate.ShouldFindNothingOutsideTheRegistry(
+                counted: "rule sentence(s)",
+                swept: "rule sentences",
+                authority: "the spec",
+                heldElsewhere: static quote => quote != 1));
+
+        // Assert
+        failure.Message.ShouldContain($"{TrackedDoc} quotes 1 rule sentence(s) but is not registered.");
+    }
+
+    [Fact]
+    public void RegistrySweep_WhenEveryQuoteOutsideTheRegistryIsHeldElsewhere_Passes()
+    {
+        // Arrange
+        DocGate<int> gate = GateOver([], static doc => doc == TrackedDoc ? 2 : 0, "rule quotes");
+
+        // Act & Assert
+        Should.NotThrow(() =>
+            gate.ShouldFindNothingOutsideTheRegistry(
+                counted: "rule sentence(s)",
+                swept: "rule sentences",
+                authority: "the spec",
+                heldElsewhere: static _ => true));
+    }
+
+    [Fact]
     public void RegistrySweep_WhenTheOnlyYieldingDocIsRegistered_Passes()
     {
         // Arrange
@@ -175,8 +208,8 @@ public sealed class DocGateTests
             .ShouldReportNothing("Something has drifted"));
     }
 
-    // A gate whose scanner yields as many placeholder quotes as the count says, which is all either
-    // shared fact reads of what it scanned.
+    // A gate whose scanner yields as many quotes as the count says, numbered from 0 in scan order, so a
+    // heldElsewhere predicate can pick quotes out by position.
     private static DocGate<int> GateOver(
         IReadOnlyList<string> registeredDocs,
         Func<string, int> countFor,

@@ -61,6 +61,11 @@ internal static class DocPaths
     internal const string InterchangeReadme = "examples/Meridian.Interchange/README.md";
 
     /// <summary>
+    ///     The walkthrough of the eShopOnWeb fork's adoption, whose runs are over a pinned external checkout.
+    /// </summary>
+    internal const string ShowcaseReadme = "examples/eShopOnWeb/README.md";
+
+    /// <summary>
     ///     The hook verb's page: its exit-code contract, its options, and the MCP registration a clone pastes.
     /// </summary>
     internal const string HooksReadme = "hooks/README.md";
