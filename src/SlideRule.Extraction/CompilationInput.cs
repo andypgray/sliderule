@@ -20,7 +20,10 @@ namespace SlideRule.Extraction;
 ///     referenced projects that <see cref="ProjectReferences" /> does not account for, directly or through what a
 ///     declared project references in turn; <see langword="null" /> or empty reports none.
 ///     <see cref="ArtifactFacts" /> is what evaluating the project file said about its artifact, and
-///     <see langword="null" /> where nothing evaluated the project.
+///     <see langword="null" /> where nothing evaluated the project. <see cref="SolutionAssemblyNames" /> names the
+///     assemblies every project of the load produces, which tells a registration wrapper a sibling declares from
+///     the framework's methods when the sibling is referenced as a built assembly rather than as a project;
+///     <see langword="null" /> leaves only source symbols counted as the solution's.
 /// </remarks>
 internal sealed record CompilationInput(
     Compilation Compilation,
@@ -30,4 +33,5 @@ internal sealed record CompilationInput(
     bool? SolutionMember = null,
     IReadOnlyCollection<SyntaxTree>? GeneratedTrees = null,
     IReadOnlyList<string>? UndeclaredProjectReferences = null,
-    ProjectArtifactFacts? ArtifactFacts = null);
+    ProjectArtifactFacts? ArtifactFacts = null,
+    IReadOnlyCollection<string>? SolutionAssemblyNames = null);

@@ -20,7 +20,8 @@ namespace SlideRule.Extraction.Fragments;
 ///         a fact came from. It is null for a single-framework project. The parameters from
 ///         <see cref="SolutionMember" /> on carry defaults so that a hand-built fragment need not name facts it
 ///         has no way to know, and null in them reads as unknown, never as off, except in
-///         <see cref="UndeclaredProjectReferences" />, where null and empty both mean nothing to report.
+///         <see cref="UndeclaredProjectReferences" />, <see cref="RegistrationTemplates" /> and
+///         <see cref="WrapperCalls" />, where null and empty both mean nothing to report.
 ///         <see cref="AssemblyName" /> is what the compilation emits, which an <c>&lt;AssemblyName&gt;</c>
 ///         property or a renamed csproj parts from <see cref="ProjectName" />, the csproj's own file name; it is
 ///         the string comparable against <see cref="FragmentExternal.AssemblyName" />. The artifact facts come
@@ -53,4 +54,6 @@ internal sealed record CodebaseFragment(
     bool? LocksPackages = null,
     FragmentSite? LocksPackagesSite = null,
     IReadOnlyList<string>? UndeclaredProjectReferences = null,
-    FragmentProperties? Properties = null);
+    FragmentProperties? Properties = null,
+    IReadOnlyList<FragmentRegistrationTemplate>? RegistrationTemplates = null,
+    IReadOnlyList<FragmentWrapperCall>? WrapperCalls = null);

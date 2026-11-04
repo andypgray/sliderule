@@ -54,6 +54,19 @@ internal static class CompilationFactory
     }
 
     /// <summary>
+    ///     As <see cref="CompileReferencing" />, against the DI references, with the referenced project in either
+    ///     form <see cref="Reference" /> builds, and both projects' assemblies named as the solution's, as a
+    ///     workspace load names them.
+    /// </summary>
+    public static CompilationInput CompileWithDiReferencing(
+        string projectName, Compilation referenced, string referencedProjectName, bool asImage, params (string Path, string Source)[] files)
+    {
+        CSharpCompilation compilation = CreateCompilation(projectName, [.. DiReferences, Reference(referenced, asImage)], files);
+        string[] solutionAssemblies = [compilation.AssemblyName!, referenced.AssemblyName!];
+        return new CompilationInput(compilation, projectName, [referencedProjectName], SolutionAssemblyNames: solutionAssemblies);
+    }
+
+    /// <summary>
     ///     <paramref name="compilation" /> as a reference-assembly image. Takes a whole
     ///     <see cref="Compilation" /> rather than sources, so a chain deeper than two projects is built
     ///     bottom-up by feeding each image into the next compilation.

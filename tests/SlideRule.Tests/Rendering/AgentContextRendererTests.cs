@@ -608,8 +608,9 @@ public class AgentContextRendererTests
         // A Registered noun (here on a MustNotReference subject, not MustNotInject) gates its own line.
         block.ShouldContain(
             "registered = named in a source-level container registration " +
-            "(`AddSingleton`/`AddScoped`/`AddTransient`/`TryAdd*`/`AddHostedService`/`AddDbContext`/`AddDbContextPool`/`AddHttpClient<TClient>`); " +
-            "keyed-service and raw `ServiceDescriptor` registrations, assembly scanning, factory internals and " +
+            "(`AddSingleton`/`AddScoped`/`AddTransient`/`TryAdd*`/`AddHostedService`/`AddDbContext`/`AddDbContextPool`/`AddHttpClient<TClient>`, " +
+            "or a `ServiceDescriptor` added to the collection), directly or through a wrapper declared in the solution; " +
+            "keyed-service registrations, assembly scanning, factory internals, wrappers compiled into packages and " +
             "framework defaults are not seen.");
         // The verb is MustNotReference, not MustNotInject → no inject clause.
         block.ShouldNotContain("inject = a source-level constructor-parameter dependency");
@@ -632,8 +633,9 @@ public class AgentContextRendererTests
         // ...and the Registered noun gates the separate registered line.
         block.ShouldContain(
             "registered = named in a source-level container registration " +
-            "(`AddSingleton`/`AddScoped`/`AddTransient`/`TryAdd*`/`AddHostedService`/`AddDbContext`/`AddDbContextPool`/`AddHttpClient<TClient>`); " +
-            "keyed-service and raw `ServiceDescriptor` registrations, assembly scanning, factory internals and " +
+            "(`AddSingleton`/`AddScoped`/`AddTransient`/`TryAdd*`/`AddHostedService`/`AddDbContext`/`AddDbContextPool`/`AddHttpClient<TClient>`, " +
+            "or a `ServiceDescriptor` added to the collection), directly or through a wrapper declared in the solution; " +
+            "keyed-service registrations, assembly scanning, factory internals, wrappers compiled into packages and " +
             "framework defaults are not seen.");
         // The rendered law keeps its qualified subject head — never a false bare "Types, …".
         block.ShouldContain(

@@ -55,6 +55,9 @@ internal static class FragmentSiteRemapper
             fragment.ServiceRegistrations,
             static registration => registration.Sites,
             static (registration, sites) => registration with { Sites = sites });
+        IReadOnlyList<FragmentWrapperCall>? wrapperCalls = fragment.WrapperCalls is { } calls
+            ? pass.RemapEach(calls, static call => call.Sites, static (call, sites) => call with { Sites = sites })
+            : null;
 
         // The artifact sites name props and project files, so in practice no C# document's map ever
         // claims one; they go through the same site function anyway rather than being trusted to.
@@ -78,6 +81,7 @@ internal static class FragmentSiteRemapper
             ThrowEdges = throwEdges,
             ExposureEdges = exposureEdges,
             ServiceRegistrations = registrations,
+            WrapperCalls = wrapperCalls,
             TargetFrameworksSite = targetFrameworksSite,
             PackageReferences = packageReferences,
             IsPackableSite = isPackableSite,

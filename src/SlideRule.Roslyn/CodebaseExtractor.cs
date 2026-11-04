@@ -133,6 +133,13 @@ internal static class CodebaseExtractor
             DeclaredProjectReferences.NamesByProjectFile(loadedProjects, canonical => canonical);
         Func<string, IEnumerable<string>> workspaceReach = WorkspaceReach(solution);
 
+        // Every loaded project's, for the same reason: a project may reference a sibling's built output by path,
+        // which no project reference records. A change to the set is a change to the solution or a project file,
+        // which the extraction cache treats as a miss, so a cached fragment never reads a stale set.
+        IReadOnlyCollection<string> solutionAssemblies = solution.Projects
+            .Select(p => p.AssemblyName)
+            .ToHashSet(StringComparer.Ordinal);
+
         List<CompilationInput> inputs = [];
         for (var i = 0; i < projects.Count; i++)
         {
@@ -158,7 +165,8 @@ internal static class CodebaseExtractor
                 SpecExclusion.SolutionMembershipOf(declaredMembers, projectFiles, project),
                 generatedTrees[i],
                 undeclared,
-                evaluated[i]));
+                evaluated[i],
+                solutionAssemblies));
         }
 
         return new ExtractionInputs(inputs);

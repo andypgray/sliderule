@@ -279,7 +279,9 @@ public sealed class CodebaseExtractorMemberInventoryTests
         // interface, a referenced one included, and methods, properties, events and static abstract members
         // alike. A base class's member that only a derived type uses to satisfy an interface reports false on
         // the base class; a public method beside the explicit implementation the map names reports false; an
-        // interface's own members report false; and an override that also implements reports both facts.
+        // interface's own members report false; an override that also implements reports both facts, while one
+        // whose type takes the interface only from its base class reports the override alone; and a member of an
+        // interface the type reaches through another interface is implemented like any other.
         CodebaseModel model = CompilationFactory.Extract("""
                                                          namespace N;
                                                          public interface IRun { void Run(); }
@@ -303,9 +305,16 @@ public sealed class CodebaseExtractorMemberInventoryTests
                                                          public abstract class Worker { public abstract void Run(); }
                                                          public class RunningWorker : Worker, IRun { public override void Run() {} }
                                                          public class Split : IRun { void IRun.Run() {} public void Run() {} }
+                                                         public class VirtualRunner : IRun { public virtual void Run() {} }
+                                                         public class OverridingRunner : VirtualRunner { public override void Run() {} }
+                                                         public class MoreImpl : IMore { public void More() {} public void Run() {} }
                                                          """);
 
-        string[] types = ["N.Impl", "N.RunnerBase", "N.Worker", "N.RunningWorker", "N.Split", "N.IRun", "N.IMore"];
+        string[] types =
+        [
+            "N.Impl", "N.RunnerBase", "N.Worker", "N.RunningWorker", "N.Split", "N.IRun", "N.IMore", "N.VirtualRunner",
+            "N.OverridingRunner", "N.MoreImpl"
+        ];
         List<(string Member, bool Implementation, bool Override)> facts = types
             .SelectMany(type => model.Type(type)
                 .Members)
@@ -326,7 +335,11 @@ public sealed class CodebaseExtractorMemberInventoryTests
             ("M:N.RunningWorker.Run", true, true),
             ("M:N.Split.Run", false, false),
             ("M:N.IRun.Run", false, false),
-            ("M:N.IMore.More", false, false)
+            ("M:N.IMore.More", false, false),
+            ("M:N.VirtualRunner.Run", true, false),
+            ("M:N.OverridingRunner.Run", false, true),
+            ("M:N.MoreImpl.More", true, false),
+            ("M:N.MoreImpl.Run", true, false)
         ]);
     }
 

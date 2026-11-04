@@ -642,8 +642,10 @@ expression's static type (bare rethrows `throw;` are not recorded); "expose" mea
 not caught; a factory lambda that genuinely `new`s the type IS caught, so `.Except` the sanctioned
 composition root or baseline the edge. `Registered` membership comes only from source-visible
 registration calls (`AddSingleton`/`AddScoped`/`AddTransient`/`TryAdd*`/`AddHostedService`/
-`AddDbContext`/`AddDbContextPool`/`AddHttpClient<TClient>`) — keyed and raw-descriptor
-registrations, assembly scanning, factory-lambda internals, and framework defaults are invisible; an empty `Registered` subject fails loud (check the visibility
+`AddDbContext`/`AddDbContextPool`/`AddHttpClient<TClient>`, or a `ServiceDescriptor` added to the
+collection), made directly or through a wrapper the solution declares — keyed registrations,
+assembly scanning, wrappers compiled into packages, factory-lambda internals, and framework
+defaults are invisible; an empty `Registered` subject fails loud (check the visibility
 boundary before blaming the code), while an empty `MustNotInject` operand is the win condition
 and never warns. Member bans are
 source-visibility bans, not runtime-dispatch bans — a ban on a concrete member does not catch

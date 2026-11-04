@@ -39,6 +39,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `arch.Registered`, `MustBeRegistered` and `MustNotInject` see registrations made through a generic
+  extension method the solution declares, such as `services.AddUnique<IFoo, Foo>()`, at each place it is
+  called, with that call's types and its lifetime: a `ServiceLifetime` argument, or the parameter's default.
+  This holds when the extension is declared in one project and called from another, when it calls
+  another such method, and in any namespace, `Microsoft.Extensions.DependencyInjection` included.
+  A `ServiceDescriptor` handed to the collection
+  (`services.Add(ServiceDescriptor.Describe(typeof(IFoo), typeof(Foo), ServiceLifetime.Scoped))`,
+  `TryAddEnumerable(ServiceDescriptor.Singleton<IFoo, Foo>())`, `new ServiceDescriptor(...)`) is a
+  registration too. A codebase that registers this way gets more registered types, so a captive-dependency
+  rule has more subjects and can report violations it did not before. The rendered glossary line names
+  the new reach.
+- The same holds for such an extension method on a builder that exposes the collection as a property, such
+  as `builder.AddNotificationHandler<TNotification, THandler>()` over a builder whose `Services` property is
+  the `IServiceCollection`. A descriptor kept in a local variable that is never reassigned and then handed to
+  the collection counts, and so does a subclass of `ServiceDescriptor` declared in the same project whose
+  constructor passes its parameters straight to the base constructor. Entries a builder adds to collections
+  of its own, rather than to the service collection, are still not seen.
 - Visual Studio 2026 is in the tested range with 2019 and 2022, so a machine whose only Visual Studio is 2026
   no longer reports its MSBuild as outside the tested envelope. On a machine with both 2022 and 2026, projects
   are now loaded with 2026; set `SLIDERULE_VS_INSTALL_PATH` to an install root to choose another.

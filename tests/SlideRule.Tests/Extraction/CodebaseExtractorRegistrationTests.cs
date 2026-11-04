@@ -1,5 +1,11 @@
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Text;
 using Shouldly;
 using SlideRule.Codebase;
+using SlideRule.Extraction;
+using SlideRule.Roslyn;
+using SlideRule.Tests.TestSupport;
 using Xunit;
 
 namespace SlideRule.Tests.Extraction;
@@ -637,57 +643,680 @@ public sealed class CodebaseExtractorRegistrationTests
     public void Recognize_Configure_IsNotRecognized()
     {
         // Configure passes the namespace + first-parameter gate but its name is not in the recognized-call
-        // table — the options interfaces are framework-registered and invisible (GRAMMAR §4.7).
-        CodebaseModel model = CompilationFactory.ExtractWithDi(("Reg.cs", """
-                                                                          using Microsoft.Extensions.DependencyInjection;
-                                                                          namespace N;
-                                                                          public class MyOptions {}
-                                                                          public static class Reg
-                                                                          {
-                                                                              public static void Configure(IServiceCollection services) => services.Configure<MyOptions>(o => {});
-                                                                          }
-                                                                          """));
+        // table — the options interfaces are framework-registered and invisible (GRAMMAR §4.7). It is generic over
+        // the collection too, so it is not a wrapper call either: the framework declares it, not the solution.
+        CompilationInput input = CompilationFactory.CompileWithDi("TestProject", ("Reg.cs", """
+                                                                                            using Microsoft.Extensions.DependencyInjection;
+                                                                                            namespace N;
+                                                                                            public class MyOptions {}
+                                                                                            public static class Reg
+                                                                                            {
+                                                                                                public static void Configure(IServiceCollection services) => services.Configure<MyOptions>(o => {});
+                                                                                            }
+                                                                                            """));
 
-        Registrations(model)
+        Registrations(Harness.Extract([input]))
             .ShouldBeEmpty();
+        FragmentExtractor.Extract(input, Ct)
+            .WrapperCalls.ShouldBeNull();
     }
 
     [Fact]
     public void Recognize_KeyedService_IsNotRecognized()
     {
+        CompilationInput input = CompilationFactory.CompileWithDi("TestProject", ("Reg.cs", """
+                                                                                            using Microsoft.Extensions.DependencyInjection;
+                                                                                            namespace N;
+                                                                                            public interface IFoo {}
+                                                                                            public class Foo : IFoo {}
+                                                                                            public static class Reg
+                                                                                            {
+                                                                                                public static void Configure(IServiceCollection services) => services.AddKeyedSingleton<IFoo, Foo>("key");
+                                                                                            }
+                                                                                            """));
+
+        Registrations(Harness.Extract([input]))
+            .ShouldBeEmpty();
+        FragmentExtractor.Extract(input, Ct)
+            .WrapperCalls.ShouldBeNull();
+    }
+
+    // ── ServiceDescriptor handed to the collection ────────────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData("services.Add(ServiceDescriptor.Describe(typeof(IFoo), typeof(Foo), ServiceLifetime.Scoped))", Lifetime.Scoped, "N.Foo")]
+    [InlineData("services.Add(ServiceDescriptor.Describe(typeof(IFoo), sp => new Foo(), ServiceLifetime.Transient))", Lifetime.Transient, null)]
+    [InlineData("services.TryAddEnumerable(ServiceDescriptor.Singleton<IFoo, Foo>())", Lifetime.Singleton, "N.Foo")]
+    [InlineData("services.TryAdd(ServiceDescriptor.Transient(typeof(IFoo), typeof(Foo)))", Lifetime.Transient, "N.Foo")]
+    [InlineData("services.Replace(ServiceDescriptor.Scoped<IFoo>(sp => new Foo()))", Lifetime.Scoped, null)]
+    [InlineData("services.Add(new ServiceDescriptor(typeof(IFoo), typeof(Foo), ServiceLifetime.Transient))", Lifetime.Transient, "N.Foo")]
+    [InlineData("services.Add(new ServiceDescriptor(typeof(IFoo), new Foo()))", Lifetime.Singleton, null)]
+    [InlineData("services.Insert(0, new(typeof(IFoo), typeof(Foo), ServiceLifetime.Scoped))", Lifetime.Scoped, "N.Foo")]
+    [InlineData("new ServiceCollection().Add(ServiceDescriptor.Singleton<IFoo, Foo>())", Lifetime.Singleton, "N.Foo")]
+    [InlineData("services.Add(ServiceDescriptor.Describe(serviceType: typeof(IFoo), typeof(Foo), ServiceLifetime.Scoped))", Lifetime.Scoped, "N.Foo")]
+    [InlineData("var d = ServiceDescriptor.Singleton<IFoo, Foo>(); services.Add(d)", Lifetime.Singleton, "N.Foo")]
+    [InlineData("var d = new ServiceDescriptor(typeof(IFoo), typeof(Foo), ServiceLifetime.Transient); if (!services.Contains(d)) services.Add(d)", Lifetime.Transient, "N.Foo")]
+    public void Recognize_DescriptorHandedToTheCollection_RecordsItsRegistration(string call, Lifetime lifetime, string? implementation)
+    {
+        CodebaseModel model = CompilationFactory.ExtractWithDi(("Reg.cs", DescriptorSource(call)));
+
+        Registrations(model)
+            .ShouldBe([(lifetime, "N.IFoo", implementation)]);
+    }
+
+    [Theory]
+    [InlineData("services.Remove(ServiceDescriptor.Singleton<IFoo, Foo>())")]
+    [InlineData("services.Add(ServiceDescriptor.Describe(typeof(IFoo), typeof(Foo), Chosen))")]
+    [InlineData("services.Add(ServiceDescriptor.KeyedSingleton<IFoo, Foo>(\"key\"))")]
+    [InlineData("var descriptor = ServiceDescriptor.Singleton<IFoo, Foo>()")]
+    [InlineData("var d = ServiceDescriptor.Singleton<IFoo, Foo>(); services.Remove(d)")]
+    [InlineData("var d = ServiceDescriptor.Singleton<IFoo, Foo>(); d = ServiceDescriptor.Describe(typeof(IFoo), typeof(Foo), Chosen); services.Add(d)")]
+    [InlineData("var d = ServiceDescriptor.Singleton<IFoo, Foo>(); (d, _) = (ServiceDescriptor.Describe(typeof(IFoo), typeof(Foo), Chosen), 0); services.Add(d)")]
+    [InlineData("var d = ServiceDescriptor.Singleton<IFoo, Foo>(); ref ServiceDescriptor alias = ref d; alias = ServiceDescriptor.Describe(typeof(IFoo), typeof(Foo), Chosen); services.Add(d)")]
+    public void Recognize_DescriptorNotAddedOrUnreadable_RecordsNothing(string call)
+    {
+        CodebaseModel model = CompilationFactory.ExtractWithDi(("Reg.cs", DescriptorSource(call)));
+
+        Registrations(model)
+            .ShouldBeEmpty();
+    }
+
+    private static string DescriptorSource(string call)
+    {
+        return $$"""
+                 using Microsoft.Extensions.DependencyInjection;
+                 using Microsoft.Extensions.DependencyInjection.Extensions;
+                 namespace N;
+                 public interface IFoo {}
+                 public class Foo : IFoo {}
+                 public static class Reg
+                 {
+                     public static ServiceLifetime Chosen { get; } = ServiceLifetime.Scoped;
+
+                     public static void Configure(IServiceCollection services)
+                     {
+                         {{call}};
+                     }
+                 }
+                 """;
+    }
+
+    // ── ServiceDescriptor subclasses, read through the base constructor ─────────────────────────────────────
+
+    // Named without the ServiceDescriptor suffix, and declared in a file of its own, apart from the creation.
+    private static string DescriptorSubclass(string constructor)
+    {
+        return $$"""
+                 using System;
+                 using Microsoft.Extensions.DependencyInjection;
+                 namespace N;
+                 public sealed class UniqueDescriptor : ServiceDescriptor
+                 {
+                     {{constructor}}
+
+                     private static ServiceLifetime Promote(ServiceLifetime lifetime) => lifetime;
+                 }
+                 """;
+    }
+
+    [Theory]
+    [InlineData(
+        "public UniqueDescriptor(Type serviceType, Type implementationType, ServiceLifetime lifetime) : base(serviceType, implementationType, lifetime) {}",
+        "typeof(IFoo), typeof(Foo), ServiceLifetime.Transient")]
+    [InlineData(
+        "public UniqueDescriptor(ServiceLifetime lifetime, Type impl, Type svc) : base(svc, impl, lifetime) {}",
+        "ServiceLifetime.Transient, typeof(Foo), typeof(IFoo)")]
+    public void Recognize_DescriptorSubclassForwardingItsParameters_RecordsItsRegistration(string constructor, string arguments)
+    {
+        CodebaseModel model = CompilationFactory.ExtractWithDi(
+            ("Descriptor.cs", DescriptorSubclass(constructor)),
+            ("Reg.cs", DescriptorSource($"services.Add(new UniqueDescriptor({arguments}))")));
+
+        Registrations(model)
+            .ShouldBe([(Lifetime.Transient, "N.IFoo", "N.Foo")]);
+    }
+
+    // A computed base argument, and a forwarded lifetime the creation leaves to the constructor's default: neither
+    // lifetime is read, so neither records one, Singleton included.
+    [Theory]
+    [InlineData(
+        "public UniqueDescriptor(Type serviceType, Type implementationType, ServiceLifetime lifetime) : base(serviceType, implementationType, Promote(lifetime)) {}",
+        "typeof(IFoo), typeof(Foo), ServiceLifetime.Transient")]
+    [InlineData(
+        "public UniqueDescriptor(Type serviceType, Type implementationType, ServiceLifetime lifetime = ServiceLifetime.Scoped) : base(serviceType, implementationType, lifetime) {}",
+        "typeof(IFoo), typeof(Foo)")]
+    public void Recognize_DescriptorSubclassWhoseLifetimeIsUnread_RecordsNothing(string constructor, string arguments)
+    {
+        CodebaseModel model = CompilationFactory.ExtractWithDi(
+            ("Descriptor.cs", DescriptorSubclass(constructor)),
+            ("Reg.cs", DescriptorSource($"services.Add(new UniqueDescriptor({arguments}))")));
+
+        Registrations(model)
+            .ShouldBeEmpty();
+    }
+
+    // ── Generic wrappers, expanded at each call ──────────────────────────────────────────────────────────
+
+    private const string DiNamespace = "Microsoft.Extensions.DependencyInjection";
+
+    // The shape of a wrapper that replaces any earlier registration: the parameterless overload forwards a literal
+    // lifetime to the one that hands a descriptor to the collection.
+    private const string UniqueWrappers = """
+                                          using System;
+                                          using Microsoft.Extensions.DependencyInjection;
+                                          using Microsoft.Extensions.DependencyInjection.Extensions;
+                                          namespace W;
+                                          public static class UniqueExtensions
+                                          {
+                                              public static IServiceCollection AddUnique<TService, TImplementing>(this IServiceCollection services)
+                                                  where TService : class where TImplementing : class, TService =>
+                                                  AddUnique<TService, TImplementing>(services, ServiceLifetime.Singleton);
+
+                                              public static IServiceCollection AddUnique<TService, TImplementing>(this IServiceCollection services, ServiceLifetime lifetime)
+                                                  where TService : class where TImplementing : class, TService
+                                              {
+                                                  services.RemoveAll<TService>();
+                                                  services.Add(ServiceDescriptor.Describe(typeof(TService), typeof(TImplementing), lifetime));
+                                                  return services;
+                                              }
+
+                                              public static IServiceCollection AddUnique<TService>(this IServiceCollection services, Func<IServiceProvider, TService> factory)
+                                                  where TService : class
+                                              {
+                                                  services.Add(ServiceDescriptor.Describe(typeof(TService), factory, ServiceLifetime.Singleton));
+                                                  return services;
+                                              }
+
+                                              public static IServiceCollection AddWithDefault<TService>(this IServiceCollection services, ServiceLifetime lifetime = ServiceLifetime.Transient)
+                                                  where TService : class
+                                              {
+                                                  services.Add(ServiceDescriptor.Describe(typeof(TService), typeof(TService), lifetime));
+                                                  return services;
+                                              }
+                                          }
+                                          """;
+
+    private const string UniqueCallers = """
+                                         using Microsoft.Extensions.DependencyInjection;
+                                         using W;
+                                         namespace N;
+                                         public interface IFoo {}
+                                         public class Foo : IFoo {}
+                                         public interface IBar {}
+                                         public class Bar : IBar {}
+                                         public class Baz {}
+                                         public static class Root
+                                         {
+                                             public static ServiceLifetime Chosen { get; } = ServiceLifetime.Transient;
+
+                                             public static void Configure(IServiceCollection services)
+                                             {
+                                                 services.AddUnique<IFoo, Foo>();
+                                                 services.AddUnique<IBar, Bar>(ServiceLifetime.Scoped);
+                                                 services.AddUnique<Baz>(sp => new Baz());
+                                                 services.AddWithDefault<Foo>();
+                                                 services.AddUnique<IFoo, Foo>(Chosen);
+                                             }
+                                         }
+                                         """;
+
+    private static readonly (Lifetime Lifetime, string Service, string? Implementation)[] UniqueRegistrations =
+    [
+        (Lifetime.Singleton, "N.Baz", null),
+        (Lifetime.Singleton, "N.IFoo", "N.Foo"),
+        (Lifetime.Scoped, "N.IBar", "N.Bar"),
+        (Lifetime.Transient, "N.Foo", "N.Foo")
+    ];
+
+    // The wrappers declared in wrapperNamespace, the namespace Microsoft's guidance gives Add{Group} methods among
+    // them; the callers' import of W becomes a comment there, so every line keeps its number.
+    private static (string Path, string Source)[] UniqueWiring(string wrapperNamespace)
+    {
+        string wrappers = UniqueWrappers.Replace("namespace W;", $"namespace {wrapperNamespace};", StringComparison.Ordinal);
+        string callers = wrapperNamespace == "W"
+            ? UniqueCallers
+            : UniqueCallers.Replace("using W;", "// the wrappers share the collection's namespace", StringComparison.Ordinal);
+        return [("Wrappers.cs", wrappers), ("Root.cs", callers)];
+    }
+
+    [Theory]
+    [InlineData("W")]
+    [InlineData(DiNamespace)]
+    public void Recognize_GenericWrapperOverDescriptor_RecordsEachCallsRegistrationAtTheCall(string wrapperNamespace)
+    {
+        CodebaseModel model = CompilationFactory.ExtractWithDi(UniqueWiring(wrapperNamespace));
+
+        // The call passing a lifetime that is not a literal records nothing; the wrapper bodies record nothing of
+        // their own, since every registration there reads a type or lifetime parameter.
+        Registrations(model)
+            .ShouldBe(UniqueRegistrations);
+        model.Registration(Lifetime.Singleton, "N.IFoo", "N.Foo")
+            .Sites.Rendered()
+            .ShouldBe(["Root.cs:15"]);
+    }
+
+    [Theory]
+    [InlineData(false, "W")]
+    [InlineData(true, "W")]
+    [InlineData(false, DiNamespace)]
+    [InlineData(true, DiNamespace)]
+    public void Recognize_GenericWrapperInAnotherProject_IsExpandedAtTheMerge(bool referencedAsImage, string wrapperNamespace)
+    {
+        (string Path, string Source)[] wiring = UniqueWiring(wrapperNamespace);
+        CompilationInput wrappers = CompilationFactory.CompileWithDi("Wrappers", wiring[0]);
+        CompilationInput callers = CompilationFactory.CompileWithDiReferencing(
+            "App", wrappers.Compilation, "Wrappers", referencedAsImage, wiring[1]);
+
+        CodebaseModel model = Harness.Extract([wrappers, callers]);
+
+        Registrations(model)
+            .ShouldBe(UniqueRegistrations);
+    }
+
+    [Fact]
+    public void Recognize_NonGenericLifetimeWrapperInAnotherProject_IsReachedByItsLifetimeArgument()
+    {
+        // With no type arguments, a call to a wrapper declared elsewhere is told apart by its lifetime argument:
+        // a literal at the call, spelled through the type's name or an alias of it, or the calling wrapper's own
+        // lifetime parameter passed on, whose default applies.
+        CompilationInput wrappers = CompilationFactory.CompileWithDi("Wrappers", ("Clock.cs", """
+                                                                                              using Microsoft.Extensions.DependencyInjection;
+                                                                                              namespace W;
+                                                                                              public class Clock {}
+                                                                                              public static class ClockExtensions
+                                                                                              {
+                                                                                                  public static IServiceCollection AddClock(this IServiceCollection services, ServiceLifetime lifetime)
+                                                                                                  {
+                                                                                                      services.Add(ServiceDescriptor.Describe(typeof(Clock), typeof(Clock), lifetime));
+                                                                                                      return services;
+                                                                                                  }
+                                                                                              }
+                                                                                              """));
+        CompilationInput callers = CompilationFactory.CompileWithDiReferencing(
+            "App", wrappers.Compilation, "Wrappers", asImage: true, ("Root.cs", """
+                                                                                using Microsoft.Extensions.DependencyInjection;
+                                                                                using W;
+                                                                                using Lifetime = Microsoft.Extensions.DependencyInjection.ServiceLifetime;
+                                                                                namespace N;
+                                                                                public static class Root
+                                                                                {
+                                                                                    public static IServiceCollection AddScopedClock(this IServiceCollection services, ServiceLifetime lifetime = ServiceLifetime.Scoped) =>
+                                                                                        services.AddClock(lifetime);
+
+                                                                                    public static void Configure(IServiceCollection services)
+                                                                                    {
+                                                                                        services.AddClock(ServiceLifetime.Transient);
+                                                                                        services.AddScopedClock();
+                                                                                        services.AddClock(Lifetime.Singleton);
+                                                                                    }
+                                                                                }
+                                                                                """));
+
+        CodebaseModel model = Harness.Extract([wrappers, callers]);
+
+        Registrations(model)
+            .ShouldBe([
+                (Lifetime.Singleton, "W.Clock", "W.Clock"),
+                (Lifetime.Scoped, "W.Clock", "W.Clock"),
+                (Lifetime.Transient, "W.Clock", "W.Clock")
+            ]);
+    }
+
+    [Fact]
+    public void Recognize_NonGenericWrapperWhoseLifetimeParameterIsSpelledThroughAnAlias_IsExpandedAtItsCall()
+    {
+        // Nothing in the wrapper's declaration spells ServiceLifetime, so only its declared symbol says it takes one.
+        // The tuple alias beside it names no type by a name at all, and must be read past.
+        CodebaseModel model = CompilationFactory.ExtractWithDi(("Reg.cs", """
+                                                                          using Microsoft.Extensions.DependencyInjection;
+                                                                          using Lifetime = Microsoft.Extensions.DependencyInjection.ServiceLifetime;
+                                                                          using Pair = (int, int);
+                                                                          namespace N;
+                                                                          public class Clock {}
+                                                                          public static class ClockExtensions
+                                                                          {
+                                                                              public static IServiceCollection AddClock(this IServiceCollection services, Lifetime lifetime)
+                                                                              {
+                                                                                  services.Add(ServiceDescriptor.Describe(typeof(Clock), typeof(Clock), lifetime));
+                                                                                  return services;
+                                                                              }
+                                                                          }
+                                                                          public static class Root
+                                                                          {
+                                                                              public static void Configure(IServiceCollection services) => services.AddClock(ServiceLifetime.Transient);
+                                                                          }
+                                                                          """));
+
+        Registrations(model)
+            .ShouldBe([(Lifetime.Transient, "N.Clock", "N.Clock")]);
+    }
+
+    [Fact]
+    public void Recognize_PartialWrappers_ReadTheBodyAndTheDefiningDeclarationsDefault()
+    {
+        // The body binds its type parameters to the implementing declaration, and a parameter's default is written on
+        // the defining one, so a partial wrapper is read from both.
         CodebaseModel model = CompilationFactory.ExtractWithDi(("Reg.cs", """
                                                                           using Microsoft.Extensions.DependencyInjection;
                                                                           namespace N;
-                                                                          public interface IFoo {}
-                                                                          public class Foo : IFoo {}
-                                                                          public static class Reg
+                                                                          public class Foo {}
+                                                                          public class Bar {}
+                                                                          public static partial class Wiring
                                                                           {
-                                                                              public static void Configure(IServiceCollection services) => services.AddKeyedSingleton<IFoo, Foo>("key");
+                                                                              public static partial IServiceCollection AddThing<T>(this IServiceCollection services) where T : class;
+                                                                              public static partial IServiceCollection AddWithDefault<T>(this IServiceCollection services, ServiceLifetime lifetime = ServiceLifetime.Scoped) where T : class;
+                                                                          }
+                                                                          public static partial class Wiring
+                                                                          {
+                                                                              public static partial IServiceCollection AddThing<T>(this IServiceCollection services) where T : class
+                                                                              {
+                                                                                  services.AddSingleton<T>();
+                                                                                  return services;
+                                                                              }
+
+                                                                              public static partial IServiceCollection AddWithDefault<T>(this IServiceCollection services, ServiceLifetime lifetime) where T : class
+                                                                              {
+                                                                                  services.Add(ServiceDescriptor.Describe(typeof(T), typeof(T), lifetime));
+                                                                                  return services;
+                                                                              }
+                                                                          }
+                                                                          public static class Root
+                                                                          {
+                                                                              public static void Configure(IServiceCollection services)
+                                                                              {
+                                                                                  services.AddThing<Foo>();
+                                                                                  services.AddWithDefault<Bar>();
+                                                                              }
                                                                           }
                                                                           """));
+
+        Registrations(model)
+            .ShouldBe([(Lifetime.Singleton, "N.Foo", "N.Foo"), (Lifetime.Scoped, "N.Bar", "N.Bar")]);
+    }
+
+    [Fact]
+    public void Recognize_WrappersInFileLocalTypesSharingAName_AreEachExpandedAtTheirCalls()
+    {
+        // Two file-local types share a full name, and the model keeps one type by it; each still declares its own
+        // wrapper.
+        CodebaseModel model = CompilationFactory.ExtractWithDi(
+            ("First.cs", FileLocalWiring("AddFirst", "Foo", "AddSingleton")),
+            ("Second.cs", FileLocalWiring("AddSecond", "Bar", "AddScoped")));
+
+        Registrations(model)
+            .ShouldBe([(Lifetime.Singleton, "N.Foo", "N.Foo"), (Lifetime.Scoped, "N.Bar", "N.Bar")]);
+    }
+
+    private static string FileLocalWiring(string wrapper, string registered, string registration)
+    {
+        return $$"""
+                 using Microsoft.Extensions.DependencyInjection;
+                 namespace N;
+                 public class {{registered}} {}
+                 file static class Wiring
+                 {
+                     public static IServiceCollection {{wrapper}}<T>(this IServiceCollection services) where T : class
+                     {
+                         services.{{registration}}<T>();
+                         return services;
+                     }
+                 }
+                 public static class {{registered}}Root
+                 {
+                     public static void Configure(IServiceCollection services) => services.{{wrapper}}<{{registered}}>();
+                 }
+                 """;
+    }
+
+    // One project built for two frameworks, whose wrapper registers a different lifetime under each. A registration
+    // made directly under the same #if is recorded for the frameworks that compile it, and so is each framework's
+    // reading of the wrapper at that framework's own calls.
+    private static string FrameworkWiring(string calls)
+    {
+        return $$"""
+                 using Microsoft.Extensions.DependencyInjection;
+                 namespace N;
+                 public class Foo {}
+                 public static class Wiring
+                 {
+                     public static IServiceCollection AddFoo<T>(this IServiceCollection services) where T : class
+                     {
+                 #if NET8_0
+                         services.AddSingleton<T>();
+                 #else
+                         services.AddScoped<T>();
+                 #endif
+                         return services;
+                     }
+                 }
+                 public static class Root
+                 {
+                     public static void Configure(IServiceCollection services)
+                     {
+                 {{calls}}
+                     }
+                 }
+                 """;
+    }
+
+    [Theory]
+    [InlineData("        services.AddFoo<Foo>();", true)]
+    [InlineData("#if NET8_0\n        services.AddFoo<Foo>();\n#endif", false)]
+    public void Recognize_WrapperOfAMultiTargetedProject_IsExpandedThroughTheTemplateOfEachCallsFramework(string calls, bool calledOnBoth)
+    {
+        string source = FrameworkWiring(calls);
+        CodebaseModel model = Harness.Extract([FrameworkOfWiring("net8.0", source, "NET8_0"), FrameworkOfWiring("net48", source)]);
+
+        (Lifetime Lifetime, string Service, string? Implementation)[] expected = calledOnBoth
+            ? [(Lifetime.Singleton, "N.Foo", "N.Foo"), (Lifetime.Scoped, "N.Foo", "N.Foo")]
+            : [(Lifetime.Singleton, "N.Foo", "N.Foo")];
+        Registrations(model)
+            .ShouldBe(expected);
+    }
+
+    [Fact]
+    public void Recognize_SingleFrameworkCallerOfAMultiTargetedWrapper_IsExpandedThroughEveryFrameworksTemplate()
+    {
+        // The caller builds for one framework and the wrapper's project for two, and which of them the caller compiles
+        // against is not recorded, so both readings count.
+        string wiring = FrameworkWiring("");
+        CompilationInput modern = FrameworkOfWiring("net8.0", wiring, "NET8_0");
+        CompilationInput callers = CompilationFactory.CompileWithDiReferencing(
+            "App", modern.Compilation, "Shared", asImage: false, ("App.cs", """
+                                                                            using Microsoft.Extensions.DependencyInjection;
+                                                                            using N;
+                                                                            namespace App;
+                                                                            public static class AppRoot
+                                                                            {
+                                                                                public static void Configure(IServiceCollection services) => services.AddFoo<Foo>();
+                                                                            }
+                                                                            """));
+
+        CodebaseModel model = Harness.Extract([modern, FrameworkOfWiring("net48", wiring), callers]);
+
+        Registrations(model)
+            .ShouldBe([(Lifetime.Singleton, "N.Foo", "N.Foo"), (Lifetime.Scoped, "N.Foo", "N.Foo")]);
+    }
+
+    private static CompilationInput FrameworkOfWiring(string targetFramework, string source, params string[] preprocessorSymbols)
+    {
+        SyntaxTree tree = CSharpSyntaxTree.ParseText(
+            source, CSharpParseOptions.Default.WithPreprocessorSymbols(preprocessorSymbols), "Wiring.cs");
+        var compilation = CSharpCompilation.Create(
+            "Shared", [tree], TrustedPlatform.References, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        return new CompilationInput(compilation, "Shared", [], targetFramework);
+    }
+
+    [Fact]
+    public async Task ExtractFromSolutionAsync_WrapperReachedThroughASiblingsCompiledAssembly_IsExpandedAtTheCall()
+    {
+        // App references Library's built assembly by its path rather than as a project, as a HintPath reference does,
+        // so the wrapper reaches App as metadata, in the collection's own namespace. A project of this load produces
+        // its assembly, which is what tells it from the framework's methods there.
+        (string Path, string Source)[] wiring = UniqueWiring(DiNamespace);
+        MetadataReference libraryAssembly = CompilationFactory.ImageOf(CompilationFactory.CompileWithDi("Library", wiring[0]).Compilation);
+        using var workspace = new AdhocWorkspace();
+        var libraryId = ProjectId.CreateNewId();
+        var appId = ProjectId.CreateNewId();
+        Solution solution = workspace.CurrentSolution
+            .AddProject(libraryId, "Library", "Library", LanguageNames.CSharp)
+            .AddProject(appId, "App", "App", LanguageNames.CSharp)
+            .WithProjectCompilationOptions(libraryId, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
+            .WithProjectCompilationOptions(appId, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
+            .AddMetadataReferences(libraryId, TrustedPlatform.References)
+            .AddMetadataReferences(appId, [.. TrustedPlatform.References, libraryAssembly])
+            .AddDocument(DocumentId.CreateNewId(libraryId), wiring[0].Path, SourceText.From(wiring[0].Source), filePath: wiring[0].Path)
+            .AddDocument(DocumentId.CreateNewId(appId), wiring[1].Path, SourceText.From(wiring[1].Source), filePath: wiring[1].Path);
+
+        CodebaseModel model = await CodebaseExtractor.ExtractFromSolutionAsync(solution, ct: Ct);
+
+        Registrations(model)
+            .ShouldBe(UniqueRegistrations);
+    }
+
+    // ── Builder wrappers, which reach the collection through a property ───────────────────────────────────
+
+    // One builder exposes Services on an interface, the other inherits it from a base class. Each generic extension
+    // forwards to an internal collection wrapper that holds a descriptor subclass, declared in a file of its own,
+    // in a local before handing it over.
+    private const string HandlerDescriptor = """
+                                             using System;
+                                             using Microsoft.Extensions.DependencyInjection;
+                                             namespace W;
+                                             public sealed class UniqueDescriptor : ServiceDescriptor
+                                             {
+                                                 public UniqueDescriptor(Type serviceType, Type implementationType, ServiceLifetime lifetime)
+                                                     : base(serviceType, implementationType, lifetime) {}
+                                             }
+                                             """;
+
+    private const string HandlerBuilders = """
+                                           using Microsoft.Extensions.DependencyInjection;
+                                           namespace W;
+                                           public interface IHandler<T> {}
+                                           public interface IMyBuilder { IServiceCollection Services { get; } }
+                                           public abstract class BuilderBase { public IServiceCollection Services { get; } = new ServiceCollection(); }
+                                           public sealed class AppBuilder : BuilderBase {}
+                                           public static class BuilderExtensions
+                                           {
+                                               public static IMyBuilder AddHandler<TMessage, THandler>(this IMyBuilder builder) where THandler : IHandler<TMessage>
+                                               {
+                                                   builder.Services.AddHandler<TMessage, THandler>();
+                                                   return builder;
+                                               }
+
+                                               public static AppBuilder AddHandler<TMessage, THandler>(this AppBuilder builder) where THandler : IHandler<TMessage>
+                                               {
+                                                   builder.Services.AddHandler<TMessage, THandler>();
+                                                   return builder;
+                                               }
+
+                                               internal static IServiceCollection AddHandler<TMessage, THandler>(this IServiceCollection services) where THandler : IHandler<TMessage>
+                                               {
+                                                   var descriptor = new UniqueDescriptor(typeof(IHandler<TMessage>), typeof(THandler), ServiceLifetime.Transient);
+                                                   if (!services.Contains(descriptor)) services.Add(descriptor);
+                                                   return services;
+                                               }
+                                           }
+                                           """;
+
+    private const string HandlerCallers = """
+                                          using W;
+                                          namespace N;
+                                          public class Ping {}
+                                          public class PingHandler : IHandler<Ping> {}
+                                          public class Pong {}
+                                          public class PongHandler : IHandler<Pong> {}
+                                          public static class Root
+                                          {
+                                              public static void Configure(IMyBuilder builder, AppBuilder app)
+                                              {
+                                                  builder.AddHandler<Ping, PingHandler>();
+                                                  app.AddHandler<Pong, PongHandler>();
+                                              }
+                                          }
+                                          """;
+
+    private static readonly (Lifetime Lifetime, string Service, string? Implementation)[] HandlerRegistrations =
+    [
+        (Lifetime.Transient, "W.IHandler<T>", "N.PingHandler"),
+        (Lifetime.Transient, "W.IHandler<T>", "N.PongHandler")
+    ];
+
+    [Fact]
+    public void Recognize_BuilderWrapperOverAHeldSubclassDescriptor_RecordsEachHandlerAtTheBuilderCall()
+    {
+        CodebaseModel model = CompilationFactory.ExtractWithDi(
+            ("Descriptor.cs", HandlerDescriptor), ("Builders.cs", HandlerBuilders), ("Root.cs", HandlerCallers));
+
+        // The service is the handler interface at definition level, named by its own type parameter.
+        Registrations(model)
+            .ShouldBe(HandlerRegistrations);
+        model.Registration(Lifetime.Transient, "W.IHandler<T>", "N.PingHandler")
+            .Sites.Rendered()
+            .ShouldBe(["Root.cs:11"]);
+        model.Registration(Lifetime.Transient, "W.IHandler<T>", "N.PongHandler")
+            .Sites.Rendered()
+            .ShouldBe(["Root.cs:12"]);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Recognize_BuilderWrapperInAnotherProject_IsExpandedAtTheMerge(bool referencedAsImage)
+    {
+        CompilationInput wrappers = CompilationFactory.CompileWithDi(
+            "Wrappers", ("Descriptor.cs", HandlerDescriptor), ("Builders.cs", HandlerBuilders));
+        CompilationInput callers = CompilationFactory.CompileWithDiReferencing(
+            "App", wrappers.Compilation, "Wrappers", referencedAsImage, ("Root.cs", HandlerCallers));
+
+        CodebaseModel model = Harness.Extract([wrappers, callers]);
+
+        Registrations(model)
+            .ShouldBe(HandlerRegistrations);
+    }
+
+    [Fact]
+    public void Recognize_WrapperCompiledIntoAPackage_RecordsNothing()
+    {
+        // The wrapper's assembly is referenced but is not a project of the solution, so no template reaches the
+        // merge, and a call to a wrapper with no syntax tree to walk expands to nothing.
+        CompilationInput wrappers = CompilationFactory.CompileWithDi("Wrappers", ("Wrappers.cs", UniqueWrappers));
+        CSharpCompilation callers = CompilationFactory.CreateCompilation(
+            "App", [.. TrustedPlatform.References, CompilationFactory.ImageOf(wrappers.Compilation)], ("Root.cs", UniqueCallers));
+
+        CodebaseModel model = Harness.Extract([new CompilationInput(callers, "App", [])]);
 
         Registrations(model)
             .ShouldBeEmpty();
     }
 
     [Fact]
-    public void Recognize_ServiceDescriptorTryAddEnumerable_IsNotRecognized()
+    public void Recognize_WrappersForwardingInACycle_RecordEachRegistrationOnce()
     {
         CodebaseModel model = CompilationFactory.ExtractWithDi(("Reg.cs", """
                                                                           using Microsoft.Extensions.DependencyInjection;
-                                                                          using Microsoft.Extensions.DependencyInjection.Extensions;
                                                                           namespace N;
-                                                                          public interface IFoo {}
-                                                                          public class Foo : IFoo {}
-                                                                          public static class Reg
+                                                                          public class Foo {}
+                                                                          public static class Cycle
                                                                           {
-                                                                              public static void Configure(IServiceCollection services) =>
-                                                                                  services.TryAddEnumerable(ServiceDescriptor.Singleton<IFoo, Foo>());
+                                                                              public static IServiceCollection AddPing<T>(this IServiceCollection services) where T : class
+                                                                              {
+                                                                                  services.AddSingleton<T>();
+                                                                                  return services.AddPong<T>();
+                                                                              }
+
+                                                                              public static IServiceCollection AddPong<T>(this IServiceCollection services) where T : class =>
+                                                                                  services.AddPing<T>();
+                                                                          }
+                                                                          public static class Root
+                                                                          {
+                                                                              public static void Configure(IServiceCollection services) => services.AddPing<Foo>();
                                                                           }
                                                                           """));
 
         Registrations(model)
-            .ShouldBeEmpty();
+            .ShouldBe([(Lifetime.Singleton, "N.Foo", "N.Foo")]);
     }
 
     // ── Whole-compilation reach (top-level Program) ───────────────────────────────────────────────────────

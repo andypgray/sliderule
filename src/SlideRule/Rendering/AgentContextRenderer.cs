@@ -60,8 +60,9 @@ internal static class AgentContextRenderer
     // literal output.
     private const string GlossaryRegisteredLine =
         "registered = named in a source-level container registration " +
-        "(`AddSingleton`/`AddScoped`/`AddTransient`/`TryAdd*`/`AddHostedService`/`AddDbContext`/`AddDbContextPool`/`AddHttpClient<TClient>`); " +
-        "keyed-service and raw `ServiceDescriptor` registrations, assembly scanning, factory internals and " +
+        "(`AddSingleton`/`AddScoped`/`AddTransient`/`TryAdd*`/`AddHostedService`/`AddDbContext`/`AddDbContextPool`/`AddHttpClient<TClient>`, " +
+        "or a `ServiceDescriptor` added to the collection), directly or through a wrapper declared in the solution; " +
+        "keyed-service registrations, assembly scanning, factory internals, wrappers compiled into packages and " +
         "framework defaults are not seen.";
 
     private const string GlossaryTail = "Expand any rule ID with `sliderule explain <rule-id>`.";

@@ -1046,8 +1046,20 @@ needs two facts no other section provides: who is *registered* with what lifetim
   `Microsoft.Extensions.DependencyInjection` (or its `.Extensions` sub-namespace, the
   `TryAdd*` family's home), whose name is in the recognized-call table, and whose first
   parameter is `IServiceCollection`. A look-alike extension in a user namespace is not
-  recognized — but an **in-solution wrapper whose body calls a recognized registration IS seen** (the
-  pass walks the wrapper's body like any other tree).
+  recognized itself, but an **in-solution wrapper is followed**. A wrapper whose body
+  registers concrete types is seen where its body makes the call, since the pass walks every
+  tree. A **generic or lifetime-taking wrapper** (a method declared in the solution, in any
+  namespace, the two above included, whose first parameter is `IServiceCollection` or a builder that
+  exposes one as a readable instance property, on itself, a base class or an interface, and
+  which takes type parameters or a `ServiceLifetime` parameter) is read as a template over its own parameters
+  and expanded at **each call**, in whichever project the call sits: `services.AddUnique<IFoo,
+  Foo>()` records what the wrapper's body registers, with `IFoo`, `Foo` and the lifetime the
+  call passes, either a literal `ServiceLifetime.X` or the parameter's declared default,
+  substituted, at the call's own `file:line`. A wrapper that calls another wrapper is followed
+  along the chain, and a chain that returns to a wrapper already on it stops there. A
+  registration in the body that reads none of the wrapper's parameters is recorded once, at
+  the body. Whatever reads a type or lifetime the call does not spell readably (a lifetime
+  passed as a variable, an array type argument) records nothing.
 
   | Recognized call | Lifetime | service / implementation |
   |---|---|---|
@@ -1055,15 +1067,18 @@ needs two facts no other section provides: who is *registered* with what lifetim
   | `AddHostedService<T>` | Singleton | service = `Microsoft.Extensions.Hosting.IHostedService`, synthesized — no syntactic mention exists (implementation-only if unresolvable); impl = `T` |
   | `AddDbContext<T>` / `AddDbContextPool<T>` | Scoped; an explicit **literal** `ServiceLifetime.X` argument is honored; a non-literal lifetime argument → no fact recorded (never guess) | (T, T) |
   | `AddHttpClient<TClient>` / `AddHttpClient<TClient, TImpl>` | Transient | (TClient, TClient) / (TClient, TImpl); the named-only string form registers no user type → no fact |
+  | `ServiceDescriptor.Describe` / `.Singleton` / `.Scoped` / `.Transient` and `new ServiceDescriptor(…)`, each only as an argument of the collection's `Add`, `Insert`, `TryAdd`, `TryAddEnumerable` or `Replace`, or held in a local that is assigned once and handed to one of them; also `new` of a subclass declared in the same project whose constructor passes its own parameters to `base(…)` unchanged | by name; `Describe` and the constructor take a **literal** `ServiceLifetime.X` argument (non-literal → no fact); the instance constructor is Singleton | as the `AddSingleton` row: two type-args or two `typeof`s → (service, impl), a factory or instance → (service, —); a descriptor built anywhere else, one in a local written again, a subclass whose constructor computes a base argument or whose creation leaves a forwarded parameter to its default, and a keyed one, → no fact |
 
   Open-generic `typeof` registrations (`AddSingleton(typeof(IRepo<>), typeof(Repo<>))`)
   record definition-level, like every other fact (§4.1).
 - **The honesty boundary** (rendered into the glossary whenever a `Registered` noun is in
-  play, §10): registrations the source does not spell with a recognized call are invisible —
-  `Configure`/`AddOptions` (the options interfaces are framework-registered), keyed-service
-  overloads, raw `ServiceDescriptor`/`TryAddEnumerable`, assembly-scanning registrars,
-  reflection, framework defaults, and wrapper extensions compiled into packages (no syntax
-  tree to walk). The recognized-call table is the fence; growth beyond it is named in §11.
+  play, §10): registrations the source does not spell with a recognized call, directly or
+  through a followed wrapper, are invisible — `Configure`/`AddOptions` (the options interfaces
+  are framework-registered), keyed-service overloads, assembly-scanning registrars,
+  reflection, framework defaults, wrappers compiled into packages (no syntax tree to walk),
+  a builder's own item collections (entries added to a builder object rather than to the
+  service collection), descriptor subclasses declared outside the project that creates them,
+  and a wrapper's `Type`-valued parameter. The recognized-call table is the fence; growth beyond it is named in §11.
 - **`arch.Registered(lifetime)` membership** is the union of **service and implementation
   type FQNs** of the recognized registrations at that lifetime (`arch.Registered()` — any
   lifetime). Registration is many-to-many, so membership is resolved at evaluation against
@@ -1081,7 +1096,7 @@ needs two facts no other section provides: who is *registered* with what lifetim
   also inverts the polarity of the honesty boundary above: under the nouns an invisible
   registration hides a violation, while under this verb it reds a correctly registered type —
   a false red, not a miss. An estate that registers through an invisible route — assembly
-  scanning, keyed overloads, raw `ServiceDescriptor`, a wrapper compiled into a package —
+  scanning, keyed overloads, a wrapper compiled into a package, a builder's own item collections —
   should not use the verb; the recognized-call table is the fence either way.
 
 ### 4.8 Exception edges (catch and throw)
@@ -2542,8 +2557,10 @@ this catalog.
   that noun's (§4.7), additionally gates its own glossary line on the same
   byte-identical-without-it terms: *"registered = named in a source-level container registration
   (`AddSingleton`/`AddScoped`/`AddTransient`/`TryAdd*`/`AddHostedService`/`AddDbContext`/
-  `AddDbContextPool`/`AddHttpClient<TClient>`); keyed-service and raw `ServiceDescriptor`
-  registrations, assembly scanning, factory internals and framework defaults are not seen."*
+  `AddDbContextPool`/`AddHttpClient<TClient>`, or a `ServiceDescriptor` added to the
+  collection), directly or through a wrapper declared in the solution; keyed-service
+  registrations, assembly scanning, factory internals, wrappers compiled into packages and
+  framework defaults are not seen."*
 - **Posture verbs**: imperative (`Enforce`, `Migrate`, `Quarantine`, `Caution`). **Options**: nouns
   (`Baseline`) or deliberate idiom (`WhileYoureThere` — it names the boy-scout rule). Its policies
   each answer the question the option asks, as imperatives (`MigrateIfSmall`, `AlwaysMigrate`,
@@ -2663,8 +2680,9 @@ outside its subject is an authoring choice.
 On the injection axis (§4.7): the `MustOnlyInject` / `MustNotBeInjectedBy` twins; a
 lifetime-scoped `MustBeRegistered(Lifetime)` (the nullary verb is any-lifetime, §5.3);
 property- and method-injection edges (constructor parameters are the recorded form); recognition growth beyond
-the pinned call table — keyed services, `ServiceDescriptor`/`TryAddEnumerable`, assembly-scanning
-registrars — the table is the fence, everything outside it the documented honesty boundary;
+the pinned call table — keyed services, assembly-scanning registrars, a builder's own item
+collections, descriptor subclasses from another project, a wrapper's `Type`-valued parameters — the table is the fence,
+everything outside it the documented honesty boundary;
 lifetime facts on `ITypeInfo` (registration membership stays model-side, resolved at evaluation);
 and `graph` registration data.
 

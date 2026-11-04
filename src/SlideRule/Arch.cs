@@ -254,10 +254,12 @@ public sealed class Arch
     ///     service and implementation types alike, such as <c>arch.Registered(Lifetime.Singleton)</c>.
     ///     Registrations are recognized from <c>AddSingleton</c>, <c>AddScoped</c>, <c>AddTransient</c>,
     ///     their <c>TryAdd</c> twins, <c>AddHostedService</c>, <c>AddDbContext</c>, <c>AddDbContextPool</c> and
-    ///     <c>AddHttpClient</c> on an <c>IServiceCollection</c>; anything registered another way
-    ///     (assembly scanning, keyed services, raw descriptors, code compiled into a package) is not seen.
-    ///     The natural operand of <c>MustNotInject</c>; as a subject, a selection that matches nothing
-    ///     fails the rule. An undefined <see cref="Lifetime" /> value is reported when the spec is loaded.
+    ///     <c>AddHttpClient</c> on an <c>IServiceCollection</c>, and from a <c>ServiceDescriptor</c> added to
+    ///     one, in the solution's own source, made directly or through a wrapper method the solution declares.
+    ///     Anything registered another way (assembly scanning, keyed services, a wrapper compiled into a
+    ///     package) is not seen. The natural operand of <c>MustNotInject</c>; as a subject, a selection that
+    ///     matches nothing fails the rule. An undefined <see cref="Lifetime" /> value is reported when the spec
+    ///     is loaded.
     /// </summary>
     public Selection Registered(Lifetime lifetime)
     {
@@ -269,9 +271,11 @@ public sealed class Arch
     ///     and implementation types alike. Registrations are recognized from <c>AddSingleton</c>,
     ///     <c>AddScoped</c>, <c>AddTransient</c>, their <c>TryAdd</c> twins, <c>AddHostedService</c>,
     ///     <c>AddDbContext</c>, <c>AddDbContextPool</c> and <c>AddHttpClient</c> on an
-    ///     <c>IServiceCollection</c>; anything registered another way (assembly scanning, keyed services,
-    ///     raw descriptors, code compiled into a package) is not seen. The natural operand of
-    ///     <c>MustNotInject</c>; as a subject, a selection that matches nothing fails the rule.
+    ///     <c>IServiceCollection</c>, and from a <c>ServiceDescriptor</c> added to one, in the solution's own
+    ///     source, made directly or through a wrapper method the solution declares. Anything registered
+    ///     another way (assembly scanning, keyed services, a wrapper compiled into a package) is not seen.
+    ///     The natural operand of <c>MustNotInject</c>; as a subject, a selection that matches nothing fails the
+    ///     rule.
     /// </summary>
     public Selection Registered()
     {

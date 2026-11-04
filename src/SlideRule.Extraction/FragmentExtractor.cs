@@ -466,6 +466,10 @@ internal static class FragmentExtractor
         private readonly Dictionary<(string Src, string MemberSymbolId), MemberEdgeBuilder> _memberEdges = new();
         private readonly Dictionary<(Lifetime Lifetime, string Service, string? Impl), SortedSet<FragmentSite>> _registrationSites = new();
 
+        // Null unless the registration walk runs and finds the container API referenced; a one-project or
+        // document view never runs it.
+        private RegistrationTemplates? _registrationTemplates;
+
         // Compilation.GetSemanticModel mints a new model on every call (no provider is attached), and the edge
         // pass asks once per declaring syntax reference, so ModelFor keeps one model per tree.
         private readonly Dictionary<SyntaxTree, SemanticModel> _semanticModels = new();
@@ -755,25 +759,99 @@ internal static class FragmentExtractor
         // definition-level names, never resolved to nodes, because registration is many-to-many.
         private void WalkRegistrations()
         {
-            var recognizer = new RegistrationRecognizer(_compilation);
+            var recognizer = new RegistrationRecognizer(_compilation, ModelFor, _input.SolutionAssemblyNames);
             if (!recognizer.IsActive) return; // MEDI not referenced — nothing can be recognized
+
+            Dictionary<MethodDeclarationSyntax, IMethodSymbol> wrappers = DeclaredWrappers(recognizer);
+            var wrapperNames = new HashSet<string>(wrappers.Values.Select(wrapper => wrapper.Name), StringComparer.Ordinal);
+            HashSet<string> descriptorSubclasses = DeclaredDescriptorSubclasses(recognizer);
+            _registrationTemplates = new RegistrationTemplates(recognizer, FullNameOf);
 
             foreach (SyntaxTree tree in _compilation.SyntaxTrees)
             {
                 _cancellationToken.ThrowIfCancellationRequested();
 
                 SemanticModel model = ModelFor(tree);
-                foreach (InvocationExpressionSyntax invocation in tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>())
-                    if (recognizer.Recognize(invocation, model) is { } registration)
-                        RecordRegistration(registration, RegistrationSite(invocation));
+                foreach (SyntaxNode node in tree.GetRoot().DescendantNodes())
+                    switch (node)
+                    {
+                        case InvocationExpressionSyntax invocation:
+                        {
+                            IMethodSymbol? wrapper = EnclosingWrapper(invocation, wrappers);
+                            if (recognizer.Recognize(invocation, model, wrapper) is { } registration)
+                                RecordRegistration(registration, RegistrationSite(invocation), wrapper);
+                            else if (recognizer.RecognizeWrapperCall(invocation, model, wrapper, wrapperNames) is { } call)
+                                _registrationTemplates.AddCall(wrapper, call, RegistrationSite(invocation));
+                            break;
+                        }
+                        case BaseObjectCreationExpressionSyntax creation:
+                        {
+                            IMethodSymbol? wrapper = EnclosingWrapper(creation, wrappers);
+                            if (recognizer.Recognize(creation, model, wrapper, descriptorSubclasses) is { } registration)
+                                RecordRegistration(registration, FragmentSite.Of(creation), wrapper);
+                            break;
+                        }
+                    }
             }
         }
 
-        private void RecordRegistration(RecognizedRegistration registration, FragmentSite site)
+        // The wrappers this compilation declares, from its type symbols, each keyed by every declaration of it. The
+        // walk reads the compilation's types rather than the declaring pass's table, which keeps one symbol per full
+        // name and so one of two file-local types that share it. A partial method's implementing declaration is
+        // keyed to the implementation part, the symbol its body's type parameters bind to.
+        private Dictionary<MethodDeclarationSyntax, IMethodSymbol> DeclaredWrappers(RegistrationRecognizer recognizer)
         {
-            string serviceFqn = FullNameOf(registration.Service);
-            string? implFqn = registration.Implementation is { } impl ? FullNameOf(impl) : null;
-            _registrationSites.SitesFor((registration.Lifetime, serviceFqn, implFqn)).Add(site);
+            IEnumerable<IMethodSymbol> methods = DeclaredTypes(_compilation)
+                .SelectMany(type => type.GetMembers())
+                .OfType<IMethodSymbol>()
+                .Where(recognizer.IsWrapper);
+
+            var wrappers = new Dictionary<MethodDeclarationSyntax, IMethodSymbol>();
+            foreach (IMethodSymbol method in methods)
+            foreach (IMethodSymbol part in new[] { method, method.PartialImplementationPart }.OfType<IMethodSymbol>())
+            foreach (SyntaxReference reference in part.DeclaringSyntaxReferences)
+                if (reference.GetSyntax(_cancellationToken) is MethodDeclarationSyntax declaration)
+                    wrappers[declaration] = part;
+
+            return wrappers;
+        }
+
+        // The names of the ServiceDescriptor subclasses this compilation declares, which a creation's syntactic
+        // screen admits beside the names ending in ServiceDescriptor. Read from the declaring pass's table, which
+        // is complete before the registration walk starts.
+        private HashSet<string> DeclaredDescriptorSubclasses(RegistrationRecognizer recognizer)
+        {
+            IEnumerable<string> names = _declared.Values
+                .Select(builder => builder.Symbol)
+                .Where(type => type.TypeKind == RoslynTypeKind.Class && recognizer.IsDescriptorSubclass(type))
+                .Select(type => type.Name);
+            return new HashSet<string>(names, StringComparer.Ordinal);
+        }
+
+        private static IMethodSymbol? EnclosingWrapper(SyntaxNode node, Dictionary<MethodDeclarationSyntax, IMethodSymbol> wrappers)
+        {
+            if (wrappers.Count == 0) return null;
+
+            return node.FirstAncestorOrSelf<MethodDeclarationSyntax>() is { } declaration
+                   && wrappers.TryGetValue(declaration, out IMethodSymbol? wrapper)
+                ? wrapper
+                : null;
+        }
+
+        private void RecordRegistration(RecognizedRegistration registration, FragmentSite site, IMethodSymbol? wrapper)
+        {
+            if (wrapper is not null && RegistrationTemplates.ReadsWrapper(registration))
+            {
+                _registrationTemplates!.AddRegistration(wrapper, registration);
+                return;
+            }
+
+            // Read outside a wrapper's parameters, every type is named and the lifetime a literal.
+            if (registration is not { Service: INamedTypeSymbol service, Lifetime.Literal: { } lifetime }) return;
+
+            string serviceFqn = FullNameOf(service);
+            string? implFqn = registration.Implementation is INamedTypeSymbol impl ? FullNameOf(impl) : null;
+            _registrationSites.SitesFor((lifetime, serviceFqn, implFqn)).Add(site);
         }
 
         /// <summary><see cref="DefinitionName" /> for a named type.</summary>
@@ -937,16 +1015,21 @@ internal static class FragmentExtractor
 
         // The implementations the type's own interface map names (GRAMMAR §4.6). Only the type's own members are
         // looked up in it, so a base class's member that a derived type uses to satisfy an interface reports false
-        // on the base class. An interface implements its base interfaces' members only explicitly, and explicit
-        // implementations are never inventoried, so an interface's map is not read. Accessors, operators and
-        // nested types are not looked up, since the inventory keeps no method that is not ordinary and a nested
-        // type implements nothing.
+        // on the base class. Only the interfaces the type itself declares, and those they extend, are mapped: C# maps
+        // an interface a base class declares at that base class, so its members never map to this type's own, an
+        // override of the implementing member included. An interface implements its base interfaces' members only
+        // explicitly, and explicit implementations are never inventoried, so an interface's map is not read.
+        // Accessors, operators and nested types are not looked up, since the inventory keeps no method that is not
+        // ordinary and a nested type implements nothing.
         private static ImmutableHashSet<ISymbol> InterfaceImplementationsOf(INamedTypeSymbol type)
         {
             ImmutableHashSet<ISymbol>.Builder implementations = ImmutableHashSet.CreateBuilder<ISymbol>(SymbolEqualityComparer.Default);
             if (type.TypeKind == RoslynTypeKind.Interface) return implementations.ToImmutable();
 
-            foreach (INamedTypeSymbol @interface in type.AllInterfaces)
+            IEnumerable<INamedTypeSymbol> declared = type.Interfaces
+                .SelectMany(@interface => @interface.AllInterfaces.Prepend(@interface))
+                .Distinct<INamedTypeSymbol>(SymbolEqualityComparer.Default);
+            foreach (INamedTypeSymbol @interface in declared)
             foreach (ISymbol interfaceMember in @interface.GetMembers().Where(member => member is not (IMethodSymbol { MethodKind: not MethodKind.Ordinary } or INamedTypeSymbol)))
                 if (type.FindImplementationForInterfaceMember(interfaceMember) is { } implementation)
                     implementations.Add(implementation);
@@ -1312,7 +1395,9 @@ internal static class FragmentExtractor
                 _input.ProjectName, _input.TargetFramework, projectReferences, declaredTypes, externals, edges,
                 memberEdges, constructorEdges, injectionEdges, catchEdges, throwEdges, exposureEdges,
                 serviceRegistrations, _input.SolutionMember, _compilation.Assembly.Name,
-                UndeclaredProjectReferences: _input.UndeclaredProjectReferences);
+                UndeclaredProjectReferences: _input.UndeclaredProjectReferences,
+                RegistrationTemplates: _registrationTemplates?.Templates(),
+                WrapperCalls: _registrationTemplates?.Calls());
 
             return WithArtifactFacts(fragment, _input.ArtifactFacts);
         }

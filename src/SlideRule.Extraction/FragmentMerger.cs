@@ -1,5 +1,6 @@
 using SlideRule.Codebase;
 using SlideRule.Extraction.Fragments;
+using SlideRule.Extraction.Passes;
 using SlideRule.Internal;
 using SlideRule.Prose;
 
@@ -231,6 +232,10 @@ internal static class FragmentMerger
                         binding, exposureEdge.SourceFullName, exposureEdge.ExposedFullName, _exposureEdges,
                         exposureEdge.Sites);
             }
+
+            // After every fragment, because a wrapper's template and the calls to it can sit in different projects.
+            foreach (FragmentServiceRegistration registration in WrapperCallExpander.Expand(fragments))
+                MergeRegistration(registration);
 
             return Materialize();
         }

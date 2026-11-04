@@ -7,7 +7,7 @@
 
 reference = a source-level type reference; use = a source-level member access; construct = a source-level object creation (`new`, including target-typed `new()`); inject = a source-level constructor-parameter dependency (primary constructors included); catch = a source-level `catch` clause (a bare `catch` counts as `System.Exception`); expose = a public signature position (return, parameter, or property/field/event type) on a public member of an externally visible type. Expand any rule ID with `sliderule explain <rule-id>`.
 
-registered = named in a source-level container registration (`AddSingleton`/`AddScoped`/`AddTransient`/`TryAdd*`/`AddHostedService`/`AddDbContext`/`AddDbContextPool`/`AddHttpClient<TClient>`); keyed-service and raw `ServiceDescriptor` registrations, assembly scanning, factory internals and framework defaults are not seen.
+registered = named in a source-level container registration (`AddSingleton`/`AddScoped`/`AddTransient`/`TryAdd*`/`AddHostedService`/`AddDbContext`/`AddDbContextPool`/`AddHttpClient<TClient>`, or a `ServiceDescriptor` added to the collection), directly or through a wrapper declared in the solution; keyed-service registrations, assembly scanning, factory internals, wrappers compiled into packages and framework defaults are not seen.
 
 ### Rules
 - `di/construct-via-container` — Types, except types in `Meridian.Interchange.Host.*`, must not construct types implementing `IPartnerClient`. Partner clients are wired with their pooled HttpClient and options in the composition root; constructing one elsewhere bypasses that wiring and the registered lifetime. See <https://learn.microsoft.com/dotnet/core/extensions/dependency-injection/guidelines>.

@@ -5,16 +5,18 @@ namespace SlideRule.Codebase;
 ///     <see cref="Lifetime" />, and where the call names one, the implementation type behind it. Read them
 ///     from <see cref="CodebaseModel.ServiceRegistrations" />. The calls recognized are
 ///     <c>AddSingleton</c>, <c>AddScoped</c> and <c>AddTransient</c> with their <c>TryAdd</c> forms,
-///     <c>AddHostedService</c>, <c>AddDbContext</c>, <c>AddDbContextPool</c> and <c>AddHttpClient</c>.
+///     <c>AddHostedService</c>, <c>AddDbContext</c>, <c>AddDbContextPool</c> and <c>AddHttpClient</c>, and a
+///     <c>ServiceDescriptor</c> handed to the collection.
 /// </summary>
 /// <remarks>
 ///     <para>
 ///         A call is recognized by the method it resolves to and never by its name alone: it must come from
 ///         <c>Microsoft.Extensions.DependencyInjection</c> and take an <c>IServiceCollection</c> first. So a
 ///         look-alike of your own is not counted, while a helper of your own whose body calls one of those
-///         methods is. Everything registered another way is absent — assembly scanning, keyed overloads, a
-///         raw <c>ServiceDescriptor</c>, <c>Configure</c> and <c>AddOptions</c>, reflection, framework
-///         defaults, and registration helpers compiled into a package, which leave no source to read.
+///         methods is. A helper with type parameters or a <c>ServiceLifetime</c> parameter is counted at each
+///         place it is called, with that call's types and lifetime. Everything registered another way is
+///         absent — assembly scanning, keyed overloads, <c>Configure</c> and <c>AddOptions</c>, reflection,
+///         framework defaults, and registration helpers compiled into a package, which leave no source to read.
 ///     </para>
 ///     <para>
 ///         The two type names are fully qualified in the same form <see cref="TypeNode.FullName" /> takes,
@@ -41,8 +43,9 @@ internal sealed class ServiceRegistration
     ///     Gets the lifetime the registration was made with. <c>AddSingleton</c>, <c>AddScoped</c> and
     ///     <c>AddTransient</c> each name their own; <c>AddHostedService</c> registers as a singleton,
     ///     <c>AddHttpClient</c> as transient, and <c>AddDbContext</c> as scoped unless the call passes a
-    ///     <c>ServiceLifetime</c> of its own. Such an argument is honoured only when it is a literal: where it
-    ///     is computed, the call records no fact at all rather than a guess.
+    ///     <c>ServiceLifetime</c> of its own. Such an argument is honoured when it is a literal, or a helper's own
+    ///     lifetime parameter read at each call to the helper; where it is computed, the call records no fact at
+    ///     all rather than a guess.
     /// </summary>
     public Lifetime Lifetime { get; }
 

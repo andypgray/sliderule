@@ -193,9 +193,10 @@ public sealed class FragmentRoundTripTests
     [Fact]
     public void SerializeDeserializeMerge_InjectionEdgesAndRegistrations_SurviveRoundTripByteStably()
     {
-        // Arrange — a source exercising both DI fact families (GRAMMAR §4.7): a constructor-injection edge
-        // and two registrations (a two-arg service/impl and a one-arg self), so a lost edge, dropped
-        // registration, or mis-serialized lifetime would move the merged dump.
+        // Arrange — a source exercising both DI fact families (GRAMMAR §4.7): a constructor-injection edge,
+        // two registrations (a two-arg service/impl and a one-arg self), and a generic wrapper with a defaulted
+        // lifetime parameter called once, so a lost edge, dropped registration, mis-serialized lifetime, or a
+        // template or wrapper call lost in serialization would move the merged dump.
         CompilationInput app = CompilationFactory.CompileWithDi("App", ("Wire.cs", """
                                                                                    using Microsoft.Extensions.DependencyInjection;
                                                                                    namespace N;
@@ -208,6 +209,14 @@ public sealed class FragmentRoundTripTests
                                                                                        {
                                                                                            services.AddSingleton<IFoo, Foo>();
                                                                                            services.AddScoped<Svc>();
+                                                                                           services.AddSelf<Foo>();
+                                                                                       }
+
+                                                                                       public static IServiceCollection AddSelf<T>(
+                                                                                           this IServiceCollection services, ServiceLifetime lifetime = ServiceLifetime.Transient)
+                                                                                       {
+                                                                                           services.Add(ServiceDescriptor.Describe(typeof(T), typeof(T), lifetime));
+                                                                                           return services;
                                                                                        }
                                                                                    }
                                                                                    """));
@@ -227,6 +236,9 @@ public sealed class FragmentRoundTripTests
         direct.ServiceRegistrations
             .Any(r => r is { Lifetime: Lifetime.Singleton, ServiceFullName: "N.IFoo", ImplementationFullName: "N.Foo" })
             .ShouldBeTrue();
+        fromCache.Registration(Lifetime.Transient, "N.Foo", "N.Foo")
+            .Sites.Lines()
+            .ShouldBe([12]);
         fromCache.ShouldModelTheSameAs(direct);
     }
 

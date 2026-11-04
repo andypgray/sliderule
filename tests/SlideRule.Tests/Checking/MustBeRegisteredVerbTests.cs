@@ -118,11 +118,42 @@ public sealed class MustBeRegisteredVerbTests
     }
 
     [Fact]
+    public void MustBeRegistered_TypeRegisteredOnlyThroughABuilderWrapper_Satisfies()
+    {
+        // The registration sits two steps from a recognized call: a generic extension over a builder that
+        // exposes the collection, whose body holds the descriptor in a local before adding it.
+        CodebaseModel model = CompilationFactory.ExtractWithDi(("Scene.cs", """
+                                                                            using Microsoft.Extensions.DependencyInjection;
+                                                                            namespace App
+                                                                            {
+                                                                                public interface IAppBuilder { IServiceCollection Services { get; } }
+                                                                                public class Handler {}
+                                                                                public static class BuilderExtensions
+                                                                                {
+                                                                                    public static IAppBuilder AddHandler<THandler>(this IAppBuilder builder) where THandler : class
+                                                                                    {
+                                                                                        var descriptor = ServiceDescriptor.Transient<THandler, THandler>();
+                                                                                        builder.Services.Add(descriptor);
+                                                                                        return builder;
+                                                                                    }
+                                                                                }
+                                                                                public static class Wiring
+                                                                                {
+                                                                                    public static void Configure(IAppBuilder builder) => builder.AddHandler<Handler>();
+                                                                                }
+                                                                            }
+                                                                            """));
+
+        Checker.Verdict(model, arch => arch.Types.WithNameMatching("Handler").MustBeRegistered())
+            .ShouldHavePassedClean();
+    }
+
+    [Fact]
     public void MustBeRegistered_NoRegistrationsAtAll_RedsEverySubject()
     {
         // The verb's polarity, pinned as behaviour rather than left to be discovered. Registration is read
         // from source-visible container calls, so wiring the extraction cannot see — assembly scanning, a
-        // keyed overload, a raw ServiceDescriptor, an extension compiled into a package — reds every subject
+        // keyed overload, an extension compiled into a package — reds every subject
         // instead of missing a violation. An estate that registers by convention should not use the verb, and
         // this is what ignoring that looks like.
         RuleResult result = Checker.Verdict(

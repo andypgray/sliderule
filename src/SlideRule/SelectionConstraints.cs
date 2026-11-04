@@ -1057,11 +1057,11 @@ public static class SelectionConstraints
     ///     lifetime, exactly the membership <c>arch.Registered()</c> selects. Registrations are recognized
     ///     from <c>AddSingleton</c>, <c>AddScoped</c>, <c>AddTransient</c>, their <c>TryAdd</c> twins,
     ///     <c>AddHostedService</c>, <c>AddDbContext</c>, <c>AddDbContextPool</c> and <c>AddHttpClient</c> on an
-    ///     <c>IServiceCollection</c> in the solution's own source. Anything registered another way
-    ///     (assembly scanning, keyed services, a raw <c>ServiceDescriptor</c>, an extension method compiled
-    ///     into a package) is not seen, and under this verb that turns a correctly wired type into a
-    ///     failure rather than hiding a real one, so a codebase that registers by convention should not use
-    ///     it. Takes no arguments.
+    ///     <c>IServiceCollection</c>, and from a <c>ServiceDescriptor</c> added to one, in the solution's own
+    ///     source, made directly or through a wrapper method the solution declares. Anything registered
+    ///     another way (assembly scanning, keyed services, a wrapper compiled into a package) is not seen,
+    ///     and under this verb that turns a correctly wired type into a failure rather than hiding a
+    ///     real one, so a codebase that registers by convention should not use it. Takes no arguments.
     /// </summary>
     public static Constraint MustBeRegistered(this Selection subject)
     {

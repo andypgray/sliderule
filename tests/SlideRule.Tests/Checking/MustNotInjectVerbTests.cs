@@ -214,6 +214,49 @@ public sealed class MustNotInjectVerbTests
     }
 
     [Fact]
+    public void MustNotInject_SingletonRegisteredThroughAGenericWrapper_IsASubject()
+    {
+        // The singleton is registered only through a wrapper whose body hands a descriptor to the collection, the
+        // lifetime defaulting to Singleton, so the captive edge exists only if the wrapper call is expanded.
+        const string source = """
+                              using Microsoft.Extensions.DependencyInjection;
+                              namespace App
+                              {
+                                  public interface IScopedDep {}
+                                  public class ScopedDep : IScopedDep {}
+                                  public class CaptiveSingleton
+                                  {
+                                      public CaptiveSingleton(IScopedDep dep) { }
+                                  }
+                                  public static class UniqueExtensions
+                                  {
+                                      public static IServiceCollection AddUnique<TService>(
+                                          this IServiceCollection services, ServiceLifetime lifetime = ServiceLifetime.Singleton)
+                                          where TService : class
+                                      {
+                                          services.Add(ServiceDescriptor.Describe(typeof(TService), typeof(TService), lifetime));
+                                          return services;
+                                      }
+                                  }
+                                  public static class Wiring
+                                  {
+                                      public static void Configure(IServiceCollection services)
+                                      {
+                                          services.AddUnique<CaptiveSingleton>();
+                                          services.AddScoped<IScopedDep, ScopedDep>();
+                                      }
+                                  }
+                              }
+                              """;
+
+        RuleResult result = Checker.Verdict(
+            CompilationFactory.ExtractWithDi(("Scene.cs", source)), arch => arch.Registered(Lifetime.Singleton)
+                .MustNotInject(arch.Registered(Lifetime.Scoped)));
+
+        result.ShouldHaveFailedWithSingleEdge(ViolationKind.Injection, "App.CaptiveSingleton", "App.IScopedDep");
+    }
+
+    [Fact]
     public void JsonReportRenderer_InjectionViolation_EmitsInjectionKindAndTargetAndOmitsMemberSlots()
     {
         // The JSON kind string is "injection", and the injected type rides the `target` field a reference uses,

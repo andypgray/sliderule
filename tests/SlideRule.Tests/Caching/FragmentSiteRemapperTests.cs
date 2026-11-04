@@ -23,7 +23,7 @@ public sealed class FragmentSiteRemapperTests
     // A solution shaped to leave no site-bearing list empty: a partial class and partial method across two
     // files (multi-site type and member declarations), reference/member/construction edges, a constructor
     // taking an interface (injection), catch clauses filtered, swallowing and rethrowing, throws, public
-    // signatures (exposure), and a composition root the registration recognizer reads.
+    // signatures (exposure), and a composition root the registration recognizer reads, calling a wrapper.
     private static readonly (string Path, string Source)[] LibSources =
     [
         ("Contracts.cs", """
@@ -111,7 +111,11 @@ public sealed class FragmentSiteRemapperTests
                                {
                                    services.AddScoped<IStore, Store>();
                                    services.AddSingleton<Ledger>();
+                                   services.AddSelf<Report>();
                                }
+
+                               public static IServiceCollection AddSelf<T>(this IServiceCollection services) where T : class =>
+                                   services.AddSingleton<T>();
                            }
                            """)
     ];
@@ -185,7 +189,8 @@ public sealed class FragmentSiteRemapperTests
         ("throw edge sites", fragment => fragment.ThrowEdges.SelectMany(edge => edge.Sites)),
         ("exposure edge sites", fragment => fragment.ExposureEdges.SelectMany(edge => edge.Sites)),
         ("service registration sites",
-            fragment => fragment.ServiceRegistrations.SelectMany(registration => registration.Sites))
+            fragment => fragment.ServiceRegistrations.SelectMany(registration => registration.Sites)),
+        ("wrapper call sites", fragment => (fragment.WrapperCalls ?? []).SelectMany(call => call.Sites))
     ];
 
     [Fact]
