@@ -64,9 +64,10 @@ internal static class LoadBoundary
     ///     <paramref name="otherLanguageProjects" />, the project files in another language the load could not reach:
     ///     the compiler calls a replay declined, or the referenced projects the workspace opened in no language.
     /// </summary>
-    // The steps read and write disjoint facts (references; names; file and output paths), so their order decides
-    // nothing; it is fixed here so that both paths run one sequence. The project files are resolved once, here, for
-    // the steps that compare them and for every reader of the load after them.
+    // The steps read and write disjoint facts (references; names; parse options; file and output paths), so their
+    // order decides nothing, except that the defines step needs the framework map the name step returns; it is fixed
+    // here so that both paths run one sequence. The project files are resolved once, here, for the steps that compare
+    // them and for every reader of the load after them.
     internal static SettledSolution Settle(
         Solution solution, SolutionMembership? membership, IReadOnlyCollection<string> otherLanguageProjects)
     {
@@ -74,9 +75,10 @@ internal static class LoadBoundary
         (Solution stripped, int analyzerCount, int metadataCount) = solution.StripUnresolvedReferences();
         (Solution normalized, IReadOnlyDictionary<ProjectId, string> targetFrameworks) =
             stripped.NormalizeProjectNames(projectFiles);
-        ProjectLoadReport report = ProjectLoadFailures.Detect(normalized, projectFiles, membership, otherLanguageProjects);
+        Solution defined = VisualBasicDefines.Restore(normalized, targetFrameworks);
+        ProjectLoadReport report = ProjectLoadFailures.Detect(defined, projectFiles, membership, otherLanguageProjects);
 
         return new SettledSolution(
-            normalized, targetFrameworks, projectFiles, report, analyzerCount, metadataCount);
+            defined, targetFrameworks, projectFiles, report, analyzerCount, metadataCount);
     }
 }

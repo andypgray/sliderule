@@ -100,6 +100,16 @@ internal static class WorkspaceLoader
             foreach (UnresolvedReferences.Finding found in UnresolvedReferences.Detect(settled.Solution, settled.Report.Failed))
                 diagnosticLog?.Invoke(UnresolvedReferences.Message(found.ProjectPath, found.Names));
 
+            // It compiles the C# projects it inspects, so it runs only when there is a log to write to.
+            if (diagnosticLog is not null)
+            {
+                IReadOnlyList<CrossLanguageReferences.Finding> dropped = await CrossLanguageReferences
+                    .DetectAsync(settled.Solution, settled.Report.Failed, ct)
+                    .ConfigureAwait(false);
+                foreach (CrossLanguageReferences.Finding found in dropped)
+                    diagnosticLog(CrossLanguageReferences.Message(found));
+            }
+
             // A project whose restore failed loads completely, so nothing in the loaded structure says so and
             // only its assets file can.
             IReadOnlyList<string> restoreFailed = RestoreFailures.Detect(settled.Solution, settled.Report.Failed);

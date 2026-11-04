@@ -198,6 +198,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   CS1591 on the spec class, which under `TreatWarningsAsErrors` was a failed build. The
   recipe now asks for the spec files in the repository's own style, its header included, and its list of
   errors adds IDE0073, NU1100 under package source mapping and NU1004 under locked restore, each with its fix.
+- On Linux, a reference from a C# project into an SDK-style Visual Basic project is checked, as it is on
+  Windows. Before, the MSBuild workspace on Linux loaded the VB project without its `/define:` symbols, so its
+  `My` template failed to compile, the C# compilation never received its assembly, and a rule about
+  references into the VB project's types could not report a violation there. Where a C# project's reference
+  to a project in another language still does not reach its compilation, such as a VB project with a compile
+  error, the run prints a `warning:` line naming both project files.
 
 ## [0.2.1] - 2026-10-26
 

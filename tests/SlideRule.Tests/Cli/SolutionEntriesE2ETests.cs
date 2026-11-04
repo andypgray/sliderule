@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Shouldly;
+using SlideRule.Roslyn.Diagnostics;
 using SlideRule.Tests.Mcp.TestDoubles;
 using SlideRule.Tests.Replay;
 using SlideRule.Tests.TestSupport;
@@ -417,11 +418,6 @@ public sealed class SolutionEntriesE2ETests
     [Fact]
     public async Task CheckJson_ReferenceFromCSharpIntoAVisualBasicProject_IsChecked()
     {
-        Assert.SkipUnless(
-            OperatingSystem.IsWindows(),
-            "On Linux the MSBuild workspace compiles the VB project without its _MyType define, so the C# project's "
-            + "reference into it does not bind.");
-
         // Arrange
         using TempDirectory bed = TestTempRoot.Fresh("visual-basic-reference");
         (string solution, string spec) = WriteVisualBasicBed(bed);
@@ -429,9 +425,35 @@ public sealed class SolutionEntriesE2ETests
         // Act
         CliResult result = await CliRunner.InvokeColdAsync("check", solution, "--spec", spec, "--no-cache", "--json");
 
-        // Assert — a reference into the VB project from C# is still checked, because the C# compilation reaches its
-        // types through the project's assembly.
+        // Assert — a reference into the VB project from C# is still checked, on every platform, because the C#
+        // compilation reaches its types through the project's assembly, and the load says nothing about it.
         result.Out.ShouldHaveSingleViolationOnEdge("vb/app-off-legacy", "reference", "App.Widget", "Legacy.Ledger");
+        result.Err.ShouldNotContain(CrossLanguageReferences.Message(LegacyReference(bed)), customMessage: result.Transcript());
+    }
+
+    [Fact]
+    public async Task Check_ReferenceIntoAVisualBasicProjectWithDeclarationErrors_WarnsThatItsTypesAreUnbound()
+    {
+        // Arrange — the bed builds, and then the VB project gains a declaration error, so the workspace has no
+        // assembly to hand the C# compilation.
+        using TempDirectory bed = TestTempRoot.Fresh("visual-basic-broken");
+        (string solution, string spec) = WriteVisualBasicBed(bed);
+        bed.WriteFile(
+            ["Legacy", "Ledger.vb"],
+            "Namespace Legacy\n    Public Class Ledger\n        Inherits Missing\n    End Class\nEnd Namespace\n");
+
+        // Act
+        CliResult result = await CliRunner.InvokeColdAsync("check", solution, "--spec", spec, "--no-cache");
+
+        // Assert
+        result.Err.ShouldContain(
+            "warning: " + CrossLanguageReferences.Message(LegacyReference(bed)), customMessage: result.Transcript());
+    }
+
+    // The bed's one cross-language reference, as the load names it.
+    private static CrossLanguageReferences.Finding LegacyReference(TempDirectory bed)
+    {
+        return new CrossLanguageReferences.Finding(bed.PathOf("App", "App.csproj"), bed.PathOf("Legacy", "Legacy.vbproj"));
     }
 
     // A C# project referencing an SDK-style Visual Basic one, both declared and built, and the spec that layers them.
