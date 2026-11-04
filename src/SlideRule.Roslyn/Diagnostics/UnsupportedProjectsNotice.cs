@@ -1,9 +1,10 @@
+using SlideRule.Internal;
 using SlideRule.Rendering;
 
 namespace SlideRule.Roslyn.Diagnostics;
 
 /// <summary>
-///     The wording each verb uses to say that the solution declares projects the run did not survey — the
+///     The wording each verb uses to say that the run did not survey some of the solution's projects — the
 ///     human twin of the documents' <c>unsupportedProjects</c> slot.
 /// </summary>
 /// <remarks>
@@ -92,7 +93,7 @@ internal static class UnsupportedProjectsNotice
         return Block(
             unsupportedProjects,
             "The burndown below counts only the projects this product can read: these contribute no "
-            + "violations and never will, so every count reads low by whatever they hold.");
+            + "violations to it, so every count reads low by whatever they hold.");
     }
 
     /// <summary>
@@ -113,10 +114,18 @@ internal static class UnsupportedProjectsNotice
         return EvidenceBlock.Compose(lede, unsupportedProjects, tail);
     }
 
-    // The clause states no cause, because each entry beneath it says its own, and "C# only" would be false
-    // about a shared project.
-    private static string Subject(int unsupportedProjectCount)
+    /// <summary>
+    ///     The clause every surface opens its list of unsupported projects with, inflected for
+    ///     <paramref name="unsupportedProjectCount" />.
+    /// </summary>
+    /// <remarks>
+    ///     It states no cause, because each entry beneath it says its own, and "C# only" would be false about a
+    ///     shared project. Nor does it say the solution declares them: a replay lists a compiler call it declined
+    ///     whether or not the solution names its project.
+    /// </remarks>
+    internal static string Subject(int unsupportedProjectCount)
     {
-        return DeclaredProjectsClause.Subject(unsupportedProjectCount, "surveyed");
+        return $"{Plurals.Counted(unsupportedProjectCount, "project")} "
+               + $"{Plurals.PastVerb(unsupportedProjectCount)} not surveyed";
     }
 }

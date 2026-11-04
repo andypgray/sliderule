@@ -41,7 +41,7 @@ unsupportedProjects[]   { project, reason }
 
 Read it in this order:
 
-1. `unsupportedProjects[]` first: the declared projects the survey does not cover, each with its reason. No rule can be violated in one, and nothing else flags the gap.
+1. `unsupportedProjects[]` first: the projects the survey does not cover, each with its reason. No rule can be violated in one, and nothing else flags the gap.
 2. `projects[]`: the namespace inventory is your raw material for layer globs. Keep a `solutionMember: false` row out of your layer globs: a passenger a `ProjectReference` dragged in, not part of the estate you are writing law for. `generated` counts the types a generator emitted. **A namespace whose `generated` equals its `types` is wholly generator output: never make it a layer glob and never anchor a rule on it.** Where a project's `generated` is a large share of its `types`, narrow the project noun with `.Authored()`. `factsFollow` marks a multi-targeting project whose frameworks share types, and `isPackable`, `locksPackages` and `packageReferences[]` are evaluated facts: evidence for `arch.Projects` rules.
 3. `multiplyDeclaredTypes[]` and `shadowedTypes[]`, before anchoring a subject on a project: `arch.Project(...)` on any declarer selects a multiply declared type, with the facts of the declarer the entry names, and a shadowed name is two types, of which a rule naming it reaches both and `arch.Project(...)` over the declarer only its own.
 4. `projectEdges[]`: the observed references. A declared reference with no observed edge is a dead reference, cleanup for the handoff and not a rule; an observed edge you did not expect is the interesting kind.

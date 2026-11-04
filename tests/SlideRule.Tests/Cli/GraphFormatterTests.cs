@@ -15,7 +15,7 @@ namespace SlideRule.Tests.Cli;
 /// </summary>
 public sealed class GraphFormatterTests
 {
-    private const string UnsupportedHeading = "Projects the solution declares that this survey does not cover:";
+    private const string UnsupportedHeading = "Projects this survey does not cover:";
 
     [Fact]
     public void Lines_MixedSolutionMembership_AnnotatesOnlyThePassenger()

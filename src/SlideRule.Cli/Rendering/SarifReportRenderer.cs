@@ -214,7 +214,7 @@ internal static class SarifReportRenderer
     // cannot disagree about what the run could read.
     private static SarifNotification UnsupportedNotification(IReadOnlyList<UnsupportedProjectStamp> unsupportedProjects)
     {
-        string subject = DeclaredProjectsClause.Subject(unsupportedProjects.Count, "surveyed");
+        string subject = UnsupportedProjectsNotice.Subject(unsupportedProjects.Count);
         IEnumerable<string> entries = unsupportedProjects
             .Select(project => $"{project.Project} ({project.Reason})");
 

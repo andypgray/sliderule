@@ -42,6 +42,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Visual Studio 2026 is in the tested range with 2019 and 2022, so a machine whose only Visual Studio is 2026
   no longer reports its MSBuild as outside the tested envelope. On a machine with both 2022 and 2026, projects
   are now loaded with 2026; set `SLIDERULE_VS_INSTALL_PATH` to an install root to choose another.
+- The stamp `check` and `status` print over projects outside the model opens "2 projects were not surveyed:",
+  as does the SARIF notification, and `graph` heads the list "Projects this survey does not cover:". Both
+  used to say the solution declares these projects, which a run from a binary log can contradict: a project
+  the build compiled in another language is listed whether the solution names it or not. The `status` stamp
+  no longer says these projects never contribute violations, because one the default configuration skips
+  contributes once that configuration builds it.
 
 ### Fixed
 

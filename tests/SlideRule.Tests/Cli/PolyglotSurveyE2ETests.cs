@@ -36,7 +36,7 @@ namespace SlideRule.Tests.Cli;
 /// </remarks>
 public sealed class PolyglotSurveyE2ETests
 {
-    private const string UnsupportedHeading = "Projects the solution declares that this survey does not cover:";
+    private const string UnsupportedHeading = "Projects this survey does not cover:";
 
     [Theory]
     [InlineData("graph")]
@@ -165,10 +165,10 @@ public sealed class PolyglotSurveyE2ETests
         result.ShouldSucceed();
         result.Out.NormalizedTrimmed()
             .ShouldStartWith(
-                "1 project the solution declares was not surveyed:\n"
+                "1 project was not surveyed:\n"
                 + "  PolyglotApp.Fs/PolyglotApp.Fs.fsproj — not a C# project\n"
                 + "The burndown below counts only the projects this product can read: these contribute no "
-                + "violations and never will, so every count reads low by whatever they hold.");
+                + "violations to it, so every count reads low by whatever they hold.");
     }
 
     [Fact]
@@ -185,7 +185,7 @@ public sealed class PolyglotSurveyE2ETests
         result.ShouldSucceed();
         result.Out.NormalizedTrimmed()
             .ShouldStartWith(
-                "1 project the solution declares was not surveyed:\n"
+                "1 project was not surveyed:\n"
                 + "  PolyglotApp.Fs/PolyglotApp.Fs.fsproj — not a C# project\n"
                 + "The verdict below covers only the projects this product can read, so a clean result here "
                 + "is not a clean solution.");
@@ -216,7 +216,7 @@ public sealed class PolyglotSurveyE2ETests
 
         notification.SarifMessageText()
             .ShouldBe(
-                "1 project the solution declares was not surveyed, so these results cover part of the "
+                "1 project was not surveyed, so these results cover part of the "
                 + "solution: PolyglotApp.Fs/PolyglotApp.Fs.fsproj (not a C# project)");
         notification.GetProperty("level")
             .GetString()

@@ -125,7 +125,7 @@ The fork's [Architecture workflow](https://github.com/andypgray/eShopOnWeb/blob/
 The solution declares one project SlideRule cannot read, the Docker Compose project. Run without a base, `check` prints a stamp naming it above the report. Here is that stamp and the report's summary line:
 
 ```text
-1 project the solution declares was not surveyed:
+1 project was not surveyed:
   docker-compose.dcproj — not a C# project
 The verdict below covers only the projects this product can read, so a clean result here is not a clean solution.
 
@@ -135,9 +135,9 @@ Checked 19 rules: 18 passed, 0 failed, 1 skipped (0 violations, 0 warnings).
 `status` prints the burndown, one line per rule:
 
 ```text
-1 project the solution declares was not surveyed:
+1 project was not surveyed:
   docker-compose.dcproj — not a C# project
-The burndown below counts only the projects this product can read: these contribute no violations and never will, so every count reads low by whatever they hold.
+The burndown below counts only the projects this product can read: these contribute no violations to it, so every count reads low by whatever they hold.
 
 pass layering/core-independent
 pass layering/core-declares-no-blazor-shared (migrate) — 1 grandfathered remaining, 0 new, 0 fixed awaiting acceptance

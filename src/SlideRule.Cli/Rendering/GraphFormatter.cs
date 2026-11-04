@@ -33,7 +33,7 @@ internal static class GraphFormatter
         lines.AddRange(summary.Projects.Select(project => ProjectLine(project, grain)));
         lines.Add("");
 
-        lines.Add("Projects the solution declares that this survey does not cover:");
+        lines.Add("Projects this survey does not cover:");
         lines.AddRange(UnsupportedProjectLines(unsupportedProjects));
         lines.Add("");
 

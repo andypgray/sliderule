@@ -4,7 +4,7 @@ using SlideRule.Roslyn.Diagnostics;
 namespace SlideRule.Cli.Rendering;
 
 /// <summary>
-///     The one place the CLI composes an unsupported-projects stamp: which declared projects the run did not
+///     The one place the CLI composes an unsupported-projects stamp: which projects the run did not
 ///     reach, and why.
 /// </summary>
 /// <remarks>
@@ -17,7 +17,7 @@ internal static class UnsupportedProjectsNotices
 {
     /// <summary>
     ///     Writes the stamp to <paramref name="output" />, stdout, above a verb's answer, or nothing at all when
-    ///     the run reached every declared project.
+    ///     the run surveyed every project it found.
     /// </summary>
     internal static void Stamp(
         TextWriter output, CodebaseSource source, Func<IReadOnlyList<string>, string> factory)

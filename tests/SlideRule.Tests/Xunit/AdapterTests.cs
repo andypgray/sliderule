@@ -253,7 +253,7 @@ public sealed class AdapterTests
 
         var skip = exception.ShouldBeOfType<SkipException>();
         skip.Message.ShouldContain(
-            "1 project the solution declares was not surveyed:\n"
+            "1 project was not surveyed:\n"
             + "  PolyglotApp.Fs/PolyglotApp.Fs.fsproj — not a C# project\n"
             + "Rule verdicts come from the projects this product can read, but a test by this name "
             + "cannot pass while the solution declares projects the model never held.");

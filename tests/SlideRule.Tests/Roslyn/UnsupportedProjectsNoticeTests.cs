@@ -5,8 +5,8 @@ using Xunit;
 namespace SlideRule.Tests.Roslyn;
 
 /// <summary>
-///     The wording of the coverage statement every verb writes when the solution declares projects no
-///     extractor reaches: the per-kind reason, the entry line that joins it to its project, the two verb
+///     The wording of the coverage statement every verb writes when the run lists projects no extractor
+///     reaches: the per-kind reason, the entry line that joins it to its project, the two verb
 ///     stamps and the adapter's skip — pinned pure, no workspace and no disk.
 ///     <see cref="SlideRule.Tests.Cli.PolyglotSurveyE2ETests" /> pins the same bytes coming out of a
 ///     real polyglot load.
@@ -110,7 +110,7 @@ public sealed class UnsupportedProjectsNoticeTests
         string stamp = UnsupportedProjectsNotice.CheckStamp(TwoProjects);
 
         stamp.ShouldBe(
-            "2 projects the solution declares were not surveyed:\n"
+            "2 projects were not surveyed:\n"
             + "  PolyglotApp.Fs/PolyglotApp.Fs.fsproj — not a C# project\n"
             + "  Shared/Shared.shproj — a shared project, compiled into the projects that import it\n"
             + "The verdict below covers only the projects this product can read, so a clean result here is "
@@ -118,18 +118,19 @@ public sealed class UnsupportedProjectsNoticeTests
     }
 
     [Fact]
-    public void StatusStamp_TwoProjects_SaysTheCountsReadLowAndAlwaysWill()
+    public void StatusStamp_TwoProjects_SaysTheCountsReadLow()
     {
-        // Unlike a filter's narrowing this zero is permanent, which is the whole difference between the two
-        // tails: no later run of this product will find debt in these projects to burn down.
+        // Unlike a filter's narrowing, no argument to this run would count these projects, so the tail names
+        // no command. It promises no permanence either: a project the default configuration skips counts once
+        // that configuration builds it.
         string stamp = UnsupportedProjectsNotice.StatusStamp(TwoProjects);
 
         stamp.ShouldBe(
-            "2 projects the solution declares were not surveyed:\n"
+            "2 projects were not surveyed:\n"
             + "  PolyglotApp.Fs/PolyglotApp.Fs.fsproj — not a C# project\n"
             + "  Shared/Shared.shproj — a shared project, compiled into the projects that import it\n"
             + "The burndown below counts only the projects this product can read: these contribute no "
-            + "violations and never will, so every count reads low by whatever they hold.");
+            + "violations to it, so every count reads low by whatever they hold.");
     }
 
     [Fact]
@@ -140,7 +141,7 @@ public sealed class UnsupportedProjectsNoticeTests
         string skip = UnsupportedProjectsNotice.AdapterSkip(TwoProjects);
 
         skip.ShouldBe(
-            "2 projects the solution declares were not surveyed:\n"
+            "2 projects were not surveyed:\n"
             + "  PolyglotApp.Fs/PolyglotApp.Fs.fsproj — not a C# project\n"
             + "  Shared/Shared.shproj — a shared project, compiled into the projects that import it\n"
             + "Rule verdicts come from the projects this product can read, but a test by this name cannot "
@@ -153,7 +154,7 @@ public sealed class UnsupportedProjectsNoticeTests
         // One unsupported project is the commonest case there is — a polyglot solution usually holds a
         // single .fsproj — and "1 projects ... were not surveyed" is the sentence a reader stops trusting.
         UnsupportedProjectsNotice.CheckStamp(["PolyglotApp.Fs/PolyglotApp.Fs.fsproj — not a C# project"])
-            .ShouldStartWith("1 project the solution declares was not surveyed:\n");
+            .ShouldStartWith("1 project was not surveyed:\n");
     }
 
     [Fact]
@@ -174,7 +175,7 @@ public sealed class UnsupportedProjectsNoticeTests
             + "Rule verdicts come from the projects that loaded, but a test by this name cannot pass while "
             + "declared projects went unchecked; run the solution the filter references for the whole "
             + "answer.\n"
-            + "1 project the solution declares was not surveyed:\n"
+            + "1 project was not surveyed:\n"
             + "  PolyglotApp.Fs/PolyglotApp.Fs.fsproj — not a C# project\n"
             + "Rule verdicts come from the projects this product can read, but a test by this name cannot "
             + "pass while the solution declares projects the model never held.");

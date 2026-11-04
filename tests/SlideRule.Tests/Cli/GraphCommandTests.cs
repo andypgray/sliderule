@@ -50,7 +50,7 @@ public sealed class GraphCommandTests
           MyApp.Legacy.Billing — 4 types; targets net10.0; references: (none); packages: (none)
           MyApp.Web — 19 types; targets net10.0; references: MyApp.Legacy.Billing; packages: Microsoft.Extensions.DependencyInjection.Abstractions
 
-        Projects the solution declares that this survey does not cover:
+        Projects this survey does not cover:
           (none)
 
         Observed project references (distinct type pairs):
@@ -90,7 +90,7 @@ public sealed class GraphCommandTests
         Projects (1):
           MyApp.Web — 19 types; targets net10.0; references: MyApp.Legacy.Billing; packages: Microsoft.Extensions.DependencyInjection.Abstractions
 
-        Projects the solution declares that this survey does not cover:
+        Projects this survey does not cover:
           (none)
 
         Observed project references (distinct type pairs):
