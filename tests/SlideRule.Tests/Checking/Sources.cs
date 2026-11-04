@@ -100,10 +100,11 @@ internal static class Sources
                                     """;
 
     /// <summary>
-    ///     Transitivity / type-argument-substitution / declared-only-attribute fixture for the negative
-    ///     hierarchy verbs (GRAMMAR §5.2–§5.3): a transitive interface implementer (via a base class), a
+    ///     Transitivity / type-argument-substitution / declared-only-attribute fixture for the hierarchy
+    ///     matchers (GRAMMAR §5.2–§5.3): a transitive interface implementer (via a base class), a
     ///     substitution handler (a class extending a generic base that implements <c>IHandler&lt;T&gt;</c>),
-    ///     and an attributed base with an un-attributed derived type. Anchors are the reflectable
+    ///     and an attributed base with an un-attributed intermediate base and leaf below it. <c>Mark</c> keeps
+    ///     the default <c>AttributeUsage</c>, so reflection would report it on both. Anchors are the reflectable
     ///     <see cref="Targets" /> types, re-declared here in lockstep (a separate compilation) — the same
     ///     discipline as <see cref="Hierarchy" />.
     /// </summary>
@@ -120,6 +121,7 @@ internal static class Sources
                                               public class SubstHandler : HandlerBase<Order> {}
                                               [Mark] public class AttrBase {}
                                               public class AttrDerived : AttrBase {}
+                                              public class AttrLeaf : AttrDerived {}
                                               """;
 
     /// <summary>

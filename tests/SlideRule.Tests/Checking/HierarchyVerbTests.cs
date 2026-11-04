@@ -143,6 +143,32 @@ public sealed class HierarchyVerbTests
             .ShouldHavePassed();
     }
 
+    // AttrBase [Mark] ← AttrDerived ← AttrLeaf: only the declaring type is attributed, though Mark's default usage is
+    // Inherited = true.
+    [Fact]
+    public void AttributedWith_DeclaredOnly_SelectsNeitherTheIntermediateBaseNorTheLeaf()
+    {
+        Checker.Selects(TransitiveModel, arch => arch.Types.WithPrefix("Attr").AttributedWith(typeof(MarkAttribute)))
+            .ShouldBe([$"{T}AttrBase"]);
+    }
+
+    [Fact]
+    public void MustBeAttributedWith_DeclaredOnly_RedsTheIntermediateBaseAndTheLeaf()
+    {
+        Checker.Verdict(TransitiveModel, arch => arch.Types.WithPrefix("Attr")
+                .MustBeAttributedWith(typeof(MarkAttribute)))
+            .ShouldHaveFailedWithSubjects([$"{T}AttrDerived", $"{T}AttrLeaf"]);
+    }
+
+    // The spelling GRAMMAR §5.2 gives for an attribute a shared base carries: name the base, which reaches every level
+    // below it.
+    [Fact]
+    public void DerivedFrom_AttributedBase_SelectsTheIntermediateBaseAndTheLeaf()
+    {
+        Checker.Selects(TransitiveModel, arch => arch.Types.DerivedFrom($"{T}AttrBase"))
+            .ShouldBe([$"{T}AttrDerived", $"{T}AttrLeaf"]);
+    }
+
     // ── string attribute anchors (GRAMMAR §5.2–§5.3): the escape hatch names the attribute DEFINITION by
     //    fully-qualified string, so a spec need not compile against the attribute's package. Parity band —
     //    each anchor selects and reds exactly what its typeof twin above does ──

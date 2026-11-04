@@ -1619,8 +1619,22 @@ inheritance matches) and the whole base-type chain, arguments substituted. A cla
 `HandlerBase<Order>` where `HandlerBase<T> : IHandler<T>` satisfies
 `Implementing(typeof(IHandler<Order>))`. An open definition matches any construction (on the
 definition name); a closed construction matches that construction exactly (on the constructed
-name); a **string** anchor is always the definition arm (string anchors, below). `AttributedWith`
-is **declared attributes only** — no inheritance. External (metadata)
+name); a **string** anchor is always the definition arm (string anchors, below).
+
+`AttributedWith` reads **declared attributes only**: the attributes written on the subject's own
+declaration. An attribute on a base class, declared in the solution or in a package, never counts
+for a type that derives from it, whatever the attribute's `AttributeUsage.Inherited` says. Where a
+set of types gets a cross-cutting attribute from a shared base, and the framework reads that
+attribute through the base (`Inherited = true`, the default), state the law as two rules: the set
+`MustDeriveFrom` the base, and the base `MustBeAttributedWith` the attribute. `MustDeriveFrom`
+alone checks ancestry, not the attribute. Where some types in the set declare the attribute
+themselves, leave the base's descendants out of the attribute rule's subject with
+`.Except(arch.Types.DerivedFrom(…))`. An attribute declared `Inherited = false` is not read through
+a base by the framework either, so each type must declare it. A concrete intermediate base is a
+subject like any other type, so a subject meant for the types at the bottom of a hierarchy leaves
+the bases out by name or suffix (`.Except(arch.Types.WithSuffix("ControllerBase"))`).
+
+External (metadata)
 types carry a **shallow** hierarchy: extraction records their identity but not their own
 bases/interfaces/attributes, so the hierarchy adjectives never match an external **subject** (a
 documented boundary; pattern and name adjectives still work on externals). The **anchor**

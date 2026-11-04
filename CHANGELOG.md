@@ -92,6 +92,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the collection counts, and so does a subclass of `ServiceDescriptor` declared in the same project whose
   constructor passes its parameters straight to the base constructor. Entries a builder adds to collections
   of its own, rather than to the service collection, are still not seen.
+- The `derive_spec` recipe's attributes question says that only attributes declared on a type count. For an
+  attribute a shared base class declares, it writes two rules: the types derive from the base, and the base
+  has the attribute. It also warns that a concrete intermediate base class is a subject like the types below
+  it. [GRAMMAR §5.2](https://github.com/andypgray/sliderule/blob/main/GRAMMAR.md#52-adjectives-reduced-relative-clauses)
+  states the same for `AttributedWith` and `MustBeAttributedWith`.
 - Visual Studio 2026 is in the tested range with 2019 and 2022, so a machine whose only Visual Studio is 2026
   no longer reports its MSBuild as outside the tested envelope. On a machine with both 2022 and 2026, projects
   are now loaded with 2026; set `SLIDERULE_VS_INSTALL_PATH` to an install root to choose another.
