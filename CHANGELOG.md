@@ -104,6 +104,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `check --sarif` writes each file's URI relative to the git repository's root, where GitHub code scanning
+  resolves a relative path, rather than relative to the solution's directory. For a solution below the root,
+  code scanning put every alert on a path missing the solution's directory. Outside a git repository the URIs
+  stay relative to the solution's directory. The fingerprints keep the solution-relative path, so an alert for
+  a solution at the repository root is unchanged.
 - The `derive_spec` recipe's spec csproj now clears an inherited singular `<TargetFramework>`. A
   `Directory.Build.props` that set one decided the spec project's build while its own `<TargetFrameworks>`
   list decided the restore, and the first build failed with NETSDK1005.

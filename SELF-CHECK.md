@@ -46,7 +46,7 @@ FAIL cli/no-stdout — The Host layer must not use `Console.Out`, `Console.Write
   because: Stdout is a protocol channel here — the MCP server speaks JSON-RPC over it and CLI output flows through System.CommandLine's console — so a direct Console write corrupts the wire and is invisible to the in-process tests.
   citation: https://modelcontextprotocol.io/specification/2025-06-18/basic/transports#stdio
   fix: Write CLI output through the command's InvocationConfiguration console; route server diagnostics to the logger or Console.Error.
-  subject: 219 types, 1 generated
+  subject: 222 types, 1 generated
   src/SlideRule.Cli/Rendering/ProgressPrinter.cs:10 — SlideRule.Cli.Rendering.ProgressPrinter uses System.Console.WriteLine()
   src/SlideRule.Cli/Rendering/ProgressPrinter.cs:15 — SlideRule.Cli.Rendering.ProgressPrinter uses System.Console.WriteLine()
 ```
@@ -119,7 +119,7 @@ Its 12 baselined violations keep the rule green at the command line, and their s
     {
       "physicalLocation": {
         "artifactLocation": {
-          "uri": "src/Meridian.Web/Controllers/CustomsController.cs",
+          "uri": "examples/Meridian/src/Meridian.Web/Controllers/CustomsController.cs",
           "uriBaseId": "SRCROOT"
         },
         "region": {
@@ -141,7 +141,7 @@ Its 12 baselined violations keep the rule green at the command line, and their s
 }
 ```
 
-A violation of a red rule has the same shape at `error` level, with `"baselineState": "new"` and no `suppressions` array. In code scanning a reviewer tells baselined debt from a new violation by severity, and a SARIF consumer that reads `baselineState` or `suppressions` can use either. Reproduce the file from a checkout:
+A violation of a red rule has the same shape at `error` level, with `"baselineState": "new"` and no `suppressions` array. In code scanning a reviewer tells baselined debt from a new violation by severity, and a SARIF consumer that reads `baselineState` or `suppressions` can use either. The `uri` is relative to the repository root, because code scanning resolves a relative path from there, while the fingerprint keeps the path from the solution's directory. Reproduce the file from a checkout:
 
 ```bash
 dotnet build examples/Meridian/Meridian.slnx
@@ -192,7 +192,7 @@ The same rule from `check --json`, the document `arch_check` returns over MCP, s
   SlideRule — 389 types; targets netstandard2.0; references: (none); packages: (none); locks restore
   SlideRule.Analyzers — 15 types; targets netstandard2.0; references: SlideRule, SlideRule.Extraction; packages: Microsoft.CodeAnalysis.Analyzers (private); locks restore
   SlideRule.Architecture — 1 type; targets net10.0; references: SlideRule, SlideRule.Packs.DotNet; packages: Microsoft.Build.Locator; does not pack
-  SlideRule.Cli — 218 types (1 generated); targets net10.0; references: SlideRule, SlideRule.Extraction, SlideRule.Roslyn; packages: Microsoft.Extensions.Hosting, ModelContextProtocol, Serilog.Extensions.Hosting, Serilog.Sinks.File, SlideRule.Analyzers (private), System.CommandLine; locks restore
+  SlideRule.Cli — 221 types (1 generated); targets net10.0; references: SlideRule, SlideRule.Extraction, SlideRule.Roslyn; packages: Microsoft.Extensions.Hosting, ModelContextProtocol, Serilog.Extensions.Hosting, Serilog.Sinks.File, SlideRule.Analyzers (private), System.CommandLine; locks restore
   SlideRule.Extraction — 66 types; targets netstandard2.0; references: SlideRule; packages: Microsoft.CodeAnalysis.CSharp; does not pack; locks restore
   SlideRule.Guidance.DotNet — 2 types; targets netstandard2.0; references: (none); undeclared references: SlideRule.Analyzers; packages: Microsoft.CodeAnalysis.Analyzers (private), Microsoft.CodeAnalysis.CSharp (private), SlideRule.Analyzers (private); locks restore
   SlideRule.Packs.DotNet — 2 types; targets net10.0; references: SlideRule; packages: Microsoft.Extensions.DependencyInjection, Microsoft.Extensions.DependencyInjection.Abstractions, SlideRule.Analyzers (private); does not pack; locks restore

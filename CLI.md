@@ -665,7 +665,7 @@ The hook document is the `hookSpecificOutput` object Claude Code reads from a ho
 
 `check --sarif <path>` writes the check as SARIF 2.1.0, the format GitHub code scanning reads. The file contains one run. Its driver lists every rule in the spec's order. Each has the generated sentence, the `Because`, the `Fix` followed by each exemplar type's file and line, and the `Citation` as the help link. A rule reports at `error` by default, and a scope's tripwire at `warning`.
 
-Each violation site is one result, at its file and line relative to the solution directory:
+Each violation site is one result, at its file and line. The file's URI is relative to the git repository's root, where code scanning resolves it, or to the solution directory outside a repository; the fingerprint keeps the path relative to the solution directory:
 
 | Result | `level` | `baselineState` |
 |---|---|---|

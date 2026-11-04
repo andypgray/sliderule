@@ -1,4 +1,5 @@
 using SlideRule.Checking;
+using SlideRule.Cli.Hooks;
 using SlideRule.Cli.Mcp.Infrastructure;
 using SlideRule.Cli.Pipeline;
 using SlideRule.Cli.Rendering;
@@ -109,7 +110,12 @@ internal sealed class CheckRunner(
         // otherwise the agent would not learn that a clean verdict came from rules the sources have since changed.
         bool cleanWithWarnings = !gated && !report.HasViolations && (report.WarningCount > 0 || source.StaleSpec is not null);
 
-        Render(request, stdout, human, stderr, report, source, !gated, ruleGlobs, forHook && cleanWithWarnings);
+        string sarifUriRoot = request.Sarif is null
+            ? source.SolutionDirectory
+            : await SarifUriRootAsync(source.SolutionDirectory, ct);
+        Render(
+            request, stdout, human, stderr, report, source, sarifUriRoot, !gated, ruleGlobs,
+            forHook && cleanWithWarnings);
 
         // The incomplete-model gate: exit 2 overrides the 0/1 verdict. SARIF (if requested) was already
         // written above with executionSuccessful: false, so the gate verdict still reaches code scanning.
@@ -134,9 +140,21 @@ internal sealed class CheckRunner(
         human.WriteLine();
     }
 
+    // Code scanning reads a relative SARIF URI from the repository root, so the URIs are written from git's top
+    // level when the solution lies inside one, and from the solution directory when git gives no answer.
+    private static async Task<string> SarifUriRootAsync(string solutionDirectory, CancellationToken ct)
+    {
+        string? topLevel = await HookGit.TopLevelAsync(solutionDirectory, ct);
+        if (topLevel is null) return solutionDirectory;
+
+        string[] solutionSegments = PathFormat.Segments(Path.GetFullPath(solutionDirectory));
+        return PathFormat.Contains(topLevel, solutionSegments) ? topLevel : solutionDirectory;
+    }
+
     private void Render(
         CheckRequest request, TextWriter stdout, TextWriter human, TextWriter stderr, CheckReport report,
-        CodebaseSource source, bool executionSuccessful, IReadOnlyList<string> ruleGlobs, bool withoutPasses)
+        CodebaseSource source, string sarifUriRoot, bool executionSuccessful, IReadOnlyList<string> ruleGlobs,
+        bool withoutPasses)
     {
         // check is the one verb that folds the advisory merge notes into its rendered diagnostics stream
         // (stderr warning: lines + the JSON workspaceDiagnostics array + SARIF notifications), load failures
@@ -172,8 +190,9 @@ internal sealed class CheckRunner(
         if (request.Sarif is { } sarifPath)
         {
             SarifReportRenderer.Render(
-                sarifPath, report, source.SolutionDirectory, executionSuccessful, renderedDiagnostics, trust);
-            human.WriteLine($"wrote {PathFormat.Relative(source.SolutionDirectory, sarifPath)}");
+                sarifPath, report, source.SolutionDirectory, sarifUriRoot, executionSuccessful, renderedDiagnostics,
+                trust);
+            human.WriteLine(WriteReport.Line(WriteOutcome.Wrote, source.SolutionDirectory, sarifPath));
         }
 
         // The GitHub pair, each written on its own request: workflow commands for a step to print, and the job

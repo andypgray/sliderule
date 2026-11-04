@@ -56,8 +56,7 @@ public sealed class SarifReportRendererTests
         results.ShouldNotBeEmpty();
         foreach (JsonElement result in results)
         {
-            result.GetProperty("level")
-                .GetString()
+            result.SarifLevel()
                 .ShouldBe("error");
             result.GetProperty("baselineState")
                 .GetString()
@@ -540,8 +539,7 @@ public sealed class SarifReportRendererTests
         result.GetProperty("ruleId")
             .GetString()
             .ShouldBe("legacy/quarantined/tripwire");
-        result.GetProperty("level")
-            .GetString()
+        result.SarifLevel()
             .ShouldBe("warning");
         result.SarifMessageText()
             .ShouldContain("App.Legacy/Alpha.cs");
@@ -594,8 +592,7 @@ public sealed class SarifReportRendererTests
         result.GetProperty("ruleId")
             .GetString()
             .ShouldBe("legacy/cautioned/tripwire");
-        result.GetProperty("level")
-            .GetString()
+        result.SarifLevel()
             .ShouldBe("warning");
         result.GetProperty("locations")
             .EnumerateArray()
@@ -676,8 +673,7 @@ public sealed class SarifReportRendererTests
 
         List<JsonElement> warnings = report.ToSarif()
             .SarifResults()
-            .Where(result => result.GetProperty("level")
-                .GetString() == "warning")
+            .Where(result => result.SarifLevel() == "warning")
             .ToList();
 
         warnings.Select(result => result.SarifFingerprint())
@@ -688,6 +684,53 @@ public sealed class SarifReportRendererTests
                 .GetProperty("uri")
                 .GetString())
             .ShouldBe(["arch/baselines/data/old-x.json", "arch/shared.json"]);
+    }
+
+    [Fact]
+    public void Serialize_UriRootAboveTheSolution_PrefixesEachSiteUriAndKeepsItsFingerprint()
+    {
+        // Code scanning reads a relative URI from the repository root, so a solution below it has to carry its own
+        // directory in every URI, or the alert lands on a path that is missing it. The fingerprint stays
+        // solution-relative, so moving the root does not re-key the alert.
+        CheckReport report = Checker.Run(
+            "namespace App.Web { public class Page { public App.Data.Db Open() => new App.Data.Db(); } }"
+            + " namespace App.Data { public class Db {} }",
+            arch => arch.Rule("layer/no-data")
+                .Enforce(arch.Namespace("App.Web.*").MustNotReference(arch.Namespace("App.Data.*")))
+                .Because("The web layer must not open the data layer directly."));
+        string solutionDirectory = Directory.GetCurrentDirectory();
+        string solutionLeaf = Path.GetFileName(solutionDirectory);
+
+        IReadOnlyList<JsonElement> results = report.ToSarif(uriRoot: Path.GetDirectoryName(solutionDirectory))
+            .SarifResults();
+
+        results.Select(result => (result.SarifUri(), result.SarifFingerprint()))
+            .Distinct()
+            .ShouldBe([($"{solutionLeaf}/Test.cs", "v1|T:App.Web.Page|T:App.Data.Db||Test.cs|0")]);
+    }
+
+    [Fact]
+    public void Serialize_UriRootAboveTheSolution_PrefixesEachWarningUriAndKeepsItsFingerprint()
+    {
+        // A check warning names its file relative to the solution directory, so it is rebased onto the URI root
+        // the same way a violation site is, and its fingerprint keeps the solution-relative path.
+        CheckReport report = Checker.Run(
+            Sources.OneControllerModel, BaselineIndex.Empty.WithOrphanScan(Sources.TwoOrphans), Sources.NoDataAccess);
+        string solutionDirectory = Directory.GetCurrentDirectory();
+        string solutionLeaf = Path.GetFileName(solutionDirectory);
+
+        List<(string Uri, string Fingerprint)> warnings = report
+            .ToSarif(uriRoot: Path.GetDirectoryName(solutionDirectory))
+            .SarifResults()
+            .Where(result => result.SarifLevel() == "warning")
+            .Select(result => (result.SarifUri(), result.SarifFingerprint()))
+            .ToList();
+
+        warnings.ShouldBe(
+        [
+            ($"{solutionLeaf}/arch/baselines/data/old-x.json", "v1||data/old-x||arch/baselines/data/old-x.json|0"),
+            ($"{solutionLeaf}/arch/shared.json", "v1||legacy/old||arch/shared.json|0")
+        ]);
     }
 
     [Fact]
@@ -741,8 +784,7 @@ public sealed class SarifReportRendererTests
         results.Count.ShouldBe(2); // one per site of the grown pair, and nothing grandfathered beside them
         foreach (JsonElement result in results)
         {
-            result.GetProperty("level")
-                .GetString()
+            result.SarifLevel()
                 .ShouldBe("error");
             result.GetProperty("baselineState")
                 .GetString()
@@ -775,7 +817,7 @@ public sealed class SarifReportRendererTests
                 "a load failure",
                 MsBuildBootstrap.SelectionNote()
             ]);
-        notifications.ShouldAllBe(notification => notification.GetProperty("level").GetString() == "warning");
+        notifications.ShouldAllBe(notification => notification.SarifLevel() == "warning");
     }
 
     [Fact]
@@ -856,8 +898,7 @@ public sealed class SarifReportRendererTests
     private static IReadOnlyList<JsonElement> Notes(string json)
     {
         return json.SarifResults()
-            .Where(r => r.GetProperty("level")
-                .GetString() == "note")
+            .Where(r => r.SarifLevel() == "note")
             .ToList();
     }
 }

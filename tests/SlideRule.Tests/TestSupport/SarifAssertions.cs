@@ -34,15 +34,18 @@ internal static class SarifAssertions
     /// <remarks>
     ///     No caller chooses the solution directory. An in-memory report's site paths are already relative
     ///     — a bare <c>Test.cs</c> from the MSBuild-free source factory, a bare <c>Internal.csproj</c> from
-    ///     the project-facts one — so every directory relativizes them to themselves, and no row built on
-    ///     this asserts on a resolved URI.
+    ///     the project-facts one — so every directory relativizes them to themselves. The URIs read from the
+    ///     solution directory too unless <paramref name="uriRoot" /> names another directory, as a repository's
+    ///     top level above the solution would be.
     /// </remarks>
-    internal static string ToSarif(this CheckReport report, WorkspaceDiagnostics? diagnostics = null)
+    internal static string ToSarif(
+        this CheckReport report, WorkspaceDiagnostics? diagnostics = null, string? uriRoot = null)
     {
         WorkspaceDiagnostics load = diagnostics ?? WorkspaceDiagnostics.None;
         string solutionDirectory = Directory.GetCurrentDirectory();
         WorkspaceTrustStamp trust = WorkspaceTrustStamp.From(load, solutionDirectory);
-        return SarifReportRenderer.Serialize(report, solutionDirectory, true, load.RenderedWithMergeNotes, trust);
+        return SarifReportRenderer.Serialize(
+            report, solutionDirectory, uriRoot ?? solutionDirectory, true, load.RenderedWithMergeNotes, trust);
     }
 
     /// <summary>
@@ -53,8 +56,7 @@ internal static class SarifAssertions
     {
         JsonElement result = sarif.SarifResults()
             .ShouldHaveSingleItem();
-        result.GetProperty("level")
-            .GetString()
+        result.SarifLevel()
             .ShouldBe("error");
         result.SarifMessageText()
             .ShouldBe(message);
@@ -73,8 +75,7 @@ internal static class SarifAssertions
     {
         JsonElement notification = sarif.SarifNotifications()
             .ShouldHaveSingleItem(sarif);
-        notification.GetProperty("level")
-            .GetString()
+        notification.SarifLevel()
             .ShouldBe("warning", sarif);
         notification.SarifMessageText()
             .ShouldBe(new PackageAuditEntry(message, projects).Describe(), sarif);
@@ -90,8 +91,7 @@ internal static class SarifAssertions
             .Where(candidate => candidate.SarifMessageText()
                 .Contains(lede, StringComparison.Ordinal))
             .ShouldHaveSingleItem(sarif);
-        notification.GetProperty("level")
-            .GetString()
+        notification.SarifLevel()
             .ShouldBe(level, sarif);
 
         return notification;
@@ -158,6 +158,23 @@ internal static class SarifAssertions
     {
         return result.GetProperty("partialFingerprints")
             .GetProperty("slideRuleViolationIdentity/v1")
+            .GetString()!;
+    }
+
+    /// <summary>A result's or notification's own <c>level</c>: <c>error</c>, <c>warning</c> or <c>note</c>.</summary>
+    internal static string SarifLevel(this JsonElement result)
+    {
+        return result.GetProperty("level")
+            .GetString()!;
+    }
+
+    /// <summary>The artifact URI of a single-location result: the file code scanning puts the alert on.</summary>
+    internal static string SarifUri(this JsonElement result)
+    {
+        return result.GetProperty("locations")[0]
+            .GetProperty("physicalLocation")
+            .GetProperty("artifactLocation")
+            .GetProperty("uri")
             .GetString()!;
     }
 

@@ -47,38 +47,43 @@ internal static class SarifReportRenderer
         string sarifPath,
         CheckReport report,
         string solutionDirectory,
+        string uriRoot,
         bool executionSuccessful,
         IReadOnlyList<string> workspaceDiagnostics,
         WorkspaceTrustStamp trust)
     {
-        string json = Serialize(report, solutionDirectory, executionSuccessful, workspaceDiagnostics, trust);
+        string json = Serialize(report, solutionDirectory, uriRoot, executionSuccessful, workspaceDiagnostics, trust);
         AtomicFile.WriteAllBytes(sarifPath, Utf8NoBom.GetBytes(json + "\n"));
     }
 
     /// <summary>
     ///     Serializes <paramref name="report" /> to the SARIF 2.1.0 JSON string, with no workspace or filesystem
-    ///     behind it. <paramref name="solutionDirectory" /> makes every site path solution-relative, and
-    ///     <paramref name="executionSuccessful" /> becomes the invocation verdict, false when the
-    ///     incomplete-model gate will exit 2.
+    ///     behind it. Every artifact URI is relative to <paramref name="uriRoot" />, the repository's top level
+    ///     or the solution directory, while fingerprints and messages keep their paths relative to
+    ///     <paramref name="solutionDirectory" />. <paramref name="executionSuccessful" /> becomes the invocation
+    ///     verdict, false when the incomplete-model gate will exit 2.
     /// </summary>
     internal static string Serialize(
         CheckReport report,
         string solutionDirectory,
+        string uriRoot,
         bool executionSuccessful,
         IReadOnlyList<string> workspaceDiagnostics,
         WorkspaceTrustStamp trust)
     {
-        // One relativizer for the whole log: the solution directory is the same string for every site, and
+        // One relativizer per frame for the whole log: each base is the same string for every site, and
         // normalizing plus splitting it is the constant half of the walk.
-        var relativizer = new PathFormat.Relativizer(solutionDirectory);
+        var paths = new SitePaths(
+            solutionDirectory, new PathFormat.Relativizer(solutionDirectory), new PathFormat.Relativizer(uriRoot));
 
-        var driver = new SarifDriver(DriverName, ServerVersion.SemVer, InformationUri, BuildRules(report, relativizer));
+        var driver = new SarifDriver(
+            DriverName, ServerVersion.SemVer, InformationUri, BuildRules(report, paths.Solution));
 
         var run = new SarifRun(
             new SarifTool(driver),
             BuildInvocations(executionSuccessful, trust, workspaceDiagnostics),
             BuildOriginalUriBaseIds(),
-            BuildResults(report, relativizer));
+            BuildResults(report, paths));
         var log = new SarifLog(SchemaUri, SarifVersion, [run]);
         return JsonSerializer.Serialize(log, SlideRuleJson.Context.SarifLog);
     }
@@ -239,8 +244,10 @@ internal static class SarifReportRenderer
             WarningLevel);
     }
 
-    // {"SRCROOT": {}} — the one solution-root URI base every artifact location resolves against, so no
-    // absolute path is ever written.
+    // {"SRCROOT": {}}: the one URI base every artifact location resolves against, the repository's top level, or
+    // the solution directory outside a repository. It carries no uri of its own because code scanning ignores
+    // one and reads a relative URI from the repository root, so the relative URIs alone must be right. Only a
+    // file on another drive than that root is written absolute, since it has no relative path.
     private static IReadOnlyDictionary<string, SarifArtifactLocationBase> BuildOriginalUriBaseIds()
     {
         return new Dictionary<string, SarifArtifactLocationBase>(StringComparer.Ordinal)
@@ -260,7 +267,7 @@ internal static class SarifReportRenderer
     // alert shows, that channel reading a result's level and message and ignoring the suppression entirely.
     // Warnings come last per rule, where the human report puts them, and they are the one result kind that is
     // not a violation at all — see WarningResult.
-    private static IReadOnlyList<SarifResult> BuildResults(CheckReport report, PathFormat.Relativizer relativizer)
+    private static IReadOnlyList<SarifResult> BuildResults(CheckReport report, SitePaths paths)
     {
         var results = new List<SarifResult>();
         foreach (RuleResult result in report.Results)
@@ -268,7 +275,7 @@ internal static class SarifReportRenderer
             foreach (Violation violation in result.Violations)
             {
                 string state = result.GrownEntries.ContainsKey(violation) ? "updated" : "new";
-                results.AddRange(SiteResults(result.Rule.Id, violation, ErrorLevel, state, null, relativizer));
+                results.AddRange(SiteResults(result.Rule.Id, violation, ErrorLevel, state, null, paths));
             }
 
             // Grandfathered is index-aligned with GrandfatheredEntries (RuleResult invariant), so entry i
@@ -280,10 +287,10 @@ internal static class SarifReportRenderer
                 string attribution = entry.Because is { } because
                     ? $"grandfathered: {because}"
                     : $"grandfathered in {result.Rule.BaselinePath}";
-                results.AddRange(SiteResults(result.Rule.Id, violation, NoteLevel, "unchanged", attribution, relativizer));
+                results.AddRange(SiteResults(result.Rule.Id, violation, NoteLevel, "unchanged", attribution, paths));
             }
 
-            foreach (CheckWarning warning in result.Warnings) results.Add(WarningResult(result.Rule.Id, warning));
+            foreach (CheckWarning warning in result.Warnings) results.Add(WarningResult(result.Rule.Id, warning, paths));
         }
 
         return results;
@@ -312,11 +319,14 @@ internal static class SarifReportRenderer
     // with the literal `exemplar` in the source slot: an exemplar and a forbidden target may name the same
     // type, and with the source slot empty for both, a dead target operand and a dead exemplar part on one
     // rule would be one alert.
-    private static SarifResult WarningResult(string ruleId, CheckWarning warning)
+    private static SarifResult WarningResult(string ruleId, CheckWarning warning, SitePaths paths)
     {
-        IReadOnlyList<SarifLocation> locations = warning.File is { } file
-            ? [new SarifLocation(new SarifPhysicalLocation(new SarifArtifactLocation(file, SrcRootBaseId), null))]
-            : [];
+        SarifArtifactLocation? artifact = warning.File is { } file
+            ? new SarifArtifactLocation(paths.UriOfSolutionRelative(file), SrcRootBaseId)
+            : null;
+        IReadOnlyList<SarifLocation> locations = artifact is null
+            ? []
+            : [new SarifLocation(new SarifPhysicalLocation(artifact, null))];
         string source = warning.Kind == CheckWarningKind.DeadExemplar ? ExemplarSource : string.Empty;
         string target = warning.Key ?? string.Empty;
         Dictionary<string, string> fingerprints = Fingerprint(
@@ -352,7 +362,7 @@ internal static class SarifReportRenderer
         string level,
         string baselineState,
         string? attribution,
-        PathFormat.Relativizer relativizer)
+        SitePaths paths)
     {
         BaselineEntry? identity = violation.BaselineIdentity();
         string source = identity?.Source ?? string.Empty;
@@ -367,18 +377,32 @@ internal static class SarifReportRenderer
 
         foreach (SourceLocation site in violation.Sites)
         {
-            string relativePath = relativizer.Relative(site.FilePath);
+            string relativePath = paths.Solution.Relative(site.FilePath);
             int ordinal = ordinals.GetValueOrDefault(relativePath);
             ordinals[relativePath] = ordinal + 1;
 
             Dictionary<string, string> fingerprints = Fingerprint(source, target, subject, relativePath, ordinal);
             var location = new SarifLocation(
                 new SarifPhysicalLocation(
-                    new SarifArtifactLocation(relativePath, SrcRootBaseId),
+                    new SarifArtifactLocation(paths.Uri.Relative(site.FilePath), SrcRootBaseId),
                     new SarifRegion(site.Line)));
 
             yield return new SarifResult(
                 ruleId, level, message, [location], fingerprints, baselineState, suppressions);
+        }
+    }
+
+    // The log's two path frames. A fingerprint and a message read from the solution directory, as the baselines
+    // and the human report do, so an alert keeps its fingerprint wherever the repository root lies; an artifact
+    // URI reads from the URI root, because code scanning resolves a relative URI there.
+    private sealed record SitePaths(
+        string SolutionDirectory,
+        PathFormat.Relativizer Solution,
+        PathFormat.Relativizer Uri)
+    {
+        public string UriOfSolutionRelative(string solutionRelativePath)
+        {
+            return Uri.Relative(Path.Combine(SolutionDirectory, solutionRelativePath));
         }
     }
 }

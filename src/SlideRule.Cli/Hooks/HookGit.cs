@@ -7,8 +7,8 @@ using SlideRule.Roslyn.Hosting;
 namespace SlideRule.Cli.Hooks;
 
 /// <summary>
-///     The git questions <c>sliderule hook</c> asks: which working tree a directory belongs to, which git
-///     directory that tree shares, and what HEAD and the changed code files are.
+///     The git questions whose failure must read as doubt rather than end the run: which working tree a directory
+///     belongs to, which git directory that tree shares, and what HEAD and the changed code files are.
 /// </summary>
 /// <remarks>
 ///     Every question has a null answer, and none of them throws. A directory outside any repository, git missing

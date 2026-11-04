@@ -586,7 +586,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Domain/OrderService.cs",
+                  "uri": "{solution}/MyApp.Domain/OrderService.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -610,7 +610,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Domain/OrderService.cs",
+                  "uri": "{solution}/MyApp.Domain/OrderService.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -634,7 +634,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Domain/OrderService.cs",
+                  "uri": "{solution}/MyApp.Domain/OrderService.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -658,7 +658,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Domain/OrderService.cs",
+                  "uri": "{solution}/MyApp.Domain/OrderService.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -682,7 +682,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Domain/OrderService.cs",
+                  "uri": "{solution}/MyApp.Domain/OrderService.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -706,7 +706,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Domain/OrderService.cs",
+                  "uri": "{solution}/MyApp.Domain/OrderService.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -730,7 +730,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Domain/OrderService.cs",
+                  "uri": "{solution}/MyApp.Domain/OrderService.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -754,7 +754,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Domain/OrderService.cs",
+                  "uri": "{solution}/MyApp.Domain/OrderService.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -778,7 +778,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Web/HomeController.cs",
+                  "uri": "{solution}/MyApp.Web/HomeController.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -802,7 +802,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Web/HomeController.cs",
+                  "uri": "{solution}/MyApp.Web/HomeController.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -826,7 +826,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Web/InvoiceController.cs",
+                  "uri": "{solution}/MyApp.Web/InvoiceController.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -850,7 +850,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Web/InvoiceController.cs",
+                  "uri": "{solution}/MyApp.Web/InvoiceController.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -874,7 +874,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Web/InvoiceController.cs",
+                  "uri": "{solution}/MyApp.Web/InvoiceController.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -898,7 +898,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Domain/OrderService.cs",
+                  "uri": "{solution}/MyApp.Domain/OrderService.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -928,7 +928,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Domain/OrderService.cs",
+                  "uri": "{solution}/MyApp.Domain/OrderService.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -958,7 +958,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Domain/OrderService.cs",
+                  "uri": "{solution}/MyApp.Domain/OrderService.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -988,7 +988,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Domain/OrderService.cs",
+                  "uri": "{solution}/MyApp.Domain/OrderService.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -1018,7 +1018,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Web/HomeController.cs",
+                  "uri": "{solution}/MyApp.Web/HomeController.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -1048,7 +1048,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Web/HomeController.cs",
+                  "uri": "{solution}/MyApp.Web/HomeController.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -1078,7 +1078,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Web/InvoiceController.cs",
+                  "uri": "{solution}/MyApp.Web/InvoiceController.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -1108,7 +1108,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Web/InvoiceController.cs",
+                  "uri": "{solution}/MyApp.Web/InvoiceController.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -1138,7 +1138,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Web/InvoiceController.cs",
+                  "uri": "{solution}/MyApp.Web/InvoiceController.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -1168,7 +1168,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Web/InvoiceCreatedHandler.cs",
+                  "uri": "{solution}/MyApp.Web/InvoiceCreatedHandler.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -1192,7 +1192,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Web/ReportEndpoint.cs",
+                  "uri": "{solution}/MyApp.Web/ReportEndpoint.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -1216,7 +1216,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Web/HomeController.cs",
+                  "uri": "{solution}/MyApp.Web/HomeController.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -1240,7 +1240,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Web/HomeController.cs",
+                  "uri": "{solution}/MyApp.Web/HomeController.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -1264,7 +1264,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Web/InvoiceController.cs",
+                  "uri": "{solution}/MyApp.Web/InvoiceController.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -1294,7 +1294,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Web/InvoiceController.cs",
+                  "uri": "{solution}/MyApp.Web/InvoiceController.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -1336,7 +1336,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Web/HomeController.cs",
+                  "uri": "{solution}/MyApp.Web/HomeController.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -1360,7 +1360,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Web/HomeController.cs",
+                  "uri": "{solution}/MyApp.Web/HomeController.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -1384,7 +1384,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Web/HomeController.cs",
+                  "uri": "{solution}/MyApp.Web/HomeController.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -1408,7 +1408,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Web/HomeController.cs",
+                  "uri": "{solution}/MyApp.Web/HomeController.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -1432,7 +1432,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Web/InvoiceService.cs",
+                  "uri": "{solution}/MyApp.Web/InvoiceService.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -1456,7 +1456,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Web/ReportScheduler.cs",
+                  "uri": "{solution}/MyApp.Web/ReportScheduler.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -1480,7 +1480,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Web/ReportScheduler.cs",
+                  "uri": "{solution}/MyApp.Web/ReportScheduler.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -1516,7 +1516,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Web/InvoiceController.cs",
+                  "uri": "{solution}/MyApp.Web/InvoiceController.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -1540,7 +1540,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Web/InvoiceController.cs",
+                  "uri": "{solution}/MyApp.Web/InvoiceController.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -1564,7 +1564,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Web/InvoiceController.cs",
+                  "uri": "{solution}/MyApp.Web/InvoiceController.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -1588,7 +1588,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Web/ReportEndpoint.cs",
+                  "uri": "{solution}/MyApp.Web/ReportEndpoint.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -1612,7 +1612,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Web/ReportPublisher.cs",
+                  "uri": "{solution}/MyApp.Web/ReportPublisher.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -1636,7 +1636,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Domain/OrderApproval.cs",
+                  "uri": "{solution}/MyApp.Domain/OrderApproval.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -1660,7 +1660,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Web/HomeController.cs",
+                  "uri": "{solution}/MyApp.Web/HomeController.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -1684,7 +1684,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Web/HomeController.cs",
+                  "uri": "{solution}/MyApp.Web/HomeController.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -1708,7 +1708,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Web/HomeController.cs",
+                  "uri": "{solution}/MyApp.Web/HomeController.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -1732,7 +1732,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Web/HomeController.cs",
+                  "uri": "{solution}/MyApp.Web/HomeController.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -1756,7 +1756,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Web/InvoiceController.cs",
+                  "uri": "{solution}/MyApp.Web/InvoiceController.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -1780,7 +1780,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Web/ReportEndpoint.cs",
+                  "uri": "{solution}/MyApp.Web/ReportEndpoint.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -1804,7 +1804,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Web/ReportPublisher.cs",
+                  "uri": "{solution}/MyApp.Web/ReportPublisher.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -1828,7 +1828,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Web/ReportEndpoint.cs",
+                  "uri": "{solution}/MyApp.Web/ReportEndpoint.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -1852,7 +1852,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Domain/OrderApproval.cs",
+                  "uri": "{solution}/MyApp.Domain/OrderApproval.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -1876,7 +1876,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Domain/OrderService.cs",
+                  "uri": "{solution}/MyApp.Domain/OrderService.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -1900,7 +1900,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Web/InvoiceService.cs",
+                  "uri": "{solution}/MyApp.Web/InvoiceService.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -1924,7 +1924,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Domain/OrderService.cs",
+                  "uri": "{solution}/MyApp.Domain/OrderService.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -1954,7 +1954,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Legacy.Billing/BillingCalculator.cs",
+                  "uri": "{solution}/MyApp.Legacy.Billing/BillingCalculator.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -1978,7 +1978,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Legacy.Billing/BillingFacade.cs",
+                  "uri": "{solution}/MyApp.Legacy.Billing/BillingFacade.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -2002,7 +2002,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Legacy.Billing/IBillingFacade.cs",
+                  "uri": "{solution}/MyApp.Legacy.Billing/IBillingFacade.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -2026,7 +2026,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Legacy.Billing/RoundingMode.cs",
+                  "uri": "{solution}/MyApp.Legacy.Billing/RoundingMode.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -2050,7 +2050,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Web/InvoiceCreatedHandler.cs",
+                  "uri": "{solution}/MyApp.Web/InvoiceCreatedHandler.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -2074,7 +2074,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Web/RefundProcessor.cs",
+                  "uri": "{solution}/MyApp.Web/RefundProcessor.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -2098,7 +2098,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Domain/Money.cs",
+                  "uri": "{solution}/MyApp.Domain/Money.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -2122,7 +2122,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Domain/Order.cs",
+                  "uri": "{solution}/MyApp.Domain/Order.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -2146,7 +2146,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Domain/Order.cs",
+                  "uri": "{solution}/MyApp.Domain/Order.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -2170,7 +2170,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Web/ReportBudget.cs",
+                  "uri": "{solution}/MyApp.Web/ReportBudget.cs",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -2194,7 +2194,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Domain/MyApp.Domain.csproj",
+                  "uri": "{solution}/MyApp.Domain/MyApp.Domain.csproj",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -2218,7 +2218,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Legacy.Billing/MyApp.Legacy.Billing.csproj",
+                  "uri": "{solution}/MyApp.Legacy.Billing/MyApp.Legacy.Billing.csproj",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -2242,7 +2242,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Web/MyApp.Web.csproj",
+                  "uri": "{solution}/MyApp.Web/MyApp.Web.csproj",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -2266,7 +2266,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Web/MyApp.Web.csproj",
+                  "uri": "{solution}/MyApp.Web/MyApp.Web.csproj",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -2290,7 +2290,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Web/MyApp.Web.csproj",
+                  "uri": "{solution}/MyApp.Web/MyApp.Web.csproj",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -2314,7 +2314,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Domain/MyApp.Domain.csproj",
+                  "uri": "{solution}/MyApp.Domain/MyApp.Domain.csproj",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {
@@ -2338,7 +2338,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "MyApp.Web/MyApp.Web.csproj",
+                  "uri": "{solution}/MyApp.Web/MyApp.Web.csproj",
                   "uriBaseId": "SRCROOT"
                 },
                 "region": {

@@ -542,17 +542,46 @@ public sealed class CheckCommandE2ETests
     public async Task Check_ViolatedSpecSarif_MatchesGolden()
     {
         // The SARIF render target over the same result model: one result per violation site, red errors and
-        // grandfathered notes, solution-relative paths. The golden is temp-path-independent because every URI
-        // is resolved against SRCROOT, so the temp file the run writes to never leaks into the document.
+        // grandfathered notes. The bed runs from the test output inside this checkout, so every URI leads with
+        // the bed's path from the repository root, where code scanning reads a relative URI from, while the
+        // fingerprints stay solution-relative. The token stands for that path, which differs per build
+        // configuration, and the temp file the run writes to never reaches the document.
         using TempDirectory temp = TestTempRoot.Fresh("check-sarif");
         string sarifPath = temp.PathOf("violated-check.sarif");
+        string bedFromRepositoryRoot = Path.GetRelativePath(RepoRoot.Directory, FixtureBeds.MyAppRoot)
+            .Replace('\\', '/');
 
         CliResult result = await CliRunner.InvokeAsync(
             "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--sarif", sarifPath);
 
         result.ShouldReportViolations();
         File.ReadAllText(sarifPath)
+            .Replace($"\"uri\": \"{bedFromRepositoryRoot}/", "\"uri\": \"{solution}/")
             .ShouldMatchGolden("violated-check.sarif");
+    }
+
+    [Fact]
+    public async Task Check_SarifOutsideAnyRepository_WritesEachUriFromTheSolutionDirectory()
+    {
+        // With no git repository above the solution there is no repository root, so each URI is the
+        // solution-relative path its fingerprint carries.
+        using var workspace = new TempFixtureWorkspace();
+        using TempDirectory temp = TestTempRoot.Fresh("check-sarif");
+        string sarifPath = temp.PathOf("outside-repository.sarif");
+
+        CliResult result = await CliRunner.InvokeAsync(
+            "check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--sarif", sarifPath);
+
+        result.ShouldReportViolations();
+        List<(string Uri, string FingerprintPath)> located = File.ReadAllText(sarifPath)
+            .SarifResults()
+            .Where(sarifResult => sarifResult.GetProperty("locations")
+                .GetArrayLength() > 0)
+            .Select(sarifResult => (sarifResult.SarifUri(), sarifResult.SarifFingerprint()
+                .Split('|')[4]))
+            .ToList();
+        located.ShouldNotBeEmpty();
+        located.ShouldAllBe(pair => pair.Uri == pair.FingerprintPath);
     }
 
     [Fact]
