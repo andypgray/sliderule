@@ -20,6 +20,11 @@
         <RestoreLockedMode Condition="'$(CI)' == 'true'">true</RestoreLockedMode>
     </PropertyGroup>
 
+    <!-- The documentation file is generated only because generating it is what makes the compiler resolve
+         crefs and check doc comments: without it an ambiguous or dangling cref builds green. The spec
+         carries no doc requirement, so CS1591 stays silent here. -->
+    <Import Project="$(MSBuildThisFileDirectory)../../build/DocumentationWarnings.props" />
+
     <ItemGroup>
         <ProjectReference Include="..\..\src\SlideRule\SlideRule.csproj" />
         <ProjectReference Include="..\..\src\SlideRule.Packs.DotNet\SlideRule.Packs.DotNet.csproj" />

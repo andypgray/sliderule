@@ -1,0 +1,20 @@
+<Project>
+
+    <!-- The compiler's documentation-mode diagnostics, imported by name from src/Directory.Build.props, the
+         architecture spec's csproj and the tests csproj. Nothing auto-discovers this file, so the fixture
+         solutions staged under the tree inherit none of it.
+
+         Generating the documentation file is what turns those diagnostics on: without it the compiler
+         resolves no cref and reports no malformed comment, so a namespace move can leave crefs pointing at
+         nothing through a green build and a green suite. The whole family is promoted to an error, so every
+         comment is well-formed and resolves. CS1591, a missing comment on a public member, is promoted only
+         where SlideRuleRequireDocs is true (the shipping projects, which set it before the import), and is
+         silenced elsewhere, since spec and test members carry no doc requirement. -->
+    <PropertyGroup>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <WarningsAsErrors>$(WarningsAsErrors);CS0419;CS1570;CS1571;CS1572;CS1573;CS1574;CS1580;CS1581;CS1584;CS1587;CS1589;CS1590;CS1592;CS1710;CS1711;CS1712;CS1723;CS1734;CS1735</WarningsAsErrors>
+        <WarningsAsErrors Condition="'$(SlideRuleRequireDocs)' == 'true'">$(WarningsAsErrors);CS1591</WarningsAsErrors>
+        <NoWarn Condition="'$(SlideRuleRequireDocs)' != 'true'">$(NoWarn);CS1591</NoWarn>
+    </PropertyGroup>
+
+</Project>

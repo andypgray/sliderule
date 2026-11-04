@@ -26,6 +26,12 @@
         <RestoreLockedMode Condition="'$(CI)' == 'true'">true</RestoreLockedMode>
     </PropertyGroup>
 
+    <!-- The documentation file is generated only because generating it is what makes the compiler resolve
+         crefs and check doc comments: without it an ambiguous or dangling cref builds green. Test members
+         carry no doc requirement, so CS1591 stays silent here. Imported by name for the same reason as the
+         lock policy above is inline. -->
+    <Import Project="$(MSBuildThisFileDirectory)../../build/DocumentationWarnings.props" />
+
     <!-- Analyzer severities from the repo-root analyzers.globalconfig, named here for the same reason the
          lock policy above is inline: this project alone, never the fixture solutions below it.
          src/Directory.Build.props names the same file for the shipping projects. -->
