@@ -1551,6 +1551,86 @@ jobs:
           dotnet run --no-build --project src/SlideRule.Cli -- graph --format mermaid
           dotnet run --no-build --project src/SlideRule.Cli -- explain layering/model-independent
 
+  # The action as an adopter on Windows runs it: installed at a released version through its install step,
+  # against a solution below the repository root. self-check covers neither, since it is ubuntu, runs the CLI
+  # built from source through `command`, and checks the solution at the root. The scaffold is the derive_spec
+  # recipe's spec project pinned to VERSION from nuget.org, with the one checked rule and a deliberate
+  # violation of it, so a red step is the proof the spec loaded and evaluated. The step is allowed to fail and
+  # the assertions after it require that it did. render-check is off because the scaffold has no rendered
+  # files, and upload-sarif is off so this leg adds no alerts to code scanning.
+  #
+  # VERSION is the newest release, the one OPERATING.md tells an adopter to name. Under a release whose check
+  # has no annotation options, the step leaves them out, so this leg exercises the step's temporary directory
+  # and not the forward-slashed annotation paths.
+  action-windows:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    env:
+      VERSION: 0.2.1
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+      # A Directory.Build.props and .targets of its own keep the repository's packaging props off the scaffold.
+      - name: Scaffold a spec project on the released package, below the repository root
+        shell: bash
+        run: |
+          . .github/scripts/spec-scaffold.sh
+          spec_scaffold_cut "$VERSION"
+          scaffold action-smoke nuget_org_feed
+          echo '<Project />' > action-smoke/Directory.Build.props
+          echo '<Project />' > action-smoke/Directory.Build.targets
+          write_violation action-smoke
+          dotnet build action-smoke/MyApp.slnx
+      - name: Check the scaffold through the action's install path
+        id: action
+        continue-on-error: true
+        uses: ./
+        with:
+          version: ${{ env.VERSION }}
+          working-directory: action-smoke
+          diff-base: ''
+          upload-sarif: 'false'
+          render-check: 'false'
+      - name: The action installed the tool, and its check ran and went red on the violation
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          $failed = $false
+          if ($env:OUTCOME -ne 'failure') {
+            Write-Output "::error::The action's step ended '$env:OUTCOME' over a deliberate violation; 'failure' is the only right answer, so the check did not run, or ran without evaluating the rule"
+            $failed = $true
+          }
+          # GITHUB_PATH holds the install step's bash spelling, forward slash and all, so both sides are normalised.
+          $tool = (Get-Command sliderule -ErrorAction SilentlyContinue).Source
+          $toolDirectory = [IO.Path]::GetFullPath((Join-Path $env:RUNNER_TEMP 'sliderule-tool')) + [IO.Path]::DirectorySeparatorChar
+          if (-not $tool -or -not [IO.Path]::GetFullPath($tool).StartsWith($toolDirectory, [StringComparison]::OrdinalIgnoreCase)) {
+            Write-Output "::error::sliderule resolves to '$tool', not under $toolDirectory, so the steps after the action do not run the tool its install step put on the PATH"
+            $failed = $true
+          }
+          $sarifPath = 'action-smoke/sliderule.sarif'
+          if (-not (Test-Path $sarifPath)) {
+            Write-Output "::error::The action's check wrote no $sarifPath, so it never reached the verdict"
+            exit 1
+          }
+          $run = (Get-Content $sarifPath -Raw | ConvertFrom-Json).runs[0]
+          if (-not $run.invocations[0].executionSuccessful) {
+            Write-Output "::error::The SARIF invocation reports an unsuccessful execution: the scaffold's workspace did not load completely"
+            $failed = $true
+          }
+          $red = @($run.results | Where-Object { $_.ruleId -eq 'naming/interfaces' -and $_.level -eq 'error' })
+          if ($red.Count -eq 0) {
+            Write-Output "::error::The SARIF file carries no error on naming/interfaces, so the violation in Broken.cs was not found"
+            $failed = $true
+          }
+          if ($failed) { exit 1 }
+
   # Provably-current examples: build each example solution, run `check` (exit 0 on the
   # committed baselines), then run `render --check` over each of them and fail on any file a render would change
   # across examples/ — root blocks, the scoped per-directory cards, the committed

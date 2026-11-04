@@ -7,15 +7,18 @@
 # and a recipe edit that breaks the scaffold reddens a leg rather than reaching a reader. An empty cut fails
 # the step: a restructure must redden it, never silently scaffold nothing.
 #
-# scaffold <root> writes the reader's tree under <root>: the unchanged csproj and spec class, one rule in a
-# file of its own, a product with one conforming interface, a solution holding both, and a nuget.config whose
-# only source is the local pack. The rule is authored here because the recipe's Define() is empty by design,
+# scaffold <root> [feed] writes the reader's tree under <root>: the unchanged csproj and spec class, one rule in
+# a file of its own, a product with one conforming interface, a solution holding both, and a nuget.config that
+# the function named by [feed] writes, local_pack_feed by default, whose only source is the local pack. The rule is authored here because the recipe's Define() is empty by design,
 # and a spec with no rules would prove loading and evaluate nothing. A second spec class is the seam that
 # leaves the recipe's own file byte for byte what it publishes, since the model runs every IArchitectureSpec
 # in the assembly over one shared Arch.
 #
-# product_tree <root> writes the same product, a solution holding only it, and the same nuget.config: the tree
-# sliderule init starts from, with no spec project for init to find.
+# product_tree <root> [feed] writes the same product, a solution holding only it, and the same nuget.config: the
+# tree sliderule init starts from, with no spec project for init to find.
+#
+# nuget_org_feed <root> writes <root>/nuget.config with nuget.org as its only source, for a leg that runs a
+# released version rather than this job's pack.
 #
 # checked_rule <dir> writes that one rule into the spec project folder <dir>.
 #
@@ -74,7 +77,7 @@ cat > "$1/MyApp.slnx" <<'SLNX'
 </Solution>
 SLNX
 
-local_pack_feed "$1"
+${2:-local_pack_feed} "$1"
 }
 
 product_tree() {
@@ -88,7 +91,19 @@ cat > "$1/MyApp.slnx" <<'SLNX'
 </Solution>
 SLNX
 
-local_pack_feed "$1"
+${2:-local_pack_feed} "$1"
+}
+
+nuget_org_feed() {
+  cat > "$1/nuget.config" <<'CONFIG'
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+    <packageSources>
+        <clear />
+        <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+    </packageSources>
+</configuration>
+CONFIG
 }
 
 checked_rule() {
