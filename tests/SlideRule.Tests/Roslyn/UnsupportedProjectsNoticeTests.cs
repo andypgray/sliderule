@@ -1,4 +1,5 @@
 using Shouldly;
+using SlideRule.Rendering;
 using SlideRule.Roslyn.Diagnostics;
 using Xunit;
 
@@ -100,6 +101,52 @@ public sealed class UnsupportedProjectsNoticeTests
             "Portal — a Web Site project, which has no project file",
             "Skipped/Skipped.csproj — not built by the solution's default configuration"
         ]);
+    }
+
+    [Fact]
+    public void UnsurveyedCure_EachKind_NamesTheProjectItsReasonAndARemedyThatFitsIt()
+    {
+        // The cure a selection anchored on such a project reports. A project the default configuration skips is
+        // already C#, and a shared project's code lives in its importers, so neither takes the C# remedy.
+        string solutionDirectory = Path.Combine(Path.GetTempPath(), "unsupported-projects-tests", "solution");
+        var relativizer = new PathFormat.Relativizer(solutionDirectory);
+
+        string Cure(UnsupportedProject project)
+        {
+            return UnsupportedProjectsNotice.UnsurveyedCure(project, relativizer);
+        }
+
+        Cure(new UnsupportedProject(Path.Combine(solutionDirectory, "Legacy", "Legacy.vbproj"), UnsupportedProjectKind.NotCsharp))
+            .ShouldBe(
+                "Legacy/Legacy.vbproj is a project this run does not survey (not a C# project), so a selection "
+                + "anchored on it matches nothing; anchor the rule on C# projects, or remove it.");
+        Cure(new UnsupportedProject(Path.Combine(solutionDirectory, "Skipped", "Skipped.csproj"), UnsupportedProjectKind.NotBuilt))
+            .ShouldBe(
+                "Skipped/Skipped.csproj is a project this run does not survey (not built by the solution's default "
+                + "configuration), so a selection anchored on it matches nothing; build it in the solution's "
+                + "default configuration, or anchor the rule elsewhere.");
+        Cure(new UnsupportedProject(Path.Combine(solutionDirectory, "Shared", "Shared.shproj"), UnsupportedProjectKind.SharedProject))
+            .ShouldBe(
+                "Shared/Shared.shproj is a project this run does not survey (a shared project, compiled into the "
+                + "projects that import it), so a selection anchored on it matches nothing; anchor the rule on the "
+                + "projects that import it.");
+        Cure(new UnsupportedProject(Path.Combine(solutionDirectory, "http:", "localhost:3961"), UnsupportedProjectKind.WebSite, "Portal"))
+            .ShouldBe(
+                "Portal is a project this run does not survey (a Web Site project, which has no project file), so a "
+                + "selection anchored on it matches nothing; anchor the rule on C# projects, or remove it.");
+    }
+
+    [Fact]
+    public void SelectionName_IsTheSolutionsNameOrTheFileNameWithoutItsExtension()
+    {
+        // The key a selection reaches the cure by: arch.Project("Legacy") names Legacy/Legacy.vbproj, as it names
+        // a csproj by its file name.
+        UnsupportedProjectsNotice.SelectionName(
+                new UnsupportedProject(Path.Combine("C:", "repo", "Legacy", "Legacy.vbproj"), UnsupportedProjectKind.NotCsharp))
+            .ShouldBe("Legacy");
+        UnsupportedProjectsNotice.SelectionName(
+                new UnsupportedProject(Path.Combine("C:", "repo", "localhost:3961"), UnsupportedProjectKind.WebSite, "Portal"))
+            .ShouldBe("Portal");
     }
 
     [Fact]

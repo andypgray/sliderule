@@ -109,7 +109,7 @@ internal sealed class BaselineRunner(
                 .ToList()
             : source.Model.Rules;
         CheckReport report = ArchChecker.Check(
-            rules, codebase, BaselineIndex.Empty, null, null, null, new SolutionRoot(source.SolutionDirectory), ct);
+            rules, codebase, BaselineIndex.Empty, null, ModelCaveats.None, new SolutionRoot(source.SolutionDirectory), ct);
 
         // Branch to the single-rule add path before the ratchet survey below, so a bad --rule refuses instead of exiting 0.
         if (request.Mode == BaselineMode.Add)

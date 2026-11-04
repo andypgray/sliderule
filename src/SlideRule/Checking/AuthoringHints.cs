@@ -25,6 +25,12 @@ namespace SlideRule.Checking;
 ///         keep.
 ///     </para>
 ///     <para>
+///         A selection anchored on a project the run did not survey takes that project's cure in place of the
+///         shape advice, for the same reason and at every entry point: no spelling makes it match. It ranks below
+///         a partial model, whose repair comes first, and above a narrowing, since a whole-solution run would match
+///         nothing there either.
+///     </para>
+///     <para>
 ///         A narrowing replaces the cures on a target or an allow-list for the same reason, and reaches those
 ///         entry points alone. The subject entry points take no narrowing, and that is not an omission: a rule
 ///         whose subject a narrowing emptied is skipped, so no subject cure is ever reported under one.
@@ -123,38 +129,44 @@ internal static class AuthoringHints
         "; the verdict never depends on it, so point it at a type the solution declares or remove it";
 
     /// <summary>What to change when <paramref name="subject" /> selected nothing.</summary>
-    internal static string ForSubject(Selection subject, IncompleteModel? model)
+    internal static string ForSubject(Selection subject, ModelCaveats caveats)
     {
-        return model?.EmptySelectionHint ?? Sentence(ShapeAdvice(subject) + SubjectTail);
+        return caveats.EmptySelectionCure(caveats.Unsurveyed?.CureFor(subject), withNarrowing: false)
+               ?? Sentence(ShapeAdvice(subject) + SubjectTail);
     }
 
     /// <summary>
     ///     What to change when a member subject resolved to nothing — the one fixed clause, or the partial
     ///     model where there is one. The member and project cures read off no selection shape, so these two
     ///     entry points exist only for the replacement: without them a failed project would reach half the
-    ///     raise sites and leave the other half advising a spec fix for a load failure.
+    ///     raise sites and leave the other half advising a spec fix for a load failure. <paramref name="types" />
+    ///     is the type selection the members were read from, which may be anchored on a project the run did not
+    ///     survey.
     /// </summary>
-    internal static string ForMemberSubject(IncompleteModel? model)
+    internal static string ForMemberSubject(Selection? types, ModelCaveats caveats)
     {
-        return model?.EmptySelectionHint ?? EmptyMemberSubject;
+        return caveats.EmptySelectionCure(caveats.Unsurveyed?.CureFor(types), withNarrowing: false)
+               ?? EmptyMemberSubject;
     }
 
     /// <summary>
     ///     What to change when one name of a member subject's <c>Named</c> list matched no member while the
     ///     others matched, or the partial model where there is one.
     /// </summary>
-    internal static string ForMemberName(IncompleteModel? model)
+    internal static string ForMemberName(ModelCaveats caveats)
     {
-        return model?.EmptySelectionHint ?? Sentence(MemberNamedClause + SubjectTail);
+        return caveats.EmptySelectionCure(null, withNarrowing: false)
+               ?? Sentence(MemberNamedClause + SubjectTail);
     }
 
     /// <summary>
     ///     What to change when a project subject resolved to nothing, or the partial model where there is one
     ///     (<see cref="ForMemberSubject" />'s reasoning).
     /// </summary>
-    internal static string ForProjectSubject(IncompleteModel? model)
+    internal static string ForProjectSubject(ProjectSelection? subject, ModelCaveats caveats)
     {
-        return model?.EmptySelectionHint ?? EmptyProjectSubject;
+        return caveats.EmptySelectionCure(caveats.Unsurveyed?.CureFor(subject), withNarrowing: false)
+               ?? EmptyProjectSubject;
     }
 
     /// <summary>
@@ -162,21 +174,23 @@ internal static class AuthoringHints
     ///     pattern operand's, the same operand the inert gate itself tests for, so the sentence describes
     ///     the selection that raised the warning rather than a sibling that did not.
     /// </summary>
-    internal static string ForInertTarget(
-        IReadOnlyList<Selection> operands, IncompleteModel? model, NarrowedUniverse? narrowing)
+    internal static string ForInertTarget(IReadOnlyList<Selection> operands, ModelCaveats caveats)
     {
         Selection? pattern = operands.FirstOrDefault(SelectionEvaluator.IsPatternSelection);
-        return InertReplacement(model, narrowing) ?? Sentence(ShapeAdvice(pattern) + InertTail);
+        string? unsurveyedCure = operands
+            .Select(operand => caveats.Unsurveyed?.CureFor(operand))
+            .FirstOrDefault(cure => cure is not null);
+        return caveats.EmptySelectionCure(unsurveyedCure, withNarrowing: true)
+               ?? Sentence(ShapeAdvice(pattern) + InertTail);
     }
 
     /// <summary>
     ///     What to change when <paramref name="piece" />, one dead pattern holding <paramref name="role" />, selected
     ///     nothing: advice read off the piece alone, since it is the one the warning names, then what its death
-    ///     costs in that role. A narrowed run raises no warning on a membership or an <c>among:</c> part, so
-    ///     <paramref name="narrowing" /> is null for those two roles.
+    ///     costs in that role. A narrowed run raises no warning on a membership or an <c>among:</c> part, so the
+    ///     narrowing's cure reaches only the other two roles.
     /// </summary>
-    internal static string ForDeadOperand(
-        DeadOperandRole role, Selection piece, IncompleteModel? model, NarrowedUniverse? narrowing)
+    internal static string ForDeadOperand(DeadOperandRole role, Selection piece, ModelCaveats caveats)
     {
         string consequence = role switch
         {
@@ -188,7 +202,7 @@ internal static class AuthoringHints
         };
         string advice = ShapeAdvice(piece);
         string noun = advice == NamedClause ? "name" : "pattern";
-        return InertReplacement(model, narrowing)
+        return caveats.EmptySelectionCure(caveats.Unsurveyed?.CureFor(piece), withNarrowing: true)
                ?? Sentence(advice + "; a " + noun + " that matches nothing " + consequence);
     }
 
@@ -197,16 +211,10 @@ internal static class AuthoringHints
     ///     read off the part alone, since it is the one the warning names. It takes no narrowing, because a run
     ///     over a solution filter raises no dead-exemplar warning at all.
     /// </summary>
-    internal static string ForExemplar(Selection part, IncompleteModel? model)
+    internal static string ForExemplar(Selection part, ModelCaveats caveats)
     {
-        return model?.EmptySelectionHint ?? Sentence(ShapeAdvice(part) + ExemplarTail);
-    }
-
-    // The two replacements every inert cure takes, owned once so their order cannot differ between them:
-    // a broken model's repair comes before reading a smaller one.
-    private static string? InertReplacement(IncompleteModel? model, NarrowedUniverse? narrowing)
-    {
-        return model?.EmptySelectionHint ?? narrowing?.InertTargetHint;
+        return caveats.EmptySelectionCure(caveats.Unsurveyed?.CureFor(part), withNarrowing: false)
+               ?? Sentence(ShapeAdvice(part) + ExemplarTail);
     }
 
     // Null covers an operand list with no pattern in it; the narrowing clause is true of every selection,

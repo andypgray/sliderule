@@ -2,6 +2,7 @@ using SlideRule.Baselines;
 using SlideRule.Checking;
 using SlideRule.Hosting;
 using SlideRule.Internal;
+using SlideRule.Rendering;
 using SlideRule.Roslyn.Baselines;
 using SlideRule.Roslyn.Diagnostics;
 
@@ -43,12 +44,13 @@ internal static class ArchCheckSequence
         ExtractedCodebase extracted = await extract(ct).ConfigureAwait(false);
         NarrowedUniverse? narrowing = Narrowing(solutionPath, extracted.Diagnostics.UncheckedProjects);
         IncompleteModel? incomplete = Incomplete(extracted.Diagnostics);
+        UnsurveyedProjects? unsurveyed = Unsurveyed(extracted.Diagnostics.UnsupportedProjects, solutionDirectory);
 
-        return ArchChecker.Check(
-            rules, extracted.Codebase, baselines, diff, narrowing, incomplete, new SolutionRoot(solutionDirectory), ct);
+        var caveats = new ModelCaveats(incomplete, unsurveyed, narrowing);
+        return ArchChecker.Check(rules, extracted.Codebase, baselines, diff, caveats, new SolutionRoot(solutionDirectory), ct);
     }
 
-    // Both values below are facts about the load, worded here as sentences because Core cannot name a project
+    // The values below are facts about the load, worded here as sentences because Core cannot name a project
     // path. Null unless the run checked less than the solution declares, measured from the load and never read
     // off the filter text (ProjectLoadFailures' remarks say why).
     private static NarrowedUniverse? Narrowing(string solutionPath, IReadOnlyList<string> uncheckedProjects)
@@ -59,6 +61,22 @@ internal static class ArchCheckSequence
         string skipReason = NarrowedUniverseNotice.RuleSkipReason(filterName, uncheckedProjects.Count);
         string inertTargetHint = NarrowedUniverseNotice.InertTargetHint(filterName, uncheckedProjects.Count);
         return new NarrowedUniverse(skipReason, inertTargetHint);
+    }
+
+    // Keyed by the name a selection would give each project. Two entries under one name take the first's cure,
+    // since either names the project the selection is anchored on.
+    private static UnsurveyedProjects? Unsurveyed(
+        IReadOnlyList<UnsupportedProject> unsupportedProjects, string solutionDirectory)
+    {
+        if (unsupportedProjects.Count == 0) return null;
+
+        var relativizer = new PathFormat.Relativizer(solutionDirectory);
+        var cureByProject = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (UnsupportedProject project in unsupportedProjects)
+            cureByProject.TryAdd(
+                UnsupportedProjectsNotice.SelectionName(project),
+                UnsupportedProjectsNotice.UnsurveyedCure(project, relativizer));
+        return new UnsurveyedProjects(cureByProject);
     }
 
     // Not gated on the operator's opt-in to a partial model: that changes the exit code, never the truth about

@@ -251,7 +251,7 @@ public sealed class OneProjectNarrowingTests
             .Parts;
 
         RuleResult result = Harness.Check(
-                model.Rules, WebAndDataModel, BaselineIndex.Empty, null, NarrowedUniverse.OneProject, null)
+                model.Rules, WebAndDataModel, BaselineIndex.Empty, null, new ModelCaveats(null, null, NarrowedUniverse.OneProject))
             .Single();
 
         result.ShouldHaveFailedWithSingleEdge(ViolationKind.Reference, "App.Web.HomeController", "App.Data.Db");

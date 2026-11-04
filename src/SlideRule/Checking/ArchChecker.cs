@@ -39,9 +39,8 @@ internal static class ArchChecker
     /// <summary>
     ///     Checks exactly <paramref name="rules" />, the whole model's or the subset <see cref="SelectRules" />
     ///     chose, and reports on those alone; choosing a subset changes nothing about how a rule is judged.
-    ///     <paramref name="narrowing" /> is set where the run's universe is smaller than the solution, and
-    ///     <paramref name="incompleteModel" /> where part of the model never loaded; each is null where the
-    ///     universe or the model is whole.
+    ///     <paramref name="caveats" /> says where the run's universe is smaller than the solution, part of the
+    ///     model never loaded, or the run found projects it cannot survey.
     ///     <paramref name="root" /> is the directory path globs are relative to, or null for a run that has none
     ///     to give. <paramref name="cancellationToken" /> is observed once before each rule is evaluated, so a
     ///     caller that has given up waits at worst for the rule already running.
@@ -67,18 +66,18 @@ internal static class ArchChecker
     /// </remarks>
     internal static CheckReport Check(
         IReadOnlyList<ArchRule> rules, CodebaseModel codebase, BaselineIndex baselines, DiffContext? diff,
-        NarrowedUniverse? narrowing, IncompleteModel? incompleteModel, SolutionRoot? root,
-        CancellationToken cancellationToken)
+        ModelCaveats caveats, SolutionRoot? root, CancellationToken cancellationToken)
     {
         Guard.NotNull(rules, nameof(rules));
         Guard.NotNull(codebase, nameof(codebase));
         Guard.NotNull(baselines, nameof(baselines));
+        Guard.NotNull(caveats, nameof(caveats));
 
         // One selection evaluator for the whole run — the constraint arms and the tripwire path share it.
         // Its constructor materializes the solution-declared type list and the noun indexes, so building a
         // second would repeat a full pass over the model; it holds no per-rule mutable state.
         var selections = new SelectionEvaluator(codebase, root);
-        var evaluator = new ConstraintEvaluator(codebase, selections, incompleteModel, narrowing);
+        var evaluator = new ConstraintEvaluator(codebase, selections, caveats);
 
         // An explicit loop rather than a Select, so the poll sits before the rule it guards; the results
         // stay in the order the rules arrived, which is the order the report declares.
@@ -86,7 +85,7 @@ internal static class ArchChecker
         foreach (ArchRule rule in rules)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            results.Add(CheckRule(rule, evaluator, selections, baselines, diff, narrowing));
+            results.Add(CheckRule(rule, evaluator, selections, baselines, diff, caveats));
         }
 
         return new CheckReport(results, baselines.OrphanScan);
@@ -118,10 +117,10 @@ internal static class ArchChecker
 
     private static RuleResult CheckRule(
         ArchRule rule, ConstraintEvaluator evaluator, SelectionEvaluator selections, BaselineIndex baselines,
-        DiffContext? diff, NarrowedUniverse? narrowing)
+        DiffContext? diff, ModelCaveats caveats)
     {
-        RuleResult verdict = Verdict(rule, evaluator, selections, baselines, diff, narrowing);
-        return AttachExemplar(verdict, rule, evaluator, narrowing);
+        RuleResult verdict = Verdict(rule, evaluator, selections, baselines, diff, caveats);
+        return AttachExemplar(verdict, rule, evaluator, caveats.Narrowing);
     }
 
     // The exemplar is resolved after the verdict and in a guard of its own, because it never decides one: any
@@ -148,8 +147,9 @@ internal static class ArchChecker
 
     private static RuleResult Verdict(
         ArchRule rule, ConstraintEvaluator evaluator, SelectionEvaluator selections, BaselineIndex baselines,
-        DiffContext? diff, NarrowedUniverse? narrowing)
+        DiffContext? diff, ModelCaveats caveats)
     {
+        NarrowedUniverse? narrowing = caveats.Narrowing;
         try
         {
             // The tripwire carries no closed-vocabulary constraint (its Constraint is null and must never reach the
@@ -173,8 +173,9 @@ internal static class ArchChecker
             (IReadOnlyList<Violation> violations, IReadOnlyList<CheckWarning> warnings, SubjectCoverage coverage) =
                 evaluator.Evaluate(rule.Constraint!, subject, memberSubject);
             // Ahead of the ratchet fork, because the question it answers — did this run have the subject in
-            // view at all — is asked of the raw violations and is the same one for both branches.
-            if (narrowing is not null && SelectedNothing(violations))
+            // view at all — is asked of the raw violations and is the same one for both branches. A subject
+            // anchored on a project no run surveys is not skipped: a whole-solution run would fail it too.
+            if (narrowing is not null && SelectedNothing(violations) && !AnchorsOnUnsurveyed(rule, caveats.Unsurveyed))
                 return NarrowedSkip(rule, warnings, baselines, narrowing);
 
             return rule.IsRatcheted
@@ -323,6 +324,15 @@ internal static class ArchChecker
     private static bool SelectedNothing(IReadOnlyList<Violation> violations)
     {
         return violations.Count > 0 && violations.All(violation => violation.Kind == ViolationKind.EmptySubject);
+    }
+
+    private static bool AnchorsOnUnsurveyed(ArchRule rule, UnsurveyedProjects? unsurveyed)
+    {
+        if (unsurveyed is null) return false;
+
+        return rule.Constraint is ProjectConstraint project
+            ? unsurveyed.CureFor(project.ProjectSubject) is not null
+            : unsurveyed.CureFor(rule.Constraint!.Subject) is not null;
     }
 
     // The narrowing skip, minted apart from Skipped() below, which drops warnings and hardcodes an

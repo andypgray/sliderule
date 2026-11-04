@@ -730,7 +730,8 @@ internal sealed class BuildTierEngine
         SolutionRoot? root = modelDirectory is null ? null : new SolutionRoot(modelDirectory);
 
         return ArchChecker.Check(
-            rules, codebase, baselines, null, NarrowedUniverse.OneProject, null, root, cancellationToken);
+            rules, codebase, baselines, null, new ModelCaveats(null, null, NarrowedUniverse.OneProject), root,
+            cancellationToken);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]

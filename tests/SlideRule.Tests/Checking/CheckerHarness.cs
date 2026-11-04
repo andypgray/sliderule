@@ -39,19 +39,20 @@ internal static class Checker
     /// </summary>
     public static CheckReport Run(
         CodebaseModel codebase, Action<Arch> define, BaselineIndex? baselines = null, DiffContext? diff = null,
-        NarrowedUniverse? narrowing = null, IncompleteModel? incompleteModel = null, SolutionRoot? root = null)
+        NarrowedUniverse? narrowing = null, IncompleteModel? incompleteModel = null, SolutionRoot? root = null,
+        UnsurveyedProjects? unsurveyed = null)
     {
         BaselineIndex index = baselines ?? BaselineIndex.Empty;
-        return Pinned(
-            define, codebase,
-            rules => Harness.Check(rules, codebase, index, diff, narrowing, incompleteModel, root));
+        var caveats = new ModelCaveats(incompleteModel, unsurveyed, narrowing);
+        return Pinned(define, codebase, rules => Harness.Check(rules, codebase, index, diff, caveats, root));
     }
 
     /// <summary>The same run, extracting <paramref name="source" /> first.</summary>
     public static CheckReport Run(
-        string source, Action<Arch> define, BaselineIndex? baselines = null, NarrowedUniverse? narrowing = null)
+        string source, Action<Arch> define, BaselineIndex? baselines = null, NarrowedUniverse? narrowing = null,
+        UnsurveyedProjects? unsurveyed = null)
     {
-        return Run(CompilationFactory.Extract(source), define, baselines, narrowing: narrowing);
+        return Run(CompilationFactory.Extract(source), define, baselines, narrowing: narrowing, unsurveyed: unsurveyed);
     }
 
     public static CheckReport Run(CodebaseModel codebase, BaselineIndex baselines, Action<Arch> define)
@@ -91,6 +92,24 @@ internal static class Checker
 
     /// <summary>The partial-model fact handed to the checker by a run part of whose model never loaded.</summary>
     internal static IncompleteModel PartialModel { get; } = new(PartialModelCure);
+
+    /// <summary>The project <see cref="Unsurveyed" /> says the run did not survey.</summary>
+    internal const string UnsurveyedProject = "App.Legacy";
+
+    /// <summary>
+    ///     The cure a selection anchored on <see cref="UnsurveyedProject" /> reports under <see cref="Unsurveyed" />.
+    /// </summary>
+    /// <remarks>
+    ///     A stand-in for the sentence a run over such a solution composes, for <see cref="FilterSkipReason" />'s
+    ///     reason.
+    /// </remarks>
+    internal const string UnsurveyedCure = "THE-UNSURVEYED-CURE";
+
+    /// <summary>
+    ///     The unsurveyed-project fact a run over a solution declaring a project in another language hands in.
+    /// </summary>
+    internal static UnsurveyedProjects Unsurveyed { get; } =
+        new(new Dictionary<string, string>(StringComparer.Ordinal) { [UnsurveyedProject] = UnsurveyedCure });
 
     /// <summary>
     ///     The report <paramref name="check" /> gives over the model <paramref name="define" /> builds, having

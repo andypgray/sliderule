@@ -51,7 +51,7 @@ public sealed class AuthoringHintTests
         // single InNamespace exactly as it reads it off the noun.
         var arch = new Arch();
 
-        AuthoringHints.ForSubject(arch.Types.InNamespace("App.Nowhere.*"), null)
+        AuthoringHints.ForSubject(arch.Types.InNamespace("App.Nowhere.*"), ModelCaveats.None)
             .ShouldContain(NamespaceFragment);
     }
 
@@ -60,7 +60,7 @@ public sealed class AuthoringHintTests
     {
         var arch = new Arch();
 
-        AuthoringHints.ForSubject(arch.Layer("Domain", "App.Nowhere.*"), null)
+        AuthoringHints.ForSubject(arch.Layer("Domain", "App.Nowhere.*"), ModelCaveats.None)
             .ShouldContain(NamespaceFragment);
     }
 
@@ -71,7 +71,7 @@ public sealed class AuthoringHintTests
         // rather than glob semantics it has no glob to apply to.
         var arch = new Arch();
 
-        AuthoringHints.ForSubject(arch.Layer("Core", arch.Project("App.Core")), null)
+        AuthoringHints.ForSubject(arch.Layer("Core", arch.Project("App.Core")), ModelCaveats.None)
             .ShouldContain(ProjectFragment);
     }
 
@@ -80,7 +80,7 @@ public sealed class AuthoringHintTests
     {
         var arch = new Arch();
 
-        AuthoringHints.ForSubject(arch.Project("App.Nowhere"), null)
+        AuthoringHints.ForSubject(arch.Project("App.Nowhere"), ModelCaveats.None)
             .ShouldContain(ProjectFragment);
     }
 
@@ -89,7 +89,7 @@ public sealed class AuthoringHintTests
     {
         var arch = new Arch();
 
-        AuthoringHints.ForSubject(arch.Type(typeof(AuthoringHintTests)), null)
+        AuthoringHints.ForSubject(arch.Type(typeof(AuthoringHintTests)), ModelCaveats.None)
             .ShouldContain(TypeFragment);
     }
 
@@ -100,7 +100,7 @@ public sealed class AuthoringHintTests
         // true of every selection.
         var arch = new Arch();
 
-        AuthoringHints.ForSubject(arch.Types.WithSuffix("Service"), null)
+        AuthoringHints.ForSubject(arch.Types.WithSuffix("Service"), ModelCaveats.None)
             .ShouldContain(NarrowingFragment);
     }
 
@@ -109,7 +109,7 @@ public sealed class AuthoringHintTests
     {
         var arch = new Arch();
 
-        AuthoringHints.ForSubject(arch.Registered(Lifetime.Singleton), null)
+        AuthoringHints.ForSubject(arch.Registered(Lifetime.Singleton), ModelCaveats.None)
             .ShouldContain(NarrowingFragment);
     }
 
@@ -120,7 +120,7 @@ public sealed class AuthoringHintTests
         // its own terms anyway, so the union's own sentence never has to choose between them.
         var arch = new Arch();
 
-        AuthoringHints.ForSubject(arch.AnyOf(arch.Namespace("App.A.*"), arch.Project("App.B")), null)
+        AuthoringHints.ForSubject(arch.AnyOf(arch.Namespace("App.A.*"), arch.Project("App.B")), ModelCaveats.None)
             .ShouldContain(NarrowingFragment);
     }
 
@@ -132,11 +132,11 @@ public sealed class AuthoringHintTests
         var arch = new Arch();
         Selection named = arch.Types.Named("Orders.Line", "Acme.Widget");
 
-        AuthoringHints.ForSubject(named, null)
+        AuthoringHints.ForSubject(named, ModelCaveats.None)
             .ShouldBe(NamedClause + "; check the selection against what the solution declares.");
-        AuthoringHints.ForInertTarget([named], null, null)
+        AuthoringHints.ForInertTarget([named], ModelCaveats.None)
             .ShouldBe(NamedClause + "; a rule whose target matches nothing passes forever, so decide before keeping it.");
-        AuthoringHints.ForDeadOperand(DeadOperandRole.Target, named, null, null)
+        AuthoringHints.ForDeadOperand(DeadOperandRole.Target, named, ModelCaveats.None)
             .ShouldBe(NamedClause + "; a name that matches nothing bans nothing, so decide before keeping it.");
     }
 
@@ -151,9 +151,9 @@ public sealed class AuthoringHintTests
             "A path glob is relative to the solution directory with `/` between segments, and reaches a type when any "
             + "file declaring it is under the glob";
 
-        AuthoringHints.ForSubject(under, null)
+        AuthoringHints.ForSubject(under, ModelCaveats.None)
             .ShouldBe(pathClause + "; check the selection against what the solution declares.");
-        AuthoringHints.ForDeadOperand(DeadOperandRole.Target, under, null, null)
+        AuthoringHints.ForDeadOperand(DeadOperandRole.Target, under, ModelCaveats.None)
             .ShouldBe(pathClause + "; a pattern that matches nothing bans nothing, so decide before keeping it.");
     }
 
@@ -165,8 +165,8 @@ public sealed class AuthoringHintTests
         var arch = new Arch();
         string[] hints =
         [
-            AuthoringHints.ForSubject(arch.Namespace("App.*").Named("Ghost"), null),
-            AuthoringHints.ForSubject(arch.Types.InNamespace("App.*").Named("Ghost"), null)
+            AuthoringHints.ForSubject(arch.Namespace("App.*").Named("Ghost"), ModelCaveats.None),
+            AuthoringHints.ForSubject(arch.Types.InNamespace("App.*").Named("Ghost"), ModelCaveats.None)
         ];
 
         hints.ShouldAllBe(hint => hint.Contains(NamedFragment) && !hint.Contains(NamespaceFragment));
@@ -178,7 +178,7 @@ public sealed class AuthoringHintTests
         // An exemption's names exempt; the selection that came up empty is the one the exemption narrows.
         var arch = new Arch();
 
-        AuthoringHints.ForSubject(arch.Types.WithSuffix("Service").Except(arch.Types.Named("Ghost")), null)
+        AuthoringHints.ForSubject(arch.Types.WithSuffix("Service").Except(arch.Types.Named("Ghost")), ModelCaveats.None)
             .ShouldContain(NarrowingFragment);
     }
 
@@ -188,7 +188,7 @@ public sealed class AuthoringHintTests
         // The layer arm reaches its definition, and the definition is a list.
         var arch = new Arch();
 
-        AuthoringHints.ForSubject(arch.Layer("Core", arch.Types.Named("Ghost")), null)
+        AuthoringHints.ForSubject(arch.Layer("Core", arch.Types.Named("Ghost")), ModelCaveats.None)
             .ShouldContain(NamedFragment);
     }
 
@@ -215,8 +215,8 @@ public sealed class AuthoringHintTests
         var arch = new Arch();
         Selection pattern = arch.Namespace("App.Nowhere.*");
 
-        string subject = AuthoringHints.ForSubject(pattern, null);
-        string inert = AuthoringHints.ForInertTarget([pattern], null, null);
+        string subject = AuthoringHints.ForSubject(pattern, ModelCaveats.None);
+        string inert = AuthoringHints.ForInertTarget([pattern], ModelCaveats.None);
 
         subject.ShouldSatisfyAllConditions(
             () => subject.ShouldContain(NamespaceFragment),
@@ -237,7 +237,7 @@ public sealed class AuthoringHintTests
         var arch = new Arch();
         Selection[] operands = [arch.Type(typeof(AuthoringHintTests)), arch.Namespace("App.Ghost.*")];
 
-        AuthoringHints.ForInertTarget(operands, null, null)
+        AuthoringHints.ForInertTarget(operands, ModelCaveats.None)
             .ShouldContain(NamespaceFragment);
     }
 
@@ -247,7 +247,7 @@ public sealed class AuthoringHintTests
         // Unreachable through the checker, whose gate warns only when some operand is a pattern — but the
         // floor has to hold anyway, because it is what makes the chooser total. Advice true of every
         // selection is the only answer that cannot be false when there is no shape to read.
-        AuthoringHints.ForInertTarget([], null, null)
+        AuthoringHints.ForInertTarget([], ModelCaveats.None)
             .ShouldContain(NarrowingFragment);
     }
 
@@ -258,12 +258,12 @@ public sealed class AuthoringHintTests
         // calls the piece a pattern or a name by the piece's own shape, and a one-name list is a name.
         var arch = new Arch();
 
-        AuthoringHints.ForDeadOperand(DeadOperandRole.AllowList, arch.Namespace("App.Ghost.*"), null, null)
+        AuthoringHints.ForDeadOperand(DeadOperandRole.AllowList, arch.Namespace("App.Ghost.*"), ModelCaveats.None)
             .ShouldBe(
                 "A trailing `.*` covers the namespace itself and everything under it, and `Legacy*` never crosses a "
                 + "dot; a pattern that matches nothing allows nothing, so what it was meant to allow is reported as "
                 + "a violation.");
-        AuthoringHints.ForDeadOperand(DeadOperandRole.AllowList, arch.Types.Named("Ghost"), null, null)
+        AuthoringHints.ForDeadOperand(DeadOperandRole.AllowList, arch.Types.Named("Ghost"), ModelCaveats.None)
             .ShouldBe(
                 NamedClause + "; a name that matches nothing allows nothing, so what it was meant to allow is "
                             + "reported as a violation.");
@@ -276,16 +276,16 @@ public sealed class AuthoringHintTests
         // ways, and its tail says so. Each calls the piece a pattern or a name by the piece's own shape.
         var arch = new Arch();
 
-        AuthoringHints.ForDeadOperand(DeadOperandRole.Membership, arch.Namespace("App.Ghost.*"), null, null)
+        AuthoringHints.ForDeadOperand(DeadOperandRole.Membership, arch.Namespace("App.Ghost.*"), ModelCaveats.None)
             .ShouldBe(
                 "A trailing `.*` covers the namespace itself and everything under it, and `Legacy*` never crosses a "
                 + "dot; a pattern that matches nothing holds no type, so each subject it was meant to hold is "
                 + "reported as a violation.");
-        AuthoringHints.ForDeadOperand(DeadOperandRole.Membership, arch.Types.Named("Ghost"), null, null)
+        AuthoringHints.ForDeadOperand(DeadOperandRole.Membership, arch.Types.Named("Ghost"), ModelCaveats.None)
             .ShouldBe(NamedClause + "; a name that " + HoldsNoTypeAction + ".");
-        AuthoringHints.ForDeadOperand(DeadOperandRole.Among, arch.Namespace("App.Ghost.*"), null, null)
+        AuthoringHints.ForDeadOperand(DeadOperandRole.Among, arch.Namespace("App.Ghost.*"), ModelCaveats.None)
             .ShouldEndWith("; a pattern that " + HoldsNoCounterpartAction + ".");
-        AuthoringHints.ForDeadOperand(DeadOperandRole.Among, arch.Types.Named("Ghost"), null, null)
+        AuthoringHints.ForDeadOperand(DeadOperandRole.Among, arch.Types.Named("Ghost"), ModelCaveats.None)
             .ShouldBe(NamedClause + "; a name that " + HoldsNoCounterpartAction + ".");
     }
 
@@ -295,18 +295,18 @@ public sealed class AuthoringHintTests
         // The registers these share: one line, a semicolon parting diagnosis from cure, a full stop, and
         // never the second person. Cheap insurance on text only ever read at a moment of failure.
         IEnumerable<string> subjectCures = EveryShape()
-            .Select(shape => AuthoringHints.ForSubject(shape.Pattern, null));
+            .Select(shape => AuthoringHints.ForSubject(shape.Pattern, ModelCaveats.None));
         IEnumerable<string> inertCures = EveryShape()
-            .SelectMany(shape => EveryInertCure().Select(cure => cure.HintFor(shape.Pattern, null, null)));
+            .SelectMany(shape => EveryInertCure().Select(cure => cure.HintFor(shape.Pattern, ModelCaveats.None)));
         IEnumerable<string> subjectSideCures = EveryShape()
-            .SelectMany(shape => EverySubjectSideCure().Select(cure => cure.HintFor(shape.Pattern, null)));
+            .SelectMany(shape => EverySubjectSideCure().Select(cure => cure.HintFor(shape.Pattern, ModelCaveats.None)));
         string[] hints =
         [
             .. subjectCures,
             .. inertCures,
             .. subjectSideCures,
-            AuthoringHints.ForMemberSubject(null),
-            AuthoringHints.ForProjectSubject(null)
+            AuthoringHints.ForMemberSubject(null, ModelCaveats.None),
+            AuthoringHints.ForProjectSubject(null, ModelCaveats.None)
         ];
 
         hints.ShouldAllBe(hint => !hint.Contains('\n'));
@@ -429,7 +429,7 @@ public sealed class AuthoringHintTests
         // and a cure narrowed to namespace nouns would go on reading green against a glob row while a
         // project- or typeof-shaped empty subject advised a spec fix for a load failure. That is the
         // half-fix the member and project row below exists to prevent, one stratum over.
-        IncompleteModel partial = Checker.PartialModel;
+        var partial = new ModelCaveats(Checker.PartialModel, null, null);
 
         foreach ((string shape, Selection pattern) in EveryShape())
         {
@@ -437,7 +437,7 @@ public sealed class AuthoringHintTests
                 .ShouldBe(Checker.PartialModelCure, shape);
 
             foreach ((string cure, InertCure hintFor) in EveryInertCure())
-                hintFor(pattern, partial, null)
+                hintFor(pattern, partial)
                     .ShouldBe(Checker.PartialModelCure, $"{cure} on {shape}");
 
             foreach ((string cure, SubjectSideCure hintFor) in EverySubjectSideCure())
@@ -452,11 +452,11 @@ public sealed class AuthoringHintTests
         // The two fixed clauses read off no selection shape, so nothing about them would have made anyone
         // route them through the fact — and a failed project empties a member or a project subject exactly
         // as it empties a type one. Leaving these two alone would be the half-fix this row exists to prevent.
-        IncompleteModel partial = Checker.PartialModel;
+        var partial = new ModelCaveats(Checker.PartialModel, null, null);
 
-        AuthoringHints.ForMemberSubject(partial)
+        AuthoringHints.ForMemberSubject(null, partial)
             .ShouldBe(Checker.PartialModelCure);
-        AuthoringHints.ForProjectSubject(partial)
+        AuthoringHints.ForProjectSubject(null, partial)
             .ShouldBe(Checker.PartialModelCure);
     }
 
@@ -500,9 +500,11 @@ public sealed class AuthoringHintTests
         // A solution filter's narrowing takes over every cure on a target or an allow-list, for the partial model's
         // reason: a project the filter left out may declare what the selection names, so advice about how it was
         // spelled is advice about the wrong thing. Every shape the chooser reads, for the same reason as there.
+        var filtered = new ModelCaveats(null, null, Checker.FilterNarrowing);
+
         foreach ((string shape, Selection pattern) in EveryShape())
         foreach ((string cure, InertCure hintFor) in EveryInertCure())
-            hintFor(pattern, null, Checker.FilterNarrowing)
+            hintFor(pattern, filtered)
                 .ShouldBe(Checker.FilterInertCure, $"{cure} on {shape}");
     }
 
@@ -512,12 +514,113 @@ public sealed class AuthoringHintTests
         // A filtered run can also be a broken one. The narrowing's cure sends the reader to re-check against
         // the whole solution, which loads the same broken model, so the load's repair has to come first —
         // for every cure a narrowing replaces, whatever the shape of what came up empty.
-        IncompleteModel partial = Checker.PartialModel;
+        var partialAndFiltered = new ModelCaveats(Checker.PartialModel, null, Checker.FilterNarrowing);
 
         foreach ((string shape, Selection pattern) in EveryShape())
         foreach ((string cure, InertCure hintFor) in EveryInertCure())
-            hintFor(pattern, partial, Checker.FilterNarrowing)
+            hintFor(pattern, partialAndFiltered)
                 .ShouldBe(Checker.PartialModelCure, $"{cure} on {shape}");
+    }
+
+    [Fact]
+    public void AnUnsurveyedAnchor_ReplacesTheShapeCureAtEveryEntryPoint()
+    {
+        // A selection anchored on a project the run did not survey matches nothing however it is spelled, so
+        // advice about its spelling is replaced at every entry point, through a layer and a union alike.
+        var arch = new Arch();
+        var unsurveyed = new ModelCaveats(null, Checker.Unsurveyed, null);
+        (string Shape, Selection Pattern)[] anchored =
+        [
+            ("the project", arch.Project(Checker.UnsurveyedProject)),
+            ("a layer it defines", arch.Layer("Legacy", arch.Project(Checker.UnsurveyedProject))),
+            ("a union holding it", arch.AnyOf(arch.Namespace("App.Nowhere.*"), arch.Project(Checker.UnsurveyedProject)))
+        ];
+
+        foreach ((string shape, Selection pattern) in anchored)
+        {
+            AuthoringHints.ForSubject(pattern, unsurveyed)
+                .ShouldBe(Checker.UnsurveyedCure, $"{nameof(AuthoringHints.ForSubject)} on {shape}");
+            AuthoringHints.ForExemplar(pattern, unsurveyed)
+                .ShouldBe(Checker.UnsurveyedCure, $"{nameof(AuthoringHints.ForExemplar)} on {shape}");
+            AuthoringHints.ForMemberSubject(pattern, unsurveyed)
+                .ShouldBe(Checker.UnsurveyedCure, $"{nameof(AuthoringHints.ForMemberSubject)} on {shape}");
+
+            foreach ((string cure, InertCure hintFor) in EveryInertCure())
+                hintFor(pattern, unsurveyed)
+                    .ShouldBe(Checker.UnsurveyedCure, $"{cure} on {shape}");
+
+            foreach ((string cure, SubjectSideCure hintFor) in EverySubjectSideCure())
+                hintFor(pattern, unsurveyed)
+                    .ShouldBe(Checker.UnsurveyedCure, $"{cure} on {shape}");
+        }
+
+        AuthoringHints.ForProjectSubject(arch.Projects.Named(Checker.UnsurveyedProject), unsurveyed)
+            .ShouldBe(Checker.UnsurveyedCure);
+    }
+
+    [Fact]
+    public void ASelectionAnchoredElsewhere_KeepsItsShapeCureBesideAnUnsurveyedProject()
+    {
+        // The replacement is by anchor, not by run: a typo'd project name in a solution that also declares a VB
+        // project is still a typo.
+        var arch = new Arch();
+        var unsurveyed = new ModelCaveats(null, Checker.Unsurveyed, null);
+
+        AuthoringHints.ForSubject(arch.Project("App.Nowhere"), unsurveyed)
+            .ShouldContain(ProjectFragment);
+        AuthoringHints.ForProjectSubject(arch.Projects.Named("App.Nowhere"), unsurveyed)
+            .ShouldContain("named by its csproj file name");
+    }
+
+    [Fact]
+    public void AnUnsurveyedAnchor_RanksBelowAPartialModelAndAboveANarrowing()
+    {
+        // A broken model's repair comes first, as it does over a narrowing. Over a narrowing the unsurveyed cure
+        // wins, because re-checking the whole solution would match nothing there either.
+        var arch = new Arch();
+        Selection legacy = arch.Project(Checker.UnsurveyedProject);
+        var everything = new ModelCaveats(Checker.PartialModel, Checker.Unsurveyed, Checker.FilterNarrowing);
+        var unsurveyedAndFiltered = new ModelCaveats(null, Checker.Unsurveyed, Checker.FilterNarrowing);
+
+        foreach ((string cure, InertCure hintFor) in EveryInertCure())
+        {
+            hintFor(legacy, everything)
+                .ShouldBe(Checker.PartialModelCure, cure);
+            hintFor(legacy, unsurveyedAndFiltered)
+                .ShouldBe(Checker.UnsurveyedCure, cure);
+        }
+
+        AuthoringHints.ForSubject(legacy, new ModelCaveats(Checker.PartialModel, Checker.Unsurveyed, null))
+            .ShouldBe(Checker.PartialModelCure);
+    }
+
+    [Fact]
+    public void AnEmptySubjectAndAnInertTargetAnchoredOnAnUnsurveyedProject_CarryItsCureThroughTheChecker()
+    {
+        // The evaluator is what hands the hints the run's facts: a call site that passed none would keep every
+        // row above green.
+        RuleResult subject = Checker.Run(Sources.LayeredModel, unsurveyed: Checker.Unsurveyed, define: arch =>
+                arch.Rule("empty/legacy")
+                    .Enforce(arch.Project(Checker.UnsurveyedProject).MustHaveSuffix("X"))
+                    .Because("b"))
+            .Single();
+        RuleResult target = Checker.Run(Sources.LayeredModel, unsurveyed: Checker.Unsurveyed, define: arch =>
+                arch.Rule("inert/legacy")
+                    .Enforce(arch.Namespace("App.Domain.*").MustNotReference(arch.Project(Checker.UnsurveyedProject)))
+                    .Because("b"))
+            .Single();
+        RuleResult member = Checker.Run(Sources.LayeredModel, unsurveyed: Checker.Unsurveyed, define: arch =>
+                arch.Rule("member/legacy")
+                    .Enforce(arch.Project(Checker.UnsurveyedProject).Methods.MustBePublic())
+                    .Because("b"))
+            .Single();
+
+        subject.Violations.ShouldHaveSingleItem()
+            .Hint.ShouldBe(Checker.UnsurveyedCure);
+        target.Warnings.ShouldHaveSingleItem()
+            .Hint.ShouldBe(Checker.UnsurveyedCure);
+        member.Violations.ShouldHaveSingleItem()
+            .Hint.ShouldBe(Checker.UnsurveyedCure);
     }
 
     // A namespace subject no type occupies, so the rule fails empty and its cure is read off the selection.
@@ -560,7 +663,7 @@ public sealed class AuthoringHintTests
         ];
     }
 
-    private delegate string InertCure(Selection piece, IncompleteModel? model, NarrowedUniverse? narrowing);
+    private delegate string InertCure(Selection piece, ModelCaveats caveats);
 
     // The cures on a target or an allow-list, the entry points a narrowing reaches. Walked rather than listed
     // per row, for EveryShape's reason: an entry point left off a hand-kept list is one whose replacements and voice
@@ -569,31 +672,30 @@ public sealed class AuthoringHintTests
     {
         return
         [
-            (nameof(AuthoringHints.ForInertTarget),
-                (piece, model, narrowing) => AuthoringHints.ForInertTarget([piece], model, narrowing)),
+            (nameof(AuthoringHints.ForInertTarget), (piece, caveats) => AuthoringHints.ForInertTarget([piece], caveats)),
             DeadOperandCure(DeadOperandRole.Target),
             DeadOperandCure(DeadOperandRole.AllowList)
         ];
     }
 
-    private delegate string SubjectSideCure(Selection piece, IncompleteModel? model);
+    private delegate string SubjectSideCure(Selection piece, ModelCaveats caveats);
 
     // The two cures on a membership or an among part. Kept apart from EveryInertCure because a narrowed run
-    // raises neither warning, so they take no narrowing to replace their advice with.
+    // raises neither warning, so no row hands them a narrowing to replace their advice with.
     private static (string Cure, SubjectSideCure HintFor)[] EverySubjectSideCure()
     {
         return
         [
             ($"{nameof(AuthoringHints.ForDeadOperand)}({DeadOperandRole.Membership})",
-                (piece, model) => AuthoringHints.ForDeadOperand(DeadOperandRole.Membership, piece, model, null)),
+                (piece, caveats) => AuthoringHints.ForDeadOperand(DeadOperandRole.Membership, piece, caveats)),
             ($"{nameof(AuthoringHints.ForDeadOperand)}({DeadOperandRole.Among})",
-                (piece, model) => AuthoringHints.ForDeadOperand(DeadOperandRole.Among, piece, model, null))
+                (piece, caveats) => AuthoringHints.ForDeadOperand(DeadOperandRole.Among, piece, caveats))
         ];
     }
 
     private static (string Cure, InertCure HintFor) DeadOperandCure(DeadOperandRole role)
     {
         return ($"{nameof(AuthoringHints.ForDeadOperand)}({role})",
-            (piece, model, narrowing) => AuthoringHints.ForDeadOperand(role, piece, model, narrowing));
+            (piece, caveats) => AuthoringHints.ForDeadOperand(role, piece, caveats));
     }
 }

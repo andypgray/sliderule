@@ -100,6 +100,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   solution. Before, it said to restore and build the solution, which no restore or build could end. The check,
   status and graph documents list such a project as `missingProjects`, beside `failedProjects`, and SARIF
   reports it in a notification of its own. A cached run notices when the file appears.
+- A rule whose subject or target is a project the run does not survey, such as an SDK-style VB project, a
+  shared project or one the default configuration does not build, gets a hint that names the project and says
+  the run does not survey it. Before, the hint said a project is named by its csproj file name, which sent the
+  reader after a typo that was not there. The rule still fails, under a solution filter too, because no run
+  ever surveys such a project.
 - A run from a binary log lists a `.vcxproj`, `.sqlproj`, `.esproj` or other project in another language that a
   C# project references and the solution does not declare, as a load does, read off the build's own
   evaluation of the C# project in the log. Before, `unsupportedProjects` and the "projects were not surveyed"

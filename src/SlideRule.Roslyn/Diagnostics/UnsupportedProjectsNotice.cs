@@ -78,6 +78,37 @@ internal static class UnsupportedProjectsNotice
         return project.Name ?? relativizer.Relative(project.Path);
     }
 
+    /// <summary>
+    ///     The name a selection gives <paramref name="project" />: the name the solution gives it where it has one,
+    ///     and its file name without the extension otherwise, as a C# project is named by its csproj.
+    /// </summary>
+    internal static string SelectionName(UnsupportedProject project)
+    {
+        return project.Name ?? Path.GetFileNameWithoutExtension(project.Path);
+    }
+
+    /// <summary>
+    ///     The cure a rule's selection reports when it is anchored on <paramref name="project" />, in place of advice
+    ///     about how the selection is spelled, which no spelling could make match.
+    /// </summary>
+    /// <remarks>
+    ///     It reads in the voice of the cures it replaces: one line, opening upper-case, diagnosis parted from cure by
+    ///     a single semicolon, ending in a full stop, never in the second person. The remedy follows the kind,
+    ///     because a project the default configuration skips is already C#.
+    /// </remarks>
+    internal static string UnsurveyedCure(UnsupportedProject project, PathFormat.Relativizer relativizer)
+    {
+        string remedy = project.Kind switch
+        {
+            UnsupportedProjectKind.SharedProject => "anchor the rule on the projects that import it",
+            UnsupportedProjectKind.NotBuilt =>
+                "build it in the solution's default configuration, or anchor the rule elsewhere",
+            _ => "anchor the rule on C# projects, or remove it"
+        };
+        return $"{Shown(project, relativizer)} is a project this run does not survey ({Reason(project.Kind)}), so a "
+               + $"selection anchored on it matches nothing; {remedy}.";
+    }
+
     /// <summary>The stamp <c>check</c> writes above its report.</summary>
     internal static string CheckStamp(IReadOnlyList<string> unsupportedProjects)
     {

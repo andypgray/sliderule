@@ -44,7 +44,7 @@ internal static class Harness
     public static CheckReport Check(
         IReadOnlyList<ArchRule> rules, CodebaseModel codebase, BaselineIndex baselines, DiffContext? diff)
     {
-        return Check(rules, codebase, baselines, diff, null, null);
+        return Check(rules, codebase, baselines, diff, ModelCaveats.None);
     }
 
     /// <summary>
@@ -54,14 +54,14 @@ internal static class Harness
     public static CheckReport CheckUncancellable(
         IReadOnlyList<ArchRule> rules, CodebaseModel codebase, BaselineIndex baselines, DiffContext? diff)
     {
-        return ArchChecker.Check(rules, codebase, baselines, diff, null, null, null, CancellationToken.None);
+        return ArchChecker.Check(rules, codebase, baselines, diff, ModelCaveats.None, null, CancellationToken.None);
     }
 
     /// <summary>Checks exactly <paramref name="rules" /> with every argument the checker takes but the token.</summary>
     public static CheckReport Check(
         IReadOnlyList<ArchRule> rules, CodebaseModel codebase, BaselineIndex baselines, DiffContext? diff,
-        NarrowedUniverse? narrowing, IncompleteModel? incompleteModel, SolutionRoot? root = null)
+        ModelCaveats caveats, SolutionRoot? root = null)
     {
-        return ArchChecker.Check(rules, codebase, baselines, diff, narrowing, incompleteModel, root, Ct);
+        return ArchChecker.Check(rules, codebase, baselines, diff, caveats, root, Ct);
     }
 }

@@ -102,11 +102,11 @@ public sealed class CheckCancellationTests
                 ViolationKind.RuleError, "the `Must` predicate threw InvalidOperationException", "boom");
     }
 
-    // The eight-argument seam, spelled once: every row above is about the token, and the five arguments
-    // between the codebase and it are what a whole-solution run over no baselines and no path globs passes.
+    // The checker's whole seam, spelled once: every row above is about the token, and the arguments between the
+    // codebase and it are what a whole-solution run over no baselines and no path globs passes.
     private static CheckReport Check(ArchitectureModel model, CancellationToken cancellationToken)
     {
         return ArchChecker.Check(
-            model.Rules, Sources.LayeredModel, BaselineIndex.Empty, null, null, null, null, cancellationToken);
+            model.Rules, Sources.LayeredModel, BaselineIndex.Empty, null, ModelCaveats.None, null, cancellationToken);
     }
 }

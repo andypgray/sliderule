@@ -1,3 +1,4 @@
+using Shouldly;
 using SlideRule.Checking;
 using SlideRule.Codebase;
 using SlideRule.Tests.Checking.Targets;
@@ -104,6 +105,49 @@ public sealed class NarrowedUniverseSkipTests
     }
 
     [Fact]
+    public void Check_EmptySubjectAnchoredOnAnUnsurveyedProject_FailsWithTheUnsurveyedCure()
+    {
+        // A project in another language is never surveyed, by this run or a whole-solution one, so a rule whose
+        // subject is anchored on it fails rather than skipping: a skip would leave a rule that is never judged.
+        RuleResult result = Checker.Run(WebAndData, unsurveyed: Checker.Unsurveyed, define: LegacySubjectRule)
+            .Single();
+
+        result.ShouldHaveFailedWithDetail(ViolationKind.EmptySubject, ConstraintEvaluator.EmptySubjectMessage);
+        result.Violations.ShouldHaveSingleItem()
+            .Hint.ShouldBe(Checker.UnsurveyedCure);
+    }
+
+    [Fact]
+    public void Check_EmptySubjectAnchoredOnAnUnsurveyedProjectUnderNarrowing_StillFails()
+    {
+        // The narrowing skip holds back a subject the whole solution might fill. This one it never fills.
+        RuleResult result = Checker.Run(
+                WebAndData, narrowing: Checker.FilterNarrowing, unsurveyed: Checker.Unsurveyed,
+                define: LegacySubjectRule)
+            .Single();
+
+        result.ShouldHaveFailedWithDetail(ViolationKind.EmptySubject, ConstraintEvaluator.EmptySubjectMessage);
+        result.Violations.ShouldHaveSingleItem()
+            .Hint.ShouldBe(Checker.UnsurveyedCure);
+    }
+
+    [Fact]
+    public void Check_EmptySubjectExceptingAnUnsurveyedProjectUnderNarrowing_Skips()
+    {
+        // An Except payload takes types out of the subject, so the unsurveyed project it names is no anchor: the
+        // subject's own namespace is what the filter may have dropped, and the rule skips as any other would.
+        RuleResult result = Checker.Run(
+                WebAndData, narrowing: Checker.FilterNarrowing, unsurveyed: Checker.Unsurveyed, define: arch =>
+                    arch.Rule("layering/x")
+                        .Enforce(arch.Namespace("App.Nowhere.*").Except(arch.Project(Checker.UnsurveyedProject))
+                            .MustNotReference(arch.Namespace("App.Data.*")))
+                        .Because("b"))
+            .Single();
+
+        result.ShouldHaveSkipped(Checker.FilterSkipReason);
+    }
+
+    [Fact]
     public void Check_RealViolationUnderNarrowing_IsStillRed()
     {
         // The predicate is "every violation is an empty subject", not "the run was narrowed". A finding over
@@ -129,6 +173,15 @@ public sealed class NarrowedUniverseSkipTests
             .Single();
 
         result.ShouldHaveFailedWithSingle(ViolationKind.RuleError);
+    }
+
+    // A rule whose subject is a layer the unsurveyed project defines.
+    private static void LegacySubjectRule(Arch arch)
+    {
+        Layer legacy = arch.Layer("Legacy", arch.Project(Checker.UnsurveyedProject));
+        arch.Rule("legacy/x")
+            .Enforce(legacy.MustNotReference(arch.Namespace("App.Data.*")))
+            .Because("b");
     }
 
     // A solution the filter left one project of — so a rule naming any other project reaches nothing, which

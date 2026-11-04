@@ -191,7 +191,7 @@ public sealed class HookReportFenceTests
     {
         return Harness.Check(
                 SelfSpecTests.SelfModel.Rules, model, BaselineIndex.Empty, diff: null,
-                NarrowedUniverse.OneProject, incompleteModel: null)
+                new ModelCaveats(null, null, NarrowedUniverse.OneProject))
             .Results;
     }
 

@@ -73,7 +73,8 @@ public sealed class SolutionEntriesE2ETests
         }
         """;
 
-    // One rule into the VB project's layer, the direction a C# compilation can see.
+    // One rule into the VB project's layer, the direction a C# compilation can see, and one out of it, whose
+    // subject no run surveys.
     private const string VisualBasicSpecSource =
         """
         using SlideRule;
@@ -89,6 +90,9 @@ public sealed class SolutionEntriesE2ETests
                     arch.Rule("vb/app-off-legacy")
                         .Enforce(app.MustNotReference(legacy))
                         .Because("App does not reach the VB ledger.");
+                    arch.Rule("vb/legacy-off-app")
+                        .Enforce(legacy.MustNotReference(app))
+                        .Because("The VB ledger does not reach App.");
                 }
             }
         }
@@ -377,11 +381,63 @@ public sealed class SolutionEntriesE2ETests
     }
 
     [Fact]
-    public async Task CheckJson_VisualBasicProject_IsListedAndARuleIntoItIsChecked()
+    public async Task CheckJson_VisualBasicProject_IsListedAndARuleOnItGetsTheCure()
     {
-        // Arrange — a C# project referencing an SDK-style Visual Basic one, both declared. The workspace loads the
-        // VB project without a failure, and extraction skips it by language.
+        // Arrange
         using TempDirectory bed = TestTempRoot.Fresh("visual-basic-member");
+        (string solution, string spec) = WriteVisualBasicBed(bed);
+
+        // Act
+        CliResult result = await CliRunner.InvokeColdAsync("check", solution, "--spec", spec, "--no-cache", "--json");
+
+        // Assert — the VB project is named as outside the survey, and a rule whose subject is the VB layer fails
+        // empty, and its cure says why, rather than sending the reader after a misspelt project name that is spelt
+        // right.
+        result.ShouldReportViolations();
+        using JsonDocument document = result.ShouldHaveJsonStdout();
+        document.UnsupportedProjectEntries()
+            .ShouldBe([("Legacy/Legacy.vbproj", "not a C# project")]);
+        result.Out.ShouldHaveFailed("vb/legacy-off-app");
+        JsonElement emptySubject = CheckJson.Rule(document, "vb/legacy-off-app")
+            .GetProperty("violations")
+            .EnumerateArray()
+            .ShouldHaveSingleItem(result.Transcript());
+        emptySubject.GetProperty("kind")
+            .GetString()
+            .ShouldBe("emptySubject", result.Transcript());
+        emptySubject.GetProperty("hint")
+            .GetString()
+            .ShouldBe(LegacyCure, result.Transcript());
+
+        // The text channel prints the same cure as the rule's hint line.
+        CliResult human = await CliRunner.InvokeColdAsync("check", solution, "--spec", spec, "--no-cache");
+        human.ShouldReportViolations("hint: " + LegacyCure);
+    }
+
+    [Fact]
+    public async Task CheckJson_ReferenceFromCSharpIntoAVisualBasicProject_IsChecked()
+    {
+        Assert.SkipUnless(
+            OperatingSystem.IsWindows(),
+            "On Linux the MSBuild workspace compiles the VB project without its _MyType define, so the C# project's "
+            + "reference into it does not bind.");
+
+        // Arrange
+        using TempDirectory bed = TestTempRoot.Fresh("visual-basic-reference");
+        (string solution, string spec) = WriteVisualBasicBed(bed);
+
+        // Act
+        CliResult result = await CliRunner.InvokeColdAsync("check", solution, "--spec", spec, "--no-cache", "--json");
+
+        // Assert — a reference into the VB project from C# is still checked, because the C# compilation reaches its
+        // types through the project's assembly.
+        result.Out.ShouldHaveSingleViolationOnEdge("vb/app-off-legacy", "reference", "App.Widget", "Legacy.Ledger");
+    }
+
+    // A C# project referencing an SDK-style Visual Basic one, both declared and built, and the spec that layers them.
+    // The workspace loads the VB project without a failure, and extraction skips it by language.
+    private static (string Solution, string Spec) WriteVisualBasicBed(TempDirectory bed)
+    {
         bed.WriteFile(
             ["App", "App.csproj"],
             """
@@ -409,17 +465,7 @@ public sealed class SolutionEntriesE2ETests
         string solution = bed.WriteFile(["App.slnx"], ScratchProjects.Solution("App/App.csproj", "Legacy/Legacy.vbproj"));
         DotnetCli.Run("build App.slnx", bed.Path);
         string spec = SpecAssemblyCompiler.EmitSpecDllToFreshTemp("visual-basic-member", "VisualBasic", VisualBasicSpecSource);
-
-        // Act
-        CliResult result = await CliRunner.InvokeColdAsync("check", solution, "--spec", spec, "--no-cache", "--json");
-
-        // Assert — the VB project is named as outside the survey, and a reference into it from C# is still
-        // checked, because the C# compilation reaches its types through the project's assembly.
-        result.Out.ShouldHaveSingleViolationOnEdge("vb/app-off-legacy", "reference", "App.Widget", "Legacy.Ledger");
-        result.ShouldReportViolations();
-        using JsonDocument document = result.ShouldHaveJsonStdout();
-        document.UnsupportedProjectEntries()
-            .ShouldBe([("Legacy/Legacy.vbproj", "not a C# project")]);
+        return (solution, spec);
     }
 
     // A project in another language that a C# project references: the targets a build of the referrer calls on a
@@ -435,6 +481,11 @@ public sealed class SolutionEntriesE2ETests
           <Target Name="GetCopyToPublishDirectoryItems" />
         </Project>
         """;
+
+    // The cure a rule anchored on the bed's VB project reports.
+    private const string LegacyCure =
+        "Legacy/Legacy.vbproj is a project this run does not survey (not a C# project), so a selection anchored on "
+        + "it matches nothing; anchor the rule on C# projects, or remove it.";
 
     // Cold, with no cache: a pooled workspace or a cached model from another copy could answer for a tree the fact
     // did not stage.

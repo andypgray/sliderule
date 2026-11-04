@@ -61,20 +61,17 @@ internal sealed class ConstraintEvaluator
     private readonly EdgeIndex<ReferenceEdge> _edgesBySource;
     private readonly EdgeIndex<ReferenceEdge> _edgesByTarget;
     private readonly EdgeIndex<ExposureEdge> _exposureEdgesBySource;
-    private readonly IncompleteModel? _incompleteModel;
+    private readonly ModelCaveats _caveats;
     private readonly EdgeIndex<InjectionEdge> _injectionEdgesBySource;
     private readonly EdgeIndex<MemberEdge> _memberEdgesBySource;
-    private readonly NarrowedUniverse? _narrowing;
     private readonly IReadOnlyList<ProjectNode> _projects;
     private readonly SelectionEvaluator _selections;
     private readonly EdgeIndex<ThrowEdge> _throwEdgesBySource;
 
     internal ConstraintEvaluator(
-        CodebaseModel model, SelectionEvaluator selections, IncompleteModel? incompleteModel = null,
-        NarrowedUniverse? narrowing = null)
+        CodebaseModel model, SelectionEvaluator selections, ModelCaveats caveats)
     {
-        _incompleteModel = incompleteModel;
-        _narrowing = narrowing;
+        _caveats = Guard.NotNull(caveats, nameof(caveats));
         _projects = model.Projects;
         _edgesBySource = new EdgeIndex<ReferenceEdge>(model.Edges, e => e.Source);
         _edgesByTarget = new EdgeIndex<ReferenceEdge>(model.Edges, e => e.Target);
@@ -145,7 +142,7 @@ internal sealed class ConstraintEvaluator
             return (
             [
                 Violation.EmptySubject(
-                    EmptySubjectMessage, AuthoringHints.ForSubject(subject!, _incompleteModel))
+                    EmptySubjectMessage, AuthoringHints.ForSubject(subject!, _caveats))
             ], NoWarnings, default);
 
         (IReadOnlyList<Violation> violations, IReadOnlyList<CheckWarning> warnings) =
@@ -365,7 +362,7 @@ internal sealed class ConstraintEvaluator
                 ?
                 [
                     CheckWarning.InertTarget(
-                        InertTargetMessage, AuthoringHints.ForInertTarget(operands, _incompleteModel, _narrowing))
+                        InertTargetMessage, AuthoringHints.ForInertTarget(operands, _caveats))
                 ]
                 : NoWarnings;
 
@@ -398,7 +395,7 @@ internal sealed class ConstraintEvaluator
     private IReadOnlyList<CheckWarning> SubjectSideDeadWarnings(
         IReadOnlyList<Selection> operands, IReadOnlyList<SelectionAdmission> parts, DeadOperandRole role)
     {
-        return _narrowing is not null
+        return _caveats.Narrowing is not null
             ? NoWarnings
             : DeadOperandWarnings(operands, parts, role, SelectionPosition.Subject);
     }
@@ -410,7 +407,7 @@ internal sealed class ConstraintEvaluator
         (IReadOnlyList<Violation> Violations, IReadOnlyList<CheckWarning> Warnings) verdict, Selection home)
     {
         // The warnings are silent under a narrowing, so the home is not collected there.
-        if (_narrowing is not null) return (verdict.Violations, NoWarnings);
+        if (_caveats.Narrowing is not null) return (verdict.Violations, NoWarnings);
 
         SelectionAdmission matched = SelectionAdmission.Collect(_selections, home, SelectionPosition.Subject);
         return (verdict.Violations, SubjectSideDeadWarnings([home], [matched], DeadOperandRole.Membership));
@@ -471,7 +468,7 @@ internal sealed class ConstraintEvaluator
             warning.Kind == CheckWarningKind.DeadOperand && warning.Key == reference);
         if (raised) return;
 
-        string hint = AuthoringHints.ForDeadOperand(role, piece, _incompleteModel, _narrowing);
+        string hint = AuthoringHints.ForDeadOperand(role, piece, _caveats);
         warnings.Add(CheckWarning.DeadOperand(role, reference, hint));
     }
 
@@ -1028,7 +1025,7 @@ internal sealed class ConstraintEvaluator
         return dead
             .Select(part => Violation.EmptySubject(
                 EmptyOperandMessage(part.ReferenceProse()),
-                AuthoringHints.ForSubject(part, _incompleteModel)))
+                AuthoringHints.ForSubject(part, _caveats)))
             .ToList();
     }
 
@@ -1065,7 +1062,7 @@ internal sealed class ConstraintEvaluator
         List<TypeNode> types = whole.Nodes
             .OrderBy(type => type.FullName, StringComparer.Ordinal)
             .ToList();
-        if (_narrowing is not null || dead.Count == 0) return (types, NoWarnings);
+        if (_caveats.Narrowing is not null || dead.Count == 0) return (types, NoWarnings);
 
         // One warning per distinct reference: the reference is the warning's key, so two parts that render
         // alike warn once.
@@ -1074,7 +1071,7 @@ internal sealed class ConstraintEvaluator
             .GroupBy(entry => entry.Reference, StringComparer.Ordinal)
             .Select(group => group.First())
             .Select(entry => CheckWarning.DeadExemplar(
-                entry.Reference, AuthoringHints.ForExemplar(entry.Part, _incompleteModel)))
+                entry.Reference, AuthoringHints.ForExemplar(entry.Part, _caveats)))
             .ToList();
         return (types, warnings);
     }
@@ -1274,7 +1271,7 @@ internal sealed class ConstraintEvaluator
             return (
             [
                 Violation.EmptySubject(
-                    EmptyMemberSubjectMessage, AuthoringHints.ForMemberSubject(_incompleteModel))
+                    EmptyMemberSubjectMessage, AuthoringHints.ForMemberSubject(memberSubject.Source, _caveats))
             ], NoWarnings, default);
 
         // A member Named list is read per name in the type subject's register (ResolveSubject): Named(a, b)
@@ -1283,7 +1280,7 @@ internal sealed class ConstraintEvaluator
         List<Violation> deadNames = MemberDeadNames.In(memberSubject, members)
             .Select(dead => Violation.EmptySubject(
                 EmptyMemberOperandMessage(dead.ReferenceProse()),
-                AuthoringHints.ForMemberName(_incompleteModel)))
+                AuthoringHints.ForMemberName(_caveats)))
             .ToList();
         if (deadNames.Count > 0) return (deadNames, NoWarnings, default);
 
@@ -1387,7 +1384,7 @@ internal sealed class ConstraintEvaluator
             return (
             [
                 Violation.EmptySubject(
-                    EmptyProjectSubjectMessage, AuthoringHints.ForProjectSubject(_incompleteModel))
+                    EmptyProjectSubjectMessage, AuthoringHints.ForProjectSubject(constraint.ProjectSubject, _caveats))
             ], NoWarnings, default);
 
         IReadOnlyList<Violation> violations = DispatchProject(constraint, subjects);
