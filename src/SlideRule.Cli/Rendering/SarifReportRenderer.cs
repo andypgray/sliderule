@@ -1,4 +1,3 @@
-using System.Text;
 using System.Text.Json;
 using SlideRule.Baselines;
 using SlideRule.Checking;
@@ -18,8 +17,11 @@ namespace SlideRule.Cli.Rendering;
 /// </summary>
 /// <remarks>
 ///     Site-less violations (EmptySubject, RuleError) contribute no results and still gate through the CLI
-///     exit code. The log composes its own pointers, stamps and notifications rather than borrowing the human
-///     report's; a violation's wording is the exception, with <see cref="ViolationWording" /> as its one owner.
+///     exit code. A check warning that names no file is about the spec rather than the code, and rides on the
+///     invocation as a configuration notification, because code scanning rejects the whole upload over a result
+///     with no location. The log composes its own pointers, stamps and notifications rather than borrowing the
+///     human report's; a violation's wording is the exception, with <see cref="ViolationWording" /> as its one
+///     owner.
 /// </remarks>
 internal static class SarifReportRenderer
 {
@@ -32,10 +34,6 @@ internal static class SarifReportRenderer
     private const string ErrorLevel = "error";
     private const string NoteLevel = "note";
     private const string WarningLevel = "warning";
-    private const string ExemplarSource = "exemplar";
-
-    // UTF-8 without a BOM: SARIF consumers read UTF-8, and a leading BOM would churn the byte-level golden.
-    private static readonly UTF8Encoding Utf8NoBom = new(false);
 
     /// <summary>
     ///     Writes the SARIF file for <paramref name="report" /> to <paramref name="sarifPath" /> —
@@ -53,7 +51,7 @@ internal static class SarifReportRenderer
         WorkspaceTrustStamp trust)
     {
         string json = Serialize(report, solutionDirectory, uriRoot, executionSuccessful, workspaceDiagnostics, trust);
-        AtomicFile.WriteAllBytes(sarifPath, Utf8NoBom.GetBytes(json + "\n"));
+        AtomicFile.WriteAllText(sarifPath, json + "\n");
     }
 
     /// <summary>
@@ -81,7 +79,7 @@ internal static class SarifReportRenderer
 
         var run = new SarifRun(
             new SarifTool(driver),
-            BuildInvocations(executionSuccessful, trust, workspaceDiagnostics),
+            BuildInvocations(report, executionSuccessful, trust, workspaceDiagnostics),
             BuildOriginalUriBaseIds(),
             BuildResults(report, paths));
         var log = new SarifLog(SchemaUri, SarifVersion, [run]);
@@ -145,10 +143,14 @@ internal static class SarifReportRenderer
     // of the stream's own, in the order stderr writes them — and the structured facts add one
     // notification each after them, in the order the CLI refusals state them: the model being wrong outranks
     // the model being small, and a failed load outranks a failed restore. Each is written where the stamp
-    // carries it: the stamp's empty-to-null policy is the presence test. The notifications are omitted when
-    // there is nothing to say, so a clean run's invocation carries none.
+    // carries it: the stamp's empty-to-null policy is the presence test. The configuration notifications are
+    // the check warnings that name no file. Each list is omitted when there is nothing to say, so a clean run's
+    // invocation carries neither.
     private static IReadOnlyList<SarifInvocation> BuildInvocations(
-        bool executionSuccessful, WorkspaceTrustStamp trust, IReadOnlyList<string> workspaceDiagnostics)
+        CheckReport report,
+        bool executionSuccessful,
+        WorkspaceTrustStamp trust,
+        IReadOnlyList<string> workspaceDiagnostics)
     {
         IEnumerable<string> advisories = trust.PackageAudit.Select(entry => entry.Describe());
         List<SarifNotification> notifications = advisories
@@ -163,7 +165,30 @@ internal static class SarifReportRenderer
         if (trust.UncheckedProjects is { } narrowed) notifications.Add(NarrowingNotification(narrowed));
         if (trust.UnsupportedProjects is { } unsupported) notifications.Add(UnsupportedNotification(unsupported));
 
-        return [new SarifInvocation(executionSuccessful, notifications.Count > 0 ? notifications : null)];
+        List<SarifNotification> configuration = SpecWarningNotifications(report);
+
+        return
+        [
+            new SarifInvocation(
+                executionSuccessful,
+                SlideRuleJson.OmitEmpty(notifications),
+                SlideRuleJson.OmitEmpty(configuration))
+        ];
+    }
+
+    // A warning about the spec itself, in rule order and then warning order: the message alone, never the Hint,
+    // for the reason WarningResult gives, with the rule it is about as the associated rule, since the message
+    // does not name it.
+    private static List<SarifNotification> SpecWarningNotifications(CheckReport report)
+    {
+        return report.Results
+            .SelectMany(result => result.Warnings
+                .Where(warning => warning.File is null)
+                .Select(warning => new SarifNotification(
+                    new SarifMessage(warning.Message),
+                    WarningLevel,
+                    new SarifReportingDescriptorReference(result.Rule.Id))))
+            .ToList();
     }
 
     // Without it an incomplete model reaches SARIF only as MSBuild's replayed prose, in which a fatal
@@ -185,12 +210,10 @@ internal static class SarifReportRenderer
     // never a restore or a build.
     private static SarifNotification MissingProjectNotification(IReadOnlyList<string> missingProjects)
     {
-        string subject = Plurals.Counted(missingProjects.Count, "project file");
-
         return new SarifNotification(
             new SarifMessage(
-                $"The model is incomplete: {subject} the solution declares {Plurals.Verb(missingProjects.Count)} "
-                + "not on disk, so these results were reached against a codebase missing whole projects: "
+                $"The model is incomplete: {IncompleteModelGate.MissingClause(missingProjects.Count)}, so these "
+                + "results were reached against a codebase missing whole projects: "
                 + string.Join(", ", missingProjects)),
             ErrorLevel);
     }
@@ -265,8 +288,8 @@ internal static class SarifReportRenderer
     // A grandfathered site's attribution is one string minted here and landing twice — as the suppression's
     // justification, and again in the message — because the message is the only one of the two a code-scanning
     // alert shows, that channel reading a result's level and message and ignoring the suppression entirely.
-    // Warnings come last per rule, where the human report puts them, and they are the one result kind that is
-    // not a violation at all — see WarningResult.
+    // Warnings that name a file come last per rule, where the human report puts them, and they are the one
+    // result kind that is not a violation at all — see WarningResult.
     private static IReadOnlyList<SarifResult> BuildResults(CheckReport report, SitePaths paths)
     {
         var results = new List<SarifResult>();
@@ -290,50 +313,37 @@ internal static class SarifReportRenderer
                 results.AddRange(SiteResults(result.Rule.Id, violation, NoteLevel, "unchanged", attribution, paths));
             }
 
-            foreach (CheckWarning warning in result.Warnings) results.Add(WarningResult(result.Rule.Id, warning, paths));
+            foreach (CheckWarning warning in result.Warnings)
+                if (warning.File is { } file)
+                    results.Add(WarningResult(result.Rule.Id, warning, file, paths));
         }
 
         return results;
     }
 
-    // A check warning as a result: warning level, the message verbatim, and the file the warning names as its
-    // location — the tripwire names the changed file, an inert target is about the rule's own operand and so
-    // gets no location at all. No region with it: the finding is that the file was touched, and a start line
-    // would put the alert on whichever line the renderer picked rather than where anything happened. The
-    // fingerprint keys on that file so one touch stays one alert across runs. The baseline state is always
-    // `new`, because no baseline holds a warning.
+    // A check warning that names a file, as a result: warning level, the message verbatim, and that file as its
+    // location — the changed file for a tripwire, the baseline file for an orphaned section. No region with it:
+    // the finding is that the file was touched, and a start line would put the alert on whichever line the
+    // renderer picked rather than where anything happened. The fingerprint keys on that file so one touch stays
+    // one alert across runs. The baseline state is always `new`, because no baseline holds a warning.
     //
     // The message alone, never the warning's Hint: a hint is authoring advice for whoever writes the rule,
     // and this document is read by code scanning, where an alert stands in front of the whole team.
     //
     // Ordinal 0 always, so the rest of the key is what keeps two warnings of one rule apart. A tripwire warns
-    // once per changed file and keys on the path, and a whole-target inert warning is at most one per rule and
-    // keys on nothing. A dead-operand warning, whichever role its operand held, is one per distinct dead
-    // operand and puts that operand's rendered reference in the target slot, where an edge result puts its
-    // target. The reference is the sentence renderer's, so a change to how a selection renders re-keys those
-    // alerts once; and it may carry a `|`, a Where description being free text, which a consumer that splits
-    // the key on `|` has to allow for. An orphaned-baseline warning is one per orphan section and puts the
-    // section's rule ID in the same target slot, with the baseline file holding it as the location and the
-    // path slot, so two orphans on one rule are two alerts and one orphan stays one alert across runs. A
-    // dead-exemplar warning is one per dead part and puts that part's reference in the target slot too, but
-    // with the literal `exemplar` in the source slot: an exemplar and a forbidden target may name the same
-    // type, and with the source slot empty for both, a dead target operand and a dead exemplar part on one
-    // rule would be one alert.
-    private static SarifResult WarningResult(string ruleId, CheckWarning warning, SitePaths paths)
+    // once per changed file and keys on the path. An orphaned-baseline warning is one per orphan section and
+    // puts the section's rule ID in the target slot, where an edge result puts its target, with the baseline file
+    // holding it as the location and the path slot, so two orphans on one rule are two alerts and one orphan
+    // stays one alert across runs.
+    private static SarifResult WarningResult(string ruleId, CheckWarning warning, string file, SitePaths paths)
     {
-        SarifArtifactLocation? artifact = warning.File is { } file
-            ? new SarifArtifactLocation(paths.UriOfSolutionRelative(file), SrcRootBaseId)
-            : null;
-        IReadOnlyList<SarifLocation> locations = artifact is null
-            ? []
-            : [new SarifLocation(new SarifPhysicalLocation(artifact, null))];
-        string source = warning.Kind == CheckWarningKind.DeadExemplar ? ExemplarSource : string.Empty;
+        var artifact = new SarifArtifactLocation(paths.UriOfSolutionRelative(file), SrcRootBaseId);
+        var location = new SarifLocation(new SarifPhysicalLocation(artifact, null));
         string target = warning.Key ?? string.Empty;
-        Dictionary<string, string> fingerprints = Fingerprint(
-            source, target, string.Empty, warning.File ?? string.Empty, 0);
+        Dictionary<string, string> fingerprints = Fingerprint(string.Empty, target, string.Empty, file, 0);
 
         return new SarifResult(
-            ruleId, WarningLevel, new SarifMessage(warning.Message), locations, fingerprints, "new", null);
+            ruleId, WarningLevel, new SarifMessage(warning.Message), [location], fingerprints, "new", null);
     }
 
     // The one fingerprint format, so a sixth slot or a v2 bump cannot reach one result kind and miss the

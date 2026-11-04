@@ -114,6 +114,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   code scanning put every alert on a path missing the solution's directory. Outside a git repository the URIs
   stay relative to the solution's directory. The fingerprints keep the solution-relative path, so an alert for
   a solution at the repository root is unchanged.
+- `check --sarif` no longer writes a result without a location. GitHub code scanning rejects the whole upload
+  over one such result, so a spec with a single inert rule, a pattern that matched nothing or an exemplar that
+  matched nothing got no alerts at all, red violations included. Those warnings are about the spec and name no
+  file, so they are now configuration notifications on the run's invocation, each naming its rule. Code
+  scanning raises no alert for them. The annotations and the job summary still list them.
 - The `derive_spec` recipe's spec csproj now clears an inherited singular `<TargetFramework>`. A
   `Directory.Build.props` that set one decided the spec project's build while its own `<TargetFrameworks>`
   list decided the restore, and the first build failed with NETSDK1005.

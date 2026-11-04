@@ -103,8 +103,7 @@ internal static class SarifAssertions
     /// </summary>
     internal static bool SarifExecutionSuccessful(this string sarif)
     {
-        return Run(sarif)
-            .GetProperty("invocations")[0]
+        return Invocation(sarif)
             .GetProperty("executionSuccessful")
             .GetBoolean();
     }
@@ -138,11 +137,33 @@ internal static class SarifAssertions
     /// </summary>
     internal static IReadOnlyList<JsonElement> SarifNotifications(this string sarif)
     {
-        return Run(sarif)
-            .GetProperty("invocations")[0]
+        return Invocation(sarif)
             .GetProperty("toolExecutionNotifications")
             .EnumerateArray()
             .ToList();
+    }
+
+    /// <summary>
+    ///     The run's tool-configuration notifications, in render order: the check warnings about the spec itself,
+    ///     which name no file for a result to sit on. Throws, quoting the invocation, when it carries none.
+    /// </summary>
+    internal static IReadOnlyList<JsonElement> SarifConfigurationNotifications(this string sarif)
+    {
+        JsonElement invocation = Invocation(sarif);
+
+        return invocation.TryGetProperty("toolConfigurationNotifications", out JsonElement notifications)
+            ? notifications.EnumerateArray()
+                .ToList()
+            : throw new KeyNotFoundException($"The invocation carries no configuration notifications: {invocation}");
+    }
+
+    /// <summary>The rule a notification names as its associated rule; throws, quoting it, when it names none.</summary>
+    internal static string SarifAssociatedRuleId(this JsonElement notification)
+    {
+        return notification.TryGetProperty("associatedRule", out JsonElement rule)
+            ? rule.GetProperty("id")
+                .GetString()!
+            : throw new KeyNotFoundException($"The notification names no associated rule: {notification}");
     }
 
     /// <summary>A result's or notification's message text: the alert title every code-scanning UI shows.</summary>
@@ -193,5 +214,12 @@ internal static class SarifAssertions
     {
         return JsonDocument.Parse(sarif)
             .RootElement.GetProperty("runs")[0];
+    }
+
+    // The run's one invocation.
+    private static JsonElement Invocation(string sarif)
+    {
+        return Run(sarif)
+            .GetProperty("invocations")[0];
     }
 }

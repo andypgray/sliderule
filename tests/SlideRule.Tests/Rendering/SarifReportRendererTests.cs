@@ -45,10 +45,7 @@ public sealed class SarifReportRendererTests
     {
         // An uncaptured Enforce reference violation: every site is a red error at baselineState new, and —
         // nothing grandfathers it — carries no suppressions property at all (null-omitted, not an empty array).
-        CheckReport report = Checker.Run(Sources.OneControllerModel, arch =>
-            arch.Rule("layer/no-data")
-                .Enforce(arch.Namespace("App.Web.*").MustNotReference(arch.Namespace("App.Data.*")))
-                .Because("The web layer must not open the data layer directly."));
+        CheckReport report = Checker.Run(Sources.OneControllerModel, Sources.NoDataReference);
 
         string json = report.ToSarif();
 
@@ -83,10 +80,7 @@ public sealed class SarifReportRendererTests
                               }
                               namespace App.Data { public class Db {} }
                               """;
-        CheckReport report = Checker.Run(source, arch =>
-            arch.Rule("layer/no-data")
-                .Enforce(arch.Namespace("App.Web.*").MustNotReference(arch.Namespace("App.Data.*")))
-                .Because("The web layer must not open the data layer directly."));
+        CheckReport report = Checker.Run(source, Sources.NoDataReference);
 
         string json = report.ToSarif();
 
@@ -458,7 +452,7 @@ public sealed class SarifReportRendererTests
     public void Serialize_RuleWhoseExemplarResolvedNothing_HelpsWithTheFixAlone()
     {
         // Help reads the run's resolved types, not the spec's phrase: a dead exemplar has nothing to point at,
-        // and the warning result is where it is reported.
+        // and its configuration notification is where it is reported.
         CheckReport report = Checker.Run("namespace App { public class Page {} }", arch =>
             arch.Rule("naming/pages")
                 .Enforce(arch.Namespace("App.*").MustHaveSuffix("Page"))
@@ -476,11 +470,10 @@ public sealed class SarifReportRendererTests
     }
 
     [Fact]
-    public void Serialize_DeadExemplarAndDeadOperandNamingOneType_GetDistinctFingerprints()
+    public void Serialize_DeadExemplarAndDeadOperandNamingOneType_AreTwoConfigurationNotifications()
     {
-        // Both warnings quote the same reference, carry no file and take ordinal 0, so with the source slot
-        // empty for both a consumer keyed on the fingerprint would merge two findings into one alert. The
-        // literal `exemplar` in the source slot is what keeps them apart.
+        // Both warnings quote the same reference and name no file, so neither can be a result, and the two
+        // stay apart as notifications in warning order, each naming its rule.
         CheckReport report = Checker.Run("namespace App { public class Page {} }", arch =>
             arch.Rule("layer/no-ghosts")
                 .Enforce(arch.Namespace("App.*")
@@ -488,12 +481,17 @@ public sealed class SarifReportRendererTests
                 .Because("Nothing may reach the ghost.")
                 .Exemplar(arch.Types.Named("Ghost")));
 
-        IReadOnlyList<string> fingerprints = report.ToSarif()
-            .SarifResults()
-            .Select(result => result.SarifFingerprint())
-            .ToList();
+        string sarif = report.ToSarif();
 
-        fingerprints.ShouldBe(["v1||types named `Ghost`|||0", "v1|exemplar|types named `Ghost`|||0"]);
+        sarif.SarifResults()
+            .ShouldBeEmpty();
+        sarif.SarifConfigurationNotifications()
+            .Select(notification => (notification.SarifAssociatedRuleId(), notification.SarifMessageText()))
+            .ShouldBe([
+                ("layer/no-ghosts",
+                    "This rule is partly inert: its target selection operand \"types named `Ghost`\" matched no types."),
+                ("layer/no-ghosts", "This rule's exemplar \"types named `Ghost`\" matched no solution-declared types.")
+            ]);
     }
 
     [Fact]
@@ -605,38 +603,37 @@ public sealed class SarifReportRendererTests
     }
 
     [Fact]
-    public void Serialize_InertTargetWarning_EmitsAWarningResultWithNoLocation()
+    public void Serialize_InertTargetWarning_IsAConfigurationNotificationNamingItsRule()
     {
-        // The other warning kind, and the one that proves the location is read off the warning rather than
-        // assumed: an inert target is a fact about the rule's own operand — a pattern that matched no type —
-        // so there is no file to point at and the result carries an empty locations array rather than a
-        // fabricated one.
+        // An inert target is a fact about the rule's own operand, a pattern that matched no type, so there is no
+        // file to point at. Code scanning rejects the whole upload over one result with no location, so the
+        // warning is a notification on the invocation instead, at warning level and naming the rule it is about.
         string json = InertTargetReport.ToSarif();
 
-        JsonElement result = json.SarifResults()
-            .ShouldHaveSingleItem();
-        result.GetProperty("level")
-            .GetString()
-            .ShouldBe("warning");
-        result.GetProperty("locations")
-            .EnumerateArray()
+        json.SarifResults()
             .ShouldBeEmpty();
+        JsonElement notification = json.SarifConfigurationNotifications()
+            .ShouldHaveSingleItem();
+        notification.SarifLevel()
+            .ShouldBe("warning");
+        notification.SarifAssociatedRuleId()
+            .ShouldBe("layer/no-ghosts");
     }
 
     [Fact]
     public void Serialize_InertTargetWarning_CarriesTheMessageWithoutTheAuthoringCure()
     {
         // The warning carries a cure for whoever writes the rule, and this document does not: its reader is
-        // code scanning, where an alert stands in front of the whole team rather than the spec's author. The
-        // empty-subject cure could not join it in any case — those violations are site-less and mint no
-        // result — so carrying one here would land half a family's advice and hide the rest.
+        // code scanning, where the whole team reads it rather than the spec's author. The empty-subject cure
+        // could not join it in any case — those violations are site-less and mint nothing here — so carrying
+        // one would land half a family's advice and hide the rest.
         InertTargetReport.Results.ShouldHaveSingleItem()
             .Warnings.ShouldHaveSingleItem()
             .Hint.ShouldNotBeNull();
 
         string json = InertTargetReport.ToSarif();
 
-        JsonElement warning = json.SarifResults()
+        JsonElement warning = json.SarifConfigurationNotifications()
             .ShouldHaveSingleItem();
 
         warning.SarifMessageText()
@@ -644,23 +641,24 @@ public sealed class SarifReportRendererTests
     }
 
     [Fact]
-    public void Serialize_TwoDeadTargetPatterns_GetDistinctFingerprintsKeyedOnEachPattern()
+    public void Serialize_TwoDeadTargetPatterns_AreOneConfigurationNotificationEach()
     {
-        // Every warning result takes ordinal 0 and none of these carries a file, so without the pattern in the
-        // key two dead patterns on one rule would mint one fingerprint, and a consumer keyed on it would merge
-        // two findings into one alert. The pattern sits in the target slot, where an edge puts its target.
+        // One notification per dead pattern, in pattern order, each quoting its own pattern.
         CheckReport report = Checker.Run("namespace App { public class Page {} }", arch =>
             arch.Rule("layer/no-ghosts")
                 .Enforce(arch.Namespace("App.*")
                     .MustNotReference(arch.Namespace("App.*"), arch.Namespace("Ghost.*"), arch.Namespace("Phantom.*")))
                 .Because("Nothing may reach the ghost layers."));
 
-        IReadOnlyList<string> fingerprints = report.ToSarif()
-            .SarifResults()
-            .Select(result => result.SarifFingerprint())
+        IReadOnlyList<string> messages = report.ToSarif()
+            .SarifConfigurationNotifications()
+            .Select(notification => notification.SarifMessageText())
             .ToList();
 
-        fingerprints.ShouldBe(["v1||types in `Ghost.*`|||0", "v1||types in `Phantom.*`|||0"]);
+        messages.ShouldBe([
+            "This rule is partly inert: its target selection operand \"types in `Ghost.*`\" matched no types.",
+            "This rule is partly inert: its target selection operand \"types in `Phantom.*`\" matched no types."
+        ]);
     }
 
     [Fact]
@@ -695,9 +693,7 @@ public sealed class SarifReportRendererTests
         CheckReport report = Checker.Run(
             "namespace App.Web { public class Page { public App.Data.Db Open() => new App.Data.Db(); } }"
             + " namespace App.Data { public class Db {} }",
-            arch => arch.Rule("layer/no-data")
-                .Enforce(arch.Namespace("App.Web.*").MustNotReference(arch.Namespace("App.Data.*")))
-                .Because("The web layer must not open the data layer directly."));
+            Sources.NoDataReference);
         string solutionDirectory = Directory.GetCurrentDirectory();
         string solutionLeaf = Path.GetFileName(solutionDirectory);
 

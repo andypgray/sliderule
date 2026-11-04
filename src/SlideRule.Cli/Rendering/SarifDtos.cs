@@ -4,7 +4,8 @@ using SlideRule.Model;
 namespace SlideRule.Cli.Rendering;
 
 // The wire shape of `check --sarif`: SARIF 2.1.0 (OASIS), the subset SlideRule emits — one run, a driver
-// carrying a reporting descriptor per rule, one result per violation site, and one per check warning. Pinned
+// carrying a reporting descriptor per rule, one result per violation site, and one per check warning that names a
+// file; a check warning about the spec itself rides on the invocation as a configuration notification. Pinned
 // by the golden `Cli/Golden/violated-check.sarif`. Clustered in one file: these records are one cohesive
 // DTO, not product types.
 // Serialized with the shared SlideRuleJson.Options (camelCase names, indented, nulls omitted);
@@ -56,8 +57,8 @@ internal sealed record SarifReportingConfiguration(string Level);
 internal sealed record SarifRuleProperties(Posture Posture);
 
 /// <summary>
-///     One result — a single violation site, or a check warning. <see cref="Suppressions" /> is null
-///     (omitted) on red and on a warning; <see cref="Locations" /> is empty for a warning that names no file.
+///     One result — a single violation site, or a check warning that names a file. <see cref="Suppressions" />
+///     is null (omitted) on red and on a warning. <see cref="Locations" /> is never empty.
 /// </summary>
 internal sealed record SarifResult(
     string RuleId,
@@ -99,8 +100,23 @@ internal sealed record SarifRegion(int StartLine);
 /// <summary>A result suppression (kind <c>external</c>) carrying the baseline justification.</summary>
 internal sealed record SarifSuppression(string Kind, string Justification);
 
-/// <summary>The tool invocation: whether it ran successfully and any tool-execution notifications.</summary>
-internal sealed record SarifInvocation(bool ExecutionSuccessful, IReadOnlyList<SarifNotification>? ToolExecutionNotifications);
+/// <summary>
+///     The tool invocation: whether it ran successfully, the tool-execution notifications about the load, and
+///     the tool-configuration notifications about the spec — each list null (omitted) when empty.
+/// </summary>
+internal sealed record SarifInvocation(
+    bool ExecutionSuccessful,
+    IReadOnlyList<SarifNotification>? ToolExecutionNotifications,
+    IReadOnlyList<SarifNotification>? ToolConfigurationNotifications);
 
-/// <summary>One tool-execution notification (a workspace diagnostic), level <c>warning</c>.</summary>
-internal sealed record SarifNotification(SarifMessage Message, string Level);
+/// <summary>
+///     One notification: a workspace diagnostic, or a check warning about the spec, which alone names its rule in
+///     <see cref="AssociatedRule" />.
+/// </summary>
+internal sealed record SarifNotification(
+    SarifMessage Message,
+    string Level,
+    SarifReportingDescriptorReference? AssociatedRule = null);
+
+/// <summary>A reference to one of the driver's rules by its ID.</summary>
+internal sealed record SarifReportingDescriptorReference(string Id);

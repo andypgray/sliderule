@@ -555,8 +555,8 @@ public sealed class CheckCommandE2ETests
             "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--sarif", sarifPath);
 
         result.ShouldReportViolations();
-        File.ReadAllText(sarifPath)
-            .Replace($"\"uri\": \"{bedFromRepositoryRoot}/", "\"uri\": \"{solution}/")
+        string sarif = File.ReadAllText(sarifPath);
+        sarif.Replace($"\"uri\": \"{bedFromRepositoryRoot}/", "\"uri\": \"{solution}/")
             .ShouldMatchGolden("violated-check.sarif");
     }
 
@@ -575,8 +575,6 @@ public sealed class CheckCommandE2ETests
         result.ShouldReportViolations();
         List<(string Uri, string FingerprintPath)> located = File.ReadAllText(sarifPath)
             .SarifResults()
-            .Where(sarifResult => sarifResult.GetProperty("locations")
-                .GetArrayLength() > 0)
             .Select(sarifResult => (sarifResult.SarifUri(), sarifResult.SarifFingerprint()
                 .Split('|')[4]))
             .ToList();
@@ -588,13 +586,18 @@ public sealed class CheckCommandE2ETests
     public async Task Check_ViolatedSpecAnnotations_MatchGoldens()
     {
         // The GitHub pair over the same result model. Each command's file property is the site's absolute path,
-        // so the golden holds the solution directory as a token; the summary's paths are solution-relative.
+        // so the golden holds the solution directory as a token, escaped as a workflow-command property is, percent
+        // first; the summary's paths are solution-relative.
         using TempDirectory temp = TestTempRoot.Fresh("check-annotations");
         string annotationsPath = temp.PathOf("violated-check.annotations");
         string summaryPath = temp.PathOf("violated-check.summary");
         string solutionRoot = Path.GetDirectoryName(Path.GetFullPath(CliRunner.MyAppSolution))!
             .Replace(Path.DirectorySeparatorChar, '/')
-            .Replace(":", "%3A");
+            .Replace("%", "%25")
+            .Replace("\r", "%0D")
+            .Replace("\n", "%0A")
+            .Replace(":", "%3A")
+            .Replace(",", "%2C");
 
         CliResult result = await CliRunner.InvokeAsync(
             "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll,

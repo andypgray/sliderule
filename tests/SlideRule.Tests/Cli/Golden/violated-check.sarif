@@ -569,7 +569,27 @@
       },
       "invocations": [
         {
-          "executionSuccessful": true
+          "executionSuccessful": true,
+          "toolConfigurationNotifications": [
+            {
+              "message": {
+                "text": "This rule's exemplar \"types named `OrdersRepository`\" matched no solution-declared types."
+              },
+              "level": "warning",
+              "associatedRule": {
+                "id": "data-access/no-inline-sql"
+              }
+            },
+            {
+              "message": {
+                "text": "This rule is inert: its target selection matched no types."
+              },
+              "level": "warning",
+              "associatedRule": {
+                "id": "layering/no-ghost"
+              }
+            }
+          ]
         }
       ],
       "originalUriBaseIds": {
@@ -1315,18 +1335,6 @@
           ]
         },
         {
-          "ruleId": "data-access/no-inline-sql",
-          "level": "warning",
-          "message": {
-            "text": "This rule's exemplar \"types named `OrdersRepository`\" matched no solution-declared types."
-          },
-          "locations": [],
-          "partialFingerprints": {
-            "slideRuleViolationIdentity/v1": "v1|exemplar|types named `OrdersRepository`|||0"
-          },
-          "baselineState": "new"
-        },
-        {
           "ruleId": "time/inject-clock",
           "level": "error",
           "message": {
@@ -1491,18 +1499,6 @@
           ],
           "partialFingerprints": {
             "slideRuleViolationIdentity/v1": "v1|T:MyApp.Web.ReportScheduler|T:MyApp.Web.IOrderFormatter||MyApp.Web/ReportScheduler.cs|0"
-          },
-          "baselineState": "new"
-        },
-        {
-          "ruleId": "layering/no-ghost",
-          "level": "warning",
-          "message": {
-            "text": "This rule is inert: its target selection matched no types."
-          },
-          "locations": [],
-          "partialFingerprints": {
-            "slideRuleViolationIdentity/v1": "v1|||||0"
           },
           "baselineState": "new"
         },

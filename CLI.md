@@ -598,7 +598,7 @@ A `sliderule.json` at the root of a repository names the solution and the spec o
 
 ## Warnings
 
-A warning is something `check` noticed that does not affect the verdict. It never changes a rule's status or the exit code. In the text report, a rule that passed with a warning is headed `warn`. The JSON report lists each warning under its rule with a `kind`, and SARIF reports it as a `warning`-level result.
+A warning is something `check` noticed that does not affect the verdict. It never changes a rule's status or the exit code. In the text report, a rule that passed with a warning is headed `warn`. The JSON report lists each warning under its rule with a `kind`. SARIF reports a warning that names a file as a `warning`-level result, and a warning about the spec itself as a notification, as [SARIF](#sarif) describes.
 
 | Kind | Raised when |
 |---|---|
@@ -671,9 +671,9 @@ Each violation site is one result, at its file and line. The file's URI is relat
 |---|---|---|
 | a site of a red rule | `error` | `new`, or `updated` for a grown pair |
 | a grandfathered site | `note` | `unchanged` |
-| a check warning, such as a tripwire touch | `warning` | `new` |
+| a check warning that names a file, such as a tripwire touch | `warning` | `new` |
 
-A grandfathered site also has an external suppression that quotes its baseline entry's reason, or names the baseline file when the entry has none. Its message repeats that attribution, since code scanning shows the message and ignores the suppression. A violation with no site, such as a rule whose subject matched no types, adds no result and still fails the run. Workspace diagnostics and an incomplete model are reported as notifications on the run's invocation.
+A grandfathered site also has an external suppression that quotes its baseline entry's reason, or names the baseline file when the entry has none. Its message repeats that attribution, since code scanning shows the message and ignores the suppression. A violation with no site, such as a rule whose subject matched no types, adds no result and still fails the run. Workspace diagnostics and an incomplete model are reported as notifications on the run's invocation. An `inertTarget`, `deadOperand` or `deadExemplar` warning is about the spec and names no file, and code scanning rejects a whole upload that contains a result with no location. So each one is a `warning`-level configuration notification on the invocation instead, with its rule ID as the associated rule. Code scanning raises no alert for it, and the [GitHub annotations](#github-annotations) and job summary still list it.
 
 Each result's `partialFingerprints` includes `slideRuleViolationIdentity/v1`, built from the violation's source, target and subject, the file, and the site's ordinal within that file. Code that moves around a site leaves the key alone, so one violation stays one alert across runs. The [SARIF section](https://github.com/andypgray/sliderule/blob/main/SELF-CHECK.md#as-sarif) of SlideRule on itself shows a grandfathered result from a real run.
 
