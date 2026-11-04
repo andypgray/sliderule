@@ -57,7 +57,7 @@ public sealed class ExtractionCacheStoreTests
 
         version.ShouldNotBeNull("the extraction cache still declares a schema version");
         version.GetRawConstantValue()
-            .ShouldBe(41);
+            .ShouldBe(42);
     }
 
     [Fact]
@@ -536,7 +536,9 @@ public sealed class ExtractionCacheStoreTests
                 UnsupportedProjects =
                 [
                     new UnsupportedProject("/repo/Fs/Fs.fsproj", UnsupportedProjectKind.NotCsharp),
-                    new UnsupportedProject("/repo/Shared/Shared.shproj", UnsupportedProjectKind.SharedProject)
+                    new UnsupportedProject("/repo/Shared/Shared.shproj", UnsupportedProjectKind.SharedProject),
+                    new UnsupportedProject("/repo/Skipped/Skipped.csproj", UnsupportedProjectKind.NotBuilt),
+                    new UnsupportedProject("/repo/http:/localhost:3961", UnsupportedProjectKind.WebSite, "Portal")
                 ]
             }
         };
@@ -567,10 +569,13 @@ public sealed class ExtractionCacheStoreTests
         result.LoadDiagnostics.RestoreFailedProjects.ShouldBe(["/repo/Unrestored/Unrestored.csproj"]);
         // The coverage statement round-trips with its classification, not just its paths. The kind is the
         // producer's verdict and a hit owns no solution file to re-read it from, so a manifest that stored
-        // paths alone would leave the reason to be guessed again on the one path that cannot check.
+        // paths alone would leave the reason to be guessed again on the one path that cannot check. A Web Site's
+        // name round-trips too, because its path is never shown and a hit has no solution file to read it from.
         result.LoadDiagnostics.UnsupportedProjects.ShouldBe([
             new UnsupportedProject("/repo/Fs/Fs.fsproj", UnsupportedProjectKind.NotCsharp),
-            new UnsupportedProject("/repo/Shared/Shared.shproj", UnsupportedProjectKind.SharedProject)
+            new UnsupportedProject("/repo/Shared/Shared.shproj", UnsupportedProjectKind.SharedProject),
+            new UnsupportedProject("/repo/Skipped/Skipped.csproj", UnsupportedProjectKind.NotBuilt),
+            new UnsupportedProject("/repo/http:/localhost:3961", UnsupportedProjectKind.WebSite, "Portal")
         ]);
     }
 

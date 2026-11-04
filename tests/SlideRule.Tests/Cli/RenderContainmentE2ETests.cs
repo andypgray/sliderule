@@ -84,7 +84,8 @@ public sealed class RenderContainmentE2ETests
     private static readonly string SolutionFile = Path.Combine("b", "repo", "src", SolutionFileName);
 
     // Each spec compiled once for the class: the compilation drags in the whole platform closure, and every fact
-    // writes the bytes into its own copy because --spec takes a path.
+    // writes the bytes into its own copy because --spec takes a path. They land in a directory at the copy's root,
+    // outside the solution directory, so the spec itself can never be counted as a file render wrote.
     private static readonly Lazy<byte[]> ProjectLayerSpec =
         new(() => SpecAssemblyCompiler.EmitImage(ProjectLayerSpecSource, "ProjectLayerSpec"));
 
@@ -99,7 +100,7 @@ public sealed class RenderContainmentE2ETests
         using TempFixtureWorkspace workspace = TempFixtureWorkspace.Dedicated(FixtureDirectory, SolutionFile, false);
         using var scopedPackages = new ScopedEnvironmentVariable("NUGET_PACKAGES", PackagesRoot(workspace));
         ShouldRestoreWithTheShimPackage(workspace);
-        string specDll = WriteSpec(workspace, ProjectLayerSpec, "ProjectLayerSpec");
+        string specDll = workspace.WriteSpec("ProjectLayerSpec", ProjectLayerSpec.Value);
 
         CliResult result = await Render(workspace.SolutionPath, specDll);
 
@@ -115,7 +116,7 @@ public sealed class RenderContainmentE2ETests
         using TempFixtureWorkspace workspace = TempFixtureWorkspace.Dedicated(FixtureDirectory, SolutionFile, false);
         using var scopedPackages = new ScopedEnvironmentVariable("NUGET_PACKAGES", PackagesRoot(workspace));
         ShouldRestoreWithTheShimPackage(workspace);
-        string specDll = WriteSpec(workspace, ShimLayerSpec, "ShimLayerSpec");
+        string specDll = workspace.WriteSpec("ShimLayerSpec", ShimLayerSpec.Value);
 
         CliResult result = await Render(workspace.SolutionPath, specDll);
 
@@ -139,7 +140,7 @@ public sealed class RenderContainmentE2ETests
 
         using var scopedPackages = new ScopedEnvironmentVariable("NUGET_PACKAGES", PackagesRoot(workspace));
         ShouldRestoreWithTheShimPackage(workspace);
-        string specDll = WriteSpec(workspace, ProjectLayerSpec, "ProjectLayerSpec");
+        string specDll = workspace.WriteSpec("ProjectLayerSpec", ProjectLayerSpec.Value);
         string linkedSolution = Path.Combine(linkedTree, "repo", "src", SolutionFileName);
 
         CliResult result = await Render(linkedSolution, specDll);
@@ -157,7 +158,7 @@ public sealed class RenderContainmentE2ETests
         File.WriteAllText(workspace.PathOf("b", "repo", "CLAUDE.md"), "# Repository rules\n");
         using var scopedPackages = new ScopedEnvironmentVariable("NUGET_PACKAGES", PackagesRoot(workspace));
         ShouldRestoreWithTheShimPackage(workspace);
-        string specDll = WriteSpec(workspace, ProjectLayerSpec, "ProjectLayerSpec");
+        string specDll = workspace.WriteSpec("ProjectLayerSpec", ProjectLayerSpec.Value);
 
         CliResult result = await Render(workspace.SolutionPath, specDll);
 
@@ -205,16 +206,6 @@ public sealed class RenderContainmentE2ETests
     private static Task<CliResult> Render(string solutionPath, string specDll)
     {
         return CliRunner.InvokeColdAsync("render", solutionPath, "--spec", specDll, "--no-cache");
-    }
-
-    // Outside the solution directory, so the spec itself can never be counted as a file render wrote.
-    private static string WriteSpec(TempFixtureWorkspace workspace, Lazy<byte[]> image, string assemblyName)
-    {
-        string specDirectory = workspace.PathOf("spec");
-        Directory.CreateDirectory(specDirectory);
-        string specDll = Path.Combine(specDirectory, $"{assemblyName}.dll");
-        File.WriteAllBytes(specDll, image.Value);
-        return specDll;
     }
 
     // Every context file anywhere in the copy, packages and feed included, relative to the copy's root.

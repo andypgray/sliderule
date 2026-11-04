@@ -158,7 +158,7 @@ internal static class ExampleReplay
             .. diagnostics.UncheckedProjects.Select(static path => $"unchecked: {path}"),
             .. Differences(
                 "unsupported project", expectations.UnsupportedProjects,
-                diagnostics.UnsupportedProjects.Select(project => relativizer.Relative(project.Path))),
+                diagnostics.UnsupportedProjects.Select(project => UnsupportedProjectsNotice.Shown(project, relativizer))),
             .. Differences(
                 "load diagnostic", expectations.LoadDiagnostics,
                 diagnostics.ActionableDiagnostics.Select(diagnostic => RootRelative(diagnostic, directory)))

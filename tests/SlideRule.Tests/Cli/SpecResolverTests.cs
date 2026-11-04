@@ -293,6 +293,27 @@ public sealed class SpecResolverTests
     }
 
     [Fact]
+    public void ResolveConventionProject_FailedLoadBesideANotBuiltProject_LeavesTheNotBuiltRemedyOut()
+    {
+        // The not-built line belongs to the clean arm alone: under a failed load its remedy would sit beside one
+        // the reader has to apply first.
+        WorkspaceDiagnostics diagnostics = WorkspaceDiagnostics.None with
+        {
+            FailedProjects = [BrokenProject],
+            UnsupportedProjects = [new UnsupportedProject("C:/repo/src/MyApp.Skipped/MyApp.Skipped.csproj", UnsupportedProjectKind.NotBuilt)]
+        };
+
+        string message = ShouldRefuseResolution(diagnostics);
+
+        message.ShouldBe(
+            "No spec project found: 1 project failed to load, so a project that references "
+            + "SlideRule.dll may be among them:\n"
+            + $"  {BrokenProject}\n"
+            + $"  {MsBuildBootstrap.SelectionNote()}\n"
+            + "Restore and build the solution first (dotnet restore, dotnet build), then retry.");
+    }
+
+    [Fact]
     public void ResolveConventionProject_ManyLoadFailures_QuotesABoundedNumberAndCountsTheRest()
     {
         // A workspace that fails to load rarely fails once. Quoting all of them buries the remedy under a

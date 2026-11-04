@@ -46,13 +46,13 @@ internal static class ProjectLoadFailures
     ///     ordinal-sorted and deduplicated by this OS's path rule.
     /// </summary>
     /// <remarks>
-    ///     <paramref name="solutionPath" /> is the solution file the load came from, or the one a replayed build was
-    ///     run over, or null when none is known; arm 1 needs one in a format the parser owns and is skipped without
-    ///     it, and arm 2 runs either way. <paramref name="projectFiles" /> holds the loaded projects' canonical
-    ///     paths, which arm 1 compares the solution's declared paths against.
+    ///     <paramref name="membership" /> is what the solution file the load came from, or the one a replayed build
+    ///     was run over, declares, or null when no such file is known or the parser does not own its format; arm 1
+    ///     needs it and is skipped without it, and arm 2 runs either way. <paramref name="projectFiles" /> holds the
+    ///     loaded projects' canonical paths, which arm 1 compares the solution's declared paths against.
     /// </remarks>
     internal static ProjectLoadReport Detect(
-        Solution solution, CanonicalProjectFiles projectFiles, string? solutionPath)
+        Solution solution, CanonicalProjectFiles projectFiles, SolutionMembership? membership)
     {
         var failed = new HashSet<string>(PathComparison.Comparer);
 
@@ -69,7 +69,7 @@ internal static class ProjectLoadFailures
         var uncheckedMembers = new HashSet<string>(PathComparison.Comparer);
         IReadOnlyList<UnsupportedProject> unsupported = [];
 
-        if (solutionPath is not null && SolutionProjectFileParser.OwnsFormat(solutionPath))
+        if (membership is not null)
         {
             // Both sides canonical: a replayed project carries the path its build was run under, which need
             // not be the spelling the solution file resolves to (macOS's /var against /private/var, a junction),
@@ -80,8 +80,6 @@ internal static class ProjectLoadFailures
                 .OfType<string>()
                 .ToHashSet(PathComparison.Comparer);
 
-            SolutionMembership membership = SolutionProjectFileParser.ReadDeclaredMembership(solutionPath);
-
             foreach (string required in membership.Required)
                 if (!loadedFiles.Contains(canonicalizer.Resolve(required)!))
                     failed.Add(required);
@@ -91,9 +89,16 @@ internal static class ProjectLoadFailures
                 if (!loadedFiles.Contains(canonicalizer.Resolve(declared)!) && !failed.Contains(declared))
                     uncheckedMembers.Add(declared);
 
+            // Measured against what loaded rather than taken on trust from the step that removes them, like the two
+            // lists above.
+            IEnumerable<UnsupportedProject> notBuilt = membership.NotBuilt
+                .Where(path => !loadedFiles.Contains(canonicalizer.Resolve(path)!))
+                .Select(path => new UnsupportedProject(path, UnsupportedProjectKind.NotBuilt));
+
             // Sorted on the path, like every list on this report, so a document reads the same on any OS; the kind
             // orders nothing, because a reader looks these up by project.
             unsupported = membership.Unsupported
+                .Concat(notBuilt)
                 .OrderBy(project => project.Path, StringComparer.Ordinal)
                 .ToList();
         }

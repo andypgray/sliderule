@@ -50,7 +50,8 @@ internal static class WorkspaceLoader
     ///     <c>Microsoft.Build.Locator</c> package.
     /// </summary>
     /// <remarks>
-    ///     A filter loads the projects it selects plus their transitive references. A failure never aborts the
+    ///     A filter loads the projects it selects plus their transitive references, and the load leaves out the
+    ///     projects the solution's default configuration does not build. A failure never aborts the
     ///     load, since a partial load still yields a usable model: <paramref name="diagnosticLog" /> receives the
     ///     workspace's failure messages and the load's own warnings for a host to render, and whether the model
     ///     is incomplete is the answer of <see cref="WorkspaceDiagnostics.FailedProjects" /> and
@@ -111,8 +112,8 @@ internal static class WorkspaceLoader
     ///     <paramref name="solutionPath" />, a solution or a filter over one, through a temporary solution filter:
     ///     the same load a whole solution takes, seeded with fewer projects, so each project it loads compiles
     ///     exactly as it does in a whole load. Returns null when the subset cannot be expressed as a filter: a
-    ///     project the solution does not declare, a solution format the filter cannot name, or a filter the load
-    ///     refuses.
+    ///     project the solution does not declare or its default configuration does not build, a solution format
+    ///     the filter cannot name, or a filter the load refuses.
     /// </summary>
     /// <remarks>
     ///     The verdict on the result is measured against the temporary filter, so its unchecked projects are
@@ -149,7 +150,8 @@ internal static class WorkspaceLoader
     }
 
     // The filter's JSON, naming each requested project by the spelling the solution declares it with, or null
-    // when one is not declared there: a filter may only select a solution's own members.
+    // when one is not a member the solution builds: a filter may only select a solution's own members, and the
+    // load would remove a not-built one.
     private static string? ClosureFilterText(string solutionPath, IReadOnlyCollection<string> projectFiles)
     {
         if (!SolutionProjectFileParser.OwnsFormat(solutionPath)) return null;

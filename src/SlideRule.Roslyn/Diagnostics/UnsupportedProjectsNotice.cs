@@ -35,6 +35,8 @@ internal static class UnsupportedProjectsNotice
         return kind switch
         {
             UnsupportedProjectKind.SharedProject => "a shared project, compiled into the projects that import it",
+            UnsupportedProjectKind.NotBuilt => "not built by the solution's default configuration",
+            UnsupportedProjectKind.WebSite => "a Web Site project, which has no project file",
             _ => "not a C# project"
         };
     }
@@ -62,8 +64,17 @@ internal static class UnsupportedProjectsNotice
     {
         var relativizer = new PathFormat.Relativizer(solutionDirectory);
         return projects
-            .Select(project => Entry(relativizer.Relative(project.Path), Reason(project.Kind)))
+            .Select(project => Entry(Shown(project, relativizer), Reason(project.Kind)))
             .ToList();
+    }
+
+    /// <summary>
+    ///     How an entry names its project on every surface: the name the solution gives it where it has one, and
+    ///     its path relativized by <paramref name="relativizer" /> otherwise.
+    /// </summary>
+    internal static string Shown(UnsupportedProject project, PathFormat.Relativizer relativizer)
+    {
+        return project.Name ?? relativizer.Relative(project.Path);
     }
 
     /// <summary>The stamp <c>check</c> writes above its report.</summary>

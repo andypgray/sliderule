@@ -43,7 +43,7 @@ internal sealed class ArchTools(
         "against a partial model; report that, never plain green. " +
         "Under a .slnf solution filter, uncheckedProjects names the declared projects the run never " +
         "checked — a clean report then covers a subset; say so. " +
-        "unsupportedProjects names the declared projects this product cannot read at all (C# only), each " +
+        "unsupportedProjects names the declared projects outside the model (not C#, Web Sites, unbuilt), each " +
         "with its reason — no rule can be violated in one, so a clean report over a polyglot solution is " +
         "not a clean solution either. " +
         "multiTargetedProjects names the projects that compiled for several frameworks, each with the " +
@@ -61,7 +61,7 @@ internal sealed class ArchTools(
         "counts from a partial model; report that rather than quoting them as whole. " +
         "Under a .slnf solution filter, uncheckedProjects names the declared projects the run never checked; " +
         "they contribute no violations, so every count reads low. unsupportedProjects names the declared " +
-        "projects this product cannot read at all (C# only): their zero is permanent, not burndown. " +
+        "projects outside the model (not C#, Web Sites, unbuilt): their zero is permanent, not burndown. " +
         "orphans lists baseline sections no rule in the spec names, such as a renamed rule's old section, and " +
         "baseline files that could not be read. staleSpec names a spec source that differs from the spec " +
         "project's last build, so the counts are of the rules that build holds; rebuild it and ask again.";
@@ -124,8 +124,8 @@ internal sealed class ArchTools(
         "every project name, which is what projects globs match. " +
         "Under a .slnf solution filter, uncheckedProjects names the declared projects the run never loaded — " +
         "a project absent from the survey may simply be out of view. unsupportedProjects is the third " +
-        "coverage key and the one that bounds the survey's subject: the declared projects this product " +
-        "cannot read at all (C# only), each with its reason, so projects[] shorter than the solution is a " +
+        "coverage key and the one that bounds the survey's subject: the declared projects outside the " +
+        "model (not C#, Web Sites, unbuilt), each with its reason, so projects[] shorter than the solution is a " +
         "stated fact rather than something to infer by opening the solution file.";
 
     [McpServerTool(

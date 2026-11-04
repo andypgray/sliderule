@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ConfigExcluded: a solution whose entries a build does not take as projects to build.
+
+  ConfigExcluded.sln maps ConfigExcluded.Skipped and ConfigExcluded.Shared with an ActiveCfg line and no Build.0
+  line in Debug|Any CPU, the configuration a build takes when none is named. This project is the one the build
+  does build. It references ConfigExcluded.Shared, which a restore of the solution therefore restores, though a
+  build of the solution neither builds it nor passes its assembly here; ConfigExcluded.Skipped is left with no
+  assets file. The solution also declares two Web Site entries, one with a URL path and one with a folder path,
+  neither of which is a project file. The test restores the solution and reads what the load makes of the rest;
+  see SolutionEntriesE2ETests.
+
+  The siting constraints FieldMini.Core.csproj states apply here for the same reasons: it lives outside
+  Fixtures/TestSolutions/, so the startup restore never touches it; it is in no solution of this repository; and
+  it is source only.
+-->
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>disable</Nullable>
+        <ImplicitUsings>disable</ImplicitUsings>
+        <NuGetAudit>false</NuGetAudit>
+        <RestoreLockedMode Condition="'$(CI)' == 'true'">true</RestoreLockedMode>
+    </PropertyGroup>
+    <ItemGroup>
+        <ProjectReference Include="..\ConfigExcluded.Shared\ConfigExcluded.Shared.csproj" />
+    </ItemGroup>
+</Project>

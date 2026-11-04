@@ -5,8 +5,9 @@ using SlideRule.Roslyn.Diagnostics;
 namespace SlideRule.Cli.Rendering;
 
 /// <summary>
-///     One declared project the run did not reach, solution-relative and forward-slashed, and why — the entry
-///     shape of <see cref="WorkspaceTrustStamp.UnsupportedProjects" />.
+///     One project the run did not reach, and why: the entry shape of
+///     <see cref="WorkspaceTrustStamp.UnsupportedProjects" />. <paramref name="Project" /> is its path,
+///     solution-relative and forward-slashed, or the name the solution gives an entry whose path cannot be shown.
 /// </summary>
 internal sealed record UnsupportedProjectStamp(string Project, string Reason)
 {
@@ -40,8 +41,8 @@ internal sealed record UnsupportedProjectStamp(string Project, string Reason)
 ///     </para>
 ///     <para>
 ///         The unsupported projects' reason is read here, from <see cref="UnsupportedProjectsNotice.Reason" />, so
-///         the wire key and the human line state one sentence. <paramref name="PackageAudit" />, the one fact here
-///         that is not a verdict about the projects, rides the stamp so a load's lines are grouped once.
+///         the wire key and the human line state one sentence. <paramref name="PackageAudit" />, which is not a
+///         verdict about the projects, rides the stamp so a load's lines are grouped once.
 ///     </para>
 ///     <para>
 ///         <see cref="StaleSpec" /> is the one stamp about the spec rather than the workspace, so it is not read off
@@ -104,7 +105,7 @@ internal readonly record struct WorkspaceTrustStamp(
         return projects.Count == 0
             ? null
             : projects.Select(project => new UnsupportedProjectStamp(
-                    relativizer.Relative(project.Path), UnsupportedProjectsNotice.Reason(project.Kind)))
+                    UnsupportedProjectsNotice.Shown(project, relativizer), UnsupportedProjectsNotice.Reason(project.Kind)))
                 .ToList();
     }
 }

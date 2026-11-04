@@ -1,0 +1,69 @@
+
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ConfigExcluded.Built", "ConfigExcluded.Built\ConfigExcluded.Built.csproj", "{A1A1A1A1-1111-1111-1111-111111111111}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ConfigExcluded.Skipped", "ConfigExcluded.Skipped\ConfigExcluded.Skipped.csproj", "{B2B2B2B2-2222-2222-2222-222222222222}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ConfigExcluded.Shared", "ConfigExcluded.Shared\ConfigExcluded.Shared.csproj", "{E5E5E5E5-5555-5555-5555-555555555555}"
+EndProject
+Project("{E24C65DC-7377-472B-9ABA-BC803B73C61A}") = "ConfigExcluded.Portal", "http://localhost:3961", "{C3C3C3C3-3333-3333-3333-333333333333}"
+	ProjectSection(WebsiteProperties) = preProject
+		UseIISExpress = "true"
+		TargetFrameworkMoniker = ".NETFramework,Version%3Dv4.8"
+		Debug.AspNetCompiler.VirtualPath = "/localhost_3961"
+		Debug.AspNetCompiler.PhysicalPath = "ConfigExcluded.Portal\"
+		Debug.AspNetCompiler.TargetPath = "PrecompiledWeb\localhost_3961\"
+		Debug.AspNetCompiler.Updateable = "true"
+		Debug.AspNetCompiler.ForceOverwrite = "true"
+		Debug.AspNetCompiler.FixedNames = "false"
+		Debug.AspNetCompiler.Debug = "True"
+		Release.AspNetCompiler.VirtualPath = "/localhost_3961"
+		Release.AspNetCompiler.PhysicalPath = "ConfigExcluded.Portal\"
+		Release.AspNetCompiler.TargetPath = "PrecompiledWeb\localhost_3961\"
+		Release.AspNetCompiler.Updateable = "true"
+		Release.AspNetCompiler.ForceOverwrite = "true"
+		Release.AspNetCompiler.FixedNames = "false"
+		Release.AspNetCompiler.Debug = "False"
+		SlnRelativePath = "ConfigExcluded.Portal\"
+	EndProjectSection
+EndProject
+Project("{E24C65DC-7377-472B-9ABA-BC803B73C61A}") = "ConfigExcluded.LegacySite", "ConfigExcluded.LegacySite\", "{D4D4D4D4-4444-4444-4444-444444444444}"
+	ProjectSection(WebsiteProperties) = preProject
+		TargetFrameworkMoniker = ".NETFramework,Version%3Dv4.8"
+		Debug.AspNetCompiler.VirtualPath = "/ConfigExcluded.LegacySite"
+		Debug.AspNetCompiler.PhysicalPath = "ConfigExcluded.LegacySite\"
+		Debug.AspNetCompiler.TargetPath = "PrecompiledWeb\ConfigExcluded.LegacySite\"
+		Debug.AspNetCompiler.Updateable = "true"
+		Debug.AspNetCompiler.ForceOverwrite = "true"
+		Debug.AspNetCompiler.FixedNames = "false"
+		Debug.AspNetCompiler.Debug = "True"
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{A1A1A1A1-1111-1111-1111-111111111111}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A1A1A1A1-1111-1111-1111-111111111111}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A1A1A1A1-1111-1111-1111-111111111111}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A1A1A1A1-1111-1111-1111-111111111111}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B2B2B2B2-2222-2222-2222-222222222222}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B2B2B2B2-2222-2222-2222-222222222222}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B2B2B2B2-2222-2222-2222-222222222222}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E5E5E5E5-5555-5555-5555-555555555555}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E5E5E5E5-5555-5555-5555-555555555555}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E5E5E5E5-5555-5555-5555-555555555555}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C3C3C3C3-3333-3333-3333-333333333333}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C3C3C3C3-3333-3333-3333-333333333333}.Release|Any CPU.ActiveCfg = Debug|Any CPU
+		{D4D4D4D4-4444-4444-4444-444444444444}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D4D4D4D4-4444-4444-4444-444444444444}.Release|Any CPU.ActiveCfg = Debug|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

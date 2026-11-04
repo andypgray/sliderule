@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis;
 using SlideRule.Cli.Pipeline;
 using SlideRule.Internal;
+using SlideRule.Rendering;
 using SlideRule.Roslyn;
 using SlideRule.Roslyn.Diagnostics;
 using SlideRule.Roslyn.Solutions;
@@ -78,7 +79,7 @@ internal static class SpecResolver
     {
         return string.IsNullOrWhiteSpace(specArgument)
             ? ResolveByConvention(solution, projectFiles, declaredMembers, diagnostics)
-            : ResolveExplicit(solution, projectFiles, declaredMembers, specArgument);
+            : ResolveExplicit(solution, projectFiles, declaredMembers, specArgument, diagnostics);
     }
 
     /// <summary>
@@ -104,13 +105,18 @@ internal static class SpecResolver
 
     private static SpecResolution ResolveExplicit(
         Solution solution, CanonicalProjectFiles projectFiles, IReadOnlySet<string>? declaredMembers,
-        string specArgument)
+        string specArgument, WorkspaceDiagnostics diagnostics)
     {
         if (specArgument.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase))
         {
             string canonicalPath = PathCanonicalizer.Resolve(Path.GetFullPath(specArgument));
             List<CanonicalProject> projects = CanonicalProjectsOf(solution, projectFiles);
             List<CanonicalProject> sharingProjects = ProjectsSharingFile(projects, canonicalPath);
+            if (sharingProjects.Count == 0 && IsNotBuilt(diagnostics, canonicalPath))
+                throw new UserErrorException(
+                    $"--spec '{specArgument}' is not built by the solution's default configuration, so the load "
+                    + "leaves it out. Make that configuration build it, or pass its built DLL.");
+
             if (sharingProjects.Count == 0)
                 throw new UserErrorException(
                     $"--spec '{specArgument}' is not a project in the solution. " +
@@ -143,7 +149,8 @@ internal static class SpecResolver
                 entry.Project.CompilationOutputInfo.AssemblyPath))
             .ToList();
 
-        SpecProjectCandidate chosen = ResolveConventionProject(candidates, diagnostics);
+        SpecProjectCandidate chosen =
+            ResolveConventionProject(candidates, diagnostics, Path.GetDirectoryName(solution.FilePath));
         BuiltOutputInputs built = BuiltOutputsOfProjectFile(
             projects, chosen.CanonicalFilePath, chosen.OutputFilePath, chosen.IntermediateAssemblyPath);
         return MemberResolution(solution, projectFiles, declaredMembers, chosen.Name, chosen.FilePath, built);
@@ -256,14 +263,16 @@ internal static class SpecResolver
     ///     Zero candidates is reported against <paramref name="diagnostics" />, because a workspace that did
     ///     not load cleanly produces exactly the same zero: a project that failed to load declares no
     ///     reference to match, and an unresolved package reference means the spec project's reference to the
-    ///     contract library is not there to match either.
+    ///     contract library is not there to match either. <paramref name="solutionDirectory" /> is what the
+    ///     refusal shows the projects the build leaves out relative to; null shows them absolute.
     /// </remarks>
     internal static SpecProjectCandidate ResolveConventionProject(
-        IReadOnlyList<SpecProjectCandidate> candidates, WorkspaceDiagnostics diagnostics)
+        IReadOnlyList<SpecProjectCandidate> candidates, WorkspaceDiagnostics diagnostics,
+        string? solutionDirectory = null)
     {
         List<SpecProjectCandidate> matches = candidates.Where(c => c.IsDeclaredMember && ReferencesCore(c)).ToList();
 
-        if (matches.Count == 0) throw NoSpecProjectFound(candidates, diagnostics);
+        if (matches.Count == 0) throw NoSpecProjectFound(candidates, diagnostics, solutionDirectory);
 
         List<IGrouping<string, SpecProjectCandidate>> groups = matches
             .Select((candidate, index) => (Candidate: candidate, Key: GroupKey(candidate, index)))
@@ -289,14 +298,16 @@ internal static class SpecResolver
     // breaks both ways: no --spec argument repairs a load, and a broken restore (the measured locked-mode shape)
     // leaves the spec project's reference to the contract library unresolved while the project itself still loads
     // completely. Load problems that blame no project come next, worded "may" because that is all they show. A
-    // clean load means the solution really has no spec project; that sentence stays byte-identical
+    // clean load means the solution has no spec project the load holds; that sentence stays byte-identical
     // (GETTING-STARTED.md quotes it), with the count of projects considered, which tells a reader whether the
-    // workspace held what they expected. NuGetAudit advisories are kept out of the "may" arm's input, and only
-    // that arm's: an advisory's publication date says nothing about whether this solution's references resolved,
-    // so a solution with no spec project must not be sent to fix its restore. Every arm is the same refusal with
-    // different evidence, so no exit code turns on which one fires.
+    // workspace held what they expected. The projects the default configuration does not build follow it in the
+    // clean arm alone. The load left them out, so one of them may be the spec project, but under a failed load or
+    // a broken restore that remedy would come second to one the reader has to apply first. NuGetAudit advisories
+    // are kept out of the "may" arm's input, and only that arm's: an advisory's publication date says nothing about
+    // whether this solution's references resolved, so a solution with no spec project must not be sent to fix its
+    // restore. Every arm is the same refusal with different evidence, so no exit code turns on which one fires.
     private static UserErrorException NoSpecProjectFound(
-        IReadOnlyList<SpecProjectCandidate> candidates, WorkspaceDiagnostics diagnostics)
+        IReadOnlyList<SpecProjectCandidate> candidates, WorkspaceDiagnostics diagnostics, string? solutionDirectory)
     {
         // The refusal is thrown before a CodebaseSource exists, so no runner renders the evidence beside it —
         // the message has to carry it itself, in the shape every other evidence block takes. CliErrorMapper
@@ -315,9 +326,42 @@ internal static class SpecResolver
                     withSelectionNote: true,
                     quoteCap: MaxQuotedDiagnostics));
 
-        return new UserErrorException(
+        string cleanLoad =
             "No spec project found: no solution project references SlideRule.dll. Pass --spec to name one.\n"
-            + $"Considered {candidates.Count} C# project(s) in the workspace.");
+            + $"Considered {candidates.Count} C# project(s) in the workspace.";
+        IReadOnlyList<string> notBuilt = NotBuiltShown(diagnostics, solutionDirectory);
+        if (notBuilt.Count == 0) return new UserErrorException(cleanLoad);
+
+        string leftOut = EvidenceBlock.Compose(
+            "The solution's default configuration does not build these projects, so the load left them out:",
+            notBuilt,
+            "If the spec project is among them, make that configuration build it, or pass its built DLL to --spec.");
+        return new UserErrorException(cleanLoad + "\n" + leftOut);
+    }
+
+    // Compared canonical with canonical, as ProjectsSharingFile compares the projects that did load.
+    private static bool IsNotBuilt(WorkspaceDiagnostics diagnostics, string canonicalProjectFile)
+    {
+        IEnumerable<string> notBuilt = NotBuilt(diagnostics)
+            .Select(project => project.Path);
+        return SpecExclusion.CanonicalMemberSet(notBuilt).Contains(canonicalProjectFile);
+    }
+
+    // Solution-relative where the solution's directory is known, as the unsupportedProjects notices show them.
+    private static IReadOnlyList<string> NotBuiltShown(WorkspaceDiagnostics diagnostics, string? solutionDirectory)
+    {
+        PathFormat.Relativizer? relativizer = string.IsNullOrEmpty(solutionDirectory)
+            ? null
+            : new PathFormat.Relativizer(solutionDirectory);
+        return NotBuilt(diagnostics)
+            .Select(project => relativizer is null ? project.Path : UnsupportedProjectsNotice.Shown(project, relativizer))
+            .ToList();
+    }
+
+    private static IEnumerable<UnsupportedProject> NotBuilt(WorkspaceDiagnostics diagnostics)
+    {
+        return diagnostics.UnsupportedProjects
+            .Where(project => project.Kind == UnsupportedProjectKind.NotBuilt);
     }
 
     // Group on the canonicalized project file, folded so a plain ordinal comparer carries the per-OS case rule.

@@ -594,6 +594,9 @@ public sealed class SelfSpecTests
                 "System.Text.RegularExpressions.Generated.SlnProjectLine_2",
                 "System.Text.RegularExpressions.Generated.SlnProjectLine_2.RunnerFactory",
                 "System.Text.RegularExpressions.Generated.SlnProjectLine_2.RunnerFactory.Runner",
+                "System.Text.RegularExpressions.Generated.SlnGlobalSection_3",
+                "System.Text.RegularExpressions.Generated.SlnGlobalSection_3.RunnerFactory",
+                "System.Text.RegularExpressions.Generated.SlnGlobalSection_3.RunnerFactory.Runner",
                 "System.Text.RegularExpressions.Generated.Utilities",
                 "SlideRule.Roslyn.Caching.ManifestJsonContext"
             ], ignoreOrder: true);

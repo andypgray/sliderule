@@ -37,6 +37,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   clean stop, so it can rebuild, and keeps it in the report on a red one. A spec passed to `--spec` as a DLL
   names no project and is not compared.
 
+### Fixed
+
+- A project the solution's default build configuration does not build, mapped with no `Build.0` line in a
+  `.sln` or with `Project="false"` in a `.slnx`, no longer refuses `check`, `graph` and the other commands as
+  a project whose packages did not resolve. A restore of the solution skips such a project, so the advice to
+  restore could not end the refusal. The project is now left out of the model, as the build leaves it out
+  even for a project that references it, and `unsupportedProjects` lists it with the reason. A binary log
+  built from the same solution reports it the same way. A spec project left out this way is refused with the
+  configuration as the reason: `--spec` naming its csproj says the configuration does not build it, and a
+  run with no `--spec` lists the projects the load left out below `No spec project found`.
+- A Web Site entry in a `.sln`, whose path is a folder or a URL, is listed in `unsupportedProjects` by the
+  name the solution gives it. Before, it appeared only as a workspace diagnostic saying that no project file
+  was found, at a path made by joining the URL onto the solution directory.
+
 ## [0.2.1] - 2026-10-26
 
 ### Changed

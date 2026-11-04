@@ -161,6 +161,20 @@ internal sealed class TempFixtureWorkspace : IDisposable
         return Path.Combine([_root, .. relativeSegments]);
     }
 
+    /// <summary>
+    ///     Writes a compiled spec's <paramref name="image" /> into a <c>spec</c> directory at the copy's root, named
+    ///     after <paramref name="assemblyName" />, and returns the file's absolute path, which is what <c>--spec</c>
+    ///     takes.
+    /// </summary>
+    internal string WriteSpec(string assemblyName, byte[] image)
+    {
+        string specDirectory = PathOf("spec");
+        Directory.CreateDirectory(specDirectory);
+        string specDll = Path.Combine(specDirectory, $"{assemblyName}.dll");
+        File.WriteAllBytes(specDll, image);
+        return specDll;
+    }
+
     private static string SourceDirectory(string fixtureDirectory)
     {
         return Path.Combine([FixtureBeds.FixturesRoot, .. fixtureDirectory.Split('/')]);

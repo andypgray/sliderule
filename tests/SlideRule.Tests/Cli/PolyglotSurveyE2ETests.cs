@@ -6,9 +6,9 @@ using Xunit;
 namespace SlideRule.Tests.Cli;
 
 /// <summary>
-///     End-to-end <c>graph</c>, <c>check</c> and <c>status</c> against the PolyglotApp fixture — the one
-///     solution in the suite holding a project this product cannot read: a real <c>.fsproj</c>, not a
-///     renamed <c>.csproj</c>, beside one ordinary C# project.
+///     End-to-end <c>graph</c>, <c>check</c> and <c>status</c> against the PolyglotApp fixture, a solution
+///     holding a project this product cannot read: a real <c>.fsproj</c>, not a renamed <c>.csproj</c>, beside
+///     one ordinary C# project.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -25,8 +25,7 @@ namespace SlideRule.Tests.Cli;
 ///         Measured on this bed, it reaches the workspace carrying its output paths, which is why nothing
 ///         upstream noticed it going missing. The other kinds — <c>.vbproj</c>, <c>.sqlproj</c>,
 ///         <c>.vcxproj</c>, <c>.shproj</c> — never load at all and are pinned over solution text in
-///         <see cref="Roslyn.SolutionProjectFileParserTests" />, where they cost a theory row rather than a
-///         second heavyweight bed.
+///         <see cref="Roslyn.SolutionProjectFileParserTests" />.
 ///     </para>
 ///     <para>
 ///         The fixture is read in place rather than leased: nothing here writes into the tree, and the startup
@@ -60,16 +59,8 @@ public sealed class PolyglotSurveyE2ETests
 
         result.ShouldSucceed();
         using JsonDocument document = result.ShouldHaveJsonStdout();
-        JsonElement entry = document.RootElement.GetProperty("unsupportedProjects")
-            .EnumerateArray()
-            .ShouldHaveSingleItem();
-
-        entry.GetProperty("project")
-            .GetString()
-            .ShouldBe("PolyglotApp.Fs/PolyglotApp.Fs.fsproj");
-        entry.GetProperty("reason")
-            .GetString()
-            .ShouldBe("not a C# project");
+        document.UnsupportedProjectEntries()
+            .ShouldBe([("PolyglotApp.Fs/PolyglotApp.Fs.fsproj", "not a C# project")]);
     }
 
     [Fact]
@@ -102,10 +93,8 @@ public sealed class PolyglotSurveyE2ETests
         // Assert — the entries themselves, not a count standing in for them.
         result.ShouldSucceed();
         using JsonDocument document = result.ShouldHaveJsonStdout();
-        document.RootElement.GetProperty("unsupportedProjects")
-            .EnumerateArray()
-            .Select(entry => entry.GetProperty("project")
-                .GetString())
+        document.UnsupportedProjectEntries()
+            .Select(entry => entry.Project)
             .ShouldBe(["PolyglotApp.Fs/PolyglotApp.Fs.fsproj"]);
     }
 
@@ -123,10 +112,8 @@ public sealed class PolyglotSurveyE2ETests
         // Assert
         result.ShouldSucceed();
         using JsonDocument document = result.ShouldHaveJsonStdout();
-        document.RootElement.GetProperty("unsupportedProjects")
-            .EnumerateArray()
-            .Select(entry => entry.GetProperty("project")
-                .GetString())
+        document.UnsupportedProjectEntries()
+            .Select(entry => entry.Project)
             .ShouldBe(["PolyglotApp.Fs/PolyglotApp.Fs.fsproj"]);
     }
 

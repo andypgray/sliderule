@@ -8,11 +8,10 @@ namespace SlideRule.Tests.Roslyn;
 
 /// <summary>
 ///     Tests for <see cref="SolutionProjectFileParser" />, no fixture solution anywhere. They pin the
-///     textual project-membership extraction both the capture's coverage check and
-///     <see cref="SpecExclusion" />'s membership subtraction depend on: both solution formats, both slash
-///     spellings, the partition that sends <c>.csproj</c> entries to the load and every other project kind
-///     to the coverage statement (with solution folders in neither), and which formats the parser owns at
-///     all.
+///     textual project-membership extraction: both solution formats, both slash spellings, which
+///     <c>.csproj</c> entries a build of the default configuration skips, the partition that sends the built
+///     <c>.csproj</c> entries to the load and every other project entry, Web Sites included, to the coverage
+///     statement (with solution folders in neither), and which formats the parser owns at all.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -35,6 +34,8 @@ public sealed class SolutionProjectFileParserTests
     // A path root that need not exist — ParseDeclaredProjects resolves textually via Path.GetFullPath.
     private static readonly string SolutionDirectory = Path.Combine(Path.GetTempPath(), "sln-parse-tests");
 
+    private static readonly string Alpha = Path.GetFullPath(Path.Combine(SolutionDirectory, "Alpha", "Alpha.csproj"));
+
     // The filter and the solution it points at deliberately live in different directories, which is the only
     // arrangement that can tell the two resolution bases apart.
     private static readonly string FilterDirectory = Path.Combine(SolutionDirectory, "filters");
@@ -44,13 +45,12 @@ public sealed class SolutionProjectFileParserTests
 
     /// <summary>
     ///     Every project kind a solution may declare in another language, one row each. F# is the only one of
-    ///     them that reaches a loaded solution at all, which is why it — and only it — also has a heavyweight
-    ///     bed; the rest come free with the "ends in <c>proj</c>" partition and are pinned here, over text,
-    ///     rather than by three more solutions on disk.
+    ///     them that reaches a loaded solution at all, which is why it also has a bed of its own; the rest come
+    ///     free with the "ends in <c>proj</c>" partition and are pinned here, over text.
     /// </summary>
     /// <remarks>
     ///     The <c>.shproj</c> is deliberately not among them: it is the one extension this partition catches
-    ///     that is not a language at all, so it has a named fact of its own
+    ///     that the parser classifies apart from "not a C# project", so it has a named fact of its own
     ///     (<see cref="ParseDeclaredProjects_ASharedProject_IsClassifiedByShapeRatherThanAsAnotherLanguage" />)
     ///     rather than a row asserting the answer the others get.
     /// </remarks>
@@ -85,7 +85,7 @@ public sealed class SolutionProjectFileParserTests
         // keeps folders out; getting it wrong would name "Solution Items" as an unreadable project on every
         // classic solution.
         declared.Csproj.ShouldBe([
-            Path.GetFullPath(Path.Combine(SolutionDirectory, "Alpha", "Alpha.csproj")),
+            Alpha,
             Path.GetFullPath(Path.Combine(SolutionDirectory, "nested", "Beta", "Beta.csproj"))
         ]);
         declared.Unsupported.ShouldBeEmpty();
@@ -110,7 +110,7 @@ public sealed class SolutionProjectFileParserTests
 
         // Assert — both csprojs (nesting flattened, both slash spellings); the markdown is not a project.
         declared.Csproj.ShouldBe([
-            Path.GetFullPath(Path.Combine(SolutionDirectory, "Alpha", "Alpha.csproj")),
+            Alpha,
             Path.GetFullPath(Path.Combine(SolutionDirectory, "nested", "Beta", "Beta.csproj"))
         ]);
         declared.Unsupported.ShouldBeEmpty();
@@ -137,7 +137,7 @@ public sealed class SolutionProjectFileParserTests
         // Assert — the csproj half is untouched, so a polyglot solution loads its C# projects alone, and the
         // other project is a fact the run can state, carrying the kind this parser classified it as rather
         // than leaving a later reader to re-derive one from the extension.
-        declared.Csproj.ShouldBe([Path.GetFullPath(Path.Combine(SolutionDirectory, "Alpha", "Alpha.csproj"))]);
+        declared.Csproj.ShouldBe([Alpha]);
         declared.Unsupported.ShouldBe([
             new UnsupportedProject(
                 Path.GetFullPath(Path.Combine(SolutionDirectory, name, $"{name}.{extension}")),
@@ -168,6 +168,145 @@ public sealed class SolutionProjectFileParserTests
             new UnsupportedProject(
                 Path.GetFullPath(Path.Combine(SolutionDirectory, "Shared", "Shared.shproj")),
                 UnsupportedProjectKind.SharedProject)
+        ]);
+    }
+
+    /// <summary>
+    ///     Classic <c>.sln</c> configuration shapes, as the solution's configuration list, the lines it maps the
+    ///     Alpha project with, and whether a build that names no configuration skips Alpha. The default is
+    ///     MSBuild's: <c>Debug</c> if any configuration has it, otherwise the first; then <c>Mixed Platforms</c>,
+    ///     else <c>Any CPU</c>, else the first platform.
+    /// </summary>
+    public static TheoryData<string, string[], string[], bool> SlnConfigurationCases => new()
+    {
+        { "mapped without Build.0", ["Debug|Any CPU"], ["Debug|Any CPU.ActiveCfg"], true },
+        { "mapped and built", ["Debug|Any CPU"], ["Debug|Any CPU.ActiveCfg", "Debug|Any CPU.Build.0"], false },
+        { "not mapped at all", ["Debug|Any CPU"], [], false },
+        { "no configurations declared", [], [], false },
+        { "Debug preferred over the first", ["Release|Any CPU", "Debug|Any CPU"], ["Debug|Any CPU.ActiveCfg"], true },
+        {
+            "the first when there is no Debug", ["Release|Any CPU", "Staging|Any CPU"],
+            ["Release|Any CPU.ActiveCfg", "Staging|Any CPU.ActiveCfg", "Staging|Any CPU.Build.0"], true
+        },
+        {
+            "Mixed Platforms preferred over Any CPU", ["Debug|Any CPU", "Debug|Mixed Platforms"],
+            ["Debug|Any CPU.ActiveCfg", "Debug|Any CPU.Build.0", "Debug|Mixed Platforms.ActiveCfg"], true
+        },
+        {
+            "skipped only outside the default", ["Debug|Any CPU", "Release|Any CPU"],
+            ["Debug|Any CPU.ActiveCfg", "Debug|Any CPU.Build.0", "Release|Any CPU.ActiveCfg"], false
+        }
+    };
+
+    /// <summary>
+    ///     <c>.slnx</c> configuration shapes, as the solution's <c>Configurations</c> element, the rules on the
+    ///     Alpha project, and whether a build that names no configuration skips Alpha.
+    /// </summary>
+    public static TheoryData<string, string, string, bool> SlnxConfigurationCases => new()
+    {
+        { "excluded in the default pair", "", """<Build Solution="Debug|Any CPU" Project="false" />""", true },
+        { "excluded in every build type", "", """<Build Solution="*|Any CPU" Project="false" />""", true },
+        { "excluded with no solution pattern", "", """<Build Project="false" />""", true },
+        { "excluded only in another build type", "", """<Build Solution="Release|*" Project="false" />""", false },
+        {
+            "a later rule overrides an earlier one", "",
+            """<Build Project="false" /><Build Solution="Debug|*" Project="true" />""", false
+        },
+        {
+            "the first declared build type when there is no Debug",
+            """<Configurations><BuildType Name="Release" /><BuildType Name="Staging" /></Configurations>""",
+            """<Build Solution="Release|*" Project="false" />""", true
+        }
+    };
+
+    [Theory]
+    [MemberData(nameof(SlnConfigurationCases))]
+    public void ParseDeclaredProjects_ClassicSlnConfiguration_DecidesWhetherTheBuildSkipsAProject(
+        string shape, string[] configurations, string[] alphaLines, bool skipped)
+    {
+        // Arrange — Alpha, mapped as the row says, beside Beta, which every configuration builds.
+        string solutionConfigurations = string.Concat(
+            configurations.Select(configuration => $"\t\t{configuration} = {configuration}\n"));
+        string projectConfigurations = string.Concat(
+            alphaLines.Select(line => $"\t\t{{11111111-1111-1111-1111-111111111111}}.{line} = Debug|Any CPU\n"));
+        var text = $$"""
+                     Microsoft Visual Studio Solution File, Format Version 12.00
+                     Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Alpha", "Alpha\Alpha.csproj", "{11111111-1111-1111-1111-111111111111}"
+                     EndProject
+                     Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Beta", "Beta\Beta.csproj", "{22222222-2222-2222-2222-222222222222}"
+                     EndProject
+                     Global
+                     	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+                     {{solutionConfigurations}}	EndGlobalSection
+                     	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+                     {{projectConfigurations}}	EndGlobalSection
+                     EndGlobal
+                     """;
+
+        // Act
+        DeclaredProjects declared = SolutionProjectFileParser.ParseDeclaredProjects(text, ".sln", SolutionDirectory);
+
+        // Assert — a skipped project leaves the load's membership for a list of its own, and only then.
+        string beta = Path.GetFullPath(Path.Combine(SolutionDirectory, "Beta", "Beta.csproj"));
+        declared.NotBuilt.ShouldBe(skipped ? [Alpha] : [], shape);
+        declared.Csproj.ShouldBe(skipped ? [beta] : [Alpha, beta], shape);
+    }
+
+    [Theory]
+    [MemberData(nameof(SlnxConfigurationCases))]
+    public void ParseDeclaredProjects_SlnxBuildRules_DecideWhetherTheBuildSkipsAProject(
+        string shape, string configurations, string alphaRules, bool skipped)
+    {
+        // Arrange
+        var text = $"""
+                    <Solution>
+                      {configurations}
+                      <Project Path="Alpha\Alpha.csproj">{alphaRules}</Project>
+                      <Project Path="Beta\Beta.csproj" />
+                    </Solution>
+                    """;
+
+        // Act
+        DeclaredProjects declared = SolutionProjectFileParser.ParseDeclaredProjects(text, ".slnx", SolutionDirectory);
+
+        // Assert
+        string beta = Path.GetFullPath(Path.Combine(SolutionDirectory, "Beta", "Beta.csproj"));
+        declared.NotBuilt.ShouldBe(skipped ? [Alpha] : [], shape);
+        declared.Csproj.ShouldBe(skipped ? [beta] : [Alpha, beta], shape);
+    }
+
+    [Fact]
+    public void ParseDeclaredProjects_WebSiteEntries_AreNamedAsWebSitesByTheirSolutionName()
+    {
+        // A Web Site's path field holds a URL or a folder, so neither passes the "ends in proj" test; without
+        // the project-type test both would be dropped, and only the workspace's complaint about a missing file
+        // would say they exist. The second entry spells its type GUID in lower case, which the project-type
+        // test must match too.
+        const string text = """
+                            Microsoft Visual Studio Solution File, Format Version 12.00
+                            Project("{E24C65DC-7377-472B-9ABA-BC803B73C61A}") = "Portal", "http://localhost:3961", "{33333333-3333-3333-3333-333333333333}"
+                            	ProjectSection(WebsiteProperties) = preProject
+                            		Debug.AspNetCompiler.PhysicalPath = "Portal\"
+                            	EndProjectSection
+                            EndProject
+                            Project("{e24c65dc-7377-472b-9aba-bc803b73c61a}") = "LegacySite", "LegacySite\", "{44444444-4444-4444-4444-444444444444}"
+                            EndProject
+                            """;
+
+        // Act
+        DeclaredProjects declared = SolutionProjectFileParser.ParseDeclaredProjects(text, ".sln", SolutionDirectory);
+
+        // Assert
+        declared.Csproj.ShouldBeEmpty();
+        declared.Unsupported.ShouldBe([
+            new UnsupportedProject(
+                Path.GetFullPath(Path.Combine(SolutionDirectory, "http:", "localhost:3961")),
+                UnsupportedProjectKind.WebSite,
+                "Portal"),
+            new UnsupportedProject(
+                Path.GetFullPath(Path.Combine(SolutionDirectory, "LegacySite") + Path.DirectorySeparatorChar),
+                UnsupportedProjectKind.WebSite,
+                "LegacySite")
         ]);
     }
 

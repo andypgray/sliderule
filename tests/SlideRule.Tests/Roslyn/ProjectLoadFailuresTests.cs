@@ -10,7 +10,9 @@ namespace SlideRule.Tests.Roslyn;
 /// <summary>
 ///     <see cref="ProjectLoadFailures.Detect" />'s two arms — and, under a solution filter, its second
 ///     answer — over a pure <see cref="AdhocWorkspace" /> graph plus a real solution file on disk. This is
-///     the predicate the fail-closed gate keys on, rather than on MSBuild message text.
+///     the predicate the fail-closed gate keys on, rather than on MSBuild message text. The class also pins the
+///     unsupported entries <see cref="ProjectLoadFailures.Detect" /> lists from the solution file and from the
+///     other-language project files a load could not reach.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -38,7 +40,7 @@ public sealed class ProjectLoadFailuresTests
         string csproj = ProjectPath("P", "P.csproj");
         Solution solution = workspace.WithProjects(AdhocSolution.Loaded("P", csproj));
 
-        ProjectLoadFailures.Detect(solution, CanonicalProjectFiles.Of(solution), null)
+        Detect(solution)
             .ShouldHaveLoadedEverything();
     }
 
@@ -52,7 +54,7 @@ public sealed class ProjectLoadFailuresTests
         string csproj = ProjectPath("P", "P.csproj");
         Solution solution = workspace.WithProjects(AdhocSolution.Empty("P", csproj));
 
-        ProjectLoadFailures.Detect(solution, CanonicalProjectFiles.Of(solution), null)
+        Detect(solution)
             .ShouldHaveFailed(csproj);
     }
 
@@ -68,7 +70,7 @@ public sealed class ProjectLoadFailuresTests
         Solution solution = workspace.WithProjects(
             AdhocSolution.Empty("HasOutput", csproj).WithOutputFilePath(outputPath));
 
-        ProjectLoadFailures.Detect(solution, CanonicalProjectFiles.Of(solution), null)
+        Detect(solution)
             .ShouldHaveLoadedEverything();
     }
 
@@ -83,7 +85,7 @@ public sealed class ProjectLoadFailuresTests
             AdhocSolution.Empty("P(net10.0)", csproj),
             AdhocSolution.Empty("P(netstandard2.0)", csproj));
 
-        ProjectLoadFailures.Detect(solution, CanonicalProjectFiles.Of(solution), null)
+        Detect(solution)
             .ShouldHaveFailed(csproj);
     }
 
@@ -97,7 +99,7 @@ public sealed class ProjectLoadFailuresTests
         using var workspace = new AdhocWorkspace();
         Solution solution = workspace.WithProjects(AdhocSolution.Loaded("Present", temp.PathOf("Present", "Present.csproj")));
 
-        ProjectLoadFailures.Detect(solution, CanonicalProjectFiles.Of(solution), solutionPath)
+        Detect(solution, solutionPath)
             .ShouldHaveFailed(temp.PathOf("Absent", "Absent.csproj"));
     }
 
@@ -111,7 +113,7 @@ public sealed class ProjectLoadFailuresTests
             AdhocSolution.Loaded("One", temp.PathOf("One", "One.csproj")),
             AdhocSolution.Loaded("Two", temp.PathOf("Two", "Two.csproj")));
 
-        ProjectLoadFailures.Detect(solution, CanonicalProjectFiles.Of(solution), solutionPath)
+        Detect(solution, solutionPath)
             .ShouldHaveLoadedEverything();
     }
 
@@ -125,7 +127,7 @@ public sealed class ProjectLoadFailuresTests
         using var workspace = new AdhocWorkspace();
         Solution solution = workspace.WithProjects(AdhocSolution.Loaded("Kept", temp.PathOf("Kept", "Kept.csproj")));
 
-        ProjectLoadFailures.Detect(solution, CanonicalProjectFiles.Of(solution), filterPath)
+        Detect(solution, filterPath)
             .ShouldHaveLeftUnchecked(temp.PathOf("Dropped", "Dropped.csproj"));
     }
 
@@ -140,7 +142,7 @@ public sealed class ProjectLoadFailuresTests
         using var workspace = new AdhocWorkspace();
         Solution solution = workspace.CurrentSolution;
 
-        ProjectLoadReport report = ProjectLoadFailures.Detect(solution, CanonicalProjectFiles.Of(solution), filterPath);
+        ProjectLoadReport report = Detect(solution, filterPath);
 
         report.Failed.ShouldBe([temp.PathOf("Kept", "Kept.csproj")]);
         report.Unchecked.ShouldBe([temp.PathOf("Dropped", "Dropped.csproj")]);
@@ -159,7 +161,7 @@ public sealed class ProjectLoadFailuresTests
             AdhocSolution.Loaded("One", temp.PathOf("One", "One.csproj")),
             AdhocSolution.Loaded("Two", temp.PathOf("Two", "Two.csproj")));
 
-        ProjectLoadFailures.Detect(solution, CanonicalProjectFiles.Of(solution), filterPath)
+        Detect(solution, filterPath)
             .ShouldHaveLoadedEverything();
     }
 
@@ -177,7 +179,7 @@ public sealed class ProjectLoadFailuresTests
             AdhocSolution.Loaded("Kept", temp.PathOf("Kept", "Kept.csproj")),
             AdhocSolution.Loaded("Pulled", temp.PathOf("Pulled", "Pulled.csproj")));
 
-        ProjectLoadFailures.Detect(solution, CanonicalProjectFiles.Of(solution), filterPath)
+        Detect(solution, filterPath)
             .ShouldHaveLoadedEverything();
     }
 
@@ -191,7 +193,7 @@ public sealed class ProjectLoadFailuresTests
         using var workspace = new AdhocWorkspace();
         Solution solution = workspace.WithProjects(AdhocSolution.Empty("Zed", temp.PathOf("Zed", "Zed.csproj")));
 
-        ProjectLoadFailures.Detect(solution, CanonicalProjectFiles.Of(solution), solutionPath)
+        Detect(solution, solutionPath)
             .ShouldHaveFailed(temp.PathOf("Absent", "Absent.csproj"), temp.PathOf("Zed", "Zed.csproj"));
     }
 
@@ -210,31 +212,24 @@ public sealed class ProjectLoadFailuresTests
         using var workspace = new AdhocWorkspace();
         Solution solution = workspace.WithProjects(AdhocSolution.Loaded("Present", real.PathOf("Present", "Present.csproj")));
 
-        ProjectLoadFailures.Detect(solution, CanonicalProjectFiles.Of(solution), Path.Combine(via, "Solution.sln"))
+        Detect(solution, Path.Combine(via, "Solution.sln"))
             .ShouldHaveFailed(Path.Combine(via, "Absent", "Absent.csproj"));
     }
 
-    // A classic .sln declaring one project line per name. Only the project paths are read, so the rest of the
-    // file is the minimum a real solution carries.
+    // Detect over the solution's resolved project files, against the membership the file at solutionPath declares,
+    // or against none when a test names no file.
+    private static ProjectLoadReport Detect(Solution solution, string? solutionPath = null)
+    {
+        CanonicalProjectFiles projectFiles = CanonicalProjectFiles.Of(solution);
+        SolutionMembership? membership = solutionPath is null
+            ? null
+            : SolutionProjectFileParser.ReadDeclaredMembership(solutionPath);
+        return ProjectLoadFailures.Detect(solution, projectFiles, membership);
+    }
+
     private static string WriteSolution(TempDirectory temp, params string[] projectNames)
     {
-        var lines = new List<string>
-        {
-            "",
-            "Microsoft Visual Studio Solution File, Format Version 12.00",
-            "# Visual Studio Version 17"
-        };
-        foreach (string name in projectNames)
-        {
-            lines.Add(
-                $"Project(\"{{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}}\") = \"{name}\", "
-                + $"\"{name}\\{name}.csproj\", \"{{11111111-1111-1111-1111-111111111111}}\"");
-            lines.Add("EndProject");
-        }
-
-        string solutionPath = temp.PathOf("Solution.sln");
-        File.WriteAllLines(solutionPath, lines);
-        return solutionPath;
+        return temp.WriteFile(["Solution.sln"], ClassicSolution.Text(projectNames));
     }
 
     // A .slnf beside the solution it filters. Passing no selection writes an empty projects array — the

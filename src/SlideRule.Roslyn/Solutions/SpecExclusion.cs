@@ -43,7 +43,7 @@ internal sealed record SpecExclusionProject(
 ///     </para>
 ///     <para>
 ///         A solution filter reads through to the solution it filters, and against that solution's
-///         <see cref="SolutionMembership.Declared">whole</see> membership rather than the filter's selection:
+///         whole membership rather than the filter's selection:
 ///         membership answers "is this project solution material?", which a filter does not change. Selecting
 ///         instead would exclude a member a reference dragged in anyway.
 ///     </para>

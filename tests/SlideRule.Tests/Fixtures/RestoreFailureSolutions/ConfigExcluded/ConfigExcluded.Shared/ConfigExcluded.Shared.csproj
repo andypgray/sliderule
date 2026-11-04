@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The project ConfigExcluded.sln's default configuration does not build although ConfigExcluded.Built references
+  it: a restore of the solution restores it for Built, and a build of the solution neither builds it nor passes its
+  assembly to Built. ConfigExcluded.Built.csproj says why the bed exists and where it may sit.
+-->
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>disable</Nullable>
+        <ImplicitUsings>disable</ImplicitUsings>
+        <NuGetAudit>false</NuGetAudit>
+        <RestoreLockedMode Condition="'$(CI)' == 'true'">true</RestoreLockedMode>
+    </PropertyGroup>
+</Project>

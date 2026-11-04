@@ -9,8 +9,7 @@ namespace SlideRule.Tests.Roslyn;
 ///     extractor reaches: the per-kind reason, the entry line that joins it to its project, the two verb
 ///     stamps and the adapter's skip — pinned pure, no workspace and no disk.
 ///     <see cref="SlideRule.Tests.Cli.PolyglotSurveyE2ETests" /> pins the same bytes coming out of a
-///     real polyglot load; what is spec here is the half a fixture solution cannot reach, since the suite
-///     holds no <c>.shproj</c> bed and deliberately does not need one.
+///     real polyglot load.
 /// </summary>
 /// <remarks>
 ///     A kind rides all the way from its producer because one string stamped onto every path at the composing
@@ -20,8 +19,8 @@ namespace SlideRule.Tests.Roslyn;
 /// </remarks>
 public sealed class UnsupportedProjectsNoticeTests
 {
-    // The entries every stamp below shares, so each test reads as its own tail and nothing else. Both kinds,
-    // because a stamp's lede states no cause and each entry has to carry its own.
+    // The entries every stamp below shares, so each test reads as its own tail and nothing else. Entries of
+    // different kinds, because a stamp's lede states no cause and each entry has to carry its own.
     private static readonly string[] TwoProjects =
     [
         "PolyglotApp.Fs/PolyglotApp.Fs.fsproj — not a C# project",
@@ -49,7 +48,7 @@ public sealed class UnsupportedProjectsNoticeTests
     public void Reason_EveryDeclaredKind_CarriesNoEmDashOfItsOwn()
     {
         // Entry joins on an em dash, so a reason carrying a second would put two in one line. Over every kind
-        // rather than the two the Relative row pins, because the next kind added is where it would happen.
+        // rather than the ones the Relative rows pin, because the next kind added is where it would happen.
         foreach (UnsupportedProjectKind kind in Enum.GetValues<UnsupportedProjectKind>())
             UnsupportedProjectsNotice.Reason(kind)
                 .ShouldNotContain("—", $"{kind}'s reason carries an em dash, and Entry already joins on one");
@@ -79,6 +78,27 @@ public sealed class UnsupportedProjectsNoticeTests
         shown.ShouldBe([
             "PolyglotApp.Fs/PolyglotApp.Fs.fsproj — not a C# project",
             "../Shared/Shared.shproj — a shared project, compiled into the projects that import it"
+        ]);
+    }
+
+    [Fact]
+    public void Relative_AWebSiteAndANotBuiltProject_ShowTheSolutionNameAndThePath()
+    {
+        // A Web Site's path is its folder or URL joined onto the solution directory, which names nothing a reader
+        // can open, so the entry shows the name the solution gives it. A project the build skips is a file like
+        // any other and keeps its path.
+        string solutionDirectory = Path.Combine(Path.GetTempPath(), "unsupported-projects-tests", "solution");
+        UnsupportedProject[] projects =
+        [
+            new(Path.Combine(solutionDirectory, "http:", "localhost:3961"), UnsupportedProjectKind.WebSite, "Portal"),
+            new(Path.Combine(solutionDirectory, "Skipped", "Skipped.csproj"), UnsupportedProjectKind.NotBuilt)
+        ];
+
+        IReadOnlyList<string> shown = UnsupportedProjectsNotice.Relative(projects, solutionDirectory);
+
+        shown.ShouldBe([
+            "Portal — a Web Site project, which has no project file",
+            "Skipped/Skipped.csproj — not built by the solution's default configuration"
         ]);
     }
 

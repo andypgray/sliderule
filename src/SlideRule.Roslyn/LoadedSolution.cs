@@ -52,12 +52,17 @@ internal sealed class LoadedSolution : IDisposable
     /// <summary>
     ///     This load's verdict as the one value every surface reads. <paramref name="loadFailures" /> are the
     ///     messages the loader wrote to the caller's sink, the workspace's failures and the load's own warnings,
-    ///     which never land on this type; the merge's notes and multi-targeted projects stay empty, since only
-    ///     extraction produces them.
+    ///     which never land on this type. The failure the workspace raises for a Web Site entry is left out,
+    ///     because the verdict names that entry among its unsupported projects; the merge's notes and
+    ///     multi-targeted projects stay empty, since only extraction produces them.
     /// </summary>
     internal WorkspaceDiagnostics LoadDiagnosticsWith(IReadOnlyList<string> loadFailures)
     {
-        return _loadVerdict with { LoadFailures = loadFailures };
+        IReadOnlyList<string> webSitePaths = WebSiteEntries.PathsOf(_loadVerdict.UnsupportedProjects);
+        List<string> reported = loadFailures
+            .Where(message => !WebSiteEntries.IsAbout(message, webSitePaths))
+            .ToList();
+        return _loadVerdict with { LoadFailures = reported };
     }
 
     public void Dispose()

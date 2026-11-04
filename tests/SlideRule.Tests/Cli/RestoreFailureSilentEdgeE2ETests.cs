@@ -265,11 +265,7 @@ public sealed class RestoreFailureSilentEdgeE2ETests
     // The spec this arm passes as --spec, written into its own workspace out of the one compilation.
     private static string WriteSpec(TempFixtureWorkspace workspace)
     {
-        string specDirectory = workspace.PathOf("spec");
-        Directory.CreateDirectory(specDirectory);
-        string specDll = Path.Combine(specDirectory, "FieldMiniSpec.dll");
-        File.WriteAllBytes(specDll, SpecImage.Value);
-        return specDll;
+        return workspace.WriteSpec("FieldMiniSpec", SpecImage.Value);
     }
 
     // Assembled here rather than through `dotnet pack`: a pack would need its own project, its own restore

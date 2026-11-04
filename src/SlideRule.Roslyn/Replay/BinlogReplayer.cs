@@ -113,11 +113,15 @@ internal static class BinlogReplayer
             foreach (UnresolvedReferences.Finding found in UnresolvedReferences.Detect(settled.Solution, settled.Report.Failed))
                 diagnosticSink?.Invoke(UnresolvedReferences.Message(found.ProjectPath, found.Names));
 
-            // Every one of them is NotCsharp by construction: the predicate below drops a compiler call for
-            // exactly one reason, and a shared project mints no compiler call of its own to be dropped.
+            // Every declined call is NotCsharp by construction: the predicate below drops a compiler call for
+            // exactly one reason, and a shared project mints no compiler call of its own to be dropped. A project
+            // the build skipped and a Web Site leave no call at all, so those two come from the solution file, as
+            // they do on a cold load.
             List<UnsupportedProject> unsupported = unsupportedProjects
-                .OrderBy(path => path, StringComparer.Ordinal)
                 .Select(path => new UnsupportedProject(path, UnsupportedProjectKind.NotCsharp))
+                .Concat(settled.Report.Unsupported.Where(project =>
+                    project.Kind is UnsupportedProjectKind.NotBuilt or UnsupportedProjectKind.WebSite))
+                .OrderBy(project => project.Path, StringComparer.Ordinal)
                 .ToList();
 
             return new ReplayedSolution(

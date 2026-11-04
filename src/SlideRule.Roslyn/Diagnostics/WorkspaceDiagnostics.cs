@@ -46,7 +46,7 @@ internal static class MultiTargetedProjects
 }
 
 /// <summary>
-///     Why a project the solution declares is outside the model, as the producer that found it classified it.
+///     Why a project is outside the model, as the producer that found it classified it.
 ///     The edge that composes the sentence reads this kind rather than testing the path again: a test that knows
 ///     only <c>.csproj</c> calls a shared project not C#.
 /// </summary>
@@ -63,14 +63,34 @@ internal enum UnsupportedProjectKind
     ///     compiled into every project that imports it. Its code is very often C#, and where an importing
     ///     project is in the model that code is in the model too, so it is described by its shape alone.
     /// </summary>
-    SharedProject
+    SharedProject,
+
+    /// <summary>
+    ///     A C# project the solution's default configuration leaves out of the build, which a restore of the
+    ///     solution skips too unless a built project references it. It is left out of the model as the build
+    ///     leaves it out, referenced or not.
+    /// </summary>
+    NotBuilt,
+
+    /// <summary>
+    ///     A Web Site project: a solution entry whose path is a folder or a URL rather than a project file, so
+    ///     there is no file to load.
+    /// </summary>
+    WebSite
 }
 
-/// <summary>
-///     One project the solution declares that no extractor reached, by the absolute <paramref name="Path" /> of its
-///     project file, and the kind of reason it did not.
-/// </summary>
-internal sealed record UnsupportedProject(string Path, UnsupportedProjectKind Kind);
+/// <summary>One project outside the model that no extractor reached.</summary>
+/// <param name="Path">
+///     The entry's absolute path: resolved against the solution directory for a solution entry, and as the build
+///     named it for a compiler call a replay declined. A Web Site's is a folder or a URL joined onto the solution
+///     directory, which names nothing a reader could open, so it orders and matches entries and is never shown.
+/// </param>
+/// <param name="Kind">Why no extractor reached it.</param>
+/// <param name="Name">
+///     The name the solution gives the entry, set where the path cannot be shown; a reader is shown it in place of
+///     the path.
+/// </param>
+internal sealed record UnsupportedProject(string Path, UnsupportedProjectKind Kind, string? Name = null);
 
 /// <summary>
 ///     Everything a run knows about how well its workspace loaded, as one value, and the gate decision every verb
@@ -100,8 +120,8 @@ internal sealed record UnsupportedProject(string Path, UnsupportedProjectKind Ki
 /// <param name="MergeNotes">The advisory notes the fragment merge raised.</param>
 /// <param name="FailedProjects">The <c>.csproj</c> paths of the projects that failed to load.</param>
 /// <param name="UncheckedProjects">
-///     The <c>.csproj</c> paths the solution declares that this run did not check; non-empty only under a
-///     solution filter that left members out.
+///     The <c>.csproj</c> paths the solution's default configuration builds that this run did not check;
+///     non-empty only under a solution filter that left members out.
 /// </param>
 /// <param name="RestoreFailedProjects">
 ///     The <c>.csproj</c> paths of the projects whose NuGet packages are not in the model, because restore failed
@@ -110,8 +130,8 @@ internal sealed record UnsupportedProject(string Path, UnsupportedProjectKind Ki
 ///     (<c>dotnet restore</c>).
 /// </param>
 /// <param name="UnsupportedProjects">
-///     The projects the solution declares that no extractor reached, read off the solution file rather than off
-///     the load.
+///     The projects outside the model that no extractor reached, read off the solution file and, on a replay, off
+///     the compiler calls it declined.
 /// </param>
 /// <param name="MultiTargetedProjects">
 ///     The projects one <c>.csproj</c> of which yielded several compilations: the machine-readable half of

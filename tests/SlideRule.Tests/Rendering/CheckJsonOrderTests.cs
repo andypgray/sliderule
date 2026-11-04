@@ -17,8 +17,8 @@ namespace SlideRule.Tests.Rendering;
 ///     The check document's key order (<see cref="JsonReportRenderer.Document" />, and so
 ///     <c>arch_check</c>'s too): the roll-up and every trust stamp serialize ahead of <c>rules</c> — the
 ///     bulk a truncating reader's cut lands in — and the stamps serialize ahead of the <c>summary</c> they
-///     invalidate. The goldens cannot pin this: a stamp is omitted from every clean run, so six of the seven
-///     keys here appear in no golden at all. The one document under test carries all of them at once —
+///     invalidate. The goldens cannot pin this: a stamp is omitted from every clean run, so the stamps here
+///     appear in no golden at all. The one document under test carries all of them at once —
 ///     including the per-rule subject-coverage pair, which the same reasoning applies to one level down.
 /// </summary>
 public sealed class CheckJsonOrderTests

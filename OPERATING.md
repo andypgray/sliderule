@@ -101,7 +101,8 @@ A half-finished upgrade shows in the build: a model file in a newer schema than 
 |---|---|---|
 | exit 1 | a rule is red | fix the code the report names |
 | exit 2 | SlideRule's own error | read the message on stderr |
-| `No spec project found` | no spec project, or a failed load or restore | add the project or pass `--spec`; after a failed load or restore, restore and build |
+| `No spec project found` | no spec project, a failed load or restore, or a spec project the default configuration does not build | add the project or pass `--spec`; after a failed load or restore, restore and build; for a listed project, make the configuration build it |
+| `is not built by the solution's default configuration` | `--spec` names a project the build leaves out | make the configuration build it, or pass its built DLL |
 | `has no built output` | the spec project is not built | build it |
 | `modelIncomplete`, failed projects | a project failed to load | build the solution, and read the load errors the run lists |
 | a refusal naming `dotnet restore` | packages did not resolve | restore the solution |
