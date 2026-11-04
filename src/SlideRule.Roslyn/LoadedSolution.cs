@@ -58,10 +58,8 @@ internal sealed class LoadedSolution : IDisposable
     /// </summary>
     internal WorkspaceDiagnostics LoadDiagnosticsWith(IReadOnlyList<string> loadFailures)
     {
-        IReadOnlyList<string> webSitePaths = WebSiteEntries.PathsOf(_loadVerdict.UnsupportedProjects);
-        List<string> reported = loadFailures
-            .Where(message => !WebSiteEntries.IsAbout(message, webSitePaths))
-            .ToList();
+        List<string> reported = UnsupportedEntryMessages.Without(
+            loadFailures, _loadVerdict.UnsupportedProjects, UnsupportedProjectKind.WebSite);
         return _loadVerdict with { LoadFailures = reported };
     }
 

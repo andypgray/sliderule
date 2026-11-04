@@ -53,8 +53,9 @@ internal static class MultiTargetedProjects
 internal enum UnsupportedProjectKind
 {
     /// <summary>
-    ///     A project in a language this product has no extractor for — an <c>.fsproj</c>, a <c>.vbproj</c>,
-    ///     a <c>.sqlproj</c>, a <c>.vcxproj</c>, or a compiler invocation the replay declined as non-C#.
+    ///     A project this product has no extractor for: one in another language, such as an <c>.fsproj</c>, a
+    ///     <c>.vbproj</c>, a <c>.sqlproj</c> or a <c>.vcxproj</c>; one that compiles no code, such as a Docker
+    ///     Compose <c>.dcproj</c>; or a compiler invocation the replay declined as non-C#.
     /// </summary>
     NotCsharp,
 
@@ -207,6 +208,15 @@ internal readonly record struct WorkspaceDiagnostics(
     internal IReadOnlyList<string> ActionableDiagnostics =>
         LoadFailures.Where(diagnostic => !NuGetAuditDiagnostics.IsAudit(diagnostic))
             .ToList();
+
+    /// <summary>
+    ///     The <see cref="ActionableDiagnostics" /> that could explain a spec project failing to resolve: every one
+    ///     except the workspace's failure for an entry that is not C# or is a shared project, which cannot be a spec
+    ///     project. That failure stays in <see cref="Rendered" />, because the entry is real and the line names it.
+    /// </summary>
+    internal IReadOnlyList<string> SpecResolutionEvidence =>
+        UnsupportedEntryMessages.Without(
+            ActionableDiagnostics, UnsupportedProjects, UnsupportedProjectKind.NotCsharp, UnsupportedProjectKind.SharedProject);
 
     /// <summary>
     ///     Whether a project failed to load or its NuGet packages did not resolve, whatever the operator opted

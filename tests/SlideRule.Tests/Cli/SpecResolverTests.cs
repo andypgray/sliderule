@@ -29,6 +29,10 @@ public sealed class SpecResolverTests
         "Package 'Contoso.Widgets' 1.2.3 has a known high severity vulnerability, "
         + "https://github.com/advisories/GHSA-aaaa-bbbb-cccc";
 
+    private const string SharedProjectPath = "C:/repo/src/MyApp.Common/MyApp.Common.shproj";
+
+    private const string DatabaseProjectPath = "C:/repo/src/MyApp.Database/MyApp.Database.sqlproj";
+
     // A project that failed to load, in the form the gate carries them: an absolute .csproj path.
     private const string BrokenProject = "C:/repo/src/MyApp.Arch/MyApp.Arch.csproj";
 
@@ -276,6 +280,53 @@ public sealed class SpecResolverTests
     }
 
     [Fact]
+    public void ResolveConventionProject_OnlyFailuresOfEntriesNoWorkspaceOpens_KeepsTheCleanLoadMessage()
+    {
+        // A shared project or a database project cannot be the spec project, and no restore makes the workspace
+        // open one, so its failure is not evidence a spec project failed to resolve. The clean arm keeps its
+        // not-built block, which a solution with such an entry needs as much as any other.
+        WorkspaceDiagnostics diagnostics = WorkspaceDiagnostics.None with
+        {
+            LoadFailures = [UnopenedFailure(SharedProjectPath), UnopenedFailure(DatabaseProjectPath)],
+            UnsupportedProjects =
+            [
+                new UnsupportedProject(SharedProjectPath, UnsupportedProjectKind.SharedProject),
+                new UnsupportedProject(DatabaseProjectPath, UnsupportedProjectKind.NotCsharp),
+                new UnsupportedProject("C:/repo/src/MyApp.Skipped/MyApp.Skipped.csproj", UnsupportedProjectKind.NotBuilt)
+            ]
+        };
+
+        string message = ShouldRefuseResolution(diagnostics);
+
+        message.ShouldBe(
+            "No spec project found: no solution project references SlideRule.dll. Pass --spec to name one.\n"
+            + "Considered 1 C# project(s) in the workspace.\n"
+            + "The solution's default configuration does not build these projects, so the load left them out:\n"
+            + "  C:/repo/src/MyApp.Skipped/MyApp.Skipped.csproj\n"
+            + "If the spec project is among them, make that configuration build it, or pass its built DLL to --spec.");
+    }
+
+    [Fact]
+    public void ResolveConventionProject_EntryFailureBesideAnotherLoadFailure_QuotesOnlyTheOther()
+    {
+        // The entry's failure is left out by its path, so a load failure about anything else still decides the arm.
+        WorkspaceDiagnostics diagnostics = WorkspaceDiagnostics.None with
+        {
+            LoadFailures = [UnopenedFailure(SharedProjectPath), LockFileFailure],
+            UnsupportedProjects = [new UnsupportedProject(SharedProjectPath, UnsupportedProjectKind.SharedProject)]
+        };
+
+        string message = ShouldRefuseResolution(diagnostics);
+
+        message.ShouldBe(
+            "No spec project found: the workspace did not load cleanly, so a project that references "
+            + "SlideRule.dll may have failed to resolve it:\n"
+            + $"  {LockFileFailure}\n"
+            + $"  {MsBuildBootstrap.SelectionNote()}\n"
+            + "Restore and build the solution first (dotnet restore, dotnet build), then retry.");
+    }
+
+    [Fact]
     public void ResolveConventionProject_CleanLoad_NamesHowManyProjectsWereConsidered()
     {
         // The first sentence stays byte-identical — GETTING-STARTED.md quotes it — and the count is a new
@@ -501,6 +552,13 @@ public sealed class SpecResolverTests
         return Should.Throw<UserErrorException>(() => SpecResolver.ResolveConventionProject(
                 [Candidate(candidate, "C:/pkgs/Newtonsoft.Json.dll")], diagnostics))
             .Message;
+    }
+
+    // The workspace's failure for an entry whose extension it maps to no language, in its English wording.
+    private static string UnopenedFailure(string path)
+    {
+        string extension = Path.GetExtension(path);
+        return $"Cannot open project '{path}' because the file extension '{extension}' is not associated with a language.";
     }
 
     // No project file on purpose: the convention has to keep treating unknown-path candidates as distinct,

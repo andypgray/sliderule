@@ -305,7 +305,9 @@ internal static class SpecResolver
     // a broken restore that remedy would come second to one the reader has to apply first. NuGetAudit advisories
     // are kept out of the "may" arm's input, and only that arm's: an advisory's publication date says nothing about
     // whether this solution's references resolved, so a solution with no spec project must not be sent to fix its
-    // restore. Every arm is the same refusal with different evidence, so no exit code turns on which one fires.
+    // restore. The workspace's failure for an entry that is not C# or is a shared project is kept out of it for the
+    // same reason: such an entry cannot be a spec project, and no restore makes the workspace open it. Every arm is
+    // the same refusal with different evidence, so no exit code turns on which one fires.
     private static UserErrorException NoSpecProjectFound(
         IReadOnlyList<SpecProjectCandidate> candidates, WorkspaceDiagnostics diagnostics, string? solutionDirectory)
     {
@@ -315,7 +317,7 @@ internal static class SpecResolver
         if (diagnostics.IsIncomplete)
             return new UserErrorException(IncompleteModelGate.SpecRefusal(diagnostics));
 
-        IReadOnlyList<string> actionable = diagnostics.ActionableDiagnostics;
+        IReadOnlyList<string> actionable = diagnostics.SpecResolutionEvidence;
         if (actionable.Count > 0)
             return new UserErrorException(
                 EvidenceBlock.Compose(

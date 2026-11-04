@@ -55,6 +55,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A Web Site entry in a `.sln`, whose path is a folder or a URL, is listed in `unsupportedProjects` by the
   name the solution gives it. Before, it appeared only as a workspace diagnostic saying that no project file
   was found, at a path made by joining the URL onto the solution directory.
+- A solution with no spec project that declares a shared project, a `.sqlproj` or a `.dcproj` now gets the
+  `No spec project found: no solution project references SlideRule.dll` refusal, with the projects the load
+  left out listed below it. Before, the workspace's failure to open such an entry counted as a load problem,
+  and the refusal said to restore and build the solution, which could not end it. The workspace's line for the
+  entry stays in `workspaceDiagnostics`.
 
 ## [0.2.1] - 2026-10-26
 

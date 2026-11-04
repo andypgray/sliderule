@@ -211,6 +211,10 @@ public sealed class SolutionEntriesE2ETests
         using JsonDocument loadDocument = load.ShouldHaveJsonStdout();
         loadDocument.UnsupportedProjectEntries()
             .ShouldBe(expected);
+        loadDocument.RootElement.Strings("workspaceDiagnostics")
+            .ShouldContain(
+                diagnostic => diagnostic.Contains("UnopenedEntries.Common.shproj", StringComparison.Ordinal),
+                "the load document keeps the workspace's line for the shared project:\n" + load.Transcript());
         replay.ShouldSucceed();
         using JsonDocument replayDocument = replay.ShouldHaveJsonStdout();
         replayDocument.UnsupportedProjectEntries()
@@ -269,6 +273,23 @@ public sealed class SolutionEntriesE2ETests
             + "  ConfigExcluded.Shared/ConfigExcluded.Shared.csproj\n"
             + "  ConfigExcluded.Skipped/ConfigExcluded.Skipped.csproj\n"
             + "If the spec project is among them, make that configuration build it, or pass its built DLL to --spec.");
+    }
+
+    [Fact]
+    public async Task Check_NoSpecArgument_EntriesNoWorkspaceOpens_GetsTheCleanLoadRefusal()
+    {
+        // Arrange — restored, so the workspace's failures for the shared and database projects are the only lines
+        // the load reports.
+        using TempFixtureWorkspace workspace = TempFixtureWorkspace.Dedicated(UnopenedBed, UnopenedSolution);
+
+        // Act
+        CliResult result = await CliRunner.InvokeColdAsync("check", workspace.SolutionPath, "--no-cache");
+
+        // Assert — neither entry can be the spec project and no restore opens one, so the refusal sends the reader
+        // to --spec rather than to a restore.
+        result.ShouldRefuseWithExactly(
+            "No spec project found: no solution project references SlideRule.dll. Pass --spec to name one.\n"
+            + "Considered 1 C# project(s) in the workspace.");
     }
 
     // Cold, with no cache: a pooled workspace or a cached model from another copy could answer for a tree the fact
