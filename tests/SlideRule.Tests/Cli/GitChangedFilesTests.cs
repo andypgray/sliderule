@@ -225,10 +225,11 @@ public sealed class GitChangedFilesTests
     }
 
     [Fact]
-    public async Task ResolveAsync_SolutionDirectoryReachedThroughAShortName_ListsTheFileInTheCallersSpelling()
+    public async Task ResolveAsync_SolutionDirectoryReachedThroughAShortName_ListsTheFileAsDiscoverySpellsTheSolution()
     {
-        // git names its top level and the paths below it in long names, while the model's sites carry the spelling
-        // the solution was reached by, so a changed file listed in git's spelling matches no site and trips nothing.
+        // A tripwire fires only where a changed file's path equals a site's, and the sites are spelled the way solution
+        // discovery spells the solution's path. Discovery expands a short name, as Path.GetFullPath does, so a file
+        // listed in the short spelling would match no site.
         // Arrange
         using TempDirectory temp = TestTempRoot.Fresh("git-changed-files");
         string repository = Path.Combine(temp.Path, "short");
@@ -243,8 +244,11 @@ public sealed class GitChangedFilesTests
         DiffContext context = await GitChangedFiles.ResolveAsync("HEAD", shortFolder, Ct);
 
         // Assert
-        context.Contains(Path.Join(shortFolder, "Probe.cs"))
-            .ShouldBeTrue("A file changed below a solution reached through a short name is listed in that spelling.");
+        string expected = Path.Join(PathCanonicalizer.Resolve(shortFolder), "Probe.cs");
+        context.Contains(expected)
+            .ShouldBeTrue(
+                $"A file changed below a directory reached through a short name is listed as {expected}, the spelling "
+                + "solution discovery gives that directory.");
     }
 
     // Initialises the repository on first use, then writes and commits one C# file at its root.

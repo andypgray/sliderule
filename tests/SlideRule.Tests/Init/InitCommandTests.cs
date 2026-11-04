@@ -130,8 +130,8 @@ public sealed class InitCommandTests : IDisposable
     [Fact]
     public async Task Init_ThroughAShortNameBelowTheRepositoryRoot_WritesTheSettingsAtTheRootInLongNames()
     {
-        // git names the path below the root in long names, so a solution reached through a folder's short name still
-        // has its root found, and the committed settings record the names another clone will have.
+        // A solution reached through a folder's short name still has its root found, and the committed settings record
+        // the long names another clone will have.
         // Arrange
         string longSolution = ProductTree(Path.Combine("short", "Application Folder"));
         string shortFolder = ShortPaths.ShortSpellingOrSkip(_temp.PathOf("short", "Application Folder"));

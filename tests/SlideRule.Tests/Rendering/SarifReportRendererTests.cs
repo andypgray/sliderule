@@ -732,8 +732,8 @@ public sealed class SarifReportRendererTests
     [Fact]
     public void Serialize_APrefixSpelledApartFromTheSolutionDirectory_LeadsEachUriWithThePrefix()
     {
-        // The prefix is git's spelling of the path below the repository root, which differs from the solution
-        // directory's own when that was reached through a short name, so the URI takes the prefix's names.
+        // The prefix is git's spelling of the path below the repository root, which need not be the solution
+        // directory's own, so the URI takes the prefix's names.
         CheckReport report = Checker.Run(
             "namespace App.Web { public class Page { public App.Data.Db Open() => new App.Data.Db(); } }"
             + " namespace App.Data { public class Db {} }",

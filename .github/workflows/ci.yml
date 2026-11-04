@@ -87,10 +87,12 @@ jobs:
       # against it. This is the step that says so instead.
       #
       # The selection note is diagnostic context by design, not a banner: a clean run says nothing about
-      # MSBuild on any surface, so an assertion has to give the note something to ride on. A solution naming a
-      # project the tree does not contain is the smallest thing that does — the load is partial, graph refuses
-      # (graph, because it is the verb that needs no spec), and the refusal carries the selection line.
-      # Nothing is restored and nothing is built, so the step costs seconds and has no failure mode of its own.
+      # MSBuild on any surface, so an assertion has to give the note something to ride on. A project whose SDK
+      # no resolver can find is the smallest thing that does. MSBuild cannot evaluate it, graph refuses (graph,
+      # because it is the verb that needs no spec), and the refusal's failed-load block carries the selection
+      # line. A solution entry with no file behind it would not do, because no MSBuild could have opened a file
+      # that is not there and so that refusal carries no note. Nothing is restored and nothing is built, so the
+      # step costs seconds and has no failure mode of its own.
       #
       # No minor or patch version is pinned. The line is echoed on every run, so the version is always on the
       # record; what reddens is a change of kind — VS or SDK, the Visual Studio major, and which side of
@@ -101,12 +103,13 @@ jobs:
           IMAGE: ${{ matrix.os }}
         run: |
           root="$RUNNER_TEMP/msbuild-selection"
-          mkdir -p "$root"
+          mkdir -p "$root/Unloadable"
           cat > "$root/Selection.slnx" <<'SLNX'
           <Solution>
-            <Project Path="Absent/Absent.csproj" />
+            <Project Path="Unloadable/Unloadable.csproj" />
           </Solution>
           SLNX
+          echo '<Project Sdk="SlideRule.NoSuchSdk" />' > "$root/Unloadable/Unloadable.csproj"
 
           log="$root/graph.log"
           dotnet run --no-build --project src/SlideRule.Cli -- graph "$root/Selection.slnx" --no-cache \

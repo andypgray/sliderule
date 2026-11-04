@@ -22,11 +22,10 @@ internal static class GitWorkTree
     ///     Where <paramref name="directory" /> lies in the work tree it belongs to, or null when git names none, or
     ///     when the ancestor that git's path below the root leads back to is not, to git, that work tree's top level.
     /// </summary>
-    // The root is cut from the caller's own spelling rather than taken from git's, which on Windows resolves short
-    // names and can then fail to contain the directory it was asked about. The names below the root are git's, which
-    // are long names, because the caller's may be short names that mean nothing on another machine. The cut counts
-    // segments and compares no names, so git is asked again at the candidate, and only its answer that the candidate
-    // is the same top level makes it the root. A directory inside a .git directory has a prefix and no work tree, and
+    // The root is cut from the caller's own spelling rather than taken from git's, which need not be spelled the way
+    // the caller reached the directory and can then fail to contain it. The names below the root are git's, because
+    // they are the names another clone has. The cut counts segments and compares no names, so git is asked again at
+    // the candidate, and only its answer that the candidate is the same top level makes it the root. A directory inside a .git directory has a prefix and no work tree, and
     // asking for the top level is what makes it answer null.
     public static async Task<Location?> LocateAsync(string directory, CancellationToken ct)
     {

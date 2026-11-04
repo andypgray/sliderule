@@ -407,7 +407,7 @@ internal static class SarifReportRenderer
     // and the human report do, so an alert keeps its fingerprint wherever the repository root lies; an artifact
     // URI reads from the repository root, because code scanning resolves a relative URI there. The URI is the
     // solution-relative path under the solution's prefix rather than a path relativized against the root, because
-    // the prefix carries git's names below the root and a site's path may carry a short name in their place.
+    // the prefix carries git's names below the root, which a site's path need not spell the same way.
     private sealed record SitePaths(PathFormat.Relativizer Solution, string SolutionPrefix)
     {
         public string UriOf(string solutionRelativePath)

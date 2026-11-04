@@ -48,8 +48,9 @@ updates:
   # not ignored and stays current. XunitRequirementSyncTests holds these ignores, the pair and the stated
   # requirement to each other.
   #
-  # Changing the directory list orphans the pull requests the old list opened: no later run refreshes
-  # or closes them, so close them by hand.
+  # Merging nuget entries into one orphans the pull requests the old entries opened: no later run
+  # refreshes or closes them. Adding a directory to the list keeps them on record, yet a pull request
+  # can stay open after the push that satisfies it. Close those by hand.
   - package-ecosystem: nuget
     directories:
       - /src/SlideRule
