@@ -91,7 +91,7 @@
         <InternalsVisibleTo Include="sliderule-cli" />
         <InternalsVisibleTo Include="SlideRule.Xunit" />
         <InternalsVisibleTo Include="SlideRule.Tests" />
-        <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
+        <InternalsVisibleTo Include="DynamicProxyGenAssembly2" Key="$(CastleDynamicProxyPublicKey)" />
     </ItemGroup>
 
     <!-- The closure the compiler and the editor have to load, named once for the two targets that need

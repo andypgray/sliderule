@@ -222,11 +222,13 @@ public sealed class DeriveSpecPromptTests
         string text = await ShouldServeRecipeAsync();
 
         // Assert — each warning sits where its trap is met: an SDK pinned below 10 at the scaffold's framework, a
-        // props file's versionless package references under the central-management opt-out, MVC action names under
-        // the async-suffix rule, a test host's registrations under the captive-dependency rule, and the analyzer
-        // rollout in the next steps handed to the human.
+        // props file's versionless package references under the central-management opt-out, a strong-named
+        // product's keyed grant beside the internal-type anchor, MVC action names under the async-suffix rule, a
+        // test host's registrations under the captive-dependency rule, and the analyzer rollout in the next steps
+        // handed to the human.
         text.ShouldContain("NETSDK1045");
         text.ShouldContain("NU1015");
+        text.ShouldContain("A strong-named product's grant must name the spec's public key (`, PublicKey=…`)");
         text.ShouldContain("take the controllers out first");
         text.ShouldContain("test projects included");
         text.ShouldContain("roll out the build analyzer");
@@ -408,17 +410,15 @@ public sealed class DeriveSpecPromptTests
     // Each opt-out keeps the scaffold valid under a repository-wide setting it would otherwise inherit. Central
     // package management makes the inline version NU1008. Package validation makes restore fetch every packable
     // project's own id at the baseline version, which is NU1101 for a spec never published. Generated
-    // documentation reports CS1591 on the public spec class, and signing a .NET Framework spec reports CS8002 on
-    // the unsigned contract. An inherited TargetFrameworks list decides restore while a singular element decides
-    // the build (NETSDK1005); an inherited singular element beside the scaffold's plural list does the same
-    // unless the scaffold clears it. The prose quotes some of these elements too, so only the csproj fence, cut as
+    // documentation reports CS1591 on the public spec class. An inherited TargetFrameworks list decides restore
+    // while a singular element decides the build (NETSDK1005); an inherited singular element beside the
+    // scaffold's plural list does the same unless the scaffold clears it. The prose quotes some of these elements too, so only the csproj fence, cut as
     // CI cuts it, can tell an opt-out that left the scaffold from one still named in the prose. CI executes the
     // same commitments against real central, props and editorconfig files.
     [Theory]
     [InlineData("<ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>")]
     [InlineData("<IsPackable>false</IsPackable>")]
     [InlineData("<GenerateDocumentationFile>false</GenerateDocumentationFile>")]
-    [InlineData("<NoWarn>$(NoWarn);CS8002</NoWarn>")]
     [InlineData("<TargetFrameworks>net10.0</TargetFrameworks>")]
     [InlineData("<TargetFramework></TargetFramework>")]
     public void DeriveSpec_ScaffoldCsproj_CarriesEachOptOut(string element)

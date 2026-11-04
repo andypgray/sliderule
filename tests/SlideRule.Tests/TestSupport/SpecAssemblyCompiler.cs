@@ -93,12 +93,15 @@ internal static class SpecAssemblyCompiler
 
     /// <summary>
     ///     Compiles <paramref name="source" /> against <paramref name="references" /> and hands back the
-    ///     emitted image, for a caller that <em>references</em> the result rather than loads it.
+    ///     emitted image, for a caller that <em>references</em> the result rather than loads it. The compilation
+    ///     takes <paramref name="options" /> where given, a plain library otherwise.
     /// </summary>
-    internal static byte[] EmitImage(string source, string assemblyName, IReadOnlyList<MetadataReference> references)
+    internal static byte[] EmitImage(
+        string source, string assemblyName, IReadOnlyList<MetadataReference> references,
+        CSharpCompilationOptions? options = null)
     {
         using var stream = new MemoryStream();
-        EmitResult result = Compile(source, assemblyName, references)
+        EmitResult result = Compile(source, assemblyName, references, options)
             .Emit(stream);
         ThrowOnFailure(result, assemblyName);
         return stream.ToArray();
@@ -162,14 +165,16 @@ internal static class SpecAssemblyCompiler
         ThrowOnFailure(result, assemblyName);
     }
 
-    private static CSharpCompilation Compile(string source, string assemblyName, IReadOnlyList<MetadataReference> references)
+    private static CSharpCompilation Compile(
+        string source, string assemblyName, IReadOnlyList<MetadataReference> references,
+        CSharpCompilationOptions? options = null)
     {
         SyntaxTree tree = CSharpSyntaxTree.ParseText(source);
         return CSharpCompilation.Create(
             assemblyName,
             [tree],
             references,
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            options ?? new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
     }
 
     private static void ThrowOnFailure(EmitResult result, string assemblyName)

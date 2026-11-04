@@ -61,6 +61,7 @@ public sealed class AdapterTests
                 "packaging/xunit-in-adapter-only",
                 "packaging/shipping-locks-restore",
                 "packaging/shipping-carries-docs",
+                "packaging/strong-named",
                 "packaging/only-the-named-ship",
                 "di/no-captive-dependencies",
                 "di/seams-constructed-at-root",

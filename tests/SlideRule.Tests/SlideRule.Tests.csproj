@@ -32,6 +32,10 @@
          lock policy above is inline. -->
     <Import Project="$(MSBuildThisFileDirectory)../../build/DocumentationWarnings.props" />
 
+    <!-- Signed with the src projects' key, which every grant to this assembly names. Imported by name for the
+         same reason as the documentation warnings above. -->
+    <Import Project="$(MSBuildThisFileDirectory)../../build/StrongName.props" />
+
     <!-- Analyzer severities from the repo-root analyzers.globalconfig, named here for the same reason the
          lock policy above is inline: this project alone, never the fixture solutions below it.
          src/Directory.Build.props names the same file for the shipping projects. -->

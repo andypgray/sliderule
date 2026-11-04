@@ -58,6 +58,13 @@
     <IsBaselineSuppression>true</IsBaselineSuppression>
   </Suppression>
   <Suppression>
+    <DiagnosticId>CP0003</DiagnosticId>
+    <Target>SlideRule, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null</Target>
+    <Left>lib/netstandard2.0/SlideRule.dll</Left>
+    <Right>lib/netstandard2.0/SlideRule.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
     <DiagnosticId>CP0006</DiagnosticId>
     <Target>P:SlideRule.IMemberInfo.IsInterfaceImplementation</Target>
     <Left>lib/netstandard2.0/SlideRule.dll</Left>

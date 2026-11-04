@@ -84,6 +84,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The SlideRule assemblies are strong-named, all with one key, so their identity now includes a public key
+  token, `f1ab2c1d070c9fc6`. That includes the three assemblies a test project takes from `SlideRule.Xunit`:
+  the adapter itself and the `SlideRule.Extraction` and `SlideRule.Roslyn` assemblies it carries. A signed
+  .NET Framework spec project no longer reports CS8002 on its reference to `SlideRule`, and builds under
+  `TreatWarningsAsErrors` with no opt-out, so the `derive_spec` and `init` scaffold no longer suppresses it.
+  A spec built against an earlier, unsigned release still loads and checks.
 - `arch.Registered`, `MustBeRegistered` and `MustNotInject` see registrations made through a generic
   extension method the solution declares, such as `services.AddUnique<IFoo, Foo>()`, at each place it is
   called, with that call's types and its lifetime: a `ServiceLifetime` argument, or the parameter's default.
@@ -189,8 +195,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Directory.Build.props` applies to every project. It names its framework in `<TargetFrameworks>`, so a
   framework list set above it no longer fails the build with NETSDK1005. It sets
   `<GenerateDocumentationFile>false</GenerateDocumentationFile>`, so generated documentation does not report
-  CS1591 on the spec class, and suppresses CS8002, which a signed .NET Framework spec reports because the
-  SlideRule assemblies are not strong-named. Under `TreatWarningsAsErrors` either was a failed build. The
+  CS1591 on the spec class, which under `TreatWarningsAsErrors` was a failed build. The
   recipe now asks for the spec files in the repository's own style, its header included, and its list of
   errors adds IDE0073, NU1100 under package source mapping and NU1004 under locked restore, each with its fix.
 

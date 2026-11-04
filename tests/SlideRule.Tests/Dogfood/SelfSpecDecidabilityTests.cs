@@ -42,6 +42,7 @@ public sealed class SelfSpecDecidabilityTests
         "packaging/only-the-named-ship",
         "packaging/shipping-carries-docs",
         "packaging/shipping-locks-restore",
+        "packaging/strong-named",
         "packaging/xunit-in-adapter-only",
         "roslyn/msbuild-bootstrap/tripwire"
     ];

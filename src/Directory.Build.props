@@ -96,6 +96,8 @@
     </PropertyGroup>
     <Import Project="$(MSBuildThisFileDirectory)../build/DocumentationWarnings.props" />
 
+    <Import Project="$(MSBuildThisFileDirectory)../build/StrongName.props" />
+
     <!-- NU1701 is restore resolving a package through the .NET Framework fallback: the project then
          compiles against assemblies built for another framework, and their Framework polyfills join
          the graph. The MSBuild packages are the known case, since each MSBuild minor line ships assets

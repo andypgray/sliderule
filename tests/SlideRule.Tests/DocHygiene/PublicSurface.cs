@@ -40,6 +40,11 @@ internal static class PublicSurface
     /// </summary>
     internal static readonly Version PinnedBindingIdentity = new(1, 0, 0, 0);
 
+    /// <summary>
+    ///     The public key token of the key in build/SlideRule.snk, which every src assembly is signed with.
+    /// </summary>
+    internal const string PinnedPublicKeyToken = "f1ab2c1d070c9fc6";
+
     /// <summary>The repo-relative path of the pin recording <paramref name="assembly" />'s surface.</summary>
     internal static string PinPath(Assembly assembly)
     {

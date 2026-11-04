@@ -527,11 +527,13 @@ jobs:
       # error code, never a bare non-zero exit, which any unrelated failure would satisfy.
       #
       # D: warnings as errors with documentation and signing on. Generated documentation is CS1591 on the
-      #    public spec class, and a signed .NET Framework spec is CS8002 on the unsigned contract library
-      #    (a .NET target does not report it, so that control retargets the spec to net48, and the leg's feed
-      #    adds nuget.org behind the mapping for the reference assemblies). Both are
-      #    opt-outs; TreatWarningsAsErrors itself stays the repository's, and its control is a dead spec
-      #    literal, whose analyzer warning becomes error SR1017.
+      #    public spec class, an opt-out. A signed .NET Framework spec reports CS8002 on any unsigned
+      #    reference, and the contract is strong-named, so the scaffold retargeted to net48 has to build
+      #    signed with no opt-out at all (a .NET target never reports CS8002, and the leg's feed adds nuget.org
+      #    behind the mapping for the net48 reference assemblies). TreatWarningsAsErrors itself stays the
+      #    repository's, and its control is a dead spec literal, whose analyzer warning becomes error SR1017.
+      #    Last, the signed spec anchors an internal member of the signed product through the keyed grant the
+      #    recipe gives a strong-named product.
       # E: code style enforced in the build, with a file header required at error. The spec files are the
       #    repository's code, so the recipe has the agent write the header rather than opt out of the style.
       # F: a TargetFrameworks list in the root props without the spec's framework. Restore follows the list
@@ -561,9 +563,17 @@ jobs:
 
           using var rsa = new RSACryptoServiceProvider(1024);
           File.WriteAllBytes(args[0], rsa.ExportCspBlob(includePrivateParameters: true));
+          byte[] key = rsa.ExportCspBlob(includePrivateParameters: false);
+          BitConverter.GetBytes(0x00002400).CopyTo(key, 4);
+          byte[] blob = [0x00, 0x24, 0x00, 0x00, 0x04, 0x80, 0x00, 0x00, .. BitConverter.GetBytes(key.Length), .. key];
+          Console.WriteLine(Convert.ToHexStringLower(blob));
           CS
           key="$RUNNER_TEMP/keygen/scaffold.snk"
-          dotnet run "$RUNNER_TEMP/keygen/key.cs" -- "$key"
+          publickey="$(dotnet run "$RUNNER_TEMP/keygen/key.cs" -- "$key")"
+          [[ "$publickey" =~ ^0024000004800000[0-9a-f]+$ ]] || {
+            echo "::error::The key helper printed '$publickey', not a strong-name public key blob"
+            exit 1
+          }
 
           export NUGET_PACKAGES="$RUNNER_TEMP/packageref-policy-packages"
 
@@ -610,17 +620,56 @@ jobs:
           cp "$RUNNER_TEMP/wae-csproj.orig" "$speccsproj"
           sed -i 's|<TargetFrameworks>net10.0</TargetFrameworks>|<TargetFrameworks>net48</TargetFrameworks>|' "$speccsproj"
           dotnet build "$speccsproj" || {
-            echo "::error::The scaffold csproj retargeted to net48, as the recipe tells a .NET Framework estate to, did not build signed under TreatWarningsAsErrors"
+            echo "::error::The scaffold csproj retargeted to net48, as the recipe tells a .NET Framework estate to, did not build signed under TreatWarningsAsErrors; CS8002 there means a SlideRule assembly it references is not strong-named"
             exit 1
           }
-          sed -i '/<NoWarn>/d' "$speccsproj"
-          build_fails_with "$speccsproj" "$RUNNER_TEMP/wae-without-cs8002-opt-out.log" 'error CS8002.*SlideRule' \
-            "Removing the CS8002 NoWarn from the net48 scaffold csproj did not produce CS8002 on SlideRule — that line is no longer what keeps a signed .NET Framework spec building, so the leg above proves nothing"
 
           cp "$RUNNER_TEMP/wae-csproj.orig" "$speccsproj"
           dead_pattern_rule "$wae/arch/MyApp.Architecture"
           build_fails_with "$speccsproj" "$RUNNER_TEMP/wae-dead-literal.log" 'DeadPattern\.cs\([0-9]+,[0-9]+\): error SR1017' \
             "A dead spec literal under TreatWarningsAsErrors did not fail the build with error SR1017 — the troubleshooting entry for an SR error under that setting describes a failure this leg can no longer show"
+
+          # The recipe's grant for an internal-type anchor, on a strong-named product: both projects are signed
+          # with the one key, the product names the spec by name and public key, and the spec anchors an
+          # internal member. A name-only grant fails the product with CS1726, and the spec takes its reference to
+          # the product only here, after the net48 build that retargets the spec alone.
+          rm "$wae/arch/MyApp.Architecture/DeadPattern.cs"
+          cat > "$wae/src/MyApp/ShipmentLedger.cs" <<CS
+          using System.Runtime.CompilerServices;
+
+          [assembly: InternalsVisibleTo("MyApp.Architecture, PublicKey=$publickey")]
+
+          namespace MyApp;
+
+          internal sealed class ShipmentLedger
+          {
+              internal string Total() => "0";
+          }
+          CS
+          sed -i 's|</Project>|    <ItemGroup>\n        <ProjectReference Include="../../src/MyApp/MyApp.csproj" />\n    </ItemGroup>\n</Project>|' "$speccsproj"
+          cat > "$wae/arch/MyApp.Architecture/InternalAnchor.cs" <<'CS'
+          using SlideRule;
+
+          namespace MyApp.Architecture;
+
+          public sealed class InternalAnchorProof : IArchitectureSpec
+          {
+              public void Define(Arch arch)
+              {
+                  arch.Rule("members/no-ledger-total")
+                      .Enforce(arch.Project("MyApp").MustNotUse(arch.Member(typeof(MyApp.ShipmentLedger), nameof(MyApp.ShipmentLedger.Total))))
+                      .Because("The anchor is an internal member, so the spec compiles only through the product's keyed grant, and check loads it only if the signed assemblies agree.");
+              }
+          }
+          CS
+          dotnet build "$wae/MyApp.slnx" || {
+            echo "::error::A signed spec anchoring an internal member of a signed product did not build under the recipe's keyed InternalsVisibleTo grant"
+            exit 1
+          }
+          sliderule check "$wae/MyApp.slnx" || {
+            echo "::error::The signed spec anchoring an internal member built but was not discovered, did not load, or did not pass over conforming code"
+            exit 1
+          }
 
           # ── Leg E: code style enforced in the build, with a file header required ─────────────────
           style="$RUNNER_TEMP/packageref-style"

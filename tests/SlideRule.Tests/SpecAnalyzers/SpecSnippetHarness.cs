@@ -48,15 +48,20 @@ internal static class SpecSnippet
     /// </remarks>
     internal static CSharpParseOptions Language { get; } = new(LanguageVersion.CSharp14);
 
-    /// <summary>The options every spec compilation here is built with: a library, with nullable annotations on.</summary>
+    /// <summary>
+    ///     The options every spec compilation here is built with: a library, with nullable annotations on,
+    ///     public-signed with the repository's key.
+    /// </summary>
     /// <remarks>
     ///     Nullable annotations on, which is how every spec project in this repository is built. The analysis
     ///     reports warnings and never errors, so it changes nothing the zero-errors assertion reads; what it
-    ///     buys is that a real source file compiles here in the context it was written in.
+    ///     buys is that a real source file compiles here in the context it was written in. The signature is
+    ///     what lets a compilation that takes the suite's own name reach the internals the contract grants it.
     /// </remarks>
     internal static CSharpCompilationOptions Options { get; } =
         new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
-            .WithNullableContextOptions(NullableContextOptions.Enable);
+            .WithNullableContextOptions(NullableContextOptions.Enable)
+            .WithRepositoryKey();
 
     /// <summary>
     ///     The global usings the SDK writes for a class library with implicit usings on, as a source tree of

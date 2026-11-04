@@ -329,6 +329,31 @@ public sealed class PublicSurfaceSyncTests
     }
 
     [Fact]
+    public void SrcAssemblies_CarryThePinnedPublicKeyToken()
+    {
+        // Arrange: the public key token is part of every published assembly's identity. A swapped key rebuilds
+        // every grant with it and stays green, so this pin is what reports the change of identity.
+        List<string> findings = new();
+
+        // Act
+        foreach (string name in SolutionInventory.SrcProjects.Select(static project => project.AssemblyName))
+        {
+            byte[] token = Assembly.Load(new AssemblyName(name))
+                .GetName()
+                .GetPublicKeyToken() ?? [];
+            string actual = Convert.ToHexStringLower(token);
+            if (actual == PublicSurface.PinnedPublicKeyToken) continue;
+
+            findings.Add($"{name} has public key token '{actual}', not {PublicSurface.PinnedPublicKeyToken}. A "
+                         + ".NET Framework reference to a published version names the pinned token and will no "
+                         + "longer bind.");
+        }
+
+        // Assert
+        findings.ShouldReportNothing("These src assemblies no longer carry the repository's strong name");
+    }
+
+    [Fact]
     public void EveryPinFile_IsCommittedAsLfWithOneTrailingNewline()
     {
         // Arrange: the pin is compared as text against a render that joins on "\n", so a checkout that

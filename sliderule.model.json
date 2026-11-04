@@ -249,6 +249,14 @@
       "constraint": { "node": "mustSetProperty", "projectSubject": { "adjectives": [{ "node": "projectMatching", "globs": ["SlideRule*"] }, { "node": "projectPackable" }] }, "property": "GenerateDocumentationFile", "value": "true" }
     },
     {
+      "id": "packaging/strong-named",
+      "posture": "enforce",
+      "sentence": "Projects `SlideRule`, `SlideRule.Extraction`, `SlideRule.Analyzers`, `SlideRule.SpecAnalyzers`, `SlideRule.SpecCompletion`, `SlideRule.Roslyn`, `SlideRule.Cli`, `SlideRule.Xunit`, `SlideRule.Packs.DotNet`, `SlideRule.Guidance.DotNet` or `SlideRule.Tests` must set `SignAssembly` to `true`.",
+      "because": "A signed .NET Framework project reports CS8002 on a reference to an unsigned assembly, which fails its build under warnings as errors, and a spec takes the contract from a .NET Framework estate as often as from a modern one. Every assembly here carries the one key, because the contract grants its internals to the others by name and public key, and the key is part of each published assembly's identity.",
+      "fix": "Import build/StrongName.props, as src/Directory.Build.props does for every project under src/; never sign with another key. A new project under src/ joins the names in this rule's subject in the same change.",
+      "constraint": { "node": "mustSetProperty", "projectSubject": { "adjectives": [{ "node": "projectNamed", "names": ["SlideRule", "SlideRule.Extraction", "SlideRule.Analyzers", "SlideRule.SpecAnalyzers", "SlideRule.SpecCompletion", "SlideRule.Roslyn", "SlideRule.Cli", "SlideRule.Xunit", "SlideRule.Packs.DotNet", "SlideRule.Guidance.DotNet", "SlideRule.Tests"] }] }, "property": "SignAssembly", "value": "true" }
+    },
+    {
       "id": "packaging/only-the-named-ship",
       "posture": "enforce",
       "sentence": "Projects matching `SlideRule*`, except projects `SlideRule`, `SlideRule.Analyzers`, `SlideRule.Xunit`, `SlideRule.Cli` or `SlideRule.Guidance.DotNet`, must not be packable.",

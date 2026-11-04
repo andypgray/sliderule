@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
+using Microsoft.CodeAnalysis;
 using Shouldly;
 using SlideRule.Cli.SpecLoading;
 using SlideRule.Tests.TestSupport;
@@ -61,14 +62,15 @@ public sealed class SpecContractSkewE2ETests
                                                 """;
 
     [Theory]
-    [InlineData("0.2.0.0")] // older than the host's pinned identity…
-    [InlineData("2.0.0.0")] // …and newer, the direction a version-keyed bind fails at load with a missing-file error
-    public async Task Explain_SpecBuiltAgainstASkewedContract_BindsAndExplainsTheRule(string version)
+    [InlineData("0.2.0.0", true)] // older than the host's pinned identity…
+    [InlineData("2.0.0.0", true)] // …and newer, the direction a version-keyed bind fails at load with a missing-file error
+    [InlineData("0.2.0.0", false)] // a release from before the contract was strong-named, against the signed host
+    public async Task Explain_SpecBuiltAgainstASkewedContract_BindsAndExplainsTheRule(string version, bool signed)
     {
         // Arrange
         using TempDirectory temp = TestTempRoot.Fresh("spec-contract-skew");
-        string specDll = EmitSkewedSpec(temp, Version.Parse(version), "");
-        ShouldReferenceContract(specDll, Version.Parse(version));
+        string specDll = EmitSkewedSpec(temp, Version.Parse(version), "", signed: signed);
+        ShouldReferenceContract(specDll, Version.Parse(version), signed);
 
         // Act
         CliResult result = await CliRunner.InvokeAsync("explain", RuleId, "--spec", specDll);
@@ -137,12 +139,13 @@ public sealed class SpecContractSkewE2ETests
     }
 
     private static string EmitSkewedSpec(
-        TempDirectory temp, Version contractVersion, string extraStatement, string extraDeclaration = "")
+        TempDirectory temp, Version contractVersion, string extraStatement, string extraDeclaration = "",
+        bool signed = true)
     {
         string specDll = temp.PathOf(SpecContractSkewAssertions.SpecAssemblyName + ".dll");
         string source = SpecSource(extraStatement, extraDeclaration);
-        SpecAssemblyCompiler.EmitSpecDll(
-            source, specDll, SpecContractSkewAssertions.SpecAssemblyName, SkewedContract.Reference(contractVersion));
+        MetadataReference contract = SkewedContract.Reference(contractVersion, signed);
+        SpecAssemblyCompiler.EmitSpecDll(source, specDll, SpecContractSkewAssertions.SpecAssemblyName, contract);
         return specDll;
     }
 
@@ -170,24 +173,24 @@ public sealed class SpecContractSkewE2ETests
     }
 
     /// <summary>
-    ///     Asserts the emitted spec really carries the skewed contract identity. Without it the green arms
-    ///     would pass just as happily on a spec that had been built against the host's own contract — which
-    ///     is the one thing they exist to rule out.
+    ///     Asserts the emitted spec really carries the skewed contract identity, its version and whether it names a
+    ///     public key token. Without it the green arms would pass just as happily on a spec that had been built
+    ///     against the host's own contract — which is the one thing they exist to rule out.
     /// </summary>
-    private static void ShouldReferenceContract(string specDllPath, Version expected)
+    private static void ShouldReferenceContract(string specDllPath, Version expected, bool signed)
     {
         using FileStream stream = File.OpenRead(specDllPath);
         using var peReader = new PEReader(stream);
         MetadataReader metadata = peReader.GetMetadataReader();
 
-        List<Version> referenced = metadata.AssemblyReferences
+        List<(Version Version, bool Signed)> referenced = metadata.AssemblyReferences
             .Select(metadata.GetAssemblyReference)
             .Where(reference => metadata.GetString(reference.Name) == SpecLoadContext.ContractAssemblyName)
-            .Select(reference => reference.Version)
+            .Select(reference => (reference.Version, !reference.PublicKeyOrToken.IsNil))
             .ToList();
 
         referenced.ShouldBe(
-            [expected],
+            [(expected, signed)],
             $"'{Path.GetFileName(specDllPath)}' must reference exactly one {SpecLoadContext.ContractAssemblyName}, "
             + "at the skewed identity it was built against.");
     }

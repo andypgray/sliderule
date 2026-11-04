@@ -1,0 +1,23 @@
+<Project>
+
+    <!-- Strong naming, imported by name from src/Directory.Build.props and the tests csproj. Nothing
+         auto-discovers this file, so the fixture solutions staged under the tree stay unsigned; an unsigned
+         project may reference a signed one.
+
+         The key is part of every published assembly's identity: a .NET Framework project binds a reference by
+         name, version and public key token. Never change the key and never remove it, since either is a break
+         for every consumer compiled against a published package. The private key is committed because a
+         strong name is an identity, not a security boundary, and committing it lets any clone build the
+         same identity.
+
+         PublicKey also keys every InternalsVisibleTo item that carries no Key of its own, which is how the
+         SDK writes the grants between this repository's assemblies; a grant to an assembly signed with
+         another key names that key, as the DynamicProxyGenAssembly2 grants do with Castle's. -->
+    <PropertyGroup>
+        <SignAssembly>true</SignAssembly>
+        <AssemblyOriginatorKeyFile>$(MSBuildThisFileDirectory)SlideRule.snk</AssemblyOriginatorKeyFile>
+        <PublicKey>0024000004800000940000000602000000240000525341310004000001000100911161dbea86323ecfc0ee92b7d6ba2610a6f3ebfe2d80644d89023a045ed122bfbd1aa03c9dcb76879ea19a4b234fea064108e01371fecc220bcbcf8ebcec52bf254b92569deadd345708f170434e539fc37a7154e66ed3f05b451f1f7368437ef5be305e2abe9d1d63b925d28e27c85a1375d47f6b6b15959972e49c25cca1</PublicKey>
+        <CastleDynamicProxyPublicKey>0024000004800000940000000602000000240000525341310004000001000100c547cac37abd99c8db225ef2f6c8a3602f3b3606cc9891605d02baa56104f4cfc0734aa39b93bf7852f7d9266654753cc297e7d2edfe0bac1cdcf9f717241550e0a7b191195b7667bb4f64bcb8e2121380fd1d9d46ad2d92d2d15605093924cceaf74c4861eff62abf69b9291ed0a340e113be11e6a7d3113e92484cf7045cc7</CastleDynamicProxyPublicKey>
+    </PropertyGroup>
+
+</Project>

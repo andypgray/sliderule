@@ -24,7 +24,7 @@
         <InternalsVisibleTo Include="sliderule-cli" />
         <InternalsVisibleTo Include="SlideRule.Xunit" />
         <InternalsVisibleTo Include="SlideRule.Tests" />
-        <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
+        <InternalsVisibleTo Include="DynamicProxyGenAssembly2" Key="$(CastleDynamicProxyPublicKey)" />
     </ItemGroup>
 
     <!-- Severities for this project alone, beside the repo-wide file src/Directory.Build.props names. The

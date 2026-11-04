@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using SlideRule.Cli.SpecLoading;
 
 namespace SlideRule.Tests.TestSupport;
@@ -122,36 +123,44 @@ internal static class SkewedContract
                                   }
                                   """;
 
-    // The emitted image is a pure function of the version and a MetadataReference is immutable, so one stored
-    // image per distinct version serves the whole run rather than one per request, and serves both forms. Two
+    // The emitted image is a pure function of the identity and a MetadataReference is immutable, so one stored
+    // image per distinct identity serves the whole run rather than one per request, and serves both forms. Two
     // racing first requests may each compile it, but both get the one GetOrAdd keeps.
-    private static readonly ConcurrentDictionary<Version, Emitted> ByVersion = new();
+    private static readonly ConcurrentDictionary<(Version Version, bool Signed), Emitted> ByIdentity = new();
 
     /// <summary>
-    ///     The stand-in contract at <paramref name="version" />, as a reference to compile a spec against.
+    ///     The stand-in contract at <paramref name="version" />, as a reference to compile a spec against. It is
+    ///     signed with the real contract's key unless <paramref name="signed" /> is false, which stands in for a
+    ///     release published before the contract was strong-named.
     /// </summary>
-    internal static MetadataReference Reference(Version version)
+    internal static MetadataReference Reference(Version version, bool signed = true)
     {
-        return ByVersion.GetOrAdd(version, Emit)
+        return ByIdentity.GetOrAdd((version, signed), Emit)
             .MetadataReference;
     }
 
     /// <summary>
-    ///     The stand-in contract at <paramref name="version" />, as the emitted image, for a probe that loads it
-    ///     into a load context of its own. The array is shared; never write to it.
+    ///     The stand-in contract at <paramref name="version" />, signed, as the emitted image, for a probe that
+    ///     loads it into a load context of its own. The array is shared; never write to it.
     /// </summary>
     internal static byte[] Image(Version version)
     {
-        return ByVersion.GetOrAdd(version, Emit)
+        return ByIdentity.GetOrAdd((version, true), Emit)
             .Bytes;
     }
 
-    private static Emitted Emit(Version version)
+    // A signed stand-in carries the real contract's key, so it unifies with the references the signed adapter and
+    // engine assemblies carry to the contract and differs from the real one in version alone.
+    private static Emitted Emit((Version Version, bool Signed) identity)
     {
+        var options = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary);
+        if (identity.Signed) options = options.WithRepositoryKey();
+
         byte[] image = SpecAssemblyCompiler.EmitImage(
-            Source.Replace("{VERSION}", version.ToString(), StringComparison.Ordinal),
+            Source.Replace("{VERSION}", identity.Version.ToString(), StringComparison.Ordinal),
             SpecLoadContext.ContractAssemblyName,
-            SpecAssemblyCompiler.PlatformReferences);
+            SpecAssemblyCompiler.PlatformReferences,
+            options);
         MetadataReference reference = MetadataReference.CreateFromImage(image);
         return new Emitted(image, reference);
     }

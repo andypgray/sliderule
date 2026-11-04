@@ -66,7 +66,7 @@
 
     <ItemGroup>
         <InternalsVisibleTo Include="SlideRule.Tests" />
-        <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
+        <InternalsVisibleTo Include="DynamicProxyGenAssembly2" Key="$(CastleDynamicProxyPublicKey)" />
     </ItemGroup>
 
 </Project>

@@ -297,7 +297,8 @@ public sealed class AnalyzerCoreFirewallTests
         var compilation = CSharpCompilation.Create(
             "SlideRule.Analyzers", [tree], TrustedPlatform.References,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
-                .WithNullableContextOptions(NullableContextOptions.Enable));
+                .WithNullableContextOptions(NullableContextOptions.Enable)
+                .WithRepositoryKey());
 
         using var stream = new MemoryStream();
         EmitResult result = compilation.Emit(stream);

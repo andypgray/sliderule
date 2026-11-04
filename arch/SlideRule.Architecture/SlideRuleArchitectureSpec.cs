@@ -478,6 +478,30 @@ public sealed class SlideRuleArchitectureSpec : IArchitectureSpec
             .Fix("Set `GenerateDocumentationFile` to true. src/Directory.Build.props already sets it for every " +
                  "project under src/.");
 
+        // Named rather than matched: the fixture spec projects match `SlideRule*` too, and they stay unsigned.
+        arch.Rule("packaging/strong-named")
+            .Enforce(arch.Projects.Named(
+                    "SlideRule",
+                    "SlideRule.Extraction",
+                    "SlideRule.Analyzers",
+                    "SlideRule.SpecAnalyzers",
+                    "SlideRule.SpecCompletion",
+                    "SlideRule.Roslyn",
+                    "SlideRule.Cli",
+                    "SlideRule.Xunit",
+                    "SlideRule.Packs.DotNet",
+                    "SlideRule.Guidance.DotNet",
+                    "SlideRule.Tests")
+                .MustSetProperty("SignAssembly", "true"))
+            .Because("A signed .NET Framework project reports CS8002 on a reference to an unsigned assembly, " +
+                     "which fails its build under warnings as errors, and a spec takes the contract from a .NET " +
+                     "Framework estate as often as from a modern one. Every assembly here carries the one key, " +
+                     "because the contract grants its internals to the others by name and public key, and the " +
+                     "key is part of each published assembly's identity.")
+            .Fix("Import build/StrongName.props, as src/Directory.Build.props does for every project under " +
+                 "src/; never sign with another key. A new project under src/ joins the names in this rule's " +
+                 "subject in the same change.");
+
         arch.Rule("packaging/only-the-named-ship")
             .Enforce(repoProjects
                 .Except(arch.Projects.Named(
