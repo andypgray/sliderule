@@ -30,6 +30,7 @@ internal sealed record CacheManifest(
     IReadOnlyList<string> UncheckedProjects,
     IReadOnlyList<string> RestoreFailedProjects,
     IReadOnlyList<UnsupportedProject> UnsupportedProjects,
+    IReadOnlyList<string> MissingProjects,
     IReadOnlyList<CodebaseFragment> Fragments);
 
 /// <summary>

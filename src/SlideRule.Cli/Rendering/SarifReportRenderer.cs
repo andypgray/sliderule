@@ -151,6 +151,7 @@ internal static class SarifReportRenderer
             .Select(text => new SarifNotification(new SarifMessage(text), WarningLevel))
             .ToList();
 
+        if (trust.MissingProjects is { } missing) notifications.Add(MissingProjectNotification(missing));
         if (trust.FailedProjects is { } failed) notifications.Add(LoadFailureNotification(failed));
         if (trust.RestoreFailedProjects is { } restoreFailed)
             notifications.Add(RestoreFailureNotification(restoreFailed));
@@ -172,6 +173,20 @@ internal static class SarifReportRenderer
             new SarifMessage(
                 $"The model is incomplete: {subject} failed to load, so these results were reached against a "
                 + $"codebase missing whole projects: {string.Join(", ", failedProjects)}"),
+            ErrorLevel);
+    }
+
+    // The same error for a declared project file that is not on disk, kept apart because its remedy is the file,
+    // never a restore or a build.
+    private static SarifNotification MissingProjectNotification(IReadOnlyList<string> missingProjects)
+    {
+        string subject = Plurals.Counted(missingProjects.Count, "project file");
+
+        return new SarifNotification(
+            new SarifMessage(
+                $"The model is incomplete: {subject} the solution declares {Plurals.Verb(missingProjects.Count)} "
+                + "not on disk, so these results were reached against a codebase missing whole projects: "
+                + string.Join(", ", missingProjects)),
             ErrorLevel);
     }
 

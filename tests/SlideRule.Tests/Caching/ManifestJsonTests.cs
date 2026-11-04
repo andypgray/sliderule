@@ -241,6 +241,7 @@ public sealed class ManifestJsonTests
             [
                 new UnsupportedProject("C:/repo/src/Shared/Shared.shproj", UnsupportedProjectKind.SharedProject)
             ],
+            MissingProjects: ["C:/repo/src/Submodule/Submodule.csproj"],
             Fragments: [FullyPopulatedFragment()]);
     }
 

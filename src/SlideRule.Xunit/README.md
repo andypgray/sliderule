@@ -50,7 +50,9 @@ A project that fails to load would otherwise drop out of the checked universe. E
 measured over a codebase missing whole projects, and a green verdict would not name the missing
 projects. So the adapter fails one named test, `Workspace_LoadedCompletely`, and its message lists
 the load diagnostics and the MSBuild selection that produced them. Every rule case skips, because its
-verdict was never reached. Restore and build the target solution, then rerun.
+verdict was never reached. Restore and build the target solution, then rerun. A project file the
+solution declares that is not on disk fails the same test; put the file back, or remove its entry from the
+solution.
 
 To check whatever did load anyway, opt in:
 

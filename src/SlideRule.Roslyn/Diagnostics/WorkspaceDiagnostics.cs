@@ -100,10 +100,11 @@ internal sealed record UnsupportedProject(string Path, UnsupportedProjectKind Ki
 /// <remarks>
 ///     <para>
 ///         Every project path here is absolute, and every list of them ordinal-sorted. The fail-closed gate rests
-///         on two of those lists, <see cref="FailedProjects" /> and <see cref="RestoreFailedProjects" />, read at
-///         load time by <see cref="ProjectLoadFailures" /> and <see cref="RestoreFailures" />, and never on
-///         diagnostic text, which is neither a contract nor language-independent: the diagnostics render and
-///         decide nothing. The two causes stay two lists, with separate remedies, and meet at
+///         on three of those lists, <see cref="MissingProjects" />, <see cref="FailedProjects" /> and
+///         <see cref="RestoreFailedProjects" />, read at load time by <see cref="ProjectLoadFailures" /> and
+///         <see cref="RestoreFailures" />, and never on diagnostic text, which is neither a contract nor
+///         language-independent: the diagnostics render and decide nothing. The three causes stay three lists, with
+///         separate remedies, and meet at
 ///         <see cref="IsIncomplete" />. The other lists scope the verdict and never reach <see cref="Gates" />: the
 ///         model they qualify is smaller, never wrong.
 ///     </para>
@@ -119,7 +120,9 @@ internal sealed record UnsupportedProject(string Path, UnsupportedProjectKind Ki
 ///     can tell.
 /// </param>
 /// <param name="MergeNotes">The advisory notes the fragment merge raised.</param>
-/// <param name="FailedProjects">The <c>.csproj</c> paths of the projects that failed to load.</param>
+/// <param name="FailedProjects">
+///     The <c>.csproj</c> paths of the projects that failed to load; disjoint from <see cref="MissingProjects" />.
+/// </param>
 /// <param name="UncheckedProjects">
 ///     The <c>.csproj</c> paths the solution's default configuration builds that this run did not check;
 ///     non-empty only under a solution filter that left members out.
@@ -140,6 +143,10 @@ internal sealed record UnsupportedProject(string Path, UnsupportedProjectKind Ki
 ///     <see cref="MergeNotes" />, filled from the same merge on the same read, so the two cannot disagree about
 ///     what compiled twice. The model is complete over one framework's view of each.
 /// </param>
+/// <param name="MissingProjects">
+///     The <c>.csproj</c> paths the solution declares that are not on disk, such as a project in an uninitialised
+///     submodule. No restore or build creates a project file, so their remedy is neither.
+/// </param>
 internal readonly record struct WorkspaceDiagnostics(
     IReadOnlyList<string> LoadFailures,
     IReadOnlyList<string> MergeNotes,
@@ -147,9 +154,10 @@ internal readonly record struct WorkspaceDiagnostics(
     IReadOnlyList<string> UncheckedProjects,
     IReadOnlyList<string> RestoreFailedProjects,
     IReadOnlyList<UnsupportedProject> UnsupportedProjects,
-    IReadOnlyList<MultiTargetedProject> MultiTargetedProjects)
+    IReadOnlyList<MultiTargetedProject> MultiTargetedProjects,
+    IReadOnlyList<string> MissingProjects)
 {
-    internal static WorkspaceDiagnostics None { get; } = new([], [], [], [], [], [], []);
+    internal static WorkspaceDiagnostics None { get; } = new([], [], [], [], [], [], [], []);
 
     /// <summary>
     ///     A load's verdict before any extraction: the merge's notes and multi-targeted projects stay empty, since
@@ -160,10 +168,12 @@ internal readonly record struct WorkspaceDiagnostics(
         IReadOnlyList<string> failedProjects,
         IReadOnlyList<string> uncheckedProjects,
         IReadOnlyList<string> restoreFailedProjects,
-        IReadOnlyList<UnsupportedProject> unsupportedProjects)
+        IReadOnlyList<UnsupportedProject> unsupportedProjects,
+        IReadOnlyList<string> missingProjects)
     {
         return new WorkspaceDiagnostics(
-            loadFailures, [], failedProjects, uncheckedProjects, restoreFailedProjects, unsupportedProjects, []);
+            loadFailures, [], failedProjects, uncheckedProjects, restoreFailedProjects, unsupportedProjects, [],
+            missingProjects);
     }
 
     /// <summary>
@@ -220,11 +230,12 @@ internal readonly record struct WorkspaceDiagnostics(
             ActionableDiagnostics, UnsupportedProjects, UnsupportedProjectKind.NotCsharp, UnsupportedProjectKind.SharedProject);
 
     /// <summary>
-    ///     Whether a project failed to load or its NuGet packages did not resolve, whatever the operator opted
-    ///     into: the JSON documents carry this, and the opt-in changes the exit code, never the truth about the
-    ///     model.
+    ///     Whether a declared project file is missing, a project failed to load or its NuGet packages did not
+    ///     resolve, whatever the operator opted into: the JSON documents carry this, and the opt-in changes the exit
+    ///     code, never the truth about the model.
     /// </summary>
-    internal bool IsIncomplete => FailedProjects.Count > 0 || RestoreFailedProjects.Count > 0;
+    internal bool IsIncomplete =>
+        MissingProjects.Count > 0 || FailedProjects.Count > 0 || RestoreFailedProjects.Count > 0;
 
     /// <summary>
     ///     Whether a solution filter left a declared project unchecked. Never a gate input: a narrowed run is a

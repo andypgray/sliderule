@@ -14,52 +14,59 @@ namespace SlideRule.Tests.Cli;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         Pins two field failures on a partially-loaded tree: <c>arch_graph</c> crashing with an invariant
+///         Guards two failures a partially-loaded tree can provoke: <c>arch_graph</c> crashing with an invariant
 ///         violation, and <c>check</c>/<c>baseline</c>/<c>graph</c>/<c>status</c> giving four different
 ///         answers to one condition. Neither reproduces on a tree that loads completely. The BrokenApp fixture
 ///         supplies the missing state: its solution names a project the tree does not contain, so the load
-///         reports real failures and the project that does load carries Roslyn error symbols where its
-///         reference to the absent one should be. <c>BrokenApp.Web.csproj</c>'s header records why leaving a
+///         reports a real missing project file, and the project that does load carries Roslyn error symbols where
+///         its reference to the absent one should be. <c>BrokenApp.Web.csproj</c>'s header records why leaving a
 ///         tree unrestored does not reproduce that, and the siting constraints that keep the fixture broken.
 ///     </para>
 ///     <para>
 ///         It is also the only bed where both causes compose. The tree is never restored — the fixture
 ///         forbids an <c>obj/</c>, and <c>BrokenApp.Web</c> could not be restored in isolation anyway, since it
 ///         references the deliberately-absent project — so its two SDK-style projects carry the restore cause
-///         while the third carries the load cause. Every refusal below therefore writes two blocks, and the
-///         order they come in is asserted rather than assumed: nothing else in the suite reaches the
-///         composition over a real tree, because the cheaper beds hand both lists in ready-made.
+///         while the third, absent from disk, carries the missing-file cause. Every refusal below therefore
+///         writes two blocks, and the order they come in is asserted rather than assumed: nothing else in the
+///         suite reaches the composition over a real tree, because the cheaper beds hand both lists in
+///         ready-made.
 ///     </para>
 ///     <para>
 ///         The first row loads cold (<see cref="CliRunner.InvokeColdAsync(string[])" />), the CLI's own path to
 ///         this refusal; the rest read the warm pool, whose session runs the same loader and carries the same
-///         failed and restore-failed projects. The copy's lease is this class's alone, so no other class is
+///         missing and restore-failed projects. The copy's lease is this class's alone, so no other class is
 ///         handed the broken session the pool keeps for it. The MCP leg gets its own harness, which composes its
 ///         own session.
 ///     </para>
 /// </remarks>
 public sealed class PartialLoadWorkspaceE2ETests
 {
-    // The lede of each verb's refusal. The evidence — one indented line per failed project — and the shared
-    // tail follow it, and BrokenApp.Contracts.csproj is asserted separately wherever the evidence is the
-    // subject: a refusal that could not name what failed is the defect these four exist to prevent.
+    // The lede of each verb's refusal for the declared project file that is not on disk. The evidence — one
+    // indented line per missing project — and the shared tail follow it, and BrokenApp.Contracts.csproj is
+    // asserted separately wherever the evidence is the subject: a refusal that could not name what is missing is
+    // the defect these four exist to prevent.
     private const string CheckGateLine =
-        "error: the model is incomplete — 1 project failed to load, so check cannot pass:";
+        "error: the model is incomplete — 1 project file the solution declares is not on disk, so check cannot pass:";
 
     private const string StatusGateLine =
-        "error: the model is incomplete — 1 project failed to load, so status cannot report the burndown: "
-        + "unloaded projects contribute no violations, so every count reads low:";
+        "error: the model is incomplete — 1 project file the solution declares is not on disk, so status cannot "
+        + "report the burndown: a project that is not there contributes no violations, so every count reads low:";
 
     private const string BaselineGateLine =
-        "error: the model is incomplete — 1 project failed to load, so no baseline was written: a baseline "
-        + "captured from a partial model signs off debt that was never measured:";
+        "error: the model is incomplete — 1 project file the solution declares is not on disk, so no baseline was "
+        + "written: a baseline captured from a partial model signs off debt that was never measured:";
 
     private const string RenderGateLine =
-        "error: the model is incomplete — 1 project failed to load, so nothing was rendered: a card whose "
-        + "project failed to load cannot be placed and would be dropped from the committed files, and "
-        + "--diagram would draw a survey missing whole projects:";
+        "error: the model is incomplete — 1 project file the solution declares is not on disk, so nothing was "
+        + "rendered: a card whose project is not on disk cannot be placed and would be dropped from the committed "
+        + "files, and --diagram would draw a survey missing whole projects:";
 
-    // The restore lede each of the four verbs writes below its load block. Only the count and the noun phrase
+    // The remedy every surface gives for a missing project file. No restore or build creates one, so advice to
+    // run either could never end the refusal.
+    private const string MissingRemedy =
+        "No restore or build creates a project file: initialise the submodule or check out the tree that holds it, generate it, or remove its entry from the solution";
+
+    // The restore lede each of the four verbs writes below its missing-file block. Only the count and the noun phrase
     // are shared; what each says is at stake is not, which is why they are separate strings in production too.
     private const string CheckRestoreGateLine =
         "error: the model is incomplete — NuGet packages did not resolve for 2 projects, so check cannot pass: "
@@ -84,8 +91,8 @@ public sealed class PartialLoadWorkspaceE2ETests
     // The spec refusal's two ledes. It is the one refusal a reader can meet before any verb's gate has run,
     // so its counts and its projects are the gate's own.
     private const string SpecGateLine =
-        "No spec project found: 1 project failed to load, so a project that references SlideRule.dll "
-        + "may be among them:";
+        "No spec project found: 1 project file the solution declares is not on disk, so a project that references "
+        + "SlideRule.dll may be among them:";
 
     private const string SpecRestoreGateLine =
         "No spec project found: NuGet packages did not resolve for 2 projects, so a project that references "
@@ -112,19 +119,20 @@ public sealed class PartialLoadWorkspaceE2ETests
         graph.ShouldRefuseWith(
             "the model is incomplete",
             "graph cannot survey the codebase",
-            // It names what failed, inline — the MCP surface discards the error writer, so a refusal that
+            // It names what is missing, inline — the MCP surface discards the error writer, so a refusal that
             // pointed at "the warnings above" would name evidence half its callers cannot reach.
             MissingProject,
             // ... says which MSBuild opened them, which is nearly always the next question ...
             "MSBuild for this run:",
-            // ... and says what to do about it, in both dialects.
-            "Restore and build the solution first",
+            // ... and says what to do about it, in both dialects: never a restore or build for the missing file.
+            MissingRemedy,
             "--allow-workspace-diagnostics",
             "allowWorkspaceDiagnostics");
+        graph.Err.ShouldNotContain("Restore and build the solution first");
         // ... and the second cause, which on a survey is the sharper of the two: these projects are all
         // present with all their types, so a reader has nothing to notice as absent.
-        graph.ShouldTellBothCausesLoadFirst(
-            "the model is incomplete — 1 project failed to load, so graph cannot survey the codebase:",
+        graph.ShouldTellBothCausesMissingFirst(
+            "the model is incomplete — 1 project file the solution declares is not on disk, so graph cannot survey the codebase:",
             "the model is incomplete — NuGet packages did not resolve for 2 projects, so graph cannot survey "
             + "the codebase: the external references a survey exists to show are exactly what did not resolve:");
 
@@ -154,12 +162,9 @@ public sealed class PartialLoadWorkspaceE2ETests
         json.ShouldSucceed();
         using JsonDocument document = json.ShouldHaveJsonStdout();
         // The survey is a partial map, and says so in the document — the only channel an MCP client has.
-        document.ShouldBeStampedIncomplete();
+        document.ShouldNameOnlyMissing(MissingProject, json.Transcript());
         document.RootElement.Strings("workspaceDiagnostics")
             .ShouldNotBeEmpty(json.Transcript());
-        document.RootElement.Strings("failedProjects")
-            .ShouldHaveSingleItem(json.Transcript())
-            .ShouldEndWith(MissingProject);
     }
 
     [Fact]
@@ -172,7 +177,7 @@ public sealed class PartialLoadWorkspaceE2ETests
         CliResult check = await CliRunner.InvokeAsync(
             "check", workspace.SolutionPath, "--spec", CliRunner.CleanSpecDll, "--no-cache");
         check.ShouldRefuseWith(CheckGateLine, MissingProject);
-        check.ShouldTellBothCausesLoadFirst(CheckGateLine, CheckRestoreGateLine);
+        check.ShouldTellBothCausesMissingFirst(CheckGateLine, CheckRestoreGateLine);
         check.Err.ShouldNotContain(InvariantViolationFragment);
 
         CliResult checkAllowed = await CliRunner.InvokeAsync(
@@ -184,7 +189,7 @@ public sealed class PartialLoadWorkspaceE2ETests
         CliResult status = await CliRunner.InvokeAsync(
             "status", workspace.SolutionPath, "--spec", CliRunner.CleanSpecDll, "--no-cache");
         status.ShouldRefuseWith(StatusGateLine, MissingProject);
-        status.ShouldTellBothCausesLoadFirst(StatusGateLine, StatusRestoreGateLine);
+        status.ShouldTellBothCausesMissingFirst(StatusGateLine, StatusRestoreGateLine);
         status.Out.ShouldNotBeEmpty(); // status renders the burndown it does have, then gates
 
         CliResult statusAllowed = await CliRunner.InvokeAsync(
@@ -192,12 +197,9 @@ public sealed class PartialLoadWorkspaceE2ETests
             "--allow-workspace-diagnostics");
         statusAllowed.ShouldSucceed();
         using JsonDocument document = statusAllowed.ShouldHaveJsonStdout();
-        document.ShouldBeStampedIncomplete();
+        document.ShouldNameOnlyMissing(MissingProject, statusAllowed.Transcript());
         document.RootElement.Strings("workspaceDiagnostics")
             .ShouldNotBeEmpty(statusAllowed.Transcript());
-        document.RootElement.Strings("failedProjects")
-            .ShouldHaveSingleItem(statusAllowed.Transcript())
-            .ShouldEndWith(MissingProject); // and the document names it, not only the exit code
     }
 
     [Fact]
@@ -220,9 +222,10 @@ public sealed class PartialLoadWorkspaceE2ETests
             // written to this stream above the refusal, so the note reaches the reader here or nowhere ...
             "MSBuild for this run:",
             // ... and says what to do about it.
-            "Restore and build the solution first",
+            MissingRemedy,
             "Restore the solution first (dotnet restore), then retry.");
-        check.ShouldTellBothCausesLoadFirst(SpecGateLine, SpecRestoreGateLine);
+        check.Err.ShouldNotContain("Restore and build the solution first");
+        check.ShouldTellBothCausesMissingFirst(SpecGateLine, SpecRestoreGateLine);
         check.Err.ShouldNotContain("Pass --spec to name one");
         check.Err.ShouldNotContain(InvariantViolationFragment);
     }
@@ -238,7 +241,7 @@ public sealed class PartialLoadWorkspaceE2ETests
             "baseline", "init", workspace.SolutionPath, "--spec", CliRunner.CleanSpecDll);
 
         baseline.ShouldRefuseWith(BaselineGateLine, MissingProject);
-        baseline.ShouldTellBothCausesLoadFirst(BaselineGateLine, BaselineRestoreGateLine);
+        baseline.ShouldTellBothCausesMissingFirst(BaselineGateLine, BaselineRestoreGateLine);
         baseline.Err.ShouldNotContain(InvariantViolationFragment);
         WriteFootprint.Of(workspace.PathOf())
             .ShouldBe(before);
@@ -257,7 +260,7 @@ public sealed class PartialLoadWorkspaceE2ETests
             "render", workspace.SolutionPath, "--spec", CliRunner.CleanSpecDll);
 
         render.ShouldRefuseWith(RenderGateLine, MissingProject);
-        render.ShouldTellBothCausesLoadFirst(RenderGateLine, RenderRestoreGateLine);
+        render.ShouldTellBothCausesMissingFirst(RenderGateLine, RenderRestoreGateLine);
         render.Err.ShouldNotContain(InvariantViolationFragment);
         render.Out.ShouldBeEmpty(); // it refused before the first wrote/unchanged line
         WriteFootprint.Of(workspace.PathOf())
@@ -303,8 +306,8 @@ public sealed class PartialLoadWorkspaceE2ETests
             + "reads a package's base types, interfaces or attributes cannot be trusted for the types they declare:",
             "BrokenApp.Web"); // the answer the partial model still supports follows
         result.Out.ShouldStartWith(
-            "caveat: the model is incomplete — 1 project failed to load, so a type declared only there reads as "
-            + "unknown and a path under them as declaring no type:");
+            "caveat: the model is incomplete — 1 project file the solution declares is not on disk, so a type declared only there "
+            + "reads as unknown and a path under them as declaring no type:");
     }
 
     [Fact]
@@ -325,11 +328,11 @@ public sealed class PartialLoadWorkspaceE2ETests
 
         // A lookup, never a gate.
         result.ShouldSucceed(
-            MissingProject, // naming what failed, inline: there is no stderr here
+            MissingProject, // naming what is missing, inline: there is no stderr here
             "MSBuild for this run:",
-            "Restore and build the solution first (dotnet build), then retry for a whole answer.",
-            // Both causes ride the body, load first, because the caveat is the whole of what this verb can say —
-            // and the path being looked up is under one of the projects the second cause names.
+            MissingRemedy + ", then retry for a whole answer.",
+            // Both causes are in the body, the missing file first, because the caveat is the whole of what this verb
+            // can say — and the path being looked up is under one of the projects the second cause names.
             "caveat: the model is incomplete — NuGet packages did not resolve for 2 projects, so a rule about "
             + "a package cannot be trusted to have been measured for paths under them:",
             "Restore the solution first (dotnet restore), then retry for a whole answer.",
@@ -355,7 +358,7 @@ public sealed class PartialLoadWorkspaceE2ETests
         string refusal = refused.ShouldHaveTextContent();
         refusal.ShouldContain("the model is incomplete");
         refusal.ShouldContain(MissingProject); // the evidence, inline: there is no stderr here
-        refusal.ShouldContain("Restore and build the solution first");
+        refusal.ShouldContain(MissingRemedy);
         refusal.ShouldContain("allowWorkspaceDiagnostics");
         // The second cause reaches the agent too, and inline for the same reason as the first: this surface
         // has no stderr, so a block that pointed at warnings above would name nothing reachable.
@@ -372,12 +375,9 @@ public sealed class PartialLoadWorkspaceE2ETests
         string survey = surveyed.ShouldHaveTextContent();
         survey.ShouldContain("BrokenApp.Core");
         using JsonDocument surveyDocument = JsonDocument.Parse(survey);
-        surveyDocument.ShouldBeStampedIncomplete();
+        surveyDocument.ShouldNameOnlyMissing(MissingProject, survey);
         surveyDocument.RootElement.Strings("workspaceDiagnostics")
             .ShouldNotBeEmpty(survey);
-        surveyDocument.RootElement.Strings("failedProjects")
-            .ShouldHaveSingleItem(survey)
-            .ShouldEndWith(MissingProject);
     }
 
     /// <summary>
@@ -424,20 +424,20 @@ file static class PartialLoadRefusalAssertions
     internal static readonly string[] UnrestoredProjects = ["BrokenApp.Core.csproj", "BrokenApp.Web.csproj"];
 
     /// <summary>
-    ///     Asserts one refusal carries <em>both</em> causes, each naming its own projects, with the load block
-    ///     above the restore block.
+    ///     Asserts one refusal carries <em>both</em> causes, each naming its own projects, with the missing-file
+    ///     block above the restore block.
     /// </summary>
     /// <remarks>
-    ///     The load block comes first because a project that never loaded is more fundamentally broken than one
-    ///     that loaded without its packages, and the two ask for different repairs.
+    ///     The missing-file block comes first because a project whose file is not there is more fundamentally
+    ///     broken than one that loaded without its packages, and the two ask for different repairs.
     /// </remarks>
-    internal static void ShouldTellBothCausesLoadFirst(
-        this CliResult result, string loadLede, string restoreLede)
+    internal static void ShouldTellBothCausesMissingFirst(
+        this CliResult result, string missingLede, string restoreLede)
     {
         string channel = result.Err;
         string report = result.Transcript();
 
-        channel.ShouldContainInOrder(loadLede, restoreLede, customMessage: report);
+        channel.ShouldContainInOrder(missingLede, restoreLede, customMessage: report);
         foreach (string project in UnrestoredProjects) channel.ShouldContain(project, report);
     }
 }

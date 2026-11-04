@@ -151,6 +151,7 @@ public sealed class AdapterTests
 
         var failure = exception.ShouldBeOfType<FailException>();
         failure.Message.ShouldContain("BrokenApp.Contracts.csproj");
+        failure.Message.ShouldContain("1 project file the solution declares is not on disk");
         failure.Message.ShouldContain("AllowWorkspaceDiagnostics");
     }
 
@@ -175,6 +176,7 @@ public sealed class AdapterTests
 
         var skip = exception.ShouldBeOfType<SkipException>();
         skip.Message.ShouldContain("BrokenApp.Contracts.csproj");
+        skip.Message.ShouldContain("despite 1 project file the solution declares not being on disk:");
     }
 
     [Fact]

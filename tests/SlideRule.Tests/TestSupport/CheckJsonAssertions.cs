@@ -389,6 +389,22 @@ internal static class CheckJsonAssertions
     }
 
     /// <summary>
+    ///     Asserts <paramref name="document" /> is stamped incomplete and lists one project file the solution
+    ///     declares and the disk lacks, ending in <paramref name="projectSuffix" />, under <c>missingProjects</c>
+    ///     and carries no <c>failedProjects</c>: a missing file is not a failed load. The slot reds carry
+    ///     <paramref name="report" />.
+    /// </summary>
+    internal static void ShouldNameOnlyMissing(this JsonDocument document, string projectSuffix, string report)
+    {
+        document.ShouldBeStampedIncomplete();
+        document.RootElement.TryGetProperty("failedProjects", out _)
+            .ShouldBeFalse(report);
+        document.RootElement.Strings("missingProjects")
+            .ShouldHaveSingleItem(report)
+            .ShouldEndWith(projectSuffix, customMessage: report);
+    }
+
+    /// <summary>
     ///     Asserts <paramref name="document" />, any verb's <c>--json</c> document, carries no
     ///     <c>modelIncomplete</c> stamp: a model that loaded whole.
     /// </summary>

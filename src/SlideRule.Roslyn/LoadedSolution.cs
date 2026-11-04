@@ -30,7 +30,8 @@ internal sealed class LoadedSolution : IDisposable
             failedProjects: report.Failed,
             uncheckedProjects: report.Unchecked,
             restoreFailedProjects: restoreFailedProjects,
-            unsupportedProjects: report.Unsupported);
+            unsupportedProjects: report.Unsupported,
+            missingProjects: report.Missing);
     }
 
     /// <summary>

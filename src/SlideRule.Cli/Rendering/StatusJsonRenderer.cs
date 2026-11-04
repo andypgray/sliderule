@@ -34,6 +34,7 @@ internal static class StatusJsonRenderer
             PackageAudit: SlideRuleJson.OmitEmpty(trust.PackageAudit),
             WorkspaceDiagnostics: SlideRuleJson.OmitEmpty(workspaceDiagnostics),
             ModelIncomplete: trust.ModelIncomplete,
+            MissingProjects: trust.MissingProjects,
             FailedProjects: trust.FailedProjects,
             UncheckedProjects: trust.UncheckedProjects,
             RestoreFailedProjects: trust.RestoreFailedProjects,

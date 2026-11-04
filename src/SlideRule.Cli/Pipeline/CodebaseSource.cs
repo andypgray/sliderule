@@ -485,6 +485,7 @@ internal sealed class CodebaseSource : IDisposable
 
         return cacheRead.DirtyProjects.All(loaded.Contains)
                && measured.FailedProjects.Count == 0
+               && measured.MissingProjects.Count == 0
                && measured.RestoreFailedProjects.All(recordedRestoreFailures.Contains)
                && measured.LoadFailures.All(recordedMessages.Contains);
     }

@@ -593,7 +593,7 @@ public sealed class RenderCommandE2ETests : IDisposable
         // model file, whose projects ARE the projects the spec governs. Asked for explicitly, the answer is
         // that nothing is rendered — the root AGENTS.md included, so a reader never gets a fresh block
         // beside a model file the run refused to write.
-        CliResult result = await RenderWithFailedProjectAsync(model: true);
+        CliResult result = await RenderOverAsync(new DiagnosticInjectingSolutionSource([LoadDiagnostic], [BrokenProject]), model: true);
 
         result.ShouldRefuseWith(
             "error: the model is incomplete — 1 project failed to load, so --model was refused and "
@@ -611,6 +611,51 @@ public sealed class RenderCommandE2ETests : IDisposable
     }
 
     [Fact]
+    public async Task RenderModel_OnAMissingProjectFile_RefusesTheWholeCommandWithTheFileRemedy()
+    {
+        // The opt-out passes a missing project file just as it passes a failed load, so the model-file guard must
+        // count it too: without that, the file would be written without the project the solution declares.
+        CliResult result = await RenderOverAsync(
+            new DiagnosticInjectingSolutionSource([LoadDiagnostic], missingProjects: [DiagnosticInjectingSolutionSource.SimulatedMissingProject]), model: true);
+
+        result.ShouldRefuseWith(
+            "error: the model is incomplete — 1 project file the solution declares is not on disk, so --model "
+            + "was refused and nothing was rendered: the model file names every project the spec governs, and "
+            + "one written now would leave out exactly the projects that are not there:\n"
+            + $"  {DiagnosticInjectingSolutionSource.SimulatedMissingProject}\n"
+            + "No restore or build creates a project file: initialise the submodule or check out the tree that "
+            + "holds it, generate it, or remove its entry from the solution, then retry. "
+            + "--allow-workspace-diagnostics renders the block and the cards from the partial model, but "
+            + "never the model file; drop --model to do that.");
+        result.Out.ShouldBeEmpty();
+        File.Exists(ModelFilePath)
+            .ShouldBeFalse();
+        File.Exists(RootAgents)
+            .ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Render_AnExistingModelFileBesideAMissingProjectFile_LeavesItAloneAndWarns()
+    {
+        File.WriteAllText(ModelFilePath, StaleModelFile);
+        File.SetLastWriteTimeUtc(ModelFilePath, Stamped);
+
+        CliResult result = await RenderOverAsync(
+            new DiagnosticInjectingSolutionSource([LoadDiagnostic], missingProjects: [DiagnosticInjectingSolutionSource.SimulatedMissingProject]), model: false);
+
+        result.ShouldSucceed();
+        result.ShouldPrint(RenderSpecCardsWritten);
+        result.Err.ShouldContain(
+            "warning: sliderule.model.json was not refreshed — 1 project file the solution declares is not on "
+            + "disk, and a model file written now would leave out exactly those projects. Put the missing "
+            + "project files on disk, then render again.");
+        File.ReadAllBytes(ModelFilePath)
+            .ShouldBe(Encoding.UTF8.GetBytes(StaleModelFile));
+        File.GetLastWriteTimeUtc(ModelFilePath)
+            .ShouldBe(Stamped);
+    }
+
+    [Fact]
     public async Task Render_AnExistingModelFileOnAPartialModel_LeavesItAloneAndWarns()
     {
         // The other half of the policy. Nobody asked for the file this run, so refusing the whole command
@@ -620,7 +665,7 @@ public sealed class RenderCommandE2ETests : IDisposable
         File.WriteAllText(ModelFilePath, StaleModelFile);
         File.SetLastWriteTimeUtc(ModelFilePath, Stamped);
 
-        CliResult result = await RenderWithFailedProjectAsync(model: false);
+        CliResult result = await RenderOverAsync(new DiagnosticInjectingSolutionSource([LoadDiagnostic], [BrokenProject]), model: false);
 
         result.ShouldSucceed();
         result.ShouldPrint(RenderSpecCardsWritten);
@@ -634,13 +679,11 @@ public sealed class RenderCommandE2ETests : IDisposable
             .ShouldBe(Stamped);
     }
 
-    // A render over a solution one of whose projects the load is told failed. Injected rather than really
-    // broken, the shape every verb's gate rows take: the gate's inputs are a list of paths, and what each
-    // surface does with the list is the whole subject here. Cache-free, so a hit cannot replay a healthy
-    // run's diagnostics over the injected ones.
-    private Task<CliResult> RenderWithFailedProjectAsync(bool model)
+    // A render over a solution whose load diagnostics are injected rather than really broken, the shape every
+    // verb's gate rows take: the gate's inputs are a list of paths, and what each surface does with the list is
+    // the whole subject here. Cache-free, so a hit cannot replay a healthy run's diagnostics over the injected ones.
+    private Task<CliResult> RenderOverAsync(DiagnosticInjectingSolutionSource source, bool model)
     {
-        var source = new DiagnosticInjectingSolutionSource([LoadDiagnostic], [BrokenProject]);
         var request = new RenderRequest(
             _workspace.SolutionPath, CliRunner.RenderSpecDll, SolutionDirectory, true, true, Model: model);
 

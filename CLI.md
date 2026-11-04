@@ -202,7 +202,7 @@ Options:
 
 `render` adds and updates files, and never deletes one. When a spec change moves a rule, the card in the directory the rule left stays on disk until you delete it, and `render --check` does not report it. Under `--check`, each file a render would write is listed as `current` or `stale`, including a card the spec now places where none is committed.
 
-The build analyzer reads the model file `--model` writes. The model file is never written while a project has failed to load. Under `--allow-workspace-diagnostics`, such a render fails whole when `--model` or the settings file asks for the model file. One that would only refresh an existing model file leaves it as it was, with a warning. A [settings file](#the-settings-file) can ask for the model file or the diagram without the option. A `--diagram` on the command line replaces the settings file's whole `diagram` entry, its `only` and `exclude` lists included.
+The build analyzer reads the model file `--model` writes. The model file is never written while a project has failed to load or a declared project file is not on disk. Under `--allow-workspace-diagnostics`, such a render fails whole when `--model` or the settings file asks for the model file. One that would only refresh an existing model file leaves it as it was, with a warning. A [settings file](#the-settings-file) can ask for the model file or the diagram without the option. A `--diagram` on the command line replaces the settings file's whole `diagram` entry, its `only` and `exclude` lists included.
 
 ### `baseline`
 
@@ -626,6 +626,8 @@ A run with `--no-cache` bypasses the cache and any stored capture, loads and ext
 ## Wrong and smaller models
 
 A project that fails to load makes the model wrong, because every rule would be judged without that project's code. `check`, `render`, `graph`, `status` and every `baseline` subcommand except `rename` exit 2 and name the projects that failed. `--allow-workspace-diagnostics` opts into the partial model. With or without it, the check and status documents say `modelIncomplete: true` and list `failedProjects`.
+
+A project the solution declares whose file is not on disk, such as one in a git submodule that was never initialised, gates in the same way and takes the same opt-out. Its refusal lists it in a block of its own, ahead of the others, because no restore or build creates a project file. Initialise its submodule or check out its tree, generate it, or remove its entry from the solution. The documents list it as `missingProjects`.
 
 A project whose NuGet packages did not resolve is wrong in the same way, though it loads. Only the edges its package references would have produced are missing. Without the gate, a rule about a package would report itself inert and the run would pass. This covers a restore that failed and one that never ran. An SDK-style project writes `obj/project.assets.json` every time it restores, so a missing one is a fact about that project. A non-SDK-style .NET Framework project never writes one and is left alone. These projects take the same opt-out and are listed as `restoreFailedProjects`. Their refusal lists them in a block of their own and sends you to `dotnet restore`. A project that failed to load is sent to `dotnet build` instead.
 

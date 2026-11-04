@@ -92,9 +92,9 @@ internal sealed class RenderRunner(
         bool wantsModel = request.Model || File.Exists(modelPath);
 
         // Reachable only where --allow-workspace-diagnostics let the run past the gate above, and only on a
-        // failed LOAD. Settled here, before any target is written, because an explicit --model means the whole
-        // command is refused rather than partly honoured.
-        if (wantsModel && diagnostics.FailedProjects.Count > 0)
+        // failed LOAD or a missing project file. Settled here, before any target is written, because an explicit
+        // --model means the whole command is refused rather than partly honoured.
+        if (wantsModel && (diagnostics.FailedProjects.Count > 0 || diagnostics.MissingProjects.Count > 0))
         {
             if (request.Model)
             {

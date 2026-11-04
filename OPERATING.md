@@ -101,10 +101,11 @@ A half-finished upgrade shows in the build: a model file in a newer schema than 
 |---|---|---|
 | exit 1 | a rule is red | fix the code the report names |
 | exit 2 | SlideRule's own error | read the message on stderr |
-| `No spec project found` | no spec project, a failed load or restore, or a spec project the default configuration does not build | add the project or pass `--spec`; after a failed load or restore, restore and build; for a listed project, make the configuration build it |
+| `No spec project found` | no spec project, a failed load or restore, a missing project file, or a spec project the default configuration does not build | add the project or pass `--spec`; after a failed load or restore, restore and build; for a missing project file, put it back or remove its entry; for a listed project, make the configuration build it |
 | `is not built by the solution's default configuration` | `--spec` names a project the build leaves out | make the configuration build it, or pass its built DLL |
 | `has no built output` | the spec project is not built | build it |
 | `modelIncomplete`, failed projects | a project failed to load | build the solution, and read the load errors the run lists |
+| `modelIncomplete`, missing projects | a project file the solution declares is not on disk | initialise its submodule or check out its tree, or remove the entry from the solution |
 | a refusal naming `dotnet restore` | packages did not resolve | restore the solution |
 | `failed its integrity check` | a baseline line edited by hand | restore the line |
 | `SR2090` | no model file above the project | run `sliderule render --model` |

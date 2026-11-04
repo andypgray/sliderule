@@ -29,6 +29,38 @@ public sealed class IncompleteModelGateAdapterMessagesTests
 
     private const string UnrestoredProject = "C:/repo/App.Unrestored/App.Unrestored.csproj";
 
+    private const string MissingProject = "C:/repo/App.Vendor/App.Vendor.csproj";
+
+    [Fact]
+    public void AdapterRefusal_MissingProjectFile_NamesTheFileAndARemedyThatCanEndIt()
+    {
+        string refusal = IncompleteModelGate.AdapterRefusal(Diagnostics(missing: [MissingProject]));
+
+        refusal.ShouldBe(
+            "the model is incomplete — 1 project file the solution declares is not on disk, so every rule test "
+            + "was skipped:\n"
+            + $"  {MissingProject}\n"
+            + "Every rule would be measured over a codebase missing whole projects — a green run against a "
+            + "partial model would sign verdicts that were never reached. No restore or build creates a project "
+            + "file: initialise the submodule or check out the tree that holds it, generate it, or remove its "
+            + "entry from the solution, then retry. To check the partial model as it loaded, override "
+            + "AllowWorkspaceDiagnostics to true on the test class.");
+    }
+
+    [Fact]
+    public void AdapterRefusal_EveryCause_WritesTheMissingBlockThenTheLoadBlockThenTheRestoreBlock()
+    {
+        string refusal = IncompleteModelGate.AdapterRefusal(
+            Diagnostics([BrokenProject], [UnrestoredProject], [MissingProject]));
+
+        refusal.ShouldSatisfyAllConditions(
+            () => refusal.ShouldContainInOrder("1 project file the solution declares is not on disk", MissingProject),
+            () => refusal.ShouldContainInOrder(MissingProject, "1 project failed to load"),
+            () => refusal.ShouldContainInOrder("1 project failed to load", BrokenProject),
+            () => refusal.ShouldContainInOrder(BrokenProject, "NuGet packages did not resolve for 1 project"),
+            () => refusal.ShouldContainInOrder("NuGet packages did not resolve for 1 project", UnrestoredProject));
+    }
+
     [Fact]
     public void AdapterRefusal_RestoreFailure_NamesTheProjectTheStakesAndTheRestoreRemedy()
     {
@@ -90,16 +122,18 @@ public sealed class IncompleteModelGateAdapterMessagesTests
         // Workspace_LoadedCompletely's failure, so this points there rather than repeating them once per rule.
         IncompleteModelGate.AdapterSkipReason.ShouldBe(
             "the workspace did not load completely, so no verdict was reached; see Workspace_LoadedCompletely "
-            + "for the projects that failed to load or whose NuGet packages did not resolve.");
+            + "for the projects that are not on disk, failed to load or whose NuGet packages did not resolve.");
     }
 
     private static WorkspaceDiagnostics Diagnostics(
-        IReadOnlyList<string>? failed = null, IReadOnlyList<string>? restoreFailed = null)
+        IReadOnlyList<string>? failed = null, IReadOnlyList<string>? restoreFailed = null,
+        IReadOnlyList<string>? missing = null)
     {
         return WorkspaceDiagnostics.None with
         {
             FailedProjects = failed ?? [],
-            RestoreFailedProjects = restoreFailed ?? []
+            RestoreFailedProjects = restoreFailed ?? [],
+            MissingProjects = missing ?? []
         };
     }
 }

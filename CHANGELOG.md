@@ -94,6 +94,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   not load cleanly. The referenced project is listed in `unsupportedProjects` as not a C# project, and counts
   in the "projects were not surveyed" line. Before, the workspace's failure to open it was the only trace of
   it, and the refusal said to restore and build the solution, which could not end it.
+- A project the solution declares whose file is not on disk, such as one in a git submodule that was never
+  initialised, is refused as a missing project file rather than as a project that failed to load. The refusal
+  says to initialise the submodule or check out the tree, generate the file, or remove the entry from the
+  solution. Before, it said to restore and build the solution, which no restore or build could end. The check,
+  status and graph documents list such a project as `missingProjects`, beside `failedProjects`, and SARIF
+  reports it in a notification of its own. A cached run notices when the file appears.
 - A run from a binary log lists a `.vcxproj`, `.sqlproj`, `.esproj` or other project in another language that a
   C# project references and the solution does not declare, as a load does, read off the build's own
   evaluation of the C# project in the log. Before, `unsupportedProjects` and the "projects were not surveyed"

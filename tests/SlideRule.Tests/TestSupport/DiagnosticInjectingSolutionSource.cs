@@ -5,20 +5,22 @@ namespace SlideRule.Tests.TestSupport;
 
 /// <summary>
 ///     An <see cref="ISolutionSource" /> that wraps a real load, then re-wraps the handle with synthetic
-///     workspace-load diagnostics, synthetic failed projects, synthetic restore-failed ones and/or synthetic
+///     workspace-load diagnostics, synthetic failed projects, synthetic restore-failed, missing and/or
 ///     unchecked ones — the one way to drive the incomplete-model gate, and the narrowed-universe slots, over
-///     a fixture that loads perfectly well. Shared by the gate tests of every verb that has one, so each verb
-///     is exercised against the same injected input rather than inventing its own.
+///     a fixture that loads perfectly well. A verb's gate test takes its input from here rather than
+///     inventing its own, so every gated verb is exercised against the same input.
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>The four inputs are separate on purpose, because the product separates them.</b> Diagnostics
-///         render and never gate; failed projects and restore-failed projects each gate, with their own
-///         wording and their own remedy, and are what every refusal names; unchecked projects scope the answer
-///         and never gate at all. A caller that wants a refusal injects a failed or restore-failed project, a
-///         caller that wants a rendered-but-harmless warning injects a diagnostic, a caller that wants a
-///         narrowed universe injects an unchecked project, and a caller testing that they do not leak into
-///         each other injects one without the others.
+///         <b>The inputs are separate on purpose, because the product separates them.</b> Diagnostics
+///         render and never gate; failed, restore-failed and missing projects each gate, with their own
+///         wording and their own remedy, and are what every incomplete-model refusal names; unchecked projects
+///         scope the answer and never trip that gate, though <c>render</c> and the baseline modes that read
+///         absence as evidence refuse a narrowed model on their own terms. A caller that wants an
+///         incomplete-model refusal injects a failed, restore-failed or missing project, a caller that wants a
+///         rendered-but-harmless warning injects a diagnostic, a caller that wants a narrowed universe injects an
+///         unchecked project, and a caller testing that they do not leak into each other injects one without the
+///         others.
 ///     </para>
 ///     <para>
 ///         <b>Why the restore cause is injected rather than restored.</b> A real broken restore costs a live
@@ -43,7 +45,8 @@ internal sealed class DiagnosticInjectingSolutionSource(
     IReadOnlyList<string>? failedProjects = null,
     IReadOnlyList<string>? uncheckedProjects = null,
     IReadOnlyList<string>? restoreFailedProjects = null,
-    ISolutionSource? inner = null) : ISolutionSource
+    ISolutionSource? inner = null,
+    IReadOnlyList<string>? missingProjects = null) : ISolutionSource
 {
     /// <summary>The load failure the gate rows inject as a diagnostic: it renders, and decides nothing.</summary>
     internal const string SimulatedLoadFailure =
@@ -57,6 +60,9 @@ internal sealed class DiagnosticInjectingSolutionSource(
     /// </summary>
     internal const string SimulatedRestoreFailedProject = "C:/repo/MyApp.Unrestored/MyApp.Unrestored.csproj";
 
+    /// <summary>The project file the gate rows inject as declared and not on disk.</summary>
+    internal const string SimulatedMissingProject = "C:/repo/MyApp.Vendor/MyApp.Vendor.csproj";
+
     public async Task<SolutionHandle> AcquireAsync(string solutionPath, CancellationToken ct)
     {
         SolutionHandle real = await (inner ?? WarmWorkspacePool.Source).AcquireAsync(solutionPath, ct);
@@ -65,7 +71,8 @@ internal sealed class DiagnosticInjectingSolutionSource(
             LoadFailures = diagnostics,
             FailedProjects = failedProjects ?? [],
             UncheckedProjects = uncheckedProjects ?? [],
-            RestoreFailedProjects = restoreFailedProjects ?? []
+            RestoreFailedProjects = restoreFailedProjects ?? [],
+            MissingProjects = missingProjects ?? []
         };
         // Every warm affordance the inner handle carried is forwarded, not just the ones a caller happens to
         // exercise today: this double re-wraps a real handle, so anything it drops silently sends the run

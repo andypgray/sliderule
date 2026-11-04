@@ -122,8 +122,7 @@ internal static class BinlogReplayer
                 diagnosticSink?.Invoke(UnresolvedReferences.Message(found.ProjectPath, found.Names));
 
             return new ReplayedSolution(
-                workspace, reader, settled.Solution, settled.TargetFrameworks, settled.ProjectFiles,
-                settled.Report.Failed, settled.Report.Unchecked, settled.Report.Unsupported);
+                workspace, reader, settled.Solution, settled.TargetFrameworks, settled.ProjectFiles, settled.Report);
         }
         catch
         {

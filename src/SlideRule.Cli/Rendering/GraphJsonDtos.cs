@@ -56,6 +56,7 @@ internal sealed record GraphJson(
     IReadOnlyList<string>? WorkspaceDiagnostics,
     int? WorkspaceDiagnosticCount,
     bool? ModelIncomplete,
+    IReadOnlyList<string>? MissingProjects,
     IReadOnlyList<string>? FailedProjects,
     IReadOnlyList<string>? UncheckedProjects,
     IReadOnlyList<string>? RestoreFailedProjects,

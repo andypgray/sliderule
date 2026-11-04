@@ -200,7 +200,7 @@ public sealed class BinlogCliE2ETests(BinlogFixtureWorkspace fixture)
     {
         // No capture is ingested under --no-cache, so the coverage refusal never runs; the replay's own
         // declared-membership answer is what keeps a binlog of less than the solution from checking green.
-        using ScopedFile widerSolution = Fixture.WriteSolutionWithUnbuiltMember();
+        using WiderSolution widerSolution = Fixture.WriteSolutionWithUnbuiltMember();
         string unbuilt = Fixture.UnbuiltProject;
 
         CliResult run = await RunAsync(
@@ -219,7 +219,7 @@ public sealed class BinlogCliE2ETests(BinlogFixtureWorkspace fixture)
     {
         // The same binlog with a capture to ingest: the coverage refusal fires first and alone, so the replay's
         // failed-project answer changes nothing a user sees on this path.
-        using ScopedFile widerSolution = Fixture.WriteSolutionWithUnbuiltMember();
+        using WiderSolution widerSolution = Fixture.WriteSolutionWithUnbuiltMember();
         string unbuilt = Fixture.UnbuiltProject;
 
         CliResult run = await RunAsync(FreshCache(), "check", widerSolution.Path, "--binlog", Binlog, "--spec", CleanSpec);

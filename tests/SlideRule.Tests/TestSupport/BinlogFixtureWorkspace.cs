@@ -58,18 +58,29 @@ public sealed class BinlogFixtureWorkspace : IDisposable
 
     /// <summary>
     ///     The project <see cref="WriteSolutionWithUnbuiltMember" />'s wider solution declares and the binlog never
-    ///     built, <c>MyApp.Unbuilt\MyApp.Unbuilt.csproj</c>, as an absolute path; no file exists there.
+    ///     built, <c>MyApp.Unbuilt\MyApp.Unbuilt.csproj</c>, as an absolute path.
     /// </summary>
     internal string UnbuiltProject => PathOf(UnbuiltName, $"{UnbuiltName}.csproj");
 
     /// <summary>
     ///     Writes a second solution file beside <see cref="SolutionPath" /> declaring its members plus
-    ///     <see cref="UnbuiltProject" />, and returns it as a scope that deletes it on dispose. It carries the
-    ///     original's write time, so a capture's ingest reads it as no newer than the build rather than refusing
-    ///     the binlog as stale.
+    ///     <see cref="UnbuiltProject" />, and returns a scope that deletes what it wrote on dispose. The member's
+    ///     project file is written too unless <paramref name="memberOnDisk" /> is false, which makes the member a
+    ///     missing file rather than an unbuilt project. Both files carry the original solution's write time, so a
+    ///     capture's ingest reads them as no newer than the build rather than refusing the binlog as stale.
     /// </summary>
-    internal ScopedFile WriteSolutionWithUnbuiltMember()
+    internal WiderSolution WriteSolutionWithUnbuiltMember(bool memberOnDisk = true)
     {
+        string widerPath = PathOf("MyApp.Wider.sln");
+        var scope = new WiderSolution(
+            ScopedFile.Hold(widerPath), memberOnDisk ? ScopedFile.Hold(UnbuiltProject) : null);
+        if (memberOnDisk)
+        {
+            Directory.CreateDirectory(PathOf(UnbuiltName));
+            File.WriteAllText(UnbuiltProject, "<Project />");
+            File.SetLastWriteTimeUtc(UnbuiltProject, File.GetLastWriteTimeUtc(SolutionPath));
+        }
+
         string declared = File.ReadAllText(SolutionPath);
         int global = declared.IndexOf("Global", StringComparison.Ordinal);
         string member =
@@ -77,9 +88,24 @@ public sealed class BinlogFixtureWorkspace : IDisposable
             + $"\"{UnbuiltName}\\{UnbuiltName}.csproj\", \"{{44444444-4444-4444-4444-444444444444}}\"{Environment.NewLine}"
             + $"EndProject{Environment.NewLine}";
 
-        string widerPath = PathOf("MyApp.Wider.sln");
         File.WriteAllText(widerPath, declared.Insert(global, member));
         File.SetLastWriteTimeUtc(widerPath, File.GetLastWriteTimeUtc(SolutionPath));
-        return ScopedFile.Planted(widerPath);
+        return scope;
+    }
+}
+
+/// <summary>
+///     The wider solution <see cref="BinlogFixtureWorkspace.WriteSolutionWithUnbuiltMember" /> wrote, and the
+///     member's project file when it wrote one; disposing deletes both.
+/// </summary>
+internal sealed class WiderSolution(ScopedFile solution, ScopedFile? member) : IDisposable
+{
+    /// <summary>The wider solution file.</summary>
+    internal string Path => solution.Path;
+
+    public void Dispose()
+    {
+        member?.Dispose();
+        solution.Dispose();
     }
 }

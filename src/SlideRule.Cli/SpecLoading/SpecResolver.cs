@@ -293,12 +293,12 @@ internal static class SpecResolver
     }
 
     // Zero candidates has causes whose remedies do not overlap, and a refusal naming only the first sends readers
-    // to write an argument that cannot help them, so the strongest evidence decides the refusal. Failed loads and
-    // unresolved packages are the incomplete-model gate's two causes, said in its words and composed when one run
-    // breaks both ways: no --spec argument repairs a load, and a broken restore (the measured locked-mode shape)
-    // leaves the spec project's reference to the contract library unresolved while the project itself still loads
-    // completely. Load problems that blame no project come next, worded "may" because that is all they show. A
-    // clean load means the solution has no spec project the load holds; that sentence stays byte-identical
+    // to write an argument that cannot help them, so the strongest evidence decides the refusal. Missing project files,
+    // failed loads and unresolved packages are the incomplete-model gate's causes, said in its words and composed when
+    // one run breaks more than one way: no --spec argument repairs a load, and a broken restore (the measured
+    // locked-mode shape) leaves the spec project's reference to the contract library unresolved while the project
+    // itself still loads completely. Load problems that blame no project come next, worded "may" because that is all
+    // they show. A clean load means the solution has no spec project the load holds; that sentence stays byte-identical
     // (GETTING-STARTED.md quotes it), with the count of projects considered, which tells a reader whether the
     // workspace held what they expected. The projects the default configuration does not build follow it in the
     // clean arm alone. The load left them out, so one of them may be the spec project, but under a failed load or

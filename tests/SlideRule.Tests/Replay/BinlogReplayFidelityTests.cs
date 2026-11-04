@@ -100,7 +100,7 @@ public sealed class BinlogReplayFidelityTests(BinlogFixtureWorkspace fixture) : 
     {
         // A binlog of less than the solution. A capture's ingest refuses one, but a run that ingests nothing
         // replays it as given, and only this answer stops it checking a model missing that project.
-        using ScopedFile widerSolution = Fixture.WriteSolutionWithUnbuiltMember();
+        using WiderSolution widerSolution = Fixture.WriteSolutionWithUnbuiltMember();
         string unbuilt = Fixture.UnbuiltProject;
         var diagnostics = new List<string>();
 
@@ -108,6 +108,21 @@ public sealed class BinlogReplayFidelityTests(BinlogFixtureWorkspace fixture) : 
 
         replayed.FailedProjects.ShouldBe([unbuilt]);
         diagnostics.ShouldBe([BinlogReplayer.UnbuiltMemberMessage(unbuilt)]);
+    }
+
+    [Fact]
+    public void Replay_SolutionDeclaresAMemberAbsentFromDisk_ReportsItMissingRatherThanUnbuilt()
+    {
+        // The same binlog of less than the solution, where the member's file is not there at all: no build could
+        // have built it, so the replay names it missing and gives no build advice for it.
+        using WiderSolution widerSolution = Fixture.WriteSolutionWithUnbuiltMember(memberOnDisk: false);
+        var diagnostics = new List<string>();
+
+        using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath, widerSolution.Path, diagnostics.Add, ct: Ct);
+
+        replayed.FailedProjects.ShouldBeEmpty();
+        replayed.LoadDiagnosticsWith([]).MissingProjects.ShouldBe([Fixture.UnbuiltProject]);
+        diagnostics.ShouldBeEmpty();
     }
 
     [Fact]

@@ -59,6 +59,7 @@ internal static class JsonReportRenderer
             DiffBase: diffBase,
             RulesFilter: SlideRuleJson.OmitEmpty(rulesFilter),
             ModelIncomplete: trust.ModelIncomplete,
+            MissingProjects: trust.MissingProjects,
             FailedProjects: trust.FailedProjects,
             UncheckedProjects: trust.UncheckedProjects,
             RestoreFailedProjects: trust.RestoreFailedProjects,

@@ -57,7 +57,7 @@ public sealed class ExtractionCacheStoreTests
 
         version.ShouldNotBeNull("the extraction cache still declares a schema version");
         version.GetRawConstantValue()
-            .ShouldBe(47);
+            .ShouldBe(48);
     }
 
     [Fact]
@@ -231,6 +231,28 @@ public sealed class ExtractionCacheStoreTests
         File.WriteAllText(Path.Combine(solution.Root, probeFileName), "probe\n");
 
         // Assert — an existence flip on a structural probe is a full miss.
+        store.ReadAndValidate(Ct)
+            .Outcome.ShouldBe(CacheOutcome.Miss);
+    }
+
+    [Fact]
+    public void ReadAndValidate_DeclaredProjectFileAppears_ReturnsMiss()
+    {
+        // A declared project file that is not on disk refuses the run with advice to put it back, so putting it
+        // back has to dirty the cache: a hit would replay the refusal the advice was followed to end.
+        using var solution = new SyntheticSolution();
+        solution.AddProject("A", [], ("A.cs", "class A {}"));
+        solution.DeclareProjects("A", "Vendor");
+        solution.BackdateAll();
+        ExtractionCacheStore store = solution.NewStore();
+        store.ShouldWrite(solution.Projects, TrivialExtraction(solution));
+        store.ReadAndValidate(Ct)
+            .Outcome.ShouldBe(CacheOutcome.Hit); // baseline: clean while the file is still missing
+
+        string vendor = solution.PathOf("Vendor", "Vendor.csproj");
+        Directory.CreateDirectory(Path.GetDirectoryName(vendor)!);
+        File.WriteAllText(vendor, "<Project Sdk=\"Microsoft.NET.Sdk\" />\n");
+
         store.ReadAndValidate(Ct)
             .Outcome.ShouldBe(CacheOutcome.Miss);
     }
@@ -1091,6 +1113,13 @@ public sealed class ExtractionCacheStoreTests
             List<string> documentPaths = WriteDocuments([name], documents);
 
             projects.Add(new ProjectInputs(name, csproj, temp.PathOf(name), references, documentPaths));
+        }
+
+        // Rewrites the solution file as a classic .sln declaring one C# project per name, whether or not its
+        // directory exists, so the structural set can see a member that is not on disk.
+        public void DeclareProjects(params string[] names)
+        {
+            File.WriteAllText(SolutionPath, ClassicSolution.Text(names));
         }
 
         // A project built under UseArtifactsOutput: its intermediate tree — project.assets.json included —

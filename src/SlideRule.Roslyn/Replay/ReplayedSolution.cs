@@ -35,17 +35,15 @@ internal sealed class ReplayedSolution : IDisposable
         AdhocWorkspace workspace, SolutionReader reader, Solution solution,
         IReadOnlyDictionary<ProjectId, string> targetFrameworks,
         CanonicalProjectFiles projectFiles,
-        IReadOnlyList<string> failedProjects,
-        IReadOnlyList<string> uncheckedProjects,
-        IReadOnlyList<UnsupportedProject> unsupportedProjects)
+        ProjectLoadReport report)
     {
         _workspace = workspace;
         _reader = reader;
         Solution = solution;
         TargetFrameworks = targetFrameworks;
         ProjectFiles = projectFiles;
-        FailedProjects = failedProjects;
-        UncheckedProjects = uncheckedProjects;
+        FailedProjects = report.Failed;
+        UncheckedProjects = report.Unchecked;
         _loadVerdict = WorkspaceDiagnostics.OfLoad(
             loadFailures: [],
             failedProjects: FailedProjects,
@@ -56,7 +54,8 @@ internal sealed class ReplayedSolution : IDisposable
             restoreFailedProjects: [],
             // The solution file's entries, as on an MSBuild load, joined with the compiler invocations the C#-only
             // predicate declined from the capture.
-            unsupportedProjects: unsupportedProjects);
+            unsupportedProjects: report.Unsupported,
+            missingProjects: report.Missing);
     }
 
     public Solution Solution { get; }
@@ -73,7 +72,8 @@ internal sealed class ReplayedSolution : IDisposable
 
     /// <summary>The <c>.csproj</c> paths of the projects that failed to load.</summary>
     /// <remarks>
-    ///     On this path every entry is a project the solution declares and the binlog never built. A replayed
+    ///     On this path every entry is a project the solution declares, whose file is on disk, and the binlog never
+    ///     built; one whose file is not on disk is a missing project instead. A replayed
     ///     project comes from a compiler invocation a real build actually made, so it carries an output path
     ///     and cannot present the loaded-but-empty shape; what can go missing is a whole member, when the
     ///     binlog is a build of less than the solution. A capture's ingest refuses such a binlog outright, so

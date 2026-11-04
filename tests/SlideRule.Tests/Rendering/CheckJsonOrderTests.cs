@@ -227,8 +227,8 @@ public sealed class CheckJsonOrderTests
         foreach (string stamp in
                  new[]
                  {
-                     "modelIncomplete", "failedProjects", "uncheckedProjects", "restoreFailedProjects",
-                     "unsupportedProjects", "multiTargetedProjects", "staleSpec", "summary"
+                     "modelIncomplete", "missingProjects", "failedProjects", "uncheckedProjects",
+                     "restoreFailedProjects", "unsupportedProjects", "multiTargetedProjects", "staleSpec", "summary"
                  })
             index.ShouldContain($"\"{stamp}\"");
     }
@@ -307,6 +307,7 @@ public sealed class CheckJsonOrderTests
         WorkspaceDiagnostics diagnostics = WorkspaceDiagnostics.None with
         {
             LoadFailures = [Advisory],
+            MissingProjects = ["App.Vendor/App.Vendor.csproj"],
             FailedProjects = ["App.Web/App.Web.csproj"],
             UncheckedProjects = ["App.Reports/App.Reports.csproj"],
             RestoreFailedProjects = ["App.Data/App.Data.csproj"],

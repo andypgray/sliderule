@@ -15,13 +15,14 @@ namespace SlideRule.Roslyn.Diagnostics;
 ///         has.
 ///     </para>
 ///     <para>
-///         Every message names the projects, and one with both causes puts the load block before the restore
-///         block: a project that never loaded is the more broken of the two, and the repairs differ
-///         (<c>dotnet build</c> versus <c>dotnet restore</c>). A refusal written to stderr below the workspace
-///         diagnostics sends the reader to those warnings instead of repeating them; the restore tail does so only
-///         for "a restore that ran", because the SDK replays NuGet's own logs into later builds only where a restore
-///         actually ran. A refusal or caveat whose surface has nothing above it points at no warnings and carries
-///         the MSBuild selection note in its own block.
+///         Every message names the projects, one block per cause: a declared project file not on disk first,
+///         then a project that failed to load, then one whose packages did not resolve, most broken first, because
+///         the repairs differ (putting the file back, <c>dotnet build</c>, <c>dotnet restore</c>). A refusal
+///         written to stderr below the workspace diagnostics sends the reader to those warnings instead of
+///         repeating them; the restore tail does so only for "a restore that ran", because the SDK replays
+///         NuGet's own logs into later builds only where a restore actually ran. A refusal or caveat whose
+///         surface has nothing above it points at no warnings and carries the MSBuild selection note in its own
+///         block.
 ///     </para>
 /// </remarks>
 internal static class IncompleteModelGate
@@ -33,7 +34,12 @@ internal static class IncompleteModelGate
     /// </summary>
     internal const string AdapterSkipReason =
         "the workspace did not load completely, so no verdict was reached; see Workspace_LoadedCompletely for "
-        + "the projects that failed to load or whose NuGet packages did not resolve.";
+        + "the projects that are not on disk, failed to load or whose NuGet packages did not resolve.";
+
+    // The one remedy for a declared project file that is not on disk, which every surface shares.
+    private const string MissingRemedy =
+        "No restore or build creates a project file: initialise the submodule or check out the tree that holds "
+        + "it, generate it, or remove its entry from the solution";
 
     /// <summary>The stderr lines <c>check</c> emits before exit 2.</summary>
     internal static string CheckMessage(WorkspaceDiagnostics diagnostics)
@@ -41,6 +47,9 @@ internal static class IncompleteModelGate
         return Message(
             diagnostics,
             false,
+            $"error: the model is incomplete — {Missing(diagnostics)}, so check cannot pass:",
+            $"{MissingRemedy}, then retry. To check against the partial model anyway, pass "
+            + "--allow-workspace-diagnostics.",
             $"error: the model is incomplete — {Failed(diagnostics)} failed to load, so check cannot pass:",
             "See the warnings above for why, then restore and build the solution (dotnet build). To check "
             + "against the partial model anyway, pass --allow-workspace-diagnostics.",
@@ -61,6 +70,10 @@ internal static class IncompleteModelGate
         return Message(
             diagnostics,
             false,
+            $"error: the model is incomplete — {Missing(diagnostics)}, so no baseline was written: a baseline "
+            + "captured from a partial model signs off debt that was never measured:",
+            $"{MissingRemedy}, then retry. To baseline against the partial model anyway, pass "
+            + "--allow-workspace-diagnostics.",
             $"error: the model is incomplete — {Failed(diagnostics)} failed to load, so no baseline was "
             + "written: a baseline captured from a partial model signs off debt that was never measured:",
             "See the warnings above for why, then restore and build the solution (dotnet build). To baseline "
@@ -79,6 +92,10 @@ internal static class IncompleteModelGate
         return Message(
             diagnostics,
             false,
+            $"error: the model is incomplete — {Missing(diagnostics)}, so status cannot report the burndown: "
+            + "a project that is not there contributes no violations, so every count reads low:",
+            $"{MissingRemedy}, then retry. To report against the partial model anyway, pass "
+            + "--allow-workspace-diagnostics.",
             $"error: the model is incomplete — {Failed(diagnostics)} failed to load, so status cannot report "
             + "the burndown: unloaded projects contribute no violations, so every count reads low:",
             "See the warnings above for why, then restore and build the solution (dotnet build). To report "
@@ -100,6 +117,11 @@ internal static class IncompleteModelGate
         return Message(
             diagnostics,
             false,
+            $"error: the model is incomplete — {Missing(diagnostics)}, so nothing was rendered: a card whose "
+            + "project is not on disk cannot be placed and would be dropped from the committed files, and "
+            + "--diagram would draw a survey missing whole projects:",
+            $"{MissingRemedy}, then retry. To render from the partial model anyway, pass "
+            + "--allow-workspace-diagnostics.",
             $"error: the model is incomplete — {Failed(diagnostics)} failed to load, so nothing was rendered: "
             + "a card whose project failed to load cannot be placed and would be dropped from the committed "
             + "files, and --diagram would draw a survey missing whole projects:",
@@ -114,28 +136,35 @@ internal static class IncompleteModelGate
 
     /// <summary>
     ///     The stderr block <c>render</c> emits before exit 2 when <c>--model</c> was passed explicitly and a
-    ///     project failed to load; a reader of the model file with no spec assembly has nothing to compare it
-    ///     against.
+    ///     project failed to load or is not on disk; a reader of the model file with no spec assembly has nothing
+    ///     to compare it against.
     /// </summary>
     /// <remarks>
-    ///     A load failure alone, never a restore one: a project whose restore failed is still in the codebase
+    ///     Those two causes alone, never a restore failure: a project whose restore failed is still in the codebase
     ///     with its name and its assembly names, so the project list the file records is whole.
     /// </remarks>
     internal static string RenderModelRefusal(WorkspaceDiagnostics diagnostics)
     {
-        return EvidenceBlock.Compose(
+        const string optOut = "--allow-workspace-diagnostics renders the block and the cards from the partial "
+                              + "model, but never the model file; drop --model to do that.";
+        return Message(
+            diagnostics with { RestoreFailedProjects = [] },
+            false,
+            $"error: the model is incomplete — {Missing(diagnostics)}, so --model was refused and nothing "
+            + "was rendered: the model file names every project the spec governs, and one written now would "
+            + "leave out exactly the projects that are not there:",
+            $"{MissingRemedy}, then retry. {optOut}",
             $"error: the model is incomplete — {Failed(diagnostics)} failed to load, so --model was refused "
             + "and nothing was rendered: the model file names every project the spec governs, and one "
             + "written now would leave out exactly the projects that failed:",
-            diagnostics.FailedProjects,
-            "See the warnings above for why, then restore and build the solution (dotnet build). "
-            + "--allow-workspace-diagnostics renders the block and the cards from the partial model, but "
-            + "never the model file; drop --model to do that.");
+            $"See the warnings above for why, then restore and build the solution (dotnet build). {optOut}",
+            "",
+            null);
     }
 
     /// <summary>
     ///     The one stderr line <c>render</c> emits when a model file already exists and a project failed to
-    ///     load, and the model file is neither compared nor written.
+    ///     load or is not on disk, and the model file is neither compared nor written.
     /// </summary>
     /// <remarks>
     ///     One line rather than an evidence block: nothing is refused, so there is no remedy to hang a project list
@@ -143,9 +172,11 @@ internal static class IncompleteModelGate
     /// </remarks>
     internal static string RenderModelWarning(WorkspaceDiagnostics diagnostics)
     {
-        return $"warning: {ModelDocument.FileName} was not refreshed — {Failed(diagnostics)} failed to load, "
-               + "and a model file written now would leave out exactly those projects. Build the solution "
-               + "(dotnet build), then render again.";
+        string repair = diagnostics.FailedProjects.Count > 0
+            ? "Build the solution (dotnet build)"
+            : "Put the missing project files on disk";
+        return $"warning: {ModelDocument.FileName} was not refreshed — {Unloaded(diagnostics)}, and a model "
+               + $"file written now would leave out exactly those projects. {repair}, then render again.";
     }
 
     /// <summary>
@@ -161,6 +192,9 @@ internal static class IncompleteModelGate
         return Message(
             diagnostics,
             true,
+            $"the model is incomplete — {Missing(diagnostics)}, so graph cannot survey the codebase:",
+            $"{MissingRemedy}, then retry. To survey the partial model as it loaded, pass "
+            + "--allow-workspace-diagnostics (CLI) or allowWorkspaceDiagnostics: true (arch_graph).",
             $"the model is incomplete — {Failed(diagnostics)} failed to load, so graph cannot survey the "
             + "codebase:",
             "Restore and build the solution first (dotnet build), then retry. To survey the partial model as it "
@@ -175,11 +209,11 @@ internal static class IncompleteModelGate
     /// <summary>
     ///     The refusal spec resolution throws when the convention finds no spec project and the model is
     ///     incomplete — the project that would have matched may be one the run could not see, and no
-    ///     <c>--spec</c> argument repairs either cause.
+    ///     <c>--spec</c> argument repairs any of its causes.
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         Like <see cref="ContextCaveat" /> it gates nothing: it is the same two causes with the same two
+    ///         Like <see cref="ContextCaveat" /> it gates nothing: it is the same causes with the same
     ///         remedies, said where spec resolution meets them, which is before any verb's gate can fire. It is
     ///         thrown before a runner exists to render any diagnostics beside it, so on both its surfaces there is
     ///         nothing above it.
@@ -195,6 +229,9 @@ internal static class IncompleteModelGate
         return Message(
             diagnostics,
             true,
+            $"No spec project found: {Missing(diagnostics)}, so a project that references SlideRule.dll may "
+            + "be among them:",
+            $"{MissingRemedy}, then retry.",
             $"No spec project found: {Failed(diagnostics)} failed to load, so a project that references "
             + "SlideRule.dll may be among them:",
             "Restore and build the solution first (dotnet restore, dotnet build), then retry.",
@@ -216,6 +253,9 @@ internal static class IncompleteModelGate
         return Message(
             diagnostics,
             true,
+            $"caveat: the model is incomplete — {Missing(diagnostics)}, so scope cards from them cannot be "
+            + "placed and \"no architecture scope covers\" cannot be trusted for paths under them:",
+            $"{MissingRemedy}, then retry for a whole answer.",
             $"caveat: the model is incomplete — {Failed(diagnostics)} failed to load, so scope cards from "
             + "them cannot be placed and \"no architecture scope covers\" cannot be trusted for paths under "
             + "them:",
@@ -235,6 +275,9 @@ internal static class IncompleteModelGate
         return Message(
             diagnostics,
             true,
+            $"caveat: the model is incomplete — {Missing(diagnostics)}, so a type declared only there reads as "
+            + "unknown and a path under them as declaring no type:",
+            $"{MissingRemedy}, then retry for a whole answer.",
             $"caveat: the model is incomplete — {Failed(diagnostics)} failed to load, so a type declared only "
             + "there reads as unknown and a path under them as declaring no type:",
             "Restore and build the solution first (dotnet build), then retry for a whole answer.",
@@ -253,6 +296,10 @@ internal static class IncompleteModelGate
         return Message(
             diagnostics,
             true,
+            $"the model is incomplete — {Missing(diagnostics)}, so every rule test was skipped:",
+            "Every rule would be measured over a codebase missing whole projects — a green run against a "
+            + $"partial model would sign verdicts that were never reached. {MissingRemedy}, then retry. To check "
+            + "the partial model as it loaded, override AllowWorkspaceDiagnostics to true on the test class.",
             $"the model is incomplete — {Failed(diagnostics)} failed to load, so every rule test was skipped:",
             "Every rule would be measured over a codebase missing whole projects — a green run against a "
             + "partial model would sign verdicts that were never reached. Restore and build the solution "
@@ -277,6 +324,9 @@ internal static class IncompleteModelGate
             diagnostics,
             false,
             "AllowWorkspaceDiagnostics is true: rule verdicts come from the partial model that loaded, despite "
+            + $"{MissingFiles(diagnostics)} the solution declares not being on disk:",
+            null,
+            "AllowWorkspaceDiagnostics is true: rule verdicts come from the partial model that loaded, despite "
             + $"{Failed(diagnostics)} failing to load:",
             null,
             "AllowWorkspaceDiagnostics is true: rule verdicts come from the partial model that loaded, despite "
@@ -293,7 +343,7 @@ internal static class IncompleteModelGate
     ///     <para>
     ///         An authoring cure is a single line on a single slot, so it cannot carry a block, a project list, or
     ///         the one-block-per-cause shape <see cref="Message" /> composes. The causes fold into one clause and
-    ///         the remedies into one, load's repair ahead of restore's as in every message here.
+    ///         the remedies into one, in the order every message here gives them.
     ///     </para>
     ///     <para>
     ///         It must read in the voice of the cures it replaces, which are pinned as one line ending in a
@@ -303,24 +353,24 @@ internal static class IncompleteModelGate
     /// </remarks>
     internal static string EmptySelectionHint(WorkspaceDiagnostics diagnostics)
     {
+        bool missing = diagnostics.MissingProjects.Count > 0;
         bool load = diagnostics.FailedProjects.Count > 0;
         bool restore = diagnostics.RestoreFailedProjects.Count > 0;
 
-        string cause = (load, restore) switch
-        {
-            (true, true) => $"{Failed(diagnostics)} failed to load and NuGet packages did not resolve for "
-                            + $"{Unrestored(diagnostics)}",
-            (true, false) => $"{Failed(diagnostics)} failed to load",
-            _ => $"NuGet packages did not resolve for {Unrestored(diagnostics)}"
-        };
+        var causes = new List<string>();
+        if (missing || load) causes.Add(Unloaded(diagnostics));
+        if (restore) causes.Add($"NuGet packages did not resolve for {Unrestored(diagnostics)}");
 
-        // A failed load needs the build as well as the restore; an unresolved package needs only the restore.
-        string repair = load
-            ? "restore and build the solution (dotnet restore, dotnet build)"
-            : "restore the solution (dotnet restore)";
+        // A failed load needs the build as well as the restore; an unresolved package needs only the restore; a
+        // missing project file needs neither, only the file.
+        var repairs = new List<string>();
+        if (missing) repairs.Add("put the missing project files on disk or remove their entries from the solution");
+        if (load) repairs.Add("restore and build the solution (dotnet restore, dotnet build)");
+        else if (restore) repairs.Add("restore the solution (dotnet restore)");
 
-        return $"The model is incomplete: {cause}, so this selection may name types or rest on references "
-               + $"that were never extracted; {repair}, then re-check before reading this as a spec defect.";
+        return $"The model is incomplete: {string.Join(" and ", causes)}, so this selection may name types or rest "
+               + $"on references that were never extracted; {string.Join(", then ", repairs)}, then re-check "
+               + "before reading this as a spec defect.";
     }
 
     // The count, as a noun phrase every lede can take: "1 project" / "3 projects". A gate that knows exactly
@@ -330,23 +380,57 @@ internal static class IncompleteModelGate
         return Plurals.Counted(diagnostics.FailedProjects.Count, "project");
     }
 
+    /// <summary>
+    ///     "1 project file the solution declares is not on disk" / "2 project files the solution declares are not
+    ///     on disk": the missing cause as every surface states it.
+    /// </summary>
+    internal static string MissingClause(int count)
+    {
+        return $"{Plurals.Counted(count, "project file")} the solution declares {Plurals.Verb(count)} not on disk";
+    }
+
+    private static string Missing(WorkspaceDiagnostics diagnostics)
+    {
+        return MissingClause(diagnostics.MissingProjects.Count);
+    }
+
+    private static string MissingFiles(WorkspaceDiagnostics diagnostics)
+    {
+        return Plurals.Counted(diagnostics.MissingProjects.Count, "project file");
+    }
+
+    // The missing and load causes as one clause, for a surface that states both in one line.
+    private static string Unloaded(WorkspaceDiagnostics diagnostics)
+    {
+        var causes = new List<string>();
+        if (diagnostics.MissingProjects.Count > 0) causes.Add(Missing(diagnostics));
+        if (diagnostics.FailedProjects.Count > 0) causes.Add($"{Failed(diagnostics)} failed to load");
+        return string.Join(" and ", causes);
+    }
+
     private static string Unrestored(WorkspaceDiagnostics diagnostics)
     {
         return Plurals.Counted(diagnostics.RestoreFailedProjects.Count, "project");
     }
 
-    // A surface's whole refusal: one EvidenceBlock per cause it has, load failures first. Both ledes are
-    // built by the caller and the unused one is dropped, so a single-cause message carries that cause's block
-    // alone, with no branch in the caller and no conditional in any literal.
+    // A surface's whole refusal: one EvidenceBlock per cause it has, missing files, then failed loads and restores.
+    // Every lede is built by the caller and the unused ones are dropped, so a single-cause message carries that
+    // cause's block alone, with no branch in the caller and no conditional in any literal. The missing block never
+    // carries the MSBuild selection note, because no MSBuild could have opened a file that is not there.
     private static string Message(
         WorkspaceDiagnostics diagnostics,
         bool withSelectionNote,
+        string missingLede,
+        string? missingTail,
         string loadLede,
         string? loadTail,
         string restoreLede,
         string? restoreTail)
     {
         var blocks = new List<string>();
+
+        if (diagnostics.MissingProjects.Count > 0)
+            blocks.Add(EvidenceBlock.Compose(missingLede, diagnostics.MissingProjects, missingTail));
 
         if (diagnostics.FailedProjects.Count > 0)
             blocks.Add(EvidenceBlock.Compose(loadLede, diagnostics.FailedProjects, loadTail, withSelectionNote));

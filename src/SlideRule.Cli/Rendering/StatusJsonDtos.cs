@@ -22,9 +22,9 @@ namespace SlideRule.Cli.Rendering;
 ///     </para>
 ///     <para>
 ///         The trust stamps, <paramref name="ModelIncomplete" /> through <paramref name="UnsupportedProjects" />,
-///         are <see cref="WorkspaceTrustStamp" />'s, and each makes the burndown read low. A failed, unchecked or
-///         unsupported project contributes no violations, and a restore-failed project's rules run and report but
-///         find nothing to count where their target is a package the restore never fetched. An unsupported
+///         are <see cref="WorkspaceTrustStamp" />'s, and each makes the burndown read low. A missing, failed,
+///         unchecked or unsupported project contributes no violations, and a restore-failed project's rules run and
+///         report but find nothing to count where their target is a package the restore never fetched. An unsupported
 ///         project's zero is not progress the team made, and it lasts as long as this product cannot read the
 ///         project or the solution's default configuration does not build it.
 ///         <paramref name="StaleSpec" /> means the spec's sources differ from the build the run loaded, so the
@@ -39,6 +39,7 @@ internal sealed record StatusJson(
     IReadOnlyList<PackageAuditEntry>? PackageAudit,
     IReadOnlyList<string>? WorkspaceDiagnostics,
     bool? ModelIncomplete,
+    IReadOnlyList<string>? MissingProjects,
     IReadOnlyList<string>? FailedProjects,
     IReadOnlyList<string>? UncheckedProjects,
     IReadOnlyList<string>? RestoreFailedProjects,

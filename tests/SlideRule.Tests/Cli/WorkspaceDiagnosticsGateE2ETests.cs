@@ -641,6 +641,51 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         result.Err.ShouldContainInOrder(GateLine, RestoreGateLine);
     }
 
+    [Fact]
+    public async Task Check_MissingProjectFile_RefusesWithAFileRemedyAndNamesItInTheSarif()
+    {
+        // A declared project file that is not on disk gates like a failed load, and is told apart from one: no
+        // restore or build creates a project file, so the refusal advises neither.
+        using TempDirectory temp = TestTempRoot.Fresh("missing-gate-sarif");
+        string sarifPath = temp.PathOf("missing-gate.sarif");
+
+        CliResult result = await RunWithInjectedDiagnosticAsync(
+            [], CliRunner.CleanSpecDll, false, false, sarifPath,
+            missingProjects: [DiagnosticInjectingSolutionSource.SimulatedMissingProject]);
+
+        result.ShouldRefuseWith(
+            "error: the model is incomplete — 1 project file the solution declares is not on disk, so check "
+            + "cannot pass:\n"
+            + $"  {DiagnosticInjectingSolutionSource.SimulatedMissingProject}\n"
+            + "No restore or build creates a project file: initialise the submodule or check out the tree that "
+            + "holds it, generate it, or remove its entry from the solution, then retry. To check against the "
+            + "partial model anyway, pass --allow-workspace-diagnostics.");
+        File.ReadAllText(sarifPath)
+            .ShouldCarryNotification(
+                "error",
+                "The model is incomplete: 1 project file the solution declares is not on disk, so these results "
+                + "were reached against a codebase missing whole projects: ")
+            .SarifMessageText()
+            .ShouldContain("MyApp.Vendor/MyApp.Vendor.csproj");
+    }
+
+    [Fact]
+    public async Task Check_MissingProjectFileJson_CarriesItInItsOwnSlot()
+    {
+        CliResult result = await RunWithInjectedDiagnosticAsync(
+            [], CliRunner.CleanSpecDll, false, true,
+            missingProjects: [DiagnosticInjectingSolutionSource.SimulatedMissingProject]);
+
+        result.ShouldRefuseWith();
+        using JsonDocument document = result.ShouldHaveJsonStdout();
+        document.ShouldBeStampedIncomplete();
+        document.RootElement.Strings("missingProjects")
+            .ShouldHaveSingleItem()
+            .ShouldEndWith("MyApp.Vendor/MyApp.Vendor.csproj");
+        document.RootElement.TryGetProperty("failedProjects", out _)
+            .ShouldBeFalse(result.Transcript());
+    }
+
     // ── harness ───────────────────────────────────────────────────────────────────────────────────────────
 
     // The load-failure shape: the diagnostic renders, and the project beside it is what gates.
@@ -670,11 +715,12 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         IReadOnlyList<string>? uncheckedProjects = null,
         IReadOnlyList<string>? restoreFailedProjects = null,
         bool forTheHook = false,
-        CancellationToken? cancellationToken = null)
+        CancellationToken? cancellationToken = null,
+        IReadOnlyList<string>? missingProjects = null)
     {
         string solution = CliRunner.MyAppSolution;
         var source = new DiagnosticInjectingSolutionSource(
-            diagnostics, failedProjects, uncheckedProjects, restoreFailedProjects);
+            diagnostics, failedProjects, uncheckedProjects, restoreFailedProjects, missingProjects: missingProjects);
         CheckRequest request = CheckRequests.For(solution, spec, SolutionPaths.SolutionDirectoryOf(solution))
             with
             {

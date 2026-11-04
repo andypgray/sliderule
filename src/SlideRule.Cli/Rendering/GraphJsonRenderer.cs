@@ -70,6 +70,7 @@ internal static class GraphJsonRenderer
             WorkspaceDiagnostics: diagnosticRows,
             WorkspaceDiagnosticCount: diagnosticCount,
             ModelIncomplete: trust.ModelIncomplete,
+            MissingProjects: trust.MissingProjects,
             FailedProjects: trust.FailedProjects,
             UncheckedProjects: trust.UncheckedProjects,
             RestoreFailedProjects: trust.RestoreFailedProjects,

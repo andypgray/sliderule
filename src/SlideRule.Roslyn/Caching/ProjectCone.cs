@@ -174,7 +174,7 @@ internal static class ProjectCone
     ///     One solution's whole structural set, deduplicated and in stamping order: the solution (or filter) file
     ///     at <paramref name="solutionPath" />, the solution a filter points at, then each of
     ///     <paramref name="projects" />, in the order given, as its file followed by its
-    ///     <see cref="StructuralPaths" />.
+    ///     <see cref="StructuralPaths" />, then every project file the solution requires that is not already listed.
     /// </summary>
     /// <remarks>
     ///     The filter leg costs a non-filter solution nothing: the format test comes before any I/O.
@@ -221,6 +221,13 @@ internal static class ProjectCone
             foreach (string path in StructuralPaths(projectDirectory, evaluatedOutputPath, intermediateAssemblyPath))
                 Add(path);
         }
+
+        // Every project file the solution requires, after the loaded ones, so a declared file absent from disk is
+        // stamped absent. Without it, restoring that file (initialising the submodule that holds it) would leave the
+        // cached refusal in force, since nothing stamped would change.
+        if (LoadBoundary.ReadMembership(fullSolution) is { } membership)
+            foreach (string required in membership.Required)
+                Add(Path.GetFullPath(required));
 
         return paths;
 

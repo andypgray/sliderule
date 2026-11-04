@@ -178,7 +178,7 @@ internal sealed class ExtractionCacheStore
     // gains a slot, even one that deserializes to a harmless default, so a reader never reasons about which
     // slots a file predates. The suite cannot catch a missed bump — every run gets a fresh cache directory — so
     // the discipline is the only guard.
-    private const int CurrentSchemaVersion = 47;
+    private const int CurrentSchemaVersion = 48;
 
     private static readonly IReadOnlySet<string> NoDocuments = new HashSet<string>(PathComparison.Comparer);
 
@@ -445,6 +445,7 @@ internal sealed class ExtractionCacheStore
             extraction.LoadDiagnostics.UncheckedProjects,
             extraction.LoadDiagnostics.RestoreFailedProjects,
             extraction.LoadDiagnostics.UnsupportedProjects,
+            extraction.LoadDiagnostics.MissingProjects,
             extraction.Fragments);
 
         return TryWriteAtomic(manifest);
@@ -530,7 +531,8 @@ internal sealed class ExtractionCacheStore
             failedProjects: manifest.FailedProjects,
             uncheckedProjects: manifest.UncheckedProjects,
             restoreFailedProjects: manifest.RestoreFailedProjects,
-            unsupportedProjects: manifest.UnsupportedProjects);
+            unsupportedProjects: manifest.UnsupportedProjects,
+            missingProjects: manifest.MissingProjects);
 
         if (dirtyProjects.Count == 0)
         {

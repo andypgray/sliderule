@@ -8,8 +8,9 @@ using Xunit;
 namespace SlideRule.Tests.Roslyn;
 
 /// <summary>
-///     <see cref="ProjectLoadFailures.Detect" />'s two arms — and, under a solution filter, its second
-///     answer — over a pure <see cref="AdhocWorkspace" /> graph plus a real solution file on disk. This is
+///     <see cref="ProjectLoadFailures.Detect" />'s two arms over a pure <see cref="AdhocWorkspace" /> graph plus a
+///     real solution file on disk: a declared project file missing from disk told apart from one that failed to
+///     load, and, under a solution filter, the unchecked answer. This is
 ///     the predicate the fail-closed gate keys on, rather than on MSBuild message text. The class also pins the
 ///     unsupported entries <see cref="ProjectLoadFailures.Detect" /> lists from the solution file and from the
 ///     other-language project files a load could not reach.
@@ -92,15 +93,44 @@ public sealed class ProjectLoadFailuresTests
     [Fact]
     public void Detect_SolutionDeclaresAProjectThatDidNotLoad_NamesTheDeclaredPath()
     {
-        // Arm 1, over a real solution file: a member whose .csproj is absent never becomes a Project at all,
-        // so the loaded solution has nothing to inspect and only the declared membership can say it is gone.
+        // Arm 1, over a real solution file: a member whose evaluation failed never becomes a Project at all, so
+        // the loaded solution has nothing to inspect and only the declared membership can say it is gone.
+        using TempDirectory temp = TestTempRoot.Fresh("declared-unloaded");
+        string solutionPath = WriteSolution(temp, "Present", "Broken");
+        WriteProjectFile(temp, "Broken");
+        using var workspace = new AdhocWorkspace();
+        Solution solution = workspace.WithProjects(AdhocSolution.Loaded("Present", temp.PathOf("Present", "Present.csproj")));
+
+        Detect(solution, solutionPath)
+            .ShouldHaveFailed(temp.PathOf("Broken", "Broken.csproj"));
+    }
+
+    [Fact]
+    public void Detect_SolutionDeclaresAProjectAbsentFromDisk_NamesItMissingRatherThanFailed()
+    {
+        // The same arm told apart by the file itself: no restore or build creates a project file, so one that is
+        // not on disk (an uninitialised submodule) is a cause of its own, with a remedy of its own.
         using TempDirectory temp = TestTempRoot.Fresh("declared-absent");
         string solutionPath = WriteSolution(temp, "Present", "Absent");
         using var workspace = new AdhocWorkspace();
         Solution solution = workspace.WithProjects(AdhocSolution.Loaded("Present", temp.PathOf("Present", "Present.csproj")));
 
         Detect(solution, solutionPath)
-            .ShouldHaveFailed(temp.PathOf("Absent", "Absent.csproj"));
+            .ShouldHaveMissing(temp.PathOf("Absent", "Absent.csproj"));
+    }
+
+    [Fact]
+    public void Detect_AbsentBesideUnloaded_NamesEachUnderItsOwnCause()
+    {
+        using TempDirectory temp = TestTempRoot.Fresh("declared-both-causes");
+        string solutionPath = WriteSolution(temp, "Absent", "Broken");
+        WriteProjectFile(temp, "Broken");
+        using var workspace = new AdhocWorkspace();
+
+        ProjectLoadReport report = Detect(workspace.CurrentSolution, solutionPath);
+
+        report.ShouldHaveReported(
+            missing: [temp.PathOf("Absent", "Absent.csproj")], failed: [temp.PathOf("Broken", "Broken.csproj")]);
     }
 
     [Fact]
@@ -137,15 +167,29 @@ public sealed class ProjectLoadFailuresTests
         // The strengthening the filter-aware arm buys: without it, the run asks for Kept, does not get it, and
         // exits green. It is sound to demand it because Roslyn refuses a filter naming a non-member outright,
         // so everything a well-formed filter selects is something the load was obliged to produce.
-        using TempDirectory temp = TestTempRoot.Fresh("filtered-absent");
+        using TempDirectory temp = TestTempRoot.Fresh("filtered-unloaded");
         string filterPath = WriteFilter(temp, ["Kept", "Dropped"], "Kept");
+        WriteProjectFile(temp, "Kept");
         using var workspace = new AdhocWorkspace();
         Solution solution = workspace.CurrentSolution;
 
         ProjectLoadReport report = Detect(solution, filterPath);
 
-        report.Failed.ShouldBe([temp.PathOf("Kept", "Kept.csproj")]);
-        report.Unchecked.ShouldBe([temp.PathOf("Dropped", "Dropped.csproj")]);
+        report.ShouldHaveReported(
+            failed: [temp.PathOf("Kept", "Kept.csproj")], @unchecked: [temp.PathOf("Dropped", "Dropped.csproj")]);
+    }
+
+    [Fact]
+    public void Detect_SolutionFilterSelectsAProjectAbsentFromDisk_IsMissingRatherThanUnchecked()
+    {
+        using TempDirectory temp = TestTempRoot.Fresh("filtered-absent");
+        string filterPath = WriteFilter(temp, ["Kept", "Dropped"], "Kept");
+        using var workspace = new AdhocWorkspace();
+
+        ProjectLoadReport report = Detect(workspace.CurrentSolution, filterPath);
+
+        report.ShouldHaveReported(
+            missing: [temp.PathOf("Kept", "Kept.csproj")], @unchecked: [temp.PathOf("Dropped", "Dropped.csproj")]);
     }
 
     [Fact]
@@ -189,12 +233,13 @@ public sealed class ProjectLoadFailuresTests
         // The two arms are one answer, deduplicated by this OS's path rule and ordinal-sorted, so a refusal
         // reads the same however the failures arose and however the solution file happened to order them.
         using TempDirectory temp = TestTempRoot.Fresh("both-arms");
-        string solutionPath = WriteSolution(temp, "Zed", "Absent");
+        string solutionPath = WriteSolution(temp, "Zed", "Unloaded");
+        WriteProjectFile(temp, "Unloaded");
         using var workspace = new AdhocWorkspace();
         Solution solution = workspace.WithProjects(AdhocSolution.Empty("Zed", temp.PathOf("Zed", "Zed.csproj")));
 
         Detect(solution, solutionPath)
-            .ShouldHaveFailed(temp.PathOf("Absent", "Absent.csproj"), temp.PathOf("Zed", "Zed.csproj"));
+            .ShouldHaveFailed(temp.PathOf("Unloaded", "Unloaded.csproj"), temp.PathOf("Zed", "Zed.csproj"));
     }
 
     [Fact]
@@ -213,7 +258,7 @@ public sealed class ProjectLoadFailuresTests
         Solution solution = workspace.WithProjects(AdhocSolution.Loaded("Present", real.PathOf("Present", "Present.csproj")));
 
         Detect(solution, Path.Combine(via, "Solution.sln"))
-            .ShouldHaveFailed(Path.Combine(via, "Absent", "Absent.csproj"));
+            .ShouldHaveMissing(Path.Combine(via, "Absent", "Absent.csproj"));
     }
 
     [Fact]
@@ -275,6 +320,12 @@ public sealed class ProjectLoadFailuresTests
             ? null
             : SolutionProjectFileParser.ReadDeclaredMembership(solutionPath);
         return ProjectLoadFailures.Detect(solution, projectFiles, membership, otherLanguageProjects ?? []);
+    }
+
+    // A declared member's project file on disk, so arm 1 reads it as a failed evaluation rather than a missing file.
+    private static void WriteProjectFile(TempDirectory temp, string name)
+    {
+        temp.WriteFile([name, $"{name}.csproj"], "<Project />");
     }
 
     private static string WriteSolution(TempDirectory temp, params string[] projectNames)

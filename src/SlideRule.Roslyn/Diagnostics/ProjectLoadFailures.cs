@@ -6,14 +6,16 @@ namespace SlideRule.Roslyn.Diagnostics;
 
 /// <summary>
 ///     What one load produced, in the shapes a verdict has to distinguish: the projects that
-///     <see cref="Failed" />, which gates; the declared members a solution filter left <see cref="Unchecked" />,
+///     <see cref="Failed" /> and the declared project files that are <see cref="Missing" /> from disk, which both
+///     gate; the declared members a solution filter left <see cref="Unchecked" />,
 ///     which narrows the verdict without invalidating it; and the <see cref="Unsupported" /> projects no load
 ///     could have produced, which state the run's coverage.
 /// </summary>
 internal sealed record ProjectLoadReport(
     IReadOnlyList<string> Failed,
     IReadOnlyList<string> Unchecked,
-    IReadOnlyList<UnsupportedProject> Unsupported);
+    IReadOnlyList<UnsupportedProject> Unsupported,
+    IReadOnlyList<string> Missing);
 
 /// <summary>
 ///     Which projects failed to load, answered from the structure of the loaded <see cref="Solution" /> rather
@@ -43,8 +45,8 @@ internal sealed record ProjectLoadReport(
 internal static class ProjectLoadFailures
 {
     /// <summary>
-    ///     What the load did and did not produce. The failed and unchecked lists are absolute <c>.csproj</c> paths,
-    ///     ordinal-sorted and deduplicated by this OS's path rule.
+    ///     What the load did and did not produce. The failed, missing and unchecked lists are absolute
+    ///     <c>.csproj</c> paths, ordinal-sorted and deduplicated by this OS's path rule.
     /// </summary>
     /// <remarks>
     ///     <paramref name="membership" /> is what the solution file the load came from, or the one a replayed build
@@ -60,6 +62,7 @@ internal static class ProjectLoadFailures
         IReadOnlyCollection<string> otherLanguageProjects)
     {
         var failed = new HashSet<string>(PathComparison.Comparer);
+        var missing = new HashSet<string>(PathComparison.Comparer);
 
         // Arm 2 first, over what did load: a multi-target-framework project is several Projects behind one
         // file path, so the set collapses them to the one csproj a reader would go and fix. A project in
@@ -86,13 +89,16 @@ internal static class ProjectLoadFailures
                 .OfType<string>()
                 .ToHashSet(PathComparison.Comparer);
 
+            // A declared file that is not on disk is told apart from one whose evaluation failed, because no
+            // restore or build creates a project file, so the two causes take different remedies.
             foreach (string required in membership.Required)
                 if (!loadedFiles.Contains(canonicalizer.Resolve(required)!))
-                    failed.Add(required);
+                    (File.Exists(required) ? failed : missing).Add(required);
 
             // Declared, not loaded, and not blamed — the only thing left for it to be is out of scope.
             foreach (string declared in membership.Declared)
-                if (!loadedFiles.Contains(canonicalizer.Resolve(declared)!) && !failed.Contains(declared))
+                if (!loadedFiles.Contains(canonicalizer.Resolve(declared)!) && !failed.Contains(declared)
+                                                                            && !missing.Contains(declared))
                     uncheckedMembers.Add(declared);
 
             // Measured against what loaded, like the two lists above, rather than taken on trust from the MSBuild
@@ -126,7 +132,7 @@ internal static class ProjectLoadFailures
             .OrderBy(project => project.Path, StringComparer.Ordinal)
             .ToList();
 
-        return new ProjectLoadReport(Sorted(failed), Sorted(uncheckedMembers), sortedUnsupported);
+        return new ProjectLoadReport(Sorted(failed), Sorted(uncheckedMembers), sortedUnsupported, Sorted(missing));
     }
 
     private static IReadOnlyList<string> Sorted(IEnumerable<string> paths)

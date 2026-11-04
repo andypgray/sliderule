@@ -38,8 +38,9 @@ internal sealed class ArchTools(
         "subjectTypes/subjectGeneratedTypes appear together on a rule whose subject contained generator " +
         "output, pass or fail: how many types it swept and how many nobody wrote. Both absent means none " +
         "were. Narrowing the rule with .Authored() removes them. " +
-        "If projects fail to load, or their NuGet packages did not resolve, the report still " +
-        "returns, stamped modelIncomplete: true and failedProjects/restoreFailedProjects — a verdict reached " +
+        "If declared project files are missing, projects fail to load, or their NuGet packages did not " +
+        "resolve, the report still returns, stamped modelIncomplete: true and " +
+        "missingProjects/failedProjects/restoreFailedProjects — a verdict reached " +
         "against a partial model; report that, never plain green. " +
         "Under a .slnf solution filter, uncheckedProjects names the declared projects the run never " +
         "checked — a clean report then covers a subset; say so. " +
@@ -56,8 +57,9 @@ internal sealed class ArchTools(
 
     private const string StatusDescription =
         "Return the JSON migration burndown (schemaVersion 2): per-rule grandfathered/stale counts and " +
-        "promotion suggestions. If projects fail to load, or their NuGet packages did not resolve, the " +
-        "burndown still returns, stamped modelIncomplete: true and failedProjects/restoreFailedProjects — " +
+        "promotion suggestions. If declared project files are missing, projects fail to load, or their NuGet " +
+        "packages did not resolve, the burndown still returns, stamped modelIncomplete: true and " +
+        "missingProjects/failedProjects/restoreFailedProjects — " +
         "counts from a partial model; report that rather than quoting them as whole. " +
         "Under a .slnf solution filter, uncheckedProjects names the declared projects the run never checked; " +
         "they contribute no violations, so every count reads low. unsupportedProjects names the projects " +

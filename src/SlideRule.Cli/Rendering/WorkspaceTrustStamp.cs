@@ -26,7 +26,8 @@ internal sealed record UnsupportedProjectStamp(string Project, string Reason)
 ///     <para>
 ///         Each is <see cref="WorkspaceDiagnostics" />' fact of the same name, which says what it holds, with
 ///         every path made solution-relative and forward-slashed; <paramref name="ModelIncomplete" /> is
-///         <see cref="WorkspaceDiagnostics.IsIncomplete" />. Three of them are adjacent lists of the same type,
+///         <see cref="WorkspaceDiagnostics.IsIncomplete" />. The path lists, <paramref name="MissingProjects" />
+///         through <paramref name="RestoreFailedProjects" />, are adjacent and of one type,
 ///         which is a swap the compiler cannot see: a reorder exchanging what failed to load with what a solution
 ///         filter left unchecked type-checks cleanly and reaches the wire. Composed once here, off one
 ///         <see cref="WorkspaceDiagnostics" /> and by name, that reorder is untypeable — and no document decides
@@ -51,6 +52,7 @@ internal sealed record UnsupportedProjectStamp(string Project, string Reason)
 /// </remarks>
 internal readonly record struct WorkspaceTrustStamp(
     bool? ModelIncomplete,
+    IReadOnlyList<string>? MissingProjects,
     IReadOnlyList<string>? FailedProjects,
     IReadOnlyList<string>? UncheckedProjects,
     IReadOnlyList<string>? RestoreFailedProjects,
@@ -70,6 +72,7 @@ internal readonly record struct WorkspaceTrustStamp(
         var relativizer = new PathFormat.Relativizer(solutionDirectory);
         return new WorkspaceTrustStamp(
             SlideRuleJson.OmitFalse(diagnostics.IsIncomplete),
+            Relative(diagnostics.MissingProjects, relativizer),
             Relative(diagnostics.FailedProjects, relativizer),
             Relative(diagnostics.UncheckedProjects, relativizer),
             Relative(diagnostics.RestoreFailedProjects, relativizer),
