@@ -1061,7 +1061,7 @@ internal static class FragmentExtractor
                 member is IPropertySymbol { SetMethod: not null }, // any setter, `private set` and `init` included
                 member is IPropertySymbol { SetMethod.IsInitOnly: true }, // the init-only refinement of the above
                 member is IFieldSymbol { IsReadOnly: true }, // C# `readonly`; false for a const (IsConst below)
-                member is IFieldSymbol { IsConst: true }); // const is also IsStatic — already pinned
+                member is IFieldSymbol { IsConst: true }); // a const also reports IsStatic
 
             return new FragmentMember(facts, MemberDeclarationSites(member));
         }

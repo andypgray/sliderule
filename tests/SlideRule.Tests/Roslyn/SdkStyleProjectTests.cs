@@ -21,8 +21,7 @@ namespace SlideRule.Tests.Roslyn;
 ///         roots it scans, classified, and beside each one whether an assets file is actually on disk at a
 ///         location <see cref="IntermediateOutputTree.AssetsPathsOf" /> stamps. The only rows where the two
 ///         columns come apart are the beds deliberately left unrestored — the state the gate exists to
-///         catch — and the output-layout and render-containment beds, which are restored only inside the
-///         temp copies that drive them.
+///         catch — and the beds restored only inside the temp copies that drive them.
 ///     </para>
 ///     <para>
 ///         Real files rather than only written shapes: the written ones fix the boundaries — a comment
@@ -55,8 +54,8 @@ public sealed class SdkStyleProjectTests
         // The one non-SDK-style project in the corpus: 2003 XML namespace, net48, and no assets file — the
         // shape "absent ⇒ failed" would have refused wholesale.
         "Classic.Billing.csproj: legacy, no assets file",
-        // The three beds deliberately left unrestored. SDK-style with no assets file is the state the restore
-        // gate exists to catch, and these are the only rows that show it.
+        // The three beds left unrestored. SDK-style with no assets file is the state the restore gate exists to
+        // catch. The temp-copy beds below read the same, because nothing restores them in the output tree.
         "BrokenApp.Core.csproj: SDK-style, no assets file",
         "BrokenApp.Web.csproj: SDK-style, no assets file",
         "FieldMini.Core.csproj: SDK-style, no assets file",
@@ -130,7 +129,7 @@ public sealed class SdkStyleProjectTests
     [InlineData("""<Project><Sdk Name="Microsoft.NET.Sdk" Version="10.0.100" /><PropertyGroup /></Project>""", true)]
     [InlineData(
         """<Project><Import Sdk="Microsoft.NET.Sdk" Project="Sdk.props" /><PropertyGroup /></Project>""", true)]
-    // An Import may legitimately sit inside an ImportGroup, so that arm reads descendants rather than the
+    // An Import may also sit inside an ImportGroup, so that arm reads descendants rather than the
     // root's own children.
     [InlineData(
         """<Project><ImportGroup><Import Sdk="Microsoft.NET.Sdk" Project="Sdk.props" /></ImportGroup></Project>""",
@@ -194,7 +193,7 @@ public sealed class SdkStyleProjectTests
     {
         // The measurement the gate rests on. Both columns in one table, because the classification alone would
         // only describe the XML: what licenses the gate is that "SDK-style" and "has an assets file" agree
-        // everywhere except where a bed was deliberately left unrestored.
+        // everywhere except on a bed left unrestored or restored only inside a temp copy.
         List<string> measured = RealProjectFiles()
             .Select(Describe)
             .Order(StringComparer.Ordinal)

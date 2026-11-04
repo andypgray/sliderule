@@ -142,7 +142,9 @@ internal static class Checker
         return report;
     }
 
-    /// <summary>The reified model of a one-off spec — for the tests whose subject is the model, not the check.</summary>
+    /// <summary>
+    ///     The reified model of a one-off spec — for the tests whose subject is the model, not the check.
+    /// </summary>
     public static ArchitectureModel Model(Action<Arch> define)
     {
         return ArchModelBuilder.Build(new InlineSpec(define));

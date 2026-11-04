@@ -7,8 +7,8 @@ namespace SlideRule.Tests.TestSupport;
 ///     The plain <c>graph</c> run every <see cref="GraphRunner" /> row starts from: the human survey at full
 ///     grain, over the cache, with no binlog, no project filter and workspace diagnostics not allowed — and no
 ///     spec, because the survey is a property of the codebase. A row that cares about one of those says so with
-///     a <c>with</c> clause instead of respelling eight positional arguments, three of them a bare
-///     <c>false</c> and two a bare <c>null</c>.
+///     a <c>with</c> clause instead of respelling every positional argument, the bare <c>false</c> and
+///     <c>null</c> ones among them.
 /// </summary>
 /// <remarks>
 ///     The twin of <see cref="CheckRequests" />, and for its reason: what a row is about should be the only

@@ -210,7 +210,7 @@ public sealed class CheckJsonOrderTests
     {
         // MSBuild's own words are evidence rather than verdict, they have no ceiling, and the actionable half
         // of them is already hoisted into failedProjects and restoreFailedProjects — so this is the one slot
-        // deliberately left where a cut can reach it.
+        // left where a cut can reach it.
         StampedDocument.ShouldSerializeBefore("rules", "workspaceDiagnostics");
     }
 

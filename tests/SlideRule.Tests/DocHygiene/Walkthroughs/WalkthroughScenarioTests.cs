@@ -101,7 +101,7 @@ public sealed class WalkthroughScenarioTests
         // Arrange
         List<string> undeclared = [];
 
-        // Act: a fence compared with a cut of its run is honest only while the page says what it cut; the
+        // Act: comparing a fence with a cut of its run is fair only while the page says what it cut; the
         // sentence saying so must still be in the page's prose, however the paragraph is wrapped.
         foreach (ReplayedFence fence in WalkthroughFences.Replayed.Concat(WalkthroughFences.Showcase)
                      .Where(static fence => fence.DeclaredCut is not null))

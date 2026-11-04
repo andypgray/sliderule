@@ -99,7 +99,7 @@ public sealed class MemberSelectionAdjectivesTests
     {
         // A COMPILE-TIME pin: the TSelf shape returns each projection's own type, so the kind-only verb
         // beside it stays reachable after the adjective. Each line below would fail to compile against a
-        // bare MemberSelection return, which is the whole claim — the assertions merely observe that the
+        // bare MemberSelection return, which is the whole claim — the assertions only observe that the
         // three chains do reify.
         Arch.Types.Methods.ThatAreStatic()
             .Returning(typeof(Task))

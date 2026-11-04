@@ -143,7 +143,7 @@ public sealed class GrandfatheredCountSyncTests
     ///     Draft-era counts: sentences that deliberately state a number the committed baseline does not
     ///     hold, because the walkthrough is mid-authoring at that point. Each is pinned from both sides —
     ///     the drafted text must still be there, and the baseline's number must still be absent — so the
-    ///     day the divergence closes, the exemption fails rather than quietly covering a real drift.
+    ///     day the divergence closes, the exemption fails rather than silently covering a real drift.
     /// </summary>
     private static readonly DraftCount[] DraftCounts =
     [

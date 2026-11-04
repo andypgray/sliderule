@@ -643,7 +643,7 @@ public sealed class SelfSpecTests
 
         // The type the generator completed rather than emitted. Its own declaration is hand-written, the
         // attribute landed on the method, and the two parts merge onto one symbol — so it must survive the
-        // narrowing, and an equality above is what proves it was not quietly taken along.
+        // narrowing, and an equality above is what proves it was not silently taken along.
         authored.ShouldContain("SlideRule.Roslyn.Diagnostics.NuGetAuditDiagnostics");
     }
 
@@ -653,7 +653,7 @@ public sealed class SelfSpecTests
     ///     suite proves Roslyn populates it. If it ever stops — a Workspaces change, a BuildHost that no
     ///     longer reads <c>@(IntermediateAssembly)</c> — the refusal degrades to a silent no-op with every
     ///     other test still green, and this is the only gate that can catch it. Asserted as three facts per
-    ///     project (present, rooted, and not the output path) because a path that is merely non-empty could
+    ///     project (present, rooted, and not the output path) because a non-empty path could still
     ///     be the bin-side one, which would exclude the real output instead of the intermediate.
     /// </summary>
     [Fact]

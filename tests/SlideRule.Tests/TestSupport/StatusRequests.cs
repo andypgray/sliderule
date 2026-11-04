@@ -5,8 +5,8 @@ namespace SlideRule.Tests.TestSupport;
 /// <summary>
 ///     The plain <c>status</c> run every <see cref="StatusRunner" /> row starts from: the human burndown, over
 ///     the cache, with no binlog and workspace diagnostics not allowed. A row that cares about one of those
-///     says so with a <c>with</c> clause instead of respelling seven positional arguments, three of them a
-///     bare <c>false</c> and one a bare <c>null</c>.
+///     says so with a <c>with</c> clause instead of respelling every positional argument, the bare
+///     <c>false</c> and <c>null</c> ones among them.
 /// </summary>
 /// <remarks>
 ///     The twin of <see cref="CheckRequests" />, and for its reason: what a row is about should be the only

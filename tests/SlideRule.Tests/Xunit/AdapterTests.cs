@@ -455,7 +455,7 @@ public sealed class AdapterTests
     private static string PolyglotSolution => FixtureBeds.PolyglotAppSolution;
 
     // A verbatim inline copy of the fixture spec's one rule, which holds over the C# project — so the rule
-    // case below reaches a genuine verdict rather than an empty-subject pass, and the skip is provably about
+    // case below reaches a genuine verdict rather than an empty-subject pass, and the skip can only be about
     // the .fsproj alone.
     private sealed class PolyglotInlineSpec : IArchitectureSpec
     {

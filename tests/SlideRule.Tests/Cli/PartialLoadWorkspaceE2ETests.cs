@@ -290,8 +290,8 @@ public sealed class PartialLoadWorkspaceE2ETests
     public async Task ExplainPath_PartiallyLoadedWorkspace_OpensWithACaveatAndStillAnswers()
     {
         // explain's type and path forms never gate either, and for context's reason: a type in a project that
-        // failed to load is not in the model, so "declares no type" would be a false answer without the caveat.
-        // The body is arch_explain's only channel, so the caveat rides it, both causes, load first.
+        // never loaded is not in the model, so "declares no type" would be a false answer without the caveat.
+        // The body is arch_explain's only channel, so the caveat is in it, both causes, the missing file first.
         using TempFixtureWorkspace workspace = BrokenApp();
         string solutionDirectory = Path.GetDirectoryName(workspace.SolutionPath)!;
         var request = new ExplainRequest(
@@ -346,8 +346,8 @@ public sealed class PartialLoadWorkspaceE2ETests
     [Fact]
     public async Task ArchGraph_PartiallyLoadedWorkspace_IsAnErrorResultThenSurveysWithTheOptOut()
     {
-        // The MCP twin, on the surface where the field crash was observed. A tool error rather than an
-        // exception dump is the whole point: the agent has to be able to read the refusal as actionable.
+        // The MCP twin, on arch_graph itself. A tool error rather than an exception dump is the whole point: the
+        // agent has to be able to read the refusal as actionable.
         using TempFixtureWorkspace workspace = BrokenApp();
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
             McpServerBindings.For(workspace.SolutionPath, null), Ct);

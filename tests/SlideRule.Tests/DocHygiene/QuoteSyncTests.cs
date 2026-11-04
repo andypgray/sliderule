@@ -11,10 +11,9 @@ using Xunit;
 namespace SlideRule.Tests.DocHygiene;
 
 /// <summary>
-///     The quote-sync gate over the hand-written docs' fenced excerpts. The landing page, the self-check
-///     page, the getting-started page, the language spec and the example walkthroughs quote committed files
-///     inside fenced code blocks, and this gate holds each quote to the file it was cut from, so an edit to
-///     the source that the doc does not follow fails the suite instead of publishing a stale quote. A
+///     The quote-sync gate over the hand-written docs' fenced excerpts. Those docs quote committed files inside
+///     fenced code blocks, and this gate holds each quote to the file it was cut from, so an edit to the source
+///     that the doc does not follow fails the suite instead of publishing a stale quote. A
 ///     deliberate excerpt is held line by line, in order, as verbatim substrings of its source; a quote that
 ///     presents something whole, a file, a fence or a statement, is held whole, line for line, because an
 ///     in-order check passes a quote with lines left out.
@@ -289,9 +288,9 @@ public sealed class QuoteSyncTests
     ];
 
     /// <summary>
-    ///     The fences that quote nothing: commands for the reader to run, and files for the reader to save.
-    ///     Each is registered so that its page can promise every fence is held by something, and held to its
-    ///     place so that promise cannot silently lapse.
+    ///     The fences that quote nothing: commands for the reader to run, and files the reader saves or a command
+    ///     writes. Each is registered so that its page can promise every fence is held by something, and held to
+    ///     its place so that promise cannot silently lapse.
     /// </summary>
     private static readonly CommandFence[] CommandFences =
     [
@@ -582,8 +581,7 @@ public sealed class QuoteSyncTests
     public void EveryRegisteredDoc_YieldsAtLeastOneFence()
     {
         // Act & Assert: guard against the fence scanner silently matching nothing if a doc's quoting style
-        // changes out from under this gate. Every registered doc is reported, not just the first to come
-        // up empty.
+        // changes out from under this gate.
         Gate.ShouldYieldFromEveryRegisteredDoc();
     }
 

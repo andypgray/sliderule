@@ -512,7 +512,7 @@ public sealed class WarmWorkspaceMcpTests
         CallToolResult afterDelete = await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct);
         CliResult coldCheck = await CliRunner.InvokeColdAsync(
             "check", workspace.SolutionPath, "--no-cache", "--json");
-        // Named, not merely "some refusal": byte-equality against a cold run that had refused for another
+        // Named, not "some refusal": byte-equality against a cold run that had refused for another
         // reason entirely — a spec project it could no longer find, say — would read exactly as green here.
         coldCheck.ShouldRefuseWith(
             $"The spec project '{LayoutAppFixture.SpecProject}' has no built output",

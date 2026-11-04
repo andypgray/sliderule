@@ -469,7 +469,7 @@ public sealed class FragmentRoundTripTests
         // Arrange — one project's worth of every evaluated fact, with values no default could produce: two
         // frameworks, two packages of which one is private, an explicit packable-false and a lock policy
         // declared in a file the project does not name. Each site is distinct, so a hit that dropped one would
-        // land somewhere visibly wrong rather than merely somewhere.
+        // land somewhere visibly wrong rather than somewhere that reads as right.
         CodebaseFragment fragment = FragmentExtractor.Extract(CompilationFactory.Compile("Widget", ("Widget.cs", """
                                                                                                                  namespace Widget;
                                                                                                                  public class W {}
@@ -622,7 +622,7 @@ public sealed class FragmentRoundTripTests
     {
         // Arrange — the same two declarations, once as one framework's duplicates and once split across two
         // frameworks. Restore keeps the first of two duplicates, which here is the private one; the model
-        // answers as it does for frameworks instead, deliberately the stricter of the two.
+        // answers as it does for frameworks instead, the stricter of the two.
         FragmentPackageReference privately = Declaration("Polyfill", 9, isPrivate: true);
         FragmentPackageReference shipped = Declaration("Polyfill", 13, isPrivate: false);
         CodebaseFragment duplicated = WidgetFragment("net10.0", privately, shipped);

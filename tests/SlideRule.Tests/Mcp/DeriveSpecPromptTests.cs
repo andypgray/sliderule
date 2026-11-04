@@ -75,7 +75,7 @@ public sealed class DeriveSpecPromptTests
     private static readonly Regex RuleId = new(@"[a-z0-9-]+(/[a-z0-9-]+)+", RegexOptions.CultureInvariant);
 
     // A prompt call never resolves the binding (prompts read no solution/spec), so any working directory
-    // serves; a real one keeps StartAsync's host build honest.
+    // serves; a real one lets StartAsync build its host as it would in use.
     private static McpServerBinding Binding => McpServerBindings.For(null, null);
 
     [Fact]

@@ -669,7 +669,7 @@ public sealed class SlideRuleArchitectureSpec : IArchitectureSpec
     /// <summary>
     ///     The MCP SDK's tool attribute by full name. The SDK is the CLI's package reference alone, so the
     ///     spec cannot name its types, and an empty subject fails loudly, so a rename there reds the rules
-    ///     anchored on these names rather than quietly emptying them.
+    ///     anchored on these names rather than silently emptying them.
     /// </summary>
     private const string McpServerToolAttribute = "ModelContextProtocol.Server.McpServerToolAttribute";
 

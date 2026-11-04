@@ -855,7 +855,7 @@ public sealed class CodebaseExtractorMemberInventoryTests
                                                          }
                                                          """);
 
-        // A C# 11 generic attribute is where the pair earns its keep: the definition side erases the
+        // A C# 11 generic attribute is where the pair is needed: the definition side erases the
         // construction (so an open-definition anchor matches any construction), while the constructed name keeps
         // the substituted argument — exactly the type-side attribute-construction discipline, member-level.
         model.Type("N.C")
@@ -884,7 +884,7 @@ public sealed class CodebaseExtractorMemberInventoryTests
 
         // EMPIRICAL PIN: a partial method's two parts carry different attributes, and the merged symbol the
         // inventory reads reports BOTH — observed Roslyn merged-symbol behaviour, not a designed rule. The union
-        // is the honest reading for a member subject (either part's attribute is authored surface). The names
+        // is the right reading for a member subject (either part's attribute is authored surface). The names
         // are chosen so ordinal order reverses part order, which pins the ordering as by constructed name.
         model.Type("N.Host")
             .MemberNamed("OnScan")
@@ -953,7 +953,7 @@ public sealed class CodebaseExtractorMemberInventoryTests
                                                          }
                                                          """);
 
-        // ACCESSIBILITY-BLIND, the honesty boundary: the fact is that a setter exists, not that a caller
+        // ACCESSIBILITY-BLIND: the fact is that a setter exists, not that a caller
         // outside the type can reach it. A hand-written accessor body, a `private set` and an `internal set`
         // are each a setter, so none of the three is get-only however unreachable the write is.
         TypeNode c = model.Type("N.C");

@@ -20,7 +20,7 @@ namespace SlideRule.Tests.TestSupport;
 ///         any caller whose lease is held, gets a private copy instead.
 ///     </para>
 ///     <para>
-///         <b>Why the path must be stable, not merely private.</b> <c>CacheLocations</c> keys the extraction
+///         <b>Why the path must be stable, not only private.</b> <c>CacheLocations</c> keys the extraction
 ///         cache on a hash of the canonical solution path, so a new path is a guaranteed cold miss, and a cold
 ///         <c>check</c> costs far more than the restore (measured on the MyApp fixture). Holding the path
 ///         steady across a class turns every test after the first into the warm case.
@@ -47,7 +47,7 @@ internal sealed class TempFixtureWorkspace : IDisposable
 
     // Spelled out rather than left to a search pattern: a three-character pattern is documented to match
     // longer extensions too, so ".sln" alone is not a reliable way to include — or exclude — its siblings.
-    // Every project kind a bed may hold, not just C#: a bed with a project in another language restores it
+    // Every project kind a bed may hold, C# or not: a bed with a project in another language restores it
     // like any other, and leaving that extension out would let an edit to it reuse a stale restore.
     private static readonly string[] RestoreRelevantExtensions =
         [".csproj", ".fsproj", ".vbproj", ".sln", ".slnx", ".slnf", ".props", ".targets"];
@@ -144,7 +144,7 @@ internal sealed class TempFixtureWorkspace : IDisposable
     /// <summary>
     ///     A copy no other test shares, for a caller that must own its tree for the whole run rather than hand
     ///     it back between tests (see <see cref="BinlogFixtureWorkspace" />, whose binlog bakes in these
-    ///     absolute paths, and whose classes mutate the tree deliberately between tests).
+    ///     absolute paths, and whose classes mutate the tree between tests).
     /// </summary>
     internal static TempFixtureWorkspace Dedicated(
         string fixtureDirectory = DefaultFixtureDirectory,

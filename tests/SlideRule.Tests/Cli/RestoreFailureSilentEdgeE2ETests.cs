@@ -157,7 +157,7 @@ public sealed class RestoreFailureSilentEdgeE2ETests
         never.ShouldRefuseWith(
             "NuGet packages did not resolve for 1 project", "FieldMini.Core.csproj", "dotnet restore");
         // No restore ran, so there are no NuGet logs for the SDK to replay and no warnings to point at. The
-        // refusal has to be honest about that rather than sending the reader up the terminal.
+        // refusal has to say so rather than sending the reader up the terminal.
         never.Err.ShouldNotContain("See the warnings above", customMessage: never.Transcript());
         // check renders before it gates, so the rule's own report is on stdout beside the refusal — and this
         // is the one place the inert warning's cure is read. Without the stamp reaching it, the cure here would

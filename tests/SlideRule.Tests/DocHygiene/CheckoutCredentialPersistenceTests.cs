@@ -26,7 +26,7 @@ namespace SlideRule.Tests.DocHygiene;
 ///         <b>Moving the pin.</b> A workflow that needs to push — one that commits, tags, or
 ///         opens a pull request — needs the credential, and this test will red for it. That is the
 ///         intended path: widen it deliberately as part of that change, naming the step and why it is
-///         exempt, rather than dropping the input quietly.
+///         exempt, rather than dropping the input silently.
 ///     </para>
 /// </remarks>
 public sealed class CheckoutCredentialPersistenceTests

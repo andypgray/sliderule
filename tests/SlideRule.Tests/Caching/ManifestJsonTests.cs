@@ -158,7 +158,7 @@ public sealed class ManifestJsonTests
     ///     Peels a constructor parameter down to the type whose members the serializer will write: the
     ///     underlying type of a nullable slot, or the element of a single-argument generic. Every collection
     ///     in the graph today is an <see cref="IReadOnlyList{T}" />, but taking any one-argument generic
-    ///     keeps a slot retyped to <c>List</c> or <c>IEnumerable</c> from quietly opening a hole in the walk.
+    ///     keeps a slot retyped to <c>List</c> or <c>IEnumerable</c> from silently opening a hole in the walk.
     /// </summary>
     private static Type UnwrapSlot(Type slot)
     {

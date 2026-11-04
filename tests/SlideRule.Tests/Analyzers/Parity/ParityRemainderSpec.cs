@@ -62,7 +62,10 @@ internal static class ParityRemainderSpec
     /// <summary>The type the foldered file declares, public where its folder says it should not be.</summary>
     internal const string FolderedSource = "namespace Own; public class Foldered { }";
 
-    /// <summary>The own project's types, one per verb the spec below states.</summary>
+    /// <summary>
+    ///     The own project's types: one breaking each type verb the spec below states, and one per member kind
+    ///     whose members break the member verbs.
+    /// </summary>
     internal const string OwnSource =
         """
         namespace Own;

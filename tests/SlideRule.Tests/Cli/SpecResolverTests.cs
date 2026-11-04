@@ -17,8 +17,8 @@ public sealed class SpecResolverTests
 {
     private const string CoreDll = "C:/pkgs/SlideRule.dll";
 
-    // The load failure field testing found: a --locked-mode restore whose lock file no longer matches
-    // the project, which leaves the spec project's reference to the contract library unresolved.
+    // A --locked-mode restore whose lock file no longer matches the project, which leaves the spec project's
+    // reference to the contract library unresolved.
     private static readonly string LockFileFailure = CapturedAuditLines.Framed(
         "C:/repo/src/MyApp.Arch/MyApp.Arch.csproj",
         "NU1004: The packages lock file is inconsistent with the project dependencies.");
@@ -123,7 +123,7 @@ public sealed class SpecResolverTests
     public void ResolveConventionProject_TwoCandidatesWithNoFilePath_StillErrorsWithTheUnchangedText()
     {
         // The fail-open guard for the grouping above: candidates with no project file must never fold
-        // together. Folding them would resolve one of two genuinely different spec projects silently, which
+        // together. Folding them would resolve one of two different spec projects silently, which
         // is the one outcome worse than the block. The message stays byte-identical to the ungrouped text.
         var error = Should.Throw<UserErrorException>(() =>
             SpecResolver.ResolveConventionProject([
@@ -410,8 +410,8 @@ public sealed class SpecResolverTests
     public void ResolveConventionProject_AuditAdvisoriesBesideARealDiagnostic_QuotesTheRealOne()
     {
         // What forces the quote to skip the advisories: three freshly published ones arriving first would
-        // fill a bounded quote and push the one actionable line out of it — the same defect this refusal
-        // exists to remove, wearing a new costume.
+        // fill a bounded quote and push the one actionable line out of it, which is the defect this refusal
+        // exists to remove.
         WorkspaceDiagnostics diagnostics = WorkspaceDiagnostics.None with
         {
             LoadFailures = [Advisory, Advisory, Advisory, LockFileFailure]

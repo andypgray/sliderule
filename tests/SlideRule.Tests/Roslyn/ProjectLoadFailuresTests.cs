@@ -150,7 +150,7 @@ public sealed class ProjectLoadFailuresTests
     [Fact]
     public void Detect_SolutionFilter_NamesTheUnselectedMemberAsUncheckedRatherThanFailed()
     {
-        // A .slnf legitimately loads a subset, so a member it did not select is not a failure — but it is not
+        // A .slnf loads a subset by design, so a member it did not select is not a failure — but it is not
         // nothing either. It lands in the second list, which narrows the verdict without gating it.
         using TempDirectory temp = TestTempRoot.Fresh("declared-filtered");
         string filterPath = WriteFilter(temp, ["Kept", "Dropped"], "Kept");

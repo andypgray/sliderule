@@ -454,7 +454,7 @@ public sealed class SolutionProjectFileParserTests
     public void ParseFilter_FilterPointingAtAnotherFilter_Refuses()
     {
         // Roslyn does not support chained filters, so resolving one would produce a membership no load could
-        // ever match — a refusal here is the honest answer rather than a downstream mystery.
+        // ever match — a refusal here names the cause where a downstream failure would hide it.
         const string filterText = """{ "solution": { "path": "../solutions/Inner.slnf", "projects": [] } }""";
 
         var ex = Should.Throw<FormatException>(() => SolutionProjectFileParser.ParseFilter(filterText, FilterDirectory));
@@ -504,7 +504,7 @@ public sealed class SolutionProjectFileParserTests
     [Fact]
     public void AnchorDirectory_FilterNamingAMissingSolution_FallsBackToItsOwnDirectory()
     {
-        // The filter parses and the path resolves — there is simply no solution there. Anchoring at a
+        // The filter parses and the path resolves — there is no solution there. Anchoring at a
         // directory that does not exist would resolve conventions into nowhere and create it on the first
         // write, so a solution that is not on disk is not an anchor.
         using TempDirectory temp = TestTempRoot.Fresh("solution-anchor");

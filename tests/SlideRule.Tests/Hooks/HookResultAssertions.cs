@@ -8,9 +8,9 @@ namespace SlideRule.Tests.Hooks;
 
 /// <summary>
 ///     The Shouldly surface over a <see cref="CliResult" /> from the <c>hook</c> verb: each assertion names the exit
-///     contract in Claude Code's terms (the stop stands, in silence or with the check's text handed on as context; the
-///     stop is refused; SlideRule's own error is reported) rather than the integer that encodes it, and carries both
-///     output channels into its failure message.
+///     contract in Claude Code's terms (the stop stands, in silence, with the check's text handed on as context or
+///     with a notice for the user beside it; the stop is refused; SlideRule's own error is reported) rather than the
+///     integer that encodes it, and carries both output channels into its failure message.
 /// </summary>
 /// <remarks>
 ///     The CLI's own assertions read its own codes, where 2 is a refusal; under the hook verb 2 is a block and a

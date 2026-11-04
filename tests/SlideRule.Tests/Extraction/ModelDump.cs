@@ -373,9 +373,9 @@ internal static class ModelDump
         return node is null ? "<null>" : Endpoint(node);
     }
 
-    // An endpoint's node, not merely its name. A full name a project declares and a referenced assembly
+    // An endpoint's node, not its name alone. A full name a project declares and a referenced assembly
     // also supplies denotes two nodes, and on the name alone an edge into one renders exactly like an edge
-    // into the other — leaving this dump untotal for precisely the comparison that needs it most, a cache
+    // into the other — leaving this dump untotal for the comparison that needs it most, a cache
     // hit or a replay that resolved an endpoint to the wrong one of the two.
     private static string Endpoint(TypeNode node)
     {

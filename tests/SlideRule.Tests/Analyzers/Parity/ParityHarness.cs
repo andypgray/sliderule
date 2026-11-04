@@ -678,7 +678,7 @@ internal static class ParityHarness
         if (images.TryGetValue(reference.Compilation, out MetadataReference? cached)) return cached;
 
         // The reference's own properties ride over: an alias or an embedded-interop reference that lost
-        // them would bind differently rather than merely arrive in another form.
+        // them would bind differently rather than arrive in another form.
         Compilation sibling = Imaged(reference.Compilation, images);
         MetadataReference image = CompilationFactory.ImageOf(sibling, reference.Properties);
         images.Add(reference.Compilation, image);

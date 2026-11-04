@@ -13,7 +13,7 @@ namespace SlideRule.Tests.DocHygiene;
 ///     and leaves a walkthrough behind fails the suite instead of publishing a page that contradicts the
 ///     <c>AGENTS.md</c> next to it. Two quotes are narrative — output from a draft spec, or from a check
 ///     over a test fixture that renders no block — and are pinned as such, so the day one starts matching
-///     it is promoted rather than quietly counted as covered.
+///     it is promoted rather than silently counted as covered.
 /// </summary>
 /// <remarks>
 ///     Sibling to <see cref="QuoteSyncTests" />, which covers the other quote shape: a whole fenced block

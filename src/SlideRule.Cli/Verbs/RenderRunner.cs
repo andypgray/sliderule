@@ -32,7 +32,7 @@ namespace SlideRule.Cli.Verbs;
 ///     <para>
 ///         <b>The model file is never written from a partial model</b>, even where the flag opted the rest
 ///         of the render into one. Its projects are the projects the spec governs, so one written while a
-///         project failed to load would quietly leave out exactly the project that failed, and a reader
+///         project failed to load would silently leave out exactly the project that failed, and a reader
 ///         with no spec assembly has nothing to notice that against. A requested model file, by
 ///         <c>--model</c> or the settings file, therefore refuses the whole command, and an existing file is
 ///         left alone with a warning. A failed restore is not this cause: such a project is still in the

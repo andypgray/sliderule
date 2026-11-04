@@ -765,7 +765,7 @@ internal sealed class ExtractionCacheStore
         }
 
         if (document.IsTrustedBy(current))
-            // provably unchanged: trust the recorded hash
+            // a promoted stamp whose size and write time still match: trust the recorded hash
             return new DocumentCheck(document.Sha256, document.Sha256, document, null);
 
         if (document.Shape is not { } recordedShape)

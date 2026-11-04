@@ -18,7 +18,7 @@ public class VocabularyFragmentTests
     [Fact]
     public void MustOnlyReference_StatesExternalPackagesCaveat()
     {
-        // §4.1: the complement universe is solution-declared types — honesty is pinned.
+        // §4.1: the complement universe is solution-declared types, and the sentence says so.
         SentenceRenderer.Sentence(Arch.Types.MustOnlyReference(typeof(SqlConnection)))
             .ShouldBe("Types must reference only `SqlConnection` (external packages are not constrained by this rule).");
     }
@@ -742,7 +742,7 @@ public class VocabularyFragmentTests
         // Two boundaries ride in the sentence. The first says which references the verb passes and defines
         // "private" by the metadata that makes one, because the word alone also means a package from a private
         // feed; "other than" rather than "except" keeps it from reading as a second except clause. The second
-        // is the honesty boundary, pinned like MustOnlyReference's: the model holds what a project declares, so
+        // states what is not seen, pinned like MustOnlyReference's: the model holds what a project declares, so
         // the sentence says the transitive graph is not seen rather than letting a reader assume it is.
         SentenceRenderer.Sentence(Arch.Projects.Named("SlideRule").MustReferenceNoPackages())
             .ShouldBe(

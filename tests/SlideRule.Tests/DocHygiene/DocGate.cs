@@ -20,7 +20,7 @@ namespace SlideRule.Tests.DocHygiene;
 ///     </para>
 ///     <para>
 ///         <b>Why the nouns are parameters.</b> Each gate's failure text is the wording its reader already
-///         knows, and sharing one harness across near-identical messages must not quietly normalize them.
+///         knows, and sharing one harness across near-identical messages must not normalize them silently.
 ///         So the emptiness header is composed from three words — the doc-set noun, the plural of what is
 ///         yielded, the scanner's name — and the registry sweep from three more, and each gate passes its
 ///         own. <see cref="DocGateTests" /> pins the composed text.

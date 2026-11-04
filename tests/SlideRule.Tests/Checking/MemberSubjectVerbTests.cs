@@ -71,7 +71,7 @@ public sealed class MemberSubjectVerbTests
     // The MustAcceptParameter substrate (GRAMMAR §4.6, §5.7): every method returns a Task form (so the
     // .Returning(Task, Task<>) subject keeps them all), and the parameter lists span the compliant and
     // non-compliant shapes — a bare token, a token behind other params, a defaulted token (the common
-    // compliant signature), an open-generic IProgress<int>, and the two definition-level "honesty" traps a
+    // compliant signature), an open-generic IProgress<int>, and the two definition-level traps a
     // CancellationToken? (System.Nullable<T>) and a params CancellationToken[] (the array type) that do NOT
     // match a System.Threading.CancellationToken anchor.
     private const string Parameters = """
@@ -626,7 +626,7 @@ public sealed class MemberSubjectVerbTests
         // Nothing is inferred from a string's shape (GRAMMAR §5.2), so the closed-generic refusal the typeof
         // arm carries cannot port here: a constructed spelling builds, names no definition, and as the SOLE
         // anchor empties the member subject — which the fail-on-empty gate reds in member terms rather than
-        // passing vacuously. Loud, and pinned because it is the honesty boundary of the hatch.
+        // passing vacuously. Loud, and pinned because it marks where the string arm stops matching.
         ShouldFailOnTheEmptyMemberSubject(
             AsyncModel, arch => arch.Namespace("App.Async.*").Methods
                 .Returning("System.Threading.Tasks.Task<System.Int32>")
