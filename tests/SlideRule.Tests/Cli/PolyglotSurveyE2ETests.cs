@@ -19,12 +19,12 @@ namespace SlideRule.Tests.Cli;
 ///         solution never mentions the projects it never measured.
 ///     </para>
 ///     <para>
-///         The bed uses an <c>.fsproj</c> because F# is the one
-///         non-C# kind that reaches a loaded solution at all: it plugs into Roslyn's workspace model while
-///         having no Roslyn compiler behind it, so it arrives as a project that supports no compilation.
-///         Measured on this bed, it reaches the workspace carrying its output paths, which is why nothing
-///         upstream noticed it going missing. The other kinds — <c>.vbproj</c>, <c>.sqlproj</c>,
-///         <c>.vcxproj</c>, <c>.shproj</c> — never load at all and are pinned over solution text in
+///         The bed uses an <c>.fsproj</c> because F# plugs into Roslyn's workspace model while having no Roslyn
+///         compiler behind it, so it arrives as a project that supports no compilation. Measured on this bed, it
+///         reaches the workspace carrying its output paths, so the load-failure check, which keys on those paths,
+///         does not report it. A <c>.vbproj</c> loads as a Visual Basic project and extraction skips it by language;
+///         <see cref="SolutionEntriesE2ETests" /> carries that bed. The other kinds — <c>.sqlproj</c>,
+///         <c>.vcxproj</c>, <c>.shproj</c> and the rest — never load at all and are pinned over solution text in
 ///         <see cref="Roslyn.SolutionProjectFileParserTests" />.
 ///     </para>
 ///     <para>

@@ -6,8 +6,10 @@ namespace SlideRule.Tests.Roslyn;
 
 /// <summary>
 ///     <see cref="UnsupportedEntryMessages.IsAbout" />, which recognizes the workspace's failure for an unsupported
-///     entry by the path in it. <c>Cli/SolutionEntriesE2ETests</c> drives it through a real load; these pin that a
-///     path is matched whole, so a message about a different file whose path starts with a Web Site's is kept.
+///     entry by the path in it, and <see cref="UnsupportedEntryMessages.OtherLanguageProjectFiles" />, which reads the
+///     other-language project files out of such failures. <c>Cli/SolutionEntriesE2ETests</c> drives both through a
+///     real load; these pin that a path is matched whole, so a message about a different file whose path starts with
+///     a Web Site's is kept, and which quoted paths count as another language's project file.
 /// </summary>
 public sealed class UnsupportedEntryMessagesTests
 {
@@ -21,6 +23,29 @@ public sealed class UnsupportedEntryMessagesTests
     private static readonly string BareFolderEntry = Path.Combine(Root, "WebSite1");
 
     private static readonly char Separator = Path.DirectorySeparatorChar;
+
+    private static readonly string Native = Path.Combine(Root, "Native", "Native.vcxproj");
+
+    private static readonly string Database = Path.Combine(Root, "Db", "Db.sqlproj");
+
+    // The workspace's two failures for one referenced C++ project, as measured, and the shapes around them.
+    public static TheoryData<string, string[], string[]> ProjectFileMessages => new()
+    {
+        {
+            "both failures for one project",
+            [
+                $"Msbuild failed when processing the file '{Native}' with message: The target \"GetTargetPath\" does not exist in the project.",
+                $"Cannot open project '{Native}' because the file extension '.vcxproj' is not associated with a language."
+            ],
+            [Native]
+        },
+        { "a project file not on disk", [$"Project file not found: '{Native}'"], [Native] },
+        { "two projects, in the order named", [$"'{Database}'", $"'{Native}'"], [Database, Native] },
+        { "a localized quote", [$"Das Projekt „{Native}“ kann nicht geöffnet werden."], [Native] },
+        { "a C# project", [$"Cannot open project '{Path.Combine(Root, "App", "App.csproj")}'"], [] },
+        { "a relative path", [$"Cannot open project '{Path.Combine("Native", "Native.vcxproj")}'"], [] },
+        { "a file that is no project", [$"Msbuild failed when processing the file '{Path.Combine(Root, "x.targets")}'"], [] }
+    };
 
     public static TheoryData<string, string, bool> Messages => new()
     {
@@ -61,6 +86,15 @@ public sealed class UnsupportedEntryMessagesTests
     public void IsAbout_Message_MatchesOnlyAWholeEntryPath(string shape, string message, bool expected)
     {
         UnsupportedEntryMessages.IsAbout(message, [UrlEntry, FolderEntry, BareFolderEntry])
+            .ShouldBe(expected, shape);
+    }
+
+    [Theory]
+    [MemberData(nameof(ProjectFileMessages))]
+    public void OtherLanguageProjectFiles_Messages_NameEachQuotedAbsoluteNonCsharpProjectFileOnce(
+        string shape, string[] messages, string[] expected)
+    {
+        UnsupportedEntryMessages.OtherLanguageProjectFiles(messages)
             .ShouldBe(expected, shape);
     }
 }

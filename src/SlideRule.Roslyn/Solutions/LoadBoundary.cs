@@ -61,20 +61,20 @@ internal static class LoadBoundary
     /// <summary>
     ///     Strips <paramref name="solution" />'s unresolved references, normalizes its project names and measures what
     ///     loaded against <paramref name="membership" /> (<see cref="ReadMembership" />'s answer) and
-    ///     <paramref name="declinedCalls" />, the project files of the compiler calls a replay declined, empty on the
-    ///     MSBuild load.
+    ///     <paramref name="otherLanguageProjects" />, the project files in another language the load could not reach:
+    ///     the compiler calls a replay declined, or the referenced projects the workspace opened in no language.
     /// </summary>
     // The steps read and write disjoint facts (references; names; file and output paths), so their order decides
     // nothing; it is fixed here so that both paths run one sequence. The project files are resolved once, here, for
     // the steps that compare them and for every reader of the load after them.
     internal static SettledSolution Settle(
-        Solution solution, SolutionMembership? membership, IReadOnlyCollection<string> declinedCalls)
+        Solution solution, SolutionMembership? membership, IReadOnlyCollection<string> otherLanguageProjects)
     {
         CanonicalProjectFiles projectFiles = CanonicalProjectFiles.Of(solution);
         (Solution stripped, int analyzerCount, int metadataCount) = solution.StripUnresolvedReferences();
         (Solution normalized, IReadOnlyDictionary<ProjectId, string> targetFrameworks) =
             stripped.NormalizeProjectNames(projectFiles);
-        ProjectLoadReport report = ProjectLoadFailures.Detect(normalized, projectFiles, membership, declinedCalls);
+        ProjectLoadReport report = ProjectLoadFailures.Detect(normalized, projectFiles, membership, otherLanguageProjects);
 
         return new SettledSolution(
             normalized, targetFrameworks, projectFiles, report, analyzerCount, metadataCount);

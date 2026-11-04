@@ -131,8 +131,9 @@ internal sealed record UnsupportedProject(string Path, UnsupportedProjectKind Ki
 ///     (<c>dotnet restore</c>).
 /// </param>
 /// <param name="UnsupportedProjects">
-///     The projects outside the model that no extractor reached, read off the solution file and, on a replay, off
-///     the compiler calls it declined.
+///     The projects outside the model that no extractor reached, read off the solution file and off the
+///     other-language projects the load could not reach: on a replay the compiler calls it declined, on an MSBuild
+///     load the referenced projects the workspace opened in no language.
 /// </param>
 /// <param name="MultiTargetedProjects">
 ///     The projects one <c>.csproj</c> of which yielded several compilations: the machine-readable half of

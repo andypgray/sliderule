@@ -38,6 +38,12 @@ namespace SlideRule.Tests.Cli;
 ///         A shared project and a database project leave no compiler call in a binlog either, so a replay names
 ///         them from the solution file, as a load does.
 ///     </para>
+///     <para>
+///         A project in another language that a C# project references and the solution does not declare reaches
+///         the load only as the workspace's failure to open it. A scratch bed pins that the load names it from that
+///         failure, and that the failure does not read as a load the spec project may have been lost in. A
+///         declared one absent from the tree is listed the same way.
+///     </para>
 /// </remarks>
 public sealed class SolutionEntriesE2ETests
 {
@@ -62,6 +68,27 @@ public sealed class SolutionEntriesE2ETests
                     arch.Rule("configexcluded/built-no-http")
                         .Enforce(arch.Project("ConfigExcluded.Built").MustNotReference(arch.Namespace("System.Net.Http.*")))
                         .Because("The ledger does no network calls.");
+                }
+            }
+        }
+        """;
+
+    // One rule into the VB project's layer, the direction a C# compilation can see.
+    private const string VisualBasicSpecSource =
+        """
+        using SlideRule;
+
+        namespace VisualBasicSpecAssembly
+        {
+            public sealed class VisualBasicSpec : IArchitectureSpec
+            {
+                public void Define(Arch arch)
+                {
+                    Layer app = arch.Layer("App", arch.Project("App"));
+                    Layer legacy = arch.Layer("Legacy", arch.Project("Legacy"));
+                    arch.Rule("vb/app-off-legacy")
+                        .Enforce(app.MustNotReference(legacy))
+                        .Because("App does not reach the VB ledger.");
                 }
             }
         }
@@ -291,6 +318,123 @@ public sealed class SolutionEntriesE2ETests
             "No spec project found: no solution project references SlideRule.dll. Pass --spec to name one.\n"
             + "Considered 1 C# project(s) in the workspace.");
     }
+
+    [Fact]
+    public async Task Json_ReferencedProjectsInAnotherLanguage_AreListedOnALoadAndAReplayAndGetTheCleanLoadRefusal()
+    {
+        // Arrange — one C# project referencing a C++, a database and a JavaScript project that the solution does not
+        // declare. The workspace drops each reference and reports the project as one it opens in no language; a
+        // replay reads each off the build's evaluation of the C# project. The solution also declares a generated
+        // C++ project that is not on disk, as a premake-built solution does before generation. Each referenced
+        // project carries the targets a build of its referrer calls, and builds nothing.
+        using TempDirectory bed = TestTempRoot.Fresh("referenced-other-language");
+        bed.WriteFile(
+            ["App", "App.csproj"],
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+              <ItemGroup>
+                <ProjectReference Include="..\Native\Native.vcxproj" />
+                <ProjectReference Include="..\Db\Db.sqlproj" />
+                <ProjectReference Include="..\Web\Web.esproj" />
+              </ItemGroup>
+            </Project>
+            """);
+        bed.WriteFile(["App", "Widget.cs"], "namespace App;\n\npublic sealed class Widget;\n");
+        foreach (string[] project in (string[][])[["Native", "Native.vcxproj"], ["Db", "Db.sqlproj"], ["Web", "Web.esproj"]])
+            bed.WriteFile(project, ReferencedStub);
+        string solution = bed.WriteFile(["App.slnx"], ScratchProjects.Solution("App/App.csproj", "Gen/Gen.vcxproj"));
+        string binlog = bed.PathOf("App.binlog");
+        DotnetCli.Run($"build App/App.csproj -bl:LogFile=\"{binlog}\"", bed.Path);
+        (string Project, string Reason)[] expected =
+        [
+            ("Db/Db.sqlproj", "not a C# project"),
+            ("Gen/Gen.vcxproj", "not a C# project"),
+            ("Native/Native.vcxproj", "not a C# project"),
+            ("Web/Web.esproj", "not a C# project")
+        ];
+
+        // Act
+        CliResult graph = await CliRunner.InvokeColdAsync("graph", solution, "--no-cache", "--json");
+        CliResult replay = await CliRunner.InvokeColdAsync("graph", solution, "--binlog", binlog, "--no-cache", "--json");
+        CliResult check = await CliRunner.InvokeColdAsync("check", solution, "--no-cache");
+
+        // Assert — each is named as a project outside the survey, and none can be the spec project, so the refusal
+        // sends the reader to --spec rather than to a restore that cannot open them.
+        graph.ShouldSucceed();
+        using JsonDocument document = graph.ShouldHaveJsonStdout();
+        document.UnsupportedProjectEntries()
+            .ShouldBe(expected);
+        replay.ShouldSucceed();
+        using JsonDocument replayDocument = replay.ShouldHaveJsonStdout();
+        replayDocument.UnsupportedProjectEntries()
+            .ShouldBe(expected);
+        check.ShouldRefuseWithExactly(
+            "No spec project found: no solution project references SlideRule.dll. Pass --spec to name one.\n"
+            + "Considered 1 C# project(s) in the workspace.");
+    }
+
+    [Fact]
+    public async Task CheckJson_VisualBasicProject_IsListedAndARuleIntoItIsChecked()
+    {
+        // Arrange — a C# project referencing an SDK-style Visual Basic one, both declared. The workspace loads the
+        // VB project without a failure, and extraction skips it by language.
+        using TempDirectory bed = TestTempRoot.Fresh("visual-basic-member");
+        bed.WriteFile(
+            ["App", "App.csproj"],
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+              <ItemGroup>
+                <ProjectReference Include="..\Legacy\Legacy.vbproj" />
+              </ItemGroup>
+            </Project>
+            """);
+        bed.WriteFile(["App", "Widget.cs"], "namespace App;\n\npublic sealed class Widget\n{\n    public Legacy.Ledger? Ledger { get; }\n}\n");
+        bed.WriteFile(
+            ["Legacy", "Legacy.vbproj"],
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+                <RootNamespace></RootNamespace>
+              </PropertyGroup>
+            </Project>
+            """);
+        bed.WriteFile(["Legacy", "Ledger.vb"], "Namespace Legacy\n    Public Class Ledger\n    End Class\nEnd Namespace\n");
+        string solution = bed.WriteFile(["App.slnx"], ScratchProjects.Solution("App/App.csproj", "Legacy/Legacy.vbproj"));
+        DotnetCli.Run("build App.slnx", bed.Path);
+        string spec = SpecAssemblyCompiler.EmitSpecDllToFreshTemp("visual-basic-member", "VisualBasic", VisualBasicSpecSource);
+
+        // Act
+        CliResult result = await CliRunner.InvokeColdAsync("check", solution, "--spec", spec, "--no-cache", "--json");
+
+        // Assert — the VB project is named as outside the survey, and a reference into it from C# is still
+        // checked, because the C# compilation reaches its types through the project's assembly.
+        result.Out.ShouldHaveSingleViolationOnEdge("vb/app-off-legacy", "reference", "App.Widget", "Legacy.Ledger");
+        result.ShouldReportViolations();
+        using JsonDocument document = result.ShouldHaveJsonStdout();
+        document.UnsupportedProjectEntries()
+            .ShouldBe([("Legacy/Legacy.vbproj", "not a C# project")]);
+    }
+
+    // A project in another language that a C# project references: the targets a build of the referrer calls on a
+    // reference, each doing nothing, so the referrer builds and the build writes a binary log.
+    private const string ReferencedStub =
+        """
+        <Project>
+          <Target Name="Build" />
+          <Target Name="GetTargetFrameworks" />
+          <Target Name="GetTargetPath" />
+          <Target Name="GetNativeManifest" />
+          <Target Name="GetCopyToOutputDirectoryItems" />
+          <Target Name="GetCopyToPublishDirectoryItems" />
+        </Project>
+        """;
 
     // Cold, with no cache: a pooled workspace or a cached model from another copy could answer for a tree the fact
     // did not stage.

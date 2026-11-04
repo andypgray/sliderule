@@ -1,8 +1,11 @@
+using System.Collections;
 using Basic.CompilerLog.Util;
+using Microsoft.Build.Framework;
 using Microsoft.CodeAnalysis;
 using SlideRule.Internal;
 using SlideRule.Roslyn.Diagnostics;
 using SlideRule.Roslyn.Solutions;
+using BinLogReader = Microsoft.Build.Logging.StructuredLogger.BinLogReader;
 
 namespace SlideRule.Roslyn.Replay;
 
@@ -68,10 +71,11 @@ internal static class BinlogReplayer
         // Filled by the predicate below as the reader walks the capture — the one moment the dropped
         // projects are visible on this path.
         var unsupportedProjects = new HashSet<string>(PathComparison.Comparer);
+        var replayedProjects = new HashSet<string>(PathComparison.Comparer);
 
         var reader = SolutionReader.Create(
             binlogPath, BasicAnalyzerKind.OnDisk,
-            predicate: call => IsReplayableCSharpCall(call, unsupportedProjects));
+            predicate: call => IsReplayableCSharpCall(call, replayedProjects, unsupportedProjects));
 
         AdhocWorkspace? workspace = null;
         try
@@ -96,6 +100,7 @@ internal static class BinlogReplayer
             });
 
             Solution solution = AlignWithMsBuildWorkspace(workspace.AddSolution(solutionInfo));
+            unsupportedProjects.UnionWith(ReferencedOtherLanguageProjects(binlogPath, replayedProjects, ct));
             // No removal of the projects the default configuration does not build: one the binlog compiled is what
             // this build built, and one it did not compile is not here to remove.
             SettledSolution settled = LoadBoundary.Settle(
@@ -198,14 +203,57 @@ internal static class BinlogReplayer
     // capture replays its C# projects and states the rest. The dropped paths are collected because nothing
     // downstream could recover them: the solution file says what was declared, and only these invocations say
     // what this build dropped.
-    private static bool IsReplayableCSharpCall(CompilerCall call, ICollection<string> droppedProjects)
+    private static bool IsReplayableCSharpCall(
+        CompilerCall call, ICollection<string> replayedProjects, ICollection<string> droppedProjects)
     {
         if (call.Kind != CompilerCallKind.Regular) return false;
-        if (call.IsCSharp) return true;
 
-        if (call.ProjectFilePath is { Length: > 0 } projectFilePath)
-            droppedProjects.Add(Path.GetFullPath(projectFilePath));
+        string? projectFilePath = call.ProjectFilePath is { Length: > 0 } path ? Path.GetFullPath(path) : null;
+        if (call.IsCSharp)
+        {
+            if (projectFilePath is not null) replayedProjects.Add(projectFilePath);
+            return true;
+        }
+
+        if (projectFilePath is not null) droppedProjects.Add(projectFilePath);
 
         return false;
+    }
+
+    // The project files in another language that a replayed C# project references, read off the build's own
+    // evaluation of that project in the log. Such a project mints no compiler call to decline, and a replay opens no
+    // workspace that could fail on it, so without this a replay lists one project fewer than a load of the same
+    // tree. A ProjectReference that does not reference the output assembly is listed too, as a load lists it.
+    private static IReadOnlyList<string> ReferencedOtherLanguageProjects(
+        string binlogPath, IReadOnlySet<string> replayedProjects, CancellationToken ct)
+    {
+        var found = new List<string>();
+        var reader = new BinLogReader();
+        reader.AnyEventRaised += (_, e) =>
+        {
+            if (e is not ProjectEvaluationFinishedEventArgs { ProjectFile: { } projectFile, Items: { } items }) return;
+
+            string project = Path.GetFullPath(projectFile);
+            if (!replayedProjects.Contains(project)) return;
+
+            string projectDirectory = Path.GetDirectoryName(project)!;
+            found.AddRange(items
+                .OfType<DictionaryEntry>()
+                .Where(entry => entry is { Key: "ProjectReference", Value: ITaskItem })
+                .Select(entry => Path.GetFullPath(Path.Combine(projectDirectory, SpecOf(entry))))
+                .Where(UnsupportedEntryMessages.IsOtherLanguageProjectFile));
+        };
+
+        // The reader takes no token, so the run is cancelled on either side of the one synchronous pass.
+        ct.ThrowIfCancellationRequested();
+        reader.Replay(binlogPath);
+        ct.ThrowIfCancellationRequested();
+        return found;
+    }
+
+    // An item spec as the build wrote it, which MSBuild separates with backslashes on every OS.
+    private static string SpecOf(DictionaryEntry entry)
+    {
+        return ((ITaskItem)entry.Value!).ItemSpec.Replace('\\', Path.DirectorySeparatorChar);
     }
 }

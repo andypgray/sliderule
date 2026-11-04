@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Text.Json.Nodes;
 using System.Xml;
@@ -72,9 +73,13 @@ internal static class WorkspaceLoader
         foreach (StrongBox<long> box in LoadsOnThisFlow.Value ?? []) Interlocked.Increment(ref box.Value);
 
         var workspace = MSBuildWorkspace.Create();
+        var failures = new ConcurrentQueue<string>();
         workspace.RegisterWorkspaceFailedHandler(e =>
         {
-            if (e.Diagnostic.Kind == WorkspaceDiagnosticKind.Failure) diagnosticLog?.Invoke(e.Diagnostic.Message);
+            if (e.Diagnostic.Kind != WorkspaceDiagnosticKind.Failure) return;
+
+            failures.Enqueue(e.Diagnostic.Message);
+            diagnosticLog?.Invoke(e.Diagnostic.Message);
         });
 
         // The workspace owns an out-of-process build host, so a throw before the result takes ownership of
@@ -84,7 +89,8 @@ internal static class WorkspaceLoader
             Solution solution = await OpenAsync(workspace, solutionPath, ct).ConfigureAwait(false);
             SolutionMembership? membership = LoadBoundary.ReadMembership(solutionPath);
             Solution built = LoadBoundary.WithoutUnbuilt(solution, membership);
-            SettledSolution settled = LoadBoundary.Settle(built, membership, []);
+            IReadOnlyList<string> unopened = UnsupportedEntryMessages.OtherLanguageProjectFiles(failures);
+            SettledSolution settled = LoadBoundary.Settle(built, membership, unopened);
 
             // Only the analyzer count can be nonzero here: Roslyn's MSBuild loader removes an unresolved metadata
             // reference itself before the boundary sees it.

@@ -56,7 +56,9 @@ internal sealed record DeclaredProjects(
 ///     <para>
 ///         <see cref="SolutionMembership.Unsupported" /> is read off the solution file rather than the loaded
 ///         solution, which no non-C# kind but F# ever reaches, so a non-C# project pulled in through a
-///         <c>ProjectReference</c> and declared in no solution file stays invisible.
+///         <c>ProjectReference</c> and declared in no solution file is not in it. The load lists such a project
+///         from the workspace's failure to open it
+///         (<see cref="UnsupportedEntryMessages.OtherLanguageProjectFiles" />).
 ///     </para>
 ///     <para>
 ///         This is a membership oracle, not a solution loader. Of the configurations it reads only whether the
@@ -311,7 +313,7 @@ internal static partial class SolutionProjectFileParser
     // has no extractor for: another language's, or one that compiles no code, such as a Docker Compose .dcproj. The
     // default arm therefore covers the family this parser cannot enumerate, and only the shared project, which
     // means something else, is named.
-    private static UnsupportedProjectKind KindOf(string relativePath)
+    internal static UnsupportedProjectKind KindOf(string relativePath)
     {
         return Path.GetExtension(relativePath)
             .Equals(".shproj", StringComparison.OrdinalIgnoreCase)
@@ -319,7 +321,7 @@ internal static partial class SolutionProjectFileParser
             : UnsupportedProjectKind.NotCsharp;
     }
 
-    private static bool IsProjectEntry(string relativePath)
+    internal static bool IsProjectEntry(string relativePath)
     {
         return Path.GetExtension(relativePath)
             .EndsWith("proj", StringComparison.OrdinalIgnoreCase);

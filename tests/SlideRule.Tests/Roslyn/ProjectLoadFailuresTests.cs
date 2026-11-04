@@ -217,12 +217,13 @@ public sealed class ProjectLoadFailuresTests
     }
 
     [Fact]
-    public void Detect_DeclaredEntriesAndDeclinedCalls_ListsEachProjectOnceWithItsKind()
+    public void Detect_DeclaredEntriesAndOtherLanguageProjects_ListsEachProjectOnceWithItsKind()
     {
-        // A replay joins the solution file's entries with the compiler calls it declined. A declined call for a
-        // project the solution declares is the same project in the build's spelling, here through a link, so it
-        // is listed once in the solution's spelling; a declined call the solution does not declare is listed in
-        // the build's.
+        // A load joins the solution file's entries with the other-language project files it could not reach: the
+        // compiler calls a replay declined, or the referenced projects the workspace opened in no language. One the
+        // solution declares is the same project in the build's spelling, here through a link, so it is listed once
+        // in the solution's spelling; one the solution does not declare is listed in the build's, with the kind its
+        // extension gives it.
         using TempDirectory real = TestTempRoot.Fresh("unsupported-real");
         using TempDirectory links = TestTempRoot.Fresh("unsupported-link");
         real.WriteFile(
@@ -247,7 +248,10 @@ public sealed class ProjectLoadFailuresTests
         // Act
         ProjectLoadReport report = Detect(
             workspace.CurrentSolution, real.PathOf("Solution.sln"),
-            [Path.Combine(via, "Vb", "Vb.vbproj"), Path.Combine(via, "Fs", "Fs.fsproj")]);
+            [
+                Path.Combine(via, "Vb", "Vb.vbproj"), Path.Combine(via, "Fs", "Fs.fsproj"),
+                Path.Combine(via, "Common", "Common.shproj")
+            ]);
 
         // Assert
         UnsupportedProject[] expected =
@@ -257,19 +261,20 @@ public sealed class ProjectLoadFailuresTests
             new(real.PathOf("Native", "Native.vcxproj"), UnsupportedProjectKind.NotCsharp),
             new(real.PathOf("Shared", "Shared.shproj"), UnsupportedProjectKind.SharedProject),
             new(real.PathOf("Vb", "Vb.vbproj"), UnsupportedProjectKind.NotCsharp),
-            new(Path.Combine(via, "Fs", "Fs.fsproj"), UnsupportedProjectKind.NotCsharp)
+            new(Path.Combine(via, "Fs", "Fs.fsproj"), UnsupportedProjectKind.NotCsharp),
+            new(Path.Combine(via, "Common", "Common.shproj"), UnsupportedProjectKind.SharedProject)
         ];
         report.Unsupported.ShouldBe(expected.OrderBy(project => project.Path, StringComparer.Ordinal));
     }
 
     private static ProjectLoadReport Detect(
-        Solution solution, string? solutionPath = null, IReadOnlyCollection<string>? declinedCalls = null)
+        Solution solution, string? solutionPath = null, IReadOnlyCollection<string>? otherLanguageProjects = null)
     {
         CanonicalProjectFiles projectFiles = CanonicalProjectFiles.Of(solution);
         SolutionMembership? membership = solutionPath is null
             ? null
             : SolutionProjectFileParser.ReadDeclaredMembership(solutionPath);
-        return ProjectLoadFailures.Detect(solution, projectFiles, membership, declinedCalls ?? []);
+        return ProjectLoadFailures.Detect(solution, projectFiles, membership, otherLanguageProjects ?? []);
     }
 
     private static string WriteSolution(TempDirectory temp, params string[] projectNames)

@@ -34,9 +34,10 @@ internal sealed record ProjectLoadReport(
 ///         like any other. <see cref="ProjectLoadReport.Unchecked" /> is the subtraction against
 ///         <see cref="SolutionMembership.Declared" />, never derived from filter text: Roslyn loads a filter's
 ///         projects plus their transitive <c>ProjectReference</c> closure, so filter text overstates the gap.
-///         <see cref="ProjectLoadReport.Unsupported" /> is read off the solution file, and on a replay off the
-///         compiler calls it declined as well. It sits outside both subtractions: a project no extractor reaches
-///         was never owed, so a polyglot solution cannot be refused for holding one.
+///         <see cref="ProjectLoadReport.Unsupported" /> is read off the solution file, and off the project files in
+///         another language the load could not reach: the compiler calls a replay declined, or the referenced
+///         projects the workspace opened in no language. It sits outside both subtractions: a project no
+///         extractor reaches was never owed, so a polyglot solution cannot be refused for holding one.
 ///     </para>
 /// </remarks>
 internal static class ProjectLoadFailures
@@ -50,12 +51,13 @@ internal static class ProjectLoadFailures
     ///     was run over, declares, or null when no such file is known or the parser does not own its format; arm 1
     ///     needs it and is skipped without it, and arm 2 runs either way. <paramref name="projectFiles" /> holds the
     ///     loaded projects' canonical paths, which arm 1 compares the solution's declared paths against.
-    ///     <paramref name="declinedCalls" /> are the project files of the compiler calls a replay declined as not C#,
-    ///     each listed unless the solution already names it.
+    ///     <paramref name="otherLanguageProjects" /> are project files in another language that the load could not
+    ///     reach: on a replay the compiler calls it declined as not C#, on an MSBuild load the referenced projects the
+    ///     workspace opened in no language. Each is listed unless the solution already names it.
     /// </remarks>
     internal static ProjectLoadReport Detect(
         Solution solution, CanonicalProjectFiles projectFiles, SolutionMembership? membership,
-        IReadOnlyCollection<string> declinedCalls)
+        IReadOnlyCollection<string> otherLanguageProjects)
     {
         var failed = new HashSet<string>(PathComparison.Comparer);
 
@@ -102,19 +104,20 @@ internal static class ProjectLoadFailures
             unsupported.AddRange(membership.Unsupported.Concat(notBuilt));
         }
 
-        // A declined call is NotCsharp by construction: the replay declines a compiler call for that one reason, and
-        // a shared project, a Web Site and a project the build skipped mint no call to decline. One the solution
-        // declares is already listed, in the solution's spelling; any other is listed in the build's. A Web Site's
-        // path is a URL or a folder, which no call names, so it is never resolved.
-        if (declinedCalls.Count > 0)
+        // Each is classified by its extension, as a solution entry is, which makes a declined call NotCsharp: a
+        // shared project, a Web Site and a project the build skipped mint no compiler call to decline. One the
+        // solution declares is already listed, in the solution's spelling; any other is listed in the spelling the
+        // build or the workspace gave it. A Web Site's path is a URL or a folder, which neither names, so it is never
+        // resolved.
+        if (otherLanguageProjects.Count > 0)
         {
             HashSet<string> listed = unsupported
                 .Where(project => project.Kind != UnsupportedProjectKind.WebSite)
                 .Select(project => canonicalizer.Resolve(project.Path)!)
                 .ToHashSet(PathComparison.Comparer);
-            unsupported.AddRange(declinedCalls
+            unsupported.AddRange(otherLanguageProjects
                 .Where(path => listed.Add(canonicalizer.Resolve(path)!))
-                .Select(path => new UnsupportedProject(path, UnsupportedProjectKind.NotCsharp)));
+                .Select(path => new UnsupportedProject(path, SolutionProjectFileParser.KindOf(path))));
         }
 
         // Sorted on the path, like every list on this report, so a document reads the same on any OS; the kind

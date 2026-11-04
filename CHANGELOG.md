@@ -89,6 +89,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   left out listed below it. Before, the workspace's failure to open such an entry counted as a load problem,
   and the refusal said to restore and build the solution, which could not end it. The workspace's line for the
   entry stays in `workspaceDiagnostics`.
+- A C# project's `ProjectReference` to a `.vcxproj`, `.sqlproj`, `.esproj` or other project in another
+  language that the solution does not declare no longer refuses a run with no spec project as a load that did
+  not load cleanly. The referenced project is listed in `unsupportedProjects` as not a C# project, and counts
+  in the "projects were not surveyed" line. Before, the workspace's failure to open it was the only trace of
+  it, and the refusal said to restore and build the solution, which could not end it.
+- A run from a binary log lists a `.vcxproj`, `.sqlproj`, `.esproj` or other project in another language that a
+  C# project references and the solution does not declare, as a load does, read off the build's own
+  evaluation of the C# project in the log. Before, `unsupportedProjects` and the "projects were not surveyed"
+  line read one shorter on a replay than on a load of the same tree.
 - The spec project in the `derive_spec` recipe sets `<IsPackable>false</IsPackable>`, so it restores in a
   repository whose `Directory.Build.props` turns on package validation for every project. Without the
   setting, restore looks for the spec project's own package at the baseline version and fails with NU1101.

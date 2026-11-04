@@ -44,9 +44,11 @@ public sealed class SolutionProjectFileParserTests
         Path.GetFullPath(Path.Combine(SolutionDirectory, "solutions", "App.sln"));
 
     /// <summary>
-    ///     Every project kind a solution may declare in another language, one row each. F# is the only one of
-    ///     them that reaches a loaded solution at all, which is why it also has a bed of its own; the rest come
-    ///     free with the "ends in <c>proj</c>" partition and are pinned here, over text.
+    ///     Project kinds a solution may declare that are not C#, one row each: other languages, and the database,
+    ///     JavaScript, installer, packaging, deployment and Service Fabric projects that real solutions declare
+    ///     beside C#. F# and Visual Basic are the ones that reach a loaded solution, which is why each also has a
+    ///     bed of its own; the rest come free with the "ends in <c>proj</c>" partition and are pinned here, over
+    ///     text.
     /// </summary>
     /// <remarks>
     ///     The <c>.shproj</c> is deliberately not among them: it is the one extension this partition catches
@@ -59,7 +61,14 @@ public sealed class SolutionProjectFileParserTests
         { "Fs", "fsproj" },
         { "Vb", "vbproj" },
         { "Database", "sqlproj" },
-        { "Native", "vcxproj" }
+        { "Native", "vcxproj" },
+        { "Python", "pyproj" },
+        { "Client", "esproj" },
+        { "Installer", "wixproj" },
+        { "Package", "wapproj" },
+        { "Setup", "vdproj" },
+        { "Deploy", "wdproj" },
+        { "Cluster", "sfproj" }
     };
 
     [Fact]

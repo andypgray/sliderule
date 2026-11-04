@@ -51,6 +51,12 @@
         <PackageReference Include="Basic.CompilerLog.Util" Version="0.9.65" />
     </ItemGroup>
 
+    <!-- The binlog reader complog pulls, declared because the replay also reads the build's own project
+         evaluations from the log through it. Pinned at the version complog pulls, so the graph does not move. -->
+    <ItemGroup>
+        <PackageReference Include="MSBuild.StructuredLogger" Version="2.3.246" />
+    </ItemGroup>
+
     <!-- complog references the Microsoft.CodeAnalysis meta-package at >= 4.8.0; left alone it resolves
          to 4.8.0, whose exact-version constraints on its C#/VB workspace children (= 4.8.0) collide with
          our 5.9.0 workspace pins and raise NU1608. Pin the meta-package to 5.9.0 so the whole graph —

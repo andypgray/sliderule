@@ -4,13 +4,15 @@ using SlideRule.Roslyn.Solutions;
 namespace SlideRule.Roslyn.Diagnostics;
 
 /// <summary>
-///     Recognizes the workspace's failure for a solution entry the run already lists among its unsupported projects:
-///     for a Web Site, a project file it could not find at the entry's folder or URL joined onto the solution
-///     directory; for an entry it opens in no language, a project file whose extension it maps to none.
+///     Recognizes the workspace's failure for a project the run lists among its unsupported projects: for a Web
+///     Site, a project file it could not find at the entry's folder or URL joined onto the solution directory; for
+///     a project it opens in no language, a project file whose extension it maps to none. Also finds the projects
+///     in another language that such failures name and no solution entry declares.
 /// </summary>
 /// <remarks>
-///     The message is recognized by the path in it, never by its text, which the workspace localizes. The path is
-///     the one <see cref="SolutionProjectFileParser" /> resolves the entry to, the same join the workspace makes.
+///     A message is read for the paths in it, never for its text, which the workspace localizes. For a solution
+///     entry the path is the one <see cref="SolutionProjectFileParser" /> resolves the entry to, the same join the
+///     workspace makes.
 /// </remarks>
 internal static class UnsupportedEntryMessages
 {
@@ -65,6 +67,36 @@ internal static class UnsupportedEntryMessages
         return false;
     }
 
+    /// <summary>
+    ///     The project files in another language that <paramref name="messages" /> name, distinct and in the order
+    ///     first named: every quoted absolute path the "ends in <c>proj</c>" partition admits, other than a
+    ///     <c>.csproj</c>.
+    /// </summary>
+    /// <remarks>
+    ///     The workspace drops a <c>ProjectReference</c> to a project it opens in no language, and its failure to
+    ///     open it is the only trace the load leaves, so this is how a referenced project that no solution entry
+    ///     declares is listed. A path holding a quote mark is split and not found; its failure then still reads as
+    ///     the load's own.
+    /// </remarks>
+    internal static IReadOnlyList<string> OtherLanguageProjectFiles(IEnumerable<string> messages)
+    {
+        return messages
+            .SelectMany(message => message.Split(Quotes))
+            .Where(IsOtherLanguageProjectFile)
+            .Distinct(PathComparison.Comparer)
+            .ToList();
+    }
+
+    /// <summary>
+    ///     Whether <paramref name="segment" /> is a rooted path to a project file in a language other than C#.
+    /// </summary>
+    internal static bool IsOtherLanguageProjectFile(string segment)
+    {
+        return Path.IsPathRooted(segment)
+               && SolutionProjectFileParser.IsProjectEntry(segment)
+               && !segment.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase);
+    }
+
     private static bool EndsWhole(string message, int end)
     {
         if (end == message.Length) return true;
@@ -88,4 +120,7 @@ internal static class UnsupportedEntryMessages
 
     // The workspace's messages are localized, and each language quotes a path its own way.
     private const string ClosingQuotes = "'\"\u2018\u2019\u201C\u201D\u00AB\u00BB\u201E";
+
+    // Opening and closing marks alike, since a path is the run between two of them.
+    private static readonly char[] Quotes = (ClosingQuotes + "\u201A\u201B\u201F").ToCharArray();
 }

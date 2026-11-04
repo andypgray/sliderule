@@ -948,6 +948,7 @@
         "type": "Project",
         "dependencies": {
           "Basic.CompilerLog.Util": "[0.9.65, )",
+          "MSBuild.StructuredLogger": "[2.3.246, )",
           "Microsoft.Build.Locator": "[1.11.2, )",
           "Microsoft.CodeAnalysis": "[5.9.0, )",
           "Microsoft.CodeAnalysis.CSharp.Workspaces": "[5.9.0, )",
@@ -969,6 +970,7 @@
         "type": "Project",
         "dependencies": {
           "Basic.CompilerLog.Util": "[0.9.65, )",
+          "MSBuild.StructuredLogger": "[2.3.246, )",
           "Microsoft.Build.Locator": "[1.11.2, )",
           "Microsoft.CodeAnalysis": "[5.9.0, )",
           "Microsoft.CodeAnalysis.CSharp.Workspaces": "[5.9.0, )",

@@ -128,6 +128,16 @@
         "resolved": "18.9.6",
         "contentHash": "CNZfh4P65tHm1Wh/uuIbYfvHlPnb0dJ9SCaIZbXRzOMn+8JEorSqSdXdGRsrDbKBDJfNG6nmgleYhnfL2pd1oQ=="
       },
+      "MSBuild.StructuredLogger": {
+        "type": "Direct",
+        "requested": "[2.3.246, )",
+        "resolved": "2.3.246",
+        "contentHash": "W7sQrvBS9KzipO7TuL35RsahjDIWxjieK1x9SasTHcu8jbTUyUSxPxnwmt5I19WyMvytatI0TqpL3xF4XL9mhw==",
+        "dependencies": {
+          "Microsoft.Build.Framework": "17.5.0",
+          "Microsoft.Build.Utilities.Core": "17.5.0"
+        }
+      },
       "SlideRule.Analyzers": {
         "type": "Direct",
         "requested": "[0.2.1, )",
@@ -287,15 +297,6 @@
         "type": "Transitive",
         "resolved": "1.0.52",
         "contentHash": "oNv2JtYXhpdJrX63nibx1JT3uCESOBQ1LAk7Dtz/sr0+laW0KRM6eKp4CZ3MHDR2siIkKsY8MmUkeP5DKkQQ5w=="
-      },
-      "MSBuild.StructuredLogger": {
-        "type": "Transitive",
-        "resolved": "2.3.246",
-        "contentHash": "W7sQrvBS9KzipO7TuL35RsahjDIWxjieK1x9SasTHcu8jbTUyUSxPxnwmt5I19WyMvytatI0TqpL3xF4XL9mhw==",
-        "dependencies": {
-          "Microsoft.Build.Framework": "17.5.0",
-          "Microsoft.Build.Utilities.Core": "17.5.0"
-        }
       },
       "System.CodeDom": {
         "type": "Transitive",
