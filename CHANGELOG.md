@@ -47,6 +47,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unanswered. The example receipt no longer lists a dropped rule on a candidate line.
 - A command line that does not parse now gets System.CommandLine's "Did you mean" suggestions for a mistyped
   command or option, on stderr. Stdout stays empty and the exit code stays 2.
+- A load now writes one warning for each C# project that declares a `Reference` the build could not
+  resolve, such as a `HintPath` DLL missing from disk, naming the references and saying that edges to
+  those assemblies are absent from the model. The build drops such a reference before the compiler sees
+  it, so before, the load read as complete while types from that assembly bound to nothing. The warning
+  covers unconditioned `Reference` items on both load paths, MSBuild and binlog replay, counts a reference
+  as resolved when any target framework received it, and appears in `--json` output's diagnostics. It
+  changes no verdict.
+- A load through MSBuild whose build names an analyzer or source generator file missing from disk now
+  writes one notice with the number of analyzer references it stripped, saying that any code they
+  generate is absent from the model. Before, the MSBuild path dropped such a reference without a word; the
+  binlog replay already wrote this notice.
 
 ### Fixed
 
@@ -91,6 +102,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   bound the whole initializer again, so an initializer of 400 rows took 28.8 s where it now takes 0.3 s.
   The build analyzer, the xUnit adapter and every command and MCP tool that reads the code run this
   extraction, and what it extracts is unchanged.
+- `--diff-base` and `arch_check`'s `diffBase` now count a file moved since the ref as changed at both its
+  old and its new path, as `hook` already did. Before, git's rename detection listed it only at the new
+  path, so a scope tripwire on the directory it left did not fire.
+- `arch_check` with an empty `diffBase` now treats it as absent, as `arch_explain` already did. Before,
+  the empty string was passed to git and the call failed.
+- `SLIDERULE_LOG_LEVEL` set to a comma-separated list now falls back to Warning, like any other value it
+  does not recognise. Before, the listed levels combined into one that turned logging off.
+- `MAX_MCP_OUTPUT_TOKENS=1` no longer makes every non-empty tool reply fail. Before, it gave a budget of
+  zero characters, and truncating a reply to it threw.
+- A quarantine whose boundary names or contains its own scoped region is now listed under "Not drawn in
+  full" in the law diagram. Before, its scope box became its own parent, and the box and its rule vanished
+  from the diagram.
 
 ## [0.2.0] - 2026-10-18
 
