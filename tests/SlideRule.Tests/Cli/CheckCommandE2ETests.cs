@@ -556,6 +556,30 @@ public sealed class CheckCommandE2ETests
     }
 
     [Fact]
+    public async Task Check_ViolatedSpecAnnotations_MatchGoldens()
+    {
+        // The GitHub pair over the same result model. Each command's file property is the site's absolute path,
+        // so the golden holds the solution directory as a token; the summary's paths are solution-relative.
+        using TempDirectory temp = TestTempRoot.Fresh("check-annotations");
+        string annotationsPath = temp.PathOf("violated-check.annotations");
+        string summaryPath = temp.PathOf("violated-check.summary");
+        string solutionRoot = Path.GetDirectoryName(Path.GetFullPath(CliRunner.MyAppSolution))!
+            .Replace(Path.DirectorySeparatorChar, '/')
+            .Replace(":", "%3A");
+
+        CliResult result = await CliRunner.InvokeAsync(
+            "check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll,
+            "--annotations", annotationsPath, "--annotations-summary", summaryPath);
+
+        result.ShouldReportViolations();
+        File.ReadAllText(annotationsPath)
+            .Replace(solutionRoot, "{solution}")
+            .ShouldMatchGolden("violated-check.annotations");
+        File.ReadAllText(summaryPath)
+            .ShouldMatchGolden("violated-check.summary");
+    }
+
+    [Fact]
     public async Task Check_ViolatedSpecJsonWithSarif_StdoutStaysPureJson()
     {
         // --json owns stdout. --sarif writes its report to the file, and the human-mode `wrote <path>` line is

@@ -12,7 +12,9 @@ namespace SlideRule.Cli.Verbs;
 ///     failing closed when a project fails to load or restore.
 ///     <paramref name="Grain" /> is the floor on how much of each rule the JSON document renders; a transport with a
 ///     response budget may go coarser (<see cref="IResponseFitter" />). <paramref name="ChangedFiles" />, absolute
-///     paths, replaces the <paramref name="DiffBase" /> listing.
+///     paths, replaces the <paramref name="DiffBase" /> listing. <paramref name="Annotations" /> and
+///     <paramref name="AnnotationsSummary" /> are the paths the GitHub workflow commands and the Markdown job
+///     summary are written to, or null for none.
 /// </remarks>
 internal sealed record CheckRequest(
     string? Solution,
@@ -26,4 +28,6 @@ internal sealed record CheckRequest(
     string? Sarif,
     string? Rules,
     DocumentGrain Grain,
-    IReadOnlyList<string>? ChangedFiles = null) : IReplayableRequest;
+    IReadOnlyList<string>? ChangedFiles = null,
+    string? Annotations = null,
+    string? AnnotationsSummary = null) : IReplayableRequest;

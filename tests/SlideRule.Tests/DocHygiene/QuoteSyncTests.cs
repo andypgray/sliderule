@@ -342,7 +342,9 @@ public sealed class QuoteSyncTests
         new(DocPaths.Contributing, "contributing-lock-files", "gh pr checkout <number>"),
         new(DocPaths.Security, "security-attestation", "gh attestation verify"),
 
-        // The operations guide's pull-request job and its upgrade line, both commands for the reader to run.
+        // The operations guide's pull-request job, as a GitHub workflow and as commands, and its upgrade line. The
+        // workflow's inputs are held to the action's by ActionInputTests.
+        new(DocPaths.Operating, "operating-ci-action", "uses: andypgray/sliderule@"),
         new(DocPaths.Operating, "operating-ci", "sliderule render --check"),
         new(DocPaths.Operating, "operating-ratchet", "baseline accept-reductions"),
         new(DocPaths.Operating, "operating-upgrade", "dotnet tool update -g SlideRule.Cli")

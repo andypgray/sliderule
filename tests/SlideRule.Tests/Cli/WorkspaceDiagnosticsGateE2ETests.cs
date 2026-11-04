@@ -678,12 +678,28 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
 
         result.ShouldRefuseWith();
         using JsonDocument document = result.ShouldHaveJsonStdout();
-        document.ShouldBeStampedIncomplete();
-        document.RootElement.Strings("missingProjects")
-            .ShouldHaveSingleItem()
-            .ShouldEndWith("MyApp.Vendor/MyApp.Vendor.csproj");
-        document.RootElement.TryGetProperty("failedProjects", out _)
-            .ShouldBeFalse(result.Transcript());
+        document.ShouldNameOnlyMissing("MyApp.Vendor/MyApp.Vendor.csproj", result.Transcript());
+    }
+
+    [Fact]
+    public async Task Check_MissingProjectFileSummary_NamesTheMissingFileAsTheCause()
+    {
+        // The job summary sends its reader to the job log for the projects, so it names the cause the log lists: a
+        // run gated on a missing project file alone has no failed load or restore to look for there.
+        using TempDirectory temp = TestTempRoot.Fresh("missing-gate-summary");
+        string summaryPath = temp.PathOf("missing-gate.md");
+
+        CliResult result = await RunWithInjectedDiagnosticAsync(
+            [], CliRunner.CleanSpecDll, false, false,
+            missingProjects: [DiagnosticInjectingSolutionSource.SimulatedMissingProject],
+            annotationsSummary: summaryPath);
+
+        result.ShouldRefuseWith();
+        File.ReadAllText(summaryPath)
+            .ShouldContain(
+                "\n\nThe model is incomplete, so this run fails with exit 2 whatever the rules say. The job log names "
+                + "the project files the solution declares that are not on disk.\n\n",
+                customMessage: result.Transcript());
     }
 
     // ── harness ───────────────────────────────────────────────────────────────────────────────────────────
@@ -716,7 +732,8 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         IReadOnlyList<string>? restoreFailedProjects = null,
         bool forTheHook = false,
         CancellationToken? cancellationToken = null,
-        IReadOnlyList<string>? missingProjects = null)
+        IReadOnlyList<string>? missingProjects = null,
+        string? annotationsSummary = null)
     {
         string solution = CliRunner.MyAppSolution;
         var source = new DiagnosticInjectingSolutionSource(
@@ -725,7 +742,7 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
             with
             {
                 Json = json, NoCache = true, AllowWorkspaceDiagnostics = allowWorkspaceDiagnostics,
-                Sarif = sarif
+                Sarif = sarif, AnnotationsSummary = annotationsSummary
             };
 
         CancellationToken ct = cancellationToken ?? Ct;

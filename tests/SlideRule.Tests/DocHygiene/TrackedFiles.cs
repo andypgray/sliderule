@@ -36,6 +36,9 @@ internal static class TrackedFiles
 
     internal const string CiWorkflow = WorkflowDirectory + "ci.yml";
 
+    /// <summary>The metadata file of the GitHub Action this repository publishes, at its root.</summary>
+    internal const string ActionMetadata = "action.yml";
+
     // How much of a file the text/binary sniff reads — the same window `git grep -I` looks at.
     private const int SniffBytes = 8192;
 
@@ -60,6 +63,10 @@ internal static class TrackedFiles
 
     private static readonly Lazy<IReadOnlyList<string>> LazyWorkflows =
         new(() => LazyAll.Value.Where(static path => path.StartsWith(WorkflowDirectory, StringComparison.Ordinal))
+            .ToArray());
+
+    private static readonly Lazy<IReadOnlyList<string>> LazyActionSteps =
+        new(() => LazyWorkflows.Value.Concat(LazyAll.Value.Where(static path => path == ActionMetadata))
             .ToArray());
 
     private static readonly Lazy<IReadOnlyList<string>> LazyProjects =
@@ -89,6 +96,12 @@ internal static class TrackedFiles
 
     /// <summary>The tracked workflow files.</summary>
     public static IReadOnlyList<string> Workflows => LazyWorkflows.Value;
+
+    /// <summary>
+    ///     Every tracked file whose steps GitHub runs: the workflows and the action metadata. Scorecard reads only
+    ///     the workflows, so a gate over the steps reads this set.
+    /// </summary>
+    public static IReadOnlyList<string> ActionSteps => LazyActionSteps.Value;
 
     /// <summary>The tracked C# project files.</summary>
     public static IReadOnlyList<string> Projects => LazyProjects.Value;

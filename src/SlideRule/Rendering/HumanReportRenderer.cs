@@ -46,10 +46,15 @@ internal static class HumanReportRenderer
                 RenderRule(output, result, relativizer);
 
         output.WriteLine();
+        output.WriteLine(SummaryLine(report));
+    }
 
+    // The line the report closes with: the rule counts, then the violations and warnings behind them.
+    internal static string SummaryLine(CheckReport report)
+    {
         string violations = Plurals.Counted(report.ViolationCount, "violation");
         string warnings = Plurals.Counted(report.WarningCount, "warning");
-        output.WriteLine($"{RuleTally(report)} ({violations}, {warnings}).");
+        return $"{RuleTally(report)} ({violations}, {warnings}).";
     }
 
     // The rule counts a summary line opens with, up to the punctuation that closes them.
@@ -226,33 +231,25 @@ internal static class HumanReportRenderer
         var unlocated = new List<string>();
         var hints = new List<string>();
 
+        // One line per placed site; the rest land in the unlocated block, and an edge violation that carries no
+        // site renders nothing.
         foreach (Violation violation in result.Violations)
-            switch (violation.Kind)
-            {
-                case ViolationKind.EmptySubject:
-                    unlocated.Add(violation.Detail ?? "the subject selection matched no types");
-                    if (violation.Hint is { } hint && !hints.Contains(hint)) hints.Add(hint);
-                    break;
-                case ViolationKind.RuleError:
-                    unlocated.Add($"error: {violation.Detail}");
-                    break;
-                // One line per placed site; a shape violation that carries no site lands in the unlocated block,
-                // and an edge violation that carries none renders nothing.
-                default:
-                    IReadOnlyList<SourceLocation> placed = violation.PlacedSites();
-                    if (placed.Count > 0)
-                    {
-                        string text = violation.Text();
-                        foreach (SourceLocation site in placed)
-                            located.Add((relativizer.Relative(site.FilePath), site.Line, text));
-                    }
-                    else if (violation.Kind.IsShape())
-                    {
-                        unlocated.Add(violation.SubjectText());
-                    }
+        {
+            if (violation is { Kind: ViolationKind.EmptySubject, Hint: { } hint } && !hints.Contains(hint))
+                hints.Add(hint);
 
-                    break;
+            IReadOnlyList<SourceLocation> placed = violation.PlacedSites();
+            if (placed.Count > 0)
+            {
+                string text = violation.Text();
+                foreach (SourceLocation site in placed)
+                    located.Add((relativizer.Relative(site.FilePath), site.Line, text));
             }
+            else if (violation.UnplacedText() is { } unplaced)
+            {
+                unlocated.Add(unplaced);
+            }
+        }
 
         foreach (string text in unlocated) yield return text;
 

@@ -18,7 +18,31 @@ A check reads your code from source, so an edit counts as soon as it is saved, b
 
 ## CI
 
-A pull-request job installs the tool, builds the solution, checks it, and fails on any stale rendered file. The check takes the pull request's base ref, from which the scope tripwires read the change:
+On GitHub Actions, the SlideRule action installs the tool, checks the solution, annotates each finding on its line, uploads the result to code scanning, and fails on any stale rendered file. Your job checks out the full history and builds the solution first:
+
+```yaml
+jobs:
+  architecture:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet build MyApp.sln
+      - uses: andypgray/sliderule@v<version>
+        with:
+          version: <version>
+```
+
+Set `version` to the version the spec's `SlideRule` package reference names, so CI checks with the tool the spec was written against. Pinning each action to a commit SHA keeps a moved tag from changing what your job runs, and Dependabot keeps such pins current. The check takes the pull request's base branch as its diff base, from which the scope tripwires read the change. The action's other [inputs](https://github.com/andypgray/sliderule/blob/main/action.yml) name a solution, a diff base, a SARIF path or a code scanning category, choose when the SARIF file uploads, and turn off the annotations or the render check.
+
+On another CI system, the job runs the same steps as commands:
 
 ```bash
 dotnet tool install -g SlideRule.Cli --version <version>
@@ -27,13 +51,15 @@ sliderule check --diff-base origin/main --sarif sliderule.sarif
 sliderule render --check
 ```
 
-Install the version the spec's `SlideRule` package reference names, so CI checks with the tool the spec was written against. The commands find the solution and the spec through a committed [settings file](https://github.com/andypgray/sliderule/blob/main/CLI.md#the-settings-file), or take them as arguments.
+The commands find the solution and the spec through a committed [settings file](https://github.com/andypgray/sliderule/blob/main/CLI.md#the-settings-file), or take them as arguments.
 
-`check` exits 1 on a red rule, and 2 on SlideRule's own error, such as a spec error or a project that failed to load. `render --check` exits 1 when a rendered file is stale, and a card the spec now places where none is committed counts as stale. A card the spec no longer places is not compared, so delete it by hand as step 4 of [Changing the spec](#changing-the-spec) explains. `--diff-base` needs the base ref in the checkout, and on GitHub Actions a checkout with `fetch-depth: 0` provides it. A ref the checkout lacks fails the run with exit 2, and without `--diff-base` every scope's tripwire reports skipped.
+`check` exits 1 on a red rule, and 2 on SlideRule's own error, such as a spec error or a project that failed to load. `render --check` exits 1 when a rendered file is stale, and a card the spec now places where none is committed counts as stale. A card the spec no longer places is not compared, so delete it by hand as step 4 of [Changing the spec](#changing-the-spec) explains. `--diff-base` needs the base ref in the checkout, which `fetch-depth: 0` provides on GitHub Actions. A ref the checkout lacks fails the run with exit 2, and without `--diff-base` every scope's tripwire reports skipped.
 
-Upload `sliderule.sarif` to code scanning to see each violation on the line that caused it. On GitHub, `github/codeql-action/upload-sarif` uploads it, with `security-events: write` on the job and `if: always()` on the step, so the alerts still upload when the check fails. A red rule becomes an error-level alert, and a tripwire touch a warning. Each baselined site becomes a note that quotes its baseline entry's reason, or names the baseline file when the entry has none. The xUnit adapter can run the same rules as named tests in the test step, for teams that want them in the test report.
+The action annotates every run, whether or not it uploads. Each red violation is an error annotation on its line, with the rule ID as its title, and each check warning, such as a tripwire touch, a warning annotation. Baselined sites are left out. GitHub shows 10 error and 10 warning annotations a step, so the action also writes a job summary that lists every finding. The summary stops short of GitHub's 1 MiB limit and ends with a count of the findings it left out. A GitHub workflow that runs the tool without the action gets the same with `check --annotations <path> --annotations-summary <path>`, printing the first file and appending the second to `$GITHUB_STEP_SUMMARY`.
 
-This repository's own [CI workflow](https://github.com/andypgray/sliderule/blob/main/.github/workflows/ci.yml) runs these steps on every push to `main` and every pull request, with the tool built from source.
+Code scanning shows each violation on the line that caused it. The action uploads the SARIF file even when the check fails. With `upload-sarif` at its default, `auto`, it skips the upload in a private repository, where code scanning needs GitHub Code Security. Set it to `true` for a private repository that has it, and give the job `actions: read` as well as `security-events: write`. Either way the action skips the upload for a pull request from a fork, and for a run Dependabot starts by any event but a pull request, whose token is read-only. Set `annotate: false` when the alerts already show each finding. A red rule becomes an error-level alert, and a tripwire touch a warning. Each baselined site becomes a note that quotes its baseline entry's reason, or names the baseline file when the entry has none. The xUnit adapter can run the same rules as named tests in the test step, for teams that want them in the test report.
+
+This repository's own [CI workflow](https://github.com/andypgray/sliderule/blob/main/.github/workflows/ci.yml) runs the action from its own checkout on every push to `main` and every pull request, with the tool built from source.
 
 ## Working a ratchet down
 

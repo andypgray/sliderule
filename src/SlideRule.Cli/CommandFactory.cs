@@ -92,6 +92,21 @@ internal static class CommandFactory
             Description =
                 "Write a SARIF 2.1.0 report to <path> (GitHub code scanning et al.); human/--json output is unchanged."
         };
+        Option<string?> annotations = new("--annotations")
+        {
+            Description =
+                "Write GitHub Actions workflow commands to <path>, one ::error per red violation site and one "
+                + "::warning per check warning, for a step to print; grandfathered sites are left out, and "
+                + "human/--json output is unchanged.",
+            HelpName = "path"
+        };
+        Option<string?> annotationsSummary = new("--annotations-summary")
+        {
+            Description =
+                "Write a Markdown job summary to <path>: the verdict and a table of the findings --annotations "
+                + "writes, for a step to append to $GITHUB_STEP_SUMMARY; human/--json output is unchanged.",
+            HelpName = "path"
+        };
         Option<string?> rules = new("--rules")
         {
             Description =
@@ -121,6 +136,8 @@ internal static class CommandFactory
             diffBase,
             allowWorkspaceDiagnostics,
             sarif,
+            annotations,
+            annotationsSummary,
             rules,
             grain,
             noCache,
@@ -140,7 +157,9 @@ internal static class CommandFactory
                 parseResult.GetValue(allowWorkspaceDiagnostics),
                 parseResult.GetValue(sarif),
                 parseResult.GetValue(rules),
-                DocumentGrains.Parse(parseResult.GetValue(grain)))),
+                DocumentGrains.Parse(parseResult.GetValue(grain)),
+                Annotations: parseResult.GetValue(annotations),
+                AnnotationsSummary: parseResult.GetValue(annotationsSummary))),
             (request, output, error, ct) =>
                 MsBuildGate.RunCheckAsync(request, output, error, hostSource, environment, ct));
 

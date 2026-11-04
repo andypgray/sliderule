@@ -27,6 +27,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   interface-implementing methods of types, must accept a parameter of type `CancellationToken`".
 - `IMemberInfo.IsInterfaceImplementation` reports a member that implements an interface member, for
   `.Where` and `.Must` predicates.
+- A GitHub Action, `andypgray/sliderule`, for a pull-request job: it installs the tool at the version you
+  name, runs `check` against the pull request's base branch, annotates each finding on its line and lists
+  them all in the job summary, uploads the SARIF file to code scanning even when the check fails, and runs
+  `render --check`. The annotations and the summary need no upload. The upload skips a private repository
+  unless `upload-sarif` is `true`, for one with GitHub Code Security, and `annotate: false` leaves the
+  annotations to code scanning. Your job checks out the full history and builds the solution first. The
+  action is versioned by this repository's release tags, and the
+  [operations guide](https://github.com/andypgray/sliderule/blob/main/OPERATING.md#ci) shows the job.
+- `check --annotations <path>` writes GitHub Actions workflow commands, an `::error` at each line a red
+  violation is reported on and a `::warning` for each check warning, which a step prints to annotate the
+  code without a code scanning upload. Grandfathered sites are left out, and a violation with no site is an
+  error with no file. `check --annotations-summary <path>` writes the same findings as a Markdown job
+  summary under the report's closing line, cut short of GitHub's 1 MiB limit with a count of what it left
+  out.
 - A spec edited and not rebuilt is reported. Every command that loads the spec compares the spec project's
   sources with the build it runs, and when they differ prints a `warning:` line naming the project and the
   file, with the command that rebuilds it. The check and status documents, and so `arch_check` and

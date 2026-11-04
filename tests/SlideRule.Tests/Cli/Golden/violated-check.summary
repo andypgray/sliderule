@@ -1,0 +1,67 @@
+## SlideRule check
+
+Checked 32 rules: 3 passed, 27 failed, 2 skipped (51 violations, 2 warnings).
+
+| Level | Rule | Where | Finding |
+|---|---|---|---|
+| error | layering/domain-independent | MyApp.Domain/OrderService.cs:9 | MyApp.Domain.OrderService references MyApp.Web.HomeController |
+| error | layering/domain-independent | MyApp.Domain/OrderService.cs:10 | MyApp.Domain.OrderService references MyApp.Web.HomeController |
+| error | layering/domain-independent | MyApp.Domain/OrderService.cs:13 | MyApp.Domain.OrderService references MyApp.Web.HomeController |
+| error | layering/domain-independent | MyApp.Domain/OrderService.cs:10 | MyApp.Domain.OrderService references MyApp.Web.WebTextExtensions |
+| error | layering/projects-independent | MyApp.Domain/OrderService.cs:9 | MyApp.Domain.OrderService references MyApp.Web.HomeController |
+| error | layering/projects-independent | MyApp.Domain/OrderService.cs:10 | MyApp.Domain.OrderService references MyApp.Web.HomeController |
+| error | layering/projects-independent | MyApp.Domain/OrderService.cs:13 | MyApp.Domain.OrderService references MyApp.Web.HomeController |
+| error | layering/projects-independent | MyApp.Domain/OrderService.cs:10 | MyApp.Domain.OrderService references MyApp.Web.WebTextExtensions |
+| error | layering/projects-independent | MyApp.Web/HomeController.cs:17 | MyApp.Web.HomeController references MyApp.Legacy.Billing.IBillingFacade |
+| error | layering/projects-independent | MyApp.Web/HomeController.cs:20 | MyApp.Web.HomeController references MyApp.Legacy.Billing.IBillingFacade |
+| error | layering/projects-independent | MyApp.Web/InvoiceController.cs:9 | MyApp.Web.InvoiceController references MyApp.Legacy.Billing.BillingCalculator |
+| error | layering/projects-independent | MyApp.Web/InvoiceController.cs:10 | MyApp.Web.InvoiceController references MyApp.Legacy.Billing.BillingCalculator |
+| error | layering/projects-independent | MyApp.Web/InvoiceController.cs:10 | MyApp.Web.InvoiceController references MyApp.Legacy.Billing.RoundingMode |
+| error | layering/web-cuts-not-circular | MyApp.Web/InvoiceCreatedHandler.cs:10 | MyApp.Web.InvoiceCreatedHandler references MyApp.Web.ReportEndpoint |
+| error | layering/web-cuts-not-circular | MyApp.Web/ReportEndpoint.cs:23 | MyApp.Web.ReportEndpoint references MyApp.Web.InvoiceService |
+| error | data-access/no-inline-sql | MyApp.Web/HomeController.cs:24 | MyApp.Web.HomeController references System.Data.DataTable |
+| error | data-access/no-inline-sql | MyApp.Web/HomeController.cs:26 | MyApp.Web.HomeController references System.Data.DataTable |
+| warning | data-access/no-inline-sql |  | This rule's exemplar "types named \`OrdersRepository\`" matched no solution-declared types. |
+| error | time/inject-clock | MyApp.Web/HomeController.cs:32 | MyApp.Web.HomeController uses System.DateTime.Now |
+| error | time/inject-clock | MyApp.Web/HomeController.cs:37 | MyApp.Web.HomeController uses System.DateTime.UtcNow |
+| error | naming/async-suffix | MyApp.Web/HomeController.cs:48 | MyApp.Web.HomeController.Load() |
+| error | naming/async-suffix | MyApp.Web/HomeController.cs:43 | MyApp.Web.HomeController.Save() |
+| error | di/handlers-via-registry | MyApp.Web/InvoiceService.cs:8 | MyApp.Web.InvoiceService constructs MyApp.Web.InvoiceCreatedHandler |
+| error | di/no-captive-dependencies | MyApp.Web/ReportScheduler.cs:7 | MyApp.Web.ReportScheduler injects MyApp.Web.IOrderFeed |
+| error | di/no-captive-dependencies | MyApp.Web/ReportScheduler.cs:8 | MyApp.Web.ReportScheduler injects MyApp.Web.IOrderFormatter |
+| warning | layering/no-ghost |  | This rule is inert: its target selection matched no types. |
+| error | naming/nonexistent |  | The subject selection matched no solution-declared types. |
+| error | legacy/billing/containment | MyApp.Web/InvoiceController.cs:9 | MyApp.Web.InvoiceController references MyApp.Legacy.Billing.BillingCalculator |
+| error | legacy/billing/containment | MyApp.Web/InvoiceController.cs:10 | MyApp.Web.InvoiceController references MyApp.Legacy.Billing.BillingCalculator |
+| error | legacy/billing/containment | MyApp.Web/InvoiceController.cs:10 | MyApp.Web.InvoiceController references MyApp.Legacy.Billing.RoundingMode |
+| error | exceptions/no-general-catch | MyApp.Web/ReportEndpoint.cs:15 | MyApp.Web.ReportEndpoint catches System.Exception |
+| error | exceptions/no-general-catch | MyApp.Web/ReportPublisher.cs:22 | MyApp.Web.ReportPublisher catches System.Exception |
+| error | exceptions/domain-throws-domain | MyApp.Domain/OrderApproval.cs:17 | MyApp.Domain.OrderApproval throws System.InvalidOperationException |
+| error | async/accept-cancellation | MyApp.Web/HomeController.cs:48 | MyApp.Web.HomeController.Load() |
+| error | async/accept-cancellation | MyApp.Web/HomeController.cs:43 | MyApp.Web.HomeController.Save() |
+| error | async/accept-cancellation | MyApp.Web/HomeController.cs:53 | MyApp.Web.HomeController.SaveAsync() |
+| error | api/return-dtos | MyApp.Web/HomeController.cs:24 | MyApp.Web.HomeController exposes System.Data.DataTable |
+| error | api/return-dtos | MyApp.Web/InvoiceController.cs:14 | MyApp.Web.InvoiceController exposes System.Data.DataTable |
+| error | exceptions/no-unfiltered-catch | MyApp.Web/ReportEndpoint.cs:15 | MyApp.Web.ReportEndpoint catches System.Exception |
+| error | exceptions/no-unfiltered-catch | MyApp.Web/ReportPublisher.cs:22 | MyApp.Web.ReportPublisher catches System.Exception |
+| error | exceptions/no-swallowed-catch | MyApp.Web/ReportEndpoint.cs:15 | MyApp.Web.ReportEndpoint catches System.Exception |
+| error | exceptions/no-bare-bcl-throw | MyApp.Domain/OrderApproval.cs:17 | MyApp.Domain.OrderApproval throws System.InvalidOperationException |
+| error | layering/services-in-web | MyApp.Domain/OrderService.cs:5 | MyApp.Domain.OrderService |
+| error | layering/services-behind-contracts | MyApp.Web/InvoiceService.cs:4 | MyApp.Web.InvoiceService |
+| error | layering/no-ungoverned-types | MyApp.Legacy.Billing/BillingCalculator.cs:5 | MyApp.Legacy.Billing.BillingCalculator |
+| error | layering/no-ungoverned-types | MyApp.Legacy.Billing/BillingFacade.cs:3 | MyApp.Legacy.Billing.BillingFacade |
+| error | layering/no-ungoverned-types | MyApp.Legacy.Billing/IBillingFacade.cs:3 | MyApp.Legacy.Billing.IBillingFacade |
+| error | layering/no-ungoverned-types | MyApp.Legacy.Billing/RoundingMode.cs:3 | MyApp.Legacy.Billing.RoundingMode |
+| error | di/handlers-registered | MyApp.Web/InvoiceCreatedHandler.cs:3 | MyApp.Web.InvoiceCreatedHandler |
+| error | di/handlers-registered | MyApp.Web/RefundProcessor.cs:3 | MyApp.Web.RefundProcessor |
+| error | domain/values-immutable | MyApp.Domain/Money.cs:3 | MyApp.Domain.Money.Amount |
+| error | domain/values-immutable | MyApp.Domain/Order.cs:5 | MyApp.Domain.Order.Reference |
+| error | domain/values-immutable | MyApp.Domain/Order.cs:7 | MyApp.Domain.Order.Total |
+| error | state/no-static-mutable | MyApp.Web/ReportBudget.cs:18 | MyApp.Web.ReportBudget.RenderCount |
+| error | packaging/supported-frameworks | MyApp.Domain/MyApp.Domain.csproj:3 | MyApp.Domain targets net10.0 |
+| error | packaging/supported-frameworks | MyApp.Legacy.Billing/MyApp.Legacy.Billing.csproj:3 | MyApp.Legacy.Billing targets net10.0 |
+| error | packaging/supported-frameworks | MyApp.Web/MyApp.Web.csproj:3 | MyApp.Web targets net10.0 |
+| error | packaging/no-feed-dependencies | MyApp.Web/MyApp.Web.csproj:24 | MyApp.Web references package Microsoft.Extensions.DependencyInjection.Abstractions |
+| error | packaging/locked-restore | MyApp.Web/MyApp.Web.csproj:1 | MyApp.Web |
+| error | packaging/nothing-published | MyApp.Domain/MyApp.Domain.csproj:1 | MyApp.Domain |
+| error | packaging/nothing-published | MyApp.Web/MyApp.Web.csproj:1 | MyApp.Web |

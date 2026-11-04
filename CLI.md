@@ -82,6 +82,14 @@ Options:
                                           with exit 2.
   --sarif <sarif>                         Write a SARIF 2.1.0 report to <path> (GitHub code
                                           scanning et al.); human/--json output is unchanged.
+  --annotations <path>                    Write GitHub Actions workflow commands to <path>, one
+                                          ::error per red violation site and one ::warning per
+                                          check warning, for a step to print; grandfathered sites
+                                          are left out, and human/--json output is unchanged.
+  --annotations-summary <path>            Write a Markdown job summary to <path>: the verdict and a
+                                          table of the findings --annotations writes, for a step to
+                                          append to $GITHUB_STEP_SUMMARY; human/--json output is
+                                          unchanged.
   --rules <rules>                         Check only the rules whose ID matches these globs
                                           (semicolon-separated, '*' allowed and it spans '/'); the
                                           report, the summary counts and the 0/1 verdict then cover
@@ -110,7 +118,7 @@ Options:
 
 Without `--diff-base` every tripwire reports skipped, which is not the same as clean. A pull-request check therefore passes the pull request's base ref, and the checkout has to be deep enough for that ref to resolve. A tripwire touch is one of the [warnings](#warnings) a check can raise, and a warning never fails the run.
 
-Five options have a section of their own below. `--sarif` is under [SARIF](#sarif), `--grain` under [Grains](#grains), and `--binlog` and `--no-cache` under [Caching](#caching). What `--allow-workspace-diagnostics` accepts is under [Wrong and smaller models](#wrong-and-smaller-models).
+Seven options have a section of their own below. `--sarif` is under [SARIF](#sarif), `--annotations` and `--annotations-summary` under [GitHub annotations](#github-annotations), `--grain` under [Grains](#grains), and `--binlog` and `--no-cache` under [Caching](#caching). What `--allow-workspace-diagnostics` accepts is under [Wrong and smaller models](#wrong-and-smaller-models).
 
 ### `explain`
 
@@ -609,6 +617,14 @@ Each violation site is one result, at its file and line relative to the solution
 A grandfathered site also has an external suppression that quotes its baseline entry's reason, or names the baseline file when the entry has none. Its message repeats that attribution, since code scanning shows the message and ignores the suppression. A violation with no site, such as a rule whose subject matched no types, adds no result and still fails the run. Workspace diagnostics and an incomplete model are reported as notifications on the run's invocation.
 
 Each result's `partialFingerprints` includes `slideRuleViolationIdentity/v1`, built from the violation's source, target and subject, the file, and the site's ordinal within that file. Code that moves around a site leaves the key alone, so one violation stays one alert across runs. The [SARIF section](https://github.com/andypgray/sliderule/blob/main/SELF-CHECK.md#as-sarif) of SlideRule on itself shows a grandfathered result from a real run.
+
+## GitHub annotations
+
+`check --annotations <path>` writes the check as GitHub Actions workflow commands, one line per finding, and a step that prints the file puts each finding on its line of code. The step needs no code scanning upload and no permission beyond its own log. Each red violation is an `::error` at each line the human report gives it, with the rule ID as its title. A violation with no site, such as a rule whose subject matched no types, is an `::error` with no file. Each check warning is a `::warning`, at the file it names and no line. Grandfathered sites are left out. A file path is absolute, which the runner makes relative to the repository, so a solution below the repository root still annotates the right file.
+
+GitHub shows 10 error and 10 warning annotations a step and drops the rest. `check --annotations-summary <path>` writes a Markdown job summary, for a step to append to `$GITHUB_STEP_SUMMARY`: the report's closing line, a note when the model is incomplete, and a table of every finding `--annotations` writes. A step summary over 1 MiB fails to upload, so the table stops short of that and ends with a count of the findings it left out.
+
+The [GitHub Action](https://github.com/andypgray/sliderule/blob/main/action.yml) passes both options and prints both files.
 
 ## Caching
 

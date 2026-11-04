@@ -167,13 +167,33 @@ internal sealed class CheckRunner(
         else
             HumanReportRenderer.Render(stdout, report, source.SolutionDirectory);
 
-        // The optional third render target: a SARIF file alongside stdout. The wrote line is human-mode only
+        // An optional render target: a SARIF file alongside stdout. The wrote line is human-mode only
         // (it would break --json stdout purity); the SARIF itself carries the same result model either way.
         if (request.Sarif is { } sarifPath)
         {
             SarifReportRenderer.Render(
                 sarifPath, report, source.SolutionDirectory, executionSuccessful, renderedDiagnostics, trust);
             human.WriteLine($"wrote {PathFormat.Relative(source.SolutionDirectory, sarifPath)}");
+        }
+
+        // The GitHub pair, each written on its own request: workflow commands for a step to print, and the job
+        // summary that lists what the annotation limit hides. Both read one list, so the summary lists exactly what
+        // was annotated.
+        IReadOnlyList<GitHubFinding> findings = request.Annotations is null && request.AnnotationsSummary is null
+            ? []
+            : GitHubFinding.From(report, source.SolutionDirectory);
+
+        if (request.Annotations is { } annotationsPath)
+        {
+            GitHubAnnotationsRenderer.Render(annotationsPath, findings, source.SolutionDirectory);
+            human.WriteLine(WriteReport.Line(WriteOutcome.Wrote, source.SolutionDirectory, annotationsPath));
+        }
+
+        if (request.AnnotationsSummary is { } summaryPath)
+        {
+            string? incompleteModel = executionSuccessful ? null : IncompleteModelGate.SummaryCaveat(diagnostics);
+            GitHubSummaryRenderer.Render(summaryPath, report, findings, incompleteModel);
+            human.WriteLine(WriteReport.Line(WriteOutcome.Wrote, source.SolutionDirectory, summaryPath));
         }
     }
 

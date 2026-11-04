@@ -1,12 +1,11 @@
 using Shouldly;
-using SlideRule.Tests.TestSupport;
 using Xunit;
 
 namespace SlideRule.Tests.DocHygiene;
 
 /// <summary>
-///     The gate that keeps every <c>actions/checkout</c> step across the workflows opted out of
-///     credential persistence.
+///     The gate that keeps every <c>actions/checkout</c> step across the workflows and the action metadata
+///     opted out of credential persistence.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -62,58 +61,22 @@ public sealed class CheckoutCredentialPersistenceTests
         steps.ShouldNotBeEmpty($"No actions/checkout steps were found under {TrackedFiles.WorkflowDirectory}.");
     }
 
-    // Every use of the action across the tracked workflows, tagged with the file and line it sits on.
+    // Every use of the action across the tracked workflows and the action metadata, tagged with the file and
+    // line it sits on.
     private static IReadOnlyList<CheckoutStep> ReadCheckoutSteps()
     {
-        return TrackedFiles.Workflows
-            .SelectMany(StepsIn)
+        return TrackedFiles.ActionSteps
+            .SelectMany(ActionUses.In)
+            .Where(static use => use.Reference.StartsWith("actions/checkout@", StringComparison.Ordinal))
+            .Select(static use => new CheckoutStep(use.File, use.Line, OptsOutOfPersistedCredentials(use.Body)))
             .ToArray();
     }
 
-    private static IEnumerable<CheckoutStep> StepsIn(string workflow)
+    private static bool OptsOutOfPersistedCredentials(string[] body)
     {
-        string[] lines = RepoRoot.ReadLines(workflow);
-
-        return Enumerable.Range(0, lines.Length)
-            .Where(index => IsCheckoutUse(lines[index]))
-            .Select(index => ToStep(workflow, lines, index))
-            .ToList();
-    }
-
-    private static bool IsCheckoutUse(string line)
-    {
-        return line.Contains("uses:", StringComparison.Ordinal)
-               && line.Contains("actions/checkout@", StringComparison.Ordinal);
-    }
-
-    private static CheckoutStep ToStep(string workflow, string[] lines, int index)
-    {
-        int indent = IndentOf(lines[index]);
-        IEnumerable<string> inputs = lines
-            .Skip(index + 1)
-            .TakeWhile(line => ContinuesStep(line, indent));
-        bool optsOut = inputs.Any(static line =>
+        return body.Any(static line =>
             line.Contains("persist-credentials:", StringComparison.Ordinal)
             && line.Contains("false", StringComparison.Ordinal));
-
-        return new CheckoutStep(workflow, index + 1, optsOut);
-    }
-
-    // The step's inputs run until the next list item, or until a line that dedents out of the block
-    // entirely — the next job's key. A blank line is neither, so a step whose inputs follow one is
-    // still read as one step.
-    private static bool ContinuesStep(string line, int indent)
-    {
-        if (line.Trim().Length == 0) return true;
-
-        if (line.TrimStart().StartsWith("- ", StringComparison.Ordinal)) return false;
-
-        return IndentOf(line) >= indent;
-    }
-
-    private static int IndentOf(string line)
-    {
-        return line.Length - line.TrimStart().Length;
     }
 
     private sealed record CheckoutStep(string Workflow, int Line, bool OptsOut);

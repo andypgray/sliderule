@@ -82,10 +82,11 @@ public sealed class CodeQlActionPinTests
         return $"  {workflow.Key}:\n{string.Join("\n", steps)}";
     }
 
-    // Every pinned use of the action across the tracked workflows, tagged with the file it sits in.
+    // Every pinned use of the action across the tracked workflows and the action metadata, tagged with the file
+    // it sits in.
     private static IReadOnlyList<Pin> ReadPins()
     {
-        return TrackedFiles.Workflows
+        return TrackedFiles.ActionSteps
             .SelectMany(PinsIn)
             .ToArray();
     }

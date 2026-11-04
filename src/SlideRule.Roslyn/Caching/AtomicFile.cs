@@ -1,3 +1,5 @@
+using System.Text;
+
 namespace SlideRule.Roslyn.Caching;
 
 /// <summary>
@@ -26,6 +28,13 @@ internal static class AtomicFile
     public static void WriteAllBytes(string path, byte[] bytes)
     {
         PromoteViaTemp(path, temp => WriteDurably(temp, bytes));
+    }
+
+    /// <summary>Writes <paramref name="text" /> as UTF-8 with no byte-order mark.</summary>
+    public static void WriteAllText(string path, string text)
+    {
+        // GetBytes never emits a preamble, so the bytes written carry no BOM.
+        WriteAllBytes(path, Encoding.UTF8.GetBytes(text));
     }
 
     public static void Copy(string source, string destination)

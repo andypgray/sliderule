@@ -49,6 +49,20 @@ internal static class ViolationWording
         return violation.Kind.IsShape() ? violation.SubjectText() : violation.EdgeText();
     }
 
+    // What a violation that ViolationPlacement places at no site reads as, standing alone: the selection that
+    // matched nothing, the rule error, or the shape subject that carries no declaration. Null for one it places,
+    // and for an edge violation without a site, which no surface prints.
+    internal static string? UnplacedText(this Violation violation)
+    {
+        return violation.Kind switch
+        {
+            ViolationKind.EmptySubject => violation.Detail ?? "the subject selection matched no types",
+            ViolationKind.RuleError => $"error: {violation.Detail}",
+            _ when violation.Kind.IsShape() && violation.Sites.Count == 0 => violation.SubjectText(),
+            _ => null
+        };
+    }
+
     // The Shape parallel over a project: its name, at whichever declaration carried the fact the verb read,
     // which may be a props file above the project or nothing at all. A per-package or per-framework violation
     // names the item too, in EdgeText's register (no backticks: these lines are jump targets, not prose), and a

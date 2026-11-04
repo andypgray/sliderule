@@ -1,0 +1,154 @@
+name: SlideRule architecture check
+description: Check a .NET solution against its SlideRule architecture spec, annotate each violation on its line, upload the result to code scanning, and fail on a stale rendered file.
+author: andypgray
+
+branding:
+  icon: layers
+  color: blue
+
+# The caller checks out with fetch-depth: 0, so the diff base exists as a local ref, and restores and builds
+# the solution first: a check reads the code from source but runs the spec from its project's last build.
+# The job needs security-events: write for the upload, and a private repository's job actions: read as well.
+inputs:
+  version:
+    description: The SlideRule.Cli version to install. Set it to the version of the spec project's SlideRule package reference, so the check runs the tool the spec was written against. Required unless command is set.
+    required: false
+    default: ''
+  command:
+    description: A command that runs SlideRule, used in place of installing the tool, such as a dotnet run line for a CLI built from source. Leave version empty when this is set.
+    required: false
+    default: ''
+  solution:
+    description: The solution to check. When empty, the committed settings file names it, or the one solution file found walking up from the working directory.
+    required: false
+    default: ''
+  diff-base:
+    description: The git ref the scope tripwires read the change from. Defaults to the pull request's base branch, or to the default branch on a push. Empty turns the tripwires off.
+    required: false
+    default: origin/${{ github.event.pull_request.base.ref || github.event.repository.default_branch }}
+  sarif-file:
+    description: Where check writes its SARIF file, relative to working-directory.
+    required: false
+    default: sliderule.sarif
+  category:
+    description: The code scanning category the SARIF file uploads under.
+    required: false
+    default: sliderule
+  annotate:
+    description: Annotate each red violation and each check warning on its line of code, from the check step. GitHub shows 10 error and 10 warning annotations a step; the job summary lists every finding either way. Set to false where the code scanning alerts already show them.
+    required: false
+    default: 'true'
+  upload-sarif:
+    description: Upload the SARIF file to code scanning. auto uploads except in a private repository, true uploads in a private repository too, for one with GitHub Code Security, and false never uploads. Under auto or true, the upload is skipped for a pull request from a fork and for a run Dependabot started by any event but a pull request, whose token cannot write alerts.
+    required: false
+    default: auto
+  render-check:
+    description: Fail when a rendered file is stale, as render --check does.
+    required: false
+    default: 'true'
+  working-directory:
+    description: The directory the commands run in.
+    required: false
+    default: .
+
+runs:
+  using: composite
+  steps:
+    - name: Check the inputs
+      shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+        CLI_COMMAND: ${{ inputs.command }}
+        ANNOTATE: ${{ inputs.annotate }}
+        UPLOAD_SARIF: ${{ inputs.upload-sarif }}
+      run: |
+        case "$ANNOTATE" in true | false) ;; *)
+          echo "::error::Set annotate to true or false, not '$ANNOTATE'."
+          exit 1 ;;
+        esac
+        case "$UPLOAD_SARIF" in auto | true | false) ;; *)
+          echo "::error::Set upload-sarif to auto, true or false, not '$UPLOAD_SARIF'."
+          exit 1 ;;
+        esac
+        if [ -z "$VERSION" ] && [ -z "$CLI_COMMAND" ]; then
+          echo "::error::Set the version input to the SlideRule.Cli version to install: the one the spec project's SlideRule package reference names."
+          exit 1
+        fi
+        if [ -n "$VERSION" ] && [ -n "$CLI_COMMAND" ]; then
+          echo "::error::Set either version, to install the tool, or command, to run one already built, not both."
+          exit 1
+        fi
+
+    - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+      if: inputs.command == ''
+      with:
+        dotnet-version: '10.0.x'
+
+    # Installed from the runner's temporary directory, because inside a repository whose global.json pins an
+    # SDK below 10 the install fails. The tool directory then goes on the PATH for the steps after this one,
+    # the caller's included.
+    - name: Install SlideRule.Cli
+      if: inputs.command == ''
+      shell: bash
+      working-directory: ${{ runner.temp }}
+      env:
+        VERSION: ${{ inputs.version }}
+      run: |
+        dotnet tool install SlideRule.Cli --tool-path "$RUNNER_TEMP/sliderule-tool" --version "$VERSION"
+        echo "$RUNNER_TEMP/sliderule-tool" >> "$GITHUB_PATH"
+
+    # A red rule exits 1 and SlideRule's own error exits 2. The SARIF file is reported written even when the
+    # step fails, so the upload below runs for a red check and is skipped for a run that never wrote one.
+    # The annotations and the job summary go to a directory of this step's own, so nothing from an earlier
+    # run is printed, and only for a tool that has the options, so an older version still checks.
+    - name: Check the architecture
+      id: check
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        CLI_COMMAND: ${{ inputs.command }}
+        SOLUTION: ${{ inputs.solution }}
+        DIFF_BASE: ${{ inputs.diff-base }}
+        SARIF_FILE: ${{ inputs.sarif-file }}
+        ANNOTATE: ${{ inputs.annotate }}
+      run: |
+        cli=(sliderule)
+        [ -z "$CLI_COMMAND" ] || read -ra cli <<<"$CLI_COMMAND"
+        args=(check)
+        [ -z "$SOLUTION" ] || args+=("$SOLUTION")
+        [ -z "$DIFF_BASE" ] || args+=(--diff-base "$DIFF_BASE")
+        out=$(mktemp -d "$RUNNER_TEMP/sliderule.XXXXXX")
+        help=$("${cli[@]}" check --help) || help=''
+        case "$help" in *--annotations-summary*)
+          [ "$ANNOTATE" != true ] || args+=(--annotations "$out/annotations.txt")
+          args+=(--annotations-summary "$out/summary.md") ;;
+        esac
+        rm -f "$SARIF_FILE"
+        rc=0
+        "${cli[@]}" "${args[@]}" --sarif "$SARIF_FILE" || rc=$?
+        [ ! -f "$SARIF_FILE" ] || echo 'sarif-written=true' >> "$GITHUB_OUTPUT"
+        [ ! -f "$out/annotations.txt" ] || cat "$out/annotations.txt"
+        [ ! -f "$out/summary.md" ] || cat "$out/summary.md" >> "$GITHUB_STEP_SUMMARY"
+        exit "$rc"
+
+    # Runs whatever check reported, so one run names both a red rule and a stale file.
+    - name: Require every rendered file current
+      if: ${{ !cancelled() && inputs.render-check == 'true' && steps.check.outcome != 'skipped' }}
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        CLI_COMMAND: ${{ inputs.command }}
+        SOLUTION: ${{ inputs.solution }}
+      run: |
+        cli=(sliderule)
+        [ -z "$CLI_COMMAND" ] || read -ra cli <<<"$CLI_COMMAND"
+        args=(render)
+        [ -z "$SOLUTION" ] || args+=("$SOLUTION")
+        "${cli[@]}" "${args[@]}" --check
+
+    - name: Upload the SARIF file to code scanning
+      if: ${{ !cancelled() && inputs.upload-sarif != 'false' && steps.check.outputs.sarif-written == 'true' && !github.event.pull_request.head.repo.fork && (github.event_name == 'pull_request' || github.actor != 'dependabot[bot]') && (inputs.upload-sarif == 'true' || !github.event.repository.private) }}
+      uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
+      with:
+        sarif_file: ${{ inputs.working-directory }}/${{ inputs.sarif-file }}
+        category: ${{ inputs.category }}
