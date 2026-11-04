@@ -2,6 +2,7 @@ using System.CommandLine;
 using System.CommandLine.Help;
 using System.CommandLine.Parsing;
 using SlideRule.Cli.Hooks;
+using SlideRule.Cli.Init;
 using SlideRule.Cli.Mcp;
 using SlideRule.Cli.Mcp.Infrastructure;
 using SlideRule.Cli.Pipeline;
@@ -35,14 +36,18 @@ internal static class CommandFactory
     ///     workspace (<see cref="MsBuildGate" /> says what it displaces); <paramref name="input" /> is the stdin the
     ///     <c>hook</c> verb reads its payload from, or null when nothing was piped in, and is passed here because
     ///     <see cref="InvocationConfiguration" /> carries an output and an error writer and no input.
+    ///     <paramref name="specProjectCommands" /> runs <c>init</c>'s <c>dotnet</c> commands, the SDK's own when
+    ///     null.
     /// </summary>
     public static RootCommand BuildRootCommand(
-        ISolutionSource hostSource, IEnvironment environment, TextReader? input = null)
+        ISolutionSource hostSource, IEnvironment environment, TextReader? input = null,
+        ISpecProjectCommands? specProjectCommands = null)
     {
         RootCommand root = new(
             "SlideRule is a .NET architecture checker that enforces one C# spec and renders the same rules for "
             + "coding agents.")
         {
+            BuildInitCommand(hostSource, environment, specProjectCommands ?? new DotnetSpecProjectCommands()),
             BuildCheckCommand(hostSource, environment),
             BuildExplainCommand(hostSource, environment),
             BuildRenderCommand(hostSource, environment),
@@ -69,6 +74,73 @@ internal static class CommandFactory
     private static IEnumerable<Command> Descendants(Command command)
     {
         return command.Subcommands.SelectMany(static subcommand => Descendants(subcommand).Prepend(subcommand));
+    }
+
+    private static Command BuildInitCommand(
+        ISolutionSource hostSource, IEnvironment environment, ISpecProjectCommands commands)
+    {
+        Argument<string?> solution = SolutionArgument(
+            "Solution file, or a directory to search, or omitted to walk up from the working directory. A "
+            + "sliderule.json is never read: one already in the solution's directory or above it, up to the "
+            + "repository root, refuses the run.");
+        Option<string?> name = new("--name")
+        {
+            Description =
+                "The spec project's name, its folder and its namespace. Defaults to the solution's name plus "
+                + ".Architecture; a namespace segment 'Arch' refuses (CS0118)."
+        };
+        Option<string?> framework = new("--framework")
+        {
+            Description =
+                "The spec project's target framework. Defaults to the highest .NET Framework one on an estate "
+                + "that targets only .NET Framework, otherwise net10.0, or the pinned SDK's netN.0 under a "
+                + "global.json that pins an SDK below 10."
+        };
+        Option<string?> outputDirectory = new("--output")
+        {
+            Description =
+                "The folder the spec project's own folder goes in. Defaults to arch/ beside the solution.",
+            HelpName = "dir"
+        };
+        Option<bool> fromGraph = new("--from-graph")
+        {
+            Description =
+                "Also write a layer per product project and, for each, a rule that it must not reference the "
+                + "projects it is not connected to either way, each with a reason saying it was recorded from "
+                + "the graph and is yours to rewrite. Without it the spec has no rules."
+        };
+        Option<bool> allowWorkspaceDiagnostics = AllowWorkspaceDiagnosticsOption(
+            "Survey and check the partial model even when some projects fail to load or to restore, instead "
+            + "of refusing with exit 2.");
+
+        Command init = new(
+            "init",
+            "Scaffold the solution's first spec project: write it under arch/, add it to the solution, write the "
+            + "sliderule.json naming both, build it, and run the first check. Refuses before writing anything "
+            + "where a spec project or a sliderule.json already exists.")
+        {
+            solution,
+            name,
+            framework,
+            outputDirectory,
+            fromGraph,
+            allowWorkspaceDiagnostics
+        };
+
+        SetRequestAction(
+            init,
+            parseResult => new InitRequest(
+                parseResult.GetValue(solution),
+                parseResult.GetValue(name),
+                parseResult.GetValue(framework),
+                parseResult.GetValue(outputDirectory),
+                parseResult.GetValue(fromGraph),
+                parseResult.GetValue(allowWorkspaceDiagnostics),
+                Directory.GetCurrentDirectory()),
+            (request, output, error, ct) =>
+                MsBuildGate.RunInitAsync(request, output, error, hostSource, environment, commands, ct));
+
+        return init;
     }
 
     private static Command BuildCheckCommand(ISolutionSource hostSource, IEnvironment environment)
@@ -733,9 +805,9 @@ internal static class CommandFactory
         return hook;
     }
 
-    // Every command resolves its solution and spec through the settings file the same way, and every one but the
-    // hook does it inside the request builder, so a malformed or misdirected settings file is refused like a bad
-    // argument: exit 2, before any load.
+    // Every command but init, which writes the settings file, resolves its solution and spec through it the same way,
+    // and every one of those but the hook does it inside the request builder, so a malformed or misdirected settings
+    // file is refused like a bad argument: exit 2, before any load.
     private static TRequest Resolved<TRequest>(
         ParseResult parseResult, Argument<string?> solution, Option<string?>? spec, IEnvironment environment,
         Func<InvocationTargets, TRequest> build)

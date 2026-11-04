@@ -1,6 +1,7 @@
 using System.CommandLine;
 using System.CommandLine.Invocation;
 using System.CommandLine.Parsing;
+using SlideRule.Cli.Init;
 using SlideRule.Cli.Mcp.Infrastructure;
 using SlideRule.Cli.Pipeline;
 using SlideRule.Cli.Verbs;
@@ -22,9 +23,10 @@ internal static class CliEntry
         InvocationConfiguration configuration,
         ISolutionSource hostSource,
         IEnvironment environment,
-        TextReader? input = null)
+        TextReader? input = null,
+        ISpecProjectCommands? specProjectCommands = null)
     {
-        RootCommand root = CommandFactory.BuildRootCommand(hostSource, environment, input);
+        RootCommand root = CommandFactory.BuildRootCommand(hostSource, environment, input, specProjectCommands);
         return InvokeAsync(root, args, configuration);
     }
 

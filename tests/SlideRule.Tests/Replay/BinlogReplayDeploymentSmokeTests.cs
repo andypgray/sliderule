@@ -25,7 +25,7 @@ namespace SlideRule.Tests.Replay;
 ///         <c>Could not load file or assembly 'Microsoft.Build.Framework …'</c>. This is the only test that
 ///         runs the shipped registration path for replay: a fresh child process with no module initializer and
 ///         no pre-registration, launched with the test host's MSBuild poison vars stripped
-///         (<see cref="DotnetCli.ApplyCleanSdkEnvironment" />) so the child sees a normal user environment,
+///         (<see cref="DotnetCommand.ApplyCleanSdkEnvironment" />) so the child sees a normal user environment,
 ///         which is what a user typing <c>sliderule check --binlog</c> gets.
 ///     </para>
 ///     <para>
@@ -88,7 +88,7 @@ public sealed class BinlogReplayDeploymentSmokeTests(BinlogFixtureWorkspace fixt
         startInfo.ArgumentList.Add(cliDll);
         foreach (string arg in args) startInfo.ArgumentList.Add(arg);
 
-        DotnetCli.ApplyCleanSdkEnvironment(startInfo);
+        DotnetCommand.ApplyCleanSdkEnvironment(startInfo);
         startInfo.Environment[SlideRuleEnvVars.CacheDirectory] = cacheDir;
 
         return ChildProcess.Run(startInfo);

@@ -304,9 +304,9 @@ public sealed class QuoteSyncTests
         // The getting-started page's commands and the README quickstart, which CI's walk runs as written. The two
         // install lines are compared with the install rather than run, because CI installs from the pack.
         new(DocPaths.GettingStarted, "getting-started-install", "dotnet tool install -g SlideRule.Cli", GettingStartedWalk),
-        new(DocPaths.GettingStarted, "getting-started-spec-project", "dotnet new classlib", GettingStartedWalk),
+        new(DocPaths.GettingStarted, "getting-started-spec-project", "sliderule init MyApp.sln", GettingStartedWalk),
         new(DocPaths.GettingStarted, "getting-started-first-check", "dotnet build MyApp.sln", GettingStartedWalk),
-        // The settings file the page tells its reader to save, which the walk writes where the page says before it
+        // The settings file the page says init wrote, which the walk compares with the one init wrote before it
         // runs the page's CI lines, since those name no path and so run on what the file names.
         new(DocPaths.GettingStarted, "getting-started-settings", "\"solution\": \"MyApp.sln\"", GettingStartedWalk),
         new(DocPaths.GettingStarted, "getting-started-ci", "sliderule render --check", GettingStartedWalk),

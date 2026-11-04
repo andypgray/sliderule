@@ -208,7 +208,7 @@ public sealed class BuildTierDemoE2ETests
         startInfo.ArgumentList.Add("--disable-build-servers");
         startInfo.ArgumentList.Add("-p:UseSharedCompilation=false");
         startInfo.ArgumentList.Add("-clp:NoSummary");
-        DotnetCli.ApplyCleanSdkEnvironment(startInfo);
+        DotnetCommand.ApplyCleanSdkEnvironment(startInfo);
 
         return ChildProcess.Run(startInfo);
     }

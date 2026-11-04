@@ -14,6 +14,11 @@
 # leaves the recipe's own file byte for byte what it publishes, since the model runs every IArchitectureSpec
 # in the assembly over one shared Arch.
 #
+# product_tree <root> writes the same product, a solution holding only it, and the same nuget.config: the tree
+# sliderule init starts from, with no spec project for init to find.
+#
+# checked_rule <dir> writes that one rule into the spec project folder <dir>.
+#
 # write_violation <root> writes <root>/src/MyApp/Broken.cs, an interface without the prefix checked_rule's rule
 # requires: the violation a leg plants to see the rule go red.
 #
@@ -55,7 +60,39 @@ grep -Fq "<PackageReference Include=\"SlideRule\" Version=\"$scaffold_version\" 
   exit 1
 }
 
-cat > "$1/arch/MyApp.Architecture/CheckedRule.cs" <<'CS'
+checked_rule "$1/arch/MyApp.Architecture"
+write_product "$1"
+
+cat > "$1/MyApp.slnx" <<'SLNX'
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/MyApp/MyApp.csproj" />
+  </Folder>
+  <Folder Name="/arch/">
+    <Project Path="arch/MyApp.Architecture/MyApp.Architecture.csproj" />
+  </Folder>
+</Solution>
+SLNX
+
+local_pack_feed "$1"
+}
+
+product_tree() {
+write_product "$1"
+
+cat > "$1/MyApp.slnx" <<'SLNX'
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/MyApp/MyApp.csproj" />
+  </Folder>
+</Solution>
+SLNX
+
+local_pack_feed "$1"
+}
+
+checked_rule() {
+cat > "$1/CheckedRule.cs" <<'CS'
 using SlideRule;
 
 namespace MyApp.Architecture;
@@ -70,7 +107,10 @@ public sealed class PackageReferenceProof : IArchitectureSpec
     }
 }
 CS
+}
 
+write_product() {
+mkdir -p "$1/src/MyApp"
 cat > "$1/src/MyApp/MyApp.csproj" <<'CSPROJ'
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
@@ -92,19 +132,6 @@ public sealed class ShipmentPort : IShipmentPort
     public string Describe() => "shipment";
 }
 CS
-
-cat > "$1/MyApp.slnx" <<'SLNX'
-<Solution>
-  <Folder Name="/src/">
-    <Project Path="src/MyApp/MyApp.csproj" />
-  </Folder>
-  <Folder Name="/arch/">
-    <Project Path="arch/MyApp.Architecture/MyApp.Architecture.csproj" />
-  </Folder>
-</Solution>
-SLNX
-
-local_pack_feed "$1"
 }
 
 write_violation() {

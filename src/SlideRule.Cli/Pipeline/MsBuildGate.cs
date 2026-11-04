@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using SlideRule.Cli.Init;
 using SlideRule.Cli.Mcp.Infrastructure;
 using SlideRule.Cli.Replay;
 using SlideRule.Cli.Verbs;
@@ -127,6 +128,15 @@ internal static class MsBuildGate
     {
         EnsureMsBuildRegistered();
         return InvokeBaselineAsync(request, output, error, hostSource, environment, ct);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    public static Task<int> RunInitAsync(
+        InitRequest request, TextWriter output, TextWriter error, ISolutionSource hostSource,
+        IEnvironment environment, ISpecProjectCommands commands, CancellationToken ct)
+    {
+        EnsureMsBuildRegistered();
+        return InvokeInitAsync(request, output, error, hostSource, environment, commands, ct);
     }
 
     // Registration runs once up front: the binlog parser (MSBuild.StructuredLogger, under Basic.CompilerLog.Util)
@@ -324,6 +334,14 @@ internal static class MsBuildGate
         IEnvironment environment, CancellationToken ct)
     {
         return new RenderRunner(output, error, source, environment).RunAsync(request, ct);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static Task<int> InvokeInitAsync(
+        InitRequest request, TextWriter output, TextWriter error, ISolutionSource source,
+        IEnvironment environment, ISpecProjectCommands commands, CancellationToken ct)
+    {
+        return new InitRunner(output, error, source, environment, commands).RunAsync(request, ct);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]

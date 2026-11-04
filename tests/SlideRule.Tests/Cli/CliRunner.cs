@@ -3,10 +3,12 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using Shouldly;
 using SlideRule.Cli;
+using SlideRule.Cli.Init;
 using SlideRule.Cli.Mcp.Infrastructure;
 using SlideRule.Cli.Pipeline;
 using SlideRule.Cli.Replay;
 using SlideRule.Roslyn;
+using SlideRule.Tests.Mcp.TestDoubles;
 using SlideRule.Tests.TestSupport;
 using Xunit;
 
@@ -200,10 +202,23 @@ internal static class CliRunner
         return RunAsync(WarmWorkspacePool.Source, environment, args, new StringReader(input));
     }
 
+    /// <summary>
+    ///     Runs the CLI over a fresh <see cref="ColdSolutionSource" /> and a <see cref="FakeEnvironment" />, with
+    ///     <c>init</c>'s <c>dotnet</c> commands answered by <paramref name="commands" />: cold, because an
+    ///     <c>init</c> run's solution is one the test has just written.
+    /// </summary>
+    public static Task<CliResult> InvokeWithSpecProjectCommandsAsync(
+        ISpecProjectCommands commands, params string[] args)
+    {
+        return RunAsync(new ColdSolutionSource(), new FakeEnvironment(), args, specProjectCommands: commands);
+    }
+
     private static Task<CliResult> RunAsync(
-        ISolutionSource hostSource, IEnvironment environment, string[] args, TextReader? input = null)
+        ISolutionSource hostSource, IEnvironment environment, string[] args, TextReader? input = null,
+        ISpecProjectCommands? specProjectCommands = null)
     {
         return CliResult.CapturedAsync((output, error) => CliEntry.InvokeAsync(
-            args, new InvocationConfiguration { Output = output, Error = error }, hostSource, environment, input));
+            args, new InvocationConfiguration { Output = output, Error = error }, hostSource, environment, input,
+            specProjectCommands));
     }
 }

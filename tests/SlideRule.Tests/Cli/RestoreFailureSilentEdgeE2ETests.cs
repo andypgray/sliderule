@@ -247,7 +247,7 @@ public sealed class RestoreFailureSilentEdgeE2ETests
         {
             WorkingDirectory = Path.GetDirectoryName(workspace.SolutionPath)!
         };
-        DotnetCli.ApplyCleanSdkEnvironment(startInfo);
+        DotnetCommand.ApplyCleanSdkEnvironment(startInfo);
         startInfo.Environment["NUGET_PACKAGES"] = packagesRoot;
 
         return ChildProcess.Run(startInfo);

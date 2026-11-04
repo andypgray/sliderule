@@ -23,6 +23,10 @@ Options:
   --version       Show version information
 
 Commands:
+  init <solution>               Scaffold the solution's first spec project: write it under arch/,
+                                add it to the solution, write the sliderule.json naming both, build
+                                it, and run the first check. Refuses before writing anything where
+                                a spec project or a sliderule.json already exists.
   check <solution>              Evaluate rules against a target solution; a project that fails to
                                 load, or whose NuGet packages did not resolve, fails the run (exit
                                 2) unless --allow-workspace-diagnostics is passed.
@@ -54,6 +58,61 @@ Commands:
                                 report on stderr; 1 is SlideRule's own error, reported on stderr
                                 without blocking.
 ```
+
+### `init`
+
+```text
+Description:
+  Scaffold the solution's first spec project: write it under arch/, add it to the solution, write
+  the sliderule.json naming both, build it, and run the first check. Refuses before writing
+  anything where a spec project or a sliderule.json already exists.
+
+Usage:
+  sliderule init [<solution>] [options]
+
+Arguments:
+  <solution>  Solution file, or a directory to search, or omitted to walk up from the working
+              directory. A sliderule.json is never read: one already in the solution's directory or
+              above it, up to the repository root, refuses the run.
+
+Options:
+  --name <name>                  The spec project's name, its folder and its namespace. Defaults to
+                                 the solution's name plus .Architecture; a namespace segment 'Arch'
+                                 refuses (CS0118).
+  --framework <framework>        The spec project's target framework. Defaults to the highest .NET
+                                 Framework one on an estate that targets only .NET Framework,
+                                 otherwise net10.0, or the pinned SDK's netN.0 under a global.json
+                                 that pins an SDK below 10.
+  --output <dir>                 The folder the spec project's own folder goes in. Defaults to
+                                 arch/ beside the solution.
+  --from-graph                   Also write a layer per product project and, for each, a rule that
+                                 it must not reference the projects it is not connected to either
+                                 way, each with a reason saying it was recorded from the graph and
+                                 is yours to rewrite. Without it the spec has no rules.
+  --allow-workspace-diagnostics  Survey and check the partial model even when some projects fail to
+                                 load or to restore, instead of refusing with exit 2.
+  -?, -h, --help                 Show help and usage information
+```
+
+`init` writes a solution's first spec project, the same one the [`derive_spec` recipe](https://github.com/andypgray/sliderule/blob/main/CODING-AGENTS.md#drafting-a-spec-with-derive_spec) scaffolds. It writes `arch/MyApp.Architecture/` in the directory of `MyApp.sln`, holding the csproj and an `ArchitectureSpec` class with no rules. It then adds the project to the solution with `dotnet sln add`, which maps it in every configuration the solution declares, and writes a [settings file](#the-settings-file) naming both. The settings file goes at the root of the git work tree above the solution, or in the solution's directory outside one. Last, it builds the spec project and runs `check`, and its exit code is that check's. Restore the solution first, because `init` surveys it as `graph` does, and a project that fails to load or to restore stops the run with exit 2.
+
+The csproj references `SlideRule` at the version `sliderule --version` prints. It opts out of central package management, package validation, generated documentation, the CS8002 signing warning and an inherited target framework, any of which would otherwise break its first build. Where the solution's `.editorconfig` sets a `file_header_template`, the spec class starts with that header.
+
+Its target framework, unless `--framework` names one, is the highest .NET Framework one on an estate whose projects target only .NET Framework, and `net10.0` otherwise. Under a `global.json` that pins an SDK below 10, without a `rollForward` across majors, it is the pinned SDK's own `netN.0`. A pin below SDK 6, which cannot compile the spec class, stops the run.
+
+`init` exits 2, before it writes anything, in these cases:
+
+- a project in the solution already references `SlideRule`;
+- a `sliderule.json` exists in the solution's directory or in a directory between it and the work-tree root;
+- the spec project's folder already exists, or a folder above it contains a project file, whose project would compile the spec class;
+- the solution is a solution filter;
+- a segment of the namespace is `Arch`, which hides the `Arch` type `Define` takes (CS0118).
+
+Once it has written the files, a failed `dotnet sln add` or build exits 2 with the output and the commands that finish the job by hand. A second `init` stops at the folder the first one wrote.
+
+`--from-graph` also writes rules recorded from the project graph. It writes a layer for each product project, a solution member that declares types and references no test framework. For each project it then writes a rule that the project must not reference the projects it is not connected to in either direction. A connection follows the references the projects declare and the ones the code makes. Each rule's reason names the project graph as its source and gives the day, so the rendered rules read as unreviewed until someone rewrites them. A rule allows any reference that follows a path the graph already has, and no rule binds a project added later. With no unconnected pair, `--from-graph` writes no rule and prints a line explaining why.
+
+`init` does not connect a coding agent. It ends by printing the `claude mcp add` command that registers the [MCP server](https://github.com/andypgray/sliderule/blob/main/CODING-AGENTS.md#connecting-the-mcp-server), and where the [hook entries](https://github.com/andypgray/sliderule/tree/main/hooks) are.
 
 ### `check`
 

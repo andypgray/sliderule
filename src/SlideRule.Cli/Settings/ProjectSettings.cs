@@ -23,3 +23,9 @@ internal sealed record RenderSettings(bool Model, DiagramSettings? Diagram)
 ///     <paramref name="Only" /> draws them all.
 /// </summary>
 internal sealed record DiagramSettings(string Target, IReadOnlyList<string> Only, IReadOnlyList<string> Exclude);
+
+/// <summary>
+///     The <c>sliderule.json</c> <c>init</c> writes: the solution and the spec project, each relative to the file's
+///     directory and forward-slashed.
+/// </summary>
+internal sealed record SettingsFileJson(string Solution, string Spec);

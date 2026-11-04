@@ -74,7 +74,7 @@ internal static class McpChildHarness
     ///     The working directory is a parameter rather than a default because it is a subject in its own
     ///     right: a process holds an OS handle on its own working directory for as long as it lives, and it
     ///     is also what the solution walk-up starts from, so a test asserting on either has to choose it
-    ///     deliberately. The environment is <see cref="DotnetCli.ApplyCleanSdkEnvironment" />'s, so the child
+    ///     deliberately. The environment is <see cref="DotnetCommand.ApplyCleanSdkEnvironment" />'s, so the child
     ///     discovers MSBuild through its own vswhere probe, with <see cref="SlideRuleEnvVars.SolutionPath" />
     ///     also removed, because it beats the walk-up: a developer machine that happens to have it set would
     ///     silently bind a server a test meant to leave unbound.
@@ -96,7 +96,7 @@ internal static class McpChildHarness
         startInfo.ArgumentList.Add(cliDllPath);
         startInfo.ArgumentList.Add("mcp");
 
-        DotnetCli.ApplyCleanSdkEnvironment(startInfo);
+        DotnetCommand.ApplyCleanSdkEnvironment(startInfo);
         startInfo.Environment.Remove(SlideRuleEnvVars.SolutionPath);
 
         return startInfo;

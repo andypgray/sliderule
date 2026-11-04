@@ -46,6 +46,7 @@ internal static class CliHelpFences
     internal static readonly IReadOnlyList<CliHelpFence> Rows =
     [
         new("sliderule", "sliderule [command] [options]"),
+        new("sliderule init", "sliderule init [<solution>] [options]"),
         new("sliderule check", "sliderule check [<solution>] [options]"),
         new("sliderule explain", "sliderule explain [<rule-id> [<solution>]] [options]"),
         new("sliderule render", "sliderule render [<solution>] [options]"),

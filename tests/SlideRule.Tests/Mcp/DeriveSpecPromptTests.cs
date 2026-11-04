@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
 using Shouldly;
+using SlideRule.Cli.Init;
 using SlideRule.Cli.Mcp;
 using SlideRule.Cli.Mcp.Infrastructure;
 using SlideRule.Cli.Mcp.Prompts;
@@ -404,24 +405,26 @@ public sealed class DeriveSpecPromptTests
         text.ShouldContain("https://github.com/andypgray/sliderule/blob/main/GRAMMAR.md");
     }
 
-    // Each opt-out keeps the scaffold valid under a repository-wide setting it would otherwise inherit:
-    // central package management makes the inline version NU1008; package validation makes restore fetch
-    // every packable project's own id at the baseline version, NU1101 for a spec never published; generated
-    // documentation reports CS1591 on the public spec class; signing a .NET Framework spec reports CS8002 on
-    // the unsigned contract; and an inherited TargetFrameworks list decides restore while a singular element
-    // decides the build, NETSDK1005. The prose quotes some of these elements too, so only the csproj fence,
-    // cut as CI cuts it, can tell an opt-out that left the scaffold from one still named in the prose. CI
-    // executes the same commitments against real central, props and editorconfig files.
+    // Each opt-out keeps the scaffold valid under a repository-wide setting it would otherwise inherit. Central
+    // package management makes the inline version NU1008. Package validation makes restore fetch every packable
+    // project's own id at the baseline version, which is NU1101 for a spec never published. Generated
+    // documentation reports CS1591 on the public spec class, and signing a .NET Framework spec reports CS8002 on
+    // the unsigned contract. An inherited TargetFrameworks list decides restore while a singular element decides
+    // the build (NETSDK1005); an inherited singular element beside the scaffold's plural list does the same
+    // unless the scaffold clears it. The prose quotes some of these elements too, so only the csproj fence, cut as
+    // CI cuts it, can tell an opt-out that left the scaffold from one still named in the prose. CI executes the
+    // same commitments against real central, props and editorconfig files.
     [Theory]
     [InlineData("<ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>")]
     [InlineData("<IsPackable>false</IsPackable>")]
     [InlineData("<GenerateDocumentationFile>false</GenerateDocumentationFile>")]
     [InlineData("<NoWarn>$(NoWarn);CS8002</NoWarn>")]
     [InlineData("<TargetFrameworks>net10.0</TargetFrameworks>")]
+    [InlineData("<TargetFramework></TargetFramework>")]
     public void DeriveSpec_ScaffoldCsproj_CarriesEachOptOut(string element)
     {
         QuotedFence fence = QuotedFence.ShouldFindOne(
-            DocPaths.DeriveSpecPrompt, "PackageReference Include=\"SlideRule\"",
+            DocPaths.DeriveSpecPrompt, SpecScaffold.ProjectMarker,
             "where the scaffold's spec csproj should be exactly one");
 
         fence.Lines

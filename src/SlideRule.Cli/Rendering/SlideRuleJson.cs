@@ -105,4 +105,5 @@ internal static class SlideRuleJson
 [JsonSerializable(typeof(GraphJson))]
 [JsonSerializable(typeof(SarifLog))]
 [JsonSerializable(typeof(HookJson))]
+[JsonSerializable(typeof(SettingsFileJson))]
 internal sealed partial class SlideRuleJsonContext : JsonSerializerContext;

@@ -97,7 +97,7 @@ public sealed class FrameworkBinlogReplayTests
         startInfo.ArgumentList.Add(solutionPath);
         startInfo.ArgumentList.Add($"-bl:LogFile={binlogPath}");
         startInfo.ArgumentList.Add("-nodeReuse:false");
-        DotnetCli.ApplyCleanSdkEnvironment(startInfo);
+        DotnetCommand.ApplyCleanSdkEnvironment(startInfo);
 
         ChildProcess.ProcessResult result = ChildProcess.Run(startInfo);
         if (result.ExitCode != 0)

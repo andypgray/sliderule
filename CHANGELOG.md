@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `sliderule init` scaffolds a solution's first spec project. It writes the spec project the `derive_spec`
+  recipe publishes under `arch/`, with an empty `ArchitectureSpec`, adds it to the solution, writes a
+  `sliderule.json` naming both, builds the spec project and runs the first check. It picks the target
+  framework from the product projects and any `global.json` pin, follows the repository's
+  `file_header_template`, and refuses before writing anything where the solution already has a spec project
+  or a `sliderule.json`. `--from-graph` also writes a layer per product project and, for each, a rule that it
+  must not reference the projects it is not connected to, each with a reason that says it was recorded from
+  the project graph. [The `init` reference](https://github.com/andypgray/sliderule/blob/main/CLI.md#init) has
+  the details, and path 1 of
+  [Getting started](https://github.com/andypgray/sliderule/blob/main/GETTING-STARTED.md#path-1-rules-you-write)
+  now starts with it.
 - `SlideRule.Guidance.DotNet`, a new package: Microsoft's .NET guidance as compiler warnings, with no spec,
   model file or tool. Reference it and the next build reports. Each rule has its own ID, `SR3001` to
   `SR3008`, links to the Microsoft page it rests on, and takes a severity in `.editorconfig`. `SR3007`
@@ -93,6 +104,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The `derive_spec` recipe's spec csproj now clears an inherited singular `<TargetFramework>`. A
+  `Directory.Build.props` that set one decided the spec project's build while its own `<TargetFrameworks>`
+  list decided the restore, and the first build failed with NETSDK1005.
 - A project the solution's default build configuration does not build, mapped with no `Build.0` line in a
   `.sln` or with `Project="false"` in a `.slnx`, no longer refuses `check`, `graph` and the other commands as
   a project whose packages did not resolve. A restore of the solution skips such a project, so the advice to

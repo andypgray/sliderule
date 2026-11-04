@@ -579,6 +579,8 @@ jobs:
       # F: a TargetFrameworks list in the root props without the spec's framework. Restore follows the list
       #    while a singular element decides the build, which is NETSDK1005; the plural element overrides both.
       #    The control needs a net9.0 reference pack, so this leg's feed adds nuget.org behind the mapping.
+      # F2: a singular TargetFramework in the root props. It survives beside the spec's plural list and decides
+      #    the build while the list decides restore, NETSDK1005 again; the scaffold clears it, an opt-out.
       # G: lock files restored in locked mode. The spec's first build writes its lock file; the failure is a
       #    lock file left behind a version change, NU1004, and the cure is a forced re-evaluation.
       # H: package source mapping that maps nothing to SlideRule, NU1100. A package folder that already holds
@@ -725,6 +727,30 @@ jobs:
           build_fails_with "$tfms/arch/MyApp.Architecture/MyApp.Architecture.csproj" "$RUNNER_TEMP/tfms-singular.log" 'error NETSDK1005.*MyApp\.Architecture' \
             "The scaffold csproj with a singular TargetFramework did not produce NETSDK1005 under a root TargetFrameworks list — the plural element is no longer what makes the published scaffold valid there, so the leg above proves nothing"
 
+          # ── Leg F2: a singular TargetFramework in the root props ───────────────────────────────
+          tfm="$RUNNER_TEMP/packageref-tfm"
+          scaffold "$tfm" mapped_pack_feed
+          cat > "$tfm/Directory.Build.props" <<'PROPS'
+          <Project>
+              <PropertyGroup>
+                  <TargetFramework>net9.0</TargetFramework>
+              </PropertyGroup>
+          </Project>
+          PROPS
+
+          dotnet build "$tfm/MyApp.slnx" || {
+            echo "::error::The scaffold csproj did not build under a root singular TargetFramework — the shape derive_spec publishes has to be valid there, and valid without the adopter editing that file"
+            exit 1
+          }
+          sliderule check "$tfm/MyApp.slnx" || {
+            echo "::error::The scaffolded spec project built under a root singular TargetFramework but was not discovered, or did not pass over conforming code"
+            exit 1
+          }
+
+          sed -i '/<TargetFramework><\/TargetFramework>/d' "$tfm/arch/MyApp.Architecture/MyApp.Architecture.csproj"
+          build_fails_with "$tfm/arch/MyApp.Architecture/MyApp.Architecture.csproj" "$RUNNER_TEMP/tfm-uncleared.log" 'error NETSDK1005.*MyApp\.Architecture' \
+            "The scaffold csproj without its cleared TargetFramework did not produce NETSDK1005 under a root singular TargetFramework — that line is no longer what makes the published scaffold valid there, so the leg above proves nothing"
+
           # ── Leg G: lock files restored in locked mode ──────────────────────────────────────────
           lock="$RUNNER_TEMP/packageref-lock"
           scaffold "$lock"
@@ -802,6 +828,125 @@ jobs:
             echo "::error::The scaffolded spec project built under package source mapping but was not discovered, or did not pass over conforming code"
             exit 1
           }
+
+      # The legs above hand-write the scaffold the recipe publishes; sliderule init writes the same one from the
+      # installed tool, cut from the recipe embedded in it, adds it to the solution, writes sliderule.json, builds
+      # it and runs the first check. Each leg starts from a restored product tree with no spec project, runs init
+      # there with no arguments, and then holds the result to the same bar as leg A: a rule added to the spec
+      # init wrote is discovered and passes over conforming code, and fails with exactly 1 over a violation, with
+      # every command finding the solution and the spec through the sliderule.json init wrote. The from-graph leg
+      # holds the recorded rules to the same bar: green on the tree they were recorded from, and exit 1 once a
+      # reference and a use of it cross a boundary the graph showed clean. A ProjectReference alone does not
+      # red the rule, because it bans source references, so the control writes both.
+      - name: Scaffold the spec project with sliderule init — plain, CPM and from the graph — and check it
+        run: |
+          . .github/scripts/local-pack.sh
+          version="$(pack_version)"
+          export PATH="$PATH:$HOME/.dotnet/tools"
+
+          plain="$RUNNER_TEMP/init-plain"
+          cpm="$RUNNER_TEMP/init-cpm"
+          graph="$RUNNER_TEMP/init-graph"
+          export NUGET_PACKAGES="$plain/.packages"
+
+          . .github/scripts/spec-scaffold.sh
+
+          # Over a violation the check must say 1: 2 would mean the spec or the workspace did not resolve.
+          require_violation() {
+            dotnet build "$1/MyApp.slnx"
+            rc=0
+            (cd "$1" && sliderule check) || rc=$?
+            [ "$rc" -eq 1 ] || {
+              echo "::error::check exited $rc over a deliberate violation in the tree init scaffolded; 1 is the only right answer"
+              exit 1
+            }
+          }
+
+          # ── Leg 1: a repository that pins package versions per project ──────────────────────────
+          product_tree "$plain"
+          dotnet restore "$plain/MyApp.slnx"
+          (cd "$plain" && sliderule init) || {
+            echo "::error::sliderule init did not scaffold, build and check a spec project on a plain product tree"
+            exit 1
+          }
+          require_contract_from_pack "$version" "The spec project sliderule init wrote"
+          grep -Fq '"spec": "arch/MyApp.Architecture/MyApp.Architecture.csproj"' "$plain/sliderule.json" || {
+            echo "::error::sliderule init did not write a sliderule.json naming the spec project it scaffolded"
+            cat "$plain/sliderule.json"
+            exit 1
+          }
+
+          checked_rule "$plain/arch/MyApp.Architecture"
+          dotnet build "$plain/MyApp.slnx"
+          (cd "$plain" && sliderule check) || {
+            echo "::error::A rule added to the spec project sliderule init wrote was not discovered, or did not pass over conforming code"
+            exit 1
+          }
+          write_violation "$plain"
+          require_violation "$plain"
+
+          # ── Leg 2: the same on a repository that manages versions centrally ─────────────────────
+          product_tree "$cpm"
+          cat > "$cpm/Directory.Packages.props" <<'PROPS'
+          <Project>
+              <PropertyGroup>
+                  <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+              </PropertyGroup>
+          </Project>
+          PROPS
+          dotnet restore "$cpm/MyApp.slnx"
+          (cd "$cpm" && sliderule init) || {
+            echo "::error::sliderule init did not scaffold, build and check a spec project on a repository carrying a Directory.Packages.props"
+            exit 1
+          }
+          checked_rule "$cpm/arch/MyApp.Architecture"
+          dotnet build "$cpm/MyApp.slnx"
+          (cd "$cpm" && sliderule check) || {
+            echo "::error::A rule added to the spec project sliderule init wrote under central package management was not discovered, or did not pass over conforming code"
+            exit 1
+          }
+
+          # ── Leg 3: init --from-graph over two unconnected projects ─────────────────────────────
+          product_tree "$graph"
+          mkdir -p "$graph/src/MyApp.Reports"
+          cat > "$graph/src/MyApp.Reports/MyApp.Reports.csproj" <<'CSPROJ'
+          <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                  <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+          </Project>
+          CSPROJ
+          cat > "$graph/src/MyApp.Reports/Report.cs" <<'CS'
+          namespace MyApp.Reports;
+
+          public sealed class Report
+          {
+          }
+          CS
+          dotnet sln "$graph/MyApp.slnx" add "$graph/src/MyApp.Reports/MyApp.Reports.csproj"
+          dotnet restore "$graph/MyApp.slnx"
+          (cd "$graph" && sliderule init --from-graph) || {
+            echo "::error::sliderule init --from-graph did not scaffold a spec whose recorded rules pass over the tree they were recorded from"
+            exit 1
+          }
+          for id in layering/myapp-independent layering/myapp-reports-independent; do
+            grep -Fq "arch.Rule(\"$id\")" "$graph/arch/MyApp.Architecture/ArchitectureSpec.cs" || {
+              echo "::error::sliderule init --from-graph did not record $id between two projects with no reference either way"
+              cat "$graph/arch/MyApp.Architecture/ArchitectureSpec.cs"
+              exit 1
+            }
+          done
+
+          dotnet add "$graph/src/MyApp.Reports/MyApp.Reports.csproj" reference "$graph/src/MyApp/MyApp.csproj"
+          cat > "$graph/src/MyApp.Reports/Shipped.cs" <<'CS'
+          namespace MyApp.Reports;
+
+          public sealed class Shipped
+          {
+              public MyApp.IShipmentPort Port { get; init; }
+          }
+          CS
+          require_violation "$graph"
 
       # Above proves the contract package restores and that `check` finds the scaffold. Nothing yet proves
       # the other half of what that one PackageReference delivers: a spec author who references the contract
@@ -1130,8 +1275,8 @@ jobs:
             exit 1
           fi
 
-      # GETTING-STARTED.md is the first run a new user takes: a spec project made from the package in
-      # their own solution, then build, check and render. The README quickstart is the three lines in
+      # GETTING-STARTED.md is the first run a new user takes: a spec project sliderule init makes in their
+      # own solution, then build, check and render. The README quickstart is the three lines in
       # front of it, and on a solution with no spec project those lines stop at a refusal. Nothing ran
       # either page as written, so this walks both with the packages packed above, cutting every command
       # out of the published pages rather than restating it here. QuoteSyncTests holds each cut below to
@@ -1144,12 +1289,12 @@ jobs:
       #   - the quickstart on the bare solution, which has to exit 2 with the refusal the page quotes,
       #     the dead end the page exists for, held to the words the page uses;
       #   - the page: its install line compared with the one this job ran (which adds the pack as a
-      #     source), its spec-project commands, its spec class written where it says, then its build,
-      #     check and render, with the contract asserted to come from the pack and AGENTS.md to carry
-      #     the page's rule;
+      #     source), the restore it asks for, its init line, its spec class written where it says, then
+      #     its build, check and render, with the contract asserted to come from the pack and AGENTS.md
+      #     to carry the page's rule;
       #   - the quickstart again, now green;
-      #   - the page's sliderule.json, written where the page says, and then its CI lines, which name no
-      #     path and so run on what the file names;
+      #   - the sliderule.json init wrote, compared with the one the page quotes, and then the page's CI
+      #     lines, which name no path and so run on what the file names;
       #   - the negative control the scaffold step also runs, because a green check proves nothing until
       #     the same tree can fail it: a Domain type that holds a Web type must exit exactly 1.
       #
@@ -1166,7 +1311,7 @@ jobs:
           refusal='No spec project found: no solution project references SlideRule.dll. Pass --spec to name one.'
 
           install="$(fence GETTING-STARTED.md bash 'dotnet tool install -g SlideRule.Cli')"
-          project="$(fence GETTING-STARTED.md bash 'dotnet new classlib')"
+          project="$(fence GETTING-STARTED.md bash 'sliderule init MyApp.sln')"
           spec="$(fence GETTING-STARTED.md csharp 'public sealed class ArchitectureSpec : IArchitectureSpec')"
           first="$(fence GETTING-STARTED.md bash 'dotnet build MyApp.sln')"
           settings="$(fence GETTING-STARTED.md json '"solution": "MyApp.sln"')"
@@ -1210,13 +1355,13 @@ jobs:
             echo "::error::GETTING-STARTED.md's install fence is no longer the one line '$install_line' this job runs from the pack in its place: $install"
             exit 1
           }
+          dotnet restore MyApp.sln
           bash -e -c "$project" || {
-            echo "::error::GETTING-STARTED.md's spec-project commands failed on a fresh solution"
+            echo "::error::GETTING-STARTED.md's sliderule init failed on a fresh, restored solution"
             exit 1
           }
-          require_contract_from_pack "$version" "The page's dotnet add"
+          require_contract_from_pack "$version" "The spec project the page's sliderule init wrote"
           printf '%s\n' "$spec" > arch/MyApp.Architecture/ArchitectureSpec.cs
-          rm -f arch/MyApp.Architecture/Class1.cs
           bash -e -c "$first" || {
             echo "::error::GETTING-STARTED.md's build, check and render did not all pass over the solution the page walks a reader through"
             exit 1
@@ -1232,7 +1377,10 @@ jobs:
             exit 1
           }
 
-          printf '%s\n' "$settings" > sliderule.json
+          printf '%s\n' "$settings" | diff - sliderule.json || {
+            echo "::error::The sliderule.json sliderule init wrote is not the one GETTING-STARTED.md quotes"
+            exit 1
+          }
           bash -e -c "$ci" || {
             echo "::error::GETTING-STARTED.md's CI lines failed on a conforming tree beside the page's sliderule.json: the SARIF check or the render check"
             exit 1

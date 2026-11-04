@@ -66,7 +66,8 @@ Create a small class library for the spec (convention: an `arch/` folder next to
 ```xml
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <!-- Plural even for one framework: a singular one under an inherited list fails NETSDK1005. -->
+        <!-- Plural, singular cleared: either form, when inherited, fails NETSDK1005. -->
+        <TargetFramework></TargetFramework>
         <TargetFrameworks>net10.0</TargetFrameworks>
         <!-- net48 and netstandard2.0 default to C# 7.3; the spec class below needs C# 10. -->
         <LangVersion>latest</LangVersion>
