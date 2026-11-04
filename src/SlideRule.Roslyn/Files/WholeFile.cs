@@ -1,4 +1,3 @@
-using System.Text;
 using SlideRule.Rendering;
 using SlideRule.Roslyn.Caching;
 
@@ -32,9 +31,8 @@ internal static class WholeFile
         if (IsCurrent(absolutePath, composed)) return WriteOutcome.Unchanged;
 
         // These are committed, version-controlled files, so the write is atomic: a crash mid-write must not
-        // truncate one. GetBytes never emits a preamble, so the bytes written carry no BOM.
-        byte[] bytes = new UTF8Encoding(false).GetBytes(composed);
-        AtomicFile.WriteAllBytes(absolutePath, bytes);
+        // truncate one.
+        AtomicFile.WriteAllText(absolutePath, composed);
         return WriteOutcome.Wrote;
     }
 

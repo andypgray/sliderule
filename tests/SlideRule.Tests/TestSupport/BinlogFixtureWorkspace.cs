@@ -83,10 +83,7 @@ public sealed class BinlogFixtureWorkspace : IDisposable
 
         string declared = File.ReadAllText(SolutionPath);
         int global = declared.IndexOf("Global", StringComparison.Ordinal);
-        string member =
-            $"Project(\"{{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}}\") = \"{UnbuiltName}\", "
-            + $"\"{UnbuiltName}\\{UnbuiltName}.csproj\", \"{{44444444-4444-4444-4444-444444444444}}\"{Environment.NewLine}"
-            + $"EndProject{Environment.NewLine}";
+        string member = ClassicSolution.Entry(UnbuiltName, "{44444444-4444-4444-4444-444444444444}");
 
         File.WriteAllText(widerPath, declared.Insert(global, member));
         File.SetLastWriteTimeUtc(widerPath, File.GetLastWriteTimeUtc(SolutionPath));

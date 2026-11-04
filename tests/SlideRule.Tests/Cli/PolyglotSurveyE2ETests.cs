@@ -245,8 +245,7 @@ public sealed class PolyglotSurveyE2ETests
             .ShouldBe(
                 "1 project was not surveyed, so these results cover part of the "
                 + "solution: PolyglotApp.Fs/PolyglotApp.Fs.fsproj (not a C# project)");
-        notification.GetProperty("level")
-            .GetString()
+        notification.SarifLevel()
             .ShouldBe("warning");
     }
 }

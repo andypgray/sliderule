@@ -318,8 +318,7 @@ public sealed class CheckCacheE2ETests
         IReadOnlyList<int> lines = sarif.SarifResults()
             .Where(result => result.GetProperty("ruleId")
                 .GetString() == "data-access/no-inline-sql")
-            .Where(result => result.GetProperty("level")
-                .GetString() == level)
+            .Where(result => result.SarifLevel() == level)
             .Select(result => result.SarifStartLine())
             .ToList();
         lines.ShouldNotBeEmpty();

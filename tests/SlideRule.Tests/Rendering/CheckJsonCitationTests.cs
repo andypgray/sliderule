@@ -25,10 +25,7 @@ public sealed class CheckJsonCitationTests
             .Because("The web layer must not open the data layer directly.")
             .Citation(Page));
 
-    private static readonly CheckReport Uncited = Checker.Run(Sources.OneControllerModel, arch =>
-        arch.Rule("layer/no-data")
-            .Enforce(arch.Namespace("App.Web.*").MustNotReference(arch.Namespace("App.Data.*")))
-            .Because("The web layer must not open the data layer directly."));
+    private static readonly CheckReport Uncited = Checker.Run(Sources.OneControllerModel, Sources.NoDataReference);
 
     [Fact]
     public void Rule_WithCitation_CarriesItAtFullGrain()

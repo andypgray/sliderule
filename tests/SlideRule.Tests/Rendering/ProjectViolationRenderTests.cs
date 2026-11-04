@@ -242,7 +242,7 @@ public sealed class ProjectViolationRenderTests
             .ToSarif()
             .SarifResults();
 
-        results.Select(result => $"{result.GetProperty("level").GetString()}: {result.SarifMessageText()}")
+        results.Select(result => $"{result.SarifLevel()}: {result.SarifMessageText()}")
             .ShouldBe([
                 "error: Zphil.Bus does not set Nullable for net472",
                 "error: Zphil.Bus sets Nullable to disable for net8.0"
