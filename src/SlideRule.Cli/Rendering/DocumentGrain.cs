@@ -1,6 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
 using SlideRule.Cli.Pipeline;
-using SlideRule.Prose;
 using SlideRule.Roslyn;
 
 namespace SlideRule.Cli.Rendering;
@@ -87,8 +86,7 @@ internal static class DocumentGrains
         grain = DocumentGrain.Full;
         if (string.IsNullOrWhiteSpace(name)) return true;
 
-        string wanted = name.Trim();
-        int rung = Names.ToList().FindIndex(known => string.Equals(known, wanted, StringComparison.OrdinalIgnoreCase));
+        int rung = WireWords.IndexOf(Names, name);
         if (rung < 0) return false;
 
         grain = (DocumentGrain)rung;
@@ -110,9 +108,7 @@ internal static class DocumentGrains
     /// <param name="name">The value as the caller wrote it.</param>
     public static string Refusal(string name)
     {
-        var lead = $"Unknown grain '{name}'";
-        return Refusals.SingleValueRefusal(name, lead, "pass one grain")
-               ?? $"{lead}; use {ProseFormat.JoinReferences(Names)}.";
+        return WireWords.Refusal("grain", name, Names);
     }
 
     /// <summary>

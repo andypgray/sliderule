@@ -1,4 +1,5 @@
 using SlideRule.Cli.Pipeline;
+using SlideRule.Roslyn;
 
 namespace SlideRule.Cli.Mcp.Pipeline;
 
@@ -28,5 +29,14 @@ internal sealed class BudgetedResponseFitter(IResponseBudget budget) : IResponse
         }
 
         return coarsest;
+    }
+
+    /// <inheritdoc />
+    public string FitWhole(string document, Func<int, int, string> oversized)
+    {
+        int maxChars = budget.MaxChars();
+        if (document.Length > maxChars) throw new UserErrorException(oversized(document.Length, maxChars));
+
+        return document;
     }
 }

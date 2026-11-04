@@ -128,7 +128,10 @@ internal sealed class ArchTools(
         "a project absent from the survey may simply be out of view. unsupportedProjects is the third " +
         "coverage key and the one that bounds the survey's subject: the projects outside the " +
         "model (not C#, Web Sites, unbuilt), each with its reason, so projects[] shorter than the solution is a " +
-        "stated fact rather than something to infer by opening the solution file.";
+        "stated fact rather than something to infer by opening the solution file. " +
+        "format mermaid returns the drawing instead of the document: the projects the solution declares and " +
+        "their references as one Mermaid fence, count-free, with what the coverage keys would say written as " +
+        "%% comment lines.";
 
     [McpServerTool(
         Name = ArchToolNames.Check,
@@ -269,9 +272,15 @@ internal sealed class ArchTools(
         string? grain = null,
         [Description(
             "Project-name globs as one string, not an array, semicolon-separated ('*' allowed). References "
-            + "in both directions are kept, so an edge can name a project outside the scope. Matching no "
-            + "project is an error listing the available names.")]
+            + "in both directions are kept, so an edge can name a project outside the scope; under format "
+            + "mermaid only projects the solution declares are drawn, and an edge only when both its ends are. "
+            + "Matching no project is an error listing the available names.")]
         string? projects = null,
+        [Description(
+            "One format as one string, not an array: json (the default), the survey document; or mermaid, the "
+            + "projects and their references as one Mermaid fence, as render --diagram draws them, with no grain. A "
+            + "fence over the response budget is an error naming the size; narrow it with projects.")]
+        string? format = null,
         CancellationToken cancellationToken = default)
     {
         // Unlike arch_check and arch_status, the incomplete-model verdict cannot ride this document by
@@ -279,8 +288,7 @@ internal sealed class ArchTools(
         // returns it as a clean un-logged error result.
         return await CaptureAsync(output => new GraphRunner(output, TextWriter.Null, source, environment, fitter)
             .RunAsync(
-                binding.GraphRequest(
-                    allowWorkspaceDiagnostics, DocumentGrains.Parse(grain), projects),
+                binding.GraphRequest(allowWorkspaceDiagnostics, grain, projects, format),
                 cancellationToken));
     }
 

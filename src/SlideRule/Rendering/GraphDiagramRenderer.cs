@@ -26,9 +26,20 @@ internal static class GraphDiagramRenderer
     private const string EmptyScopeLabel = "(no projects in scope)";
 
     /// <summary>
-    ///     The managed-block body for a diagram file: a provenance caption, a blank line, then the fenced
-    ///     Mermaid diagram. The caption sits outside the fence, so the fence stays paste-able into any Mermaid
-    ///     renderer. A null <paramref name="scope" /> draws every project.
+    ///     The managed-block body for a diagram file: a provenance caption, a blank line, then the
+    ///     <see cref="Fence" />. The caption sits outside the fence, so the fence stays paste-able into any
+    ///     Mermaid renderer. A null <paramref name="scope" /> draws every project.
+    /// </summary>
+    public static string Block(GraphSummary summary, string solutionName, DiagramScope? scope = null)
+    {
+        return ProvenanceLine(solutionName) + "\n\n" + Fence(summary, solutionName, scope);
+    }
+
+    /// <summary>
+    ///     The fenced Mermaid diagram alone, LF-separated and with no trailing newline. A null
+    ///     <paramref name="scope" /> draws every project; each of <paramref name="comments" /> becomes a
+    ///     <c>%%</c> comment line above the nodes, and none leaves the fence exactly as <see cref="Block" />
+    ///     draws it.
     /// </summary>
     /// <remarks>
     ///     Only projects the solution declares are drawn, under any <paramref name="scope" />: a workspace
@@ -38,7 +49,8 @@ internal static class GraphDiagramRenderer
     ///     (<c>ProjectSummary.SolutionMember</c> is null) is drawn rather than dropped, so an unparseable
     ///     solution file degrades the drawing instead of emptying it.
     /// </remarks>
-    public static string Block(GraphSummary summary, string solutionName, DiagramScope? scope = null)
+    public static string Fence(
+        GraphSummary summary, string solutionName, DiagramScope? scope = null, IReadOnlyList<string>? comments = null)
     {
         Guard.NotNull(summary, nameof(summary));
         Guard.NotNullOrWhiteSpace(solutionName, nameof(solutionName));
@@ -48,15 +60,24 @@ internal static class GraphDiagramRenderer
             .Where(project => project.SolutionMember != false && filter.Includes(project.Name))
             .ToList();
         Dictionary<string, string> ids = NodeIds(projects);
+        IReadOnlyList<string> commentLines = CommentLines(comments ?? []);
         IReadOnlyList<string> nodeLines = NodeLines(projects, ids);
         List<string> edgeLines = EdgeLines(summary, projects, ids);
         IReadOnlyList<string> lines = MermaidText.Fence(
             $"Codebase survey: {solutionName}",
             "Projects in this solution and their cross-project references.",
+            commentLines,
             nodeLines,
             edgeLines);
 
-        return ProvenanceLine(solutionName) + "\n\n" + string.Join("\n", lines);
+        return string.Join("\n", lines);
+    }
+
+    // A blank comment keeps the bare marker, so no line of the fence ends in a space.
+    private static IReadOnlyList<string> CommentLines(IReadOnlyList<string> comments)
+    {
+        return comments.Select(comment => comment.Length == 0 ? "    %%" : $"    %% {comment}")
+            .ToList();
     }
 
     // Names the solution rather than the spec: the survey is a property of the codebase, so there is no spec

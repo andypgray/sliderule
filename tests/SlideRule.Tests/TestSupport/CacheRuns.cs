@@ -1,5 +1,6 @@
 using SlideRule.Cli.Mcp.Infrastructure;
 using SlideRule.Cli.Pipeline;
+using SlideRule.Cli.Rendering;
 using SlideRule.Cli.Verbs;
 using SlideRule.Tests.Cli;
 using SlideRule.Tests.Mcp.TestDoubles;
@@ -62,7 +63,7 @@ internal static class CacheRuns
         GraphRequest request = GraphRequests.For(solution, SolutionPaths.SolutionDirectoryOf(solution))
             with
             {
-                Json = true, NoCache = noCache
+                Format = GraphFormat.Json, NoCache = noCache
             };
 
         return RunAsync(

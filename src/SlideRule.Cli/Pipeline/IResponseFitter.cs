@@ -1,3 +1,5 @@
+using SlideRule.Roslyn;
+
 namespace SlideRule.Cli.Pipeline;
 
 /// <summary>
@@ -21,6 +23,13 @@ internal interface IResponseFitter
     ///     Returns the document to write, given the rungs in coarsening order (finest first).
     /// </summary>
     string Fit(IEnumerable<string> ladder);
+
+    /// <summary>
+    ///     Returns <paramref name="document" />, an answer with no coarser rung, whole, or refuses it whole rather than
+    ///     let it be cut: <paramref name="oversized" /> composes the refusal from the document's length and the budget.
+    /// </summary>
+    /// <exception cref="UserErrorException">The document is longer than the channel's budget.</exception>
+    string FitWhole(string document, Func<int, int, string> oversized);
 }
 
 /// <summary>
@@ -40,5 +49,11 @@ internal sealed class ResponseFitter : IResponseFitter
     public string Fit(IEnumerable<string> ladder)
     {
         return ladder.First();
+    }
+
+    /// <inheritdoc />
+    public string FitWhole(string document, Func<int, int, string> oversized)
+    {
+        return document;
     }
 }

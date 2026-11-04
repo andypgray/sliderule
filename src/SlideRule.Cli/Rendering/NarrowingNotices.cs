@@ -20,10 +20,13 @@ internal static class NarrowingNotices
     internal static void Stamp(
         TextWriter output, CodebaseSource source, Func<string, IReadOnlyList<string>, string> factory)
     {
-        if (!source.Diagnostics.IsNarrowed) return;
+        if (Text(source, factory) is { } stamp) LineBlocks.WriteStamp(output, stamp);
+    }
 
-        string stamp = Compose(source, factory);
-        LineBlocks.WriteStamp(output, stamp);
+    /// <summary>The narrowing stamp's text, or null when the run was not narrowed.</summary>
+    internal static string? Text(CodebaseSource source, Func<string, IReadOnlyList<string>, string> factory)
+    {
+        return source.Diagnostics.IsNarrowed ? Compose(source, factory) : null;
     }
 
     /// <summary>

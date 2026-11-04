@@ -52,6 +52,16 @@ internal static class NarrowedUniverseNotice
             + "from it may simply be out of view.");
     }
 
+    /// <summary>The comment <c>graph --format mermaid</c> writes inside its diagram.</summary>
+    internal static string DiagramStamp(string filterName, IReadOnlyList<string> uncheckedProjects)
+    {
+        return Block(
+            filterName,
+            uncheckedProjects,
+            "The diagram below draws only the projects that loaded, so a project or reference edge absent "
+            + "from it may simply be out of view.");
+    }
+
     /// <summary>
     ///     The stamp <c>context</c> writes above its answer, beside <see cref="IncompleteModelGate.ContextCaveat" />.
     ///     Stdout is context's only channel, so this block is the only way <c>arch_context</c> learns that the

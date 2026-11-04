@@ -53,6 +53,60 @@ public sealed class GraphDiagramRendererTests
     }
 
     [Fact]
+    public void Fence_ObservedAndDeclaredReferences_IsTheDiagramWithNoCaptionAndNoTrailingNewline()
+    {
+        // Arrange
+        GraphSummary summary = ThreeProjectSummary();
+
+        // Act
+        string fence = GraphDiagramRenderer.Fence(summary, SolutionName);
+
+        // Assert — what graph --format mermaid prints, so the caption naming render must not be in it.
+        fence.ShouldBe(
+            """
+            ```mermaid
+            flowchart LR
+                accTitle: Codebase survey: Test.slnx
+                accDescr: Projects in this solution and their cross-project references.
+
+                p_App["App"]
+                p_Lib["Lib"]
+                p_Orphan["Orphan"]
+
+                p_App --> p_Lib
+                p_Orphan -.-> p_Lib
+            ```
+            """);
+    }
+
+    [Fact]
+    public void Fence_Comments_LandAsCommentLinesAboveTheNodes()
+    {
+        // Arrange — a blank comment line and an indented one, the two shapes a stamp's evidence block carries.
+        GraphSummary summary = ThreeProjectSummary();
+
+        // Act
+        string fence = GraphDiagramRenderer.Fence(
+            summary, SolutionName, new DiagramScope(["Lib"], []), ["1 project was not surveyed:", "  - Tool.vbproj", ""]);
+
+        // Assert
+        fence.ShouldBe(
+            """
+            ```mermaid
+            flowchart LR
+                accTitle: Codebase survey: Test.slnx
+                accDescr: Projects in this solution and their cross-project references.
+
+                %% 1 project was not surveyed:
+                %%   - Tool.vbproj
+                %%
+
+                p_Lib["Lib"]
+            ```
+            """);
+    }
+
+    [Fact]
     public void Block_OnlyList_DrawsTheNamedProjectsAndNothingElse()
     {
         // Arrange

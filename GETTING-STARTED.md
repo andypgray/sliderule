@@ -2,7 +2,7 @@
 
 SlideRule reads your architecture from a spec project, a C# class library in your solution that states the rules. Until the solution has one, `check` stops before it evaluates anything and prints `No spec project found: no solution project references SlideRule.dll. Pass --spec to name one.`
 
-This page takes you from that message to a green check. There are two ways to start, and they differ in who drafts the first rules, not in how old the code is. On path 1 you write them yourself. On path 2 a coding agent drafts them, and you decide which ones stay. Pick one before you run anything, because each makes its own spec project, and `check` stops on a solution with two (`Multiple spec projects found`). On either path, `sliderule graph MyApp.sln` is a safe first look: it surveys the solution's projects, references and namespaces without a spec.
+This page takes you from that message to a green check. There are two ways to start, and they differ in who drafts the first rules, not in how old the code is. On path 1 you write them yourself. On path 2 a coding agent drafts them, and you decide which ones stay. Pick one before you run anything, because each makes its own spec project, and `check` stops on a solution with two (`Multiple spec projects found`). On either path, `sliderule graph MyApp.sln` is a safe first look: it surveys the solution's projects, references and namespaces without a spec. Add `--format mermaid` to get the projects and their references as a Mermaid diagram.
 
 ## Requirements
 

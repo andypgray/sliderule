@@ -335,6 +335,29 @@ public sealed class CliMcpParityTests
         mcpScoped.ShouldHaveTextContent()
             .ShouldBeTheSameTextAs(cliScoped.Out);
 
+        // arch_graph format mermaid ≡ graph --format mermaid: the drawing instead of the document.
+        CliResult cliMermaid = await CliRunner.InvokeColdAsync(
+            "graph", CliRunner.MyAppSolution, "--format", "mermaid");
+        cliMermaid.ShouldSucceed();
+        CallToolResult mcpMermaid = await harness.Client.CallToolAsync(
+            "arch_graph", new Dictionary<string, object?> { ["format"] = "mermaid" }, cancellationToken: Ct);
+        mcpMermaid.ShouldHaveTextContent()
+            .ShouldBeTheSameTextAs(cliMermaid.Out);
+
+        // The tool takes json or mermaid: the text survey is the CLI's, and a coarser grain has nothing to coarsen
+        // in a drawing. Each refusal names its own surface's words.
+        CallToolResult mcpText = await harness.Client.CallToolAsync(
+            "arch_graph", new Dictionary<string, object?> { ["format"] = "text" }, cancellationToken: Ct);
+        mcpText.ShouldHaveRefused()
+            .ShouldBe("Unknown format 'text'; use json or mermaid.");
+        CallToolResult mcpMermaidIndex = await harness.Client.CallToolAsync(
+            "arch_graph", new Dictionary<string, object?> { ["format"] = "mermaid", ["grain"] = "index" },
+            cancellationToken: Ct);
+        mcpMermaidIndex.ShouldHaveRefused()
+            .ShouldBe(
+                "The Mermaid diagram has no grain, so grain index does not apply to it. Narrow the diagram by "
+                + "project instead, or leave the grain out.");
+
         // arch_check rules ≡ check --rules --json (CLI exits 1 on the subset's violations; the tool never
         // reports IsError). Same parse, same selection, same document — including rulesFilter.
         CliResult cliRules = await CliRunner.InvokeColdAsync(

@@ -36,6 +36,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   without one, a source written after the build does. The turn-end hook hands the warning to the agent on a
   clean stop, so it can rebuild, and keeps it in the report on a red one. A spec passed to `--spec` as a DLL
   names no project and is not compared.
+- `graph --format mermaid` draws the projects and their references as one Mermaid fence, the drawing
+  `render --diagram` commits, with no spec. It draws the projects the solution file declares, and with
+  `--projects` it keeps an edge only when both of its ends are drawn. When the load left projects out,
+  `%%` comment lines inside the fence say which and why. `--format text` and `--format json` are the
+  existing outputs, and `--json` stays as the short form of the second. `arch_graph` takes the same choice
+  as `format`, `json` by default or `mermaid`; a fence over the response budget is an error that names
+  `projects`, because a cut would leave it unclosed.
 
 ### Changed
 

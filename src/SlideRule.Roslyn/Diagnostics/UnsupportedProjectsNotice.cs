@@ -9,9 +9,9 @@ namespace SlideRule.Roslyn.Diagnostics;
 /// </summary>
 /// <remarks>
 ///     Every tail closes on the reading being denied rather than on a command, because no command would widen
-///     the answer. There is no <c>graph</c> stamp: the survey lists these projects as a section of its own
-///     roster, and a stamp as well would say it twice. The stamps take the entries <see cref="Relative" />
-///     composes.
+///     the answer. The <c>graph</c> survey takes no stamp: it lists these projects as a section of its own
+///     roster, and a stamp as well would say it twice. Its Mermaid diagram has no roster, so it takes
+///     <see cref="DiagramStamp" />. The stamps take the entries <see cref="Relative" /> composes.
 /// </remarks>
 internal static class UnsupportedProjectsNotice
 {
@@ -125,6 +125,15 @@ internal static class UnsupportedProjectsNotice
             unsupportedProjects,
             "The burndown below counts only the projects this product can read: these contribute no "
             + "violations to it, so every count reads low by whatever they hold.");
+    }
+
+    /// <summary>The comment <c>graph --format mermaid</c> writes inside its diagram.</summary>
+    internal static string DiagramStamp(IReadOnlyList<string> unsupportedProjects)
+    {
+        return Block(
+            unsupportedProjects,
+            "The diagram below draws only the projects this product can read, so these and their references are "
+            + "not on it.");
     }
 
     /// <summary>

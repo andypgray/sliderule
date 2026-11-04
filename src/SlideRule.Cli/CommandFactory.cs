@@ -542,8 +542,22 @@ internal static class CommandFactory
         Argument<string?> solution = SolutionArgument();
         Option<bool> json = new("--json")
         {
-            Description = "Emit the machine-readable JSON survey document instead of human-readable output."
+            Description = "Same as --format json."
         };
+        Option<string?> format = new("--format")
+        {
+            Description =
+                "What to write: text, the human survey (the default); json, the machine-readable survey document; "
+                + "or mermaid, the projects and their references as one Mermaid fence, as render --diagram draws "
+                + "them, which needs no spec.",
+            HelpName = string.Join("|", GraphFormats.Names)
+        };
+        format.CompletionSources.Add([.. GraphFormats.Names]);
+        format.Validators.Add(static result =>
+        {
+            var name = result.GetValueOrDefault<string?>();
+            if (!GraphFormats.TryParse(name, GraphFormat.Text, out _)) result.AddError(GraphFormats.Refusal(name));
+        });
         Option<bool> allowWorkspaceDiagnostics = AllowWorkspaceDiagnosticsOption(
             "Survey the partial model even when some projects fail to load or to restore, instead of refusing with "
             + "exit 2.");
@@ -563,6 +577,8 @@ internal static class CommandFactory
             Description =
                 "Survey only the projects matching these name globs (semicolon-separated, '*' allowed); "
                 + "references in both directions are kept, so an edge can name a project outside the scope. "
+                + "Under --format mermaid the filter scopes the diagram as render's --diagram-only does: only "
+                + "projects the solution file declares are drawn, and an edge only when both its ends are. "
                 + "A filter matching no project refuses the survey (exit 2) and lists the available names."
         };
 
@@ -576,6 +592,7 @@ internal static class CommandFactory
         {
             solution,
             json,
+            format,
             allowWorkspaceDiagnostics,
             noCache,
             binlog,
@@ -587,7 +604,7 @@ internal static class CommandFactory
             graph,
             parseResult => Resolved(parseResult, solution, null, environment, targets => new GraphRequest(
                 targets.Solution,
-                parseResult.GetValue(json),
+                GraphFormatFrom(parseResult.GetValue(json), parseResult.GetValue(format), parseResult.GetValue(grain)),
                 Directory.GetCurrentDirectory(),
                 parseResult.GetValue(noCache),
                 parseResult.GetValue(binlog),
@@ -598,6 +615,18 @@ internal static class CommandFactory
                 MsBuildGate.RunGraphAsync(request, output, error, hostSource, environment, ct));
 
         return graph;
+    }
+
+    // Settled while the request is built, so a contradiction refuses before a binlog is replayed or a workspace
+    // loads. --json is the alias every verb shares, so it agrees with --format json and refuses any other format.
+    private static GraphFormat GraphFormatFrom(bool json, string? format, string? grain)
+    {
+        GraphFormat named = GraphFormats.Parse(format, json ? GraphFormat.Json : GraphFormat.Text);
+        if (json && named != GraphFormat.Json)
+            throw new UserErrorException($"--json and --format {format} name two formats; pass one of them.");
+
+        GraphFormats.RefuseGrainOnMermaid(named, grain, "--grain");
+        return named;
     }
 
     private static Command BuildMcpCommand(IEnvironment environment)

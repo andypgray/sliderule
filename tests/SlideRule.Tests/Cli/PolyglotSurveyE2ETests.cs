@@ -80,6 +80,33 @@ public sealed class PolyglotSurveyE2ETests
     }
 
     [Fact]
+    public async Task GraphMermaid_SolutionDeclaringAnFsproj_SaysInsideTheFenceThatItIsNotDrawn()
+    {
+        // The drawing's twin of the unsupportedProjects key: a fence with one node must say it is not the whole
+        // solution, and the fence is the only text arch_graph returns in this format.
+
+        // Act
+        CliResult result = await CliRunner.InvokeAsync("graph", FixtureBeds.PolyglotAppSolution, "--format", "mermaid");
+
+        // Assert
+        result.ShouldSucceed();
+        result.ShouldPrint(
+            """
+            ```mermaid
+            flowchart LR
+                accTitle: Codebase survey: PolyglotApp.slnx
+                accDescr: Projects in this solution and their cross-project references.
+
+                %% 1 project was not surveyed:
+                %%   PolyglotApp.Fs/PolyglotApp.Fs.fsproj — not a C# project
+                %% The diagram below draws only the projects this product can read, so these and their references are not on it.
+
+                p_PolyglotApp_Core["PolyglotApp.Core"]
+            ```
+            """);
+    }
+
+    [Fact]
     public async Task Graph_SkeletonGrain_KeepsTheCoverageStatementWhole()
     {
         // Unlike the survey's other two coverage keys this one is NOT elided at any grain: its

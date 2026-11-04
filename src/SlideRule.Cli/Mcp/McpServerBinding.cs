@@ -94,16 +94,28 @@ internal sealed record McpServerBinding(string? Solution, string? Spec, string W
     }
 
     /// <summary>
-    ///     The <c>arch_graph</c> run. Two departures from the policy above, both deliberate:
+    ///     The <c>arch_graph</c> run. Its departures from the policy above, all deliberate:
     ///     <see cref="Spec" /> goes unused, because the survey is a property of the codebase and derive runs
-    ///     before any spec exists; and <paramref name="allowWorkspaceDiagnostics" /> is the caller's, because
+    ///     before any spec exists; <paramref name="allowWorkspaceDiagnostics" /> is the caller's, because
     ///     graph refuses before it has a document to stamp, so opting into a partial model is a choice the
-    ///     tool exposes rather than one the surface makes.
+    ///     tool exposes rather than one the surface makes; and <paramref name="format" /> is the caller's too,
+    ///     JSON when it names none, because the Mermaid fence is an answer of its own rather than a rendering of
+    ///     the document.
     /// </summary>
-    internal GraphRequest GraphRequest(bool allowWorkspaceDiagnostics, DocumentGrain grain, string? projects)
+    /// <exception cref="UserErrorException">
+    ///     The format is not json or mermaid, or a coarser grain is named beside mermaid.
+    /// </exception>
+    internal GraphRequest GraphRequest(
+        bool allowWorkspaceDiagnostics, string? grain, string? projects, string? format)
     {
+        // The text survey is the CLI's alone: the json document carries everything it prints, as data.
+        GraphFormat named = GraphFormats.Parse(format, GraphFormat.Json, GraphToolFormats);
+
+        GraphFormats.RefuseGrainOnMermaid(named, grain, "grain");
         return new GraphRequest(
-            Solution, AsJsonDocument, WorkingDirectory, BypassPersistedCache, NoBinlogReplay,
-            allowWorkspaceDiagnostics, grain, projects);
+            Solution, named, WorkingDirectory, BypassPersistedCache, NoBinlogReplay,
+            allowWorkspaceDiagnostics, DocumentGrains.Parse(grain), projects);
     }
+
+    private static readonly IReadOnlyList<string> GraphToolFormats = ["json", "mermaid"];
 }

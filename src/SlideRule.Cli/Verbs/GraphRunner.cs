@@ -2,13 +2,14 @@ using SlideRule.Cli.Mcp.Infrastructure;
 using SlideRule.Cli.Pipeline;
 using SlideRule.Cli.Rendering;
 using SlideRule.Codebase;
+using SlideRule.Rendering;
 using SlideRule.Roslyn;
 using SlideRule.Roslyn.Diagnostics;
 
 namespace SlideRule.Cli.Verbs;
 
 /// <summary>
-///     The <c>graph</c> verb: a survey of the whole codebase, human or JSON, through a spec-less
+///     The <c>graph</c> verb: a survey of the whole codebase, as text, JSON or a Mermaid diagram, through a spec-less
 ///     <see cref="CodebaseSource" /> fronted by the persisted extraction cache.
 /// </summary>
 /// <remarks>
@@ -28,6 +29,13 @@ namespace SlideRule.Cli.Verbs;
 ///         or, where the filter is a JSON array written as text, names that shape instead
 ///         (<see cref="Refusals" />).
 ///     </para>
+///     <para>
+///         The Mermaid format draws what <c>render --diagram</c> draws for the same project globs, so
+///         <see cref="GraphRequest.Projects" /> scopes it as <c>--diagram-only</c> does: declared projects only,
+///         and an edge only when both its ends are drawn. What the human run would stamp about the load rides the
+///         fence as comments, because on MCP the fence is the only channel. It has no grain to degrade, so a fence
+///         over the caller's budget refuses whole rather than reach the truncator.
+///     </para>
 /// </remarks>
 internal sealed class GraphRunner(
     TextWriter output,
@@ -38,7 +46,7 @@ internal sealed class GraphRunner(
 {
     public async Task<int> RunAsync(GraphRequest request, CancellationToken ct)
     {
-        TextWriter human = HumanChannel(request.Json, output);
+        TextWriter human = HumanChannel(request.Format != GraphFormat.Text, output);
 
         (CodebaseSource survey, GraphSummary summary) = await SurveyAsync(
             request.Solution, request.WorkingDirectory, request.NoCache, request.AllowWorkspaceDiagnostics, ct);
@@ -68,10 +76,18 @@ internal sealed class GraphRunner(
         // uncheckedProjects.
         NarrowingNotices.Stamp(human, source, NarrowedUniverseNotice.GraphStamp);
 
-        if (request.Json)
-            WriteJson(request, scoped, solutionName, renderedDiagnostics, trust, projectGlobs);
-        else
-            WriteHuman(request, summary, scoped, solutionName, projectGlobs, trust);
+        switch (request.Format)
+        {
+            case GraphFormat.Json:
+                WriteJson(request, scoped, solutionName, renderedDiagnostics, trust, projectGlobs);
+                break;
+            case GraphFormat.Mermaid:
+                WriteMermaid(summary, solutionName, projectGlobs, source);
+                break;
+            default:
+                WriteHuman(request, summary, scoped, solutionName, projectGlobs, trust);
+                break;
+        }
 
         return ExitCodes.Clean;
     }
@@ -85,6 +101,34 @@ internal sealed class GraphRunner(
     {
         WriteFitted(output, request.Grain, at => GraphJsonRenderer.Document(
             scoped, solutionName, renderedDiagnostics, trust, at, projectGlobs));
+    }
+
+    // The unscoped summary, because the fence scopes its own nodes and draws an edge only between two of them,
+    // which is what keeps it byte-identical to render's for the same globs. The terminator is written as LF, so
+    // the bytes match on every platform.
+    private void WriteMermaid(
+        GraphSummary summary, string solutionName, IReadOnlyList<string> projectGlobs, CodebaseSource source)
+    {
+        string fence = GraphDiagramRenderer.Fence(
+            summary, solutionName, new DiagramScope(projectGlobs, []), DiagramComments(source)) + "\n";
+
+        output.Write(Fitter.FitWhole(fence, GraphFormats.OversizedRefusal));
+    }
+
+    // Each fact the human run stamps about the load, one comment line per line of its stamp, in the order the
+    // human run writes them. A clean load has none.
+    private static IReadOnlyList<string> DiagramComments(CodebaseSource source)
+    {
+        WorkspaceDiagnostics diagnostics = source.Diagnostics;
+        var blocks = new List<string>();
+
+        if (diagnostics.IsIncomplete) blocks.Add(IncompleteModelGate.DiagramCaveat(diagnostics));
+        if (NarrowingNotices.Text(source, NarrowedUniverseNotice.DiagramStamp) is { } narrowed) blocks.Add(narrowed);
+        if (UnsupportedProjectsNotices.Text(source, UnsupportedProjectsNotice.DiagramStamp) is { } unsupported)
+            blocks.Add(unsupported);
+
+        return blocks.SelectMany(block => block.Split('\n'))
+            .ToList();
     }
 
     // The human survey. The scope stamp is written here rather than by the formatter so an unscoped run writes

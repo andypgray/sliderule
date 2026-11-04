@@ -401,8 +401,11 @@ Arguments:
               directory.
 
 Options:
-  --json                                  Emit the machine-readable JSON survey document instead of
-                                          human-readable output.
+  --json                                  Same as --format json.
+  --format <text|json|mermaid>            What to write: text, the human survey (the default);
+                                          json, the machine-readable survey document; or mermaid,
+                                          the projects and their references as one Mermaid fence,
+                                          as render --diagram draws them, which needs no spec.
   --allow-workspace-diagnostics           Survey the partial model even when some projects fail to
                                           load or to restore, instead of refusing with exit 2.
   --no-cache                              Bypass the persisted caches (extraction fragments and the
@@ -428,12 +431,16 @@ Options:
   --projects <projects>                   Survey only the projects matching these name globs
                                           (semicolon-separated, '*' allowed); references in both
                                           directions are kept, so an edge can name a project
-                                          outside the scope. A filter matching no project refuses
-                                          the survey (exit 2) and lists the available names.
+                                          outside the scope. Under --format mermaid the filter
+                                          scopes the diagram as render's --diagram-only does: only
+                                          projects the solution file declares are drawn, and an
+                                          edge only when both its ends are. A filter matching no
+                                          project refuses the survey (exit 2) and lists the
+                                          available names.
   -?, -h, --help                          Show help and usage information
 ```
 
-`graph` needs no spec, so it is the first command to run on a solution that has none. Besides the projects and their references, it lists each type name that two projects, or a project and a package, both declare. `--json` writes the survey `arch_graph` returns, and `--grain` coarsens it by the rungs under [Grains](#grains).
+`graph` needs no spec, so it is the first command to run on a solution that has none. Besides the projects and their references, it lists each type name that two projects, or a project and a package, both declare. `--json`, or `--format json`, writes the survey `arch_graph` returns, and `--grain` coarsens it by the rungs under [Grains](#grains). `--format mermaid` writes the projects and their references as one Mermaid fence instead, the drawing `render --diagram` commits, so a team with no spec can see its graph drawn. It draws only the projects the solution file declares, and with `--projects` it keeps an edge only when both of its ends are drawn. It has no grain. When the load left projects out, `%%` comment lines inside the fence name them.
 
 ### `mcp`
 
@@ -555,7 +562,7 @@ Every JSON document a command writes has a `schemaVersion` at its top, except th
 |---|---|---|
 | check report | `check --json`, `arch_check` | 3 |
 | status burndown | `status --json`, `arch_status` | 2 |
-| graph survey | `graph --json`, `arch_graph` | 1 |
+| graph survey | `graph --json` or `--format json`, `arch_graph` | 1 |
 | baseline file | `baseline` | 2 |
 | model file | `render --model` | 2 |
 | hook document | `hook` | unversioned |

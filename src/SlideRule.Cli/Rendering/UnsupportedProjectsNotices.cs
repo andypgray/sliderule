@@ -22,11 +22,17 @@ internal static class UnsupportedProjectsNotices
     internal static void Stamp(
         TextWriter output, CodebaseSource source, Func<IReadOnlyList<string>, string> factory)
     {
-        if (source.Diagnostics.UnsupportedProjects.Count == 0) return;
+        if (Text(source, factory) is { } stamp) LineBlocks.WriteStamp(output, stamp);
+    }
+
+    /// <summary>The stamp's text, or null when the run surveyed every project it found.</summary>
+    internal static string? Text(CodebaseSource source, Func<IReadOnlyList<string>, string> factory)
+    {
+        if (source.Diagnostics.UnsupportedProjects.Count == 0) return null;
 
         IReadOnlyList<string> entries = UnsupportedProjectsNotice.Relative(
             source.Diagnostics.UnsupportedProjects, source.SolutionDirectory);
 
-        LineBlocks.WriteStamp(output, factory(entries));
+        return factory(entries);
     }
 }

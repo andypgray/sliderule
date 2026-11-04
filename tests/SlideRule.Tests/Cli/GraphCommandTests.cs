@@ -5,6 +5,7 @@ using SlideRule.Cli.Mcp.Pipeline;
 using SlideRule.Cli.Pipeline;
 using SlideRule.Cli.Rendering;
 using SlideRule.Cli.Verbs;
+using SlideRule.Roslyn;
 using SlideRule.Roslyn.Hosting;
 using SlideRule.Tests.Mcp.TestDoubles;
 using SlideRule.Tests.TestSupport;
@@ -224,6 +225,156 @@ public sealed class GraphCommandTests
             .ShouldBe(["MyApp.Web"]);
         ProjectRowKeys(document)
             .ShouldNotContain("namespaces");
+    }
+
+    [Fact]
+    public async Task Graph_FormatMermaid_PrintsTheSurveyFenceRenderDrawsAndEndsInOneLf()
+    {
+        // Arrange — the survey half of render's own golden for this solution, so the two commands cannot drift.
+        string expected = GoldenFile.Read("diagram.md")
+            .ShouldCarrySurveyFence("The render golden diagram.md") + "\n";
+        var output = new StringWriter();
+
+        // Act — the runner directly, so stdout's bytes are read as written, terminator included.
+        await Runner(output)
+            .RunAsync(Request() with { Format = GraphFormat.Mermaid }, Ct);
+
+        // Assert
+        output.ToString()
+            .ShouldBe(expected);
+    }
+
+    [Fact]
+    public async Task Graph_FormatMermaidWithProjects_ScopesAsDiagramOnlyDoesAndDropsTheEdgeLeavingTheScope()
+    {
+        // Act — the two projects render's --diagram-only row draws, so MyApp.Domain -> MyApp.Web leaves the scope.
+        CliResult result = await CliRunner.InvokeAsync(
+            "graph", CliRunner.MyAppSolution, "--format", "mermaid", "--projects", "MyApp.Web;MyApp.Legacy.Billing");
+
+        // Assert — the JSON survey would keep that edge; the drawing has no node to end it on.
+        result.ShouldSucceed();
+        result.ShouldPrint(
+            """
+            ```mermaid
+            flowchart LR
+                accTitle: Codebase survey: MyApp.sln
+                accDescr: Projects in this solution and their cross-project references.
+
+                p_MyApp_Legacy_Billing["MyApp.Legacy.Billing"]
+                p_MyApp_Web["MyApp.Web"]
+
+                p_MyApp_Web --> p_MyApp_Legacy_Billing
+            ```
+            """);
+    }
+
+    [Theory]
+    [InlineData("--format", "json")]
+    [InlineData("--json", "--format", "Json")]
+    public async Task Graph_FormatJson_WritesTheDocumentJsonWrites(params string[] options)
+    {
+        // Act
+        CliResult result = await CliRunner.InvokeAsync(["graph", CliRunner.MyAppSolution, .. options]);
+
+        // Assert
+        result.ShouldSucceed();
+        result.Out.ShouldMatchGolden("graph.json");
+    }
+
+    [Theory]
+    [InlineData("--json and --format mermaid name two formats; pass one of them.", "--json", "--format", "mermaid")]
+    [InlineData(
+        "The Mermaid diagram has no grain, so --grain index does not apply to it. Narrow the diagram by project "
+        + "instead, or leave the grain out.",
+        "--format", "mermaid", "--grain", "index")]
+    [InlineData("Unknown format 'svg'; use text, json or mermaid.", "--format", "svg")]
+    public async Task Graph_FormatThatCannotBeHonoured_RefusesBeforeTheBinlogIsRead(
+        string refusal, params string[] options)
+    {
+        // Act — a binlog that does not exist, which a run that got as far as acquiring a workspace refuses on.
+        CliResult result = await CliRunner.InvokeAsync(
+            ["graph", CliRunner.MyAppSolution, .. options, "--binlog", "missing.binlog"]);
+
+        // Assert
+        result.ShouldRefuseWithExactly(refusal);
+        result.Out.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Graph_FormatMermaidOverTheBudget_RefusesWholeAndNamesTheProjectsKnob()
+    {
+        // Arrange — the fence's own length is the boundary: at it the fence is written, one below it refused.
+        var unbudgeted = new StringWriter();
+        GraphRequest request = Request() with { Format = GraphFormat.Mermaid };
+        await Runner(unbudgeted)
+            .RunAsync(request, Ct);
+        int length = unbudgeted.ToString()
+            .Length;
+        var atTheBudget = new StringWriter();
+        var overTheBudget = new StringWriter();
+
+        // Act
+        await Runner(atTheBudget, FixedResponseBudget.Fitter(length))
+            .RunAsync(request, Ct);
+        var refusal = await Should.ThrowAsync<UserErrorException>(() => Runner(
+                overTheBudget, FixedResponseBudget.Fitter(length - 1))
+            .RunAsync(request, Ct));
+
+        // Assert — cut at a line, the fence would reach the client unclosed.
+        atTheBudget.ToString()
+            .ShouldBe(unbudgeted.ToString());
+        refusal.Message.ShouldBe(
+            $"The Mermaid diagram is {length} characters, over this response's limit of {length - 1}. Narrow the "
+            + "subject: projects: \"<name globs>\" draws part of the solution. On the CLI, sliderule graph "
+            + "--format mermaid --projects <globs>.");
+        overTheBudget.ToString()
+            .ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Graph_FormatMermaidOverAPartialNarrowedModel_StampsBothInsideTheFence()
+    {
+        // Arrange — the facts graph --json carries as keys and the human run stamps; on MCP the fence is all there
+        // is. No persisted cache, because a hit replays the clean load's diagnostics instead of these.
+        var source = new DiagnosticInjectingSolutionSource(
+            [],
+            failedProjects: [DiagnosticInjectingSolutionSource.SimulatedFailedProject],
+            uncheckedProjects: [Path.Combine(FixtureBeds.MyAppRoot, "MyApp.Unchecked", "MyApp.Unchecked.csproj")]);
+        var output = new StringWriter();
+        GraphRequest request = Request() with
+        {
+            Format = GraphFormat.Mermaid, AllowWorkspaceDiagnostics = true, NoCache = true
+        };
+
+        // Act
+        await new GraphRunner(output, TextWriter.Null, source, new FakeEnvironment())
+            .RunAsync(request, Ct);
+
+        // Assert — the drawing itself is the whole solution's, because the injected projects never reached it.
+        output.ToString()
+            .ShouldBe(
+                """
+                ```mermaid
+                flowchart LR
+                    accTitle: Codebase survey: MyApp.sln
+                    accDescr: Projects in this solution and their cross-project references.
+
+                    %% caveat: the model is incomplete — 1 project failed to load, so nothing declared there is drawn:
+                    %%   C:/repo/MyApp.Broken/MyApp.Broken.csproj
+                    %% Restore and build the solution first (dotnet build), then retry for a whole diagram.
+                    %% 'MyApp.sln' narrowed this run: 1 project the solution declares was not checked.
+                    %%   MyApp.Unchecked/MyApp.Unchecked.csproj
+                    %% The diagram below draws only the projects that loaded, so a project or reference edge absent from it may simply be out of view.
+
+                    p_MyApp_Domain["MyApp.Domain"]
+                    p_MyApp_Legacy_Billing["MyApp.Legacy.Billing"]
+                    p_MyApp_Web["MyApp.Web"]
+
+                    p_MyApp_Domain --> p_MyApp_Web
+                    p_MyApp_Web --> p_MyApp_Legacy_Billing
+                ```
+
+                """);
     }
 
     [Fact]
@@ -601,7 +752,7 @@ public sealed class GraphCommandTests
         return GraphRequests.For(CliRunner.MyAppSolution, workingDirectory)
             with
             {
-                Json = true, Grain = grain
+                Format = GraphFormat.Json, Grain = grain
             };
     }
 }

@@ -3,7 +3,11 @@ using Microsoft.CodeAnalysis;
 using Shouldly;
 using SlideRule.Architecture;
 using SlideRule.Checking;
+using SlideRule.Cli.Mcp;
+using SlideRule.Cli.Mcp.Pipeline;
+using SlideRule.Cli.Mcp.Tools;
 using SlideRule.Cli.Rendering;
+using SlideRule.Cli.Verbs;
 using SlideRule.Codebase;
 using SlideRule.Hosting;
 using SlideRule.Internal;
@@ -17,6 +21,7 @@ using SlideRule.Tests.Checking;
 using SlideRule.Tests.Cli;
 using SlideRule.Tests.DocHygiene;
 using SlideRule.Tests.Extraction;
+using SlideRule.Tests.Mcp.TestDoubles;
 using SlideRule.Tests.TestSupport;
 using Xunit;
 
@@ -153,6 +158,41 @@ public sealed class SelfSpecTests
 
         committed.ShouldCarryOneManagedBlock("ARCHITECTURE.md must carry exactly one managed block.")
             .ShouldBe(composed);
+    }
+
+    /// <summary>
+    ///     The committed diagram's survey half is what <c>graph --format mermaid</c> prints for the projects it
+    ///     draws, on both surfaces: the spec-less command, run here over this repository, draws the same picture
+    ///     the spec-bound render committed.
+    /// </summary>
+    [Fact]
+    public async Task ArchitectureMd_SurveyFence_IsWhatGraphMermaidPrintsOnBothSurfaces()
+    {
+        // Arrange
+        string expected = File.ReadAllText(RepoRoot.ArchitectureMd)
+            .ShouldCarrySurveyFence("ARCHITECTURE.md") + "\n";
+        string projects = string.Join(";", ShippingProjects);
+        GraphRequest request = GraphRequests.For(RepoRoot.Solution, RepoRoot.Directory) with
+        {
+            Format = GraphFormat.Mermaid, NoCache = true, Projects = projects
+        };
+        var environment = new FakeEnvironment();
+        var cliOutput = new StringWriter();
+        var tools = new ArchTools(
+            new McpServerBinding(RepoRoot.Solution, null, RepoRoot.Directory),
+            WarmWorkspacePool.Source,
+            environment,
+            new BudgetedResponseFitter(new ResponseBudget(environment)));
+
+        // Act
+        await new GraphRunner(cliOutput, TextWriter.Null, WarmWorkspacePool.Source, environment)
+            .RunAsync(request, Ct);
+        string mcpOutput = await tools.GraphAsync(projects: projects, format: "mermaid", cancellationToken: Ct);
+
+        // Assert
+        cliOutput.ToString()
+            .ShouldBe(expected, "graph --format mermaid");
+        mcpOutput.ShouldBe(expected, "arch_graph format mermaid");
     }
 
     /// <summary>

@@ -20,7 +20,7 @@ internal static class GraphRequests
     internal static GraphRequest For(string solution, string workingDirectory)
     {
         return new GraphRequest(
-            solution, Json: false, workingDirectory, NoCache: false, Binlog: null,
+            solution, GraphFormat.Text, workingDirectory, NoCache: false, Binlog: null,
             AllowWorkspaceDiagnostics: false, DocumentGrain.Full, Projects: null);
     }
 }

@@ -266,6 +266,42 @@ internal static class IncompleteModelGate
     }
 
     /// <summary>
+    ///     The caveat <c>graph --format mermaid</c> writes inside its diagram when the caller opted into a partial
+    ///     model. The fence is <c>arch_graph</c>'s only channel in that format, so like <see cref="ContextCaveat" />
+    ///     it rides the body. It leaves out the MSBuild selection note, which explains a load and not a drawing.
+    /// </summary>
+    internal static string DiagramCaveat(WorkspaceDiagnostics diagnostics)
+    {
+        return Message(
+            diagnostics,
+            false,
+            $"caveat: the model is incomplete — {Missing(diagnostics)}, so nothing declared there is drawn:",
+            $"{MissingRemedy}, then retry for a whole diagram.",
+            $"caveat: the model is incomplete — {Failed(diagnostics)} failed to load, so nothing declared there "
+            + "is drawn:",
+            "Restore and build the solution first (dotnet build), then retry for a whole diagram.",
+            $"caveat: the model is incomplete — NuGet packages did not resolve for {Unrestored(diagnostics)}, "
+            + "so a reference that resolves through a package may be missing from the diagram:",
+            "Restore the solution first (dotnet restore), then retry for a whole diagram.");
+    }
+
+    /// <summary>
+    ///     The sentence a GitHub job summary states above its findings when the gate will exit 2. A summary carries
+    ///     no evidence block, so it names the causes and leaves the projects to the job log, where the refusal lists
+    ///     them.
+    /// </summary>
+    internal static string SummaryCaveat(WorkspaceDiagnostics diagnostics)
+    {
+        var causes = new List<string>();
+        if (diagnostics.MissingProjects.Count > 0) causes.Add("project files the solution declares that are not on disk");
+        if (diagnostics.FailedProjects.Count > 0 || diagnostics.RestoreFailedProjects.Count > 0)
+            causes.Add("projects that did not load or whose packages did not resolve");
+
+        return "The model is incomplete, so this run fails with exit 2 whatever the rules say. The job log names the "
+               + $"{string.Join(", and the ", causes)}.";
+    }
+
+    /// <summary>
     ///     The caveat block <c>explain --type</c> and <c>explain --path</c> write above their answer when the
     ///     model is incomplete. Like <see cref="ContextCaveat" /> it gates nothing and rides the body, which is
     ///     <c>arch_explain</c>'s only channel.

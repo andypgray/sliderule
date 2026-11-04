@@ -5,7 +5,8 @@ using SlideRule.Roslyn.Diagnostics;
 namespace SlideRule.Cli.Verbs;
 
 /// <summary>
-///     The parsed inputs for <c>sliderule graph</c> — the pre-spec codebase survey (human or <c>--json</c>).
+///     The parsed inputs for <c>sliderule graph</c> — the pre-spec codebase survey, as text, JSON or a Mermaid
+///     diagram.
 /// </summary>
 /// <remarks>
 ///     <paramref name="AllowWorkspaceDiagnostics" /> opts out of <see cref="IncompleteModelGate" />.
@@ -15,10 +16,14 @@ namespace SlideRule.Cli.Verbs;
 /// </remarks>
 internal sealed record GraphRequest(
     string? Solution,
-    bool Json,
+    GraphFormat Format,
     string WorkingDirectory,
     bool NoCache,
     string? Binlog,
     bool AllowWorkspaceDiagnostics,
     DocumentGrain Grain,
-    string? Projects) : IReplayableRequest;
+    string? Projects) : IReplayableRequest
+{
+    /// <summary>Whether the survey is the JSON document.</summary>
+    public bool Json => Format == GraphFormat.Json;
+}
