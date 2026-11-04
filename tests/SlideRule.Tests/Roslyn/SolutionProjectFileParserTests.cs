@@ -204,6 +204,14 @@ public sealed class SolutionProjectFileParserTests
         {
             "skipped only outside the default", ["Debug|Any CPU", "Release|Any CPU"],
             ["Debug|Any CPU.ActiveCfg", "Debug|Any CPU.Build.0", "Release|Any CPU.ActiveCfg"], false
+        },
+        {
+            "the first platform when there is no Any CPU", ["Debug|arm64", "Debug|x64"],
+            ["Debug|arm64.ActiveCfg", "Debug|x64.ActiveCfg", "Debug|x64.Build.0"], true
+        },
+        {
+            "AnyCPU without the space is not Any CPU", ["Debug|ARM64", "Debug|AnyCPU"],
+            ["Debug|ARM64.ActiveCfg", "Debug|AnyCPU.ActiveCfg", "Debug|AnyCPU.Build.0"], true
         }
     };
 
@@ -225,6 +233,26 @@ public sealed class SolutionProjectFileParserTests
             "the first declared build type when there is no Debug",
             """<Configurations><BuildType Name="Release" /><BuildType Name="Staging" /></Configurations>""",
             """<Build Solution="Release|*" Project="false" />""", true
+        },
+        {
+            "the first declared platform when there is no Any CPU",
+            """<Configurations><Platform Name="arm64" /><Platform Name="x64" /></Configurations>""",
+            """<Build Solution="*|arm64" Project="false" />""", true
+        },
+        {
+            "excluded only on other platforms", "",
+            """<Build Solution="*|x64" Project="false" /><Build Solution="*|x86" Project="false" />""", false
+        },
+        {
+            "excluded on the platform that is the default",
+            """<Configurations><Platform Name="x64" /><Platform Name="x86" /></Configurations>""",
+            """<Build Solution="*|x64" Project="false" /><Build Solution="*|x86" Project="false" />""", true
+        },
+        { "a rule spelling AnyCPU matches Any CPU", "", """<Build Solution="*|AnyCPU" Project="false" />""", true },
+        {
+            "a rule spelling Any CPU matches a declared AnyCPU",
+            """<Configurations><Platform Name="AnyCPU" /></Configurations>""",
+            """<Build Solution="Debug|Any CPU" Project="false" />""", true
         }
     };
 

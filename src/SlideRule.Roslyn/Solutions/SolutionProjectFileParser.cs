@@ -416,7 +416,16 @@ internal static partial class SolutionProjectFileParser
         if (string.IsNullOrWhiteSpace(pattern)) return true;
 
         string[] halves = pattern.Split('|');
-        return MatchesHalf(halves[0], buildType) && (halves.Length < 2 || MatchesHalf(halves[1], platform));
+        return MatchesHalf(halves[0], buildType)
+               && (halves.Length < 2 || MatchesHalf(CanonicalPlatform(halves[1]), CanonicalPlatform(platform)));
+    }
+
+    // The solution model reads "Any CPU" and "AnyCPU" as one platform when it matches a rule, and nowhere else: the
+    // default pair compares the name as written.
+    private static string CanonicalPlatform(string platform)
+    {
+        string trimmed = platform.Trim();
+        return trimmed.Equals("Any CPU", StringComparison.OrdinalIgnoreCase) ? "AnyCPU" : trimmed;
     }
 
     private static bool MatchesHalf(string half, string value)
@@ -440,7 +449,8 @@ internal static partial class SolutionProjectFileParser
     ///     The configuration a build of the solution takes when none is named, picked from the build types and
     ///     platforms its configurations use, neither of them empty. This is MSBuild's rule: <c>Debug</c> when any
     ///     configuration has it and the first build type otherwise, then <c>Mixed Platforms</c>, else
-    ///     <c>Any CPU</c>, else the first platform.
+    ///     <c>Any CPU</c>, else the first platform. The names are compared as written, so <c>AnyCPU</c> is not
+    ///     <c>Any CPU</c> here.
     /// </summary>
     private static (string BuildType, string Platform) DefaultConfiguration(
         IReadOnlyList<string> buildTypes, IReadOnlyList<string> platforms)

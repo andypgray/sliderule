@@ -98,6 +98,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   C# project references and the solution does not declare, as a load does, read off the build's own
   evaluation of the C# project in the log. Before, `unsupportedProjects` and the "projects were not surveyed"
   line read one shorter on a replay than on a load of the same tree.
+- A `.slnx` build rule that spells the platform `AnyCPU` now applies at `Any CPU`, and one that spells it
+  `Any CPU` applies where the solution declares `AnyCPU`, as MSBuild reads them. Before, a project such a rule
+  leaves out of the default build was surveyed as one the build compiles.
 - The spec project in the `derive_spec` recipe sets `<IsPackable>false</IsPackable>`, so it restores in a
   repository whose `Directory.Build.props` turns on package validation for every project. Without the
   setting, restore looks for the spec project's own package at the baseline version and fails with NU1101.
