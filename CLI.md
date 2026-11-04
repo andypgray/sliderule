@@ -641,7 +641,7 @@ Two more stamps describe a model that is smaller and still right. `unsupportedPr
 
 Loading a non-SDK-style project, and replaying a binary log from .NET Framework `MSBuild.exe`, both run the .NET Framework build host that Roslyn ships. That host needs Windows and a Visual Studio or Build Tools install that includes `MSBuild\Current\Bin\MSBuild.exe`, which the tool finds with `vswhere`.
 
-Where several are installed, it prefers Visual Studio 2019 or 2022. Where neither is installed, it takes the newest it found and names it on stderr, next to any load failure. Set `SLIDERULE_VS_INSTALL_PATH` to an install root, the parent of `MSBuild\Current\Bin`, to choose one yourself. A spec project that targets `net48` needs none of this and builds anywhere.
+Where several are installed, it prefers Visual Studio 2019, 2022 or 2026. Where none of those is installed, it takes the newest it found and names it on stderr, next to any load failure. Set `SLIDERULE_VS_INSTALL_PATH` to an install root, the parent of `MSBuild\Current\Bin`, to choose one yourself. A spec project that targets `net48` needs none of this and builds anywhere.
 
 ## Environment variables
 

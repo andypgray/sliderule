@@ -37,6 +37,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   clean stop, so it can rebuild, and keeps it in the report on a red one. A spec passed to `--spec` as a DLL
   names no project and is not compared.
 
+### Changed
+
+- Visual Studio 2026 is in the tested range with 2019 and 2022, so a machine whose only Visual Studio is 2026
+  no longer reports its MSBuild as outside the tested envelope. On a machine with both 2022 and 2026, projects
+  are now loaded with 2026; set `SLIDERULE_VS_INSTALL_PATH` to an install root to choose another.
+
 ### Fixed
 
 - A project the solution's default build configuration does not build, mapped with no `Build.0` line in a

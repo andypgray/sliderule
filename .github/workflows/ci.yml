@@ -18,12 +18,10 @@ env:
 
 jobs:
   # Two Windows legs, because the .NET Framework fixtures make the Visual Studio on the image
-  # required rather than incidental. `windows-latest` is now the VS-2026-only image (VS
-  # Enterprise 18.x, no VS 2022 and no Build Tools 17 anywhere on it), and a non-SDK-style project in
-  # the 2003 MSBuild XML namespace is exactly what MsBuildBootstrap's VS 16/17 preference has nothing
-  # to prefer on there. `windows-2022` is the leg that gives the suite a VS 17 machine, so the
-  # README's legacy claim stays proven under CI — and keeping `windows-latest` in the matrix is what
-  # keeps the VS 2026 gap exposed rather than hidden.
+  # required rather than incidental, and each leg is one major of MsBuildBootstrap's tested VS
+  # 16/17/18 envelope. `windows-latest` is the VS-2026-only image (VS Enterprise 18.x, no VS 2022 and
+  # no Build Tools 17 anywhere on it) and `windows-2022` is the VS 17 machine, so the non-SDK-style
+  # projects in the 2003 MSBuild XML namespace that the README claims are proven on both.
   build-and-test:
     strategy:
       fail-fast: false
@@ -126,9 +124,9 @@ jobs:
       # (graph, because it is the verb that needs no spec), and the refusal carries the selection line.
       # Nothing is restored and nothing is built, so the step costs seconds and has no failure mode of its own.
       #
-      # No patch version is pinned. The line is echoed on every run, so the version is always on the record;
-      # what reddens is a change of kind — VS or SDK, and which side of MsBuildBootstrap's VS 16/17 preference
-      # the image fell on.
+      # No minor or patch version is pinned. The line is echoed on every run, so the version is always on the
+      # record; what reddens is a change of kind — VS or SDK, the Visual Studio major, and which side of
+      # MsBuildBootstrap's tested envelope the image fell on.
       - name: Assert which MSBuild this runner selects
         shell: bash
         env:
@@ -157,29 +155,22 @@ jobs:
 
           # ', via vswhere)' closes every Visual Studio pick and nothing else: the SDK fallback also says 'via
           # vswhere', with a reason after it on Windows, so the comma is what tells the two apart. The envelope
-          # tail is which side of the VS 16/17 preference the image landed on, matched without its leading em
-          # dash so the comparison stays ASCII.
+          # tail is which side of the tested VS 16/17/18 envelope the image landed on, matched without its
+          # leading em dash so the comparison stays ASCII, and must agree with MsBuildBootstrap's note. The
+          # major, read from the '(<major>.' that opens the version, is which leg of the envelope this is.
           vs=', via vswhere)'
-          outside='outside the tested VS 2019/2022 envelope'
+          outside='outside the tested VS 2019/2022/2026 envelope'
           sdk='MSBuildLocator default (no Visual Studio install detected via vswhere)'
           bad=''
           case "$IMAGE" in
-            windows-2022)
-              # The leg that gives the suite a VS 17 machine, which is what keeps the README's legacy claim
-              # proven on an MSBuild inside the tested envelope.
+            windows-2022|windows-latest)
+              if [ "$IMAGE" = windows-2022 ]; then major='(17.'; else major='(18.'; fi
               if ! grep -Fq "$vs" <<<"$selection"; then
-                bad='vswhere found no Visual Studio, so the tool fell back to the SDK MSBuild and this leg no longer tests VS 17'
+                bad="vswhere found no Visual Studio, so the tool fell back to the SDK MSBuild and this leg no longer tests VS ${major:1:2}"
               elif grep -Fq "$outside" <<<"$selection"; then
-                bad='the selected Visual Studio is outside the VS 16/17 preference, so this is no longer the VS 2022 leg'
-              fi
-              ;;
-            windows-latest)
-              # The VS-2026-only image. The comment at the top of this job asserts that in prose; this is the
-              # line that checks it, and green here means the gap is still exposed rather than quietly closed.
-              if ! grep -Fq "$vs" <<<"$selection"; then
-                bad='vswhere found no Visual Studio, so the tool fell back to the SDK MSBuild'
-              elif ! grep -Fq "$outside" <<<"$selection"; then
-                bad='a VS 2019/2022 turned up on the image this job describes as shipping VS 2026 alone'
+                bad='the selected Visual Studio is outside the tested envelope'
+              elif ! grep -Fq "$major" <<<"$selection"; then
+                bad="the selected Visual Studio is not major ${major:1:2}, so this leg no longer tests the major the comment at the top of this job assigns it"
               fi
               ;;
             *)

@@ -7,7 +7,7 @@ namespace SlideRule.Roslyn.MsBuild;
 ///     Chooses the MSBuild a host loads a solution with, and registers it both for the running process and for the
 ///     separate build-host process Roslyn starts to read project files.
 ///     On Windows the build-host process needs a Visual Studio install to load a project that is not SDK-style, so
-///     one is used when present, preferring Visual Studio 2019 or 2022 over any other version. To choose a
+///     one is used when present, preferring Visual Studio 2019, 2022 or 2026 over any other version. To choose a
 ///     different one, set the <c>SLIDERULE_VS_INSTALL_PATH</c> environment variable to a Visual Studio install
 ///     root (the parent of <c>MSBuild\Current\Bin</c>); a value that is not an existing directory, or holds no
 ///     <c>MSBuild.exe</c> there, fails with a message naming the variable and the path that was probed.
@@ -25,10 +25,10 @@ internal static class MsBuildBootstrap
     // probed. Windows separators: every VS install root is a Windows path.
     private const string MsBuildBinLayout = @"MSBuild\Current\Bin";
 
-    // The tail an instance taken outside the preferred VS 16/17 set carries in its description. The
+    // The tail an instance taken outside the preferred VS 16/17/18 set carries in its description. The
     // preferred arm needs no counterpart: an ordinary pick is the unremarkable case, and a note on every
     // line would stop the exceptional one from reading as exceptional.
-    private const string OutsideEnvelopeNote = " — outside the tested VS 2019/2022 envelope";
+    private const string OutsideEnvelopeNote = " — outside the tested VS 2019/2022/2026 envelope";
 
     /// <summary>
     ///     The <see cref="MsBuildSelection.Source" /> of the most recent registration; <see langword="null" /> until
@@ -80,12 +80,12 @@ internal static class MsBuildBootstrap
 
     /// <summary>
     ///     Picks the Visual Studio instance to register MSBuild from: the highest of the preferred majors
-    ///     (16 = VS 2019, 17 = VS 2022), or the highest of any major when none of those is installed, as on a
-    ///     runner image that ships VS 2026 alone.
+    ///     (16 = VS 2019, 17 = VS 2022, 18 = VS 2026), or the highest of any major when none of those is
+    ///     installed.
     /// </summary>
     /// <remarks>
-    ///     The preference is caution about a moving target, and no known break motivates it: 16 and 17 are the
-    ///     widely-tested versions that load both legacy <c>http://schemas.microsoft.com/developer/msbuild/2003</c>
+    ///     The preference is caution about a moving target, and no known break motivates it: these are the
+    ///     tested majors, which load both legacy <c>http://schemas.microsoft.com/developer/msbuild/2003</c>
     ///     projects and SDK-style ones. <see cref="DescribeSelection" /> says so for a pick outside them.
     /// </remarks>
     internal static VsInstance? SelectBestInstance(IReadOnlyList<VsInstance> instances)
@@ -111,11 +111,12 @@ internal static class MsBuildBootstrap
         return $"{instance.Name} ({instance.Version.Major}.{instance.Version.Minor}, via vswhere){envelope}";
     }
 
-    // The tested envelope: VS 2019 and VS 2022. Shared by the selection and its description so the two
-    // cannot drift into describing an instance as preferred that the selection took as a fallback.
+    // The tested envelope: VS 2019, VS 2022 and VS 2026. Shared by the selection and its description so the
+    // two cannot drift into describing an instance as preferred that the selection took as a fallback.
+    // Must agree with OutsideEnvelopeNote's wording and with ci.yml's per-image selection assertion.
     private static bool IsPreferredMajor(VsInstance instance)
     {
-        return instance.Version.Major is 16 or 17;
+        return instance.Version.Major is 16 or 17 or 18;
     }
 
     // Registration, plus the publication of what it chose. Every arm below returns a selection, so

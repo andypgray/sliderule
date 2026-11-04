@@ -860,11 +860,12 @@ public sealed class SlideRuleArchitectureSpec : IArchitectureSpec
         arch.Scope("roslyn/msbuild-bootstrap")
             .Quarantine(workspace.InNamespace("SlideRule.Roslyn.MsBuild.*"))
             .BoundaryOnlyVia(arch.Types.Named("MsBuildBootstrap"))
-            .Dragons("We pick a VS 16/17 via vswhere and hand it to the out-of-process BuildHost through " +
-                     "VSINSTALLDIR/VSCMD_VER=99.0. That preference is caution about a moving target, not a " +
-                     "live workaround: the TypeInitializationException (XMakeElements) on legacy-namespace " +
-                     "projects came from an early VS 18 preview and does not reproduce on VS 18.6. Where no " +
-                     "16/17 is installed, the highest available is taken and MsBuildBootstrap.LastSelection " +
+            .Dragons("We pick the highest VS 16/17/18 via vswhere and hand it to the out-of-process BuildHost " +
+                     "through VSINSTALLDIR/VSCMD_VER=99.0. That preference is caution about a moving target, not " +
+                     "a live workaround: the TypeInitializationException (XMakeElements) on legacy-namespace " +
+                     "projects came from an early VS 18 preview and does not reproduce on a released VS 18. " +
+                     "Where none of those majors is installed, the highest available is taken and " +
+                     "MsBuildBootstrap.LastSelection " +
                      "says so — the CLI prints it beside any workspace-load diagnostic, and " +
                      "SLIDERULE_VS_INSTALL_PATH overrides the choice. Do NOT switch to " +
                      "MSBuildLocator.QueryVisualStudioInstances — on .NET it returns no VS Setup instances.")

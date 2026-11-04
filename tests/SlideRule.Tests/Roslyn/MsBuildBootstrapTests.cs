@@ -23,71 +23,76 @@ public sealed class MsBuildBootstrapTests
     }
 
     [Fact]
-    public void SelectBestInstance_PrefersStableOverPreview()
+    public void SelectBestInstance_PrefersATestedMajorOverANewerUntestedOne()
     {
-        // Arrange — VS 2022 (17.x) and a preview VS 18 both installed.
+        // Arrange — VS 2022 (17.x) and a VS 19, newer than any tested major, both installed.
         VsInstance vs2022 = new(@"C:\VS\2022", new Version(17, 14, 100), "VS 2022");
-        VsInstance vs18Preview = new(@"C:\VS\18", new Version(18, 4, 200), "VS 18");
+        VsInstance vs19 = new(@"C:\VS\19", new Version(19, 0, 200), "VS 19");
 
-        // Act — preview has higher version but stable should still win.
-        VsInstance? selected = MsBuildBootstrap.SelectBestInstance([vs18Preview, vs2022]);
+        // Act — the untested one has the higher version, but the tested one should still win.
+        VsInstance? selected = MsBuildBootstrap.SelectBestInstance([vs19, vs2022]);
 
         // Assert
         selected.ShouldBe(vs2022);
     }
 
     [Fact]
-    public void SelectBestInstance_AmongStable_PicksHighestVersion()
+    public void SelectBestInstance_AmongTested_PicksHighestVersion()
     {
+        // VS 2026 beside a VS 2022 is the pair a machine keeps through an upgrade, and the newer one wins.
         VsInstance vs2019 = new(@"C:\VS\2019", new Version(16, 11, 500), "VS 2019");
-        VsInstance vs2022Old = new(@"C:\VS\2022old", new Version(17, 0, 0), "VS 2022");
-        VsInstance vs2022New = new(@"C:\VS\2022new", new Version(17, 14, 100), "VS 2022");
+        VsInstance vs2022 = new(@"C:\VS\2022", new Version(17, 14, 100), "VS 2022");
+        VsInstance vs2026 = new(@"C:\VS\18", new Version(18, 10, 100), "VS 2026");
 
-        VsInstance? selected = MsBuildBootstrap.SelectBestInstance([vs2019, vs2022Old, vs2022New]);
+        VsInstance? selected = MsBuildBootstrap.SelectBestInstance([vs2019, vs2026, vs2022]);
 
-        selected.ShouldBe(vs2022New);
+        selected.ShouldBe(vs2026);
     }
 
     [Fact]
-    public void SelectBestInstance_OnlyPreview_FallsBackToHighest()
+    public void SelectBestInstance_NoTestedMajor_FallsBackToHighest()
     {
-        // No 16/17 installed; pick highest among newer.
-        VsInstance vs18 = new(@"C:\VS\18", new Version(18, 4, 200), "VS 18");
+        // No 16, 17 or 18 installed; pick the highest among the newer ones.
+        VsInstance vs19 = new(@"C:\VS\19", new Version(19, 4, 200), "VS 19");
         VsInstance vs26 = new(@"C:\VS\26", new Version(26, 0, 100), "VS 26");
 
-        VsInstance? selected = MsBuildBootstrap.SelectBestInstance([vs18, vs26]);
+        VsInstance? selected = MsBuildBootstrap.SelectBestInstance([vs19, vs26]);
 
         selected.ShouldBe(vs26);
     }
 
-    [Fact]
-    public void DescribeSelection_PreferredMajor_ReportsAnOrdinaryPickWithNoCaveat()
+    [Theory]
+    [InlineData(16, 11, "Visual Studio Professional 2019", "Visual Studio Professional 2019 (16.11, via vswhere)")]
+    [InlineData(17, 14, "Visual Studio Professional 2022", "Visual Studio Professional 2022 (17.14, via vswhere)")]
+    [InlineData(18, 10, "Visual Studio Community 2026", "Visual Studio Community 2026 (18.10, via vswhere)")]
+    public void DescribeSelection_TestedMajor_ReportsAnOrdinaryPickWithNoCaveat(
+        int major, int minor, string name, string expected)
     {
-        // Arrange — a VS 2022, which is inside the tested envelope.
-        VsInstance vs2022 = new(@"C:\VS\2022", new Version(17, 14, 100), "Visual Studio Professional 2022");
+        // Arrange — the only Visual Studio on the machine, inside the tested envelope.
+        VsInstance instance = new(@"C:\VS\only", new Version(major, minor, 100), name);
 
         // Act
-        string description = MsBuildBootstrap.DescribeSelection(MsBuildBootstrap.SelectBestInstance([vs2022])!);
+        string description = MsBuildBootstrap.DescribeSelection(MsBuildBootstrap.SelectBestInstance([instance])!);
 
         // Assert — no caveat: an ordinary pick has to read as unremarkable, or the fallback below stops
-        // reading as remarkable.
-        description.ShouldBe("Visual Studio Professional 2022 (17.14, via vswhere)");
+        // reading as remarkable, and an agent passes the caveat on as a finding.
+        description.ShouldBe(expected);
     }
 
     [Fact]
     public void DescribeSelection_NothingInsideTheEnvelope_NamesTheVersionAndSaysItFellOutside()
     {
-        // Arrange — the shape of a CI image that ships VS 2026 alone: nothing for the 16/17 preference to
-        // pick, so the highest available is taken.
-        VsInstance vs2026 = new(@"C:\VS\18", new Version(18, 7, 11925), "Visual Studio Enterprise 2026");
+        // Arrange — a machine whose only Visual Studio is newer than any tested major, so the highest
+        // available is taken.
+        VsInstance vs19 = new(@"C:\VS\19", new Version(19, 2, 11925), "Visual Studio Enterprise 19");
 
         // Act
-        string description = MsBuildBootstrap.DescribeSelection(MsBuildBootstrap.SelectBestInstance([vs2026])!);
+        string description = MsBuildBootstrap.DescribeSelection(MsBuildBootstrap.SelectBestInstance([vs19])!);
 
         // Assert — the fallback arm names itself apart from a preferred pick, and names the version it fell
         // back to, which is the fact a load failure on such a machine turns on.
         description.ShouldBe(
-            "Visual Studio Enterprise 2026 (18.7, via vswhere) — outside the tested VS 2019/2022 envelope");
+            "Visual Studio Enterprise 19 (19.2, via vswhere) — outside the tested VS 2019/2022/2026 envelope");
     }
 
     [Theory]
