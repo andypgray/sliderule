@@ -1,0 +1,33 @@
+<Project>
+
+    <!-- Every example's wiring first: the build analyzer, attached by project path. -->
+    <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.targets', '$(MSBuildThisFileDirectory)../'))" />
+
+    <PropertyGroup>
+        <_SlideRuleGuidanceProject>$(MSBuildThisFileDirectory)../../src/SlideRule.Guidance.DotNet/SlideRule.Guidance.DotNet.csproj</_SlideRuleGuidanceProject>
+    </PropertyGroup>
+
+    <!-- This example also takes the guidance analyzer, the way an adopter who already keeps a spec would. Its
+         spec declares every rule the guidance package carries, so the analyzer leaves each one to the
+         example's own model, with the example's own exemptions and baseline, and the build stays as silent as
+         the build analyzer keeps it. Attached the way examples/Directory.Build.targets attaches the build
+         analyzer, and for its reasons: plain Analyzer items rather than a project reference, so the example's
+         checked universe holds none of the tool's projects, with the restore and the build as separate calls.
+         The design-time properties are dropped as well, so a workspace loading the example gets the assembly
+         the real build writes, never the design-time view the guidance project shows its own tools. -->
+    <Target Name="_SlideRuleBuildTheGuidanceAnalyzer" BeforeTargets="CoreCompile">
+        <MSBuild Projects="$(_SlideRuleGuidanceProject)"
+                 Targets="Restore"
+                 Properties="Configuration=$(Configuration);_SlideRuleGuidanceRestore=true"
+                 RemoveProperties="TargetFramework;DesignTimeBuild;SkipCompilerExecution;ProvideCommandLineArgs" />
+        <MSBuild Projects="$(_SlideRuleGuidanceProject)"
+                 Targets="Build"
+                 Properties="Configuration=$(Configuration)"
+                 RemoveProperties="TargetFramework;DesignTimeBuild;SkipCompilerExecution;ProvideCommandLineArgs">
+            <Output TaskParameter="TargetOutputs" ItemName="Analyzer" />
+        </MSBuild>
+    </Target>
+
+    <Import Project="$(MSBuildThisFileDirectory)../../src/SlideRule.Guidance.DotNet/buildTransitive/SlideRule.Guidance.DotNet.targets" />
+
+</Project>

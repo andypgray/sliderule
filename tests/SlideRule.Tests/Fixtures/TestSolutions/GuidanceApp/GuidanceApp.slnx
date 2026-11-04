@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="GuidanceApp.Conforming/GuidanceApp.Conforming.csproj" />
+  <Project Path="GuidanceApp.Rules/GuidanceApp.Rules.csproj" />
+</Solution>

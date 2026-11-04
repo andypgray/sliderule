@@ -1,0 +1,80 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <!-- netstandard2.0 because the compiler loads this assembly into whatever process is building the
+             project, as it does the build analyzer. LangVersion 13.0 is pinned for the sources this project
+             compiles, which are written to it. -->
+        <TargetFramework>netstandard2.0</TargetFramework>
+        <LangVersion>13.0</LangVersion>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+        <IsRoslynComponent>true</IsRoslynComponent>
+
+        <!-- The canonical .NET guidance as an analyzer of its own: one assembly holding the contract, the
+             extractor, the build analyzer's engine and the rules, under a name of its own, so it shares no
+             assembly with the contract or the build analyzer and needs neither at any version. -->
+        <PackageId>SlideRule.Guidance.DotNet</PackageId>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <Description>SlideRule.Guidance.DotNet is a Roslyn analyzer that reports code departing from Microsoft's .NET guidance as compiler warnings. Each rule has its own diagnostic ID, from SR3001, links to the Microsoft page it rests on, and takes a severity in .editorconfig. It needs no spec, no model file and no tool: reference the package, and the next build reports. A project whose own SlideRule model declares one of these rules keeps it, and the package does not report that rule. It is built with SlideRule. It needs a compiler on Roslyn 4.0.1 or later (the .NET 6 SDK, Visual Studio 2022). An older compiler builds as before, without the analyzer.</Description>
+        <PackageTags>roslyn;analyzer;roslyn-analyzer;dotnet;csharp;guidelines;async;dependency-injection;httpclient;static-analysis</PackageTags>
+        <DevelopmentDependency>true</DevelopmentDependency>
+
+        <!-- No lib/ folder and no dependencies: the one assembly goes under analyzers/dotnet/cs, packed by
+             the target at the bottom of this file, and NU5128 is NuGet noticing that shape. Symbols are
+             collected with the build output, which this package does not ship. -->
+        <IncludeBuildOutput>false</IncludeBuildOutput>
+        <NoWarn>$(NoWarn);NU5128</NoWarn>
+        <IncludeSymbols>false</IncludeSymbols>
+        <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+        <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);_PackGuidanceAnalyzer</TargetsForTfmSpecificContentInPackage>
+
+        <RestoreLockedMode Condition="'$(CI)' == 'true'">true</RestoreLockedMode>
+    </PropertyGroup>
+
+    <!-- An editor and the workspace every SlideRule verb loads run a design-time build, and see the project as
+         what it is built on: a reference to the build analyzer, which brings Extraction and Core with it. The
+         compile below would show them a second declaration of every type in those three projects, which this
+         repository's own check reports as a layout fault on every run. -->
+    <ItemGroup Condition="'$(DesignTimeBuild)' == 'true'">
+        <ProjectReference Include="..\SlideRule.Analyzers\SlideRule.Analyzers.csproj" />
+    </ItemGroup>
+
+    <ItemGroup Condition="'$(DesignTimeBuild)' != 'true'">
+        <!-- The contract, the extractor and the build analyzer's engine, compiled here rather than referenced,
+             because an analyzer's dependencies resolve from its own directory and a copy of SlideRule.dll there
+             would be the same assembly the contract package ships, at whatever version each package is. The
+             build analyzer's own attributed class and its descriptors stay behind, so this assembly exports one
+             analyzer and declares only the descriptors it reports. -->
+        <Compile Include="..\SlideRule\**\*.cs" Exclude="..\SlideRule\bin\**;..\SlideRule\obj\**" Link="Core\%(RecursiveDir)%(Filename)%(Extension)" />
+        <Compile Include="..\SlideRule.Extraction\**\*.cs" Exclude="..\SlideRule.Extraction\bin\**;..\SlideRule.Extraction\obj\**" Link="Extraction\%(RecursiveDir)%(Filename)%(Extension)" />
+        <Compile Include="..\SlideRule.Analyzers\*.cs" Exclude="..\SlideRule.Analyzers\BuildTierAnalyzer.cs;..\SlideRule.Analyzers\BuildTierDescriptors.cs" Link="Engine\%(Filename)%(Extension)" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <EmbeddedResource Include="guidance.model.json" LogicalName="SlideRule.Guidance.DotNet.guidance.model.json" />
+        <None Include="README.md" Pack="true" PackagePath="/" />
+        <None Include="buildTransitive\*.targets" Pack="true" PackagePath="buildTransitive/" />
+        <None Include="buildTransitive\*.targets" Pack="true" PackagePath="build/" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- The support floor, the same literal Extraction carries, private here because nothing is passed
+             on: the compiler supplies its own API to every analyzer it loads. -->
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.0.1" PrivateAssets="all" />
+        <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="5.9.0" PrivateAssets="all" />
+        <AdditionalFiles Include="AnalyzerReleases.Shipped.md" />
+        <AdditionalFiles Include="AnalyzerReleases.Unshipped.md" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <InternalsVisibleTo Include="SlideRule.Tests" />
+    </ItemGroup>
+
+    <Target Name="_PackGuidanceAnalyzer">
+        <ItemGroup>
+            <TfmSpecificPackageFile Include="$(TargetPath)" PackagePath="analyzers/dotnet/cs" />
+        </ItemGroup>
+    </Target>
+
+</Project>

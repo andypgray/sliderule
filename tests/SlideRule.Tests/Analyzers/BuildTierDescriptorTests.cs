@@ -33,7 +33,7 @@ public sealed class BuildTierDescriptorTests
         new()
         {
             {
-                nameof(BuildTierDiagnostics.BrokenRule),
+                nameof(BuildTierDescriptors.BrokenRule),
                 "SR2001",
                 "An architecture rule is broken",
                 "{0}",
@@ -43,7 +43,7 @@ public sealed class BuildTierDescriptorTests
                 + "gate; this warning is the same finding, reported while the project builds."
             },
             {
-                nameof(BuildTierDiagnostics.NewDebt),
+                nameof(BuildTierDescriptors.NewDebt),
                 "SR2002",
                 "A Migrate rule has a violation its baseline does not hold",
                 "{0}",
@@ -51,7 +51,7 @@ public sealed class BuildTierDescriptorTests
                 + "sites to a pair it does. Violations the baseline already holds are not reported."
             },
             {
-                nameof(BuildTierDiagnostics.NoModelFile),
+                nameof(BuildTierDescriptors.NoModelFile),
                 "SR2090",
                 "No SlideRule model file was found",
                 "No sliderule.model.json was found above this project, so this build checked no "
@@ -61,7 +61,7 @@ public sealed class BuildTierDescriptorTests
                 + "--model' writes beside the solution. Without it the build checks nothing."
             },
             {
-                nameof(BuildTierDiagnostics.UnreadableFile),
+                nameof(BuildTierDescriptors.UnreadableFile),
                 "SR2091",
                 "A SlideRule file could not be read",
                 "{0}",
@@ -70,7 +70,7 @@ public sealed class BuildTierDescriptorTests
                 + "sits in that file at the place the read stopped."
             },
             {
-                nameof(BuildTierDiagnostics.UncheckedRule),
+                nameof(BuildTierDescriptors.UncheckedRule),
                 "SR2092",
                 "A ratcheted rule was not checked because the build was given no baseline for it",
                 "Rule '{0}' was not checked in this build. It is ratcheted and the build was given no "
@@ -84,7 +84,7 @@ public sealed class BuildTierDescriptorTests
                 + "in this project."
             },
             {
-                nameof(BuildTierDiagnostics.AnalyzerFault),
+                nameof(BuildTierDescriptors.AnalyzerFault),
                 "SR2093",
                 "The SlideRule analyzer failed",
                 "The SlideRule analyzer failed in this project, so some or all of its findings are "
@@ -95,7 +95,7 @@ public sealed class BuildTierDescriptorTests
                 + "own so that a build treating warnings as errors can exclude it by ID."
             },
             {
-                nameof(BuildTierDiagnostics.VersionMismatch),
+                nameof(BuildTierDescriptors.VersionMismatch),
                 "SR2093",
                 "The SlideRule analyzer failed",
                 "The SlideRule analyzer checked nothing in this project: it is version {0}, and the compiler "
@@ -127,7 +127,7 @@ public sealed class BuildTierDescriptorTests
     [Fact]
     public void EveryDescriptorField_HasItsWordingPinnedAbove()
     {
-        List<string> declared = typeof(BuildTierDiagnostics)
+        List<string> declared = typeof(BuildTierDescriptors)
             .GetFields(BindingFlags.NonPublic | BindingFlags.Static)
             .Where(field => field.FieldType == typeof(DiagnosticDescriptor))
             .Select(field => field.Name)
@@ -144,7 +144,7 @@ public sealed class BuildTierDescriptorTests
     [Fact]
     public void EveryDescriptor_IsAnEnabledWarningInTheSlideRuleCategoryWithTheSameHelpLink()
     {
-        List<string> declared = BuildTierDiagnostics.All
+        List<string> declared = BuildTierDescriptors.All
             .Select(descriptor =>
                 $"{descriptor.Id} {descriptor.Category} {descriptor.DefaultSeverity} "
                 + $"{descriptor.IsEnabledByDefault} {descriptor.HelpLinkUri}")
@@ -165,7 +165,7 @@ public sealed class BuildTierDescriptorTests
     [Fact]
     public void TheCompilationEndTag_IsOnEveryDescriptorReportedFromAnEndActionAndOnNoOther()
     {
-        List<string> tagged = BuildTierDiagnostics.All
+        List<string> tagged = BuildTierDescriptors.All
             .Where(descriptor => descriptor.CustomTags.Contains(WellKnownDiagnosticTags.CompilationEnd))
             .Select(descriptor => descriptor.Id)
             .ToList();
@@ -186,9 +186,9 @@ public sealed class BuildTierDescriptorTests
     // A descriptor by the field that declares it, which is the one name two descriptors under one ID do not share.
     private static DiagnosticDescriptor ShouldDeclare(string field)
     {
-        FieldInfo declared = typeof(BuildTierDiagnostics)
+        FieldInfo declared = typeof(BuildTierDescriptors)
             .GetField(field, BindingFlags.NonPublic | BindingFlags.Static)
-            .ShouldNotBeNull($"BuildTierDiagnostics should declare {field}");
+            .ShouldNotBeNull($"BuildTierDescriptors should declare {field}");
 
         return (DiagnosticDescriptor)declared.GetValue(null)!;
     }

@@ -56,6 +56,32 @@ require_build_targets() {
   require "build/$id.targets" "$1"
 }
 
+# What makes a package one the compiler loads and nobody compiles against. No lib/: an assembly there is a
+# reference every consumer compiles against by accident, and an accidental public surface cannot be withdrawn
+# from a version once pushed. No <dependencies>, since what the analyzer needs travels inside the package; $1
+# is what one would do instead, worded to follow "which". A development dependency, so a consumer's own
+# package never depends on this one. And no symbol package for the id the calling script set, among the
+# artifacts it named: symbols are collected with the build output, which this package does not ship, so a
+# .snupkg is an empty one on its way to nuget.org.
+require_analyzer_only() {
+  local libraries symbols
+  libraries="$(grep '^lib/' <<<"$entries" || true)"
+  [ -z "$libraries" ] ||
+    findings+=("lib/ is present, which makes this package something consumers compile against: $(paste -sd' ' <<<"$libraries")")
+
+  ! grep -q '<dependencies' <<<"$nuspec" ||
+    findings+=("the nuspec declares <dependencies>, which $1")
+
+  grep -q '<developmentDependency>true</developmentDependency>' <<<"$nuspec" ||
+    findings+=("the nuspec is not a development dependency, so a consumer's own package would depend on this one")
+
+  shopt -s nullglob
+  symbols=("$artifacts"/$id.[0-9]*.snupkg)
+  shopt -u nullglob
+  [ "${#symbols[@]}" -eq 0 ] ||
+    findings+=("${#symbols[@]} $id symbol package(s) were packed, and an analyzer-only package has no symbols to carry")
+}
+
 # Prints each finding as a workflow error and fails, or says the package carries the shape it was checked
 # for.
 report() {

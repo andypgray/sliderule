@@ -17,9 +17,9 @@ namespace SlideRule.Tests.Analyzers.Parity;
 ///         layer can stand in, because those are the axes the project noun's row turns on: a layer that
 ///         bans is decided in the build, as is one that spares at one edge end, and only one that spares
 ///         by plain membership is left to the check. Three of the rows therefore run through
-///         <see cref="ParityAssertions.ShouldHoldOnBothLegsAsync" />, and the fourth — the exclusion —
-///         through <c>ForcedKeys</c>, which is how a row the classifier holds out is put in front of the
-///         pin without flipping it.
+///         <see cref="ParityAssertions.ShouldHoldOnBothLegsAsync(ParitySubject, CancellationToken, ParityGap[])" />,
+///         and the fourth — the exclusion — through <c>ForcedKeys</c>, which is how a row the classifier
+///         holds out is put in front of the pin without flipping it.
 ///     </para>
 ///     <para>
 ///         Inline specs rather than spec projects, because the point of these rows is to put the hazards on
@@ -31,11 +31,12 @@ namespace SlideRule.Tests.Analyzers.Parity;
 ///         have the first failure hide the second.
 ///     </para>
 ///     <para>
-///         Every row that runs through <see cref="ParityAssertions.ShouldHoldOnBothLegsAsync" /> holds
-///         both drivers: what each project reported asked whole, and then the union over its documents
-///         asked one at a time, each key in the document that holds its site. The multi-framework bed
-///         carries one row more — that the tier a project declares moves which action does the work and
-///         nothing else — because it is the one bed whose csproj yields two compilations.
+///         Every row that runs through
+///         <see cref="ParityAssertions.ShouldHoldOnBothLegsAsync(ParitySubject, CancellationToken, ParityGap[])" />
+///         holds both drivers: what each project reported asked whole, and then the union over its
+///         documents asked one at a time, each key in the document that holds its site. The multi-framework
+///         bed carries one row more — that the tier a project declares moves which action does the work
+///         and nothing else — because it is the one bed whose csproj yields two compilations.
 ///     </para>
 /// </remarks>
 public sealed class SpecLessBedParityTests(ParityBeds beds) : IClassFixture<ParityBeds>

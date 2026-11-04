@@ -53,6 +53,19 @@ internal static class DiagnosticAssertions
     }
 
     /// <summary>
+    ///     Asserts the warnings are those of <paramref name="expected" />, each saying the same, in the same order.
+    /// </summary>
+    internal static void ShouldReportTheSameAs(this IReadOnlyList<Diagnostic> reported, IEnumerable<Diagnostic> expected)
+    {
+        List<string> said = reported.Select(diagnostic => diagnostic.Describe())
+            .ToList();
+        List<string> wanted = expected.Select(diagnostic => diagnostic.Describe())
+            .ToList();
+
+        said.ShouldBe(wanted, Case.Sensitive, reported.Describe("Expected the same warnings as the other run"));
+    }
+
+    /// <summary>
     ///     Asserts no warning carries <paramref name="id" />, whatever else was reported, with
     ///     <paramref name="customMessage" /> heading the red when one is given.
     /// </summary>

@@ -10,7 +10,7 @@ namespace SlideRule.Xunit;
 /// </summary>
 // Deliberately self-contained: it names one contract type, which every version carries, and nothing else of the
 // contract's, because every other member is exactly what a mismatched copy may not have. InformationalVersionOf
-// and ReleasedVersion must agree with BuildTierAnalyzer's copies, so the adapter and the analyzers call the same
+// and ReleasedVersion must agree with BuildTierEngine's copies, so the adapter and the analyzers call the same
 // two versions one release; CopiedMemberParityTests holds them identical.
 internal static class ContractVersion
 {

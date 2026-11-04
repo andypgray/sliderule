@@ -24,7 +24,7 @@ SlideRule is a local analysis tool, and its threat model follows from that.
 
 ## Verify what you install
 
-Each release ships a signed build provenance attestation covering all four packages. Download a `.nupkg` from the GitHub release and verify it as built:
+Each release ships a signed build provenance attestation covering all five packages. Download a `.nupkg` from the GitHub release and verify it as built:
 
 ```bash
 gh attestation verify SlideRule.Cli.<version>.nupkg --repo andypgray/sliderule

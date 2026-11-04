@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.Extensions.Hosting;
 using Shouldly;
+using SlideRule.Checking;
 using SlideRule.Hosting;
 using SlideRule.Model;
 using SlideRule.Packs.DotNet;
@@ -159,6 +160,33 @@ public class DotNetGuidanceTests
         overrode.Because.ShouldBe(defaulted.Because);
     }
 
+    [Theory]
+    [InlineData("naming/async-suffix")]
+    [InlineData("async/accept-cancellation")]
+    public void ExemptArgument_LeavesTheMethodsItNamesAlone_AndNoOthers(string id)
+    {
+        const string source = """
+                              namespace Sample.Testing { public sealed class CheckAttribute : System.Attribute { } }
+
+                              namespace Sample
+                              {
+                                  public sealed class Orders
+                                  {
+                                      public System.Threading.Tasks.Task Load() => System.Threading.Tasks.Task.CompletedTask;
+
+                                      [Sample.Testing.Check]
+                                      public System.Threading.Tasks.Task Ships() => System.Threading.Tasks.Task.CompletedTask;
+                                  }
+                              }
+                              """;
+
+        RuleResult result = Checker.Run(source, arch => DeclareOne(
+                arch, id, PackPosture.Enforce, [arch.Types.Methods.AttributedWith("Sample.Testing.CheckAttribute")]))
+            .Single();
+
+        result.ShouldHaveFailedWithMemberSubjects(["M:Sample.Orders.Load"]);
+    }
+
     [Fact]
     public void SameRule_EnforceInOneSpecAndMigrateInAnother_IsTheConsumersChoice()
     {
@@ -231,8 +259,9 @@ public class DotNetGuidanceTests
 
     // The method↔ID mapping written out longhand, which is exactly what makes it a pin: the pack derives
     // its method names from its IDs by convention, and this is the table that would disagree if either
-    // side drifted.
-    private static void DeclareOne(Arch arch, string id, PackPosture posture)
+    // side drifted. The exempt methods reach only the async rules that take them.
+    private static void DeclareOne(
+        Arch arch, string id, PackPosture posture, IEnumerable<MemberSelection>? exempt = null)
     {
         Selection subject = arch.Types.InNamespace(SubjectNamespace);
         Selection host = arch.Namespace("Sample.Host.*");
@@ -255,13 +284,13 @@ public class DotNetGuidanceTests
                 DotNetGuidance.NoCaptiveDependencies(arch, arch.Registered(Lifetime.Singleton), posture);
                 break;
             case "naming/async-suffix":
-                DotNetGuidance.AsyncSuffix(arch, subject, posture);
+                DotNetGuidance.AsyncSuffix(arch, subject, posture, exempt: exempt);
                 break;
             case "exceptions/no-general-catch":
                 DotNetGuidance.NoGeneralCatch(arch, subject, arch.Types.DerivedFrom<BackgroundService>(), posture);
                 break;
             case "async/accept-cancellation":
-                DotNetGuidance.AcceptCancellation(arch, subject, posture);
+                DotNetGuidance.AcceptCancellation(arch, subject, posture, exempt: exempt);
                 break;
             case "persistence/no-mapping-attributes":
                 DotNetGuidance.NoMappingAttributes(arch, subject, posture);

@@ -4,6 +4,7 @@
     <Project Path="src/SlideRule.Analyzers/SlideRule.Analyzers.csproj" />
     <Project Path="src/SlideRule.Cli/SlideRule.Cli.csproj" />
     <Project Path="src/SlideRule.Extraction/SlideRule.Extraction.csproj" />
+    <Project Path="src/SlideRule.Guidance.DotNet/SlideRule.Guidance.DotNet.csproj" />
     <Project Path="src/SlideRule.Packs.DotNet/SlideRule.Packs.DotNet.csproj" />
     <Project Path="src/SlideRule.Roslyn/SlideRule.Roslyn.csproj" />
     <Project Path="src/SlideRule.SpecAnalyzers/SlideRule.SpecAnalyzers.csproj" />

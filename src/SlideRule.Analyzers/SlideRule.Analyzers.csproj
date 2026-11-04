@@ -80,6 +80,9 @@
 
     <ItemGroup>
         <InternalsVisibleTo Include="SlideRule.Tests" />
+        <!-- For the design-time view of the guidance project, which references this project there; its build
+             compiles the engine's sources instead. -->
+        <InternalsVisibleTo Include="SlideRule.Guidance.DotNet" />
     </ItemGroup>
 
     <!-- The three assemblies the compiler has to load together, in the one folder it resolves them from,

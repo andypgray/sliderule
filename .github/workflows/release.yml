@@ -1,11 +1,14 @@
-# Publishes the four SlideRule packages to NuGet, creates a GitHub release, and lists
+# Publishes the SlideRule packages to NuGet, creates a GitHub release, and lists
 # the new version in the official MCP registry when a v* tag is pushed.
 #
 # Auth: NuGet trusted publishing (OIDC). The job trades a GitHub-signed OIDC token for
 # a short-lived (1-hour, single-use) nuget.org API key at run time via the NuGet/login
 # step — there is NO long-lived NUGET_API_KEY secret to store or rotate. This requires a
 # trusted-publishing policy on nuget.org (owner + repo + this workflow's file name) and
-# the `id-token: write` permission below.
+# the `id-token: write` permission below. The policy's scope must allow pushing new
+# packages and its glob must match every shipped ID: a package the solution adds reaches
+# nuget.org first through this push, and a policy that refuses its ID stops the push
+# part-way, after the IDs that sort before it are already live.
 #
 # Why pack in CI rather than locally: packing here means SourceLink embeds a commit
 # that actually exists on GitHub, so debugger source-stepping resolves. The symbol
@@ -15,7 +18,7 @@
 #
 # Build/test scope: the whole solution is built and tested directly — the slnx is the
 # entire tree here (no transitive-proxy trick needed). The pack step then repacks the
-# solution so ContinuousIntegrationBuild applies to the four shipped packages. That test
+# solution so ContinuousIntegrationBuild applies to every shipped package. That test
 # run is ubuntu-only, so every Windows-gated fact skips here — the .NET Framework fixtures
 # above all. This is not the gate for those: ci.yml's four-image matrix is, and it runs on
 # this same commit because the release flow pushes the branch and the tag together.
@@ -51,8 +54,8 @@ jobs:
           dotnet-version: '10.0.x'
 
       # The tag drives publication, so it must agree with every place the version is
-      # declared: the single <Version> in Directory.Build.props (declared once for all four
-      # lockstep-versioned packages) and BOTH version fields in .mcp/server.json (the
+      # declared: the single <Version> in Directory.Build.props (declared once for every
+      # lockstep-versioned package) and BOTH version fields in .mcp/server.json (the
       # top-level `version` and the package entry's `version`). Any mismatch fails the
       # release before anything is pushed. jq ships on the ubuntu-latest runner.
       #
@@ -96,18 +99,18 @@ jobs:
           SLIDERULE_LINK_CHECK: 'true'
         run: dotnet test SlideRule.slnx -c Release --no-build
 
-      - name: Pack (produces four .nupkg + three .snupkg)
+      - name: Pack (every .nupkg, and a .snupkg for each package that ships an assembly)
         run: dotnet pack SlideRule.slnx -c Release -o artifacts -p:RestoreLockedMode=true
 
       # nuget.org generates the VS Code MCP config only if the package holds an entry at
       # exactly `.mcp/server.json`. A backslash PackagePath mis-packs it as `.mcp//server.json`
       # on Linux — a bug Windows packs cannot reproduce, so this runner is the only place the
       # path is truly verified. Fail here, before the immutable nuget push. The solution pack
-      # emits four nupkgs and only the Cli one carries the manifest, so glob that package
-      # explicitly (a bare artifacts/*.nupkg would hand unzip four files and break). -Z1 lists
-      # one entry per line; -Fxq is a whole-line literal match, so the double-slash form fails
-      # it. Capturing into a variable first avoids a SIGPIPE false-failure from a live
-      # unzip|grep pipe.
+      # emits one nupkg per shipped package and only the Cli one carries the manifest, so glob
+      # that package explicitly (a bare artifacts/*.nupkg would hand unzip several files and
+      # break). -Z1 lists one entry per line; -Fxq is a whole-line literal match, so the
+      # double-slash form fails it. Capturing into a variable first avoids a SIGPIPE
+      # false-failure from a live unzip|grep pipe.
       - name: Verify server.json is packed at .mcp/server.json
         run: |
           entries="$(unzip -Z1 artifacts/SlideRule.Cli.*.nupkg)"
@@ -122,7 +125,7 @@ jobs:
       - name: Verify the XML documentation is packed
         run: bash .github/scripts/verify-xml-docs-packed.sh artifacts
 
-      # The analyzer package is the one with no lib/ folder, so none of the checks above say anything
+      # The analyzer package has no lib/ folder, so none of the checks above say anything
       # about it. Its shape lives in the same place for the same reason, and this is the last moment
       # it can be read before the push makes the version permanent.
       - name: Verify the analyzer package shape
@@ -134,10 +137,14 @@ jobs:
       - name: Verify the contract package shape
         run: bash .github/scripts/verify-contract-package-shape.sh artifacts
 
+      # The guidance package is one analyzer assembly with its rules inside, and this is the last moment its
+      # shape can be read before the push makes the version permanent.
+      - name: Verify the guidance package shape
+        run: bash .github/scripts/verify-guidance-package-shape.sh artifacts
+
       # Signed SLSA build provenance for the exact bytes built here (actions/attest emits
-      # provenance by default when no predicate is given). subject-path covers all seven
-      # artifacts — four .nupkg + three .snupkg, the analyzer package carrying no symbols of its
-      # own. Verify with:
+      # provenance by default when no predicate is given). subject-path covers every .nupkg and
+      # .snupkg, the analyzer-only packages carrying no symbols of their own. Verify with:
       #   gh attestation verify <file> --repo andypgray/sliderule
       # Permissions: id-token + attestations only. Do NOT add artifact-metadata: write —
       # that is for create-storage-record/push-to-registry, which file subjects don't use.
@@ -164,7 +171,7 @@ jobs:
         with:
           user: andypgray
 
-      # The glob pushes all four .nupkg; each .snupkg rides along automatically with its .nupkg.
+      # The glob pushes every .nupkg; each .snupkg rides along with its .nupkg.
       - name: Push to NuGet
         run: dotnet nuget push "artifacts/*.nupkg" --api-key "${{ steps.login.outputs.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
 

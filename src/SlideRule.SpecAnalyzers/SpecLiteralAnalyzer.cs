@@ -103,7 +103,7 @@ internal sealed class SpecLiteralAnalyzer : DiagnosticAnalyzer
         context.RegisterCompilationStartAction(OnCompilationStart);
     }
 
-    // This member and ReleasedVersion must agree with BuildTierAnalyzer's; CopiedMemberParityTests holds
+    // This member and ReleasedVersion must agree with BuildTierEngine's; CopiedMemberParityTests holds
     // them identical.
     internal static string? InformationalVersionOf(Assembly assembly)
     {

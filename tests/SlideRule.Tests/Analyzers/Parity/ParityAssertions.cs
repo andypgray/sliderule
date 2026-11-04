@@ -44,15 +44,28 @@ internal static class ParityAssertions
     /// <param name="subject">The solution and spec under test.</param>
     /// <param name="cancellationToken">The token the analysis runs under.</param>
     /// <param name="gaps">The under-reports this design accepts here, each named and keyed.</param>
-    internal static async Task ShouldHoldOnBothLegsAsync(
+    internal static Task ShouldHoldOnBothLegsAsync(
         this ParitySubject subject, CancellationToken cancellationToken, params ParityGap[] gaps)
+    {
+        return subject.ShouldHoldOnBothLegsAsync(ParityAnalyzer.Product, cancellationToken, gaps);
+    }
+
+    /// <summary>The same claims, made of <paramref name="analyzer" />.</summary>
+    /// <param name="subject">The solution and spec under test.</param>
+    /// <param name="analyzer">The analyzer the reports are taken from.</param>
+    /// <param name="cancellationToken">The token the analysis runs under.</param>
+    /// <param name="gaps">The under-reports this design accepts here, each named and keyed.</param>
+    internal static async Task ShouldHoldOnBothLegsAsync(
+        this ParitySubject subject, ParityAnalyzer analyzer, CancellationToken cancellationToken,
+        params ParityGap[] gaps)
     {
         subject.Compilations.ShouldNotBeEmpty($"{subject.Name}: compilations to analyse");
 
         foreach (ParityLeg leg in Legs)
         {
             IReadOnlyList<ParityCompilation> compilations = subject.On(leg);
-            ParityReport batch = await subject.ReportAsync(compilations, ParityDriver.Batch, cancellationToken);
+            ParityReport batch = await subject.ReportAsync(
+                compilations, ParityDriver.Batch, cancellationToken, analyzer: analyzer);
 
             batch.ShouldReportEverythingBut(subject.Expectation, subject.Name, leg, gaps);
             batch.ShouldNameExactlyTheseUncheckedRules(
@@ -60,7 +73,7 @@ internal static class ParityAssertions
             batch.ShouldHoldNoDuplicate(subject.Name, leg);
 
             ParityReport perDocument = await subject.ReportAsync(
-                compilations, ParityDriver.PerDocument, cancellationToken);
+                compilations, ParityDriver.PerDocument, cancellationToken, analyzer: analyzer);
 
             perDocument.ShouldEqualTheBatchLessToolState(batch, subject.Name, leg);
             perDocument.ShouldPlaceEveryKeyInItsOwnTree(subject.Name, leg);
@@ -73,10 +86,10 @@ internal static class ParityAssertions
     ///     reports, finding for finding and unchecked rule for unchecked rule.
     /// </summary>
     /// <remarks>
-    ///     Held out of <see cref="ShouldHoldOnBothLegsAsync" /> and asked of a chosen few subjects, because
-    ///     it doubles the analysis of every compilation and the claim is about the switch rather than about
-    ///     any one solution: the in-memory corpus reaches every verb the table decides, and one bed states
-    ///     it over a real project system.
+    ///     Held out of <see cref="ShouldHoldOnBothLegsAsync(ParitySubject, CancellationToken, ParityGap[])" />
+    ///     and asked of a chosen few subjects, because it doubles the analysis of every compilation and the
+    ///     claim is about the switch rather than about any one solution: the in-memory corpus reaches every
+    ///     verb the table decides, and one bed states it over a real project system.
     /// </remarks>
     /// <param name="subject">The solution and spec under test.</param>
     /// <param name="cancellationToken">The token the analysis runs under.</param>

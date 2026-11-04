@@ -173,7 +173,7 @@ The CLI is a .NET global tool, and the machine that runs it needs a .NET 10 SDK.
 
 The [command-line reference](https://github.com/andypgray/sliderule/blob/main/CLI.md) covers each command's options and exit codes, and what a run does when a project fails to load or a solution filter narrows it.
 
-The command is `sliderule`. Four lockstep-versioned packages make up a release, and a spec project references `SlideRule` at the version `sliderule --version` prints:
+The command is `sliderule`. Five lockstep-versioned packages make up a release, and a spec project references `SlideRule` at the version `sliderule --version` prints:
 
 | Package | What it is |
 |---|---|
@@ -181,6 +181,7 @@ The command is `sliderule`. Four lockstep-versioned packages make up a release, 
 | [`SlideRule`](https://www.nuget.org/packages/SlideRule) | The spec contract, zero dependencies. It includes an analyzer that reports a spec's bad string literals as compiler warnings while you write it, and completion for namespace and type names. |
 | [`SlideRule.Xunit`](https://www.nuget.org/packages/SlideRule.Xunit) | The xUnit adapter: every rule as an individually named test. |
 | [`SlideRule.Analyzers`](https://www.nuget.org/packages/SlideRule.Analyzers) | The build analyzer: a broken rule as a squiggle in the editor and a compiler warning in `dotnet build`, read from the model file `render --model` writes. |
+| [`SlideRule.Guidance.DotNet`](https://www.nuget.org/packages/SlideRule.Guidance.DotNet) | Microsoft's .NET guidance as compiler warnings, one ID per rule, with no spec to write. |
 
 [Operating SlideRule](https://github.com/andypgray/sliderule/blob/main/OPERATING.md#upgrading) explains how to keep the tool and the packages on one version as releases come out.
 

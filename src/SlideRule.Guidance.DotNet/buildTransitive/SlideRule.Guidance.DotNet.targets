@@ -1,0 +1,24 @@
+<Project>
+
+    <!-- The analyzer needs nothing handed to it: its rules travel inside its assembly, and it reads the project's
+         own sliderule.model.json only where the build already hands that file over. So the one thing this file
+         does is keep a compiler too old to load the analyzer from failing the build.
+
+         The same file is packed to buildTransitive/ and to build/, so a project can import both copies; the
+         target below does the same thing however often it runs.
+
+         A compiler below Roslyn 4.0.1 cannot load this analyzer and says so with CS8032 on every build: a
+         warning ordinarily, an error wherever warnings are errors. Taking the analyzer back out leaves such a
+         build working as it did before. CompilerApiVersion is empty on a host below the floor and carries a
+         value on every host at or above it, and the Analyzer items carry NuGetPackageId on all of them. -->
+    <Target Name="_SlideRuleGuidanceRemoveAnalyzerBelowTheFloor"
+            BeforeTargets="CoreCompile"
+            Condition="'$(CompilerApiVersion)' == ''">
+        <ItemGroup>
+            <_SlideRuleGuidanceBelowTheFloor Include="@(Analyzer)"
+                                             Condition="'%(Analyzer.NuGetPackageId)' == 'SlideRule.Guidance.DotNet'" />
+            <Analyzer Remove="@(_SlideRuleGuidanceBelowTheFloor)" />
+        </ItemGroup>
+    </Target>
+
+</Project>

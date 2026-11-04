@@ -9,6 +9,7 @@
         "SlideRule",
         "SlideRule.Analyzers",
         "SlideRule.Cli",
+        "SlideRule.Guidance.DotNet",
         "SlideRule.Xunit",
         "SlideRule.Extraction",
         "SlideRule.Packs.DotNet",

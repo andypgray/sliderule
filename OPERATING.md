@@ -85,7 +85,7 @@ A merge conflict inside a managed block, or in the model file, resolves by rende
 
 ## Upgrading
 
-The four packages ship one version together, so upgrade them in one change. Update the tool first:
+The tool, the contract, the build analyzer and the xUnit adapter ship one version together, so upgrade them in one change. `SlideRule.Guidance.DotNet` shares their version number and works with any of them. Update the tool first:
 
 ```bash
 dotnet tool update -g SlideRule.Cli --version <version>

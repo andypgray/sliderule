@@ -1,6 +1,6 @@
 # SlideRule on itself
 
-SlideRule is a .NET architecture checker, and it governs itself. Its spec, [`SlideRuleArchitectureSpec.cs`](https://github.com/andypgray/sliderule/blob/main/arch/SlideRule.Architecture/SlideRuleArchitectureSpec.cs), states 49 rules over this repository's real code, across 12 declared layers. That rule count includes the spec's one [quarantined scope](https://github.com/andypgray/sliderule/blob/main/WRITING-SPECS.md#scopes) and leaves out its Caution scope, which only warns. A `check` run counts more rules, because it runs the quarantine as a containment rule and a tripwire, and the Caution scope as a tripwire. Each fence on this page shows that spec, or this solution under it, on one surface after another. The fences under [As SARIF](#as-sarif) are the exception, because showing a ratchet needs live debt and this repository has paid its own off. They come from the Meridian example. The section [Why these excerpts can be trusted](#why-these-excerpts-can-be-trusted) explains how each fence on this page is checked or registered.
+SlideRule is a .NET architecture checker, and it governs itself. Its spec, [`SlideRuleArchitectureSpec.cs`](https://github.com/andypgray/sliderule/blob/main/arch/SlideRule.Architecture/SlideRuleArchitectureSpec.cs), states 50 rules over this repository's real code, across 13 declared layers. That rule count includes the spec's one [quarantined scope](https://github.com/andypgray/sliderule/blob/main/WRITING-SPECS.md#scopes) and leaves out its Caution scope, which only warns. A `check` run counts more rules, because it runs the quarantine as a containment rule and a tripwire, and the Caution scope as a tripwire. Each fence on this page shows that spec, or this solution under it, on one surface after another. The fences under [As SARIF](#as-sarif) are the exception, because showing a ratchet needs live debt and this repository has paid its own off. They come from the Meridian example. The section [Why these excerpts can be trusted](#why-these-excerpts-can-be-trusted) explains how each fence on this page is checked or registered.
 
 ## This repo's own spec
 
@@ -65,10 +65,10 @@ SlideRule.Cli.CommandEntryPoint (class)
     Host
       declared by project `SlideRule.Cli`
   excepted by:
-    rule exceptions/no-swallowed-broad-catches: Types in the Core, Extraction, Analyzers, SpecAnalyzers, SpecCompletion, Workspace, Host, Adapter or Pack layers, except types named `ArchChecker`, `ArchRuleTests`, `BuildTierAnalyzer`, `CommandEntryPoint`, `IdleTimeoutWatchdog`, `ParentProcessWatcher`, `ServerShutdown`, `SpecLiteralAnalyzer` or `VsWhereLocator`
+    rule exceptions/no-swallowed-broad-catches: Types in the Core, Extraction, Analyzers, SpecAnalyzers, SpecCompletion, Workspace, Host, Adapter, Pack or Guidance layers, except types named `ArchChecker`, `ArchRuleTests`, `BuildTierEngine`, `CommandEntryPoint`, `IdleTimeoutWatchdog`, `ParentProcessWatcher`, `ServerShutdown`, `SpecLiteralAnalyzer` or `VsWhereLocator`
       in the Host layer
         declared by project `SlideRule.Cli`
-      removed by the except: types named `ArchChecker`, `ArchRuleTests`, `BuildTierAnalyzer`, `CommandEntryPoint`, `IdleTimeoutWatchdog`, `ParentProcessWatcher`, `ServerShutdown`, `SpecLiteralAnalyzer` or `VsWhereLocator`
+      removed by the except: types named `ArchChecker`, `ArchRuleTests`, `BuildTierEngine`, `CommandEntryPoint`, `IdleTimeoutWatchdog`, `ParentProcessWatcher`, `ServerShutdown`, `SpecLiteralAnalyzer` or `VsWhereLocator`
         it is named `CommandEntryPoint`
 ```
 
@@ -186,14 +186,15 @@ The same rule from `check --json`, the document `arch_check` returns over MCP, s
 
 ## The graph
 
-`sliderule graph` surveys the codebase a spec is written against: projects and their references, namespaces and their sizes, and every external dependency by root. It needs no spec. It prints 27 project lines for this solution, one for every project the load reaches, so the projects that test fixtures reference are among them. These are the lines for its ten projects outside the tests and their fixtures:
+`sliderule graph` surveys the codebase a spec is written against: projects and their references, namespaces and their sizes, and every external dependency by root. It needs no spec. It prints 28 project lines for this solution, one for every project the load reaches, so the projects that test fixtures reference are among them. These are the lines for its 11 projects outside the tests and their fixtures:
 
 ```text
   SlideRule — 385 types; targets netstandard2.0; references: (none); packages: (none); locks restore
-  SlideRule.Analyzers — 11 types; targets netstandard2.0; references: SlideRule, SlideRule.Extraction; packages: Microsoft.CodeAnalysis.Analyzers (private); locks restore
+  SlideRule.Analyzers — 15 types; targets netstandard2.0; references: SlideRule, SlideRule.Extraction; packages: Microsoft.CodeAnalysis.Analyzers (private); locks restore
   SlideRule.Architecture — 1 type; targets net10.0; references: SlideRule, SlideRule.Packs.DotNet; packages: Microsoft.Build.Locator; does not pack
   SlideRule.Cli — 195 types (1 generated); targets net10.0; references: SlideRule, SlideRule.Extraction, SlideRule.Roslyn; packages: Microsoft.Extensions.Hosting, ModelContextProtocol, Serilog.Extensions.Hosting, Serilog.Sinks.File, SlideRule.Analyzers (private), System.CommandLine; locks restore
   SlideRule.Extraction — 54 types; targets netstandard2.0; references: SlideRule; packages: Microsoft.CodeAnalysis.CSharp; does not pack; locks restore
+  SlideRule.Guidance.DotNet — 2 types; targets netstandard2.0; references: (none); undeclared references: SlideRule.Analyzers; packages: Microsoft.CodeAnalysis.Analyzers (private), Microsoft.CodeAnalysis.CSharp (private), SlideRule.Analyzers (private); locks restore
   SlideRule.Packs.DotNet — 2 types; targets net10.0; references: SlideRule; packages: Microsoft.Extensions.DependencyInjection, Microsoft.Extensions.DependencyInjection.Abstractions, SlideRule.Analyzers (private); does not pack; locks restore
   SlideRule.Roslyn — 114 types (11 generated); targets net10.0; references: SlideRule, SlideRule.Extraction; packages: Basic.CompilerLog.Util, Microsoft.Build (private), Microsoft.Build.Framework (private), Microsoft.Build.Locator, Microsoft.Build.Tasks.Core (private), Microsoft.Build.Utilities.Core (private), Microsoft.CodeAnalysis, Microsoft.CodeAnalysis.CSharp.Workspaces, Microsoft.CodeAnalysis.Workspaces.MSBuild, Microsoft.NET.StringTools (private), SlideRule.Analyzers (private), System.Security.Cryptography.Xml (private); does not pack; locks restore
   SlideRule.SpecAnalyzers — 5 types; targets netstandard2.0; references: SlideRule; packages: Microsoft.CodeAnalysis.Analyzers (private), Microsoft.CodeAnalysis.CSharp (private), SlideRule.Analyzers (private); does not pack; locks restore
@@ -201,7 +202,7 @@ The same rule from `check --json`, the document `arch_check` returns over MCP, s
   SlideRule.Xunit — 3 types; targets net10.0; references: SlideRule, SlideRule.Roslyn; packages: Basic.CompilerLog.Util, Microsoft.Build.Framework (private), Microsoft.Build.Locator, Microsoft.Build.Utilities.Core (private), Microsoft.CodeAnalysis, Microsoft.CodeAnalysis.CSharp.Workspaces, Microsoft.CodeAnalysis.Workspaces.MSBuild, Microsoft.NET.StringTools (private), SlideRule.Analyzers (private), xunit.v3.assert, xunit.v3.extensibility.core; locks restore
 ```
 
-The `references: (none)` on the first line is the rule `layering/core-no-roslyn` seen from the other side. That rule forbids Core, the model every spec compiles to, from referencing the Roslyn project or the compiler packages, and the survey shows Core referencing no project at all. The count of generated types in parentheses is worth checking before writing a rule on a project, because `arch.Project` selects everything the assembly declares, generated files included. On a web project where compiled views outnumber the code around them, that number shows whether a project rule would mostly judge generated code. `locks restore` and `does not pack` are facts the packaging rules judge. A rule can check a project's target frameworks, package references and lock file as well as its types, as [Writing specs](https://github.com/andypgray/sliderule/blob/main/WRITING-SPECS.md#what-a-rule-covers) shows.
+The `references: (none)` on the first line is the rule `layering/core-no-roslyn` seen from the other side. That rule forbids Core, the model every spec compiles to, from referencing the Roslyn project or the compiler packages, and the survey shows Core referencing no project at all. The count of generated types in parentheses is worth checking before writing a rule on a project, because `arch.Project` selects everything the assembly declares, generated files included. On a web project where compiled views outnumber the code around them, that number shows whether a project rule would mostly judge generated code. `locks restore` and `does not pack` are facts the packaging rules judge. A rule can check a project's target frameworks, package references and lock file as well as its types, as [Writing specs](https://github.com/andypgray/sliderule/blob/main/WRITING-SPECS.md#what-a-rule-covers) shows. The `undeclared references` entry on `SlideRule.Guidance.DotNet` is what an editor sees of that project: a reference to the build analyzer. Its build compiles the analyzer's sources into its own assembly instead, so its project file declares no reference at all.
 
 `render --diagram <path>` draws that same survey as a Mermaid diagram inside a committed file's managed block. Pointed at this repository and scoped to the projects shown above, it writes [`ARCHITECTURE.md`](https://github.com/andypgray/sliderule/blob/main/ARCHITECTURE.md):
 
@@ -215,6 +216,7 @@ flowchart LR
     p_SlideRule_Architecture["SlideRule.Architecture"]
     p_SlideRule_Cli["SlideRule.Cli"]
     p_SlideRule_Extraction["SlideRule.Extraction"]
+    p_SlideRule_Guidance_DotNet["SlideRule.Guidance.DotNet"]
     p_SlideRule_Packs_DotNet["SlideRule.Packs.DotNet"]
     p_SlideRule_Roslyn["SlideRule.Roslyn"]
     p_SlideRule_SpecAnalyzers["SlideRule.SpecAnalyzers"]
@@ -229,6 +231,7 @@ flowchart LR
     p_SlideRule_Cli --> p_SlideRule_Extraction
     p_SlideRule_Cli --> p_SlideRule_Roslyn
     p_SlideRule_Extraction --> p_SlideRule
+    p_SlideRule_Guidance_DotNet --> p_SlideRule_Analyzers
     p_SlideRule_Packs_DotNet --> p_SlideRule
     p_SlideRule_Roslyn --> p_SlideRule
     p_SlideRule_Roslyn --> p_SlideRule_Extraction
@@ -265,6 +268,7 @@ flowchart LR
     s_Analyzers["Analyzers"]
     s_SpecAnalyzers["SpecAnalyzers"]
     s_SpecCompletion["SpecCompletion"]
+    s_Guidance["Guidance"]
 
     s_Core --x s_Extraction
     s_Core --x s_Workspace
@@ -285,6 +289,9 @@ flowchart LR
     s_SpecAnalyzers -->|"only"| s_Core
     s_Core --x s_Adapter
     s_Workspace --x s_Adapter
+    s_Guidance -->|"only"| s_Core
+    s_Guidance -->|"only"| s_Extraction
+    s_Guidance -->|"only"| s_Analyzers
 
     subgraph l_legend["Legend"]
         l_ban["--x = must not reference"]

@@ -29,7 +29,7 @@ internal sealed class InMemoryAdditionalText(string path, string? content) : Add
     }
 }
 
-/// <summary>The analyzer config keys a project declares, as the one global section.</summary>
+/// <summary>The analyzer config keys of one section, the global one or a tree's, held in memory.</summary>
 internal sealed class InMemoryConfigOptions(IReadOnlyDictionary<string, string> values) : AnalyzerConfigOptions
 {
     public override IEnumerable<string> Keys => values.Keys;
@@ -41,10 +41,12 @@ internal sealed class InMemoryConfigOptions(IReadOnlyDictionary<string, string> 
 }
 
 /// <summary>
-///     The options provider a compilation is analysed under. Only the global section carries anything: the
-///     build tier reads one MSBuild property and nothing per file.
+///     The options provider a compilation is analysed under: the global section, and the keys each tree's
+///     config files give it where <paramref name="perTree" /> names the tree.
 /// </summary>
-internal sealed class InMemoryConfigOptionsProvider(IReadOnlyDictionary<string, string> global)
+internal sealed class InMemoryConfigOptionsProvider(
+    IReadOnlyDictionary<string, string> global,
+    IReadOnlyDictionary<SyntaxTree, AnalyzerConfigOptions>? perTree = null)
     : AnalyzerConfigOptionsProvider
 {
     private static readonly AnalyzerConfigOptions None = new InMemoryConfigOptions(new Dictionary<string, string>());
@@ -53,7 +55,7 @@ internal sealed class InMemoryConfigOptionsProvider(IReadOnlyDictionary<string, 
 
     public override AnalyzerConfigOptions GetOptions(SyntaxTree tree)
     {
-        return None;
+        return perTree is not null && perTree.TryGetValue(tree, out AnalyzerConfigOptions? options) ? options : None;
     }
 
     public override AnalyzerConfigOptions GetOptions(AdditionalText textFile)
@@ -63,9 +65,39 @@ internal sealed class InMemoryConfigOptionsProvider(IReadOnlyDictionary<string, 
 }
 
 /// <summary>
-///     Runs the build-tier analyzer the two ways a host runs it — over a whole compilation as a build does,
-///     and document by document as an editor does, both through <see cref="CompilationWithAnalyzers" /> —
-///     and builds the two-project world the facts are written against.
+///     The severities config files set, per tree and globally, answered from the results the compiler's own
+///     <see cref="AnalyzerConfigSet" /> gives, as the command-line compiler's own provider answers them.
+/// </summary>
+internal sealed class InMemorySyntaxTreeOptionsProvider(
+    IReadOnlyDictionary<SyntaxTree, AnalyzerConfigOptionsResult> perTree,
+    AnalyzerConfigOptionsResult global)
+    : SyntaxTreeOptionsProvider
+{
+    public override GeneratedKind IsGenerated(SyntaxTree tree, CancellationToken cancellationToken)
+    {
+        return GeneratedKind.Unknown;
+    }
+
+    public override bool TryGetDiagnosticValue(
+        SyntaxTree tree, string diagnosticId, CancellationToken cancellationToken, out ReportDiagnostic severity)
+    {
+        severity = ReportDiagnostic.Default;
+
+        return perTree.TryGetValue(tree, out AnalyzerConfigOptionsResult options)
+               && options.TreeOptions.TryGetValue(diagnosticId, out severity);
+    }
+
+    public override bool TryGetGlobalDiagnosticValue(
+        string diagnosticId, CancellationToken cancellationToken, out ReportDiagnostic severity)
+    {
+        return global.TreeOptions.TryGetValue(diagnosticId, out severity);
+    }
+}
+
+/// <summary>
+///     Runs an analyzer, the build-tier analyzer unless a fact passes another, the two ways a host runs it: over a
+///     whole compilation as a build does, and document by document as an editor does, both through
+///     <see cref="CompilationWithAnalyzers" />. It also builds the two-project world the facts are written against.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -178,10 +210,18 @@ internal static class BuildTier
     /// <summary>
     ///     What <c>SR2093</c> says for the fault <see cref="Boom" /> throws, which quotes only the fault's first line.
     /// </summary>
-    internal const string FaultMessage =
-        "The SlideRule analyzer failed in this project, so some or all of its findings are missing: "
-        + "InvalidOperationException: boom. This is a fault in the analyzer and says nothing about the code, "
-        + "and 'sliderule check' is unaffected. Report it at https://github.com/andypgray/sliderule/issues.";
+    internal static string FaultMessage => FaultMessageFor("InvalidOperationException: boom");
+
+    /// <summary>
+    ///     What <c>SR2093</c> says for a fault it quotes as <paramref name="fault" />: the exception's type name, a
+    ///     colon, and the first line of its message.
+    /// </summary>
+    internal static string FaultMessageFor(string fault)
+    {
+        return "The SlideRule analyzer failed in this project, so some or all of its findings are missing: "
+               + $"{fault}. This is a fault in the analyzer and says nothing about the code, "
+               + "and 'sliderule check' is unaffected. Report it at https://github.com/andypgray/sliderule/issues.";
+    }
 
     /// <summary>The fault a seam throws to stand for any fault in the analyzer, with a second line to drop.</summary>
     internal static void Boom()
@@ -370,13 +410,63 @@ internal static class BuildTier
     /// <param name="tier">The tier the project declares, or null for a project that declares none.</param>
     /// <param name="cancellationToken">The token the analysis runs under.</param>
     internal static async Task<IReadOnlyList<Diagnostic>> DiagnoseAsync(
-        BuildTierAnalyzer analyzer,
+        DiagnosticAnalyzer analyzer,
         Compilation compilation,
         IReadOnlyList<AdditionalText> additionalFiles,
         string? tier = null,
         CancellationToken cancellationToken = default)
     {
         CompilationWithAnalyzers withAnalyzers = Armed(compilation, additionalFiles, tier, analyzer);
+
+        ImmutableArray<Diagnostic> reported = await withAnalyzers.GetAnalyzerDiagnosticsAsync(cancellationToken);
+
+        return Sorted(reported);
+    }
+
+    /// <summary>
+    ///     <paramref name="compilation" /> under <paramref name="configs" />, each an <c>.editorconfig</c> or a
+    ///     global config given by its path and text. The compiler's own parser reads them, and their keys are split
+    ///     between severities and analyzer options as the command-line compiler splits them. Analyse the result with
+    ///     <see cref="DiagnoseAsync(DiagnosticAnalyzer, Compilation, AnalyzerConfigOptionsProvider, CancellationToken)" />.
+    /// </summary>
+    internal static (Compilation Compilation, AnalyzerConfigOptionsProvider Options) Configured(
+        Compilation compilation, params (string Path, string Text)[] configs)
+    {
+        List<AnalyzerConfig> parsed = configs
+            .Select(config => AnalyzerConfig.Parse(config.Text, config.Path))
+            .ToList();
+        var set = AnalyzerConfigSet.Create(parsed);
+        AnalyzerConfigOptionsResult global = set.GlobalConfigOptions;
+        Dictionary<SyntaxTree, AnalyzerConfigOptionsResult> perTree = compilation.SyntaxTrees
+            .ToDictionary(tree => tree, tree => set.GetOptionsForSourcePath(tree.FilePath));
+
+        var severities = new InMemorySyntaxTreeOptionsProvider(perTree, global);
+        Compilation configured = compilation.WithOptions(compilation.Options.WithSyntaxTreeOptionsProvider(severities));
+
+        Dictionary<SyntaxTree, AnalyzerConfigOptions> treeOptions = perTree.ToDictionary(
+            pair => pair.Key, AnalyzerConfigOptions (pair) => new InMemoryConfigOptions(pair.Value.AnalyzerOptions));
+
+        return (configured, new InMemoryConfigOptionsProvider(global.AnalyzerOptions, treeOptions));
+    }
+
+    /// <summary>
+    ///     <paramref name="compilation" /> with each of <paramref name="ids" /> set to <paramref name="severity" /> in
+    ///     its options.
+    /// </summary>
+    internal static Compilation WithSeverity(Compilation compilation, ReportDiagnostic severity, params string[] ids)
+    {
+        ImmutableDictionary<string, ReportDiagnostic> set = compilation.Options.SpecificDiagnosticOptions
+            .SetItems(ids.Select(id => new KeyValuePair<string, ReportDiagnostic>(id, severity)));
+
+        return compilation.WithOptions(compilation.Options.WithSpecificDiagnosticOptions(set));
+    }
+
+    /// <summary>The diagnostics the analyzer reports over a compilation <see cref="Configured" /> built.</summary>
+    internal static async Task<IReadOnlyList<Diagnostic>> DiagnoseAsync(
+        DiagnosticAnalyzer analyzer, Compilation compilation, AnalyzerConfigOptionsProvider options,
+        CancellationToken cancellationToken)
+    {
+        CompilationWithAnalyzers withAnalyzers = compilation.WithAnalyzers([analyzer], new AnalyzerOptions([], options));
 
         ImmutableArray<Diagnostic> reported = await withAnalyzers.GetAnalyzerDiagnosticsAsync(cancellationToken);
 
@@ -436,8 +526,25 @@ internal static class BuildTier
             Action? beforeCheck = null,
             CancellationToken cancellationToken = default)
     {
-        CompilationWithAnalyzers withAnalyzers =
-            Armed(compilation, additionalFiles, tier, new BuildTierAnalyzer(beforeCheck));
+        return await DiagnoseEachDocumentAsync(
+            new BuildTierAnalyzer(beforeCheck), compilation, additionalFiles, tier, cancellationToken);
+    }
+
+    /// <summary>The same per-document run by an analyzer the caller built.</summary>
+    /// <param name="analyzer">The analyzer, with its seams armed.</param>
+    /// <param name="compilation">The compilation being built.</param>
+    /// <param name="additionalFiles">The files the build hands over.</param>
+    /// <param name="tier">The tier the project declares, or null for a project that declares none.</param>
+    /// <param name="cancellationToken">The token the analysis runs under.</param>
+    internal static async Task<IReadOnlyList<(SyntaxTree Tree, IReadOnlyList<Diagnostic> Reported)>>
+        DiagnoseEachDocumentAsync(
+            DiagnosticAnalyzer analyzer,
+            Compilation compilation,
+            IReadOnlyList<AdditionalText> additionalFiles,
+            string? tier,
+            CancellationToken cancellationToken)
+    {
+        CompilationWithAnalyzers withAnalyzers = Armed(compilation, additionalFiles, tier, analyzer);
 
         var documents = new List<(SyntaxTree Tree, IReadOnlyList<Diagnostic> Reported)>();
         foreach (SyntaxTree tree in compilation.SyntaxTrees)
@@ -458,7 +565,7 @@ internal static class BuildTier
 
     private static CompilationWithAnalyzers Armed(
         Compilation compilation, IReadOnlyList<AdditionalText> additionalFiles, string? tier,
-        BuildTierAnalyzer analyzer)
+        DiagnosticAnalyzer analyzer)
     {
         // What a project declaring the tier states, or nothing at all: a build that declares no tier is the
         // common case and the analyzer reads it as live, so a null here is a project with no global section
@@ -473,7 +580,7 @@ internal static class BuildTier
         return compilation.WithAnalyzers([analyzer], analyzerOptions);
     }
 
-    // One order for both calls, so a fact written against the batch result reads the same way round when it
+    // One order for every run, so a fact written against the batch result reads the same way round when it
     // is asked of one document.
     private static IReadOnlyList<Diagnostic> Sorted(ImmutableArray<Diagnostic> reported)
     {

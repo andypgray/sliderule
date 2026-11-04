@@ -46,7 +46,7 @@ The `sliderule` tool finds it as the one project in the solution that references
 describes. The check leaves out the spec project itself, and any library the spec references that the
 solution does not declare.
 
-The four SlideRule packages ship one version in lockstep: this one, `SlideRule.Analyzers`,
+The five SlideRule packages ship one version in lockstep: this one, `SlideRule.Analyzers`,
 `SlideRule.Xunit` and the `SlideRule.Cli` tool. Reference the version `sliderule --version` prints,
 without its `+<commit>` suffix. A spec project that also gets `SlideRule.Analyzers`, for example from a
 `Directory.Build.props` covering every project, needs both on one version. Each

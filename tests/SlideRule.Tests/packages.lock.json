@@ -933,6 +933,9 @@
           "SlideRule": "[0.2.1, )"
         }
       },
+      "sliderule.guidance.dotnet": {
+        "type": "Project"
+      },
       "sliderule.packs.dotnet": {
         "type": "Project",
         "dependencies": {

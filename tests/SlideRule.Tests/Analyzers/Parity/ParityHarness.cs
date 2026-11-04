@@ -1,5 +1,6 @@
 using System.Globalization;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Diagnostics;
 using SlideRule.Analyzers;
 using SlideRule.Baselines;
 using SlideRule.Checking;
@@ -75,6 +76,31 @@ internal sealed record ParityCompilation(string Label, Compilation Compilation);
 /// <param name="Covers">Whether a key the build did not report is this difference.</param>
 internal sealed record ParityGap(string Name, Func<ParityKey, bool> Covers);
 
+/// <summary>The analyzer a report is taken from, and how its warnings are read.</summary>
+/// <param name="Create">A fresh instance, with no seam armed.</param>
+/// <param name="IsFinding">
+///     Whether a warning is a finding, to be keyed. A warning that is neither a finding nor one under
+///     <paramref name="UncheckedId" /> is a stranger.
+/// </param>
+/// <param name="UncheckedId">The ID it names a ratcheted rule it could not check under, or null for none.</param>
+/// <param name="TakesTheSubjectsFiles">Whether the build hands it the subject's model file and baselines.</param>
+/// <param name="Configure">The compilation as this analyzer is run over it.</param>
+internal sealed record ParityAnalyzer(
+    Func<DiagnosticAnalyzer> Create,
+    Func<Diagnostic, bool> IsFinding,
+    string? UncheckedId,
+    bool TakesTheSubjectsFiles,
+    Func<Compilation, Compilation> Configure)
+{
+    /// <summary>The build analyzer, handed the model file and its baselines, over the compilation as built.</summary>
+    internal static ParityAnalyzer Product { get; } = new(
+        () => new BuildTierAnalyzer(),
+        diagnostic => diagnostic.Id is "SR2001" or "SR2002",
+        "SR2092",
+        true,
+        compilation => compilation);
+}
+
 /// <summary>
 ///     What the whole-solution check says of one solution under one spec: the findings the build is held
 ///     to, and the two sets of rules that are outside that hold.
@@ -144,7 +170,7 @@ internal sealed class ParityReport(
     IReadOnlyList<string> strangers,
     IReadOnlyList<(string Compilation, string TreePath, ParityKey Key, Diagnostic Diagnostic)> placed)
 {
-    /// <summary>Every <c>SR2001</c> and <c>SR2002</c>, read off the diagnostic's properties.</summary>
+    /// <summary>Every finding, read off the diagnostic's properties.</summary>
     internal IReadOnlyList<ParityKey> Keys { get; } = found
         .Select(finding => finding.Key)
         .ToList();
@@ -155,7 +181,7 @@ internal sealed class ParityReport(
     /// </summary>
     internal IReadOnlyList<(string Compilation, ParityKey Key, Diagnostic Diagnostic)> Found { get; } = found;
 
-    /// <summary>Every <c>SR2092</c>, as the compilation that reported it and the rule it named.</summary>
+    /// <summary>Every rule named unchecked, as the compilation that named it and the rule.</summary>
     internal IReadOnlyList<(string Compilation, string Rule)> Unchecked { get; } = uncheckedRules;
 
     /// <summary>Anything else the build tier said — a fault, a refusal, a missing file, a compiler AD0001.</summary>
@@ -375,9 +401,9 @@ internal static class ParityHarness
     /// </summary>
     /// <remarks>
     ///     The two drivers differ in what the tool's own state does, and in nothing else. A batch run is
-    ///     handed <c>SR2092</c> from the compilation's end action and records it; a per-document run cannot
-    ///     be handed it at all — a diagnostic with no location is local to no document — so one that arrived
-    ///     there would be a stranger, and <c>SR2093</c> with it.
+    ///     handed the unchecked warning (<c>SR2092</c>) from the compilation's end action and records it; a
+    ///     per-document run cannot be handed it at all — a diagnostic with no location is local to no
+    ///     document — so one that arrived there would be a stranger, and the fault warning with it.
     /// </remarks>
     /// <param name="subject">
     ///     The solution and spec under test: the model file and baseline files the build hands over, and the
@@ -389,10 +415,13 @@ internal static class ParityHarness
     /// <param name="tier">
     ///     The tier the build declares, or null to declare none, which the analyzer reads as the live tier.
     /// </param>
+    /// <param name="analyzer">The analyzer to ask, or null for the build analyzer.</param>
     internal static async Task<ParityReport> ReportAsync(
         this ParitySubject subject, IReadOnlyList<ParityCompilation> compilations, ParityDriver driver,
-        CancellationToken cancellationToken, string? tier = null)
+        CancellationToken cancellationToken, string? tier = null, ParityAnalyzer? analyzer = null)
     {
+        analyzer ??= ParityAnalyzer.Product;
+        IReadOnlyList<AdditionalText> files = analyzer.TakesTheSubjectsFiles ? subject.Files : [];
         var excluded = new HashSet<string>(subject.Expectation.Unmeasured, StringComparer.Ordinal);
         var found = new List<(string Compilation, ParityKey Key, Diagnostic Diagnostic)>();
         var placed = new List<(string Compilation, string TreePath, ParityKey Key, Diagnostic Diagnostic)>();
@@ -401,38 +430,38 @@ internal static class ParityHarness
 
         foreach (ParityCompilation compilation in compilations)
         {
+            Compilation configured = analyzer.Configure(compilation.Compilation);
             if (driver == ParityDriver.Batch)
             {
                 IReadOnlyList<Diagnostic> reported = await BuildTier.DiagnoseAsync(
-                    compilation.Compilation, subject.Files, tier, cancellationToken: cancellationToken);
+                    analyzer.Create(), configured, files, tier, cancellationToken);
 
                 foreach (Diagnostic diagnostic in reported)
-                    switch (diagnostic.Id)
+                    if (analyzer.IsFinding(diagnostic))
                     {
-                        case "SR2001" or "SR2002":
-                            ParityKey key = KeyOf(diagnostic);
-                            if (!excluded.Contains(key.Rule)) found.Add((compilation.Label, key, diagnostic));
-                            break;
-                        case "SR2092":
-                            string rule = diagnostic.Property("rule") ?? "(none)";
-                            if (!excluded.Contains(rule)) uncheckedRules.Add((compilation.Label, rule));
-                            break;
-                        default:
-                            strangers.Add($"{compilation.Label}: {diagnostic.Id} {Message(diagnostic)}");
-                            break;
+                        ParityKey key = KeyOf(diagnostic);
+                        if (!excluded.Contains(key.Rule)) found.Add((compilation.Label, key, diagnostic));
+                    }
+                    else if (diagnostic.Id == analyzer.UncheckedId)
+                    {
+                        string rule = diagnostic.Property("rule") ?? "(none)";
+                        if (!excluded.Contains(rule)) uncheckedRules.Add((compilation.Label, rule));
+                    }
+                    else
+                    {
+                        strangers.Add($"{compilation.Label}: {diagnostic.Id} {Message(diagnostic)}");
                     }
 
                 continue;
             }
 
             IReadOnlyList<(SyntaxTree Tree, IReadOnlyList<Diagnostic> Reported)> documents =
-                await BuildTier.DiagnoseEachDocumentAsync(
-                    compilation.Compilation, subject.Files, tier, cancellationToken: cancellationToken);
+                await BuildTier.DiagnoseEachDocumentAsync(analyzer.Create(), configured, files, tier, cancellationToken);
 
             foreach ((SyntaxTree tree, IReadOnlyList<Diagnostic> reported) in documents)
             foreach (Diagnostic diagnostic in reported)
             {
-                if (diagnostic.Id is not ("SR2001" or "SR2002"))
+                if (!analyzer.IsFinding(diagnostic))
                 {
                     strangers.Add($"{compilation.Label} ({tree.FilePath}): {diagnostic.Id} {Message(diagnostic)}");
                     continue;
@@ -531,13 +560,13 @@ internal static class ParityHarness
         var keys = new List<ParityKey>();
         foreach (ParityCompilation compilation in compilations)
         {
-            if (BuildTierAnalyzer.OwnProjectName(subject.Document, compilation.Compilation) is not { } owner) continue;
+            if (BuildTierEngine.OwnProjectName(subject.Document, compilation.Compilation) is not { } owner) continue;
 
             var input = new CompilationInput(compilation.Compilation, owner, Array.Empty<string>());
-            var siblings = new SiblingProjects(BuildTierAnalyzer.ProjectTable(subject.Document), owner);
+            var siblings = new SiblingProjects(BuildTierEngine.ProjectTable(subject.Document), owner);
             IReadOnlyList<CodebaseFragment> fragments =
                 FragmentExtractor.ExtractOneProject(input, siblings, cancellationToken);
-            CheckReport report = BuildTierAnalyzer.CheckOneProject(
+            CheckReport report = BuildTierEngine.CheckOneProject(
                 fragments, [rule], subject.Baselines, subject.ModelDirectory, cancellationToken);
 
             HashSet<string> owned = compilation.Compilation.SyntaxTrees

@@ -40,6 +40,8 @@ public sealed class PublicSurfaceSyncTests
 
     private const string CoreCsproj = "src/SlideRule/SlideRule.csproj";
 
+    private const string GuidanceCsproj = "src/SlideRule.Guidance.DotNet/SlideRule.Guidance.DotNet.csproj";
+
     /// <summary>
     ///     The two packages a consumer writes code against, each named by its csproj and by one type its assembly
     ///     exports, which the reflection sweep must see in that assembly's render: the contract package every spec
@@ -83,9 +85,9 @@ public sealed class PublicSurfaceSyncTests
     ];
 
     /// <summary>
-    ///     The two packages deliberately left unpinned, each with the text in its own csproj that makes the
+    ///     The packages left unpinned, each with the text in its own csproj that makes the
     ///     exemption true. Reading the evidence back is what stops an exemption outliving its reason: the day
-    ///     the CLI stops being a tool, or the analyzer stops declaring itself a development dependency, the
+    ///     the CLI stops being a tool, or an analyzer stops declaring itself a development dependency, the
     ///     sentence that says otherwise will have gone and this arm fails rather than silently covering a
     ///     package nothing watches.
     /// </summary>
@@ -100,6 +102,11 @@ public sealed class PublicSurfaceSyncTests
             "DevelopmentDependency",
             "true",
             "an analyzer: every type in it is internal and the package ships no lib/ folder, so there is "
+            + "no surface anyone can compile against"),
+        new(GuidanceCsproj,
+            "DevelopmentDependency",
+            "true",
+            "an analyzer: the package ships no lib/ folder, so the types compiled into its one assembly are "
             + "no surface anyone can compile against")
     ];
 

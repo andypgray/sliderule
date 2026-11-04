@@ -91,6 +91,10 @@
              brings Microsoft.Extensions.DependencyInjection (the container, not just the abstractions)
              in transitively — hence the lock-file churn that lands with this reference. -->
         <ProjectReference Include="..\..\src\SlideRule.Packs.DotNet\SlideRule.Packs.DotNet.csproj" />
+        <!-- The guidance analyzer compiles its own copy of the contract, the extractor and the build analyzer's
+             engine, so every type in it shares a full name with one the references above carry. The alias keeps
+             its copies out of the global namespace, where they would make every such name ambiguous. -->
+        <ProjectReference Include="..\..\src\SlideRule.Guidance.DotNet\SlideRule.Guidance.DotNet.csproj" Aliases="guidance" />
         <!-- Normal reference (ReferenceOutputAssembly=true): AgentsMd_IsCurrent consumes the dogfood
              spec type directly to compose the block in-process. Unlike the fixture specs, using this
              type is legitimate. -->

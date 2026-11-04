@@ -179,7 +179,7 @@ internal static class ParityRemainderSpec
         }
         """;
 
-    /// <summary>Every rule of the remainder, one per verb.</summary>
+    /// <summary>Every rule of the remainder, at least one per verb.</summary>
     internal static void Define(Arch arch)
     {
         DefineShapes(arch);

@@ -109,7 +109,7 @@ You write the spec against the [`SlideRule`](https://www.nuget.org/packages/Slid
 package, whose README covers the fluent surface. The
 [`SlideRule.Cli`](https://www.nuget.org/packages/SlideRule.Cli) global tool runs the same rules at
 the command line, in CI, and as an MCP server for coding agents. The adapter and the CLI produce
-identical failure text by construction. All four SlideRule packages ship one version in lockstep;
+identical failure text by construction. All five SlideRule packages ship one version in lockstep;
 reference the adapter and the contract at the same one. At two versions, `Workspace_LoadedCompletely`
 fails and names both, and a single skipped case, `ArchitectureSpec: not checked` for the spec above,
 replaces the rule cases.

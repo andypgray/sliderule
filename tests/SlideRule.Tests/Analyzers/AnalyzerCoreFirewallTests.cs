@@ -36,8 +36,8 @@ public sealed class AnalyzerCoreFirewallTests
     // the warning's two forms.
     private static readonly string[] BuildFaultPath =
     [
-        "SlideRule.Analyzers.BuildTierAnalyzer.ReportFault",
-        "SlideRule.Analyzers.BuildTierAnalyzer.ReportHeldFault",
+        "SlideRule.Analyzers.BuildTierEngine.ReportFault",
+        "SlideRule.Analyzers.BuildTierEngine.ReportHeldFault",
         "SlideRule.Analyzers.BuildTierDiagnostics.AnalyzerFailed",
         "SlideRule.Analyzers.BuildTierDiagnostics.VersionsMismatched"
     ];

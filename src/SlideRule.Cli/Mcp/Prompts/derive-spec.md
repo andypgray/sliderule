@@ -83,7 +83,7 @@ Create a small class library for the spec (convention: an `arch/` folder next to
 </Project>
 ```
 
-The four SlideRule packages ship one version in lockstep: reference the version `sliderule --version` prints. Where the repository manages package versions centrally, leave its `Directory.Packages.props` alone — the property above opts this one project out, so the spec keeps its own pin and the central file needs no entry for it.
+The five SlideRule packages ship one version in lockstep: reference the version `sliderule --version` prints. Where the repository manages package versions centrally, leave its `Directory.Packages.props` alone — the property above opts this one project out, so the spec keeps its own pin and the central file needs no entry for it.
 
 **A `Directory.Build.props` above the spec project applies to it too.** Where it adds `PackageReference` items whose versions live in the central file (MinVer, SourceLink, analyzers), the opt-out leaves them versionless, and restore fails with NU1015 naming packages the spec never asked for. Switch them off in the spec csproj with the property the props file conditions them on (one repository spells it `UseBuildTimeTools`), or `<PackageReference Remove="…" />` them there; never turn central management back on.
 

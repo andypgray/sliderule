@@ -47,6 +47,12 @@ internal static class FixtureBeds
     internal static string LinkedAppSolution => Path.Combine(TestSolutionsRoot, "LinkedApp", "LinkedApp.slnx");
 
     /// <summary>
+    ///     The guidance analyzer's bed: a project breaking each of the package's rules beside a near miss, and a
+    ///     project that touches the rules' anchors only where a rule allows it.
+    /// </summary>
+    internal static string GuidanceAppSolution => Path.Combine(TestSolutionsRoot, "GuidanceApp", "GuidanceApp.slnx");
+
+    /// <summary>
     ///     The solution-directory bed's solution, whose projects reach their references through
     ///     <c>$(SolutionDir)</c>.
     /// </summary>

@@ -111,10 +111,10 @@ public sealed class BuildTierVersionCheckTests
     {
         // The check's own read, over the assemblies this suite was built with: the same version on both
         // sides, and a real one, because two missing versions would agree as well.
-        string analyzer = BuildTierAnalyzer.ReleasedVersion(
-            BuildTierAnalyzer.InformationalVersionOf(typeof(BuildTierAnalyzer).Assembly));
-        string core = BuildTierAnalyzer.ReleasedVersion(
-            BuildTierAnalyzer.InformationalVersionOf(typeof(IArchitectureSpec).Assembly));
+        string analyzer = BuildTierEngine.ReleasedVersion(
+            BuildTierEngine.InformationalVersionOf(typeof(BuildTierEngine).Assembly));
+        string core = BuildTierEngine.ReleasedVersion(
+            BuildTierEngine.InformationalVersionOf(typeof(IArchitectureSpec).Assembly));
 
         analyzer.ShouldNotBeEmpty();
         analyzer.ShouldNotContain("+");
@@ -128,7 +128,7 @@ public sealed class BuildTierVersionCheckTests
     [InlineData(null, "")]
     public void AReleasedVersion_IsTheInformationalVersionUpToItsFirstPlus(string? informational, string released)
     {
-        BuildTierAnalyzer.ReleasedVersion(informational)
+        BuildTierEngine.ReleasedVersion(informational)
             .ShouldBe(released);
     }
 

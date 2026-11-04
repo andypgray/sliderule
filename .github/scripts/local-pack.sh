@@ -8,6 +8,10 @@
 # local_pack_feed <dir> writes <dir>/nuget.config with the local pack as its only source, so no feed but
 # this job's pack can answer a restore under <dir>.
 #
+# mapped_pack_feed <dir> writes <dir>/nuget.config with the local pack and nuget.org, and package source
+# mapping that sends the contract id and every SlideRule.* id to the pack and everything else to nuget.org.
+# The bare pattern is needed beside the prefix one, which does not match the contract's own id.
+#
 # require_contract_from_pack <version> <subject> fails the step unless $NUGET_PACKAGES holds the contract
 # library at <version>, and its error names <subject> as what did not restore it. Restored from the pack,
 # not resolved from a project: the path is the assertion.
@@ -26,6 +30,28 @@ local_pack_feed() {
         <clear />
         <add key="local-pack" value="$GITHUB_WORKSPACE/artifacts" />
     </packageSources>
+</configuration>
+CONFIG
+}
+
+mapped_pack_feed() {
+  cat > "$1/nuget.config" <<CONFIG
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+    <packageSources>
+        <clear />
+        <add key="local-pack" value="$GITHUB_WORKSPACE/artifacts" />
+        <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+    </packageSources>
+    <packageSourceMapping>
+        <packageSource key="local-pack">
+            <package pattern="SlideRule" />
+            <package pattern="SlideRule.*" />
+        </packageSource>
+        <packageSource key="nuget.org">
+            <package pattern="*" />
+        </packageSource>
+    </packageSourceMapping>
 </configuration>
 CONFIG
 }

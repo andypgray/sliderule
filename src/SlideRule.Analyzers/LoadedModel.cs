@@ -12,10 +12,10 @@ namespace SlideRule.Analyzers;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         Immutable, and built by <see cref="Load" /> alone, because the analyzer keeps one of these per
-///         model file path for as long as the file is unchanged and hands the same instance to every
-///         compilation that names it. Anything mutable here would be shared across those compilations'
-///         analyses, which run concurrently.
+///         Immutable, because the analyzer keeps the one <see cref="Load" /> built per model file path for as
+///         long as the file is unchanged and hands the same instance to every compilation that names it.
+///         Anything mutable here would be shared across those compilations' analyses, which run concurrently.
+///         <see cref="Without" /> leaves the shared instance as it was and narrows a copy where a rule is declined.
 ///     </para>
 ///     <para>
 ///         <see cref="Load" /> is the path-keyed read's function and throws nothing but a cancellation, which
@@ -85,6 +85,23 @@ internal sealed class LoadedModel : IReadHandle
         {
             return new LoadedModel(exception);
         }
+    }
+
+    /// <summary>
+    ///     This model less the rules <paramref name="declined" /> names, or this model itself where nothing is
+    ///     declined; read only on a model that read.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    internal LoadedModel Without(ISet<string> declined)
+    {
+        if (declined.Count == 0) return this;
+
+        var kept = new List<ArchRule>(InRules.Count);
+        foreach (ArchRule rule in InRules)
+            if (!declined.Contains(rule.Id))
+                kept.Add(rule);
+
+        return new LoadedModel(Result, kept);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]

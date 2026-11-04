@@ -26,6 +26,7 @@ flowchart LR
     p_SlideRule_Architecture["SlideRule.Architecture"]
     p_SlideRule_Cli["SlideRule.Cli"]
     p_SlideRule_Extraction["SlideRule.Extraction"]
+    p_SlideRule_Guidance_DotNet["SlideRule.Guidance.DotNet"]
     p_SlideRule_Packs_DotNet["SlideRule.Packs.DotNet"]
     p_SlideRule_Roslyn["SlideRule.Roslyn"]
     p_SlideRule_SpecAnalyzers["SlideRule.SpecAnalyzers"]
@@ -40,6 +41,7 @@ flowchart LR
     p_SlideRule_Cli --> p_SlideRule_Extraction
     p_SlideRule_Cli --> p_SlideRule_Roslyn
     p_SlideRule_Extraction --> p_SlideRule
+    p_SlideRule_Guidance_DotNet --> p_SlideRule_Analyzers
     p_SlideRule_Packs_DotNet --> p_SlideRule
     p_SlideRule_Roslyn --> p_SlideRule
     p_SlideRule_Roslyn --> p_SlideRule_Extraction
@@ -74,6 +76,7 @@ flowchart LR
     s_Analyzers["Analyzers"]
     s_SpecAnalyzers["SpecAnalyzers"]
     s_SpecCompletion["SpecCompletion"]
+    s_Guidance["Guidance"]
 
     s_Core --x s_Extraction
     s_Core --x s_Workspace
@@ -94,6 +97,9 @@ flowchart LR
     s_SpecAnalyzers -->|"only"| s_Core
     s_Core --x s_Adapter
     s_Workspace --x s_Adapter
+    s_Guidance -->|"only"| s_Core
+    s_Guidance -->|"only"| s_Extraction
+    s_Guidance -->|"only"| s_Analyzers
 
     subgraph l_legend["Legend"]
         l_ban["--x = must not reference"]
@@ -115,7 +121,7 @@ drifts from the code or the spec therefore fails the suite.
 The two drawings are scoped differently, and the `sliderule.json` at the repository root records how.
 The survey draws only declared projects, so it leaves out the MyApp fixture projects, which the spec
 fixtures bring into the build through project references. The file's `render.diagram.only` list narrows that
-further, because all 24 declared projects would crowd the drawing. It keeps the four packages that ship,
+further, because all 25 declared projects would crowd the drawing. It keeps the five packages that ship,
 the four assemblies that ship inside them, the rule pack and the spec project. The law is never scoped,
 because what the spec forbids does not depend on which projects someone chose to draw. It can therefore
 name a place the survey leaves out, and the two drawings still agree.

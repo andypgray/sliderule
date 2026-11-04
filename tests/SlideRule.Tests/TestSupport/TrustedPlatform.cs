@@ -8,6 +8,8 @@ internal static class TrustedPlatform
 {
     private static readonly string ContractPath = typeof(Arch).Assembly.Location;
 
+    private const string GuidanceFileName = "SlideRule.Guidance.DotNet.dll";
+
     // Every assembly the running host resolves against, each read once and kept beside its path. A
     // narrower set is taken by filtering this rather than by reading the files again, so a run that needs
     // several sets pays for the metadata once and Roslyn sees one image per assembly.
@@ -45,7 +47,8 @@ internal static class TrustedPlatform
 
     // The host's own resolved set, with the contract guaranteed present: a host that had loaded it from
     // somewhere outside that set would otherwise leave every spec compilation with no spec surface to bind
-    // against.
+    // against. The guidance analyzer is left out, because it compiles its own copy of the contract and a
+    // compilation handed both sees every contract type twice (CS0433).
     private static ImmutableArray<(string Path, MetadataReference Reference)> Resolve()
     {
         List<string> paths = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
@@ -53,6 +56,7 @@ internal static class TrustedPlatform
             .Where(path => path.Length > 0)
             // The host can list a path twice (System.Private.CoreLib, measured on .NET 10).
             .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Where(path => !string.Equals(Path.GetFileName(path), GuidanceFileName, StringComparison.OrdinalIgnoreCase))
             .ToList();
 
         if (!paths.Any(IsContract)) paths.Add(ContractPath);

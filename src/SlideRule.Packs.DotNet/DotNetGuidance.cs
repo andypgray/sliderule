@@ -268,13 +268,19 @@ public static class DotNetGuidance
     ///     The type to copy when fixing a violation, as a selection such as
     ///     <c>arch.Types.Named("CarrierClient")</c>. Optional; the pack names none of its own.
     /// </param>
+    /// <param name="exempt">
+    ///     Methods the rule leaves alone because another convention governs them, such as test methods:
+    ///     <c>[arch.Types.Methods.AttributedWith("Xunit.FactAttribute")]</c>. A method any one of them names is
+    ///     left alone. <c>AttributedWith</c> matches the attribute it names and no other, so xUnit's <c>[Theory]</c>
+    ///     methods need a selection of their own. Optional; an empty list is reported when the spec is loaded.
+    /// </param>
     public static void AsyncSuffix(
         Arch arch, Selection subject, PackPosture posture, string? fix = null,
-        Selection? exemplar = null)
+        Selection? exemplar = null, IEnumerable<MemberSelection>? exempt = null)
     {
         ArgumentNullException.ThrowIfNull(arch);
         ArgumentNullException.ThrowIfNull(posture);
-        Constraint constraint = TaskReturningMethods(subject)
+        Constraint constraint = TaskReturningMethods(subject, exempt)
             .MustHaveSuffix("Async");
         IRuleBuilder rule = arch.Rule("naming/async-suffix");
 
@@ -340,13 +346,19 @@ public static class DotNetGuidance
     ///     The type to copy when fixing a violation, as a selection such as
     ///     <c>arch.Types.Named("CarrierClient")</c>. Optional; the pack names none of its own.
     /// </param>
+    /// <param name="exempt">
+    ///     Methods the rule leaves alone because another convention governs them, such as test methods:
+    ///     <c>[arch.Types.Methods.AttributedWith("Xunit.FactAttribute")]</c>. A method any one of them names is
+    ///     left alone. <c>AttributedWith</c> matches the attribute it names and no other, so xUnit's <c>[Theory]</c>
+    ///     methods need a selection of their own. Optional; an empty list is reported when the spec is loaded.
+    /// </param>
     public static void AcceptCancellation(
         Arch arch, Selection subject, PackPosture posture, string? fix = null,
-        Selection? exemplar = null)
+        Selection? exemplar = null, IEnumerable<MemberSelection>? exempt = null)
     {
         ArgumentNullException.ThrowIfNull(arch);
         ArgumentNullException.ThrowIfNull(posture);
-        Constraint constraint = TaskReturningMethods(subject)
+        Constraint constraint = TaskReturningMethods(subject, exempt)
             .MustAcceptParameter<CancellationToken>();
         IRuleBuilder rule = arch.Rule("async/accept-cancellation");
 
@@ -424,12 +436,14 @@ public static class DotNetGuidance
         NoMappingAttributes(arch, subject, posture);
     }
 
-    // The authored methods returning a task or a value task, generic or not, defined once so the async rules
-    // agree on which methods they govern.
-    private static MethodSelection TaskReturningMethods(Selection subject)
+    // The authored methods returning a task or a value task, generic or not, less the exempt ones, defined once
+    // so the async rules agree on which methods they govern.
+    private static MethodSelection TaskReturningMethods(Selection subject, IEnumerable<MemberSelection>? exempt)
     {
-        return subject.Authored().Methods
+        MethodSelection methods = subject.Authored().Methods
             .Returning(typeof(Task), typeof(Task<>), typeof(ValueTask), typeof(ValueTask<>));
+
+        return exempt is null ? methods : methods.Except(exempt);
     }
 
     // The one place a posture becomes a chain. IEnforceRule and IMigrateRule are unrelated interfaces,

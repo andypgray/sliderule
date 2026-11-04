@@ -59,16 +59,19 @@ public sealed class SlideRuleArchitectureSpec : IArchitectureSpec
         Layer pack = arch.Layer("Pack", arch.Project("SlideRule.Packs.DotNet"))
             .Purpose("Pack is the shared rule pack: canonical .NET rules as an ordinary class library that a spec " +
                      "takes one method at a time.");
+        Layer guidance = arch.Layer("Guidance", arch.Project("SlideRule.Guidance.DotNet"))
+            .Purpose("Guidance is the analyzer the guidance package exports: the pack's build-decidable rules as " +
+                     "a model it embeds, each reported under an ID of its own by the build analyzer's engine.");
 
         // `repo` is every type this repository declares, spec and test projects included; `shipping` is the
-        // nine product layers, the never-published rule pack among them, which is `repo` minus those two.
+        // product layers, the never-published rule pack among them, which is `repo` minus those two.
         Selection repo = arch.Namespace("SlideRule.*");
         Selection shipping = arch.AnyOf(
-            core, extraction, analyzers, specAnalyzers, specCompletion, workspace, host, adapter, pack);
+            core, extraction, analyzers, specAnalyzers, specCompletion, workspace, host, adapter, pack, guidance);
 
         Layering(
             arch, core, model, checking, rendering, extraction, analyzers, specAnalyzers, specCompletion, workspace,
-            host, adapter, pack);
+            host, adapter, pack, guidance);
         FrontDoors(arch);
         ModelNodes(arch, core);
         Packaging(arch);
@@ -77,7 +80,7 @@ public sealed class SlideRuleArchitectureSpec : IArchitectureSpec
         McpServer(arch, host, workspace, extraction, repo);
         RoslynHost(arch, repo);
         Adapter(arch, adapter);
-        CompilerHost(arch, core, extraction);
+        CompilerHost(arch, core, extraction, guidance);
         Exceptions(arch, shipping);
         StaticState(arch, shipping);
         Naming(arch, shipping, repo);
@@ -86,7 +89,8 @@ public sealed class SlideRuleArchitectureSpec : IArchitectureSpec
 
     private static void Layering(
         Arch arch, Layer core, Layer model, Layer checking, Layer rendering, Layer extraction, Layer analyzers,
-        Layer specAnalyzers, Layer specCompletion, Layer workspace, Layer host, Layer adapter, Layer pack)
+        Layer specAnalyzers, Layer specCompletion, Layer workspace, Layer host, Layer adapter, Layer pack,
+        Layer guidance)
     {
         arch.Rule("layering/core-no-roslyn")
             .Enforce(core.MustNotReference(
@@ -204,6 +208,16 @@ public sealed class SlideRuleArchitectureSpec : IArchitectureSpec
                      "SpecCompletion are the other five leaves, and layering/leaves-independent already holds " +
                      "all six off each other, so this rule names only what sits below the adapter.")
             .Fix("Keep the dependency one-way: the adapter consumes Core and Workspace, never the reverse.");
+
+        arch.Rule("layering/guidance-builds-on-the-engine-only")
+            .Enforce(guidance.MustOnlyReference(core, extraction, analyzers))
+            .Because("The guidance package is one assembly: its build compiles Core, Extraction and the build " +
+                     "analyzer's engine in from their own directories, and nothing else. A reference to any other " +
+                     "project here resolves in the editor and in every tool that reads this repository, and then " +
+                     "names a type the shipped assembly does not contain, so the analyzer fails to load inside " +
+                     "the compiler of everyone who references the package.")
+            .Fix("Take what the guidance analyzer needs from the engine, Extraction or Core; a capability they " +
+                 "lack belongs in one of them, where the build analyzer gets it too.");
     }
 
     private static void FrontDoors(Arch arch)
@@ -401,13 +415,14 @@ public sealed class SlideRuleArchitectureSpec : IArchitectureSpec
             "SlideRule.Extraction",
             "SlideRule.Analyzers",
             "SlideRule.SpecAnalyzers",
-            "SlideRule.SpecCompletion");
+            "SlideRule.SpecCompletion",
+            "SlideRule.Guidance.DotNet");
 
         arch.Rule("packaging/compiler-hosted-netstandard")
             .Enforce(compilerHosted.MustTarget("netstandard2.0"))
-            .Because("A compiler loads these four projects: the analyzer package carries Extraction beside the " +
-                     "build analyzer, and the contract package carries the spec analyzer and the completion " +
-                     "provider. Visual Studio runs its compiler on .NET Framework and the dotnet CLI runs it on " +
+            .Because("A compiler loads these five projects: the analyzer package carries Extraction beside the " +
+                     "build analyzer, the contract package carries the spec analyzer and the completion " +
+                     "provider, and the guidance package is one analyzer assembly. Visual Studio runs its compiler on .NET Framework and the dotnet CLI runs it on " +
                      ".NET, and netstandard2.0 is the one target both of them can load.")
             .Fix("Keep netstandard2.0 among the project's target frameworks. An API it lacks belongs in " +
                  "SlideRule.Roslyn or the CLI, which no compiler loads.");
@@ -469,7 +484,8 @@ public sealed class SlideRuleArchitectureSpec : IArchitectureSpec
                     "SlideRule",
                     "SlideRule.Analyzers",
                     "SlideRule.Xunit",
-                    "SlideRule.Cli"))
+                    "SlideRule.Cli",
+                    "SlideRule.Guidance.DotNet"))
                 .MustNotBePackable())
             .Because("Only the packages named in this rule ship, and the SDK packs by default, so a project " +
                      "that stays silent about it is one release-pipeline accident away from publishing this " +
@@ -678,13 +694,13 @@ public sealed class SlideRuleArchitectureSpec : IArchitectureSpec
             .Fix("Declare the hook protected.");
     }
 
-    // The banned list is RS1035's, which the compiler enforces on the three projects that declare
-    // EnforceExtendedAnalyzerRules — and only on those, because the rule inspects the project it is set
-    // for. These two travel beside them and answer to the same host.
-    private static void CompilerHost(Arch arch, Layer core, Layer extraction)
+    // The banned list is RS1035's, which the compiler enforces on the projects that declare
+    // EnforceExtendedAnalyzerRules, and only on those, because the rule inspects the project it is set
+    // for. Core and Extraction travel beside them and answer to the same host.
+    private static void CompilerHost(Arch arch, Layer core, Layer extraction, Layer guidance)
     {
         arch.Rule("analyzer/no-ambient-types")
-            .Enforce(arch.AnyOf(core, extraction)
+            .Enforce(arch.AnyOf(core, extraction, guidance)
                 .MustNotReference(
                     typeof(File),
                     typeof(Directory),
@@ -694,24 +710,24 @@ public sealed class SlideRuleArchitectureSpec : IArchitectureSpec
                     typeof(ProcessStartInfo),
                     typeof(Random)))
             .Because("The analyzer package ships Core and Extraction in the directory the compiler loads the " +
-                     "analyzer from, and the contract package ships a second Core copy beside its own " +
-                     "analyzer, so both of these run inside csc: there is no console, the working directory " +
-                     "belongs to whoever started the build, and one compiler server outlives many builds. " +
-                     "RS1035 holds the analyzer projects to this list and cannot see the assemblies beside " +
-                     "them.")
+                     "analyzer from, the contract package ships a second Core copy beside its own analyzer, " +
+                     "and the guidance package compiles both into its one analyzer assembly, so all of these " +
+                     "run inside csc: there is no console, the working directory belongs to whoever started " +
+                     "the build, and one compiler server outlives many builds. RS1035 holds the analyzer " +
+                     "projects to this list and cannot see the assemblies beside them.")
             .Citation("https://github.com/dotnet/roslyn/blob/3c9fedee40c44979ca893b6490ad5748bbb137b5/" +
                       "src/RoslynAnalyzers/Microsoft.CodeAnalysis.Analyzers/Core/AnalyzerBannedSymbols.txt")
             .Fix("Take the value as a parameter, or through a host seam the CLI fills in; an assembly the " +
                  "compiler loads reads only what the compilation hands it.");
 
         arch.Rule("analyzer/no-ambient-members")
-            .Enforce(arch.AnyOf(core, extraction)
+            .Enforce(arch.AnyOf(core, extraction, guidance)
                 .MustNotUse(
                     arch.Member(typeof(Path), nameof(Path.GetTempPath)),
                     arch.Member(typeof(Assembly), nameof(Assembly.Load)),
                     arch.Member(typeof(CultureInfo), nameof(CultureInfo.CurrentCulture)),
                     arch.Member(typeof(CultureInfo), nameof(CultureInfo.CurrentUICulture))))
-            .Because("These four reach the same ambient world through types both layers otherwise use " +
+            .Because("These four reach the same ambient world through types these layers otherwise use " +
                      "correctly — Path for path arithmetic, CultureInfo for the invariant culture, Assembly " +
                      "for reflection-only discovery — so the ban is member-level, where banning the types " +
                      "would red on code that is right.")
@@ -724,13 +740,13 @@ public sealed class SlideRuleArchitectureSpec : IArchitectureSpec
         // The nine exempted handlers each hold any failure and continue down a sanctioned degraded path:
         //   ArchChecker           one rule's fault becomes that rule's errored result, so the others still report
         //   ArchRuleTests         a spec that fails to build becomes one failing test row, not an empty theory
-        //   BuildTierAnalyzer     an analyzer fault becomes one warning of its own, not an AD0001 that fails a
+        //   BuildTierEngine       an analyzer fault becomes one warning of its own, not an AD0001 that fails a
         //                         warnings-as-errors build
         //   CommandEntryPoint     every CLI failure becomes an exit code and a message, not a stack trace
         //   IdleTimeoutWatchdog   a poll fault logs and disables the watchdog rather than take the server down
         //   ParentProcessWatcher  a probe and a loop that both fail toward the safe side for a leak guard
         //   ServerShutdown        a faulting disposer must not stop the rest, or the process exits holding a lock
-        //   SpecLiteralAnalyzer   the same boundary as BuildTierAnalyzer, inside a spec author's compiler: a
+        //   SpecLiteralAnalyzer   the same boundary as BuildTierEngine, inside a spec author's compiler: a
         //                         fault becomes one warning of its own and the spec still builds
         //   VsWhereLocator        any vswhere failure degrades to an empty list and the RegisterDefaults fallback
         arch.Rule("exceptions/no-swallowed-broad-catches")
@@ -738,7 +754,7 @@ public sealed class SlideRuleArchitectureSpec : IArchitectureSpec
                 .Except(arch.Types.Named(
                     "ArchChecker",
                     "ArchRuleTests",
-                    "BuildTierAnalyzer",
+                    "BuildTierEngine",
                     "CommandEntryPoint",
                     "IdleTimeoutWatchdog",
                     "ParentProcessWatcher",

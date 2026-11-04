@@ -19,7 +19,7 @@ namespace SlideRule.Tests.Analyzers;
 /// </remarks>
 public sealed class CopiedMemberParityTests
 {
-    private const string BuildTierAnalyzer = "src/SlideRule.Analyzers/BuildTierAnalyzer.cs";
+    private const string BuildTierEngine = "src/SlideRule.Analyzers/BuildTierEngine.cs";
     private const string BuildTierDiagnostics = "src/SlideRule.Analyzers/BuildTierDiagnostics.cs";
     private const string SpecLiteralAnalyzer = "src/SlideRule.SpecAnalyzers/SpecLiteralAnalyzer.cs";
     private const string SpecLiteralDiagnostics = "src/SlideRule.SpecAnalyzers/SpecLiteralDiagnostics.cs";
@@ -27,10 +27,10 @@ public sealed class CopiedMemberParityTests
     private const string SlotBinding = "src/SlideRule.SpecCompletion/SlotBinding.cs";
 
     [Theory]
-    [InlineData(BuildTierAnalyzer, SpecLiteralAnalyzer, "InformationalVersionOf")]
-    [InlineData(BuildTierAnalyzer, SpecLiteralAnalyzer, "ReleasedVersion")]
-    [InlineData(BuildTierAnalyzer, ContractVersion, "InformationalVersionOf")]
-    [InlineData(BuildTierAnalyzer, ContractVersion, "ReleasedVersion")]
+    [InlineData(BuildTierEngine, SpecLiteralAnalyzer, "InformationalVersionOf")]
+    [InlineData(BuildTierEngine, SpecLiteralAnalyzer, "ReleasedVersion")]
+    [InlineData(BuildTierEngine, ContractVersion, "InformationalVersionOf")]
+    [InlineData(BuildTierEngine, ContractVersion, "ReleasedVersion")]
     [InlineData(BuildTierDiagnostics, SpecLiteralDiagnostics, "Opening")]
     [InlineData(SpecLiteralAnalyzer, SlotBinding, "SlotNameOn")]
     [InlineData(SpecLiteralAnalyzer, SlotBinding, "CarriesValuesThrough")]

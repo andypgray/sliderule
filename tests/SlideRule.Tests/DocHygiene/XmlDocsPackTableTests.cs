@@ -31,10 +31,12 @@ public sealed class XmlDocsPackTableTests
     private const string Script = ".github/scripts/verify-xml-docs-packed.sh";
 
     /// <summary>
-    ///     The one package that reads as a library by every other measure and still has no <c>lib/</c>
+    ///     A package that reads as a library by every other measure and still has no <c>lib/</c>
     ///     folder, which is what the fact below is written around.
     /// </summary>
     private const string AnalyzerProject = "SlideRule.Analyzers";
+
+    private const string GuidanceProject = "SlideRule.Guidance.DotNet";
 
     // The table sits in a quoted heredoc, so the rows are literal text rather than anything the shell
     // expands: what is read here is what the loop reads.
@@ -110,9 +112,9 @@ public sealed class XmlDocsPackTableTests
     }
 
     [Fact]
-    public void TheLibrarySet_LeavesOutTheAnalyzerAndNothingElse()
+    public void TheLibrarySet_LeavesOutTheTwoAnalyzersAndNothingElse()
     {
-        // Arrange: the analyzer packs and is not a tool, so deciding this set by those two facts alone
+        // Arrange: an analyzer packs and is not a tool, so deciding this set by those two facts alone
         // would put it in — and the table would then demand a lib/netstandard2.0 entry from a package
         // whose assemblies all sit under analyzers/dotnet/cs. Reading whether a package ships its build
         // output at all is the third fact, and this is where it is stated rather than inferred.
@@ -132,7 +134,7 @@ public sealed class XmlDocsPackTableTests
 
         // Assert
         leftOut.ShouldBe(
-            [AnalyzerProject],
+            [AnalyzerProject, GuidanceProject],
             Case.Sensitive,
             "Which packable projects have no lib/ folder is read from IncludeBuildOutput. A name that "
             + "appeared here ships its assemblies somewhere a consumer never compiles against and needs no "

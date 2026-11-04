@@ -46,6 +46,7 @@ public sealed class AdapterTests
                 "layering/spec-analyzers-depend-on-core-only",
                 "layering/spec-completion-stands-alone",
                 "layering/adapter-is-a-leaf",
+                "layering/guidance-builds-on-the-engine-only",
                 "api/core-front-door",
                 "api/extraction-front-door",
                 "api/workspace-front-door",

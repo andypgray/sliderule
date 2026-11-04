@@ -467,9 +467,9 @@ public sealed class SelfSpecTests
         SelfModel.Rule("exceptions/no-swallowed-broad-catches")
             .Sentence
             .ShouldBe(
-                "Types in the Core, Extraction, Analyzers, SpecAnalyzers, SpecCompletion, Workspace, Host, Adapter " +
-                "or Pack layers, " +
-                "except types named `ArchChecker`, `ArchRuleTests`, `BuildTierAnalyzer`, `CommandEntryPoint`, " +
+                "Types in the Core, Extraction, Analyzers, SpecAnalyzers, SpecCompletion, Workspace, Host, Adapter, " +
+                "Pack or Guidance layers, " +
+                "except types named `ArchChecker`, `ArchRuleTests`, `BuildTierEngine`, `CommandEntryPoint`, " +
                 "`IdleTimeoutWatchdog`, `ParentProcessWatcher`, `ServerShutdown`, `SpecLiteralAnalyzer` or " +
                 "`VsWhereLocator`, must not swallow `Exception`.",
                 customMessage: "a name added here leaves the broad-catch law; add it with its reason in the comment " +
@@ -488,7 +488,7 @@ public sealed class SelfSpecTests
             .Sentence
             .ShouldBe(
                 "Static fields of authored types in the Core, Extraction, Analyzers, SpecAnalyzers, SpecCompletion, " +
-                "Workspace, Host, Adapter or Pack layers, " +
+                "Workspace, Host, Adapter, Pack or Guidance layers, " +
                 "except `s_inFlightCount`, `s_lastActivityTicks`, `s_drainWaiter` or `s_timestampProvider` fields of " +
                 "types named `IdleTimeoutWatchdog`, `s_hasExited` fields of types named `ServerShutdown` or " +
                 "`_loadCount` fields of types named `WorkspaceLoader`, must be readonly.",

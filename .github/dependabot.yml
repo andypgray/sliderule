@@ -27,12 +27,12 @@ updates:
   # through a reference.
   #
   # Microsoft.CodeAnalysis.CSharp and Microsoft.CodeAnalysis.Features are the product's support floor:
-  # the oldest compiler API SlideRule runs against, stated by the extraction project, the spec
-  # analyzer and the completion provider. It is not a dependency to keep fresh: raising it drops
-  # support for every host pinned below it, which is a decision for a person to take deliberately.
+  # the oldest compiler API SlideRule runs against, stated by the extraction project, the guidance
+  # analyzer, the spec analyzer and the completion provider. It is not a dependency to keep fresh: raising
+  # it drops support for every host pinned below it, which is a decision for a person to take deliberately.
   # Each package is named exactly rather than by the family wildcard, which would also freeze the
   # workspace packages and Microsoft.CodeAnalysis.Analyzers, all meant to stay current.
-  # RoslynFloorPinTests holds these ignores and the three projects' literals to each other.
+  # RoslynFloorPinTests holds these ignores and those projects' literals to each other.
   #
   # The four Microsoft.Build engine packages and Microsoft.NET.StringTools are held to the 18.9 line,
   # patches still allowed. Each MSBuild minor line now ships assets for its own .NET only: 18.10 is
@@ -56,6 +56,7 @@ updates:
       - /src/SlideRule.Analyzers
       - /src/SlideRule.Cli
       - /src/SlideRule.Extraction
+      - /src/SlideRule.Guidance.DotNet
       - /src/SlideRule.Packs.DotNet
       - /src/SlideRule.Roslyn
       - /src/SlideRule.SpecAnalyzers

@@ -13,6 +13,8 @@ permissions:
 # four example solutions, which attach it by project path. The examples job says why all six.
 env:
   SR_BUILD_TIER_IDS: 'SR2001,SR2002,SR2090,SR2091,SR2092,SR2093'
+  # The guidance analyzer's IDs: its eight rules and its fault. The Interchange example's build takes it too.
+  SR_GUIDANCE_IDS: 'SR3001,SR3002,SR3003,SR3004,SR3005,SR3006,SR3007,SR3008,SR3093'
 
 jobs:
   # Two Windows legs, because the .NET Framework fixtures make the Visual Studio on the image
@@ -248,8 +250,8 @@ jobs:
       - name: Pack
         run: dotnet pack SlideRule.slnx -c Release -o artifacts -p:RestoreLockedMode=true
 
-      # Target the Cli package explicitly: the solution pack emits four nupkgs and only the
-      # Cli one carries the MCP manifest. A bare artifacts/*.nupkg glob would hand unzip four
+      # Target the Cli package explicitly: the solution pack emits five nupkgs and only the
+      # Cli one carries the MCP manifest. A bare artifacts/*.nupkg glob would hand unzip five
       # files and break, so glob the single Cli package here.
       - name: Verify server.json is packed at .mcp/server.json
         run: |
@@ -265,7 +267,7 @@ jobs:
       - name: Verify the XML documentation is packed
         run: bash .github/scripts/verify-xml-docs-packed.sh artifacts
 
-      # The analyzer package is the one with no lib/ folder, so none of the checks above say anything
+      # The analyzer package has no lib/ folder, so none of the checks above say anything
       # about it. Its shape lives in the same place for the same reason.
       - name: Verify the analyzer package shape
         run: bash .github/scripts/verify-analyzer-package-shape.sh artifacts
@@ -276,13 +278,18 @@ jobs:
       - name: Verify the contract package shape
         run: bash .github/scripts/verify-contract-package-shape.sh artifacts
 
+      # The guidance package is one analyzer assembly with its rules inside, and none of the checks above
+      # look at it.
+      - name: Verify the guidance package shape
+        run: bash .github/scripts/verify-guidance-package-shape.sh artifacts
+
       # The xUnit adapter reaches every project in this repository by project reference, so nothing here sees the
       # package a test project takes from nuget.org, and a release once failed there twice over: Microsoft.Build.Locator
       # refused the build (MSBL001), because the workspace packages brought MSBuild's engine assemblies into the
       # test output, and past that no solution loaded, because the MSBuild workspace's build host is content that
       # NuGet withholds from a package that arrives transitively. So a fresh test project here takes the contract and
       # the adapter from the pack and nothing else (package source mapping sends SlideRule and every SlideRule.* id to
-      # it; a prefix pattern alone misses the bare contract id), builds, asserts the build host is beside the output
+      # it), builds, asserts the build host is beside the output
       # and no engine assembly is, and runs: the adapter's own completeness test, one rule over a one-project
       # solution, and a spec validated through the public entry.
       - name: Build and run a fresh test project on the packed xUnit adapter
@@ -299,25 +306,7 @@ jobs:
           tree="$RUNNER_TEMP/adapter-consumer"
           export NUGET_PACKAGES="$RUNNER_TEMP/adapter-consumer-packages"
           mkdir -p "$tree/App" "$tree/App.Tests"
-          cat > "$tree/nuget.config" <<CONFIG
-          <?xml version="1.0" encoding="utf-8"?>
-          <configuration>
-              <packageSources>
-                  <clear />
-                  <add key="local-pack" value="$GITHUB_WORKSPACE/artifacts" />
-                  <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
-              </packageSources>
-              <packageSourceMapping>
-                  <packageSource key="local-pack">
-                      <package pattern="SlideRule" />
-                      <package pattern="SlideRule.*" />
-                  </packageSource>
-                  <packageSource key="nuget.org">
-                      <package pattern="*" />
-                  </packageSource>
-              </packageSourceMapping>
-          </configuration>
-          CONFIG
+          mapped_pack_feed "$tree"
           cat > "$tree/App.slnx" <<'SLN'
           <Solution>
             <Project Path="App/App.csproj" />
@@ -832,6 +821,90 @@ jobs:
             exit 1
           }
 
+      # The guidance package does its whole job inside somebody else's build, with nothing beside it: no spec,
+      # no model file, no tool. So a fresh project takes it from the pack and nothing else (package source
+      # mapping sends every SlideRule id to the pack), over the sources of the suite's own guidance bed, and
+      # the build is read three ways. The conforming sources are silent on every SR ID. The violating sources
+      # report each rule that ships on, under its own ID, and the one that ships off stays off until an
+      # .editorconfig turns it on, which also turns one off, the way the README documents. And the contract
+      # package beside it at the same version changes nothing: the guidance assembly shares no file with it,
+      # so there is no second SlideRule.dll for the compiler to choose between.
+      - name: Build a fresh project on the packed guidance package
+        run: |
+          . .github/scripts/local-pack.sh
+          version="$(pack_version)"
+          bed="$GITHUB_WORKSPACE/tests/SlideRule.Tests/Fixtures/TestSolutions/GuidanceApp"
+          tree="$RUNNER_TEMP/guidance-consumer"
+          export NUGET_PACKAGES="$RUNNER_TEMP/guidance-consumer-packages"
+          mkdir -p "$tree/App"
+          mapped_pack_feed "$tree"
+
+          # $1 is any extra PackageReference line.
+          write_project() {
+            cat > "$tree/App/App.csproj" <<PROJ
+          <Project Sdk="Microsoft.NET.Sdk">
+            <PropertyGroup>
+              <TargetFramework>net10.0</TargetFramework>
+              <Nullable>enable</Nullable>
+              <ImplicitUsings>enable</ImplicitUsings>
+            </PropertyGroup>
+            <ItemGroup>
+              <PackageReference Include="SlideRule.Guidance.DotNet" Version="$version" PrivateAssets="all" />
+              <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.13" />
+              $1
+            </ItemGroup>
+          </Project>
+          PROJ
+          }
+
+          # $1 names the half, for the log file and the error.
+          build() {
+            log="$RUNNER_TEMP/guidance-$1.log"
+            dotnet build "$tree/App/App.csproj" --no-incremental > "$log" 2>&1 || {
+              echo "::error::The $1 build failed; the guidance analyzer reports warnings and must never stop one"
+              cat "$log"
+              exit 1
+            }
+            reported="$(grep -oE ': (warning|error) SR[0-9]{4}' "$log" | grep -oE 'SR[0-9]{4}' | sort -u | paste -sd' ' || true)"
+          }
+
+          write_project ''
+          cp "$bed/GuidanceApp.Conforming/"*.cs "$tree/App/"
+          build conforming
+          [ -z "$reported" ] || {
+            echo "::error::The guidance analyzer reported $reported on conforming code"
+            grep -E ': (warning|error) SR[0-9]{4}' "$log"
+            exit 1
+          }
+
+          write_project '<PackageReference Include="SlideRule" Version="'"$version"'" />'
+          build beside-the-contract
+          [ -z "$reported" ] || {
+            echo "::error::With the contract package beside it at the same version, the build reported $reported on conforming code. SR1093 or SR3093 means two copies of one assembly met in the compiler."
+            grep -E ': (warning|error) SR[0-9]{4}' "$log"
+            exit 1
+          }
+
+          write_project ''
+          rm -f "$tree/App/"*.cs
+          cp "$bed/GuidanceApp.Rules/"*.cs "$tree/App/"
+          build violating
+          expected='SR3001 SR3002 SR3003 SR3004 SR3005 SR3006 SR3008'
+          [ "$reported" = "$expected" ] || {
+            echo "::error::The violating sources reported '$reported', not each rule that ships on: '$expected'"
+            cat "$log"
+            exit 1
+          }
+
+          printf '[*.cs]\ndotnet_diagnostic.SR3007.severity = warning\ndotnet_diagnostic.SR3005.severity = none\n' > "$tree/.editorconfig"
+          build tuned
+          expected='SR3001 SR3002 SR3003 SR3004 SR3006 SR3007 SR3008'
+          [ "$reported" = "$expected" ] || {
+            echo "::error::An .editorconfig turning SR3007 on and SR3005 off left the build reporting '$reported', not '$expected'"
+            cat "$log"
+            exit 1
+          }
+
       # The refusal a reader is most likely to meet first, on a real runner rather than only in unit tests.
       # `sliderule check` with no argument walks up from the working directory, and a repository whose root
       # holds several solutions is a normal layout rather than an exotic one — so this text is the tool's
@@ -1233,8 +1306,10 @@ jobs:
         run: dotnet build examples/Meridian.Quoting/Meridian.Quoting.slnx -p:RestoreLockedMode=true -warnaserror:${{ env.SR_BUILD_TIER_IDS }}
       - name: Build the Meridian.Operations example solution
         run: dotnet build examples/Meridian.Operations/Meridian.Operations.slnx -p:RestoreLockedMode=true -warnaserror:${{ env.SR_BUILD_TIER_IDS }}
+      # Interchange also takes the guidance analyzer, whose rules its own spec all declares, so the analyzer
+      # leaves every one of them to the example's model and any of its IDs here is news.
       - name: Build the Meridian.Interchange example solution
-        run: dotnet build examples/Meridian.Interchange/Meridian.Interchange.slnx -p:RestoreLockedMode=true -warnaserror:${{ env.SR_BUILD_TIER_IDS }}
+        run: dotnet build examples/Meridian.Interchange/Meridian.Interchange.slnx -p:RestoreLockedMode=true -warnaserror:${{ env.SR_BUILD_TIER_IDS }},${{ env.SR_GUIDANCE_IDS }}
       - name: Build the SlideRule CLI
         run: dotnet build src/SlideRule.Cli/SlideRule.Cli.csproj -p:RestoreLockedMode=true
       - name: Check Meridian (expect exit 0 on the committed baselines)

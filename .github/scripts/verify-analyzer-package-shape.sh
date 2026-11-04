@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The analyzer package is the one package here that ships no lib/ folder. What it carries is three
+# The analyzer package ships no lib/ folder. What it carries is three
 # assemblies the compiler loads together, the MSBuild file that hands them the rules, and nothing anybody
 # compiles against. Every part of that shape comes from a property in the project file rather than from
 # anything the pack itself checks, so a knob lost in a merge produces a package that still builds, still
@@ -31,26 +31,11 @@ require_closure "the analyzer cannot load in a consumer's build" "$id.dll" 'Slid
 # the analyzer where the rules are.
 require_build_targets 'nothing hands the analyzer the model file and the baselines'
 
-# No lib/. A copy of the assembly there is a reference every consumer compiles against by accident, and an
-# accidental public surface cannot be withdrawn from a version once pushed.
-libraries="$(grep '^lib/' <<<"$entries" || true)"
-[ -z "$libraries" ] ||
-  findings+=("lib/ is present, which makes this package something consumers compile against: $(paste -sd' ' <<<"$libraries")")
-
 require README.md "the package's page on nuget.org says nothing"
 
-# No <dependencies>. The closure travels inside the package, so a dependency here would install a second
-# copy of Core or Extraction into the consumer's own graph at whatever version resolution picked.
-! grep -q '<dependencies' <<<"$nuspec" ||
-  findings+=("the nuspec declares <dependencies>, which puts this package's own closure into the consumer's package graph")
-
-# No symbol package. Symbols are collected with the build output, which this package does not ship, so any
-# .snupkg here is an empty one on its way to nuget.org.
-shopt -s nullglob
-symbols=("$artifacts"/$id.*.snupkg)
-shopt -u nullglob
-[ "${#symbols[@]}" -eq 0 ] ||
-  findings+=("${#symbols[@]} $id symbol package(s) were packed, and an analyzer-only package has no symbols to carry")
+# A dependency here would install a second copy of Core or Extraction into the consumer's own graph at
+# whatever version resolution picked.
+require_analyzer_only "puts this package's own closure into the consumer's package graph"
 
 # The same contract assembly, byte for byte, as the contract package of the same build. A project carrying
 # both packages hands the compiler two copies of SlideRule.dll under one assembly identity. A .NET
