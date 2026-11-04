@@ -39,44 +39,12 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      # Dependabot bumps a PackageReference and that project's own packages.lock.json, but leaves the
-      # lock file of every project downstream of it stale, so a NuGet update PR arrives failing
-      # NU1004 at Restore, before a single test runs — a red check that says nothing about the bump
-      # it was raised for. Relocking first means everything below tests what
-      # Dependabot actually proposed. The same step runs in pack-check, self-check and examples; the
-      # rationale lives here only, so the four copies cannot drift apart in wording.
-      #
-      # Solution-wide, because the staleness ripples: a version change in one project rewrites the
-      # lock file of every project that references it transitively, and Dependabot updates one
-      # directory at a time, so nothing scoped to the bumped project could be right. Four details
-      # carry weight:
-      #
-      #   - shell: bash, because this matrix includes Windows, where run: defaults to pwsh and the
-      #     `||` below would not parse.
-      #   - CI: '' is scoped to this step alone, so only this restore leaves locked mode; every
-      #     build, test and pack step after it still sees CI=true. RestorePackagesWithLockFile is
-      #     unconditional, so the lock files are rewritten rather than ignored.
-      #   - The commit is local and never pushed. A GITHUB_TOKEN push could not re-trigger the PR's
-      #     checks anyway, and a standing write credential is a poor trade for a weekly convenience
-      #     PR. It exists so pack-check's `<version>+<commit>` assertion still names the commit
-      #     SourceLink embedded, and so nothing packs from a dirty tree.
-      #   - head_ref, not actor: head_ref is empty on push, so main is untouched; a maintainer
-      #     re-running the workflow gets the same answer; and a github-actions bump does not pay for
-      #     a restore it has no use for.
-      #
-      # The PR still cannot reach all-green by itself. The lock-files job below stays red until a
-      # human puts the relock commit on the branch, which is the one signal worth acting on.
+      # Relock for Dependabot NuGet PRs, so everything below tests the bump; the script says why. The shell
+      # is named so the Windows legs run it under Git Bash, as every Windows step here does, rather than
+      # whichever bash pwsh finds first on PATH.
       - name: Regenerate NuGet lock files (Dependabot NuGet PRs)
-        if: startsWith(github.head_ref, 'dependabot/nuget/')
         shell: bash
-        env:
-          CI: ''
-        run: |
-          dotnet restore SlideRule.slnx --force-evaluate
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -- '*packages.lock.json'
-          git diff --cached --quiet || git commit -q -m 'Regenerate NuGet lock files'
+        run: bash .github/scripts/relock.sh
 
       # Restore/build/test the whole solution, not just the test project: the self-spec
       # tests open the real SlideRule.slnx through MSBuildWorkspace, so building the
@@ -222,19 +190,9 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      # Relock for Dependabot NuGet PRs, so the pack below is of the bump rather than of a failed
-      # restore. Identical text in build-and-test, which carries the rationale.
+      # Relock for Dependabot NuGet PRs, so the pack below is of the bump rather than of a failed restore.
       - name: Regenerate NuGet lock files (Dependabot NuGet PRs)
-        if: startsWith(github.head_ref, 'dependabot/nuget/')
-        shell: bash
-        env:
-          CI: ''
-        run: |
-          dotnet restore SlideRule.slnx --force-evaluate
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -- '*packages.lock.json'
-          git diff --cached --quiet || git commit -q -m 'Regenerate NuGet lock files'
+        run: bash .github/scripts/relock.sh
 
       # This step restores implicitly, so without the property its locked mode would be contingent on
       # the runner setting CI=true — the exposure build-and-test's Restore step names in full.
@@ -1488,19 +1446,9 @@ jobs:
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: '10.0.x'
-      # Relock for Dependabot NuGet PRs, so the build below is of the bump. Identical text in
-      # build-and-test, which carries the rationale.
+      # Relock for Dependabot NuGet PRs, so the build below is of the bump.
       - name: Regenerate NuGet lock files (Dependabot NuGet PRs)
-        if: startsWith(github.head_ref, 'dependabot/nuget/')
-        shell: bash
-        env:
-          CI: ''
-        run: |
-          dotnet restore SlideRule.slnx --force-evaluate
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -- '*packages.lock.json'
-          git diff --cached --quiet || git commit -q -m 'Regenerate NuGet lock files'
+        run: bash .github/scripts/relock.sh
       # Build the whole solution (CLI + the arch spec) so --no-build can run the check over
       # the real MSBuildWorkspace, exactly as build-and-test does. The solution and the spec come
       # from sliderule.json at the repository root: the self-solution has many Core-referencing
@@ -1648,19 +1596,9 @@ jobs:
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: '10.0.x'
-      # Relock for Dependabot NuGet PRs, so the CLI build below is of the bump. Identical text in
-      # build-and-test, which carries the rationale.
+      # Relock for Dependabot NuGet PRs, so the builds below are of the bump.
       - name: Regenerate NuGet lock files (Dependabot NuGet PRs)
-        if: startsWith(github.head_ref, 'dependabot/nuget/')
-        shell: bash
-        env:
-          CI: ''
-        run: |
-          dotnet restore SlideRule.slnx --force-evaluate
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -- '*packages.lock.json'
-          git diff --cached --quiet || git commit -q -m 'Regenerate NuGet lock files'
+        run: bash .github/scripts/relock.sh
       # The CLI never builds the target; build the example solutions first. Every step below restores
       # IMPLICITLY, so each names -p:RestoreLockedMode=true rather than leaving the locked mode to
       # CI=true — build-and-test's Restore step carries the reason in full.
@@ -1693,8 +1631,9 @@ jobs:
       # leaves every one of them to the example's model and any of its IDs here is news.
       - name: Build the Meridian.Interchange example solution
         run: dotnet build examples/Meridian.Interchange/Meridian.Interchange.slnx -p:RestoreLockedMode=true -warnaserror:${{ env.SR_BUILD_TIER_IDS }},${{ env.SR_GUIDANCE_IDS }}
-      - name: Build the SlideRule CLI
-        run: dotnet build src/SlideRule.Cli/SlideRule.Cli.csproj -p:RestoreLockedMode=true
+      # The test project references the CLI, so this one build serves the checks and the tests below.
+      - name: Build the SlideRule CLI and the test project
+        run: dotnet build tests/SlideRule.Tests/SlideRule.Tests.csproj -p:RestoreLockedMode=true
       - name: Check Meridian (expect exit 0 on the committed baselines)
         run: dotnet run --no-build --project src/SlideRule.Cli -- check examples/Meridian/Meridian.slnx
       - name: Check Meridian.Quoting (expect exit 0; Enforce-only, no baselines)
@@ -1714,12 +1653,10 @@ jobs:
       # the rows actually run. The self-check page's two fences cut from a check over Meridian, a SARIF
       # result and a check-document entry, skip on the same condition, so this is also where a fresh
       # check re-runs them; and so do the example walkthroughs' output fences, which the replay re-makes
-      # over each example with the edit its page imagines. No --no-build, for the reason the adapter step
-      # above gives: nothing in this job builds the test project, so dotnet test restores and builds it,
-      # and it carries a lock file. It reaches the same conclusion about the committed model files as the
-      # render check below, one step earlier.
+      # over each example with the edit its page imagines. It reaches the same conclusion about the committed
+      # model files as the render check below, one step earlier.
       - name: The examples' committed model files round trip and are current, the self-check page's Meridian fences match a fresh check, and the walkthroughs' output fences match their replay
-        run: dotnet test tests/SlideRule.Tests/SlideRule.Tests.csproj --filter "FullyQualifiedName~ExampleModelRoundTripTests|FullyQualifiedName~SelfCheckMeridianFenceTests|FullyQualifiedName~WalkthroughReplayTests" --output Detailed -p:RestoreLockedMode=true
+        run: dotnet test tests/SlideRule.Tests/SlideRule.Tests.csproj --filter "FullyQualifiedName~ExampleModelRoundTripTests|FullyQualifiedName~SelfCheckMeridianFenceTests|FullyQualifiedName~WalkthroughReplayTests" --no-build --output Detailed
       # No scope flag on any of these four, which is the property being exercised: every example spec
       # project references the SlideRule packages it is written against, so the workspace loads this
       # repository's projects on each render and only the survey fence's declared-members default keeps
@@ -1753,19 +1690,9 @@ jobs:
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: '10.0.x'
-      # Relock for Dependabot NuGet PRs, so the CLI build below is of the bump. Identical text in
-      # build-and-test, which carries the rationale.
+      # Relock for Dependabot NuGet PRs, so the builds below are of the bump.
       - name: Regenerate NuGet lock files (Dependabot NuGet PRs)
-        if: startsWith(github.head_ref, 'dependabot/nuget/')
-        shell: bash
-        env:
-          CI: ''
-        run: |
-          dotnet restore SlideRule.slnx --force-evaluate
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -- '*packages.lock.json'
-          git diff --cached --quiet || git commit -q -m 'Regenerate NuGet lock files'
+        run: bash .github/scripts/relock.sh
       # The pin names a commit, which a shallow fetch reaches without its history. The audit is off
       # because the replay quotes no advisory, and the advisories change with the date.
       - name: Fetch and build the pinned showcase fork
@@ -1784,8 +1711,9 @@ jobs:
             echo "SHOWCASE_SOLUTION=$solution"
             echo "SHOWCASE_SPEC=$spec"
           } >> "$GITHUB_ENV"
-      - name: Build the SlideRule CLI
-        run: dotnet build src/SlideRule.Cli/SlideRule.Cli.csproj -p:RestoreLockedMode=true
+      # The test project references the CLI, so this one build serves the checks and the tests below.
+      - name: Build the SlideRule CLI and the test project
+        run: dotnet build tests/SlideRule.Tests/SlideRule.Tests.csproj -p:RestoreLockedMode=true
       - name: Check the showcase fork with this commit's CLI (expect exit 0 on its committed baselines)
         run: dotnet run --no-build --project src/SlideRule.Cli -- check "$SHOWCASE_SOLUTION" --spec "$SHOWCASE_SPEC"
       # The page's commands as a reader runs them: a clone at the tag, the release the fork pins, a
@@ -1803,12 +1731,10 @@ jobs:
           mkdir -p "$walk"
           cd "$walk"
           bash -e -c "$commands"
-      # No --no-build: nothing above builds the test project, so dotnet test restores and builds it,
-      # and it carries a lock file.
       - name: The showcase page's fences and excerpts match the pinned fork
         env:
           SLIDERULE_SHOWCASE_ROOT: ${{ env.SHOWCASE_ROOT }}
-        run: dotnet test tests/SlideRule.Tests/SlideRule.Tests.csproj --filter "FullyQualifiedName~ShowcaseReplayTests|FullyQualifiedName~ShowcaseExcerptTests" --output Detailed -p:RestoreLockedMode=true
+        run: dotnet test tests/SlideRule.Tests/SlideRule.Tests.csproj --filter "FullyQualifiedName~ShowcaseReplayTests|FullyQualifiedName~ShowcaseExcerptTests" --no-build --output Detailed
 
   # The one check a Dependabot NuGet PR is meant to fail. Every job above relocks so it can test the
   # bump; this one relocks and requires a zero diff, so the PR carries real signal about the update
@@ -1828,7 +1754,7 @@ jobs:
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: '10.0.x'
-      # CI: '' for the same reason as the relock step in build-and-test: in locked mode this restore
+      # CI: '' for the same reason as .github/scripts/relock.sh empties it: in locked mode this restore
       # would fail rather than rewrite the files this job exists to compare. The remedy is a command
       # rather than an artifact, so the summary carries the fix and nothing is uploaded.
       #
