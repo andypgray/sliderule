@@ -1,3 +1,4 @@
+using SlideRule.Cli.Pipeline;
 using SlideRule.Rendering;
 using SlideRule.Roslyn.Diagnostics;
 
@@ -42,6 +43,10 @@ internal sealed record UnsupportedProjectStamp(string Project, string Reason)
 ///         the wire key and the human line state one sentence. <paramref name="PackageAudit" />, the one fact here
 ///         that is not a verdict about the projects, rides the stamp so a load's lines are grouped once.
 ///     </para>
+///     <para>
+///         <see cref="StaleSpec" /> is the one stamp about the spec rather than the workspace, so it is not read off
+///         <see cref="WorkspaceDiagnostics" />: <see cref="From(CodebaseSource)" /> reads it off the source.
+///     </para>
 /// </remarks>
 internal readonly record struct WorkspaceTrustStamp(
     bool? ModelIncomplete,
@@ -52,6 +57,9 @@ internal readonly record struct WorkspaceTrustStamp(
     IReadOnlyList<MultiTargetedProject>? MultiTargetedProjects,
     IReadOnlyList<PackageAuditEntry> PackageAudit)
 {
+    /// <summary>The spec project's sources against the build the run loaded; null when they match.</summary>
+    internal StaleSpecStamp? StaleSpec { get; init; }
+
     /// <summary>
     ///     Reads the stamp off a load's own verdict, relativizing every project path against
     ///     <paramref name="solutionDirectory" /> so a machine path never reaches a golden.
@@ -67,6 +75,18 @@ internal readonly record struct WorkspaceTrustStamp(
             Unsupported(diagnostics.UnsupportedProjects, relativizer),
             SlideRuleJson.OmitEmpty(diagnostics.MultiTargetedProjects),
             diagnostics.PackageAudit);
+    }
+
+    /// <summary>
+    ///     The stamp for a verb's whole load: <see cref="From(WorkspaceDiagnostics, string)" /> over its diagnostics,
+    ///     with <see cref="StaleSpec" /> read off the spec it loaded, null on a spec-less source.
+    /// </summary>
+    internal static WorkspaceTrustStamp From(CodebaseSource source)
+    {
+        return From(source.Diagnostics, source.SolutionDirectory) with
+        {
+            StaleSpec = StaleSpecStamp.From(source.StaleSpec, source.SolutionDirectory)
+        };
     }
 
     private static IReadOnlyList<string>? Relative(

@@ -204,6 +204,17 @@ internal static class Sources
     }
 
     /// <summary>
+    ///     The Enforce rule the controller scenes are checked against: the web layer must not reference the data
+    ///     layer.
+    /// </summary>
+    public static void NoDataReference(Arch arch)
+    {
+        arch.Rule("layer/no-data")
+            .Enforce(arch.Namespace("App.Web.*").MustNotReference(arch.Namespace("App.Data.*")))
+            .Because("The web layer must not open the data layer directly.");
+    }
+
+    /// <summary>
     ///     A hermetic quarantine over <see cref="Containment" />: with no sanctioned surface every inbound
     ///     reference is red, the facade's included, so the desugared containment rule fails without a facade
     ///     stub having to be named.

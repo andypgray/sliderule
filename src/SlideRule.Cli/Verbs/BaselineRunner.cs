@@ -68,7 +68,7 @@ internal sealed class BaselineRunner(
 
         // Composed for the render, so the MSBuild-selection note goes out with the load failures.
         WorkspaceDiagnostics diagnostics = source.Diagnostics;
-        WorkspaceDiagnosticsRenderer.Render(error, diagnostics);
+        WorkspaceDiagnosticsRenderer.Render(error, source);
 
         // Fail closed before extraction, and so before any mode writes a byte: the projects that failed to
         // load or to restore are the whole gate input here, exactly as they are for check, and no diagnostic
@@ -243,7 +243,7 @@ internal sealed class BaselineRunner(
         BaselineRename rename = request.Rename ?? throw MisassembledRenameRequest();
         RefuseMalformedFrom(rename.From);
 
-        (ArchitectureModel model, string? solutionDirectory) = await LoadSpecModelAsync(
+        (ArchitectureModel model, string? solutionDirectory, _) = await LoadSpecModelAsync(
             request.Solution, request.Spec, request.WorkingDirectory, noCache: false, needsSolutionDirectory: true,
             error, ct);
 

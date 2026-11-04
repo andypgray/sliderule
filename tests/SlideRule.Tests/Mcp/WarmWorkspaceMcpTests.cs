@@ -508,8 +508,7 @@ public sealed class WarmWorkspaceMcpTests
 
         // Act — delete the built spec output and re-check the still-warm server. The spec is loaded from
         // bytes (SpecLoadNoLockTests pins that), so the file is deletable mid-session.
-        File.Delete(workspace.PathOf(
-            LayoutAppFixture.SpecProject, "bin", "Debug", "net10.0", LayoutAppFixture.SpecAssembly));
+        File.Delete(LayoutAppFixture.BuiltSpecDll(workspace));
         CallToolResult afterDelete = await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct);
         CliResult coldCheck = await CliRunner.InvokeColdAsync(
             "check", workspace.SolutionPath, "--no-cache", "--json");
@@ -525,6 +524,65 @@ public sealed class WarmWorkspaceMcpTests
         afterDelete.ShouldHaveRefused()
             .ShouldBeTheSameTextAs(coldCheck.Err);
         resolutions.FullResolveCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task ArchCheck_SpecSourceEditedMidSession_StampsStaleSpecUntilTheSourceMatchesTheBuildAgain()
+    {
+        // Arrange — the declared-spec fixture by convention, warmed while its sources match the build. The warm
+        // model cache keys on the spec DLL alone, so only a comparison made on every call can see a source edit.
+        using TempFixtureWorkspace workspace = LayoutAppFixture.BuiltCopy();
+        await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
+            McpServerBindings.For(workspace.SolutionPath, null), Ct);
+
+        string fresh = await ShouldAnswerArchCheckAsync(harness);
+
+        string stale;
+        using (LayoutAppFixture.EditSpecAfterBuild(workspace))
+        {
+            stale = await ShouldAnswerArchCheckAsync(harness);
+        }
+
+        string restored = await ShouldAnswerArchCheckAsync(harness);
+
+        // Assert — the stamp names the edited file, and is gone again once the bytes match the build.
+        fresh.ShouldNotContain("\"staleSpec\"");
+        stale.ShouldContain("""
+                            "staleSpec": {
+                                "project": "LayoutApp.Spec/LayoutApp.Spec.csproj",
+                                "file": "LayoutApp.Spec/LayoutAppSpec.cs",
+                                "reason": "changed",
+                                "comparison": "checksum"
+                              }
+                            """);
+        restored.ShouldNotContain("\"staleSpec\"");
+    }
+
+    [Theory]
+    [InlineData("arch_explain", "ruleId", LayoutAppFixture.RuleId)]
+    [InlineData("arch_context", "path", "LayoutApp.Core")]
+    public async Task TextTool_SpecSourceEditedMidSession_PutsTheSentenceAboveTheAnswerUntilTheSourceMatchesAgain(
+        string tool, string argument, string value)
+    {
+        // Arrange — as for arch_check above; these answers are text, so the stale-spec line is part of the body.
+        using TempFixtureWorkspace workspace = LayoutAppFixture.BuiltCopy();
+        await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
+            McpServerBindings.For(workspace.SolutionPath, null), Ct);
+        var arguments = new Dictionary<string, object?> { [argument] = value };
+
+        string fresh = await ShouldAnswerAsync(harness, tool, arguments);
+
+        string stale;
+        using (LayoutAppFixture.EditSpecAfterBuild(workspace))
+        {
+            stale = await ShouldAnswerAsync(harness, tool, arguments);
+        }
+
+        string restored = await ShouldAnswerAsync(harness, tool, arguments);
+
+        // Assert — the sentence and its blank line sit above the answer only while the bytes differ from the build.
+        stale.ShouldBe(LayoutAppFixture.StaleSpecSentence + Environment.NewLine + Environment.NewLine + fresh);
+        restored.ShouldBe(fresh);
     }
 
     [Fact]
@@ -581,11 +639,17 @@ public sealed class WarmWorkspaceMcpTests
                 StringComparer.Ordinal);
     }
 
-    private static async Task<string> ShouldAnswerArchCheckAsync(McpPipelineHarness harness)
+    private static async Task<string> ShouldAnswerAsync(
+        McpPipelineHarness harness, string tool, Dictionary<string, object?>? arguments)
     {
-        CallToolResult result = await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct);
+        CallToolResult result = await harness.Client.CallToolAsync(tool, arguments, cancellationToken: Ct);
 
         return result.ShouldHaveAnswered();
+    }
+
+    private static Task<string> ShouldAnswerArchCheckAsync(McpPipelineHarness harness)
+    {
+        return ShouldAnswerAsync(harness, "arch_check", null);
     }
 
     private sealed record WarmRecheck(

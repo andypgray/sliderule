@@ -64,7 +64,7 @@ internal sealed class RenderRunner(
 
         // Composed like every other verb's, so the MSBuild-selection note accompanies the load failures.
         WorkspaceDiagnostics diagnostics = source.Diagnostics;
-        WorkspaceDiagnosticsRenderer.Render(error, diagnostics);
+        WorkspaceDiagnosticsRenderer.Render(error, source);
 
         // Fail closed before the first byte hits disk: the files render writes are committed context, and a
         // partial model composes them wrong — a card whose project failed to load resolves no directory and

@@ -2,7 +2,10 @@ using SlideRule.Cli.Mcp.Infrastructure;
 using SlideRule.Cli.Pipeline;
 using SlideRule.Cli.Rendering;
 using SlideRule.Cli.SpecLoading;
+using SlideRule.Codebase;
 using SlideRule.Hosting;
+using SlideRule.Roslyn;
+using SlideRule.Roslyn.Diagnostics;
 using SlideRule.Roslyn.Solutions;
 
 namespace SlideRule.Cli.Verbs;
@@ -70,8 +73,43 @@ internal abstract class CacheWiredRunner(
     }
 
     /// <summary>
+    ///     The spec-less survey of the whole solution, with the source it was read from, which the caller disposes.
+    /// </summary>
+    /// <exception cref="UserErrorException">
+    ///     A project failed to load or to restore and <paramref name="allowWorkspaceDiagnostics" /> is false.
+    /// </exception>
+    protected async Task<(CodebaseSource Source, GraphSummary Summary)> SurveyAsync(
+        string? solution, string workingDirectory, bool noCache, bool allowWorkspaceDiagnostics, CancellationToken ct)
+    {
+        var source = await CodebaseSource.CreateSpeclessAsync(
+            SolutionSource, Environment, solution, workingDirectory, noCache, ct);
+        try
+        {
+            // Refuse before extraction: a survey of a partial model shows each project that failed to load as one
+            // the solution does not have.
+            // The refusal carries the diagnostics in its own text rather than leaving them to a stderr render, so
+            // the MCP surface, which discards the error writer, gets the same actionable message. A cache hit
+            // refuses identically: diagnostics persist into the extraction cache and replay with it.
+            WorkspaceDiagnostics diagnostics = source.Diagnostics;
+            if (diagnostics.Gates(allowWorkspaceDiagnostics))
+                throw new UserErrorException(IncompleteModelGate.GraphRefusal(diagnostics));
+
+            CodebaseModel codebase = await source.ExtractAsync([], ct); // spec-less: the survey excludes nothing
+            RecordCacheOutcome(source);
+            return (source, GraphSummarizer.Summarize(codebase));
+        }
+        catch
+        {
+            source.Dispose();
+            throw;
+        }
+    }
+
+    /// <summary>
     ///     The spec's model alone, for a verb that reads the spec and never the code, with the solution directory
-    ///     when <paramref name="needsSolutionDirectory" /> asks for it (null otherwise on the built-DLL path).
+    ///     when <paramref name="needsSolutionDirectory" /> asks for it (null otherwise on the built-DLL path), and
+    ///     the spec's <see cref="CodebaseSource.StaleSpec" /> verdict, null on the built-DLL path; a verdict that is
+    ///     not null comes with a solution directory that is not null either.
     /// </summary>
     /// <remarks>
     ///     A built-DLL spec resolves without ever opening the solution. The model still comes through the source,
@@ -82,7 +120,7 @@ internal abstract class CacheWiredRunner(
     ///     every other verb would have loaded; its diagnostics are composed like every other verb's, so the
     ///     MSBuild-selection note accompanies the load failures.
     /// </remarks>
-    protected async Task<(ArchitectureModel Model, string? SolutionDirectory)> LoadSpecModelAsync(
+    protected async Task<(ArchitectureModel Model, string? SolutionDirectory, StaleSpec? StaleSpec)> LoadSpecModelAsync(
         string? solution, string? spec, string workingDirectory, bool noCache, bool needsSolutionDirectory,
         TextWriter error, CancellationToken ct)
     {
@@ -97,14 +135,14 @@ internal abstract class CacheWiredRunner(
             }
 
             ArchitectureModel model = SolutionSource.LoadSpecModel(withoutSolution.DllPath);
-            return (model, anchor);
+            return (model, anchor, null);
         }
 
         using var source = await CodebaseSource.CreateWithSpecAsync(
             SolutionSource, Environment, solution, spec, workingDirectory, noCache, ct);
-        WorkspaceDiagnosticsRenderer.Render(error, source.Diagnostics);
+        WorkspaceDiagnosticsRenderer.Render(error, source);
         RecordCacheOutcome(source);
 
-        return (source.Model, source.SolutionDirectory);
+        return (source.Model, source.SolutionDirectory, source.StaleSpec);
     }
 }

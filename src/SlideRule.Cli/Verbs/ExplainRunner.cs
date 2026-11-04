@@ -2,6 +2,7 @@ using SlideRule.Checking;
 using SlideRule.Cli.Mcp.Infrastructure;
 using SlideRule.Cli.Pipeline;
 using SlideRule.Cli.Rendering;
+using SlideRule.Cli.SpecLoading;
 using SlideRule.Codebase;
 using SlideRule.Hosting;
 using SlideRule.Internal;
@@ -55,12 +56,15 @@ internal sealed class ExplainRunner(
         if (request.RuleId is not { } ruleId) return await ExplainClaimsAsync(request, ct);
 
         // A built-DLL --spec answers with no solution in reach, so none is discovered.
-        (ArchitectureModel model, _) = await LoadSpecModelAsync(
+        (ArchitectureModel model, string? solutionDirectory, StaleSpec? stale) = await LoadSpecModelAsync(
             request.Solution, request.Spec, request.WorkingDirectory, request.NoCache, needsSolutionDirectory: false,
             error, ct);
 
         ArchRule? rule = model.Rules.FirstOrDefault(candidate => candidate.Id == ruleId);
         if (rule is null) throw new UserErrorException(UnknownRuleMessage(ruleId, model));
+
+        // After the refusal, which it does not qualify: a stale build can only make a found rule's prose old.
+        if (stale is not null) StaleSpecNotice.Stamp(output, stale, solutionDirectory!);
 
         foreach (string line in ExplainFormatter.Lines(rule)) await output.WriteLineAsync(line);
         return ExitCodes.Clean;
@@ -77,10 +81,11 @@ internal sealed class ExplainRunner(
             request.NoCache, ct);
 
         WorkspaceDiagnostics diagnostics = source.Diagnostics;
-        WorkspaceDiagnosticsRenderer.Render(error, diagnostics);
+        WorkspaceDiagnosticsRenderer.Render(error, source);
         IncompleteModelNotices.Caveat(output, diagnostics, IncompleteModelGate.ExplainCaveat);
 
         NarrowingNotices.Stamp(output, source, NarrowedUniverseNotice.ExplainStamp);
+        StaleSpecNotice.Stamp(output, source.StaleSpec, source.SolutionDirectory);
 
         CodebaseModel codebase = await source.ExtractAsync(source.Resolution.ExcludeProjectNames, ct);
         RecordCacheOutcome(source);

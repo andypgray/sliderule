@@ -57,7 +57,7 @@ public sealed class ExtractionCacheStoreTests
 
         version.ShouldNotBeNull("the extraction cache still declares a schema version");
         version.GetRawConstantValue()
-            .ShouldBe(40);
+            .ShouldBe(41);
     }
 
     [Fact]
@@ -72,7 +72,7 @@ public sealed class ExtractionCacheStoreTests
         ExtractionCacheStore store = solution.NewStore();
         ExtractionResult extraction = TrivialExtraction(solution) with
         {
-            SpecResolutions = [new SpecResolutionRecord("", "A", ["A"], ["/out/A.dll"], null)],
+            SpecResolutions = [new SpecResolutionRecord("", "A", ["A"], ["/out/A.dll"], null, null)],
             LoadDiagnostics = WorkspaceDiagnostics.None
         };
         store.ShouldWrite(solution.Projects, extraction);
@@ -524,7 +524,7 @@ public sealed class ExtractionCacheStoreTests
         solution.AddProject("B", ["A"], ("B.cs", "class B {}"));
         solution.BackdateAll();
         ExtractionCacheStore store = solution.NewStore();
-        SpecResolutionRecord[] specs = [new("", "A", ["A", "PrivatePack"], ["/out/A.dll"], "/obj/A.dll")];
+        SpecResolutionRecord[] specs = [new("", "A", ["A", "PrivatePack"], ["/out/A.dll"], "/obj/A.dll", "/src/A/A.csproj")];
         ExtractionResult extraction = TrivialExtraction(solution) with
         {
             SpecResolutions = specs,

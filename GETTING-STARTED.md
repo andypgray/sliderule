@@ -16,7 +16,7 @@ dotnet tool install -g SlideRule.Cli
 
 Run the install from outside any repository whose `global.json` pins an SDK below 10. Inside one, `dotnet` selects the pinned SDK, which cannot install a tool built for .NET 10.
 
-SlideRule never builds the code it checks. It reads the code from source, so an edit counts as soon as it is saved, built or not. It does need the solution restored, and it runs the spec from the spec project's last build. Restore and build the solution before the first check, and rebuild the spec project after each change to the spec.
+SlideRule never builds the code it checks. It reads the code from source, so an edit counts as soon as it is saved, built or not. It does need the solution restored, and it runs the spec from the spec project's last build. Restore and build the solution before the first check, and rebuild the spec project after each change to the spec. A run over a spec edited and not rebuilt prints a `warning:` line naming the file that changed.
 
 ## Path 1: rules you write
 

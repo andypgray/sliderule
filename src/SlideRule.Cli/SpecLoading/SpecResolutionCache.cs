@@ -74,7 +74,7 @@ internal sealed class SpecResolutionCache
             SpecResolution recorded = cached.Resolved.Resolution;
             SpecResolution replayed = SpecResolver.Replay(
                 recorded.SpecProjectName, normalizedSpecArgument, recorded.ExcludeProjectNames,
-                recorded.OutputFilePaths, recorded.IntermediateAssemblyPath);
+                recorded.OutputFilePaths, recorded.IntermediateAssemblyPath, recorded.ProjectFilePath);
             return cached.Resolved with { Resolution = replayed };
         }
 

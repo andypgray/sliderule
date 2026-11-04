@@ -38,6 +38,7 @@ internal static class StatusJsonRenderer
             UncheckedProjects: trust.UncheckedProjects,
             RestoreFailedProjects: trust.RestoreFailedProjects,
             UnsupportedProjects: trust.UnsupportedProjects,
+            StaleSpec: trust.StaleSpec,
             Orphans: Orphans(report.OrphanScan),
             Summary: new StatusSummaryJson(
                 report.RulesChecked,

@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Emit;
+using Microsoft.CodeAnalysis.Text;
 
 namespace SlideRule.Tests.TestSupport;
 
@@ -101,6 +102,57 @@ internal static class SpecAssemblyCompiler
             .Emit(stream);
         ThrowOnFailure(result, assemblyName);
         return stream.ToArray();
+    }
+
+    /// <summary>
+    ///     Compiles the C# files at <paramref name="sourcePaths" /> to a DLL at <paramref name="outputPath" />, with a
+    ///     portable PDB beside it, embedded in it, or none, as <paramref name="debugFormat" /> says (null for none), so
+    ///     the PDB records each file's checksum as a build of a project on disk would.
+    /// </summary>
+    /// <remarks>
+    ///     <paramref name="recordedPath" /> is the path the PDB records for a file, its own path by default; a
+    ///     <c>/_/</c> spelling stands in for a build that mapped its source paths.
+    ///     <paramref name="checksumAlgorithm" /> is the hash the PDB records, SHA-256 as the SDK writes by default.
+    /// </remarks>
+    internal static void EmitFromFiles(
+        IReadOnlyList<string> sourcePaths, string outputPath, DebugInformationFormat? debugFormat,
+        Func<string, string>? recordedPath = null, SourceHashAlgorithm checksumAlgorithm = SourceHashAlgorithm.Sha256)
+    {
+        List<SyntaxTree> trees = sourcePaths
+            .Select(path => ParseFile(path, recordedPath?.Invoke(path) ?? path, checksumAlgorithm))
+            .ToList();
+        string assemblyName = Path.GetFileNameWithoutExtension(outputPath);
+        var compilation = CSharpCompilation.Create(
+            assemblyName, trees, HostContract, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+        string pdbPath = Path.ChangeExtension(outputPath, ".pdb");
+        using (FileStream dll = File.Create(outputPath))
+        {
+            EmitResult result;
+            if (debugFormat is not { } format)
+            {
+                result = compilation.Emit(dll);
+            }
+            else if (format == DebugInformationFormat.Embedded)
+            {
+                result = compilation.Emit(dll, options: new EmitOptions(debugInformationFormat: format));
+            }
+            else
+            {
+                using FileStream pdb = File.Create(pdbPath);
+                result = compilation.Emit(
+                    dll, pdb, options: new EmitOptions(debugInformationFormat: format, pdbFilePath: pdbPath));
+            }
+
+            ThrowOnFailure(result, assemblyName);
+        }
+    }
+
+    private static SyntaxTree ParseFile(string path, string recordedPath, SourceHashAlgorithm checksumAlgorithm)
+    {
+        using FileStream stream = File.OpenRead(path);
+        SourceText text = SourceText.From(stream, checksumAlgorithm: checksumAlgorithm);
+        return CSharpSyntaxTree.ParseText(text, path: recordedPath);
     }
 
     private static void EmitSpecDll(string source, string outputPath, string assemblyName, IReadOnlyList<MetadataReference> references)

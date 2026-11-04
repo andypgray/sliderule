@@ -103,9 +103,14 @@ internal sealed record ProjectCacheEntry(
 ///     carry one. One path serves every framework: the built-output search derives the intermediate root from the
 ///     prefix it shares with the evaluated path, and that root is the same whichever framework's pair it starts from.
 /// </param>
+/// <param name="ProjectFilePath">
+///     The spec project's <c>.csproj</c>, so a hit compares the spec's sources with its build as a cold run does, or
+///     null when the workspace reported no project file.
+/// </param>
 internal sealed record SpecResolutionRecord(
     string NormalizedSpecArgument,
     string? SpecProjectName,
     IReadOnlyList<string> ExcludeProjectNames,
     IReadOnlyList<string> OutputFilePaths,
-    string? IntermediateAssemblyPath);
+    string? IntermediateAssemblyPath,
+    string? ProjectFilePath);

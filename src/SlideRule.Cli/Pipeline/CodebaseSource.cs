@@ -72,6 +72,7 @@ internal sealed class CodebaseSource : IDisposable
     private readonly ArchitectureModel? model;
     private readonly string normalizedSpecArgument;
     private readonly SpecResolution? resolution;
+    private readonly Lazy<StaleSpec?> staleSpec;
     private readonly ExtractionCacheStore? store;
 
     // The fragment set this source acquired, held for its lifetime — walked from the workspace, or taken
@@ -102,6 +103,7 @@ internal sealed class CodebaseSource : IDisposable
         Diagnostics = loadDiagnostics;
         this.model = model;
         this.resolution = resolution;
+        staleSpec = new Lazy<StaleSpec?>(() => resolution is null ? null : SpecSourceComparison.Compare(resolution));
         this.handle = handle;
         this.store = store;
         this.cacheRead = cacheRead;
@@ -118,6 +120,13 @@ internal sealed class CodebaseSource : IDisposable
     /// <summary>The resolved spec (DLL + excluded projects). Absent for the spec-less <c>graph</c> survey.</summary>
     public SpecResolution Resolution =>
         resolution ?? throw new InvalidOperationException("This codebase source was created without a spec (graph is spec-less).");
+
+    /// <summary>
+    ///     The spec project's sources compared with the build this run loaded: null when they match, when the spec
+    ///     was passed as a DLL, and for the spec-less <c>graph</c> survey.
+    /// </summary>
+    /// <remarks>Compared once, on first read, so every surface of one run reports one verdict.</remarks>
+    public StaleSpec? StaleSpec => staleSpec.Value;
 
     /// <summary>
     ///     How well the workspace loaded (collected on a cold run, replayed from the cache on a hit), with the merge
@@ -503,7 +512,7 @@ internal sealed class CodebaseSource : IDisposable
 
         return SpecResolver.Replay(
             record.SpecProjectName, normalized, record.ExcludeProjectNames, record.OutputFilePaths,
-            record.IntermediateAssemblyPath);
+            record.IntermediateAssemblyPath, record.ProjectFilePath);
     }
 
     private CacheFingerprint? TryCaptureFingerprint(Solution solution, CancellationToken ct)
@@ -556,7 +565,7 @@ internal sealed class CodebaseSource : IDisposable
 
         var record = new SpecResolutionRecord(
             normalizedSpecArgument, specProjectName, [.. resolution.ExcludeProjectNames], outputFilePaths,
-            resolution.IntermediateAssemblyPath);
+            resolution.IntermediateAssemblyPath, resolution.ProjectFilePath);
         return existing
             .Where(r => !string.Equals(r.NormalizedSpecArgument, normalizedSpecArgument, StringComparison.Ordinal))
             .Append(record)

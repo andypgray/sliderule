@@ -63,7 +63,7 @@ A config generated from the registry manifest passes no solution argument, so a 
 
 `dnx` ships with the .NET 10 SDK, so a client that launches `dnx` itself needs only one installed on the machine. The `dnx` command picks the newest installed SDK and never reads `global.json`, so a repository pinning an older SDK launches the server anyway. The `dotnet dnx` spelling goes through `dotnet`, which honours the nearest `global.json`. Inside a repository pinning an SDK below 10 that spelling fails, so run it from outside the repository and pass the solution's absolute path. With no .NET 10 SDK installed, a registry client sees a server that died before the handshake, with the reason on stderr alone.
 
-The server reads your code from source and runs the spec from its last build, so restore the solution and build the spec project before an agent queries it.
+The server reads your code from source and runs the spec from its last build, so restore the solution and build the spec project before an agent queries it. A check or status document over a spec edited since that build includes `staleSpec`, naming the file, and `arch_explain` and `arch_context` print a line naming it above their answer.
 
 ## The tools
 

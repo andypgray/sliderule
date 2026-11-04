@@ -3,6 +3,7 @@ using Shouldly;
 using SlideRule.Baselines;
 using SlideRule.Checking;
 using SlideRule.Cli.Rendering;
+using SlideRule.Cli.SpecLoading;
 using SlideRule.Roslyn.Diagnostics;
 using SlideRule.Tests.Checking;
 using SlideRule.Tests.TestSupport;
@@ -36,15 +37,10 @@ public sealed class CheckJsonOrderTests
     private static readonly string Advisory =
         CapturedAuditLines.Framed("App.Web/App.Web.csproj", CapturedAuditLines.BuildTasksGitAdvisory);
 
-    private static readonly CheckReport WebOpensData = Checker.Run(OneController, arch =>
-        arch.Rule("layer/no-data")
-            .Enforce(arch.Namespace("App.Web.*").MustNotReference(arch.Namespace("App.Data.*")))
-            .Because("The web layer must not open the data layer directly."));
+    private static readonly CheckReport WebOpensData = Checker.Run(OneController, Sources.NoDataReference);
 
-    // A run whose workspace loaded incompletely, whose packages did not restore, that a solution filter
-    // narrowed, whose solution declares a project in another language and a project that compiles twice,
-    // whose load raised a NuGet audit advisory, and that a --rules glob narrowed further: every optional slot
-    // populated at once, which no real run needs to be for the order to matter and which no golden can be.
+    // A run with every optional slot populated at once, which no real run needs to be for the order to matter
+    // and which no golden can be.
     // Must stay declared below WebOpensData: static field initializers run in declaration order, and Render
     // reads it.
     private static readonly string StampedDocument = Render(DocumentGrain.Full);
@@ -71,6 +67,7 @@ public sealed class CheckJsonOrderTests
     [InlineData("restoreFailedProjects")]
     [InlineData("unsupportedProjects")]
     [InlineData("multiTargetedProjects")]
+    [InlineData("staleSpec")]
     public void Document_VerdictAndTrustStamps_SerializeAheadOfRules(string key)
     {
         // Below the grain ladder's coarsest rung a reader with a response budget cuts at the last newline
@@ -86,6 +83,7 @@ public sealed class CheckJsonOrderTests
     [InlineData("restoreFailedProjects")]
     [InlineData("unsupportedProjects")]
     [InlineData("multiTargetedProjects")]
+    [InlineData("staleSpec")]
     public void Document_TrustStamps_SerializeAheadOfTheSummaryTheyInvalidate(string key)
     {
         StampedDocument.ShouldSerializeBefore(key, "summary");
@@ -230,7 +228,7 @@ public sealed class CheckJsonOrderTests
                  new[]
                  {
                      "modelIncomplete", "failedProjects", "uncheckedProjects", "restoreFailedProjects",
-                     "unsupportedProjects", "multiTargetedProjects", "summary"
+                     "unsupportedProjects", "multiTargetedProjects", "staleSpec", "summary"
                  })
             index.ShouldContain($"\"{stamp}\"");
     }
@@ -326,7 +324,10 @@ public sealed class CheckJsonOrderTests
             specAssembly: "Spec.dll",
             diffBase: null,
             workspaceDiagnostics: ["App.Web/App.Web.csproj : error MSB4019: imported project was not found"],
-            trust: WorkspaceTrustStamp.From(diagnostics, solutionDirectory),
+            trust: WorkspaceTrustStamp.From(diagnostics, solutionDirectory) with
+            {
+                StaleSpec = new StaleSpecStamp("App.Arch/App.Arch.csproj", "App.Arch/Rules.cs", StaleReason.Changed, SpecComparison.Checksum)
+            },
             rulesFilter: ["layer/*"],
             grain: grain);
     }

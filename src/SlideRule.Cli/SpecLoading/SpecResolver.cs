@@ -37,14 +37,16 @@ internal sealed record SpecProjectCandidate(
 ///     <see cref="OutputFilePaths" /> are the evaluated output paths <see cref="DllPath" /> was chosen from, every
 ///     framework's, ordinal-sorted, and <see cref="IntermediateAssemblyPath" /> is the <c>obj</c>-side assembly the
 ///     built-output search refused an intermediate result under; both are null for a prebuilt DLL, which was never
-///     searched for.
+///     searched for. <see cref="ProjectFilePath" /> is the spec project's <c>.csproj</c>, whose sources are compared
+///     with its build, and null for a prebuilt DLL.
 /// </remarks>
 internal sealed record SpecResolution(
     string DllPath,
     string? SpecProjectName,
     IReadOnlyCollection<string> ExcludeProjectNames,
     IReadOnlyList<string>? OutputFilePaths = null,
-    string? IntermediateAssemblyPath = null);
+    string? IntermediateAssemblyPath = null,
+    string? ProjectFilePath = null);
 
 /// <summary>
 ///     Resolves which spec DLL to load. The CLI
@@ -115,7 +117,8 @@ internal static class SpecResolver
                     "Pass a built spec DLL or a csproj that is a member of the target solution.");
 
             BuiltOutputInputs built = BuiltOutputsOf(sharingProjects);
-            return MemberResolution(solution, projectFiles, declaredMembers, sharingProjects[0].Project.Name, built);
+            Project chosen = sharingProjects[0].Project;
+            return MemberResolution(solution, projectFiles, declaredMembers, chosen.Name, chosen.FilePath, built);
         }
 
         // A DLL path — the branch that needs no solution.
@@ -143,7 +146,7 @@ internal static class SpecResolver
         SpecProjectCandidate chosen = ResolveConventionProject(candidates, diagnostics);
         BuiltOutputInputs built = BuiltOutputsOfProjectFile(
             projects, chosen.CanonicalFilePath, chosen.OutputFilePath, chosen.IntermediateAssemblyPath);
-        return MemberResolution(solution, projectFiles, declaredMembers, chosen.Name, built);
+        return MemberResolution(solution, projectFiles, declaredMembers, chosen.Name, chosen.FilePath, built);
     }
 
     // A null declaredMembers is the unreadable case, which SpecExclusion degrades to just the spec project.
@@ -152,6 +155,7 @@ internal static class SpecResolver
         CanonicalProjectFiles projectFiles,
         IReadOnlySet<string>? declaredMembers,
         string specProjectName,
+        string? projectFilePath,
         BuiltOutputInputs built)
     {
         List<string> evaluatedPaths = NormalizeEvaluatedPaths(built.OutputFilePaths);
@@ -161,7 +165,8 @@ internal static class SpecResolver
             specProjectName,
             SpecExclusion.Compute(solution, projectFiles, declaredMembers, specProjectName),
             evaluatedPaths,
-            built.IntermediateAssemblyPath);
+            built.IntermediateAssemblyPath,
+            projectFilePath);
     }
 
     // Both sides of the scan arrive canonical from the load, so the scan probes the filesystem for no project.
@@ -395,14 +400,15 @@ internal static class SpecResolver
         string fallbackProjectName,
         IReadOnlyCollection<string> excludeProjectNames,
         IReadOnlyList<string>? outputFilePaths,
-        string? intermediateAssemblyPath)
+        string? intermediateAssemblyPath,
+        string? projectFilePath)
     {
         IReadOnlyList<string> evaluatedPaths = outputFilePaths ?? [];
         string dllPath = RequireBuiltOutput(
             specProjectName ?? fallbackProjectName, evaluatedPaths, intermediateAssemblyPath);
 
         return new SpecResolution(
-            dllPath, specProjectName, excludeProjectNames, evaluatedPaths, intermediateAssemblyPath);
+            dllPath, specProjectName, excludeProjectNames, evaluatedPaths, intermediateAssemblyPath, projectFilePath);
     }
 
     // The evaluated output paths in the one order the built-output search consumes them: blanks dropped,

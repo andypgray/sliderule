@@ -47,8 +47,8 @@ internal sealed class StatusRunner(
 
         // And the stamp with it, so the advisories stderr echoes are the very entries the document carries
         // rather than a second grouping of the same load lines.
-        WorkspaceTrustStamp trust = WorkspaceTrustStamp.From(diagnostics, source.SolutionDirectory);
-        WorkspaceDiagnosticsRenderer.Render(error, trust, renderedDiagnostics, request.Json);
+        WorkspaceTrustStamp trust = WorkspaceTrustStamp.From(source);
+        WorkspaceDiagnosticsRenderer.Render(error, trust, renderedDiagnostics, source, request.Json);
 
         // Both stamps are human-channel only, where the document carries the same facts in
         // uncheckedProjects and unsupportedProjects.

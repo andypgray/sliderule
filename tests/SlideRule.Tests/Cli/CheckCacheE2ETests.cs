@@ -206,7 +206,7 @@ public sealed class CheckCacheE2ETests
         var records = new[]
         {
             new SpecResolutionRecord(
-                "", "MyApp.Arch", ["MyApp.Arch", "MyApp.Arch.Pack"], [CliRunner.CleanSpecDll], null)
+                "", "MyApp.Arch", ["MyApp.Arch", "MyApp.Arch.Pack"], [CliRunner.CleanSpecDll], null, null)
         };
 
         SpecResolution? resolution = CodebaseSource.ResolveSpecOnHit(null, records);
@@ -230,7 +230,7 @@ public sealed class CheckCacheE2ETests
         string intermediate = WriteAssembly(temp, "obj", "Release", "net10.0", "MyApp.Arch.dll");
         var records = new[]
         {
-            new SpecResolutionRecord("", "MyApp.Arch", ["MyApp.Arch"], [evaluatedDebug], intermediate)
+            new SpecResolutionRecord("", "MyApp.Arch", ["MyApp.Arch"], [evaluatedDebug], intermediate, null)
         };
 
         SpecResolution? resolution = CodebaseSource.ResolveSpecOnHit(null, records);
@@ -253,7 +253,7 @@ public sealed class CheckCacheE2ETests
         string intermediate = WriteAssembly(temp, "bin", "obj", "Debug", "net10.0", "MyApp.Arch.dll");
         var recorded = new[]
         {
-            new SpecResolutionRecord("", "MyApp.Arch", ["MyApp.Arch"], [evaluatedDebug], intermediate)
+            new SpecResolutionRecord("", "MyApp.Arch", ["MyApp.Arch"], [evaluatedDebug], intermediate, null)
         };
 
         var error = Should.Throw<UserErrorException>(() => CodebaseSource.ResolveSpecOnHit(null, recorded));
@@ -264,7 +264,7 @@ public sealed class CheckCacheE2ETests
         // keep out of a hit.
         var unrecorded = new[]
         {
-            new SpecResolutionRecord("", "MyApp.Arch", ["MyApp.Arch"], [evaluatedDebug], null)
+            new SpecResolutionRecord("", "MyApp.Arch", ["MyApp.Arch"], [evaluatedDebug], null, null)
         };
 
         SpecResolution? unrefused = CodebaseSource.ResolveSpecOnHit(null, unrecorded);
@@ -281,7 +281,7 @@ public sealed class CheckCacheE2ETests
         string normalized = Path.GetFullPath(csprojArgument);
         var records = new[]
         {
-            new SpecResolutionRecord(normalized, "MyApp.Arch", ["MyApp.Arch"], [CliRunner.CleanSpecDll], null)
+            new SpecResolutionRecord(normalized, "MyApp.Arch", ["MyApp.Arch"], [CliRunner.CleanSpecDll], null, null)
         };
 
         SpecResolution? resolution = CodebaseSource.ResolveSpecOnHit(csprojArgument, records);

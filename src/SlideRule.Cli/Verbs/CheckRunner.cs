@@ -105,7 +105,9 @@ internal sealed class CheckRunner(
         // Computed above Render, which reads the same value, so the document and the SARIF stamp carry the
         // verdict the gate below returns.
         bool gated = diagnostics.Gates(request.AllowWorkspaceDiagnostics);
-        bool cleanWithWarnings = !gated && !report.HasViolations && report.WarningCount > 0;
+        // A stale spec counts as a warning, so on a clean stop the hook hands it to the agent, which can rebuild;
+        // otherwise the agent would not learn that a clean verdict came from rules the sources have since changed.
+        bool cleanWithWarnings = !gated && !report.HasViolations && (report.WarningCount > 0 || source.StaleSpec is not null);
 
         Render(request, stdout, human, stderr, report, source, !gated, ruleGlobs, forHook && cleanWithWarnings);
 
@@ -148,11 +150,11 @@ internal sealed class CheckRunner(
         // audit advisories and relativizing the project lists are the load's work, not a rung's, and the
         // grain ladder below renders the same load once per rung. stderr reads its advisories off it too, so
         // the terminal and the document cannot disagree about how they group.
-        WorkspaceTrustStamp trust = WorkspaceTrustStamp.From(diagnostics, source.SolutionDirectory);
+        WorkspaceTrustStamp trust = WorkspaceTrustStamp.From(source);
 
         // --json purity: only the JSON document reaches stdout; diagnostics go to stderr and ride inside the
         // document, the NuGet audit advisories in packageAudit and the rest in workspaceDiagnostics.
-        WorkspaceDiagnosticsRenderer.Render(stderr, trust, renderedDiagnostics, request.Json);
+        WorkspaceDiagnosticsRenderer.Render(stderr, trust, renderedDiagnostics, source, request.Json);
 
         if (request.Json)
             WriteJson(request, stdout, report, source, renderedDiagnostics, trust, ruleGlobs);

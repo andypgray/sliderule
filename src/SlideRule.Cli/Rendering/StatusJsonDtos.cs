@@ -26,6 +26,8 @@ namespace SlideRule.Cli.Rendering;
 ///         unsupported project contributes no violations, and a restore-failed project's rules run and report but
 ///         find nothing to count where their target is a package the restore never fetched. An unsupported
 ///         project's zero is permanent, a property of this product rather than progress the team made.
+///         <paramref name="StaleSpec" /> means the spec's sources differ from the build the run loaded, so the
+///         burndown is of the rules that build holds.
 ///     </para>
 /// </remarks>
 internal sealed record StatusJson(
@@ -40,6 +42,7 @@ internal sealed record StatusJson(
     IReadOnlyList<string>? UncheckedProjects,
     IReadOnlyList<string>? RestoreFailedProjects,
     IReadOnlyList<UnsupportedProjectStamp>? UnsupportedProjects,
+    StaleSpecStamp? StaleSpec,
     IReadOnlyList<StatusOrphanJson>? Orphans,
     StatusSummaryJson Summary);
 

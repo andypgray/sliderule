@@ -64,6 +64,7 @@ internal static class JsonReportRenderer
             RestoreFailedProjects: trust.RestoreFailedProjects,
             UnsupportedProjects: trust.UnsupportedProjects,
             MultiTargetedProjects: trust.MultiTargetedProjects,
+            StaleSpec: trust.StaleSpec,
             Summary: new SummaryJson(
                 report.RulesChecked,
                 report.RulesPassed,

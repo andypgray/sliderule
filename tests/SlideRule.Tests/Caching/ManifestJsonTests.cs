@@ -222,7 +222,8 @@ public sealed class ManifestJsonTests
             SpecProjectName: "Arch",
             ExcludeProjectNames: ["Arch"],
             OutputFilePaths: ["C:/repo/arch/bin/Debug/net10.0/Arch.dll"],
-            IntermediateAssemblyPath: "C:/repo/arch/obj/Debug/net10.0/Arch.dll");
+            IntermediateAssemblyPath: "C:/repo/arch/obj/Debug/net10.0/Arch.dll",
+            ProjectFilePath: "C:/repo/arch/Arch.csproj");
 
         return new CacheManifest(
             SchemaVersion: 7,

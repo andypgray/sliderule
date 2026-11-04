@@ -50,7 +50,9 @@ internal sealed class ArchTools(
         "first framework its shared types' members and hierarchy follow (a type that framework does not " +
         "declare follows the next that does); their references come from every framework, so a clean " +
         "report over such a project covers one framework's members and hierarchy per type and every " +
-        "framework's references.";
+        "framework's references. " +
+        "staleSpec names a spec source that differs from the spec project's last build: the verdict is of " +
+        "the rules that build holds, so rebuild the spec project and check again.";
 
     private const string StatusDescription =
         "Return the JSON migration burndown (schemaVersion 2): per-rule grandfathered/stale counts and " +
@@ -61,14 +63,17 @@ internal sealed class ArchTools(
         "they contribute no violations, so every count reads low. unsupportedProjects names the declared " +
         "projects this product cannot read at all (C# only): their zero is permanent, not burndown. " +
         "orphans lists baseline sections no rule in the spec names, such as a renamed rule's old section, and " +
-        "baseline files that could not be read.";
+        "baseline files that could not be read. staleSpec names a spec source that differs from the spec " +
+        "project's last build, so the counts are of the rules that build holds; rebuild it and ask again.";
 
     private const string ExplainDescription =
         "Return one rule's because, fix, citation, exemplar, posture payload, and linked prose as text. Given a " +
         "type or a path instead of a rule ID, return which layers, rules and scopes claim each type, the step that " +
         "admitted it to each, and the rules whose selection reached it and then left it out: call it when a rule " +
         "fires on a type you did not expect it to govern. Pass exactly one of ruleId, type and path. If projects " +
-        "fail to load or to restore, a type or path answer opens with a caveat naming them.";
+        "fail to load or to restore, a type or path answer opens with a caveat naming them. A spec source that " +
+        "differs from the spec project's last build is named in a line above any answer: the answer is of the " +
+        "rules that build holds, so rebuild the spec project and ask again.";
 
     private const string ContextDescription =
         "Return the architecture scope card(s) covering a file or directory — a quarantined scope's dragons + " +
@@ -76,7 +81,9 @@ internal sealed class ArchTools(
         "apply. If projects fail to load or to restore, the answer opens with a caveat naming them: cards from " +
         "unloaded projects cannot be placed, and a rule about a package the restore never fetched was never " +
         "measured, so treat a no-coverage answer as unproven there. A .slnf solution filter gets the same caveat " +
-        "for the declared projects it left unchecked: treat a no-coverage answer as unproven under them as well.";
+        "for the declared projects it left unchecked: treat a no-coverage answer as unproven under them as well. " +
+        "A spec source that differs from the spec project's last build is named in a line above the answer: the " +
+        "cards are of the rules that build holds, so rebuild the spec project and ask again.";
 
     private const string GraphDescription =
         "Return the JSON codebase survey (schemaVersion 1): projects[] with namespace inventories, " +
@@ -202,7 +209,8 @@ internal sealed class ArchTools(
         CancellationToken cancellationToken = default)
     {
         // Error writer deliberately discarded. A rule answer is spec-derived and cannot be made wrong by a load
-        // failure; a type or path answer carries its partial-model caveat in the body, as arch_context does.
+        // failure; a type or path answer carries its partial-model caveat in the body, as arch_context does, and
+        // either answer carries the stale-spec line there too.
         return await CaptureAsync(output => new ExplainRunner(output, TextWriter.Null, source, environment)
             .RunAsync(binding.ExplainRequest(ruleId, type, path), cancellationToken));
     }

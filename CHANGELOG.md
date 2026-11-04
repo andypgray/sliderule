@@ -27,6 +27,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   interface-implementing methods of types, must accept a parameter of type `CancellationToken`".
 - `IMemberInfo.IsInterfaceImplementation` reports a member that implements an interface member, for
   `.Where` and `.Must` predicates.
+- A spec edited and not rebuilt is reported. Every command that loads the spec compares the spec project's
+  sources with the build it runs, and when they differ prints a `warning:` line naming the project and the
+  file, with the command that rebuilds it. The check and status documents, and so `arch_check` and
+  `arch_status`, carry the same fact as `staleSpec`, and `explain`, `arch_explain` and `arch_context` print
+  the sentence above their answer. Where the build has a portable PDB, the comparison is of
+  the checksums it records for each source, so a checkout, a touch or an edit made and undone does not count;
+  without one, a source written after the build does. The turn-end hook hands the warning to the agent on a
+  clean stop, so it can rebuild, and keeps it in the report on a red one. A spec passed to `--spec` as a DLL
+  names no project and is not compared.
 
 ## [0.2.1] - 2026-10-26
 

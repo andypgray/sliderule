@@ -32,6 +32,14 @@ internal static class ProjectCone
         ReturnSpecialDirectories = false
     };
 
+    private static readonly EnumerationOptions ConeEnumerationSkippingInaccessible = new()
+    {
+        RecurseSubdirectories = true,
+        AttributesToSkip = FileAttributes.None,
+        IgnoreInaccessible = true,
+        ReturnSpecialDirectories = false
+    };
+
     /// <summary>
     ///     Enumerates every <c>*.cs</c> under <paramref name="projectDirectory" /> (recursively), skipping the
     ///     <c>bin</c>/<c>obj</c> build-output subtrees; a non-existent directory yields nothing. This is the SDK
@@ -39,15 +47,19 @@ internal static class ProjectCone
     ///     touches no MSBuild file. The cone is a superset of a project's <em>compiled</em> documents: a
     ///     <c>&lt;Compile Remove&gt;</c>'d or <c>None</c>-typed <c>*.cs</c> still lives here, so callers must record
     ///     cone membership to tell a genuine add from a file that was never compiled in the first place.
+    ///     <paramref name="skipInaccessible" /> skips a directory the walk cannot open instead of throwing, for a
+    ///     caller whose answer is advisory; a caller that must never serve a stale answer keeps the throw.
     /// </summary>
     /// <remarks>
     ///     The walk streams, so a caller that asks only whether the cone holds anything new stops at the first
-    ///     hit. Both tests are ordinal, the <c>.cs</c> suffix and the pruned directory names, so a differently-cased
-    ///     <c>BIN</c> is not build output and a <c>.CS</c> is not source, matching
-    ///     <see cref="BuildOutputDirectories.IsUnderBuildOutput" /> exactly. Order is whatever the file system
-    ///     yields: <see cref="Adds" /> sorts, and no caller may key on the raw order.
+    ///     hit. The pruned directory names are ordinal, so a differently-cased <c>BIN</c> is walked, matching
+    ///     <see cref="BuildOutputDirectories.IsUnderBuildOutput" />; the <c>.cs</c> suffix follows
+    ///     <see cref="PathComparison" />, as the build's glob matches file names on each platform, so a <c>.CS</c> is
+    ///     source on Windows. A directory link is followed, as the build follows it, unless it leads back into the
+    ///     walk or to no directory (<see cref="IsUnwalkableLink" />). Order is whatever the file system yields:
+    ///     <see cref="Adds" /> sorts, and no caller may key on the raw order.
     /// </remarks>
-    public static IEnumerable<string> Enumerate(string projectDirectory)
+    public static IEnumerable<string> Enumerate(string projectDirectory, bool skipInaccessible = false)
     {
         string root = Path.GetFullPath(projectDirectory);
         if (!Directory.Exists(root)) return [];
@@ -55,13 +67,55 @@ internal static class ProjectCone
         return new FileSystemEnumerable<string>(
             root,
             static (ref entry) => entry.ToFullPath(),
-            ConeEnumeration)
+            skipInaccessible ? ConeEnumerationSkippingInaccessible : ConeEnumeration)
         {
             ShouldIncludePredicate = static (ref entry) =>
-                !entry.IsDirectory && entry.FileName.EndsWith(".cs", StringComparison.Ordinal),
-            ShouldRecursePredicate = static (ref entry) =>
+                !entry.IsDirectory && entry.FileName.EndsWith(".cs", PathComparison.Comparison),
+            ShouldRecursePredicate = (ref entry) =>
                 !BuildOutputDirectories.IsBuildOutputName(entry.FileName)
+                && !((entry.Attributes & FileAttributes.ReparsePoint) != 0
+                     && IsUnwalkableLink(root, entry.Directory.ToString(), entry.ToFullPath()))
         };
+    }
+
+    // Whether the directory link at linkPath must not be entered: it resolves to no directory (a dangling link, or
+    // links that point at each other, which throw when entered), or it leads to a directory already on the walk's
+    // way down to it, the shape of every link cycle, which never ends. The descent is compared by real paths,
+    // because a link reached through another link never contains its own target lexically. A reparse point that
+    // is not a link is entered like any directory.
+    private static bool IsUnwalkableLink(string root, string parentDirectory, string linkPath)
+    {
+        string? resolved;
+        try
+        {
+            resolved = new DirectoryInfo(linkPath).ResolveLinkTarget(returnFinalTarget: true)?.FullName;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return true;
+        }
+
+        if (resolved is null) return false;
+        if (!Directory.Exists(resolved)) return true;
+
+        string target = PathCanonicalizer.Resolve(resolved);
+        string top = Path.TrimEndingDirectorySeparator(root);
+        for (string? directory = parentDirectory; directory is not null; directory = Path.GetDirectoryName(directory))
+        {
+            if (IsAncestorOrSelf(target, PathCanonicalizer.Resolve(directory))) return true;
+            if (PathComparison.Comparer.Equals(directory, top)) break;
+        }
+
+        return false;
+    }
+
+    // Compared with a separator closing both, so a drive root ("C:\") needs no case of its own and "C:\work2" is
+    // not under "C:\work".
+    private static bool IsAncestorOrSelf(string ancestor, string path)
+    {
+        string prefix = Path.EndsInDirectorySeparator(ancestor) ? ancestor : ancestor + Path.DirectorySeparatorChar;
+        string probe = Path.EndsInDirectorySeparator(path) ? path : path + Path.DirectorySeparatorChar;
+        return probe.StartsWith(prefix, PathComparison.Comparison);
     }
 
     /// <summary>

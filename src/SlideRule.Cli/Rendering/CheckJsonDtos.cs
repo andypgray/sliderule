@@ -33,8 +33,10 @@ namespace SlideRule.Cli.Rendering;
 ///         a clean narrowed document is not a clean solution.
 ///     </para>
 ///     <para>
-///         The trust stamps, <paramref name="ModelIncomplete" /> through <paramref name="MultiTargetedProjects" />,
-///         are <see cref="WorkspaceTrustStamp" />'s. <paramref name="FailedProjects" /> and
+///         The trust stamps, <paramref name="ModelIncomplete" /> through <paramref name="StaleSpec" />,
+///         are <see cref="WorkspaceTrustStamp" />'s. <paramref name="StaleSpec" /> means the spec's sources differ
+///         from the build the run loaded, so every verdict is of the rules that build holds.
+///         <paramref name="FailedProjects" /> and
 ///         <paramref name="RestoreFailedProjects" /> are the evidence behind <paramref name="ModelIncomplete" />,
 ///         which means every verdict was reached against a partial model. The unchecked, unsupported and
 ///         multi-targeted lists scope the verdict rather than invalidate it: every rule ran and answered, over
@@ -60,6 +62,7 @@ internal sealed record CheckJson(
     IReadOnlyList<string>? RestoreFailedProjects,
     IReadOnlyList<UnsupportedProjectStamp>? UnsupportedProjects,
     IReadOnlyList<MultiTargetedProject>? MultiTargetedProjects,
+    StaleSpecStamp? StaleSpec,
     SummaryJson Summary,
     IReadOnlyList<RuleJson> Rules,
     IReadOnlyList<PackageAuditEntry>? PackageAudit,

@@ -18,7 +18,8 @@ namespace SlideRule.Cli.Verbs;
 ///         <b>Never a gate.</b> No finding about the codebase changes the exit code: context is a lookup, so
 ///         an incomplete model is announced rather than enforced. The answer opens with a caveat block naming
 ///         the load failures, because a card whose project failed to load places nowhere and the pinned
-///         pointer line would otherwise read as a clean "not dragon territory".
+///         pointer line would otherwise read as a clean "not dragon territory". A spec edited since its build is
+///         announced the same way, above the answer, because the cards are the old build's.
 ///     </para>
 ///     <para>The card body carries no provenance line — that is a <c>render</c> file-splice concern.</para>
 /// </remarks>
@@ -54,6 +55,9 @@ internal sealed class ContextRunner(
         // a smaller true answer, and this says which paths the pointer line below cannot speak for. There is
         // no --json to suppress it for; the stamp writes itself only when the run was narrowed.
         NarrowingNotices.Stamp(output, source, NarrowedUniverseNotice.ContextStamp);
+
+        // Last above the answer, as on stderr for the verbs that have it: the cards come from the build loaded.
+        StaleSpecNotice.Stamp(output, source.StaleSpec, source.SolutionDirectory);
 
         // Nothing scoped to place — no scope of either posture and no anchored layer — ⇒ skip the
         // extraction cost and point at the root block.

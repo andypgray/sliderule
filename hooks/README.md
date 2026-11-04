@@ -17,7 +17,7 @@ Any other event takes the per-edit path, and so does a run with no payload on st
 
 A stop names no edited file, so the hook reads the working tree, and reading the tree is also what makes the check complete. A hook matched on `Edit` misses the edits an agent makes through a shell or a language server. Over six weeks of this repository's own sessions, 27% of the turns that changed code changed it only that way. Reading the tree covers every edit however it arrived.
 
-The check judges every rule against the whole solution. It reads the code from source, so an agent's edit counts as soon as it is saved, built or not. It runs the spec from the spec project's last build. A stop also gives it the code files whose bytes changed since the prompt's record, and a scope's tripwire reads that list. So the tripwire warns about the turn's own changes, whatever else the tree has uncommitted.
+The check judges every rule against the whole solution. It reads the code from source, so an agent's edit counts as soon as it is saved, built or not. It runs the spec from the spec project's last build. When the spec's sources have changed since, a clean stop gives the agent a warning about it, and the exit code stays 0. A stop also gives it the code files whose bytes changed since the prompt's record, and a scope's tripwire reads that list. So the tripwire warns about the turn's own changes, whatever else the tree has uncommitted.
 
 ### What a stop skips
 

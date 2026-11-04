@@ -1,3 +1,4 @@
+using SlideRule.Cli.Pipeline;
 using SlideRule.Roslyn.Diagnostics;
 
 namespace SlideRule.Cli.Rendering;
@@ -41,13 +42,26 @@ internal static class WorkspaceDiagnosticsRenderer
     }
 
     /// <summary>
-    ///     The advisories the document already stamped, and then the stream the caller composed — for the
-    ///     verbs that write a document beside this echo, so the advisories are grouped once per load.
+    ///     A verb's whole load, for a verb that writes no document: the load's own streams, and then the
+    ///     stale-spec line (<see cref="StaleSpecNotice" />).
+    /// </summary>
+    internal static void Render(TextWriter error, CodebaseSource source)
+    {
+        Render(error, source.Diagnostics);
+        StaleSpecNotice.Render(error, source.StaleSpec, source.SolutionDirectory);
+    }
+
+    /// <summary>
+    ///     The advisories the document already stamped, the stream the caller composed, and then the stale-spec line
+    ///     for <paramref name="source" />: for the verbs that write a document beside this echo, so the advisories
+    ///     are grouped once per load.
     /// </summary>
     internal static void Render(
-        TextWriter error, WorkspaceTrustStamp trust, IReadOnlyList<string> diagnostics, bool json)
+        TextWriter error, WorkspaceTrustStamp trust, IReadOnlyList<string> diagnostics, CodebaseSource source,
+        bool json)
     {
         Render(error, trust.PackageAudit, diagnostics, json);
+        StaleSpecNotice.Render(error, source.StaleSpec, source.SolutionDirectory, json);
     }
 
     private static string Line(string text, bool json)

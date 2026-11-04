@@ -92,10 +92,43 @@ internal static class LayoutAppFixture
             FixtureDirectory, SolutionFileName, restore: false, callerFilePath: callerFilePath);
         WritePropsFile(workspace);
 
-        string specAssembly = workspace.PathOf(SpecProject, "bin", "Debug", "net10.0", SpecAssembly);
-        if (File.Exists(specAssembly)) return workspace;
+        if (File.Exists(BuiltSpecDll(workspace))) return workspace;
 
         DotnetCli.Run($"build \"{workspace.SolutionPath}\"", Path.GetDirectoryName(workspace.SolutionPath)!);
         return workspace;
+    }
+
+    /// <summary>The spec assembly a default-layout build of <paramref name="workspace" /> writes.</summary>
+    internal static string BuiltSpecDll(TempFixtureWorkspace workspace)
+    {
+        return workspace.PathOf(SpecProject, "bin", "Debug", "net10.0", SpecAssembly);
+    }
+
+    /// <summary>
+    ///     The stale-spec sentence a run reports while <see cref="EditSpecAfterBuild" />'s edit stands, without the
+    ///     <c>warning:</c> prefix stderr gives it.
+    /// </summary>
+    internal const string StaleSpecSentence =
+        "the spec project 'LayoutApp.Spec' differs from its last build ('LayoutApp.Spec/LayoutAppSpec.cs' "
+        + "has changed since it was built); this run used the rules that build holds. "
+        + "Rebuild it: dotnet build LayoutApp.Spec/LayoutApp.Spec.csproj";
+
+    /// <summary>
+    ///     Edits the spec source of <paramref name="workspace" /> after its build, adding a member and changing no
+    ///     rule, and returns the scope that restores it.
+    /// </summary>
+    internal static ScopedFile EditSpecAfterBuild(TempFixtureWorkspace workspace)
+    {
+        ScopedFile edit = ScopedFile.Hold(workspace.PathOf(SpecProject, "LayoutAppSpec.cs"));
+        try
+        {
+            FixtureEdits.InsertMember(edit.Path, "\n    private const int Unbuilt = 0;\n");
+            return edit;
+        }
+        catch
+        {
+            edit.Dispose();
+            throw;
+        }
     }
 }

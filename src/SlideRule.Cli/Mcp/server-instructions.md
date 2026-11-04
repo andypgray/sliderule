@@ -10,5 +10,5 @@ One prompt, `derive_spec` — the onboarding recipe to run when spec resolution 
 
 - Documents are the CLI's `--json` output byte for byte: camelCase, optional fields absent not null, check entries keyed by `id` (`ruleId` is SARIF-only).
 - The server is bound to one solution + one spec at start; the tools take no solution argument.
-- The first call loads the workspace; later calls reconcile it. Code is read from source, built or not; the spec from its project's last build, so rebuild that after a spec edit.
+- The first call loads the workspace; later calls reconcile it. Code is read from source, built or not; the spec from its project's last build, so rebuild that after a spec edit (`staleSpec`, or a line above an explain or context answer, says when you have not).
 - Drill down with `arch_explain <rule-id>`; the always-on summary lives in the root `AGENTS.md` managed block.

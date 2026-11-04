@@ -40,20 +40,9 @@ internal sealed class GraphRunner(
     {
         TextWriter human = HumanChannel(request.Json, output);
 
-        using var source = await CodebaseSource.CreateSpeclessAsync(
-            SolutionSource, Environment, request.Solution, request.WorkingDirectory, request.NoCache, ct);
-
-        // Refuse before extraction, not after: a survey of a partial model is a wrong map, not a smaller one.
-        // The refusal carries the diagnostics in its own text rather than leaving them to the stderr render
-        // below, so the MCP surface — which discards this error writer — gets the same actionable message.
-        // A cache hit refuses identically: diagnostics persist into the extraction cache and replay with it.
-        WorkspaceDiagnostics diagnostics = source.Diagnostics;
-        if (diagnostics.Gates(request.AllowWorkspaceDiagnostics))
-            throw new UserErrorException(IncompleteModelGate.GraphRefusal(diagnostics));
-
-        CodebaseModel codebase = await source.ExtractAsync([], ct); // spec-less: the survey excludes nothing
-        RecordCacheOutcome(source);
-        GraphSummary summary = GraphSummarizer.Summarize(codebase);
+        (CodebaseSource survey, GraphSummary summary) = await SurveyAsync(
+            request.Solution, request.WorkingDirectory, request.NoCache, request.AllowWorkspaceDiagnostics, ct);
+        using CodebaseSource source = survey;
         string solutionName = source.SolutionName;
 
         // Scope, then refuse, then render. The refusal fires here rather than at parse time because the
@@ -65,15 +54,15 @@ internal sealed class GraphRunner(
             throw new UserErrorException(UnmatchedProjectsMessage(projectGlobs, summary));
 
         // --json purity: only the JSON document reaches stdout; workspace diagnostics go to stderr. Composed
-        // once for both, so the survey document carries the MSBuild-selection note the refusal above already
-        // carries.
-        IReadOnlyList<string> renderedDiagnostics = diagnostics.Rendered;
+        // once for both, so the survey document carries the MSBuild-selection note the survey's incomplete-model
+        // refusal carries.
+        IReadOnlyList<string> renderedDiagnostics = source.Diagnostics.Rendered;
 
         // The stamp goes the same way: read off the load once, then handed to stderr, to the human survey
         // and to every rung of the document ladder, so none of the three regroups the load's advisories or
         // respells its project paths for itself.
-        WorkspaceTrustStamp trust = WorkspaceTrustStamp.From(diagnostics, source.SolutionDirectory);
-        WorkspaceDiagnosticsRenderer.Render(error, trust, renderedDiagnostics, request.Json);
+        WorkspaceTrustStamp trust = WorkspaceTrustStamp.From(source);
+        WorkspaceDiagnosticsRenderer.Render(error, trust, renderedDiagnostics, source, request.Json);
 
         // The narrowing stamp is human-channel only, where the document carries the same fact in
         // uncheckedProjects.
