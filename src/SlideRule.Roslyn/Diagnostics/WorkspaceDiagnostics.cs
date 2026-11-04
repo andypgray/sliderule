@@ -67,8 +67,8 @@ internal enum UnsupportedProjectKind
 
     /// <summary>
     ///     A C# project the solution's default configuration leaves out of the build, which a restore of the
-    ///     solution skips too unless a built project references it. It is left out of the model as the build
-    ///     leaves it out, referenced or not.
+    ///     solution skips too unless a built project references it. A load leaves it out of the model as the build
+    ///     leaves it out, referenced or not; a replay whose binlog compiled it keeps it, and does not list it.
     /// </summary>
     NotBuilt,
 

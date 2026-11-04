@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  UnopenedEntries: a solution declaring, beside this one C# project, two entries no workspace opens and no
+  build compiles: a shared project whose items nothing imports, and a database project mapped with an ActiveCfg
+  line alone. A load and a replay of the same tree must name both the same way; see SolutionEntriesE2ETests.
+
+  The siting constraints FieldMini.Core.csproj states apply here for the same reasons: it lives outside
+  Fixtures/TestSolutions/, so the startup restore never touches it; it is in no solution of this repository; and
+  it is source only.
+-->
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>disable</Nullable>
+        <ImplicitUsings>disable</ImplicitUsings>
+        <NuGetAudit>false</NuGetAudit>
+        <RestoreLockedMode Condition="'$(CI)' == 'true'">true</RestoreLockedMode>
+    </PropertyGroup>
+</Project>

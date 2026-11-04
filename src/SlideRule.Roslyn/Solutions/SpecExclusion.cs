@@ -122,17 +122,22 @@ internal static class SpecExclusion
     }
 
     /// <summary>
-    ///     The solution's declared <c>.csproj</c> members, canonicalized for comparison, or
-    ///     <see langword="null" /> when membership cannot be read — an unowned format or any read/parse
-    ///     failure, a malformed solution filter included. Null is the fallback signal, never an empty set.
+    ///     The solution's declared <c>.csproj</c> members, built by the default configuration or not, canonicalized
+    ///     for comparison, or <see langword="null" /> when membership cannot be read — an unowned format or any
+    ///     read/parse failure, a malformed solution filter included. Null is the fallback signal, never an empty set.
     /// </summary>
+    /// <remarks>
+    ///     Counting the not-built entries changes no MSBuild load, which never holds one. A replay holds one only when
+    ///     its binlog compiled it, and that project is the solution's own, not a passenger.
+    /// </remarks>
     internal static IReadOnlySet<string>? TryReadDeclaredMembers(string solutionPath)
     {
         if (!SolutionProjectFileParser.OwnsFormat(solutionPath)) return null;
 
         try
         {
-            return CanonicalMemberSet(SolutionProjectFileParser.ReadDeclaredMembership(solutionPath).Declared);
+            SolutionMembership membership = SolutionProjectFileParser.ReadDeclaredMembership(solutionPath);
+            return CanonicalMemberSet(membership.Declared.Concat(membership.NotBuilt));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

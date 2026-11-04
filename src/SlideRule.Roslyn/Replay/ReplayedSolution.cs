@@ -54,8 +54,8 @@ internal sealed class ReplayedSolution : IDisposable
             // as it stands on disk now, so reading one here would stamp today's restore onto yesterday's model, and
             // a capture replayed because it was structurally valid is a capture of a build that compiled.
             restoreFailedProjects: [],
-            // The compiler invocations the C#-only predicate declined from the capture, beside the solution file's
-            // not-built and Web Site entries, which leave no invocation in a binlog to decline.
+            // The solution file's entries, as on an MSBuild load, joined with the compiler invocations the C#-only
+            // predicate declined from the capture.
             unsupportedProjects: unsupportedProjects);
     }
 
@@ -83,8 +83,8 @@ internal sealed class ReplayedSolution : IDisposable
     public IReadOnlyList<string> FailedProjects { get; }
 
     /// <summary>
-    ///     The <c>.csproj</c> paths the solution declares that a solution filter left out of this run and the
-    ///     binlog did not build; empty unless the replay was given a solution filter.
+    ///     The <c>.csproj</c> paths the solution's default configuration builds that a solution filter left out of
+    ///     this run and the binlog did not build; empty unless the replay was given a solution filter.
     /// </summary>
     public IReadOnlyList<string> UncheckedProjects { get; }
 

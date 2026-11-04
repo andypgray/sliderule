@@ -57,9 +57,10 @@ internal sealed record CaptureValidation(CaptureState State, string? BinlogCopyP
 ///         command lines.
 ///     </para>
 ///     <para>
-///         A binlog older than the tree's structural files, or one that does not cover exactly the solution's
-///         csproj set, is a loud <see cref="UserErrorException" /> refusal at ingest: the capture contract is
-///         "from a build of the current tree", and a subset binlog would silently shrink the model forever. A
+///         A binlog older than the tree's structural files, or one that misses a csproj the solution's default
+///         configuration builds or contains a project the solution does not declare, is a loud
+///         <see cref="UserErrorException" /> refusal at ingest: the capture contract is "from a build of the current
+///         tree", and a subset binlog would silently shrink the model forever. A
 ///         capture invalidated later is not loud: <see cref="Validate" /> reports an
 ///         <see cref="CaptureState.Invalid" /> notice and the run falls back to a design-time build, because a
 ///         hard error would break CI on any csproj change until re-capture.
@@ -128,7 +129,10 @@ internal sealed class BinlogCaptureStore
                + "the current tree). Rebuild with -bl and pass the fresh binlog.";
     }
 
-    /// <summary>The refusal text when the binlog is missing one or more of the solution's csproj members.</summary>
+    /// <summary>
+    ///     The refusal text when the binlog is missing one or more of the csproj members the solution's default
+    ///     configuration builds.
+    /// </summary>
     internal static string MissingCoverageMessage(string binlogArgument, IEnumerable<string> missingCsprojs)
     {
         List<string> ordered = missingCsprojs
@@ -174,7 +178,8 @@ internal sealed class BinlogCaptureStore
     ///     <c>--binlog</c> value, verbatim.
     /// </summary>
     /// <exception cref="UserErrorException">
-    ///     The solution is a solution filter, or the binlog is stale or does not cover exactly the solution.
+    ///     The solution is a solution filter, or the binlog is stale, misses a project the solution's default
+    ///     configuration builds, or contains one the solution does not declare.
     /// </exception>
     public bool Ingest(
         Solution replayedSolution, string binlogFullPath, string binlogArgument, CancellationToken ct = default)
@@ -231,8 +236,11 @@ internal sealed class BinlogCaptureStore
     {
         // Canonicalized once per side, not once per comparison: resolving a path walks its ancestors probing
         // for reparse points, and the two-way subtraction below asks about every member twice. The refusals
-        // quote the original spellings, which is what the pairing keeps hold of.
-        IReadOnlyList<(string Original, string Canonical)> solutionCsprojs = CanonicalPairs(SolutionProjectFileParser.ReadCsprojMembers(solutionPath));
+        // quote the original spellings, which is what the pairing keeps hold of. The membership is read as the load
+        // boundary reads it: a binlog owes every project the default configuration builds, and may also compile one
+        // it does not (a build of another configuration), which the replay keeps as the solution's own.
+        SolutionMembership membership = SolutionProjectFileParser.ReadDeclaredMembership(solutionPath);
+        IReadOnlyList<(string Original, string Canonical)> solutionCsprojs = CanonicalPairs(membership.Declared);
         IReadOnlyList<(string Original, string Canonical)> replayCsprojs = CanonicalPairs(projects.Select(project => project.CsprojPath));
 
         var replayCanonical = new HashSet<string>(
@@ -244,8 +252,9 @@ internal sealed class BinlogCaptureStore
         if (missing.Count > 0)
             throw new UserErrorException(MissingCoverageMessage(binlogArgument, missing));
 
+        IEnumerable<string> notBuiltCanonical = CanonicalPairs(membership.NotBuilt).Select(csproj => csproj.Canonical);
         var solutionCanonical = new HashSet<string>(
-            solutionCsprojs.Select(csproj => csproj.Canonical), PathComparison.Comparer);
+            solutionCsprojs.Select(csproj => csproj.Canonical).Concat(notBuiltCanonical), PathComparison.Comparer);
         List<string> extra = replayCsprojs
             .Where(csproj => !solutionCanonical.Contains(csproj.Canonical))
             .Select(csproj => csproj.Original)

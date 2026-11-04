@@ -216,15 +216,60 @@ public sealed class ProjectLoadFailuresTests
             .ShouldHaveFailed(Path.Combine(via, "Absent", "Absent.csproj"));
     }
 
-    // Detect over the solution's resolved project files, against the membership the file at solutionPath declares,
-    // or against none when a test names no file.
-    private static ProjectLoadReport Detect(Solution solution, string? solutionPath = null)
+    [Fact]
+    public void Detect_DeclaredEntriesAndDeclinedCalls_ListsEachProjectOnceWithItsKind()
+    {
+        // A replay joins the solution file's entries with the compiler calls it declined. A declined call for a
+        // project the solution declares is the same project in the build's spelling, here through a link, so it
+        // is listed once in the solution's spelling; a declined call the solution does not declare is listed in
+        // the build's.
+        using TempDirectory real = TestTempRoot.Fresh("unsupported-real");
+        using TempDirectory links = TestTempRoot.Fresh("unsupported-link");
+        real.WriteFile(
+            ["Solution.sln"],
+            """
+            Microsoft Visual Studio Solution File, Format Version 12.00
+            Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Shared", "Shared\Shared.shproj", "{11111111-1111-1111-1111-111111111111}"
+            EndProject
+            Project("{00D1A9C2-B5F0-4AF3-8072-F6C62B433612}") = "Db", "Db\Db.sqlproj", "{22222222-2222-2222-2222-222222222222}"
+            EndProject
+            Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Native", "Native\Native.vcxproj", "{33333333-3333-3333-3333-333333333333}"
+            EndProject
+            Project("{E53339B2-1760-4266-BCC7-CA923CBCF16C}") = "docker-compose", "Compose\docker-compose.dcproj", "{44444444-4444-4444-4444-444444444444}"
+            EndProject
+            Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "Vb", "Vb\Vb.vbproj", "{55555555-5555-5555-5555-555555555555}"
+            EndProject
+            """);
+        string via = links.PathOf("via");
+        SymlinkSupport.CreateDirectorySymlink(via, real.Path);
+        using var workspace = new AdhocWorkspace();
+
+        // Act
+        ProjectLoadReport report = Detect(
+            workspace.CurrentSolution, real.PathOf("Solution.sln"),
+            [Path.Combine(via, "Vb", "Vb.vbproj"), Path.Combine(via, "Fs", "Fs.fsproj")]);
+
+        // Assert
+        UnsupportedProject[] expected =
+        [
+            new(real.PathOf("Compose", "docker-compose.dcproj"), UnsupportedProjectKind.NotCsharp),
+            new(real.PathOf("Db", "Db.sqlproj"), UnsupportedProjectKind.NotCsharp),
+            new(real.PathOf("Native", "Native.vcxproj"), UnsupportedProjectKind.NotCsharp),
+            new(real.PathOf("Shared", "Shared.shproj"), UnsupportedProjectKind.SharedProject),
+            new(real.PathOf("Vb", "Vb.vbproj"), UnsupportedProjectKind.NotCsharp),
+            new(Path.Combine(via, "Fs", "Fs.fsproj"), UnsupportedProjectKind.NotCsharp)
+        ];
+        report.Unsupported.ShouldBe(expected.OrderBy(project => project.Path, StringComparer.Ordinal));
+    }
+
+    private static ProjectLoadReport Detect(
+        Solution solution, string? solutionPath = null, IReadOnlyCollection<string>? declinedCalls = null)
     {
         CanonicalProjectFiles projectFiles = CanonicalProjectFiles.Of(solution);
         SolutionMembership? membership = solutionPath is null
             ? null
             : SolutionProjectFileParser.ReadDeclaredMembership(solutionPath);
-        return ProjectLoadFailures.Detect(solution, projectFiles, membership);
+        return ProjectLoadFailures.Detect(solution, projectFiles, membership, declinedCalls ?? []);
     }
 
     private static string WriteSolution(TempDirectory temp, params string[] projectNames)

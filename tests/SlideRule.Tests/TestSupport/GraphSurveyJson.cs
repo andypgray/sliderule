@@ -31,6 +31,19 @@ internal static class GraphSurveyJson
             .ToList();
     }
 
+    /// <summary>
+    ///     Every project row's name beside whether the solution declares it, in the order the survey lists them.
+    /// </summary>
+    internal static IReadOnlyList<(string Name, bool SolutionMember)> ProjectMemberships(this JsonDocument document)
+    {
+        return document.RootElement.GetProperty("projects")
+            .EnumerateArray()
+            .Select(project => (
+                project.GetProperty("name").GetString()!,
+                project.GetProperty("solutionMember").GetBoolean()))
+            .ToList();
+    }
+
     /// <summary>Every project reference edge, as the pair it joins and how many references cross it.</summary>
     internal static IReadOnlyList<(string Source, string Target, int References)> ProjectEdges(
         this JsonDocument document)

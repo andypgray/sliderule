@@ -23,49 +23,60 @@ internal sealed record SettledSolution(
 internal static class LoadBoundary
 {
     /// <summary>
-    ///     Removes the projects <paramref name="solution" />'s default configuration does not build, strips its
-    ///     unresolved references, normalizes its project names and measures what loaded against
-    ///     <paramref name="solutionPath" />, the solution file the load came from or was run over, or null when none
-    ///     is known.
+    ///     What <paramref name="solutionPath" />, the solution file a load came from or was run over, declares, or null
+    ///     when none is known or the parser does not own its format. Each load reads it once, for every step below.
     /// </summary>
-    // The removal comes first, so that no later step, and no reader of the load, sees a project the build skipped:
-    // a restore of the solution can skip it too, and every package-backed fact about it would then read as a
-    // restore failure. The
-    // remaining steps read and write disjoint facts (references; names; file and output paths), so their order
-    // decides nothing; it is fixed here so that both paths run one sequence. The project files are resolved once,
-    // here, for the steps that compare them and for every reader of the load after them.
-    internal static SettledSolution Settle(Solution solution, string? solutionPath)
+    internal static SolutionMembership? ReadMembership(string? solutionPath)
     {
-        SolutionMembership? membership = solutionPath is not null && SolutionProjectFileParser.OwnsFormat(solutionPath)
+        return solutionPath is not null && SolutionProjectFileParser.OwnsFormat(solutionPath)
             ? SolutionProjectFileParser.ReadDeclaredMembership(solutionPath)
             : null;
-
-        CanonicalProjectFiles projectFiles = CanonicalProjectFiles.Of(solution);
-        Solution built = membership is null ? solution : WithoutUnbuilt(solution, projectFiles, membership.NotBuilt);
-        (Solution stripped, int analyzerCount, int metadataCount) = built.StripUnresolvedReferences();
-        (Solution normalized, IReadOnlyDictionary<ProjectId, string> targetFrameworks) =
-            stripped.NormalizeProjectNames(projectFiles);
-        ProjectLoadReport report = ProjectLoadFailures.Detect(normalized, projectFiles, membership);
-
-        return new SettledSolution(
-            normalized, targetFrameworks, projectFiles, report, analyzerCount, metadataCount);
     }
 
-    // A not-built project leaves even when a built one references it: a solution build neither builds a project its
-    // configuration disables nor passes its assembly to a project that references it, because MSBuild's
+    /// <summary>
+    ///     Removes the projects <paramref name="membership" /> says the solution's default configuration does not
+    ///     build. Only the MSBuild load runs it, because the workspace opens every entry whatever the configuration
+    ///     says; a replay holds a not-built project only when its binlog compiled one, and keeps it.
+    /// </summary>
+    // It runs before Settle, so that no step after it, and no reader of the load, sees a project the build skipped: a
+    // restore of the solution can skip it too, and every package-backed fact about it would then read as a restore
+    // failure. A not-built project leaves even when a built one references it: a solution build neither builds a
+    // project its configuration disables nor passes its assembly to a project that references it, because MSBuild's
     // AssignProjectConfiguration defaults OnlyReferenceAndBuildProjectsEnabledInSolutionConfiguration to true
     // (measured on the .NET 10 SDK). Only the restore follows such a reference.
-    private static Solution WithoutUnbuilt(
-        Solution solution, CanonicalProjectFiles projectFiles, IReadOnlyList<string> notBuilt)
+    internal static Solution WithoutUnbuilt(Solution solution, SolutionMembership? membership)
     {
-        if (notBuilt.Count == 0) return solution;
+        if (membership is null || membership.NotBuilt.Count == 0) return solution;
 
-        IReadOnlySet<string> unbuiltFiles = SpecExclusion.CanonicalMemberSet(notBuilt);
+        CanonicalProjectFiles projectFiles = CanonicalProjectFiles.Of(solution);
+        IReadOnlySet<string> unbuiltFiles = SpecExclusion.CanonicalMemberSet(membership.NotBuilt);
         List<ProjectId> unbuilt = solution.Projects
             .Where(project => projectFiles.PathOf(project) is { } file && unbuiltFiles.Contains(file))
             .Select(project => project.Id)
             .ToList();
 
         return unbuilt.Aggregate(solution, (remaining, id) => remaining.RemoveProject(id));
+    }
+
+    /// <summary>
+    ///     Strips <paramref name="solution" />'s unresolved references, normalizes its project names and measures what
+    ///     loaded against <paramref name="membership" /> (<see cref="ReadMembership" />'s answer) and
+    ///     <paramref name="declinedCalls" />, the project files of the compiler calls a replay declined, empty on the
+    ///     MSBuild load.
+    /// </summary>
+    // The steps read and write disjoint facts (references; names; file and output paths), so their order decides
+    // nothing; it is fixed here so that both paths run one sequence. The project files are resolved once, here, for
+    // the steps that compare them and for every reader of the load after them.
+    internal static SettledSolution Settle(
+        Solution solution, SolutionMembership? membership, IReadOnlyCollection<string> declinedCalls)
+    {
+        CanonicalProjectFiles projectFiles = CanonicalProjectFiles.Of(solution);
+        (Solution stripped, int analyzerCount, int metadataCount) = solution.StripUnresolvedReferences();
+        (Solution normalized, IReadOnlyDictionary<ProjectId, string> targetFrameworks) =
+            stripped.NormalizeProjectNames(projectFiles);
+        ProjectLoadReport report = ProjectLoadFailures.Detect(normalized, projectFiles, membership, declinedCalls);
+
+        return new SettledSolution(
+            normalized, targetFrameworks, projectFiles, report, analyzerCount, metadataCount);
     }
 }

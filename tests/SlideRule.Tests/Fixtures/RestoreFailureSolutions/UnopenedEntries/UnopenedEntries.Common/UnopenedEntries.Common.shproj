@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  A shared project UnopenedEntries.sln declares, which a workspace does not open and a build does not build: no
+  project imports its items, so it compiles into nothing. UnopenedEntries.Core.csproj says why the bed exists and
+  where it may sit.
+-->
+<Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>f6f6f6f6-6666-6666-6666-666666666666</ProjectGuid>
+  </PropertyGroup>
+  <Import Project="UnopenedEntries.Common.projitems" Label="Shared" />
+</Project>

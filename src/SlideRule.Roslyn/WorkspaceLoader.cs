@@ -82,7 +82,9 @@ internal static class WorkspaceLoader
         try
         {
             Solution solution = await OpenAsync(workspace, solutionPath, ct).ConfigureAwait(false);
-            SettledSolution settled = LoadBoundary.Settle(solution, solutionPath);
+            SolutionMembership? membership = LoadBoundary.ReadMembership(solutionPath);
+            Solution built = LoadBoundary.WithoutUnbuilt(solution, membership);
+            SettledSolution settled = LoadBoundary.Settle(built, membership, []);
 
             // Only the analyzer count can be nonzero here: Roslyn's MSBuild loader removes an unresolved metadata
             // reference itself before the boundary sees it.

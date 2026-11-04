@@ -96,7 +96,10 @@ internal static class BinlogReplayer
             });
 
             Solution solution = AlignWithMsBuildWorkspace(workspace.AddSolution(solutionInfo));
-            SettledSolution settled = LoadBoundary.Settle(solution, solutionPath);
+            // No removal of the projects the default configuration does not build: one the binlog compiled is what
+            // this build built, and one it did not compile is not here to remove.
+            SettledSolution settled = LoadBoundary.Settle(
+                solution, LoadBoundary.ReadMembership(solutionPath), unsupportedProjects);
             if (settled.StrippedAnalyzerReferences > 0 || settled.StrippedMetadataReferences > 0)
             {
                 string analyzers = Plurals.Counted(settled.StrippedAnalyzerReferences, "unresolved analyzer reference");
@@ -113,20 +116,9 @@ internal static class BinlogReplayer
             foreach (UnresolvedReferences.Finding found in UnresolvedReferences.Detect(settled.Solution, settled.Report.Failed))
                 diagnosticSink?.Invoke(UnresolvedReferences.Message(found.ProjectPath, found.Names));
 
-            // Every declined call is NotCsharp by construction: the predicate below drops a compiler call for
-            // exactly one reason, and a shared project mints no compiler call of its own to be dropped. A project
-            // the build skipped and a Web Site leave no call at all, so those two come from the solution file, as
-            // they do on a cold load.
-            List<UnsupportedProject> unsupported = unsupportedProjects
-                .Select(path => new UnsupportedProject(path, UnsupportedProjectKind.NotCsharp))
-                .Concat(settled.Report.Unsupported.Where(project =>
-                    project.Kind is UnsupportedProjectKind.NotBuilt or UnsupportedProjectKind.WebSite))
-                .OrderBy(project => project.Path, StringComparer.Ordinal)
-                .ToList();
-
             return new ReplayedSolution(
                 workspace, reader, settled.Solution, settled.TargetFrameworks, settled.ProjectFiles,
-                settled.Report.Failed, settled.Report.Unchecked, unsupported);
+                settled.Report.Failed, settled.Report.Unchecked, settled.Report.Unsupported);
         }
         catch
         {

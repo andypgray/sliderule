@@ -69,11 +69,12 @@ public sealed class SdkStyleProjectTests
         // the temp copy each fact makes, against a package the test manufactures, so the output tree holds no
         // assets file for it.
         "Acme.Json.csproj: SDK-style, no assets file",
-        // The solution-entries bed, in the same position: Cli/SolutionEntriesE2ETests restores it only inside
+        // The solution-entries beds, in the same position: Cli/SolutionEntriesE2ETests restores them only inside
         // the temp copy each fact makes.
         "ConfigExcluded.Built.csproj: SDK-style, no assets file",
         "ConfigExcluded.Shared.csproj: SDK-style, no assets file",
         "ConfigExcluded.Skipped.csproj: SDK-style, no assets file",
+        "UnopenedEntries.Core.csproj: SDK-style, no assets file",
         // The restored fixture solutions: SDK-style, and the assets file the classification predicts is
         // there. This is the pairing — the predicate earns the right to gate here, not in the XML.
         "DriftedApp.Client.csproj: SDK-style, assets file present",

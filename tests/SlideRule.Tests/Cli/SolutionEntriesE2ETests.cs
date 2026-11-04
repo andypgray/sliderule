@@ -9,8 +9,10 @@ namespace SlideRule.Tests.Cli;
 
 /// <summary>
 ///     End-to-end <c>graph</c> and <c>check</c> over a solution declaring entries its default configuration does
-///     not build: two C# projects it maps with no <c>Build.0</c> line, one of which the built project references,
-///     and two Web Site entries, one with a URL path and one with a folder path.
+///     not build, and over a second solution declaring a shared project and a database project beside one C#
+///     project. The first solution maps two C# projects with no <c>Build.0</c> line in its default <c>Debug</c>
+///     configuration and builds them in <c>Release</c>, and its built project references one of the two. The first
+///     solution also declares two Web Site entries, one with a URL path and one with a folder path.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -27,12 +29,25 @@ namespace SlideRule.Tests.Cli;
 ///         the entry's URL or folder onto the solution directory. These pin that the entry is named as unsupported
 ///         by its solution name and that the made-up path appears nowhere.
 ///     </para>
+///     <para>
+///         A replay describes what its binlog compiled. A <c>Release</c> binlog compiles both projects the default
+///         configuration skips, so its model holds them as the solution's own and lists only the entries no build
+///         compiles.
+///     </para>
+///     <para>
+///         A shared project and a database project leave no compiler call in a binlog either, so a replay names
+///         them from the solution file, as a load does.
+///     </para>
 /// </remarks>
 public sealed class SolutionEntriesE2ETests
 {
     private const string Bed = "RestoreFailureSolutions/ConfigExcluded";
 
     private const string Solution = "ConfigExcluded.sln";
+
+    private const string UnopenedBed = "RestoreFailureSolutions/UnopenedEntries";
+
+    private const string UnopenedSolution = "UnopenedEntries.sln";
 
     private const string SpecSource =
         """
@@ -60,6 +75,13 @@ public sealed class SolutionEntriesE2ETests
         ("ConfigExcluded.LegacySite", "a Web Site project, which has no project file"),
         ("ConfigExcluded.Shared/ConfigExcluded.Shared.csproj", "not built by the solution's default configuration"),
         ("ConfigExcluded.Skipped/ConfigExcluded.Skipped.csproj", "not built by the solution's default configuration"),
+        ("ConfigExcluded.Portal", "a Web Site project, which has no project file")
+    ];
+
+    // What no configuration compiles, so what a Release binlog's replay still lists.
+    private static readonly (string Project, string Reason)[] ExpectedUnsupportedInRelease =
+    [
+        ("ConfigExcluded.LegacySite", "a Web Site project, which has no project file"),
         ("ConfigExcluded.Portal", "a Web Site project, which has no project file")
     ];
 
@@ -133,6 +155,66 @@ public sealed class SolutionEntriesE2ETests
         using JsonDocument document = result.ShouldHaveJsonStdout();
         document.UnsupportedProjectEntries()
             .ShouldBe(ExpectedUnsupported);
+    }
+
+    [Fact]
+    public async Task Json_ReplayedReleaseBinlog_KeepsTheProjectsItCompiledAsMembers()
+    {
+        // Arrange — a Release build, which compiles both projects the default configuration skips.
+        using var cache = new TempCacheRoot("solution-entries-release");
+        using TempFixtureWorkspace workspace = TempFixtureWorkspace.Dedicated(Bed, Solution, false);
+        string binlog = BuildWithBinlog(workspace, "ConfigExcluded.Release.binlog", "Release");
+        string specDll = workspace.WriteSpec("ConfigExcludedSpec", SpecImage.Value);
+        FakeEnvironment environment = FakeEnvironment.WithCacheRoot(cache.Root);
+
+        // Act — the check ingests the binlog as a capture; the survey reads the model it replays.
+        CliResult check = await CliRunner.InvokeColdAsync(
+            environment, "check", workspace.SolutionPath, "--spec", specDll, "--binlog", binlog, "--json");
+        CliResult graph = await CliRunner.InvokeColdAsync(
+            environment, "graph", workspace.SolutionPath, "--binlog", binlog, "--json");
+
+        // Assert — the capture's coverage check accepts the projects the binlog compiled beyond the default
+        // configuration, the model holds them as the solution's own, and neither is listed.
+        check.ShouldSucceed();
+        File.Exists(CaptureFiles.Manifest(workspace.SolutionPath, cache.Root))
+            .ShouldBeTrue(check.Transcript());
+        using JsonDocument checkDocument = check.ShouldHaveJsonStdout();
+        checkDocument.UnsupportedProjectEntries()
+            .ShouldBe(ExpectedUnsupportedInRelease);
+        graph.ShouldSucceed();
+        using JsonDocument graphDocument = graph.ShouldHaveJsonStdout();
+        graphDocument.ProjectMemberships()
+            .ShouldBe([("ConfigExcluded.Built", true), ("ConfigExcluded.Shared", true), ("ConfigExcluded.Skipped", true)]);
+        graphDocument.UnsupportedProjectEntries()
+            .ShouldBe(ExpectedUnsupportedInRelease);
+    }
+
+    [Fact]
+    public async Task GraphJson_ReplayedBinlog_NamesTheSharedAndDatabaseProjectsALoadNames()
+    {
+        // Arrange — a build of the second bed, which compiles its one C# project.
+        using TempFixtureWorkspace workspace = TempFixtureWorkspace.Dedicated(UnopenedBed, UnopenedSolution);
+        string binlog = BuildWithBinlog(workspace, "UnopenedEntries.binlog");
+        (string Project, string Reason)[] expected =
+        [
+            ("UnopenedEntries.Common/UnopenedEntries.Common.shproj", "a shared project, compiled into the projects that import it"),
+            ("UnopenedEntries.Database/UnopenedEntries.Database.sqlproj", "not a C# project")
+        ];
+
+        // Act
+        CliResult load = await CliRunner.InvokeColdAsync("graph", workspace.SolutionPath, "--no-cache", "--json");
+        CliResult replay = await CliRunner.InvokeColdAsync(
+            "graph", workspace.SolutionPath, "--binlog", binlog, "--no-cache", "--json");
+
+        // Assert
+        load.ShouldSucceed();
+        using JsonDocument loadDocument = load.ShouldHaveJsonStdout();
+        loadDocument.UnsupportedProjectEntries()
+            .ShouldBe(expected);
+        replay.ShouldSucceed();
+        using JsonDocument replayDocument = replay.ShouldHaveJsonStdout();
+        replayDocument.UnsupportedProjectEntries()
+            .ShouldBe(expected);
     }
 
     [Fact]

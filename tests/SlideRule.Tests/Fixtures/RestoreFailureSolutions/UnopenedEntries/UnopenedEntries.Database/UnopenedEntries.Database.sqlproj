@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  A database project UnopenedEntries.sln declares and maps with an ActiveCfg line alone in every configuration, so
+  no build of the solution builds it and the stub needs no SQL tooling. A workspace does not open it.
+  UnopenedEntries.Core.csproj says why the bed exists and where it may sit.
+-->
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Name>UnopenedEntries.Database</Name>
+  </PropertyGroup>
+</Project>

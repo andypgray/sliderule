@@ -34,9 +34,9 @@ internal sealed record ProjectLoadReport(
 ///         like any other. <see cref="ProjectLoadReport.Unchecked" /> is the subtraction against
 ///         <see cref="SolutionMembership.Declared" />, never derived from filter text: Roslyn loads a filter's
 ///         projects plus their transitive <c>ProjectReference</c> closure, so filter text overstates the gap.
-///         <see cref="ProjectLoadReport.Unsupported" /> is read off the solution file and outside both
-///         subtractions: a project no extractor reaches was never owed, so a polyglot solution cannot be refused
-///         for holding one.
+///         <see cref="ProjectLoadReport.Unsupported" /> is read off the solution file, and on a replay off the
+///         compiler calls it declined as well. It sits outside both subtractions: a project no extractor reaches
+///         was never owed, so a polyglot solution cannot be refused for holding one.
 ///     </para>
 /// </remarks>
 internal static class ProjectLoadFailures
@@ -50,9 +50,12 @@ internal static class ProjectLoadFailures
     ///     was run over, declares, or null when no such file is known or the parser does not own its format; arm 1
     ///     needs it and is skipped without it, and arm 2 runs either way. <paramref name="projectFiles" /> holds the
     ///     loaded projects' canonical paths, which arm 1 compares the solution's declared paths against.
+    ///     <paramref name="declinedCalls" /> are the project files of the compiler calls a replay declined as not C#,
+    ///     each listed unless the solution already names it.
     /// </remarks>
     internal static ProjectLoadReport Detect(
-        Solution solution, CanonicalProjectFiles projectFiles, SolutionMembership? membership)
+        Solution solution, CanonicalProjectFiles projectFiles, SolutionMembership? membership,
+        IReadOnlyCollection<string> declinedCalls)
     {
         var failed = new HashSet<string>(PathComparison.Comparer);
 
@@ -67,14 +70,15 @@ internal static class ProjectLoadFailures
                 failed.Add(Path.GetFullPath(filePath));
 
         var uncheckedMembers = new HashSet<string>(PathComparison.Comparer);
-        IReadOnlyList<UnsupportedProject> unsupported = [];
+        var unsupported = new List<UnsupportedProject>();
 
+        // Both sides canonical: a replayed project carries the path its build was run under, which need not be the
+        // spelling the solution file resolves to (macOS's /var against /private/var, a junction), and a mismatch
+        // here would blame a member that loaded or list a declined call twice. The reports keep the solution's
+        // spelling.
+        var canonicalizer = new ProjectFileCanonicalizer();
         if (membership is not null)
         {
-            // Both sides canonical: a replayed project carries the path its build was run under, which need
-            // not be the spelling the solution file resolves to (macOS's /var against /private/var, a junction),
-            // and a mismatch here would blame a member that loaded. The reports keep the solution's spelling.
-            var canonicalizer = new ProjectFileCanonicalizer();
             HashSet<string> loadedFiles = solution.Projects
                 .Select(projectFiles.PathOf)
                 .OfType<string>()
@@ -89,21 +93,37 @@ internal static class ProjectLoadFailures
                 if (!loadedFiles.Contains(canonicalizer.Resolve(declared)!) && !failed.Contains(declared))
                     uncheckedMembers.Add(declared);
 
-            // Measured against what loaded rather than taken on trust from the step that removes them, like the two
-            // lists above.
+            // Measured against what loaded, like the two lists above, rather than taken on trust from the MSBuild
+            // load's removal: a replay keeps a not-built project its binlog compiled, and that one is not listed.
             IEnumerable<UnsupportedProject> notBuilt = membership.NotBuilt
                 .Where(path => !loadedFiles.Contains(canonicalizer.Resolve(path)!))
                 .Select(path => new UnsupportedProject(path, UnsupportedProjectKind.NotBuilt));
 
-            // Sorted on the path, like every list on this report, so a document reads the same on any OS; the kind
-            // orders nothing, because a reader looks these up by project.
-            unsupported = membership.Unsupported
-                .Concat(notBuilt)
-                .OrderBy(project => project.Path, StringComparer.Ordinal)
-                .ToList();
+            unsupported.AddRange(membership.Unsupported.Concat(notBuilt));
         }
 
-        return new ProjectLoadReport(Sorted(failed), Sorted(uncheckedMembers), unsupported);
+        // A declined call is NotCsharp by construction: the replay declines a compiler call for that one reason, and
+        // a shared project, a Web Site and a project the build skipped mint no call to decline. One the solution
+        // declares is already listed, in the solution's spelling; any other is listed in the build's. A Web Site's
+        // path is a URL or a folder, which no call names, so it is never resolved.
+        if (declinedCalls.Count > 0)
+        {
+            HashSet<string> listed = unsupported
+                .Where(project => project.Kind != UnsupportedProjectKind.WebSite)
+                .Select(project => canonicalizer.Resolve(project.Path)!)
+                .ToHashSet(PathComparison.Comparer);
+            unsupported.AddRange(declinedCalls
+                .Where(path => listed.Add(canonicalizer.Resolve(path)!))
+                .Select(path => new UnsupportedProject(path, UnsupportedProjectKind.NotCsharp)));
+        }
+
+        // Sorted on the path, like every list on this report, so a document reads the same on any OS; the kind
+        // orders nothing, because a reader looks these up by project.
+        List<UnsupportedProject> sortedUnsupported = unsupported
+            .OrderBy(project => project.Path, StringComparer.Ordinal)
+            .ToList();
+
+        return new ProjectLoadReport(Sorted(failed), Sorted(uncheckedMembers), sortedUnsupported);
     }
 
     private static IReadOnlyList<string> Sorted(IEnumerable<string> paths)

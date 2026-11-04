@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The items of UnopenedEntries.Common.shproj, which holds none. -->
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <SharedGUID>f6f6f6f6-6666-6666-6666-666666666666</SharedGUID>
+  </PropertyGroup>
+</Project>
