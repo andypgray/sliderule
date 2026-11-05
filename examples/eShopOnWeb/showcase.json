@@ -1,8 +1,8 @@
 {
   "fork": {
     "repository": "https://github.com/andypgray/eShopOnWeb",
-    "commit": "a99ad6d366f40d24961879599d902e684c91046e",
-    "tag": "sliderule-showcase-1"
+    "commit": "02f1c3f1d473a06bd606aeb515874ca8a5cfbf29",
+    "tag": "sliderule-showcase-2"
   },
   "upstream": {
     "repository": "https://github.com/NimblePros/eShopOnWeb",

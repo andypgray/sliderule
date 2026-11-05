@@ -284,7 +284,7 @@ public sealed class QuoteSyncTests
             DocPaths.ShowcaseReadme, "showcase-spec-web-rule", "arch.Rule(\"layering/web-infrastructure-via-composition-root\")",
             ShowcaseSpec, Extent.WholeStatements),
         new(DocPaths.ShowcaseReadme, "showcase-agents", "### Migrations", "AGENTS.md"),
-        new(DocPaths.ShowcaseReadme, "showcase-workflow", "--sarif sliderule.sarif", ".github/workflows/architecture.yml")
+        new(DocPaths.ShowcaseReadme, "showcase-workflow", "uses: andypgray/sliderule@", ".github/workflows/architecture.yml")
     ];
 
     /// <summary>
@@ -332,7 +332,7 @@ public sealed class QuoteSyncTests
         new(DocPaths.OperationsReadme, "operations-build-and-check", "sliderule check examples/Meridian.Operations/Meridian.Operations.slnx"),
         new(DocPaths.InterchangeReadme, "interchange-install", "dotnet tool install -g SlideRule.Cli"),
         new(DocPaths.InterchangeReadme, "interchange-build-and-check", "sliderule check examples/Meridian.Interchange/Meridian.Interchange.slnx"),
-        new(DocPaths.ShowcaseReadme, "showcase-run-it", "git clone --branch sliderule-showcase-1", ShowcaseWalk),
+        new(DocPaths.ShowcaseReadme, "showcase-run-it", "git clone --branch sliderule-showcase-2", ShowcaseWalk),
 
         // The README's own build and test lines, the contributor guide's, the lock-file regeneration that guide
         // walks a maintainer through, and the security policy's release verification.

@@ -1,8 +1,8 @@
 # A reference architecture held to its own book: eShopOnWeb
 
-eShopOnWeb is Microsoft's reference application for the e-book *Architecting Modern Web Applications with ASP.NET Core and Azure*, now maintained by NimblePros. [A public fork](https://github.com/andypgray/eShopOnWeb/tree/sliderule-showcase-1) adopts SlideRule on it end to end, and is not affiliated with NimblePros or Microsoft. It adds a spec derived from the book and the repository's own docs, a baseline of today's departures from it, and agent context. It also adds a Claude Code hook, an MCP server registration, a CI check and the build analyzer. The application code is unchanged. [Every change from upstream](https://github.com/andypgray/eShopOnWeb/compare/f21d6233b851897371c25c5e7ffa67bb8552dba8...sliderule-showcase-1) is in the compare view.
+eShopOnWeb is Microsoft's reference application for the e-book *Architecting Modern Web Applications with ASP.NET Core and Azure*, now maintained by NimblePros. [A public fork](https://github.com/andypgray/eShopOnWeb/tree/sliderule-showcase-2) adopts SlideRule on it end to end, and is not affiliated with NimblePros or Microsoft. It adds a spec derived from the book and the repository's own docs, a baseline of today's departures from it, and agent context. It also adds a Claude Code hook, an MCP server registration, a CI check and the build analyzer. The application code is unchanged. [Every change from upstream](https://github.com/andypgray/eShopOnWeb/compare/f21d6233b851897371c25c5e7ffa67bb8552dba8...sliderule-showcase-2) is in the compare view.
 
-The other examples run on Meridian, a fiction built in this repository. This one runs on code you may already know. The fork is pinned at the tag `sliderule-showcase-1`. CI fetches that commit, re-runs every command output on this page with the current build of SlideRule, and compares every quoted file with the fork's.
+The other examples run on Meridian, a fiction built in this repository. This one runs on code you may already know. The fork is pinned at the tag `sliderule-showcase-2`. CI fetches that commit, re-runs every command output on this page with the current build of SlideRule, and compares every quoted file with the fork's.
 
 ## How eShopOnWeb describes itself
 
@@ -28,7 +28,7 @@ The build checks these statements only as far as the project references go, and 
 
 ## How the spec was derived
 
-The spec was written by one fresh Claude Code session with Claude Opus 5.5. It ran SlideRule 0.2.1 and followed the `derive_spec` recipe the MCP server serves, as given. The session read the book chapter and the repository's docs, and surveyed the solution with `arch_graph`. It drafted rules, each with a reason naming its evidence, and stopped at the curation gate. Its receipt is [committed in the fork](https://github.com/andypgray/eShopOnWeb/blob/sliderule-showcase-1/arch/derive_spec-receipt.md). These lines are from its close:
+The spec was written by one fresh Claude Code session with Claude Opus 5.5. It ran SlideRule 0.2.1 and followed the `derive_spec` recipe the MCP server serves, as given. The session read the book chapter and the repository's docs, and surveyed the solution with `arch_graph`. It drafted rules, each with a reason naming its evidence, and stopped at the curation gate. Its receipt is [committed in the fork](https://github.com/andypgray/eShopOnWeb/blob/sliderule-showcase-2/arch/derive_spec-receipt.md). These lines are from its close:
 
 ```text
 specBuild: ok
@@ -45,7 +45,7 @@ The `check` line is the draft's verdict over the fork's first commit before any 
 
 ## The spec
 
-The spec is [`arch/EShopOnWeb.Architecture/ArchitectureSpec.cs`](https://github.com/andypgray/eShopOnWeb/blob/sliderule-showcase-1/arch/EShopOnWeb.Architecture/ArchitectureSpec.cs). Each application project under `src/` except the Aspire host is a layer, and the layering rules state which may reference which. The book's composition-root exception is written into the subject of the rule it qualifies:
+The spec is [`arch/EShopOnWeb.Architecture/ArchitectureSpec.cs`](https://github.com/andypgray/eShopOnWeb/blob/sliderule-showcase-2/arch/EShopOnWeb.Architecture/ArchitectureSpec.cs). Each application project under `src/` except the Aspire host is a layer, and the layering rules state which may reference which. The book's composition-root exception is written into the subject of the rule it qualifies:
 
 ```csharp
         Selection webRoot = arch.AnyOf(
@@ -75,7 +75,7 @@ Only types in that root may name Infrastructure types. The fork chose `Migrate` 
                 to: arch.Projects.Named("ApplicationCore")
                     .Must(project => !project.ProjectReferences.Contains("BlazorShared"),
                         description: "declare no project reference to BlazorShared"))
-            .Because("A project reference is a dependency even when no code uses it. This one adds BlazorShared and the Blazor packages it references to the build of every project that references the Application Core. The maintainer's rule for the core is that a package bringing UI concerns, like Microsoft.AspNetCore, does not belong there.")
+            .Because("A project reference is a dependency even when no code uses it. This one adds BlazorShared, and the BlazorInputFile package it references, to the build of every project that references the Application Core. The maintainer's rule for the core is that a package bringing UI concerns, like Microsoft.AspNetCore, does not belong there.")
             .Citation(CoreDependenciesAnswer);
 ```
 
@@ -83,7 +83,7 @@ Before the baseline, `check` fails the rule with this block:
 
 ```text
 FAIL layering/core-declares-no-blazor-shared — Project `ApplicationCore` must declare no project reference to BlazorShared.
-  because: A project reference is a dependency even when no code uses it. This one adds BlazorShared and the Blazor packages it references to the build of every project that references the Application Core. The maintainer's rule for the core is that a package bringing UI concerns, like Microsoft.AspNetCore, does not belong there.
+  because: A project reference is a dependency even when no code uses it. This one adds BlazorShared, and the BlazorInputFile package it references, to the build of every project that references the Application Core. The maintainer's rule for the core is that a package bringing UI concerns, like Microsoft.AspNetCore, does not belong there.
   citation: https://github.com/dotnet-architecture/eShopOnWeb/issues/581
   ApplicationCore
   hint: no baseline captured for this rule; run 'sliderule baseline init' to grandfather existing violations
@@ -94,7 +94,7 @@ Infrastructure and PublicApi use BlazorShared types today, and they reach the pr
 ```text
 layering/core-declares-no-blazor-shared (migrate)
   sentence: Project `ApplicationCore` must declare no project reference to BlazorShared.
-  because: A project reference is a dependency even when no code uses it. This one adds BlazorShared and the Blazor packages it references to the build of every project that references the Application Core. The maintainer's rule for the core is that a package bringing UI concerns, like Microsoft.AspNetCore, does not belong there.
+  because: A project reference is a dependency even when no code uses it. This one adds BlazorShared, and the BlazorInputFile package it references, to the build of every project that references the Application Core. The maintainer's rule for the core is that a package bringing UI concerns, like Microsoft.AspNetCore, does not belong there.
   citation: https://github.com/dotnet-architecture/eShopOnWeb/issues/581
   from: ApplicationCore.csproj declares a project reference to BlazorShared that no ApplicationCore source uses. Infrastructure and PublicApi use BlazorShared types through it.
   policy: MigrateIfSmall
@@ -105,21 +105,25 @@ Three of the other migrations keep Infrastructure types inside the composition r
 
 ## What an agent reads now
 
-Upstream has merged pull requests from coding agents, including Copilot's. In the fork, `sliderule render` writes a managed block into the fork's [`AGENTS.md`](https://github.com/andypgray/eShopOnWeb/blob/sliderule-showcase-1/AGENTS.md), and a card into each governed project's directory. Claude Code, Copilot and the other agents that read `AGENTS.md` see each migration with its old pattern and the rule new code follows:
+Upstream has merged pull requests from coding agents, including Copilot's. In the fork, `sliderule render` writes a managed block into the fork's [`AGENTS.md`](https://github.com/andypgray/eShopOnWeb/blob/sliderule-showcase-2/AGENTS.md), and a card into each governed project's directory. Claude Code, Copilot and the other agents that read `AGENTS.md` see each migration with its old pattern and the rule new code follows:
 
 ```markdown
 ### Migrations
-- `layering/core-declares-no-blazor-shared` — Some existing code here still follows the OLD pattern: ApplicationCore.csproj declares a project reference to BlazorShared that no ApplicationCore source uses. Infrastructure and PublicApi use BlazorShared types through it. That is grandfathered debt, not house style. New code must follow: Project `ApplicationCore` must declare no project reference to BlazorShared. A project reference is a dependency even when no code uses it. This one adds BlazorShared and the Blazor packages it references to the build of every project that references the Application Core. The maintainer's rule for the core is that a package bringing UI concerns, like Microsoft.AspNetCore, does not belong there. See <https://github.com/dotnet-architecture/eShopOnWeb/issues/581>. If you are already editing a grandfathered site and the migration is small, migrate it; otherwise do not grow the debt.
+- `layering/core-declares-no-blazor-shared` — Some existing code here still follows the OLD pattern: ApplicationCore.csproj declares a project reference to BlazorShared that no ApplicationCore source uses. Infrastructure and PublicApi use BlazorShared types through it. That is grandfathered debt, not house style. New code must follow: Project `ApplicationCore` must declare no project reference to BlazorShared. A project reference is a dependency even when no code uses it. This one adds BlazorShared, and the BlazorInputFile package it references, to the build of every project that references the Application Core. The maintainer's rule for the core is that a package bringing UI concerns, like Microsoft.AspNetCore, does not belong there. See <https://github.com/dotnet-architecture/eShopOnWeb/issues/581>. If you are already editing a grandfathered site and the migration is small, migrate it; otherwise do not grow the debt.
 ```
 
-The fork also commits [`.claude/settings.json`](https://github.com/andypgray/eShopOnWeb/blob/sliderule-showcase-1/.claude/settings.json), whose `Stop` hook runs `sliderule hook` when a session's turn ends and returns a red check to the agent, and [`.mcp.json`](https://github.com/andypgray/eShopOnWeb/blob/sliderule-showcase-1/.mcp.json), which registers the MCP server. [CODING-AGENTS.md](../../CODING-AGENTS.md) explains both.
+The fork also commits [`.claude/settings.json`](https://github.com/andypgray/eShopOnWeb/blob/sliderule-showcase-2/.claude/settings.json), whose `Stop` hook runs `sliderule hook` when a session's turn ends and returns a red check to the agent, and [`.mcp.json`](https://github.com/andypgray/eShopOnWeb/blob/sliderule-showcase-2/.mcp.json), which registers the MCP server. [CODING-AGENTS.md](../../CODING-AGENTS.md) explains both.
 
 ## CI and the build
 
-The fork's [Architecture workflow](https://github.com/andypgray/eShopOnWeb/blob/sliderule-showcase-1/.github/workflows/architecture.yml) builds the solution with the build analyzer's diagnostics as errors, runs `check` with SARIF output for code scanning, and fails when a rendered file is out of date. On a pull request, `check` compares against the base branch:
+The fork's [Architecture workflow](https://github.com/andypgray/eShopOnWeb/blob/sliderule-showcase-2/.github/workflows/architecture.yml) builds the solution with the build analyzer's diagnostics as errors, then runs SlideRule's GitHub Action, pinned by commit. The action installs the release the fork pins, runs `check` with SARIF output for code scanning, and fails when a rendered file is out of date. The fork's default branch is upstream's, so only a pull request gives `check` a base branch to compare against:
 
-```bash
-            sliderule check --diff-base "origin/$BASE_REF" --sarif sliderule.sarif
+```yaml
+      - name: Check the architecture
+        uses: andypgray/sliderule@745368986e3c1fd46ef7585042d38e2d04d9a1ce # v0.3.0
+        with:
+          version: ${{ env.SLIDERULE_VERSION }}
+          diff-base: ${{ github.base_ref && format('origin/{0}', github.base_ref) || '' }}
 ```
 
 The solution declares one project SlideRule cannot read, the Docker Compose project. Run without a base, `check` prints a stamp naming it above the report. Here is that stamp and the report's summary line:
@@ -168,9 +172,9 @@ The skipped line is the fork's `Caution` scope over the EF Core migrations, whos
 The commands need git and a .NET 10 SDK. They clone the fork at its tag, install the release the fork pins, build the solution and check it:
 
 ```bash
-git clone --branch sliderule-showcase-1 https://github.com/andypgray/eShopOnWeb.git
+git clone --branch sliderule-showcase-2 https://github.com/andypgray/eShopOnWeb.git
 cd eShopOnWeb
-dotnet tool install -g SlideRule.Cli --version 0.2.1
+dotnet tool install -g SlideRule.Cli --version 0.3.0
 dotnet build eShopOnWeb.slnx
 sliderule check
 sliderule explain layering/core-declares-no-blazor-shared

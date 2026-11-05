@@ -1818,7 +1818,7 @@ jobs:
       - name: Run the showcase page's commands against a fresh clone of the pinned fork
         run: |
           . .github/scripts/fence.sh
-          commands="$(fence examples/eShopOnWeb/README.md bash 'git clone --branch sliderule-showcase-1')"
+          commands="$(fence examples/eShopOnWeb/README.md bash 'git clone --branch sliderule-showcase-2')"
           [ -n "$commands" ] || {
             echo "::error::Could not cut the command fence out of examples/eShopOnWeb/README.md; it has moved or changed shape. Fix the page or fix this cut; do not delete the assertion."
             exit 1
