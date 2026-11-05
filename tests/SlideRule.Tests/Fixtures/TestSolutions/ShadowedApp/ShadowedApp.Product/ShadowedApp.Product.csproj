@@ -23,6 +23,6 @@
              nothing to hold it to. That declaration is for OpenSSF Scorecard, which reads csproj files
              only and credits the property all-or-nothing across every one of them.
              The version matches MyApp.Web's, so the restore is already warm. -->
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.11" PrivateAssets="all" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.14" PrivateAssets="all" />
     </ItemGroup>
 </Project>
