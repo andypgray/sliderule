@@ -856,12 +856,17 @@ public sealed class SlideRuleArchitectureSpec : IArchitectureSpec
                 .Methods.Returning(typeof(Task), typeof(Task<>), typeof(ValueTask), typeof(ValueTask<>))
                 .Except(
                     arch.Types.Named("ArchRuleTests").Methods.Named("Rule_Holds", "Workspace_LoadedCompletely"),
-                    arch.Types.Named("IdleTimeoutWatchdog").Methods.Named("WhenAllCallsComplete"))
+                    arch.Types.Named("IdleTimeoutWatchdog").Methods.Named("WhenAllCallsComplete"),
+                    arch.Types.Methods.ThatAreOverrides(),
+                    arch.Types.Methods.ThatImplementInterfaces())
                 .MustHaveSuffix("Async"))
-            .Because("House convention held repo-wide: an agent grepping *Async sees every await point. The " +
-                     "three exceptions are deliberate, not drift: Rule_Holds and Workspace_LoadedCompletely are " +
-                     "the adapter's test methods, whose names a consumer reads in every test run, and " +
-                     "WhenAllCallsComplete takes its name from Task.WhenAll, the combinator it mirrors.")
+            .Because("House convention held repo-wide: an agent grepping *Async sees every await point. An " +
+                     "override or an interface implementation takes its name from the member it implements, so " +
+                     "the rule checks that member where it is declared, and a name a package dictates stays the " +
+                     "package's. The three named exceptions are deliberate, not drift: Rule_Holds and " +
+                     "Workspace_LoadedCompletely are the adapter's test methods, whose names a consumer reads in " +
+                     "every test run, and WhenAllCallsComplete takes its name from Task.WhenAll, the combinator " +
+                     "it mirrors.")
             .Citation("https://learn.microsoft.com/dotnet/standard/asynchronous-programming-patterns/task-based-asynchronous-pattern-tap")
             .Fix("Name Task-returning methods with the Async suffix.");
 

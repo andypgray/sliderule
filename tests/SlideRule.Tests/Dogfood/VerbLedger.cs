@@ -20,10 +20,6 @@ internal static class VerbLedger
     private const string MemberShapeTwin =
         "A member-level twin of the type-shape modals, and like them it constrains nothing here.";
 
-    private const string AwaitsTheAnalyzerRelease =
-        "The build analyzer this repository's build runs is the released package, which cannot read the verb " +
-        "until the next release carries it; the extractor's fragments are the subject it would take.";
-
     private const string SeamsAreInjected =
         "The seams here are consumed by injection rather than inheritance, and the one true hierarchy " +
         "statement, that every *Constraint derives from Constraint, is already model/constraint-nodes.";
@@ -39,7 +35,10 @@ internal static class VerbLedger
             [nameof(SelectionConstraints.MustBeStatic)] = NoUniformTypeShape,
             [nameof(SelectionConstraints.MustBePublic)] = NoUniformTypeShape,
             [nameof(SelectionConstraints.MustBeInternal)] = NoUniformTypeShape,
-            [nameof(SelectionConstraints.MustBeRecords)] = AwaitsTheAnalyzerRelease,
+            [nameof(SelectionConstraints.MustBeRecords)] =
+                "The one namespace here that is nearly all records, the extractor's fragments, uses them for " +
+                "with-copies, which the compiler already refuses on a class, and never compares two by value, " +
+                "so a record law over it would hold nothing the build does not.",
             [nameof(MemberSelectionConstraints.MustBePrivate)] = MemberShapeTwin,
             [nameof(MemberSelectionConstraints.MustBeVirtual)] = MemberShapeTwin,
             [nameof(SelectionConstraints.MustImplement)] = SeamsAreInjected,
