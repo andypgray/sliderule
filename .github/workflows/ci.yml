@@ -1571,13 +1571,15 @@ jobs:
   # the assertions after it require that it did. render-check is off because the scaffold has no rendered
   # files, and upload-sarif is off so this leg adds no alerts to code scanning.
   #
-  # VERSION is the newest release, the one OPERATING.md tells an adopter to name. Under a release whose check
-  # has no annotation options, the step leaves them out, so this leg exercises the step's temporary directory
-  # and not the forward-slashed annotation paths.
+  # VERSION is the newest release, the one OPERATING.md tells an adopter to name. Its check writes each
+  # annotation's file as an absolute path with forward slashes, which the runner has to make relative to its
+  # Windows workspace; action-windows-annotations reads where the violation's annotation landed.
   action-windows:
     runs-on: windows-latest
     permissions:
       contents: read
+    outputs:
+      check-run-id: ${{ job.check_run_id }}
     env:
       VERSION: 0.3.0
     steps:
@@ -1642,6 +1644,37 @@ jobs:
             $failed = $true
           }
           if ($failed) { exit 1 }
+
+  # The annotations of action-windows' check run, read once that job has finished, so the set is complete. The
+  # violation's must sit on its file, relative to the repository root, and on its line: a path the runner
+  # failed to make relative lands as an annotation with no file, which GitHub shows on no line of code. The
+  # expected line must agree with write_violation in .github/scripts/spec-scaffold.sh.
+  action-windows-annotations:
+    needs: action-windows
+    runs-on: ubuntu-latest
+    permissions:
+      checks: read
+    steps:
+      - name: The violation's annotation sits on its file and line
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CHECK_RUN_ID: ${{ needs.action-windows.outputs.check-run-id }}
+          EXPECTED_PATH: action-smoke/src/MyApp/Broken.cs
+          EXPECTED_LINE: '3'
+        run: |
+          if [ -z "$CHECK_RUN_ID" ]; then
+            echo "::error::action-windows passed no check run ID, so its annotations cannot be read"
+            exit 1
+          fi
+          annotations=$(gh api "repos/$GITHUB_REPOSITORY/check-runs/$CHECK_RUN_ID/annotations?per_page=100")
+          found=$(jq --arg path "$EXPECTED_PATH" --argjson line "$EXPECTED_LINE" '[.[] | select(.path == $path
+            and .start_line == $line and .annotation_level == "failure" and .title == "naming/interfaces")] | length' \
+            <<<"$annotations")
+          if [ "$found" != 1 ]; then
+            echo "::error::action-windows' check run holds $found failure annotations for naming/interfaces on $EXPECTED_PATH:$EXPECTED_LINE, where one is right. Its annotations:"
+            jq -r '.[] | "  \(.annotation_level) \(.path):\(.start_line) \(.title // "") \(.message // "")"' <<<"$annotations"
+            exit 1
+          fi
 
   # Provably-current examples: build each example solution, run `check` (exit 0 on the
   # committed baselines), then run `render --check` over each of them and fail on any file a render would change
