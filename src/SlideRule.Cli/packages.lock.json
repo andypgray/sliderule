@@ -67,9 +67,9 @@
       },
       "SlideRule.Analyzers": {
         "type": "Direct",
-        "requested": "[0.2.1, )",
-        "resolved": "0.2.1",
-        "contentHash": "UFxnCYUIb1iwRUTEjHi+uvatNtDfS+y6GQ+RkjdnXUEfzXpfJq5BLi/2EAIkJHL+TK+6/jcf1UwlSEfyCc71qg=="
+        "requested": "[0.3.0, )",
+        "resolved": "0.3.0",
+        "contentHash": "fjOr4LDstm3cXERZviBGFHsFB1Fu7c2Z2Exgo8bqBLOlraMl4xcEAL09Jea4rPqelD6SjDU9r/Ra7CVolu2x4g=="
       },
       "System.CommandLine": {
         "type": "Direct",
