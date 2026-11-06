@@ -99,9 +99,9 @@
       },
       "MSBuild.StructuredLogger": {
         "type": "Direct",
-        "requested": "[2.3.246, )",
-        "resolved": "2.3.246",
-        "contentHash": "W7sQrvBS9KzipO7TuL35RsahjDIWxjieK1x9SasTHcu8jbTUyUSxPxnwmt5I19WyMvytatI0TqpL3xF4XL9mhw==",
+        "requested": "[2.3.269, )",
+        "resolved": "2.3.269",
+        "contentHash": "m3mgwxcJ3cl8+FA8k99lwIjGybfJsDdcnkrVZheTyr/WQS+2DV55tgc7AQsBfOstJfNYNFXhBsXvi28fjAbD1Q==",
         "dependencies": {
           "Microsoft.Build.Framework": "17.5.0",
           "Microsoft.Build.Utilities.Core": "17.5.0"
@@ -362,7 +362,7 @@
         "type": "Project",
         "dependencies": {
           "Basic.CompilerLog.Util": "[0.9.65, )",
-          "MSBuild.StructuredLogger": "[2.3.246, )",
+          "MSBuild.StructuredLogger": "[2.3.269, )",
           "Microsoft.Build.Locator": "[1.11.2, )",
           "Microsoft.CodeAnalysis": "[5.9.0, )",
           "Microsoft.CodeAnalysis.CSharp.Workspaces": "[5.9.0, )",

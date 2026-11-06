@@ -54,7 +54,7 @@
     <!-- The binlog reader complog pulls, declared because the replay also reads the build's own project
          evaluations from the log through it. Pinned at the version complog pulls, so the graph does not move. -->
     <ItemGroup>
-        <PackageReference Include="MSBuild.StructuredLogger" Version="2.3.246" />
+        <PackageReference Include="MSBuild.StructuredLogger" Version="2.3.269" />
     </ItemGroup>
 
     <!-- complog references the Microsoft.CodeAnalysis meta-package at >= 4.8.0; left alone it resolves
