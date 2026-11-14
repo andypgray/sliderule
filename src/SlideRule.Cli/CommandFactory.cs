@@ -204,6 +204,12 @@ internal static class CommandFactory
             + "globs pick from.");
         Option<bool> noCache = NoCacheOption();
         Option<string?> binlog = BinlogOption();
+        Option<bool> timings = new("--timings")
+        {
+            Description =
+                "Write per-phase wall times and the cache verdict to stderr after the report; stdout and every "
+                + "written report are unchanged."
+        };
 
         Command check = new(
             "check",
@@ -221,29 +227,53 @@ internal static class CommandFactory
             rules,
             grain,
             noCache,
-            binlog
+            binlog,
+            timings
         };
 
+        // The request is built inside the run rather than before it, so a timed run's scope is already open while
+        // the settings file is read and resolution is the first thing it times.
         SetRequestAction(
             check,
-            parseResult => Resolved(parseResult, solution, spec, environment, targets => new CheckRequest(
-                targets.Solution,
-                targets.Spec,
-                parseResult.GetValue(json),
-                parseResult.GetValue(diffBase),
-                Directory.GetCurrentDirectory(),
-                parseResult.GetValue(noCache),
-                parseResult.GetValue(binlog),
-                parseResult.GetValue(allowWorkspaceDiagnostics),
-                parseResult.GetValue(sarif),
-                parseResult.GetValue(rules),
-                DocumentGrains.Parse(parseResult.GetValue(grain)),
-                Annotations: parseResult.GetValue(annotations),
-                AnnotationsSummary: parseResult.GetValue(annotationsSummary))),
-            (request, output, error, ct) =>
-                MsBuildGate.RunCheckAsync(request, output, error, hostSource, environment, ct));
+            static parseResult => parseResult,
+            (parseResult, output, error, ct) => RunTimedAsync(
+                parseResult.GetValue(timings),
+                () => Resolved(parseResult, solution, spec, environment, targets => new CheckRequest(
+                    targets.Solution,
+                    targets.Spec,
+                    parseResult.GetValue(json),
+                    parseResult.GetValue(diffBase),
+                    Directory.GetCurrentDirectory(),
+                    parseResult.GetValue(noCache),
+                    parseResult.GetValue(binlog),
+                    parseResult.GetValue(allowWorkspaceDiagnostics),
+                    parseResult.GetValue(sarif),
+                    parseResult.GetValue(rules),
+                    DocumentGrains.Parse(parseResult.GetValue(grain)),
+                    Annotations: parseResult.GetValue(annotations),
+                    AnnotationsSummary: parseResult.GetValue(annotationsSummary))),
+                request => MsBuildGate.RunCheckAsync(request, output, error, hostSource, environment, ct),
+                error));
 
         return check;
+    }
+
+    // A run that throws writes no timings: there is no report for them to follow.
+    private static async Task<int> RunTimedAsync<TRequest>(
+        bool timed, Func<TRequest> resolve, Func<TRequest, Task<int>> run, TextWriter error)
+    {
+        if (!timed) return await run(resolve());
+
+        using PhaseTimings timings = PhaseTimings.Begin();
+        TRequest request;
+        using (PhaseTimings.Measure(TimedPhase.Resolve))
+        {
+            request = resolve();
+        }
+
+        int code = await run(request);
+        timings.WriteTo(error);
+        return code;
     }
 
     private static Command BuildExplainCommand(ISolutionSource hostSource, IEnvironment environment)

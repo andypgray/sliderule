@@ -121,6 +121,22 @@ public sealed class MultiTfmCheckE2ETests
     }
 
     [Fact]
+    public async Task CheckTimings_MultiTargetedProject_CountsAsOneProjectInTheCacheLine()
+    {
+        // Arrange: two project files, one of which compiles for two frameworks.
+        string specDll = SpecAssemblyCompiler.EmitSpecDllToFreshTemp("multi-tfm", "CoreIndependentTimed", CoreIndependentSpec);
+        string[] check = ["check", FixtureBeds.MultiTfmSolution, "--spec", specDll, "--no-cache"];
+
+        // Act
+        CliResult untimed = await CliRunner.InvokeAsync(check);
+        CliResult timed = await CliRunner.InvokeAsync([.. check, "--timings"]);
+
+        // Assert: the line counts projects, not compilations.
+        timed.ShouldAppendTimingsTo(untimed)
+            .Cache.ShouldBe("cache: disabled, 2 of 2 projects extracted");
+    }
+
+    [Fact]
     public async Task Check_SingleTargetedSolution_OmitsTheStampEntirely()
     {
         // Act — the MyApp bed, every project of which targets one framework, checked with the spec that

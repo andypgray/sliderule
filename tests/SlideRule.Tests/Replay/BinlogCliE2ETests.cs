@@ -87,6 +87,26 @@ public sealed class BinlogCliE2ETests(BinlogFixtureWorkspace fixture)
         autoReplay.Loads.ShouldBe(0);
     }
 
+    [Fact]
+    public async Task CheckTimings_ExplicitBinlogOverAFragmentHit_TimesTheEagerReplayAsTheWorkspaceLoad()
+    {
+        // The first run fills the fragment cache, so the second loads no workspace of its own: the replay the gate
+        // makes before the runner is the only workspace load left for the second run to time.
+        string cache = FreshCache();
+        CliResult filling = await RunAsync(cache, "check", Sln, "--binlog", Binlog, "--spec", CleanSpec);
+        CliResult timed = await RunAsync(cache, "check", Sln, "--binlog", Binlog, "--spec", CleanSpec, "--timings");
+
+        TimingsBlock block = timed.ShouldAppendTimingsTo(filling);
+        block.ShouldSatisfyAllConditions(
+            () => block.Names.ShouldBe(
+            [
+                "startup", "resolve", "msbuild", "cache read", "workspace load", "spec resolve", "spec load",
+                "extraction", "check", "report", "total"
+            ]),
+            () => block.Cache.ShouldNotBeNull()
+                .ShouldStartWith("cache: hit, 0 of "));
+    }
+
     // ── invalid capture ⇒ one notice + cold fallback ─────────────────────────────────────────────────────
 
     [Fact]

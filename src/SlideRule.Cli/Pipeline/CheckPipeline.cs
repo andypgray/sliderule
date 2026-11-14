@@ -39,7 +39,7 @@ internal static class CheckPipeline
         return selected;
     }
 
-    public static Task<CheckReport> ExecuteAsync(
+    public static async Task<CheckReport> ExecuteAsync(
         CodebaseSource source,
         string? diffBase,
         IReadOnlyList<string>? changedFiles,
@@ -48,8 +48,11 @@ internal static class CheckPipeline
     {
         async Task<ExtractedCodebase> Extract(CancellationToken token)
         {
-            CodebaseModel codebase = await source.ExtractAsync(source.Resolution.ExcludeProjectNames, token);
-            return new ExtractedCodebase(codebase, source.Diagnostics);
+            using (PhaseTimings.Measure(TimedPhase.Extraction))
+            {
+                CodebaseModel codebase = await source.ExtractAsync(source.Resolution.ExcludeProjectNames, token);
+                return new ExtractedCodebase(codebase, source.Diagnostics);
+            }
         }
 
         // Changed files a caller already listed are taken as given; otherwise git lists them since the diff base, and
@@ -61,8 +64,12 @@ internal static class CheckPipeline
             _ => null
         };
 
-        return ArchCheckSequence.ExecuteAsync(
-            source.Model, rules, source.SolutionPath, source.SolutionDirectory, Extract, resolveDiff, ct);
+        // The extraction measured inside this span is subtracted from it, so the check phase is the sequence's own work.
+        using (PhaseTimings.Measure(TimedPhase.Check))
+        {
+            return await ArchCheckSequence.ExecuteAsync(
+                source.Model, rules, source.SolutionPath, source.SolutionDirectory, Extract, resolveDiff, ct);
+        }
     }
 
     // The unmatched-filter refusal, in the shared shape explain's unknown-rule refusal and graph's

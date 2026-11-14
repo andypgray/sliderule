@@ -153,7 +153,10 @@ internal static class MsBuildGate
         IReplayableRequest request, TextWriter error, ISolutionSource hostSource, IEnvironment environment,
         Func<string?, ISolutionSource, Task<int>> invokeRunner, CancellationToken ct)
     {
-        EnsureMsBuildRegistered();
+        using (PhaseTimings.Measure(TimedPhase.MsBuild))
+        {
+            EnsureMsBuildRegistered();
+        }
 
         string? binlog = request.Binlog;
 
@@ -163,9 +166,16 @@ internal static class MsBuildGate
         string? solution = request.Solution;
         if (!request.NoCache)
         {
-            solution = ModelPipeline.DiscoverSolution(request.Solution, request.WorkingDirectory, environment);
-            string? cacheRoot = environment.CacheRootOverride();
-            CaptureValidation capture = ValidateCapture(solution, cacheRoot, ct);
+            CaptureValidation capture;
+            // The resolve phase ends when the request is built, before the gate runs, so the gate's solution
+            // discovery and capture check count as msbuild.
+            using (PhaseTimings.Measure(TimedPhase.MsBuild))
+            {
+                solution = ModelPipeline.DiscoverSolution(request.Solution, request.WorkingDirectory, environment);
+                string? cacheRoot = environment.CacheRootOverride();
+                capture = ValidateCapture(solution, cacheRoot, ct);
+            }
+
             if (capture.State == CaptureState.Usable)
                 return await RunCaptureReplayAsync(capture.BinlogCopyPath!, solution, error, hostSource, invokeRunner);
             if (capture.State == CaptureState.Invalid)
@@ -192,17 +202,38 @@ internal static class MsBuildGate
         string solutionPath = ModelPipeline.DiscoverSolution(request.Solution, request.WorkingDirectory, environment);
 
         var diagnostics = new List<string>();
-        using ReplayedSolution replayed = await ReplayOrThrowAsync(binlogFullPath, solutionPath, binlog, diagnostics, ct);
-        if (!request.NoCache)
-        {
-            string? cacheRoot = environment.CacheRootOverride();
-            new BinlogCaptureStore(solutionPath, cacheRoot).Ingest(replayed.Solution, binlogFullPath, binlog, ct);
-        }
+        using ReplayedSolution replayed = await ReplayAndIngestAsync(
+            request, binlogFullPath, solutionPath, binlog, diagnostics, environment, ct);
 
         var source = new ReplayedSolutionSource(
             replayed.Solution, replayed.LoadDiagnosticsWith(diagnostics), replayed.TargetFrameworks,
             replayed.ProjectFiles);
         return await invokeRunner(solutionPath, source);
+    }
+
+    private static async Task<ReplayedSolution> ReplayAndIngestAsync(
+        IReplayableRequest request, string binlogFullPath, string solutionPath, string binlog, List<string> diagnostics,
+        IEnvironment environment, CancellationToken ct)
+    {
+        using (PhaseTimings.Measure(TimedPhase.WorkspaceLoad))
+        {
+            ReplayedSolution replayed = await ReplayOrThrowAsync(binlogFullPath, solutionPath, binlog, diagnostics, ct);
+            try
+            {
+                if (!request.NoCache)
+                {
+                    string? cacheRoot = environment.CacheRootOverride();
+                    new BinlogCaptureStore(solutionPath, cacheRoot).Ingest(replayed.Solution, binlogFullPath, binlog, ct);
+                }
+
+                return replayed;
+            }
+            catch
+            {
+                replayed.Dispose();
+                throw;
+            }
+        }
     }
 
     // A structurally-valid capture, replayed lazily (LazyCaptureReplaySource). A runtime replay failure of the

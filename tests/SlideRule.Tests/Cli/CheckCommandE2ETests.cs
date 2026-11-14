@@ -632,6 +632,34 @@ public sealed class CheckCommandE2ETests
     }
 
     [Fact]
+    public async Task CheckTimings_WrittenReports_AreByteEqualToAnUntimedRunsReports()
+    {
+        using TempDirectory temp = TestTempRoot.Fresh("check-timings-reports");
+        string[] check = ["check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, "--json"];
+
+        CliResult untimed = await CliRunner.InvokeAsync([.. check, .. ReportsUnder(temp, "untimed")]);
+        CliResult timed = await CliRunner.InvokeAsync([.. check, .. ReportsUnder(temp, "timed"), "--timings"]);
+
+        timed.ShouldAppendTimingsTo(untimed);
+        timed.ShouldSatisfyAllConditions(
+            () => File.ReadAllBytes(temp.PathOf("timed.sarif"))
+                .ShouldBe(File.ReadAllBytes(temp.PathOf("untimed.sarif")), "the SARIF report"),
+            () => File.ReadAllBytes(temp.PathOf("timed.annotations"))
+                .ShouldBe(File.ReadAllBytes(temp.PathOf("untimed.annotations")), "the annotations"),
+            () => File.ReadAllBytes(temp.PathOf("timed.md"))
+                .ShouldBe(File.ReadAllBytes(temp.PathOf("untimed.md")), "the annotations summary"));
+
+        static string[] ReportsUnder(TempDirectory directory, string name)
+        {
+            return
+            [
+                "--sarif", directory.PathOf($"{name}.sarif"), "--annotations", directory.PathOf($"{name}.annotations"),
+                "--annotations-summary", directory.PathOf($"{name}.md")
+            ];
+        }
+    }
+
+    [Fact]
     public async Task Check_MissingSpecFile_ExitsTwoWithMessage()
     {
         CliResult result = await CliRunner.InvokeAsync("check", CliRunner.MyAppSolution, "--spec", "does-not-exist.dll");

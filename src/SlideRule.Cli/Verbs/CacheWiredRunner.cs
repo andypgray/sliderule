@@ -15,9 +15,10 @@ namespace SlideRule.Cli.Verbs;
 ///     cache root is read through, and the observables a test reads to learn which path a run took.
 /// </summary>
 /// <remarks>
-///     The observables are never printed: stdout and stderr are byte-identical whichever path a run takes, which is
-///     the whole claim the cache has to earn. The base class does not decide the policy: each runner spells its own
-///     as the <c>noCache</c> argument it passes <see cref="CodebaseSource.CreateWithSpecAsync" />.
+///     Stdout and stderr are byte-identical whichever path a run takes, which is the whole claim the cache has to
+///     earn, so the observables reach the terminal only under <c>check --timings</c>, as its cache line on stderr.
+///     The base class does not decide the policy: each runner spells its own as the <c>noCache</c> argument it
+///     passes <see cref="CodebaseSource.CreateWithSpecAsync" />.
 /// </remarks>
 internal abstract class CacheWiredRunner(
     ISolutionSource source,
@@ -48,6 +49,7 @@ internal abstract class CacheWiredRunner(
         LastOutcome = source.Outcome;
         LastReExtractedProjects = source.ReExtractedProjects;
         LastExtractionCount = source.ExtractionCount;
+        PhaseTimings.RecordCache(new CacheVerdict(source.Outcome, source.ExtractedProjectCount, source.ProjectCount));
     }
 
     /// <summary>

@@ -41,6 +41,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   starts through Git's `sh`, a stop after a one-line edit took 5 seconds through the server and 26 seconds without it. `SLIDERULE_HOOK_TIMEOUT` tells the hook your
   client's timeout where it is not Claude Code's 600 seconds, and `SLIDERULE_DISABLE_WARM_HOOK` keeps every stop
   in the hook's own process.
+- `check --timings` writes the wall-clock time of each phase of the run to stderr after the report, from
+  resolution and the MSBuild registration through the cache read, the workspace load, spec resolution and
+  loading, extraction and the cache write to the check and the report, then the total and the time the process
+  took to start. Its last line gives the cache verdict and how many of the solution's projects the run extracted.
+  Stdout, the `--json` document and every report file are the same with or without it.
 
 ### Changed
 

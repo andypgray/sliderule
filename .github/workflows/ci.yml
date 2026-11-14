@@ -1808,6 +1808,10 @@ jobs:
         uses: ./
         with:
           command: dotnet run --no-build --project src/SlideRule.Cli --
+      # The step above left the extraction cache filled, so this check is a cache hit, and its stderr shows the
+      # time of each phase of a rerun on a clean tree and the cache verdict.
+      - name: Time a rerun of the check
+        run: dotnet run --no-build --project src/SlideRule.Cli -- check --timings
       # The same self-spec through the xUnit adapter, as its own step so the log reads one line per rule
       # ID — the run the landing page's xUnit beat links. The 3-OS matrix already runs these tests inside
       # the full suite; this leg exists to be readable, not to add coverage.

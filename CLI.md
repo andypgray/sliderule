@@ -180,12 +180,17 @@ Options:
                                           machine. Replays the captured structure instead of a
                                           design-time build; the capture persists, and later runs
                                           replay it automatically while structurally valid.
+  --timings                               Write per-phase wall times and the cache verdict to
+                                          stderr after the report; stdout and every written report
+                                          are unchanged.
   -?, -h, --help                          Show help and usage information
 ```
 
 Without `--diff-base`, quarantine and caution tripwires are skipped. The reason is `Tripwire: no diff context — run 'sliderule check --diff-base <ref>' to check changed files against this quarantined scope.` Caution tripwires use `cautioned scope` in that message. With a ref, git lists files committed since it plus changes against HEAD, including untracked files. Each tripwire warns once per changed file declaring a type in its scope, and the tripwire rule passes. These [warnings](#warnings), `quarantinedScopeTouched` and `cautionedScopeTouched`, change neither rule status nor exit code. An unresolved ref exits 2 with `--diff-base could not resolve changed files: …`. A pull-request checkout must include enough history to resolve its base ref.
 
 See [SARIF](#sarif) for `--sarif`, [GitHub annotations](#github-annotations) for `--annotations` and `--annotations-summary`, and [Grains](#grains) for `--grain`. [Caching](#caching) covers `--binlog` and `--no-cache`. [Wrong and smaller models](#wrong-and-smaller-models) explains what `--allow-workspace-diagnostics` accepts.
+
+`--timings` writes the run's wall-clock time per phase to stderr after the report, in seconds: `startup` (from process start to the command), `resolve`, `msbuild`, `cache read`, `workspace load`, `spec resolve`, `spec load`, `extraction`, `cache write`, `check` and `report`, then `total`. A phase that did not run is left out, so a cache hit has no `workspace load` line unless `--binlog` named a log to replay. A phase nested in another is not counted in its parent, and the phases sum to at most `total`. The last line gives the [cache](#caching) verdict (`hit`, `partial`, `miss` or `disabled`) and how many of the solution's projects the run extracted, as in `cache: hit, 0 of 13 projects extracted`. Stdout, the `--json` document and every report file are the same with or without the flag. The first run after a build, a tool install or a spec rebuild pays a one-time warm-up spread across the phases, so discard it before comparing runs.
 
 ### `explain`
 

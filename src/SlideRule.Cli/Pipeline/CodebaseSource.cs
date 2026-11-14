@@ -15,9 +15,8 @@ using SlideRule.Roslyn.Solutions;
 namespace SlideRule.Cli.Pipeline;
 
 /// <summary>
-///     How a <see cref="CodebaseSource" /> produced its model — the internal test observable for the
-///     persisted extraction cache. Never printed: stdout/stderr stay byte-identical to a cold
-///     run in every mode, so this only ever tells a test which path a run took.
+///     How a <see cref="CodebaseSource" /> produced its model. Stdout and stderr stay byte-identical to a cold run
+///     in every mode, so it reaches the terminal only as the cache line <c>check --timings</c> adds to stderr.
 /// </summary>
 internal enum CodebaseSourceOutcome
 {
@@ -173,6 +172,15 @@ internal sealed class CodebaseSource : IDisposable
     /// </summary>
     internal int ExtractionCount { get; private set; }
 
+    /// <summary>
+    ///     How many projects this run extracted from a workspace, counted whether or not a cache asked for them, so
+    ///     unlike <see cref="ReExtractedProjects" /> it counts every project of a <c>--no-cache</c> run.
+    /// </summary>
+    internal int ExtractedProjectCount { get; private set; }
+
+    /// <summary>How many projects the fragments this source acquired cover; zero before the first extraction.</summary>
+    internal int ProjectCount => fragments is null ? 0 : ProjectsIn(fragments);
+
     /// <summary>Disposes the owned cold workspace; a no-op on a cache hit (which owns none).</summary>
     public void Dispose()
     {
@@ -207,11 +215,11 @@ internal sealed class CodebaseSource : IDisposable
                 source, solutionPath, spec, normalized, null, CacheReadResult.Miss(),
                 CodebaseSourceOutcome.Disabled, ct);
 
-        CacheReadResult read = store.ReadAndValidate(ct);
-        if (read.Outcome == CacheOutcome.Hit
-            && ResolveSpecOnHit(spec, read.SpecResolutions) is { } hitResolution)
+        CacheReadResult read = ReadTimed(store, ct);
+
+        if (read.Outcome == CacheOutcome.Hit && ResolveSpecOnHitTimed(spec, read.SpecResolutions) is { } hitResolution)
         {
-            ArchitectureModel hitModel = source.LoadSpecModel(hitResolution.DllPath);
+            ArchitectureModel hitModel = LoadSpecModelTimed(source, hitResolution.DllPath);
             return new CodebaseSource(
                 CodebaseSourceOutcome.Hit, solutionPath, read.LoadDiagnostics, hitModel, hitResolution, null,
                 store, read, normalized);
@@ -308,20 +316,27 @@ internal sealed class CodebaseSource : IDisposable
         Solution solution = handle!.Solution;
 
         if (store is null)
+        {
             // Disabled and cold: walk every project and let the merge above drop what each caller excludes.
             // That is byte-identical to excluding at collection — FragmentMerger.Retain is an order-preserving
             // filter on ProjectName, over a list CollectInputsAsync has already ordered — and it is what lets
             // one walk serve two exclusion sets. reExtractedProjects stays empty on this cold disabled run:
             // the field says which projects a cache, persisted or session, made this run re-extract.
-            return await CodebaseExtractor.ExtractFragmentsAsync(
+            IReadOnlyList<CodebaseFragment> walked = await CodebaseExtractor.ExtractFragmentsAsync(
                 solution, null, handle.TargetFrameworks, handle.ProjectFiles, declaredMembers.Value, ct);
+            ExtractedProjectCount = ProjectsIn(walked);
+            return walked;
+        }
 
         // Fingerprint before extraction so a mid-run edit is caught by the store's re-stat at write time.
         CacheFingerprint? fingerprint = TryCaptureFingerprint(solution, ct);
 
         List<CodebaseFragment> allFragments = await ExtractAllFragmentsAsync(solution, ct);
         if (fingerprint is not null)
-            TryWrite(fingerprint, allFragments, ct);
+            using (PhaseTimings.Measure(TimedPhase.CacheWrite))
+            {
+                TryWrite(fingerprint, allFragments, ct);
+            }
 
         return allFragments;
     }
@@ -351,6 +366,7 @@ internal sealed class CodebaseSource : IDisposable
                 solution, cacheRead.DirtyProjects, handle!.TargetFrameworks, handle.ProjectFiles,
                 declaredMembers.Value, ct);
             reExtractedProjects = new HashSet<string>(cacheRead.DirtyProjects, StringComparer.Ordinal);
+            ExtractedProjectCount = ProjectsIn(reExtracted);
             return cacheRead.ReusableFragments
                 .Concat(reExtracted)
                 .OrderBy(f => f.ProjectName, StringComparer.Ordinal)
@@ -363,6 +379,7 @@ internal sealed class CodebaseSource : IDisposable
                 solution, null, handle!.TargetFrameworks, handle.ProjectFiles, declaredMembers.Value, ct)
         ];
         reExtractedProjects = all.Select(f => f.ProjectName).ToHashSet(StringComparer.Ordinal);
+        ExtractedProjectCount = reExtractedProjects.Count;
         return all;
     }
 
@@ -373,21 +390,31 @@ internal sealed class CodebaseSource : IDisposable
         // A partial resolves its spec from the record a hit replays, because resolving it cold scans the whole
         // solution. Only then can it load just its dirty projects' closure.
         SpecResolution? replayed = outcome == CodebaseSourceOutcome.Partial
-            ? ResolveSpecOnHit(spec, cacheRead.SpecResolutions)
+            ? ResolveSpecOnHitTimed(spec, cacheRead.SpecResolutions)
             : null;
-        SolutionHandle handle = await AcquireForRunAsync(source, solutionPath, cacheRead, replayed is not null, ct);
+        SolutionHandle handle;
+        using (PhaseTimings.Measure(TimedPhase.WorkspaceLoad))
+        {
+            handle = await AcquireForRunAsync(source, solutionPath, cacheRead, replayed is not null, ct);
+        }
+
         try
         {
             if (handle.IsClosure)
             {
-                ArchitectureModel closureModel = source.LoadSpecModel(replayed!.DllPath);
+                ArchitectureModel closureModel = LoadSpecModelTimed(source, replayed!.DllPath);
                 return new CodebaseSource(
                     outcome, solutionPath, cacheRead.LoadDiagnostics, closureModel, replayed, handle, store, cacheRead,
                     normalizedSpec);
             }
 
-            SessionSpecResolution resolved = ResolveSpec(handle, solutionPath, spec, normalizedSpec);
-            ArchitectureModel model = source.LoadSpecModel(resolved.Resolution.DllPath);
+            SessionSpecResolution resolved;
+            using (PhaseTimings.Measure(TimedPhase.SpecResolve))
+            {
+                resolved = ResolveSpec(handle, solutionPath, spec, normalizedSpec);
+            }
+
+            ArchitectureModel model = LoadSpecModelTimed(source, resolved.Resolution.DllPath);
             // The membership set travels on as the one resolution read (or replayed), so what resolution
             // saw is what extraction gets — already computed, hence the value-taking Lazy.
             return new CodebaseSource(
@@ -398,6 +425,31 @@ internal sealed class CodebaseSource : IDisposable
         {
             handle.Dispose();
             throw;
+        }
+    }
+
+    private static SpecResolution? ResolveSpecOnHitTimed(string? spec, IReadOnlyList<SpecResolutionRecord> records)
+    {
+        using (PhaseTimings.Measure(TimedPhase.SpecResolve))
+        {
+            return ResolveSpecOnHit(spec, records);
+        }
+    }
+
+    // A fragment is one compilation, so a project that targets several frameworks has one per framework.
+    private static int ProjectsIn(IEnumerable<CodebaseFragment> fragments)
+    {
+        return fragments
+            .Select(fragment => fragment.ProjectName)
+            .Distinct(StringComparer.Ordinal)
+            .Count();
+    }
+
+    private static ArchitectureModel LoadSpecModelTimed(ISolutionSource source, string dllPath)
+    {
+        using (PhaseTimings.Measure(TimedPhase.SpecLoad))
+        {
+            return source.LoadSpecModel(dllPath);
         }
     }
 
@@ -514,6 +566,14 @@ internal sealed class CodebaseSource : IDisposable
         return SpecResolver.Replay(
             record.SpecProjectName, normalized, record.ExcludeProjectNames, record.OutputFilePaths,
             record.IntermediateAssemblyPath, record.ProjectFilePath);
+    }
+
+    private static CacheReadResult ReadTimed(ExtractionCacheStore store, CancellationToken ct)
+    {
+        using (PhaseTimings.Measure(TimedPhase.CacheRead))
+        {
+            return store.ReadAndValidate(ct);
+        }
     }
 
     private CacheFingerprint? TryCaptureFingerprint(Solution solution, CancellationToken ct)

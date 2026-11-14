@@ -24,6 +24,16 @@ public sealed class CheckCacheE2ETests
     private const string Domain = "MyApp.Domain";
     private const string Web = "MyApp.Web";
 
+    // The MyApp solution's projects, every one of which a whole extraction walks.
+    private const int MyAppProjects = 3;
+
+    // The phases a check that extracts at least one project records, in report order.
+    private static readonly string[] ExtractingPhases =
+    [
+        "startup", "resolve", "msbuild", "cache read", "workspace load", "spec resolve", "spec load",
+        "extraction", "cache write", "check", "report", "total"
+    ];
+
     // ── fragment cache: hit / disabled / partial / shared store ───────────────────────────────────────────
 
     [Fact]
@@ -43,6 +53,46 @@ public sealed class CheckCacheE2ETests
 
         // Byte-identical: stdout, stderr, and exit code all match — the cache never leaks into observable output.
         warm.Result.ShouldMatchTheOutputOf(cold.Result);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CheckTimings_MissHitAndNoCache_AppendThePhasesAndTheCacheLineToAnUnchangedRun(bool json)
+    {
+        using var untimedCache = new TempCacheRoot("check-timings");
+        using var timedCache = new TempCacheRoot("check-timings");
+        string[] format = json ? ["--json"] : [];
+        string[] check = ["check", CliRunner.MyAppSolution, "--spec", CliRunner.ViolatedSpecDll, .. format];
+
+        CliResult untimed = await CheckOverCacheAsync(untimedCache.Root, check);
+        CliResult miss = await CheckOverCacheAsync(timedCache.Root, [.. check, "--timings"]);
+        CliResult hit = await CheckOverCacheAsync(timedCache.Root, [.. check, "--timings"]);
+        CliResult disabled = await CheckOverCacheAsync(timedCache.Root, [.. check, "--timings", "--no-cache"]);
+
+        // A hit and a --no-cache run print what a miss prints, so each timed run is held to the one untimed run.
+        TimingsBlock missBlock = miss.ShouldAppendTimingsTo(untimed);
+        TimingsBlock hitBlock = hit.ShouldAppendTimingsTo(untimed);
+        TimingsBlock disabledBlock = disabled.ShouldAppendTimingsTo(untimed);
+
+        missBlock.ShouldSatisfyAllConditions(
+            () => missBlock.Names.ShouldBe(ExtractingPhases),
+            () => missBlock.Cache.ShouldBe($"cache: miss, {MyAppProjects} of {MyAppProjects} projects extracted"));
+        hitBlock.ShouldSatisfyAllConditions(
+            () => hitBlock.Names.ShouldBe(
+            [
+                "startup", "resolve", "msbuild", "cache read", "spec resolve", "spec load", "extraction", "check",
+                "report", "total"
+            ]),
+            () => hitBlock.Cache.ShouldBe($"cache: hit, 0 of {MyAppProjects} projects extracted"));
+        disabledBlock.ShouldSatisfyAllConditions(
+            () => disabledBlock.Names.ShouldBe(
+            [
+                "startup", "resolve", "msbuild", "workspace load", "spec resolve", "spec load", "extraction", "check",
+                "report", "total"
+            ]),
+            () => disabledBlock.Cache.ShouldBe(
+                $"cache: disabled, {MyAppProjects} of {MyAppProjects} projects extracted"));
     }
 
     [Fact]
@@ -96,6 +146,26 @@ public sealed class CheckCacheE2ETests
         // The partial model equals a full cold extraction on the edited tree, and the edit really was seen.
         partial.Result.ShouldMatchTheOutputOf(freshCold.Result);
         partial.Result.Out.ShouldNotBe(cold.Result.Out);
+    }
+
+    [Fact]
+    public async Task CheckTimings_SourceEditedBetweenRuns_PartialCountsTheReExtractedProjectsOfTheWhole()
+    {
+        using var workspace = new TempFixtureWorkspace();
+        using var cache = new TempCacheRoot("check-timings");
+        string[] check = ["check", workspace.SolutionPath, "--spec", CliRunner.ViolatedSpecDll];
+        await CheckOverCacheAsync(cache.Root, check);
+
+        // Web gains a type, so Web and Domain, which references it, are re-extracted and Billing is reused.
+        await AddSourceFileAsync(workspace.PathOf(Web, "CacheProbe.cs"), "namespace MyApp.Web;\n\npublic class CacheProbeType;\n");
+
+        CliResult partial = await CheckOverCacheAsync(cache.Root, [.. check, "--timings"]);
+        CliResult freshCold = await CheckOverCacheAsync(cache.Root, [.. check, "--no-cache"]);
+
+        TimingsBlock block = partial.ShouldAppendTimingsTo(freshCold);
+        block.ShouldSatisfyAllConditions(
+            () => block.Names.ShouldBe(ExtractingPhases),
+            () => block.Cache.ShouldBe($"cache: partial, 2 of {MyAppProjects} projects extracted"));
     }
 
     [Fact]
@@ -330,5 +400,11 @@ public sealed class CheckCacheE2ETests
     private static string WriteAssembly(TempDirectory temp, params string[] segments)
     {
         return temp.WriteFile(segments, "");
+    }
+
+    // Through the real command tree, which is where a timed run's scope opens, with the caches under the row's root.
+    private static Task<CliResult> CheckOverCacheAsync(string cacheRoot, string[] args)
+    {
+        return CliRunner.InvokeColdAsync(FakeEnvironment.WithCacheRoot(cacheRoot), args);
     }
 }

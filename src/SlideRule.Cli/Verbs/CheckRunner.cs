@@ -110,12 +110,15 @@ internal sealed class CheckRunner(
         // otherwise the agent would not learn that a clean verdict came from rules the sources have since changed.
         bool cleanWithWarnings = !gated && !report.HasViolations && (report.WarningCount > 0 || source.StaleSpec is not null);
 
-        string sarifSolutionPrefix = request.Sarif is null
-            ? ""
-            : await SarifSolutionPrefixAsync(source.SolutionDirectory, ct);
-        Render(
-            request, stdout, human, stderr, report, source, sarifSolutionPrefix, !gated, ruleGlobs,
-            forHook && cleanWithWarnings);
+        using (PhaseTimings.Measure(TimedPhase.Report))
+        {
+            string sarifSolutionPrefix = request.Sarif is null
+                ? ""
+                : await SarifSolutionPrefixAsync(source.SolutionDirectory, ct);
+            Render(
+                request, stdout, human, stderr, report, source, sarifSolutionPrefix, !gated, ruleGlobs,
+                forHook && cleanWithWarnings);
+        }
 
         // The incomplete-model gate: exit 2 overrides the 0/1 verdict. SARIF (if requested) was already
         // written above with executionSuccessful: false, so the gate verdict still reaches code scanning.

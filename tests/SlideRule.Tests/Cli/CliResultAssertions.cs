@@ -1,4 +1,6 @@
+using System.Globalization;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Shouldly;
 using SlideRule.Roslyn.Diagnostics;
 using SlideRule.Tests.TestSupport;
@@ -120,6 +122,48 @@ internal static class CliResultAssertions
             () => actual.Err.ShouldBe(expected.Err, report));
 
         return actual;
+    }
+
+    /// <summary>
+    ///     Asserts this timed run came out as <paramref name="untimed" /> did with a timings block after it: the same
+    ///     exit code and stdout, and stderr that is the untimed stderr followed by the block, which it hands back.
+    /// </summary>
+    internal static TimingsBlock ShouldAppendTimingsTo(this CliResult timed, CliResult untimed)
+    {
+        string report = $"This run:{Environment.NewLine}{timed.Transcript()}{Environment.NewLine}"
+                        + $"The untimed run:{Environment.NewLine}{untimed.Transcript()}";
+
+        timed.ShouldSatisfyAllConditions(
+            () => timed.Exit.ShouldBe(untimed.Exit, report),
+            () => timed.Out.ShouldBe(untimed.Out, report),
+            () => timed.Err.ShouldStartWith(untimed.Err, customMessage: report));
+
+        return timed.Err[untimed.Err.Length..].ShouldBeTimings();
+    }
+
+    /// <summary>
+    ///     Asserts <paramref name="text" /> is exactly a timings block, the header, rows of a name and seconds to two
+    ///     places, and at most one closing cache line, and hands it back parsed.
+    /// </summary>
+    internal static TimingsBlock ShouldBeTimings(this string text)
+    {
+        string[] lines = text.NormalizedLines()
+            .TrimEnd('\n')
+            .Split('\n');
+        lines[0].ShouldBe("timings (wall clock, seconds):", text);
+
+        string? cache = lines[^1].StartsWith("cache: ", StringComparison.Ordinal) ? lines[^1] : null;
+        string[] rows = cache is null ? lines[1..] : lines[1..^1];
+        List<(string Name, double Seconds)> parsed = [];
+        foreach (string row in rows)
+        {
+            Match match = Regex.Match(row, @"^  (?<name>[a-z]+(?: [a-z]+)?) +(?<seconds>\d+\.\d{2})$");
+            match.Success.ShouldBeTrue($"'{row}' is not a timings row in:{Environment.NewLine}{text}");
+            double seconds = double.Parse(match.Groups["seconds"].Value, CultureInfo.InvariantCulture);
+            parsed.Add((match.Groups["name"].Value, seconds));
+        }
+
+        return new TimingsBlock(parsed, cache);
     }
 
     /// <summary>

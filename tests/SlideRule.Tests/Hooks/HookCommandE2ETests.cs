@@ -47,6 +47,10 @@ public sealed class HookCommandE2ETests
             "FAIL layering/domain-independent",
             "fix: Define an abstraction in Domain and implement it in Web.",
             "MyApp.Domain/OrderService.cs:9 — MyApp.Domain.OrderService references MyApp.Web.HomeController");
+
+        // The report reaches the agent as context, and the hook never times the check it composes.
+        result.Transcript()
+            .ShouldNotContain("timings (wall clock");
     }
 
     [Fact]
