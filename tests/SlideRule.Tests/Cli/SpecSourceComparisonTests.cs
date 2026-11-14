@@ -126,6 +126,17 @@ public sealed class SpecSourceComparisonTests
     }
 
     [Fact]
+    public void Compare_CompiledSourceUnderABinWithNoProjectFileBesideIt_EditReportsItChangedByChecksum()
+    {
+        // The SDK compiles a bin or obj below the project directory unless a project file sits beside it.
+        using var bed = SpecBed.Build(DebugInformationFormat.PortablePdb, deepBin: true);
+        File.WriteAllText(bed.DeepBin!, "public sealed class DeepBin { public int Edited; }");
+
+        bed.Compare()
+            .ShouldBe(bed.Stale(bed.DeepBin!, StaleReason.Changed, SpecComparison.Checksum));
+    }
+
+    [Fact]
     public void Compare_SourceAddedBesideAnInaccessibleDirectory_StillReportsItAdded()
     {
         using var bed = SpecBed.Build(DebugInformationFormat.PortablePdb);
@@ -222,7 +233,7 @@ public sealed class SpecSourceComparisonTests
         private readonly string[] _project;
         private ScopedDirectoryDenial? _denial;
 
-        private SpecBed(TempDirectory temp, string? under)
+        private SpecBed(TempDirectory temp, string? under, bool deepBin)
         {
             string[] project = under is null ? ["MyApp.Architecture"] : [under, "MyApp.Architecture"];
             _project = project;
@@ -231,6 +242,9 @@ public sealed class SpecSourceComparisonTests
             Rules = temp.WriteFile([.. project, "Rules.cs"], RulesSource);
             Layer = temp.WriteFile([.. project, "Layers", "Layer.cs"], "public sealed class Layer { }");
             Generated = temp.WriteFile([.. project, "obj", "Debug", "Generated.cs"], "public sealed class Generated { }");
+            DeepBin = deepBin
+                ? temp.WriteFile([.. project, "Sub", "bin", "DeepBin.cs"], "public sealed class DeepBin { }")
+                : null;
             Dll = temp.PathOf([.. project, "bin", "Debug", "MyApp.Architecture.dll"]);
         }
 
@@ -241,6 +255,9 @@ public sealed class SpecSourceComparisonTests
         public string Rules { get; }
 
         public string Generated { get; }
+
+        // A compiled source under Sub/bin, which holds no project file; null unless the bed was built with one.
+        public string? DeepBin { get; }
 
         public string Dll { get; }
 
@@ -260,9 +277,10 @@ public sealed class SpecSourceComparisonTests
 
         public static SpecBed Build(
             DebugInformationFormat? debugFormat, bool mapPaths = false,
-            SourceHashAlgorithm checksumAlgorithm = SourceHashAlgorithm.Sha256, string? under = null)
+            SourceHashAlgorithm checksumAlgorithm = SourceHashAlgorithm.Sha256, string? under = null,
+            bool deepBin = false)
         {
-            var bed = new SpecBed(TestTempRoot.Fresh("spec-source-comparison"), under);
+            var bed = new SpecBed(TestTempRoot.Fresh("spec-source-comparison"), under, deepBin);
             try
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(bed.Dll)!);
@@ -271,10 +289,12 @@ public sealed class SpecSourceComparisonTests
                 Func<string, string>? recordedPath = mapPaths
                     ? path => "/_/" + Path.GetRelativePath(projectDirectory, path).Replace('\\', '/')
                     : null;
-                SpecAssemblyCompiler.EmitFromFiles(
-                    [bed.Rules, bed.Layer, bed.Generated], bed.Dll, debugFormat, recordedPath, checksumAlgorithm);
+                string[] compiled = bed.DeepBin is { } deep
+                    ? [bed.Rules, bed.Layer, bed.Generated, deep]
+                    : [bed.Rules, bed.Layer, bed.Generated];
+                SpecAssemblyCompiler.EmitFromFiles(compiled, bed.Dll, debugFormat, recordedPath, checksumAlgorithm);
 
-                foreach (string source in new[] { bed.Project, bed.Rules, bed.Layer, bed.Generated }) bed.Backdate(source);
+                foreach (string source in compiled.Append(bed.Project)) bed.Backdate(source);
                 DateTime builtAt = DateTime.UtcNow.AddHours(-1);
                 File.SetLastWriteTimeUtc(bed.Dll, builtAt);
                 if (debugFormat == DebugInformationFormat.PortablePdb)
