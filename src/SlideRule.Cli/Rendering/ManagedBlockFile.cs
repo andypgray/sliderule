@@ -47,6 +47,16 @@ internal static class ManagedBlockFile
         return Compose(path, body).Current;
     }
 
+    /// <summary>
+    ///     How many bytes <paramref name="path" /> holds once <see cref="Splice" /> has written
+    ///     <paramref name="body" />, its BOM and the text outside the block included, reading the file and writing
+    ///     nothing.
+    /// </summary>
+    public static int ComposedLength(string path, string body)
+    {
+        return Compose(path, body).Bytes.Length;
+    }
+
     // The bytes a splice of body leaves the file holding, and whether it holds them already.
     private static (byte[] Bytes, bool Current) Compose(string path, string body)
     {

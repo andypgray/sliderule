@@ -1,8 +1,10 @@
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using Shouldly;
 using SlideRule.Cli.Mcp.Infrastructure;
 using SlideRule.Cli.Pipeline;
+using SlideRule.Cli.Rendering;
 using SlideRule.Cli.Settings;
 using SlideRule.Cli.Verbs;
 using SlideRule.ModelFile;
@@ -256,6 +258,7 @@ public sealed class RenderCommandE2ETests : IDisposable
 
         result.ShouldSucceed();
         result.ShouldPrint(RenderSpecCardsWritten);
+        result.Err.ShouldNotContain("Codex");
         File.ReadAllText(RootAgents)
             .ShouldBe(Wrap(RootBody, "\n"));
         File.ReadAllText(ScopeAgents)
@@ -745,6 +748,85 @@ public sealed class RenderCommandE2ETests : IDisposable
         result.Err.ShouldNotContain("Claude Code");
     }
 
+    // ── Codex's budget for AGENTS.md files ──────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Render_ARootPastCodexsBudget_WarnsWithTheSizeItWrote()
+    {
+        File.WriteAllText(RootAgents, HandWritten(CodexInstructionBudget.DefaultBytes));
+
+        CliResult result = await CliRunner.InvokeAsync("render", _workspace.SolutionPath, "--spec", CliRunner.RenderSpecDll);
+
+        result.ShouldSucceed();
+        result.ShouldPrint(RenderSpecCardsWritten);
+        result.Err.ShouldContain(
+            $"warning: AGENTS.md is {ByteCount(RootAgents)} bytes, and by default Codex reads only the first "
+            + "32,768 bytes of AGENTS.md files, so its sessions lose everything after that; raise "
+            + "project_doc_max_bytes in Codex's config.toml, or shorten AGENTS.md.");
+    }
+
+    [Fact]
+    public async Task Render_ACardWhoseTotalWithTheRootPassesCodexsBudget_WarnsNamingTheCard()
+    {
+        // The card alone fits, and so does the root; only a session started in the card's directory reads both.
+        Directory.CreateDirectory(Path.GetDirectoryName(DomainAgents)!);
+        File.WriteAllText(DomainAgents, HandWritten(CodexInstructionBudget.DefaultBytes - 1_500));
+
+        CliResult result = await CliRunner.InvokeAsync("render", _workspace.SolutionPath, "--spec", CliRunner.RenderSpecDll);
+
+        result.ShouldSucceed();
+        result.ShouldPrint(RenderSpecCardsWritten);
+        long root = new FileInfo(RootAgents).Length;
+        long card = new FileInfo(DomainAgents).Length;
+        root.ShouldBeLessThanOrEqualTo(CodexInstructionBudget.DefaultBytes, "the root alone must fit for this row.");
+        card.ShouldBeLessThanOrEqualTo(CodexInstructionBudget.DefaultBytes, "the card alone must fit for this row.");
+        long total = root + card;
+        result.Err.ShouldContain(
+            "warning: the files from AGENTS.md down to MyApp.Domain/AGENTS.md total "
+            + $"{total.ToString("N0", CultureInfo.InvariantCulture)} bytes, and by default Codex reads only the "
+            + "first 32,768 bytes of AGENTS.md files, so a session started in MyApp.Domain loses everything after "
+            + "that; raise project_doc_max_bytes in Codex's config.toml, or shorten those files.");
+    }
+
+    [Fact]
+    public async Task RenderCheck_ARootPastCodexsBudget_WarnsAndStillReportsItCurrent()
+    {
+        // Arrange
+        File.WriteAllText(RootAgents, HandWritten(CodexInstructionBudget.DefaultBytes));
+        (await CliRunner.InvokeAsync("render", _workspace.SolutionPath, "--spec", CliRunner.RenderSpecDll))
+            .ShouldSucceed();
+        byte[] rendered = File.ReadAllBytes(RootAgents);
+
+        // Act
+        CliResult result = await CliRunner.InvokeAsync(
+            "render", _workspace.SolutionPath, "--spec", CliRunner.RenderSpecDll, "--check");
+
+        // Assert
+        result.ShouldSucceed();
+        result.ShouldPrint(
+            "current AGENTS.md\ncurrent MyApp.Legacy.Billing/AGENTS.md\ncurrent MyApp.Domain/AGENTS.md");
+        result.Err.ShouldContain($"warning: AGENTS.md is {ByteCount(RootAgents)} bytes,");
+        File.ReadAllBytes(RootAgents)
+            .ShouldBe(rendered);
+    }
+
+    [Fact]
+    public async Task Render_AMalformedCard_IsRefusedBeforeTheRootIsWritten()
+    {
+        // The card is the last file placed, so a refusal that waited for its placement would leave the root
+        // written beside it.
+        File.Exists(RootAgents)
+            .ShouldBeFalse("the fixture ships no root AGENTS.md, so its absence afterwards is what this row reads.");
+        Directory.CreateDirectory(Path.GetDirectoryName(DomainAgents)!);
+        File.WriteAllText(DomainAgents, "<!-- sliderule:begin -->\nno end marker\n");
+
+        CliResult result = await CliRunner.InvokeAsync("render", _workspace.SolutionPath, "--spec", CliRunner.RenderSpecDll);
+
+        result.ShouldRefuseWith(DomainAgents);
+        File.Exists(RootAgents)
+            .ShouldBeFalse();
+    }
+
     [Fact]
     public async Task Render_DiagramScopeWithoutATarget_IsAUserError()
     {
@@ -856,6 +938,19 @@ public sealed class RenderCommandE2ETests : IDisposable
     private static string Wrap(string body, string nl)
     {
         return $"<!-- sliderule:begin -->{nl}{body.Replace("\n", nl)}{nl}<!-- sliderule:end -->{nl}";
+    }
+
+    // Hand-written prose with no managed block, longer than atLeast bytes.
+    private static string HandWritten(int atLeast)
+    {
+        const string line = "Hand-written notes for agents working in this directory.\n";
+        return string.Concat(Enumerable.Repeat(line, atLeast / line.Length + 1));
+    }
+
+    // A file's size on disk, as the Codex budget warning prints it.
+    private static string ByteCount(string path)
+    {
+        return new FileInfo(path).Length.ToString("N0", CultureInfo.InvariantCulture);
     }
 
     // A hand-authored file with prose above and below a managed block holding body.

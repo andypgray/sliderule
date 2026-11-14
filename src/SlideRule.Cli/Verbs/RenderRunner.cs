@@ -124,6 +124,15 @@ internal sealed class RenderRunner(
         if (ClaudeInstructionFiles.Warning(solutionDirectory, Environment) is { } missed)
             await error.WriteLineAsync($"warning: {missed}");
 
+        // A file past Codex's default budget reaches its sessions cut short, and so does a card whose total with
+        // the files above it is. Measured at the bytes each file will hold, so the figure is the same under
+        // --check, and before any is placed, so a file that cannot be composed is refused before the first write.
+        List<(string Path, int Bytes)> sizes = composition.Files
+            .Select(file => (file.Path, ManagedBlockFile.ComposedLength(file.Path, file.Body)))
+            .ToList();
+        if (CodexInstructionBudget.Warning(solutionDirectory, sizes) is { } cut)
+            await error.WriteLineAsync($"warning: {cut}");
+
         // Composed and read back before the first byte of any target hits disk. A file that does not read
         // back as it was written is a defect in this tool rather than in the spec, and the answer to one is
         // to render nothing at all — not to leave a fresh block and fresh cards standing beside a model file

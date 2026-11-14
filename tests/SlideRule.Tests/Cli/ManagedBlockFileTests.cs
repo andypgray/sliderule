@@ -56,6 +56,20 @@ public sealed class ManagedBlockFileTests
     }
 
     [Fact]
+    public void ComposedLength_ExistingBomFile_IsTheByteLengthSpliceWrites()
+    {
+        // A multi-byte character and the BOM both count, so a length taken from the text alone falls short.
+        using TempDirectory temp = TestTempRoot.Fresh("managed-block");
+        string path = temp.PathOf("AGENTS.md");
+        File.WriteAllBytes(path, [.. Utf8Bom, .. "# Title — notes\n"u8]);
+
+        int composed = ManagedBlockFile.ComposedLength(path, Body);
+        ManagedBlockFile.Splice(path, Body);
+
+        composed.ShouldBe(File.ReadAllBytes(path).Length);
+    }
+
+    [Fact]
     public void Splice_ExistingNoBomFile_StaysWithoutBom()
     {
         using TempDirectory temp = TestTempRoot.Fresh("managed-block");
