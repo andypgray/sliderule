@@ -3,7 +3,6 @@ using Shouldly;
 using SlideRule.Cli.Replay;
 using SlideRule.Codebase;
 using SlideRule.Roslyn;
-using SlideRule.Roslyn.Diagnostics;
 using SlideRule.Roslyn.Replay;
 using SlideRule.Tests.Extraction;
 using SlideRule.Tests.Mcp.TestDoubles;
@@ -433,7 +432,7 @@ public sealed class SolutionEntriesE2ETests
         // Assert — a reference into the VB project from C# is still checked, on every platform, because the C#
         // compilation reaches its types through the project's assembly, and the load says nothing about it.
         result.Out.ShouldHaveSingleViolationOnEdge("vb/app-off-legacy", "reference", "App.Widget", "Legacy.Ledger");
-        result.Err.ShouldNotContain(CrossLanguageReferences.Message(LegacyReference(bed)), customMessage: result.Transcript());
+        result.Err.ShouldNotContain(ScratchProjects.VisualBasicBedWarning(bed), customMessage: result.Transcript());
     }
 
     [Fact]
@@ -443,16 +442,14 @@ public sealed class SolutionEntriesE2ETests
         // assembly to hand the C# compilation.
         using TempDirectory bed = TestTempRoot.Fresh("visual-basic-broken");
         (string solution, string spec) = WriteVisualBasicBed(bed);
-        bed.WriteFile(
-            ["Legacy", "Ledger.vb"],
-            "Namespace Legacy\n    Public Class Ledger\n        Inherits Missing\n    End Class\nEnd Namespace\n");
+        ScratchProjects.BreakVisualBasicBed(bed);
 
         // Act
         CliResult result = await CliRunner.InvokeColdAsync("check", solution, "--spec", spec, "--no-cache");
 
         // Assert
         result.Err.ShouldContain(
-            "warning: " + CrossLanguageReferences.Message(LegacyReference(bed)), customMessage: result.Transcript());
+            "warning: " + ScratchProjects.VisualBasicBedWarning(bed), customMessage: result.Transcript());
     }
 
     [Fact]
@@ -474,7 +471,7 @@ public sealed class SolutionEntriesE2ETests
         cached.Result.Out.ShouldHavePassed("vb/app-off-legacy");
         using JsonDocument document = cached.Result.ShouldHaveJsonStdout();
         document.RootElement.Strings("workspaceDiagnostics")
-            .ShouldContain(CrossLanguageReferences.Message(LegacyReference(bed)), cached.Result.Transcript());
+            .ShouldContain(ScratchProjects.VisualBasicBedWarning(bed), cached.Result.Transcript());
     }
 
     [Fact]
@@ -521,7 +518,7 @@ public sealed class SolutionEntriesE2ETests
         cached.Out.ShouldHavePassed("vb/app-off-legacy");
         using JsonDocument document = cached.ShouldHaveJsonStdout();
         document.RootElement.Strings("workspaceDiagnostics")
-            .ShouldContain(CrossLanguageReferences.Message(LegacyReference(bed)), cached.Transcript());
+            .ShouldContain(ScratchProjects.VisualBasicBedWarning(bed), cached.Transcript());
     }
 
     [Fact]
@@ -552,7 +549,7 @@ public sealed class SolutionEntriesE2ETests
     {
         // Arrange
         using TempDirectory bed = TestTempRoot.Fresh("visual-basic-warm-edit");
-        (string solution, _) = WriteVisualBasicBed(bed);
+        string solution = ScratchProjects.WriteVisualBasicBed(bed);
         await using var session = new WorkspaceSession();
         await session.GetCurrentAsync(solution, Ct);
         long reloadsBefore = session.FullReloadCount;
@@ -563,7 +560,7 @@ public sealed class SolutionEntriesE2ETests
 
         // Assert — the warning is computed at load, so only a reload can raise it.
         (session.FullReloadCount - reloadsBefore).ShouldBe(1);
-        after.LoadDiagnostics.LoadFailures.ShouldContain(CrossLanguageReferences.Message(LegacyReference(bed)));
+        after.LoadDiagnostics.LoadFailures.ShouldContain(ScratchProjects.VisualBasicBedWarning(bed));
         CodebaseModel model = await CodebaseExtractor.ExtractFromSolutionAsync(after.Solution, ct: Ct);
         model.HasEdge("App.Widget", "Legacy.Ledger")
             .ShouldBeFalse();
@@ -574,7 +571,7 @@ public sealed class SolutionEntriesE2ETests
     {
         // Arrange
         using TempDirectory bed = TestTempRoot.Fresh("visual-basic-warm-add");
-        (string solution, _) = WriteVisualBasicBed(bed);
+        string solution = ScratchProjects.WriteVisualBasicBed(bed);
         FixtureEdits.EditOnDisk(bed.PathOf("App", "Widget.cs"), ReferenceOther);
         await using var session = new WorkspaceSession();
         WorkspaceSnapshot before = await session.GetCurrentAsync(solution, Ct);
@@ -617,42 +614,10 @@ public sealed class SolutionEntriesE2ETests
 
     private const string OtherSource = "Namespace Legacy\n    Public Class Other\n    End Class\nEnd Namespace\n";
 
-    // The bed's one cross-language reference, as the load names it.
-    private static CrossLanguageReferences.Finding LegacyReference(TempDirectory bed)
-    {
-        return new CrossLanguageReferences.Finding(bed.PathOf("App", "App.csproj"), bed.PathOf("Legacy", "Legacy.vbproj"));
-    }
-
-    // A C# project referencing an SDK-style Visual Basic one, both declared and built, and the spec that layers them.
-    // The workspace loads the VB project without a failure, and extraction skips it by language.
+    // The shared Visual Basic bed and the spec that layers it.
     private static (string Solution, string Spec) WriteVisualBasicBed(TempDirectory bed)
     {
-        bed.WriteFile(
-            ["App", "App.csproj"],
-            """
-            <Project Sdk="Microsoft.NET.Sdk">
-              <PropertyGroup>
-                <TargetFramework>net10.0</TargetFramework>
-              </PropertyGroup>
-              <ItemGroup>
-                <ProjectReference Include="..\Legacy\Legacy.vbproj" />
-              </ItemGroup>
-            </Project>
-            """);
-        bed.WriteFile(["App", "Widget.cs"], "namespace App;\n\npublic sealed class Widget\n{\n    public Legacy.Ledger? Ledger { get; }\n}\n");
-        bed.WriteFile(
-            ["Legacy", "Legacy.vbproj"],
-            """
-            <Project Sdk="Microsoft.NET.Sdk">
-              <PropertyGroup>
-                <TargetFramework>net10.0</TargetFramework>
-                <RootNamespace></RootNamespace>
-              </PropertyGroup>
-            </Project>
-            """);
-        bed.WriteFile(["Legacy", "Ledger.vb"], "Namespace Legacy\n    Public Class Ledger\n    End Class\nEnd Namespace\n");
-        string solution = bed.WriteFile(["App.slnx"], ScratchProjects.Solution("App/App.csproj", "Legacy/Legacy.vbproj"));
-        DotnetCli.Run("build App.slnx", bed.Path);
+        string solution = ScratchProjects.WriteVisualBasicBed(bed);
         string spec = SpecAssemblyCompiler.EmitSpecDllToFreshTemp("visual-basic-member", "VisualBasic", VisualBasicSpecSource);
         return (solution, spec);
     }

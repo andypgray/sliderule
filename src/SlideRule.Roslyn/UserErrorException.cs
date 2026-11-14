@@ -5,7 +5,7 @@ namespace SlideRule.Roslyn;
 ///     as an unreadable solution filter or a baseline file that has been tampered with. Throw it when the
 ///     fault is something the reader can fix; anything else is a bug and should surface as itself.
 /// </summary>
-internal sealed class UserErrorException : InvalidOperationException
+internal class UserErrorException : InvalidOperationException
 {
     public UserErrorException(string message) : base(message)
     {

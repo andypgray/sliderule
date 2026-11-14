@@ -14,7 +14,7 @@ internal sealed class ColdSolutionSource : ISolutionSource
     public async Task<SolutionHandle> AcquireAsync(string solutionPath, CancellationToken ct)
     {
         var diagnostics = new List<string>();
-        LoadedSolution loaded = await WorkspaceLoader.LoadAsync(solutionPath, diagnostics.Add, ct);
+        LoadedSolution loaded = await WorkspaceLoader.LoadAsync(solutionPath, diagnostics.Add, ct: ct);
         return new SolutionHandle(
             loaded.Solution, loaded.LoadDiagnosticsWith(diagnostics), loaded,
             targetFrameworks: loaded.TargetFrameworks, projectFiles: loaded.ProjectFiles);

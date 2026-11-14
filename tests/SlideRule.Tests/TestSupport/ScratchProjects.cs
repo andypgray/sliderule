@@ -1,3 +1,5 @@
+using SlideRule.Roslyn.Diagnostics;
+
 namespace SlideRule.Tests.TestSupport;
 
 /// <summary>Project and solution file text for scratch beds a test writes under the run's temp root.</summary>
@@ -39,6 +41,65 @@ internal static class ScratchProjects
         bed.WriteFile(["Lib", "Lib.csproj"], ClassLibrary());
         string solution = bed.WriteFile(["App.slnx"], Solution("Lib/Lib.csproj"));
         return (pin, solution);
+    }
+
+    /// <summary>
+    ///     Writes and builds a C# project at <c>App/App.csproj</c> whose <c>Widget</c> names a type of the SDK-style
+    ///     Visual Basic project it references, <c>Legacy/Legacy.vbproj</c>, and an <c>App.slnx</c> declaring both,
+    ///     and returns the solution's path. The workspace loads the VB project without a failure.
+    /// </summary>
+    internal static string WriteVisualBasicBed(TempDirectory bed)
+    {
+        bed.WriteFile(
+            ["App", "App.csproj"],
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+              <ItemGroup>
+                <ProjectReference Include="..\Legacy\Legacy.vbproj" />
+              </ItemGroup>
+            </Project>
+            """);
+        bed.WriteFile(["App", "Widget.cs"], "namespace App;\n\npublic sealed class Widget\n{\n    public Legacy.Ledger? Ledger { get; }\n}\n");
+        bed.WriteFile(
+            ["Legacy", "Legacy.vbproj"],
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+                <RootNamespace></RootNamespace>
+              </PropertyGroup>
+            </Project>
+            """);
+        bed.WriteFile(["Legacy", "Ledger.vb"], "Namespace Legacy\n    Public Class Ledger\n    End Class\nEnd Namespace\n");
+        string solution = bed.WriteFile(["App.slnx"], Solution("App/App.csproj", "Legacy/Legacy.vbproj"));
+        DotnetCli.Run("build App.slnx", bed.Path);
+        return solution;
+    }
+
+    /// <summary>
+    ///     Gives the <see cref="WriteVisualBasicBed" /> bed's VB type a declaration error, so the workspace has no
+    ///     assembly to hand the C# compilation.
+    /// </summary>
+    internal static void BreakVisualBasicBed(TempDirectory bed)
+    {
+        bed.WriteFile(
+            ["Legacy", "Ledger.vb"],
+            "Namespace Legacy\n    Public Class Ledger\n        Inherits Missing\n    End Class\nEnd Namespace\n");
+    }
+
+    /// <summary>
+    ///     The warning a load of the <see cref="WriteVisualBasicBed" /> bed logs for its one cross-language reference
+    ///     once <see cref="BreakVisualBasicBed" /> has run.
+    /// </summary>
+    internal static string VisualBasicBedWarning(TempDirectory bed)
+    {
+        string referrer = bed.PathOf("App", "App.csproj");
+        string target = bed.PathOf("Legacy", "Legacy.vbproj");
+        var finding = new CrossLanguageReferences.Finding(referrer, target);
+        return CrossLanguageReferences.Message(finding);
     }
 
     /// <summary>An .slnx declaring each of <paramref name="projectPaths" /> in order.</summary>

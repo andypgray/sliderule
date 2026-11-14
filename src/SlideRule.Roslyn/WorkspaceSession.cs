@@ -221,8 +221,8 @@ internal sealed class WorkspaceSession : IAsyncDisposable
         }
 
         // Every path is held to the stat taken before anything in this call read it, never to one the load or the
-        // sweep took: a load can read a document's text before its own stats (the cross-language check compiles
-        // first), so no stat taken inside the call vouches for the text it read.
+        // sweep took: MSBuild's evaluation reads a structural file before the load stamps it, so no stat taken
+        // inside the call vouches for what that evaluation read.
         bool reloaded = FullReloadCount != reloadsAtStart;
         foreach (string path in listed)
         {
@@ -266,34 +266,32 @@ internal sealed class WorkspaceSession : IAsyncDisposable
         List<string> collected = [];
         Lock collectedLock = new();
 
-        LoadedSolution freshlyLoaded = await WorkspaceLoader.LoadAsync(solutionPath, CollectDiagnostic, ct).ConfigureAwait(false);
-
-        // Until it is stored in loaded, nothing else will dispose the fresh workspace and its build host.
-        Solution materialized;
-        IReadOnlyDictionary<string, FileFreshness> statsBeforeRead;
-        try
-        {
-            (materialized, statsBeforeRead) = await MaterializeDocumentTextsAsync(freshlyLoaded.Solution, ct).ConfigureAwait(false);
-        }
-        catch
-        {
-            freshlyLoaded.Dispose();
-            throw;
-        }
+        // Set by MaterializeAsync, which a load that returns has always run.
+        IReadOnlyDictionary<string, FileFreshness>? statsBeforeRead = null;
+        LoadedSolution freshlyLoaded = await WorkspaceLoader
+            .LoadAsync(solutionPath, CollectDiagnostic, MaterializeAsync, ct)
+            .ConfigureAwait(false);
 
         loaded = freshlyLoaded;
-        current = materialized;
+        current = freshlyLoaded.Solution;
         loadedSolutionPath = solutionPath;
         loadVerdict = freshlyLoaded.LoadDiagnosticsWith(collected);
         targetFrameworks = freshlyLoaded.TargetFrameworks;
         projectFiles = freshlyLoaded.ProjectFiles;
         generation++;
-        SeedEditVersions(materialized);
-        RecordAllFingerprints(solutionPath, materialized, statsBeforeRead);
+        SeedEditVersions(current);
+        RecordAllFingerprints(solutionPath, current, statsBeforeRead!);
         snapshot = MintSnapshot();
         FullReloadCount++;
         Volatile.Write(ref readySolutionPath, solutionPath);
         return;
+
+        async Task<Solution> MaterializeAsync(Solution solution, CancellationToken token)
+        {
+            (Solution materialized, statsBeforeRead) = await MaterializeDocumentTextsAsync(solution, token)
+                .ConfigureAwait(false);
+            return materialized;
+        }
 
         // MSBuildWorkspace can raise workspace-failure diagnostics from BuildHost callback threads while
         // the open is in flight, so synchronize the collector even though the load itself is gate-serialized.
@@ -528,11 +526,12 @@ internal sealed class WorkspaceSession : IAsyncDisposable
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         Each path is stat'ed before it is read, as the reconcile sweep does, so a recorded stat is never
-    ///         newer than the text it vouches for and can be trusted from the first sweep. A write between the
-    ///         stat and the read moves the stat and costs that file one sweep read. Each path is read once and its
-    ///         text folded into every document there, the several a multi-targeted project gives one file.
-    ///         A document with no file path is not on disk, so it is left on its loader.
+    ///         It runs inside the load, before anything there compiles, and each path is stat'ed before it is read,
+    ///         as the reconcile sweep does, so a recorded stat is never newer than the text it vouches for and can
+    ///         be trusted from the first sweep. A write between the stat and the read moves the stat and costs that
+    ///         file one sweep read. Each path is read once and its text folded into every document there, the
+    ///         several a multi-targeted project gives one file. A document with no file path is not on disk, so it
+    ///         is left on its loader.
     ///     </para>
     ///     <para>
     ///         The reads overlap against the one immutable solution handed in, and only then are the texts folded

@@ -59,17 +59,21 @@ public sealed class SdkResolutionRefusalTests
     }
 
     [Fact]
-    public void IsRefusal_ARefusalAndTheFailureItWraps_OnlyTheRefusalCounts()
+    public void ForLoadAndForRegistration_EachRefusal_IsAnSdkRefusalWrappingTheFailure()
     {
         var failure = new InvalidOperationException(EfCoreMessage);
-        UserErrorException refusal = SdkResolutionRefusal.ForRegistration(Path.GetTempPath(), failure);
+        string solution = Path.Combine(Path.GetTempPath(), "App.slnx");
 
-        SdkResolutionRefusal.IsRefusal(refusal)
-            .ShouldBeTrue();
-        SdkResolutionRefusal.IsRefusal(failure)
-            .ShouldBeFalse();
-        SdkResolutionRefusal.IsRefusal(new UserErrorException("Could not read the solution filter."))
-            .ShouldBeFalse();
+        // Declared as the base type, so a factory that returns a plain refusal still compiles and reds here.
+        Exception forLoad = SdkResolutionRefusal.ForLoad(solution, failure);
+        Exception forRegistration = SdkResolutionRefusal.ForRegistration(Path.GetTempPath(), failure);
+
+        forLoad.ShouldBeOfType<SdkRefusalException>()
+            .InnerException
+            .ShouldBeSameAs(failure);
+        forRegistration.ShouldBeOfType<SdkRefusalException>()
+            .InnerException
+            .ShouldBeSameAs(failure);
     }
 
     [Fact]

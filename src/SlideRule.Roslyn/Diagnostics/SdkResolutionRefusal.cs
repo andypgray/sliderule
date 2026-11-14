@@ -41,22 +41,14 @@ internal static class SdkResolutionRefusal
     }
 
     /// <summary>
-    ///     Whether <paramref name="ex" /> is a refusal this type built, recognized by the failure it wraps.
-    /// </summary>
-    internal static bool IsRefusal(Exception ex)
-    {
-        return ex is UserErrorException { InnerException: { } inner } && DetailOf(inner) is not null;
-    }
-
-    /// <summary>
     ///     The refusal for a solution load at <paramref name="solutionPath" /> that the build host failed with
     ///     <paramref name="original" />, kept as the inner exception.
     /// </summary>
-    internal static UserErrorException ForLoad(string solutionPath, Exception original)
+    internal static SdkRefusalException ForLoad(string solutionPath, Exception original)
     {
         string detail = DetailOf(original) ?? original.Message;
         IReadOnlyList<GlobalJsonPin> pins = HostfxrPin(detail) is { } named ? [named] : SolutionPins(solutionPath, detail);
-        return new UserErrorException(Message(SdkRefusalTrigger.BuildHost, pins, detail), original);
+        return new SdkRefusalException(Message(SdkRefusalTrigger.BuildHost, pins, detail), original);
     }
 
     /// <summary>
@@ -64,12 +56,12 @@ internal static class SdkResolutionRefusal
     ///     <paramref name="workingDirectory" />, that failed with <paramref name="original" />, kept as the inner
     ///     exception.
     /// </summary>
-    internal static UserErrorException ForRegistration(string workingDirectory, Exception original)
+    internal static SdkRefusalException ForRegistration(string workingDirectory, Exception original)
     {
         string detail = DetailOf(original) ?? original.Message;
         GlobalJsonPin? pin = HostfxrPin(detail) ?? GlobalJsonPin.Nearest(workingDirectory);
         IReadOnlyList<GlobalJsonPin> pins = pin is null ? [] : [pin];
-        return new UserErrorException(Message(SdkRefusalTrigger.InProcess, pins, detail), original);
+        return new SdkRefusalException(Message(SdkRefusalTrigger.InProcess, pins, detail), original);
     }
 
     /// <summary>

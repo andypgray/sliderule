@@ -272,7 +272,7 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
                 model, model.Rules, fullSolutionPath, solutionDirectory,
                 async ct =>
                 {
-                    LoadedSolution loaded = await WorkspaceLoader.LoadAsync(fullSolutionPath, diagnostics.Add, ct);
+                    LoadedSolution loaded = await WorkspaceLoader.LoadAsync(fullSolutionPath, diagnostics.Add, ct: ct);
                     opened = loaded; // handed out so the finally below disposes it whatever the walk does
 
                     // The same exclusion closure the CLI applies, from one read of the solution's declared members.

@@ -48,7 +48,9 @@ internal static class WorkspaceLoader
     ///     Opens <paramref name="solutionPath" />, the absolute path of a <c>.sln</c>, <c>.slnx</c> or <c>.slnf</c>
     ///     filter, through a fresh MSBuild workspace; the caller disposes the result, which owns the workspace.
     ///     MSBuild must be registered in the process before the first call, for example through the
-    ///     <c>Microsoft.Build.Locator</c> package.
+    ///     <c>Microsoft.Build.Locator</c> package. <paramref name="beforeFirstRead" />, when given, runs over the
+    ///     loaded solution before any step of the load reads a document's text, and the solution it returns is the
+    ///     one the rest of the load inspects and the result carries.
     /// </summary>
     /// <remarks>
     ///     A filter loads the projects it selects plus their transitive references, and the load leaves out the
@@ -60,15 +62,18 @@ internal static class WorkspaceLoader
     ///     <see cref="LoadedSolution.LoadDiagnosticsWith" />, never the messages'.
     /// </remarks>
     /// <exception cref="UserErrorException">
-    ///     The <c>.slnf</c> filter at <paramref name="solutionPath" /> could not be read, or the .NET host could not
-    ///     resolve the SDK a <c>global.json</c> pins for the solution or one of its projects.
+    ///     The <c>.slnf</c> filter at <paramref name="solutionPath" /> could not be read.
+    /// </exception>
+    /// <exception cref="SdkRefusalException">
+    ///     The .NET host could not resolve the SDK a <c>global.json</c> pins for the solution or one of its projects.
     /// </exception>
     // MethodImplOptions.NoInlining keeps the JIT from resolving MSBuild/Roslyn assemblies before
     // MSBuildLocator registration in non-test hosts; in tests registration happens in a
     // [ModuleInitializer], so ordering is already safe there.
     [MethodImpl(MethodImplOptions.NoInlining)]
     public static async Task<LoadedSolution> LoadAsync(
-        string solutionPath, Action<string>? diagnosticLog = null, CancellationToken ct = default)
+        string solutionPath, Action<string>? diagnosticLog = null,
+        Func<Solution, CancellationToken, Task<Solution>>? beforeFirstRead = null, CancellationToken ct = default)
     {
         Interlocked.Increment(ref _loadCount);
         foreach (StrongBox<long> box in LoadsOnThisFlow.Value ?? []) Interlocked.Increment(ref box.Value);
@@ -101,11 +106,17 @@ internal static class WorkspaceLoader
             foreach (UnresolvedReferences.Finding found in UnresolvedReferences.Detect(settled.Solution, settled.Report.Failed))
                 diagnosticLog?.Invoke(UnresolvedReferences.Message(found.ProjectPath, found.Names));
 
+            // No step above reads a document's text and the cross-language check below compiles, so the delegate
+            // must run between them.
+            Solution inspected = beforeFirstRead is null
+                ? settled.Solution
+                : await beforeFirstRead(settled.Solution, ct).ConfigureAwait(false);
+
             // It compiles the C# projects it inspects, so it runs only when there is a log to write to.
             if (diagnosticLog is not null)
             {
                 IReadOnlyList<CrossLanguageReferences.Finding> dropped = await CrossLanguageReferences
-                    .DetectAsync(settled.Solution, settled.Report.Failed, ct)
+                    .DetectAsync(inspected, settled.Report.Failed, ct)
                     .ConfigureAwait(false);
                 foreach (CrossLanguageReferences.Finding found in dropped)
                     diagnosticLog(CrossLanguageReferences.Message(found));
@@ -113,10 +124,10 @@ internal static class WorkspaceLoader
 
             // A project whose restore failed loads completely, so nothing in the loaded structure says so and
             // only its assets file can.
-            IReadOnlyList<string> restoreFailed = RestoreFailures.Detect(settled.Solution, settled.Report.Failed);
+            IReadOnlyList<string> restoreFailed = RestoreFailures.Detect(inspected, settled.Report.Failed);
 
             return new LoadedSolution(
-                workspace, settled.Solution, settled.TargetFrameworks, settled.ProjectFiles, settled.Report,
+                workspace, inspected, settled.TargetFrameworks, settled.ProjectFiles, settled.Report,
                 restoreFailed);
         }
         catch
@@ -155,13 +166,12 @@ internal static class WorkspaceLoader
 
             Directory.CreateDirectory(filterDirectory);
             await File.WriteAllTextAsync(filterPath, filterText, ct).ConfigureAwait(false);
-            return await LoadAsync(filterPath, diagnosticLog, ct).ConfigureAwait(false);
+            return await LoadAsync(filterPath, diagnosticLog, ct: ct).ConfigureAwait(false);
         }
-        // An SDK the pin cannot resolve fails the whole solution's load as surely as this one's, so that refusal
+        // An SDK the pin cannot resolve fails the whole solution's load as surely as this one's, so its refusal
         // propagates rather than sending the caller to a reload that would refuse the same way.
-        catch (Exception ex) when (ex is UserErrorException or IOException or UnauthorizedAccessException
-                                       or FormatException or XmlException
-                                   && !SdkResolutionRefusal.IsRefusal(ex))
+        catch (Exception ex) when (ex is UserErrorException and not SdkRefusalException or IOException
+                                       or UnauthorizedAccessException or FormatException or XmlException)
         {
             return null;
         }

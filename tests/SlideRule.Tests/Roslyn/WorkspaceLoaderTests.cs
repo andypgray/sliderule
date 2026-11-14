@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using Microsoft.CodeAnalysis;
 using Shouldly;
 using SlideRule.Roslyn;
 using SlideRule.Roslyn.Diagnostics;
@@ -37,6 +38,11 @@ namespace SlideRule.Tests.Roslyn;
 ///         item naming a file that does not exist leaves an unresolved reference for the load boundary to strip, and a
 ///         <c>Reference</c> whose HintPath is missing is dropped by the build before the compiler sees it. The legacy
 ///         row also holds the framework references the build resolves without a HintPath out of the warning.
+///     </para>
+///     <para>
+///         The order of a load's reads: the delegate a session materializes through sees no document whose text
+///         anything has read, even in a solution whose cross-language check compiles a C# project, and a delegate
+///         that throws leaves the load to dispose the workspace it opened.
 ///     </para>
 /// </remarks>
 public sealed class WorkspaceLoaderTests
@@ -96,11 +102,23 @@ public sealed class WorkspaceLoaderTests
         (string pin, string solution) = ScratchProjects.WriteBrokenPinBed(temp);
         string project = temp.PathOf("Lib", "Lib.csproj");
 
-        var refusal = await Should.ThrowAsync<UserErrorException>(() => WorkspaceLoader.LoadClosureAsync(solution, [project], ct: Ct));
+        var refusal = await Should.ThrowAsync<SdkRefusalException>(() => WorkspaceLoader.LoadClosureAsync(solution, [project], ct: Ct));
 
         refusal.Message.ShouldStartWith(
             $"The .NET host could not resolve an SDK for version {ScratchProjects.UnresolvableSdkVersion}, which "
             + $"'{pin}' pins, so the solution's projects cannot be loaded.");
+    }
+
+    [Fact]
+    public async Task LoadAsync_AMalformedFilter_RefusesAsUnreadableRatherThanAsAnSdkRefusal()
+    {
+        using TempDirectory temp = TestTempRoot.Fresh("loader-malformed-filter");
+        string filter = temp.WriteFile(["App.slnf"], "{ not json");
+
+        var refusal = await Should.ThrowAsync<UserErrorException>(() => WorkspaceLoader.LoadAsync(filter, ct: Ct));
+
+        refusal.ShouldBeOfType<UserErrorException>();
+        refusal.Message.ShouldBe(WorkspaceLoader.UnreadableFilterMessage(filter));
     }
 
     [Fact]
@@ -123,7 +141,7 @@ public sealed class WorkspaceLoaderTests
         string solution = temp.WriteFile(["App.slnx"], "<Solution>\n  <Project Path=\"App/App.csproj\" />\n</Solution>\n");
         var diagnostics = new List<string>();
 
-        using LoadedSolution loaded = await WorkspaceLoader.LoadAsync(solution, diagnostics.Add, Ct);
+        using LoadedSolution loaded = await WorkspaceLoader.LoadAsync(solution, diagnostics.Add, ct: Ct);
 
         diagnostics.ShouldBe(
         [
@@ -154,7 +172,7 @@ public sealed class WorkspaceLoaderTests
         string solution = temp.WriteFile(["App.slnx"], "<Solution>\n  <Project Path=\"App/App.csproj\" />\n</Solution>\n");
         var diagnostics = new List<string>();
 
-        using LoadedSolution loaded = await WorkspaceLoader.LoadAsync(solution, diagnostics.Add, Ct);
+        using LoadedSolution loaded = await WorkspaceLoader.LoadAsync(solution, diagnostics.Add, ct: Ct);
 
         diagnostics.ShouldBe([UnresolvedReferences.Message(csproj, ["Vendor.Missing"])]);
     }
@@ -174,9 +192,67 @@ public sealed class WorkspaceLoaderTests
                 StringComparison.Ordinal));
         var diagnostics = new List<string>();
 
-        using LoadedSolution loaded = await WorkspaceLoader.LoadAsync(fixture.SolutionPath, diagnostics.Add, Ct);
+        using LoadedSolution loaded = await WorkspaceLoader.LoadAsync(fixture.SolutionPath, diagnostics.Add, ct: Ct);
 
         diagnostics.ShouldBe([UnresolvedReferences.Message(csproj, ["Vendor.Missing"])]);
+    }
+
+    [Fact]
+    public async Task LoadAsync_ACSharpProjectReferencingVisualBasic_RunsBeforeFirstReadAheadOfTheCompile()
+    {
+        // Arrange — the broken VB project makes the cross-language check report, which proves its compile ran.
+        using TempDirectory bed = TestTempRoot.Fresh("loader-before-first-read");
+        string solution = ScratchProjects.WriteVisualBasicBed(bed);
+        ScratchProjects.BreakVisualBasicBed(bed);
+        var diagnostics = new List<string>();
+        List<string> alreadyRead = [];
+
+        // Act
+        using LoadedSolution loaded = await WorkspaceLoader.LoadAsync(
+            solution, diagnostics.Add, RecordReadDocuments, Ct);
+
+        // Assert
+        alreadyRead.ShouldBeEmpty();
+        diagnostics.ShouldBe([ScratchProjects.VisualBasicBedWarning(bed)]);
+        return;
+
+        Task<Solution> RecordReadDocuments(Solution handedIn, CancellationToken token)
+        {
+            IEnumerable<string> read = handedIn.Projects
+                .SelectMany(project => project.Documents)
+                .Where(document => document.TryGetText(out _) || document.TryGetSyntaxTree(out _))
+                .Select(document => document.FilePath ?? document.Name);
+            alreadyRead.AddRange(read);
+            return Task.FromResult(handedIn);
+        }
+    }
+
+    [Fact]
+    public async Task LoadAsync_ABeforeFirstReadThatThrows_PropagatesItAndDisposesTheWorkspace()
+    {
+        // Arrange
+        using TempDirectory temp = TestTempRoot.Fresh("loader-before-first-read-throws");
+        temp.WriteFile(["Lib", "Lib.csproj"], ScratchProjects.ClassLibrary());
+        string solution = temp.WriteFile(["App.slnx"], ScratchProjects.Solution("Lib/Lib.csproj"));
+        var thrown = new InvalidOperationException("materialization failed");
+        Workspace? opened = null;
+
+        // Act
+        var escaped = await Should.ThrowAsync<InvalidOperationException>(() => WorkspaceLoader.LoadAsync(solution, beforeFirstRead: Throw, ct: Ct));
+
+        // Assert — a disposed workspace has cleared its solution, so the projects the load opened are gone.
+        escaped.ShouldBeSameAs(thrown);
+        opened.ShouldNotBeNull()
+            .CurrentSolution
+            .ProjectIds
+            .ShouldBeEmpty();
+        return;
+
+        Task<Solution> Throw(Solution handedIn, CancellationToken token)
+        {
+            opened = handedIn.Workspace;
+            return Task.FromException<Solution>(thrown);
+        }
     }
 
     private static async Task<long> ShouldFailLoadingOnceAsync(string missingSolution)
