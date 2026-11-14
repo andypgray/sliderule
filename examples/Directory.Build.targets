@@ -2,9 +2,6 @@
 
     <PropertyGroup>
         <_SlideRuleAnalyzerProject>$(MSBuildThisFileDirectory)../src/SlideRule.Analyzers/SlideRule.Analyzers.csproj</_SlideRuleAnalyzerProject>
-        <!-- The caller's properties every call that builds one of the tool's analyzers drops; the comment on the
-             target below gives the reason for each. -->
-        <_SlideRuleInheritedBuildProperties>TargetFramework;DesignTimeBuild;SkipCompilerExecution;ProvideCommandLineArgs;BuildingProject;BuildProjectReferences;NonExistentFile;ContinueOnError;ShouldUnsetParentConfigurationAndPlatform</_SlideRuleInheritedBuildProperties>
     </PropertyGroup>
 
     <!-- The three assemblies the compiler loads together, which is how the package ships them: an analyzer's
@@ -26,19 +23,18 @@
          project.assets.json is the evaluation the build call would otherwise be served from, so the two calls
          must not share one; and the property is a fixed value rather than one per caller so that every
          example project reaching this target in a parallel build shares a single cached execution instead of
-         racing in the same obj directory. TargetFramework is dropped for a neighbouring reason: inherited
-         from a multi-targeted caller it would build this project for a framework it does not target, and
-         the last call would hand back that build's files.
+         racing in the same obj directory. TargetFramework is dropped from every call for a neighbouring
+         reason: inherited from a multi-targeted caller it would build this project for a framework it does
+         not target, and the last call would hand back that build's files.
 
-         The rest of the list is what a workspace's design-time build sets, and this target also runs inside
-         the design-time build a check, a render or an MCP server makes of an example. Inherited there, those
-         properties would make the analyzer's build differ from the real one: the design-time switches record
-         design-time compiler inputs, and NonExistentFile names an input of every compile that never exists,
-         so the analyzer would compile on every load. Either way its assembly comes out newer, and the next
-         real build of the example compiles every example project again, since that assembly is an input of
-         each one's compile. Dropped, the design-time load gets the assembly the real build writes and leaves
-         that build's inputs as they were. A property added to the design-time build later shows up as that
-         recompile, which the examples job in CI fails on.
+         Inside a design-time build (the load a check, a render, an MCP server or an IDE makes of an example)
+         the restore and the build are skipped and only the paths are asked for. Built there, the analyzer
+         would compile under the design-time properties, and its newer assembly, an input of every example
+         project's compile, would make the next real build compile each of them again. A load of a tree that
+         has never built the analyzer names files that do not exist yet; the load strips those references
+         with a notice, and since neither analyzer generates code the loaded model is the same. Measured
+         2026-11-13: with both analyzers' output moved aside, check, render and graph over two examples gave
+         the same verdicts, with only that notice added.
 
          One limit comes with it. A rebuild of an example solution (the Rebuild target, which the
          no-incremental switch selects) cleans the contract library, which every example reaches through
@@ -51,15 +47,17 @@
         <MSBuild Projects="$(_SlideRuleAnalyzerProject)"
                  Targets="Restore"
                  Properties="Configuration=$(Configuration);_SlideRuleAnalyzerRestore=true"
-                 RemoveProperties="$(_SlideRuleInheritedBuildProperties)" />
+                 RemoveProperties="TargetFramework"
+                 Condition="'$(DesignTimeBuild)' != 'true'" />
         <MSBuild Projects="$(_SlideRuleAnalyzerProject)"
                  Targets="Build"
                  Properties="Configuration=$(Configuration)"
-                 RemoveProperties="$(_SlideRuleInheritedBuildProperties)" />
+                 RemoveProperties="TargetFramework"
+                 Condition="'$(DesignTimeBuild)' != 'true'" />
         <MSBuild Projects="$(_SlideRuleAnalyzerProject)"
                  Targets="GetSlideRuleAnalyzerClosure"
                  Properties="Configuration=$(Configuration)"
-                 RemoveProperties="$(_SlideRuleInheritedBuildProperties)">
+                 RemoveProperties="TargetFramework">
             <Output TaskParameter="TargetOutputs" ItemName="Analyzer" />
         </MSBuild>
     </Target>

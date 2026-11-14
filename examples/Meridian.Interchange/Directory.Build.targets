@@ -12,17 +12,23 @@
          example's own model, with the example's own exemptions and baseline, and the build stays as silent as
          the build analyzer keeps it. Attached the way examples/Directory.Build.targets attaches the build
          analyzer, and for its reasons: plain Analyzer items rather than a project reference, so the example's
-         checked universe holds none of the tool's projects, with the restore and the build as separate calls
-         and the same caller properties dropped. -->
+         checked universe holds none of the tool's projects, with the restore and the build as separate calls,
+         both skipped in a design-time build. -->
     <Target Name="_SlideRuleBuildTheGuidanceAnalyzer" BeforeTargets="CoreCompile">
         <MSBuild Projects="$(_SlideRuleGuidanceProject)"
                  Targets="Restore"
                  Properties="Configuration=$(Configuration);_SlideRuleGuidanceRestore=true"
-                 RemoveProperties="$(_SlideRuleInheritedBuildProperties)" />
+                 RemoveProperties="TargetFramework"
+                 Condition="'$(DesignTimeBuild)' != 'true'" />
         <MSBuild Projects="$(_SlideRuleGuidanceProject)"
                  Targets="Build"
                  Properties="Configuration=$(Configuration)"
-                 RemoveProperties="$(_SlideRuleInheritedBuildProperties)">
+                 RemoveProperties="TargetFramework"
+                 Condition="'$(DesignTimeBuild)' != 'true'" />
+        <MSBuild Projects="$(_SlideRuleGuidanceProject)"
+                 Targets="GetTargetPath"
+                 Properties="Configuration=$(Configuration)"
+                 RemoveProperties="TargetFramework">
             <Output TaskParameter="TargetOutputs" ItemName="Analyzer" />
         </MSBuild>
     </Target>
