@@ -117,7 +117,7 @@ The gaps are the standard. The letter values skip every multiple of 11 (11, 22, 
 
 ## The burndown
 
-Because the Migrate and Quarantine baselines are counted, `sliderule status` reports what is left to work off:
+Because the Migrate and Quarantine baselines are counted, `sliderule status` reports what is left to work off. It also prints an `oldest entry:` line under each rule with grandfathered entries left, giving the oldest entry's age and who recorded it. The age comes from your clone's git history, so those lines are left out here:
 
 ```text
 pass layering/domain-independent

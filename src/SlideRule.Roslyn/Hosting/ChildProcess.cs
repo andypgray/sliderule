@@ -6,7 +6,7 @@ namespace SlideRule.Roslyn.Hosting;
 
 /// <summary>
 ///     The one child-process launcher in this repository. It starts a process with all three
-///     standard streams redirected, hands it a stdin it closes immediately, captures stdout and stderr,
+///     standard streams redirected, hands it a stdin it closes once any input is written, captures stdout and stderr,
 ///     and bounds the whole thing: on expiry it kills the process tree rather than waiting on.
 /// </summary>
 /// <remarks>
@@ -41,8 +41,8 @@ internal static class ChildProcess
 
     /// <summary>
     ///     Starts <paramref name="startInfo" />, overwriting its redirection flags, writes
-    ///     <paramref name="standardInput" /> if any and closes stdin, drains both output streams, and returns the
-    ///     result. Throws <see cref="TimeoutException" />, after killing the process tree, when the child outlives
+    ///     <paramref name="standardInput" /> if any and closes stdin while it drains both output streams, and returns
+    ///     the result. Throws <see cref="TimeoutException" />, after killing the process tree, when the child outlives
     ///     <paramref name="timeout" />, and <see cref="OperationCanceledException" /> when <paramref name="ct" /> is
     ///     cancelled first, so a cancelled call aborts its child rather than leaving it to run out the clock.
     /// </summary>
@@ -58,16 +58,20 @@ internal static class ChildProcess
         TimeSpan bound = timeout ?? DefaultTimeout;
 
         using Process process = Start(startInfo);
-        await WriteAndCloseInputAsync(process, standardInput).ConfigureAwait(false);
 
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
         deadline.CancelAfter(bound);
 
+        // The input is written while both outputs drain, and inside the bound: a child that answers each line of
+        // its input as it reads it (git cat-file --batch) blocks on a full stdout pipe, so a write that had to
+        // finish before the reads began would wait on it forever once the input outgrew the pipe.
         Task<string> output = process.StandardOutput.ReadToEndAsync(deadline.Token);
         Task<string> error = process.StandardError.ReadToEndAsync(deadline.Token);
+        Task input = WriteAndCloseInputAsync(process, standardInput);
         try
         {
             await process.WaitForExitAsync(deadline.Token).ConfigureAwait(false);
+            await input.ConfigureAwait(false);
             string standardOutput = await output.ConfigureAwait(false);
             string standardError = await error.ConfigureAwait(false);
             return new ProcessResult(process.ExitCode, standardOutput, standardError);
@@ -75,7 +79,7 @@ internal static class ChildProcess
         catch (OperationCanceledException)
         {
             TryKillTree(process, killTree);
-            await ObserveKilledReadsAsync(output, error).ConfigureAwait(false);
+            await ObserveKilledReadsAsync(output, error, input).ConfigureAwait(false);
 
             // A caller cancel is a cancel, not a timeout: only the ceiling produces a TimeoutException.
             ct.ThrowIfCancellationRequested();
@@ -133,10 +137,21 @@ internal static class ChildProcess
                ?? throw new InvalidOperationException($"Failed to start '{startInfo.FileName}'.");
     }
 
+    // With no input this completes before its first await, so the child's stdin is closed before anything else
+    // happens. A child that exits without reading all of its input breaks the pipe, and its exit code is then the
+    // answer: the write's IOException says only that nobody was reading.
     private static async Task WriteAndCloseInputAsync(Process process, string? standardInput)
     {
-        if (!string.IsNullOrEmpty(standardInput)) await process.StandardInput.WriteAsync(standardInput).ConfigureAwait(false);
-        process.StandardInput.Close();
+        try
+        {
+            if (!string.IsNullOrEmpty(standardInput))
+                await process.StandardInput.WriteAsync(standardInput).ConfigureAwait(false);
+            process.StandardInput.Close();
+        }
+        catch (IOException)
+        {
+            // The child closed its end first.
+        }
     }
 
     // The tree, not the process: git on Windows is a wrapper that execs the real binary as a grandchild,
@@ -163,10 +178,10 @@ internal static class ChildProcess
 
     // Awaiting the killed reads keeps neither faulted nor cancelled against the Process this call is about to
     // dispose; the outcome itself is moot, because the caller is already getting a timeout.
-    private static async Task ObserveKilledReadsAsync(Task<string> output, Task<string> error)
+    private static async Task ObserveKilledReadsAsync(Task<string> output, Task<string> error, Task input)
     {
         Task observed = Task
-            .WhenAll(output, error)
+            .WhenAll(output, error, input)
             .ContinueWith(
                 static completed => _ = completed.Exception,
                 CancellationToken.None,

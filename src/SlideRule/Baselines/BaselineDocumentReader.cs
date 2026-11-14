@@ -7,13 +7,23 @@ namespace SlideRule.Baselines;
 ///     Nothing here throws for content, whatever the text says: a file that is truncated, hand-edited
 ///     into nonsense, or written by a version of the format this reader does not admit comes back as a
 ///     refusal naming what is wrong and where. A null text is a different thing — a caller bug — and
-///     throws. Every entry verifies against its seal on the way in, so a document that comes back has
-///     already been through the integrity check and nothing downstream repeats it.
+///     throws. Unless the caller opts out, every entry verifies against its seal on the way in, so a
+///     document that comes back has already been through the integrity check and nothing downstream
+///     repeats it.
 /// </remarks>
 internal static class BaselineDocumentReader
 {
     /// <summary>The document <paramref name="text" /> carries, or why it is not a baseline file.</summary>
     internal static BaselineReadResult Read(string text)
+    {
+        return Read(text, verifySeals: true);
+    }
+
+    /// <summary>
+    ///     The same, where <paramref name="verifySeals" /> false skips the seal and legacy digest checks, for a
+    ///     reader that wants the entries a past version of a file named and has no trust to decide.
+    /// </summary>
+    internal static BaselineReadResult Read(string text, bool verifySeals)
     {
         Guard.NotNull(text, nameof(text));
 
@@ -26,7 +36,7 @@ internal static class BaselineDocumentReader
                 new BaselineRefusal(BaselineRefusalKind.Syntax, json.Reason, json.Position));
         }
 
-        var walk = new Walk();
+        var walk = new Walk(verifySeals);
         BaselineDocument? document = walk.ReadDocument(root!);
         if (walk.Refusal is { } refusal) return BaselineReadResult.Refused(refusal);
 
@@ -39,7 +49,7 @@ internal static class BaselineDocumentReader
     ///     up, which is what makes "the first refusal wins" true of the whole read rather than of one
     ///     method.
     /// </remarks>
-    private sealed class Walk
+    private sealed class Walk(bool verifySeals)
     {
         /// <summary>Why the text is not a baseline file, or null while it still is one.</summary>
         internal BaselineRefusal? Refusal { get; private set; }
@@ -71,7 +81,7 @@ internal static class BaselineDocumentReader
                 if (legacyDigest is null) return null;
             }
 
-            using BaselineSealer? sealer = sealsEntries ? new BaselineSealer() : null;
+            using BaselineSealer? sealer = sealsEntries && verifySeals ? new BaselineSealer() : null;
             Dictionary<string, IReadOnlyList<BaselineEntry>>? sections = ReadSections(root, schemaVersion, sealer);
             if (sections is null) return null;
 
@@ -80,7 +90,7 @@ internal static class BaselineDocumentReader
             // A sealed file verified itself entry by entry on the way in. A legacy one has one digest
             // over all of them, so it is rebuilt here from the parsed entries in that version's frozen
             // grammar: formatting, order and CRLF changes are invisible; any entry change is not.
-            if (legacyDigest is null) return document;
+            if (legacyDigest is null || !verifySeals) return document;
 
             string recomputed = BaselineFormat.LegacyDigest(document.Sections);
             if (string.Equals(recomputed, legacyDigest, StringComparison.Ordinal)) return document;
@@ -275,9 +285,9 @@ internal static class BaselineDocumentReader
                 parsed = parsed.WithBecause(attribution);
             }
 
-            if (seal is null) return parsed;
+            if (seal is null || sealer is null) return parsed;
 
-            return VerifySeal(ruleId, entry, seal, parsed, sealer!);
+            return VerifySeal(ruleId, entry, seal, parsed, sealer);
         }
 
         private BaselineEntry? ReadSubjectEntry(string ruleId, StrictJsonValue subject)

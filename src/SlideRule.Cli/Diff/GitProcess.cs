@@ -26,6 +26,35 @@ internal static class GitProcess
     internal static Task<ChildProcess.ProcessResult> RunAsync(
         string directory, CancellationToken ct, params string[] arguments)
     {
+        // git writes paths as UTF-8, and left unset .NET decodes a child's output with the console's code page on
+        // Windows, which turns a non-ASCII name into one that names no file.
+        return LaunchAsync(directory, Encoding.UTF8, standardInput: null, ct, arguments);
+    }
+
+    /// <summary>
+    ///     git's standard output as the bytes it wrote, after <paramref name="standardInput" /> was written to it, when
+    ///     it exits 0, or null on every failure <see cref="AnswerAsync" /> reads as no answer. For output framed by
+    ///     byte counts, such as <c>cat-file --batch</c>'s.
+    /// </summary>
+    internal static async Task<byte[]?> AnswerBytesAsync(
+        string directory, string standardInput, CancellationToken ct, params string[] arguments)
+    {
+        try
+        {
+            // Latin-1 maps each byte to the one char of the same value, so encoding the text back returns the bytes.
+            ChildProcess.ProcessResult result =
+                await LaunchAsync(directory, Encoding.Latin1, standardInput, ct, arguments);
+            return result.ExitCode == 0 ? Encoding.Latin1.GetBytes(result.StandardOutput) : null;
+        }
+        catch (Exception ex) when (ex is Win32Exception or InvalidOperationException or TimeoutException)
+        {
+            return null;
+        }
+    }
+
+    private static Task<ChildProcess.ProcessResult> LaunchAsync(
+        string directory, Encoding outputEncoding, string? standardInput, CancellationToken ct, string[] arguments)
+    {
         // Resolved once for both roots: a relative directory given to each would be applied twice, the child starting
         // in it and -C then stepping into it again. Against the current directory, where an empty one means here.
         string root = Path.GetFullPath(directory, Directory.GetCurrentDirectory());
@@ -33,9 +62,7 @@ internal static class GitProcess
         {
             CreateNoWindow = true,
             WorkingDirectory = root,
-            // git writes paths as UTF-8, and left unset .NET decodes a child's output with the console's code page on
-            // Windows, which turns a non-ASCII name into one that names no file.
-            StandardOutputEncoding = Encoding.UTF8,
+            StandardOutputEncoding = outputEncoding,
             StandardErrorEncoding = Encoding.UTF8
         };
         // Every git this tool starts is a read made beside someone else's work, so each is asked to take no lock it
@@ -49,7 +76,7 @@ internal static class GitProcess
         foreach (string argument in arguments) startInfo.ArgumentList.Add(argument);
 
         TimeSpan bound = TimeSpan.FromSeconds(TimeoutSeconds);
-        return ChildProcess.RunAsync(startInfo, bound, ct: ct);
+        return ChildProcess.RunAsync(startInfo, bound, standardInput, ct: ct);
     }
 
     /// <summary>

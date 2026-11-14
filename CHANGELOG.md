@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `status` prints an `oldest entry:` line under each rule with grandfathered entries left, giving the oldest entry's
+  age in days, the author of the commit that recorded it and that commit's date, read from the git history of the
+  solution's baseline files. An entry keeps its date through `accept-reductions`, `baseline rename`, a moved file and
+  a reformat. A shallow clone, a solution outside git and an uncommitted entry read as unknown, and the exit code
+  does not change. `status --json` and `arch_status` list every remaining entry under `ratchet.entries` with
+  `recordedAt` and `recordedBy`, or `ageUnknown`, and the oldest dated one under `ratchet.oldest`. The baseline
+  format and `check` are unchanged.
 - `render` prints a warning on stderr when Codex would cut the files it writes short. By default Codex reads
   32 KiB of the `AGENTS.md` files from the repository root down to the directory it was started in, cuts the
   file that crosses the limit and skips the rest. The warning names the root `AGENTS.md` when it is over the

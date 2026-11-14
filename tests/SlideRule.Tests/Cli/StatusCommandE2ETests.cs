@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using Shouldly;
 using SlideRule.Tests.TestSupport;
@@ -31,8 +32,10 @@ public sealed class StatusCommandE2ETests
         // The Invoice pair covers two DataTable sites, so the burndown states them: the pair count is what
         // the baseline holds and the site count is what the work is. Services-behind-contracts below is one
         // subject declaration, so its line is unchanged — the parenthetical extinguishes itself.
+        // The fixture copy sits in this repository's ignored build output, so no commit holds its baselines.
         result.ShouldSucceed(
-            "FAIL data-access/no-inline-sql (migrate) — 1 grandfathered remaining (2 sites), 1 new, 0 fixed awaiting acceptance",
+            "FAIL data-access/no-inline-sql (migrate) — 1 grandfathered remaining (2 sites), 1 new, 0 fixed awaiting acceptance\n"
+            + "  oldest entry: age unknown (not committed)",
             // Quarantine containment ratchets like Migrate (uncaptured here) but never suggests promotion.
             "FAIL legacy/billing/containment (quarantine) — no baseline captured; run 'sliderule baseline init' (2 current violations)",
             "skip legacy/billing/tripwire (tripwire) — diff-aware; run 'sliderule check --diff-base <ref>'",
@@ -68,12 +71,13 @@ public sealed class StatusCommandE2ETests
         // same partition and reds every one of the pairs its ratcheted sibling grandfathers, and
         // layering/web-cuts-not-circular is a family of layers. One sub-line in the whole report is what says
         // the split reads tolerated debt rather than violations, and reads it off the baseline rather than
-        // off the noun.
+        // off the noun. The age sub-lines ride every rule with remaining entries, so they are not counted.
         CliResult result = await ViolatedHuman.Value;
 
         result.ShouldSucceed("FAIL layering/projects-independent — 5 violations");
         result.Out.Split('\n')
             .Where(line => line.StartsWith("  ", StringComparison.Ordinal))
+            .Where(line => !line.StartsWith("  oldest entry:", StringComparison.Ordinal))
             .ShouldHaveSingleItem();
     }
 
@@ -120,6 +124,34 @@ public sealed class StatusCommandE2ETests
 
         result.ShouldSucceed();
         result.Out.ShouldMatchGolden("violated-status.json");
+    }
+
+    [Fact]
+    public async Task Status_CommittedBaselineJson_DatesEachEntryByTheCommitThatAddedIt()
+    {
+        // Arrange — the fixture committed whole, its baselines included.
+        using var repo = new TempGitRepo();
+        string committedAt = GitCommand.Output(repo.Root, "log", "-1", "--format=%cI").Trim();
+
+        // Act
+        CliResult result = await CliRunner.InvokeAsync(
+            "status", repo.SolutionPath, "--spec", CliRunner.ViolatedSpecDll, "--json");
+
+        // Assert
+        using JsonDocument document = result.ShouldHaveJsonStdout();
+        JsonElement ratchet = document.RootElement.GetProperty("rules")
+            .EnumerateArray()
+            .Single(rule => rule.GetProperty("id").GetString() == "data-access/no-inline-sql")
+            .GetProperty("ratchet");
+        ratchet.GetProperty("entries")
+            .EnumerateArray()
+            .Select(entry => $"{entry.GetProperty("source")} -> {entry.GetProperty("target")}: "
+                             + $"{entry.GetProperty("recordedAt").GetDateTimeOffset():O} by {entry.GetProperty("recordedBy")}")
+            .ShouldBe(
+            [
+                "T:MyApp.Web.InvoiceController -> T:System.Data.DataTable: "
+                + $"{DateTimeOffset.Parse(committedAt, CultureInfo.InvariantCulture):O} by SlideRule Test"
+            ]);
     }
 
     private static bool CarriesCells(JsonElement rule)

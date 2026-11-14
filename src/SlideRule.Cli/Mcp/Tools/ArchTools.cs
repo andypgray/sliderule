@@ -57,7 +57,9 @@ internal sealed class ArchTools(
 
     private const string StatusDescription =
         "Return the JSON migration burndown (schemaVersion 2): per-rule grandfathered/stale counts and " +
-        "promotion suggestions. If declared project files are missing, projects fail to load, or their NuGet " +
+        "promotion suggestions. Each ratchet lists its remaining entries, oldest first, with recordedAt and " +
+        "recordedBy from git history, or ageUnknown (noHistory, shallowClone, notCommitted), and oldest repeats the " +
+        "first dated one. If declared project files are missing, projects fail to load, or their NuGet " +
         "packages did not resolve, the burndown still returns, stamped modelIncomplete: true and " +
         "missingProjects/failedProjects/restoreFailedProjects — " +
         "counts from a partial model; report that rather than quoting them as whole. " +
@@ -186,8 +188,9 @@ internal sealed class ArchTools(
     [Description(StatusDescription)]
     public async Task<string> StatusAsync(CancellationToken cancellationToken = default)
     {
-        return await CaptureAsync(output => new StatusRunner(output, TextWriter.Null, source, environment)
-            .RunAsync(binding.StatusRequest(), cancellationToken));
+        return await CaptureAsync(output =>
+            new StatusRunner(output, TextWriter.Null, source, environment, TimeProvider.System)
+                .RunAsync(binding.StatusRequest(), cancellationToken));
     }
 
     [McpServerTool(

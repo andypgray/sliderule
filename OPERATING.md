@@ -67,7 +67,7 @@ A `Migrate` rule moves toward `Enforce` in five steps:
 
 1. Capture. `sliderule baseline init` writes a baseline for every ratcheted rule that has none yet. Commit it with the spec.
 2. Hold. A new violation fails `check` and the adapter, blocks the hook's stop, and shows as a warning in builds that run the analyzer. The baselined sites stay quiet, and SARIF reports them as notes.
-3. Watch. `sliderule status` prints each ratchet's burndown: the violations still baselined, the entries already fixed, and the rules ready for promotion. A ratchet's line reports its counts as `N grandfathered remaining, N new, N fixed awaiting acceptance`, with the site total after the first count when it is larger.
+3. Watch. `sliderule status` prints each ratchet's burndown: the violations still baselined, the entries already fixed, and the rules ready for promotion. A ratchet's line reports its counts as `N grandfathered remaining, N new, N fixed awaiting acceptance`, with the site total after the first count when it is larger. An `oldest entry:` line under it gives the oldest remaining entry's age and who recorded it, read from the baseline's git history.
 4. Shrink. `sliderule baseline accept-reductions` removes the fixed entries. Commit the smaller files.
 5. Promote. Once a baseline is empty, `status` suggests `Enforce` by printing `0 remaining; promotable to Enforce (baseline is empty)`, and you change the rule's `.Migrate(from:, to:)` to `.Enforce(...)` with the same constraint. Drop any `.Baseline(...)` or `.WhileYoureThere(...)` too, which an `Enforce` rule does not take. Then delete the rule's baseline file.
 

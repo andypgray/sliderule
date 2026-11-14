@@ -1,6 +1,7 @@
 using Shouldly;
 using SlideRule.Baselines;
 using SlideRule.Checking;
+using SlideRule.Cli.Diff;
 using SlideRule.Cli.Rendering;
 using SlideRule.Hosting;
 using SlideRule.Tests.Checking;
@@ -16,6 +17,9 @@ namespace SlideRule.Tests.Cli;
 /// </summary>
 public sealed class StatusFormatterTests
 {
+    // The moment the age sub-line counts days to.
+    private static readonly DateTimeOffset Now = new(2026, 11, 10, 14, 0, 0, TimeSpan.Zero);
+
     // One rule of each posture so the formatter can be pinned over real ArchRules. The five family rules
     // carry the two cell words and both baseline states, which is what decides whether a row gains a
     // sub-line and what that sub-line is keyed by. One of them declares its cells against alphabetical
@@ -64,7 +68,7 @@ public sealed class StatusFormatterTests
 
     private static IReadOnlyList<string> Lines(RuleResult result)
     {
-        return StatusFormatter.Lines(new CheckReport([result]));
+        return StatusFormatter.Lines(new CheckReport([result]), BaselineAges.Unavailable, Now);
     }
 
     private static string Line(RuleResult result)
@@ -80,7 +84,7 @@ public sealed class StatusFormatterTests
 
     private static string Summary(CheckReport report)
     {
-        return StatusFormatter.Lines(report)
+        return StatusFormatter.Lines(report, BaselineAges.Unavailable, Now)
             .Last();
     }
 
@@ -240,7 +244,7 @@ public sealed class StatusFormatterTests
         var report = new CheckReport(
             [Result(Model.Rule("data-access/no-inline-sql"), RuleStatus.Failed, 2)], scan);
 
-        IReadOnlyList<string> lines = StatusFormatter.Lines(report);
+        IReadOnlyList<string> lines = StatusFormatter.Lines(report, BaselineAges.Unavailable, Now);
 
         lines.Skip(1)
             .ShouldBe(
@@ -261,7 +265,7 @@ public sealed class StatusFormatterTests
     {
         RuleResult result = Result(Model.Rule("data-access/no-inline-sql"), RuleStatus.Failed, 2);
 
-        IReadOnlyList<string> withEmptyScan = StatusFormatter.Lines(new CheckReport([result], BaselineOrphanScan.Empty));
+        IReadOnlyList<string> withEmptyScan = StatusFormatter.Lines(new CheckReport([result], BaselineOrphanScan.Empty), BaselineAges.Unavailable, Now);
 
         // The rule's row and the summary, and nothing after them.
         withEmptyScan.ShouldBe(
@@ -910,6 +914,91 @@ public sealed class StatusFormatterTests
             remaining,
             new RatchetMeasure(stale, shrunk, uncounted),
             captured);
+    }
+
+    [Fact]
+    public void AgeLine_EveryEntryDated_NamesTheOldestOnItsOwnCalendar()
+    {
+        // The older entry was committed late on 2026-10-09 west of UTC, already 2026-10-10 in UTC, so the date and
+        // the day count both read the committer's clock.
+        BaselineAges ages = Ages(
+            (Old, new EntryRecord(new DateTimeOffset(2026, 10, 9, 23, 30, 0, TimeSpan.FromHours(-5)), "Ada")),
+            (New, new EntryRecord(new DateTimeOffset(2026, 11, 1, 9, 0, 0, TimeSpan.Zero), "Bob")));
+
+        ShouldRowAgeSubLines(ages)
+            .ShouldBe(["  oldest entry: 32 days, recorded by Ada on 2026-10-09"]);
+    }
+
+    [Fact]
+    public void AgeLine_SomeEntriesUndated_CountsThemBesideTheOldestDated()
+    {
+        BaselineAges ages = Ages((New, new EntryRecord(new DateTimeOffset(2026, 11, 9, 9, 0, 0, TimeSpan.Zero), "Bob")));
+
+        ShouldRowAgeSubLines(ages)
+            .ShouldBe(["  oldest entry: 1 day, recorded by Bob on 2026-11-09, 1 of unknown age"]);
+    }
+
+    [Fact]
+    public void AgeLine_NoHistory_SaysWhyTheAgeIsUnknown()
+    {
+        ShouldRowAgeSubLines(BaselineAges.Unavailable)
+            .ShouldBe(["  oldest entry: age unknown (no git history)"]);
+    }
+
+    [Fact]
+    public void AgeLine_UndatedForSeveralReasons_NamesEachOnce()
+    {
+        // In a shallow clone, the dated entry sits in the oldest fetched commit, and the other is not committed.
+        var recordings = new Dictionary<BaselineAges.EntryKey, BaselineAges.Recording>
+        {
+            [new BaselineAges.EntryKey(AgedRule, Old)] =
+                new(new EntryRecord(new DateTimeOffset(2026, 11, 1, 9, 0, 0, TimeSpan.Zero), "Ada"), AtHistoryStart: true)
+        };
+
+        ShouldRowAgeSubLines(BaselineAges.Of(recordings, shallow: true))
+            .ShouldBe(["  oldest entry: age unknown (shallow clone, not committed)"]);
+    }
+
+    // The two controllers both reach the data layer and both are baselined, so the rule's row carries two
+    // grandfathered entries and no other sub-line.
+    private const string AgedRule = "data/x";
+
+    private static readonly BaselineEntry Old = BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db")
+        .WithSiteCount(1);
+
+    private static readonly BaselineEntry New = BaselineEntry.ForEdge("T:App.Web.NewController", "T:App.Data.Db")
+        .WithSiteCount(1);
+
+    private static readonly CheckReport AgedReport = Checker.Run(
+        """
+        namespace App.Web
+        {
+            public class OldController { public App.Data.Db Load() => new App.Data.Db(); }
+            public class NewController { public App.Data.Db Load() => new App.Data.Db(); }
+        }
+        namespace App.Data { public class Db {} }
+        """,
+        Checker.Baselines(AgedRule, Old, New),
+        Sources.LiveDataAccess);
+
+    private static BaselineAges Ages(params (BaselineEntry Entry, EntryRecord Record)[] dated)
+    {
+        Dictionary<BaselineAges.EntryKey, BaselineAges.Recording> recordings = dated.ToDictionary(
+            pair => new BaselineAges.EntryKey(AgedRule, pair.Entry),
+            pair => new BaselineAges.Recording(pair.Record, AtHistoryStart: false));
+        return BaselineAges.Of(recordings, shallow: false);
+    }
+
+    // Every line between the rule's row and the summary.
+    private static IReadOnlyList<string> ShouldRowAgeSubLines(BaselineAges ages)
+    {
+        IReadOnlyList<string> lines = StatusFormatter.Lines(AgedReport, ages, Now);
+        lines[0].ShouldBe(
+            "pass data/x (migrate) — 2 grandfathered remaining, 0 new, 0 fixed awaiting acceptance",
+            "the row the sub-line rides under");
+        return lines.Skip(1)
+            .SkipLast(1)
+            .ToList();
     }
 
     /// <summary>

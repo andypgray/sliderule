@@ -1,8 +1,10 @@
 using SlideRule.Checking;
+using SlideRule.Cli.Diff;
 using SlideRule.Cli.Mcp.Infrastructure;
 using SlideRule.Cli.Pipeline;
 using SlideRule.Cli.Rendering;
 using SlideRule.Hosting;
+using SlideRule.Roslyn.Baselines;
 using SlideRule.Roslyn.Diagnostics;
 
 namespace SlideRule.Cli.Verbs;
@@ -18,12 +20,18 @@ namespace SlideRule.Cli.Verbs;
 ///     read against it looks like progress that never happened. That fails closed on <c>check</c>'s
 ///     terms — the burndown still renders, then exit 2, opt-out
 ///     <see cref="StatusRequest.AllowWorkspaceDiagnostics" /> (<see cref="IncompleteModelGate" />).
+///     <para>
+///         Each grandfathered entry's age comes from the baseline files' git history (<see cref="BaselineHistory" />),
+///         read only when some rule has an entry to date. <paramref name="clock" /> is what the text's day counts
+///         are measured to; the document carries dates alone.
+///     </para>
 /// </remarks>
 internal sealed class StatusRunner(
     TextWriter output,
     TextWriter error,
     ISolutionSource source,
-    IEnvironment environment) : CacheWiredRunner(source, environment)
+    IEnvironment environment,
+    TimeProvider clock) : CacheWiredRunner(source, environment)
 {
     public async Task<int> RunAsync(StatusRequest request, CancellationToken ct)
     {
@@ -39,6 +47,17 @@ internal sealed class StatusRunner(
 
         CheckReport report = await CheckPipeline.ExecuteAsync(source, null, null, rules, ct);
         RecordCacheOutcome(source);
+
+        bool anyToDate = report.Results.Any(result => result.GrandfatheredEntries.Count > 0);
+        string solutionDirectory = source.SolutionDirectory;
+        List<string> baselineFiles = rules
+            .Select(rule => rule.BaselinePath)
+            .OfType<string>()
+            .Select(path => BaselineStore.ResolvePath(path, solutionDirectory))
+            .ToList();
+        BaselineAges ages = anyToDate
+            ? await BaselineHistory.ReadAsync(solutionDirectory, baselineFiles, ct)
+            : BaselineAges.Unavailable;
 
         // Composed once and handed to both surfaces, so the MSBuild-selection note rides the burndown
         // document as well as stderr.
@@ -58,10 +77,10 @@ internal sealed class StatusRunner(
         // check's shape: render the burndown it does have, stamping the verdict into the document, then gate.
         if (request.Json)
             StatusJsonRenderer.Render(
-                output, report, source.SolutionName, Path.GetFileName(source.Resolution.DllPath),
+                output, report, ages, source.SolutionName, Path.GetFileName(source.Resolution.DllPath),
                 renderedDiagnostics, trust);
         else
-            foreach (string line in StatusFormatter.Lines(report))
+            foreach (string line in StatusFormatter.Lines(report, ages, clock.GetLocalNow()))
                 await output.WriteLineAsync(line);
 
         if (IncompleteModelNotices.Refused(

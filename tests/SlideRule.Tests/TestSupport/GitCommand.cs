@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using SlideRule.Roslyn.Hosting;
 
 namespace SlideRule.Tests.TestSupport;
@@ -65,14 +66,37 @@ internal static class GitCommand
             ]);
     }
 
+    /// <summary>
+    ///     Runs <c>git <paramref name="args" /></c> in <paramref name="directory" /> as <paramref name="author" />, who
+    ///     is also the committer, with both dates at <paramref name="when" />, for a commit or a merge whose date and
+    ///     author a test reads back.
+    /// </summary>
+    internal static void RunAs(string directory, string author, DateTimeOffset when, params string[] args)
+    {
+        var date = when.ToString("yyyy-MM-ddTHH:mm:sszzz", CultureInfo.InvariantCulture);
+        var dates = new Dictionary<string, string> { ["GIT_AUTHOR_DATE"] = date, ["GIT_COMMITTER_DATE"] = date };
+        Execute(
+            directory,
+            [
+                "-c", "user.email=sliderule-test@example.invalid",
+                "-c", $"user.name={author}",
+                "-c", "commit.gpgsign=false",
+                .. args
+            ],
+            environment: dates);
+    }
+
     private static ChildProcess.ProcessResult Execute(
-        string workingDirectory, string[] args, bool throwOnFailure = true)
+        string workingDirectory, string[] args, bool throwOnFailure = true,
+        IReadOnlyDictionary<string, string>? environment = null)
     {
         var startInfo = new ProcessStartInfo("git")
         {
             WorkingDirectory = workingDirectory,
             CreateNoWindow = true
         };
+        foreach ((string name, string value) in environment ?? new Dictionary<string, string>())
+            startInfo.Environment[name] = value;
         startInfo.ArgumentList.Add("-C");
         startInfo.ArgumentList.Add(workingDirectory);
         foreach (string argument in args) startInfo.ArgumentList.Add(argument);

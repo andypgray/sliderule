@@ -1830,9 +1830,17 @@ jobs:
       # `explain --type` is asked of SpecModelCache, which the MCP server registers as a singleton through an
       # inferred type argument, so the answer has to walk to the registration site. A type no rule claims
       # also exits 0, so the step requires the registration line and its site rather than the exit code.
+      #
+      # `status` dates each ratchet's oldest entry from git history, which this job's full checkout carries, so the
+      # step also requires a dated `oldest entry:` line: an undated one means the history read found nothing.
       - name: Read verbs against this solution (status, graph, explain by rule and by type)
         run: |
-          dotnet run --no-build --project src/SlideRule.Cli -- status
+          board="$(dotnet run --no-build --project src/SlideRule.Cli -- status)"
+          printf '%s\n' "$board"
+          grep -Eq '^  oldest entry: [0-9]+ days?, recorded by .+ on [0-9]{4}-[0-9]{2}-[0-9]{2}' <<< "$board" || {
+            echo "::error::status printed no dated 'oldest entry:' line, so this repository's baseline entries were not dated from its history"
+            exit 1
+          }
           dotnet run --no-build --project src/SlideRule.Cli -- graph
           dotnet run --no-build --project src/SlideRule.Cli -- graph --format mermaid
           dotnet run --no-build --project src/SlideRule.Cli -- explain layering/model-independent

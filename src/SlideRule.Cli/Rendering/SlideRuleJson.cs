@@ -2,6 +2,7 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using SlideRule.Checking;
+using SlideRule.Cli.Diff;
 using SlideRule.Cli.Settings;
 using SlideRule.Cli.SpecLoading;
 using SlideRule.Model;
@@ -44,7 +45,8 @@ internal static class SlideRuleJson
             new JsonStringEnumConverter<ViolationKind>(JsonNamingPolicy.CamelCase),
             new JsonStringEnumConverter<CheckWarningKind>(JsonNamingPolicy.CamelCase),
             new JsonStringEnumConverter<StaleReason>(JsonNamingPolicy.CamelCase),
-            new JsonStringEnumConverter<SpecComparison>(JsonNamingPolicy.CamelCase)
+            new JsonStringEnumConverter<SpecComparison>(JsonNamingPolicy.CamelCase),
+            new JsonStringEnumConverter<AgeUnknownReason>(JsonNamingPolicy.CamelCase)
         }
     };
 

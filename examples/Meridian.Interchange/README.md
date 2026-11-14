@@ -68,7 +68,7 @@ They reify to the same kind of rule, so the rendered context, the violation mess
 
 ## The burndown
 
-The one `Migrate` rule governs every type, and all of its debt is in `LegacyManifestClient`. The adapter wraps Meridian's own legacy manifest gateway, whose SDK exposes only synchronous entry points. It therefore blocks at three points: serializing the manifest, taking the single-flight gate, and posting it. Those three lines touch three distinct blocking members (`TaskAwaiter<T>.GetResult`, `Task.Wait` and `Task<T>.Result`), so the generated baseline contains three entries. The entries are grandfathered, so `check` exits 0 and `sliderule status` prints what is left to work off:
+The one `Migrate` rule governs every type, and all of its debt is in `LegacyManifestClient`. The adapter wraps Meridian's own legacy manifest gateway, whose SDK exposes only synchronous entry points. It therefore blocks at three points: serializing the manifest, taking the single-flight gate, and posting it. Those three lines touch three distinct blocking members (`TaskAwaiter<T>.GetResult`, `Task.Wait` and `Task<T>.Result`), so the generated baseline contains three entries. The entries are grandfathered, so `check` exits 0 and `sliderule status` prints what is left to work off. Its `oldest entry:` line under the rule gives the oldest entry's age and who recorded it. The age comes from your clone's git history, so that line is left out here:
 
 ```text
 pass di/construct-via-container

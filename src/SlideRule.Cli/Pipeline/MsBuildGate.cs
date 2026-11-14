@@ -340,7 +340,7 @@ internal static class MsBuildGate
         StatusRequest request, TextWriter output, TextWriter error, ISolutionSource source,
         IEnvironment environment, CancellationToken ct)
     {
-        return new StatusRunner(output, error, source, environment).RunAsync(request, ct);
+        return new StatusRunner(output, error, source, environment, TimeProvider.System).RunAsync(request, ct);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]

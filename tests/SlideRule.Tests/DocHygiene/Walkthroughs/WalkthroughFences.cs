@@ -139,7 +139,7 @@ internal static class WalkthroughFences
         RuleBlockOf(DocPaths.MeridianReadme, "meridian-gateway-check", "FAIL clearance/engine/containment", Gateway, cut: MeridianCheckCut),
         FromExample(
             DocPaths.MeridianReadme, "meridian-status", "Burndown:", Meridian,
-            static run => string.Join("\n", run.Tree.StatusLines)),
+            static run => WithoutAgeLines(string.Join("\n", run.StatusLines)), cut: "so those lines are left out here"),
         FromScenario(
             DocPaths.MeridianReadme, "meridian-sql-hook", ", 0 skipped (", Sql,
             static run => FenceCuts.FailBlocksAndSummary(run.DiffReport), cut: "(its passing siblings in the report omitted here)"),
@@ -199,13 +199,13 @@ internal static class WalkthroughFences
             static run => FenceCuts.FailBlocksAndSummary(run.Report), cut: "The report below keeps the two failures and the summary line"),
         FromExample(
             DocPaths.OperationsReadme, "operations-demurrage-status", "pass demurrage/engine/containment (quarantine)", Operations,
-            static run => FenceCuts.StatusLine(run.Tree.StatusLines, "demurrage/engine/containment"),
+            static run => FenceCuts.StatusLine(run.StatusLines, "demurrage/engine/containment"),
             cut: "the quarantine's line reads"),
 
         RuleBlockOf(DocPaths.InterchangeReadme, "interchange-probe-check", "FAIL http/reuse-httpclient", Probe, cut: InterchangeCut),
         FromExample(
             DocPaths.InterchangeReadme, "interchange-status", "Burndown:", Interchange,
-            static run => string.Join("\n", run.Tree.StatusLines)),
+            static run => WithoutAgeLines(string.Join("\n", run.StatusLines)), cut: "so that line is left out here"),
         FromScenario(
             DocPaths.InterchangeReadme, "interchange-captive-check", "FAIL di/no-captive-dependencies", Captive,
             static run => FenceCuts.FailBlocks(run.Report), cut: InterchangeCut),
@@ -233,7 +233,9 @@ internal static class WalkthroughFences
         FromShowcase(
             "showcase-check", "The verdict below covers only", static run => FenceCuts.StampAndSummary(Printed(run.CheckVerb)),
             cut: "that stamp and the report's summary line"),
-        FromShowcase("showcase-status", "Burndown:", static run => Printed(run.StatusVerb))
+        FromShowcase(
+            "showcase-status", "Burndown:", static run => WithoutAgeLines(Printed(run.StatusVerb)),
+            cut: "so those lines are left out here")
     ];
 
     /// <summary>Every fence showing the code a scenario writes, and the draft spec the replay compiles.</summary>
@@ -378,6 +380,13 @@ internal static class WalkthroughFences
         return new ReplayedFence(
             new CapturedFence(DocPaths.ShowcaseReadme, key, marker, ShowcaseHeldBy), ShowcaseCheckout.Name, null,
             (run, _) => expected(run), cut);
+    }
+
+    // A status board without its age sub-lines, which count days to today over the clone's own history, so no
+    // committed fence could hold them.
+    private static string WithoutAgeLines(string board)
+    {
+        return FenceCuts.WithoutLinesStarting(board, "  oldest entry:");
     }
 
     // What a verb printed, LF throughout and with no trailing newline, the shape every cut takes.

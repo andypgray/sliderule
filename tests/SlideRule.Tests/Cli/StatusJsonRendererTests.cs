@@ -2,6 +2,7 @@ using System.Text.Json;
 using Shouldly;
 using SlideRule.Baselines;
 using SlideRule.Checking;
+using SlideRule.Cli.Diff;
 using SlideRule.Cli.Rendering;
 using SlideRule.Roslyn.Diagnostics;
 using SlideRule.Tests.Checking;
@@ -146,14 +147,75 @@ public sealed class StatusJsonRendererTests
             ]);
     }
 
+    [Fact]
+    public void Render_RemainingEntries_ListsThemOldestFirstWithTheOldestBeside()
+    {
+        // Two controllers, both baselined: one dated, one the history never held.
+        BaselineEntry old = BaselineEntry.ForEdge("T:App.Web.OldController", "T:App.Data.Db");
+        BaselineEntry recent = BaselineEntry.ForEdge("T:App.Web.NewController", "T:App.Data.Db");
+        CheckReport report = Checker.Run(
+            """
+            namespace App.Web
+            {
+                public class NewController { public App.Data.Db Load() => new App.Data.Db(); }
+                public class OldController { public App.Data.Db Load() => new App.Data.Db(); }
+            }
+            namespace App.Data { public class Db {} }
+            """,
+            Checker.Baselines("data/x", recent, old),
+            Sources.LiveDataAccess);
+        var recordings = new Dictionary<BaselineAges.EntryKey, BaselineAges.Recording>
+        {
+            [new BaselineAges.EntryKey("data/x", old)] = new(
+                new EntryRecord(new DateTimeOffset(2026, 10, 9, 16, 13, 12, TimeSpan.FromHours(1)), "Ada"),
+                AtHistoryStart: false)
+        };
+
+        using JsonDocument document = Render(report, BaselineAges.Of(recordings, shallow: false));
+        JsonElement ratchet = Ratchet(document);
+
+        // Each item's keys in wire order, with nulls omitted.
+        ratchet.GetProperty("entries")
+            .EnumerateArray()
+            .Select(entry => string.Join(
+                "; ",
+                entry.EnumerateObject()
+                    .Select(property => $"{property.Name}={property.Value}")))
+            .ShouldBe(
+            [
+                "source=T:App.Web.OldController; target=T:App.Data.Db; recordedAt=2026-10-09T16:13:12+01:00; recordedBy=Ada",
+                "source=T:App.Web.NewController; target=T:App.Data.Db; ageUnknown=notCommitted"
+            ]);
+        ratchet.GetProperty("oldest")
+            .EnumerateObject()
+            .Select(property => $"{property.Name}={property.Value}")
+            .ShouldBe(["recordedAt=2026-10-09T16:13:12+01:00", "recordedBy=Ada"]);
+    }
+
+    [Fact]
+    public void Render_NoRemainingEntry_CarriesNeitherEntriesNorOldest()
+    {
+        // The one captured entry is stale, so nothing remains to date.
+        CheckReport report = Checker.Run(Sources.CleanWebBesideDataModel, GhostPairCaptured, Sources.LiveDataAccess);
+
+        using JsonDocument document = Render(report);
+        JsonElement ratchet = Ratchet(document);
+
+        ratchet.ShouldSatisfyAllConditions(
+            () => ratchet.TryGetProperty("entries", out _)
+                .ShouldBeFalse(),
+            () => ratchet.TryGetProperty("oldest", out _)
+                .ShouldBeFalse());
+    }
+
     // The document as the verb writes it, over a clean load: nothing about the workspace is what these rows
     // are about, so the trust stamp is the empty one.
-    private static JsonDocument Render(CheckReport report)
+    private static JsonDocument Render(CheckReport report, BaselineAges? ages = null)
     {
         var output = new StringWriter();
         WorkspaceTrustStamp trust = WorkspaceTrustStamp.From(WorkspaceDiagnostics.None, "/repo");
 
-        StatusJsonRenderer.Render(output, report, "S.sln", "Spec.dll", [], trust);
+        StatusJsonRenderer.Render(output, report, ages ?? BaselineAges.Unavailable, "S.sln", "Spec.dll", [], trust);
         return JsonDocument.Parse(output.ToString());
     }
 

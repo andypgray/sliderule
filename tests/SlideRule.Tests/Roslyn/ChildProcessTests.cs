@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using Shouldly;
 using SlideRule.Roslyn.Hosting;
 using SlideRule.Tests.TestSupport;
@@ -63,6 +64,54 @@ public sealed class ChildProcessTests
             ChildProcess.RunAsync(Sleeper(), TimeSpan.FromMinutes(1), killTree: kill.Run, ct: cancel.Token));
 
         kill.Calls.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task RunAsync_InputLargerThanThePipes_IsWrittenWhileTheOutputDrains()
+    {
+        // Arrange — cat-file answers each line as it reads it, so its answers fill the stdout pipe long before
+        // it has read this much input, and the input itself is larger than the stdin pipe.
+        using TempDirectory repository = TestTempRoot.Fresh("child-process-input");
+        GitCommand.Run(repository.Path, "init");
+        string[] ids = Enumerable.Range(0, 4000)
+            .Select(index => index.ToString("x40", CultureInfo.InvariantCulture))
+            .ToArray();
+        var startInfo = new ProcessStartInfo("git")
+        {
+            CreateNoWindow = true,
+            ArgumentList = { "-C", repository.Path, "cat-file", "--batch" }
+        };
+
+        // Act — a write that waits for the reads deadlocks outside RunAsync's own bound, so the wait is bounded
+        // here, and a deadlock fails the test rather than hanging the run.
+        Task<ChildProcess.ProcessResult> run = ChildProcess.RunAsync(
+            startInfo, TimeSpan.FromSeconds(30), string.Concat(ids.Select(id => id + "\n")), ct: Ct);
+        ChildProcess.ProcessResult result = await run.WaitAsync(TimeSpan.FromMinutes(1), Ct);
+
+        // Assert
+        result.ExitCode.ShouldBe(0, result.StandardError);
+        result.StandardOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            .ShouldBe(ids.Select(id => $"{id} missing"));
+    }
+
+    [Fact]
+    public async Task RunAsync_ChildThatReadsNoneOfItsInput_ReturnsWhatItPrinted()
+    {
+        // Arrange — far more input than any pipe holds, to a command that never reads its stdin, so the write is
+        // still blocked when the child exits and closes its end.
+        var startInfo = new ProcessStartInfo("git")
+        {
+            CreateNoWindow = true,
+            ArgumentList = { "--version" }
+        };
+
+        // Act
+        ChildProcess.ProcessResult result = await ChildProcess.RunAsync(
+            startInfo, TimeSpan.FromSeconds(30), new string('x', 4 * 1024 * 1024), ct: Ct);
+
+        // Assert
+        result.ExitCode.ShouldBe(0, result.StandardError);
+        result.StandardOutput.ShouldStartWith("git version ");
     }
 
     // A child that is still asleep when each test's timeout or cancel fires, and ends on its own if no kill comes.

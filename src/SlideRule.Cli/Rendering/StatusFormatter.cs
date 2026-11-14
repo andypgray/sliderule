@@ -1,4 +1,6 @@
+using System.Globalization;
 using SlideRule.Checking;
+using SlideRule.Cli.Diff;
 using SlideRule.Internal;
 using SlideRule.Model;
 using SlideRule.Rendering;
@@ -9,12 +11,17 @@ namespace SlideRule.Cli.Rendering;
 ///     Formats a <see cref="CheckReport" /> as the human <c>status</c> report — one line per rule plus a
 ///     burndown summary.
 /// </summary>
-/// <remarks>Pure over the report (no workspace), so the line shapes are unit-pinned.</remarks>
+/// <remarks>
+///     Pure over the report, the entries' ages and the moment the ages are measured to (no workspace), so the line
+///     shapes are unit-pinned.
+/// </remarks>
 internal static class StatusFormatter
 {
-    public static IReadOnlyList<string> Lines(CheckReport report)
+    public static IReadOnlyList<string> Lines(CheckReport report, BaselineAges ages, DateTimeOffset now)
     {
-        List<string> lines = report.Results.SelectMany(RuleLines).ToList();
+        List<string> lines = report.Results
+            .SelectMany(result => RuleLines(result, ages, now))
+            .ToList();
         lines.Add(Summary(report));
         // After the summary, so a report with nothing orphaned prints exactly what it always printed.
         lines.AddRange(report.OrphanScan.Orphans.Select(BaselineOrphanWording.Line));
@@ -22,10 +29,11 @@ internal static class StatusFormatter
         return lines;
     }
 
-    // One line per rule, plus a sub-line where a family rule's remaining debt has somewhere to be and another
-    // where the rule was not measured in full and its row needs qualifying: the row is byte-for-byte the row it
-    // always was, and both sub-lines ride under it rather than inside it.
-    private static IEnumerable<string> RuleLines(RuleResult result)
+    // One line per rule, plus a sub-line where a family rule's remaining debt has somewhere to be, another
+    // where the rule was not measured in full and its row needs qualifying, and a last one saying how long its
+    // oldest remaining entry has stood. The sub-lines ride under the row rather than inside it, so the row's
+    // bytes are the same whether or not any of them is printed.
+    private static IEnumerable<string> RuleLines(RuleResult result, BaselineAges ages, DateTimeOffset now)
     {
         yield return RuleLine(result);
 
@@ -37,6 +45,49 @@ internal static class StatusFormatter
         if (UnmeasuredLine(result) is { } unmeasured) yield return unmeasured;
 
         if (CellsLine(result) is { } cells) yield return cells;
+
+        if (AgeLine(result, ages, now) is { } age) yield return age;
+    }
+
+    // The oldest remaining entry's age and recorder, or null for a rule with no remaining entry. One entry rather
+    // than all of them, because the oldest is the one a reader acts on and --json lists the rest. Entries of
+    // unknown age are counted beside a known oldest, and named by their reasons where none is known.
+    private static string? AgeLine(RuleResult result, BaselineAges ages, DateTimeOffset now)
+    {
+        if (result.GrandfatheredEntries.Count == 0) return null;
+
+        IReadOnlyList<DatedEntry> dated = ages.Date(result.Rule.Id, result.GrandfatheredEntries);
+        int unknown = dated.Count(entry => entry.Recorded is null);
+        if (dated[0].Recorded is not { } oldest)
+        {
+            IEnumerable<string> reasons = dated
+                .Select(entry => entry.Unknown)
+                .OfType<AgeUnknownReason>()
+                .Distinct()
+                .Order()
+                .Select(UnknownWording);
+            return $"  oldest entry: age unknown ({string.Join(", ", reasons)})";
+        }
+
+        // Calendar days from the printed date to today's, each on its own clock, so the count is the one a reader
+        // works out from the date beside it.
+        DateOnly recorded = DateOnly.FromDateTime(oldest.RecordedAt.DateTime);
+        int days = Math.Max(0, DateOnly.FromDateTime(now.DateTime).DayNumber - recorded.DayNumber);
+        var date = recorded.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        string unknownTail = unknown > 0 ? $", {unknown} of unknown age" : string.Empty;
+        return $"  oldest entry: {Plurals.Counted(days, "day")}, recorded by {oldest.RecordedBy} on {date}"
+               + unknownTail;
+    }
+
+    private static string UnknownWording(AgeUnknownReason reason)
+    {
+        return reason switch
+        {
+            AgeUnknownReason.NoHistory => "no git history",
+            AgeUnknownReason.ShallowClone => "shallow clone",
+            AgeUnknownReason.NotCommitted => "not committed",
+            _ => throw new ArgumentOutOfRangeException(nameof(reason), reason, null)
+        };
     }
 
     // The sub-line that qualifies the row of a ratcheted rule the run did not measure in full, or null for

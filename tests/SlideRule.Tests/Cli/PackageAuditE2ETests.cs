@@ -54,7 +54,7 @@ public sealed class PackageAuditE2ETests
                 };
 
         return CliResult.CapturedAsync((output, error) =>
-            new StatusRunner(output, error, source, new FakeEnvironment()).RunAsync(request, Ct));
+            new StatusRunner(output, error, source, new FakeEnvironment(), TimeProvider.System).RunAsync(request, Ct));
     }
 
     private static Task<CliResult> RunGraphAsync()

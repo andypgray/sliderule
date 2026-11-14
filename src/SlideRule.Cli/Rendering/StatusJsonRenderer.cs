@@ -1,6 +1,7 @@
 using System.Text.Json;
 using SlideRule.Baselines;
 using SlideRule.Checking;
+using SlideRule.Cli.Diff;
 using SlideRule.Model;
 
 namespace SlideRule.Cli.Rendering;
@@ -16,11 +17,12 @@ internal static class StatusJsonRenderer
 
     /// <summary>
     ///     Writes the burndown document as the run's stdout line; <paramref name="workspaceDiagnostics" /> is the
-    ///     rendered stream the caller composed.
+    ///     rendered stream the caller composed, and <paramref name="ages" /> dates the remaining entries.
     /// </summary>
     public static void Render(
         TextWriter output,
         CheckReport report,
+        BaselineAges ages,
         string solutionName,
         string specAssembly,
         IReadOnlyList<string> workspaceDiagnostics,
@@ -30,7 +32,9 @@ internal static class StatusJsonRenderer
             SchemaVersion: SchemaVersion,
             Solution: solutionName,
             SpecAssembly: specAssembly,
-            Rules: report.Results.Select(ToRule).ToList(),
+            Rules: report.Results
+                .Select(result => ToRule(result, ages))
+                .ToList(),
             PackageAudit: SlideRuleJson.OmitEmpty(trust.PackageAudit),
             WorkspaceDiagnostics: SlideRuleJson.OmitEmpty(workspaceDiagnostics),
             ModelIncomplete: trust.ModelIncomplete,
@@ -68,7 +72,7 @@ internal static class StatusJsonRenderer
             .ToList();
     }
 
-    private static StatusRuleJson ToRule(RuleResult result)
+    private static StatusRuleJson ToRule(RuleResult result, BaselineAges ages)
     {
         return new StatusRuleJson(
             result.Rule.Id,
@@ -76,16 +80,22 @@ internal static class StatusJsonRenderer
             result.Status,
             result.Violations.Count,
             result.Warnings.Count,
-            ToRatchet(result));
+            ToRatchet(result, ages));
     }
 
     // Every value is the model's own fact, the one the human status line reads too, so the two channels cannot
     // disagree about one run.
-    private static RatchetStatusJson? ToRatchet(RuleResult result)
+    private static RatchetStatusJson? ToRatchet(RuleResult result, BaselineAges ages)
     {
         if (result.Rule.BaselinePath is not { } path) return null;
 
         bool? promotable = result.Rule.Posture == Posture.Migrate ? result.Promotable : null;
+        IReadOnlyList<DatedEntry> dated = ages.Date(result.Rule.Id, result.GrandfatheredEntries);
+        EntryRecordJson? oldest = dated
+            .Select(entry => entry.Recorded)
+            .OfType<EntryRecord>()
+            .Select(record => new EntryRecordJson(record.RecordedAt, record.RecordedBy))
+            .FirstOrDefault();
         return new RatchetStatusJson(
             path,
             result.BaselineCaptured,
@@ -99,7 +109,17 @@ internal static class StatusJsonRenderer
             ToCells(result),
             SlideRuleJson.OmitFalse(result.SelectionMatchedNothing),
             SlideRuleJson.OmitEmpty(result.UntestedOperands),
-            SlideRuleJson.OmitEmpty(result.StricterOperands));
+            SlideRuleJson.OmitEmpty(result.StricterOperands),
+            SlideRuleJson.OmitEmpty(dated.Select(ToEntry).ToList()),
+            oldest);
+    }
+
+    private static RatchetEntryJson ToEntry(DatedEntry dated)
+    {
+        BaselineEntry entry = dated.Entry;
+        return new RatchetEntryJson(
+            entry.Source, entry.Target, entry.Subject, dated.Recorded?.RecordedAt, dated.Recorded?.RecordedBy,
+            dated.Unknown);
     }
 
     private static IReadOnlyList<RatchetCellJson>? ToCells(RuleResult result)

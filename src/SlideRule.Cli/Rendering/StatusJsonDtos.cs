@@ -1,4 +1,5 @@
 using SlideRule.Checking;
+using SlideRule.Cli.Diff;
 using SlideRule.Model;
 using SlideRule.Roslyn.Diagnostics;
 
@@ -86,6 +87,11 @@ internal sealed record StatusRuleJson(
 ///         read. Each operand is quoted as the check's warning quotes it, in operand order, and the cure rides
 ///         <c>check --json</c>: on the violation for an empty subject, and on the warning otherwise.
 ///     </para>
+///     <para>
+///         <paramref name="Entries" /> lists the entries behind <paramref name="Remaining" />, the dated ones oldest
+///         first, each with when it was recorded and by whom, as the baseline files' git history says.
+///         <paramref name="Oldest" /> is the first of them that has a date. Both are absent when nothing remains.
+///     </para>
 /// </remarks>
 internal sealed record RatchetStatusJson(
     string BaselinePath,
@@ -100,7 +106,25 @@ internal sealed record RatchetStatusJson(
     IReadOnlyList<RatchetCellJson>? Cells,
     bool? MatchedNothing,
     IReadOnlyList<string>? UntestedOperands,
-    IReadOnlyList<string>? StricterOperands);
+    IReadOnlyList<string>? StricterOperands,
+    IReadOnlyList<RatchetEntryJson>? Entries,
+    EntryRecordJson? Oldest);
+
+/// <summary>
+///     One remaining entry: its identity (<see cref="Source" /> and <see cref="Target" />, or <see cref="Subject" />),
+///     the committer date and author of the commit that recorded it, or <see cref="AgeUnknown" /> saying why the
+///     history gives neither.
+/// </summary>
+internal sealed record RatchetEntryJson(
+    string? Source,
+    string? Target,
+    string? Subject,
+    DateTimeOffset? RecordedAt,
+    string? RecordedBy,
+    AgeUnknownReason? AgeUnknown);
+
+/// <summary>When the oldest dated entry was recorded, and by whom.</summary>
+internal sealed record EntryRecordJson(DateTimeOffset RecordedAt, string RecordedBy);
 
 /// <summary>One cell's share of a family rule's remaining debt, as <see cref="RatchetCell" /> counts it.</summary>
 internal sealed record RatchetCellJson(string Name, int Remaining, int RemainingSites);

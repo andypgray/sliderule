@@ -42,6 +42,33 @@
             "remaining": 2,
             "remainingSites": 4
           }
+        ],
+        "entries": [
+          {
+            "source": "T:MyApp.Domain.OrderService",
+            "target": "T:MyApp.Web.HomeController",
+            "ageUnknown": "notCommitted"
+          },
+          {
+            "source": "T:MyApp.Domain.OrderService",
+            "target": "T:MyApp.Web.WebTextExtensions",
+            "ageUnknown": "notCommitted"
+          },
+          {
+            "source": "T:MyApp.Web.HomeController",
+            "target": "T:MyApp.Legacy.Billing.IBillingFacade",
+            "ageUnknown": "notCommitted"
+          },
+          {
+            "source": "T:MyApp.Web.InvoiceController",
+            "target": "T:MyApp.Legacy.Billing.BillingCalculator",
+            "ageUnknown": "notCommitted"
+          },
+          {
+            "source": "T:MyApp.Web.InvoiceController",
+            "target": "T:MyApp.Legacy.Billing.RoundingMode",
+            "ageUnknown": "notCommitted"
+          }
         ]
       }
     },
@@ -72,7 +99,14 @@
         "remainingSites": 2,
         "newViolations": 1,
         "stale": 0,
-        "promotable": false
+        "promotable": false,
+        "entries": [
+          {
+            "source": "T:MyApp.Web.InvoiceController",
+            "target": "T:System.Data.DataTable",
+            "ageUnknown": "notCommitted"
+          }
+        ]
       }
     },
     {
@@ -262,7 +296,13 @@
         "remainingSites": 1,
         "newViolations": 1,
         "stale": 0,
-        "promotable": false
+        "promotable": false,
+        "entries": [
+          {
+            "subject": "T:MyApp.Domain.OrderService",
+            "ageUnknown": "notCommitted"
+          }
+        ]
       }
     },
     {

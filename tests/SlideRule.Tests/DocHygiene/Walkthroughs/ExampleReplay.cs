@@ -5,6 +5,7 @@ using Microsoft.CodeAnalysis.Text;
 using Shouldly;
 using SlideRule.Baselines;
 using SlideRule.Checking;
+using SlideRule.Cli.Diff;
 using SlideRule.Cli.Pipeline;
 using SlideRule.Cli.Rendering;
 using SlideRule.Cli.Verbs;
@@ -137,9 +138,17 @@ internal static class ExampleReplay
         ScenarioRun unbaselined = Check(model, committed, BaselineIndex.Empty, directory, []);
         IReadOnlyList<string> unsupported = UnsupportedProjectsNotice.Relative(snapshot.LoadDiagnostics.UnsupportedProjects, directory);
 
+        // `status` dates the remaining baseline entries from the solution's git history, so the replay reads the
+        // same history.
+        IEnumerable<string> baselineFiles = model.Rules
+            .Select(rule => rule.BaselinePath)
+            .OfType<string>()
+            .Select(path => BaselineStore.ResolvePath(path, directory));
+        BaselineAges ages = await BaselineHistory.ReadAsync(directory, baselineFiles, CancellationToken.None);
+
         var run = new ExampleRun(
             solution.Name, directory, model, extracted.Governed, committed, tree, unbaselined, unsupported,
-            new Dictionary<string, ScenarioRun>(StringComparer.Ordinal), [], null, checkVerb, statusVerb);
+            new Dictionary<string, ScenarioRun>(StringComparer.Ordinal), [], null, checkVerb, statusVerb, ages);
 
         return new CommittedTree(run, extracted, edits, baselines);
     }
@@ -477,6 +486,7 @@ internal static class ExampleReplay
 /// <param name="Adoption">The day-zero steps, which only Meridian's adoption walkthrough takes.</param>
 /// <param name="CheckVerb">What <c>check --no-cache</c> printed over the committed tree.</param>
 /// <param name="StatusVerb">What <c>status --no-cache</c> printed over it.</param>
+/// <param name="Ages">The remaining entries' ages, as the solution's git history records them.</param>
 internal sealed record ExampleRun(
     string Example,
     string SolutionDirectory,
@@ -490,7 +500,8 @@ internal sealed record ExampleRun(
     IReadOnlyList<string> RenderLines,
     AdoptionRun? Adoption,
     CliResult CheckVerb,
-    CliResult StatusVerb)
+    CliResult StatusVerb,
+    BaselineAges Ages)
 {
     /// <summary>
     ///     What <c>check</c> prints over the committed tree: the unsupported-projects stamp, then the report.
@@ -500,7 +511,10 @@ internal sealed record ExampleRun(
     /// <summary>
     ///     What <c>status</c> prints over the committed tree: the unsupported-projects stamp, then the board.
     /// </summary>
-    internal string StatusPrinted => Stamped(UnsupportedProjectsNotice.StatusStamp, string.Join("\n", Tree.StatusLines));
+    internal string StatusPrinted => Stamped(UnsupportedProjectsNotice.StatusStamp, string.Join("\n", StatusLines));
+
+    /// <summary>The board <c>status</c> prints over the committed tree, its entries dated as of now.</summary>
+    internal IReadOnlyList<string> StatusLines => StatusFormatter.Lines(Tree.Plain, Ages, DateTimeOffset.Now);
 
     /// <summary>What <c>explain</c> prints for <paramref name="ruleId" />, with no trailing newline.</summary>
     internal string Explain(string ruleId)
@@ -550,9 +564,6 @@ internal sealed record ScenarioRun(CheckReport Plain, CheckReport Diff, string S
 
     /// <summary>The document a <c>Stop</c> hook writes when the diff-aware run passes with something to say.</summary>
     internal string StopHookDocument => HookReportRenderer.Document(DiffWithoutPasses, HookReportRenderer.StopEvent);
-
-    /// <summary>The board <c>status</c> prints.</summary>
-    internal IReadOnlyList<string> StatusLines => StatusFormatter.Lines(Plain);
 
     /// <summary>The block <c>check</c> prints for <paramref name="ruleId" />, which is also a test's failure message.</summary>
     internal string RuleBlock(string ruleId)

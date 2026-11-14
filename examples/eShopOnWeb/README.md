@@ -136,7 +136,7 @@ The verdict below covers only the projects this product can read, so a clean res
 Checked 19 rules: 18 passed, 0 failed, 1 skipped (0 violations, 0 warnings).
 ```
 
-`status` prints the burndown, one line per rule:
+`status` prints the burndown, one line per rule. Under each rule with debt left it also prints an `oldest entry:` line, giving that entry's age and who recorded it. The age comes from the clone's git history, so those lines are left out here:
 
 ```text
 1 project was not surveyed:
