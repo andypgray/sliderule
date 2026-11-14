@@ -15,10 +15,7 @@ namespace SlideRule.Cli.Replay;
 ///     so releasing it at handle scope would come too early — <see cref="Dispose" /> releases it at run scope
 ///     instead.
 /// </remarks>
-internal sealed class LazyCaptureReplaySource(
-    string binlogCopyPath,
-    IReadOnlyDictionary<string, IReadOnlyList<string>> otherLanguageReferences)
-    : ISolutionSource, IDisposable
+internal sealed class LazyCaptureReplaySource(UsableCapture capture) : ISolutionSource, IDisposable
 {
     private ReplayedSolution? _replayed;
 
@@ -43,8 +40,7 @@ internal sealed class LazyCaptureReplaySource(
         ReplayedSolution replayed;
         try
         {
-            replayed = await BinlogReplayer.ReplayAsync(
-                binlogCopyPath, solutionPath, diagnostics.Add, otherLanguageReferences, ct);
+            replayed = await BinlogReplayer.ReplayAsync(capture, solutionPath, diagnostics.Add, ct);
         }
         // Cancellation is the caller's, not a bad capture: let it propagate rather than be reported as a
         // replay failure that would send the gate off to re-run the whole thing cold.

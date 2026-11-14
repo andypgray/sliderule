@@ -20,33 +20,36 @@ internal enum CaptureState
 }
 
 /// <summary>
-///     The result of <see cref="BinlogCaptureStore.Validate" />. <see cref="BinlogCopyPath" /> and
-///     <see cref="OtherLanguageReferences" /> are set only on <see cref="CaptureState.Usable" /> (the copy to replay,
-///     and the other-language references its replay takes in place of a second read); <see cref="Notice" /> only on
-///     <see cref="CaptureState.Invalid" /> — a complete user-facing line, carrying no <c>warning: </c> prefix
-///     of its own.
+///     A capture fit to replay: the binlog copy, and the other-language references recorded at ingest, keyed by the
+///     referring project file.
 /// </summary>
-internal sealed record CaptureValidation(
-    CaptureState State,
-    string? BinlogCopyPath,
-    IReadOnlyDictionary<string, IReadOnlyList<string>>? OtherLanguageReferences,
-    string? Notice)
+internal sealed record UsableCapture(
+    string BinlogCopyPath,
+    IReadOnlyDictionary<string, IReadOnlyList<string>> OtherLanguageReferences);
+
+/// <summary>
+///     The result of <see cref="BinlogCaptureStore.Validate" />. <see cref="Capture" /> is set only on
+///     <see cref="CaptureState.Usable" />; <see cref="Notice" /> only on <see cref="CaptureState.Invalid" /> — a
+///     complete user-facing line, carrying no <c>warning: </c> prefix of its own.
+/// </summary>
+internal sealed record CaptureValidation(CaptureState State, UsableCapture? Capture, string? Notice)
 {
     internal static CaptureValidation Absent()
     {
-        return new CaptureValidation(CaptureState.Absent, null, null, null);
+        return new CaptureValidation(CaptureState.Absent, null, null);
     }
 
     internal static CaptureValidation Usable(string binlogCopyPath, IReadOnlyList<CaptureReferenceEntry> references)
     {
         Dictionary<string, IReadOnlyList<string>> byProject = references.ToDictionary(
             entry => entry.ProjectFilePath, entry => entry.References, PathComparison.Comparer);
-        return new CaptureValidation(CaptureState.Usable, binlogCopyPath, byProject, null);
+        var capture = new UsableCapture(binlogCopyPath, byProject);
+        return new CaptureValidation(CaptureState.Usable, capture, null);
     }
 
     internal static CaptureValidation Invalid(string notice)
     {
-        return new CaptureValidation(CaptureState.Invalid, null, null, notice);
+        return new CaptureValidation(CaptureState.Invalid, null, notice);
     }
 }
 
@@ -179,9 +182,8 @@ internal sealed class BinlogCaptureStore
     }
 
     /// <summary>
-    ///     Sanity-checks <paramref name="replayedSolution" />, just replayed from the absolute
-    ///     <paramref name="binlogFullPath" />, and if it passes persists the capture with
-    ///     <paramref name="otherLanguageReferences" />, the replay's
+    ///     Sanity-checks <paramref name="replayed" />, just replayed from the absolute
+    ///     <paramref name="binlogFullPath" />, and if it passes persists the capture with its
     ///     <see cref="ReplayedSolution.OtherLanguageReferences" />, returning false when a best-effort I/O step
     ///     failed. Refusals quote <paramref name="binlogArgument" />, the user's as-typed <c>--binlog</c> value,
     ///     verbatim.
@@ -191,8 +193,7 @@ internal sealed class BinlogCaptureStore
     ///     configuration builds, or contains one the solution does not declare.
     /// </exception>
     public bool Ingest(
-        Solution replayedSolution, IReadOnlyDictionary<string, IReadOnlyList<string>> otherLanguageReferences,
-        string binlogFullPath, string binlogArgument, CancellationToken ct = default)
+        ReplayedSolution replayed, string binlogFullPath, string binlogArgument, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(binlogFullPath);
         ArgumentException.ThrowIfNullOrWhiteSpace(binlogArgument);
@@ -203,12 +204,13 @@ internal sealed class BinlogCaptureStore
         if (SolutionProjectFileParser.IsFilterFormat(solutionPath))
             throw new UserErrorException(SolutionFilterNotSupportedMessage(Path.GetFileName(solutionPath)));
 
+        Solution replayedSolution = replayed.Solution;
         IReadOnlyList<ProjectInputs> inputs = CollectProjects(replayedSolution);
         IReadOnlyList<ForeignProjectInputs> foreignInputs = SolutionProjects.CollectForeign(replayedSolution, static (_, _) => true);
         IReadOnlyList<string> structuralPaths = ProjectCone.SolutionStructuralPaths(solutionPath, inputs, foreignInputs);
         List<CaptureProjectEntry> projects = inputs.Select(ToEntry).ToList();
         List<CaptureForeignProjectEntry> foreignProjects = foreignInputs.Select(ToForeignEntry).ToList();
-        List<CaptureReferenceEntry> references = otherLanguageReferences
+        List<CaptureReferenceEntry> references = replayed.OtherLanguageReferences
             .Select(pair => new CaptureReferenceEntry(pair.Key, pair.Value))
             .OrderBy(entry => entry.ProjectFilePath, StringComparer.Ordinal)
             .ToList();

@@ -26,9 +26,9 @@ namespace SlideRule.Roslyn.Replay;
 ///         caller must register MSBuildLocator before replaying or the parser fails to load.
 ///     </para>
 ///     <para>
-///         Replaying analyzers/generators executes the build's own analyzer assemblies from their
-///         on-disk paths (see <see cref="ReplayAsync" /> for the analyzer-host choice) — the same trust
-///         boundary as building the solution in the first place.
+///         Replaying analyzers/generators executes the build's own analyzer assemblies from their on-disk paths
+///         (see <see cref="ReplayAsync(string, string?, Action{string}?, CancellationToken)" /> for the analyzer-host
+///         choice) — the same trust boundary as building the solution in the first place.
 ///     </para>
 /// </remarks>
 internal static class BinlogReplayer
@@ -51,12 +51,6 @@ internal static class BinlogReplayer
     ///     Optional sink for replay diagnostics that do not abort the load, on <see cref="WorkspaceLoader" />'s
     ///     <c>diagnosticLog</c> contract.
     /// </param>
-    /// <param name="recordedOtherLanguageReferences">
-    ///     The other-language project references a build capture recorded for this binlog, keyed by the referring
-    ///     project file, as <see cref="ReplayedSolution.OtherLanguageReferences" /> reported them at ingest. Given,
-    ///     the replay reads the binlog once and takes the references from here; null, it reads them off the
-    ///     build's evaluations in a second read that overlaps the first.
-    /// </param>
     /// <param name="ct">
     ///     Honoured on a best-effort basis around the synchronous binlog reads, and in full by the compilations the
     ///     cross-language check makes.
@@ -67,12 +61,33 @@ internal static class BinlogReplayer
     ///     when the binlog holds no replayable C# compiler invocation; whatever the reader raises for an
     ///     unreadable, corrupt or non-binlog file propagates unwrapped. The analyzer host is
     ///     <see cref="BasicAnalyzerKind.OnDisk" />, the shape the <c>MSBuildWorkspace</c> path itself produces;
-    ///     the differential fidelity test gates that choice.
+    ///     the differential fidelity test gates that choice. The other-language project references are read off the
+    ///     build's evaluations in a second read of the binlog that overlaps the first.
     /// </remarks>
-    public static async Task<ReplayedSolution> ReplayAsync(
-        string binlogPath, string? solutionPath, Action<string>? diagnosticSink = null,
-        IReadOnlyDictionary<string, IReadOnlyList<string>>? recordedOtherLanguageReferences = null,
+    public static Task<ReplayedSolution> ReplayAsync(
+        string binlogPath, string? solutionPath, Action<string>? diagnosticSink = null, CancellationToken ct = default)
+    {
+        return ReplayCoreAsync(binlogPath, solutionPath, diagnosticSink, recordedOtherLanguageReferences: null, ct);
+    }
+
+    /// <summary>
+    ///     Replays <paramref name="capture" />'s binlog copy as
+    ///     <see cref="ReplayAsync(string, string?, Action{string}?, CancellationToken)" /> replays a binlog, reading
+    ///     it once: the other-language project references come from the references the capture recorded at ingest,
+    ///     which spares the second read.
+    /// </summary>
+    public static Task<ReplayedSolution> ReplayAsync(
+        UsableCapture capture, string? solutionPath, Action<string>? diagnosticSink = null,
         CancellationToken ct = default)
+    {
+        return ReplayCoreAsync(
+            capture.BinlogCopyPath, solutionPath, diagnosticSink, capture.OtherLanguageReferences, ct);
+    }
+
+    // A null recordedOtherLanguageReferences reads them off the binlog in a second read beside the reader's own.
+    private static async Task<ReplayedSolution> ReplayCoreAsync(
+        string binlogPath, string? solutionPath, Action<string>? diagnosticSink,
+        IReadOnlyDictionary<string, IReadOnlyList<string>>? recordedOtherLanguageReferences, CancellationToken ct)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(binlogPath);
         if (!File.Exists(binlogPath))

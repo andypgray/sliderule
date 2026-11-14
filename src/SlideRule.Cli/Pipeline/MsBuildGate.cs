@@ -177,8 +177,7 @@ internal static class MsBuildGate
             }
 
             if (capture.State == CaptureState.Usable)
-                return await RunCaptureReplayAsync(
-                    capture.BinlogCopyPath!, capture.OtherLanguageReferences!, solution, error, hostSource, invokeRunner);
+                return await RunCaptureReplayAsync(capture.Capture!, solution, error, hostSource, invokeRunner);
             if (capture.State == CaptureState.Invalid)
                 return await RunNoticeColdAsync(capture.Notice!, solution, error, hostSource, invokeRunner);
         }
@@ -224,8 +223,7 @@ internal static class MsBuildGate
                 if (!request.NoCache)
                 {
                     string? cacheRoot = environment.CacheRootOverride();
-                    new BinlogCaptureStore(solutionPath, cacheRoot).Ingest(
-                        replayed.Solution, replayed.OtherLanguageReferences, binlogFullPath, binlog, ct);
+                    new BinlogCaptureStore(solutionPath, cacheRoot).Ingest(replayed, binlogFullPath, binlog, ct);
                 }
 
                 return replayed;
@@ -243,13 +241,12 @@ internal static class MsBuildGate
     // (MSBuildLocator is already registered from the up-front call); the two runner invocations build independent
     // runners and the failed one wrote nothing, so the retry cannot double-render.
     private static async Task<int> RunCaptureReplayAsync(
-        string binlogCopyPath, IReadOnlyDictionary<string, IReadOnlyList<string>> otherLanguageReferences,
-        string solutionPath, TextWriter error, ISolutionSource hostSource,
+        UsableCapture capture, string solutionPath, TextWriter error, ISolutionSource hostSource,
         Func<string?, ISolutionSource, Task<int>> invokeRunner)
     {
         Record(GateAcquisition.CaptureReplay);
 
-        using var source = new LazyCaptureReplaySource(binlogCopyPath, otherLanguageReferences);
+        using var source = new LazyCaptureReplaySource(capture);
         try
         {
             return await invokeRunner(solutionPath, source);
